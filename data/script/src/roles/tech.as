@@ -936,14 +936,15 @@ namespace RoleTech
 		IUnitTask @defaultTask = Builder::MakeDefaultTaskWithLog(u.id, "TECH");
 		// If the default task is a BUILDER and its build type is MEX/MEXUP/GEO/GEOUP, don't override it; return immediately.
 		{
-			if (defaultTask !is null && defaultTask.GetType() == Task::Type::BUILDER)
+			IBuilderTask @defaultBuilderTask = cast<IBuilderTask>(defaultTask);
+			if (defaultBuilderTask !is null)
 			{
-				Task::BuildType dbt = Task::BuildType(defaultTask.GetBuildType());
+				Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
 
 				// Special handling for MEXUP: only allow if we built the underlying MEX
 				if (dbt == Task::BuildType::MEXUP)
 				{
-					if (Economy::MexTracker::IsOwnedMex(defaultTask.GetBuildPos()))
+					if (Economy::MexTracker::IsOwnedMex(defaultBuilderTask.GetBuildPos()))
 					{
 						GenericHelpers::LogUtil("[TECH] defaultTask (BUILDER) is MEXUP for owned MEX; upgrading immediately.", 3);
 						string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
@@ -951,7 +952,7 @@ namespace RoleTech
 						CCircuitDef @upgradeDef = ai.GetCircuitDef(t2MexName);
 						if (upgradeDef !is null)
 						{
-							return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, upgradeDef, defaultTask.GetBuildPos(), -1));
+							return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, upgradeDef, defaultBuilderTask.GetBuildPos(), -1));
 						}
 						// return defaultTask;
 					}
@@ -1118,10 +1119,11 @@ namespace RoleTech
 		if (task is null)
 			return;
 
-		if (task !is null && task.GetType() == Task::Type::BUILDER && Task::BuildType(task.GetBuildType()) == Task::BuildType::MEXUP)
+		IBuilderTask @builderTask = cast<IBuilderTask>(task);
+		if (builderTask !is null && Task::BuildType(builderTask.GetBuildType()) == Task::BuildType::MEXUP)
 		{
 			GenericHelpers::LogUtil("[TECH] AiTaskAdded: detected MEX upgrade task, tracking it", 2);
-			Economy::MexTracker::MarkUpgradeInProgress(task.GetBuildPos(), true);
+			Economy::MexTracker::MarkUpgradeInProgress(builderTask.GetBuildPos(), true);
 		}
 	}
 
@@ -1131,22 +1133,23 @@ namespace RoleTech
 		if (task is null)
 			return;
 
-		if (task.GetType() == Task::Type::BUILDER)
+		IBuilderTask @builderTask = cast<IBuilderTask>(task);
+		if (builderTask !is null)
 		{
-			Task::BuildType bt = Task::BuildType(task.GetBuildType());
+			Task::BuildType bt = Task::BuildType(builderTask.GetBuildType());
 
 			// Track completed MEX builds to own them for future upgrades
 			if (done && bt == Task::BuildType::MEX)
 			{
-				Economy::MexTracker::RegisterMex(task.GetBuildPos());
+				Economy::MexTracker::RegisterMex(builderTask.GetBuildPos());
 			}
 
 			if (bt == Task::BuildType::MEXUP)
 			{
-				Economy::MexTracker::MarkUpgradeInProgress(task.GetBuildPos(), false);
+				Economy::MexTracker::MarkUpgradeInProgress(builderTask.GetBuildPos(), false);
 				if (done)
 				{
-					Economy::MexTracker::MarkUpgraded(task.GetBuildPos());
+					Economy::MexTracker::MarkUpgraded(builderTask.GetBuildPos());
 				}
 				GenericHelpers::LogUtil("[TECH] AiTaskRemoved: detected MEX upgrade task, removing it", 2);
 			}

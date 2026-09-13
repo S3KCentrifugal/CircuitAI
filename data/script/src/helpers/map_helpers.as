@@ -42,8 +42,10 @@ namespace MapHelpers {
     bool IsUnitInRangeOfTask(CCircuitUnit@ unit, IUnitTask@ task, float range)
     {
         if (unit is null || task is null) return false;
+        IBuilderTask@ builderTask = cast<IBuilderTask>(task);
+        if (builderTask is null) return false;
         const AIFloat3 upos = unit.GetPos(ai.frame);
-        const AIFloat3 tpos = task.GetBuildPos();
+        const AIFloat3 tpos = builderTask.GetBuildPos();
         return IsInRange(upos, tpos, range);
     }
 }

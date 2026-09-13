@@ -282,13 +282,13 @@ namespace Builder {
 		defName = "";
 		buildTypeVal = -1;
 		if (t is null) return;
-		Task::Type ttype = Task::Type(t.GetType());
-		if (ttype != Task::Type::BUILDER) return;
-		int btVal = t.GetBuildType();
+		IBuilderTask@ builderTask = cast<IBuilderTask>(t);
+		if (builderTask is null) return;
+		int btVal = builderTask.GetBuildType();
 		buildTypeVal = btVal;
 		Task::BuildType bt = Task::BuildType(btVal);
 		if (!_IsConstructionBuildType(bt)) return;
-		CCircuitDef@ d = t.GetBuildDef();
+		CCircuitDef@ d = builderTask.buildDef;
 		if (d !is null) defName = d.GetName();
 	}
 
@@ -463,8 +463,9 @@ namespace Builder {
 			return;
 		}
 		// Only cache actual construction tasks; skip guard/assist/reclaim/repair/patrol/combat/wait
-		if (task.GetType() != Task::Type::BUILDER) return;
-		Task::BuildType bt = Task::BuildType(task.GetBuildType());
+		IBuilderTask@ builderTask = cast<IBuilderTask>(task);
+		if (builderTask is null) return;
+		Task::BuildType bt = Task::BuildType(builderTask.GetBuildType());
 		if (!_IsConstructionBuildType(bt)) return;
 		builderCurrentTasks.set(key, @task);
 	}
@@ -1987,10 +1988,11 @@ namespace Builder {
 		Task::BuildType buildType = Task::BuildType(track is null ? -1 : track.buildTypeVal);
 
 		bool hasBuildDef = (buildDefName.length() > 0);
-		if (!hasBuildDef && task !is null && task.GetType() == Task::Type::BUILDER) {
-			CCircuitDef@ buildDef = task.GetBuildDef();
+		IBuilderTask@ builderTask = cast<IBuilderTask>(task);
+		if (!hasBuildDef && builderTask !is null) {
+			CCircuitDef@ buildDef = builderTask.buildDef;
 			buildDefName = (buildDef is null ? "" : buildDef.GetName());
-			buildType = Task::BuildType(task.GetBuildType());
+			buildType = Task::BuildType(builderTask.GetBuildType());
 			hasBuildDef = (buildDefName.length() > 0);
 		}
 
@@ -2135,10 +2137,11 @@ namespace Builder {
 		string bname = (tr is null ? "" : tr.defName);
 		Task::BuildType bt = Task::BuildType(tr is null ? -1 : tr.buildTypeVal);
 		bool have = (bname.length() > 0);
-		if (!have && task !is null && task.GetType() == Task::Type::BUILDER) {
-			CCircuitDef@ buildDef = task.GetBuildDef();
+		IBuilderTask@ builderTask = cast<IBuilderTask>(task);
+		if (!have && builderTask !is null) {
+			CCircuitDef@ buildDef = builderTask.buildDef;
 			bname = (buildDef is null ? "" : buildDef.GetName());
-			bt = Task::BuildType(task.GetBuildType());
+			bt = Task::BuildType(builderTask.GetBuildType());
 			have = (bname.length() > 0);
 		}
 		GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: resolved def='" + bname + "' buildType=" + int(bt), 4);

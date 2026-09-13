@@ -880,8 +880,9 @@ namespace RoleAir {
         if (udef is null) return defaultTask;
 
         // Early return: if the default task represents a resource expansion (MEX/GEO variants), keep it.
-        if (defaultTask !is null && defaultTask.GetType() == Task::Type::BUILDER) {
-            Task::BuildType dbt = Task::BuildType(defaultTask.GetBuildType());
+        IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
+        if (defaultBuilderTask !is null) {
+            Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
             if (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP ||
                 dbt == Task::BuildType::GEO || dbt == Task::BuildType::GEOUP ||
                 dbt == Task::BuildType::ENERGY) {

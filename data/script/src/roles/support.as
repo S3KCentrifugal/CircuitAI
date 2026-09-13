@@ -165,8 +165,9 @@ namespace RoleSupport {
         if (udef is null) return defaultTask;
 
         // If the default task is a BUILDER and its build type is MEX/MEXUP/GEO/GEOUP, don't override it; return immediately.
-        if (defaultTask !is null && defaultTask.GetType() == Task::Type::BUILDER) {
-            Task::BuildType dbt = Task::BuildType(defaultTask.GetBuildType());
+        IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
+        if (defaultBuilderTask !is null) {
+            Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
             if (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP ||
                 dbt == Task::BuildType::GEO || dbt == Task::BuildType::GEOUP ||
                 dbt == Task::BuildType::ENERGY) {
