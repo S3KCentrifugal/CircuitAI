@@ -74,23 +74,43 @@ local options = {
 		name    = 'Difficulty profile',
 		desc    = 'Difficulty or play-style of AI (see init.as).\nkey: profile',
 		type    = 'list',
-		def     = 'hard',
+		def     = 'experimental_balanced',
 		items   = {
--- 			{
--- 				key  = 'hard',
--- 				name = 'Hard | Balanced',
--- 				desc = 'Difficulty: Hard |Playstyle: Balanced |Made by Flaka',
--- 			},
--- 			{
--- 				key  = 'medium',
--- 				name = 'Medium | Lazy',
--- 				desc = 'Difficulty: Medium |Playstyle: Learning mechanics',
--- 			},
--- 			{
--- 				key  = 'easy',
--- 				name = 'Easy | Slow',
--- 				desc = 'Difficulty: Easy |Playstyle: First launch',
--- 			},
+			{
+				key  = 'experimental_terrible',
+				name = 'Everything is Terrible',
+				desc = 'Difficulty: Experimental |Playstyle: Role Based',
+			},
+			{
+				key  = 'experimental_hard',
+				name = 'Experimental | Hard',
+				desc = 'Difficulty: Experimental |Playstyle: Role Based',
+			},
+			{
+				key  = 'experimental_balanced',
+				name = 'Experimental | Balanced',
+				desc = 'Difficulty: Experimental |Playstyle: Role Based| Made by Centrifugal',
+			},
+			{
+				key  = 'hard_aggressive',
+				name = 'Hard | Aggressive',
+				desc = 'Difficulty: Hard |Playstyle: Balanced |Made by Flaka',
+			},
+			{
+				key  = 'hard',
+				name = 'Hard | Balanced',
+				desc = 'Difficulty: Hard |Playstyle: Balanced |Made by Flaka',
+			},
+			{
+				key  = 'medium',
+				name = 'Medium | Lazy',
+				desc = 'Difficulty: Medium |Playstyle: Learning mechanics',
+			},
+			{
+				key  = 'easy',
+				name = 'Easy | Slow',
+				desc = 'Difficulty: Easy |Playstyle: First launch',
+			},
 			{
 				key  = 'dev',
 				name = 'Testing AI',

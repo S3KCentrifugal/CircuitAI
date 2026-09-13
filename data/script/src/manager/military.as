@@ -1,0 +1,395 @@
+#include "../define.as"
+#include "../unit.as"
+#include "../helpers/generic_helpers.as"
+
+namespace Military {
+
+	// ==================== Hooks (config / role-driven) ====================
+
+	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
+	{
+		IUnitTask@ t = null;
+
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if (cfg !is null && cfg.MilitaryAiMakeTaskHandler !is null) {
+			@t = cfg.MilitaryAiMakeTaskHandler(u);
+		}
+		else {
+			@t = aiMilitaryMgr.DefaultMakeTask(u);
+		}
+
+		return t;
+	}
+
+	void AiTaskAdded(IUnitTask@ task)
+	{
+
+	}
+
+	void AiTaskRemoved(IUnitTask@ task, bool done)
+	{
+		// if (done == false) {
+		// 	SmrtLog("SMRT: AiTaskRemoved " + task);
+		// }
+		
+	}
+
+	void AiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
+	{
+		// Delegate to role-specific handler if registered
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if (cfg !is null && cfg.MilitaryAiUnitAdded !is null) {
+			cfg.MilitaryAiUnitAdded(unit, usage);
+		}
+	}
+
+	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
+	{
+		// Delegate to role-specific handler if registered
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if (cfg !is null && cfg.MilitaryAiUnitRemoved !is null) {
+			cfg.MilitaryAiUnitRemoved(unit, usage);
+		}
+	}
+
+	void AiLoad(IStream& istream)
+	{
+	}
+
+	void AiSave(OStream& ostream)
+	{
+	}
+
+	void AiMakeDefence(int cluster, const AIFloat3& in pos)
+	{
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if(cfg !is null && cfg.AiMakeDefenceHandler !is null) {
+			cfg.AiMakeDefenceHandler(cluster, pos);
+		} else {
+			if ((ai.frame > 10 * MINUTE)
+			|| (aiEconomyMgr.metal.income > 10.f)
+			|| (aiEnemyMgr.mobileThreat > 0.f))
+			{
+				GenericHelpers::LogUtil("Military::AiMakeDefence", 4);
+				aiMilitaryMgr.DefaultMakeDefence(cluster, pos);
+			}
+		}
+		//AiLog("SMRT: Frame - " + ai.frame);
+		// if ((ai.frame > 10 * MINUTE)
+		// 	|| (aiEconomyMgr.metal.income > 10.f)
+		// 	|| (aiEnemyMgr.mobileThreat > 0.f))
+		// {
+		// 	GenericHelpers::LogUtil("Military::AiMakeDefence", 4);
+		// 	aiMilitaryMgr.DefaultMakeDefence(cluster, pos);
+		// }
+	}
+
+	/*
+	* anti-air threat threshold;
+	* air factories will stop production when AA threat exceeds
+	*/
+	// FIXME: Remove/replace, deprecated.
+	bool AiIsAirValid()
+	{
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if(cfg !is null && cfg.AiIsAirValidHandler !is null) {
+			return cfg.AiIsAirValidHandler();
+		} else {
+			float aaThreat = aiEnemyMgr.GetEnemyThreat(uint(Unit::Role::AA.type));
+			if (aaThreat > 1e12f) aaThreat = 0.f; // Sanitize garbage
+			bool isAirValid = aaThreat <= 90000.f;
+			GenericHelpers::LogUtil("AiIsAirValid: " + isAirValid, 2);
+			return isAirValid;
+		}	
+	}
+
+	// ==================== Enemy Threat Layer Cache & Helpers ====================
+
+	// Cached per-layer threats and weights, updated periodically from Main::AiUpdate.
+	float g_cachedTotalAirThreat    = 0.f;
+	float g_cachedTotalSurfaceThreat = 0.f;
+	float g_cachedTotalWaterThreat  = 0.f;
+	float g_cachedAirWeight         = 0.f;
+	float g_cachedSurfaceWeight     = 0.f;
+	float g_cachedWaterWeight       = 0.f;
+
+	// Cached per-role threats used by higher-level logic (optional, but prepared here for reuse).
+	dictionary g_cachedRoleThreats; // key: string roleName, value: float threat
+
+	// ==================== Enemy Cost Cache ====================
+
+	// Cached per-role enemy costs and aggregated layer costs.
+	dictionary g_cachedRoleCosts;    // key: string roleName, value: float cost
+	float g_cachedTotalAirCost      = 0.f;
+	float g_cachedTotalSurfaceCost  = 0.f;
+	float g_cachedTotalWaterCost    = 0.f;
+
+	// Derived, cached enemy surface metrics for use by roles (to avoid recomputing in each role).
+	float g_cachedEnemySurfaceCostPerPlayer = 0.f;
+	float g_cachedEnemyAirCostPerPlayer     = 0.f;
+	float g_cachedEnemyWaterCostPerPlayer   = 0.f;
+	int   g_cachedEnemyPlayerCount          = 1;
+
+	// Update the cached enemy threat information for roles and layers.
+	// Intended to be called every ~10 seconds from Main::AiUpdate to amortize expensive queries.
+	void UpdateEnemyThreatCache()
+	{
+		g_cachedRoleThreats.deleteAll();
+
+		float mobileThreat = aiEnemyMgr.mobileThreat;
+		if (!(mobileThreat == mobileThreat) || mobileThreat < 0.f) {
+			mobileThreat = 0.f;
+		} else if (mobileThreat > 1e12f) {
+			// Clamp garbage large values
+			mobileThreat = 0.f;
+		} else if (mobileThreat > 0.f && mobileThreat < 1e-38f) {
+			// Clamp denormals to zero
+			mobileThreat = 0.f;
+		}
+		GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: start (frame=" + ai.frame + " mobileThreat=" + mobileThreat + ")", 3);
+
+		// Helper lambda-like local function via manual loop for each known role in behaviour.
+		array<string> roles;
+		roles.insertLast("anti_air");
+		roles.insertLast("air");
+		roles.insertLast("bomber");
+		// Surface roles as defined in FactoryProduction::SURFACE_ROLES
+		for (uint i = 0; i < FactoryProduction::SURFACE_ROLES.length(); ++i) {
+			roles.insertLast(FactoryProduction::SURFACE_ROLES[i]);
+		}
+		roles.insertLast("sub");
+		roles.insertLast("anti_sub");
+
+		// Use the same roleMaskCache built by FactoryProduction for consistency.
+		// We access it fully qualified to avoid relying on unqualified globals.
+		int maskVal = 0;
+		for (uint i = 0; i < roles.length(); ++i) {
+			const string roleName = roles[i];
+			float threat = 0.f;
+			if (FactoryProduction::roleMaskCache.get(roleName, maskVal)) {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: querying role '" + roleName + "' mask=" + maskVal, 4);
+				
+				if (maskVal != 0) {
+					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: role '" + roleName + "' maskVal=" + maskVal, 4);
+					threat = aiEnemyMgr.GetEnemyThreat(uint(maskVal));
+					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: threat retrieved=" + threat, 4);
+				} else {
+					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: Skipping invalid maskVal=" + maskVal + " for role " + roleName, 2);
+				}
+			}
+			// Sanitize threat from enemy manager
+			if (!(threat == threat) || threat < 0.f) {
+				threat = 0.f;
+			} else if (threat > 1e12f) {
+				// Clamp garbage large values
+				threat = 0.f;
+			} else if (threat > 0.f && threat < 1e-38f) {
+				// Clamp denormals to zero to avoid pathological floats
+				threat = 0.f;
+			}
+			
+			GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: setting dictionary for " + roleName, 4);
+			g_cachedRoleThreats.set(roleName, threat);
+			GenericHelpers::LogUtil("[Military] Threat cache role '" + roleName + "' = " + threat, 4);
+		}
+
+		// Aggregate into layers using the cached role threats
+		g_cachedTotalAirThreat     = 0.f;
+		g_cachedTotalSurfaceThreat = 0.f;
+		g_cachedTotalWaterThreat   = 0.f;
+
+		// Air: anti-air + air + bomber
+		g_cachedTotalAirThreat += GetCachedRoleThreat("anti_air");
+		g_cachedTotalAirThreat += GetCachedRoleThreat("air");
+		g_cachedTotalAirThreat += GetCachedRoleThreat("bomber");
+
+		// Surface: assault/skirm/riot/artillery/heavy/super/raider/support/builder
+		for (uint i = 0; i < FactoryProduction::SURFACE_ROLES.length(); ++i) {
+			g_cachedTotalSurfaceThreat += GetCachedRoleThreat(FactoryProduction::SURFACE_ROLES[i]);
+		}
+
+		// Water: submarines + anti-submarines
+		g_cachedTotalWaterThreat += GetCachedRoleThreat("sub");
+		g_cachedTotalWaterThreat += GetCachedRoleThreat("anti_sub");
+
+		// Sanitize aggregates
+		if (!(g_cachedTotalAirThreat == g_cachedTotalAirThreat) || g_cachedTotalAirThreat < 0.f) {
+			g_cachedTotalAirThreat = 0.f;
+		}
+		if (!(g_cachedTotalSurfaceThreat == g_cachedTotalSurfaceThreat) || g_cachedTotalSurfaceThreat < 0.f) {
+			g_cachedTotalSurfaceThreat = 0.f;
+		}
+		if (!(g_cachedTotalWaterThreat == g_cachedTotalWaterThreat) || g_cachedTotalWaterThreat < 0.f) {
+			g_cachedTotalWaterThreat = 0.f;
+		}
+
+		float totalLayerThreat = g_cachedTotalAirThreat + g_cachedTotalSurfaceThreat + g_cachedTotalWaterThreat;
+		if (!(totalLayerThreat == totalLayerThreat) || totalLayerThreat <= 0.f) {
+			totalLayerThreat = 1.f;
+		}
+		g_cachedAirWeight     = g_cachedTotalAirThreat     / totalLayerThreat;
+		g_cachedSurfaceWeight = g_cachedTotalSurfaceThreat / totalLayerThreat;
+		g_cachedWaterWeight   = g_cachedTotalWaterThreat   / totalLayerThreat;
+
+		GenericHelpers::LogUtil(
+			"[Military] Threat cache aggregates | air=" + g_cachedTotalAirThreat +
+			" surface=" + g_cachedTotalSurfaceThreat +
+			" water=" + g_cachedTotalWaterThreat +
+			" | weights air=" + g_cachedAirWeight +
+			" surface=" + g_cachedSurfaceWeight +
+			" water=" + g_cachedWaterWeight,
+			3
+		);
+	}
+
+	// Update the cached enemy cost information for roles and layers.
+	// Intended to be called every ~10 seconds from Main::AiUpdate to amortize expensive queries.
+	void UpdateEnemyCostCache()
+	{
+		g_cachedRoleCosts.deleteAll();
+		GenericHelpers::LogUtil("[Military] UpdateEnemyCostCache: start (frame=" + ai.frame + ")", 3);
+
+		array<string> roles;
+		roles.insertLast("anti_air");
+		roles.insertLast("air");
+		roles.insertLast("bomber");
+		// Surface roles as defined in FactoryProduction::SURFACE_ROLES
+		for (uint i = 0; i < FactoryProduction::SURFACE_ROLES.length(); ++i) {
+			roles.insertLast(FactoryProduction::SURFACE_ROLES[i]);
+		}
+		roles.insertLast("sub");
+		roles.insertLast("anti_sub");
+
+		// Use the same roleMaskCache built by FactoryProduction for consistency.
+		int maskVal = 0;
+		for (uint i = 0; i < roles.length(); ++i) {
+			const string roleName = roles[i];
+			float cost = 0.f;
+			if (FactoryProduction::roleMaskCache.get(roleName, maskVal)) {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyCostCache: querying role '" + roleName + "' mask=" + maskVal, 4);
+				cost = aiEnemyMgr.GetEnemyCost(uint(maskVal));
+			}
+			// Sanitize cost from enemy manager
+			if (!(cost == cost) || cost < 0.f) {
+				cost = 0.f;
+			} else if (cost > 1e12f) {
+				// Clamp garbage large values
+				cost = 0.f;
+			} else if (cost > 0.f && cost < 1e-38f) {
+				// Clamp denormals to zero to avoid pathological floats
+				cost = 0.f;
+			}
+			g_cachedRoleCosts.set(roleName, cost);
+			GenericHelpers::LogUtil("[Military] Cost cache role '" + roleName + "' = " + cost, 4);
+		}
+
+		// Aggregate into layers using the cached role costs
+		g_cachedTotalAirCost     = 0.f;
+		g_cachedTotalSurfaceCost = 0.f;
+		g_cachedTotalWaterCost   = 0.f;
+
+		// Air: anti-air + air + bomber
+		g_cachedTotalAirCost += GetCachedRoleCost("anti_air");
+		g_cachedTotalAirCost += GetCachedRoleCost("air");
+		g_cachedTotalAirCost += GetCachedRoleCost("bomber");
+
+		// Surface: assault/skirm/riot/artillery/heavy/super/raider/support/builder
+		for (uint i = 0; i < FactoryProduction::SURFACE_ROLES.length(); ++i) {
+			g_cachedTotalSurfaceCost += GetCachedRoleCost(FactoryProduction::SURFACE_ROLES[i]);
+		}
+
+		// Water: submarines + anti-submarines
+		g_cachedTotalWaterCost += GetCachedRoleCost("sub");
+		g_cachedTotalWaterCost += GetCachedRoleCost("anti_sub");
+
+		// TODO: Replace this stub with a real enemy player/team count from the engine once exposed.
+		g_cachedEnemyPlayerCount = 1;
+		if (g_cachedEnemyPlayerCount < 1) {
+			g_cachedEnemyPlayerCount = 1;
+		}
+		g_cachedEnemySurfaceCostPerPlayer = g_cachedTotalSurfaceCost / float(g_cachedEnemyPlayerCount);
+		g_cachedEnemyAirCostPerPlayer     = g_cachedTotalAirCost / float(g_cachedEnemyPlayerCount);
+		g_cachedEnemyWaterCostPerPlayer   = g_cachedTotalWaterCost / float(g_cachedEnemyPlayerCount);
+
+		GenericHelpers::LogUtil(
+			"[Military] Cost cache aggregates | air=" + g_cachedTotalAirCost +
+			" surface=" + g_cachedTotalSurfaceCost +
+			" water=" + g_cachedTotalWaterCost +
+			" | enemyPlayerCount=" + g_cachedEnemyPlayerCount +
+			" surfacePerPlayer=" + g_cachedEnemySurfaceCostPerPlayer +
+			" airPerPlayer=" + g_cachedEnemyAirCostPerPlayer +
+			" waterPerPlayer=" + g_cachedEnemyWaterCostPerPlayer,
+			3
+		);
+	}
+
+	// Helper to safely read a cached role threat; returns 0 if missing.
+	float GetCachedRoleThreat(const string &in roleName)
+	{
+		float threat = 0.f;
+		if (g_cachedRoleThreats.get(roleName, threat)) {
+			// Centralized NaN/negative/denormal guards for all threat consumers
+			if (!(threat == threat) || threat < 0.f) {
+				threat = 0.f;
+			} else if (threat > 1e12f) {
+				threat = 0.f;
+			} else if (threat > 0.f && threat < 1e-38f) {
+				threat = 0.f;
+			}
+			return threat;
+		}
+		return 0.f;
+	}
+
+	// Helper to safely read a cached role cost; returns 0 if missing.
+	float GetCachedRoleCost(const string &in roleName)
+	{
+		float cost = 0.f;
+		if (g_cachedRoleCosts.get(roleName, cost)) {
+			// Centralized NaN/negative/denormal guards for all cost consumers
+			if (!(cost == cost) || cost < 0.f) {
+				cost = 0.f;
+			} else if (cost > 1e12f) {
+				cost = 0.f;
+			} else if (cost > 0.f && cost < 1e-38f) {
+				cost = 0.f;
+			}
+			return cost;
+		}
+		return 0.f;
+	}
+
+	// Convenience accessors for derived enemy surface metrics.
+	float GetEnemySurfaceCostPerPlayer()
+	{
+		return g_cachedEnemySurfaceCostPerPlayer;
+	}
+
+	float GetEnemyAirCostPerPlayer()
+	{
+		return g_cachedEnemyAirCostPerPlayer;
+	}
+
+	float GetEnemyWaterCostPerPlayer()
+	{
+		return g_cachedEnemyWaterCostPerPlayer;
+	}
+
+	int GetEnemyPlayerCount()
+	{
+		return g_cachedEnemyPlayerCount;
+	}
+
+	// Convenience accessor to retrieve current cached layer weights and totals, without recomputing.
+	void GetEnemyLayerWeights(float &out airWeight, float &out surfaceWeight, float &out waterWeight,
+							  float &out totalAirThreat, float &out totalSurfaceThreat, float &out totalWaterThreat)
+	{
+		airWeight           = g_cachedAirWeight;
+		surfaceWeight       = g_cachedSurfaceWeight;
+		waterWeight         = g_cachedWaterWeight;
+		totalAirThreat      = g_cachedTotalAirThreat;
+		totalSurfaceThreat  = g_cachedTotalSurfaceThreat;
+		totalWaterThreat    = g_cachedTotalWaterThreat;
+	}
+
+}  // namespace Military
