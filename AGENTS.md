@@ -4,9 +4,11 @@ These instructions apply to the entire repository. This is the canonical agent g
 
 ## Project Context
 
-CircuitAI is a C++ Skirmish AI for the Recoil RTS engine. Native behavior is under `src/circuit/`; AngelScript policy and profiles are under `data/script/`; JSON behavior profiles are under `data/config/`. The C++ code is normally integrated into an engine checkout as a Skirmish AI and depends on Recoil's generated C++ AI wrapper.
+CircuitAI is a C++ Skirmish AI for the Recoil RTS engine. Native behavior is under `src/circuit/`. The primary, active AngelScript implementation and profiles are under the root `data/` tree: policy code is in `data/script/` and JSON behavior profiles are in `data/config/`. The parallel `data_sample/` tree contains sample AngelScript and configuration for reference only; it is not the implementation target. The C++ code is normally integrated into an engine checkout as a Skirmish AI and depends on Recoil's generated C++ AI wrapper.
 
 Read `data/script/README.md` before changing AngelScript policy code. Read `data/script/CHANGE_RECOMMENDATIONS.md` when investigating BAR compatibility or historical API drift. See `doc/TRUSTED_REFERENCE_REPOSITORIES.md` for the external-reference map.
+
+For every AngelScript or profile change, inspect and modify `data/`. Use `data_sample/` only to understand examples or historical patterns, and do not implement, mirror, or apply the requested change there unless the user explicitly asks to update sample material.
 
 ## Trusted Read-Only References
 
@@ -49,6 +51,7 @@ When changing classification or economy logic, check BAR values used by CircuitA
 
 - Start from the failing behavior, binding, profile, or configuration entry and trace to the code that controls it.
 - Preserve existing C++ and AngelScript style and keep changes scoped.
+- Make AngelScript and profile changes in `data/`, never `data_sample/`; the latter is reference-only unless the user explicitly requests sample maintenance.
 - Do not edit vendored libraries under `src/lib/` unless the task explicitly targets them.
 - Do not assume a generic AngelScript interface exposes derived-type members. Use registered casts and handle a null cast result.
 - Do not infer a valid factory edge merely because both UnitDefs exist. Verify the builder's effective BAR `buildoptions` under the relevant mod options.
