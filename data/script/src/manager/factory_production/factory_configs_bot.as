@@ -169,7 +169,7 @@ namespace BotConfigs {
             cfg.AddRole("raider",    array<string> = {});
             cfg.AddRole("riot",      array<string> = {});
             cfg.AddRole("skirmish",  array<string> = {});
-            cfg.AddRole("assault",   array<string> = {"corshiva", "corseal"});
+            cfg.AddRole("assault",   array<string> = {"corshiva", "corsala"});
             // cfg.AddRole("artillery", array<string> = {});
             // cfg.AddRole("anti_air",  array<string> = {});
             // cfg.AddRole("support",   array<string> = {});

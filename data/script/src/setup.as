@@ -112,12 +112,12 @@ namespace Setup {
 	void PrintRuleIfSet(const string &in scope, const string &in key) {
 		const float fv = ai.GetGameRulesParam(key, -9.876543f);
 		if (fv != -9.876543f) {
-			GenericHelpers::LogUtil("[Rules:" + scope + "] " + key + " = " + fv, 3);
+			GenericHelpers::LogUtil("[GameDetails:Rules:" + scope + "] " + key + "=" + fv, 1);
 			return;
 		}
 		const string sv = ai.GetGameRulesParam(key, "");
 		if (sv != "") {
-			GenericHelpers::LogUtil("[Rules:" + scope + "] " + key + " = '" + sv + "'", 3);
+			GenericHelpers::LogUtil("[GameDetails:Rules:" + scope + "] " + key + "='" + sv + "'", 1);
 		}
 	}
 
@@ -125,33 +125,40 @@ namespace Setup {
 	void PrintTeamRuleIfSet(const string &in scope, const string &in key) {
 		const float fv = ai.GetTeamRulesParam(key, -9.876543f);
 		if (fv != -9.876543f) {
-			GenericHelpers::LogUtil("[TeamRules:" + scope + "] " + key + " = " + fv, 3);
+			GenericHelpers::LogUtil("[GameDetails:Rules:" + scope + "] " + key + "=" + fv, 1);
 			return;
 		}
 		const string sv = ai.GetTeamRulesParam(key, "");
 		if (sv != "") {
-			GenericHelpers::LogUtil("[TeamRules:" + scope + "] " + key + " = '" + sv + "'", 3);
+			GenericHelpers::LogUtil("[GameDetails:Rules:" + scope + "] " + key + "='" + sv + "'", 1);
 		}
 	}
 
-	// Attempt to read a float GameRules param with a primary key and fallback alt key; log if found
-	void PrintRuleFloatWithFallback(const string &in label, const string &in primaryKey, const string &in altKey) {
-		float v = ai.GetGameRulesParam(primaryKey, -1.0f);
-		if (v < 0.0f) v = ai.GetGameRulesParam(altKey, -1.0f);
-		if (v >= 0.0f) {
-			GenericHelpers::LogUtil("[Rules:Game] " + label + " = " + v, 2);
+	string FormatTeamIds() {
+		array<Id>@ teamIds = ai.GetTeamIds();
+		if (teamIds is null || teamIds.length() == 0) return "[]";
+
+		teamIds.sortAsc();
+		string result = "[";
+		for (uint i = 0; i < teamIds.length(); ++i) {
+			if (i > 0) result += ",";
+			result += "" + teamIds[i];
 		}
+		return result + "]";
 	}
 
-	// Prints a snapshot of map/terrain info available at setup time.
-	// Note: The engine API currently exposes map name and mod options. A direct water coverage percentage API
-	// is not available in these scripts; we log map_waterlevel if present and mark percentage as N/A.
-	void PrintMapInfo(const AIFloat3& in startPos) {
+	// Logs the deterministic game, terrain, team, and configuration inputs exposed to scripts.
+	void PrintGameDetails(const AIFloat3& in startPos) {
 		const string mapName = Global::Map::MapName;
 		const bool landLocked = Global::Map::LandLocked;
 		const string side = Global::AISettings::Side;
 		const AiRole role = Global::AISettings::Role;
-		const int roleInt = int(role); // explicit numeric to avoid enum -> string ambiguity
+		const int roleInt = int(role);
+		const AIFloat3 terrainCenter = AiTerrainCenter();
+		const float landPercent = aiTerrainMgr.GetLandPercent();
+		const float waterPercent = AiMax(0.0f, AiMin(100.0f, 100.0f - landPercent));
+		const CCircuitDef@ commanderDef = aiSetupMgr.commChoice;
+		const string commanderName = (commanderDef is null) ? "<none>" : commanderDef.GetName();
 
 		// MapConfig summary
 		const string cfgName = Global::Map::Config._mapNameMatch;
@@ -184,54 +191,70 @@ namespace Setup {
 		const int maxUnits = Global::ModOptions::MaxUnits;
 
 		GenericHelpers::LogUtil(
-			"[MapInfo] name='" + mapName + "' cfg='" + cfgName + "' role=" + roleInt +
-			" side=" + side + " landLocked=" + landLocked +
-			" team=" + ("" + ai.teamId) + " allyTeam=" + ("" + ai.allyTeamId) +
-			" startPos=(" + startPos.x + "," + startPos.z + ")" +
+			"[GameDetails] map='" + mapName + "' cfg='" + cfgName + "'" +
+			" terrainWidth=" + AiTerrainWidth() +
+			" terrainHeight=" + AiTerrainHeight() +
+			" terrainDiagonal=" + AiTerrainDiagonal() +
+			" terrainCenter=(" + terrainCenter.x + "," + terrainCenter.z + ")" +
+			" landPercent=" + landPercent +
+			" waterPercent=" + waterPercent +
+			" waterAvoid=" + aiTerrainMgr.IsWaterAVoid(),
+			1);
+
+		GenericHelpers::LogUtil(
+			"[GameDetails] skirmishAI=" + ai.skirmishAIId +
+			" team=" + ai.teamId + " allyTeam=" + ai.allyTeamId +
+			" alliedTeams=" + FormatTeamIds() +
+			" leadTeam=" + ai.GetLeadTeamId() +
+			" enemyTeams=" + ai.GetEnemyTeamSize() +
+			" loadSave=" + ai.IsLoadSave() +
+			" side='" + side + "' sideId=" + int(ai.GetSideId()) +
+			" commander='" + commanderName + "' unitDefs=" + ai.GetDefCount() +
+			" role=" + roleInt + " landLocked=" + landLocked,
+			1);
+
+		GenericHelpers::LogUtil(
+			"[GameDetails] startPos=(" + startPos.x + "," + startPos.z + ")" +
 			" nearestSpot={" + spotStr + "}" +
 			" unitLimitKeys=" + unitLimitKeyCount +
 			" objectives=" + objectiveCount +
 			" factoryWeightsForRole=" + weightEntries,
 			2);
 
-		// Water coverage: percentage unknown without terrain sampling; report water plane level if provided by mod options.
 		GenericHelpers::LogUtil(
-			"[MapInfo] water: percent=N/A (no API) level=" + waterLevel + " isLava=" + waterIsLava +
-			" maxUnits=" + maxUnits,
-			2);
+			"[GameDetails] settings: mapWaterLevel=" + waterLevel +
+			" mapWaterIsLava=" + waterIsLava + " maxUnits=" + maxUnits,
+			1);
 
-		// Dump all mod options (keys/values) at debug level 3 to avoid spam at default levels
+		// GetModOptions() is a shared native dictionary. Sort its copied key array only.
 		dictionary@ mo = aiSetupMgr.GetModOptions();
 		if (mo !is null) {
 			array<string>@ keys = mo.getKeys();
-			GenericHelpers::LogUtil("[ModOptions] count=" + keys.length(), 3);
+			keys.sortAsc();
+			GenericHelpers::LogUtil("[GameDetails:ModOptions] count=" + keys.length(), 1);
 			for (uint i = 0; i < keys.length(); ++i) {
 				const string k = keys[i];
 				string v;
 				if (mo.get(k, v)) {
-					GenericHelpers::LogUtil("  " + k + "='" + v + "'", 3);
+					GenericHelpers::LogUtil("[GameDetails:ModOptions] " + k + "='" + v + "'", 1);
 				}
 			}
-			// Note: In this build the dictionary type doesn't expose Release() to scripts; rely on GC.
 		} else {
-			GenericHelpers::LogUtil("[ModOptions] (none)", 3);
+			GenericHelpers::LogUtil("[GameDetails:ModOptions] (none)", 1);
 		}
 
 		// Probe a set of common GameRules params often mirrored by Lua gadgets
 		array<string> gameKeys = {
 			"startmetal", "startenergy", "mo_coop", "mo_transportenemy",
-			"map_tidal", "map_windmin", "map_windmax",
+			"map_waterlevel", "map_waterislava", "map_tidal",
+			"map_windmin", "map_windmax", "windMin", "windMax",
 			"scoremode", "scenario_name", "chicken_queendifficulty"
 		};
 		for (uint i = 0; i < gameKeys.length(); ++i) {
 			PrintRuleIfSet("Game", gameKeys[i]);
 		}
-		// Explicitly attempt wind min/max with alternate keys used by some games
-		PrintRuleFloatWithFallback("windMin", "map_windmin", "windMin");
-		PrintRuleFloatWithFallback("windMax", "map_windmax", "windMax");
-
 		// Probe common TeamRules params
-		array<string> teamKeys = { "share_energy", "share_metal", "allyteam", "is_commander_dead" };
+		array<string> teamKeys = { "share_energy", "share_metal", "allyteam", "start_box_id", "is_commander_dead" };
 		const string teamScope = "Team" + ("" + ai.teamId);
 		for (uint j = 0; j < teamKeys.length(); ++j) {
 			PrintTeamRuleIfSet(teamScope, teamKeys[j]);
@@ -297,8 +320,7 @@ namespace Setup {
 
 		Global::profileController = createProfileController();
 
-		// Terrain snapshot: comprehensive map info (best-effort). Water percent not available in current API.
-		PrintMapInfo(startPos);
+		PrintGameDetails(startPos);
 
 
 		//Loop all role match functions, and return first match as the role config

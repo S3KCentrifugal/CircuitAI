@@ -329,6 +329,16 @@ namespace Global {
 
             //Stop building advanced solar if above this energy income level
             float AdvancedSolarEnergyIncomeMaximum = 1200.0f; 
+            int AdvancedSolarEarliestSeconds = 5 * 60;
+            float AdvancedSolarMinimumMetalIncome = 15.0f;
+            float AdvancedSolarMinimumMetalCurrent = 250.0f;
+
+            // Prefer cheap wind generators before advanced solar when CircuitAI's
+            // effective average wind output exceeds BAR's good-wind threshold.
+            float GoodWindMinimumEnergy = 7.0f;
+            int CommanderWindTargetCount = 6;
+            float CommanderWindEnergyIncomeTarget = 300.0f;
+            float CommanderWindMinimumMetalCurrent = 80.0f;
 
             /******************** T2 AIRCRAFT PLANT THRESHOLDS (AIR role) ********************/
             // Economy thresholds and caps for building a T2 Aircraft Plant when in AIR role
@@ -346,16 +356,38 @@ namespace Global {
             // Reserves-based nano condition threshold
             float NanoBuildWhenOverMetal = 1000.0f;
 
-            // Minimum number of T1 air constructors to maintain globally
+            // Maximum staged T1 air-constructor target. When enabled, the first
+            // is unconditional; later constructors require the thresholds below.
             int MinT1AirConstructorCount = 3;
-            // Minimum number of T2 air constructors (advanced construction aircraft) to maintain globally
+            float SecondT1AirConstructorMetalIncome = 8.0f;
+            float SecondT1AirConstructorEnergyIncome = 160.0f;
+            float ThirdT1AirConstructorMetalIncome = 18.0f;
+            float ThirdT1AirConstructorEnergyIncome = 300.0f;
+
+            // Maximum staged T2 air-constructor target. When enabled, the first
+            // is unconditional.
             int MinT2AirConstructorCount = 2;
+            float SecondT2AirConstructorMetalIncome = 40.0f;
+            float SecondT2AirConstructorEnergyIncome = 1200.0f;
 
             // Minimum number of air scouts to maintain globally for early map vision
-            int MinAirScoutCount = 2;
+            int MinAirScoutCount = 1;
 
-            // Small interception reserve; normal factory selection handles later air-defense demand.
-            int MinT1FighterCount = 4;
+            // Small economy-gated interception reserve. Dynamic/native production
+            // handles additional air-defense demand.
+            int MinT1FighterCount = 2;
+            float T1CombatProductionMetalIncome = 12.0f;
+            float T1CombatProductionEnergyIncome = 250.0f;
+
+            /******************** EARLY BUILD-POWER FOCUS ********************/
+            // Keep one strategic lane and one expansion lane until the economy is
+            // established or the deadline expires. Additional constructors assist
+            // those active lanes.
+            int BuildFocusDeadlineSeconds = 6 * 60;
+            float BuildFocusMetalIncome = 20.0f;
+            float BuildFocusEnergyIncome = 300.0f;
+            int BuildFocusAssistTimeoutSeconds = 15;
+            int BuildFocusIdleWaitSeconds = 5;
 
             // One-time T1 strike package. Keep this small so it does not delay economy growth.
             int T1StrikeOpenerSize = 3;
@@ -369,10 +401,9 @@ namespace Global {
             int T2HeavyAirBatchPerFactory = 2;
 
             /******************** COMMANDER FACTORY ASSIST ********************/
-            // Duration (in seconds) from game start during which the AIR commander
-            // will prioritize guarding the primary T1 aircraft plant instead of
-            // falling back to default builder behavior.
-            int CommanderFactoryAssistDeadlineSeconds = 3 * 60; // default: first 2 minutes
+            // Maximum time spent assisting the opening aircraft plant. Assistance
+            // ends sooner as soon as the first construction aircraft is complete.
+            int CommanderFactoryAssistDeadlineSeconds = 90;
 
             // Duration (in seconds) for each guard assignment when assisting the
             // primary T1 aircraft plant. Tasks may be renewed while within the

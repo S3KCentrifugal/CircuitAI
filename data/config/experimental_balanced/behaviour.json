@@ -304,14 +304,6 @@
 				"attribute": ["support"],
 				"build_speed": 8.0
 			},
-			"armapt3": {
-				"role": ["static"],
-				"attribute": ["support"],
-				"build_speed": 10.0, //bp 200
-				"build_mod": 1000.0,
-				"limit": 1
-			},
-
 //########################################################################################################################
 //####|| Armada T3 Factories ||###########################################################################################
 //########################################################################################################################
@@ -422,14 +414,6 @@
 				"build_mod": 1000.0,
 				"limit": 5
 			},
-			"corapt3": {
-				"role": ["static"],
-				"attribute": ["support"],
-				"limit": 1,
-				"build_mod": 1000.0,
-				"build_speed": 10.0 //bp 200
-			},
-
 //########################################################################################################################
 //####|| Cortex T3 Factories ||###########################################################################################
 //########################################################################################################################
@@ -602,11 +586,6 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"armgatet3": {
-				"role": ["static"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
-				"power": 1.0
-			},
 			"armpb": {
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -631,11 +610,6 @@
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}},
-				"power": 1.0
-			},
-			"armminivulc": {
-				"role": ["super", "static"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"armvulc": {
@@ -813,11 +787,6 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"corgatet3": {
-				"role": ["static"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
-				"power": 1.0
-			},
 			"corvipe": {
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -841,11 +810,6 @@
 			},
 			"corint": {
 				"role": ["static"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
-				"power": 1.0
-			},
-			"corminibuzz": {
-				"role": ["super", "static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1774,6 +1738,11 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
+			"armantiship": {
+				"role": ["support"],
+				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"power": 1.0
+			},
 			"armcarry": {
 				"role": ["support"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2047,6 +2016,11 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
+			"corsala": {
+				"role": ["raider"],
+				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"power": 1.0
+			},
 			"corparrow": {
 				"role": ["raider"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2178,6 +2152,11 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
+			"corantiship": {
+				"role": ["support"],
+				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"power": 1.0
+			},
 			"corcarry": {
 				"role": ["support"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2302,9 +2281,11 @@
 				"power": 1.0
 			},
 			"armuwadves": {
+				"role": ["static"],
 				"limit": 1
 			},
 			"coruwadves": {
+				"role": ["static"],
 				"limit": 1
 			}
 		}

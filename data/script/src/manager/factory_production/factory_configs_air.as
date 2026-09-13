@@ -134,6 +134,48 @@ namespace AirConfigs {
 
         // TODO: Add Legion air factories.
 
+        // Armada experimental aircraft plant (armapt3)
+        {
+            FactoryProduction::FactoryConfig@ cfg = FactoryProduction::FactoryConfig("armapt3");
+            cfg.AddRole("builder",   array<string> = {"armaca"});
+            cfg.AddRole("scout",     array<string> = {});
+            cfg.AddRole("raider",    array<string> = {});
+            cfg.AddRole("riot",      array<string> = {});
+            cfg.AddRole("skirmish",  array<string> = {});
+            cfg.AddRole("assault",   array<string> = {"armfepocht4"});
+            cfg.AddRole("artillery", array<string> = {"armthundt4", "armlichet4"});
+            cfg.AddRole("anti_air",  array<string> = {"armfepocht4"});
+            cfg.AddRole("support",   array<string> = {});
+            cfg.AddRole("heavy",     array<string> = {"armfepocht4"});
+
+            cfg.SetTierProbabilities(0, array<float> = {0.05f, 0.00f, 0.00f, 0.00f, 0.00f, 0.25f, 0.15f, 0.10f, 0.00f, 0.45f});
+            cfg.SetTierProbabilities(1, array<float> = {0.05f, 0.00f, 0.00f, 0.00f, 0.00f, 0.20f, 0.20f, 0.10f, 0.00f, 0.45f});
+
+            FactoryProduction::factoryConfigs.set("armapt3", @cfg);
+            GenericHelpers::LogUtil("[FactoryProduction] RegisterAirFactories: armapt3 registered", 3);
+        }
+
+        // Cortex experimental aircraft plant (corapt3)
+        {
+            FactoryProduction::FactoryConfig@ cfg = FactoryProduction::FactoryConfig("corapt3");
+            cfg.AddRole("builder",   array<string> = {"coraca"});
+            cfg.AddRole("scout",     array<string> = {});
+            cfg.AddRole("raider",    array<string> = {});
+            cfg.AddRole("riot",      array<string> = {});
+            cfg.AddRole("skirmish",  array<string> = {});
+            cfg.AddRole("assault",   array<string> = {"corcrwt4", "corfblackhyt4"});
+            cfg.AddRole("artillery", array<string> = {"corfblackhyt4"});
+            cfg.AddRole("anti_air",  array<string> = {"corcrwt4", "corfblackhyt4"});
+            cfg.AddRole("support",   array<string> = {"cordronecarryair"});
+            cfg.AddRole("heavy",     array<string> = {"corcrwt4", "corfblackhyt4"});
+
+            cfg.SetTierProbabilities(0, array<float> = {0.05f, 0.00f, 0.00f, 0.00f, 0.00f, 0.25f, 0.15f, 0.15f, 0.15f, 0.25f});
+            cfg.SetTierProbabilities(1, array<float> = {0.05f, 0.00f, 0.00f, 0.00f, 0.00f, 0.25f, 0.15f, 0.15f, 0.15f, 0.25f});
+
+            FactoryProduction::factoryConfigs.set("corapt3", @cfg);
+            GenericHelpers::LogUtil("[FactoryProduction] RegisterAirFactories: corapt3 registered", 3);
+        }
+
         GenericHelpers::LogUtil("[FactoryProduction] RegisterAirFactories: Completed", 2);
     }
 }

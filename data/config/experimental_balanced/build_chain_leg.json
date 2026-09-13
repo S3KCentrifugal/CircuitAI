@@ -37,7 +37,7 @@
 			"legtide": {
 				"hub": [
 					[  
-						{"unit": "legfmkr", "category": "convert", "offset": [80, 80], "condition": {"energy": true}}
+						{"unit": "legfeconv", "category": "convert", "offset": [80, 80], "condition": {"energy": true}}
 					]
 				]
 			},

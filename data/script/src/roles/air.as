@@ -10,6 +10,190 @@
 #include "../manager/factory_production.as"
 
 namespace RoleAir {
+    IUnitTask@ g_airStrategicFocusTask = null;
+    int g_airStrategicFocusLeaderId = -1;
+    bool g_airBuildFocusReleased = false;
+    bool g_airGunshipOpenerDone = false;
+    int g_airStrikeOpenerQueuedCount = 0;
+    IUnitTask@ g_airCommanderWindTask = null;
+
+    bool Air_IsEconomyHealthy()
+    {
+        return !aiEconomyMgr.isEnergyStalling;
+    }
+
+    bool Air_IsCombatProductionReady(float metalIncome, float energyIncome)
+    {
+        return Air_IsEconomyHealthy()
+            && metalIncome >= Global::RoleSettings::Air::T1CombatProductionMetalIncome
+            && energyIncome >= Global::RoleSettings::Air::T1CombatProductionEnergyIncome;
+    }
+
+    string Air_GetWindNameForSide(const string &in side)
+    {
+        if (side == "armada") return "armwin";
+        if (side == "cortex") return "corwin";
+        if (side == "legion") return "legwin";
+        return "";
+    }
+
+    bool Air_ShouldPreferWind(const string &in side)
+    {
+        const string windName = Air_GetWindNameForSide(side);
+        CCircuitDef@ windDef = (windName == "" ? null : ai.GetCircuitDef(windName));
+        if (windDef is null || !windDef.IsAvailable(ai.frame)) return false;
+
+        const float expectedWindEnergy = aiEconomyMgr.GetEnergyMake(windDef);
+        const int windCount = windDef.count;
+        return expectedWindEnergy > Global::RoleSettings::Air::GoodWindMinimumEnergy
+            && windCount >= 0
+            && windCount < Global::RoleSettings::Air::CommanderWindTargetCount
+            && Economy::GetMinEnergyIncomeLast10s() < Global::RoleSettings::Air::CommanderWindEnergyIncomeTarget;
+    }
+
+    bool Air_HasCommanderWindOpportunity(const string &in side)
+    {
+        return Builder::commander !is null
+            && !aiEconomyMgr.isEnergyFull
+            && aiEconomyMgr.metal.current >= Global::RoleSettings::Air::CommanderWindMinimumMetalCurrent
+            && Air_ShouldPreferWind(side);
+    }
+
+    IUnitTask@ Air_TryCommanderWind(CCircuitUnit@ commander)
+    {
+        if (commander is null || commander.circuitDef is null) return null;
+        if (g_airCommanderWindTask !is null) return g_airCommanderWindTask;
+
+        const string side = UnitHelpers::GetSideForUnitName(commander.circuitDef.GetName());
+        if (!Air_HasCommanderWindOpportunity(side)) return null;
+
+        const string windName = Air_GetWindNameForSide(side);
+        CCircuitDef@ windDef = ai.GetCircuitDef(windName);
+        if (windDef is null) return null;
+
+        IUnitTask@ task = aiBuilderMgr.Enqueue(
+            TaskB::Common(
+                Task::BuildType::ENERGY,
+                Task::Priority::NORMAL,
+                windDef,
+                commander.GetPos(ai.frame),
+                SQUARE_SIZE * 32,
+                true,
+                30 * SECOND
+            )
+        );
+        if (task !is null) {
+            @g_airCommanderWindTask = @task;
+            GenericHelpers::LogUtil(
+                "[AIR] Commander enqueued wind generator '" + windName +
+                "' expectedEnergy=" + aiEconomyMgr.GetEnergyMake(windDef),
+                2
+            );
+        }
+        return task;
+    }
+
+    bool Air_IsBuildFocusActive()
+    {
+        if (g_airBuildFocusReleased) return false;
+
+        const bool deadlinePassed =
+            ai.frame > Global::RoleSettings::Air::BuildFocusDeadlineSeconds * SECOND;
+        const bool incomeEstablished =
+            Economy::GetMinMetalIncomeLast10s() >= Global::RoleSettings::Air::BuildFocusMetalIncome
+            && Economy::GetMinEnergyIncomeLast10s() >= Global::RoleSettings::Air::BuildFocusEnergyIncome;
+        if (deadlinePassed || (Air_IsEconomyHealthy() && incomeEstablished)) {
+            g_airBuildFocusReleased = true;
+            GenericHelpers::LogUtil("[AIR] Early build-power focus released", 2);
+            return false;
+        }
+        return true;
+    }
+
+    bool Air_IsConstructionTask(IUnitTask@ task)
+    {
+        IBuilderTask@ builderTask = cast<IBuilderTask>(task);
+        if (builderTask is null) return false;
+        return Builder::_IsConstructionBuildType(Task::BuildType(builderTask.GetBuildType()));
+    }
+
+    IUnitTask@ Air_SetStrategicFocus(CCircuitUnit@ leader, IUnitTask@ task)
+    {
+        if (leader !is null && Air_IsConstructionTask(task)) {
+            @g_airStrategicFocusTask = @task;
+            g_airStrategicFocusLeaderId = leader.id;
+        }
+        return task;
+    }
+
+    bool Air_HasTrackedTask(CCircuitUnit@ builder)
+    {
+        Builder::BuilderTaskTrack@ track = Builder::GetTrackForBuilder(builder);
+        return track !is null && track.task !is null;
+    }
+
+    CCircuitUnit@ Air_GetAssignedT1Leader(CCircuitUnit@ builder)
+    {
+        if (builder is null) return null;
+        const string key = "" + builder.id;
+        CCircuitUnit@ ignored = null;
+        if (Builder::primaryT1AirConstructor !is null
+            && Builder::primaryT1AirConstructorGuards.get(key, @ignored)) {
+            return Builder::primaryT1AirConstructor;
+        }
+        @ignored = null;
+        if (Builder::secondaryT1AirConstructor !is null
+            && Builder::secondaryT1AirConstructorGuards.get(key, @ignored)) {
+            return Builder::secondaryT1AirConstructor;
+        }
+        return null;
+    }
+
+    IUnitTask@ Air_AssignFocusedFollower(CCircuitUnit@ builder)
+    {
+        IUnitTask@ assistTask = null;
+        CCircuitUnit@ primary = Builder::primaryT1AirConstructor;
+        if (g_airStrategicFocusTask !is null && primary !is null
+            && primary.id == g_airStrategicFocusLeaderId) {
+            @assistTask = GuardHelpers::AssignWorkerGuard(
+                builder,
+                primary,
+                Task::Priority::HIGH,
+                true,
+                Global::RoleSettings::Air::BuildFocusAssistTimeoutSeconds * SECOND
+            );
+            if (assistTask !is null) return assistTask;
+        }
+
+        CCircuitUnit@ secondary = Builder::secondaryT1AirConstructor;
+        if (secondary !is null && Air_HasTrackedTask(secondary)) {
+            @assistTask = GuardHelpers::AssignWorkerGuard(
+                builder,
+                secondary,
+                Task::Priority::HIGH,
+                true,
+                Global::RoleSettings::Air::BuildFocusAssistTimeoutSeconds * SECOND
+            );
+            if (assistTask !is null) return assistTask;
+        }
+
+        CCircuitUnit@ assignedLeader = Air_GetAssignedT1Leader(builder);
+        if (assignedLeader !is null && Air_HasTrackedTask(assignedLeader)) {
+            @assistTask = GuardHelpers::AssignWorkerGuard(
+                builder,
+                assignedLeader,
+                Task::Priority::HIGH,
+                true,
+                Global::RoleSettings::Air::BuildFocusAssistTimeoutSeconds * SECOND
+            );
+            if (assistTask !is null) return assistTask;
+        }
+
+        return aiBuilderMgr.Enqueue(
+            TaskB::Wait(Global::RoleSettings::Air::BuildFocusIdleWaitSeconds * SECOND)
+        );
+    }
+
     /******************************************************************************
 
     DYNAMIC MILITARY QUOTAS
@@ -124,6 +308,12 @@ namespace RoleAir {
     ******************************************************************************/
     void Air_Init() {
         GenericHelpers::LogUtil("Air role initialization logic executed", 2);
+        @g_airStrategicFocusTask = null;
+        g_airStrategicFocusLeaderId = -1;
+        g_airBuildFocusReleased = false;
+        g_airGunshipOpenerDone = false;
+        g_airStrikeOpenerQueuedCount = 0;
+        @g_airCommanderWindTask = null;
 
         // Apply AIR role settings
         aiTerrainMgr.SetAllyZoneRange(Global::RoleSettings::Air::AllyRange);
@@ -178,6 +368,11 @@ namespace RoleAir {
         startLimits.set("corsilo", 0);
         startLimits.set("legsilo", 0);
 
+        array<string> t1GroundDefences = UnitHelpers::GetAllT1LandDefences();
+        for (uint i = 0; i < t1GroundDefences.length(); ++i) {
+            startLimits.set(t1GroundDefences[i], 0);
+        }
+
         UnitHelpers::ApplyUnitLimits(startLimits);
 
         GenericHelpers::LogUtil("Air start limits applied", 3);
@@ -212,9 +407,6 @@ namespace RoleAir {
 
     ******************************************************************************/
 
-    // Track whether we've already executed the one-time T1 light gunship opener
-    bool g_airGunshipOpenerDone = false;
-
     // Resolve a strike aircraft that the side's T1 aircraft plant can actually build.
     string GetT1StrikeAircraftNameForSide(const string &in side)
     {
@@ -241,21 +433,25 @@ namespace RoleAir {
             return null;
         }
 
-        const int count = Global::RoleSettings::Air::T1StrikeOpenerSize;
-        if (count <= 0) {
+        const int targetCount = Global::RoleSettings::Air::T1StrikeOpenerSize;
+        if (targetCount <= 0 || g_airStrikeOpenerQueuedCount >= targetCount) {
             g_airGunshipOpenerDone = true;
             return null;
         }
-        IUnitTask@ last = null;
-        for (int i = 0; i < count; ++i) {
-            @last = aiFactoryMgr.Enqueue(
-                TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, gdef, pos, 64.f)
+
+        IUnitTask@ task = aiFactoryMgr.Enqueue(
+            TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, gdef, pos, 64.f)
+        );
+        if (task !is null) {
+            g_airStrikeOpenerQueuedCount++;
+            g_airGunshipOpenerDone = g_airStrikeOpenerQueuedCount >= targetCount;
+            GenericHelpers::LogUtil(
+                "[AIR] T1 strike opener enqueued " + g_airStrikeOpenerQueuedCount +
+                "/" + targetCount + " unit=" + gunshipName,
+                2
             );
         }
-
-        g_airGunshipOpenerDone = true;
-        GenericHelpers::LogUtil("[AIR] T1 strike opener enqueued count=" + count + " unit=" + gunshipName, 2);
-        return last;
+        return task;
     }
 
     IUnitTask@ Air_FactoryAiMakeTask(CCircuitUnit@ u) {
@@ -274,16 +470,30 @@ namespace RoleAir {
         const string side = UnitHelpers::GetSideForUnitName(fname);
         // Use the sliding-window minimum metal income across all checks in this factory make task
         const float metalIncome = Economy::GetMinMetalIncomeLast10s();
+        const float energyIncome = Economy::GetMinEnergyIncomeLast10s();
 
         // Determine plant tier first and only queue T1 builders from T1 plants.
         bool isT1Plant = UnitHelpers::IsT1AircraftPlant(fname);
         bool isT2Plant = (!isT1Plant && UnitHelpers::IsT2AircraftPlant(fname));
 
         if (isT1Plant) {
-            // Priority: maintain a minimum number of air scouts before anything else,
-            // but only during the early game (first 5 minutes) to avoid infinite scout spam.
+            const int maxT1Builders = Global::RoleSettings::Air::MinT1AirConstructorCount;
+            array<string> allT1AirCons = UnitHelpers::GetAllT1AirConstructors();
+            int t1BuildersTotal = UnitDefHelpers::SumUnitDefCounts(allT1AirCons);
+            string t1BuilderName = (side == "armada" ? "armca" : side == "cortex" ? "corca" : side == "legion" ? "legca" : "armca");
+            CCircuitDef@ t1BuilderDef = ai.GetCircuitDef(t1BuilderName);
+
+            // Establish economy control before consuming the opening queue on
+            // scouts or combat aircraft.
+            if (maxT1Builders > 0 && t1BuildersTotal < 1
+                && t1BuilderDef !is null && t1BuilderDef.IsAvailable(ai.frame)) {
+                return aiFactoryMgr.Enqueue(
+                    TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t1BuilderDef, pos, 64.f)
+                );
+            }
+
+            // Add one early scout after the first constructor.
             int scoutTarget = Global::RoleSettings::Air::MinAirScoutCount;
-            // 5 minutes in frames (engine runs in frames; 30 * SECOND == 1s, so 5 * 60 * SECOND)
             const int SCOUT_PRODUCTION_DEADLINE = 5 * 60 * SECOND;
             if (scoutTarget > 0 && ai.frame <= SCOUT_PRODUCTION_DEADLINE) {
                 array<string> allScouts = UnitHelpers::GetAllT1AircraftScouts();
@@ -300,68 +510,44 @@ namespace RoleAir {
                 }
             }
 
-            // New: Income-scaled T1 air constructors (use min metal income over last 10s)
-            // Target at least floor(mi/5) total T1 air constructors across the team.
-            // {
-            //     if (metalIncome > 0.0f) {
-            //         // Guard against pathological divisor values (defensive, though constant here)
-            //         const float perCtorIncome = 5.0f;
-            //         float divisor = (perCtorIncome <= 0.0f ? 5.0f : perCtorIncome);
-            //         int desiredT1AirCons = int(floor(metalIncome / divisor));
-            //         if (desiredT1AirCons > 0) {
-            //             array<string> allT1AirCons2 = UnitHelpers::GetAllT1AirConstructors();
-            //             int haveT1AirCons = UnitDefHelpers::SumUnitDefCounts(allT1AirCons2);
-            //             int needT1AirCons = desiredT1AirCons - haveT1AirCons;
-            //             if (needT1AirCons > 0) {
-            //                 string t1CtorName = (side == "armada" ? "armca" : side == "cortex" ? "corca" : side == "legion" ? "legca" : "armca");
-            //                 CCircuitDef@ t1CtorDef = ai.GetCircuitDef(t1CtorName);
-            //                 if (t1CtorDef !is null && t1CtorDef.IsAvailable(ai.frame)) {
-            //                     IUnitTask@ firstTask = null;
-            //                     for (int i = 0; i < needT1AirCons; ++i) {
-            //                         IUnitTask@ t = aiFactoryMgr.Enqueue(
-            //                             TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t1CtorDef, pos, 64.f)
-            //                         );
-            //                         if (firstTask is null) @firstTask = t;
-            //                     }
-            //                     if (firstTask !is null) return firstTask;
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
+            int desiredT1Builders = (maxT1Builders < 1 ? maxT1Builders : 1);
+            if (Air_IsEconomyHealthy()
+                && metalIncome >= Global::RoleSettings::Air::SecondT1AirConstructorMetalIncome
+                && energyIncome >= Global::RoleSettings::Air::SecondT1AirConstructorEnergyIncome) {
+                desiredT1Builders = (maxT1Builders < 2 ? maxT1Builders : 2);
+            }
+            if (Air_IsEconomyHealthy()
+                && metalIncome >= Global::RoleSettings::Air::ThirdT1AirConstructorMetalIncome
+                && energyIncome >= Global::RoleSettings::Air::ThirdT1AirConstructorEnergyIncome) {
+                desiredT1Builders = maxT1Builders;
+            }
+            if (t1BuildersTotal < desiredT1Builders
+                && t1BuilderDef !is null && t1BuilderDef.IsAvailable(ai.frame)) {
+                return aiFactoryMgr.Enqueue(
+                    TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t1BuilderDef, pos, 64.f)
+                );
+            }
 
-            //Keep at least MinT1AirConstructorCount T1 construction aircraft across all sides
-            array<string> allT1AirCons = UnitHelpers::GetAllT1AirConstructors();
-            int t1BuildersTotal = UnitDefHelpers::SumUnitDefCounts(allT1AirCons);
-            if (t1BuildersTotal < Global::RoleSettings::Air::MinT1AirConstructorCount) {
-                string t1BuilderName = (side == "armada" ? "armca" : side == "cortex" ? "corca" : side == "legion" ? "legca" : "armca");
-                CCircuitDef@ t1b = ai.GetCircuitDef(t1BuilderName);
-                if (t1b !is null && t1b.IsAvailable(ai.frame)) {
-                    return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t1b, pos, 64.f));
+            const bool combatProductionReady = Air_IsCombatProductionReady(metalIncome, energyIncome);
+            if (combatProductionReady) {
+                string fighterName = (side == "armada" ? "armfig" : side == "cortex" ? "corveng" : side == "legion" ? "legfig" : "armfig");
+                int haveFighters = UnitDefHelpers::GetUnitDefCount(fighterName);
+                if (haveFighters < Global::RoleSettings::Air::MinT1FighterCount) {
+                    CCircuitDef@ fighterDef = ai.GetCircuitDef(fighterName);
+                    if (fighterDef !is null && fighterDef.IsAvailable(ai.frame)) {
+                        return aiFactoryMgr.Enqueue(
+                            TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, fighterDef, pos, 64.f)
+                        );
+                    }
+                }
+
+                IUnitTask@ gunshipOpener = Air_TryT1StrikeOpener(facDef, side, pos);
+                if (gunshipOpener !is null) {
+                    return gunshipOpener;
                 }
             }
 
-            // Maintain only a small interception reserve. The normal production
-            // policy remains free to add fighters in response to enemy aircraft.
-            string fighterName = (side == "armada" ? "armfig" : side == "cortex" ? "corveng" : side == "legion" ? "legfig" : "armfig");
-            int haveFighters = UnitDefHelpers::GetUnitDefCount(fighterName);
-            if (haveFighters < Global::RoleSettings::Air::MinT1FighterCount) {
-                CCircuitDef@ fighterDef = ai.GetCircuitDef(fighterName);
-                if (fighterDef !is null && fighterDef.IsAvailable(ai.frame)) {
-                    return aiFactoryMgr.Enqueue(
-                        TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, fighterDef, pos, 64.f)
-                    );
-                }
-            }
-
-            // Seed a small ground-attack wing once the economy can sustain it.
-            IUnitTask@ gunshipOpener = Air_TryT1StrikeOpener(facDef, side, pos);
-            if (gunshipOpener !is null) {
-                return gunshipOpener;
-            }
-
-            // After fighters and opener logic, prefer dynamic factory production for T1 air plants when enabled
-            if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
+            if (combatProductionReady && Global::RoleSettings::Air::UseDynamicFactoryProduction) {
                 GenericHelpers::LogUtil("[AIR][FactoryProduction] T1 plant '" + fname + "' side=" + side + " metalIncome=" + metalIncome, 4);
                 IUnitTask@ dynTaskT1 = FactoryProduction::MakeTask(u);
                 if (dynTaskT1 !is null) {
@@ -370,27 +556,18 @@ namespace RoleAir {
                 GenericHelpers::LogUtil("[AIR] Dynamic factory production returned null for '" + fname + "', using default", 3);
             }
 
-            // After constructors and optional gunship opener: ensure T1 fighters are produced until count >= 100
-            // {
-            //     string fighterName = (side == "armada" ? "armfig" : side == "cortex" ? "corveng" : side == "legion" ? "legfig" : "armfig");
-            //     int haveFighters = UnitDefHelpers::GetUnitDefCount(fighterName);
-            //     if (haveFighters < 100) {
-            //         CCircuitDef@ fighterDef = ai.GetCircuitDef(fighterName);
-            //         if (fighterDef !is null && fighterDef.IsAvailable(ai.frame)) {
-            //             return aiFactoryMgr.Enqueue(
-            //                 TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, fighterDef, pos, 64.f)
-            //             );
-            //         }
-            //     }
-            // }
-
-            
         }
 
         // If T2 plant: ensure advanced constructor targets, then apply T2-specific strategy
         if (isT2Plant) {
             // 1) Ensure at least MinT2AirConstructorCount advanced air constructors exist globally
-            int minT2Cons = Global::RoleSettings::Air::MinT2AirConstructorCount;
+            const int maxT2Cons = Global::RoleSettings::Air::MinT2AirConstructorCount;
+            int minT2Cons = (maxT2Cons < 1 ? maxT2Cons : 1);
+            if (Air_IsEconomyHealthy()
+                && metalIncome >= Global::RoleSettings::Air::SecondT2AirConstructorMetalIncome
+                && energyIncome >= Global::RoleSettings::Air::SecondT2AirConstructorEnergyIncome) {
+                minT2Cons = maxT2Cons;
+            }
             if (minT2Cons > 0) {
                 array<string> t2AirCons; t2AirCons = { "armaca", "coraca", "legaca" };
                 int haveT2Cons = UnitDefHelpers::SumUnitDefCounts(t2AirCons);
@@ -433,7 +610,8 @@ namespace RoleAir {
 
             // Dynamic selection runs after bounded strategic quotas so it cannot
             // make constructor or heavy-air policy unreachable.
-            if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
+            if (Air_IsCombatProductionReady(metalIncome, energyIncome)
+                && Global::RoleSettings::Air::UseDynamicFactoryProduction) {
                 IUnitTask@ dynTaskT2 = FactoryProduction::MakeTask(u);
                 if (dynTaskT2 !is null) {
                     return dynTaskT2;
@@ -565,62 +743,28 @@ namespace RoleAir {
         GenericHelpers::LogUtil("[Air_BuilderAiMakeTask] called for builder", 3);
         if (builder is null) return null;
 
-        // Pre-create and cache a single default task instance; never recreate.
-        IUnitTask@ defaultTask = Builder::MakeDefaultTaskWithLog(builder.id, "AIR");
-
         const CCircuitDef@ udef = builder.circuitDef;
-        if (udef is null) return defaultTask;
+        if (udef is null) return Builder::MakeDefaultTaskWithLog(builder.id, "AIR");
 
-        // Early return: if the default task represents a resource expansion (MEX/GEO variants), keep it.
-        IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
-        if (defaultBuilderTask !is null) {
-            Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
-            if (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP ||
-                dbt == Task::BuildType::GEO || dbt == Task::BuildType::GEOUP ||
-                dbt == Task::BuildType::ENERGY) {
-                GenericHelpers::LogUtil("[AIR] defaultTask is MEX/MEXUP/GEO/GEOUP/ENERGY; returning early", 3);
-                return defaultTask;
-            }
-
-            // If the default task is a radar but we're low on stored energy (<90% of storage),
-            // prefer building a solar collector instead to stabilize the grid.
-            if (dbt == Task::BuildType::RADAR) {
-                float energyCurrent = aiEconomyMgr.energy.current;
-                float energyStorage = aiEconomyMgr.energy.storage;
-                if (energyStorage > 0.0f && energyCurrent < energyStorage * 0.9f) {
-                    string unitSide = Global::AISettings::Side;
-                    IUnitTask@ solarTask = Builder::EnqueueT1Solar(
-                        builder.id,
-                        unitSide,
-                        builder.GetPos(ai.frame),
-                        /*shake*/ SQUARE_SIZE * 16,
-                        /*timeout*/ 60 * SECOND
-                    );
-                    if (solarTask !is null) {
-                        GenericHelpers::LogUtil("[AIR] Overriding RADAR defaultTask with T1 solar (energy < 90% storage)", 3);
-                        return solarTask;
-                    }
-                }
-            }
+        if (UnitHelpers::IsCommander(udef)) {
+            return Air_Commander_AiMakeTask(builder);
         }
 
-        // Commander-specific logic: delegate to commander builder logic when applicable.
-        bool isCommander = UnitHelpers::IsCommander(udef);
-        if (isCommander) {
-            return Air_Commander_AiMakeTask(builder, defaultTask);
-        }
-
-        // Only the primary T1 construction aircraft runs AIR's local build
-        // sequence. Other constructors keep the native expansion assignment.
         string uname = udef.GetName();
         bool isT1AirConstructor = (uname == "armca" || uname == "corca" || uname == "legca");
-
         if (isT1AirConstructor) {
-            return Air_T1Constructor_AiMakeTask(builder, defaultTask);
+            if (builder is Builder::primaryT1AirConstructor) {
+                return Air_T1Constructor_AiMakeTask(builder);
+            }
+            if (builder is Builder::secondaryT1AirConstructor) {
+                return Builder::MakeDefaultTaskWithLog(builder.id, "AIR expansion");
+            }
+            if (Air_IsBuildFocusActive()) {
+                return Air_AssignFocusedFollower(builder);
+            }
         }
 
-        // Fallback to cached default task
-        return defaultTask;
+        return Builder::MakeDefaultTaskWithLog(builder.id, "AIR");
     }
 
     /******************************************************************************
@@ -629,29 +773,42 @@ namespace RoleAir {
 
     ******************************************************************************/ 
 
-    // For the early game window, keep the commander assigned to guard
-    // the primary T1 aircraft plant (if present). Do NOT apply this to bot/vehicle plants.
-    IUnitTask@ Air_Commander_AiMakeTask(CCircuitUnit@ comm, IUnitTask@ defaultTask)
+    // Accelerate the first constructor, then reinforce the strategic lane while
+    // early build-power focus remains active.
+    IUnitTask@ Air_Commander_AiMakeTask(CCircuitUnit@ comm)
     {
-        if (comm is null) return defaultTask;
+        if (comm is null) return null;
 
-        // Configurable deadline (in frames) after which the commander stops
-        // prioritizing factory assist and falls back to default behavior.
         const int AIR_FACTORY_ASSIST_DEADLINE_FRAMES = Global::RoleSettings::Air::CommanderFactoryAssistDeadlineSeconds * SECOND;
-        if (ai.frame > AIR_FACTORY_ASSIST_DEADLINE_FRAMES) {
-            // After the early window, fall back to default behavior
-            return defaultTask;
+        CCircuitUnit@ primary = Builder::primaryT1AirConstructor;
+        if (primary !is null) {
+            IUnitTask@ windTask = Air_TryCommanderWind(comm);
+            if (windTask !is null) return windTask;
+
+            if (g_airStrategicFocusTask !is null
+                && primary.id == g_airStrategicFocusLeaderId && Air_IsBuildFocusActive()) {
+                IUnitTask@ focusGuard = GuardHelpers::AssignWorkerGuard(
+                    comm,
+                    primary,
+                    Task::Priority::HIGH,
+                    true,
+                    Global::RoleSettings::Air::CommanderFactoryAssistGuardTimeoutSeconds * SECOND
+                );
+                if (focusGuard !is null) return focusGuard;
+            }
         }
 
-        // Prefer guarding the primary T1 aircraft plant only.
+        if (primary !is null || ai.frame > AIR_FACTORY_ASSIST_DEADLINE_FRAMES) {
+            return Builder::MakeDefaultTaskWithLog(comm.id, "AIR commander");
+        }
+
         CCircuitUnit@ target = null;
         if (Factory::primaryT1AirPlant !is null) {
             @target = Factory::primaryT1AirPlant;
         }
 
         if (target is null) {
-            // No suitable factory yet; let normal builder/commander logic handle this frame
-            return defaultTask;
+            return Builder::MakeDefaultTaskWithLog(comm.id, "AIR commander");
         }
 
         // Assign a high-priority guard task so the commander sticks near the air factory.
@@ -665,7 +822,8 @@ namespace RoleAir {
             AIR_FACTORY_ASSIST_GUARD_TIMEOUT_FRAMES // guard duration; can be renewed while within deadline
         );
 
-        return (guardTask !is null ? guardTask : defaultTask);
+        if (guardTask !is null) return guardTask;
+        return Builder::MakeDefaultTaskWithLog(comm.id, "AIR commander");
     }
 
     void Air_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
@@ -695,7 +853,25 @@ namespace RoleAir {
     }
 
     void Air_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
+        if (task !is null && task is g_airCommanderWindTask) {
+            @g_airCommanderWindTask = null;
+        }
+        if (task !is null && task is g_airStrategicFocusTask) {
+            @g_airStrategicFocusTask = null;
+            g_airStrategicFocusLeaderId = -1;
+        }
+    }
 
+    void Air_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
+    {
+        if (unit !is null && unit.circuitDef !is null
+            && UnitHelpers::IsCommander(unit.circuitDef)) {
+            @g_airCommanderWindTask = null;
+        }
+        if (unit !is null && unit.id == g_airStrategicFocusLeaderId) {
+            @g_airStrategicFocusTask = null;
+            g_airStrategicFocusLeaderId = -1;
+        }
     }
 
     /******************************************************************************
@@ -704,7 +880,7 @@ namespace RoleAir {
 
     ******************************************************************************/
 
-    IUnitTask@ Air_T1Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask) {
+    IUnitTask@ Air_T1Constructor_AiMakeTask(CCircuitUnit@ u) {
         // Snapshot economy
         //float mi = Global::Economy::MetalIncome;
         //float ei = Global::Economy::EnergyIncome;
@@ -732,14 +908,14 @@ namespace RoleAir {
                 ) && hasPrimaryT1AirPlant) {
                     AIFloat3 anchor = Factory::GetT1AirPlantPos();
                     IUnitTask@ tT2Air = Builder::EnqueueT2AirPlant(unitSide, anchor, SQUARE_SIZE * 30, 600 * SECOND);
-                    if (tT2Air !is null) return tT2Air;
+                    if (tT2Air !is null) return Air_SetStrategicFocus(u, tT2Air);
                 }
                 // Reserve-trigger: if metal reserves exceed 1300 and we have zero T2 air plants, force-queue one
                 // regardless of income thresholds. Avoid duplicate enqueue if a build is already queued.
                 if (hasPrimaryT1AirPlant && t2AirPlantCount <= 0 && aiEconomyMgr.metal.current > 1300.0f) {
                     AIFloat3 anchor2 = Factory::GetT1AirPlantPos();
                     IUnitTask@ tForceT2 = Builder::EnqueueT2AirPlant(unitSide, anchor2, SQUARE_SIZE * 40, 600 * SECOND);
-                    if (tForceT2 !is null) return tForceT2;
+                    if (tForceT2 !is null) return Air_SetStrategicFocus(u, tForceT2);
                 }
            // }
 
@@ -754,7 +930,7 @@ namespace RoleAir {
                 /*minEnergyCurrentPercent*/ Global::RoleSettings::Air::BuildT1ConvertersMinimumEnergyCurrentPercent
             )) {
                 IUnitTask@ tConv = Builder::EnqueueT1EnergyConverter(unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
-                if (tConv !is null) return tConv;
+                if (tConv !is null) return Air_SetStrategicFocus(u, tConv);
             }
 
             // Build regular solar?
@@ -763,7 +939,7 @@ namespace RoleAir {
                 /*minEnergyIncome*/ Global::RoleSettings::Air::SolarEnergyIncomeMinimum
             )) {
                 IUnitTask@ tSolar = Builder::EnqueueT1Solar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
-                if (tSolar !is null) return tSolar;
+                if (tSolar !is null) return Air_SetStrategicFocus(u, tSolar);
             }
 
             // Build a T1 nano caretaker if under desired target (income-based) or reserves allow
@@ -786,7 +962,7 @@ namespace RoleAir {
                 CCircuitUnit@ targetFactory = Factory::SelectFactoryNeedingNano();
                 if (targetFactory !is null) {
                     IUnitTask@ tNano = Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::NORMAL);
-                    if (tNano !is null) return tNano;
+                    if (tNano !is null) return Air_SetStrategicFocus(u, tNano);
                 }
             }
 
@@ -797,7 +973,13 @@ namespace RoleAir {
             array<string> t2AirPlants = UnitHelpers::GetAllT2AircraftPlants();
             int t2AircraftPlantCount = UnitDefHelpers::SumUnitDefCounts(t2AirPlants);
 
-            if (EconomyHelpers::ShouldBuildT1AdvancedSolar(
+            const bool advancedSolarTimingReady =
+                ai.frame >= Global::RoleSettings::Air::AdvancedSolarEarliestSeconds * SECOND
+                && mi >= Global::RoleSettings::Air::AdvancedSolarMinimumMetalIncome
+                && aiEconomyMgr.metal.current >= Global::RoleSettings::Air::AdvancedSolarMinimumMetalCurrent
+                && !aiEconomyMgr.isEnergyFull
+                && !Air_HasCommanderWindOpportunity(unitSide);
+            if (advancedSolarTimingReady && EconomyHelpers::ShouldBuildT1AdvancedSolar(
                 /*energyIncome*/ ei,
                 /*metalIncome*/ mi,
                 /*energyIncomeMinimumThreshold*/ Global::RoleSettings::Air::AdvancedSolarEnergyIncomeMinimum,
@@ -809,13 +991,12 @@ namespace RoleAir {
                 /*metalIncomeFallbackMinimum*/ 6.0f
             )) {
                 IUnitTask@ tAdvSolar = Builder::EnqueueT1AdvancedSolar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
-                if (tAdvSolar !is null) return tAdvSolar;
+                if (tAdvSolar !is null) return Air_SetStrategicFocus(u, tAdvSolar);
             } 
         }
 
-        // Non-primary constructors and exhausted custom policy retain the
-        // already-created native expansion or economy task.
-        return defaultTask;
+        IUnitTask@ defaultTask = Builder::MakeDefaultTaskWithLog(u.id, "AIR strategic");
+        return Air_SetStrategicFocus(u, defaultTask);
     }
 
 
@@ -852,6 +1033,7 @@ namespace RoleAir {
         @cfg.FactoryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_FactoryAiMakeTask);
         
         @cfg.BuilderAiUnitAdded = cast<AiUnitAddedDelegate@>(@Air_BuilderAiUnitAdded);
+        @cfg.BuilderAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_BuilderAiUnitRemoved);
 
         @cfg.BuilderAiTaskAddedHandler = cast<AiTaskAddedDelegate@>(@Air_BuilderAiTaskAdded);
         @cfg.BuilderAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_BuilderAiTaskRemoved);

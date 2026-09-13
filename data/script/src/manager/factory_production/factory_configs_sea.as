@@ -130,24 +130,27 @@ namespace SeaConfigs {
             GenericHelpers::LogUtil("[FactoryProduction] RegisterSeaFactories: corasy registered", 3);
         }
 
-        // Legion Advanced Shipyard (legasy) - currently does NOT exist in BAR Legion unit set.
-        // Left commented out intentionally as a placeholder so future T2 Legion shipyards can be wired in here.
-        // GenericHelpers::LogUtil("[FactoryProduction] RegisterSeaFactories: Registering legasy", 3);
-        // {
-        //     FactoryProduction::FactoryConfig@ cfg = FactoryProduction::FactoryConfig("legasy");
-        //     cfg.AddRole("builder",   array<string> = {"legacsub"});
-        //     cfg.AddRole("scout",     array<string> = {"legnavyscout2"});
-        //     cfg.AddRole("raider",    array<string> = {"legnavysub2"});
-        //     cfg.AddRole("assault",   array<string> = {"legnavybattleship"});
-        //     cfg.AddRole("anti_sub",  array<string> = {"legnavyscout2"});
-        //     cfg.AddRole("support",   array<string> = {"legnavyrezsub"});
-        //
-        //     cfg.SetTierProbabilities(0, array<float> = {0.16f, 0.18f, 0.26f, 0.24f, 0.08f, 0.08f});
-        //     cfg.SetTierProbabilities(1, array<float> = {0.12f, 0.16f, 0.24f, 0.30f, 0.08f, 0.10f});
-        //
-        //     FactoryProduction::factoryConfigs.set("legasy", @cfg);
-        //     GenericHelpers::LogUtil("[FactoryProduction] RegisterSeaFactories: legasy registered", 3);
-        // }
+        // Legion Advanced Shipyard (legadvshipyard)
+        {
+            FactoryProduction::FactoryConfig@ cfg = FactoryProduction::FactoryConfig("legadvshipyard");
+            cfg.AddRole("builder",   array<string> = {"leganavyconsub", "leganavyengineer"});
+            cfg.AddRole("support",   array<string> = {"leganavyradjamship", "leganavyantinukecarrier"});
+            cfg.AddRole("anti_air",  array<string> = {"leganavyaaship"});
+            cfg.AddRole("scout",     array<string> = {});
+            cfg.AddRole("raider",    array<string> = {"leganavybattlesub"});
+            cfg.AddRole("skirmish",  array<string> = {"leganavycruiser", "leganavymissileship"});
+            cfg.AddRole("assault",   array<string> = {"leganavyheavysub", "leganavybattleship", "leganavyflagship"});
+            cfg.AddRole("artillery", array<string> = {"leganavyartyship", "leganavymissileship"});
+            cfg.AddRole("anti_sub",  array<string> = {"leganavyheavysub", "leganavybattlesub"});
+            cfg.AddRole("riot",      array<string> = {"leganavyantiswarm"});
+            cfg.AddRole("heavy",     array<string> = {"leganavybattleship", "leganavyflagship"});
+
+            cfg.SetTierProbabilities(0, array<float> = {0.10f, 0.10f, 0.10f, 0.00f, 0.08f, 0.12f, 0.20f, 0.10f, 0.08f, 0.05f, 0.07f});
+            cfg.SetTierProbabilities(1, array<float> = {0.07f, 0.10f, 0.08f, 0.00f, 0.05f, 0.10f, 0.20f, 0.12f, 0.08f, 0.05f, 0.15f});
+
+            FactoryProduction::factoryConfigs.set("legadvshipyard", @cfg);
+            GenericHelpers::LogUtil("[FactoryProduction] RegisterSeaFactories: legadvshipyard registered", 3);
+        }
 
         GenericHelpers::LogUtil("[FactoryProduction] RegisterSeaFactories: Completed SEA factory registration", 2);
     }

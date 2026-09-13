@@ -20,7 +20,7 @@ namespace Init {
 		}
 		if (string(aiSetupMgr.GetModOptions()["scavunitsforplayers"]) == "1") {
 			AiLog("Inserting Scav Units");
-			data.profile.insertAt(data.profile.length(), {"behaviour_scav_units"});
+			data.profile.insertAt(data.profile.length(), {"behaviour_scav_units", "factory_scav_units"});
 		} else {
 			AiLog("Ignoring Scav Units");
 		}

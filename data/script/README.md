@@ -18,7 +18,7 @@ The experimental runtime sequence is:
 
 1. `Init::AiInit()` builds the configuration fragment list.
 2. `Main::AiMain()` registers maps and applies profile strategy/tuning.
-3. The first factory selection calls `Setup::setupMap()`, which resolves map, start spot, faction, role, unit-limit overlays, and role delegates.
+3. The first factory selection calls `Setup::setupMap()`, which resolves map, start spot, faction, role, unit-limit overlays, and role delegates. It also logs a deterministic startup snapshot covering terrain dimensions and land/water percentages, team topology, effective UnitDef count, selected commander, parsed settings, sorted mod options, and selected game/team rules.
 4. CircuitAI invokes namespace hooks for managers: `AiMakeTask`, `AiTaskAdded`, `AiTaskRemoved`, unit lifecycle hooks, economy updates, factory selection/switching, defence, and periodic `Main::AiUpdate()`.
 5. Role delegates in `RoleConfig` specialize the shared manager behavior and fall back to native `Default*` methods when no script policy applies.
 
@@ -100,7 +100,7 @@ The experimental runtime sequence is:
 |---|---|
 | FRONT (`src/roles/front.as`) | Land-force opening, bot/vehicle factory specialization, adaptive production, income-driven caps, guard behavior, defence construction, and delayed army-versus-enemy-surface quota hysteresis. |
 | SUPPORT (`src/roles/support.as`) | Economy/support opening, restricted combat/air/nuke access, resurrection and assistance focus, commander/constructor guarding, and income-scaled builder limits. |
-| AIR (`src/roles/air.as`) | Air factory production with bounded constructor/fighter/heavy-air quotas, a small economy-gated strike opener, expansion-capable air constructors, and delayed air-force-versus-enemy-air quotas. Combat aircraft retain their profile-defined roles and use native military task assignment. |
+| AIR (`src/roles/air.as`) | Staged air production, an early two-lane build-power policy (strategic economy plus expansion), task-aware constructor assistance, commander-built wind on suitable maps, delayed advanced solar, T1 static defence restricted to anti-air, bounded fighter/heavy-air quotas, and delayed air-force-versus-enemy-air quotas. Combat aircraft retain their profile-defined roles and use native military task assignment. |
 | TECH (`src/roles/tech.as`) | T2/T3/nuke strategies, strict tier caps, storage and energy progression, mex upgrades, gantries, strategic objectives, constructor donation, and extensive economy-dependent build routing. |
 | SEA (`src/roles/sea.as`) | Shipyard starts, naval production, tidal/sea economy, naval fire states, sea constructors and donation, and fleet-versus-enemy-water quota adjustment. |
 | TACTICAL (`src/roles/tactical.as`) | Hover-focused opening, tactical constructors, map-objective execution, hover production, objective-based static construction, and mixed-terrain expansion. This replaces the older HOVER_SEA name. |
