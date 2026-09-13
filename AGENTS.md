@@ -10,6 +10,10 @@ Read `data/script/README.md` before changing AngelScript policy code. Apply `ski
 
 For every AngelScript or profile change, inspect and modify `data/`. Use `data_sample/` only to understand examples or historical patterns, and do not implement, mirror, or apply the requested change there unless the user explicitly asks to update sample material.
 
+Do not create or update repository changelog entries automatically. Only when
+the user explicitly requests a changelog, invoke
+`skills/maintain-changelog/SKILL.md`.
+
 ## Trusted Read-Only References
 
 Two sibling repositories are authoritative local references:

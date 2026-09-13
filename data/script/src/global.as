@@ -330,8 +330,6 @@ namespace Global {
             //Stop building advanced solar if above this energy income level
             float AdvancedSolarEnergyIncomeMaximum = 1200.0f; 
 
-            float AssistPrimaryWorkerEnergyIncomeMinimum = 1000.0f;
-
             /******************** T2 AIRCRAFT PLANT THRESHOLDS (AIR role) ********************/
             // Economy thresholds and caps for building a T2 Aircraft Plant when in AIR role
             // Defaults mirror TECH thresholds but are scoped to AIR so air.as does not reference TECH settings.
@@ -356,27 +354,19 @@ namespace Global {
             // Minimum number of air scouts to maintain globally for early map vision
             int MinAirScoutCount = 2;
 
-            /******************** AIR T2 BOMBER TOP-UP POLICY ********************/
-            // Maintain up to this many T2 bombers globally; factories will enqueue 5 at a time until this target is met.
-            int TargetT2BomberCount = 200;
+            // Small interception reserve; normal factory selection handles later air-defense demand.
+            int MinT1FighterCount = 4;
+
+            // One-time T1 strike package. Keep this small so it does not delay economy growth.
+            int T1StrikeOpenerSize = 3;
+            float T1StrikeOpenerMinimumMetalIncome = 12.0f;
+            float T1StrikeOpenerMinimumEnergyIncome = 250.0f;
 
             /******************** HEAVY AIR STRIKE POLICY (Legion/Cortex) ********************/
-            // When metal income exceeds this threshold, each T2 air plant may enqueue a small batch of heavy air units
-            // Legion -> Tyrannus (legfort), Cortex -> Dragon (corcrw). Only applies to Legion/Cortex.
+            // Maintain a bounded late-game heavy-air force for Legion/Cortex.
             float T2HeavyAirIncomeThreshold = 250.0f;
-            int T2HeavyAirBatchPerFactory = 3;
-
-            /******************** T2 BOMBER ROLE SWITCH GATE ********************/
-            // When total T2 bombers >= this value, gate opens: all bombers get mainRole=bomber and future creations do too
-            int BomberGateOpenThreshold = 20;
-            // When total T2 bombers < this value, gate closes: default mainRole for T2 bombers reverts to support
-            int BomberGateCloseThreshold = 10;
-
-            /******************** SUPPORT FIGHTER GROUP ********************/
-            // Maintain a home-defense wing of T2 fighters that stays near base
-            int TargetSupportFighterCount = 40;
-            // Per-factory enqueue cap when topping up support fighters
-            int SupportFighterBatchPerFactory = 5;
+            int T2HeavyAirTargetCount = 6;
+            int T2HeavyAirBatchPerFactory = 2;
 
             /******************** COMMANDER FACTORY ASSIST ********************/
             // Duration (in seconds) from game start during which the AIR commander

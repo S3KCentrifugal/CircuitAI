@@ -10,75 +10,6 @@
 #include "../manager/factory_production.as"
 
 namespace RoleAir {
-    // Track pending T2 bombers created while the bomber gate is closed
-    array<string> g_pendingT2Bombers; // store unitdef names as placeholders
-    bool g_bomberGateOpen = false;
-    // Track actual T2 bomber units so we can update attributes on already-created units when gate flips
-    array<CCircuitUnit@> g_t2BomberUnits;
-    // Support fighters that should remain near base (always treated as support group)
-    array<CCircuitUnit@> g_supportFighterUnits;
-    // Track last applied tier for bomber gate open threshold to avoid redundant writes
-    //int g_lastBomberOpenTier = -1; // -1 = unset, 0:<100, 1:100-250, 2:>250
-
-    // Helper: return canonical T2 bomber unitdef names for all sides
-    array<string> GetAllT2BomberNames()
-    {
-        array<string> names;
-        names.insertLast("armpnix");     // Armada strategic bomber
-        names.insertLast("corhurc");     // Cortex heavy strategic bomber
-        names.insertLast("legphoenix");  // Legion heatray bomber
-        return names;
-    }
-
-    // Helper: set mainRole for all T2 bomber defs
-    void SetMainRoleForAllT2Bombers(const string &in mainRole)
-    {
-        array<string> names = GetAllT2BomberNames();
-        UnitDefHelpers::SetMainRoleFor(names, mainRole);
-        GenericHelpers::LogUtil("[Air][Bombers] Set mainRole=" + mainRole + " for T2 bombers", 3);
-    }
-
-    // Helper: resolve T2 fighter unit name per side
-    string GetT2FighterNameForSide(const string &in side)
-    {
-        if (side == "armada") return "armhawk";
-        if (side == "cortex") return "corvamp";
-        if (side == "legion") return "legvenator"; // Legion T2 fighter
-        return "armhawk";
-    }
-
-    // Helper: current count of tracked support fighters (prune nulls defensively)
-    int GetSupportFighterCount()
-    {
-        int n = 0;
-        for (uint i = 0; i < g_supportFighterUnits.length(); ++i) {
-            CCircuitUnit@ u = g_supportFighterUnits[i];
-            if (u !is null) ++n;
-        }
-        return n;
-    }
-
-    // Helper: compute total team count of T2 bombers across all factions
-    int GetTotalT2BomberCount()
-    {
-        array<string> names = GetAllT2BomberNames();
-        return UnitDefHelpers::SumUnitDefCounts(names);
-    }
-
-    // Apply defaults to T2 bomber defs: support role, fire state 3, siege attribute (if available)
-    void ApplyT2BomberDefDefaults()
-    {
-        array<string> names = GetAllT2BomberNames();
-        for (uint i = 0; i < names.length(); ++i) {
-            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
-            if (d is null) continue;
-            d.SetFireState(3);
-            // TODO: Missing constant for siege attribute in repo. If available, uncomment the next line.
-            // d.AddAttribute(Main::ATTR_SIEGE);
-        }
-        SetMainRoleForAllT2Bombers("support");
-    }
-
     /******************************************************************************
 
     DYNAMIC MILITARY QUOTAS
@@ -213,9 +144,6 @@ namespace RoleAir {
 
         Air_ApplyStartLimits();
 
-        // Initialize T2 bomber defaults (support role, aggressive fire state, siege attr if available)
-        ApplyT2BomberDefDefaults();
-
         // Initialize dynamic factory production system for AIR role when enabled
         if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
             FactoryProduction::Initialize();
@@ -266,37 +194,6 @@ namespace RoleAir {
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();
         }
-        // Bomber gate logic (poll-based): open/close based on total T2 bomber count
-        int totalBombers = GetTotalT2BomberCount();
-        int openThresh = Global::RoleSettings::Air::BomberGateOpenThreshold;
-        int closeThresh = Global::RoleSettings::Air::BomberGateCloseThreshold;
-        GenericHelpers::LogUtil("[Air][Bombers] GateCheck: total=" + totalBombers + " openT=" + openThresh + " closeT=" + closeThresh + " state=" + (g_bomberGateOpen ? "OPEN" : "CLOSED"), 5);
-        if (!g_bomberGateOpen && totalBombers >= openThresh) {
-            g_bomberGateOpen = true;
-            SetMainRoleForAllT2Bombers("bomber");
-            g_pendingT2Bombers.resize(0);
-            // Upgrade attributes on any already-created T2 bombers we've tracked while gate was closed
-            // Note: per-unit FireState API isn't exposed here; we apply SIEGE attribute as the behavioral cue
-            // Compact the list defensively to avoid stale handles
-            array<CCircuitUnit@> compact;
-            for (uint i = 0; i < g_t2BomberUnits.length(); ++i) {
-                CCircuitUnit@ bu = g_t2BomberUnits[i];
-                if (bu is null) continue;
-                compact.insertLast(bu);
-            }
-            for (uint i = 0; i < compact.length(); ++i) {
-                CCircuitUnit@ bu = compact[i];
-                if (bu !is null) {
-                    bu.AddAttribute(Unit::Attr::SIEGE.type);
-                }
-            }
-            g_t2BomberUnits.resize(0);
-            GenericHelpers::LogUtil("[Air][Bombers] Gate OPEN: total=" + totalBombers + ", switching defs to bomber role and clearing pending", 3);
-        } else if (g_bomberGateOpen && totalBombers < closeThresh) {
-            g_bomberGateOpen = false;
-            SetMainRoleForAllT2Bombers("support");
-            GenericHelpers::LogUtil("[Air][Bombers] Gate CLOSED: total=" + totalBombers + ", reverting defs to support role", 3);
-        }
         //LogUtil("Air update logic executed", 5);
     }
 
@@ -307,23 +204,6 @@ namespace RoleAir {
     ******************************************************************************/
 
     void Air_EconomyUpdate() {
-        // Tiered dynamic open-threshold for bomber gate based on 10s min metal income
-        // Close threshold remains unchanged.
-        // float miMin10s = Economy::GetMinMetalIncomeLast10s();
-        // int tier = 0; // 0:<100, 1:100-250, 2:>250
-        // if (miMin10s < 100.0f) {
-        //     tier = 0;
-        // } else if (miMin10s <= 150.0f) {
-        //     tier = 1;
-        // } else {
-        //     tier = 2;
-        // }
-        // if (tier != g_lastBomberOpenTier) {
-        //     int newOpen = (tier == 0 ? 1 : (tier == 1 ? 40 : 100));
-        //     Global::RoleSettings::Air::BomberGateOpenThreshold = newOpen;
-        //     g_lastBomberOpenTier = tier;
-        //     GenericHelpers::LogUtil("[Air][Economy] Bomber open threshold set to " + newOpen + " (miMin10s=" + miMin10s + ")", 4);
-        // }
     }
 
     /******************************************************************************
@@ -335,26 +215,25 @@ namespace RoleAir {
     // Track whether we've already executed the one-time T1 light gunship opener
     bool g_airGunshipOpenerDone = false;
 
-    // Helper: resolve the light gunship unit name for a given side
-    string GetT1LightGunshipNameForSide(const string &in side)
+    // Resolve a strike aircraft that the side's T1 aircraft plant can actually build.
+    string GetT1StrikeAircraftNameForSide(const string &in side)
     {
-        // Canonical light gunship IDs per faction:
-        //  - Armada: armbrawl (Brawler)
-        //  - Cortex: corape (Rapier)
-        //  - Legion: leggatling (Gatling gunship)
-        if (side == "armada") return "armbrawl";
+        if (side == "armada") return "armkam";
         if (side == "cortex") return "corbw";
-        if (side == "legion") return "leggatling";
-        return "armbrawl"; // default fallback
+        if (side == "legion") return "legkam";
+        return "";
     }
 
-    // One-time opener: enqueue a batch of 10 light gunships from a T1 aircraft plant
-    IUnitTask@ Air_TryT1GunshipOpener(const CCircuitDef@ facDef, const string &in side, const AIFloat3 &in pos)
+    IUnitTask@ Air_TryT1StrikeOpener(const CCircuitDef@ facDef, const string &in side, const AIFloat3 &in pos)
     {
         if (g_airGunshipOpenerDone) return null;
         if (facDef is null) return null;
+        if (Economy::GetMinMetalIncomeLast10s() < Global::RoleSettings::Air::T1StrikeOpenerMinimumMetalIncome ||
+            Economy::GetMinEnergyIncomeLast10s() < Global::RoleSettings::Air::T1StrikeOpenerMinimumEnergyIncome) {
+            return null;
+        }
 
-        string gunshipName = GetT1LightGunshipNameForSide(side);
+        string gunshipName = GetT1StrikeAircraftNameForSide(side);
         if (gunshipName == "") return null;
 
         CCircuitDef@ gdef = ai.GetCircuitDef(gunshipName);
@@ -362,7 +241,11 @@ namespace RoleAir {
             return null;
         }
 
-        const int count = 10;
+        const int count = Global::RoleSettings::Air::T1StrikeOpenerSize;
+        if (count <= 0) {
+            g_airGunshipOpenerDone = true;
+            return null;
+        }
         IUnitTask@ last = null;
         for (int i = 0; i < count; ++i) {
             @last = aiFactoryMgr.Enqueue(
@@ -371,7 +254,7 @@ namespace RoleAir {
         }
 
         g_airGunshipOpenerDone = true;
-        GenericHelpers::LogUtil("[AIR] T1 gunship opener enqueued count=" + count + " unit=" + gunshipName, 2);
+        GenericHelpers::LogUtil("[AIR] T1 strike opener enqueued count=" + count + " unit=" + gunshipName, 2);
         return last;
     }
 
@@ -458,10 +341,11 @@ namespace RoleAir {
                 }
             }
 
-            // Ensure at least 10 T1 fighters
+            // Maintain only a small interception reserve. The normal production
+            // policy remains free to add fighters in response to enemy aircraft.
             string fighterName = (side == "armada" ? "armfig" : side == "cortex" ? "corveng" : side == "legion" ? "legfig" : "armfig");
             int haveFighters = UnitDefHelpers::GetUnitDefCount(fighterName);
-            if (haveFighters < 10) {
+            if (haveFighters < Global::RoleSettings::Air::MinT1FighterCount) {
                 CCircuitDef@ fighterDef = ai.GetCircuitDef(fighterName);
                 if (fighterDef !is null && fighterDef.IsAvailable(ai.frame)) {
                     return aiFactoryMgr.Enqueue(
@@ -470,8 +354,8 @@ namespace RoleAir {
                 }
             }
 
-            //After constructors: one-time light gunship opener per game from a T1 aircraft plant
-            IUnitTask@ gunshipOpener = Air_TryT1GunshipOpener(facDef, side, pos);
+            // Seed a small ground-attack wing once the economy can sustain it.
+            IUnitTask@ gunshipOpener = Air_TryT1StrikeOpener(facDef, side, pos);
             if (gunshipOpener !is null) {
                 return gunshipOpener;
             }
@@ -521,50 +405,22 @@ namespace RoleAir {
                 }
             }
 
-            if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
-                IUnitTask@ dynTaskT2 = FactoryProduction::MakeTask(u);
-                if (dynTaskT2 !is null) {
-                    return dynTaskT2;
-                }
-                GenericHelpers::LogUtil("[AIR] Dynamic factory production returned null for '" + fname + "', using default", 3);
-            }
-
-            // 2) Maintain a base-defense wing of T2 fighters (after constructors, before heavy air and bombers)
-            {
-                int targetSupport = Global::RoleSettings::Air::TargetSupportFighterCount;
-                int haveSupport = GetSupportFighterCount();
-                if (targetSupport > 0 && haveSupport < targetSupport) {
-                    string fighterName = GetT2FighterNameForSide(side);
-                    CCircuitDef@ fighterDef = ai.GetCircuitDef(fighterName);
-                    if (fighterDef !is null && fighterDef.IsAvailable(ai.frame)) {
-                        int deficit = targetSupport - haveSupport;
-                        int batch = Global::RoleSettings::Air::SupportFighterBatchPerFactory;
-                        int toQueue = (deficit < batch ? deficit : batch);
-                        GenericHelpers::LogUtil("[Air][SupportFighters] Enqueue request: target=" + targetSupport + " have=" + haveSupport + " deficit=" + deficit + " toQueue=" + toQueue, 4);
-                        IUnitTask@ firstTask = null;
-                        for (int i = 0; i < toQueue; ++i) {
-                            IUnitTask@ t = aiFactoryMgr.Enqueue(
-                                TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, fighterDef, pos, 64.f)
-                            );
-                            if (firstTask is null) @firstTask = t;
-                        }
-                        if (firstTask !is null) return firstTask; // ensure support fighters are built before heavy air/bombers
-                    }
-                }
-            }
-
-            // 3) Heavy air strike (Legion/Cortex only): enqueue Tyrannus/Dragon when income is high
+            // 2) Heavy air strike (Legion/Cortex only), capped so this cannot
+            // monopolize every subsequent T2 production decision.
             {
                 float mi = metalIncome;
                 float incomeThresh = Global::RoleSettings::Air::T2HeavyAirIncomeThreshold;
                 int batch = Global::RoleSettings::Air::T2HeavyAirBatchPerFactory;
                 if (batch > 0 && mi > incomeThresh && (side == "legion" || side == "cortex")) {
-                    // Legion -> Tyrannus (legfort), Cortex -> Dragon (corcrw)
                     string heavyName = (side == "legion" ? "legfort" : "corcrwh");
                     CCircuitDef@ heavyDef = ai.GetCircuitDef(heavyName);
-                    if (heavyDef !is null && heavyDef.IsAvailable(ai.frame)) {
+                    int haveHeavy = UnitDefHelpers::GetUnitDefCount(heavyName);
+                    int heavyTarget = Global::RoleSettings::Air::T2HeavyAirTargetCount;
+                    if (haveHeavy >= 0 && haveHeavy < heavyTarget && heavyDef !is null && heavyDef.IsAvailable(ai.frame)) {
+                        int deficit = heavyTarget - haveHeavy;
+                        int toQueue = (deficit < batch ? deficit : batch);
                         IUnitTask@ firstTask = null;
-                        for (int i = 0; i < batch; ++i) {
+                        for (int i = 0; i < toQueue; ++i) {
                             IUnitTask@ t = aiFactoryMgr.Enqueue(
                                 TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NORMAL, heavyDef, pos, 64.f)
                             );
@@ -575,59 +431,15 @@ namespace RoleAir {
                 }
             }
 
-       
-            
-
-            // 5) Post-constructor strategy: top-up T2 bombers to a global target.
-            // Remove cooldown; whenever current count is below target, enqueue up to 5.
-            // int targetBombers = Global::RoleSettings::Air::TargetT2BomberCount;
-            // if (targetBombers > 0) {
-            //     // If the start position is land-locked by water, prefer torpedo bombers over standard T2 bombers
-            //     const bool landLocked = Global::Map::LandLocked;
-            //     string bomberName;
-            //     if (landLocked) {
-            //         // Torpedo bomber IDs per side: armada=armlance, cortex=cortitan, legion=legatorpbomber
-            //         bomberName = (side == "armada" ? "armlance" : (side == "cortex" ? "cortitan" : "legatorpbomber"));
-            //         GenericHelpers::LogUtil("[Air][Bombers] LandLocked start: using torpedo bomber '" + bomberName + "' for side=" + side, 3);
-            //     } else {
-            //         bomberName = UnitHelpers::GetT2BomberNameForSide(side);
-            //     }
-            //     int haveBombers = UnitDefHelpers::GetUnitDefCount(bomberName);
-            //     if (haveBombers >= 0 && haveBombers < targetBombers) {
-            //         CCircuitDef@ bomberDef = ai.GetCircuitDef(bomberName);
-            //         if (bomberDef !is null && bomberDef.IsAvailable(ai.frame)) {
-            //             int deficit = targetBombers - haveBombers;
-            //             int toQueue = (deficit < 5 ? deficit : 5);
-            //             IUnitTask@ firstTask = null;
-            //             for (int i = 0; i < toQueue; ++i) {
-            //                 IUnitTask@ t = aiFactoryMgr.Enqueue(
-            //                     TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NORMAL, bomberDef, pos, 64.f)
-            //                 );
-            //                 if (firstTask is null) @firstTask = t;
-            //                 // Track bombers while gate is closed; when gate opens, don't track
-            //                 if (!g_bomberGateOpen) {
-            //                     g_pendingT2Bombers.insertLast(bomberName);
-            //                 }
-            //             }
-            //             // If pending exceeds open threshold, switch all bombers to bomber role and clear
-            //             if (!g_bomberGateOpen && int(g_pendingT2Bombers.length()) >= Global::RoleSettings::Air::BomberGateOpenThreshold) {
-            //                 g_bomberGateOpen = true;
-            //                 SetMainRoleForAllT2Bombers("bomber");
-            //                 // Upgrade attributes on any already-created T2 bombers we've tracked
-            //                 for (uint k = 0; k < g_t2BomberUnits.length(); ++k) {
-            //                     CCircuitUnit@ bu = g_t2BomberUnits[k];
-            //                     if (bu !is null) {
-            //                         bu.AddAttribute(Unit::Attr::SIEGE.type);
-            //                     }
-            //                 }
-            //                 g_pendingT2Bombers.resize(0);
-            //                 g_t2BomberUnits.resize(0);
-            //                 GenericHelpers::LogUtil("[Air][Bombers] Gate OPEN via queue: switched defs to bomber role", 3);
-            //             }
-            //             if (firstTask !is null) return firstTask;
-            //         }
-            //     }
-            // }
+            // Dynamic selection runs after bounded strategic quotas so it cannot
+            // make constructor or heavy-air policy unreachable.
+            if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
+                IUnitTask@ dynTaskT2 = FactoryProduction::MakeTask(u);
+                if (dynTaskT2 !is null) {
+                    return dynTaskT2;
+                }
+                GenericHelpers::LogUtil("[AIR] Dynamic factory production returned null for '" + fname + "', using default", 3);
+            }
         }
         // If T2 plant but no specific action above, do NOT enqueue T1 construction aircraft here to avoid blocking advanced queues.
 
@@ -669,75 +481,6 @@ namespace RoleAir {
         return aiFactoryMgr.DefaultMakeTask(u);
     }
 
-    /******************************************************************************
-
-    MILITARY UNIT TRACKING (for bomber gate)
-
-    ******************************************************************************/
-
-    // Track newly created military units; record T2 bombers while the gate is closed
-    void Air_MilitaryAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
-    {
-        if (unit is null) return;
-        if (usage != Unit::UseAs::COMBAT) return; // bombers are military/combat
-        const CCircuitDef@ cdef = unit.circuitDef;
-        if (cdef is null) return;
-        // Only track T2 bombers when the gate is closed
-        string uname = cdef.GetName();
-        if (!g_bomberGateOpen) {
-            array<string> t2Names = GetAllT2BomberNames();
-            for (uint i = 0; i < t2Names.length(); ++i) {
-                if (uname == t2Names[i]) {
-                    g_t2BomberUnits.insertLast(unit);
-                    GenericHelpers::LogUtil("[Air][Bombers] Tracking T2 bomber unit id=" + unit.id + " ('" + uname + "') while gate closed", 4);
-                    break;
-                }
-            }
-        }
-        // Track support fighters and mark them to stay near base
-        string side = UnitHelpers::GetSideForUnitName(uname);
-        string t2Fighter = GetT2FighterNameForSide(side);
-        if (uname == t2Fighter) {
-            int targetSupport = Global::RoleSettings::Air::TargetSupportFighterCount;
-            int haveSupport = GetSupportFighterCount();
-            if (haveSupport < targetSupport) {
-                g_supportFighterUnits.insertLast(unit);
-                // Give a base/defensive hint so these hover near our start area
-                unit.AddAttribute(Unit::Attr::BASE.type);
-                // Ensure primary role is set to support for these fighters (def-level)
-                Type supportRole = aiRoleMasker.GetTypeMask("support").type;
-                CCircuitDef@ defw = ai.GetCircuitDef(uname);
-                if (defw !is null) {
-                    defw.SetMainRole(supportRole);
-                    GenericHelpers::LogUtil("[Air][SupportFighters] Set mainRole=support for '" + uname + "'", 3);
-                } else {
-                    GenericHelpers::LogUtil("[Air][SupportFighters] WARNING: Could not resolve def for '" + uname + "' to set mainRole", 2);
-                }
-                GenericHelpers::LogUtil("[Air][SupportFighters] Added unit id=" + unit.id + " to support wing (count=" + GetSupportFighterCount() + ")", 3);
-            }
-        }
-    }
-
-    void Air_MilitaryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
-    {
-        if (unit is null) return;
-        // Remove from tracking if present
-        for (uint i = 0; i < g_t2BomberUnits.length(); ++i) {
-            if (g_t2BomberUnits[i] is unit) {
-                g_t2BomberUnits.removeAt(i);
-                GenericHelpers::LogUtil("[Air][Bombers] Tracked bomber removed id=" + unit.id, 4);
-                break;
-            }
-        }
-        for (uint j = 0; j < g_supportFighterUnits.length(); ++j) {
-            if (g_supportFighterUnits[j] is unit) {
-                g_supportFighterUnits.removeAt(j);
-                GenericHelpers::LogUtil("[Air][SupportFighters] Removed unit id=" + unit.id + " from support wing (count=" + GetSupportFighterCount() + ")", 3);
-                break;
-            }
-        }
-    }
-
     string Air_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
         if(isStart) {
             if(Global::Map::NearestMapStartPosition !is null) {
@@ -750,57 +493,6 @@ namespace RoleAir {
    
         return "";
     }
-
-    void Air_FactoryAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
-    {       
-        // Build up to 3x T1 construction aircraft when a NEW AIRCRAFT PLANT comes online.
-        // Previously this ran on ANY unit add, flooding the queue and starving combat units.
-        const CCircuitDef@ cdef = (unit is null ? null : unit.circuitDef);
-        if (cdef is null) return;
-
-        // Only react to factories, and specifically aircraft plants (T1 or T2)
-        if (usage != Unit::UseAs::FACTORY) return;
-        const string uname = cdef.GetName();
-        // FIX: Only seed T1 construction aircraft from T1 aircraft plants (not from T2 plants)
-        if (!UnitHelpers::IsT1AircraftPlant(uname)) return;
-
-        // Cap initial constructors to target per global setting; enqueue only the deficit.
-        // Count ALL T1 air constructors across sides using helper.
-        array<string> t1AirCons = UnitHelpers::GetAllT1AirConstructors();
-        int have = UnitDefHelpers::SumUnitDefCounts(t1AirCons);
-        int target = Global::RoleSettings::Air::MinT1AirConstructorCount;
-        int need = target - have;
-        if (need <= 0) return;
-
-        // Resolve side-specific T1 air constructor only if we need to enqueue
-        string side = UnitHelpers::GetSideForUnitName(uname);
-        string builderName;
-        if (side == "armada")      builderName = "armca"; // T1 construction aircraft
-        else if (side == "cortex") builderName = "corca";
-        else if (side == "legion") builderName = "legca";
-        else                        builderName = "armca"; // default fallback
-
-        CCircuitDef@ buildDef = ai.GetCircuitDef(builderName);
-        if (buildDef is null || !buildDef.IsAvailable(ai.frame)) return;
-
-        const AIFloat3 pos = unit.GetPos(ai.frame);
-        for (int j = 0; j < need; ++j) {
-            aiFactoryMgr.Enqueue(
-                TaskS::Recruit(
-                    Task::RecruitType::BUILDPOWER,
-                    Task::Priority::NORMAL,
-                    buildDef,
-                    pos,
-                    64.f
-                )
-            );
-        }
-    }
-
-    void Air_FactoryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
-	{
-	}
-
 
     // Local default implementations (ready to customize per-role)
     bool Air_AiIsSwitchTime(int lastSwitchFrame) {
@@ -918,13 +610,13 @@ namespace RoleAir {
             return Air_Commander_AiMakeTask(builder, defaultTask);
         }
 
-        // For now, only specialize T1 construction aircraft; everything else falls back
+        // Only the primary T1 construction aircraft runs AIR's local build
+        // sequence. Other constructors keep the native expansion assignment.
         string uname = udef.GetName();
-        bool isAir = udef.IsAbleToFly();
-        bool isT1AirConstructor = (isAir && uname.length() >= 2 && uname.substr(uname.length() - 2, 2) == "ca");
+        bool isT1AirConstructor = (uname == "armca" || uname == "corca" || uname == "legca");
 
         if (isT1AirConstructor) {
-            return Air_T1Constructor_AiMakeTask(builder);
+            return Air_T1Constructor_AiMakeTask(builder, defaultTask);
         }
 
         // Fallback to cached default task
@@ -976,8 +668,6 @@ namespace RoleAir {
         return (guardTask !is null ? guardTask : defaultTask);
     }
 
-    CCircuitUnit@ energizer1 = null;
-	CCircuitUnit@ energizer2 = null;
     void Air_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
 		//LogUtil("BUILDER::AiUnitAdded:" + unit.circuitDef, 2);
@@ -985,39 +675,19 @@ namespace RoleAir {
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
 			return;
 
-        // New policy: apply BASE attribute broadly to air constructors when global counts are below thresholds.
         string uname = cdef.GetName();
         bool isT1AirConstructor = (uname == "armca" || uname == "corca" || uname == "legca");
         bool isT2AirConstructor = (uname == "armaca" || uname == "coraca" || uname == "legaca");
 
-        if (isT1AirConstructor) {
-            array<string> allT1AirCons = UnitHelpers::GetAllT1AirConstructors();
-            int totalT1 = UnitDefHelpers::SumUnitDefCounts(allT1AirCons);
-            if (totalT1 < 50) {
-                unit.AddAttribute(Unit::Attr::BASE.type);
-                GenericHelpers::LogUtil("[Air][Builder] T1 air constructor id=" + unit.id + " given BASE (totalT1=" + totalT1 + " < 50)", 3);
-                // Preserve previous energizer tracking for backward compatibility
-                if (energizer1 is null) { @energizer1 = unit; }
-            }
+        if (isT1AirConstructor && unit !is Builder::primaryT1AirConstructor) {
+            unit.DelAttribute(Unit::Attr::BASE.type);
         }
         else if (isT2AirConstructor) {
-            array<string> allT2AirCons; allT2AirCons = { "armaca", "coraca", "legaca" };
-            int totalT2 = UnitDefHelpers::SumUnitDefCounts(allT2AirCons);
-            if (totalT2 < 5) {
-                unit.AddAttribute(Unit::Attr::BASE.type);
-                GenericHelpers::LogUtil("[Air][Builder] T2 air constructor id=" + unit.id + " given BASE (totalT2=" + totalT2 + " < 5)", 3);
-                if (energizer2 is null) { @energizer2 = unit; }
-            }
+            // Advanced air constructors must be able to take expansion and
+            // advanced-economy tasks instead of all becoming base energizers.
+            unit.DelAttribute(Unit::Attr::BASE.type);
         }
 
-	}
-
-    void Air_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
-	{
-		if (energizer1 is unit)
-			@energizer1 = null;
-		else if (energizer2 is unit)
-			@energizer2 = null;
 	}
 
     void Air_BuilderAiTaskAdded(IUnitTask@ task) {
@@ -1034,17 +704,12 @@ namespace RoleAir {
 
     ******************************************************************************/
 
-    IUnitTask@ Air_T1Constructor_AiMakeTask(CCircuitUnit@ u) {
+    IUnitTask@ Air_T1Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask) {
         // Snapshot economy
         //float mi = Global::Economy::MetalIncome;
         //float ei = Global::Economy::EnergyIncome;
-        const SResourceInfo@ metal = aiEconomyMgr.metal;
-		const SResourceInfo@ energy = aiEconomyMgr.energy;
-		
-		float mi  = metal.income;
-		float ei  = energy.income;
-        // Deprecated: avoid writing to Global::Economy shadow; rely on aiEconomyMgr instead
-        bool isEnergyFull = aiEconomyMgr.isEnergyFull;
+		float mi = Economy::GetMinMetalIncomeLast10s();
+		float ei = Economy::GetMinEnergyIncomeLast10s();
 
         AIFloat3 conLocation = u.GetPos(ai.frame);
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
@@ -1146,15 +811,11 @@ namespace RoleAir {
                 IUnitTask@ tAdvSolar = Builder::EnqueueT1AdvancedSolar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
                 if (tAdvSolar !is null) return tAdvSolar;
             } 
-        } else if (EconomyHelpers::ShouldAssistPrimaryWorker(
-            /*energyIncome*/ ei,
-            /*minEnergyIncome*/ Global::RoleSettings::Air::AssistPrimaryWorkerEnergyIncomeMinimum
-        )) {
-            return GuardHelpers::AssignWorkerGuard(u, Builder::primaryT1AirConstructor, Task::Priority::HIGH, true, 160 * SECOND);
         }
 
-        // Default: allow null to propagate to central fallback
-        return null;
+        // Non-primary constructors and exhausted custom policy retain the
+        // already-created native expansion or economy task.
+        return defaultTask;
     }
 
 
@@ -1187,14 +848,10 @@ namespace RoleAir {
         @cfg.AiIsSwitchAllowedHandler = cast<AiIsSwitchAllowedDelegate@>(@Air_AiIsSwitchAllowed);
         @cfg.MakeSwitchIntervalHandler = cast<MakeSwitchIntervalDelegate@>(@Air_MakeSwitchInterval);
 
-        @cfg.FactoryAiUnitAdded = cast<AiUnitAddedDelegate@>(@Air_FactoryAiUnitAdded);
-        @cfg.FactoryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_FactoryAiUnitRemoved);
-
         @cfg.BuilderAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_BuilderAiMakeTask);
         @cfg.FactoryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_FactoryAiMakeTask);
         
         @cfg.BuilderAiUnitAdded = cast<AiUnitAddedDelegate@>(@Air_BuilderAiUnitAdded);
-        @cfg.BuilderAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_BuilderAiUnitRemoved);
 
         @cfg.BuilderAiTaskAddedHandler = cast<AiTaskAddedDelegate@>(@Air_BuilderAiTaskAdded);
         @cfg.BuilderAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_BuilderAiTaskRemoved);
@@ -1203,12 +860,6 @@ namespace RoleAir {
         @cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate@>(@Air_EconomyUpdate);
 
         @cfg.AiIsAirValidHandler = cast<AiIsAirValidDelegate@>(@Air_AiIsAirValid);
-        //@cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_MilitaryAiMakeTask);
-        // Track military unit creation/removal so we can upgrade existing bombers when the gate opens
-        @cfg.MilitaryAiUnitAdded = cast<AiUnitAddedDelegate@>(@Air_MilitaryAiUnitAdded);
-        @cfg.MilitaryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_MilitaryAiUnitRemoved);
-        
-
         @cfg.RoleMatchHandler = cast<RoleMatchDelegate@>(@Air_RoleMatch);
 
         RoleConfigs::Register(cfg);

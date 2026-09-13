@@ -474,7 +474,7 @@ namespace EconomyHelpers {
             return false;
         }
         bool miOk = (mi >= requiredMetalIncome);
-        bool mcOk = true;//(metalCurrent >= requiredMetalCurrent);
+        bool mcOk = (metalCurrent >= requiredMetalCurrent);
         bool eiOk = (ei >= requiredEnergyIncome);
         bool econOk = (miOk && mcOk && eiOk);
         bool countOk = (t2AirPlantCount < maxAllowed);

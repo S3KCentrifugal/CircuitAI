@@ -100,7 +100,7 @@ The experimental runtime sequence is:
 |---|---|
 | FRONT (`src/roles/front.as`) | Land-force opening, bot/vehicle factory specialization, adaptive production, income-driven caps, guard behavior, defence construction, and delayed army-versus-enemy-surface quota hysteresis. |
 | SUPPORT (`src/roles/support.as`) | Economy/support opening, restricted combat/air/nuke access, resurrection and assistance focus, commander/constructor guarding, and income-scaled builder limits. |
-| AIR (`src/roles/air.as`) | Air factory production, fighter/bomber gating, support-fighter tracking, bomber role/fire-state changes, air-specific economy limits, and delayed air-force-versus-enemy-air quotas. |
+| AIR (`src/roles/air.as`) | Air factory production with bounded constructor/fighter/heavy-air quotas, a small economy-gated strike opener, expansion-capable air constructors, and delayed air-force-versus-enemy-air quotas. Combat aircraft retain their profile-defined roles and use native military task assignment. |
 | TECH (`src/roles/tech.as`) | T2/T3/nuke strategies, strict tier caps, storage and energy progression, mex upgrades, gantries, strategic objectives, constructor donation, and extensive economy-dependent build routing. |
 | SEA (`src/roles/sea.as`) | Shipyard starts, naval production, tidal/sea economy, naval fire states, sea constructors and donation, and fleet-versus-enemy-water quota adjustment. |
 | TACTICAL (`src/roles/tactical.as`) | Hover-focused opening, tactical constructors, map-objective execution, hover production, objective-based static construction, and mixed-terrain expansion. This replaces the older HOVER_SEA name. |
