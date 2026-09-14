@@ -15,7 +15,11 @@ namespace Init {
 	{
 		SCategoryInfo category;
 		category.air   = "VTOL NOTSUB";
-		category.land  = "SURFACE NOTSUB";
+		// EMPABLE is a distinct category bit (BAR: alldefs_post.lua "categories.EMPABLE"),
+		// semantically SURFACE + paralyzable. Without it, weapons that target only
+		// EMPABLE (armemp, armspid) intersect no mask, so CCircuitDef computes zero
+		// DPS and zero maxRange and they never acquire a target.
+		category.land  = "SURFACE NOTSUB EMPABLE";
 		category.water = "UNDERWATER NOTHOVER";
 		category.bad   = "MINE";
 		category.good  = "";
