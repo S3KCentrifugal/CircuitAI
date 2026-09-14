@@ -84,25 +84,6 @@ namespace Military {
 		// }
 	}
 
-	/*
-	* anti-air threat threshold;
-	* air factories will stop production when AA threat exceeds
-	*/
-	// FIXME: Remove/replace, deprecated.
-	bool AiIsAirValid()
-	{
-		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		if(cfg !is null && cfg.AiIsAirValidHandler !is null) {
-			return cfg.AiIsAirValidHandler();
-		} else {
-			float aaThreat = aiEnemyMgr.GetEnemyThreat(uint(Unit::Role::AA.type));
-			if (aaThreat > 1e12f) aaThreat = 0.f; // Sanitize garbage
-			bool isAirValid = aaThreat <= 90000.f;
-			GenericHelpers::LogUtil("AiIsAirValid: " + isAirValid, 2);
-			return isAirValid;
-		}	
-	}
-
 	// ==================== Enemy Threat Layer Cache & Helpers ====================
 
 	// Cached per-layer threats and weights, updated periodically from Main::AiUpdate.

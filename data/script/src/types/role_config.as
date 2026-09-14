@@ -28,7 +28,6 @@ funcdef string SelectFactoryDelegate(const AIFloat3& in pos, bool isStart, bool 
 funcdef void EconomyUpdateDelegate();
 
 
-funcdef bool AiIsAirValidDelegate();
 funcdef void AiMakeDefence(int cluster, const AIFloat3& in pos);
 
 // Dynamic role matching: boolean match; first registered match wins
@@ -68,7 +67,6 @@ class RoleConfig {
     AiUnitAddedDelegate@ MilitaryAiUnitAdded; 
     AiUnitRemovedDelegate@ MilitaryAiUnitRemoved;
 
-    AiIsAirValidDelegate@ AiIsAirValidHandler;
     AiMakeDefence@ AiMakeDefenceHandler;
 
     SelectFactoryDelegate@ SelectFactoryHandler;

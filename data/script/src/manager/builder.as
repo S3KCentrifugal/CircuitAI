@@ -1932,6 +1932,17 @@ namespace Builder {
 		return _EnqueueGenericByName(btype, name, anchor, shake, timeoutFrames, prio);
 	}
 
+	// Called by CBuilderManager::AssignTask() and FallbackTask() right after a
+	// builder receives a task (upstream a78e0f6c). Observation only.
+	// CCircuitUnit is asOBJ_NOCOUNT (borrowed): do not retain the handle.
+	void AiTaskAssigned(CCircuitUnit@ unit)
+	{
+		if (unit is null) {
+			return;
+		}
+		GenericHelpers::LogUtil("[BUILDER] AiTaskAssigned id=" + unit.id, 4);
+	}
+
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u) {
 		IUnitTask@ t = null;
 		GenericHelpers::LogUtil("[BUILDER] AiMakeTask called for builder id=" + u.id, 4);

@@ -51,6 +51,16 @@ namespace Main {
 	{
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 
+		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
+		//     GetEnemyThreat(AA) <= maxAAThreat
+		// and CFactoryManager/CFactoryData use it to suspend air production.
+		// Raise the ceiling far above any reachable AA threat so air is always
+		// buildable. This is the supported replacement for the removed
+		// Military::AiIsAirValid hook (upstream a78e0f6c, 2025-11-02).
+		// Runs after CEnemyManager::ReadConfig() (AllyTeam.cpp:81), so it wins
+		// over the quota.aa_threat value derived from map size.
+		aiEnemyMgr.maxAAThreat = 1.0e30f;
+
 		GenericHelpers::LogUtil("registerMaps", 1);
 		Maps::registerMaps();
 		// Map + profile setup deferred until first factory selection in AiGetFactoryToBuild

@@ -223,10 +223,6 @@ namespace RoleTactical {
 
 	******************************************************************************/
     
-	bool Tactical_AiIsAirValid() {
-		return true;
-	}
-
 
 	/******************************************************************************
 
@@ -705,7 +701,6 @@ namespace RoleTactical {
 		@cfg.SelectFactoryHandler = cast<SelectFactoryDelegate@>(@Tactical_SelectFactoryHandler);
 		@cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate@>(@Tactical_EconomyUpdate);
 
-		@cfg.AiIsAirValidHandler = cast<AiIsAirValidDelegate@>(@Tactical_AiIsAirValid);
 
 		@cfg.RoleMatchHandler = cast<RoleMatchDelegate@>(@Tactical_RoleMatch);
 

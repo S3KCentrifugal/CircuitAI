@@ -873,12 +873,6 @@ namespace RoleTech
 		return aiMilitaryMgr.DefaultMakeTask(u);
 	}
 
-	bool Tech_AiIsAirValid()
-	{
-		GenericHelpers::LogUtil("[TECH] Enter Tech_AiIsAirValid", 4);
-		return true;
-	}
-
 	void Tech_AiMakeDefence(int cluster, const AIFloat3& in pos)
 	{
 		// float metalIncome = Economy::GetMetalIncome();
@@ -1753,7 +1747,6 @@ namespace RoleTech
 		@cfg.SelectFactoryHandler = cast<SelectFactoryDelegate @>(@Tech_SelectFactoryHandler);
 		@cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate @>(@Tech_EconomyUpdate);
 
-		@cfg.AiIsAirValidHandler = cast<AiIsAirValidDelegate @>(@Tech_AiIsAirValid);
 		@cfg.AiMakeDefenceHandler = cast<AiMakeDefence @>(@Tech_AiMakeDefence);
 
 		@cfg.RoleMatchHandler = cast<RoleMatchDelegate @>(@Tech_RoleMatch);

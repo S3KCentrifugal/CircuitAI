@@ -693,11 +693,6 @@ namespace RoleAir {
 
     ******************************************************************************/
     
-    bool Air_AiIsAirValid() {
-        //GenericHelpers::LogUtil("[AIR] Enter Air_AiIsAirValid", 4);
-        return true;
-    }
-
     // If the unit is a bomber and we have fewer than a minimum bomber count globally,
     // return null to defer making a task (avoid trickling in solo bombers).
     // IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
@@ -1041,7 +1036,6 @@ namespace RoleAir {
         @cfg.SelectFactoryHandler = cast<SelectFactoryDelegate@>(@Air_SelectFactoryHandler);
         @cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate@>(@Air_EconomyUpdate);
 
-        @cfg.AiIsAirValidHandler = cast<AiIsAirValidDelegate@>(@Air_AiIsAirValid);
         @cfg.RoleMatchHandler = cast<RoleMatchDelegate@>(@Air_RoleMatch);
 
         RoleConfigs::Register(cfg);
