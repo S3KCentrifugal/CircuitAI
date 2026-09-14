@@ -61,6 +61,29 @@ When changing classification or economy logic, check BAR values used by CircuitA
 - Do not infer a valid factory edge merely because both UnitDefs exist. Verify the builder's effective BAR `buildoptions` under the relevant mod options.
 - Avoid changing legacy, experimental, and `data_v2` implementations together unless the requirement explicitly spans them.
 
+## Runtime Logs and Diagnostics
+
+Beyond All Reason writes its runtime log to the writeable data directory of the
+local install. Do not hard-code a username; the layout is portable:
+
+| Artifact | Path |
+| --- | --- |
+| Current run | `%LOCALAPPDATA%\Programs\Beyond-All-Reason\data\infolog.txt` |
+| Archived runs | `%LOCALAPPDATA%\Programs\Beyond-All-Reason\data\log\<YYYYMMDDHHMMSS>_infolog.txt` |
+| Replays, setup, desync dumps | `demos\`, `_script.txt`, `ClientGameState-*.txt` in the same data directory |
+
+In Git Bash, `$LOCALAPPDATA` expands correctly. If the install is relocated,
+the log records the authoritative directory on its `FindWriteableDataDir` line.
+
+`infolog.txt` is overwritten on every launch, and `RotateLogFiles = 1` archives
+the previous run under `log/`. These files are frequently hundreds of megabytes
+and over a million lines, dominated by CircuitAI's own `:::AI LOG` output.
+Never read one whole. Establish size, locate the incident with `grep -n`, then
+read a bounded window. Apply `skills/troubleshoot-bar-logs/SKILL.md` when
+investigating a crash, a runtime misbehaviour, a desync, or a startup failure;
+it covers size discipline, crash-marker search, AI log filtering, and
+symbolising `SkirmishAI.dll` stack offsets.
+
 ## Validation
 
 Use the cheapest focused validation available in this repository, then broaden according to risk.
