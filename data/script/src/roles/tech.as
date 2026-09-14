@@ -1240,6 +1240,22 @@ namespace RoleTech
 
 	******************************************************************************/
 
+	// Finishing a reactor that is already under construction beats starting any new
+	// energy structure: the metal is already committed, and an unfinished reactor
+	// produces nothing until it completes. Returns an assist task when a Fusion or
+	// Advanced Fusion is in progress, otherwise null so the caller proceeds normally.
+	// A merely queued reactor does not qualify - see Builder::GetReactorUnderConstruction.
+	IUnitTask @Tech_RedirectEnergyToReactor(const string &in what)
+	{
+		IUnitTask @assist = Builder::EnqueueAssistReactor(Task::Priority::HIGH, 60 * SECOND);
+		if (assist !is null)
+		{
+			GenericHelpers::LogUtil("[TECH][Energy] Reactor under construction; redirecting "
+				+ what + " to assist it instead", 2);
+		}
+		return assist;
+	}
+
 	IUnitTask @Tech_T1BotConstructor_AiMakeTask(CCircuitUnit @u, float metalIncome, float energyIncome, IUnitTask @defaultTask)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_T1BotConstructor_AiMakeTask", 4);
@@ -1339,6 +1355,9 @@ namespace RoleTech
 				Global::RoleSettings::Tech::BuildT1ConvertersMinimumEnergyIncome,
 				Global::RoleSettings::Tech::BuildT1ConvertersMinimumEnergyCurrentPercent))
 		{
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 energy converter");
+			if (redirect !is null)
+				return redirect;
 			IUnitTask @tConv = Builder::EnqueueT1EnergyConverter(unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
 			if (tConv !is null)
 				return tConv;
@@ -1349,6 +1368,9 @@ namespace RoleTech
 				/*ei*/ energyIncome,
 				/*min*/ Global::RoleSettings::Tech::SolarEnergyIncomeMinimum))
 		{
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 solar");
+			if (redirect !is null)
+				return redirect;
 			IUnitTask @tSolar = Builder::EnqueueT1Solar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 75);
 			if (tSolar !is null)
 				return tSolar;
@@ -1386,6 +1408,9 @@ namespace RoleTech
 				/*enableT2ProgressGate*/ true,
 				/*metalIncomeFallbackMinimum*/ 6.0f))
 		{
+				IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced solar");
+				if (redirect !is null)
+					return redirect;
 				IUnitTask @tAdvSolar = Builder::EnqueueT1AdvancedSolar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 75);
 			if (tAdvSolar !is null)
 				return tAdvSolar;
@@ -1484,6 +1509,9 @@ namespace RoleTech
 				/*reqEi*/ Global::RoleSettings::Tech::MinimumEnergyIncomeForAdvConverter))
 		{
 			GenericHelpers::LogUtil("[TECH] Economy OK to build Advanced Energy Converter", 2);
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced energy converter");
+			if (redirect !is null)
+				return redirect;
 			IUnitTask @tConv = Builder::EnqueueAdvEnergyConverter(unitSide, Factory::GetT2BotLabPos(), SQUARE_SIZE * 32, SECOND * 60);
 			if (tConv !is null)
 				return tConv;

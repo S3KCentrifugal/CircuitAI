@@ -523,6 +523,13 @@ namespace Builder {
 	// Counts of queued Fusion/Advanced Fusion build tasks (across all roles)
 	int FusionQueuedCount = 0;
 	int AdvancedFusionQueuedCount = 0;
+
+	// Build tasks for an in-progress reactor, retained from enqueue time so that
+	// spare build power can be redirected onto them. IUnitTask is reference-counted
+	// (doc/angelscript-references.md), so these handles are safe to hold across
+	// callbacks; they are released in AiTaskRemoved.
+	IUnitTask@ FusionBuildTask = null;
+	IUnitTask@ AdvancedFusionBuildTask = null;
 	// Counts of queued Gantry (experimental) build tasks
 	int LandGantryQueuedCount = 0;
 	int WaterGantryQueuedCount = 0;
@@ -631,6 +638,43 @@ namespace Builder {
 	bool IsAdvancedFusionBuildQueued() { return AdvancedFusionQueuedCount > 0 || IsAdvancedFusionQueued; }
 	bool IsGantryBuildQueued() { return (LandGantryQueuedCount + WaterGantryQueuedCount) > 0; }
 	bool IsNukeSiloBuildQueued() { return NukeSiloQueuedCount > 0; }
+
+	// A reactor is "under construction" only once its build task has a target: the
+	// structure exists on the map and is being built. A merely queued task has a
+	// null target and must not divert build power.
+	CCircuitUnit@ _ReactorUnderConstruction(IUnitTask@ t)
+	{
+		if (t is null) return null;
+		IBuilderTask@ bt = cast<IBuilderTask>(t);
+		if (bt is null) return null;
+		CCircuitUnit@ tgt = bt.target;
+		if (tgt is null) return null;
+		// CCircuitUnit is asOBJ_NOCOUNT; reacquire a live handle before use.
+		return ai.GetTeamUnit(tgt.id);
+	}
+
+	// Advanced Fusion first: it is the more expensive commitment to finish.
+	CCircuitUnit@ GetReactorUnderConstruction()
+	{
+		CCircuitUnit@ u = _ReactorUnderConstruction(AdvancedFusionBuildTask);
+		if (u !is null) return u;
+		return _ReactorUnderConstruction(FusionBuildTask);
+	}
+
+
+	// Redirect build power onto an in-progress reactor. Repairing an unfinished
+	// structure is the engine's assist mechanism - IBuilderTask::UpdateTarget issues
+	// the same CmdRepair to its own assignees - and IRepairTask::SetRepTarget treats
+	// an IsBeingBuilt() target as a construction assist.
+	IUnitTask@ EnqueueAssistReactor(Task::Priority prio, int timeoutFrames)
+	{
+		CCircuitUnit@ reactor = GetReactorUnderConstruction();
+		if (reactor is null) return null;
+		IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Repair(prio, reactor, timeoutFrames));
+		GenericHelpers::LogUtil("[BUILDER] EnqueueAssistReactor: reactor id=" + reactor.id
+			+ " result=" + (t is null ? "null" : "ok"), 2);
+		return t;
+	}
 
 	// Pick a candidate from a guard map, optionally skipping any in 'avoids'.
 	// Returns the chosen CCircuitUnit@ and removes it from the guard map; null if none.
@@ -1603,6 +1647,7 @@ namespace Builder {
 			//TaskB::Factory(Task::Priority::NOW, afus, anchor, afus, squareSize, false, true, timeoutFrames)
 		);
 		GenericHelpers::LogUtil("[BUILDER] Enqueue AFUS result=" + (t is null ? "null" : "ok"), 2);
+		if (t !is null) @AdvancedFusionBuildTask = t;
 		return t;
 	}
 
@@ -1686,6 +1731,7 @@ namespace Builder {
 			//TaskB::Factory(Task::Priority::NOW, fus, anchor, fus, squareSize, false, true, timeoutFrames)
 		);
 		GenericHelpers::LogUtil("[BUILDER] Enqueue FUS result=" + (t is null ? "null" : "ok"), 2);
+		if (t !is null) @FusionBuildTask = t;
 		return t;
 	}
 
@@ -2143,6 +2189,16 @@ namespace Builder {
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
 		GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved called done=" + done, 4);
+
+		// Release retained reactor tasks by identity, independent of def-name matching.
+		if (FusionBuildTask !is null && FusionBuildTask is task) {
+			@FusionBuildTask = null;
+			GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: released Fusion build task", 2);
+		}
+		if (AdvancedFusionBuildTask !is null && AdvancedFusionBuildTask is task) {
+			@AdvancedFusionBuildTask = null;
+			GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: released Advanced Fusion build task", 2);
+		}
 		// Resolve metadata BEFORE clearing tracks; prefer tracked
 		BuilderTaskTrack@ tr = GetTrackByTask(task);
 		string bname = (tr is null ? "" : tr.defName);
