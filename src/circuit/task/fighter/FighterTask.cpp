@@ -99,8 +99,12 @@ void IFighterTask::OnUnitIdle(CCircuitUnit* unit)
 	}
 	unit->SetTaskFrame(manager->GetCircuit()->GetLastFrame());
 
-	if (!unit->GetTravelAct()->IsFinished()) {
-		unit->GetTravelAct()->InvalidateLastSector();
+	// NOTE: CCombatTask, CRallyTask, CSupportTask and CSuperTask drive units with raw
+	// commands and never PushTravelAct(), so travelAct is null for them (and after any
+	// CCircuitUnit::ClearAct()). Guard before dereferencing.
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
+		travelAct->InvalidateLastSector();
 	}
 }
 
