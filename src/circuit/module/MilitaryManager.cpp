@@ -285,7 +285,7 @@ void CMilitaryManager::InitHandlers()
 		} else {
 //			damagedHandler[unitDefId] = structDamagedHandler;
 			if (cdef.IsRoleSuper()) {
-				if (cdef.IsAttacker()) {
+				if (cdef.IsAttacker() || cdef.IsAttrStock()) {
 					createdHandler[unitDefId] = superCreatedHandler;
 					finishedHandler[unitDefId] = superFinishedHandler;
 					destroyedHandler[unitDefId] = superDestroyedHandler;
