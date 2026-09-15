@@ -258,6 +258,13 @@
 			// "power": 1.0,
 			//	"since": 900
 			//},			
+			"legjuno":{
+				"role": ["super", "static", "artillery", "juno"],
+				"threat":{"air": 0.1, "water": 0.1, "surf": 1},
+				"fire_state": 2,
+				"on": true,
+				"limit": 3
+			},
 			"legdtr": {
 				"role": ["static"]
 			},
@@ -1106,18 +1113,19 @@
 			},
 			"legmh": {
 				"role": ["artillery"],
-				"attribute": ["siege"],
+				"attribute": ["siege", "rare"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legah": {
 				"role": ["anti_air"],
-				"attribute":["support"],
+				"attribute":["support", "rare"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legcar": {
 				"role": ["heavy", "skirmish"],
+				"attribute": ["rare"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			}

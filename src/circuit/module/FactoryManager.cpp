@@ -132,6 +132,30 @@ void CFactoryManager::InitHandlers()
 		this->circuit->GetEconomyManager()->AddFactoryInfo(unit);
 		UnitAdded(unit, UseAs::FACTORY);
 
+		// UnitAdded runs AngelScript (Factory::AiUnitAdded), and script may give the unit
+		// away before returning - ai.GiveUnits() -> economy->SendUnits() -> the engine
+		// raises EVENT_UNIT_CAPTURED -> CCircuitAI::UnitCaptured -> IModule::UnitCaptured
+		// -> UnitDestroyed -> factoryDestroyedHandler -> DisableFactory (a no-op here,
+		// because EnableFactory has not run yet) -> UnregisterTeamUnit -> SetIsDead().
+		// Control then returns here, and without this guard EnableFactory would insert a
+		// unit that is already dead. CCircuitAI::ActionUpdate later sees IsDead() and
+		// calls DeleteTeamUnit, freeing it, so `factories` is left holding a dangling
+		// CCircuitUnit*. The next reader of that vector dereferences freed memory:
+		// NeedUpgrade does `factoryDefs.find(fac.unit->GetCircuitDef()->GetId())` and
+		// GetClosestFactory does `IsT1Factory(fac.unit->GetCircuitDef())`.
+		//
+		// Observed 2026-09-15, f=0052102: access violation in NeedUpgrade, reached via
+		// CScheduler::ProcessJobs -> CEconomyManager::UpdateFactoryTasks ->
+		// CheckAssistRequired. The unit pointer was still readable but its circuitDef
+		// field was not, i.e. the CCircuitUnit had been freed. The match ran 16 AIs that
+		// were donating units continuously (Team::TryDonate -> ai.GiveUnits).
+		//
+		// CCircuitAI::UnitFinished guards its own post-callback work the same way:
+		//     if (!unit->IsDead())  // AiUnitAdded script can give away unit by now
+		if (unit->IsDead()) {
+			return;
+		}
+
 		lastSwitchFrame = this->circuit->GetLastFrame();
 		EnableFactory(unit);
 	};

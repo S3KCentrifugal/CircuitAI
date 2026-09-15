@@ -582,15 +582,21 @@ namespace UnitHelpers {
     // Returns fast T2 combat bots for a given side (canonical unit IDs)
     // armada: armfast (Sprinter), cortex: corpyro (Fiend), legion: legstr (Hoplite)
     array<string> GetFastT2Bots(const string &in side) {
+        // NOTE: these are the T2 COMBAT bots built from the advanced bot lab, not the
+        // fast-assist bots - see GetFastAssistBots for those. This function previously
+        // returned armfark/corfast/legaceb, i.e. the assist bots, which made the TECH
+        // T2 combat batch queue assist bots at every advanced lab.
+        // Verified against BAR buildoptions: armalab->armfast, coralab->corpyro,
+        // legalab->legstr.
         array<string> ids;
         if (side == "armada") {
-            ids = { "armfark" };
+            ids = { "armfast" };    // Sprinter
         } else if (side == "cortex") {
-            ids = { "corfast" };
+            ids = { "corpyro" };    // Fiend
         } else if (side == "legion") {
-            ids = { "legaceb" };
+            ids = { "legstr" };     // Hoplite
         } else {
-            ids = { "armfark", "corfast", "legaceb" };
+            ids = { "armfast", "corpyro", "legstr" };
         }
         return ids;
     }

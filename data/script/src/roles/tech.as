@@ -32,6 +32,14 @@ namespace RoleTech
 	// Global fast-assist cap for TECH role (computed from income in Tech_IncomeBuilderLimits)
 	int g_fastAssistBotCap = 0;
 
+	// Engine-supplied maxthisunit for the T2 rush bots - Sprinter (armfast),
+	// Fiend (corpyro), Hoplite (legstr) - snapshotted before Tech_ApplyStartLimits
+	// zeroes the combat lists, so the rush can restore the real value instead of an
+	// invented one. The engine value is MAX_UNITS clamped by any game-level unit
+	// restriction (Recoil UnitDef.cpp: maxThisUnit / unitRestricted), which a
+	// hardcoded cap would silently ignore.
+	dictionary g_rushBotEngineCaps;
+
 	/******************************************************************************
 
 	INITIALIZATION
@@ -65,14 +73,67 @@ namespace RoleTech
 		ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::TECH, "TECH");
 	}
 
+	// Restore the engine's own maxthisunit for Sprinter/Fiend/Hoplite. Called when the
+	// T2 rush is active so the rush bots are never the limiting factor; falls back to
+	// leaving the def alone if no snapshot exists.
+	void Tech_UncapRushBots(const string &in reason)
+	{
+		array<string> rushBots = UnitHelpers::GetAllFastT2Bots();
+		for (uint i = 0; i < rushBots.length(); ++i)
+		{
+			CCircuitDef @rd = ai.GetCircuitDef(rushBots[i]);
+			if (rd is null)
+				continue;
+
+			int engineCap = 0;
+			if (!g_rushBotEngineCaps.get(rushBots[i], engineCap))
+			{
+				GenericHelpers::LogUtil("[TECH][Limits] No engine cap snapshot for rush bot '"
+					+ rushBots[i] + "'; leaving cap at " + rd.maxThisUnit, 2);
+				continue;
+			}
+			if (rd.maxThisUnit != engineCap)
+			{
+				rd.maxThisUnit = engineCap;
+				GenericHelpers::LogUtil("[TECH][Limits] Rush bot '" + rushBots[i]
+					+ "' uncapped to engine limit " + engineCap + " (" + reason + ")", 2);
+			}
+		}
+	}
+
 	void Tech_ApplyStartLimits()
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_ApplyStartLimits", 4);
 
 		// ****************** COMBAT UNIT LIMITS ****************** //
 		// Don't let tech player build anything except t3. Or logically enable T1/T2 later if desired
+		//
+		// Snapshot the rush bots first. armfast is currently filed under
+		// GetArmadaT1CombatUnits() while corpyro/legstr are in the T2 lists, so both
+		// blanket caps below can zero them; capturing by name covers either list.
+		{
+			array<string> rushBots = UnitHelpers::GetAllFastT2Bots();
+			for (uint i = 0; i < rushBots.length(); ++i)
+			{
+				CCircuitDef @rd = ai.GetCircuitDef(rushBots[i]);
+				if (rd !is null)
+					g_rushBotEngineCaps.set(rushBots[i], rd.maxThisUnit);
+			}
+		}
+
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT1CombatUnits(), Global::RoleSettings::Tech::StartCapT1CombatUnits);
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2CombatUnits(), Global::RoleSettings::Tech::StartCapT2CombatUnits);
+
+		// T2_RUSH is decided in Main::AiMain by ApplyTechStrategyWeights, which runs
+		// before ApplyProfileSettings reaches Tech_Init, so the strategy is known here.
+		// When the rush is on, the three rush bots must not be capped: they are what
+		// the additional T2 bot labs exist to produce, alongside T3 from the gantry.
+		// The primary T2 lab still makes fast-assist bots - that branch is ordered
+		// ahead of the combat batch in Tech_FactoryAiMakeTask.
+		if (Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH))
+		{
+			Tech_UncapRushBots("T2_RUSH enabled at start");
+		}
 
 		// ****************** REZBOT LIMITS ****************** //
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllRezBots(), Global::RoleSettings::Tech::StartCapRezBots);
@@ -282,6 +343,40 @@ namespace RoleTech
 			}
 		}
 
+		// --- Dynamic T2 Bot Lab cap ---
+		// The primary T2 bot lab is reserved for fast-assist production, so the T2 combat
+		// rush depends on additional labs existing. Tech_ApplyStartLimits pins maxThisUnit to
+		// StartCapT2BotLabs (1) and nothing raised it again, unlike T1 bot labs below, so a
+		// second lab was impossible: CCircuitDef::IsAvailable() is maxThisUnit > count, and
+		// Builder::EnqueueT2BotLabIfNeeded bails on that check.
+		{
+			int allowedT2Labs = EconomyHelpers::AllowedT2BotLabCountFromIncome(
+				/*mi*/ metalIncome,
+				/*ei*/ energyIncome,
+				/*metalIncomePerLab*/ Global::RoleSettings::Tech::MetalIncomePerT2Lab,
+				/*energyIncomePerLab*/ Global::RoleSettings::Tech::EnergyIncomePerT2Lab);
+			if (allowedT2Labs < 1)
+				allowedT2Labs = 1;
+			if (allowedT2Labs > Global::RoleSettings::Tech::MaxT2BotLabs)
+				allowedT2Labs = Global::RoleSettings::Tech::MaxT2BotLabs;
+
+			UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2BotLabs(), allowedT2Labs);
+
+			// Re-assert the rush bots' engine cap. Tech_IncomeBuilderLimits and the
+			// storage-unlock branch both re-apply Global::Map::MergedUnitLimits, which can
+			// re-cap these defs; this runs after those and is a no-op when already correct.
+			if (Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH))
+			{
+				Tech_UncapRushBots("T2 lab cap update, allowed=" + allowedT2Labs);
+			}
+			GenericHelpers::LogUtil(
+				"[TECH][Labs] T2 bot lab cap=" + allowedT2Labs +
+					" (mi=" + metalIncome + "/" + Global::RoleSettings::Tech::MetalIncomePerT2Lab +
+					" ei=" + energyIncome + "/" + Global::RoleSettings::Tech::EnergyIncomePerT2Lab +
+					" max=" + Global::RoleSettings::Tech::MaxT2BotLabs + ")",
+				3);
+		}
+
 		// --- Dynamic T1 Bot Lab caps and land factory placement after eco threshold ---
 		if (!hasAppliedT1EcoThreshold && metalIncome >= Global::RoleSettings::Tech::MetalIncomeThresholdForBotLabExpansion)
 		{
@@ -487,8 +582,15 @@ namespace RoleTech
 				}
 			}
 
-			// New: If fast-assist bots are below their dynamic cap and we have high metal reserves, queue one
+			// If fast-assist bots are below their dynamic cap and we have high metal reserves, queue one.
 			// Cap mirrors Tech_IncomeBuilderLimits: fastAssistBotCap = 5 * int(metalIncome / 45.0f)
+			//
+			// PRIMARY lab only. This branch returns, so without the guard it starves the T2
+			// combat batch further down: g_fastAssistBotCap scales with income without bound,
+			// so haveAssist never catches it and the rush never starts. Additional T2 bot labs,
+			// unlocked by economy in Tech_EconomyUpdate, carry the rush instead. Mirrors the
+			// primary-plant guard used for air constructor upkeep below.
+			if (Factory::primaryT2BotLab !is null && u.id == Factory::primaryT2BotLab.id)
 			{
 				array<string> fastAssist = UnitHelpers::GetFastAssistBots(side);
 				int haveAssist = UnitDefHelpers::SumUnitDefCounts(fastAssist);
