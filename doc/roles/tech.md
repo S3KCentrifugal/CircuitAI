@@ -4,8 +4,8 @@ Reference for the `TECH` AngelScript role: how it is loaded, which native
 callbacks reach it, which registered C++ APIs it depends on, how its decisions
 are actually gated, and where it is currently broken.
 
-Source: `data/script/src/roles/tech.as` (~1815 lines). Line references are as of
-branch `smrt`, 2026-09-14. Prefer function names over line numbers when
+Source: `data/script/src/roles/tech.as` (1923 lines), namespace `RoleTech`. Line
+references are as of branch `smrt`, 2026-09-17. Prefer function names over line numbers when
 navigating.
 
 ## Contents
@@ -71,12 +71,20 @@ manager namespace implements them and dispatches to the active role through a
 | `void AiTaskRemoved(IUnitTask@, bool)` | `Builder::AiTaskRemoved` | `BuilderAiTaskRemovedHandler` | `Tech_BuilderAiTaskRemoved` |
 | `void AiUnitAdded(CCircuitUnit@, Unit::UseAs)` | `Builder::AiUnitAdded` | `BuilderAiUnitAdded` | `Tech_BuilderAiUnitAdded` |
 | `void AiUnitAdded(CCircuitUnit@, Unit::UseAs)` | `Factory::AiUnitAdded` | `FactoryAiUnitAdded` | `Tech_FactoryAiUnitAdded` |
+| `void AiUnitRemoved(CCircuitUnit@, Unit::UseAs)` | `Builder::AiUnitRemoved` | `BuilderAiUnitRemoved` | `Tech_BuilderAiUnitRemoved` |
+| `void AiUnitRemoved(CCircuitUnit@, Unit::UseAs)` | `Factory::AiUnitRemoved` | `FactoryAiUnitRemoved` | `Tech_FactoryAiUnitRemoved` |
 | `void AiUpdateEconomy()` | `Economy::AiUpdateEconomy` | `EconomyUpdateHandler` | `Tech_EconomyUpdate` |
 | `bool AiIsSwitchTime(int)` | `Factory::AiIsSwitchTime` | `AiIsSwitchTimeHandler` | `Tech_AiIsSwitchTime` |
 | `bool AiIsSwitchAllowed(CCircuitDef@)` | `Factory::AiIsSwitchAllowed` | `AiIsSwitchAllowedHandler` | `Tech_AiIsSwitchAllowed` |
+| `int AiMakeSwitchInterval()` | `Factory::AiMakeSwitchInterval` | `MakeSwitchIntervalHandler` | `Tech_MakeSwitchInterval` |
 | `CCircuitDef@ AiGetFactoryToBuild(...)` | `Factory::AiGetFactoryToBuild` | `SelectFactoryHandler` | `Tech_SelectFactoryHandler` |
 | `void AiMakeDefence(int, const AIFloat3& in)` | `Military::AiMakeDefence` | `AiMakeDefenceHandler` | `Tech_AiMakeDefence` |
-| `void AiUpdate()` | `Main::AiUpdate` | via `profileController.MainUpdate` | `Tech_MainUpdate` |
+| `void AiUpdate()` | `Main::AiUpdate` | `MainUpdateHandler` (RoleConfig constructor argument) | `Tech_MainUpdate` |
+
+Two further slots are script-only and have no native lookup: `InitHandler`
+(`Tech_Init`, run once from `Setup` after the role is matched) and
+`RoleMatchHandler` (`Tech_RoleMatch`, the predicate `RoleConfigs::Match` asks
+to claim a start spot for TECH).
 
 Callbacks C++ looks up that **nothing** implements, so the native default
 applies silently:
@@ -156,7 +164,7 @@ Builder::AiMakeTask()  per builder  -> Tech_BuilderAiMakeTask()
 | Category | Start cap | Raised later? |
 | --- | --- | --- |
 | T1 combat units | `0` | only T1 **bot scouts** and **vehicle scouts** to 100, and only at `mi >= 200` |
-| T2 combat units | `0` | **never** - the raise is commented out |
+| T2 combat units | `0` | only the **gated T2 bots** (`Tech_GetGatedT2Bots`: rush bots Sprinter/Fiend/Hoplite plus amphibious Platypus/Duck/Telchine). Their engine caps are snapshotted before the blanket cap and restored by `Tech_UncapRushBots` in `Tech_EconomyUpdate` once `mi >= MetalIncomeThresholdForEarlyBotLabExpansion` (100), one-way. Everything else never |
 | T1/T2 air combat | `0` | never |
 | Fast-assist bots | `50`, then dynamic | `Tech_IncomeBuilderLimits`: `5*floor(mi/45)` below 100 income, `5*floor(mi/20)` above |
 | T1 bot labs | `1` | to 3 at `mi >= 200` |
@@ -203,7 +211,9 @@ when not.
 
 Pre-computes the native `defaultTask`, then overrides. MEX/MEXUP/GEO/GEOUP and
 ENERGY default tasks are returned immediately. Otherwise dispatch by constructor
-type - T1 bot, T2 bot, fast-assist, air, commander - each an ordered ladder of
+type - `Tech_Commander_AiMakeTask`, `Tech_T1BotConstructor_AiMakeTask`,
+`Tech_T2BotConstructor_AiMakeTask`, `Tech_T2FastAssistBotConstructor_AiMakeTask`,
+`Tech_T1AirConstructor_AiMakeTask`, `Tech_T2AirConstructor_AiMakeTask` - each an ordered ladder of
 `EconomyHelpers::Should*` income predicates calling `Builder::EnqueueXxx`
 wrappers. Energy branches are gated by `Tech_RedirectEnergyToReactor`, which
 diverts to `Builder::EnqueueAssistReactor` while a Fusion or Advanced Fusion is
@@ -211,35 +221,24 @@ under construction.
 
 ## Known defects
 
-### D1 - T2 combat units are permanently unbuildable (confirmed)
+### D1 - T2 combat units were permanently unbuildable (fixed 2026-09-16/17)
 
-`Tech_ApplyStartLimits` sets every unit in `GetAllT2CombatUnits()` to
-`maxThisUnit = 0`. The block that would raise them is **commented out**:
+Historically `Tech_ApplyStartLimits` zeroed every unit in `GetAllT2CombatUnits()`
+and the raise was commented out, so `Tech_EnqueueUnitBatch` failed `IsAvailable`
+and non-primary T2 labs produced nothing. Current behaviour: the engine caps of
+the gated T2 bots are snapshotted at start (`Tech_GetGatedT2Bots`) and released
+by `Tech_UncapRushBots` at the rush income gate; the amphibious bots were added
+to that set on 2026-09-17 so the land-locked substitution in step 7 works for
+all three factions. Releasing at start instead was tried and reverted: native
+production has no income gate, so uncapped bots were built from the first T2 lab
+at 18 income and stalled the economy. See the comment above `Tech_ApplyStartLimits`.
 
-```angelscript
-// // Ensure high caps for fast T2 bots per side (canonical unit IDs)
-// {
-//     array<string> fastT2Bots = UnitHelpers::GetAllFastT2Bots();
-//     UnitHelpers::BatchApplyUnitCaps(fastT2Bots, 100);
-// }
-```
+### D2 - armfast was filed as a T1 unit (fixed 2026-09-17)
 
-Step 7 of the factory flow calls `Tech_EnqueueUnitBatch`, which checks
-`def.IsAvailable(ai.frame)`; `0 > 0` is false, so it returns `null` and falls
-through to `DefaultMakeTask`, which has almost nothing uncapped to pick. Net
-effect: a non-primary T2 bot lab produces nothing at all.
-
-This is the confirmed cause of "4 T2 labs built, only one producing". The one
-that produced was the primary lab making Twitchers (`corfast`), which is the
-fast-assist bot - correct behaviour for step 4, not a combat unit.
-
-### D2 - armfast is filed as a T1 unit
-
-`armfast` (Sprinter) sits in `GetArmadaT1CombatUnits()`, but BAR's `armalab.lua`
-(Advanced Bot Lab) is what builds it, making it T2. Its siblings `corpyro`
-(Fiend) and `legstr` (Hoplite) are correctly in the T2 lists. So even after
-fixing D1, Armada would still be governed by the T1 cap, and the T1 raise at
-`mi >= 200` covers only scouts.
+The six T1/T2 combat lists in `unit_helpers.as` were rebuilt from the labs'
+effective `buildoptions` (commit `a789bd3d`); `armfast` and the other misfiled
+units now sit in the T2 lists. `tools/knowledge/check_unit_helpers.py` verifies
+the lists against the shared game cache.
 
 ### D3 - no combat units at all below 200 metal income
 
@@ -293,18 +292,14 @@ log check before being treated as a defect.
 
 ## Fix plan
 
-Ordered by impact. None of these are applied.
+Ordered by impact. Items 1-2 are applied; the rest are not.
 
-1. **Restore the T2 combat cap raise (D1).** Uncomment the `fastT2Bots` block,
-   or better, raise `GetAllT2CombatUnits()` to a real cap when the T2 gate is
-   crossed rather than only the three "fast" bots. Without this, nothing else in
-   the T2 rush matters.
-2. **Move `armfast` to `GetArmadaT2CombatUnits()` (D2).** Verify each side's
-   combat lists against BAR `buildoptions` while there; the split is
-   hand-maintained and this is unlikely to be the only error.
-3. **Decouple the combat-cap release from `mi >= 200` (D3).** Tie it to the same
-   `botLabGate` the production branches use, so caps and production unlock
-   together instead of 100 income apart.
+1. ~~Restore the T2 combat cap raise (D1).~~ Done: gated T2 bots released at
+   the rush income gate (`Tech_UncapRushBots`). Open question: whether the
+   rest of `GetAllT2CombatUnits()` should ever be released for TECH.
+2. ~~Move `armfast` to the T2 list (D2).~~ Done in the unit-helper review.
+3. **Decouple the scout-cap release from `mi >= 200` (D3).** The gated T2 bots
+   already release at `botLabGate`; the T1 scout raise still waits for 200.
 4. **Bound `g_fastAssistBotCap` (D4)** with an absolute ceiling, and replace the
    `metal.current > 2000` stock test with an income or ratio test.
 5. **Implement `Economy::AiUnitAdded`/`AiUnitRemoved` and extend the script
@@ -344,3 +339,5 @@ Ordered by impact. None of these are applied.
 - `skills/convention-angelscript/SKILL.md` - language and safety conventions.
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
+
+<!-- source: data/script/src/roles/tech.as; blob: b31e93e69e04d49eb8d115ab8d7f6c54987f04d5; lines: 1924 -->

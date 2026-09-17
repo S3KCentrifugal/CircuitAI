@@ -16,6 +16,7 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "Log.h"
 
 namespace circuit {
 
@@ -135,19 +136,46 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 		return false;
 	};
 
-	if (checkFacing()) {
+	auto trySites = [this, &checkFacing]() {
+		if (checkFacing()) {
+			return true;
+		}
+		facing = opposite[facing];
+		if (checkFacing()) {
+			return true;
+		}
+		++facing %= 4;
+		if (checkFacing()) {
+			return true;
+		}
+		facing = opposite[facing];
+		return checkFacing();
+	};
+
+	if (trySites() || (reprDef == nullptr)) {
 		return;
 	}
-	facing = opposite[facing];
-	if (checkFacing()) {
-		return;
-	}
-	++facing %= 4;
-	if (checkFacing()) {
-		return;
-	}
-	facing = opposite[facing];
-	checkFacing();
+
+	// The representer predicate rejects every sector whose terrain area for the
+	// factory's units is below CTerrainData's "usable" threshold (16% of the map).
+	// That is the right filter for a factory the native chooser picked, because
+	// CFactoryData::GetFactoryToBuild applies the same test before choosing. The
+	// AngelScript SelectFactoryHandler bypasses that chooser and may deliberately
+	// place a lab on a land-locked start - e.g. the TECH start spots on Tundra
+	// Continents are small islands where the role techs with a bot lab and leaves
+	// with amphibious units. Without this fallback no site is ever accepted, the
+	// task is cancelled, and CEconomyManager::UpdateFactoryTasks re-picks the same
+	// factory every cycle for the whole game (seen as one "FactoryWeightedSelect
+	// chose=leglab" line every 240 frames and no lab ever built).
+	// Retry with builder reach only; CTerrainManager::FindBuildSite still enforces
+	// the map's own buildability of the footprint.
+	circuit->LOG("CBFactoryTask: no site for %s in a usable %s area near (%.0f, %.0f); retrying without the area check",
+			buildDef->GetDef()->GetName(), reprDef->GetDef()->GetName(), pos.x, pos.z);
+	predicate = [terrainMgr, builder](const AIFloat3& p) {
+		return terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
+	};
+	FindFacing(pos);
+	trySites();
 }
 
 #define SERIALIZE(stream, func)	\

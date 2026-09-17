@@ -126,7 +126,8 @@ This is the implementation target for every AngelScript and profile change.
 | `doc/units.md` | Catalog of the 659 effective non-Scavenger BAR UnitDefs (215 Armada, 213 Cortex, 231 Legion). Use with the shared knowledge base before changing UnitDef classifications, factory edges, or behaviour properties. |
 | `doc/extra_units.md` | Catalog of the 41 UnitDefs made player-buildable by BAR's `experimentalextraunits=true` option. |
 | `doc/Profile.md` | How profiles are deployed and how to add a custom one, including the `AIOptions.lua` `profile` list and the `BARb/stable/` install layout. |
-| `doc/roles/tech.md` | Deep reference for the `TECH` AngelScript role: loading, callbacks, registered APIs it depends on, gating, and known breakage. |
+| `doc/roles/README.md` | Index of the AngelScript role layer: the `RoleConfig` contract, the handler coverage matrix, cross-role findings, and the rule that keeps these documents current. |
+| `doc/roles/{front,air,tech,sea,support,tactical}.md` | One reference per `AiRole`: registration, settings, init limits, decision flows, known defects. Each ends with a `<!-- source: ...; blob: ...; lines: ... -->` marker tying it to the script revision it describes. |
 | `doc/roles/hover.md` | Deep reference for hover production: ownership, build decisions, the native contract, and the cause of hover production stalling once a T2 factory exists. |
 | `doc/bomber-targeting.md` | Diagnosed but unfixed bomber-targeting investigation with a phased remediation plan. |
 | `doc/t2-constructor-stall.md` | Diagnosed but unfixed T2 constructor stall after mex upgrades, with three options awaiting a decision. |
@@ -140,6 +141,9 @@ This is the implementation target for every AngelScript and profile change.
 | Path | Description |
 | --- | --- |
 | `tools/knowledge/barb_report.py` | Regenerates `doc/knowledge/barb-unit-config.md`. Run `python tools/knowledge/barb_report.py` after profile or unit-cache changes. |
+| `tools/knowledge/check_unit_helpers.py` | Validates every quoted unit id in `data/script/src` against the shared game cache (unknown, unreachable, wrong faction or tier, per-side branches) and reports combat-list coverage. Exit 1 on findings. |
+| `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |
+| `.githooks/pre-commit` | Refuses a commit that stages a role script without its document, and runs `check_role_docs.py` when either is staged. Enable with `git config core.hooksPath .githooks`. |
 | `CMakeLists.txt` | Native build definition. Building requires integration into an engine checkout and Recoil's generated C++ AI wrapper. |
 | `VERSION` | AI version string. |
 | `platform/angelscript/jit/` | AngelScript JIT compiler sources (`as_jit.cpp`, `virtual_asm*`). Platform support, not policy. |
@@ -241,6 +245,7 @@ When changing classification or economy logic, check BAR values used by CircuitA
 - Preserve existing C++ and AngelScript style and keep changes scoped.
 - Make AngelScript and profile changes in `data/`, never `data_sample/`; the latter is reference-only unless the user explicitly requests sample maintenance.
 - Do not edit vendored libraries under `src/lib/` unless the task explicitly targets them.
+- Any change under `data/script/src/roles/` must be reflected in the matching `doc/roles/<role>.md` in the same change (rules in `doc/roles/README.md`, "Keeping these documents current"), then `python tools/knowledge/check_role_docs.py --update` refreshes that document's source marker. A change to `types/ai_role.as` or `types/role_config.as` also updates `doc/roles/README.md`.
 - Do not assume a generic AngelScript interface exposes derived-type members. Use registered casts and handle a null cast result.
 - Do not infer a valid factory edge merely because both UnitDefs exist. Verify the builder's effective BAR `buildoptions` under the relevant mod options.
 - Avoid changing the legacy profiles (`easy`, `medium`, `hard`, `hard_aggressive`) and the shared-framework profiles (`experimental_balanced`, `experimental_hard`, `experimental_terrible`) together unless the requirement explicitly spans them.
@@ -275,6 +280,7 @@ Use the cheapest focused validation available in this repository, then broaden a
 - Run diagnostics for edited C++ or AngelScript files.
 - For configuration changes, parse the changed JSON and check referenced UnitDef names/build edges against the effective BAR data pipeline.
 - Use `git diff --check` before finishing.
+- After touching `data/script/src/roles/` or `doc/roles/`, run `python tools/knowledge/check_role_docs.py`; after touching unit id lists in `data/script/src`, run `python tools/knowledge/check_unit_helpers.py`. Both must exit 0.
 - Runtime AngelScript changes require loading the affected profile in BAR because this repository has no standalone AngelScript compilation target.
 - Native integration builds require Recoil's C++ AI wrapper. Never build inside the trusted read-only Recoil checkout; use a separate writable checkout/build environment or report that runtime validation remains pending.
 
