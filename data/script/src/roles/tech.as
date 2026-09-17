@@ -75,12 +75,25 @@ namespace RoleTech
 		ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::TECH, "TECH");
 	}
 
-	// Restore the engine's own maxthisunit for Sprinter/Fiend/Hoplite. Called when the
-	// T2 rush is active so the rush bots are never the limiting factor; falls back to
+	// The units whose engine cap Tech snapshots at start and releases at the rush gate:
+	// the rush bots (Sprinter/Fiend/Hoplite) and the amphibious T2 bots
+	// (Platypus/Duck/Telchine) that Tech_FactoryAiMakeTask substitutes on land-locked
+	// starts. Both sets sit in the T2 combat cap list, so both must be released together.
+	array<string> Tech_GetGatedT2Bots()
+	{
+		array<string> ids = UnitHelpers::GetAllFastT2Bots();
+		array<string> amph = UnitHelpers::GetAllAmphibiousT2Bots();
+		for (uint i = 0; i < amph.length(); ++i)
+			ids.insertLast(amph[i]);
+		return ids;
+	}
+
+	// Restore the engine's own maxthisunit for the gated T2 bots. Called when the
+	// T2 rush is active so they are never the limiting factor; falls back to
 	// leaving the def alone if no snapshot exists.
 	void Tech_UncapRushBots(const string &in reason)
 	{
-		array<string> rushBots = UnitHelpers::GetAllFastT2Bots();
+		array<string> rushBots = Tech_GetGatedT2Bots();
 		for (uint i = 0; i < rushBots.length(); ++i)
 		{
 			CCircuitDef @rd = ai.GetCircuitDef(rushBots[i]);
@@ -110,11 +123,10 @@ namespace RoleTech
 		// ****************** COMBAT UNIT LIMITS ****************** //
 		// Don't let tech player build anything except t3. Or logically enable T1/T2 later if desired
 		//
-		// Snapshot the rush bots first. armfast is currently filed under
-		// GetArmadaT1CombatUnits() while corpyro/legstr are in the T2 lists, so both
-		// blanket caps below can zero them; capturing by name covers either list.
+		// Snapshot the gated T2 bots (rush + amphibious) before the blanket caps below
+		// zero them; capturing by name covers whichever list they sit in.
 		{
-			array<string> rushBots = UnitHelpers::GetAllFastT2Bots();
+			array<string> rushBots = Tech_GetGatedT2Bots();
 			for (uint i = 0; i < rushBots.length(); ++i)
 			{
 				CCircuitDef @rd = ai.GetCircuitDef(rushBots[i]);

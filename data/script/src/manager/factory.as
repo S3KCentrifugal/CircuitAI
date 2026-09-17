@@ -94,7 +94,7 @@ namespace Factory {
 	string legvp   ("legvp");
 	string legavp  ("legavp");
 	string legsy   ("legsy"); // Correct Legion T1 shipyard id (was placeholder 'legjim')
-	string legasy  ("legasy");
+	string legasy  ("legadvshipyard");
 	string legap   ("legap");
 	string legaap  ("legaap");
 	string leggant ("leggant");

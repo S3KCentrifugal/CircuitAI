@@ -22,51 +22,10 @@ namespace RoleLimitHelpers {
 
     // Disable Tier 2 combat units
     void DisableT2Combat(dictionary@ d, const string &in side) {
-        // Armada T2 combat
-        array<string> arm = { 
-            "armzeus", 
-            "armfido", 
-            "armmerl", 
-            "armsnipe", 
-            "armbull", 
-            "armmav", 
-            "armaak" ,
-            "armspid",
-            "armvader"
-        };
-
-        // Cortex T2 combat
-        array<string> cor = { 
-            "corpyro", 
-            "cormort", 
-            "cormerl", 
-            "correap", 
-            "cormando", 
-            "corgol", 
-            "corsumo", 
-            "corhrk", 
-            "cortermite", 
-            "corcan", 
-            "coramph", 
-            "corsktl", 
-            "corspy", 
-            "legajamk",
-            "corvoyr"
-        };
-
-        // Legion T2 combat (placeholders)
-        array<string> leg = { 
-            "legboar", 
-            "leginc", 
-            "legmorl", 
-            "legsnip", 
-            "legmammoth", 
-            "legstr",
-            "leghrk",
-            "legsrail",
-            "legaspy",
-            "legajamk"
-        };
+        // Lists are centralised in UnitHelpers so this stays in step with the labs' buildoptions.
+        array<string> arm = UnitHelpers::GetArmadaT2CombatUnits();
+        array<string> cor = UnitHelpers::GetCortexT2CombatUnits();
+        array<string> leg = UnitHelpers::GetLegionT2CombatUnits();
 
         if (side == "armada") { _setAll(d, arm, 0); }
         else if (side == "cortex") { _setAll(d, cor, 0); }
@@ -78,22 +37,35 @@ namespace RoleLimitHelpers {
     void DisableT3Combat(dictionary@ d, const string &in side) {
         // Armada T3 combat
         array<string> arm = { 
-            "armraven", 
-            "armraptor", 
-            "armthor" 
+            "armbanth",  // Titan
+            "armraz",    // Razorback
+            "armvang",   // Vanguard
+            "armthor",   // Thor
+            "armmar",    // Marauder
+            "armlun"     // Lunkhead
         };
 
         // Cortex T3 combat
         array<string> cor = { 
-            "cordem", 
-            "corban", 
-            "corkrog" 
+            "corkorg",   // Juggernaut
+            "corjugg",   // Behemoth
+            "corshiva",  // Shiva
+            "corkarg",   // Karganeth
+            "corcat",    // Catapult
+            "corsok",    // Cataphract
+            "cordemon"   // Demon
         };
 
-        // Legion T3 combat (placeholders)
+        // Legion T3 combat
         array<string> leg = { 
-            "legbehemoth", 
-            "legtitan" 
+            "legeheatraymech",    // Sol Invictus
+            "legeallterrainmech", // Myrmidon
+            "legerailtank",       // Daedalus
+            "legelrpcmech",       // Astraeus
+            "legeshotgunmech",    // Praetorian
+            "legehovertank",      // Charybdis
+            "legjav",             // Javelin
+            "legkeres"            // Keres
         };
 
         if (side == "armada") { _setAll(d, arm, 0); }
@@ -112,7 +84,7 @@ namespace RoleLimitHelpers {
     void DisableGantries(dictionary@ d, const string &in side) {
         array<string> arm = { "armshltx", "armshltxuw" };
         array<string> cor = { "corgant", "corgantuw" };
-        array<string> leg = { "leggant", "legapt3" }; // legapt3 = Experimental Aircraft Gantry
+        array<string> leg = { "leggant", "leggantuw" };
         if (side == "armada") { _setAll(d, arm, 0); }
         else if (side == "cortex") { _setAll(d, cor, 0); }
         else if (side == "legion") { _setAll(d, leg, 0); }
@@ -123,7 +95,7 @@ namespace RoleLimitHelpers {
     void SetGantriesCap(dictionary@ d, const string &in side, int cap) {
         array<string> arm = { "armshltx", "armshltxuw" };
         array<string> cor = { "corgant", "corgantuw" };
-        array<string> leg = { "leggant", "legapt3" };
+        array<string> leg = { "leggant", "leggantuw" };
         if (side == "armada") { _setAll(d, arm, cap); }
         else if (side == "cortex") { _setAll(d, cor, cap); }
         else if (side == "legion") { _setAll(d, leg, cap); }

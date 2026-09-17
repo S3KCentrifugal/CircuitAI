@@ -70,9 +70,9 @@ namespace EightHorses {
 		root.set("SEA", @seaRole);
 
 		// HOVER_SEA role
-		dictionary hoverSeaArm; hoverSeaArm.set("armhs",4);  hoverSeaArm.set("armhp",4);  hoverSeaArm.set("armsy",4); 
-		dictionary hoverSeaCor; hoverSeaCor.set("corhs",4);  hoverSeaCor.set("corhp",4);  hoverSeaCor.set("corsy",4);
-		dictionary hoverSeaLeg; hoverSeaLeg.set("leghs",4);  hoverSeaLeg.set("leghp",4);  hoverSeaLeg.set("legsy",4);
+		dictionary hoverSeaArm; hoverSeaArm.set("armfhp",4);  hoverSeaArm.set("armhp",4);  hoverSeaArm.set("armsy",4);
+		dictionary hoverSeaCor; hoverSeaCor.set("corfhp",4);  hoverSeaCor.set("corhp",4);  hoverSeaCor.set("corsy",4);
+		dictionary hoverSeaLeg; hoverSeaLeg.set("legfhp",4);  hoverSeaLeg.set("leghp",4);  hoverSeaLeg.set("legsy",4);
 
 		dictionary hoverSeaRole; hoverSeaRole.set("armada", @hoverSeaArm); hoverSeaRole.set("cortex", @hoverSeaCor); hoverSeaRole.set("legion", @hoverSeaLeg);
 		root.set("HOVER_SEA", @hoverSeaRole);

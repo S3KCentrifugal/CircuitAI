@@ -222,14 +222,14 @@ namespace UnitHelpers {
 
     array<string> GetCortexT3LandLabs() {
         array<string> ids = {
-            "corshltx" // Experimental Gantry
+            "corgant" // Experimental Gantry
         };
         return ids;
     }
 
     array<string> GetCortexT3WaterLabs() {
         array<string> ids = { 
-            "corshltxuw" // Underwater Experimental Gantry
+            "corgantuw" // Underwater Experimental Gantry
         };
         return ids;
     }
@@ -265,9 +265,9 @@ namespace UnitHelpers {
 
     array<string> GetLegionT2WaterLabs() {
         array<string> ids = { 
-            "corasy", //Advanced Shipyard
-            "corplat", // Seaplane Platform (Legion uses Cortex platform)
-            "coramsub"  // Amphibious Complex (Amphib Units)
+            "legadvshipyard", // Advanced Shipyard
+            "legsplab", // Offshore Seaplane Platform
+            "legamphlab"  // Amphibious Complex (Amphib Units)
         };
         return ids;
     }
@@ -281,7 +281,7 @@ namespace UnitHelpers {
 
     array<string> GetLegionT3WaterLabs() {
         array<string> ids = { 
-            "corshltxuw" // Underwater Experimental Gantry
+            "leggantuw" // Underwater Experimental Gantry
         };
         return ids;
     }
@@ -370,24 +370,22 @@ namespace UnitHelpers {
 
         return result;
     }
-    // Armada T1 combat units
+    // Armada T1 combat units (armlab + armvp buildoptions, combat only)
     array<string> GetArmadaT1CombatUnits() {
         array<string> ids = { 
-            "armpw",
-            "armrock",
-            "armham",
-            "armjeth",
-            "armflash",
-            "armstump",
-            "armart",
-            "armwar",
-            "armflea", // Tick
-            "armfboy", // Fatboy
-            "armaser",
-            "armmark",
-            "armfast", // Sprinter
-            "armsptk", // Recluse
-            "armscab"  // Umbrella
+            "armpw",  // Pawn
+            "armrock",  // Rocketeer
+            "armham",  // Mace
+            "armjeth",  // Crossbow
+            "armwar",  // Centurion
+            "armflea",  // Tick
+            "armflash",  // Blitz
+            "armstump",  // Stout
+            "armart",  // Shellshocker
+            "armfav",  // Rover
+            "armjanus",  // Janus
+            "armpincer",  // Pincer
+            "armsam"  // Whistler
         };
         return ids;
     }
@@ -404,92 +402,129 @@ namespace UnitHelpers {
         return result;
     }
 
-    // Armada T2 combat units
+    // Armada T2 combat units (armalab + armavp buildoptions, combat only)
     array<string> GetArmadaT2CombatUnits() {
         array<string> ids = { 
-            "armzeus", 
-            "armfido", 
-            "armmerl", 
-            "armsnipe", 
-            "armbull", 
-            "armmav", 
-            "armaak",
-            "armspid",
-            "armvader"
+            "armzeus",  // Welder
+            "armfido",  // Hound
+            "armmerl",  // Ambassador
+            "armsnipe",  // Sharpshooter
+            "armbull",  // Bull
+            "armmav",  // Gunslinger
+            "armaak",  // Archangel
+            "armspid",  // Webber
+            "armvader",  // Tumbleweed
+            "armfboy",  // Fatboy
+            "armaser",  // Smuggler
+            "armmark",  // Compass
+            "armfast",  // Sprinter
+            "armsptk",  // Recluse
+            "armscab",  // Umbrella
+            "armamph",  // Platypus
+            "armcroc",  // Turtle
+            "armgremlin",  // Gremlin
+            "armlatnk",  // Jaguar
+            "armmanni",  // Starlight
+            "armmart",  // Mauser
+            "armyork"  // Shredder
         };
         return ids;
     }
 
-    // Cortex T2 combat units
+    // Cortex T2 combat units (coralab + coravp buildoptions, combat only)
     array<string> GetCortexT2CombatUnits() {
         array<string> ids = { 
-            "corpyro", 
-            "cormort", 
-            "cormerl", 
-            "correap", 
-            "cormando", 
-            "corgol", 
-            "corsumo", 
-            "corhrk", 
-            "cortermite", 
-            "corcan", 
-            "coramph", 
-            "corsktl", 
-            "corspy", 
-            "legajamk",
-            "corvoyr"
+            "corpyro",  // Fiend
+            "cormort",  // Recluse
+            "corvroc",  // Negotiator
+            "correap",  // Tiger
+            "cormando",  // Commando
+            "corgol",  // Tzar
+            "corsumo",  // Mammoth
+            "corhrk",  // Arbiter
+            "cortermite",  // Termite
+            "corcan",  // Fiend
+            "coramph",  // Duck
+            "corsktl",  // Skuttle
+            "corspy",  // Spectre
+            "corvoyr",  // Augur
+            "cormart",  // Quaker
+            "coraak",  // Manticore
+            "corban",  // Banisher
+            "cormabm",  // Saviour
+            "corparrow",  // Poison Arrow
+            "corroach",  // Bedbug
+            "corsala",  // Salamander
+            "corsent",  // Fury
+            "cortrem"  // Tremor
         };
         return ids;
     }
 
-    // Legion T2 combat units (placeholders)
+    // Legion T2 combat units (legalab + legavp buildoptions, combat only)
     array<string> GetLegionT2CombatUnits() {
         array<string> ids = { 
-            "legboar", 
-            "leginc", 
-            "legmorl", 
-            "legsnip", 
-            "legmammoth", 
-            "legstr",
-            "leghrk",
-            "legsrail",
-            "legaspy",
-            "legajamk",
-            "legbart",
-            "legaradk"
+            "leginc",  // Incinerator
+            "legstr",  // Hoplite
+            "leghrk",  // Thanatos
+            "legsrail",  // Arquebus
+            "legaspy",  // Eidolon
+            "legajamk",  // Tiresias
+            "legbart",  // Belcher
+            "legaradk",  // Euclid
+            "legshot",  // Phalanx
+            "legsnapper",  // Snapper
+            "legadvaabot",  // Aquilon
+            "legamph",  // Telchine
+            "leginf",  // Inferno
+            "legaheattank",  // Prometheus
+            "legamcluster",  // Cleaver
+            "legaskirmtank",  // Gladiator
+            "legavantinuke",  // Hera
+            "legavroc",  // Boreas
+            "legfloat",  // Triton
+            "legmed",  // Medusa
+            "legmrv",  // Quickshot
+            "legvcarry",  // Mantis
+            "legvflak"  // Charon
         };
         return ids;
     }
 
-    // Cortex T1 combat units
+    // Cortex T1 combat units (corlab + corvp buildoptions, combat only)
     array<string> GetCortexT1CombatUnits() {
         array<string> ids = { 
-            "corak",
-            "corstorm",
-            "corthud",
-            "corcrash",
-            "corraid",
-            "cormist",
-            "cormart",
-            "coraak"
+            "corak",  // Grunt
+            "corstorm",  // Shuriken
+            "corthud",  // Thud
+            "corcrash",  // Trasher
+            "corfav",  // Rascal
+            "corgator",  // Incisor
+            "corraid",  // Raider
+            "cormist",  // Lasher
+            "corlevlr",  // Pounder
+            "corwolv",  // Wolverine
+            "corgarp"  // Garpike
         };
         return ids;
     }
 
-    // Legion T1 combat units (placeholders)
+    // Legion T1 combat units (leglab + legvp buildoptions, combat only)
     array<string> GetLegionT1CombatUnits() {
         array<string> ids = { 
-            "legkoda",
-            "legshot",
-            "legaa",
-            "legraider",
-            "leginf",
-            "legart",
-            "legcen",
-            "legbal",
-            "legkark",
-            "leglob",
-            "leggob"
+            "legcen",  // Phobos
+            "legbal",  // Ballista
+            "legkark",  // Karkinos
+            "leglob",  // Satyr
+            "leggob",  // Goblin
+            "legaabot",  // Toxotai
+            "leghades",  // Alaris
+            "leghelios",  // Helios
+            "leggat",  // Decurion
+            "legbar",  // Barrage
+            "legrail",  // Lance
+            "legamphtank",  // Cetus
+            "legscout"  // Wheelie
         };
         return ids;
     }
@@ -512,14 +547,18 @@ namespace UnitHelpers {
                 // T1 sea (construction ships) including Legion
                 uname == "armcs" || uname == "corcs" || uname == "legnavyconship" ||
                 // T1 air (construction aircraft)
-                uname == "armca" || uname == "corca" || uname == "legca") {
+                uname == "armca" || uname == "corca" || uname == "legca" ||
+                // T1 seaplane constructors
+                uname == "armcsa" || uname == "corcsa" || uname == "legspcon" ||
+                // T1 amphibious constructors
+                uname == "armbeaver" || uname == "cormuskrat" || uname == "legotter") {
                 tier = 1;
             }
             // T2 bot/vehicle constructors
             else if (uname == "armack" || uname == "corack" || uname == "legack" ||
                      uname == "armacv" || uname == "coracv" || uname == "legacv" ||
                      // T2 sea (advanced construction submarine)
-                     uname == "armacsub" || uname == "coracsub" ||
+                     uname == "armacsub" || uname == "coracsub" || uname == "leganavyconsub" ||
                      // T2 air (advanced construction aircraft)
                      uname == "armaca" || uname == "coraca" || uname == "legaca") {
                 tier = 2;
@@ -538,7 +577,7 @@ namespace UnitHelpers {
         } else if (side == "cortex") {
             ids = { "cornecro" };
         } else if (side == "legion") {
-            ids = { "armrectr" };
+            ids = { "legrezbot" };
         } else {
             ids = { "armrectr", "cornecro", "legrezbot" };
         }
@@ -676,7 +715,7 @@ namespace UnitHelpers {
         if (side == "armada") return "armflea";  // Tick (fast scout bot)
         if (side == "cortex") return "corak";    // Grunt (raider bot)
         if (side == "legion") return "leggob";   // Goblin (light skirm/raider)
-        return "armpw"; // default
+        return "armflea"; // default
     }
 
     // Tech role: T1 amphibious anti-air bots for landlocked starts
@@ -888,19 +927,21 @@ namespace UnitHelpers {
         ids.insertLast("armstil");
         ids.insertLast("armlance");
         ids.insertLast("armawac");   // radar plane
+        ids.insertLast("armliche");  // nuclear bomber
         // Cortex T2 aircraft
         ids.insertLast("corvamp");
         ids.insertLast("corhurc");
         ids.insertLast("corape");
-        ids.insertLast("corcrw");
+        ids.insertLast("corcrwh");   // Dragon
         ids.insertLast("corawac");   // radar plane
         ids.insertLast("cortitan");  // heavy gunship (if available)
         // Legion T2 aircraft (names based on existing configs)
         ids.insertLast("legvenator");
         ids.insertLast("legphoenix");
-        ids.insertLast("legnap");
-        ids.insertLast("legionnaire");
         ids.insertLast("legwhisper");
+        ids.insertLast("legafigdef");     // Ajax
+        ids.insertLast("legatorpbomber"); // Aesacus torpedo bomber
+        ids.insertLast("legmineb");       // Harbinger mine bomber
         // Some maps/configs include defensive/fortified flyers – include cautiously
         // ids.insertLast("legstronghold");
         // ids.insertLast("legfort");
@@ -915,7 +956,7 @@ namespace UnitHelpers {
 
     array<string> GetAllT2Shipyards() {
         array<string> ids;
-        ids = { "armasy", "corasy" };
+        ids = { "armasy", "corasy", "legadvshipyard" };
         return ids;
     }
 
@@ -926,14 +967,14 @@ namespace UnitHelpers {
     array<string> GetArmadaT1NavalCombatUnits()
     {
         // Patrol boat, submarine, destroyer
-        array<string> ids = { "armpt", "armsub", "armroy", "armpship" };
+        array<string> ids = { "armpt", "armdecade", "armsub", "armroy", "armpship" };
         return ids;
     }
 
     array<string> GetCortexT1NavalCombatUnits()
     {
         // Patrol boat, submarine, destroyer
-        array<string> ids = { "corpt", "corsub", "corroy", "corpship" };
+        array<string> ids = { "corpt", "coresupp", "corsub", "corroy", "corpship" };
         return ids;
     }
 
@@ -966,14 +1007,14 @@ namespace UnitHelpers {
     array<string> GetCortexT1HoverCombatUnits()
     {
         // Fast attack hover, rocket hover, hovertank, AA hover
-        array<string> ids = { "corsh", "cormh", "corsnap", "corah" };
+        array<string> ids = { "corsh", "cormh", "corsnap", "corah", "corhal" };
         return ids;
     }
 
     array<string> GetLegionT1HoverCombatUnits()
     {
         // Fast attack hover, rocket hover, hovertank, AA hover
-        array<string> ids = { "legsh", "legmh", "legner", "legah" };
+        array<string> ids = { "legsh", "legmh", "legner", "legah", "legcar" };
         return ids;
     }
 
@@ -1036,7 +1077,7 @@ namespace UnitHelpers {
     // Seaplane platforms across factions
     array<string> GetAllSeaplanePlatforms() {
         array<string> ids;
-        ids = { "armplat", "corplat" }; // Legion shares Cortex platform
+        ids = { "armplat", "corplat", "legsplab" };
         return ids;
     }
 
@@ -1243,10 +1284,10 @@ namespace UnitHelpers {
     // Advanced naval (underwater) energy converter (T2): underwater moho metal maker
     string GetAdvNavalEnergyConverterNameForSide(const string &in side)
     {
-        // Underwater moho metal makers (sea-capable). Legion falls back to Cortex until confirmed.
+        // Underwater moho metal makers (sea-capable).
         if (side == "armada") return "armuwmmm";
         if (side == "cortex") return "coruwmmm";
-        if (side == "legion") return "coruwmmm";
+        if (side == "legion") return "leganavaleconv";
 
         GenericHelpers::LogUtil("[UnitHelpers] GetAdvNavalEnergyConverterNameForSide: no matching side '" + side + "', defaulting to armada", 2);
         return "armuwmmm";
@@ -1286,10 +1327,10 @@ namespace UnitHelpers {
     // Naval/underwater fusion reactor (sea-capable energy structure)
     string GetNavalFusionNameForSide(const string &in side)
     {
-        // Underwater fusion reactors per side; Legion reuses Cortex variant unless confirmed otherwise
+        // Underwater fusion reactors per side
         if (side == "armada") return "armuwfus";
         if (side == "cortex") return "coruwfus";
-        if (side == "legion") return "coruwfus"; // Legion fallback to Cortex underwater fusion
+        if (side == "legion") return "leganavalfusion";
 
         GenericHelpers::LogUtil("[UnitHelpers] GetNavalFusionNameForSide: no matching side '" + side + "', defaulting to armada", 2);
         return "armuwfus";
@@ -1298,12 +1339,12 @@ namespace UnitHelpers {
     // T2 naval "destroyer" class (cruiser-tier) per side
     // - Armada: Paladin -> armcrus
     // - Cortex: Buccaneer -> corcrus
-    // - Legion sea shares Cortex naval: use corcrus
+    // - Legion: Thalassa -> leganavycruiser
     string GetNavalT2DestroyerNameForSide(const string &in side)
     {
         if (side == "armada") return "armcrus";
         if (side == "cortex") return "corcrus";
-        if (side == "legion") return "corcrus"; // Legion uses Cortex sea
+        if (side == "legion") return "leganavycruiser";
         return "armcrus";
     }
 
@@ -1314,7 +1355,7 @@ namespace UnitHelpers {
         // Verified in resources/data/units.json
         if (side == "armada") return "armroy";       // Corsair, Destroyer
         if (side == "cortex") return "corroy";       // Oppressor, Destroyer
-        if (side == "legion") return "legtriarius";  // Triarius, Destroyer (Legion)
+        if (side == "legion") return "legnavydestro"; // Syracusia, Destroyer (Legion)
         return "armroy";
     }
 
@@ -1324,7 +1365,7 @@ namespace UnitHelpers {
         // Verified in units.json: armaas/corarch are AA ships; Legion uses Cortex sea in many cases
         if (side == "armada") return "armaas";   // Dragonslayer, Anti-Air Ship
         if (side == "cortex") return "corarch";  // Arrow Storm, Anti-Air Ship
-        if (side == "legion") return "corarch";  // fallback to Cortex AA ship
+        if (side == "legion") return "leganavyaaship"; // Notus, Anti-Air Ship
         return "armaas";
     }
 
@@ -1334,7 +1375,7 @@ namespace UnitHelpers {
         // Verified in units.json: armsjam/corsjam are Radar Jammer Ship
         if (side == "armada") return "armsjam";
         if (side == "cortex") return "corsjam";
-        if (side == "legion") return "corsjam"; // fallback to Cortex jammer ship
+        if (side == "legion") return "leganavyradjamship"; // Dolus (radar + jammer ship)
         return "armsjam";
     }
 
@@ -1344,7 +1385,7 @@ namespace UnitHelpers {
         // Produced by shipyards and provides scouting utility
         if (side == "armada") return "armmls";  // Voyager, Naval Engineer
         if (side == "cortex") return "cormls";  // Pathfinder, Naval Engineer
-        if (side == "legion") return "cormls";  // fallback to Cortex variant
+        if (side == "legion") return "leganavyradjamship"; // Dolus (radar + jammer ship)
         return "armmls";
     }
 
@@ -1354,7 +1395,7 @@ namespace UnitHelpers {
         // Verified in units.json: armmship/cormship
         if (side == "armada") return "armmship";  // Longbow, Missile Cruiser
         if (side == "cortex") return "cormship";  // Messenger, Cruise Missile Ship
-        if (side == "legion") return "cormship";  // fallback to Cortex variant
+        if (side == "legion") return "leganavymissileship"; // Ultor
         return "armmship";
     }
 
@@ -1364,7 +1405,7 @@ namespace UnitHelpers {
         // Verified in units.json: armantiship/corantiship carry mobile anti-nuke
         if (side == "armada") return "armantiship";
         if (side == "cortex") return "corantiship";
-        if (side == "legion") return "corantiship"; // fallback to Cortex variant
+        if (side == "legion") return "leganavyantinukecarrier"; // Hecate
         return "armantiship";
     }
 
@@ -1382,7 +1423,7 @@ namespace UnitHelpers {
     {
         if (side == "armada") return "armferret";
         if (side == "cortex") return "corerad";
-        if (side == "legion") return "legflak";
+        if (side == "legion") return "legrhapsis"; // Rhapsis, T1 missile AA (Ferret/Eradicator tier)
         GenericHelpers::LogUtil("[UnitHelpers] GetStaticAAHeavyNameForSide: no matching side '" + side + "', defaulting to armada", 2);
         return "armferret";
     }
@@ -1409,7 +1450,7 @@ namespace UnitHelpers {
     {
         if (side == "armada") return "armrad";
         if (side == "cortex") return "corrad";
-            if (side == "legion") return "legabm";
+        if (side == "legion") return "legrad";
         return "armrad";
     }
 
@@ -1427,7 +1468,7 @@ namespace UnitHelpers {
     {
         if (side == "armada") return "armplat";
         if (side == "cortex") return "corplat";
-        if (side == "legion") return "corplat"; // Legion shares Cortex seaplane platform
+        if (side == "legion") return "legsplab";
         GenericHelpers::LogUtil("[UnitHelpers] GetSeaplanePlatformNameForSide: no matching side '" + side + "', defaulting to armada", 2);
         return "armplat";
     }
@@ -1476,7 +1517,7 @@ namespace UnitHelpers {
         // T1 static torpedo launchers
         if (side == "armada") return "armtl"; // TODO: verify upstream id
         if (side == "cortex") return "cortl"; // TODO: verify upstream id
-        if (side == "legion") return "cortl"; // TODO: provide Legion id when available
+        if (side == "legion") return "legtl"; // Stheno
         return "armtl";
     }
 
@@ -1485,7 +1526,7 @@ namespace UnitHelpers {
         // T2 static torpedo launchers
         if (side == "armada") return "armatl"; // TODO: verify upstream id
         if (side == "cortex") return "coratl"; // TODO: verify upstream id
-        if (side == "legion") return "coratl"; // TODO: provide Legion id when available
+        if (side == "legion") return "legctl"; // Euryale
         return "armatl";
     }
 
@@ -1502,7 +1543,7 @@ namespace UnitHelpers {
         // Long-range AA (e.g., chainsaw/screamer equivalents)
         if (side == "armada") return "armmercury"; // TODO: confirm BAR unit id
         if (side == "cortex") return "corscreamer"; // TODO: confirm BAR unit id
-        if (side == "legion") return "legscreamer"; // TODO: placeholder until confirmed
+        if (side == "legion") return "leglraa"; // Xyston
         return "armmercury";
     }
 
@@ -1511,8 +1552,7 @@ namespace UnitHelpers {
         // Medium plasma turrets
         if (side == "armada") return "armguard";
         if (side == "cortex") return "corpun";
-        // TODO: add Legion counterpart when confirmed; fallback to armada variant for now
-        if (side == "legion") return "armguard";
+        if (side == "legion") return "legapopupdef"; // Chimera (pop-up plasma/laser)
         return "armguard";
     }
 
@@ -1520,8 +1560,7 @@ namespace UnitHelpers {
     {
         if (side == "armada") return "armarad";
         if (side == "cortex") return "corarad";
-        // TODO: add Legion advanced radar id when confirmed; fallback to armada variant for now
-        if (side == "legion") return "armarad";
+        if (side == "legion") return "legarad";
         return "armarad";
     }
 
@@ -1530,18 +1569,17 @@ namespace UnitHelpers {
         // Long Range Plasma Cannon
         if (side == "armada") return "armbrtha";
         if (side == "cortex") return "corint";
-        // TODO: add Legion LRPC when confirmed; fallback to armada variant for now
-        if (side == "legion") return "armbrtha";
+        if (side == "legion") return "leglrpc"; // Olympus
         return "armbrtha";
     }
 
     string GetLRPCHeavyNameForSide(const string &in side)
     {
         // Heavy LRPCs (Ragnarok/Calamity/Starfall equivalents)
-        if (side == "armada") return "armragnarok"; // TODO: confirm BAR unit id
-        if (side == "cortex") return "corcalamity"; // TODO: confirm BAR unit id
-        if (side == "legion") return "legstarfall"; // TODO: confirm BAR unit id
-        return "armragnarok";
+        if (side == "armada") return "armvulc";     // Ragnarok
+        if (side == "cortex") return "corbuzz";     // Calamity
+        if (side == "legion") return "legstarfall"; // Starfall
+        return "armvulc";
     }
 
     // -------------------------------
@@ -1739,7 +1777,7 @@ namespace UnitHelpers {
 
     array<string> GetAllT2SeaConstructors()
     {
-        array<string> ids = { "armacsub", "coracsub" };
+        array<string> ids = { "armacsub", "coracsub", "leganavyconsub" };
         return ids;
     }
 
@@ -2068,12 +2106,20 @@ namespace UnitHelpers {
         return "armamph";
     }
 
+    // All amphibious T2 bots across sides (Platypus/Duck/Telchine). Tech caps these with the
+    // T2 combat list and must release them together with the rush bots on land-locked starts.
+    array<string> GetAllAmphibiousT2Bots()
+    {
+        array<string> ids = { "armamph", "coramph", "legamph" };
+        return ids;
+    }
+
     // Main Battle Tank (T2) name per side
     string GetMainBattleTankForSide(const string &in side)
     {
         if (side == "armada") return "armbull";
         if (side == "cortex") return "correap";
-        if (side == "legion") return "legboar";
+        if (side == "legion") return "legaheattank"; // Prometheus (Legion has no direct MBT; heaviest T2 line tank)
         return "armbull";
     }
 
