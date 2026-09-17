@@ -2,6 +2,8 @@
 
 This document records how the local Beyond All Reason and RecoilEngine clones inform CircuitAI development. Both repositories are trusted evidence and strictly read-only. The operational rules are in [`../AGENTS.md`](../AGENTS.md).
 
+A third sibling, `C:\bardev\rjm.bar.docs`, is the **writable** shared game knowledge base built from these two trees (unit pages, mechanics, economy, counters, doctrine). Consult it before reading the raw trees, and record newly established game facts there rather than here. See "Game and Engine Knowledge Base" in [`../AGENTS.md`](../AGENTS.md).
+
 ## Beyond All Reason
 
 Path: `C:\bardev\bar-Beyond-All-Reason`

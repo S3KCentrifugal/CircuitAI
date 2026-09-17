@@ -330,6 +330,13 @@ Ordered by impact. None of these are applied.
   can override map-specific limits in `Global::Map::MergedUnitLimits`, depending
   on call order within `Tech_EconomyUpdate`.
 
+## Open investigations
+
+- [`doc/t2-constructor-stall.md`](../t2-constructor-stall.md) - T2 construction
+  bots idle for minutes after mex upgrades while T1 keeps building. Diagnosed to
+  native `MakeBuilderTask` stall gating plus `MEXUP` not being in
+  `IsIgnoreStallingPull`; fix undecided.
+
 ## Related
 
 - `doc/angelscript-references.md` - script loading model, callback contracts,

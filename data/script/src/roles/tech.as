@@ -25,6 +25,8 @@ namespace RoleTech
 	bool hasAppliedT1VehicleEcoThreshold = false;
 	// One-way gate to unlock advanced storages when economy is ready
 	bool hasUnlockedAdvancedStorage = false;
+	// One-way gate: have the T2 rush bots had their engine cap restored?
+	bool hasUncappedRushBots = false;
 	// One-way gate: after first T2 bot lab, allow one T1 metal storage (raise cap to 1)
 	bool hasRaisedT1MetalStorageCap = false;
 	// One-way gate: has the nuke silo targeted the farthest tech spot?
@@ -126,14 +128,21 @@ namespace RoleTech
 
 		// T2_RUSH is decided in Main::AiMain by ApplyTechStrategyWeights, which runs
 		// before ApplyProfileSettings reaches Tech_Init, so the strategy is known here.
-		// When the rush is on, the three rush bots must not be capped: they are what
+		// When the rush is on, the three rush bots must not stay capped: they are what
 		// the additional T2 bot labs exist to produce, alongside T3 from the gantry.
 		// The primary T2 lab still makes fast-assist bots - that branch is ordered
 		// ahead of the combat batch in Tech_FactoryAiMakeTask.
-		if (Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH))
-		{
-			Tech_UncapRushBots("T2_RUSH enabled at start");
-		}
+		//
+		// The cap is NOT lifted here. Releasing it at start makes the bots buildable
+		// from frame 0, and the script's own income gate does not protect against that:
+		// it only guards the batch in Tech_FactoryAiMakeTask. Native production
+		// (DefaultMakeTask -> CreateFactoryTask -> UpdateFirePower -> RequiredFireDef)
+		// selects purely on availability and has no income threshold, so an uncapped
+		// rush bot is produced as soon as any T2 bot lab exists - and the first lab is
+		// allowed at MinimumMetalIncomeForT2Lab (18), far below the rush gate. That
+		// stalls the economy. Tech_EconomyUpdate lifts the cap at the same income the
+		// batch uses, so cap release and production gate unlock together.
+		hasUncappedRushBots = false;
 
 		// ****************** REZBOT LIMITS ****************** //
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllRezBots(), Global::RoleSettings::Tech::StartCapRezBots);
@@ -362,12 +371,28 @@ namespace RoleTech
 
 			UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2BotLabs(), allowedT2Labs);
 
-			// Re-assert the rush bots' engine cap. Tech_IncomeBuilderLimits and the
+			// Release the rush bots' engine cap once income reaches the same gate the T2
+			// combat batch uses in Tech_FactoryAiMakeTask (botLabGate). Doing it earlier
+			// lets native production build them from the first T2 lab at ~18 income and
+			// stall the economy; doing it here keeps cap release and production gate in
+			// step. One-way: once unlocked it stays unlocked, so a dip in income does not
+			// re-cap mid-rush.
+			//
+			// Also re-asserted on later passes because Tech_IncomeBuilderLimits and the
 			// storage-unlock branch both re-apply Global::Map::MergedUnitLimits, which can
 			// re-cap these defs; this runs after those and is a no-op when already correct.
 			if (Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH))
 			{
-				Tech_UncapRushBots("T2 lab cap update, allowed=" + allowedT2Labs);
+				const float rushGate = Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyBotLabExpansion;
+				if (!hasUncappedRushBots && metalIncome >= rushGate)
+				{
+					hasUncappedRushBots = true;
+					Tech_UncapRushBots("metalIncome " + metalIncome + " >= rush gate " + rushGate);
+				}
+				else if (hasUncappedRushBots)
+				{
+					Tech_UncapRushBots("re-assert after limit re-apply, allowed=" + allowedT2Labs);
+				}
 			}
 			GenericHelpers::LogUtil(
 				"[TECH][Labs] T2 bot lab cap=" + allowedT2Labs +
