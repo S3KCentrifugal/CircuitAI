@@ -16,6 +16,7 @@ line numbers when navigating.
 - [Init: what AIR installs](#init-what-air-installs)
 - [The build-focus system](#the-build-focus-system)
 - [Decision flows](#decision-flows)
+- [T2 bomber waves](#t2-bomber-waves)
 - [Commander wind opening](#commander-wind-opening)
 - [Known defects](#known-defects)
 - [Related](#related)
@@ -32,8 +33,9 @@ T1 land defences - AIR does not intend to fight on the ground.
 
 ## Registration
 
-`RoleAir::Register()` fills **14 of 22** slots - the common thirteen plus
-`FactoryAiMakeTaskHandler`.
+`RoleAir::Register()` fills **17 of 24** slots - the common thirteen plus
+`FactoryAiMakeTaskHandler` and the three military hooks that drive the bomber
+waves.
 
 | Slot | Handler |
 | --- | --- |
@@ -51,9 +53,12 @@ T1 land defences - AIR does not intend to fight on the ground.
 | `FactoryAiMakeTaskHandler` | `Air_FactoryAiMakeTask` |
 | `SelectFactoryHandler` | `Air_SelectFactoryHandler` |
 | `RoleMatchHandler` | `Air_RoleMatch` |
+| `MilitaryAiMakeTaskHandler` | `Air_MilitaryAiMakeTask` |
+| `MilitaryAiUnitRemoved` | `Air_MilitaryAiUnitRemoved` |
+| `MilitaryAiTaskRemovedHandler` | `Air_MilitaryAiTaskRemoved` |
 
-Not filled: both factory task hooks, both factory unit hooks, all three military
-hooks, `AiMakeDefenceHandler`.
+Not filled: both factory task hooks, both factory unit hooks,
+`MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`, `AiMakeDefenceHandler`.
 
 ## Settings
 
@@ -100,6 +105,21 @@ with `MinT1AirConstructorCount` 3 and `MinT2AirConstructorCount` 2.
 
 `UseDynamicFactoryProduction` is **false**.
 
+**T2 bomber waves** (`BomberWave*`, see [T2 bomber waves](#t2-bomber-waves)):
+
+| Setting | Value |
+| --- | --- |
+| `BomberWavesEnabled` | true |
+| `BomberWaveFirstSize` / `BomberWaveMaxSize` | 20 / 300 |
+| `BomberWaveFighterRatio` | 1.0 |
+| `BomberWaveLowSurvival` / `BomberWaveHighSurvival` | 0.4 / 0.8 |
+| `BomberWaveGrowthOnHeavyLoss` / `Default` / `OnLightLoss` | 2.0 / 1.5 / 1.25 |
+| `BomberWaveEvaluateSeconds` | 120 |
+| `BomberWaveEnemyAAMetalFraction` | 0.5 |
+| `BomberWaveMaxHoldSeconds` | 480 |
+| `BomberWaveReleaseWindowSeconds` | 15 |
+| `BomberWaveProductionMetalIncome` | 40.0 |
+
 ## Init: what AIR installs
 
 `Air_Init`:
@@ -110,7 +130,7 @@ with `MinT1AirConstructorCount` 3 and `MinT2AirConstructorCount` 2.
    `g_airCommanderWindTask`.
 2. `aiTerrainMgr.SetAllyZoneRange(1600.0)`.
 3. Installs the four military quota values and logs them at level 3.
-4. `Air_ApplyStartLimits()`.
+4. `Air_ApplyStartLimits()`, then `AirWaves::Init()` (wave roster and state).
 5. `FactoryProduction::Initialize()` only if the flag is set - it is not, so the
    else-branch logs "using legacy factory selection".
 6. `ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::AIR, "AIR")`.
@@ -189,6 +209,12 @@ minimum metal income and prioritises in this order:
 tracked by `g_airStrikeOpenerQueuedCount`; the strike type per side comes from
 `GetT1StrikeAircraftNameForSide`.
 
+For a T2 plant the order is: advanced constructors up to the income-staged
+target, the bounded heavy-air package (Legion/Cortex), then
+`AirWaves::MakeProductionTask` once `Air_IsCombatProductionReady` passes - it
+queues one wave bomber or escort fighter per call until the hold reaches the
+next wave's target - and only then dynamic production or the native default.
+
 ### Economy
 
 `Air_EconomyUpdate()` is **empty**. All AIR economy shaping happens through
@@ -206,8 +232,88 @@ the rest of the army.
 
 ### Military
 
-There is no military handler: `Air_MilitaryAiMakeTask` exists only as a
-commented-out stub, so air combat units take the native default task.
+`Air_MilitaryAiMakeTask(u)` asks `AirWaves::MakeTask(u)` first; it returns a
+task only for T2 wave bombers and T2 fighters. Everything else, including all T1
+bombers, seaplane bombers, torpedo bombers and the Harbinger minelayer, takes
+`aiMilitaryMgr.DefaultMakeTask(u)`: a bomber becomes a native `CBombTask` the
+moment it is built and attacks on its own, which is the intended early-game
+trickle. `Air_MilitaryAiUnitRemoved` and `Air_MilitaryAiTaskRemoved` forward
+deaths and task removals to the wave bookkeeping.
+
+## T2 bomber waves
+
+Implemented in `data/script/src/manager/air_waves.as` (namespace `AirWaves`);
+the file header documents the native primitives and the reasoning. Strategy by
+tier:
+
+| Tier | Units | Strategy |
+| --- | --- | --- |
+| T1 | Stormbringer, Whirlwind, Legion Martyr (suicide drone, role `mine`) | native default: each bomber attacks as it is built |
+| Seaplane | Tsunami, Dam Buster, Pyrphoros | native default |
+| T2 strategic | `UnitHelpers::GetAllT2WaveBombers()`: Blizzard, Stiletto (EMP), Liche (nuclear), Hailstorm, Phoenix (heat ray) | held at base, released in escorted waves |
+| T2 specialist | torpedo bombers Cormorant, Angler, Aesacus; Harbinger minelayer | native default (not strategic bombing) |
+| T3 | none exist: gantries build no aircraft and the experimental aircraft plants are unreachable | roster is a list in `UnitHelpers`, add the id when BAR adds one |
+
+Escorts are `UnitHelpers::GetAllT2Fighters()` (Highwind, Nighthawk, Venator,
+Ajax); the T2 plant produces `GetT2FighterForSide` for waves.
+
+**Hold.** A wave bomber or fighter asking for a task gets
+`TaskF::Defend(check = MELEE, promote = BOMB | AA, power = 1e9)`. The native
+`CDefendTask` parks it near the base position and engages only enemies inside
+our defence influence. It would promote when its power reached the threshold or
+when a task of type `check` existed; `MELEE` tasks are never created and the
+threshold is unreachable, so the hold never promotes by itself. `promote` is not
+`ATTACK` because `CMilitaryManager::UpdateDefenceTasks` rewrites the threshold of
+ATTACK-promoting defend tasks every 5 s. Held ids live in `heldBombers` and
+`heldFighters`.
+
+**Launch** (`AirWaves::Update`, from `Air_MainUpdate`): when the hold has
+`nextWaveSize` bombers and `FightersFor(nextWaveSize)` fighters, or when
+`BomberWaveFirstSize` bombers have been held for `BomberWaveMaxHoldSeconds`
+(escort requirement waived). Every distinct hold task is aborted once; its units
+fall back to the native idle task and re-enter `Military::AiMakeTask` within a
+few seconds, where the launch queue hands out wave tasks for
+`BomberWaveReleaseWindowSeconds`. Latecomers rejoin the hold.
+
+**Wave tasks.** One `TaskF::Common(BOMB)` per bomber def (native
+`CBombTask::CanAssignTo` only groups identical defs, and the script assignment
+path does not consult it), so a mixed Blizzard/Stiletto/Liche wave flies as
+parallel bomb groups released in the same second. Target selection stays native;
+its known defects and fix plan are in `doc/bomber-targeting.md`. Fighters get
+`TaskF::Guard(vip)` on the wave's living bombers, round-robin, so they fly with
+the wave; an escort whose bomber dies re-attaches to another living wave bomber.
+
+**End.** There is no explicit end. `CBombTask` keeps bombing while it has
+targets; survivors that come back idle rejoin the hold. Survival is measured
+`BomberWaveEvaluateSeconds` after launch from the wave ids still alive.
+
+**Sizing** (`AirWaves::ComputeNextWaveSize`, a pure function):
+
+```text
+growth  = survival < LowSurvival  ? GrowthOnHeavyLoss   (2.0)
+        : survival > HighSurvival ? GrowthOnLightLoss   (1.25)
+        :                           GrowthDefault       (1.5)
+next    = round(previousWave * growth)
+aaFloor = round(enemyAntiAirMetal * EnemyAAMetalFraction / waveBomberMetalCost)
+result  = clamp(max(next, aaFloor), FirstSize, MaxSize)
+```
+
+With the defaults a wave that keeps 80% of its bombers grows 20, 25, 31, 39...;
+one that loses more than 60% doubles: 20, 40, 80, 160, 300. The enemy anti-air
+metal comes from `Military::GetCachedRoleCost("anti_air")`. Until the survival
+ratio is known the next target is the previous size times `GrowthDefault`.
+
+**Production.** `AirWaves::MakeProductionTask` queues, per call, an escort
+fighter when fighters lag the held bombers, else a bomber while the hold is below
+target, else a fighter while escorts are below target. Gated by
+`BomberWaveProductionMetalIncome`.
+
+**Limits.** The script cannot aim a wave (only `CSuperTask` exposes a target
+position) and cannot read enemy groups, so targets are native and sizing uses
+aggregate enemy anti-air cost. A native `CFGuardTask` engages any enemy near its
+vip; the C++ change in `GuardTask.cpp` restricts that to enemies the guards can
+actually hit, so escort fighters no longer dive on ground units and leave the
+bombers.
 
 ## Commander wind opening
 
@@ -253,4 +359,4 @@ until `CommanderWindEnergyIncomeTarget` (300.0) is reached, provided
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 113a5cd1c2522a0448b4dab3a86647f505c4de00; lines: 1043 -->
+<!-- source: data/script/src/roles/air.as; blob: 21ea92efaf3c6db18a685eacacc481540bae8ec6; lines: 1045 -->

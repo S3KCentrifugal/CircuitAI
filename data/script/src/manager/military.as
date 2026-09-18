@@ -23,15 +23,18 @@ namespace Military {
 
 	void AiTaskAdded(IUnitTask@ task)
 	{
-
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if (cfg !is null && cfg.MilitaryAiTaskAddedHandler !is null) {
+			cfg.MilitaryAiTaskAddedHandler(task);
+		}
 	}
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
-		// if (done == false) {
-		// 	SmrtLog("SMRT: AiTaskRemoved " + task);
-		// }
-		
+		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
+		if (cfg !is null && cfg.MilitaryAiTaskRemovedHandler !is null) {
+			cfg.MilitaryAiTaskRemovedHandler(task, done);
+		}
 	}
 
 	void AiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)

@@ -8,6 +8,8 @@
 #include "../types/terrain.as"
 // Dynamic factory production
 #include "../manager/factory_production.as"
+// T2 bomber waves
+#include "../manager/air_waves.as"
 
 namespace RoleAir {
     IUnitTask@ g_airStrategicFocusTask = null;
@@ -333,6 +335,7 @@ namespace RoleAir {
             " raid.avg=" + aiMilitaryMgr.quota.raid.avg, 3);
 
         Air_ApplyStartLimits();
+        AirWaves::Init();
 
         // Initialize dynamic factory production system for AIR role when enabled
         if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
@@ -389,6 +392,8 @@ namespace RoleAir {
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();
         }
+        // T2 bomber waves: launch when the hold reaches the target, size the next wave
+        AirWaves::Update();
         //LogUtil("Air update logic executed", 5);
     }
 
@@ -608,6 +613,14 @@ namespace RoleAir {
                 }
             }
 
+            // 3) T2 bomber waves: fill the hold with the next wave's bombers and escorts.
+            if (Air_IsCombatProductionReady(metalIncome, energyIncome)) {
+                IUnitTask@ waveTask = AirWaves::MakeProductionTask(u, side, pos);
+                if (waveTask !is null) {
+                    return waveTask;
+                }
+            }
+
             // Dynamic selection runs after bounded strategic quotas so it cannot
             // make constructor or heavy-air policy unreachable.
             if (Air_IsCombatProductionReady(metalIncome, energyIncome)
@@ -693,40 +706,25 @@ namespace RoleAir {
 
     ******************************************************************************/
     
-    // If the unit is a bomber and we have fewer than a minimum bomber count globally,
-    // return null to defer making a task (avoid trickling in solo bombers).
-    // IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
-    // {
-    //     const CCircuitDef@ cdef = (u is null ? null : u.circuitDef);
-    //     if (cdef is null) {
-    //         return aiMilitaryMgr.DefaultMakeTask(u);
-    //     }
+    // T2 bombers and T2 fighters belong to the wave system (manager/air_waves.as):
+    // held at base, released together, escorted. Every other air unit, including
+    // all T1 bombers, keeps the native default task (solo bomb runs as built).
+    IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
+    {
+        IUnitTask@ waveTask = AirWaves::MakeTask(u);
+        if (waveTask !is null) return waveTask;
+        return aiMilitaryMgr.DefaultMakeTask(u);
+    }
 
-    //     // Detect bomber units via role mask (engine-provided)
-    // const bool isBomber = cdef.IsRoleAny(Unit::Role::BOMBER.mask);
+    void Air_MilitaryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
+    {
+        AirWaves::OnUnitRemoved(unit);
+    }
 
-    //     if (isBomber) {
-    //         // Count total bombers across all factions we field (T1 + T2 canonical bombers)
-    //         // Keep this list minimal and explicit; extend if we add more bomber variants later.
-    //         array<string> bomberIds;
-    //         bomberIds.insertLast("armthund");   // ARM T1 bomber
-    //         bomberIds.insertLast("corshad");    // CORE T1 bomber
-    //         bomberIds.insertLast("legmos");     // LEG T1 bomber
-    //         bomberIds.insertLast("armpnix");    // ARM T2 bomber
-    //         bomberIds.insertLast("corhurc");    // CORE T2 bomber
-    //         bomberIds.insertLast("legphoenix"); // LEG T2 bomber
-
-    //         const int totalBombers = UnitDefHelpers::SumUnitDefCounts(bomberIds);
-    //         if (totalBombers < 10) {
-    //             // Gate early: hold off on issuing tasks to bombers until we have a small pack
-    //             // to reduce ineffective trickle attacks.
-    //             return null;
-    //         }
-    //     }
-
-    //     // Fallback to default military behavior for non-bombers or when threshold met
-    //     return aiMilitaryMgr.DefaultMakeTask(u);
-    // }
+    void Air_MilitaryAiTaskRemoved(IUnitTask@ task, bool done)
+    {
+        AirWaves::OnTaskRemoved(task);
+    }
 
     /******************************************************************************
 
@@ -1037,6 +1035,10 @@ namespace RoleAir {
         @cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate@>(@Air_EconomyUpdate);
 
         @cfg.RoleMatchHandler = cast<RoleMatchDelegate@>(@Air_RoleMatch);
+
+        @cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_MilitaryAiMakeTask);
+        @cfg.MilitaryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_MilitaryAiUnitRemoved);
+        @cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_MilitaryAiTaskRemoved);
 
         RoleConfigs::Register(cfg);
     }

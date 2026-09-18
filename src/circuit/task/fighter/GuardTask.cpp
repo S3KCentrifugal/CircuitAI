@@ -87,7 +87,7 @@ void CFGuardTask::Update()
 	const std::vector<ICoreUnit::Id>& enemyIds = circuit->GetCallback()->GetEnemyUnitIdsIn(pos, vip->GetCircuitDef()->GetLosRadius() + 500.f);
 	for (ICoreUnit::Id enemyId : enemyIds) {
 		CEnemyInfo* ei = circuit->GetEnemyInfo(enemyId);
-		if (ei != nullptr) {
+		if ((ei != nullptr) && IsTargetable(ei)) {
 			target = ei;
 			break;
 		}
@@ -111,6 +111,25 @@ void CFGuardTask::Update()
 			)
 		}
 	}
+}
+
+// Guards engage only what one of them can actually hit. Without this an escort
+// of fighters (target category VTOL only) dived on the first ground unit that
+// came near its vip, left the escorted bombers and never fired a shot. Unknown
+// defs (radar blips) stay targetable so the previous behaviour is kept for them.
+bool CFGuardTask::IsTargetable(CEnemyInfo* enemy) const
+{
+	CCircuitDef* edef = enemy->GetCircuitDef();
+	if (edef == nullptr) {
+		return true;
+	}
+	const int category = edef->GetCategory();
+	for (CCircuitUnit* unit : units) {
+		if ((category & unit->GetCircuitDef()->GetTargetCategory()) != 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void CFGuardTask::OnUnitIdle(CCircuitUnit* unit)

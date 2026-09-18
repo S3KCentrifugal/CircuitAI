@@ -29,6 +29,8 @@ namespace RoleTech
 	bool hasUncappedRushBots = false;
 	// One-way gate: after first T2 bot lab, allow one T1 metal storage (raise cap to 1)
 	bool hasRaisedT1MetalStorageCap = false;
+	// One-way gate: has a landlocked start unlocked shipyards and hover plants?
+	bool hasUnlockedLandLockedWaterFactories = false;
 	// One-way gate: has the nuke silo targeted the farthest tech spot?
 	bool hasTargetedFarthestTech = false;
 	// Global fast-assist cap for TECH role (computed from income in Tech_IncomeBuilderLimits)
@@ -170,7 +172,8 @@ namespace RoleTech
 		// TECH role must not build T2 Vehicle Plants
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2VehicleLabs(), 0);
 
-		// TECH role must not build any hover plants
+		// Hover plants start capped at 0. Only a landlocked start raises them (and the
+		// shipyards below), at the income gate in Tech_UpdateLandLockedWaterExpansion.
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT1HoverPlants(), 0);
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllFloatingHoverPlants(), 0);
 
@@ -503,6 +506,99 @@ namespace RoleTech
 			UnitHelpers::BatchApplyUnitCaps(t1AirPlants, allowedT1Air);
 			UnitHelpers::BatchApplyUnitCaps(t2AirPlants, allowedT2Air);
 		}
+
+		// Landlocked start: shipyards and hover plants unlock at the income gate. Runs
+		// last so it re-asserts its caps after the limit re-applies above.
+		Tech_UpdateLandLockedWaterExpansion(metalIncome);
+	}
+
+	/******************************************************************************
+
+	LANDLOCKED WATER EXPANSION
+
+	A start the map script flags landLocked (StartSpot.landLocked ->
+	Global::Map::LandLocked) sits on ground the land army cannot leave, so the
+	role techs with a bot lab and leaves with amphibious units. Shipyards and
+	hover plants are capped at 0 by Tech_ApplyStartLimits like every other Tech
+	start; on a landlocked start this unlock raises those caps once metal income
+	reaches MetalIncomeThresholdForLandLockedWaterExpansion, and the T2
+	constructor ladder then places one T1 shipyard, one hover plant and, on top
+	of a T1 shipyard, one T2 shipyard. The native factory chooser never picks
+	them (factory.json switch importance is 0 for shipyards and hover plants),
+	so Tech_TryEnqueueLandLockedWaterFactory is the only path that builds them.
+	A start that is not landlocked is never unlocked.
+
+	One-way, and re-asserted every economy pass because Tech_IncomeBuilderLimits
+	and the storage unlock re-apply Global::Map::MergedUnitLimits, which can
+	re-cap these defs.
+
+	******************************************************************************/
+	void Tech_UpdateLandLockedWaterExpansion(float metalIncome)
+	{
+		if (!Global::Map::LandLocked)
+			return;
+
+		const float gate = Global::RoleSettings::Tech::MetalIncomeThresholdForLandLockedWaterExpansion;
+		if (!hasUnlockedLandLockedWaterFactories)
+		{
+			if (metalIncome < gate)
+				return;
+			hasUnlockedLandLockedWaterFactories = true;
+			GenericHelpers::LogUtil("[TECH][LandLocked] mi " + metalIncome + " >= " + gate
+				+ ": unlocking shipyards (T1=" + Global::RoleSettings::Tech::LandLockedMaxT1Shipyards
+				+ ", T2=" + Global::RoleSettings::Tech::LandLockedMaxT2Shipyards
+				+ ") and hover plants (" + Global::RoleSettings::Tech::LandLockedMaxHoverPlants + ")", 2);
+		}
+		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT1Shipyards(), Global::RoleSettings::Tech::LandLockedMaxT1Shipyards);
+		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2Shipyards(), Global::RoleSettings::Tech::LandLockedMaxT2Shipyards);
+		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT1HoverPlants(), Global::RoleSettings::Tech::LandLockedMaxHoverPlants);
+		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllFloatingHoverPlants(), Global::RoleSettings::Tech::LandLockedMaxHoverPlants);
+	}
+
+	// T2 constructor ladder step. Order: T1 shipyard, hover plant (land variant,
+	// then floating), T2 shipyard once a T1 shipyard stands. Each Builder::Enqueue*
+	// wrapper enforces its own cooldown and the caps above, so a step that is at
+	// cap or cooling down yields to the next one.
+	IUnitTask @Tech_TryEnqueueLandLockedWaterFactory(const string &in side, float metalIncome, float energyIncome, float metalCurrent, const AIFloat3 &in anchor)
+	{
+		if (!hasUnlockedLandLockedWaterFactories)
+			return null;
+
+		if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1Shipyards()) < Global::RoleSettings::Tech::LandLockedMaxT1Shipyards)
+		{
+			IUnitTask @tSy = Builder::EnqueueT1Shipyard(side, anchor, Global::RoleSettings::Tech::LandLockedShipyardSearchRadius, 600 * SECOND);
+			if (tSy !is null)
+				return tSy;
+		}
+
+		const int hoverPlants = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1HoverPlants())
+			+ UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllFloatingHoverPlants());
+		if (hoverPlants < Global::RoleSettings::Tech::LandLockedMaxHoverPlants)
+		{
+			IUnitTask @tHp = Builder::EnqueueT1HoverPlant(side, anchor, SQUARE_SIZE * 24, 600 * SECOND);
+			if (tHp !is null)
+				return tHp;
+			IUnitTask @tFhp = Builder::EnqueueFloatingHoverPlant(side, anchor, SQUARE_SIZE * 24, 600 * SECOND);
+			if (tFhp !is null)
+				return tFhp;
+		}
+
+		if (EconomyHelpers::ShouldBuildT2Shipyard(
+				/*mi*/ metalIncome,
+				/*ei*/ energyIncome,
+				/*metalCurrent*/ metalCurrent,
+				/*reqMi*/ Global::RoleSettings::Tech::MetalIncomeThresholdForLandLockedWaterExpansion,
+				/*reqMetalCurrent*/ 0.0f,
+				/*reqEi*/ Global::RoleSettings::Tech::LandLockedMinEnergyIncomeForT2Shipyard,
+				/*t2ShipyardCount*/ UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2Shipyards()),
+				/*maxAllowed*/ Global::RoleSettings::Tech::LandLockedMaxT2Shipyards,
+				/*hasPrimaryFactory*/ Factory::primaryT1Shipyard !is null))
+		{
+			IUnitTask @tAsy = Builder::EnqueueT2Shipyard(side, Factory::GetT1ShipyardPos(), SQUARE_SIZE * 60, 600 * SECOND);
+			if (tAsy !is null)
+				return tAsy;
+		}
+		return null;
 	}
 
 	/******************************************************************************
@@ -1638,6 +1734,11 @@ namespace RoleTech
 			if (tGantry !is null)
 				return tGantry;
 		}
+
+		// Landlocked start: shipyards / hover plant unlocked at the income gate
+		IUnitTask @tWater = Tech_TryEnqueueLandLockedWaterFactory(unitSide, metalIncome, energyIncome, metalCurrent, anchor);
+		if (tWater !is null)
+			return tWater;
 
 		if (EconomyHelpers::ShouldBuildT2EnergyConverter(
 				/*metalIncome*/ metalIncome,

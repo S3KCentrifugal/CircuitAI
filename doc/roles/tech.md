@@ -151,7 +151,8 @@ Economy::AiUpdateEconomy()         recomputes isMetalEmpty/isEnergyStalling/... 
                                    -> Tech_EconomyUpdate()
                                         Tech_IncomeBuilderLimits(metalIncome)
                                         storage unlock, gantry cap, T2 lab cap,
-                                        T1 eco-threshold block
+                                        T1 eco-threshold block,
+                                        Tech_UpdateLandLockedWaterExpansion
 Factory::AiMakeTask()  per factory  -> Tech_FactoryAiMakeTask()
 Builder::AiMakeTask()  per builder  -> Tech_BuilderAiMakeTask()
 ```
@@ -170,7 +171,8 @@ Builder::AiMakeTask()  per builder  -> Tech_BuilderAiMakeTask()
 | T1 bot labs | `1` | to 3 at `mi >= 200` |
 | T2 bot labs | `1` | income-derived, clamped to `MaxT2BotLabs` (3) |
 | T1 vehicle plants | `0` | to 3 at `mi >= 200` |
-| T2 vehicle plants, hover plants | `0` | never (deliberate) |
+| T2 vehicle plants | `0` | never (deliberate) |
+| Hover plants (land and floating), T1/T2 shipyards | `0` | only on a landlocked start: `Tech_UpdateLandLockedWaterExpansion` raises them to `LandLockedMaxT1Shipyards` / `LandLockedMaxT2Shipyards` / `LandLockedMaxHoverPlants` (1 each) at `mi >= MetalIncomeThresholdForLandLockedWaterExpansion` (200); see [Landlocked water expansion](#landlocked-water-expansion) |
 | Land defences | `0` | never (deliberate; AA and LRPC are not in that list) |
 | T1 solar | `4` | - |
 | Fusion / advanced fusion | `0` | via builder-side logic |
@@ -218,6 +220,39 @@ type - `Tech_Commander_AiMakeTask`, `Tech_T1BotConstructor_AiMakeTask`,
 wrappers. Energy branches are gated by `Tech_RedirectEnergyToReactor`, which
 diverts to `Builder::EnqueueAssistReactor` while a Fusion or Advanced Fusion is
 under construction.
+
+### Landlocked water expansion
+
+A start spot the map script flags `landLocked` (`StartSpot.landLocked`, copied
+to `Global::Map::LandLocked` in `setup.as`) is ground the land army cannot
+leave, so TECH techs with a bot lab there and leaves with amphibious units. On
+such a start only, TECH may also place water factories once the economy is
+strong:
+
+- `Tech_UpdateLandLockedWaterExpansion(metalIncome)` runs at the end of
+  `Tech_EconomyUpdate`. Once `mi >= MetalIncomeThresholdForLandLockedWaterExpansion`
+  (200) it sets `hasUnlockedLandLockedWaterFactories` and raises the caps on T1
+  shipyards, T2 shipyards, land hover plants and floating hover plants to the
+  `LandLockedMax*` settings (1 each). One-way; re-applied every pass because
+  `Tech_IncomeBuilderLimits` and the storage unlock re-apply
+  `Global::Map::MergedUnitLimits`, which can re-cap these defs.
+- `Tech_TryEnqueueLandLockedWaterFactory(...)` is a step in the
+  `Tech_T2BotConstructor_AiMakeTask` ladder, right after the gantry step. While
+  unlocked it tries, in order: a T1 shipyard via `Builder::EnqueueT1Shipyard`
+  (anchored on the T2 bot lab with `LandLockedShipyardSearchRadius`, 960 elmos,
+  because the footprint must land in water); a hover plant via
+  `Builder::EnqueueT1HoverPlant` then `Builder::EnqueueFloatingHoverPlant`; and a
+  T2 shipyard through `EconomyHelpers::ShouldBuildT2Shipyard` (needs a primary
+  T1 shipyard and `LandLockedMinEnergyIncomeForT2Shipyard`, 2000) via
+  `Builder::EnqueueT2Shipyard`. Each wrapper enforces its own cooldown and the
+  caps, so a step at cap yields to the next.
+- The native factory chooser never places these on its own: in the experimental
+  `factory.json` the switch importance of shipyards and hover plants is 0, so the
+  script step is the only path. A start that is not landlocked keeps all four
+  caps at 0 for the whole game.
+- Production from the placed factories goes through `DefaultMakeTask`; the T1
+  naval and hover combat lists are not part of the T1 combat cap, so the native
+  chooser builds them normally.
 
 ## Known defects
 
@@ -340,4 +375,4 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: b31e93e69e04d49eb8d115ab8d7f6c54987f04d5; lines: 1924 -->
+<!-- source: data/script/src/roles/tech.as; blob: 66748ddd129ea641114ed1329c1af49c99bbe033; lines: 2025 -->

@@ -9,6 +9,7 @@
 #include "task/fighter/SquadTask.h"
 #include "map/InfluenceMap.h"
 #include "module/MilitaryManager.h"
+#include "terrain/TerrainManager.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
@@ -18,7 +19,9 @@
 
 #include "AISCommands.h"
 #include "Lua.h"
+#include "Log.h"
 
+#include <cmath>
 #include <format>
 
 namespace circuit {
@@ -100,15 +103,35 @@ void CSuperTask::Update()
 		&militaryMgr->GetTasks(IFighterTask::FightType::AH),
 		&militaryMgr->GetTasks(IFighterTask::FightType::AA),
 	};
-	auto isTargetValid = [&avoidTasks, frame, sqAoe, inflMap, circuit](const CEnemyManager::SEnemyGroup& group) {
+	// A super weapon whose range does not cover the map - EMP silo (~3650), tactical
+	// missile launchers (~2300), T2 LRPCs (~4650-4950) and, on large maps, the endgame
+	// LRPCs (~5750-6100) - is a regional weapon: it is built as a cluster defence and
+	// its targets are the enemy pushes into our own clusters, which sit in *our*
+	// influence. Requiring enemy-dominated ground (influence <= -INFL_EPS) there
+	// rejects every group it can reach, so the EMP filled its stockpile and never
+	// fired and the LRPCs were left to engine auto-targeting, while the map-range
+	// Junos (32000) and nukes (72000) worked. For regional weapons require only enemy
+	// presence at the group; the own-squad exclusion and cost floor below still apply.
+	// Map-range weapons keep the strict rule so they are never spent on the front line.
+	const float mapDiag = std::sqrt(SQUARE(float(CTerrainManager::GetTerrainWidth())) + SQUARE(float(CTerrainManager::GetTerrainHeight())));
+	const bool isRegional = (cdef->GetMaxRange() < mapDiag);
+	int inRange = 0, rejInfl = 0, rejSquad = 0, rejIgnore = 0;
+	auto isTargetValid = [&avoidTasks, frame, sqAoe, inflMap, circuit, isRegional, &rejInfl, &rejSquad, &rejIgnore](const CEnemyManager::SEnemyGroup& group) {
 		// Ally influence and own tasks avoidance
-		if (inflMap->GetInfluenceAt(group.pos) > -INFL_EPS) {
+		if (isRegional) {
+			if (inflMap->GetEnemyInflAt(group.pos) <= INFL_EPS) {
+				++rejInfl;
+				return false;
+			}
+		} else if (inflMap->GetInfluenceAt(group.pos) > -INFL_EPS) {
+			++rejInfl;
 			return false;
 		}
 		for (const std::set<IFighterTask*>* tasks : avoidTasks) {
 			for (const IFighterTask* task : *tasks) {
 				const AIFloat3& leaderPos = static_cast<const ISquadTask*>(task)->GetLeaderPos(frame);
 				if (leaderPos.SqDistance2D(group.pos) < sqAoe) {
+					++rejSquad;
 					return false;
 				}
 			}
@@ -124,6 +147,7 @@ void CSuperTask::Update()
 				return true;
 			}
 		}
+		++rejIgnore;
 		return false;
 	};
 
@@ -134,6 +158,7 @@ void CSuperTask::Update()
 			if ((cost >= group.cost) || (position.SqDistance2D(group.pos) >= maxSqRange)) {
 				continue;
 			}
+			++inRange;
 			if (isTargetValid(group)) {
 				cost = group.cost;
 				groupIdx = i;
@@ -147,6 +172,7 @@ void CSuperTask::Update()
 			if (position.SqDistance2D(group.pos) >= maxSqRange) {
 				continue;
 			}
+			++inRange;
 			const AIFloat3& newVec = (group.pos - position).Normalize2D();
 			const float angleMod = M_PI / (2.f * (std::acos(targetVec.dot2D(newVec)) + 1e-2f));
 			if (cost >= group.cost * angleMod) {
@@ -161,6 +187,16 @@ void CSuperTask::Update()
 	const float maxCost = cdef->IsAttrStock() ? cdef->GetWeaponDef()->GetCostM() : cdef->GetCostM() * 0.01f;
 
 	if ((groupIdx < 0) || (cost < maxCost)) {
+		// Diagnostic for regional super weapons that never fire: which gate rejected
+		// every reachable group. Once a minute per unit (Update runs every
+		// TARGET_DELAY); for stockpiled launchers only while a shot is stocked.
+		if (isRegional && ((frame / TARGET_DELAY) % 6 == 0)
+			&& (!cdef->IsAttrStock() || (unit->GetUnit()->GetStockpile() > 0)))
+		{
+			circuit->LOG("SUPER %s(%i): no target | range=%.0f regional=%i groups=%zu inRange=%i rejInfl=%i rejSquad=%i rejIgnore=%i bestCost=%.0f minCost=%.0f",
+					cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange(), int(isRegional), groups.size(),
+					inRange, rejInfl, rejSquad, rejIgnore, cost, maxCost);
+		}
 		TRY_UNIT(circuit, unit,
 			unit->CmdStop();
 		)

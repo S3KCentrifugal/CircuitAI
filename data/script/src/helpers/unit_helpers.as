@@ -948,6 +948,52 @@ namespace UnitHelpers {
         return ids;
     }
 
+    // T2 bombers flown in waves by the AIR role (manager/air_waves.as). Each def gets
+    // its own bomb task: native CBombTask::CanAssignTo only groups identical defs.
+    // Strategic bombers only: torpedo bombers (armlance, cortitan, legatorpbomber) and
+    // the Harbinger minelayer (legmineb) keep the native default task.
+    array<string> GetAllT2WaveBombers() {
+        array<string> ids;
+        ids = {
+            "armpnix",     // Blizzard
+            "armstil",     // Stiletto (EMP)
+            "armliche",    // Liche (nuclear)
+            "corhurc",     // Hailstorm
+            "legphoenix"   // Phoenix (heat ray)
+        };
+        return ids;
+    }
+
+    // The bomber the T2 plant produces for waves
+    string GetT2WaveBomberForSide(const string &in side)
+    {
+        if (side == "armada") return "armpnix";
+        if (side == "cortex") return "corhurc";
+        if (side == "legion") return "legphoenix";
+        return "";
+    }
+
+    // T2 fighters held as wave escorts (all reachable T2 anti_air aircraft)
+    array<string> GetAllT2Fighters() {
+        array<string> ids;
+        ids = {
+            "armhawk",     // Highwind
+            "corvamp",     // Nighthawk
+            "legvenator",  // Venator
+            "legafigdef"   // Ajax
+        };
+        return ids;
+    }
+
+    // The fighter the T2 plant produces for wave escorts
+    string GetT2FighterForSide(const string &in side)
+    {
+        if (side == "armada") return "armhawk";
+        if (side == "cortex") return "corvamp";
+        if (side == "legion") return "legvenator";
+        return "";
+    }
+
     array<string> GetAllT1Shipyards() {
         array<string> ids;
         ids = { "armsy", "corsy", "legsy" }; // Include Legion T1 shipyard
@@ -1072,6 +1118,14 @@ namespace UnitHelpers {
         if (side == "cortex") return "corfhp";
         if (side == "legion") return "legfhp";
         return "armfhp"; // default
+    }
+
+    string GetT1ShipyardForSide(const string &in side)
+    {
+        if (side == "armada") return "armsy";
+        if (side == "cortex") return "corsy";
+        if (side == "legion") return "legsy";
+        return "armsy"; // default
     }
 
     // Seaplane platforms across factions

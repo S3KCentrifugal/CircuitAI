@@ -196,6 +196,21 @@ namespace Global {
             float RequiredMetalCurrentForT2AircraftPlant = 1000.0f;
             float RequiredEnergyIncomeForT2AircraftPlant = 2000.0f;
 
+            /******************** LANDLOCKED WATER EXPANSION ********************/
+            // Only on a start spot the map script flags landLocked (Global::Map::LandLocked).
+            // Shipyards and hover plants stay capped at 0 until metal income reaches the
+            // gate; then the caps below apply and Tech_TryEnqueueLandLockedWaterFactory
+            // places them from the T2 constructor ladder. See tech.as, LANDLOCKED WATER EXPANSION.
+            float MetalIncomeThresholdForLandLockedWaterExpansion = 200.0f;
+            int LandLockedMaxT1Shipyards = 1;
+            int LandLockedMaxT2Shipyards = 1;
+            int LandLockedMaxHoverPlants = 1;   // land and floating variants combined
+            // Energy income required on top of the metal gate before the T2 shipyard
+            float LandLockedMinEnergyIncomeForT2Shipyard = 2000.0f;
+            // How far (elmos) around the T2 bot lab the site search may look for water
+            // when placing the T1 shipyard from a land base (120 map squares)
+            float LandLockedShipyardSearchRadius = 960.0f;
+
             /******************** WORKFORCE MINIMUMS ********************/
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
@@ -393,6 +408,36 @@ namespace Global {
             int T1StrikeOpenerSize = 3;
             float T1StrikeOpenerMinimumMetalIncome = 12.0f;
             float T1StrikeOpenerMinimumEnergyIncome = 250.0f;
+
+            /******************** T2 BOMBER WAVES ********************/
+            // T1 bombers keep the native trickle (each bomber attacks as it is built).
+            // T2 bombers are held at base with an escort of T2 fighters and released
+            // together in waves that grow from FirstSize towards MaxSize. The sizing
+            // algorithm and the native primitives are documented in manager/air_waves.as.
+            bool BomberWavesEnabled = true;
+            int BomberWaveFirstSize = 20;          // bombers in the first wave, and the floor
+            int BomberWaveMaxSize = 300;           // hard cap on bombers per wave
+            float BomberWaveFighterRatio = 1.0f;   // fighters held per bomber before a launch
+            // Growth applied to the previous wave size from its survival ratio, measured
+            // EvaluateSeconds after launch: heavy losses mean the enemy anti-air is winning
+            // and the next wave needs mass; light losses grow gently.
+            float BomberWaveLowSurvival = 0.4f;
+            float BomberWaveHighSurvival = 0.8f;
+            float BomberWaveGrowthOnHeavyLoss = 2.0f;
+            float BomberWaveGrowthDefault = 1.5f;
+            float BomberWaveGrowthOnLightLoss = 1.25f;
+            int BomberWaveEvaluateSeconds = 120;
+            // Enemy anti-air floor: the wave's bomber metal must reach this fraction of the
+            // enemy anti_air metal on the map (Military cost cache, refreshed every update).
+            float BomberWaveEnemyAAMetalFraction = 0.5f;
+            // Launch anyway once FirstSize bombers have been held this long, so production
+            // that cannot reach the target in time never stalls the air war.
+            int BomberWaveMaxHoldSeconds = 8 * 60;
+            // After a launch, released units re-enter Military::AiMakeTask within a few
+            // seconds; units that ask later than this rejoin the hold instead.
+            int BomberWaveReleaseWindowSeconds = 15;
+            // Minimum metal income before the T2 plant produces wave aircraft.
+            float BomberWaveProductionMetalIncome = 40.0f;
 
             /******************** HEAVY AIR STRIKE POLICY (Legion/Cortex) ********************/
             // Maintain a bounded late-game heavy-air force for Legion/Cortex.

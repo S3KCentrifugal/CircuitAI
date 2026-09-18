@@ -28,6 +28,8 @@ public:
 	ICoreUnit::Id GetVipId() const { return vipId; }
 
 private:
+	bool IsTargetable(CEnemyInfo* enemy) const;
+
 	ICoreUnit::Id vipId;
 	float maxPower;
 };

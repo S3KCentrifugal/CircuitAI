@@ -97,6 +97,12 @@ namespace Main {
 		if (Global::profileController !is null) {
 			Global::profileController.MainUpdate();
 		}
+		Team::CheckOrphaned();   // ask allies for a T1 constructor if we lost commander and all builders
+	}
+
+	void AiMessage(const string& in msg, int fromTeamId)  // AiSendMessage from an allied BARb instance
+	{
+		Team::HandleMessage(msg, fromTeamId);
 	}
 
 	void AiLuaMessage(const string& in data)  // Spring.SendSkirmishAIMessage(teamID, msg) from unsynced lua

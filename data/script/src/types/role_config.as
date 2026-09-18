@@ -64,6 +64,9 @@ class RoleConfig {
 
     AiMakeTaskDelegate@ MilitaryAiMakeTaskHandler;
 
+    AiTaskAddedDelegate@ MilitaryAiTaskAddedHandler;
+    AiTaskRemovedDelegate@ MilitaryAiTaskRemovedHandler;
+
     AiUnitAddedDelegate@ MilitaryAiUnitAdded; 
     AiUnitRemovedDelegate@ MilitaryAiUnitRemoved;
 

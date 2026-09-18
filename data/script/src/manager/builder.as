@@ -12,6 +12,8 @@
 #include "../helpers/map_helpers.as"
 // Shared enum for strategic building types
 #include "../types/building_type.as"
+// Team state: T1 constructor registry for orphan rescue
+#include "team.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -546,6 +548,7 @@ namespace Builder {
 	const int T1_AIR_FACTORY_COOLDOWN_FRAMES = 120 * SECOND; // cooldown for T1 aircraft plant
 	const int T1_BOT_LAB_COOLDOWN_FRAMES    = 120 * SECOND; // cooldown for T1 bot lab
 	const int T1_HOVER_FACTORY_COOLDOWN_FRAMES = 90 * SECOND; // cooldown for T1 hover plants (land or floating)
+	const int T1_SHIPYARD_COOLDOWN_FRAMES = 120 * SECOND;   // cooldown for T1 shipyard
 	const int T1_CONVERTER_COOLDOWN_FRAMES = 15 * SECOND;  // cooldown for T1 energy converter
 	const int T1_SOLAR_COOLDOWN_FRAMES     = 25 * SECOND;  // cooldown for T1 solar
 	// Independent cooldowns for nanos and advanced solars
@@ -564,6 +567,7 @@ namespace Builder {
 	int lastT1AirFactoryEnqueueFrame = -1000000000;
 	int lastT1BotLabEnqueueFrame     = -1000000000;
 	int lastT1HoverFactoryEnqueueFrame = -1000000000;
+	int lastT1ShipyardEnqueueFrame = -1000000000;
 	int lastNanoEnqueueFrame      = -1000000000;
 	int lastAdvSolarEnqueueFrame  = -1000000000;
 	int lastAdvConverterEnqueueFrame = -1000000000;
@@ -591,6 +595,8 @@ namespace Builder {
 	void MarkT1BotLabEnqueued()      { lastT1BotLabEnqueueFrame = ai.frame; }
 	bool IsT1HoverFactoryOffCooldown() { return (ai.frame - lastT1HoverFactoryEnqueueFrame) >= T1_HOVER_FACTORY_COOLDOWN_FRAMES; }
 	void MarkT1HoverFactoryEnqueued()  { lastT1HoverFactoryEnqueueFrame = ai.frame; }
+	bool IsT1ShipyardOffCooldown()   { return (ai.frame - lastT1ShipyardEnqueueFrame) >= T1_SHIPYARD_COOLDOWN_FRAMES; }
+	void MarkT1ShipyardEnqueued()    { lastT1ShipyardEnqueueFrame = ai.frame; }
 	int GetNanoCooldownFrames()
 	{
 		// When metal income is very low, slow down nano spam to avoid overcommitting buildpower
@@ -1481,6 +1487,34 @@ namespace Builder {
 		return t;
 	}
 
+	// Enqueue a T1 shipyard for a given side. The anchor may be on land (a landlocked
+	// Tech base): searchRadius is how far around it the native site search may look,
+	// since the footprint itself must be in water.
+	IUnitTask@ EnqueueT1Shipyard(const string &in unitSide, const AIFloat3 &in anchor, float searchRadius, int timeoutFrames, Task::Priority prio = Task::Priority::NOW)
+	{
+		if (!IsT1ShipyardOffCooldown()) {
+			int remaining = T1_SHIPYARD_COOLDOWN_FRAMES - (ai.frame - lastT1ShipyardEnqueueFrame);
+			GenericHelpers::LogUtil("[BUILDER] EnqueueT1Shipyard: blocked by cooldown (remainingFrames=" + remaining + ")", 2);
+			return null;
+		}
+		string defName = UnitHelpers::GetT1ShipyardForSide(unitSide);
+		CCircuitDef@ def = ai.GetCircuitDef(defName);
+		if (def is null) {
+			GenericHelpers::LogUtil("[BUILDER] EnqueueT1Shipyard: def is <null> for name='" + defName + "'", 3);
+			return null;
+		}
+		if (!def.IsAvailable(ai.frame)) {
+			GenericHelpers::LogUtil("[BUILDER] EnqueueT1Shipyard unavailable def='" + defName + "' count=" + def.count + " maxThisUnit=" + def.maxThisUnit + " frame=" + ai.frame, 3);
+			return null;
+		}
+		IUnitTask@ t = aiBuilderMgr.Enqueue(
+			TaskB::Factory(prio, def, anchor, def, searchRadius, /*setBase*/ false, /*isPrimary*/ true, timeoutFrames)
+		);
+		GenericHelpers::LogUtil("[BUILDER] Enqueue T1 Shipyard '" + defName + "' at (" + anchor.x + "," + anchor.z + ") radius=" + searchRadius + " => " + (t is null ? "null" : "ok"), 2);
+		if (t !is null) { MarkT1ShipyardEnqueued(); }
+		return t;
+	}
+
 	IUnitTask@ EnqueueT2Shipyard(const string &in unitSide, const AIFloat3 &in anchor, float squareSize, int timeoutFrames)
 	{
 		// Enforce global T2 factory cooldown
@@ -2347,6 +2381,9 @@ namespace Builder {
 		// Handle constructor-specific registration
 		int ctorTier = UnitHelpers::GetConstructorTier(cdef);
 		string uname = (cdef is null ? "" : cdef.GetName());
+		if (ctorTier == 1 || uname == "legnavyconship") {
+			Team::RegisterT1Constructor(unit);   // orphan-rescue donor pool
+		}
 		int ctorCat = 0; // 1=bot, 2=veh, 3=air, 4=sea, 5=hover
 
 		// TODO: Consider moving constructor category/tier detection into UnitHelpers
@@ -2703,6 +2740,7 @@ namespace Builder {
 		ClearBuilderTaskByUnit(unit);
 		// Also clear any tracked pending task for this unit
 		ClearTrackByBuilder(unit);
+		Team::UnregisterT1Constructor(unit);
 
 		// Clear tracked references
 		if (Builder::commander is unit)                 {

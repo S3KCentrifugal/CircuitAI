@@ -92,7 +92,7 @@ The experimental runtime sequence is:
 
 ### Objective and team state
 
-`src/manager/objective_manager.as` owns objective assignment, completion, selected objective per role/builder group, and queued/built counts by concrete unit type. `src/manager/team.as` tracks T2 constructors and donates the third one to the lead allied team for TECH policy. SEA contains a parallel T2 sea-constructor donation policy.
+`src/manager/objective_manager.as` owns objective assignment, completion, selected objective per role/builder group, and queued/built counts by concrete unit type. `src/manager/team.as` tracks T2 constructors and donates the third one to the lead allied team for TECH policy. SEA contains a parallel T2 sea-constructor donation policy. It also implements orphan rescue: `Team::CheckOrphaned` (from `Main::AiUpdate`) makes an AI with no commander and no workers ask its allies one at a time for a T1 constructor via `AiSendMessage`; `Team::HandleMessage` (from `Main::AiMessage`) makes a donor with three or more workers hand over a spare, non-leader T1 constructor with `ai.GiveUnits`. Live T1 constructor ids are registered by `Builder::AiUnitAdded`/`AiUnitRemoved`.
 
 ## Strategic roles
 
@@ -100,8 +100,8 @@ The experimental runtime sequence is:
 |---|---|
 | FRONT (`src/roles/front.as`) | Land-force opening, bot/vehicle factory specialization, adaptive production, income-driven caps, guard behavior, defence construction, and delayed army-versus-enemy-surface quota hysteresis. |
 | SUPPORT (`src/roles/support.as`) | Economy/support opening, restricted combat/air/nuke access, resurrection and assistance focus, commander/constructor guarding, and income-scaled builder limits. |
-| AIR (`src/roles/air.as`) | Staged air production, an early two-lane build-power policy (strategic economy plus expansion), task-aware constructor assistance, commander-built wind on suitable maps, delayed advanced solar, T1 static defence restricted to anti-air, bounded fighter/heavy-air quotas, and delayed air-force-versus-enemy-air quotas. Combat aircraft retain their profile-defined roles and use native military task assignment. |
-| TECH (`src/roles/tech.as`) | T2/T3/nuke strategies, strict tier caps, storage and energy progression, mex upgrades, gantries, strategic objectives, constructor donation, and extensive economy-dependent build routing. |
+| AIR (`src/roles/air.as`) | Staged air production, an early two-lane build-power policy (strategic economy plus expansion), task-aware constructor assistance, commander-built wind on suitable maps, delayed advanced solar, T1 static defence restricted to anti-air, bounded fighter/heavy-air quotas, and delayed air-force-versus-enemy-air quotas. T1 combat aircraft use native military task assignment; T2 bombers and T2 fighters are held at base and released together in growing escorted waves by `src/manager/air_waves.as`. |
+| TECH (`src/roles/tech.as`) | T2/T3/nuke strategies, strict tier caps, storage and energy progression, mex upgrades, gantries, strategic objectives, constructor donation, shipyards and hover plants on landlocked starts once income allows, and extensive economy-dependent build routing. |
 | SEA (`src/roles/sea.as`) | Shipyard starts, naval production, tidal/sea economy, naval fire states, sea constructors and donation, and fleet-versus-enemy-water quota adjustment. |
 | TACTICAL (`src/roles/tactical.as`) | Hover-focused opening, tactical constructors, map-objective execution, hover production, objective-based static construction, and mixed-terrain expansion. This replaces the older HOVER_SEA name. |
 
