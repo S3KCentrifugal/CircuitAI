@@ -259,6 +259,12 @@ private:
 
 	unsigned int preventCount = 0;
 	float amountFactor = 0.f;
+	// Script overrides read by DefaultMakeDefence (aiMilitaryMgr.porcMode / porcBudgetMod,
+	// set per call by Military::Porc in data/script/src/manager/porc_policy.as):
+	// mode 0 keeps the native front-line heuristic, 1 forces the preventive count,
+	// 2 forces the full porcupine order; budgetMod scales the per-point income budget.
+	int porcMode = 0;
+	float porcBudgetMod = 1.f;
 	CCircuitDef* bigGunDef;
 
 	std::vector<SSideInfo> sideInfos;

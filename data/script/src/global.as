@@ -48,6 +48,40 @@ namespace Global {
 
 	ProfileController profileController;
 
+    // Shared porcupine (static defence) policy, see manager/porc_policy.as.
+    // Applies to every role without its own AiMakeDefenceHandler; TECH routes
+    // through it after its own income gate.
+    namespace Porc {
+        // Late game: from either threshold on, every visited cluster may take the
+        // full porcupine order within its income budget (native mode FULL). Before
+        // that the native front-line heuristic decides (mode AUTO).
+        int LateGameMinutes = 25;
+        float LateGameMetalIncome = 120.0f;
+        float LateGameEnergyIncome = 1500.0f;   // the income route needs both incomes
+        float LateBudgetMod = 1.0f;          // per-point budget multiplier once late
+        // Energy: while energy is stalling the late phase falls back to the native
+        // heuristic and no budget bonus applies (defences are energy-heavy); a full
+        // energy store raises the budget like a full metal store does.
+        float ExcessEnergyPercent = 0.9f;
+        float ExcessEnergyBudgetMod = 1.5f;
+        // Construction turrets with late-game porc: while the mode is FULL and both
+        // incomes are strong (no stall), one caretaker per cluster is placed at the
+        // defence point being reinforced, so builders and the porc chain get help.
+        bool NanoWithPorc = true;
+        float NanoMetalIncome = 150.0f;
+        float NanoEnergyIncome = 3000.0f;
+        int NanosPerCluster = 1;
+        // Pressure: enemy surface army (metal per enemy player, from aiEnemyMgr role
+        // costs) versus our army cost. Forces FULL in any phase after the grace period.
+        int PressureMinMinutes = 10;
+        float PressureRatio = 1.2f;
+        float PressureBudgetMod = 1.5f;
+        // Banked metal: when the store is this full, raise the budget so it is spent
+        // on defence instead of overflowing.
+        float ExcessMetalPercent = 0.9f;
+        float ExcessMetalBudgetMod = 2.0f;
+    }
+
     // Role-specific overrideable variables in a dedicated namespace
     namespace RoleSettings {        
        
@@ -264,7 +298,18 @@ namespace Global {
             float NanoBuildWhenOverMetal = 1000.0f;
 
 
+            /******************** T2 CONSTRUCTOR DONATION ********************/
+            // Team::Donation (manager/donation.as): keep the first KeepCount T2
+            // constructors, then give the next N to the closest allies, N drawn once
+            // from weight(k) = Decay^(k-1) over 1..min(Max, allies).
+            int T2DonationKeepCount = 2;
+            int T2DonationMax = 7;
+            float T2DonationDecay = 0.6f;
+
             /******************** NUCLEAR SILO THRESHOLDS ********************/
+            // First strike: how long the first silo keeps the farthest Tech start as its
+            // forced target (CSuperTask::SetTargetPos) before native targeting resumes
+            int NukeFirstStrikeOverrideSeconds = 30;
             // Separate economy thresholds for rush vs regular nuclear silo builds
             // Rush thresholds: used when rushing up to NukeRush silos
             float MinimumMetalIncomeForNukeRush = 50.0f;

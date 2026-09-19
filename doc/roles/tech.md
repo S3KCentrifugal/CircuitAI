@@ -67,6 +67,7 @@ manager namespace implements them and dispatches to the active role through a
 | `IUnitTask@ AiMakeTask(CCircuitUnit@)` | `Factory::AiMakeTask` | `FactoryAiMakeTaskHandler` | `Tech_FactoryAiMakeTask` |
 | `IUnitTask@ AiMakeTask(CCircuitUnit@)` | `Builder::AiMakeTask` | `BuilderAiMakeTaskHandler` | `Tech_BuilderAiMakeTask` |
 | `IUnitTask@ AiMakeTask(CCircuitUnit@)` | `Military::AiMakeTask` | `MilitaryAiMakeTaskHandler` | `Tech_MilitaryAiMakeTask` |
+| `void AiTaskRemoved(IUnitTask@, bool)` | `Military::AiTaskRemoved` | `MilitaryAiTaskRemovedHandler` | `Tech_MilitaryAiTaskRemoved` (drops the nuke first-strike task handle) |
 | `void AiTaskAdded(IUnitTask@)` | `Builder::AiTaskAdded` | `BuilderAiTaskAddedHandler` | `Tech_BuilderAiTaskAdded` |
 | `void AiTaskRemoved(IUnitTask@, bool)` | `Builder::AiTaskRemoved` | `BuilderAiTaskRemovedHandler` | `Tech_BuilderAiTaskRemoved` |
 | `void AiUnitAdded(CCircuitUnit@, Unit::UseAs)` | `Builder::AiUnitAdded` | `BuilderAiUnitAdded` | `Tech_BuilderAiUnitAdded` |
@@ -78,7 +79,7 @@ manager namespace implements them and dispatches to the active role through a
 | `bool AiIsSwitchAllowed(CCircuitDef@)` | `Factory::AiIsSwitchAllowed` | `AiIsSwitchAllowedHandler` | `Tech_AiIsSwitchAllowed` |
 | `int AiMakeSwitchInterval()` | `Factory::AiMakeSwitchInterval` | `MakeSwitchIntervalHandler` | `Tech_MakeSwitchInterval` |
 | `CCircuitDef@ AiGetFactoryToBuild(...)` | `Factory::AiGetFactoryToBuild` | `SelectFactoryHandler` | `Tech_SelectFactoryHandler` |
-| `void AiMakeDefence(int, const AIFloat3& in)` | `Military::AiMakeDefence` | `AiMakeDefenceHandler` | `Tech_AiMakeDefence` |
+| `void AiMakeDefence(int, const AIFloat3& in)` | `Military::AiMakeDefence` | `AiMakeDefenceHandler` | `Tech_AiMakeDefence`; below `MilitaryDefenceMetalIncomeThreshold` it calls `Military::Porc::MakeDefence` (shared porcupine policy, `manager/porc_policy.as`), which sets the native porc mode and budget and then places natively |
 | `void AiUpdate()` | `Main::AiUpdate` | `MainUpdateHandler` (RoleConfig constructor argument) | `Tech_MainUpdate` |
 
 Two further slots are script-only and have no native lookup: `InitHandler`
@@ -254,6 +255,30 @@ strong:
   naval and hover combat lists are not part of the T1 combat cap, so the native
   chooser builds them normally.
 
+### T2 constructor donation
+
+`Tech_BuilderAiUnitAdded` calls `Team::Donation::OnConstructorBuilt` for every
+finished builder. The first `T2DonationKeepCount` (2) T2 constructors stay;
+the next N are given away one per build, each to the closest allied BARb by
+roster start position that has received the fewest so far. N is drawn once
+from `weight(k) = T2DonationDecay^(k-1)` over 1..min(`T2DonationMax`, allies),
+so a single donation is the most likely and seven the least. This replaced the
+fixed "third T2 constructor to the lead team" rule.
+
+### Nuke first strike (fixed 2026-09-18 crash)
+
+`Tech_MilitaryAiMakeTask` gives the first nuke silo its native `CSuperTask` via
+`aiMilitaryMgr.DefaultMakeTask` and forces the farthest TECH start as its
+target with `CSuperTask::SetTargetPos`; `Tech_UpdateNukeFirstStrike` (from
+`Tech_MainUpdate`) clears the override after `NukeFirstStrikeOverrideSeconds`
+(30) so native targeting resumes, and `Tech_MilitaryAiTaskRemoved` drops the
+handle if the task dies first. It used to return a **factory-manager**
+`TaskS::Wait` for the silo: the military idle list never released the unit, it
+later also received a super task, the expired Wait re-parented it to the factory
+idle task, and when the silo died the super task kept a freed pointer and
+crashed in `CSuperTask::ExecuteAttack` (infolog f=37389). Native
+`ITaskModule::AssignTask` now refuses tasks of another manager and logs it.
+
 ## Known defects
 
 ### D1 - T2 combat units were permanently unbuildable (fixed 2026-09-16/17)
@@ -375,4 +400,4 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: 66748ddd129ea641114ed1329c1af49c99bbe033; lines: 2025 -->
+<!-- source: data/script/src/roles/tech.as; blob: cf7269f6be281911a47fd8e1704cd240f9979e68; lines: 2064 -->

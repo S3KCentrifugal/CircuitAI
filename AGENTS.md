@@ -143,6 +143,7 @@ This is the implementation target for every AngelScript and profile change.
 | `tools/knowledge/barb_report.py` | Regenerates `doc/knowledge/barb-unit-config.md`. Run `python tools/knowledge/barb_report.py` after profile or unit-cache changes. |
 | `tools/knowledge/check_unit_helpers.py` | Validates every quoted unit id in `data/script/src` against the shared game cache (unknown, unreachable, wrong faction or tier, per-side branches) and reports combat-list coverage. Exit 1 on findings. |
 | `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |
+| `tools/widgets/gui_barb_team_link.lua` | LuaUI widget for the host machine: displays what allied BARb instances mirror through `ai.CallUI` (`data/script/src/manager/widget_link.as`): the team roster and orphan-rescue events. Copy into the BAR `LuaUI/Widgets` folder. |
 | `.githooks/pre-commit` | Refuses a commit that stages a role script without its document, and runs `check_role_docs.py` when either is staged. Enable with `git config core.hooksPath .githooks`. |
 | `CMakeLists.txt` | Native build definition. Building requires integration into an engine checkout and Recoil's generated C++ AI wrapper. |
 | `VERSION` | AI version string. |

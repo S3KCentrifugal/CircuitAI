@@ -64,6 +64,10 @@ void CSuperTask::Start(CCircuitUnit* unit)
 
 void CSuperTask::Update()
 {
+	if (units.empty()) {  // never expected: RemoveAssignee aborts the task on its last unit
+		manager->AbortTask(this);
+		return;
+	}
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitUnit* unit = *units.begin();

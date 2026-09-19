@@ -105,6 +105,19 @@ falls through to its native default - for factory task creation that means
 for the three switching slots only (`DefaultAiIsSwitchTime`,
 `DefaultAiIsSwitchAllowed`, `DefaultMakeSwitchInterval`).
 
+## Runtime role switch
+
+`Commands::SwitchRole` (`data/script/src/manager/commands.as`, driven by the
+host-side widget through `Main::AiLuaMessage`) rebinds
+`Global::profileController.RoleCfg` to another registered `RoleConfig` during a
+game. Because every native hook resolves its delegate through that handle on
+each call, the switch takes effect on the next decision. Before running the new
+role's `InitHandler` it restores every def's `maxThisUnit`, ignore flag and main
+role from the snapshot Setup takes before the first `InitHandler`, then
+recomputes the merged map/role limits. Role-local state (one-way flags, counters)
+is not reset; a role must tolerate being initialised twice and being entered
+mid-game with those flags already set.
+
 ## Handler coverage matrix
 
 Which roles fill which slot. Read down a column for one role's surface, across a
@@ -132,11 +145,11 @@ row to see how consistently a slot is used.
 | `MilitaryAiUnitAdded` | yes | no | no | no | no | no |
 | `MilitaryAiUnitRemoved` | no | yes | no | no | no | no |
 | `MilitaryAiTaskAddedHandler` | no | no | no | no | no | no |
-| `MilitaryAiTaskRemovedHandler` | no | yes | no | no | no | no |
+| `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
 | `AiMakeDefenceHandler` | no | no | yes | no | no | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `FactoryAiTaskRemovedHandler` | no | no | no | no | no | no |
-| **Slots filled** | **17** | **17** | **18** | **14** | **15** | **14** |
+| **Slots filled** | **17** | **17** | **19** | **14** | **15** | **14** |
 
 Thirteen slots are filled by every role. That common set is the de-facto role
 interface; everything below it in the table is an exception worth understanding

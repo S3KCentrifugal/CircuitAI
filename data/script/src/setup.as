@@ -1,4 +1,5 @@
 // Helpers & Role Handlers
+#include "manager/commands.as"
 #include "helpers/generic_helpers.as"
 #include "helpers/map_helpers.as"
 #include "helpers/unit_helpers.as"
@@ -342,6 +343,10 @@ namespace Setup {
 		@Global::profileController.RoleCfg = matchedCfg;
 		@Global::AISettings::RoleCfg = matchedCfg;
  
+		// Snapshot per-def caps / ignore flags / main roles before any role touches them,
+		// so a runtime role switch (Commands::SwitchRole) can restore the baseline.
+		Commands::DefState::Snapshot();
+
 		// Apply role-specific startup limits if provided
 		RoleConfigs::ApplyStartLimits();
 

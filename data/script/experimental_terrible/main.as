@@ -84,6 +84,7 @@ namespace Main {
 		if (Global::profileController !is null) {
 			Global::profileController.MainUpdate();
 		}
+		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
 		Team::CheckOrphaned();   // ask allies for a T1 constructor if we lost commander and all builders
 	}
 
@@ -92,9 +93,11 @@ namespace Main {
 		Team::HandleMessage(msg, fromTeamId);
 	}
 
-	void AiLuaMessage(const string& in data)  // Spring.SendSkirmishAIMessage(teamID, msg) from unsynced lua
+	void AiLuaMessage(const string& in data)  // Spring.SendSkirmishAIMessage(teamID, msg) from the local LuaUI
 	{
-		GenericHelpers::LogUtil("[AI][LuaMessage] ", 2);
+		if (!Commands::Handle(data)) {
+			GenericHelpers::LogUtil("[AI][LuaMessage] ignored: " + data, 3);
+		}
 	}
 
 	//Use this to modify global.as and apply difficulty/profile settings

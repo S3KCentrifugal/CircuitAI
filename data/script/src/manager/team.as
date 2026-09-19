@@ -1,13 +1,10 @@
 #include "../global.as"
 #include "../helpers/unit_helpers.as"
 #include "../helpers/generic_helpers.as"
+#include "roster.as"
+#include "donation.as"
 
 namespace Team {
-    // Count of T2 constructors ever produced by TECH role (bots/vehicles; include T2 air explicitly)
-    int T2CtorEverBuilt = 0;
-    // Ensure we donate only once per game
-    bool DonatedThird = false;
-
     // Return true if the def represents a T2 constructor (land or air)
     bool IsT2Constructor(const CCircuitDef @d) {
         if (d is null) return false;
@@ -23,44 +20,7 @@ namespace Team {
         return false;
     }
 
-    // Attempt to donate a unit to the lead team; logs and guards
-    void TryDonate(CCircuitUnit @u) {
-        if (u is null) return;
-        const int leader = ai.GetLeadTeamId();
-        if (ai.teamId == leader) {
-            GenericHelpers::LogUtil("[Team] We are the leader team; skip donation for unit id=" + u.id, 3);
-            return; // no-op when this AI is the leader
-        }
-
-        array<CCircuitUnit @> give(1);
-        @give[0] = u; // valid handle this frame
-        ai.GiveUnits(give, leader);
-        GenericHelpers::LogUtil("[Team] Transferred unit id=" + u.id + " to team " + leader, 2);
-    }
-
-    void CheckDonation(CCircuitUnit @unit) {
-        if (unit is null) return;
-        const CCircuitDef @d = unit.circuitDef;
-        if (d is null) return;
-
-        if (IsT2Constructor(d)) {
-            // Assuming this is called from Tech_BuilderAiUnitAdded where we might want to disable assist
-            // But disabling assist is factory manager logic.
-            // The original code did: aiFactoryMgr.isAssistRequired = false;
-            // We will leave that side effect in the caller or handle it here if we can access aiFactoryMgr.
-            // Since aiFactoryMgr is likely a global or member of the main script class, we might not have access here easily without passing it.
-            // However, for now, we will just handle the donation logic.
-            
-            T2CtorEverBuilt += 1;
-            GenericHelpers::LogUtil("[Team] T2 constructor observed (" + d.GetName() + ") count=" + T2CtorEverBuilt + " id=" + unit.id, 3);
-
-            if (!DonatedThird && T2CtorEverBuilt == 3) {
-                DonatedThird = true; // lock before attempt to avoid re-entry
-                GenericHelpers::LogUtil("[Team] Triggering donation of 3rd T2 constructor (id=" + unit.id + ")", 2);
-                TryDonate(unit);
-            }
-        }
-    }
+    // T2 constructor hand-out lives in Team::Donation (donation.as).
 
     /******************************************************************************
 
@@ -160,14 +120,38 @@ namespace Team {
             Id target = teams[Orphan::nextAllyIdx++ % teams.length()];
             if (int(target) == ai.teamId) continue;
             AiSendMessage(Orphan::RequestMessage, int(target));
+            WidgetLink::Send("orphan", "request|" + target);
             Orphan::lastRequestFrame = ai.frame;
             GenericHelpers::LogUtil("[Team][Orphan] No commander and no constructors; asked team " + target + " for a T1 constructor", 1);
             return;
         }
     }
 
-    // Donor side. Called from Main::AiMessage for every message from an allied BARb.
+    // True when teamId is on our ally team (ai.GetTeamIds() lists our own ally team).
+    bool IsAlly(int teamId) {
+        array<Id>@ teams = ai.GetTeamIds();
+        if (teams is null) return false;
+        for (uint i = 0; i < teams.length(); ++i) {
+            if (int(teams[i]) == teamId) return true;
+        }
+        return false;
+    }
+
+    // Called from Main::AiMessage for every message from an allied BARb: roster
+    // lines first, then the orphan-rescue request. CInitScript::SendMessage only
+    // delivers within one ally team; the check below keeps that true even if two
+    // ally teams' AIs run in the same process and the native filter ever changes.
     void HandleMessage(const string &in msg, int fromTeamId) {
+        if (!IsAlly(fromTeamId)) {
+            GenericHelpers::LogUtil("[Team] Ignored message from non-allied team " + fromTeamId + ": " + msg, 2);
+            return;
+        }
+        if (Roster::HandleMessage(msg, fromTeamId)) return;
+        HandleOrphanMessage(msg, fromTeamId);
+    }
+
+    // Donor side of the orphan rescue.
+    void HandleOrphanMessage(const string &in msg, int fromTeamId) {
         if (msg != Orphan::RequestMessage) return;
         if (fromTeamId == ai.teamId) return;
 
@@ -193,5 +177,6 @@ namespace Team {
         ai.GiveUnits(give, fromTeamId);
         Orphan::lastDonateFrameByTeam.set("" + fromTeamId, int(ai.frame));
         GenericHelpers::LogUtil("[Team][Orphan] Donated " + name + " (id=" + spareId + ") to orphaned team " + fromTeamId, 1);
+        WidgetLink::Send("orphan", "donate|" + name + "|" + fromTeamId);
     }
 }

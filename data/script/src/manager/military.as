@@ -1,6 +1,7 @@
 #include "../define.as"
 #include "../unit.as"
 #include "../helpers/generic_helpers.as"
+#include "porc_policy.as"
 
 namespace Military {
 
@@ -74,7 +75,7 @@ namespace Military {
 			|| (aiEnemyMgr.mobileThreat > 0.f))
 			{
 				GenericHelpers::LogUtil("Military::AiMakeDefence", 4);
-				aiMilitaryMgr.DefaultMakeDefence(cluster, pos);
+				Porc::MakeDefence(cluster, pos);   // shared policy, then native placement
 			}
 		}
 		//AiLog("SMRT: Frame - " + ai.frame);

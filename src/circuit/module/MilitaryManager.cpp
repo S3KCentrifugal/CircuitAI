@@ -767,7 +767,7 @@ void CMilitaryManager::DefaultMakeDefence(int cluster, const AIFloat3& pos)
 
 	CEconomyManager* em = circuit->GetEconomyManager();
 	const float metalIncome = std::min(em->GetAvgMetalIncome(), em->GetAvgEnergyIncome()) * em->GetEcoFactor();
-	float maxCost = amountFactor * metalIncome;
+	float maxCost = amountFactor * metalIncome * porcBudgetMod;
 	CDefenceData::SDefPoint* closestPoint = FindClosestDefPoint(cluster, pos, [maxCost](const CDefenceData::SDefPoint& pnt) {
 		return pnt.cost < maxCost;
 	});
@@ -812,6 +812,13 @@ void CMilitaryManager::DefaultMakeDefence(int cluster, const AIFloat3& pos)
 		}
 	}
 	isPorc |= circuit->GetInflMap()->GetInfluenceAt(pos) < INFL_EPS;
+	// Script policy override (Military::Porc): the heuristic above only fills
+	// front-line clusters, which starves the interior late in the game.
+	if (porcMode == 2) {
+		isPorc = true;
+	} else if (porcMode == 1) {
+		isPorc = false;
+	}
 	if (!isPorc) {
 		const float sqPtRange = SQUARE(defence->GetPointRange());
 		for (IBuilderTask* t : builderMgr->GetTasks(IBuilderTask::BuildType::DEFENCE)) {

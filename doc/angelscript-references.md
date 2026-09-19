@@ -1057,9 +1057,15 @@ IUnitTask@+ EnqueueRetreat();
 void DefaultMakeDefence(int cluster, const AIFloat3& in pos);
 uint GetGuardTaskNum() const;
 const float armyCost;
+int porcMode;           // 0 native heuristic, 1 preventive count only, 2 full porcupine order
+float porcBudgetMod;    // multiplier on the per-point defence budget
 SQuotaMilitary quota;
 SResponseInfo@ GetResponseInfo(Type role) const;
 ```
+
+`porcMode` and `porcBudgetMod` are read by `DefaultMakeDefence` on every call;
+set them immediately before calling it. `Military::Porc::MakeDefence`
+(`data/script/src/manager/porc_policy.as`) is the shared policy that does so.
 
 Quota views:
 
@@ -1186,6 +1192,23 @@ namespace Main {
     }
 }
 ```
+
+Delivery is asynchronous: `CInitScript::SendMessage` queues a job on each
+allied instance's scheduler, and only instances that are already initialised
+receive it, so a message sent during startup is lost for allies that start
+later. `Team::Roster` (`data/script/src/manager/roster.as`) handles this with
+repeated announcements and a direct reply to newcomers; use it instead of a
+one-shot broadcast when every ally must learn something.
+
+The unsynced Lua side can talk back: `Spring.SendSkirmishAIMessage(teamId, text)`
+reaches `Main::AiLuaMessage(text)` of a **local** AI only, and `ai.CallUI(text)`
+reaches the local LuaUI's `RecvSkirmishAIMessage`. `Commands::Handle` and
+`WidgetLink::Send` (`data/script/src/manager/`) implement the two directions
+for the `tools/widgets/gui_barb_team_link.lua` widget. Both carry team ids:
+mirrored lines include the sender's team and ally team, commands name their
+target team and are ignored by every other instance, and `Team::HandleMessage`
+drops in-process messages from teams outside `ai.GetTeamIds()`, so two ally
+teams hosted in one process stay separate.
 
 Messages are delivered only to initialized CircuitAI instances on the same
 ally team that implement `Main::AiMessage`.

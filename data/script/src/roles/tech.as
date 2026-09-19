@@ -33,6 +33,10 @@ namespace RoleTech
 	bool hasUnlockedLandLockedWaterFactories = false;
 	// One-way gate: has the nuke silo targeted the farthest tech spot?
 	bool hasTargetedFarthestTech = false;
+	// Nuke first strike: the CSuperTask whose target position is overridden, and the
+	// frame at which Tech_UpdateNukeFirstStrike hands targeting back to native code.
+	CSuperTask @g_nukeFirstStrikeTask = null;
+	int g_nukeFirstStrikeUntilFrame = -1;
 	// Global fast-assist cap for TECH role (computed from income in Tech_IncomeBuilderLimits)
 	int g_fastAssistBotCap = 0;
 
@@ -293,6 +297,28 @@ namespace RoleTech
 	void Tech_MainUpdate()
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_MainUpdate", 4);
+		Tech_UpdateNukeFirstStrike();
+	}
+
+	// Release the first-strike override once the silo has had time to fire, so its
+	// CSuperTask returns to native target selection. An invalid position (x == -1,
+	// geom::is_valid) clears the override. The handle is ref-counted; the
+	// task-removed hook drops it early if the task dies first.
+	void Tech_UpdateNukeFirstStrike()
+	{
+		if (g_nukeFirstStrikeTask is null || ai.frame < g_nukeFirstStrikeUntilFrame)
+			return;
+		g_nukeFirstStrikeTask.SetTargetPos(AIFloat3(-1.0f, 0.0f, 0.0f));
+		@g_nukeFirstStrikeTask = null;
+		GenericHelpers::LogUtil("[TECH] Nuke first-strike override released; native targeting resumes", 2);
+	}
+
+	void Tech_MilitaryAiTaskRemoved(IUnitTask @task, bool done)
+	{
+		if (g_nukeFirstStrikeTask !is null && task is g_nukeFirstStrikeTask)
+		{
+			@g_nukeFirstStrikeTask = null;
+		}
 	}
 
 	/******************************************************************************
@@ -1079,22 +1105,33 @@ namespace RoleTech
 
 					if (found)
 					{
-						hasTargetedFarthestTech = true;
-						GenericHelpers::LogUtil("[TECH] Nuke Silo targeting farthest Tech spot at distSq=" + maxDistSq, 2);
-
-						// FIX: Use CallRules to fire, as FactoryMgr is for building.
-						// Command format: "ai_super_fire:UNIT_ID/X/Z"
-
-						// Send intention first
-						string cmdIntention = "ai_super_intention:" + u.id + "/" + int(targetPos.x) + "/" + int(targetPos.z);
-						ai.CallRules(cmdIntention);
-
-						string cmd = "ai_super_fire:" + u.id + "/" + int(targetPos.x) + "/" + int(targetPos.z);
-						GenericHelpers::LogUtil("[TECH] Sending CallRules: " + cmd, 2);
-						ai.CallRules(cmd);
-
-						// Return a Wait task to occupy the unit while it fires
-						return aiFactoryMgr.Enqueue(TaskS::Wait(false, 300)); // Wait ~10s
+						// Give the silo its native CSuperTask and point it at the spot with
+						// CSuperTask::SetTargetPos: ExecuteAttack then sends the same
+						// ai_super_intention / ai_super_fire rules messages and the attack-ground
+						// order itself, every reload, until Tech_UpdateNukeFirstStrike clears the
+						// override after NukeFirstStrikeOverrideSeconds.
+						//
+						// This used to return aiFactoryMgr.Enqueue(TaskS::Wait(...)): a task owned
+						// by the FACTORY manager handed to a MILITARY unit. IUnitTask::AssignTo only
+						// removes the unit from its own manager's idle task, so the silo stayed in
+						// the military idle list, was later also given a CSuperTask, and when the
+						// factory Wait timed out its Stop() re-parented the unit to the factory idle
+						// task while the super task still listed it. When the silo died only the
+						// current task was told; the super task kept a freed pointer and crashed in
+						// CSuperTask::ExecuteAttack (2026-09-18, f=37389). ITaskModule::AssignTask
+						// now refuses tasks of another manager as well.
+						IUnitTask @siloTask = aiMilitaryMgr.DefaultMakeTask(u);
+						IFighterTask @fighterTask = cast<IFighterTask>(siloTask);
+						CSuperTask @superTask = (fighterTask is null) ? null : cast<CSuperTask>(fighterTask);
+						if (superTask !is null)
+						{
+							hasTargetedFarthestTech = true;
+							superTask.SetTargetPos(targetPos);
+							@g_nukeFirstStrikeTask = superTask;
+							g_nukeFirstStrikeUntilFrame = ai.frame + Global::RoleSettings::Tech::NukeFirstStrikeOverrideSeconds * SECOND;
+							GenericHelpers::LogUtil("[TECH] Nuke Silo " + u.id + " first strike at farthest Tech spot (distSq=" + maxDistSq + ")", 2);
+						}
+						return siloTask;
 					}
 				}
 			}
@@ -1115,7 +1152,8 @@ namespace RoleTech
 
 		if (metalIncome < Global::RoleSettings::Tech::MilitaryDefenceMetalIncomeThreshold)
 		{
-			aiMilitaryMgr.DefaultMakeDefence(cluster, pos);
+			// Shared porcupine policy (Military::Porc) decides how much, native code places it
+			Military::Porc::MakeDefence(cluster, pos);
 		}
 	}
 
@@ -1147,7 +1185,7 @@ namespace RoleTech
 			unit.AddAttribute(Unit::Attr::BASE.type);
 		}
 
-		Team::CheckDonation(unit);
+		Team::Donation::OnConstructorBuilt(unit);   // keep the first few T2 constructors, hand the next N to the closest allies
 		if (Team::IsT2Constructor(d))
 		{
 			aiFactoryMgr.isAssistRequired = false;
@@ -2011,6 +2049,7 @@ namespace RoleTech
 		@cfg.BuilderAiTaskRemovedHandler = cast<AiTaskRemovedDelegate @>(@Tech_BuilderAiTaskRemoved);
 
 		@cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate @>(@Tech_MilitaryAiMakeTask);
+		@cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate @>(@Tech_MilitaryAiTaskRemoved);
 
 		@cfg.SelectFactoryHandler = cast<SelectFactoryDelegate @>(@Tech_SelectFactoryHandler);
 		@cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate @>(@Tech_EconomyUpdate);

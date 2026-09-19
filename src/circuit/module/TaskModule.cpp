@@ -12,7 +12,10 @@
 #include "task/PlayerTask.h"
 #include "task/RetreatTask.h"
 #include "unit/CircuitUnit.h"
+#include "unit/CircuitDef.h"
 #include "CircuitAI.h"
+#include "util/Utils.h"
+#include "Log.h"
 #include "util/Profiler.h"
 
 namespace circuit {
@@ -70,9 +73,20 @@ void ITaskModule::AssignTask(CCircuitUnit* unit, IUnitTask* task)
 void ITaskModule::AssignTask(CCircuitUnit* unit)
 {
 	IUnitTask* task = MakeTask(unit);
-	if (task != nullptr) {
-		task->AssignTo(unit);
+	if (task == nullptr) {
+		return;
 	}
+	if (task->GetManager() != this) {
+		// Script returned a task owned by another manager (seen: a factory Wait for a
+		// nuke silo). IUnitTask::AssignTo only removes the unit from the task owner's
+		// idle list, so the unit would stay idle here, be assigned a second task later
+		// and, once the foreign task stops, be re-parented while the second task still
+		// lists it. That second task then dereferences the unit after it is freed.
+		GetCircuit()->LOG("ITaskModule::AssignTask: refused task of another manager for %s(%i); unit stays idle",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
+		return;
+	}
+	task->AssignTo(unit);
 }
 
 void ITaskModule::DequeueTask(IUnitTask* task, bool done)
