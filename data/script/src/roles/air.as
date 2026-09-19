@@ -744,6 +744,15 @@ namespace RoleAir {
         }
 
         string uname = udef.GetName();
+        // T2 air constructors were pure native default: nothing in this role
+        // ever asked them for a second plant, a fusion or a gantry, which is
+        // why AIR floated at max metal late. The ladder returns null when not
+        // floating, and the default runs as before.
+        if (UnitHelpers::GetAllT2AirConstructors().find(uname) >= 0) {
+            IUnitTask@ tLate = Air_LateExpansion_AiMakeTask(builder);
+            if (tLate !is null) return tLate;
+        }
+
         bool isT1AirConstructor = (uname == "armca" || uname == "corca" || uname == "legca");
         if (isT1AirConstructor) {
             if (builder is Builder::primaryT1AirConstructor) {
@@ -873,6 +882,127 @@ namespace RoleAir {
 
     ******************************************************************************/
 
+    /**************************************************************************
+     LATE-GAME EXPANSION
+
+     Runs only while metal is floating (see Global::RoleSettings::Air::Late*).
+     Every structure it places goes on a ring LateExpansionRadius out from the
+     start position, slot chosen by how many of that structure already exist,
+     so each new one lands on fresh ground and the base grows outward instead
+     of packing the core. Returns null when there is nothing to do, and the
+     caller falls through to its normal policy.
+     **************************************************************************/
+    bool Air_IsFloating(float mi)
+    {
+        if (mi < Global::RoleSettings::Air::LateMetalIncome) return false;
+        return aiEconomyMgr.isMetalFull
+            || aiEconomyMgr.metal.current >= Global::RoleSettings::Air::LateMetalCurrent;
+    }
+
+    AIFloat3 Air_ClampToMap(const AIFloat3 &in p, float margin)
+    {
+        const float w = float(aiTerrainMgr.GetTerrainWidth());
+        const float h = float(aiTerrainMgr.GetTerrainHeight());
+        float x = p.x, z = p.z;
+        if (x < margin) x = margin;
+        if (x > w - margin) x = w - margin;
+        if (z < margin) z = margin;
+        if (z > h - margin) z = h - margin;
+        return AIFloat3(x, p.y, z);
+    }
+
+    // Slot k of n on a ring around the start position. Slot 0 faces the map
+    // centre, so the first expansion leans toward the fight rather than the
+    // map edge; the rest rotate evenly from there.
+    AIFloat3 Air_RingAnchor(int k)
+    {
+        const int n = (Global::RoleSettings::Air::LateRingSlots < 1) ? 1 : Global::RoleSettings::Air::LateRingSlots;
+        const AIFloat3 c = Global::Map::StartPos;
+        const float cx = float(aiTerrainMgr.GetTerrainWidth()) * 0.5f;
+        const float cz = float(aiTerrainMgr.GetTerrainHeight()) * 0.5f;
+        float ax = cx - c.x, az = cz - c.z;
+        const float len = sqrt(ax * ax + az * az);
+        if (len < 1.0f) { ax = 1.0f; az = 0.0f; } else { ax /= len; az /= len; }
+        const float step = 6.2831853f / float(n);
+        const float a = float(k % n) * step;
+        const float ca = cos(a), sa = sin(a);
+        const float dx = ax * ca - az * sa;
+        const float dz = ax * sa + az * ca;
+        const float r = Global::RoleSettings::Air::LateExpansionRadius;
+        return Air_ClampToMap(AIFloat3(c.x + dx * r, c.y, c.z + dz * r), Global::RoleSettings::Air::LateExpansionShake);
+    }
+
+    IUnitTask@ Air_LateExpansion_AiMakeTask(CCircuitUnit@ u)
+    {
+        if (u is null || u.circuitDef is null) return null;
+        const float mi = Economy::GetMinMetalIncomeLast10s();
+        const float ei = Economy::GetMinEnergyIncomeLast10s();
+        if (!Air_IsFloating(mi)) return null;
+
+        const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        const float shake = Global::RoleSettings::Air::LateExpansionShake;
+        const int t2Plants = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AircraftPlants());
+        const int nanos = UnitDefHelpers::GetUnitDefCount(UnitHelpers::GetT1NanoNameForSide(side));
+        const int fusions = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllFusionReactors());
+        const int afus = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllAdvancedFusionReactors());
+        const int gantries = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllLandGantries());
+
+        // 1. Build power. Nanos beyond the income-based target, anchored on the
+        //    ring so they stand where the new plants will be, not in the core.
+        const int nanoTarget = (t2Plants < 1 ? 1 : t2Plants) * Global::RoleSettings::Air::LateNanosPerT2Plant;
+        if (nanos < nanoTarget && nanos < Global::RoleSettings::Air::NanoMaxCount) {
+            IUnitTask@ t = Builder::EnqueueT1Nano(side, Air_RingAnchor(nanos), shake, 120 * SECOND, Task::Priority::NORMAL);
+            if (t !is null) {
+                GenericHelpers::LogUtil("[AIR][Late] nano " + (nanos + 1) + "/" + nanoTarget
+                    + " (metal " + int(aiEconomyMgr.metal.current) + ", income " + int(mi) + ")", 1);
+                return Air_SetStrategicFocus(u, t);
+            }
+        }
+
+        // 2. Production. More T2 air plants, each on the next ring slot.
+        if (t2Plants < Global::RoleSettings::Air::LateMaxT2AircraftPlants && !Factory::IsT2AirPlantBuildQueued()) {
+            IUnitTask@ t = Builder::EnqueueT2AirPlant(side, Air_RingAnchor(t2Plants), shake, 600 * SECOND);
+            if (t !is null) {
+                GenericHelpers::LogUtil("[AIR][Late] T2 air plant " + (t2Plants + 1) + "/"
+                    + Global::RoleSettings::Air::LateMaxT2AircraftPlants + " on ring slot " + t2Plants, 1);
+                return Air_SetStrategicFocus(u, t);
+            }
+        }
+
+        // 3. Energy to carry it. A fusion per LateEnergyPerT2Plant of shortfall;
+        //    an advanced fusion once rich enough for one.
+        const float wantEnergy = float(t2Plants < 1 ? 1 : t2Plants) * Global::RoleSettings::Air::LateEnergyPerT2Plant;
+        if (ei < wantEnergy || aiEconomyMgr.isEnergyEmpty) {
+            if (mi >= Global::RoleSettings::Air::LateAFUSMetalIncome
+                && aiEconomyMgr.metal.current >= Global::RoleSettings::Air::LateAFUSMetalCurrent) {
+                IUnitTask@ t = Builder::EnqueueAFUS(side, Air_RingAnchor(fusions + afus), shake, 900 * SECOND);
+                if (t !is null) {
+                    GenericHelpers::LogUtil("[AIR][Late] advanced fusion (energy " + int(ei) + " < " + int(wantEnergy) + ")", 1);
+                    return Air_SetStrategicFocus(u, t);
+                }
+            }
+            IUnitTask@ t = Builder::EnqueueFUS(side, Air_RingAnchor(fusions + afus), shake, 600 * SECOND, Task::Priority::NORMAL);
+            if (t !is null) {
+                GenericHelpers::LogUtil("[AIR][Late] fusion (energy " + int(ei) + " < " + int(wantEnergy) + ")", 1);
+                return Air_SetStrategicFocus(u, t);
+            }
+        }
+
+        // 4. T3. The gantry is the only way to the experimental air plant:
+        //    armhaap is built solely by the T3 air constructor the gantry makes.
+        if (gantries < 1
+            && mi >= Global::RoleSettings::Air::LateGantryMetalIncome
+            && aiEconomyMgr.metal.current >= Global::RoleSettings::Air::LateGantryMetalCurrent) {
+            IUnitTask@ t = Builder::EnqueueLandGantry(side);
+            if (t !is null) {
+                GenericHelpers::LogUtil("[AIR][Late] gantry (metal " + int(aiEconomyMgr.metal.current) + ", income " + int(mi) + ")", 1);
+                return Air_SetStrategicFocus(u, t);
+            }
+        }
+
+        return null;   // floating, but every rung is capped, queued or on cooldown
+    }
+
     IUnitTask@ Air_T1Constructor_AiMakeTask(CCircuitUnit@ u) {
         // Snapshot economy
         //float mi = Global::Economy::MetalIncome;
@@ -882,6 +1012,14 @@ namespace RoleAir {
 
         AIFloat3 conLocation = u.GetPos(ai.frame);
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+
+        // Floating metal outranks the whole T1 ladder below: a converter or a
+        // solar does nothing for a bank that is already full.
+        {
+            IUnitTask@ tLate = Air_LateExpansion_AiMakeTask(u);
+            if (tLate !is null) return tLate;
+        }
+
         if (u is Builder::primaryT1AirConstructor) {
 
             // Consider upgrading to a T2 Aircraft Plant if economy and prerequisites allow

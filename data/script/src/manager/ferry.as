@@ -29,7 +29,13 @@ coordination.
 
 Sequence, in the order the units actually move:
 
-  1. TECH starts its first T2 lab   -> broadcast req
+  1. a teammate wants a transport   -> broadcast req. Any role may call
+                                       RequestTransport(); TECH does so on its
+                                       own once its metal income clears
+                                       RequestMinMetalIncome and it owns no
+                                       transport, and again after
+                                       RequestCooldownSeconds if that is still
+                                       true (the transport died, or AIR was busy)
   2. AIR takes the request          -> the next air factory task is a
                                        transport, ahead of everything else
   3. transport finishes             -> AIR flies it to TECH's base itself,
@@ -48,6 +54,13 @@ Sequence, in the order the units actually move:
 Every failure path falls back to the old behaviour - give the constructor and
 let it walk - so a ferry that cannot be built, is shot down, or fails to lift
 its cargo costs time, never the donation.
+
+TRANSPORT CAP. Every transport def is capped at 0 for every role, from the
+first tick. A transport with a role entry in behaviour.json is, to the native
+recruiter, just another air unit, and it built extras that then sat idle with
+nothing to carry. AIR raises the def it owes to owned+1 for exactly as long as
+a request is open, so the ferry's explicit Recruit is the only order that can
+ever produce one.
 
 See doc/transport-ferry.md.
 
@@ -68,12 +81,15 @@ namespace Ferry {
     int  requestTeam = -1;
     AIFloat3 requestPos;
     int  orderedFrame = -1;        // a Recruit task is queued; do not queue more
+    bool capsApplied = false;      // the 0 cap has been put on every transport def
     int  buildingId = -1;          // transport we are flying to TECH
     bool announced = false;
+    bool buildingHoldApplied = false;
 
-    // ---- TECH side
-    bool requestSent = false;      // one-shot: only the first T2 lab asks
+    // ---- requester side (TECH by default; any role may ask)
+    int  lastRequestFrame = -1;    // cooldown anchor; -1 = never asked
     int  transportId = -1;         // our ferry transport, once received
+    bool transportHoldApplied = false;
     int  cargoId = -1;             // constructor in flight
     int  cargoRecipient = -1;
 
@@ -81,6 +97,8 @@ namespace Ferry {
 
     string TransportForSide(const string &in side)
     {
+        // exists() first: a failed get leaves the &out undefined, not "".
+        if (!Global::Ferry::TransportBySide.exists(side)) return "";
         string name = "";
         Global::Ferry::TransportBySide.get(side, name);
         return name;
@@ -102,19 +120,82 @@ namespace Ferry {
         return (transportId < 0) ? null : ai.GetTeamUnit(transportId);
     }
 
-    /**************************************************************************
-     TECH: ask, once, when the first T2 lab goes down.
-     Called from Builder::AiTaskAdded, which sees every role's build tasks.
-     **************************************************************************/
-    void OnT2LabStarted()
+    // Apply `pos` as the hold of unit `id`, if its CFerryTask exists yet.
+    //
+    // The hold is applied from Update(), retried every tick until it takes,
+    // and NOT trusted to a single call from OnUnitAdded. Natively,
+    // CMilitaryManager's attackerFinishedHandler puts a new unit on the idle
+    // task and *then* raises UnitAdded; the CFerryTask is only assigned
+    // afterwards, by UpdateIdle -> MakeTask. So at OnUnitAdded time TaskOf()
+    // is null, a one-shot SetHoldPos is silently lost, and the transport sits
+    // over the builder's base forever - which is exactly what was observed.
+    bool _ApplyHold(int id, const AIFloat3 &in pos, const string &in tag)
     {
-        if (!IsEnabled() || requestSent) return;
-        if (Global::AISettings::Role != AiRole::TECH) return;
-        requestSent = true;
+        CCircuitUnit@ u = ai.GetTeamUnit(id);
+        if (u is null) return false;
+        CFerryTask@ t = TaskOf(u);
+        if (t is null) return false;
+        t.SetHoldPos(pos);
+        GenericHelpers::LogUtil("[Ferry] " + tag + ": transport " + id + " flying to ("
+            + int(pos.x) + "," + int(pos.z) + ")", 1);
+        return true;
+    }
+
+    // Cap every transport def at 0. Idempotent; the helper only writes on change.
+    void _CapAll()
+    {
+        UnitHelpers::BatchApplyUnitCaps(Global::Ferry::AllTransportDefs, 0);
+        capsApplied = true;
+    }
+
+    // Open exactly one build slot for the def we owe: owned + 1. Anything
+    // already owned stays owned; nothing beyond the one order can be built.
+    void _OpenSlot(const string &in name)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        if (d is null) return;
+        const int cap = UnitDefHelpers::GetUnitDefCount(name) + 1;
+        array<string> one = { name };
+        UnitHelpers::BatchApplyUnitCaps(one, cap);
+        GenericHelpers::LogUtil("[Ferry] AIR: build slot open for " + name + " (cap " + cap + ")", 2);
+    }
+
+    void _CloseSlot(const string &in name)
+    {
+        array<string> one = { name };
+        UnitHelpers::BatchApplyUnitCaps(one, 0);
+    }
+
+    /**************************************************************************
+     Requesting. Any role may call this; the cooldown is the only gate.
+     **************************************************************************/
+    bool RequestTransport(const string &in why)
+    {
+        if (!IsEnabled()) return false;
+        if (transportId >= 0) return false;   // already have one
+        if (lastRequestFrame >= 0
+            && (ai.frame - lastRequestFrame) < int(Global::Ferry::RequestCooldownSeconds) * SECOND) {
+            return false;
+        }
+        lastRequestFrame = ai.frame;
         const AIFloat3 p = Global::Map::StartPos;
         AiSendMessage(MSG + "|req|" + int(p.x) + "|" + int(p.z));
-        GenericHelpers::LogUtil("[Ferry] TECH: requested a transport (first T2 lab started)", 1);
+        GenericHelpers::LogUtil("[Ferry] requested a transport (" + why + ")", 1);
         WidgetLink::Send("ferry", "req|" + int(p.x) + "|" + int(p.z));
+        return true;
+    }
+
+    // TECH asks on its own. Not "when the T2 lab starts": that fired on the
+    // lab task being *enqueued*, which is when TECH plans it, well before any
+    // builder touches it - so the transport arrived far too early. Income is
+    // the honest signal for "about to tech", and "owns none" plus the cooldown
+    // covers the transport dying or AIR being busy the first time.
+    void _AutoRequest()
+    {
+        if (Global::AISettings::Role != AiRole::TECH) return;
+        if (transportId >= 0) return;
+        if (Economy::GetMinMetalIncomeLast10s() < Global::Ferry::RequestMinMetalIncome) return;
+        RequestTransport("TECH at +" + int(Global::Ferry::RequestMinMetalIncome) + " metal, no transport");
     }
 
     /**************************************************************************
@@ -147,15 +228,19 @@ namespace Ferry {
         const string name = TransportForSide(Global::AISettings::Side);
         if (name.length() == 0) return null;
         CCircuitDef@ d = ai.GetCircuitDef(name);
-        if (d is null || !d.IsAvailable(ai.frame)) {
-            GenericHelpers::LogUtil("[Ferry] AIR: '" + name + "' unavailable; cannot fill the request", 2);
+        if (d is null) {
+            GenericHelpers::LogUtil("[Ferry] AIR: '" + name + "' is not a loaded def; cannot fill the request", 2);
             return null;
         }
+        // Not IsAvailable(): the cap is 0 until _OpenSlot below raises it, so
+        // that test would always fail here. The tech gate (sinceFrame) is the
+        // only other thing IsAvailable adds and the T1 air plant clears it.
 
         if (!announced) {
             announced = true;
             AiSendMessage(MSG + "|ack", requestTeam);
         }
+        _OpenSlot(name);
         orderedFrame = ai.frame;
         GenericHelpers::LogUtil("[Ferry] AIR: ordered one " + name + " for team " + requestTeam, 1);
         return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::NOW,
@@ -187,19 +272,21 @@ namespace Ferry {
                 orderedFrame = -1;   // the order produced its unit
                 // Fly it over before handing it across. A unit given at our own
                 // base would have to cross the map under TECH's control with no
-                // task that knows where to send it.
-                CFerryTask@ t = TaskOf(unit);
-                if (t !is null) t.SetHoldPos(requestPos);
-                GenericHelpers::LogUtil("[Ferry] AIR: transport " + unit.id + " built, flying to ("
-                    + int(requestPos.x) + "," + int(requestPos.z) + ")", 1);
+                // task that knows where to send it. The hold usually cannot be
+                // applied yet (see _ApplyHold); Update() keeps trying.
+                buildingHoldApplied = _ApplyHold(unit.id, requestPos, "AIR");
+                GenericHelpers::LogUtil("[Ferry] AIR: transport " + unit.id + " built for team "
+                    + requestTeam + (buildingHoldApplied ? "" : "; hold pending task"), 1);
             }
             return;
         }
-        if (Global::AISettings::Role == AiRole::TECH && transportId < 0) {
+        // Any role that asked for one keeps it. A transport arriving unasked -
+        // a human gift - is kept too; there is no better use for it.
+        if (transportId < 0 || transportId == unit.id) {
             transportId = unit.id;
-            CFerryTask@ t = TaskOf(unit);
-            if (t !is null) t.SetHoldPos(Global::Map::StartPos);
-            GenericHelpers::LogUtil("[Ferry] TECH: transport " + unit.id + " received and reserved", 1);
+            transportHoldApplied = _ApplyHold(unit.id, Global::Map::StartPos, "reserved");
+            GenericHelpers::LogUtil("[Ferry] transport " + unit.id + " received and reserved"
+                + (transportHoldApplied ? "" : "; hold pending task"), 1);
             WidgetLink::Send("ferry", "have|" + unit.id);
         }
     }
@@ -209,11 +296,13 @@ namespace Ferry {
         if (unit is null) return;
         if (unit.id == buildingId) {
             buildingId = -1;
+            buildingHoldApplied = false;
             orderedFrame = -1;   // shot down in transit: the request is still owed
         }
         if (unit.id == transportId) {
             transportId = -1;
-            GenericHelpers::LogUtil("[Ferry] TECH: transport lost; donations walk again", 2);
+            transportHoldApplied = false;
+            GenericHelpers::LogUtil("[Ferry] transport lost; donations walk until the next request lands", 2);
         }
     }
 
@@ -222,15 +311,25 @@ namespace Ferry {
      **************************************************************************/
     // True when the ferry took the job. False means "walk it", and the caller
     // donates immediately exactly as it did before.
+    // Every refusal says why, at level 1. A silent false here is
+    // indistinguishable from a pickup in a LOG_LEVEL 1 log, and that cost a
+    // whole game of not knowing whether the transport was ever asked.
+    bool _Refuse(const string &in why)
+    {
+        GenericHelpers::LogUtil("[Ferry] TECH: not carrying - " + why + "; constructor walks", 1);
+        return false;
+    }
+
     bool TryCarry(CCircuitUnit@ cargo, int recipient, const AIFloat3 &in dropPos)
     {
-        if (!IsEnabled() || cargo is null || recipient < 0) return false;
-        if (cargoId >= 0) return false;              // one run at a time
+        if (!IsEnabled()) return _Refuse("ferry disabled");
+        if (cargo is null || recipient < 0) return _Refuse("no cargo or no recipient");
+        if (cargoId >= 0) return _Refuse("a run is already in flight (cargo " + cargoId + ")");
         CCircuitUnit@ t = Transport();
-        if (t is null) return false;
+        if (t is null) return _Refuse("no transport owned (transportId=" + transportId + ")");
         CFerryTask@ task = TaskOf(t);
-        if (task is null) return false;
-        if (!task.SetCargo(cargo.id, dropPos)) return false;
+        if (task is null) return _Refuse("transport " + t.id + " has no CFerryTask yet");
+        if (!task.SetCargo(cargo.id, dropPos)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
         cargoId = cargo.id;
         cargoRecipient = recipient;
         GenericHelpers::LogUtil("[Ferry] TECH: carrying " + cargo.id + " to team " + recipient
@@ -244,6 +343,11 @@ namespace Ferry {
     // changes hands either way.
     void _Finish(bool delivered)
     {
+        if (!delivered) {
+            CFerryTask@ ft = TaskOf(Transport());
+            GenericHelpers::LogUtil("[Ferry] TECH: run for cargo " + cargoId + " did not complete (task "
+                + (ft is null ? "gone" : "state " + ft.GetState()) + "); giving where it stands", 1);
+        }
         CCircuitUnit@ cargo = (cargoId < 0) ? null : ai.GetTeamUnit(cargoId);
         if (cargo !is null && cargoRecipient >= 0 && cargoRecipient != ai.teamId) {
             array<CCircuitUnit@> give(1);
@@ -265,24 +369,39 @@ namespace Ferry {
     void Update()
     {
         if (!IsEnabled()) return;
+        if (!capsApplied) _CapAll();
 
-        // AIR: has the transport reached TECH's base? Hand it over there.
+        _AutoRequest();
+
+        // Holds first: they almost never take at OnUnitAdded (see _ApplyHold).
+        if (buildingId >= 0 && !buildingHoldApplied) {
+            buildingHoldApplied = _ApplyHold(buildingId, requestPos, "AIR");
+        }
+        if (transportId >= 0 && !transportHoldApplied) {
+            transportHoldApplied = _ApplyHold(transportId, Global::Map::StartPos, "reserved");
+        }
+
+        // AIR: has the transport reached the requester's base? Hand it over there.
         if (buildingId >= 0 && requestPending) {
             CCircuitUnit@ t = ai.GetTeamUnit(buildingId);
             if (t is null) {
                 buildingId = -1;
+                buildingHoldApplied = false;
                 announced = false;
             } else if (MapHelpers::SqDist(t.GetPos(ai.frame), requestPos)
                        < Global::Ferry::ArriveRadius * Global::Ferry::ArriveRadius) {
+                const int gaveId = buildingId;   // log after the fields are cleared
                 array<CCircuitUnit@> give(1);
                 @give[0] = t;
                 ai.GiveUnits(give, requestTeam);
-                AiSendMessage(MSG + "|give|" + buildingId, requestTeam);
-                GenericHelpers::LogUtil("[Ferry] AIR: transport " + buildingId
-                    + " arrived and transferred to team " + requestTeam, 1);
-                WidgetLink::Send("ferry", "gave|" + buildingId + "|" + requestTeam);
+                AiSendMessage(MSG + "|give|" + gaveId, requestTeam);
+                _CloseSlot(TransportForSide(Global::AISettings::Side));
                 requestPending = false;
                 buildingId = -1;
+                buildingHoldApplied = false;
+                GenericHelpers::LogUtil("[Ferry] AIR: transport " + gaveId
+                    + " arrived and transferred to team " + requestTeam, 1);
+                WidgetLink::Send("ferry", "gave|" + gaveId + "|" + requestTeam);
             }
         }
 
@@ -313,7 +432,13 @@ namespace Ferry {
 
         if (p[1] == "req") {
             if (Global::AISettings::Role != AiRole::AIR) return true;
-            if (requestPending || buildingId >= 0) return true;   // already committed
+            if (requestPending || buildingId >= 0) {
+                // Serving someone already. Dropped, not queued: the requester
+                // re-asks after its cooldown, by which time this one is done.
+                GenericHelpers::LogUtil("[Ferry] AIR: request from team " + fromTeamId
+                    + " dropped; already serving team " + requestTeam, 2);
+                return true;
+            }
             requestTeam = fromTeamId;
             requestPos = Global::Map::StartPos;
             if (p.length() >= 4) {
@@ -334,9 +459,17 @@ namespace Ferry {
             return true;
         }
         if (p[1] == "give") {
-            GenericHelpers::LogUtil("[Ferry] TECH: team " + fromTeamId + " transferred transport "
+            // Unit ids are global, so the id in the message is ours now. Take it
+            // here as well as in OnUnitAdded: a gifted unit may reach us through
+            // a different native handler, and Update() applies the hold either
+            // way once the CFerryTask exists.
+            if (p.length() >= 3 && transportId < 0) {
+                transportId = parseInt(p[2]);
+                transportHoldApplied = false;
+            }
+            GenericHelpers::LogUtil("[Ferry] team " + fromTeamId + " transferred transport "
                 + (p.length() >= 3 ? p[2] : "?"), 2);
-            return true;   // OnUnitAdded does the reserving
+            return true;
         }
         return false;
     }

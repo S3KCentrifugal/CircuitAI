@@ -11,6 +11,18 @@ namespace Military {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+		// A transport is never spam and never subject to a role's military
+		// policy: it exists to carry, and the only task that carries is the
+		// native CFerryTask that DefaultMakeTask hands a TRANS-role unit.
+		// TECH's handler returns null for every military unit below +50 metal
+		// income - right for its army, fatal here: the ferry transport arrives
+		// at +20, sat task-less for thousands of frames, and every donation
+		// walked because TryCarry refuses a transport with no task. Decided
+		// here, role-independently, before any policy sees the unit.
+		if (u !is null && Team::Ferry::IsFerryTransport(u.circuitDef)) {
+			return aiMilitaryMgr.DefaultMakeTask(u);
+		}
+
 		IUnitTask@ t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
 

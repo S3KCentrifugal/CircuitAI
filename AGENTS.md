@@ -20,6 +20,14 @@ read that register before starting work so you do not re-diagnose something
 already understood. Its "Maintaining this register" section is the full rule;
 "Known Issues" below is the short form.
 
+Record every non-obvious *decision* in `doc/decisions.md` — the call, the
+reasoning, the alternative rejected, links to every file it touched, and how
+far it has actually been verified. A deliberate non-change counts, and so does
+a decision later found to be wrong: those are marked, never deleted. Read it
+before reversing something that looks odd; several of these choices look wrong
+until you know what they are working around. "Decisions" below is the short
+form.
+
 Do not create or update repository changelog entries automatically. Only when
 the user explicitly requests a changelog, invoke
 `skills/maintain-changelog/SKILL.md`.
@@ -99,6 +107,7 @@ This is the implementation target for every AngelScript and profile change.
 | `data/script/src/roles/` | Role delegates that specialise shared manager behaviour: `air.as`, `front.as`, `sea.as`, `support.as`, `tactical.as`, `tech.as`. |
 | `data/script/src/types/` | Script value types: `ai_role.as`, `building_type.as`, `map_config.as`, `opener.as`, `profile.as`, `profile_controller.as`, `role_config.as`, `start_spot.as`, `strategic_objectives.as`, `strategy.as`, `terrain.as`. |
 | `data/script/src/helpers/` | Stateless helpers grouped by domain: builder, collection, defense, economy, factory, generic, guard, limits, map, objective (with `objective_executor.as`), porc, role, role-limit, task, unit, and unitdef. |
+| `data/script/src/manager/sea_assist.as` | SEA donates one T1 construction ship to a TACTICAL ally at +50 metal income, and TACTICAL lifts its zero shipyard caps once it owns a sea constructor. |
 | `data/script/src/manager/ferry.as` | Transport ferry policy: the AIR/TECH request protocol over `AiSendMessage`, and the donation hand-over. See `doc/transport-ferry.md`. |
 | `data/script/src/helpers/porc_helpers.as` | Porcupine chain policy: reads the config-seeded chain through `aiMilitaryMgr.GetPorcChain`, appends the content-option tiers, and lets a role rewrite it. See `doc/porc-chain.md`. |
 | `data/script/src/misc/commander.as` | Commander-specific script policy. |
@@ -143,6 +152,7 @@ This is the implementation target for every AngelScript and profile change.
 | `doc/roles/hover.md` | **Outstanding - not written yet**, though nine documents link to it. Intended as the deep reference for hover production: ownership, build decisions, the native contract, and the cause of hover production stalling once a T2 factory exists. Tracked as `KI-404` in `doc/known-issues.md`. |
 | `doc/intent.md` | **Design intent**: the long-term goal of driving the AI from the game's mission/objective API, the short-term goal of playing like a strong player, and the rule that build orders and behaviour policy stay controllable from AngelScript. Read before deciding where a behaviour belongs. |
 | `doc/porc-chain.md` | Static-defence ordering: the `porcupine` block in `build_chain.json`, per-role override through `RoleConfig::PorcChainHandler`, and the additive Extra Units / Scavenger tiers. |
+| `doc/decisions.md` | **The decision record**: why changes were made, what was rejected, and how far each is verified. Links directly to every file a decision touched. Read before reversing anything surprising; add to it whenever you make a judgement call. |
 | `doc/known-issues.md` | **The register of diagnosed but unresolved problems**, one entry per issue with problem, proposed solution and verification. Read before starting work; add to it whenever you leave something unfixed. Indexes the deep-dive documents below rather than duplicating them. |
 | `doc/transport-ferry.md` | The AIR-to-TECH transport ferry: the hand-over protocol, `CFerryTask`, and how a donated T2 constructor is flown instead of walked. |
 | `doc/sensor-escort.md` | Mobile radar/jammer escort rationing: the one-per-squad cap, the squad-value ranking that orders it, and the `sensor` block in `behaviour.json`. |
@@ -272,6 +282,25 @@ When changing classification or economy logic, check BAR values used by CircuitA
 - Do not infer a valid factory edge merely because both UnitDefs exist. Verify the builder's effective BAR `buildoptions` under the relevant mod options.
 - Avoid changing the legacy profiles (`easy`, `medium`, `hard`, `hard_aggressive`) and the shared-framework profiles (`experimental_balanced`, `experimental_hard`, `experimental_terrible`) together unless the requirement explicitly spans them.
 - When a change is scoped to one profile family, record the other family in `doc/known-issues.md` rather than leaving the gap undocumented.
+
+## Decisions
+
+`doc/decisions.md` records why changes were made. `known-issues.md` says what
+is still broken; this says what was chosen and what it cost.
+
+- **Add an entry for any judgement a reader could reasonably question.** A
+  rejected alternative, a trade accepted on purpose, a deliberate non-change,
+  or a correction to an earlier decision. Routine work needs none.
+- **Link every file the decision touched**, relatively, so
+  `tools/knowledge/check_doc_links.py` validates it.
+- **State verification honestly** using the record's own vocabulary — Built,
+  Checked, Symbolised, Played. "It compiles" is not "it works", and most
+  entries are not Played.
+- **Never delete a decision that turned out wrong.** Mark it, link forward to
+  the correction, and say what the wrong reasoning was. That is the part with
+  lasting value.
+- **Keep it in step with the register.** A decision that leaves something open
+  links to its `KI-`; the `KI-` links back.
 
 ## Known Issues
 

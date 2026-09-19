@@ -56,6 +56,9 @@ public:
 private:
 	CCircuitUnit* GetTransport() const;
 	CCircuitUnit* GetCargo() const;
+	// Off the ground by more than FERRY_LIFT_HEIGHT: the only observable that
+	// separates "carried" from "stood under the transport".
+	bool IsLifted(CCircuitUnit* cargo, int frame) const;
 	void GoTo(CCircuitUnit* unit, const springai::AIFloat3& pos);
 	void Enter(EState next);
 	bool IsExpired(int frame) const;

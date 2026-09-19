@@ -94,23 +94,58 @@ namespace Global {
     // lab; TECH uses it to fly donated T2 constructors to their recipients.
     namespace Ferry {
         bool Enabled = true;
-        // The heavy transports, not the light ones: transportsize 4 against a
-        // T2 constructor's 2x2 footprint, and no transportmass cap, so the
-        // lift is certain. Both come from the T1 air plant, so AIR can build
-        // one the moment it is asked. armatlas / corvalk / leglts are the
-        // light alternatives if the lift turns out to be fine.
+        // The light transports. They carry one unit of transportsize <= 3
+        // and mass <= 750; a T2 constructor is 2x2 and, because the engine
+        // defaults a unit's mass to its metal cost when the def sets none
+        // (Recoil UnitDef.cpp: GetFloat("mass", cost.metal)), weighs 410-470.
+        // The heavy ones (armhvytrans / corhvytrans / legatrans) lift more but
+        // cost 190 against 68-74, and the ferry never carries anything the
+        // light one cannot. All six come from the T1 air plant.
         dictionary TransportBySide = {
-            {"armada", "armhvytrans"},
-            {"cortex", "corhvytrans"},
-            {"legion", "legatrans"}
+            {"armada", "armatlas"},
+            {"cortex", "corvalk"},
+            {"legion", "leglts"}
         };
-        // How close the transport must get to TECH's base before AIR hands
-        // ownership across.
+        // Every transport def the ferry could be asked to build. They are all
+        // capped at 0 for every role, and AIR raises the one it owes to
+        // owned+1 only while a request is open. Without the cap the native
+        // recruiter treats a transport with a role entry as ordinary air
+        // production and builds extras that idle with nothing to carry.
+        array<string> AllTransportDefs = {
+            "armatlas", "corvalk", "leglts",
+            "armhvytrans", "corhvytrans", "legatrans"
+        };
+        // When TECH asks on its own: sliding-minimum metal income it must
+        // clear while owning no transport. Not tied to the T2 lab - that
+        // trigger fired on the lab being *planned* and delivered far too early.
+        float RequestMinMetalIncome = 20.0f;
+        // A requester waits this long before asking again (transport died,
+        // or AIR was busy serving someone else).
+        float RequestCooldownSeconds = 180.0f;
+        // How close the transport must get to the requester's base before AIR
+        // hands ownership across.
         float ArriveRadius = 320.0f;
         // How long one transport order is allowed to produce nothing before
         // AIR orders another. Only a safety net: the normal path clears the
         // latch the moment the unit appears.
         float OrderTimeoutSeconds = 120.0f;
+    }
+
+    // SEA hands a TACTICAL ally one construction ship so it can work the
+    // coast beside it (Team::SeaAssist, manager/sea_assist.as).
+    namespace SeaAssist {
+        bool Enabled = true;
+        // SEA's sliding-minimum metal income before it can spare one.
+        float MinMetalIncome = 50.0f;
+        // Construction ships SEA keeps for itself before donating the surplus.
+        int KeepConstructors = 1;
+        // TACTICAL's shipyard caps once it owns a sea constructor. They start
+        // at 0 in RoleSettings::Tactical, which is what stops it building any
+        // naval structure at all.
+        int UnlockedT1Shipyards = 2;
+        int UnlockedT2Shipyards = 1;
+        // Placement slack for the seeded shipyard around the ship's position.
+        float SeedShake = 256.0f;
     }
 
     namespace Spam {
@@ -132,6 +167,14 @@ namespace Global {
         float BehindEnemyDistance = 2500.0f;
         // Sideways offset between the lanes of different factories
         float LaneSpacing = 900.0f;
+        // Within one factory's line: units are dealt lanes 0, +1, -1, +2, -2 ...
+        // up to UnitLanes, offset UnitLaneSpacing apart, so the stream is a
+        // band rather than a single file. EndSpread scales that offset at the
+        // final waypoint - 0 converges every lane on the same endpoint, 1 keeps
+        // full width; the run is aimed at one backline, so keep it small.
+        int UnitLanes = 5;
+        float UnitLaneSpacing = 160.0f;
+        float EndSpread = 0.35f;
         // Waypoints stay this far from the map edge
         float MapMargin = 200.0f;
         // Rebuild every lane when the AI's combat focus moves further than
@@ -482,6 +525,38 @@ namespace Global {
             float RequiredMetalCurrentForT2AircraftPlant = 50.0f;
             float RequiredEnergyIncomeForT2AircraftPlant = 1200.0f;
             int MaxT2AircraftPlants = 1;
+
+            /******************** LATE-GAME EXPANSION ********************/
+            // AIR sat at max metal late: one T2 air plant, nanos capped by
+            // income, and nothing else to spend on. This ladder runs while
+            // metal is floating and turns the surplus into build power, more
+            // air production placed on a ring well outside the core, the energy
+            // to carry it, and finally a gantry - the only route to T3 air,
+            // since the experimental air plant is built solely by the T3 air
+            // constructor the gantry produces.
+            // "Floating": aiEconomyMgr.isMetalFull (> 80% of storage), or
+            // current above LateMetalCurrent - and income above LateMetalIncome
+            // either way, so a full bank on a dead economy does not trigger it.
+            float LateMetalCurrent = 2500.0f;
+            float LateMetalIncome = 35.0f;
+            // Ring the late structures are placed on, around the start position,
+            // and the site-search radius each gets. This is what grows the base.
+            float LateExpansionRadius = 1400.0f;
+            float LateExpansionShake = 384.0f;   // SQUARE_SIZE * 48
+            int LateRingSlots = 6;
+            // Build power first: nanos per T2 air plant beyond the income target.
+            int LateNanosPerT2Plant = 4;
+            // Then production: total T2 air plants allowed while floating.
+            int LateMaxT2AircraftPlants = 3;
+            // Then energy: one fusion per this much energy income shortfall, and
+            // an advanced fusion once income and bank both clear these.
+            float LateEnergyPerT2Plant = 900.0f;
+            float LateAFUSMetalIncome = 60.0f;
+            float LateAFUSMetalCurrent = 6000.0f;
+            // Then T3: a gantry once this rich. Gantry production is
+            // FactoryProduction's business (EnqueueGantrySignatureBatch).
+            float LateGantryMetalIncome = 60.0f;
+            float LateGantryMetalCurrent = 6000.0f;
 
             /******************** AIR NANO POLICY ********************/
             // How much income per additional T1 nano caretaker; and cap

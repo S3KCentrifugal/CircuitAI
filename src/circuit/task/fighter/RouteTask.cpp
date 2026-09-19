@@ -9,12 +9,15 @@
 
 #include "task/fighter/RouteTask.h"
 #include "module/MilitaryManager.h"
+#include "terrain/TerrainManager.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace circuit {
@@ -26,6 +29,10 @@ CRouteTask::CRouteTask(ITaskModule* mgr)
 		, version(0)
 		, dirty(false)
 		, arriveRadius(SQUARE_SIZE * 32)
+		, laneCount(1)
+		, laneSpacing(0.f)
+		, laneEndSpread(0.f)
+		, laneDealt(0)
 {
 }
 
@@ -38,12 +45,59 @@ bool CRouteTask::CanAssignTo(CCircuitUnit* unit) const
 	return true;  // script decides membership
 }
 
+void CRouteTask::AssignTo(CCircuitUnit* unit)
+{
+	IFighterTask::AssignTo(unit);
+	// Deal lanes from the centre outwards: 0, +1, -1, +2, -2 ... so a small
+	// stream still straddles the line rather than drifting to one side.
+	const unsigned int k = laneDealt++ % std::max(1, laneCount);
+	const int lane = (k == 0) ? 0 : (((k % 2) == 1) ? int((k + 1) / 2) : -int(k / 2));
+	lanes[unit] = lane;
+}
+
 void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 {
 	// The task belongs to a factory and outlives its units; script aborts it
 	// when the factory is gone. Fighter tasks have no timeout, so an empty
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
+	lanes.erase(unit);
+}
+
+void CRouteTask::SetLanes(int count, float spacing, float endSpread)
+{
+	laneCount = std::max(1, count);
+	laneSpacing = std::max(0.f, spacing);
+	laneEndSpread = std::min(1.f, std::max(0.f, endSpread));
+}
+
+int CRouteTask::LaneOf(CCircuitUnit* unit) const
+{
+	auto it = lanes.find(unit);
+	return (it == lanes.end()) ? 0 : it->second;
+}
+
+AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
+{
+	const AIFloat3& p = route[idx];
+	const int lane = LaneOf(unit);
+	if ((lane == 0) || (laneSpacing <= 0.f) || (route.size() < 2)) {
+		return p;
+	}
+	// Sideways is perpendicular to the leg arriving at this point (for the
+	// first point, the leg leaving it), so the band follows the line's bends.
+	const AIFloat3& a = route[(idx == 0) ? 0 : idx - 1];
+	const AIFloat3& b = route[(idx == 0) ? 1 : idx];
+	AIFloat3 dir(b.x - a.x, 0.f, b.z - a.z);
+	const float len = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+	if (len < 1.f) {
+		return p;
+	}
+	const float scale = (idx + 1 == route.size()) ? laneEndSpread : 1.f;
+	const float off = laneSpacing * float(lane) * scale;
+	AIFloat3 out(p.x + (-dir.z / len) * off, p.y, p.z + (dir.x / len) * off);
+	CTerrainManager::CorrectPosition(out);
+	return out;
 }
 
 void CRouteTask::Start(CCircuitUnit* unit)
@@ -132,7 +186,7 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 	CCircuitAI* circuit = manager->GetCircuit();
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
-		unit->CmdMoveTo(route.back(), 0, circuit->GetLastFrame() + FRAMES_PER_SEC * 600);
+		unit->CmdMoveTo(LanePoint(unit, route.size() - 1), 0, circuit->GetLastFrame() + FRAMES_PER_SEC * 600);
 	)
 }
 
@@ -146,7 +200,7 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		for (unsigned int i = fromIdx; i < route.size(); ++i) {
-			unit->CmdMoveTo(route[i], (i == fromIdx) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
+			unit->CmdMoveTo(LanePoint(unit, i), (i == fromIdx) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
 		}
 	)
 }

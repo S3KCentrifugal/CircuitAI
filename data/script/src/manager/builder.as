@@ -15,6 +15,7 @@
 // Team state: T1 constructor registry for orphan rescue
 #include "team.as"
 #include "ferry.as"
+#include "sea_assist.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -176,8 +177,12 @@ namespace Builder {
 	{
  		if (u is null) return false;
  		string key = "" + u.id;
+ 		// exists() first. A failed dictionary.get leaves a primitive &out
+ 		// UNDEFINED - the temporary it is passed through is never initialised
+ 		// and is copied back regardless of the return value - so the "= false"
+ 		// here was overwritten with junk for every builder not yet in the table.
+ 		if (!trackEligibleBuilders.exists(key)) return false;
  		bool present = false;
- 		// read presence into a temp bool; AngelScript dictionary stores variant
  		trackEligibleBuilders.get(key, present);
  		return present;
 	}
@@ -2080,20 +2085,6 @@ namespace Builder {
 				Economy::MexTracker::MarkUpgradeInProgress(mexTask.GetBuildPos(), true);
 			}
 		}
-		// The transport ferry's trigger: TECH asks AIR for a transport the
-		// moment its first T2 lab is enqueued, so the transport is flying while
-		// the lab is still building and is on station before the first T2
-		// constructor exists. Role-independent here for the same reason the mex
-		// bookkeeping is - Ferry::OnT2LabStarted ignores every role but TECH.
-		{
-			IBuilderTask@ facTask = cast<IBuilderTask>(task);
-			if (facTask !is null && facTask.buildDef !is null
-				&& Task::BuildType(facTask.GetBuildType()) == Task::BuildType::FACTORY
-				&& UnitHelpers::IsT2Lab(facTask.buildDef.GetName()))
-			{
-				Team::Ferry::OnT2LabStarted();
-			}
-		}
 		// Mark tracked task as added if present
 		MarkTaskAddedIfTracked(task);
 		GenericHelpers::LogUtil("[BUILDER] AiTaskAdded: marked tracked task as added if present", 4);
@@ -2399,6 +2390,11 @@ namespace Builder {
 	{
 		GenericHelpers::LogUtil("[BUILDER] Enter AiUnitAdded", 4);
 		if (unit is null) return;
+
+		// Role-independent, like the mex bookkeeping in AiTaskAdded: SEA counts
+		// its construction ships here, TACTICAL unlocks its shipyard caps the
+		// moment it owns one. Each branch checks its own AiRole.
+		Team::SeaAssist::OnUnitAdded(unit);
 
 		const CCircuitDef@ cdef = unit.circuitDef;
 
@@ -2773,6 +2769,8 @@ namespace Builder {
 	{
 		GenericHelpers::LogUtil("[BUILDER] Enter AiUnitRemoved", 4);
 		if (unit is null) return;
+
+		Team::SeaAssist::OnUnitRemoved(unit);
 
 		// Ensure any per-builder task mapping is cleared for this unit
 		ClearBuilderTaskByUnit(unit);

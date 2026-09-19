@@ -413,18 +413,65 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
   native `MakeBuilderTask` stall gating plus `MEXUP` not being in
   `IsIgnoreStallingPull`; fix undecided.
 
+## How many constructors are donated
+
+`Team::Donation` decides once, when the **first** T2 constructor is built
+(`planned < 0`), and never again:
+
+1. **Keep first.** The first `T2DonationKeepCount` (2) constructors are
+   TECH's own; `OnConstructorBuilt` returns early until `built` exceeds it.
+2. **Draw the count.** `DrawCount(allies)` takes `T2DonationMax` (7) clipped
+   to the number of allies on the roster, builds a geometric weight list
+   `1, 0.6, 0.36, ...` (`T2DonationDecay` 0.6), and makes **one** roll in
+   0-999 over the cumulative weights. With seven allies the sum is ~2.43, so
+   the odds are roughly 41% one, 25% two, 15% three, 9% four, 5% five, 3%
+   six, 2% seven. That number is the plan for the whole game.
+3. **Pick a recipient per constructor.** `PickRecipient` is the *closest*
+   ally with the *fewest* donations so far (`givenTo`), ties to the closer.
+   With the count round-trip fixed (D-019) that spreads them across distinct
+   allies; before it, every count read as 0 and the closest ally got all of
+   them.
+4. **Stop at the plan.** `given >= planned` ends it; a constructor built
+   after that is TECH's.
+
+Step 3 was broken twice by the same dictionary, in opposite directions -
+first every count read 0 (closest ally got everything), then every count
+read junk (nobody got anything, `PickRecipient -> team -1`). Both are
+[D-019](../decisions.md#d-019--donation-counts-are-read-and-written-as-int64)
+and [D-025](../decisions.md#d-025--a-dictionary-out-is-undefined-after-a-miss-check-exists-first);
+the counts now go through one `exists()`-guarded `Count()`.
+
+Every call logs `T2 constructor #N: <def>(id) planned=P given=G keep=K`,
+then its decision: `keeping ... (built N of keep 2; donations start at #3)`,
+`keeping ... (plan met)`, `No recipient`, or `PickRecipient -> team T (count
+C of A allies)` followed by the ferry's `being ferried` or `Gave`. All at
+**level 1** - `define.as` has `LOG_LEVEL = 1`, and anything logged at 2 never
+appears, which is why a game with four T2 constructors and no donation could
+not be explained from its log: the counting and the refusals were all
+level 2.
+
 ## Transport ferry
 
-TECH no longer walks its donated T2 constructors. When its **first** T2 lab is
-enqueued, `Team::Ferry::OnT2LabStarted` broadcasts a request; the AIR player on
-the team builds an air transport, flies it to TECH's base and transfers it
-there. From then on `Team::Donation::OnConstructorBuilt` offers each donation
+TECH no longer walks its donated T2 constructors. Once its sliding-minimum
+metal income clears `Global::Ferry::RequestMinMetalIncome` (20) while it owns
+no transport, `Team::Ferry::_AutoRequest` broadcasts a request; the AIR player
+on the team builds an air transport, flies it to TECH's base and transfers it
+there. If TECH still owns none after `RequestCooldownSeconds` (180) — the
+transport died, or AIR was busy — it asks again. From then on `Team::Donation::OnConstructorBuilt` offers each donation
 to `Team::Ferry::TryCarry` before falling back to `ai.GiveUnits`, and the
 transport flies the constructor to the recipient's base and returns home.
 
-The trigger is the lab being *enqueued*, not finished, so the transport is on
-station before the first T2 constructor exists. Every failure path walks the
-constructor exactly as before. Full sequence and limits in
+The request was originally tied to the first T2 lab task being enqueued,
+which is when TECH *plans* the lab rather than when a builder starts it, and
+the transport arrived far too early. Income is the signal now. Every failure
+path walks the constructor exactly as before.
+
+One TECH-specific trap: `Tech_MilitaryAiMakeTask` returns **null** for every
+military unit until metal income reaches 50, which withheld the transport's
+`CFerryTask` for the whole window in which the donations happen.
+`Military::AiMakeTask` now routes any ferry transport to the native default
+task before this handler runs - see
+[`../transport-ferry.md`](../transport-ferry.md), trap 7. Full sequence and limits in
 [`../transport-ferry.md`](../transport-ferry.md).
 
 ## Related

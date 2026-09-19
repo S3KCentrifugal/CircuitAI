@@ -35,6 +35,10 @@ the role-doc tooling already enforces live in
 
 Severity is about impact on a played game, not on how annoying the code is.
 
+Why a change was made, rather than what is still wrong with it, belongs in
+[`decisions.md`](decisions.md). Several entries here are the open half of a
+decision recorded there; both link to each other.
+
 ---
 
 ## Native C++ (KI-1xx)
@@ -218,6 +222,8 @@ and a denser cheap cluster of higher total value picks the cluster.
 
 ### KI-106 — Closed: the Eight Horses crash was a role mask passed as a role index
 
+Decision: [D-002](decisions.md#d-002--the-eight-horses-crash-role-mask-passed-as-role-index), [D-003](decisions.md#d-003--issuddenthreat-null-guard-kept-despite-being-the-wrong-diagnosis).
+
 **Severity**: High — **fixed and symbolised**
 **Location**: `Military::UpdateEnemyThreatCache` / `UpdateEnemyCostCache`
 (`data/script/src/manager/military.as`); guard in
@@ -270,6 +276,8 @@ Horses must now pass `f=180` with no access violation, and no
 
 ### KI-107 — A surplus mobile sensor has no job of its own
 
+Decision: [D-001](decisions.md#d-001--mobile-sensors-are-rationed-one-per-squad).
+
 **Severity**: Low
 **Location**: `CSupportTask::Update` / `FindCandidates`
 (`src/circuit/task/fighter/SupportTask.cpp`)
@@ -308,6 +316,8 @@ occupy the same cluster.
 ---
 
 ### KI-108 — Script sees only the low 32 bits of a role mask
+
+Decision: [D-004](decisions.md#d-004--scripts-mask-typedef-left-at-uint) — deliberate non-change.
 
 **Severity**: Medium
 **Location**: `CInitScript::RegisterScript` (`src/circuit/script/InitScript.cpp`),
@@ -351,6 +361,8 @@ value, and `IsRoleAny` on a custom role matches the defs the config tags.
 ---
 
 ### KI-109 — Spam activates and then produces nothing, and the log cannot say why
+
+Decision: [D-007](decisions.md#d-007--spams-fusion-era-gate-is-deliberate-and-stays).
 
 **Severity**: Medium
 **Location**: `Spam::FactoryMakeTask`, `Spam::Update`
@@ -416,6 +428,8 @@ units moving down the lane, or by a
 ---
 
 ### KI-110 — A stockpiled super weapon holds its shot until it dies
+
+Decision: [D-010](decisions.md#d-010--the-nuke-cost-floor-is-a-regression-left-unfixed-pending-a-decision) — open, awaiting a call on the floor.
 
 **Severity**: High
 **Location**: `CSuperTask::Update`, the `maxCost` floor
@@ -1152,6 +1166,8 @@ converters still pass their gate when income exceeds the silo draw, and that
 `isEnergyStalling` is not permanently true.
 
 ### KI-216 — Closed: transport support implemented (donated constructors now fly)
+
+Decision: [D-011](decisions.md#d-011--the-transport-ferry-is-native-mechanism-plus-script-protocol), [D-013](decisions.md#d-013--air-flies-the-transport-before-transferring-ownership), [D-014](decisions.md#d-014--transports-are-matched-by-role-mask-not-main-role).
 
 **Status**: implemented, unverified in a game. All four stages of the plan
 below are in the tree; see [`transport-ferry.md`](transport-ferry.md) for what

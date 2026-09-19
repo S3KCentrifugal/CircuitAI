@@ -21,6 +21,7 @@ line numbers when navigating.
 - [Commander wind opening](#commander-wind-opening)
 - [Known defects](#known-defects)
 - [Transport ferry](#transport-ferry)
+- [Late-game expansion](#late-game-expansion)
 - [Related](#related)
 
 ## Intent
@@ -389,16 +390,67 @@ until `CommanderWindEnergyIncomeTarget` (300.0) is reached, provided
 
 ## Transport ferry
 
-AIR owes the TECH player on its team exactly one air transport. On receiving
-`barbferry|req` - which TECH sends when its first T2 lab is enqueued -
-`Team::Ferry::FactoryMakeTask` preempts the air plant's normal production for a
-single heavy transport, ahead of everything else, then **flies it to TECH's
-base under AIR's own ownership** and transfers it on arrival.
+AIR builds air transports for teammates that ask. On receiving
+`barbferry|req` - any role may send it; TECH does so on its own at +20 metal
+income while it owns none - `Team::Ferry::FactoryMakeTask` preempts the air
+plant's normal production for a single heavy transport, ahead of everything
+else, then **flies it to the requester's base under AIR's own ownership** and
+transfers it on arrival.
 
-This is a one-shot commitment: the first request an AIR takes commits it, and
-the preemption ends as soon as the transport exists. It costs AIR one
-190-metal unit and one air-plant slot. Details in
+One request at a time: a `req` arriving while AIR is already serving one is
+dropped, and the requester re-asks after its cooldown. The preemption ends as
+soon as the transport exists, and one order is latched per request - the first
+version queued a new transport on every factory idle poll. Each delivery costs
+AIR one 190-metal unit and one air-plant slot. Details in
 [`../transport-ferry.md`](../transport-ferry.md).
+
+## Late-game expansion
+
+AIR used to sit at max metal late in the game. Its T1 builder policy
+(`Air_T1Constructor_AiMakeTask`) tops out at one T2 air plant
+(`MaxT2AircraftPlants = 1`), nanos to an income-based target, converters and
+solars - and its **T2 air constructors were never given a policy at all**:
+`Air_BuilderAiMakeTask` sent them to `MakeDefaultTaskWithLog`, so nothing in
+the role ever asked for a second plant, a fusion or a gantry. Once the bank
+was full there was nothing left to spend on.
+
+`Air_LateExpansion_AiMakeTask` runs while metal is **floating** -
+`aiEconomyMgr.isMetalFull` (over 80% of storage) or current above
+`LateMetalCurrent` (2500), with income above `LateMetalIncome` (35) either way
+so a full bank on a dead economy does not fire it. T2 air constructors run it
+before their native default; T1 air constructors run it before their normal
+ladder. It returns null when not floating, or when every rung is capped,
+queued or on cooldown, and the caller falls through.
+
+The ladder, in order:
+
+| # | Rung | Gate | Placement |
+| --- | --- | --- | --- |
+| 1 | T1 nanos | fewer than `LateNanosPerT2Plant` (4) per T2 plant, under `NanoMaxCount` | ring |
+| 2 | another T2 air plant | fewer than `LateMaxT2AircraftPlants` (3), none queued | ring, next slot |
+| 3 | fusion / advanced fusion | energy income below `LateEnergyPerT2Plant` (900) per plant, or energy empty; AFUS at `LateAFUSMetalIncome` 60 and `LateAFUSMetalCurrent` 6000 | ring |
+| 4 | gantry | `LateGantryMetalIncome` 60 and `LateGantryMetalCurrent` 6000, none yet | `EnqueueLandGantry` |
+
+**The ring is what grows the base.** "Building area" is not a setting -
+`AllyRange` only stops us building inside an ally's zone, and each structure
+is placed at an anchor plus a search radius. Every late structure is anchored
+on a ring `LateExpansionRadius` (1400) out from the start position with a
+`LateExpansionShake` (384) search radius; the slot is chosen by how many of
+that structure already exist, so each new one lands on fresh ground. Slot 0
+faces the map centre, so the first expansion leans toward the fight rather
+than the map edge.
+
+**T3 air.** The experimental air plant (`armhaap` / `corhaap` / `leghaap`)
+is built **only** by the T3 air constructor (`armhaca` ...), and that comes
+from the gantry - no T2 constructor can build the plant directly. So the
+gantry is the T3 air step. Whether the gantry then *produces* a T3 air
+constructor is `FactoryProduction`'s business (`EnqueueGantrySignatureBatch`)
+and is not part of this ladder.
+
+The gate is `Air_IsFloating`; ring slots come from `Air_RingAnchor`, clamped
+to the map by `Air_ClampToMap`. Every rung logs at level 1 as
+`[AIR][Late] ...`. Settings are in `Global::RoleSettings::Air`, the
+`LATE-GAME EXPANSION` block.
 
 ## Related
 
@@ -406,4 +458,4 @@ the preemption ends as soon as the transport exists. It costs AIR one
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 519163efcf404f37a10b0208811b5967d15bb32d; lines: 1055 -->
+<!-- source: data/script/src/roles/air.as; blob: b514633b515706267420dcf5190c1820643ca713; lines: 1193 -->

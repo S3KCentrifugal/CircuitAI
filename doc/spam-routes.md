@@ -39,6 +39,25 @@ for this.
 The lane offset is applied to **every** waypoint including the destination, so
 parallel lanes stay parallel the whole way rather than converging on one point.
 
+### The band within a lane
+
+That factory-level offset separates *factories*. It did nothing for the units
+of one factory, which followed the identical line in single file - one shell
+took several, and the column saw exactly what one unit sees.
+
+`CRouteTask::SetLanes(count, spacing, endSpread)` spreads the units of one
+route across a band. Each unit assigned to the task is dealt a lane from the
+centre outwards - 0, +1, -1, +2, -2 ... up to `UnitLanes` (5) - and follows
+the same waypoints offset sideways by `UnitLaneSpacing` (160) per lane,
+perpendicular to the leg it is on, so the band follows the line's bends. The
+offset at the **final** waypoint is scaled by `EndSpread` (0.35): the run is
+aimed at one backline, so the lanes converge most of the way back toward it
+rather than arriving as a 1300-elmo-wide line. A shell now takes one lane's
+worth, and the band's vision is the band's width.
+
+`IssueDirect` (the retarget path) honours the lane too, so an in-flight band
+stays a band.
+
 ### Retargeting
 
 When a route changes, units already in the air are sent **direct to the new

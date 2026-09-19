@@ -602,6 +602,9 @@ namespace Factory {
 	{
 		if (u is null) return 0;
 		string key = "" + u.id;
+		// exists() first: a failed get leaves `cnt` undefined, not 0, so a
+		// factory with no entry yet reported a junk nano count.
+		if (!factoryNanoCounts.exists(key)) return 0;
 		int cnt = 0;
 		factoryNanoCounts.get(key, cnt);
 		return cnt;

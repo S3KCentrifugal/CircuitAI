@@ -3,6 +3,7 @@
 #include "../helpers/generic_helpers.as"
 #include "roster.as"
 #include "donation.as"
+#include "sea_assist.as"
 
 namespace Team {
     // Return true if the def represents a T2 constructor (land or air)
@@ -148,6 +149,7 @@ namespace Team {
         }
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (Ferry::HandleMessage(msg, fromTeamId)) return;
+        if (SeaAssist::HandleMessage(msg, fromTeamId)) return;
         HandleOrphanMessage(msg, fromTeamId);
     }
 

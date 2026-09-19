@@ -307,6 +307,13 @@ namespace Spam {
         }
         _EnsureFocus();
         task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
+        // Spread WITHIN the factory's line: each unit is dealt its own lane
+        // across a band, so the stream crosses the map as a broad front that
+        // one shell cannot erase and that sees a band's width, then focuses
+        // back toward one endpoint. The factory-level offset above keeps
+        // different factories' bands apart; this keeps one band from being a
+        // single file.
+        task.SetLanes(Global::Spam::UnitLanes, Global::Spam::UnitLaneSpacing, Global::Spam::EndSpread);
         routeByFactory.set(key, @task);
         GenericHelpers::LogUtil("[Spam] Route created for factory " + factory.id + " lane " + lane
             + " -> (" + int(Destination().x) + "," + int(Destination().z) + ")", 2);

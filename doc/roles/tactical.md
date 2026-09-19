@@ -20,6 +20,7 @@ Note: this file is tab-indented where the other five role files use spaces.
 - [The objective chain executor](#the-objective-chain-executor)
 - [Decision flows](#decision-flows)
 - [Known defects](#known-defects)
+- [Naval unlock](#naval-unlock)
 - [Related](#related)
 
 ## Intent
@@ -239,6 +240,35 @@ path, and it does not choose a new objective.
    (`Tactical_SelectObjectiveForGroup`, the `group` parameter threaded through
    `Tactical_TryHandleObjective`) supports several; `BuilderGroup::TACTICAL` is
    the only one selected. Unused generality.
+
+## Naval unlock
+
+`Tactical_ApplyStartLimits` caps both `GetAllT1Shipyards` and
+`GetAllT2Shipyards` at **0**, so TACTICAL cannot build a shipyard, a floating
+nano, or anything else naval. That is right for a hover role on its own and
+wrong next to a SEA ally.
+
+`Team::SeaAssist::UnlockNaval` raises those caps to
+`Global::SeaAssist::UnlockedT1Shipyards` / `UnlockedT2Shipyards` (2 / 1) the
+moment TACTICAL **owns a sea constructor** - T1 or T2, from any source. The
+usual source is the one a SEA ally donates at +50 metal income, but the unlock
+is keyed on ownership rather than on the donation message, so a construction
+ship arriving any other way works too.
+
+`Tactical_ApplyStartLimits` runs once, from `Tactical_Init`, so nothing
+re-applies the zero caps afterwards.
+
+Shipyard caps are TACTICAL's **only** naval restriction - it puts no limit on
+naval units themselves - so lifting these two is the whole *permission*.
+
+It was not the whole unlock. In the first game the ship arrived, the caps
+lifted, and the ship never moved: nothing in `Tactical_BuilderAiMakeTask` or
+the native default ever *asks* for a naval structure, and every task TACTICAL
+had queued was on land the ship could not reach. `SeaAssist::SeedShipyard`
+now enqueues a T1 shipyard at the ship's own position (`TaskB::Factory`,
+priority NOW, the ship itself as the representer so the site test is answered
+by the unit that will do the building). Permission plus one concrete demand;
+the shipyard's own build chain takes it from there.
 
 ## Related
 

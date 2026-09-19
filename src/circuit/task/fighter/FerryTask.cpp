@@ -20,6 +20,7 @@
 
 #include "AISCommands.h"
 #include "Log.h"
+#include "spring/SpringMap.h"
 
 namespace circuit {
 
@@ -29,10 +30,18 @@ using namespace springai;
 #define FERRY_TRAVEL_TIMEOUT	(FRAMES_PER_SEC * 90)
 #define FERRY_LOAD_TIMEOUT		(FRAMES_PER_SEC * 20)
 #define FERRY_UNLOAD_TIMEOUT	(FRAMES_PER_SEC * 20)
-// Cargo within this of the transport counts as loaded; a carried unit sits at
-// the transport's own position, so the tolerance only has to absorb the
-// one-frame lag between the two positions being sampled.
+// A carried unit sits at the transport's own position in the horizontal
+// plane - but so does a unit the transport is hovering over, about to load.
+// 2D distance cannot tell those apart, and treating it as "loaded" made the
+// task issue the flight to the drop one tick after issuing the load, which
+// cancelled the load and flew the transport off empty (then reported a clean
+// delivery, because the "landed" test was the same check inverted). What
+// distinguishes the two is height: a loaded ground unit is lifted off the
+// terrain, an unloaded one is on it. So the load and unload tests are on the
+// cargo's height above ground, with the 2D proximity kept only as a sanity
+// check on the load side.
 #define FERRY_LOADED_DIST		(SQUARE_SIZE * 4)
+#define FERRY_LIFT_HEIGHT		(SQUARE_SIZE * 3)
 // Close enough to the drop to issue the unload.
 #define FERRY_DROP_DIST			(SQUARE_SIZE * 12)
 #define FERRY_LOAD_RETRIES		2
@@ -79,6 +88,14 @@ CCircuitUnit* CFerryTask::GetTransport() const
 CCircuitUnit* CFerryTask::GetCargo() const
 {
 	return (cargoId < 0) ? nullptr : manager->GetCircuit()->GetTeamUnit(cargoId);
+}
+
+bool CFerryTask::IsLifted(CCircuitUnit* cargo, int frame) const
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3& pos = cargo->GetPos(frame);
+	const float ground = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+	return (pos.y - ground) > FERRY_LIFT_HEIGHT;
 }
 
 void CFerryTask::Enter(EState next)
@@ -214,8 +231,11 @@ void CFerryTask::Update()
 				return;
 			}
 			// No wrapper accessor reports the carrier, so infer it: a loaded
-			// unit sits at the transport's position.
-			if (cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST)) {
+			// unit is off the ground and at the transport's position. Height is
+			// the part that matters - see FERRY_LIFT_HEIGHT.
+			if (IsLifted(cargo, frame)
+				&& (cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST)))
+			{
 				Enter(EState::TO_DROP);
 				GoTo(transport, dropPos);
 			} else if (IsExpired(frame)) {
@@ -250,8 +270,10 @@ void CFerryTask::Update()
 				Fail("cargo gone while unloading");
 				return;
 			}
-			// Landed when the cargo is no longer riding the transport.
-			if (cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) >= SQUARE(FERRY_LOADED_DIST)) {
+			// Landed when the cargo is back on the ground. Not "no longer at the
+			// transport's position": a unit that was never picked up is also
+			// not at the transport's position, and that read as delivered.
+			if (!IsLifted(cargo, frame)) {
 				circuit->LOG("FERRY: delivered cargo %i at (%.0f, %.0f)", cargoId, dropPos.x, dropPos.z);
 				Enter(EState::DONE);
 				// Head home without waiting for script: the run is over either

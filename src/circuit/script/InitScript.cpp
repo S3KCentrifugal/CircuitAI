@@ -908,6 +908,7 @@ void CInitScript::RegisterCRouteTask(asIScriptEngine* engine)
 	r = engine->RegisterObjectMethod("CRouteTask", "int GetRouteVersion() const", asMETHOD(CRouteTask, GetRouteVersion), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "uint GetRouteSize() const", asMETHOD(CRouteTask, GetRouteSize), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "bool IsAtEnd(CCircuitUnit@) const", asMETHOD(CRouteTask, IsAtEnd), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CRouteTask", "void SetLanes(int, float, float)", asMETHOD(CRouteTask, SetLanes), asCALL_THISCALL); ASSERT(r >= 0);
 }
 
 void CInitScript::RegisterCFerryTask(asIScriptEngine* engine)

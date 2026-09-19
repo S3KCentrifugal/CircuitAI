@@ -137,8 +137,12 @@ namespace Porc {
         if (!Global::Porc::NanoWithPorc || mode != MODE_FULL || energyStalling) return;
         if (metalIncome < Global::Porc::NanoMetalIncome || energyIncome < Global::Porc::NanoEnergyIncome) return;
         const string key = "" + cluster;
+        // exists() first. Every cluster misses this table the first time, and
+        // a failed get leaves `count` undefined rather than 0: junk that read
+        // above NanosPerCluster returned here before the first nano was ever
+        // queued, so cluster nanos could silently never be built.
         int count = 0;
-        nanosByCluster.get(key, count);
+        if (nanosByCluster.exists(key)) nanosByCluster.get(key, count);
         if (count >= Global::Porc::NanosPerCluster) return;
         IUnitTask@ t = Builder::EnqueueT1Nano(Global::AISettings::Side, pos, SQUARE_SIZE * 16, 300 * SECOND, Task::Priority::NORMAL);
         if (t is null) return;   // cooldown, cap or unavailable def: try again on the next visit

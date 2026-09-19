@@ -18,6 +18,7 @@ line numbers when navigating.
 - [Decision flows](#decision-flows)
 - [Strategic objectives](#strategic-objectives)
 - [The donation path](#the-donation-path)
+- [Seeding a TACTICAL ally](#seeding-a-tactical-ally)
 - [Known defects](#known-defects)
 - [Related](#related)
 
@@ -220,6 +221,30 @@ than idling.
 
 8. **`Sea_SelectFactoryHandler` is a verbatim copy** of FRONT's and AIR's apart
    from its log prefix, and ignores `isReset`.
+
+## Seeding a TACTICAL ally
+
+Once SEA's sliding-minimum metal income clears
+`Global::SeaAssist::MinMetalIncome` (50) and it holds more construction ships
+than `KeepConstructors` (1), it gives **one** T1 construction ship to a
+TACTICAL ally on the roster - once per SEA instance, never again.
+
+The point is what it unlocks on the other side rather than the 200 metal:
+TACTICAL starts with both shipyard caps at zero and cannot build any naval
+structure at all. Lifting the cap alone was not enough - see
+[`tactical.md`](tactical.md#naval-unlock) for why the ship then sat idle - so
+TACTICAL also enqueues a T1 shipyard where the ship is standing. One construction ship lets it expand along the coast beside
+SEA, hold the shoreline it is already suited to fighting over, and add naval
+economy SEA does not have to build itself.
+
+If no TACTICAL ally is on the roster, nothing happens - the check costs a
+roster scan every 30 frames and never fires. Ties are broken by lowest team
+id, so two SEA players seed the same ally properly rather than one each
+halfway.
+
+`Team::SeaAssist` (`data/script/src/manager/sea_assist.as`). The roles in that
+decision are **AiRole** - the start-position player role - not unit roles;
+units are matched by name against `UnitHelpers::GetAllT1SeaConstructors`.
 
 ## Related
 

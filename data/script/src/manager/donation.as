@@ -41,7 +41,33 @@ namespace Donation {
     int built = 0;             // T2 constructors this instance has produced
     int planned = -1;          // donations still to make; -1 = not drawn yet
     int given = 0;
-    dictionary givenTo;        // team id string -> int count
+    // team id string -> count, read and written as int64 (see D-019) and
+    // ALWAYS read through Count() below. Two rules of the dictionary add-on
+    // bit this table, one after the other:
+    //   1. set(string, int) stores INT64 and get(string, int&out) cannot read
+    //      it back - every count read as 0, closest ally got everything.
+    //   2. get(key, int64&out c) on a key that does not exist returns false
+    //      and leaves c UNDEFINED: an &out argument is an uninitialised
+    //      temporary copied back regardless of the return value, so the
+    //      "= 0" initialiser is overwritten with junk. Every count read as
+    //      ~1e6+, PickRecipient never chose anyone, and no constructor was
+    //      ever donated or ferried.
+    // Never trust an &out after a failed get: check exists() first.
+    dictionary givenTo;
+
+    int64 Count(int teamId)
+    {
+        const string key = "" + teamId;
+        if (!givenTo.exists(key)) return 0;
+        int64 c = 0;
+        givenTo.get(key, c);
+        return c;
+    }
+
+    void Bump(int teamId)
+    {
+        givenTo.set("" + teamId, Count(teamId) + 1);
+    }
 
     // How many to donate: one draw from the decreasing distribution, clipped to the allies.
     int DrawCount(int allies)
@@ -96,12 +122,13 @@ namespace Donation {
             return (leader == ai.teamId) ? -1 : leader;
         }
         int best = -1;
-        int bestCount = 1000000;
+        int64 bestCount = 1000000;
         for (uint i = 0; i < ordered.length(); ++i) {
-            int c = 0;
-            givenTo.get("" + ordered[i], c);
+            const int64 c = Count(ordered[i]);
             if (c < bestCount) { bestCount = c; best = ordered[i]; }   // ties keep the closer one
         }
+        GenericHelpers::LogUtil("[Team][Donation] PickRecipient -> team " + best + " (count " + bestCount
+            + " of " + ordered.length() + " allies)", 1);
         return best;
     }
 
@@ -111,6 +138,13 @@ namespace Donation {
         if (unit is null || unit.circuitDef is null) return;
         if (!Team::IsT2Constructor(unit.circuitDef)) return;
         ++built;
+        // Level 1 on purpose: LOG_LEVEL is 1 in define.as, so anything at 2
+        // never reaches the log. Four T2 constructors were built in one game
+        // and the log could not say whether this ran four times, twice, or
+        // once - every branch below except the give itself was level 2.
+        GenericHelpers::LogUtil("[Team][Donation] T2 constructor #" + built + ": " + unit.circuitDef.GetName()
+            + "(" + unit.id + ") planned=" + planned + " given=" + given
+            + " keep=" + Global::RoleSettings::Tech::T2DonationKeepCount, 1);
 
         if (planned < 0) {
             const int allies = int(Team::Roster::AllyTeamIds().length());
@@ -118,8 +152,20 @@ namespace Donation {
             GenericHelpers::LogUtil("[Team][Donation] Plan: keep " + Global::RoleSettings::Tech::T2DonationKeepCount
                 + ", donate " + planned + " of the following T2 constructors (allies=" + allies + ")", 1);
         }
-        if (built <= Global::RoleSettings::Tech::T2DonationKeepCount) return;
-        if (given >= planned) return;
+        // Say why nothing happens. A finished T2 constructor standing next to
+        // an idle ferry transport looks like a broken pickup; the first
+        // KeepCount are simply ours, and after the plan is met the rest are too.
+        if (built <= Global::RoleSettings::Tech::T2DonationKeepCount) {
+            GenericHelpers::LogUtil("[Team][Donation] keeping " + unit.circuitDef.GetName() + " (built "
+                + built + " of keep " + Global::RoleSettings::Tech::T2DonationKeepCount
+                + "; donations start at #" + (Global::RoleSettings::Tech::T2DonationKeepCount + 1) + ")", 1);
+            return;
+        }
+        if (given >= planned) {
+            GenericHelpers::LogUtil("[Team][Donation] keeping " + unit.circuitDef.GetName()
+                + " (plan met: " + given + "/" + planned + ")", 1);
+            return;
+        }
 
         const int recipient = PickRecipient();
         // Every path into PickRecipient already excludes our own team - AllyTeamIds
@@ -132,7 +178,7 @@ namespace Donation {
             return;
         }
         if (recipient < 0) {
-            GenericHelpers::LogUtil("[Team][Donation] No recipient (no allies or we lead alone); keeping " + unit.circuitDef.GetName(), 2);
+            GenericHelpers::LogUtil("[Team][Donation] No recipient (no allies or we lead alone); keeping " + unit.circuitDef.GetName(), 1);
             return;
         }
         const string name = unit.circuitDef.GetName();
@@ -146,9 +192,7 @@ namespace Donation {
             Team::Roster::Entry@ e = Team::Roster::Get(recipient);
             if (e !is null && Team::Ferry::TryCarry(unit, recipient, e.startPos)) {
                 ++given;
-                int fc = 0;
-                givenTo.get("" + recipient, fc);
-                givenTo.set("" + recipient, fc + 1);
+                Bump(recipient);
                 GenericHelpers::LogUtil("[Team][Donation] " + name + "(" + unitId
                     + ") being ferried to team " + recipient, 1);
                 return;
@@ -159,9 +203,7 @@ namespace Donation {
         @give[0] = unit;   // valid handle this frame
         ai.GiveUnits(give, recipient);
         ++given;
-        int c = 0;
-        givenTo.get("" + recipient, c);
-        givenTo.set("" + recipient, c + 1);
+        Bump(recipient);
         GenericHelpers::LogUtil("[Team][Donation] Gave " + name + " (id=" + unitId + ") to team " + recipient
             + " (" + given + "/" + planned + ")", 1);
         WidgetLink::Send("donation", name + "|" + recipient + "|" + given + "|" + planned);
