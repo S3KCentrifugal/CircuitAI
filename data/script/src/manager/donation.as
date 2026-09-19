@@ -6,6 +6,7 @@
 #include "../helpers/map_helpers.as"
 #include "roster.as"
 #include "widget_link.as"
+#include "ferry.as"
 
 /******************************************************************************
 
@@ -121,12 +122,39 @@ namespace Donation {
         if (given >= planned) return;
 
         const int recipient = PickRecipient();
+        // Every path into PickRecipient already excludes our own team - AllyTeamIds
+        // filters it and the lead-team fallback returns -1 - but a gift to
+        // ourselves would silently consume a donation slot, so assert it here
+        // rather than trust three call sites to stay correct.
+        if (recipient == ai.teamId) {
+            GenericHelpers::LogUtil("[Team][Donation] BUG: recipient resolved to our own team "
+                + recipient + "; keeping the constructor", 1);
+            return;
+        }
         if (recipient < 0) {
             GenericHelpers::LogUtil("[Team][Donation] No recipient (no allies or we lead alone); keeping " + unit.circuitDef.GetName(), 2);
             return;
         }
         const string name = unit.circuitDef.GetName();
         const int unitId = unit.id;
+
+        // Fly it if a ferry is free. Team::Ferry hands the unit over itself
+        // once the drop lands, so the accounting below still runs exactly
+        // once either way. A refusal - no transport yet, one already in the
+        // air, the transport dead - falls through to the walk.
+        {
+            Team::Roster::Entry@ e = Team::Roster::Get(recipient);
+            if (e !is null && Team::Ferry::TryCarry(unit, recipient, e.startPos)) {
+                ++given;
+                int fc = 0;
+                givenTo.get("" + recipient, fc);
+                givenTo.set("" + recipient, fc + 1);
+                GenericHelpers::LogUtil("[Team][Donation] " + name + "(" + unitId
+                    + ") being ferried to team " + recipient, 1);
+                return;
+            }
+        }
+
         array<CCircuitUnit@> give(1);
         @give[0] = unit;   // valid handle this frame
         ai.GiveUnits(give, recipient);

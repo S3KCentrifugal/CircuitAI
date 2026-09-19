@@ -83,6 +83,7 @@ namespace Unit {
 		TypeMask REARM     = aiAttrMasker.GetTypeMask("rearm");
 		TypeMask NO_DGUN   = aiAttrMasker.GetTypeMask("no_dgun");
 		TypeMask ANTI_STAT = aiAttrMasker.GetTypeMask("anti_stat");
+		TypeMask SPAM      = aiAttrMasker.GetTypeMask("spam");       // manager/spam.as route behaviour
 	}  // namespace Attr
 
 	enum UseAs {

@@ -57,7 +57,7 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | [sea.md](sea.md) | SEA - naval production and water expansion |
 | [support.md](support.md) | SUPPORT - hybrid economic substitute, no factory task handler |
 | [tactical.md](tactical.md) | TACTICAL - mobile-builder role, forces the hover plant opening |
-| [hover.md](hover.md) | **Not a role.** Hover is a factory family plus a production config, reachable by several roles. Kept here because it is routinely mistaken for one. |
+| `hover.md` | **Outstanding - this document does not exist yet.** It is referenced from nine places as the deep reference for hover production and the T2 hover stall; see `KI-404` in [`../known-issues.md`](../known-issues.md). Hover is **not a role**: it is a factory family plus a production config, reachable by several roles, and is listed here because it is routinely mistaken for one. |
 
 ## The contract
 
@@ -94,6 +94,7 @@ slots, and calls `RoleConfigs::Register(cfg)`.
 | `AiMakeDefenceHandler` | `AiMakeDefence` | defence placement |
 | `SelectFactoryHandler` | `SelectFactoryDelegate` | factory selection at start / reset |
 | `RoleMatchHandler` | `RoleMatchDelegate` | `RoleConfigs::Match()`, first match wins |
+| `PorcChainHandler` | `PorcChainDelegate` | porcupine chain ordering, once at setup |
 
 Plain fields: `role` (the `AiRole`), `UnitMaxOverrides` (a `dictionary` of
 unit name to cap) and `switchInterval` (int, managed per role).
@@ -147,9 +148,10 @@ row to see how consistently a slot is used.
 | `MilitaryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
 | `AiMakeDefenceHandler` | no | no | yes | no | no | no |
+| `PorcChainHandler` | no | no | no | no | yes | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `FactoryAiTaskRemovedHandler` | no | no | no | no | no | no |
-| **Slots filled** | **17** | **17** | **19** | **14** | **15** | **14** |
+| **Slots filled** | **17** | **17** | **19** | **14** | **16** | **14** |
 
 Thirteen slots are filled by every role. That common set is the de-facto role
 interface; everything below it in the table is an exception worth understanding

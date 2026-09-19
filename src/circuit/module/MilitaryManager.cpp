@@ -22,6 +22,8 @@
 #include "task/builder/DefenceTask.h"
 #include "task/fighter/RallyTask.h"
 #include "task/fighter/GuardTask.h"
+#include "task/fighter/RouteTask.h"
+#include "task/fighter/FerryTask.h"
 #include "task/fighter/DefendTask.h"
 #include "task/fighter/ScoutTask.h"
 #include "task/fighter/RaidTask.h"
@@ -31,6 +33,7 @@
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
+#include "task/fighter/SquadTask.h"
 #include "task/static/SuperTask.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/path/PathFinder.h"
@@ -43,10 +46,14 @@
 #include "json/json.h"
 
 #include "spring/SpringCallback.h"
+#include "Game.h"
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
 #include "Log.h"
+
+#include <algorithm>
+#include <map>
 
 namespace circuit {
 
@@ -370,6 +377,154 @@ void CMilitaryManager::ReadConfig()
 	threatRangeScaling.enemyCountPerEnemyTeamToEndScaling = adaptive_threat_range.get("enemy_count_per_team_to_end_scaling", 300).asInt();
 	threatRangeScaling.endScaleValue = adaptive_threat_range.get("end_scale_value", -1.0f).asFloat();
 
+	/*
+	 * Pulse weapons (Juno). "role" names the def role that marks a pulse
+	 * weapon, "jammer"/"radar" the roles that mark its worthwhile targets, and
+	 * "priority" orders the four target classes; a class left out of the list
+	 * is never targeted. Unknown role names disable the policy rather than
+	 * silently targeting nothing.
+	 */
+	const Json::Value& pulse = root["pulse"];
+	pulseInfo.rank.fill(-1);
+	pulseInfo.isEnabled = false;
+	if (!pulse.isNull() && pulse.get("enabled", true).asBool()) {
+		auto findRole = [&roleNames, &cfgName, this](const std::string& name, CCircuitDef::RoleM& out) {
+			auto it = roleNames.find(name);
+			if (it == roleNames.end()) {
+				circuit->LOG("CONFIG %s: pulse unknown role '%s'", cfgName.c_str(), name.c_str());
+				return false;
+			}
+			out = CCircuitDef::GetMask(it->second.type);
+			return true;
+		};
+		static const std::map<std::string, PulseClass> classNames = {
+			{"jammer_static", PulseClass::JAMMER_STATIC}, {"radar_static", PulseClass::RADAR_STATIC},
+			{"jammer_mobile", PulseClass::JAMMER_MOBILE}, {"radar_mobile", PulseClass::RADAR_MOBILE},
+		};
+		const bool isRoles = findRole(pulse.get("role", "juno").asString(), pulseInfo.pulseRole)
+				&& findRole(pulse.get("jammer", "jammer").asString(), pulseInfo.jammerRole)
+				&& findRole(pulse.get("radar", "radar").asString(), pulseInfo.radarRole);
+		const Json::Value& prio = pulse["priority"];
+		int rank = 0;
+		for (unsigned i = 0; i < prio.size(); ++i) {
+			auto it = classNames.find(prio[i].asString());
+			if (it == classNames.end()) {
+				circuit->LOG("CONFIG %s: pulse unknown priority class '%s'", cfgName.c_str(), prio[i].asString().c_str());
+				continue;
+			}
+			pulseInfo.rank[static_cast<PulseC>(it->second)] = rank++;
+		}
+		if (rank == 0) {  // no list given: the documented default order
+			pulseInfo.rank[static_cast<PulseC>(PulseClass::JAMMER_STATIC)] = 0;
+			pulseInfo.rank[static_cast<PulseC>(PulseClass::RADAR_STATIC)] = 1;
+			pulseInfo.rank[static_cast<PulseC>(PulseClass::JAMMER_MOBILE)] = 2;
+			pulseInfo.rank[static_cast<PulseC>(PulseClass::RADAR_MOBILE)] = 3;
+			rank = 4;
+		}
+		pulseInfo.mobileMaxAge = pulse.get("mobile_max_age", 60).asInt() * FRAMES_PER_SEC;
+		pulseInfo.minTargets = std::max(1, pulse.get("min_targets", 1).asInt());
+		pulseInfo.suspectJammer = pulse.get("suspect_jammer", true).asBool();
+		pulseInfo.holeProbeRadius = pulse.get("hole_probe_radius", 760.f).asFloat();
+		pulseInfo.holeRadius = pulse.get("hole_radius", 500.f).asFloat();
+		pulseInfo.holeMinEnemyInfl = pulse.get("hole_min_enemy_infl", 0.05f).asFloat();
+		pulseInfo.holeProbes = std::max(1, pulse.get("hole_probes", 8).asInt());
+		pulseInfo.isEnabled = isRoles;
+		circuit->LOG("CONFIG %s: pulse %s | classes=%i mobileMaxAge=%is minTargets=%i",
+				cfgName.c_str(), pulseInfo.isEnabled ? "enabled" : "disabled",
+				rank, pulseInfo.mobileMaxAge / FRAMES_PER_SEC, pulseInfo.minTargets);
+	}
+
+	/*
+	 * EMP weapons. Target worth is not metal cost but whether the shot lands a
+	 * useful stun, which depends on the target's max health and its
+	 * paralyzemultiplier. "role" marks the def carrying the weapon,
+	 * "anti_nuke" the one class ranked above raw value; everything else
+	 * EMPABLE and stunnable is ranked structures-first, then by metal, so a
+	 * Ragnarok, AFUS, gantry or silo is picked up without being tagged.
+	 */
+	const Json::Value& empCfg = root["emp"];
+	empInfo.isEnabled = false;
+	if (!empCfg.isNull() && empCfg.get("enabled", true).asBool()) {
+		auto findRole = [&roleNames, &cfgName, this](const std::string& name, CCircuitDef::RoleM& out) {
+			auto it = roleNames.find(name);
+			if (it == roleNames.end()) {
+				circuit->LOG("CONFIG %s: emp unknown role '%s'", cfgName.c_str(), name.c_str());
+				return false;
+			}
+			out = CCircuitDef::GetMask(it->second.type);
+			return true;
+		};
+		const bool isRoles = findRole(empCfg.get("role", "emp").asString(), empInfo.empRole)
+				&& findRole(empCfg.get("anti_nuke", "anti_nuke").asString(), empInfo.antiNukeRole);
+		empInfo.empableFlag = circuit->GetGame()->GetCategoriesFlag(
+				empCfg.get("category", "EMPABLE").asString().c_str());
+		empInfo.declineRate = empCfg.get("decline_rate", 40.f).asFloat();
+		if (empInfo.declineRate < 1.f) {
+			empInfo.declineRate = 40.f;
+		}
+		empInfo.minStunSeconds = empCfg.get("min_stun", 5.f).asFloat();
+		empInfo.mobileMaxAge = empCfg.get("mobile_max_age", 30).asInt() * FRAMES_PER_SEC;
+		empInfo.minTargets = std::max(1, empCfg.get("min_targets", 1).asInt());
+		empInfo.structuresFirst = empCfg.get("structures_first", true).asBool();
+		empInfo.isEnabled = isRoles && (empInfo.empableFlag != 0);
+		circuit->LOG("CONFIG %s: emp %s | empable=0x%x declineRate=%.0f minStun=%.1fs mobileMaxAge=%is",
+				cfgName.c_str(), empInfo.isEnabled ? "enabled" : "disabled",
+				empInfo.empableFlag, empInfo.declineRate, empInfo.minStunSeconds,
+				empInfo.mobileMaxAge / FRAMES_PER_SEC);
+	}
+
+	/*
+	 * Bomber policy. Defaults keep the pre-policy behaviour recognisable:
+	 * value ranking and the kill-feasibility filter always apply, the line
+	 * formation only engages when a real cluster is present.
+	 */
+	const Json::Value& bomberCfg = root["bomber"];
+	bomberInfo.isEnabled = bomberCfg.isNull() || bomberCfg.get("enabled", true).asBool();
+	if (!bomberCfg.isNull()) {
+		bomberInfo.killMargin = bomberCfg.get("kill_margin", 1.15f).asFloat();
+		bomberInfo.focusCost = bomberCfg.get("focus_cost", 1500.f).asFloat();
+		bomberInfo.areaMinTargets = std::max(2, bomberCfg.get("area_min_targets", 3).asInt());
+		bomberInfo.areaRadius = bomberCfg.get("area_radius", 900.f).asFloat();
+		bomberInfo.minSpacing = std::max(1.f, bomberCfg.get("min_spacing", 96.f).asFloat());
+		bomberInfo.cleanupDistance = bomberCfg.get("cleanup_distance", 900.f).asFloat();
+		bomberInfo.approachSamples = std::max(1, bomberCfg.get("approach_samples", 8).asInt());
+		bomberInfo.approachRing = std::max(1.f, bomberCfg.get("approach_ring", 1200.f).asFloat());
+		bomberInfo.groupMixedDefs = bomberCfg.get("group_mixed_defs", true).asBool();
+	}
+	circuit->LOG("CONFIG %s: bomber %s | killMargin=%.2f focusCost=%.0f areaMin=%i areaRadius=%.0f mixedDefs=%i",
+			cfgName.c_str(), bomberInfo.isEnabled ? "enabled" : "disabled",
+			bomberInfo.killMargin, bomberInfo.focusCost, bomberInfo.areaMinTargets,
+			bomberInfo.areaRadius, int(bomberInfo.groupMixedDefs));
+
+	/*
+	 * Mobile sensor escort. Reuses the same "jammer" and "radar" role tags the
+	 * pulse policy uses to find its targets: a def worth pulsing on the enemy
+	 * side is a def worth rationing on ours.
+	 */
+	const Json::Value& sensorCfg = root["sensor"];
+	sensorInfo.isEnabled = false;
+	if (sensorCfg.isNull() || sensorCfg.get("enabled", true).asBool()) {
+		auto orRole = [&roleNames, &cfgName, this](const std::string& name, CCircuitDef::RoleM& out) {
+			auto it = roleNames.find(name);
+			if (it == roleNames.end()) {
+				circuit->LOG("CONFIG %s: sensor unknown role '%s'", cfgName.c_str(), name.c_str());
+				return false;
+			}
+			out |= CCircuitDef::GetMask(it->second.type);
+			return true;
+		};
+		sensorInfo.sensorRole = 0;
+		bool isRoles = orRole(sensorCfg.get("jammer", "jammer").asString(), sensorInfo.sensorRole);
+		isRoles &= orRole(sensorCfg.get("radar", "radar").asString(), sensorInfo.sensorRole);
+		sensorInfo.maxPerSquad = std::max(1, sensorCfg.get("max_per_squad", 1).asInt());
+		sensorInfo.topCandidates = std::max(1, sensorCfg.get("top_candidates", 3).asInt());
+		sensorInfo.rebalance = sensorCfg.get("rebalance", true).asBool();
+		sensorInfo.isEnabled = isRoles;
+	}
+	circuit->LOG("CONFIG %s: sensor escort %s | maxPerSquad=%i topCandidates=%i rebalance=%i",
+			cfgName.c_str(), sensorInfo.isEnabled ? "enabled" : "disabled",
+			sensorInfo.maxPerSquad, sensorInfo.topCandidates, int(sensorInfo.rebalance));
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
@@ -525,6 +680,7 @@ void CMilitaryManager::Init()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateIdle, this), interval, offset + 0);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Update, this), 1/*interval / 2*/, offset + 1);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDefenceTasks, this), FRAMES_PER_SEC * 5, offset + 2);
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSensorGuards, this), FRAMES_PER_SEC * 5, offset + 3);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -652,6 +808,12 @@ IFighterTask* CMilitaryManager::Enqueue(const TaskF::SFightTask& ti)
 		} break;
 		case IFighterTask::FightType::SUPER: {
 			task = new CSuperTask(this);
+		} break;
+		case IFighterTask::FightType::ROUTE: {
+			task = new CRouteTask(this);  // script-owned waypoint route (Spam::)
+		} break;
+		case IFighterTask::FightType::FERRY: {
+			task = new CFerryTask(this);  // script-owned transport ferry (Team::Ferry)
 		} break;
 	}
 
@@ -1342,6 +1504,103 @@ float CMilitaryManager::ClampMobileCostRatio() const
 	return (enemyMobileCost > armyCost) ? (armyCost / enemyMobileCost) : 1.f;
 }
 
+/*
+ * How many EMP shots could land on one point at once. Paralysis accumulates,
+ * so a target too healthy for one shot can still be held by a salvo. This
+ * counts every stocked EMP silo we own rather than only those whose range
+ * covers a specific point: an over-estimate when silos are spread out, but
+ * the firing silo always covers its own candidates, so the first shot is
+ * never wasted on a target the salvo cannot finish.
+ */
+/*
+ * Porcupine chain accessors. The chain is the ordered list of defence defs a
+ * cluster works through; build_chain.json seeds it per side and these let the
+ * active role rewrite it at setup. Reading returns unit names so script can
+ * splice the list; writing resolves them back, warns on anything unknown, and
+ * applies the FENCE attribute the JSON path applies, so a def added by script
+ * counts toward cluster defence cost like any other.
+ */
+std::vector<std::string> CMilitaryManager::GetPorcChain(const std::string& sideName, bool isWater) const
+{
+	std::vector<std::string> names;
+	CMaskHandler& sideMasker = circuit->GetGameAttribute()->GetSideMasker();
+	if (!sideMasker.HasType(sideName)) {
+		circuit->LOG("PORC: GetPorcChain unknown side '%s'", sideName.c_str());
+		return names;
+	}
+	const CMaskHandler::Type type = sideMasker.GetTypeMask(sideName).type;
+	if ((type < 0) || (type >= int(sideInfos.size()))) {
+		return names;
+	}
+	const std::vector<CCircuitDef*>& chain = isWater
+			? sideInfos[type].waterDefenders : sideInfos[type].landDefenders;
+	names.reserve(chain.size());
+	for (CCircuitDef* cdef : chain) {
+		if (cdef != nullptr) {
+			names.push_back(cdef->GetDef()->GetName());
+		}
+	}
+	return names;
+}
+
+bool CMilitaryManager::SetPorcChain(const std::string& sideName, bool isWater, const std::vector<std::string>& names)
+{
+	CMaskHandler& sideMasker = circuit->GetGameAttribute()->GetSideMasker();
+	if (!sideMasker.HasType(sideName)) {
+		circuit->LOG("PORC: SetPorcChain unknown side '%s'", sideName.c_str());
+		return false;
+	}
+	const CMaskHandler::Type type = sideMasker.GetTypeMask(sideName).type;
+	if ((type < 0) || (type >= int(sideInfos.size()))) {
+		return false;
+	}
+	std::vector<CCircuitDef*> chain;
+	chain.reserve(names.size());
+	int unknown = 0;
+	for (const std::string& name : names) {
+		CCircuitDef* cdef = circuit->GetCircuitDef(name.c_str());
+		if (cdef == nullptr) {
+			++unknown;
+			circuit->LOG("PORC: SetPorcChain unknown UnitDef '%s'", name.c_str());
+			continue;
+		}
+		cdef->AddAttribute(ATTR_TYPE(FENCE));
+		chain.push_back(cdef);
+	}
+	if (chain.empty()) {
+		circuit->LOG("PORC: SetPorcChain for '%s' %s resolved to nothing; keeping the existing chain",
+				sideName.c_str(), isWater ? "water" : "land");
+		return false;
+	}
+	if (isWater) {
+		sideInfos[type].waterDefenders = std::move(chain);
+	} else {
+		sideInfos[type].landDefenders = std::move(chain);
+	}
+	circuit->LOG("PORC: %s %s chain set to %zu defs (%i unknown skipped)",
+			sideName.c_str(), isWater ? "water" : "land",
+			isWater ? sideInfos[type].waterDefenders.size() : sideInfos[type].landDefenders.size(), unknown);
+	return true;
+}
+
+int CMilitaryManager::GetEmpSalvoSize() const
+{
+	if (!empInfo.isEnabled) {
+		return 1;
+	}
+	int count = 0;
+	for (CCircuitUnit* unit : stockpilers) {
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if ((cdef == nullptr) || !cdef->IsRespRoleAny(empInfo.empRole)) {
+			continue;
+		}
+		if (unit->GetUnit()->GetStockpile() > 0) {
+			++count;
+		}
+	}
+	return std::max(1, count);
+}
+
 void CMilitaryManager::UpdateDefenceTasks()
 {
 	/*
@@ -1423,6 +1682,121 @@ void CMilitaryManager::UpdateDefenceTasks()
 			return;
 		}
 	}
+}
+
+/*
+ * Mobile sensor escort. See SSensorInfo in the header for why the escort is
+ * rationed at all; these are the shared predicates CSupportTask picks with and
+ * the sweep that undoes a surplus created behind its back.
+ */
+bool CMilitaryManager::IsSensorUnit(const CCircuitDef* cdef) const
+{
+	// Custom config roles live in respRole; `role` only holds the binded
+	// implemented ones, and jammer/radar are neither.
+	return sensorInfo.isEnabled && (cdef != nullptr)
+			&& cdef->IsMobile() && cdef->IsRespRoleAny(sensorInfo.sensorRole);
+}
+
+int CMilitaryManager::CountSensors(const IFighterTask* task) const
+{
+	if (task == nullptr) {
+		return 0;
+	}
+	int count = 0;
+	for (const CCircuitUnit* unit : task->GetAssignees()) {
+		if (IsSensorUnit(unit->GetCircuitDef())) {
+			++count;
+		}
+	}
+	return count;
+}
+
+bool CMilitaryManager::NeedsSensor(const IFighterTask* task) const
+{
+	return CountSensors(task) < sensorInfo.maxPerSquad;
+}
+
+float CMilitaryManager::GetSquadValue(const IFighterTask* task) const
+{
+	// The leader is the squad's most capable unit, so its cost is the tier
+	// ranking asked for without having to walk the whole squad.
+	const CCircuitUnit* leader = static_cast<const ISquadTask*>(task)->GetLeader();
+	return ((leader == nullptr) || (leader->GetCircuitDef() == nullptr))
+			? 0.f : leader->GetCircuitDef()->GetCostM();
+}
+
+/*
+ * CSupportTask caps sensors at the moment one joins, but two squads that each
+ * hold their one sensor can still merge into a squad holding two. Rather than
+ * reach into ISquadTask::Merge - which runs mid-iteration over the absorbed
+ * squad - the surplus is swept up afterwards: the extra sensors are dropped
+ * back to no task, and MakeTask gives each a fresh CSupportTask that re-picks
+ * an uncovered squad on its next update.
+ */
+void CMilitaryManager::UpdateSensorGuards()
+{
+	if (!sensorInfo.isEnabled || !sensorInfo.rebalance) {
+		return;
+	}
+	ZoneScoped;
+
+	std::vector<CCircuitUnit*> surplus;
+	for (IFighterTask::FightType type : {IFighterTask::FightType::ATTACK, IFighterTask::FightType::DEFEND}) {
+		for (IFighterTask* task : GetTasks(type)) {
+			int slack = CountSensors(task) - sensorInfo.maxPerSquad;
+			if (slack <= 0) {
+				continue;
+			}
+			for (CCircuitUnit* unit : task->GetAssignees()) {
+				if (slack <= 0) {
+					break;
+				}
+				if (IsSensorUnit(unit->GetCircuitDef())) {
+					surplus.push_back(unit);
+					--slack;
+				}
+			}
+		}
+	}
+	for (CCircuitUnit* unit : surplus) {
+		if (unit->GetTask() == nullptr) {  // an earlier release may have retasked it
+			continue;
+		}
+		// Detaches the unit from its squad and runs MakeTask, which hands a
+		// support-role unit a fresh CSupportTask; that task then re-picks under
+		// the cap. It cannot pick the squad it just left - leaving made room for
+		// exactly one, and the sensor that stayed fills it.
+		AssignTask(unit);
+	}
+	if (!surplus.empty()) {
+		circuit->LOG("SENSOR: released %i surplus escort(s)", int(surplus.size()));
+	}
+}
+
+springai::AIFloat3 CMilitaryManager::GetCombatFocusPos() const
+{
+	const int frame = circuit->GetLastFrame();
+	const IFighterTask* best = nullptr;
+	float bestPower = 0.f;
+	for (const IFighterTask* task : GetTasks(IFighterTask::FightType::ATTACK)) {
+		if ((best == nullptr) || (task->GetAttackPower() > bestPower)) {
+			bestPower = task->GetAttackPower();
+			best = task;
+		}
+	}
+	if (best != nullptr) {
+		const CCircuitUnit* leader = static_cast<const ISquadTask*>(best)->GetLeader();
+		if (leader != nullptr) {
+			return static_cast<const ISquadTask*>(best)->GetLeaderPos(frame);
+		}
+	}
+	// No army out: the enemy centroid is the best available guess at where the
+	// fighting is about to be.
+	const springai::AIFloat3& ePos = circuit->GetEnemyManager()->GetEnemyPos();
+	if (geom::is_valid(ePos)) {
+		return ePos;
+	}
+	return springai::AIFloat3(-RgtVector);
 }
 
 void CMilitaryManager::UpdateDefence()
@@ -1655,12 +2029,27 @@ IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)
 		{ROLE_TYPE(SUPPORT), IFighterTask::FightType::SUPPORT},
 		{ROLE_TYPE(MINE),    IFighterTask::FightType::SCOUT},  // FIXME
 		{ROLE_TYPE(SUPER),   IFighterTask::FightType::SUPER},
+		// NOTE: no TRANS entry here on purpose - this map is keyed on the main
+		//       role, and a flying transport's main role is forced to AIR. The
+		//       transport case is handled by IsRoleTrans() above.
 	};
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	IFighterTask* task = nullptr;
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
-		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
+	/*
+	 * Transports first, and by role *mask* rather than main role. A flying unit
+	 * has its main role overwritten with AIR in the CFactoryManager constructor
+	 * (`if (cdef.IsAbleToFly()) setRoles(ROLE_TYPE(AIR))`), so the
+	 * {ROLE_TYPE(TRANS), FERRY} entry in the map below can never match an air
+	 * transport - the mask keeps TRANS, the main role does not. Without this a
+	 * transport fell through to Defend/ATTACK and was flown at the enemy, and a
+	 * Legion transport tagged "support" went to CSupportTask and trailed the
+	 * nearest squad instead.
+	 */
+	if (cdef->IsRoleTrans()) {
+		task = Enqueue(TaskF::Common(IFighterTask::FightType::FERRY));
+	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
+		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
 	} else if (cdef->IsRoleSupport()) {
 		if (/*cdef->IsAttacker() && */GetTasks(IFighterTask::FightType::ATTACK).empty() && GetTasks(IFighterTask::FightType::DEFEND).empty()) {
 			task = Enqueue(TaskF::Defend(IFighterTask::FightType::ATTACK, IFighterTask::FightType::SUPPORT, minAttackers));

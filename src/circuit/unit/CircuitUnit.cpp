@@ -413,6 +413,43 @@ bool CCircuitUnit::IsWaiting() const
 	return command->GetId() == CMD_WAIT;
 }
 
+void CCircuitUnit::CmdLoadUnits(const std::vector<CCircuitUnit*>& cargo, short options, int timeout)
+{
+	std::vector<springai::Unit*> ids;
+	ids.reserve(cargo.size());
+	for (CCircuitUnit* u : cargo) {
+		if (u != nullptr) {
+			ids.push_back(u->GetUnit());
+		}
+	}
+	if (ids.empty()) {
+		return;
+	}
+	unit->LoadUnits(ids, options, timeout);
+	taskState = ETaskState::EXECUTE;
+}
+
+void CCircuitUnit::CmdLoadUnitsInArea(const AIFloat3& pos, float radius, short options, int timeout)
+{
+	unit->LoadUnitsInArea(pos, radius, options, timeout);
+	taskState = ETaskState::EXECUTE;
+}
+
+void CCircuitUnit::CmdUnloadUnit(const AIFloat3& pos, CCircuitUnit* cargo, short options, int timeout)
+{
+	if (cargo == nullptr) {
+		return;
+	}
+	unit->Unload(pos, cargo->GetUnit(), options, timeout);
+	taskState = ETaskState::EXECUTE;
+}
+
+void CCircuitUnit::CmdUnloadUnitsInArea(const AIFloat3& pos, float radius, short options, int timeout)
+{
+	unit->UnloadUnitsInArea(pos, radius, options, timeout);
+	taskState = ETaskState::EXECUTE;
+}
+
 void CCircuitUnit::CmdRepair(CAllyUnit* target, short options, int timeout)
 {
 	unit->Repair(target->GetUnit(), options, timeout);

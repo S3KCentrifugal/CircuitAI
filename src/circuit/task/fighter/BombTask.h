@@ -28,7 +28,28 @@ public:
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 
 private:
+	/*
+	 * A bombing pass is alpha damage: it either kills or is wasted. FOCUS puts
+	 * the whole group on one target, which is what a fat static needs; AREA
+	 * spreads the group into a line across a front and bombs the ground, which
+	 * is what a cluster of cheap targets needs. See doc/bomber-targeting.md.
+	 */
+	enum class EMode: char {FOCUS = 0, AREA = 1};
+
 	void FindTarget();
+	// Sum of one full firing from every member.
+	float GetGroupAlpha() const;
+	// Lowest-threat bearing to run in from, sampled on a ring around pos.
+	springai::AIFloat3 PickApproachDir(const springai::AIFloat3& pos) const;
+	// Line abreast across the front, perpendicular to the approach, each unit
+	// bombing its own slice and attack-moving out the far side.
+	void AttackArea(const int frame);
+
+	EMode mode = EMode::FOCUS;
+	springai::AIFloat3 areaCentre;
+	springai::AIFloat3 approachDir;
+	float frontLength = 0.f;
+	int areaCount = 0;
 	void ApplyTargetPath(const CQueryPathSingle* query);
 	void FallbackBasePos();
 	void ApplyBasePos(const CQueryPathSingle* query);

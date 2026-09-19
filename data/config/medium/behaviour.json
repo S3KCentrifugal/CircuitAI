@@ -669,7 +669,7 @@
 	},
 	"armbats": {
 		"role": ["heavy"],
-		"attribute": ["assault"],
+		"attribute": ["assault"]
 	},
 	"armepoch": {
 		"role": ["heavy"],
@@ -766,7 +766,7 @@
 	"corsktl": {
 		"role": ["assault"],
 		"attribute": ["melee"],
-		"retreat": 0,
+		"retreat": 0
 	},
 	"corvoyr": {
 		"role": ["assault"],

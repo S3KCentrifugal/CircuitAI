@@ -5,6 +5,7 @@
 #include "helpers/unit_helpers.as"
 #include "helpers/role_helpers.as"
 #include "helpers/limits_helpers.as"
+#include "helpers/porc_helpers.as"
 #include "global.as"
 #include "maps.as"
 #include "maps/factory_mapping.as"
@@ -267,6 +268,10 @@ namespace Setup {
 		if (Global::Map::MapResolved) return;
 
 		CheckModOptions();
+		// Role masks used by Military's threat/cost caches. FactoryProduction owns
+		// the table but only builds it when a role enables dynamic production, and
+		// no role does; without this every cached enemy threat and cost stays 0.
+		FactoryProduction::BuildRoleCaches();
 		// Register per-role configs 
 		RegisterRoles();
 
@@ -354,6 +359,10 @@ namespace Setup {
 	dictionary@ merged = LimitsHelpers::ComputeAndStoreMergedUnitLimits(Global::Map::Config, derivedRole);
 		UnitHelpers::ApplyUnitLimits(merged);
 
+		// Porcupine chain last: a role delegate sees its own caps already applied,
+		// and the content-option tiers depend on CheckModOptions having run.
+		PorcHelpers::ApplyForRole();
+
 		GenericHelpers::LogUtil("Setup complete role=" + derivedRole + " landLocked=" + landLocked, 1);
 	}
 
@@ -387,6 +396,23 @@ namespace Setup {
 			}
 			Global::ModOptions::MapWaterIsLava = waterIsLava;
 			GenericHelpers::LogUtil("[ModOptions] map_waterislava=" + waterIsLava, 1);
+		}
+
+		// Content options. Each gates a set of buildable units, so the porcupine
+		// chain and anything else that names units has to branch on them.
+		{
+			string sval;
+			Global::ModOptions::ExperimentalLegionFaction =
+				opts.get("experimentallegionfaction", sval) && ToBool(sval);
+			sval = "";
+			Global::ModOptions::ExperimentalExtraUnits =
+				opts.get("experimentalextraunits", sval) && ToBool(sval);
+			sval = "";
+			Global::ModOptions::ScavUnitsForPlayers =
+				opts.get("scavunitsforplayers", sval) && ToBool(sval);
+			GenericHelpers::LogUtil("[ModOptions] legion=" + Global::ModOptions::ExperimentalLegionFaction
+				+ " extraUnits=" + Global::ModOptions::ExperimentalExtraUnits
+				+ " scavUnits=" + Global::ModOptions::ScavUnitsForPlayers, 1);
 		}
 
 		// maxunits -> int (retrieve as int64)

@@ -10,10 +10,52 @@
 #include "module/MilitaryManager.h"
 #include "util/ExtAS.h"
 #include "angelscript/include/angelscript.h"
+#include "angelscript/add_on/scriptarray/scriptarray.h"
+
+#include <string>
+#include <vector>
 
 namespace circuit {
 
 using namespace springai;
+
+/*
+ * Porcupine chain marshalling. The chain is the ordered list of defences a
+ * cluster works through, seeded per side from build_chain.json. Exposing it as
+ * unit names lets a role read the default, splice mod-conditional tiers into it
+ * (Legion, the Extra Units Pack) and write it back, so the ordering is policy
+ * in script rather than frozen in JSON. See doc/porc-chain.md.
+ *
+ * The array type is looked up by declaration rather than cached: this runs once
+ * per game, at role setup.
+ */
+static CScriptArray* CMilitaryManager_GetPorcChain(CMilitaryManager* militaryMgr,
+		const std::string& sideName, bool isWater)
+{
+	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
+	asITypeInfo* strArray = engine->GetTypeInfoByDecl("array<string>");
+	const std::vector<std::string> names = militaryMgr->GetPorcChain(sideName, isWater);
+	CScriptArray* arr = CScriptArray::Create(strArray, asUINT(names.size()));
+	for (asUINT i = 0; i < asUINT(names.size()); ++i) {
+		*static_cast<std::string*>(arr->At(i)) = names[i];
+	}
+	return arr;
+}
+
+static bool CMilitaryManager_SetPorcChain(CMilitaryManager* militaryMgr,
+		const std::string& sideName, bool isWater, const CScriptArray* array)
+{
+	if (array == nullptr) {
+		return false;
+	}
+	std::vector<std::string> names;
+	names.reserve(array->GetSize());
+	for (asUINT i = 0; i < array->GetSize(); ++i) {
+		names.push_back(*static_cast<const std::string*>(array->At(i)));
+	}
+	return militaryMgr->SetPorcChain(sideName, isWater, names);
+}
+
 
 CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 		: ITaskModuleScript(scr, mgr)
@@ -36,6 +78,9 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CMilitaryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void DefaultMakeDefence(int, const AIFloat3& in)", asMETHOD(CMilitaryManager, DefaultMakeDefence), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetCombatFocusPos() const", asMETHOD(CMilitaryManager, GetCombatFocusPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "array<string>@ GetPorcChain(const string& in, bool) const", asFUNCTION(CMilitaryManager_GetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetPorcChain(const string& in, bool, const array<string>@+)", asFUNCTION(CMilitaryManager_SetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "uint GetGuardTaskNum() const", asMETHOD(CMilitaryManager, GetGuardTaskNum), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "const float armyCost", asOFFSET(CMilitaryManager, armyCost)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "int porcMode", asOFFSET(CMilitaryManager, porcMode)); ASSERT(r >= 0);

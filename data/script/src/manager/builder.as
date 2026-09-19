@@ -14,6 +14,7 @@
 #include "../types/building_type.as"
 // Team state: T1 constructor registry for orphan rescue
 #include "team.as"
+#include "ferry.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -2070,6 +2071,29 @@ namespace Builder {
 	void AiTaskAdded(IUnitTask@ task)
 	{
 		GenericHelpers::LogUtil("[BUILDER] AiTaskAdded called", 4);
+		// Mex ownership and upgrade state are role-independent: every role needs
+		// them to rank an upgrade against the energy ladder, so the bookkeeping
+		// lives here rather than in one role's handler.
+		{
+			IBuilderTask@ mexTask = cast<IBuilderTask>(task);
+			if (mexTask !is null && Task::BuildType(mexTask.GetBuildType()) == Task::BuildType::MEXUP) {
+				Economy::MexTracker::MarkUpgradeInProgress(mexTask.GetBuildPos(), true);
+			}
+		}
+		// The transport ferry's trigger: TECH asks AIR for a transport the
+		// moment its first T2 lab is enqueued, so the transport is flying while
+		// the lab is still building and is on station before the first T2
+		// constructor exists. Role-independent here for the same reason the mex
+		// bookkeeping is - Ferry::OnT2LabStarted ignores every role but TECH.
+		{
+			IBuilderTask@ facTask = cast<IBuilderTask>(task);
+			if (facTask !is null && facTask.buildDef !is null
+				&& Task::BuildType(facTask.GetBuildType()) == Task::BuildType::FACTORY
+				&& UnitHelpers::IsT2Lab(facTask.buildDef.GetName()))
+			{
+				Team::Ferry::OnT2LabStarted();
+			}
+		}
 		// Mark tracked task as added if present
 		MarkTaskAddedIfTracked(task);
 		GenericHelpers::LogUtil("[BUILDER] AiTaskAdded: marked tracked task as added if present", 4);
@@ -2222,6 +2246,20 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		{
+			IBuilderTask@ mexTask = cast<IBuilderTask>(task);
+			if (mexTask !is null) {
+				const Task::BuildType mbt = Task::BuildType(mexTask.GetBuildType());
+				if (done && mbt == Task::BuildType::MEX) {
+					Economy::MexTracker::RegisterMex(mexTask.GetBuildPos());
+				} else if (mbt == Task::BuildType::MEXUP) {
+					Economy::MexTracker::MarkUpgradeInProgress(mexTask.GetBuildPos(), false);
+					if (done) {
+						Economy::MexTracker::MarkUpgraded(mexTask.GetBuildPos());
+					}
+				}
+			}
+		}
 		GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved called done=" + done, 4);
 
 		// Release retained reactor tasks by identity, independent of def-name matching.
@@ -2764,7 +2802,7 @@ namespace Builder {
 		if (Builder::freelanceT2AirConstructor is unit) { @Builder::freelanceT2AirConstructor = null; }
 		if (Builder::primaryT1SeaConstructor is unit)   { @Builder::primaryT1SeaConstructor = null; }
 		if (Builder::secondaryT1SeaConstructor is unit) { @Builder::secondaryT1SeaConstructor = null; }
-		if (Builder::primaryT1SeaConstructor is unit)   { @Builder::primaryT1SeaConstructor = null; }
+		if (Builder::primaryT2SeaConstructor is unit)   { @Builder::primaryT2SeaConstructor = null; }
 		if (Builder::secondaryT2SeaConstructor is unit) { @Builder::secondaryT2SeaConstructor = null; }
 		if (Builder::freelanceT2SeaConstructor is unit) { @Builder::freelanceT2SeaConstructor = null; }
 		if (Builder::freelanceT1HoverConstructor is unit) { @Builder::freelanceT1HoverConstructor = null; }

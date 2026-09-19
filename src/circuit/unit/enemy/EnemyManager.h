@@ -77,11 +77,20 @@ private:
 	void DeleteEnemyUnit(CEnemyUnit* data);
 
 public:
+	/*
+	 * NOTE: `type` is a role *index*, not a role *mask*. Both accessors are
+	 *       registered to AngelScript, where script's Unit::Role::X carries a
+	 *       `.type` and a `.mask` side by side and the two are trivially
+	 *       confused - passing a mask indexes megabytes past this fixed array
+	 *       and faults (Eight Horses, f=180, access violation). An out-of-range
+	 *       index is always a caller bug, so report it and answer 0 rather than
+	 *       return whatever happens to be in memory.
+	 */
 	float GetEnemyCost(CCircuitDef::RoleT type) const {
-		return enemyInfos[type].cost;
+		return IsRoleIndex(type, "GetEnemyCost") ? enemyInfos[type].cost : 0.f;
 	}
 	float GetEnemyThreat(CCircuitDef::RoleT type) const {
-		return enemyInfos[type].threat;
+		return IsRoleIndex(type, "GetEnemyThreat") ? enemyInfos[type].threat : 0.f;
 	}
 	void AddEnemyCost(const CEnemyUnit* e);
 	void DelEnemyCost(const CEnemyUnit* e);
@@ -120,6 +129,11 @@ private:
 	SGroupData* GetNextGroupData() {
 		return (pGroupData.load() == &groupData0) ? &groupData1 : &groupData0;
 	}
+
+	// Bounds check for the two role-indexed accessors above; logs the first
+	// few offenders so a mask-for-index mix-up is visible instead of silent.
+	bool IsRoleIndex(CCircuitDef::RoleT type, const char* who) const;
+	mutable int badRoleLogs = 0;
 
 	CCircuitAI* circuit;
 

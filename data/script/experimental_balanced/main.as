@@ -98,6 +98,8 @@ namespace Main {
 			Global::profileController.MainUpdate();
 		}
 		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
+		Spam::Update();          // economy-gated spam: activation, focus rotation
+		Team::Ferry::Update();   // transport ferry: hand-over on arrival, run polling
 		Team::CheckOrphaned();   // ask allies for a T1 constructor if we lost commander and all builders
 	}
 

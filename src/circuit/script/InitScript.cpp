@@ -15,6 +15,8 @@
 #include "terrain/TerrainManager.h"
 #include "task/builder/BuilderTask.h"
 #include "task/static/SuperTask.h"
+#include "task/fighter/RouteTask.h"
+#include "task/fighter/FerryTask.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
 #include "util/GameAttribute.h"
@@ -208,6 +210,16 @@ static CScriptArray* CCircuitAI_GetTeamIds(CCircuitAI* circuit)
 		*(CAllyTeam::Id*)arr->At(i++) = teamId;
 	}
 	return arr;
+}
+
+static int CTerrainManager_GetTerrainWidth(CTerrainManager* terrainMgr)
+{
+	return CTerrainManager::GetTerrainWidth();
+}
+
+static int CTerrainManager_GetTerrainHeight(CTerrainManager* terrainMgr)
+{
+	return CTerrainManager::GetTerrainHeight();
 }
 
 static void CCircuitAI_GiveUnits(CCircuitAI* circuit, const CScriptArray* array, int newTeamId)
@@ -752,6 +764,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsWaterAVoid() const", asMETHOD(CTerrainManager, IsWaterAVoid), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float GetLandPercent() const", asMETHOD(CTerrainManager, GetLandPercent), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float SetAllyZoneRange(float)", asMETHOD(CTerrainManager, SetAllyZoneRange), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainWidth() const", asFUNCTION(CTerrainManager_GetTerrainWidth), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainHeight() const", asFUNCTION(CTerrainManager_GetTerrainHeight), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 
 	r = engine->RegisterObjectProperty("CSetupManager", "const CCircuitDef@ commChoice", asOFFSET(CSetupManager, commChoice)); ASSERT(r >= 0);
 
@@ -876,12 +890,48 @@ void CInitScript::RegisterCSuperTask(asIScriptEngine* engine)
 	int r = engine->RegisterObjectMethod("CSuperTask", "void SetTargetPos(const AIFloat3& in)", asMETHOD(CSuperTask, SetTargetPos), asCALL_THISCALL); ASSERT(r >= 0);
 }
 
+static void CRouteTask_SetRoute(CRouteTask* task, const CScriptArray* array)
+{
+	std::vector<AIFloat3> route;
+	route.reserve(array->GetSize());
+	for (asUINT i = 0; i < array->GetSize(); ++i) {
+		route.push_back(*static_cast<const AIFloat3*>(array->At(i)));
+	}
+	task->SetRoute(std::move(route));
+}
+
+void CInitScript::RegisterCRouteTask(asIScriptEngine* engine)
+{
+	RegisterIFighterTask<CRouteTask>(engine, "CRouteTask");
+	RegisterCast<IFighterTask, CRouteTask>(engine, "IFighterTask", "CRouteTask");
+	int r = engine->RegisterObjectMethod("CRouteTask", "void SetRoute(const array<AIFloat3>@+)", asFUNCTION(CRouteTask_SetRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CRouteTask", "int GetRouteVersion() const", asMETHOD(CRouteTask, GetRouteVersion), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CRouteTask", "uint GetRouteSize() const", asMETHOD(CRouteTask, GetRouteSize), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CRouteTask", "bool IsAtEnd(CCircuitUnit@) const", asMETHOD(CRouteTask, IsAtEnd), asCALL_THISCALL); ASSERT(r >= 0);
+}
+
+void CInitScript::RegisterCFerryTask(asIScriptEngine* engine)
+{
+	RegisterIFighterTask<CFerryTask>(engine, "CFerryTask");
+	RegisterCast<IFighterTask, CFerryTask>(engine, "IFighterTask", "CFerryTask");
+	// Cargo is addressed by unit id, not by handle: the script side holds ids
+	// across frames (the donation it is waiting on may outlive any handle it
+	// captured) and CFerryTask resolves them through CCircuitAI::GetTeamUnit.
+	int r = engine->RegisterObjectMethod("CFerryTask", "void SetHoldPos(const AIFloat3& in)", asMETHOD(CFerryTask, SetHoldPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFerryTask", "bool SetCargo(int, const AIFloat3& in)", asMETHOD(CFerryTask, SetCargo), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFerryTask", "int GetState() const", asMETHOD(CFerryTask, GetState), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFerryTask", "int GetCargoId() const", asMETHOD(CFerryTask, GetCargoId), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFerryTask", "void Reset()", asMETHOD(CFerryTask, Reset), asCALL_THISCALL); ASSERT(r >= 0);
+}
+
 void CInitScript::RegisterUnitTasks(asIScriptEngine* engine)
 {
 	RegisterIUnitTask<IUnitTask>(engine, "IUnitTask");
 	RegisterIBuilderTask<IBuilderTask>(engine, "IBuilderTask");
 	RegisterIFighterTask<IFighterTask>(engine, "IFighterTask");
 	RegisterCSuperTask(engine);
+	RegisterCRouteTask(engine);
+	RegisterCFerryTask(engine);
 }
 
 CMaskHandler::TypeMask CInitScript::AddRole(const std::string& name, int actAsRole)

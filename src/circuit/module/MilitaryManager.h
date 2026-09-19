@@ -15,7 +15,10 @@
 #include "util/AvailList.h"
 
 #include <vector>
+#include <string>
 #include <set>
+#include <array>
+#include <type_traits>
 
 namespace circuit {
 
@@ -110,6 +113,145 @@ public:
 
 	IFighterTask* Enqueue(const TaskF::SFightTask& ti);
 	virtual CRetreatTask* EnqueueRetreat() override;
+
+	/*
+	 * Pulse-weapon target policy (Juno). A pulse weapon does no damage: its
+	 * effect is a Lua gadget that deletes flagged defs inside the blast, so
+	 * ranking enemy groups by metal cost aims it at armies it cannot hurt.
+	 * Instead it picks the highest-priority sensor/EW target it can reach.
+	 * Configured under "pulse" in behaviour.json; see doc/juno-targets.md.
+	 */
+	enum class PulseClass: int {JAMMER_STATIC = 0, RADAR_STATIC, JAMMER_MOBILE, RADAR_MOBILE, _SIZE_};
+	using PulseC = std::underlying_type<PulseClass>::type;
+	struct SPulseInfo {
+		bool isEnabled = false;  // false when the config names no usable role
+		CCircuitDef::RoleM pulseRole = 0;  // defs that carry a pulse weapon
+		CCircuitDef::RoleM jammerRole = 0;
+		CCircuitDef::RoleM radarRole = 0;
+		// rank[class] = priority, lower fires first; -1 excludes the class
+		std::array<int, static_cast<PulseC>(PulseClass::_SIZE_)> rank = {-1, -1, -1, -1};
+		int mobileMaxAge = 0;  // frames a mobile target's last known position stays usable
+		int minTargets = 1;    // do not spend a shot on fewer than this many targets
+		/*
+		 * Radar-hole inference. A jammer sits inside its own radardistancejam
+		 * bubble (360-760 in BAR) and so hides itself from radar: it is only ever
+		 * a known target when we have LOS on it, which in practice means a unit
+		 * is already standing next to it. The inference runs the other way -
+		 * ground we cover with radar, cannot see, believe is enemy-held, and read
+		 * no contacts from, is probably jammed. The pulse AoE (1400) is wider
+		 * than the widest jam radius, so hitting the hole tends to catch the
+		 * jammer that made it. Known targets always outrank suspected ones.
+		 */
+		bool suspectJammer = true;
+		float holeProbeRadius = 760.f;   // widest BAR jam radius: probe this far off a contact
+		float holeRadius = 500.f;        // a probe with no contact inside this is a hole
+		float holeMinEnemyInfl = 0.05f;  // only where we believe the enemy operates
+		int holeProbes = 8;              // probe directions per known contact
+	};
+	const SPulseInfo& GetPulseInfo() const { return pulseInfo; }
+
+	/*
+	 * EMP-weapon target policy. A paralyzer deals no health damage: whether a
+	 * shot does anything is `maxHealth < paralysisDamage * paralyzemultiplier`,
+	 * so the policy computes the stun it would buy and rejects targets it
+	 * cannot hold. Configured under "emp" in behaviour.json; see
+	 * doc/emp-targets.md.
+	 */
+	struct SEmpInfo {
+		bool isEnabled = false;
+		CCircuitDef::RoleM empRole = 0;       // defs that carry an EMP weapon
+		CCircuitDef::RoleM antiNukeRole = 0;  // the one class ranked above raw value
+		int empableFlag = 0;                  // BAR EMPABLE category bit
+		// modrules.paralyze.paralyzeDeclineRate: paralysis drains at
+		// maxHealth / declineRate per second. 40 default, 20 with emprework.
+		float declineRate = 40.f;
+		float minStunSeconds = 5.f;  // do not spend a shot for less than this
+		int mobileMaxAge = 0;        // frames a mobile's last known position stays usable
+		int minTargets = 1;
+		bool structuresFirst = true;  // only structures get an uncapped stun
+	};
+	const SEmpInfo& GetEmpInfo() const { return empInfo; }
+
+	/*
+	 * Bomber policy. A bombing pass is alpha: it either kills or is wasted, so
+	 * a group picks by value per HP, refuses targets it cannot finish, and
+	 * chooses between concentrating on one target and spreading a line across
+	 * a front. Configured under "bomber" in behaviour.json; see
+	 * doc/bomber-targeting.md.
+	 */
+	struct SBomberInfo {
+		bool isEnabled = false;
+		// A target needing more than groupAlpha * killMargin is left for a
+		// bigger group while any finishable target exists.
+		float killMargin = 1.15f;
+		// Concentrate the whole group on one target worth at least this much.
+		float focusCost = 1500.f;
+		// Spread into a line when this many candidates sit inside areaRadius.
+		int areaMinTargets = 3;
+		float areaRadius = 900.f;
+		// Line geometry. Spacing is clamped into [minSpacing, 2 * weapon AoE]:
+		// at the top of that range the bombs tile the front without overlap, at
+		// the bottom a large group packs tight and concentrates damage.
+		float minSpacing = 96.f;
+		// How far past the front the run continues as an attack-move, so
+		// survivors clean up and leave rather than circling over the AA.
+		float cleanupDistance = 900.f;
+		// Approach bearing: sample this many directions on a ring of this
+		// radius around the aim point and run in from the quietest one.
+		int approachSamples = 8;
+		float approachRing = 1200.f;
+		// Let bombers of different defs share one task, so a mixed wave forms
+		// one line instead of several parallel groups.
+		bool groupMixedDefs = true;
+	};
+	const SBomberInfo& GetBomberInfo() const { return bomberInfo; }
+
+	/*
+	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
+	 * `support` main role, and CSupportTask walks each of them to the *nearest*
+	 * squad and joins it outright, with no cap - so every sensor on the map
+	 * converges on whichever squad happens to be closest (27 radar bots trailing
+	 * one sharpshooter in a game on Eight Horses).
+	 *
+	 * One sensor per squad is all a squad can use: a second jammer adds no
+	 * coverage a squad moving as one body does not already have, and a second
+	 * radar bot is a duplicate of the first. So the escort is rationed - at most
+	 * `max_per_squad` per squad, and the scarce sensors go to the squads worth
+	 * covering first, ranked by the value of the squad's leader, which is the
+	 * highest-tier unit in it. A sensor with nowhere to go holds near base
+	 * rather than joining a squad that is already covered.
+	 *
+	 * Configured under "sensor" in behaviour.json; see doc/sensor-escort.md.
+	 */
+	struct SSensorInfo {
+		bool isEnabled = false;
+		CCircuitDef::RoleM sensorRole = 0;  // jammer | radar: the rationed defs
+		int maxPerSquad = 1;   // "unless it dies": the count is of live assignees
+		int topCandidates = 3;  // aim at the nearest of the N most valuable squads
+		bool rebalance = true;  // release the surplus when two escorted squads merge
+	};
+	const SSensorInfo& GetSensorInfo() const { return sensorInfo; }
+	// A def whose escort is rationed: a mobile radar or jammer.
+	bool IsSensorUnit(const CCircuitDef* cdef) const;
+	// Live sensors already escorting `task`.
+	int CountSensors(const IFighterTask* task) const;
+	// Room for one more sensor in `task`.
+	bool NeedsSensor(const IFighterTask* task) const;
+	// Guard priority: the metal cost of the squad leader, which is the
+	// highest-tier unit the squad has. 0 for a squad with no leader.
+	float GetSquadValue(const IFighterTask* task) const;
+
+	/*
+	 * Porcupine chain, by side. The defaults come from build_chain.json's
+	 * "porcupine" block; these let AngelScript read that chain and replace it,
+	 * so a role can order its own defences and react to mod options (Legion,
+	 * the Extra Units Pack) without the ordering being frozen in JSON.
+	 * Names, not defs, because that is what script works in.
+	 */
+	std::vector<std::string> GetPorcChain(const std::string& sideName, bool isWater) const;
+	bool SetPorcChain(const std::string& sideName, bool isWater, const std::vector<std::string>& names);
+	// Stocked EMP silos, an upper bound on how many shots can land together.
+	int GetEmpSalvoSize() const;
 private:
 	virtual void DequeueTask(IUnitTask* task, bool done = false) override;
 
@@ -150,6 +292,16 @@ public:
 	void DiceBigGun();
 	float ClampMobileCostRatio() const;
 	void UpdateDefenceTasks();
+	void UpdateSensorGuards();
+	/*
+	 * Where this AI is currently fighting: the leader position of the strongest
+	 * ATTACK squad, or the enemy centroid when we have no attack squad, or an
+	 * invalid position when neither exists. Script has no other way to see the
+	 * front - it can reach neither the fighter tasks nor CEnemyManager's groups -
+	 * and the spam routes need it to run their lanes through the fight rather
+	 * than straight at the enemy start. See doc/spam-routes.md.
+	 */
+	springai::AIFloat3 GetCombatFocusPos() const;
 	void UpdateDefence();
 	void MakeBaseDefence(const springai::AIFloat3& pos);
 
@@ -256,6 +408,11 @@ private:
 		float scale = 1.f;  // cache per frame
 		int frame = -1;
 	} threatRangeScaling;
+
+	SPulseInfo pulseInfo;
+	SEmpInfo empInfo;
+	SBomberInfo bomberInfo;
+	SSensorInfo sensorInfo;
 
 	unsigned int preventCount = 0;
 	float amountFactor = 0.f;

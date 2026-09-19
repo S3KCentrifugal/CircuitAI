@@ -16,6 +16,7 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "map/ThreatMap.h"
 #include "Log.h"
 
 namespace circuit {
@@ -175,7 +176,20 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 		return terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
 	FindFacing(pos);
-	trySites();
+	if (trySites()) {
+		circuit->LOG("CBFactoryTask: fallback site for %s at (%.0f, %.0f) facing %i",
+				buildDef->GetDef()->GetName(), buildPos.x, buildPos.z, facing);
+		return;
+	}
+	// Still nothing: report which gate rejects the search origin itself, so a
+	// map where e.g. every shipyard site fails can be diagnosed from the log.
+	const float buildDist = builder->GetCircuitDef()->GetBuildDistance();
+	circuit->LOG("CBFactoryTask: no site for %s at all | origin (%.0f, %.0f) elev %.0f | canBuildHere=%i reach=%i threat=%.1f "
+			"enginePossible=%i mobileId=%i immobileId=%i builder=%s radius=%.0f",
+			buildDef->GetDef()->GetName(), pos.x, pos.z, map->GetElevationAt(pos.x, pos.z),
+			int(terrainMgr->CanBeBuiltAt(buildDef, pos)), int(terrainMgr->CanReachAt(builder, pos, buildDist)),
+			circuit->GetThreatMap()->GetBuilderThreatAt(pos), int(map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)),
+			int(buildDef->GetMobileId()), int(buildDef->GetImmobileId()), builder->GetCircuitDef()->GetDef()->GetName(), searchRadius);
 }
 
 #define SERIALIZE(stream, func)	\

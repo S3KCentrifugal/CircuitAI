@@ -15,6 +15,8 @@
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
+
+#include "Log.h"  // circuit->LOG in IsRoleIndex
 #include "util/Utils.h"
 #include "util/Profiler.h"
 #include "json/json.h"
@@ -345,6 +347,20 @@ void CEnemyManager::UnregisterEnemyFake(CEnemyFake* data)
 {
 	enemyFakes.erase(data);
 	delete data;
+}
+
+bool CEnemyManager::IsRoleIndex(CCircuitDef::RoleT type, const char* who) const
+{
+	if ((type >= 0) && (type < CCircuitDef::RoleT(enemyInfos.size()))) {
+		return true;
+	}
+	if (badRoleLogs < 8) {  // enough to identify the caller, not enough to flood
+		++badRoleLogs;
+		circuit->LOG("%s: role index %i out of range [0, %i) - a role mask was probably"
+				" passed where a role index was expected; answering 0",
+				who, int(type), int(enemyInfos.size()));
+	}
+	return false;
 }
 
 void CEnemyManager::UnregisterEnemyUnit(CEnemyUnit* data)

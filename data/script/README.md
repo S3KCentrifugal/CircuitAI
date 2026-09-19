@@ -88,11 +88,11 @@ The experimental runtime sequence is:
 
 ### Military manager policy
 
-`src/manager/porc_policy.as` is the shared porcupine policy: `Military::Porc::MakeDefence` sets `aiMilitaryMgr.porcMode` / `porcBudgetMod` (late game gated on both incomes, energy stall fallback, enemy pressure, banked metal or energy) and then runs the native placement, adding a caretaker per cluster while the economy is strong, for every role without its own defence handler. `src/manager/military.as` dispatches role-specific task and unit hooks, adjusts defence behavior, caches enemy threat and metal-cost totals by surface/air/water category, and exposes per-player estimates used by dynamic role quotas. Enemy player count is currently inferred by a stub rather than read from the engine.
+`src/manager/porc_policy.as` is the shared porcupine policy: `Military::Porc::MakeDefence` sets `aiMilitaryMgr.porcMode` / `porcBudgetMod` (late game gated on both incomes, energy stall fallback, enemy pressure, banked metal or energy) and then runs the native placement, adding a caretaker per cluster while the economy is strong, for every role without its own defence handler. `src/manager/military.as` dispatches role-specific task and unit hooks, adjusts defence behavior, caches enemy threat and metal-cost totals by surface/air/water category, and exposes per-player estimates used by dynamic role quotas. Enemy player count comes from `ai.GetEnemyTeamSize()`. The role masks those caches index are built by `FactoryProduction::BuildRoleCaches()`, which `Setup::setupMap()` now calls unconditionally; before that it ran only when a role enabled dynamic production, so every cached threat and cost stayed 0.
 
 ### Objective and team state
 
-`src/manager/objective_manager.as` owns objective assignment, completion, selected objective per role/builder group, and queued/built counts by concrete unit type. `src/manager/donation.as` (`Team::Donation`) is the TECH T2 constructor hand-out: keep the first `T2DonationKeepCount`, then give the next N (drawn once from `Decay^(k-1)` over 1..min(`T2DonationMax`, allies), so one is most likely and seven least) to the closest allies by roster start position, one each. `src/manager/team.as` tracks T2 constructors and donates the third one to the lead allied team for TECH policy. SEA contains a parallel T2 sea-constructor donation policy. `src/manager/roster.as` (`Team::Roster`) makes every allied BARb announce team id, skirmish AI id, role, side, start factory, start position, landlocked flag, start-spot index and lead-team flag over `AiSendMessage` until all allied team ids have answered (newcomers are answered directly); consumers use `Team::Roster::Get/All/WithRole/Leader/Nearest`. `src/manager/widget_link.as` mirrors roster and orphan events to the local LuaUI through `ai.CallUI` (host machine only, playing or spectating) for `tools/widgets/gui_barb_team_link.lua`. `src/manager/commands.as` is the reverse path: `Main::AiLuaMessage` hands `barb|...` lines from the widget to `Commands::Handle` (`query` answers with the roster line, `setrole|<ROLE>` performs a runtime role switch: restore the def snapshot taken in Setup, rebind the RoleConfig, run its InitHandler, recompute merged limits, re-announce). It also implements orphan rescue: `Team::CheckOrphaned` (from `Main::AiUpdate`) makes an AI with no commander and no workers ask its allies one at a time for a T1 constructor via `AiSendMessage`; `Team::HandleMessage` (from `Main::AiMessage`) makes a donor with three or more workers hand over a spare, non-leader T1 constructor with `ai.GiveUnits`. Live T1 constructor ids are registered by `Builder::AiUnitAdded`/`AiUnitRemoved`.
+`src/manager/objective_manager.as` owns objective assignment, completion, selected objective per role/builder group, and queued/built counts by concrete unit type. `src/manager/spam.as` (`Spam`) is the economy-gated spam: once metal and energy income clear `Global::Spam` thresholds every T1 factory listed in `UnitByFactory` produces its spam unit on repeat, each factory owns a native `CRouteTask` (`TaskF::Route`) with a parallel-lane route to a point behind the current focus, spam units join their factory route from `Military::AiMakeTask`, and every refocus rebuilds all routes and re-issues them to units on the field; see `doc/spam-routes.md`. `src/manager/donation.as` (`Team::Donation`) is the TECH T2 constructor hand-out: keep the first `T2DonationKeepCount`, then give the next N (drawn once from `Decay^(k-1)` over 1..min(`T2DonationMax`, allies), so one is most likely and seven least) to the closest allies by roster start position, one each. `src/manager/team.as` tracks T2 constructors and donates the third one to the lead allied team for TECH policy. SEA contains a parallel T2 sea-constructor donation policy. `src/manager/roster.as` (`Team::Roster`) makes every allied BARb announce team id, skirmish AI id, role, side, start factory, start position, landlocked flag, start-spot index and lead-team flag over `AiSendMessage` until all allied team ids have answered (newcomers are answered directly); consumers use `Team::Roster::Get/All/WithRole/Leader/Nearest`. `src/manager/widget_link.as` mirrors roster and orphan events to the local LuaUI through `ai.CallUI` (host machine only, playing or spectating) for `tools/widgets/gui_barb_team_link.lua`. `src/manager/commands.as` is the reverse path: `Main::AiLuaMessage` hands `barb|...` lines from the widget to `Commands::Handle` (`query` answers with the roster line, `setrole|<ROLE>` performs a runtime role switch: restore the def snapshot taken in Setup, rebind the RoleConfig, run its InitHandler, recompute merged limits, re-announce). It also implements orphan rescue: `Team::CheckOrphaned` (from `Main::AiUpdate`) makes an AI with no commander and no workers ask its allies one at a time for a T1 constructor via `AiSendMessage`; `Team::HandleMessage` (from `Main::AiMessage`) makes a donor with three or more workers hand over a spare, non-leader T1 constructor with `ai.GiveUnits`. Live T1 constructor ids are registered by `Builder::AiUnitAdded`/`AiUnitRemoved`.
 
 ## Strategic roles
 
@@ -124,8 +124,8 @@ Every role supplies only the delegates it needs. Missing behavior deliberately f
 | `limits_helpers.as` | Base-map plus role-overlay unit-limit merge. |
 | `objective_helpers.as` | Objective filtering, matching, distance, ordering, progress, and state wrappers. |
 | `objective_executor.as` | Resolves objective steps to concrete UnitDefs/build types and enqueues the next actionable task. |
+| `porc_helpers.as` | Porcupine chain: the config-seeded default, additive Extra Units / Scavenger tiers gated on mod options, and per-role rewrite through `RoleConfig::PorcChainHandler`. See `doc/porc-chain.md`. |
 | `defense_helpers.as` | Reserved defence predicates; all current predicates are placeholders returning `false`. |
-| `terrain_helpers.as` | Terrain classification and terrain-aware selection utilities. |
 | `collection_helpers.as` | Dictionary/array utility operations. |
 | `task_helpers.as` | Human-readable task/build-type names for diagnostics. |
 
@@ -155,20 +155,17 @@ Scripts consume native globals including `ai`, `aiSetupMgr`, `aiTerrainMgr`, `ai
 
 ## Known gaps and risks
 
-The typed-task compilation failure reported against `experimental_balanced` has been corrected in the shared source. All builder metadata access now uses a null-checked `IBuilderTask`; the obsolete `GetBuildDef()` call was replaced with the `buildDef` property. The fix applies to `experimental_balanced`, `experimental_hard`, and `experimental_terrible`, which include these shared modules. The four legacy profiles do not execute the affected code.
+Open problems are tracked in [`../../doc/known-issues.md`](../../doc/known-issues.md),
+the repository-wide register. Script-layer entries are `KI-2xx`, with the
+configuration entries that affect scripts at `KI-3xx`. Add an entry there
+whenever you diagnose a script problem and leave it unfixed; do not start a
+second list here.
 
-1. **UnitDef drift.** Several Legion and optional-unit identifiers are placeholders or version-sensitive. Unknown UnitDef and invalid factory build-option warnings in game logs are configuration/data compatibility issues independent of script compilation.
-2. **Incomplete Legion production.** Dynamic air configurations explicitly omit Legion, and T2 Legion naval production remains a placeholder.
-3. **Stale role keys.** Some map files still publish `HOVER_SEA` factory/limit keys. `MapConfig.RoleKey()` now emits `TACTICAL`, so those entries are unreachable until renamed.
-4. **Defence predicates are stubs.** Every function in `defense_helpers.as` returns `false`; roles rely on explicit or native defence behavior instead.
-5. **Objective placement is approximate.** MEX and GEO objective steps use objective anchors rather than native metal/geo spot selection. Several Supreme Isthmus coordinates and radii remain marked for tuning.
-6. **Objective accounting is in-memory.** Save/load hooks are empty, and queued/built bookkeeping can become stale across reloads or unexpected task/unit events.
-7. **Enemy player count is provisional.** Military per-player scaling uses a stub pending a native engine count.
-8. **Early UnitDef scanning is unsafe.** Dynamic production intentionally avoids building its unit-role cache during initialization because that path has caused engine crashes.
-9. **Profile split and duplication.** Every profile carries separate `init.as` and `main.as`; only the experimental profiles use the shared policy graph. Entry-point and configuration changes must be propagated deliberately and can drift.
-10. **No standalone script test harness.** Compilation is normally validated only when CircuitAI loads a game. Static searches can catch obsolete API calls but not registration/signature or runtime-lifetime errors.
-11. **Dead and partial features.** `types/profile.as` and commander hiding are commented out; Lua command parsing is disabled; economy save/load does nothing; some strategy and unit IDs remain tuning placeholders.
-12. **Logging volume.** Many hot paths emit level 2-4 diagnostics and may add overhead at high `LOG_LEVEL` values.
+The typed-task compilation failure once reported against `experimental_balanced`
+has been corrected in the shared source. All builder metadata access now uses a
+null-checked `IBuilderTask`; the obsolete `GetBuildDef()` call was replaced with
+the `buildDef` property. The four legacy profiles never executed the affected
+code.
 
 ## Maintenance workflow
 

@@ -1386,11 +1386,11 @@ namespace RoleTech
 		if (task is null)
 			return;
 
+		// MexTracker bookkeeping is done role-independently in Builder::AiTaskAdded.
 		IBuilderTask @builderTask = cast<IBuilderTask>(task);
 		if (builderTask !is null && Task::BuildType(builderTask.GetBuildType()) == Task::BuildType::MEXUP)
 		{
-			GenericHelpers::LogUtil("[TECH] AiTaskAdded: detected MEX upgrade task, tracking it", 2);
-			Economy::MexTracker::MarkUpgradeInProgress(builderTask.GetBuildPos(), true);
+			GenericHelpers::LogUtil("[TECH] AiTaskAdded: MEX upgrade started", 2);
 		}
 	}
 
@@ -1405,20 +1405,10 @@ namespace RoleTech
 		{
 			Task::BuildType bt = Task::BuildType(builderTask.GetBuildType());
 
-			// Track completed MEX builds to own them for future upgrades
-			if (done && bt == Task::BuildType::MEX)
-			{
-				Economy::MexTracker::RegisterMex(builderTask.GetBuildPos());
-			}
-
+			// MexTracker bookkeeping is done role-independently in Builder::AiTaskRemoved.
 			if (bt == Task::BuildType::MEXUP)
 			{
-				Economy::MexTracker::MarkUpgradeInProgress(builderTask.GetBuildPos(), false);
-				if (done)
-				{
-					Economy::MexTracker::MarkUpgraded(builderTask.GetBuildPos());
-				}
-				GenericHelpers::LogUtil("[TECH] AiTaskRemoved: detected MEX upgrade task, removing it", 2);
+				GenericHelpers::LogUtil("[TECH] AiTaskRemoved: MEX upgrade " + (done ? "completed" : "aborted"), 2);
 			}
 		}
 	}
@@ -1616,6 +1606,16 @@ namespace RoleTech
 			IUnitTask @tAir = Builder::EnqueueT1AirFactory(unitSide, preferredPosition, SQUARE_SIZE * 24, 30 * SECOND, Task::Priority::HIGH);
 			if (tAir !is null)
 				return tAir;
+		}
+
+		// A mex upgrade outranks the whole energy ladder: best metal per metal,
+		// and the supply of spots is finite. See doc/known-issues.md KI-213.
+		if (Global::RoleSettings::MexUpgradeFirst)
+		{
+			IUnitTask@ tMexUp = EconomyHelpers::EnqueueMexUpgradeIfFirst(u, Global::Map::StartPos,
+					Global::RoleSettings::MexUpgradeRadius,
+					Global::RoleSettings::MexUpgradeMaxConcurrent, "TECH");
+			if (tMexUp !is null) return tMexUp;
 		}
 
 		// ********************** ENERGY/CONVERTER/SOLAR CHECKS********************** //

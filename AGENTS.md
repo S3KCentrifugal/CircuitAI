@@ -10,6 +10,16 @@ Read `data/script/README.md` before changing AngelScript policy code. Apply `ski
 
 For every AngelScript or profile change, inspect and modify `data/`. Use `data_sample/` only to understand examples or historical patterns, and do not implement, mirror, or apply the requested change there unless the user explicitly asks to update sample material.
 
+Read `doc/intent.md` before deciding **where** a behaviour belongs. It states
+the goals this fork is aiming at and the rule that follows from them: C++ is
+mechanism, AngelScript is policy, and a native change must leave an equivalent
+lever in script or JSON rather than hardcoding a build order or a priority.
+
+Record every problem you diagnose but do not fix in `doc/known-issues.md`, and
+read that register before starting work so you do not re-diagnose something
+already understood. Its "Maintaining this register" section is the full rule;
+"Known Issues" below is the short form.
+
 Do not create or update repository changelog entries automatically. Only when
 the user explicitly requests a changelog, invoke
 `skills/maintain-changelog/SKILL.md`.
@@ -88,7 +98,9 @@ This is the implementation target for every AngelScript and profile change.
 | `data/script/src/manager/` | Script-side manager policy: `builder.as`, `economy.as`, `factory.as`, `military.as`, `team.as`, `objective_manager.as`, and `factory_production.as` with `factory_production/factory_configs_{air,bot,hover,sea,vehicle}.as`. |
 | `data/script/src/roles/` | Role delegates that specialise shared manager behaviour: `air.as`, `front.as`, `sea.as`, `support.as`, `tactical.as`, `tech.as`. |
 | `data/script/src/types/` | Script value types: `ai_role.as`, `building_type.as`, `map_config.as`, `opener.as`, `profile.as`, `profile_controller.as`, `role_config.as`, `start_spot.as`, `strategic_objectives.as`, `strategy.as`, `terrain.as`. |
-| `data/script/src/helpers/` | Stateless helpers grouped by domain: builder, collection, defense, economy, factory, generic, guard, limits, map, objective (with `objective_executor.as`), role, role-limit, task, terrain, unit, and unitdef. |
+| `data/script/src/helpers/` | Stateless helpers grouped by domain: builder, collection, defense, economy, factory, generic, guard, limits, map, objective (with `objective_executor.as`), porc, role, role-limit, task, unit, and unitdef. |
+| `data/script/src/manager/ferry.as` | Transport ferry policy: the AIR/TECH request protocol over `AiSendMessage`, and the donation hand-over. See `doc/transport-ferry.md`. |
+| `data/script/src/helpers/porc_helpers.as` | Porcupine chain policy: reads the config-seeded chain through `aiMilitaryMgr.GetPorcChain`, appends the content-option tiers, and lets a role rewrite it. See `doc/porc-chain.md`. |
 | `data/script/src/misc/commander.as` | Commander-specific script policy. |
 
 ### Reference only - `data_sample/`
@@ -128,9 +140,16 @@ This is the implementation target for every AngelScript and profile change.
 | `doc/Profile.md` | How profiles are deployed and how to add a custom one, including the `AIOptions.lua` `profile` list and the `BARb/stable/` install layout. |
 | `doc/roles/README.md` | Index of the AngelScript role layer: the `RoleConfig` contract, the handler coverage matrix, cross-role findings, and the rule that keeps these documents current. |
 | `doc/roles/{front,air,tech,sea,support,tactical}.md` | One reference per `AiRole`: registration, settings, init limits, decision flows, known defects. Each ends with a `<!-- source: ...; blob: ...; lines: ... -->` marker tying it to the script revision it describes. |
-| `doc/roles/hover.md` | Deep reference for hover production: ownership, build decisions, the native contract, and the cause of hover production stalling once a T2 factory exists. |
+| `doc/roles/hover.md` | **Outstanding - not written yet**, though nine documents link to it. Intended as the deep reference for hover production: ownership, build decisions, the native contract, and the cause of hover production stalling once a T2 factory exists. Tracked as `KI-404` in `doc/known-issues.md`. |
+| `doc/intent.md` | **Design intent**: the long-term goal of driving the AI from the game's mission/objective API, the short-term goal of playing like a strong player, and the rule that build orders and behaviour policy stay controllable from AngelScript. Read before deciding where a behaviour belongs. |
+| `doc/porc-chain.md` | Static-defence ordering: the `porcupine` block in `build_chain.json`, per-role override through `RoleConfig::PorcChainHandler`, and the additive Extra Units / Scavenger tiers. |
+| `doc/known-issues.md` | **The register of diagnosed but unresolved problems**, one entry per issue with problem, proposed solution and verification. Read before starting work; add to it whenever you leave something unfixed. Indexes the deep-dive documents below rather than duplicating them. |
+| `doc/transport-ferry.md` | The AIR-to-TECH transport ferry: the hand-over protocol, `CFerryTask`, and how a donated T2 constructor is flown instead of walked. |
+| `doc/sensor-escort.md` | Mobile radar/jammer escort rationing: the one-per-squad cap, the squad-value ranking that orders it, and the `sensor` block in `behaviour.json`. |
 | `doc/bomber-targeting.md` | Diagnosed but unfixed bomber-targeting investigation with a phased remediation plan. |
 | `doc/t2-constructor-stall.md` | Diagnosed but unfixed T2 constructor stall after mex upgrades, with three options awaiting a decision. |
+| `doc/juno-targets.md` | Juno target-priority policy: the four pulse target classes and their order, the `pulse` block in `behaviour.json`, `CSuperTask::SelectPulseTarget`, and what happens when nothing qualifies. Game mechanics live in the shared knowledge base. |
+| `doc/emp-targets.md` | EMP target-priority policy: the stun-viability arithmetic, the rank order, the `emp` block in `behaviour.json`, `CSuperTask::SelectEmpTarget`, and what happens when nothing qualifies. Game mechanics live in the shared knowledge base. |
 | `doc/knowledge/README.md` | Index of CircuitAI-specific knowledge and the pointer to the shared game knowledge base. |
 | `doc/knowledge/90-agent-decision-guides/` | Agent decision guides tied to this AI's hooks: `90-decision-architecture.md`, `91-build-order-selection.md`, `92-response-tables.md`, `93-engagement-rules.md`, `94-economy-policies.md`, `95-open-questions.md`. |
 | `doc/knowledge/barb-unit-config.md` | Generated: every reachable unit's roles, attributes, limits, threat, factory lists, and script references across all profiles, joined to the shared unit cache, plus the configuration gap lists. |
@@ -142,7 +161,9 @@ This is the implementation target for every AngelScript and profile change.
 | --- | --- |
 | `tools/knowledge/barb_report.py` | Regenerates `doc/knowledge/barb-unit-config.md`. Run `python tools/knowledge/barb_report.py` after profile or unit-cache changes. |
 | `tools/knowledge/check_unit_helpers.py` | Validates every quoted unit id in `data/script/src` against the shared game cache (unknown, unreachable, wrong faction or tier, per-side branches) and reports combat-list coverage. Exit 1 on findings. |
+| `tools/knowledge/check_doc_links.py` | Verifies that every relative Markdown link under `doc/`, `data/script/`, `skills/` and the root instruction files resolves to a file that exists. Exit 1 on findings. Run before finishing any documentation change. |
 | `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |
+| `doc/spam-routes.md` | The economy-gated spam feature: `spam` attribute, `Global::Spam` settings, `Spam::` manager, native `CRouteTask`, focus and lane geometry. |
 | `tools/widgets/gui_barb_team_link.lua` | LuaUI widget for the host machine: displays what allied BARb instances mirror through `ai.CallUI` (`data/script/src/manager/widget_link.as`): the team roster and orphan-rescue events. Copy into the BAR `LuaUI/Widgets` folder. |
 | `.githooks/pre-commit` | Refuses a commit that stages a role script without its document, and runs `check_role_docs.py` when either is staged. Enable with `git config core.hooksPath .githooks`. |
 | `CMakeLists.txt` | Native build definition. Building requires integration into an engine checkout and Recoil's generated C++ AI wrapper. |
@@ -250,6 +271,38 @@ When changing classification or economy logic, check BAR values used by CircuitA
 - Do not assume a generic AngelScript interface exposes derived-type members. Use registered casts and handle a null cast result.
 - Do not infer a valid factory edge merely because both UnitDefs exist. Verify the builder's effective BAR `buildoptions` under the relevant mod options.
 - Avoid changing the legacy profiles (`easy`, `medium`, `hard`, `hard_aggressive`) and the shared-framework profiles (`experimental_balanced`, `experimental_hard`, `experimental_terrible`) together unless the requirement explicitly spans them.
+- When a change is scoped to one profile family, record the other family in `doc/known-issues.md` rather than leaving the gap undocumented.
+
+## Known Issues
+
+`doc/known-issues.md` is the register of diagnosed but unresolved problems. It
+is not a backlog of ideas: an entry exists because someone understood a problem
+well enough to describe its cause and a concrete fix.
+
+- **Read it before starting work.** It records what is already understood,
+  including several features that are inert rather than broken, so you do not
+  spend time re-diagnosing them.
+- **Add an entry whenever you leave a problem unfixed.** That includes a defect
+  found while doing something else, a feature discovered to be dead or
+  disabled, a fix scoped to one profile family, and a fix applied but not yet
+  verified in a game. If you understood it well enough to explain it in a
+  summary, it is understood well enough to record.
+- **Every entry needs problem, proposed solution and verification.** The
+  proposed solution must carry enough detail to start work: the approach, the
+  files to touch, and the traps. "Needs investigation" is not ready for the
+  register.
+- **Never delete an entry to shorten the list.** Remove one only when the issue
+  is genuinely resolved, and say so in the commit message. IDs (`KI-<area><nn>`)
+  are stable and never reused.
+- **Keep locations current.** If your change moves code an entry points at,
+  update that entry in the same change.
+- **Prefer a pointer to a copy.** A problem large enough for its own document
+  gets one and is listed in the register's "Indexed elsewhere" table with a
+  one-line summary; do not duplicate its detail.
+
+Report unverified work honestly: a change that compiles and passes the checker
+scripts but has not been loaded in a game is not verified, and belongs in the
+register until it has been.
 
 ## Runtime Logs and Diagnostics
 
@@ -281,8 +334,9 @@ Use the cheapest focused validation available in this repository, then broaden a
 - Run diagnostics for edited C++ or AngelScript files.
 - For configuration changes, parse the changed JSON and check referenced UnitDef names/build edges against the effective BAR data pipeline.
 - Use `git diff --check` before finishing.
+- After touching any Markdown, run `python tools/knowledge/check_doc_links.py`; a link to a document that does not exist asserts an answer that is not there.
 - After touching `data/script/src/roles/` or `doc/roles/`, run `python tools/knowledge/check_role_docs.py`; after touching unit id lists in `data/script/src`, run `python tools/knowledge/check_unit_helpers.py`. Both must exit 0.
 - Runtime AngelScript changes require loading the affected profile in BAR because this repository has no standalone AngelScript compilation target.
 - Native integration builds require Recoil's C++ AI wrapper. Never build inside the trusted read-only Recoil checkout; use a separate writable checkout/build environment or report that runtime validation remains pending.
 
-Record validation performed and distinguish static checks from in-game or engine-runtime verification.
+Record validation performed and distinguish static checks from in-game or engine-runtime verification. When runtime verification remains pending, add or update the matching entry in `doc/known-issues.md` instead of leaving it only in a chat summary.

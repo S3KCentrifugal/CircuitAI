@@ -10,14 +10,25 @@ line numbers when navigating.
 
 ## Contents
 
+- [Not to be confused with the `support` unit tag](#not-to-be-confused-with-the-support-unit-tag)
 - [Intent](#intent)
 - [Registration](#registration)
 - [Settings](#settings)
 - [Init: what SUPPORT installs](#init-what-support-installs)
+- [Mex upgrade priority](#mex-upgrade-priority)
+- [Porcupine chain: the launcher swap](#porcupine-chain-the-launcher-swap)
 - [Decision flows](#decision-flows)
 - [The missing factory handler](#the-missing-factory-handler)
 - [Known defects](#known-defects)
 - [Related](#related)
+
+## Not to be confused with the `support` unit tag
+
+`support` is also a **config role** in `behaviour.json`'s def list, and the two
+have nothing to do with each other. The config tag is what mobile radar and
+jammer units carry; it routes them to native `CSupportTask`, and its escort
+rationing is documented in [`../sensor-escort.md`](../sensor-escort.md). This
+page is about the AngelScript profile role.
 
 ## Intent
 
@@ -32,7 +43,7 @@ between TECH (pure economy, full factory control) and FRONT (pure army).
 
 ## Registration
 
-`RoleSupport::Register()` fills **15 of 22** slots.
+`RoleSupport::Register()` fills **16 of 23** slots.
 
 | Slot | Handler |
 | --- | --- |
@@ -51,6 +62,7 @@ between TECH (pure economy, full factory control) and FRONT (pure army).
 | `FactoryAiUnitRemoved` | `Support_FactoryAiUnitRemoved` |
 | `SelectFactoryHandler` | `Support_SelectFactoryHandler` |
 | `RoleMatchHandler` | `Support_RoleMatch` |
+| `PorcChainHandler` | `Support_PorcChain` |
 
 **`FactoryAiMakeTaskHandler` is not filled.** SUPPORT is the only role without
 one - see [The missing factory handler](#the-missing-factory-handler).
@@ -137,6 +149,103 @@ to attack with.
 
 `armrectr`/`cornecro` at 5 is the highest resurrect-bot allowance outside FRONT's
 `StartCapRezBots` of 10. There is no Legion equivalent listed.
+
+## Mex upgrade priority
+
+Ahead of this role's energy ladder, `Builder_AiMakeTask` calls
+`EconomyHelpers::EnqueueMexUpgradeIfFirst`. A metal extractor upgrade is the
+best metal-per-metal available (roughly 1.9x a T2 converter once the
+converter's 600 E/s is priced as advanced fusion) and metal spots are finite
+while converters are not, so an upgrade outranks everything that merely
+converts energy.
+
+The gate answers only for constructors of tier 2 or above — a T1 builder
+cannot place the advanced extractor and falls straight through — and it skips a
+spot that is already being upgraded. Ownership and upgrade state come from
+`Economy::MexTracker`, which is now fed role-independently from
+`Builder::AiTaskAdded` / `AiTaskRemoved` rather than from TECH alone.
+
+Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
+`MexUpgradeMaxConcurrent` (1). See `KI-213` in
+[`../known-issues.md`](../known-issues.md).
+
+## Porcupine chain: the launcher swap
+
+`Support_PorcChain` is SUPPORT's `PorcChainHandler`, and the only one any role
+registers. It makes one edit to the land chain: **the side's Juno becomes the
+side's ranged tactical launcher.**
+
+| Side | Out | In | Name | Metal |
+| --- | --- | --- | --- | --- |
+| Armada | `armjuno` | `armemp` | Paralyzer, EMP Missile Launcher | 1600 |
+| Cortex | `corjuno` | `cortron` | Catalyst, Tactical Missile Launcher | 1200 |
+| Legion | `legjuno` | `legperdition` | Perdition, Long Range Napalm Launcher | 1250 |
+
+### Why a swap, and not an insertion
+
+`CMilitaryManager::DefaultMakeDefence` walks the chain accumulating
+`totalCost`, and breaks as soon as it passes
+`maxCost = amountFactor x metal income`, where `amountFactor` is 32-48
+depending on map size. Position in the chain is therefore a budget threshold,
+and the thresholds for this class of unit are out of reach:
+
+| Chain position | Entry (Armada) | Cumulative metal | Income needed |
+| --- | --- | --- | --- |
+| 7 | `armjuno` | 2 565 | ~64 |
+| 16 | `armemp` | 24 865 | ~620 |
+| 25 | `armemp` | 48 025 | ~1 200 |
+
+The launchers are already in the default chain, twice each, and **no cluster
+has ever reached them**. Position 7 is the last entry a well-funded cluster
+does reach. So the swap is not a preference between two units competing for a
+slot; it is the only slot in which the launcher can exist at all.
+
+Cortex and Legion have the same shape - the launcher at cumulative 24 045 and
+23 140 respectively.
+
+### What it costs
+
+The point pays the price difference at position 7: **+960** Armada, **+540**
+Cortex, **+590** Legion. Everything behind position 7 moves that much further
+out of budget. Given that everything behind position 7 starts at `armamb`
+(2 500) and the cluster reaching position 7 at all is already well funded, the
+practical effect is one fewer Rattlesnake at the best-funded points.
+
+Both units are T2. `DefaultMakeDefence` skips an unavailable def *before*
+adding its cost, so the chain is byte-identical until an advanced constructor
+exists.
+
+### If one per point is not enough
+
+The chain walk enqueues every entry it reaches, so a repeated entry builds
+repeatedly. Getting a *second* launcher at one defence point means putting it
+in a second reachable slot, and the reachable window ends around position 8 —
+`armamb` (Rattlesnake, 2 500, cumulative 5 065) for Armada. Swapping that too
+would double the launcher count at the richest points and cost the role its
+pop-up plasma artillery. That trade has not been made; it is one
+`PorcHelpers::Replace` call away in `Support_PorcChain` if a game says the
+first swap was not enough.
+
+### What SUPPORT gives up
+
+All of its Junos. The Juno answers radar, jammers, minefields and scout spam -
+[`../juno-targets.md`](../juno-targets.md) - and a role that disables its own
+T1 combat production and expects allies to hold the line is the role least
+placed to exploit that, and most able to use a stockpiled ranged strike fired
+from behind its own porc. This was an explicit trade, not a side effect.
+
+The water chain is untouched: it contains neither unit, and neither is
+buildable on water.
+
+### Fallbacks
+
+- An unrecognised side, or a table with no entry for it, logs and keeps the
+  default chain.
+- A chain that no longer holds the Juno - a config edit, or a mod option that
+  rewrote the order - appends the launcher instead of losing it, which is no
+  worse than the default it replaces.
+- `SetPorcChain` already logs and skips a def that is not loaded, so a side
+  whose launcher is absent from the game degrades to a chain without it.
 
 ## Decision flows
 
@@ -237,5 +346,7 @@ anywhere in the source.
 - [tech.md](tech.md) - the dedicated economy role, and the cap system SUPPORT's
   economy update is modelled on.
 - [hover.md](hover.md) - the native factory gate that reaches SUPPORT unmediated.
+- [../sensor-escort.md](../sensor-escort.md) - the `support` *config* role, and how
+  mobile sensors are rationed one per squad.
 
-<!-- source: data/script/src/roles/support.as; blob: 354ce85d4c2d9450e508a6c400dd3b485908d024; lines: 497 -->
+<!-- source: data/script/src/roles/support.as; blob: ca67e2411d2df9717c496fc5481f758e63b7c21b; lines: 575 -->

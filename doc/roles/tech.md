@@ -16,10 +16,12 @@ navigating.
 - [Registered C++ APIs the role depends on](#registered-c-apis-the-role-depends-on)
 - [Lifecycle](#lifecycle)
 - [The unit-cap system](#the-unit-cap-system)
+- [Mex upgrade priority](#mex-upgrade-priority)
 - [Decision flows](#decision-flows)
 - [Known defects](#known-defects)
 - [Fix plan](#fix-plan)
 - [Optimisation opportunities](#optimisation-opportunities)
+- [Transport ferry](#transport-ferry)
 
 ## Intent
 
@@ -186,6 +188,25 @@ Two further lockdowns in `Tech_ApplyStartLimits`:
 - `UnitDefHelpers::SetMainRoleFor(GetAllT1T2LandLabsAndAircraftPlants(),
   "support")` tags T1/T2 bot, vehicle and air plants as `support` until the
   `mi >= 200` block retags land labs to `static`.
+
+## Mex upgrade priority
+
+Ahead of this role's energy ladder, `Builder_AiMakeTask` calls
+`EconomyHelpers::EnqueueMexUpgradeIfFirst`. A metal extractor upgrade is the
+best metal-per-metal available (roughly 1.9x a T2 converter once the
+converter's 600 E/s is priced as advanced fusion) and metal spots are finite
+while converters are not, so an upgrade outranks everything that merely
+converts energy.
+
+The gate answers only for constructors of tier 2 or above — a T1 builder
+cannot place the advanced extractor and falls straight through — and it skips a
+spot that is already being upgraded. Ownership and upgrade state come from
+`Economy::MexTracker`, which is now fed role-independently from
+`Builder::AiTaskAdded` / `AiTaskRemoved` rather than from TECH alone.
+
+Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
+`MexUpgradeMaxConcurrent` (1). See `KI-213` in
+[`../known-issues.md`](../known-issues.md).
 
 ## Decision flows
 
@@ -392,6 +413,20 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
   native `MakeBuilderTask` stall gating plus `MEXUP` not being in
   `IsIgnoreStallingPull`; fix undecided.
 
+## Transport ferry
+
+TECH no longer walks its donated T2 constructors. When its **first** T2 lab is
+enqueued, `Team::Ferry::OnT2LabStarted` broadcasts a request; the AIR player on
+the team builds an air transport, flies it to TECH's base and transfers it
+there. From then on `Team::Donation::OnConstructorBuilt` offers each donation
+to `Team::Ferry::TryCarry` before falling back to `ai.GiveUnits`, and the
+transport flies the constructor to the recipient's base and returns home.
+
+The trigger is the lab being *enqueued*, not finished, so the transport is on
+station before the first T2 constructor exists. Every failure path walks the
+constructor exactly as before. Full sequence and limits in
+[`../transport-ferry.md`](../transport-ferry.md).
+
 ## Related
 
 - `doc/angelscript-references.md` - script loading model, callback contracts,
@@ -400,4 +435,4 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: cf7269f6be281911a47fd8e1704cd240f9979e68; lines: 2064 -->
+<!-- source: data/script/src/roles/tech.as; blob: a12ac3f5bfe1ec4de5ba271ad6fcce5cbbd39f23; lines: 2064 -->

@@ -912,6 +912,16 @@ namespace RoleAir {
                 }
            // }
 
+            // A mex upgrade outranks the whole energy ladder: best metal per metal,
+            // and the supply of spots is finite. See doc/known-issues.md KI-213.
+            if (Global::RoleSettings::MexUpgradeFirst)
+            {
+            	IUnitTask@ tMexUp = EconomyHelpers::EnqueueMexUpgradeIfFirst(u, Global::Map::StartPos,
+            			Global::RoleSettings::MexUpgradeRadius,
+            			Global::RoleSettings::MexUpgradeMaxConcurrent, "AIR");
+            	if (tMexUp !is null) return tMexUp;
+            }
+
             // Build Energy Converter?
             if (EconomyHelpers::ShouldBuildT1EnergyConverter(
                 /*metalIncome*/ mi,

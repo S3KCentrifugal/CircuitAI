@@ -30,6 +30,10 @@ funcdef void EconomyUpdateDelegate();
 
 funcdef void AiMakeDefence(int cluster, const AIFloat3& in pos);
 
+// Porcupine chain: the role rewrites the ordered defence list for its side at
+// setup. Called once, after the role's InitHandler. See helpers/porc_helpers.as.
+funcdef void PorcChainDelegate(const string &in side);
+
 // Dynamic role matching: boolean match; first registered match wins
 funcdef bool RoleMatchDelegate(AiRole preferredMapRole, const string &in side, const AIFloat3& in pos, const string &in defaultStartFactory);
 
@@ -71,6 +75,7 @@ class RoleConfig {
     AiUnitRemovedDelegate@ MilitaryAiUnitRemoved;
 
     AiMakeDefence@ AiMakeDefenceHandler;
+    PorcChainDelegate@ PorcChainHandler;
 
     SelectFactoryDelegate@ SelectFactoryHandler;
     RoleMatchDelegate@ RoleMatchHandler; // optional role-specific match predicate

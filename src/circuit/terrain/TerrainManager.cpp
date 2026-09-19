@@ -1941,7 +1941,34 @@ bool CTerrainManager::CanBeBuiltAt(CCircuitDef* cdef, const AIFloat3& position)
 	SMobileType* mobileType = GetMobileTypeById(cdef->GetMobileId());
 	SImmobileType* immobileType = GetImmobileTypeById(cdef->GetImmobileId());
 	if (mobileType != nullptr) {  // a factory or mobile unit
-		if ((mobileType->sector[iS].area == nullptr) || !mobileType->sector[iS].area->areaUsable) {
+		const SArea* area = mobileType->sector[iS].area;
+		if (area == nullptr) {
+			return false;
+		}
+		/*
+		 * NOTE: `areaUsable` means "this connected area covers at least 16% of
+		 *       the map" - a relative test with no absolute floor. On Eight
+		 *       Horses the water is two ~4% pools (boat9: "2 Map-Area(s)
+		 *       occupying 8.26%"), so no naval area is ever usable, this vetoed
+		 *       every shipyard site, and the SEA role re-picked a shipyard every
+		 *       240 frames for the whole game without ever building one.
+		 *
+		 *       GetAlternativeSector and the (cdef, pos, range) overload already
+		 *       degrade this same test - `area.areaUsable || !largestArea->
+		 *       areaUsable` - taking a usable area when one exists and dropping
+		 *       the requirement when the move type has none anywhere on the map.
+		 *       This overload is the only one that treated it as an absolute
+		 *       veto. Match the rest.
+		 *
+		 *       This does not let a shipyard onto dry land: the sector must
+		 *       still belong to an area of the move type, the immobile type must
+		 *       still accept it below, and the caller still checks the engine's
+		 *       own buildability. Nor does it make the AI choose navy on a land
+		 *       map - CFactoryData::GetFactoryToBuild still refuses a factory
+		 *       whose mobile type is unusable, so the only way here is an
+		 *       explicit AngelScript SelectFactoryHandler choice.
+		 */
+		if (!area->areaUsable && mobileType->typeUsable) {
 			return false;
 		}
 		if (immobileType != nullptr) {  // a factory

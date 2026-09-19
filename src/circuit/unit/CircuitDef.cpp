@@ -241,7 +241,9 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 	isCapturable      = def->IsCapturable();
 
 	const std::map<std::string, std::string>& customParams = def->GetCustomParams();
-	auto it = customParams.find("energyconv_capacity");
+	auto it = customParams.find("paralyzemultiplier");
+	paralyzeMult = (it != customParams.end()) ? utils::string_to_float(it->second) : 1.f;
+	it = customParams.find("energyconv_capacity");
 	if (it != customParams.end()) {
 		upkeepE += utils::string_to_float(it->second);
 	}

@@ -1,6 +1,9 @@
 # Bomber targeting
 
-**Status: diagnosed, not fixed. Phased plan below, P0 and P1 are safe to land first.**
+**Status: P0-P3 implemented and building; P4 outstanding. Not yet verified in
+a game.** The sections below are kept as the diagnosis and the reasoning; see
+[What was implemented](#what-was-implemented) at the end for what the code does
+now and what is left.
 
 Line references are as of branch `smrt`, 2026-09-16.
 
@@ -256,3 +259,100 @@ tiebreak.
   unit-cap mechanics.
 - [`doc/angelscript-references.md`](angelscript-references.md) - registered API
   surface, and what is deliberately not exposed to script.
+
+## What was implemented
+
+Landed together, all native in `CBombTask` plus a `"bomber"` block in
+`behaviour.json` read by `CMilitaryManager::ReadConfig`.
+
+| Phase | State | Where |
+| --- | --- | --- |
+| P0 logging | done | one `BOMB:` line per retarget with leader, group size, alpha, mode, target, cost, health, value, area count, front length |
+| P1 out-of-range defect | done | an out-of-range candidate can set a heading but can never clear a chosen in-range target |
+| P2 value ranking | done | `value = cost / max(health, 1)`; the windmill/AFUS case inverts from 0.19 vs 1.07 to the reactor by 5.6x |
+| P3 group feasibility | done | `CWeaponDef::GetAlpha()` added; a target needing more than `groupAlpha * kill_margin` is left for a bigger group **while any finishable target is in range**, else the group chips at the best one |
+| P4 AoE splash | **not done** | still the `FIXME`; the per-candidate engine query is the perf risk called out above |
+
+**D4 is resolved.** `CWeaponDef` now caches `GetDamage()` (per projectile,
+`default` armour class), `GetAlpha()` (`damage x salvoSize x
+projectilesPerShot`, i.e. the whole pass) and `GetEdgeEffectiveness()`. A
+weapondef's `burst` is the engine's `salvoSize`, so a Stormbringer is
+110 x 5 = 550, not the 660 the tactics doc claimed. A paralyzer's damage is
+kept in `paralyzeDamage` and its `damage` is zero, so an EMP weapon never
+contributes to a kill-feasibility budget.
+
+### Beyond the original plan
+
+Three things the plan did not cover, added because the group behaviour was the
+real gap:
+
+**Two bombing modes.** `FOCUS` concentrates the group on one target, which is
+what a fat static needs. `AREA` spreads the group into a line across a front
+and bombs the ground, which is what a cluster of cheap targets needs.
+`FindTarget` picks `AREA` when the best target is worth less than `focus_cost`
+and at least `area_min_targets` candidates sit inside `area_radius`; anything
+worth `focus_cost` alone always keeps the group concentrated.
+
+**An approach bearing.** `PickApproachDir` samples `approach_samples` bearings
+on a ring of `approach_ring` around the aim point and takes the lowest total
+threat at the stand-off point and the midpoint of the run-in, so a bearing that
+is clear at range but crosses a battery is not chosen. This matters because air
+LOS is coarse and AA shoots bombers first, so angle beats surprise.
+
+**A line formation.** `AttackArea` places the group abreast, perpendicular to
+the approach bearing, each unit attack-grounding its own slice and then
+attack-moving `cleanup_distance` past the front so survivors clean up and leave
+instead of loitering over the AA. Spacing is
+`clamp(frontLength / (n - 1), min_spacing, 2 x AoE)`: at the top of that range
+the bombs tile the front with no overlap, and a group too large for the front
+packs down toward `min_spacing` and concentrates damage. Front length is
+`min(spacing x (n - 1), area_radius x 2)` — the length of the run scales with
+the size of the run.
+
+This is the first formation code that aircraft ever reach:
+`ISquadTask::Attack` short-circuits its whole arc-and-spacing block for planes
+and issues an individual attack order per unit.
+
+**Mixed waves now form one group.** `CanAssignTo` required an exact def match,
+so a Blizzard/Stiletto/Liche wave flew as three parallel groups each choosing
+its own target. With `group_mixed_defs` (default true) any bomber can join, and
+`ISquadTask` already tracks `lowestSpeed` / `lowestRange` for the heterogeneity.
+
+**Escorts are gated on enemy air.** `AirWaves::FightersFor` scaled 1:1 with
+bombers regardless of what the enemy fielded. Because AA ranks bombers 0.1
+against fighters 2, the escort never screened the run; it only ever fought
+enemy air. The ratio now scales between `EscortMinEnemyAirCost` (no escort) and
+`EscortFullEnemyAirCost` (full ratio) from the cached enemy air and bomber
+cost, so a wave is not delayed for escorts against a purely ground defence.
+
+### Configuration
+
+```json
+"bomber": {
+    "enabled": true,
+    "kill_margin": 1.15,
+    "focus_cost": 1500,
+    "area_min_targets": 3,
+    "area_radius": 900,
+    "min_spacing": 96,
+    "cleanup_distance": 900,
+    "approach_samples": 8,
+    "approach_ring": 1200,
+    "group_mixed_defs": true
+}
+```
+
+Present in the three experimental profiles. The legacy profiles have no block;
+`enabled` defaults true when the block is absent, so they get value ranking and
+feasibility but the same defaults.
+
+### Still open
+
+- **P4**, the AoE splash estimate, which is what would make bombers prefer
+  clusters *by value* rather than by count.
+- **In-game verification.** None of this has been run in a match; the filters
+  1-10 are untouched but the ranking, the mode switch and the formation are all
+  new behaviour. Tracked as `KI-401` in [`known-issues.md`](known-issues.md).
+- **Calibration.** `kill_margin`, `focus_cost`, `area_min_targets` and
+  `min_spacing` are first guesses. Read the `BOMB:` log lines before changing
+  them.

@@ -32,6 +32,15 @@ namespace FactoryProduction {
 
     // Cache: role name -> circuit role mask
     dictionary roleMaskCache;
+    // Role *indices*, not masks. The two are not interchangeable and the
+    // difference is not visible at a call site: a mask is 1 << index, so
+    // passing one where the other is wanted compiles, runs, and reads far out
+    // of bounds. CEnemyManager::GetEnemyThreat / GetEnemyCost index a 64-entry
+    // array by index; Military's caches query them, and did so with masks until
+    // an access violation at f=180 on Eight Horses made it obvious. Anything
+    // taking a "Type" wants this table; anything taking a "Mask" wants the one
+    // above.
+    dictionary roleTypeCache;
 
     // Cache: unit name -> array<string> of role names it belongs to
     // NOT USED - scanning units during initialization causes engine crashes
@@ -115,6 +124,7 @@ namespace FactoryProduction {
     void BuildRoleCaches() {
         GenericHelpers::LogUtil("[FactoryProduction] BuildRoleCaches: Clearing existing caches", 3);
         roleMaskCache.deleteAll();
+        roleTypeCache.deleteAll();
         unitRoleCache.deleteAll();
 
         GenericHelpers::LogUtil("[FactoryProduction] BuildRoleCaches: Building role caches for " + KNOWN_ROLES.length() + " roles", 2);
@@ -142,8 +152,31 @@ namespace FactoryProduction {
         roleMaskCache.set("heavy", int(Unit::Role::HEAVY.mask));
         roleMaskCache.set("super", int(Unit::Role::SUPER.mask));
         roleMaskCache.set("commander", int(Unit::Role::COMM.mask));
+
+        // Same roles, indexed form. See the roleTypeCache comment above.
+        roleTypeCache.set("builder", int(Unit::Role::BUILDER.type));
+        roleTypeCache.set("scout", int(Unit::Role::SCOUT.type));
+        roleTypeCache.set("raider", int(Unit::Role::RAIDER.type));
+        roleTypeCache.set("riot", int(Unit::Role::RIOT.type));
+        roleTypeCache.set("assault", int(Unit::Role::ASSAULT.type));
+        roleTypeCache.set("skirmish", int(Unit::Role::SKIRM.type));
+        roleTypeCache.set("artillery", int(Unit::Role::ARTY.type));
+        roleTypeCache.set("anti_air", int(Unit::Role::AA.type));
+        roleTypeCache.set("anti_sub", int(Unit::Role::AS.type));
+        roleTypeCache.set("anti_heavy", int(Unit::Role::AH.type));
+        roleTypeCache.set("bomber", int(Unit::Role::BOMBER.type));
+        roleTypeCache.set("support", int(Unit::Role::SUPPORT.type));
+        roleTypeCache.set("mine", int(Unit::Role::MINE.type));
+        roleTypeCache.set("transport", int(Unit::Role::TRANS.type));
+        roleTypeCache.set("air", int(Unit::Role::AIR.type));
+        roleTypeCache.set("sub", int(Unit::Role::SUB.type));
+        roleTypeCache.set("static", int(Unit::Role::STATIC.type));
+        roleTypeCache.set("heavy", int(Unit::Role::HEAVY.type));
+        roleTypeCache.set("super", int(Unit::Role::SUPER.type));
+        roleTypeCache.set("commander", int(Unit::Role::COMM.type));
         
-        GenericHelpers::LogUtil("[FactoryProduction] BuildRoleCaches: Cached " + roleMaskCache.getSize() + " role masks", 2);
+        GenericHelpers::LogUtil("[FactoryProduction] BuildRoleCaches: Cached " + roleMaskCache.getSize()
+            + " role masks and " + roleTypeCache.getSize() + " role indices", 2);
 
         // Build unit -> roles mapping - DISABLED due to crashes
         // The issue is that calling GetCircuitDef/IsRoleAny during early initialization

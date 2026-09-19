@@ -754,4 +754,66 @@ namespace EconomyHelpers {
         );
         return result;
     }
+
+    /**************************************************************************
+     MEX UPGRADE PRIORITY
+
+     A metal extractor upgrade is the best metal-per-metal available and the
+     supply of spots is finite, so it outranks anything that merely converts
+     energy. At BAR values the upgrade is ~570 net metal for four times a
+     spot's output at 20 E/s upkeep, against a T2 converter's 380 metal for
+     10.34 M/s at 600 E/s - and 600 E/s is itself ~1940 metal of advanced
+     fusion, which makes the upgrade roughly 1.9x the converter per metal
+     invested. Converters are also unlimited while spots are not.
+
+     Callers put this ahead of their energy ladder. It answers only for
+     constructors that can actually build the T2 extractor, so a T1 builder
+     falls through instead of being blocked.
+     **************************************************************************/
+    bool ShouldUpgradeMexFirst(CCircuitUnit@ u, const AIFloat3 &in anchor, float radius,
+            int maxConcurrent, AIFloat3 &out upgradePos, CCircuitDef@ &out upgradeDef)
+    {
+        upgradePos = AIFloat3(-1, -1, -1);
+        @upgradeDef = null;
+        if (u is null || u.circuitDef is null) return false;
+
+        // Only a T2 constructor can place the advanced extractor.
+        if (UnitHelpers::GetConstructorTier(u.circuitDef) < 2) return false;
+
+        const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(side));
+        if (def is null || !def.IsAvailable(ai.frame)) return false;
+        if (def.maxThisUnit >= 0 && def.count >= def.maxThisUnit) return false;
+
+        const AIFloat3 unitPos = u.GetPos(ai.frame);
+        const AIFloat3 pos = Economy::MexTracker::GetNearestNonUpgradedMexInRange(unitPos, anchor, radius);
+        if (pos.x < 0) return false;
+
+        // Do not pile builders onto a spot that is already being upgraded; the
+        // tracker excludes in-progress spots, this guards the wider area.
+        if (maxConcurrent <= 1 && Economy::MexTracker::AnyUpgradeInProgressNear(pos, radius)) {
+            GenericHelpers::LogUtil("[Econ] ShouldUpgradeMexFirst: upgrade already running near ("
+                + int(pos.x) + "," + int(pos.z) + ")", 4);
+            return false;
+        }
+
+        upgradePos = pos;
+        @upgradeDef = def;
+        GenericHelpers::LogUtil("[Econ] ShouldUpgradeMexFirst: upgrade available at ("
+            + int(pos.x) + "," + int(pos.z) + ") for " + u.circuitDef.GetName(), 3);
+        return true;
+    }
+
+    // Enqueue the upgrade the gate found. Split out so every role's call site is
+    // three lines and identical.
+    IUnitTask@ EnqueueMexUpgradeIfFirst(CCircuitUnit@ u, const AIFloat3 &in anchor, float radius,
+            int maxConcurrent, const string &in roleTag)
+    {
+        AIFloat3 pos;
+        CCircuitDef@ def;
+        if (!ShouldUpgradeMexFirst(u, anchor, radius, maxConcurrent, pos, @def)) return null;
+        GenericHelpers::LogUtil("[" + roleTag + "] Mex upgrade outranks the energy ladder; upgrading ("
+            + int(pos.x) + "," + int(pos.z) + ")", 2);
+        return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, def, pos, -1));
+    }
 }

@@ -121,24 +121,29 @@
 		"max_percent": 0.1,
 		"eps_step": 0.1
 	},
+	// Juno cannot touch an anti-nuke: the pulse only deletes defs flagged
+	// juno_kill / juno_deny / mine, and an anti-nuke carries none of them.
+	// Its real counters are enemy radar and jamming.
 	"juno": {
-		"vs":         ["jammer", "anti_nuke"],
-		"ratio":      [ 0.10,     0.10],
+		"vs":         ["jammer", "radar"],
+		"ratio":      [ 0.10,    0.10],
 		"importance": [ 100.00,  100.00],
 		"max_percent": 0.3,
 		"eps_step": 0
 	},
 	"jammer": {
 		"vs":         ["radar"],
-		"ratio":      [ 0.10,     0.10],
-		"importance": [ 100.00,  100.00],
+		"ratio":      [ 0.10],
+		"importance": [ 100.00],
 		"max_percent": 0.3,
 		"eps_step": 0
 	},
+	// One ratio/importance per "vs" entry: ReadConfig falls back to 1.0 for a
+	// missing index, which silently gave "static" a 10x weight over the other two.
 	"emp": {
 		"vs":         ["anti_nuke", "heavy", "static"],
-		"ratio":      [ 0.10,     0.10],
-		"importance": [ 100.00,  100.00],
+		"ratio":      [ 0.10,      0.10,    0.10],
+		"importance": [ 100.00,   100.00,  100.00],
 		"max_percent": 0.3,
 		"eps_step": 0
 	},

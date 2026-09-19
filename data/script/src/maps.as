@@ -14,7 +14,6 @@
 #include "maps/serene_caldera.as"
 #include "maps/shore_to_shore.as"
 #include "maps/koom_valley.as"
-#include "maps/swirly_rock.as"
 #include "maps/acidic_quarry.as"
 #include "maps/tempest.as"
 #include "maps/tundra_continents.as"

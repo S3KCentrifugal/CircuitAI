@@ -30,7 +30,7 @@ struct SEnemyData {
 
 	enum LosMask: char {NONE   = 0x00,
 						LOS    = 0x01, RADAR = 0x02, HIDDEN = 0x04, NEUTRAL = 0x08,
-						IGNORE = 0x08, DYING = 0x20, DEAD   = 0x40};
+						IGNORE = 0x10, DYING = 0x20, DEAD   = 0x40};
 	using LM = std::underlying_type<LosMask>::type;
 
 	CCircuitDef* cdef;

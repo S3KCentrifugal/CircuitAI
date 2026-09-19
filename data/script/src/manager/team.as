@@ -147,6 +147,7 @@ namespace Team {
             return;
         }
         if (Roster::HandleMessage(msg, fromTeamId)) return;
+        if (Ferry::HandleMessage(msg, fromTeamId)) return;
         HandleOrphanMessage(msg, fromTeamId);
     }
 

@@ -8,10 +8,13 @@
 #include "task/static/SuperTask.h"
 #include "task/fighter/SquadTask.h"
 #include "map/InfluenceMap.h"
+#include "map/MapManager.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
+#include "unit/enemy/EnemyManager.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/CircuitUnit.h"
+#include "unit/CircuitWDef.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -21,8 +24,11 @@
 #include "Lua.h"
 #include "Log.h"
 
+#include <algorithm>
 #include <cmath>
 #include <format>
+#include <limits>
+#include <vector>
 
 namespace circuit {
 
@@ -93,6 +99,35 @@ void CSuperTask::Update()
 
 	if (isTargetOverride) {
 		ExecuteAttack(unit);
+		return;
+	}
+
+	CMilitaryManager* policyMgr = circuit->GetMilitaryManager();
+	const bool isPulse = policyMgr->GetPulseInfo().isEnabled
+			&& cdef->IsRespRoleAny(policyMgr->GetPulseInfo().pulseRole);
+	const CWeaponDef* empWd = cdef->GetWeaponDef();
+	const bool isEmp = !isPulse && policyMgr->GetEmpInfo().isEnabled
+			&& cdef->IsRespRoleAny(policyMgr->GetEmpInfo().empRole)
+			&& (empWd != nullptr) && empWd->IsParalyzer();
+	if (isPulse || isEmp) {
+		// Neither weapon falls back to the group scan: spending the stockpile on
+		// the richest enemy blob, which one cannot damage and the other cannot
+		// hold, is worse than waiting for a target that works.
+		// A known jammer or radar always wins: its position is certain, so a
+		// target deep behind the line is still worth the shot. Only when nothing
+		// is known does the weapon fall back to inferring one from a radar hole.
+		const bool hasTarget = isPulse
+				? (SelectPulseTarget(unit, cdef) || SelectSuspectedJammer(unit, cdef))
+				: SelectEmpTarget(unit, cdef);
+		if (hasTarget) {
+			ExecuteAttack(unit);
+		} else {
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+			SetTarget(nullptr);
+			targetFrame = frame;
+		}
 		return;
 	}
 
@@ -188,13 +223,16 @@ void CSuperTask::Update()
 			}
 		}
 	}
-	const float maxCost = cdef->IsAttrStock() ? cdef->GetWeaponDef()->GetCostM() : cdef->GetCostM() * 0.01f;
+	// NOTE: for a stockpile weapon CWeaponDef::GetCostM() is the per-second
+	//       stockpiling rate, not the cost of a shot; comparing it against a
+	//       group's absolute metal cost left Juno with a ~2.7 metal floor.
+	const float maxCost = cdef->IsAttrStock() ? cdef->GetWeaponDef()->GetCostMShot() : cdef->GetCostM() * 0.01f;
 
 	if ((groupIdx < 0) || (cost < maxCost)) {
-		// Diagnostic for regional super weapons that never fire: which gate rejected
-		// every reachable group. Once a minute per unit (Update runs every
-		// TARGET_DELAY); for stockpiled launchers only while a shot is stocked.
-		if (isRegional && ((frame / TARGET_DELAY) % 6 == 0)
+		// Diagnostic for a super weapon that never fires: which gate rejected every
+		// reachable group. Once a minute per unit (Update runs every TARGET_DELAY);
+		// for stockpiled launchers only while a shot is stocked.
+		if (((frame / TARGET_DELAY) % 6 == 0)
 			&& (!cdef->IsAttrStock() || (unit->GetUnit()->GetStockpile() > 0)))
 		{
 			circuit->LOG("SUPER %s(%i): no target | range=%.0f regional=%i groups=%zu inRange=%i rejInfl=%i rejSquad=%i rejIgnore=%i bestCost=%.0f minCost=%.0f",
@@ -256,6 +294,322 @@ void CSuperTask::Update()
 	}
 }
 
+/*
+ * Shared area-target selection. See the header for the contract.
+ *
+ * Differences from the generic super-weapon scan, all deliberate:
+ *  - no influence gate. The best targets for these weapons are often on ground
+ *    we hold: a jamming push into our own base, a minefield on our expansion.
+ *  - no own-squad exclusion. Neither weapon can damage our units.
+ *  - mobile targets are shot at their last known position while it is fresher
+ *    than mobileMaxAge, which is the only way to hit a mobile jammer at all:
+ *    it hides the very radar that would track it.
+ *  - it attacks the ground, not a unit, because the kill or stun is by area and
+ *    the target may no longer be visible.
+ */
+bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
+		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+
+	struct SAreaCand {
+		springai::AIFloat3 pos;
+		int rank;
+		float value;
+	};
+	std::vector<SAreaCand> cands;
+	int rejRange = 0, rejStale = 0, rejClass = 0;
+
+	for (const SEnemyData& e : circuit->GetEnemyManager()->GetHostileDatas()) {
+		if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore()) {
+			continue;
+		}
+		CCircuitDef* edef = e.cdef;
+		if (edef == nullptr) {
+			continue;
+		}
+		int rank = 0;
+		float value = 0.f;
+		if (!classify(e, edef, rank, value)) {
+			++rejClass;
+			continue;
+		}
+		if (edef->IsMobile() && !e.IsInRadarOrLOS()) {
+			CEnemyInfo* info = circuit->GetEnemyInfo(e.id);
+			const int lastSeen = (info == nullptr) ? -1 : info->GetData()->GetLastSeen();
+			if ((lastSeen < 0) || (frame - lastSeen > mobileMaxAge)) {
+				++rejStale;
+				continue;
+			}
+		}
+		if (position.SqDistance2D(e.pos) >= maxSqRange) {
+			++rejRange;
+			continue;
+		}
+		cands.push_back({e.pos, rank, value});
+	}
+
+	int bestRank = std::numeric_limits<int>::max();
+	float bestValue = 0.f;
+	int bestCount = 0;
+	int bestIdx = -1;
+	for (unsigned i = 0; i < cands.size(); ++i) {
+		int rank = std::numeric_limits<int>::max();
+		float value = 0.f;
+		int count = 0;
+		for (unsigned j = 0; j < cands.size(); ++j) {
+			if (cands[i].pos.SqDistance2D(cands[j].pos) >= sqAoe) {
+				continue;
+			}
+			rank = std::min(rank, cands[j].rank);
+			value += cands[j].value;
+			++count;
+		}
+		if (count < minTargets) {
+			continue;
+		}
+		if ((rank < bestRank) || ((rank == bestRank) && (value > bestValue))) {
+			bestRank = rank;
+			bestValue = value;
+			bestCount = count;
+			bestIdx = int(i);
+		}
+	}
+
+	if (bestIdx < 0) {
+		if ((frame / TARGET_DELAY) % 6 == 0) {
+			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i minTargets=%i",
+					tag, cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange(),
+					cands.size(), rejClass, rejRange, rejStale, minTargets);
+		}
+		return false;
+	}
+
+	SetTarget(nullptr);  // area effect at a position, possibly of a unit we can no longer see
+	const bool isMoved = (targetPos.SqDistance2D(cands[bestIdx].pos) > SQUARE(1.f));
+	targetPos = cands[bestIdx].pos;
+	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
+	if (isMoved) {  // Update runs every TARGET_DELAY: only log a new aim point
+		circuit->LOG("%s %s(%i): rank=%i targets=%i value=%.0f at (%i,%i)",
+				tag, cdef->GetDef()->GetName(), unit->GetId(), bestRank, bestCount, bestValue,
+				int(targetPos.x), int(targetPos.z));
+	}
+	return true;
+}
+
+/*
+ * Pulse weapons (Juno) do 1 damage: their effect is a Lua gadget that deletes
+ * defs flagged juno_kill / juno_deny / mine inside the blast. Ranking enemy
+ * groups by metal cost therefore aims them at armies they cannot touch, so
+ * they select the highest-priority sensor / EW class in range instead.
+ */
+bool CSuperTask::SelectPulseTarget(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	const CMilitaryManager::SPulseInfo& pulse = manager->GetCircuit()->GetMilitaryManager()->GetPulseInfo();
+	return SelectAreaTarget(unit, cdef, "PULSE", SQUARE(cdef->GetAoe()),
+			pulse.minTargets, pulse.mobileMaxAge,
+			[&pulse](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+		// Custom config roles live in respRole: AddRole() puts the requested role
+		// there and only the binded role in role.
+		const bool isJammer = edef->IsRespRoleAny(pulse.jammerRole);
+		const bool isRadar = edef->IsRespRoleAny(pulse.radarRole);
+		if (!isJammer && !isRadar) {
+			return false;
+		}
+		const bool isMobile = edef->IsMobile();
+		CMilitaryManager::PulseClass cls;
+		if (isJammer) {  // a def marked both counts as the jammer it is
+			cls = isMobile ? CMilitaryManager::PulseClass::JAMMER_MOBILE
+					: CMilitaryManager::PulseClass::JAMMER_STATIC;
+		} else {
+			cls = isMobile ? CMilitaryManager::PulseClass::RADAR_MOBILE
+					: CMilitaryManager::PulseClass::RADAR_STATIC;
+		}
+		const int r = pulse.rank[static_cast<CMilitaryManager::PulseC>(cls)];
+		if (r < 0) {
+			return false;  // class excluded by config
+		}
+		rank = r;
+		value = e.cost;
+		return true;
+	});
+}
+
+/*
+ * Fallback when no jammer or radar is known: find the hole one is making.
+ *
+ * A jammer sits inside its own radardistancejam bubble (360-760 in BAR) and
+ * hides itself along with everything near it, so it is a *known* target only
+ * where we have LOS - which in practice means a unit is already standing next
+ * to it. The useful evidence is therefore negative: ground that we cover with
+ * radar, cannot see, believe the enemy holds, and read no contacts from.
+ *
+ * Probes are seeded from known enemy contacts and thrown outward one jam
+ * radius, so the search follows the front and the recently contested ground
+ * rather than sweeping the map. Each probe must satisfy:
+ *
+ *   in our radar coverage  - otherwise "no contact" only means "not looking"
+ *   not in our LOS         - with eyes on it we would see the units directly
+ *   enemy influence        - the enemy operates here; empty rear ground is not
+ *                            evidence of anything
+ *   no contact within holeRadius - the hole itself
+ *
+ * The pulse AoE (1400) is wider than the widest jam radius, so aiming at the
+ * hole tends to catch whatever made it. Each shot that removes a jammer turns
+ * its pocket into contacts, which moves the next hole further along the line:
+ * the weapon walks the front instead of stalling on it.
+ */
+bool CSuperTask::SelectSuspectedJammer(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const CMilitaryManager::SPulseInfo& pulse = circuit->GetMilitaryManager()->GetPulseInfo();
+	if (!pulse.suspectJammer) {
+		return false;
+	}
+	CMapManager* mapMgr = circuit->GetMapManager();
+	CInfluenceMap* inflMap = circuit->GetInflMap();
+	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	const float sqHole = SQUARE(pulse.holeRadius);
+
+	const std::vector<SEnemyData>& enemies = circuit->GetEnemyManager()->GetHostileDatas();
+	AIFloat3 bestPos(-1.f, 0.f, 0.f);
+	float bestScore = 0.f;
+	int probed = 0, rejRadar = 0, rejLos = 0, rejInfl = 0, rejOccupied = 0;
+
+	for (const SEnemyData& seed : enemies) {
+		if (seed.IsFake() || seed.IsDead() || seed.IsDying()) {
+			continue;
+		}
+		for (int i = 0; i < pulse.holeProbes; ++i) {
+			const float angle = (2.f * float(M_PI) * float(i)) / float(pulse.holeProbes);
+			AIFloat3 probe(seed.pos.x + std::cos(angle) * pulse.holeProbeRadius, 0.f,
+					seed.pos.z + std::sin(angle) * pulse.holeProbeRadius);
+			CTerrainManager::CorrectPosition(probe);
+			probe.y = circuit->GetMap()->GetElevationAt(probe.x, probe.z);
+			if (position.SqDistance2D(probe) >= maxSqRange) {
+				continue;
+			}
+			++probed;
+
+			if (!mapMgr->IsInRadar(probe)) {
+				++rejRadar;  // not looking there: silence means nothing
+				continue;
+			}
+			if (mapMgr->IsInLOS(probe)) {
+				++rejLos;    // we can see it; absence of contacts is real
+				continue;
+			}
+			const float infl = inflMap->GetEnemyInflAt(probe);
+			if (infl < pulse.holeMinEnemyInfl) {
+				++rejInfl;   // empty rear ground, not a front
+				continue;
+			}
+			// The hole: nothing known inside a jam radius of the probe.
+			bool occupied = false;
+			for (const SEnemyData& other : enemies) {
+				if (other.IsFake() || other.IsDead() || other.IsDying()) {
+					continue;
+				}
+				if (probe.SqDistance2D(other.pos) < sqHole) {
+					occupied = true;
+					break;
+				}
+			}
+			if (occupied) {
+				++rejOccupied;
+				continue;
+			}
+			// Rank by how strongly we believe the enemy is here.
+			if (bestScore < infl) {
+				bestScore = infl;
+				bestPos = probe;
+			}
+		}
+	}
+
+	if (bestScore <= 0.f) {
+		if ((circuit->GetLastFrame() / TARGET_DELAY) % 6 == 0) {
+			circuit->LOG("PULSE %s(%i): no suspected jammer | probes=%i rejRadar=%i rejLos=%i rejInfl=%i rejOccupied=%i",
+					cdef->GetDef()->GetName(), unit->GetId(), probed, rejRadar, rejLos, rejInfl, rejOccupied);
+		}
+		return false;
+	}
+
+	SetTarget(nullptr);
+	const bool isMoved = (targetPos.SqDistance2D(bestPos) > SQUARE(1.f));
+	targetPos = bestPos;
+	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
+	if (isMoved) {
+		circuit->LOG("PULSE %s(%i): suspected jammer, radar hole at (%i,%i) enemyInfl=%.3f (probes=%i)",
+				cdef->GetDef()->GetName(), unit->GetId(),
+				int(targetPos.x), int(targetPos.z), bestScore, probed);
+	}
+	return true;
+}
+
+/*
+ * EMP weapons deal no health damage. A shot is worth firing only if it lands a
+ * stun, and whether it does is arithmetic, not a property of the target's cost:
+ *
+ *   effective = paralyzeDamage * paralyzemultiplier * salvo
+ *   stunned   iff effective > maxHealth
+ *   seconds   = declineRate * (min(effective / maxHealth, cap) - 1)
+ *   cap       = 1 + paralyzeTime / declineRate
+ *
+ * (Recoil CUnit::DoDamage with modrules.paralyze.paralyzeOnMaxHealth.) So a
+ * Titan at 69 000 health shrugs off one 50 000 shot despite multiplier 1.0,
+ * while every strategic structure in the game is a full-length stun - and
+ * unit_paralyze_damage_limit.lua caps mobiles at 20 s but not buildings, which
+ * is why structures rank first. Anti-nuke is the one class ranked above raw
+ * value: stunning it is what lets a nuke through, and the EMP missile itself
+ * carries no `targetable`, so the anti-nuke cannot intercept it.
+ */
+bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	CMilitaryManager* militaryMgr = manager->GetCircuit()->GetMilitaryManager();
+	const CMilitaryManager::SEmpInfo& emp = militaryMgr->GetEmpInfo();
+	const CWeaponDef* wd = cdef->GetWeaponDef();
+	if ((wd == nullptr) || !wd->IsParalyzer()) {
+		return false;
+	}
+	const float shot = wd->GetParalyzeDamage() * float(militaryMgr->GetEmpSalvoSize());
+	const float decline = 1.f / emp.declineRate;
+	const float cap = 1.f + wd->GetParalyzeTime() * decline;
+
+	return SelectAreaTarget(unit, cdef, "EMP", SQUARE(cdef->GetAoe()),
+			emp.minTargets, emp.mobileMaxAge,
+			[&emp, shot, decline, cap](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+		// BAR's EMPABLE is SURFACE and paralyzemultiplier != 0, so one bit rejects
+		// aircraft, submerged units and every immune def at once.
+		if ((edef->GetCategory() & emp.empableFlag) == 0) {
+			return false;
+		}
+		const float health = edef->GetHealth();
+		const float effective = shot * edef->GetParalyzeMult();
+		if ((health <= 0.f) || (effective <= health)) {
+			return false;  // cannot be stunned by the shots we can land
+		}
+		const float stun = (std::min(effective / health, cap) - 1.f) / decline;
+		if (stun < emp.minStunSeconds) {
+			return false;  // too brief to be worth the shot
+		}
+		const bool isMobile = edef->IsMobile();
+		if (!isMobile && edef->IsRespRoleAny(emp.antiNukeRole)) {
+			rank = 0;
+		} else if (!isMobile) {
+			rank = 1;  // every other structure, ranked by value below
+		} else {
+			rank = emp.structuresFirst ? 2 : 1;
+		}
+		// Value is metal: it floats Ragnarok, AFUS, gantry and silo above a cheap
+		// turret without any of them needing to be tagged.
+		value = e.cost;
+		return true;
+	});
+}
+
 void CSuperTask::SetTargetPos(const AIFloat3& pos)
 {
 	SetTarget(nullptr);
@@ -278,7 +632,9 @@ void CSuperTask::ExecuteAttack(CCircuitUnit* unit)
 	circuit->GetLua()->CallRules(cmd.c_str(), cmd.size());
 
 	TRY_UNIT(circuit, unit,
-		if (!isTargetOverride && GetTarget()->IsInRadarOrLOS() && !circuit->IsCheating()) {
+		if (!isTargetOverride && (GetTarget() != nullptr)
+			&& GetTarget()->IsInRadarOrLOS() && !circuit->IsCheating())
+		{
 			unit->GetUnit()->Attack(GetTarget()->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
 		} else {
 			unit->CmdAttackGround(targetPos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);

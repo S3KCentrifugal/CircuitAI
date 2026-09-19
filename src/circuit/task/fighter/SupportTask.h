@@ -23,6 +23,10 @@ public:
 	virtual void Update() override;
 
 private:
+	// Squads this unit may join. For a mobile radar or jammer the list is
+	// rationed and ranked; see the definition.
+	void FindCandidates(CCircuitUnit* unit, const std::set<IFighterTask*>& tasks,
+			std::vector<IFighterTask*>& outTasks) const;
 	void ApplyPath(const CQueryPathMulti* query);
 };
 

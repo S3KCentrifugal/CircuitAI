@@ -29,7 +29,7 @@ CMapManager::CMapManager(CCircuitAI* circuit, float decloakRadius)
 	int radarMipLevel = mod->GetRadarMipLevel();
 	delete mod;
 
-//	map->GetRadarMap(radarMap);
+	map->GetRadarMap(radarMap);
 	radarWidth = mapWidth >> radarMipLevel;
 	map->GetSonarMap(sonarMap);
 	radarResConv = SQUARE_SIZE << radarMipLevel;
@@ -55,7 +55,7 @@ void CMapManager::InitMaps()
 
 void CMapManager::PrepareUpdate()
 {
-//	circuit->GetMap()->GetRadarMap(radarMap);
+	circuit->GetMap()->GetRadarMap(radarMap);
 	circuit->GetMap()->GetSonarMap(sonarMap);
 	circuit->GetMap()->GetLosMap(losMap);
 }
@@ -105,8 +105,20 @@ bool CMapManager::PeaceInLOS(CEnemyUnit* enemy)
 
 bool CMapManager::IsSuddenThreat(CEnemyUnit* enemy) const
 {
-	return !enemy->IsKnown(circuit->GetLastFrame())
-			|| (!enemy->IsInRadar() && enemy->GetCircuitDef()->IsMobile());
+	// NOTE: CCircuitAI::EnemyEnterLOS calls this *before* allyTeam->EnemyEnterLOS
+	//       identifies the unit, so an enemy that was previously known only by
+	//       radar still has no CCircuitDef here. Dereferencing it faulted at the
+	//       first contacts of a game (access violation, f=181 on Eight Horses).
+	//       An unidentified contact cannot be judged mobile; treat the radar-loss
+	//       case as sudden, which is what the check is reaching for anyway.
+	if (!enemy->IsKnown(circuit->GetLastFrame())) {
+		return true;
+	}
+	if (enemy->IsInRadar()) {
+		return false;
+	}
+	CCircuitDef* edef = enemy->GetCircuitDef();
+	return (edef == nullptr) || edef->IsMobile();
 }
 
 bool CMapManager::EnemyEnterLOS(CEnemyUnit* enemy)
@@ -233,6 +245,28 @@ void CMapManager::DelFakeEnemy(CEnemyFake* enemy)
 	enemyFakes.erase(enemy);
 }
 
+/*
+ * Radar coverage of our ally team at this position. Note this is coverage, not
+ * detection: a unit inside an enemy jammer's radardistancejam (360-760 in BAR)
+ * produces no contact even here, which is exactly the inference a pulse weapon
+ * uses to find a jammer it can never see on radar.
+ */
+bool CMapManager::IsInRadar(const AIFloat3& pos) const
+{
+	// Underwater needs sonar rather than radar (Mod->GetRequireSonarUnderWater).
+	const IntVec& map = (pos.y < -SQUARE_SIZE * 5) ? sonarMap : radarMap;
+	if (map.empty()) {
+		return false;
+	}
+	const int x = (int)pos.x / radarResConv;
+	const int z = (int)pos.z / radarResConv;
+	const int idx = z * radarWidth + x;
+	if ((idx < 0) || (idx >= int(map.size()))) {
+		return false;
+	}
+	return map[idx] > 0;
+}
+
 bool CMapManager::IsInLOS(const AIFloat3& pos) const
 {
 	// res = 1 << Mod->GetLosMipLevel();
@@ -253,16 +287,5 @@ bool CMapManager::IsInLOS(const AIFloat3& pos) const
 	const int z = (int)pos.z / losResConv;
 	return losMap[z * losWidth + x] > 0;
 }
-
-//bool CMapManager::IsInRadar(const AIFloat3& pos) const
-//{
-//	// the value for the full resolution position (x, z) is at index ((z * width + x) / res)
-//	// the last value, bottom right, is at index (width/res * height/res - 1)
-//
-//	// convert from world coordinates to radarmap coordinates
-//	const int x = (int)pos.x / radarResConv;
-//	const int z = (int)pos.z / radarResConv;
-//	return ((pos.y < -SQUARE_SIZE * 5) ? sonarMap : radarMap)[z * radarWidth + x] > 0;
-//}
 
 } // namespace circuit

@@ -679,12 +679,24 @@ Type GetFightType() const;
 void SetTargetPos(const AIFloat3& in pos);
 ```
 
+`CRouteTask` extends `IFighterTask` (created by `TaskF::Route()`; a
+script-owned waypoint route that issues move orders only, see
+`doc/spam-routes.md`):
+
+```angelscript
+void SetRoute(const array<AIFloat3>@ waypoints);
+int GetRouteVersion() const;
+uint GetRouteSize() const;
+bool IsAtEnd(CCircuitUnit@ unit) const;
+```
+
 Available casts are:
 
 ```angelscript
 cast<IBuilderTask>(task);
 cast<IFighterTask>(task);
 cast<CSuperTask>(fighterTask);
+cast<CRouteTask>(fighterTask);
 ```
 
 ### Script task enums
@@ -878,6 +890,8 @@ bool legionEnabled = legion == "1";
 bool IsWaterAVoid() const;
 float GetLandPercent() const;
 float SetAllyZoneRange(float range);
+int GetTerrainWidth() const;    // map size in elmos
+int GetTerrainHeight() const;
 ```
 
 Terrain globals:

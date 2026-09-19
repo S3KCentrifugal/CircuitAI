@@ -249,12 +249,12 @@
 
 	// T1 Defenses -- Legion
 			"legrad":{
-				"role":["static"],
+				"role":["static", "radar"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legjam":{
-				"role":["static"],
+				"role":["static", "jammer"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -315,12 +315,12 @@
 			},
 	// T2 Defenses -- Legion
 			"legarad":{
-				"role":["static"],
+				"role":["static", "radar"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legajam":{
-				"role":["static"],
+				"role":["static", "jammer"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -401,7 +401,7 @@
 				"on": true
 			},
 			"legabm":{
-				"role":	["super", "static"],
+				"role":	["super", "static", "anti_nuke"],
 				"limit": 5,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -413,7 +413,7 @@
 			},
 	// T1 Sea Defenses -- Legion
 			"legfrad": {
-				"role": ["static"],
+				"role": ["static", "radar"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 			 	"power": 1.0
 			},
@@ -749,7 +749,7 @@
 			},
 			"leggob": {
 				"role": ["scout"],
-				"attribute": ["raider"],
+				"attribute": ["raider", "spam"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -821,14 +821,14 @@
 				"power": 1.0
 			},
 			"legaradk": {
-				"role": ["assault"],
+				"role": ["assault", "radar"],
 				"attribute": ["support"],
 				"limit": 1,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legajamk": {
-				"role": ["assault"],
+				"role": ["assault", "jammer"],
 				"attribute": ["support"],
 				"limit": 1,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -912,7 +912,7 @@
 			},
 			"leghades": {
 				"role": ["raider"],
-				"attribute": ["scout"],
+				"attribute": ["scout", "spam"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1019,13 +1019,19 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"leglts": {
-				"role": ["support", "air"],
+			"leglts": {
+				// Ferry transport: "transport", never "support". A support
+				// main role routes it into CSupportTask, which walks it to
+				// the nearest squad - which is exactly what was seen.
+				"role": ["transport", "air"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"legatrans": {
-				"role": ["support", "air"],
+			"legatrans": {
+				// Ferry transport: "transport", never "support". A support
+				// main role routes it into CSupportTask, which walks it to
+				// the nearest squad - which is exactly what was seen.
+				"role": ["transport", "air"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1125,7 +1131,7 @@
 			// LEGION HOVERS
 	
 			"legsh": {
-				"role": ["raider"],
+				"role": ["raider"], "attribute": ["spam"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

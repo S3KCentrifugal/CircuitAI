@@ -2,6 +2,8 @@
 #include "../unit.as"
 #include "../helpers/generic_helpers.as"
 #include "porc_policy.as"
+#include "spam.as"
+#include "ferry.as"
 
 namespace Military {
 
@@ -9,7 +11,8 @@ namespace Military {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
-		IUnitTask@ t = null;
+		IUnitTask@ t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
+		if (t !is null) return t;
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiMakeTaskHandler !is null) {
@@ -32,6 +35,7 @@ namespace Military {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		Spam::OnTaskRemoved(task);
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiTaskRemovedHandler !is null) {
 			cfg.MilitaryAiTaskRemovedHandler(task, done);
@@ -40,6 +44,8 @@ namespace Military {
 
 	void AiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+		Team::Ferry::OnUnitAdded(unit);   // claim a transport, ours or a gift
+
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiUnitAdded !is null) {
@@ -49,6 +55,8 @@ namespace Military {
 
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+		Team::Ferry::OnUnitRemoved(unit);
+
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiUnitRemoved !is null) {
@@ -145,22 +153,21 @@ namespace Military {
 		roles.insertLast("sub");
 		roles.insertLast("anti_sub");
 
-		// Use the same roleMaskCache built by FactoryProduction for consistency.
-		// We access it fully qualified to avoid relying on unqualified globals.
-		int maskVal = 0;
+		// GetEnemyThreat takes a role *index*, not a role mask: it indexes a
+		// 64-entry array directly. This read roleMaskCache and passed the mask
+		// (1 << index), which for "super" is 262144 - a read two megabytes past
+		// the array that faulted at f=180 on Eight Horses. roleTypeCache holds
+		// the same roles in indexed form; native now bounds-checks as well.
+		int roleType = 0;
 		for (uint i = 0; i < roles.length(); ++i) {
 			const string roleName = roles[i];
 			float threat = 0.f;
-			if (FactoryProduction::roleMaskCache.get(roleName, maskVal)) {
-				GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: querying role '" + roleName + "' mask=" + maskVal, 4);
-				
-				if (maskVal != 0) {
-					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: role '" + roleName + "' maskVal=" + maskVal, 4);
-					threat = aiEnemyMgr.GetEnemyThreat(uint(maskVal));
-					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: threat retrieved=" + threat, 4);
-				} else {
-					GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: Skipping invalid maskVal=" + maskVal + " for role " + roleName, 2);
-				}
+			if (FactoryProduction::roleTypeCache.get(roleName, roleType)) {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: querying role '" + roleName + "' type=" + roleType, 4);
+				threat = aiEnemyMgr.GetEnemyThreat(roleType);
+				GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: threat retrieved=" + threat, 4);
+			} else {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyThreatCache: no role index for '" + roleName + "'", 2);
 			}
 			// Sanitize threat from enemy manager
 			if (!(threat == threat) || threat < 0.f) {
@@ -245,14 +252,16 @@ namespace Military {
 		roles.insertLast("sub");
 		roles.insertLast("anti_sub");
 
-		// Use the same roleMaskCache built by FactoryProduction for consistency.
-		int maskVal = 0;
+		// Role *index*, not mask - see UpdateEnemyThreatCache above.
+		int roleType = 0;
 		for (uint i = 0; i < roles.length(); ++i) {
 			const string roleName = roles[i];
 			float cost = 0.f;
-			if (FactoryProduction::roleMaskCache.get(roleName, maskVal)) {
-				GenericHelpers::LogUtil("[Military] UpdateEnemyCostCache: querying role '" + roleName + "' mask=" + maskVal, 4);
-				cost = aiEnemyMgr.GetEnemyCost(uint(maskVal));
+			if (FactoryProduction::roleTypeCache.get(roleName, roleType)) {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyCostCache: querying role '" + roleName + "' type=" + roleType, 4);
+				cost = aiEnemyMgr.GetEnemyCost(roleType);
+			} else {
+				GenericHelpers::LogUtil("[Military] UpdateEnemyCostCache: no role index for '" + roleName + "'", 2);
 			}
 			// Sanitize cost from enemy manager
 			if (!(cost == cost) || cost < 0.f) {
@@ -287,8 +296,7 @@ namespace Military {
 		g_cachedTotalWaterCost += GetCachedRoleCost("sub");
 		g_cachedTotalWaterCost += GetCachedRoleCost("anti_sub");
 
-		// TODO: Replace this stub with a real enemy player/team count from the engine once exposed.
-		g_cachedEnemyPlayerCount = 1;
+		g_cachedEnemyPlayerCount = ai.GetEnemyTeamSize();
 		if (g_cachedEnemyPlayerCount < 1) {
 			g_cachedEnemyPlayerCount = 1;
 		}

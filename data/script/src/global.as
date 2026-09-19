@@ -40,7 +40,12 @@ namespace Global {
 
     // Mod options pulled from engine/lobby; set during Setup::CheckModOptions
     namespace ModOptions {
+        // Set in Setup::CheckModOptions. Content options gate whole unit tiers,
+        // so policy that picks units - the porcupine chain above all - has to
+        // know which are on.
         bool ExperimentalLegionFaction = false;
+        bool ExperimentalExtraUnits = false;
+        bool ScavUnitsForPlayers = false;
         int MapWaterLevel = 0;
         bool MapWaterIsLava = false;
         int MaxUnits = 0;
@@ -82,8 +87,78 @@ namespace Global {
         float ExcessMetalBudgetMod = 2.0f;
     }
 
+    // Spam: economy-gated mass production on parallel routes, see manager/spam.as
+    // and doc/spam-routes.md. Units need "attribute": ["spam"] in behaviour.json.
+    // Air transport ferry (Team::Ferry, manager/ferry.as). AIR builds one
+    // transport for the TECH player on its team when TECH starts its first T2
+    // lab; TECH uses it to fly donated T2 constructors to their recipients.
+    namespace Ferry {
+        bool Enabled = true;
+        // The heavy transports, not the light ones: transportsize 4 against a
+        // T2 constructor's 2x2 footprint, and no transportmass cap, so the
+        // lift is certain. Both come from the T1 air plant, so AIR can build
+        // one the moment it is asked. armatlas / corvalk / leglts are the
+        // light alternatives if the lift turns out to be fine.
+        dictionary TransportBySide = {
+            {"armada", "armhvytrans"},
+            {"cortex", "corhvytrans"},
+            {"legion", "legatrans"}
+        };
+        // How close the transport must get to TECH's base before AIR hands
+        // ownership across.
+        float ArriveRadius = 320.0f;
+        // How long one transport order is allowed to produce nothing before
+        // AIR orders another. Only a safety net: the normal path clears the
+        // latch the moment the unit appears.
+        float OrderTimeoutSeconds = 120.0f;
+    }
+
+    namespace Spam {
+        bool Enabled = true;
+        // Both sliding-minimum incomes must clear these to activate ...
+        //
+        // These are deliberately fusion-era. Below this economy the units spam
+        // produces - Pawn, Grunt, Goblin, Blitz - are ordinary front-line
+        // combat units and the roles should go on spending them as such. Spam
+        // is what a mature economy does with the T1 factories it no longer
+        // needs for the front line, which is why UnitByFactory lists only T1
+        // factories. Do not lower these to "make spam happen sooner": that
+        // takes combat units away from the roles that still need them.
+        float MinMetalIncome = 60.0f;
+        float MinEnergyIncome = 1500.0f;
+        // ... and either falling under this fraction of its threshold deactivates
+        float ReleaseFraction = 0.7f;
+        // Destination lies this far past the focus along our line of approach
+        float BehindEnemyDistance = 2500.0f;
+        // Sideways offset between the lanes of different factories
+        float LaneSpacing = 900.0f;
+        // Waypoints stay this far from the map edge
+        float MapMargin = 200.0f;
+        // Rebuild every lane when the AI's combat focus moves further than
+        // this. Small enough to follow a front that is actually shifting,
+        // large enough that a squad shuffling in place does not re-issue
+        // orders to every spam unit on the map.
+        float FrontMoveThreshold = 1200.0f;
+        // Rotate the focus to the next enemy start spot this often
+        int RefocusMinutes = 6;
+        // Which unit each T1 factory spams; factories not listed keep their role logic
+        dictionary UnitByFactory = {
+            {"armlab", "armpw"},   {"corlab", "corak"},    {"leglab", "leggob"},
+            {"armvp", "armflash"}, {"corvp", "corgator"},  {"legvp", "leghades"},
+            {"armhp", "armsh"},    {"corhp", "corsh"},     {"leghp", "legsh"}
+        };
+    }
+
     // Role-specific overrideable variables in a dedicated namespace
     namespace RoleSettings {        
+        /******************** MEX UPGRADE PRIORITY ********************/
+        // A mex upgrade is the best metal-per-metal available and spots are
+        // finite, so every role ranks it ahead of its energy ladder. Radius is
+        // measured from the role's economy anchor; MaxConcurrent 0 disables it.
+        bool MexUpgradeFirst = true;
+        float MexUpgradeRadius = 2500.0f;
+        int MexUpgradeMaxConcurrent = 1;
+
        
 
         // Max number of workers assigned as guards to a single leader (primary or secondary)
@@ -463,6 +538,11 @@ namespace Global {
             int BomberWaveFirstSize = 20;          // bombers in the first wave, and the floor
             int BomberWaveMaxSize = 300;           // hard cap on bombers per wave
             float BomberWaveFighterRatio = 1.0f;   // fighters held per bomber before a launch
+            // Escorts do not soak AA (bombers are AA's first priority), so they
+            // are only worth delaying a wave for when the enemy flies. Below the
+            // first figure no escort is held; at the second the full ratio is.
+            float EscortMinEnemyAirCost = 300.0f;
+            float EscortFullEnemyAirCost = 3000.0f;
             // Growth applied to the previous wave size from its survival ratio, measured
             // EvaluateSeconds after launch: heavy losses mean the enemy anti-air is winning
             // and the next wave needs mass; light losses grow gently.

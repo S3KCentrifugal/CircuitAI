@@ -15,10 +15,12 @@ line numbers when navigating.
 - [Settings](#settings)
 - [Init: what AIR installs](#init-what-air-installs)
 - [The build-focus system](#the-build-focus-system)
+- [Mex upgrade priority](#mex-upgrade-priority)
 - [Decision flows](#decision-flows)
 - [T2 bomber waves](#t2-bomber-waves)
 - [Commander wind opening](#commander-wind-opening)
 - [Known defects](#known-defects)
+- [Transport ferry](#transport-ferry)
 - [Related](#related)
 
 ## Intent
@@ -112,6 +114,7 @@ with `MinT1AirConstructorCount` 3 and `MinT2AirConstructorCount` 2.
 | `BomberWavesEnabled` | true |
 | `BomberWaveFirstSize` / `BomberWaveMaxSize` | 20 / 300 |
 | `BomberWaveFighterRatio` | 1.0 |
+| `EscortMinEnemyAirCost` / `EscortFullEnemyAirCost` | 300.0 / 3000.0 |
 | `BomberWaveLowSurvival` / `BomberWaveHighSurvival` | 0.4 / 0.8 |
 | `BomberWaveGrowthOnHeavyLoss` / `Default` / `OnLightLoss` | 2.0 / 1.5 / 1.25 |
 | `BomberWaveEvaluateSeconds` | 120 |
@@ -163,6 +166,25 @@ construction task instead of spreading across constructors.
 
 Focus releases when either the deadline passes or both
 `BuildFocusMetalIncome` (20.0) and `BuildFocusEnergyIncome` (300.0) are met.
+
+## Mex upgrade priority
+
+Ahead of this role's energy ladder, `Builder_AiMakeTask` calls
+`EconomyHelpers::EnqueueMexUpgradeIfFirst`. A metal extractor upgrade is the
+best metal-per-metal available (roughly 1.9x a T2 converter once the
+converter's 600 E/s is priced as advanced fusion) and metal spots are finite
+while converters are not, so an upgrade outranks everything that merely
+converts energy.
+
+The gate answers only for constructors of tier 2 or above — a T1 builder
+cannot place the advanced extractor and falls straight through — and it skips a
+spot that is already being upgraded. Ownership and upgrade state come from
+`Economy::MexTracker`, which is now fed role-independently from
+`Builder::AiTaskAdded` / `AiTaskRemoved` rather than from TECH alone.
+
+Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
+`MexUpgradeMaxConcurrent` (1). See `KI-213` in
+[`../known-issues.md`](../known-issues.md).
 
 ## Decision flows
 
@@ -275,11 +297,14 @@ fall back to the native idle task and re-enter `Military::AiMakeTask` within a
 few seconds, where the launch queue hands out wave tasks for
 `BomberWaveReleaseWindowSeconds`. Latecomers rejoin the hold.
 
-**Wave tasks.** One `TaskF::Common(BOMB)` per bomber def (native
-`CBombTask::CanAssignTo` only groups identical defs, and the script assignment
-path does not consult it), so a mixed Blizzard/Stiletto/Liche wave flies as
-parallel bomb groups released in the same second. Target selection stays native;
-its known defects and fix plan are in `doc/bomber-targeting.md`. Fighters get
+**Wave tasks.** One `TaskF::Common(BOMB)` per bomber def. Native
+`CBombTask::CanAssignTo` used to require an identical def, which made a mixed
+Blizzard/Stiletto/Liche wave fly as parallel bomb groups each picking its own
+target; with the `bomber` config block's `group_mixed_defs` (default true) any
+bomber may join the leader's task, so a mixed wave forms one group and one
+line. Target selection stays native and now ranks by value per HP with a
+group kill-feasibility filter, two bombing modes and a line formation - see
+`doc/bomber-targeting.md`, "What was implemented". Fighters get
 `TaskF::Guard(vip)` on the wave's living bombers, round-robin, so they fly with
 the wave; an escort whose bomber dies re-attaches to another living wave bomber.
 
@@ -308,9 +333,18 @@ fighter when fighters lag the held bombers, else a bomber while the hold is belo
 target, else a fighter while escorts are below target. Gated by
 `BomberWaveProductionMetalIncome`.
 
+**Escorts scale with enemy air.** `FightersFor` previously returned
+`bombers x ratio` unconditionally. AA ranks bombers 0.1 against fighters 2
+(`unit_aa_targeting_priority.lua`), so an escort never screens the run - it
+only fights enemy aircraft. The ratio now scales from zero below
+`EscortMinEnemyAirCost` to the full ratio at `EscortFullEnemyAirCost`, read
+from the cached enemy `air` + `bomber` cost, so a wave is not delayed for
+escorts against a purely ground defence.
+
 **Limits.** The script cannot aim a wave (only `CSuperTask` exposes a target
-position) and cannot read enemy groups, so targets are native and sizing uses
-aggregate enemy anti-air cost. A native `CFGuardTask` engages any enemy near its
+position) and cannot read enemy groups, so targets, modes and formation are all
+native; sizing uses aggregate enemy anti-air cost, which only began returning
+real values once the role-mask cache was built unconditionally. A native `CFGuardTask` engages any enemy near its
 vip; the C++ change in `GuardTask.cpp` restricts that to enemies the guards can
 actually hit, so escort fighters no longer dive on ground units and leave the
 bombers.
@@ -353,10 +387,23 @@ until `CommanderWindEnergyIncomeTarget` (300.0) is reached, provided
 7. **`Air_SelectFactoryHandler` is a verbatim copy** of FRONT's and SEA's apart
    from its log prefix, and ignores `isReset`.
 
+## Transport ferry
+
+AIR owes the TECH player on its team exactly one air transport. On receiving
+`barbferry|req` - which TECH sends when its first T2 lab is enqueued -
+`Team::Ferry::FactoryMakeTask` preempts the air plant's normal production for a
+single heavy transport, ahead of everything else, then **flies it to TECH's
+base under AIR's own ownership** and transfers it on arrival.
+
+This is a one-shot commitment: the first request an AIR takes commits it, and
+the preemption ends as soon as the transport exists. It costs AIR one
+190-metal unit and one air-plant slot. Details in
+[`../transport-ferry.md`](../transport-ferry.md).
+
 ## Related
 
 - [README.md](README.md) - the role contract and cross-role findings.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 21ea92efaf3c6db18a685eacacc481540bae8ec6; lines: 1045 -->
+<!-- source: data/script/src/roles/air.as; blob: 519163efcf404f37a10b0208811b5967d15bb32d; lines: 1055 -->

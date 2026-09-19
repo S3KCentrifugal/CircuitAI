@@ -155,6 +155,13 @@ public:
 	void CmdWait(bool state);
 	void RemoveWait();
 	bool IsWaiting() const;
+	// Cargo. The C++ wrapper has had these since the ABI gained them; nothing
+	// wrapped them here, which is why CircuitDef.h notes transport as "not
+	// implemented". Used by CFerryTask; see doc/transport-ferry.md.
+	void CmdLoadUnits(const std::vector<CCircuitUnit*>& cargo, short options = 0, int timeout = INT_MAX);
+	void CmdLoadUnitsInArea(const springai::AIFloat3& pos, float radius, short options = 0, int timeout = INT_MAX);
+	void CmdUnloadUnit(const springai::AIFloat3& pos, CCircuitUnit* cargo, short options = 0, int timeout = INT_MAX);
+	void CmdUnloadUnitsInArea(const springai::AIFloat3& pos, float radius, short options = 0, int timeout = INT_MAX);
 	void CmdRepair(CAllyUnit* target, short options = 0, int timeout = INT_MAX);
 	void CmdBuild(CCircuitDef* buildDef, const springai::AIFloat3& buildPos, int facing, short options = 0, int timeout = INT_MAX);
 	void CmdReclaimEnemy(CEnemyInfo* enemy, short options = 0, int timeout = INT_MAX);

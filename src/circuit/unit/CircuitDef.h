@@ -188,7 +188,7 @@ public:
 	bool IsAttrNoDGun()    const { return attr & AttrMask::NO_DGUN; }
 	bool IsAttrAntiStat()  const { return attr & AttrMask::ANTI_STAT; }
 	bool IsAttrNoRepair()  const { return attr & AttrMask::NO_REPAIR; }  // also per-unit
-	bool IsAttrNoDisrupt() const { return attr & AttrMask::NO_REPAIR; }  // also per-unit
+	bool IsAttrNoDisrupt() const { return attr & AttrMask::NO_DISRUPT; }  // also per-unit
 
 	bool IsHoldFire()   const { return fireState == FireType::HOLD; }
 	bool IsReturnFire() const { return fireState == FireType::RETURN; }
@@ -339,6 +339,9 @@ public:
 	bool IsOn() const { return isOn; }
 
 	float GetHealth()       const { return health; }
+	// BAR customparams.paralyzemultiplier scales incoming paralysis damage.
+	// 0 means immune, and BAR also drops EMPABLE from such a def.
+	float GetParalyzeMult() const { return paralyzeMult; }
 	float GetSpeed()        const { return speed; }
 	float GetLosRadius()    const { return losRadius; }
 	float GetSonarRadius()  const { return sonarRadius; }
@@ -488,6 +491,7 @@ private:
 	// ---- Bit fields ---- END
 
 	float health;
+	float paralyzeMult;
 	float speed;
 	float losRadius;
 	float sonarRadius;

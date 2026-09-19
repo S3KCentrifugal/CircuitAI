@@ -45,7 +45,10 @@ public:
 
 	Mask GetMask(const std::string& name) { return GetTypeMask(name).mask; }
 
-	static Mask GetMask(Type type) { return (1 << type); }
+	// NOTE: Mask is 64 bit; `1` would be int and shifting it by 31 or more is
+	//       undefined, which silently aliased every custom role above bit 30
+	//       (anti_nuke, jammer, radar, emp, juno, spam, ...) onto a low bit.
+	static Mask GetMask(Type type) { return (Mask(1) << type); }
 
 	std::string GetName(Type type) const;
 

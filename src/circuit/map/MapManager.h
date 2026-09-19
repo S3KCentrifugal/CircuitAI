@@ -51,7 +51,10 @@ public:
 	void DelFakeEnemy(CEnemyFake* enemy);
 
 	bool IsInLOS(const springai::AIFloat3& pos) const;
-//	bool IsInRadar(const springai::AIFloat3& pos) const;
+	// True where our ally team has radar coverage. Absence of a radar contact
+	// only means something where we are actually looking, which is what makes
+	// a radar hole evidence of jamming rather than of empty ground.
+	bool IsInRadar(const springai::AIFloat3& pos) const;
 
 private:
 	CCircuitAI* circuit;
@@ -63,7 +66,7 @@ private:
 	CEnemyManager::EnemyUnits peaceUnits;
 	CEnemyManager::EnemyFakes enemyFakes;
 
-//	IntVec radarMap;
+	IntVec radarMap;
 	IntVec sonarMap;
 	IntVec losMap;
 

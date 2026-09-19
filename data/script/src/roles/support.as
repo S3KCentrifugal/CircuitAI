@@ -3,6 +3,7 @@
 #include "../helpers/unitdef_helpers.as"
 #include "../helpers/economy_helpers.as"
 #include "../helpers/guard_helpers.as"
+#include "../helpers/porc_helpers.as"
 #include "../types/role_config.as"
 #include "../global.as"
 #include "../types/terrain.as"
@@ -335,6 +336,16 @@ namespace RoleSupport {
                 if (tLab !is null) return tLab;
             }
 
+            // A mex upgrade outranks the whole energy ladder: best metal per metal,
+            // and the supply of spots is finite. See doc/known-issues.md KI-213.
+            if (Global::RoleSettings::MexUpgradeFirst)
+            {
+            	IUnitTask@ tMexUp = EconomyHelpers::EnqueueMexUpgradeIfFirst(u, Global::Map::StartPos,
+            			Global::RoleSettings::MexUpgradeRadius,
+            			Global::RoleSettings::MexUpgradeMaxConcurrent, "SUPPORT");
+            	if (tMexUp !is null) return tMexUp;
+            }
+
             // Energy converter via shared economy helper with Support thresholds
             if (EconomyHelpers::ShouldBuildT1EnergyConverter(
                 /*metalIncome*/ mi,
@@ -466,6 +477,71 @@ namespace RoleSupport {
         return match;
     }
 
+    /******************************************************************************
+
+    PORCUPINE CHAIN
+
+    ******************************************************************************/
+
+    // SUPPORT trades its Juno for the side's ranged tactical launcher.
+    //
+    // Why the swap is the whole fix. CMilitaryManager::DefaultMakeDefence walks
+    // the chain accumulating cost and stops once the running total passes
+    // maxCost = amountFactor (32-48) x metal income. The launchers sit at chain
+    // positions 16 and 25, behind a cumulative ~24k and ~48k of metal - an
+    // income in the hundreds - so no cluster ever reaches them and the class is
+    // never built. The Juno at position 7 sits behind ~2.5k, which a real
+    // cluster does reach. Putting the launcher there is not a preference over
+    // the Juno so much as the only slot where the launcher can exist.
+    //
+    // Why SUPPORT and not everyone. SUPPORT is the defensive economic role: it
+    // disables its own T1 combat production and expects allies to fight, so a
+    // stockpiled ranged strike it can fire from behind its own porc is worth
+    // more to it than to a role that closes distance. The Juno answers radar,
+    // jammers, mines and scout spam, all of which a forward ally is better
+    // placed to handle; giving that up is the trade the role wants.
+    //
+    // Both are T2, and DefaultMakeDefence skips an unavailable def before it
+    // adds its cost, so the swap is inert until an advanced constructor exists
+    // and the early chain is untouched. After that the point costs the
+    // difference - +960 Armada, +540 Cortex, +590 Legion - which pushes the
+    // entries behind it slightly further out of budget. That is the accepted
+    // cost of the trade.
+    void Support_PorcChain(const string &in side)
+    {
+        array<string>@ land = PorcHelpers::DefaultChain(side, false);
+        const string juno = PorcHelpers::ForSide(@PorcHelpers::Junos, side);
+        const string launcher = PorcHelpers::ForSide(@PorcHelpers::TacticalLaunchers, side);
+
+        if (juno.length() == 0 || launcher.length() == 0) {
+            // An unrecognised side, or one of the tables missing an entry.
+            // Keep the default rather than silently building nothing.
+            GenericHelpers::LogUtil("[Porc] SUPPORT: no launcher mapping for side " + side
+                + "; keeping the default chain", 2);
+        } else {
+            const uint swapped = PorcHelpers::Replace(@land, juno, launcher);
+            if (swapped > 0) {
+                GenericHelpers::LogUtil("[Porc] SUPPORT: " + side + " swapped " + swapped
+                    + " x " + juno + " -> " + launcher, 1);
+            } else {
+                // The chain no longer holds the Juno - a config edit, or a mod
+                // option that rewrote it. Append rather than lose the launcher
+                // entirely; last is where it already was, so this is no worse
+                // than the default.
+                if (!PorcHelpers::Contains(land, launcher)) {
+                    land.insertLast(launcher);
+                }
+                GenericHelpers::LogUtil("[Porc] SUPPORT: " + side + " has no " + juno
+                    + " in the chain; appended " + launcher, 2);
+            }
+        }
+        aiMilitaryMgr.SetPorcChain(side, false, land);
+
+        // Water is untouched: its chain carries no Juno and no launcher, and
+        // neither of these can be built on water anyway.
+        aiMilitaryMgr.SetPorcChain(side, true, PorcHelpers::DefaultChain(side, true));
+    }
+
     void Register() {
         if (RoleConfigs::Get(AiRole::SUPPORT) !is null) return;
         RoleConfig@ cfg = RoleConfig(AiRole::SUPPORT, cast<MainUpdateDelegate@>(@Support_MainUpdate));
@@ -489,6 +565,8 @@ namespace RoleSupport {
         @cfg.FactoryAiUnitAdded = cast<AiUnitAddedDelegate@>(@Support_FactoryAiUnitAdded);
         @cfg.FactoryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Support_FactoryAiUnitRemoved);
             
+
+        @cfg.PorcChainHandler = cast<PorcChainDelegate@>(@Support_PorcChain);
 
         @cfg.RoleMatchHandler = cast<RoleMatchDelegate@>(@Support_RoleMatch);
 

@@ -16,6 +16,7 @@
 #include "unit/action/MoveAction.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/CircuitUnit.h"
+#include "unit/CircuitWDef.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -23,6 +24,11 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "Log.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace circuit {
 
@@ -39,8 +45,14 @@ CBombTask::~CBombTask()
 
 bool CBombTask::CanAssignTo(CCircuitUnit* unit) const
 {
-	if (!unit->GetCircuitDef()->IsRoleBomber() ||
-		(unit->GetCircuitDef() != leader->GetCircuitDef()))
+	if (!unit->GetCircuitDef()->IsRoleBomber()) {
+		return false;
+	}
+	// Grouping by exact def makes a mixed wave fly as several parallel groups,
+	// each picking its own target. Grouping by role lets them form one line.
+	// ISquadTask already tracks lowestSpeed / lowestRange for heterogeneity.
+	if (!manager->GetCircuit()->GetMilitaryManager()->GetBomberInfo().groupMixedDefs
+		&& (unit->GetCircuitDef() != leader->GetCircuitDef()))
 	{
 		return false;
 	}
@@ -164,8 +176,12 @@ void CBombTask::Update()
 	state = State::ROAM;
 	if (GetTarget() != nullptr) {
 		state = State::ENGAGE;
-		Attack(frame, GetTarget()->NotInRadarAndLOS() || (GetTarget()->GetCircuitDef() == nullptr)
-			|| !GetTarget()->GetCircuitDef()->IsMobile() || circuit->IsCheating());
+		if (mode == EMode::AREA) {
+			AttackArea(frame);
+		} else {
+			Attack(frame, GetTarget()->NotInRadarAndLOS() || (GetTarget()->GetCircuitDef() == nullptr)
+				|| !GetTarget()->GetCircuitDef()->IsMobile() || circuit->IsCheating());
+		}
 		return;
 	}
 
@@ -221,6 +237,56 @@ void CBombTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 	}
 }
 
+float CBombTask::GetGroupAlpha() const
+{
+	float alpha = 0.f;
+	for (CCircuitUnit* unit : units) {
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		const CWeaponDef* wd = (cdef != nullptr) ? cdef->GetWeaponDef() : nullptr;
+		if (wd != nullptr) {
+			alpha += wd->GetAlpha();
+		}
+	}
+	return alpha;
+}
+
+/*
+ * Air LOS is coarse and terrain-free, so the defender sees a run coming and
+ * angle matters more than surprise. AA also shoots bombers before anything else
+ * (unit_aa_targeting_priority.lua puts bombers at 0.1 against fighters at 2),
+ * which is why the escort cannot screen the run and why the approach bearing is
+ * worth choosing: sample the threat map on a ring around the aim point and run
+ * in from the quietest side.
+ */
+AIFloat3 CBombTask::PickApproachDir(const AIFloat3& pos) const
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CThreatMap* threatMap = circuit->GetThreatMap();
+	const CMilitaryManager::SBomberInfo& cfg = circuit->GetMilitaryManager()->GetBomberInfo();
+	const int samples = cfg.approachSamples;
+	const float ring = cfg.approachRing;
+
+	AIFloat3 bestDir(1.f, 0.f, 0.f);
+	float bestThreat = std::numeric_limits<float>::max();
+	for (int i = 0; i < samples; ++i) {
+		const float angle = (2.f * float(M_PI) * float(i)) / float(samples);
+		const float dx = std::cos(angle);
+		const float dz = std::sin(angle);
+		AIFloat3 probe(pos.x + dx * ring, pos.y, pos.z + dz * ring);
+		CTerrainManager::CorrectPosition(probe);
+		// Threat at the stand-off point plus the midpoint of the run-in, so a
+		// bearing that is clear at range but crosses a battery is not chosen.
+		AIFloat3 mid(pos.x + dx * ring * 0.5f, pos.y, pos.z + dz * ring * 0.5f);
+		CTerrainManager::CorrectPosition(mid);
+		const float threat = threatMap->GetThreatAt(probe) + threatMap->GetThreatAt(mid);
+		if (threat < bestThreat) {
+			bestThreat = threat;
+			bestDir = AIFloat3(dx, 0.f, dz);
+		}
+	}
+	return bestDir;
+}
+
 void CBombTask::FindTarget()
 {
 	// TODO: 1) Bombers should constantly harass undefended targets and not suicide.
@@ -229,19 +295,22 @@ void CBombTask::FindTarget()
 	CCircuitAI* circuit = manager->GetCircuit();
 	CThreatMap* threatMap = circuit->GetThreatMap();
 	CCircuitDef* cdef = leader->GetCircuitDef();
+	const CMilitaryManager::SBomberInfo& cfg = circuit->GetMilitaryManager()->GetBomberInfo();
 	const bool isAntiStatic = cdef->IsAttrAntiStat();
 	const bool notAW = !cdef->HasSurfToWater();
 	const AIFloat3& pos = leader->GetPos(circuit->GetLastFrame());
 	const float scale = (cdef->GetMinRange() > 300.0f) ? 4.0f : 1.0f;
 	const float maxPower = attackPower * scale * powerMod;
-//	const float maxAltitude = cdef->GetAltitude();
 	const float speed = cdef->GetSpeed() / 1.75f;
 	const int canTargetCat = cdef->GetTargetCategory();
 	const int noChaseCat = cdef->GetNoChaseCategory();
-//	const float range = std::max(unit->GetUnit()->GetMaxRange() + threatMap->GetSquareSize(),
-//								 cdef->GetLosRadius()) * 2;
 	const float sqRange = (GetTarget() != nullptr) ? pos.SqDistance2D(GetTarget()->GetPos()) + 1.f : SQUARE(2000.0f);
-	float minHealth = std::numeric_limits<float>::max();
+
+	// A pass either kills or is wasted, so the group's alpha decides what is
+	// worth attacking at all. Targets it cannot finish are left for a bigger
+	// group - but only while something finishable exists.
+	const float groupAlpha = GetGroupAlpha();
+	const float killCap = groupAlpha * cfg.killMargin;
 
 	COOAICallback* callback = circuit->GetCallback();
 	const float trueAoe = cdef->GetAoe() + SQUARE_SIZE;
@@ -256,8 +325,16 @@ void CBombTask::FindTarget()
 	}
 
 	SetTarget(nullptr);  // make adequate enemy->GetTasks().size()
-	CEnemyInfo* bestTarget = nullptr;
+	CEnemyInfo* bestTarget = nullptr;   // in range and finishable
+	CEnemyInfo* bestFat = nullptr;      // in range, too fat for this group
 	position = -RgtVector;
+	float bestValue = 0.f;
+	float bestFatValue = 0.f;
+	float bestOutValue = 0.f;           // heading only; never displaces a target
+	// Candidates kept for the area-mode cluster test.
+	static std::vector<std::pair<AIFloat3, float>> candidates;  // NOTE: micro-opt
+	candidates.clear();
+
 	threatMap->SetThreatType(leader);
 	const CCircuitAI::EnemyInfos& enemies = circuit->GetEnemyInfos();
 	for (auto& kv : enemies) {
@@ -266,7 +343,7 @@ void CBombTask::FindTarget()
 			continue;
 		}
 		const AIFloat3& ePos = enemy->GetPos();
-		float power = threatMap->GetThreatAt(ePos)/*- enemy->GetThreat(ROLE_TYPE(BOMBER))*/;
+		float power = threatMap->GetThreatAt(ePos);
 		if ((maxPower <= power) ||
 			(notAW && (ePos.y < -SQUARE_SIZE * 5)))
 		{
@@ -275,7 +352,6 @@ void CBombTask::FindTarget()
 
 		int targetCat;
 		float health;
-//		float altitude;
 		CCircuitDef* edef = enemy->GetCircuitDef();
 		if (edef != nullptr) {
 			if ((edef->GetSpeed() > speed)
@@ -289,50 +365,142 @@ void CBombTask::FindTarget()
 				continue;
 			}
 			health = enemy->GetHealth();
-//			altitude = edef->GetAltitude();
 		} else {
-//			targetCat = ~noChaseCat;
-//			altitude = 0.f;
+			continue;  // unidentified radar blips are never bombed
+		}
+
+		if (((targetCat & noChaseCat) != 0) || !noAllies(ePos)) {
 			continue;
 		}
 
-		if (/*enemy->IsInRadarOrLOS() && */((targetCat & noChaseCat) == 0)
-			/*&& (altitude < maxAltitude)*/
-			&& noAllies(ePos))
-		{
-//			float cost = 0.f;
-//			auto enemies = circuit->GetCallback()->GetEnemyUnitIdsIn(ePos, trueAoe);
-//			for (int enemyId : enemies) {
-//				CEnemyInfo* ei = circuit->GetEnemyInfo(enemyId);
-//				if (ei == nullptr) {
-//					continue;
-//				}
-//				// FIXME: Finish
-//                if (near.getHealth() > damage * (1 - near.distanceTo(e.getPos()) * falloff)) {
-//                    metalKilled += 0.33 * near.getMetalCost() * damage * (1 - near.distanceTo(e.getPos()) * falloff) / near.getDef().getHealth();
-//                } else {
-//                    metalKilled += near.getMetalCost();
-//                }
-//				cost += ei->GetCost();
-//			}
-			if (minHealth > health) {
-				minHealth = health;
-				const float sqDist = pos.SqDistance2D(ePos);
-				if (sqDist < sqRange) {
-					bestTarget = enemy;
-				} else {
+		// Value per HP: gain against how much has to be chewed through. Health
+		// is current, so a damaged high-value target becomes more attractive.
+		const float value = enemy->GetCost() / std::max(health, 1.f);
+		candidates.emplace_back(ePos, enemy->GetCost());
+
+		const float sqDist = pos.SqDistance2D(ePos);
+		if (sqDist >= sqRange) {
+			// Out of range: may set a heading, must never clear a chosen target.
+			if (bestOutValue < value) {
+				bestOutValue = value;
+				if (bestTarget == nullptr) {
 					position = ePos;
-					bestTarget = nullptr;
 				}
+			}
+			continue;
+		}
+		if ((groupAlpha > 0.f) && (health > killCap)) {
+			if (bestFatValue < value) {
+				bestFatValue = value;
+				bestFat = enemy;
+			}
+			continue;
+		}
+		if (bestValue < value) {
+			bestValue = value;
+			bestTarget = enemy;
+		}
+	}
+
+	if ((bestTarget == nullptr) && (bestFat != nullptr)) {
+		bestTarget = bestFat;   // nothing finishable in range: chip at the best one
+		bestValue = bestFatValue;
+	}
+
+	mode = EMode::FOCUS;
+	areaCount = 0;
+	if (bestTarget != nullptr) {
+		SetTarget(bestTarget);
+		position = bestTarget->GetPos();
+
+		// Area mode: a cluster of cheap targets is worth a line across a front
+		// rather than the whole group's alpha on one of them. A target worth
+		// focusCost on its own always keeps the group concentrated.
+		if (cfg.isEnabled && (bestTarget->GetCost() < cfg.focusCost) && (units.size() > 1)) {
+			const float sqArea = SQUARE(cfg.areaRadius);
+			AIFloat3 sum(0.f, 0.f, 0.f);
+			int count = 0;
+			for (const auto& cand : candidates) {
+				if (position.SqDistance2D(cand.first) < sqArea) {
+					sum += cand.first;
+					++count;
+				}
+			}
+			if (count >= cfg.areaMinTargets) {
+				mode = EMode::AREA;
+				areaCount = count;
+				areaCentre = sum / float(count);
+				CTerrainManager::CorrectPosition(areaCentre);
+				approachDir = PickApproachDir(areaCentre);
+				// Front length from the size of the run: enough line for every
+				// bomber at its spacing, bounded by the cluster it covers.
+				const float aoe = std::max(cdef->GetAoe(), 1.f);
+				const float spacing = std::max(cfg.minSpacing, aoe * 2.f);
+				frontLength = std::min(spacing * float(units.size() - 1), cfg.areaRadius * 2.f);
 			}
 		}
 	}
 
-	if (bestTarget != nullptr) {
-		SetTarget(bestTarget);
-		position = bestTarget->GetPos();
-	}
+	circuit->LOG("BOMB: leader=%i n=%zu alpha=%.0f maxPower=%.1f mode=%s -> target=%s cost=%.0f health=%.0f value=%.3f areaCount=%i front=%.0f",
+			leader->GetId(), units.size(), groupAlpha, maxPower,
+			(mode == EMode::AREA) ? "AREA" : "FOCUS",
+			((bestTarget != nullptr) && (bestTarget->GetCircuitDef() != nullptr))
+					? bestTarget->GetCircuitDef()->GetDef()->GetName() : "<none>",
+			(bestTarget != nullptr) ? bestTarget->GetCost() : 0.f,
+			(bestTarget != nullptr) ? bestTarget->GetHealth() : 0.f,
+			bestValue, areaCount, frontLength);
 	// Return: target, startPos=leader->pos, endPos=position
+}
+
+/*
+ * Line abreast across the front, perpendicular to the approach bearing. Each
+ * bomber attack-grounds its own slice and then attack-moves out the far side,
+ * so survivors clean up what the pass left and leave along the exit heading
+ * instead of circling back over the AA.
+ *
+ * Spacing is clamped into [minSpacing, 2 * AoE]: at the top the bombs tile the
+ * front with no overlap, and a group too large for the front packs down toward
+ * minSpacing, concentrating damage where the targets are densest.
+ */
+void CBombTask::AttackArea(const int frame)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const CMilitaryManager::SBomberInfo& cfg = circuit->GetMilitaryManager()->GetBomberInfo();
+	const int count = int(units.size());
+	if (count < 1) {
+		return;
+	}
+	const float aoe = std::max(leader->GetCircuitDef()->GetAoe(), 1.f);
+	const float maxSpacing = std::max(cfg.minSpacing, aoe * 2.f);
+	const float spacing = (count > 1)
+			? std::clamp(frontLength / float(count - 1), cfg.minSpacing, maxSpacing)
+			: 0.f;
+	// Perpendicular to the run-in, so the line sweeps the front broadside.
+	const AIFloat3 frontDir(-approachDir.z, 0.f, approachDir.x);
+	const float half = 0.5f * spacing * float(count - 1);
+
+	int idx = 0;
+	for (CCircuitUnit* unit : units) {
+		if (unit->Blocker() != nullptr) {
+			continue;  // Do not interrupt current action
+		}
+		unit->GetTravelAct()->StateWait();
+
+		const float offset = spacing * float(idx) - half;
+		AIFloat3 slot(areaCentre.x + frontDir.x * offset, areaCentre.y, areaCentre.z + frontDir.z * offset);
+		CTerrainManager::CorrectPosition(slot);
+		AIFloat3 exit(slot.x + approachDir.x * cfg.cleanupDistance, slot.y,
+				slot.z + approachDir.z * cfg.cleanupDistance);
+		CTerrainManager::CorrectPosition(exit);
+
+		TRY_UNIT(circuit, unit,
+			unit->CmdAttackGround(slot, 0, frame + FRAMES_PER_SEC * 60);
+			// Queued: clean up and leave rather than loitering over the target.
+			unit->CmdFightTo(exit, UNIT_COMMAND_OPTION_SHIFT_KEY, frame + FRAMES_PER_SEC * 60);
+		)
+		++idx;
+	}
+	attackFrame = frame;
 }
 
 void CBombTask::ApplyTargetPath(const CQueryPathSingle* query)

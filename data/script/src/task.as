@@ -54,6 +54,7 @@ namespace Task {
 		AH,
 		SUPPORT,
 		SUPER,
+		ROUTE,   // CRouteTask: script-owned waypoint route (Spam::)
 		_SIZE_
 	}
 
@@ -319,6 +320,10 @@ namespace TaskS {
 		ti.promote = promote;
 		ti.power = power;
 		return ti;
+	}
+	SFightTask Route()
+	{
+		return Common(Task::FightType::ROUTE);
 	}
 
 }  // namespace TaskF

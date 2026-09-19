@@ -7,6 +7,7 @@
 #include "../types/role_config.as"
 #include "../helpers/unit_helpers.as"
 #include "builder.as"
+#include "ferry.as"
 
 namespace Factory {
 
@@ -107,8 +108,11 @@ namespace Factory {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
-		IUnitTask@ t = null;
+		IUnitTask@ t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision
+		if (t !is null) return t;
 
+		@t = Team::Ferry::FactoryMakeTask(u);      // AIR owes TECH a transport: build it first
+		if (t !is null) return t;
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.FactoryAiMakeTaskHandler !is null) {
@@ -352,6 +356,7 @@ namespace Factory {
 		if (unit is null) 
             return;
 		GenericHelpers::LogUtil("Enter FactoryAiUnitRemoved", 4);
+		Spam::OnFactoryRemoved(unit);   // drop the factory spam route
 		// Clear lab references when a lab dies
 		if (Factory::primaryT1BotLab is unit){ @Factory::primaryT1BotLab = null; }
 		if (Factory::primaryT2BotLab is unit){ @Factory::primaryT2BotLab = null; }
@@ -394,40 +399,50 @@ namespace Factory {
 	*/
 	bool AiIsSwitchTime(int lastSwitchFrame)
 	{
-		bool isSwitchTime = false;
-
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		
-		// Delegate to role handler if present; otherwise compute with default formula
-		if(cfg !is null && cfg.AiIsSwitchTimeHandler !is null)
-			isSwitchTime = cfg.AiIsSwitchTimeHandler(lastSwitchFrame);
 
-		GenericHelpers::LogUtil("Factory switch due (role=" + Global::AISettings::Role + ")", 2); 
-		
+		// Delegate to the role handler if present, else the shared default;
+		// returning false here stopped factory switching whenever RoleCfg was
+		// not yet resolved.
+		bool isSwitchTime;
+		if (cfg !is null && cfg.AiIsSwitchTimeHandler !is null) {
+			isSwitchTime = cfg.AiIsSwitchTimeHandler(lastSwitchFrame);
+		} else {
+			isSwitchTime = RoleConfigs::DefaultAiIsSwitchTime(lastSwitchFrame);
+		}
+
+		if (isSwitchTime) {
+			GenericHelpers::LogUtil("Factory switch due (role=" + Global::AISettings::Role + ")", 2);
+		}
+
 		return isSwitchTime;
 	}
 
 	bool AiIsSwitchAllowed(CCircuitDef@ facDef)
 	{
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		
+
 		bool assistRequired = false;
-		bool ok;
+		// NOTE: AngelScript does not zero locals and only diagnoses uninitialised
+		//       *globals*, so this must be initialised explicitly.
+		bool ok = false;
+
+		// Inputs for the decision
+		const float armyCost = aiMilitaryMgr.armyCost;
+		const int factoryCount = aiFactoryMgr.GetFactoryCount();
+		const float metalCurrent = aiEconomyMgr.metal.current;
 
 		if (cfg !is null && cfg.AiIsSwitchAllowedHandler !is null) {
-			// Compute inputs for decision
-			const float armyCost = aiMilitaryMgr.armyCost;
-			const int factoryCount = aiFactoryMgr.GetFactoryCount();
-			const float metalCurrent = aiEconomyMgr.metal.current;
 			ok = cfg.AiIsSwitchAllowedHandler(facDef, armyCost, factoryCount, metalCurrent, assistRequired);
-		} 
+		} else {
+			ok = RoleConfigs::DefaultAiIsSwitchAllowed(facDef, armyCost, factoryCount, metalCurrent, assistRequired);
+		}
 
 		// Reflect assist decision into managers
-		//Economy::isSwitchAssist = assistRequired;
 		aiFactoryMgr.isAssistRequired = assistRequired;
-		
-		GenericHelpers::LogUtil("Factory switch allowed=" + ok + " assist=" + assistRequired + " fac=" + facDef.GetName(), 2); 
-		
+
+		GenericHelpers::LogUtil("Factory switch allowed=" + ok + " assist=" + assistRequired + " fac=" + facDef.GetName(), 2);
+
 		return ok;
 	}
 

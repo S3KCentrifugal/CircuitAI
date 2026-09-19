@@ -130,12 +130,24 @@ namespace AirWaves {
     bool IsWaveFighter(const CCircuitDef@ d) { return d !is null && waveFighterDefs.exists(d.GetName()); }
 
     // Fighters required to escort `bombers` (ratio rounded up).
+    // Escorts buy nothing against ground AA: unit_aa_targeting_priority.lua
+    // ranks bombers 0.1 against fighters 2, so AA ignores the screen and shoots
+    // the bombers regardless. A fighter is only worth holding a wave for when
+    // the enemy actually flies, so the ratio scales with their air investment
+    // and collapses to zero against a purely ground defence.
     int FightersFor(int bombers)
     {
         const float ratio = Global::RoleSettings::Air::BomberWaveFighterRatio;
         if (ratio <= 0.0f || bombers <= 0) return 0;
-        int n = int(float(bombers) * ratio);
-        if (float(n) < float(bombers) * ratio) ++n;
+        const float enemyAir = Military::GetCachedRoleCost("air")
+            + Military::GetCachedRoleCost("bomber");
+        if (enemyAir < Global::RoleSettings::Air::EscortMinEnemyAirCost) return 0;
+        // Full ratio once the enemy air investment reaches the full-escort mark.
+        const float full = AiMax(Global::RoleSettings::Air::EscortFullEnemyAirCost, 1.0f);
+        const float scale = AiMin(enemyAir / full, 1.0f);
+        const float want = float(bombers) * ratio * scale;
+        int n = int(want);
+        if (float(n) < want) ++n;
         return n;
     }
 

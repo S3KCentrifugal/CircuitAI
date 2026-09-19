@@ -833,6 +833,22 @@ namespace UnitHelpers {
         return ids;
     }
 
+    // Any T2 production lab, land or sea, every faction. Used by the transport
+    // ferry to spot the moment a TECH player commits to T2 (manager/ferry.as).
+    // Aircraft plants are included: a role that techs air is still teching.
+    bool IsT2Lab(const string &in name) {
+        if (name.length() == 0) return false;
+        array<array<string>> lists = {
+            GetAllT2BotLabs(), GetAllT2VehicleLabs(), GetAllT2AircraftPlants(), GetAllT2Shipyards()
+        };
+        for (uint i = 0; i < lists.length(); ++i) {
+            for (uint j = 0; j < lists[i].length(); ++j) {
+                if (lists[i][j] == name) return true;
+            }
+        }
+        return false;
+    }
+
     array<string> GetAllT2BotLabs() {
         array<string> ids;
         ids = { "armalab", "coralab", "legalab" };

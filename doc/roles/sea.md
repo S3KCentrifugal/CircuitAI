@@ -14,6 +14,7 @@ line numbers when navigating.
 - [Registration](#registration)
 - [Settings](#settings)
 - [Init: what SEA installs](#init-what-sea-installs)
+- [Mex upgrade priority](#mex-upgrade-priority)
 - [Decision flows](#decision-flows)
 - [Strategic objectives](#strategic-objectives)
 - [The donation path](#the-donation-path)
@@ -112,6 +113,25 @@ delay of the three dynamic-quota roles.
 5. `FactoryProduction::Initialize()` only if the flag is set.
 6. `ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::SEA, "SEA")`.
 
+## Mex upgrade priority
+
+Ahead of this role's energy ladder, `Builder_AiMakeTask` calls
+`EconomyHelpers::EnqueueMexUpgradeIfFirst`. A metal extractor upgrade is the
+best metal-per-metal available (roughly 1.9x a T2 converter once the
+converter's 600 E/s is priced as advanced fusion) and metal spots are finite
+while converters are not, so an upgrade outranks everything that merely
+converts energy.
+
+The gate answers only for constructors of tier 2 or above — a T1 builder
+cannot place the advanced extractor and falls straight through — and it skips a
+spot that is already being upgraded. Ownership and upgrade state come from
+`Economy::MexTracker`, which is now fed role-independently from
+`Builder::AiTaskAdded` / `AiTaskRemoved` rather than from TECH alone.
+
+Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
+`MexUpgradeMaxConcurrent` (1). See `KI-213` in
+[`../known-issues.md`](../known-issues.md).
+
 ## Decision flows
 
 ### Builder
@@ -209,4 +229,4 @@ than idling.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 8bead5815274c8316e246c4b0a2ce0b37c7a48e1; lines: 904 -->
+<!-- source: data/script/src/roles/sea.as; blob: 2ca62dfaf9951f26f4ba4572b99fea71a7f71a15; lines: 914 -->
