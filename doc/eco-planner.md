@@ -124,19 +124,22 @@ decide:
   0. (opening, roles/tech.as) every reachable mex within OpeningMexRadius, nearest
      the commander first; then native's start factory
   1. if draining:                     options[0] if affordable, else the cheapest lump
-  2. if floatingE, no energy build is active, not energy-stalling, and the
-     actual surplus covers the converter's native energy use:
+  2. the advanced lab, if none stands or is queued, the constructor can build it,
+     M >= MinimumMetalIncomeForT2Lab and E >= MinimumEnergyIncomeForT2Lab
+  3. if (floatingE or surplus >= 2 x EcoConverterUse), not energy-stalling, and the
+     actual surplus covers the converter's native energy use (energy under construction
+     does not block this):
          advanced converter if a T2 constructor asks and M clears its gate
          T1 converter if M < BuildT1ConvertersUntilMetalIncome
-  3. turrets, one at a time: orders not started + turrets under construction
+  3b. turrets, one at a time: orders not started + turrets under construction
      >= EcoMaxConcurrentNanos (1):
          a mobile non-commander constructor assists the turret going up within
          EcoTurretAssistRadius of the base centre ("assistnano"); else nothing here
      otherwise if bpShort (or floatingM) and Layout::CanPlaceTurret(),
      M >= EcoTurretMinMetalIncome, mB >= EcoTurretBankFraction x turret cost:
          turret (nano) on the next planned slot, nearest the factories
-  4. if deficit > 0 and no energy build is active (EcoOneEnergyAtATime; an order counts
-     from the moment it is placed, not only once its frame exists):
+  4. if deficit > 0, not floatingE (a full bank is not a shortage), and no energy build
+     is active (EcoOneEnergyAtATime; an order counts from the moment it is placed):
          options[0] if affordable, else the cheapest lump
   5. energy storage if winds >= EcoStorageWinds and none stands or is queued;
      energy storage if eS < E x EcoStorageSeconds and built+queued is below the cap;
@@ -155,8 +158,9 @@ construction instead" rule (`Tech_RedirectEnergyToReactor`) still applies.
 
 ## Worked openings
 
-**Any map (D-063).** The commander claims the three reachable mexes nearest
-the start within 2,000 elmos, nearest to itself first, and nothing else; the
+**Any map (D-063).** The commander claims up to three reachable mexes within
+700 elmos of the start (the home cluster), nearest to itself first, and
+nothing else; the
 start factory is held until the last of them (or 240 s, or the commander's
 death) and honoured the moment native asks. The mexes eat the 1,000 E bank
 (500 E each), so the lab builds at the commander's 25 E/s unless energy is
@@ -214,6 +218,7 @@ nanos through the ordinary search, logged once. Nothing else spirals.
 | `EcoStorageSeconds` | 20 | storage under this many seconds of income: another |
 | `EcoMaxEnergyStorages` / `EcoMaxMetalStorages` | 1 / 2 | queued work counts toward each cap |
 | `EcoStorageMinMetalBank` | 150 | no storage order under this much banked metal (the rule looped at 0) |
+| `EcoConverterUse` | 70 | a T1 converter's draw; twice this surplus converts even while energy is under construction |
 | `EcoMetalMapSpots` | 150 | metal spots at or above this: a metal map |
 | `EcoBuildPowerPerMetal` | 8 | assist BP wanted around the base per metal income (about what T2 work spends) |
 | `EcoBuildPowerFloatFactor` | 1.5 | ... times this when metal floats |

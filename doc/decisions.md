@@ -2869,8 +2869,45 @@ three-mex opening at two; an energy structure counts as in progress from
 the order on; no storage order under `EcoStorageMinMetalBank` (150) of
 metal; expansion and "no open spot" log at level 1.
 
-**Status.** Built (follow-up 2 DLL `4ba9b805...` deployed 2026-09-21 17:00 with
-the script tree; parity check clean), not Played; see
+**Played, 2026-09-21 (DLL `4ba9b805...`).** Both TECH openings ordered four
+mexes (360, 494, 944, then 1,866 elmos): the native cap counts the three
+nearest *open* spots on every call, so once the first three were ours the
+fourth-nearest qualified. **Follow-up 3 (script only):** the opener counts
+the distinct spots it has ordered and finishes at `OpeningMexCap`; native is
+called uncapped. The native cap stays as it is for expansion.
+
+**Played, 2026-09-21 (follow-up 3 script).** The opening and the lab were
+right; then only energy was built. Late state: energy income 601 against
+pull 59, bank 7,459 of 7,555, metal +20 with a full bank, and the choice
+was "metal storage". Two rules: the converter rule required no energy
+structure in progress, which the one-at-a-time count made nearly always
+true; and nothing put the T2 lab ahead of storage when metal floats. Mex
+expansion had also found no open spot within 2,500 elmos, so converters
+and T2 upgrades were the only metal growth left. **Follow-up 4 (script
+only):** the planner's order is now stall, T2 lab (gate: +18 metal, 500
+energy), converter (bank floating or a surplus of twice a converter's draw,
+energy under construction no longer blocking), turret, energy when short
+and not floating, storage, best-payback energy.
+
+**Played, 2026-09-21 (follow-up 3).** Three orders, in sequence, at 357,
+492 and 947 elmos: the count was right and the third spot was still too
+far - it lies outside the home cluster, toward an ally. **Follow-up 5
+(script only):** `OpeningMexRadius` is 700, the home cluster; the cap of
+three stays for maps where three spots are that close.
+
+**Played, 2026-09-21 (before follow-up 5 reached the install).** After the
+opening the commander walked out to finish a fourth mex and then to a radar
+4,000 elmos away, and came back. Both came through the sequence's "native
+queued orders" rung: native's sensor-guard job queues radars at every
+cluster and the watchdog queues repairs of anything unfinished (a
+constructor's abandoned mex), and the rung handed them to the commander.
+**Follow-up 6 (script only):** the commander never takes queued orders and
+assists only within `ExpCommanderHomeRadius` (800) before guarding the
+factory; constructors take queued orders only within `ExpOrderRadius`
+(2,000) of the base centre.
+
+**Status.** Built (follow-ups 3 to 6 are script only, on DLL `4ba9b805...`),
+not Played; see
 [KI-411](known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
 
 ---

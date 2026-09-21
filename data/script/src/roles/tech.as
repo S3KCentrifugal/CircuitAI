@@ -62,7 +62,8 @@ namespace RoleTech
 	{
 		bool complete = false;
 		int startFrame = 0;
-		int claimed = 0;
+		int claimed = 0;               // distinct spots ordered
+		array<AIFloat3> spots;         // where they are
 
 		float MexRadius()
 		{
@@ -84,6 +85,7 @@ namespace RoleTech
 			complete = labs > 0;
 			startFrame = ai.frame;
 			claimed = 0;
+			spots.resize(0);
 			aiEconomyMgr.holdStartFactory = true;   // for the whole game: the script orders every factory (D-066)
 			// TECH owns storage order (the planner); the native periodic storage
 			// job otherwise races it and counts only completed stores.
@@ -144,17 +146,35 @@ namespace RoleTech
 			IBuilderTask@ cur = (unit.task is null) ? null : cast<IBuilderTask>(unit.task);
 			if (cur !is null && Task::BuildType(cur.GetBuildType()) == Task::BuildType::MEX)
 				return unit.task;
+			// The cap is the opener's own count of distinct spots ordered: native
+			// re-evaluates "open" on every call, so a native cap of three kept
+			// reaching for the next open spot once the first three were ours
+			// (played: a fourth mex at 1,866 elmos).
+			if (MexCap() > 0 && claimed >= MexCap())
+			{
+				if (aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, MexRadius()) > 0)
+					return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+				Finish("the " + MexCap() + " nearest spots are ordered and none is pending");
+				return null;
+			}
 			// An untaken mex order in the radius is handed back before a new spot
 			// is closed (native), so one order exists at a time.
-			IUnitTask@ mex = aiEconomyMgr.EnqueueMexWithin(unit, Global::Map::StartPos, MexRadius(), MexCap());
+			IUnitTask@ mex = aiEconomyMgr.EnqueueMexWithin(unit, Global::Map::StartPos, MexRadius(), 0);
 			if (mex !is null)
 			{
 				IBuilderTask@ order = cast<IBuilderTask>(mex);
 				AIFloat3 at = Global::Map::StartPos;
 				if (order !is null) at = order.GetBuildPos();
-				++claimed;
-				GenericHelpers::LogUtil("[TECH][Opening] home mex order " + claimed + " at (" + int(at.x) + ", " + int(at.z) + "), "
-					+ int(sqrt(MapHelpers::SqDist(at, Global::Map::StartPos))) + " from start", 1);
+				bool known = false;
+				for (uint i = 0; i < spots.length(); ++i)
+					if (MapHelpers::SqDist(spots[i], at) < 64.0f * 64.0f) known = true;
+				if (!known)
+				{
+					spots.insertLast(at);
+					++claimed;
+					GenericHelpers::LogUtil("[TECH][Opening] home mex order " + claimed + "/" + MexCap() + " at (" + int(at.x) + ", " + int(at.z) + "), "
+						+ int(sqrt(MapHelpers::SqDist(at, Global::Map::StartPos))) + " from start", 1);
+				}
 				return mex;
 			}
 			// No open spot left: complete only once no mex order in the radius

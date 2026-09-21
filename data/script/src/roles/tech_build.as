@@ -107,15 +107,27 @@ namespace TechBuild {
         return t;
     }
 
-    // Native's queued orders the script chooses to honour, nearest first.
+    // Native's queued orders the script chooses to honour, nearest first,
+    // and only within ExpOrderRadius of the base: native's sensor job queues
+    // radars at every cluster on the map and the watchdog queues repairs of
+    // anything unfinished anywhere (played: a constructor's abandoned mex and
+    // a radar 4,000 elmos out). Never for the commander.
     IUnitTask@ QueuedOrder(CCircuitUnit@ u)
     {
         array<int> types = {
             int(Task::BuildType::DEFENCE), int(Task::BuildType::RADAR), int(Task::BuildType::SONAR),
             int(Task::BuildType::REPAIR), int(Task::BuildType::BUNKER) };
+        const AIFloat3 home = Layout::BaseCentre();
+        const float radius = Global::RoleSettings::Tech::ExpOrderRadius;
         for (uint i = 0; i < types.length(); ++i) {
             IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, types[i]);
-            if (t !is null) return t;
+            if (t is null) continue;
+            IBuilderTask@ bt = cast<IBuilderTask>(t);
+            if (bt !is null) {
+                const AIFloat3 at = bt.GetBuildPos();
+                if (at.x >= 0.0f && MapHelpers::SqDist(at, home) > radius * radius) continue;
+            }
+            return t;
         }
         return null;
     }
@@ -212,10 +224,18 @@ namespace TechBuild {
         if (t !is null) return t;
 
         if (isCommander) {
+            // The commander stays home after the opening: no queued orders,
+            // assist only within the home radius, then guard the factory.
             @t = RoleTech::Tech_Commander_AiMakeTask(u, null, metalIncome);
-        } else {
-            @t = Strategic(u, metalIncome, energyIncome);
+            if (t !is null) return t;
+            @t = AssistAny(u, Global::RoleSettings::Tech::ExpCommanderHomeRadius);
+            if (t !is null) return t;
+            @t = GuardFactory(u);
+            if (t !is null) return t;
+            return Wait(3 * SECOND);
         }
+
+        @t = Strategic(u, metalIncome, energyIncome);
         if (t !is null) return t;
 
         @t = QueuedOrder(u);

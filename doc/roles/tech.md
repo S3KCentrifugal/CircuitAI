@@ -660,10 +660,14 @@ Decisions:
 [`../tech-eco-meta.md`](../tech-eco-meta.md).
 
 **Opening (`Opening`, commander only).** Before any other structure the
-commander claims the `OpeningMexCap` (3) reachable mexes nearest the start
-within `OpeningMexRadius` (2,000 elmos), taken nearest to itself first
-(`aiEconomyMgr.EnqueueMexWithin` keeps the cap's *open, reachable* spots
-nearest the centre and orders them by the builder's position; cap 0 = all). Played: a fourth
+commander claims up to `OpeningMexCap` (3) reachable mexes nearest the start
+within `OpeningMexRadius` (700 elmos, the home cluster; played, a third spot
+at 947 elmos was too far), taken nearest to itself first
+(the opener counts the distinct spots it has ordered and stops at the cap;
+`aiEconomyMgr.EnqueueMexWithin` is called uncapped and hands out the open
+reachable spot nearest the commander. Played: a native cap re-evaluated
+"open" on every call and reached a fourth spot at 1,866 elmos once the
+first three were ours). Played: a fourth
 spot 944 elmos out toward an ally, and the third mex already empties the
 1,000 E bank, so three and then the planner's energy. One order at a
 time: native re-asks a busy builder every few seconds (`IBuilderTask::Update`
@@ -844,4 +848,4 @@ constructor under turrets from both. Now:
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: 44600830a5e5542f74e7952c42705db34fe3c484; lines: 2507 -->
+<!-- source: data/script/src/roles/tech.as; blob: ca4c857fc60a55763532b1289b53b6855597eea6; lines: 2527 -->

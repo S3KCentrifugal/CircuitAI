@@ -298,6 +298,8 @@ namespace Global {
             float ExperimentalBuildDirectRange = 1600.0f;   // D-064: the engine walks the last leg inside this
             float ExperimentalSearchRadius = 512.0f;        // D-066: how far from an anchor a site may be packed
             float ExpAssistRadius = 1500.0f;                // a constructor with nothing to build assists within this
+            float ExpOrderRadius = 2000.0f;                 // native's queued defence/radar/repair orders are taken only within this of the base
+            float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float EcoMexExpandRadius = 2500.0f;             // constructors expand to the nearest open spot within this ...
             float EcoMexExpandUntilIncome = 60.0f;          // ... while metal income is under this
             bool LayoutEnabled = true;                      // the planned base (needs ExperimentalBuild)
@@ -308,7 +310,10 @@ namespace Global {
             // already drains the 1,000 E bank; three, then the next step.
             // Native's start factory is held until then, at most
             // OpeningMaxSeconds, never past the commander.
-            float OpeningMexRadius = 2000.0f;
+            // 700: the home cluster. Played on Supreme the third spot is 947
+            // elmos out toward an ally and the commander walked there; with
+            // 700 the opening takes the two home spots and the lab follows.
+            float OpeningMexRadius = 700.0f;
             int OpeningMexCap = 3;
             int OpeningMaxSeconds = 240;
             // After the opening the commander stays home: native mex defaults
@@ -366,6 +371,7 @@ namespace Global {
             float EcoStorageSeconds = 20.0f;         // energy storage under this many seconds of income: another
             int EcoMaxEnergyStorages = 1;
             float EcoStorageMinMetalBank = 150.0f;   // no storage order on an empty bank (played: the rule looped at 0 metal)
+            float EcoConverterUse = 70.0f;           // a T1 converter's draw; a surplus of twice this converts even while energy is going up
             int EcoMaxMetalStorages = 2;
             int EcoMetalMapSpots = 150;              // this many metal spots or more counts as a metal map
             bool EcoOneEnergyAtATime = true;         // no new energy structure while one is under construction (unless the bank drains)

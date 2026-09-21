@@ -30,8 +30,8 @@ three seconds and is asked again.
 | 5 | `ExpandMex` | constructors | the nearest open spot the builder can reach within `EcoMexExpandRadius` (every spot inside it considered, nearest first), allied ground excluded, while metal income is under `EcoMexExpandUntilIncome`; logs `expands to a mex at (x, z)` and, once a minute, `no open mex spot within R` |
 | 6 | `Planner` | every builder | `EcoPlanner::Next` / `Execute` behind `Tech_RedirectEnergyToReactor`: energy, converters, turrets, storages, all packed into the turret box |
 | 7 | `Tech_Commander_AiMakeTask` / `Strategic` | commander / constructors | the role's strategic rungs as they stand (recycle, T2 lab gate, nukes, anti-nuke, gantry, water factories, T2 constructor policy) with a null default, so they return null when they have nothing |
-| 8 | `QueuedOrder` | constructors | native's queued defence, radar, sonar, repair and bunker orders, nearest first (`aiBuilderMgr.FindQueuedTask`) |
-| 9 | `AssistAny` | constructors | the nearest structure of ours under construction within `ExpAssistRadius` |
+| 8 | `QueuedOrder` | constructors only | native's queued defence, radar, sonar, repair and bunker orders, nearest first (`aiBuilderMgr.FindQueuedTask`), only within `ExpOrderRadius` of the base centre (native's sensor job queues radars map-wide and the watchdog queues repairs anywhere) |
+| 9 | `AssistAny` | constructors; the commander within `ExpCommanderHomeRadius` | the nearest structure of ours under construction within `ExpAssistRadius` |
 | 10 | `GuardFactory` | constructors | guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
 | 11 | `Wait` | everyone | 3 s, then ask again |
 
@@ -50,6 +50,8 @@ Mex and geo orders are exact spots.
 | `ExperimentalBuild` | true | the switch for the whole system |
 | `ExperimentalSearchRadius` | 512 | how far from an anchor a site may be packed |
 | `ExpAssistRadius` | 1500 | rung 9's radius |
+| `ExpOrderRadius` | 2000 | rung 8's radius from the base centre |
+| `ExpCommanderHomeRadius` | 800 | the commander's assist radius after the opening; it never takes rung 8 |
 | `EcoMexExpandRadius` / `EcoMexExpandUntilIncome` | 2500 / 60 | rung 5 |
 
 ## Logs
@@ -66,4 +68,4 @@ near (x, z) at (x, z), D away` for every packed site, `RESERVE: no site for
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: d4f7d86917344f3895a8789b20098d2a57248db0; lines: 232 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: a309255eb5f460079ca6ab8117711631b4fa3a5b; lines: 252 -->

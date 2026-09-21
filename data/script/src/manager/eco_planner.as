@@ -30,19 +30,27 @@ The order it produces, from the meta (doc/eco-planner.md for the numbers):
   1. Energy draining (bank under EcoEnergyLowPercent and pull over income):
      the source with the lowest metal per E/s the constructor can build,
      the bank can pay within EcoAffordSeconds, and the box can hold.
-  2. Energy floating (bank near full, sustained surplus over pull): a
-     converter whose actual native energy draw is covered; advanced when a
-     T2 constructor asks.
-  3. Metal floating, or build power short of EcoBuildPowerPerMetal times
+  2. The advanced lab the moment its income gate passes: it unlocks the
+     T2 constructors that upgrade mexes and build advanced converters.
+  3. Energy floating (bank near full) or a surplus twice a converter's draw:
+     a converter; advanced when a T2 constructor asks. Energy under
+     construction does not block it - the surplus is measured.
+  4. Metal floating, or build power short of EcoBuildPowerPerMetal times
      the metal income: a construction turret on the next planned slot,
      nearest the factories first.
-  4. Energy below the target for this metal income: the cheapest source as
-     in 1. One energy structure at a time (D-037) unless the bank drains.
-  5. Storage: one energy storage once winds carry the base or the bank is
+  5. Energy below the target for this metal income and not floating: the
+     cheapest source as in 1. One energy structure at a time (D-037).
+  6. Storage: one energy storage once winds carry the base or the bank is
      under EcoStorageSeconds of income; metal storage when metal is full.
-  6. Metal floating with energy already ahead: the best-payback source
+  7. Metal floating with energy already ahead: the best-payback source
      anyway, unless energy is already twice the target.
-  7. Otherwise nothing: the ladder's factories, defence and military run.
+  8. Otherwise nothing: the ladder's factories, defence and military run.
+
+  Scaling, in one line: metal from mexes (opening, expansion, T2 upgrades)
+  and from converters fed by measured energy surplus; energy by cheapest
+  metal per E/s up to a target that ramps with metal income; build power
+  from static turrets against a per-metal target; the T2 lab as soon as
+  income clears its gate, because everything above it needs T2 builders.
 
 Range is part of every choice: an option the turret box cannot hold within
 a turret's reach is not offered, and what is chosen is pinned to the box
@@ -69,6 +77,7 @@ namespace EcoPlanner {
         int t1Cons;
         int t2Cons;
         bool t2Lab;
+        int t2LabQueued;
         int solars;
         int advSolars;
         int winds;
@@ -180,6 +189,10 @@ namespace EcoPlanner {
         s.t1Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
         s.t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
         s.t2Lab = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) > 0;
+        {
+            CCircuitDef@ t2lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
+            s.t2LabQueued = (t2lab is null) ? 0 : aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), t2lab);
+        }
         const string side = Global::AISettings::Side;
         s.solars = Count(UnitHelpers::GetSolarNameForSide(side));
         s.advSolars = Count(UnitHelpers::GetAdvSolarNameForSide(side));
@@ -324,6 +337,21 @@ namespace EcoPlanner {
         return "";
     }
 
+    // The advanced lab as soon as its income gate passes: it is the step that
+    // unlocks T2 constructors (mex upgrades, advanced converters, fusions),
+    // so nothing but a stall outranks it. Played: metal floated at +20 for
+    // minutes while the planner chose storage.
+    string PickT2Lab(const State@ s, string &out why)
+    {
+        if (s.t2Lab || s.t2LabQueued > 0 || s.builderDef is null) return "";
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
+        if (lab is null || !lab.IsAvailable(ai.frame) || !s.builderDef.CanBuild(lab)) return "";
+        if (s.mIncome < Global::RoleSettings::Tech::MinimumMetalIncomeForT2Lab
+            || s.eIncome < Global::RoleSettings::Tech::MinimumEnergyIncomeForT2Lab) return "";
+        why = "advanced lab: +" + int(s.mIncome) + " metal, " + int(s.eIncome) + " energy clear the gate";
+        return "t2lab";
+    }
+
     // Build power: a turret when the assist power around the base is under
     // the target for this income (or metal floats), a slot is planned and
     // the constructor can build one. One at a time: an order not yet started
@@ -372,23 +400,30 @@ namespace EcoPlanner {
             if (key.length() > 0) return key;
         }
 
-        // 2. energy floating: convert it (a metal map has metal everywhere; it converts only a hard float).
-        if (floatingE && !s.energyBuilding && !aiEconomyMgr.isEnergyStalling) {
+        // 2. the advanced lab the moment its gate passes.
+        key = PickT2Lab(s, why);
+        if (key.length() > 0) return key;
+
+        // 3. energy floating, or a surplus that carries a converter twice over:
+        //    convert it. Energy under construction does not block this - a
+        //    converter turns surplus into metal, and the surplus is measured.
+        if ((floatingE || (surplus >= 2.0f * Global::RoleSettings::Tech::EcoConverterUse)) && !aiEconomyMgr.isEnergyStalling) {
             key = PickConverter(s, surplus, why);
             if (key.length() > 0) return key;
         }
 
-        // 3. metal floating or build power short: a construction turret.
+        // 4. metal floating or build power short: a construction turret.
         key = PickTurret(s, floatingM, why);
         if (key.length() > 0) return key;
 
-        // 4. energy below the target for this income: one structure at a time (D-037).
-        if (deficit > 0.0f && !oneAtATime) {
+        // 5. energy below the target for this income, and not floating: one
+        //    structure at a time (D-037). A full bank is not a shortage.
+        if (deficit > 0.0f && !floatingE && !oneAtATime) {
             key = PickEnergy(s, why, "energy " + int(s.eIncome) + " below target " + int(target));
             if (key.length() > 0) return key;
         }
 
-        // 5. storage
+        // 6. storage
         if (s.winds >= Global::RoleSettings::Tech::EcoStorageWinds
             && s.estors + s.estorsQueued < 1 && s.mIncome >= 4.0f && Layout::CanPlace(ai.GetCircuitDef(UnitHelpers::GetEnergyStorageNameForSide(Global::AISettings::Side)))) {
             why = s.winds + " winds and no energy storage: buffer the lulls";
@@ -407,7 +442,7 @@ namespace EcoPlanner {
             return "mstor";
         }
 
-        // 6. metal floating with energy ahead: the best payback anyway, up to twice the target.
+        // 7. metal floating with energy ahead: the best payback anyway, up to twice the target.
         if (floatingM && s.eIncome < 2.0f * target && !oneAtATime) {
             array<Option@> opts = EnergyOptions(s);
             for (uint i = 0; i < opts.length(); ++i) {
@@ -461,6 +496,11 @@ namespace EcoPlanner {
     IUnitTask@ Enqueue(const string &in key, CCircuitUnit@ u)
     {
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
+        if (key == "t2lab") {
+            IUnitTask@ lab = Builder::EnqueueT2BotLabIfNeeded(Global::AISettings::Side, Global::Map::StartPos, 0.0f, 300 * SECOND);
+            if (lab !is null) GenericHelpers::LogUtil("[Eco] advanced lab ordered on the pair's reserved slot", 1);
+            return lab;
+        }
         if (key == "assistnano") {
             CCircuitDef@ nanoDef = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
             CCircuitUnit@ target = (nanoDef is null) ? null
