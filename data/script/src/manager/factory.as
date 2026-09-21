@@ -114,6 +114,9 @@ namespace Factory {
 		@t = Team::Ferry::FactoryMakeTask(u);      // AIR owes TECH a transport: build it first
 		if (t !is null) return t;
 
+		@t = Team::Donation::FactoryMakeTask(u);   // TECH owes a teammate a T2 constructor: build it first
+		if (t !is null) return t;
+
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.FactoryAiMakeTaskHandler !is null) {
 			@t = cfg.FactoryAiMakeTaskHandler(u);

@@ -87,6 +87,7 @@ block of the six.
 | `MinHoverConstructorCount` | 10 |
 | `MetalIncomePerExtraHoverPlant` | 50.0 |
 | `MaxHoverPlants` | 3 |
+| `SeaConstructorMimicsSea` | true |
 | `RequiredMetalIncomeForT2VehiclePlant` | 25.0 |
 
 `MinHoverConstructorCount` of 10 is a very high constructor floor and is the
@@ -180,7 +181,9 @@ principle run separate chains for separate builder cohorts. Today only
 
 `Tactical_BuilderAiMakeTask(builder)` is the largest builder handler in the role
 layer (~127 lines). It routes through `Tactical_TryHandleObjective` first, then
-`Tactical_FallbackEcoTask` when no objective step applies.
+`Tactical_FallbackEcoTask` when no objective step applies. A construction
+ship is routed before any of that to `Tactical_SeaConstructor_AiMakeTask`,
+which runs SEA's naval ladder - see [Naval unlock](#naval-unlock).
 
 ### Factory
 
@@ -270,6 +273,23 @@ priority NOW, the ship itself as the representer so the site test is answered
 by the unit that will do the building). Permission plus one concrete demand;
 the shipyard's own build chain takes it from there.
 
+That was still not enough: the ship built the yard and then idled, because
+nothing in TACTICAL's builder policy asked it for naval eco or construction
+turrets. It now behaves as a SEA constructor would.
+`Tactical_SeaConstructor_AiMakeTask` (gated by `SeaConstructorMimicsSea`)
+runs the ladder SEA's own ships run, moved to
+`helpers/sea_constructor_helpers.as` so both roles share one policy
+([D-042](../decisions.md#d-042--the-sea-constructor-ladder-is-shared-and-tactical-runs-it)):
+`SeaConstructor::T1Ladder` for the primary construction ship (T2 shipyard,
+mex upgrades, naval converter, a nano for whichever factory needs one,
+tidals), `SeaConstructor::T2Ladder` for a T2 sub (advanced naval converter,
+naval fusion), `SeaConstructor::AssistPrimary` for any other ship while
+energy is low. The numbers are SEA's (`SeaConstructor::FromSea()`), which is
+what "mimic SEA" means; a TACTICAL-specific tuning would be a second
+`Settings` object. `Builder::primaryT1SeaConstructor` is assigned
+role-independently, so the donated ship is the primary the moment it
+arrives. Not Played.
+
 ## Related
 
 - [README.md](README.md) - the role contract and cross-role findings.
@@ -279,4 +299,4 @@ the shipyard's own build chain takes it from there.
 - [sea.md](sea.md) - the other objective-driven role, and the source of this
   role's copy-pasted settings comments.
 
-<!-- source: data/script/src/roles/tactical.as; blob: 1f5e08403a7e340dd06e3d052d27f48b193f22c8; lines: 709 -->
+<!-- source: data/script/src/roles/tactical.as; blob: 19efe384d54e3dca39167fd4b56e2d602745355a; lines: 737 -->

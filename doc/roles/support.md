@@ -234,6 +234,10 @@ T1 combat production and expects allies to hold the line is the role least
 placed to exploit that, and most able to use a stockpiled ranged strike fired
 from behind its own porc. This was an explicit trade, not a side effect.
 
+How the launcher then picks its target - and why, until
+[D-036](../decisions.md#d-036--tactical-launchers-aim-by-unit-scan-and-super-statics-bypass-role-policy),
+it never did - is [`../launcher-targets.md`](../launcher-targets.md).
+
 The water chain is untouched: it contains neither unit, and neither is
 buildable on water.
 

@@ -15,6 +15,7 @@
 // Team state: T1 constructor registry for orphan rescue
 #include "team.as"
 #include "ferry.as"
+#include "layout.as"
 #include "sea_assist.as"
 
 namespace Builder {
@@ -538,6 +539,13 @@ namespace Builder {
 	// callbacks; they are released in AiTaskRemoved.
 	IUnitTask@ FusionBuildTask = null;
 	IUnitTask@ AdvancedFusionBuildTask = null;
+	// The most recent T1 energy structure this script queued (solar, advanced
+	// solar, converter). While it is under construction, spare constructors
+	// assist it instead of starting the next one: build power on one structure
+	// finishes it sooner, and a constructor whose assist ends with the structure
+	// re-plans at once. Released in AiTaskRemoved.
+	IUnitTask@ EnergyBuildTask = null;
+	array<IUnitTask@> EnergyAssistTasks;  // live assists on EnergyBuildTask's target
 	// Counts of queued Gantry (experimental) build tasks
 	int LandGantryQueuedCount = 0;
 	int WaterGantryQueuedCount = 0;
@@ -557,6 +565,10 @@ namespace Builder {
 	const int T1_SHIPYARD_COOLDOWN_FRAMES = 120 * SECOND;   // cooldown for T1 shipyard
 	const int T1_CONVERTER_COOLDOWN_FRAMES = 15 * SECOND;  // cooldown for T1 energy converter
 	const int T1_SOLAR_COOLDOWN_FRAMES     = 25 * SECOND;  // cooldown for T1 solar
+	// A constructor blocked by a cooldown assists the structure the last one
+	// started (up to this many), or guards that builder for this long.
+	const int COOLDOWN_ASSIST_MAX             = 3;
+	const int COOLDOWN_GUARD_TIMEOUT_FRAMES   = 30 * SECOND;
 	// Independent cooldowns for nanos and advanced solars
 	const int NANO_BASE_COOLDOWN_FRAMES       = 2 * SECOND;   // base cooldown between nano caretaker enqueues
 	const int NANO_LOW_METAL_COOLDOWN_FRAMES  = 30 * SECOND;  // cooldown when metal income is very low
@@ -663,6 +675,38 @@ namespace Builder {
 		if (tgt is null) return null;
 		// CCircuitUnit is asOBJ_NOCOUNT; reacquire a live handle before use.
 		return ai.GetTeamUnit(tgt.id);
+	}
+
+	CCircuitUnit@ GetEnergyUnderConstruction()
+	{
+		return _ReactorUnderConstruction(EnergyBuildTask);
+	}
+
+	// Put a constructor onto the T1 energy structure already going up, up to
+	// maxAssists of them. Null when nothing is under construction or the
+	// structure has its share already. Same Repair mechanism as the reactor.
+	IUnitTask@ EnqueueAssistEnergy(Task::Priority prio, int timeoutFrames, int maxAssists)
+	{
+		CCircuitUnit@ target = GetEnergyUnderConstruction();
+		if (target is null) return null;
+		if (int(EnergyAssistTasks.length()) >= maxAssists) {
+			GenericHelpers::LogUtil("[BUILDER] EnqueueAssistEnergy: " + target.circuitDef.GetName() + "(" + target.id
+				+ ") already has " + EnergyAssistTasks.length() + " assist(s)", 3);
+			return null;
+		}
+		IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Repair(prio, target, timeoutFrames));
+		if (t !is null) {
+			EnergyAssistTasks.insertLast(t);
+			GenericHelpers::LogUtil("[BUILDER] EnqueueAssistEnergy: " + target.circuitDef.GetName() + "(" + target.id
+				+ ") assists=" + EnergyAssistTasks.length() + "/" + maxAssists, 1);
+		}
+		return t;
+	}
+
+	void _SetEnergyBuildTask(IUnitTask@ t)
+	{
+		@EnergyBuildTask = t;
+		EnergyAssistTasks.resize(0);
 	}
 
 	// Advanced Fusion first: it is the more expensive commitment to finish.
@@ -1335,6 +1379,7 @@ namespace Builder {
 		GenericHelpers::LogUtil("[BUILDER] Enqueue Converter", 2);
 		if (t !is null) {
 			lastT1ConverterEnqueueFrame = ai.frame;
+			_SetEnergyBuildTask(t);
 		}
 		return t;
 	}
@@ -1372,13 +1417,21 @@ namespace Builder {
 			return null;
 		}
 
+		// If the last builder's structure is already going up, assist THAT: the
+		// task ends with the structure, so this constructor re-plans the moment
+		// it completes. A guard on the builder used to run for 200 s, long after
+		// the solar was done, which read as a stalled constructor.
+		IUnitTask@ assist = EnqueueAssistEnergy(Task::Priority::HIGH, cooldownFrames, COOLDOWN_ASSIST_MAX);
+		if (assist !is null) {
+			return assist;
+		}
 		GenericHelpers::LogUtil(
 			"[BUILDER] " + label + ": assigning guard to last builder id=" + owner.id +
 			" from builder id=" + guard.id,
 			3
 		);
 		// Use shared helper for worker guard assignment (avoids self-guard loops)
-		return GuardHelpers::AssignWorkerGuard(guard, owner, Task::Priority::HIGH, true, 200 * SECOND);
+		return GuardHelpers::AssignWorkerGuard(guard, owner, Task::Priority::HIGH, true, COOLDOWN_GUARD_TIMEOUT_FRAMES);
 	}
 
 	IUnitTask@ EnqueueT1Solar(int builderId, const string &in unitSide, const AIFloat3 &in anchor, float squareSize, int timeoutFrames, Task::Priority prio = Task::Priority::NORMAL)
@@ -1406,6 +1459,7 @@ namespace Builder {
 		if (t !is null) {
 			lastT1SolarEnqueueFrame = ai.frame;
 			lastT1SolarBuilderId = builderId;
+			_SetEnergyBuildTask(t);
 		}
 		return t;
 	}
@@ -1431,6 +1485,7 @@ namespace Builder {
 		if (t !is null) {
 			MarkAdvSolarEnqueued();
 			lastAdvSolarBuilderId = builderId;
+			_SetEnergyBuildTask(t);
 		}
 		return t;
 	}
@@ -1478,6 +1533,42 @@ namespace Builder {
 			TaskB::Factory(prio, tidal, anchor, tidal, squareSize, false, true, timeoutFrames)
 		);
 		GenericHelpers::LogUtil("[BUILDER] Enqueue Tidal", 2);
+		return t;
+	}
+
+	// Wind turbine, energy storage, metal storage: the eco planner's (D-058).
+	// Served a layout slot when TECH has one (the wind band, the storage strip).
+	IUnitTask@ EnqueueT1Wind(const string &in unitSide, const AIFloat3 &in anchor, float shake, int timeoutFrames, Task::Priority prio = Task::Priority::NORMAL)
+	{
+		CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(unitSide));
+		if (def is null || !def.IsAvailable(ai.frame)) return null;
+		IUnitTask@ t = aiBuilderMgr.Enqueue(
+			TaskB::Common(Task::BuildType::ENERGY, prio, def, anchor, shake, true, timeoutFrames)
+		);
+		GenericHelpers::LogUtil("[BUILDER] Enqueue Wind", 2);
+		if (t !is null) _SetEnergyBuildTask(t);
+		return t;
+	}
+
+	IUnitTask@ EnqueueT1EnergyStorage(const string &in unitSide, const AIFloat3 &in anchor, float shake, int timeoutFrames, Task::Priority prio = Task::Priority::NORMAL)
+	{
+		CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetEnergyStorageNameForSide(unitSide));
+		if (def is null || !def.IsAvailable(ai.frame)) return null;
+		IUnitTask@ t = aiBuilderMgr.Enqueue(
+			TaskB::Common(Task::BuildType::STORE, prio, def, anchor, shake, true, timeoutFrames)
+		);
+		GenericHelpers::LogUtil("[BUILDER] Enqueue Energy Storage", 2);
+		return t;
+	}
+
+	IUnitTask@ EnqueueT1MetalStorage(const string &in unitSide, const AIFloat3 &in anchor, float shake, int timeoutFrames, Task::Priority prio = Task::Priority::NORMAL)
+	{
+		CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetMetalStorageNameForSide(unitSide));
+		if (def is null || !def.IsAvailable(ai.frame)) return null;
+		IUnitTask@ t = aiBuilderMgr.Enqueue(
+			TaskB::Common(Task::BuildType::STORE, prio, def, anchor, shake, true, timeoutFrames)
+		);
+		GenericHelpers::LogUtil("[BUILDER] Enqueue Metal Storage", 2);
 		return t;
 	}
 
@@ -1529,15 +1620,10 @@ namespace Builder {
 			return null;
 		}
 
-		// Pick side-aware T2 shipyard name
-		string defName = "";
-		if (unitSide == "armada") defName = "armasy";
-		else if (unitSide == "cortex" || unitSide == "legion") defName = "corasy"; // Legion shares Cortex shipyard
-		// Fallback if side not resolved
-		if (defName.length() == 0) {
-			array<string> all = UnitHelpers::GetAllT2Shipyards();
-			if (all.length() > 0) defName = all[0];
-		}
+		// Side-aware T2 shipyard name. This used to send Legion to corasy,
+		// which no Legion constructor can build: the task was enqueued, never
+		// assignable, and Legion SEA never got a T2 shipyard (D-039).
+		string defName = UnitHelpers::GetT2ShipyardForSide(unitSide);
 
 		CCircuitDef@ def = (defName.length() == 0 ? null : ai.GetCircuitDef(defName));
 		if (def is null) {
@@ -2032,6 +2118,19 @@ namespace Builder {
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u) {
 		IUnitTask@ t = null;
 		GenericHelpers::LogUtil("[BUILDER] AiMakeTask called for builder id=" + u.id, 4);
+		// Finish what you started (D-050). Native re-evaluates a builder's task
+		// every few seconds by asking for a new one and swapping if the KIND
+		// differs. With the energy-assist rung answering "repair the solar"
+		// on every ask, a constructor that had begun a nano was swapped to the
+		// assist, the nano abandoned (reservation restored), and the next ask
+		// started another nano: three half-built turrets and no finished one.
+		// A construction task whose structure exists is never swapped here.
+		{
+			IBuilderTask@ cur = (u.task is null) ? null : cast<IBuilderTask>(u.task);
+			if (cur !is null && cur.target !is null && Task::BuildType(cur.GetBuildType()) < Task::BuildType::REPAIR) {
+				return null;
+			}
+		}
 		// New gating via BuilderTaskTrack: grace window, then gate if added, else allow; hard timeout clears
 		BuilderTaskTrack@ tr = GetTrackForBuilder(u);
 		if (tr !is null) {
@@ -2262,6 +2361,16 @@ namespace Builder {
 			@AdvancedFusionBuildTask = null;
 			GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: released Advanced Fusion build task", 2);
 		}
+		if (EnergyBuildTask !is null && EnergyBuildTask is task) {
+			_SetEnergyBuildTask(null);
+			GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: released T1 energy build task (done=" + done + ")", 2);
+		}
+		for (uint i = 0; i < EnergyAssistTasks.length(); ++i) {
+			if (EnergyAssistTasks[i] is task) {
+				EnergyAssistTasks.removeAt(i);
+				break;
+			}
+		}
 		// Resolve metadata BEFORE clearing tracks; prefer tracked
 		BuilderTaskTrack@ tr = GetTrackByTask(task);
 		string bname = (tr is null ? "" : tr.defName);
@@ -2397,6 +2506,13 @@ namespace Builder {
 		Team::SeaAssist::OnUnitAdded(unit);
 
 		const CCircuitDef@ cdef = unit.circuitDef;
+		// Construction turrets are the layout's biggest reservation and the one
+		// whose absence was reported; one line per finished nano proves them.
+		if (cdef !is null && cdef.GetName() == UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)) {
+			const AIFloat3 np = unit.GetPos(ai.frame);
+			GenericHelpers::LogUtil("[BUILDER] nano finished: " + cdef.GetName() + "(" + unit.id + ") at ("
+				+ int(np.x) + "," + int(np.z) + ") reserved slots left " + aiTerrainMgr.GetReservationCount(cdef), 1);
+		}
 
 		// Log details (id, name, tier, commander)
 		LogAiUnitAdded(unit, cdef, usage);

@@ -81,6 +81,10 @@ void CSRepairTask::Update()
 			manager->AbortTask(this);
 			return;
 		}
+		if (circuit->GetBuilderManager()->IsReclaimUnit(repTarget)) {
+			manager->AbortTask(this);  // marked for reclaim by us or a teammate since we started
+			return;
+		}
 
 		IUnitTask* task = nullptr;
 		if (repTarget->GetUnit()->IsBeingBuilt()) {

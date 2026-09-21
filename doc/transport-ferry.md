@@ -45,7 +45,7 @@ In the order the units actually move:
 | 3 | AIR | Transport finishes -> **AIR flies it to TECH's base itself**, still owning it |
 | 4 | AIR | On arrival -> `ai.GiveUnits` to TECH, send `give` |
 | 5 | TECH | Receives it -> `CFerryTask` holds it at TECH's base; it is never an army unit |
-| 6 | TECH | Donates a constructor -> `SetCargo(unit, recipient base)`: pick up, fly, drop |
+| 6 | TECH | A teammate's constructor request is fulfilled (`Team::Donation`, [D-041](decisions.md#d-041--tech-donates-t2-bots-by-plan-and-t2-constructors-only-on-request)) -> `SetCargo(unit, recipient base)`: pick up, fly, drop |
 | 7 | TECH | Drop lands -> TECH gives the constructor to the recipient; the transport flies home |
 
 Step 3 is the part worth being deliberate about. Handing the transport over at
@@ -131,12 +131,17 @@ Script surface: `SetHoldPos(pos)`, `SetCargo(unitId, dropPos)`, `GetState()`,
 the script side holds it across frames and `CFerryTask` resolves it through
 `CCircuitAI::GetTeamUnit`.
 
-**Load verification is by height.** The C++ wrapper exposes no
-`GetTransporter`, so the task infers the load from the cargo being **lifted
-off the terrain** by more than `FERRY_LIFT_HEIGHT` (`IsLifted`), with 2D
-proximity to the transport as a secondary check. The unload is "back on the
-ground". It was originally 2D proximity alone, which cannot separate "carried"
-from "stood under the hovering transport" - see trap 5.
+**Load verification is by height, and the flight does not wait for it.**
+The C++ wrapper exposes no `GetTransporter`, so the task infers the load from
+the cargo being **lifted off the terrain** at all - `FERRY_LIFT_HEIGHT` is
+4 elmos (`IsLifted`) - with 2D proximity to the transport as a secondary
+check; the flight to the drop is **queued behind the load order**
+(`CmdMoveTo` with the shift option), so the transport leaves the moment the
+engine finishes loading whatever the task has detected. The unload is "on
+the ground exactly (`FERRY_GROUND_TOLERANCE` 1 elmo) for two updates
+running" (`landedTicks`). It was originally 2D proximity alone, which cannot
+separate "carried" from "stood under the hovering transport" (trap 5), and
+then a 24-elmo lift bar an Atlas never cleared (trap 8).
 
 **Every state has a deadline** — 90 s travel, 20 s load, 20 s unload, with two
 load retries. Transports in Spring fail to load for reasons the AI cannot
@@ -221,6 +226,18 @@ a success. Both tests are now on the cargo's **height above terrain**
 (`IsLifted`): loaded means lifted, landed means back on the ground. Height is
 the one observable that separates "carried" from "stood under the transport".
 
+**8. An Atlas hovers low with its load.** Played (D-056): team 9's Valkyrie
+delivered every run; team 10's Atlas picked its cargo up and sat there -
+`load retry 1`, `load retry 2`, `run failed (load did not take)` - and the
+fallback gave the constructor to the recipient **while it hung under the
+transport**, which the engine does not detach on a team change. The 24-elmo
+lift bar was the cause: the Atlas holds its load a few elmos up until it is
+told to move, and the move was only sent once the bar was cleared. Now any
+lift counts, and the flight to the drop is queued behind the load order so
+the transport leaves on the engine's say-so, not the task's. The landed test
+went the other way - exactly on the ground for two updates - so a give can
+never come one update early.
+
 **6. A role entry makes a transport ordinary air production.** Trap 2's fix
 gave the six transport defs a `["transport", "air"]` entry in
 `behaviour.json`. That entry is also what the **native recruiter** reads when
@@ -257,12 +274,23 @@ All of them end in the old behaviour — give the constructor and let it walk:
 
 | Failure | Result |
 | --- | --- |
-| No transport yet, or one already in the air | `TryCarry` returns false; immediate `GiveUnits` |
-| Transport dies before a run | Same |
+| No transport yet | `TryCarry` returns false; immediate `GiveUnits` |
+| One already in the air | **Queued** (`queuedCargo`), started by `_Finish` when the run ends; D-044 |
+| Transport dies before a run | Same as no transport; the queue walks (`_WalkQueue`) |
 | Transport dies mid-run | `Update` sees a null task, gives the cargo where it stands |
 | Cargo dies | Run fails; nothing to give |
-| Load or unload never takes | `FAILED` after the deadline; cargo given where it stands |
+| Load never takes | Two retries, then `FAILED`; cargo given where it stands. A cargo that *is* lifted (any height) goes through `DUMPING` first, so it is never given while hanging |
+| Drop occupied | The unload is ordered at the nearest clear footprint (`FindLandingSpot`); two widening retries; then the cargo is **set down where the transport is** (`DUMPING`) before `FAILED` |
 | AIR never builds one | TECH simply never gets a ferry |
+
+Played finding (D-044): the drop was the recipient's start position, which
+is its base. The engine refuses an unload onto occupied ground and says
+nothing, so the transport hovered for the 20 s deadline, the run failed,
+and the fallback gave the constructor away **while it still hung under the
+transport** - the "transferred without delivery" report. Two runs in that
+game delivered and two failed that way; two more failed to load because
+the constructor had taken a build order and walked off. `SetCargo` now parks
+the cargo in a builder `Wait` and stops it.
 
 The donation accounting (`given`, `givenTo`) runs exactly once on every path,
 so a ferried donation consumes the same slot a walked one would.
@@ -307,14 +335,16 @@ asked.
    type-checks against the registered API; no match has exercised it. The
    positional load check in particular wants a real load to confirm the
    tolerance.
-2. **One transport, one run at a time.** A second donation while a run is in
-   flight walks. Sequential donations reuse the transport.
+2. **One transport, one run at a time.** A second constructor while a run is
+   in flight waits in `queuedCargo` and flies next; it works normally until
+   its turn.
 3. **One request at a time per AIR.** A `req` that arrives while AIR is
    serving another is dropped, not queued; the requester re-asks after its
    cooldown. Two requesters therefore get served in the order their cooldowns
    happen to land, not in the order they first asked.
-4. **The drop is the recipient's start position**, not a chosen safe spot near
-   it. A recipient whose base has moved or been overrun gets a drop into
+4. **The drop is aimed at the recipient's start position**; the landing is
+   the nearest footprint the engine calls clear within 320 elmos of it (then
+   640, 960 on retries). A base that has been overrun gets a drop into
    whatever is there now.
 5. **No escort.** The transport flies alone. On a map with live enemy air this
    is a 70-metal unit carrying a 430-metal one with no cover.

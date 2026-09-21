@@ -59,6 +59,19 @@ so slow production never stalls the air war.
 Production: the T2 aircraft plant asks MakeProductionTask for the next wave
 unit; bombers and fighters are grown together so the escort never lags.
 
+Income floor (D-045): whatever the survival growth says, a wave must hold
+BomberWaveSizePerIncomeStep bombers for every BomberWaveIncomeStep of
+sliding-minimum metal income - 50 at +100, 100 at +200 - before it launches.
+
+Attack methods (D-045, doc/air-wave-attacks.md): each launch draws one of
+CARPET / FLANK / PINCER / STRIKE / DEEP / FEINT by weight and hands every
+bomber one native CAirWaveTask carrying the plan: form a line abreast at the
+stand-off, hold if told, attack-move down parallel lanes through the aim
+(carpet) or dive on the chosen unit (strike). When the run is over the task
+aborts itself, the survivors are handed the plain native bomb task once
+(mop-up, `mopUp`), and after that they rejoin the hold. With no wave task
+(the enqueue failed) a launch falls back to the plain bomb tasks as before.
+
 CCircuitUnit handles are not ref-counted: only ids are stored and units are
 re-acquired with ai.GetTeamUnit(id). Task handles are ref-counted and are kept
 only for the release window; Military::AiTaskRemoved drops them early.
@@ -81,6 +94,9 @@ namespace AirWaves {
     dictionary waveBombers;      // id string -> int id, launched bombers still alive
     dictionary waveFighters;     // id string -> int id, launched escorts still alive
     dictionary waveBombTasks;    // bomber def name -> IUnitTask@, release window only
+    IUnitTask@ waveTask = null;  // the launched wave's CAirWaveTask, until it aborts itself
+    dictionary mopUp;            // id string -> true: a native bomb task is still owed after the run
+    int lastMethod = -1;         // Task::WaveMode of the last launch
     uint nextVipIdx = 0;
     int releaseUntilFrame = -1;  // >= 0 while released units are being re-tasked
 
@@ -110,6 +126,9 @@ namespace AirWaves {
         waveBombers.deleteAll();
         waveFighters.deleteAll();
         waveBombTasks.deleteAll();
+        @waveTask = null;
+        mopUp.deleteAll();
+        lastMethod = -1;
         nextVipIdx = 0;
         holdSinceFrame = -1;
         releaseUntilFrame = -1;
@@ -166,7 +185,7 @@ namespace AirWaves {
         if (launchQueue.exists(key)) {
             launchQueue.delete(key);
             if (ai.frame <= releaseUntilFrame) {
-                IUnitTask@ t = isBomber ? _MakeWaveBombTask(u) : _MakeEscortTask(u);
+                IUnitTask@ t = isBomber ? _MakeWaveTaskFor(u) : _MakeEscortTask(u);
                 if (t !is null) return t;
             }
             // Missed the window or nothing to join: park it for the next wave.
@@ -178,11 +197,135 @@ namespace AirWaves {
             waveFighters.delete(key);
         }
         else if (isBomber && waveBombers.exists(key)) {
+            if (mopUp.exists(key)) {
+                // The planned run is over (CAirWaveTask aborted itself): one
+                // native bomb task to finish what the carpet left, then home.
+                mopUp.delete(key);
+                IUnitTask@ t = _MakeWaveBombTask(u);
+                if (t !is null) return t;
+            }
             // Wave bomber back from its run (bomb task aborted or merged away): the
             // wave is over for this unit, it rejoins the pool.
             waveBombers.delete(key);
         }
         return _MakeHoldTask(u, isBomber);
+    }
+
+    /**************************************************************************
+     Sizing floor from income (D-045).
+     **************************************************************************/
+    int IncomeFloor()
+    {
+        const float step = Global::RoleSettings::Air::BomberWaveIncomeStep;
+        if (step <= 0.0f) return 0;
+        const float mi = Economy::GetMinMetalIncomeLast10s();
+        return int(mi / step) * Global::RoleSettings::Air::BomberWaveSizePerIncomeStep;
+    }
+
+    // What the next wave must hold: the survival-grown target or the income floor.
+    int Required()
+    {
+        const int floor = IncomeFloor();
+        int req = (nextWaveSize > floor) ? nextWaveSize : floor;
+        const int hi = Global::RoleSettings::Air::BomberWaveMaxSize;
+        return (req > hi) ? hi : req;
+    }
+
+    /**************************************************************************
+     Attack methods (doc/air-wave-attacks.md).
+     **************************************************************************/
+    int _ChooseMethod()
+    {
+        array<float> w = {
+            Global::RoleSettings::Air::WaveWeightCarpet, Global::RoleSettings::Air::WaveWeightFlank,
+            Global::RoleSettings::Air::WaveWeightPincer, Global::RoleSettings::Air::WaveWeightStrike,
+            Global::RoleSettings::Air::WaveWeightDeep, Global::RoleSettings::Air::WaveWeightFeint };
+        float sum = 0.0f;
+        for (uint i = 0; i < w.length(); ++i) { if (w[i] > 0.0f) sum += w[i]; }
+        if (sum <= 0.0f) return Task::WaveMode::CARPET;
+        const float roll = (float(AiRandom(0, 999)) + 0.5f) / 1000.0f * sum;
+        float acc = 0.0f;
+        for (uint i = 0; i < w.length(); ++i) {
+            if (w[i] <= 0.0f) continue;
+            acc += w[i];
+            if (roll < acc) return int(i);
+        }
+        return Task::WaveMode::CARPET;
+    }
+
+    string MethodName(int m)
+    {
+        if (m == Task::WaveMode::CARPET) return "CARPET";
+        if (m == Task::WaveMode::FLANK) return "FLANK";
+        if (m == Task::WaveMode::PINCER) return "PINCER";
+        if (m == Task::WaveMode::STRIKE) return "STRIKE";
+        if (m == Task::WaveMode::DEEP) return "DEEP";
+        if (m == Task::WaveMode::FEINT) return "FEINT";
+        return "?";
+    }
+
+    // The point a carpet runs through: the current combat focus, else the
+    // middle of the map.
+    AIFloat3 _FrontAim()
+    {
+        AIFloat3 p = aiMilitaryMgr.GetCombatFocusPos();
+        if (p.x < 0.0f || p.z < 0.0f) {
+            p = AIFloat3(float(AiTerrainWidth()) * 0.5f, 0.0f, float(AiTerrainHeight()) * 0.5f);
+        }
+        return p;
+    }
+
+    // Build the launched wave's plan. Null when the native task could not be
+    // made; the launch then uses the plain bomb tasks.
+    IUnitTask@ _PlanWave(int bombers)
+    {
+        IUnitTask@ raw = aiMilitaryMgr.Enqueue(TaskF::Wave());
+        IFighterTask@ ft = (raw is null) ? null : cast<IFighterTask>(raw);
+        CAirWaveTask@ wt = (ft is null) ? null : cast<CAirWaveTask>(ft);
+        if (wt is null) {
+            GenericHelpers::LogUtil("[AIR][Waves] no CAirWaveTask; wave " + waveIndex + " flies the plain bomb task", 1);
+            return null;
+        }
+        const float fd = Global::RoleSettings::Air::WaveFormDistance;
+        const float sp = Global::RoleSettings::Air::WaveLaneSpacing;
+        const float ov = Global::RoleSettings::Air::WaveOverrun;
+        const int ft0 = Global::RoleSettings::Air::WaveFormTimeoutSeconds * SECOND;
+        const float minCost = Global::RoleSettings::Air::WaveStrikeMinStaticCost;
+        int method = _ChooseMethod();
+        AIFloat3 aim = _FrontAim();
+        string detail = "";
+        if (method == Task::WaveMode::STRIKE || method == Task::WaveMode::DEEP) {
+            const int pref = (method == Task::WaveMode::DEEP) ? 1 : 0;
+            if (wt.PickStrikeTarget(Global::Map::StartPos, pref, minCost, true)) {
+                aim = wt.GetAim();
+                detail = " target=" + wt.GetStrikeTargetId();
+            } else {
+                GenericHelpers::LogUtil("[AIR][Waves] " + MethodName(method) + ": no qualifying target (statics >= "
+                    + int(minCost) + " or T3); carpeting the front instead", 1);
+                method = Task::WaveMode::CARPET;
+            }
+        }
+        if (method == Task::WaveMode::CARPET) {
+            wt.SetPlan(method, aim, fd, sp, ov, ft0, 0, 0.0f, 1);
+        } else if (method == Task::WaveMode::FLANK) {
+            const float lo = Global::RoleSettings::Air::WaveFlankMinDeg;
+            const float hi = Global::RoleSettings::Air::WaveFlankMaxDeg;
+            float deg = lo + (hi - lo) * float(AiRandom(0, 999)) / 999.0f;
+            if (AiRandom(0, 1) == 1) deg = -deg;
+            detail = " bearing=" + int(deg);
+            wt.SetPlan(method, aim, fd, sp, ov, ft0, 0, deg, 1);
+        } else if (method == Task::WaveMode::PINCER) {
+            wt.SetPlan(method, aim, fd, sp, ov, ft0, 0, Global::RoleSettings::Air::WavePincerDeg, 2);
+        } else if (method == Task::WaveMode::STRIKE || method == Task::WaveMode::DEEP) {
+            wt.SetPlan(method, aim, fd, sp, ov, ft0, 0, Task::WAVE_SMART_BEARING, 1);
+        } else {  // FEINT
+            wt.SetPlan(method, aim, fd, sp, ov, ft0, Global::RoleSettings::Air::WaveFeintHoldSeconds * SECOND, 0.0f, 1);
+        }
+        lastMethod = method;
+        GenericHelpers::LogUtil("[AIR][Waves] Wave " + waveIndex + " method=" + MethodName(method)
+            + " aim=(" + int(aim.x) + "," + int(aim.z) + ")" + detail + " bombers=" + bombers
+            + " standoff=" + int(fd) + " spacing=" + int(sp), 1);
+        return raw;
     }
 
     IUnitTask@ _MakeHoldTask(CCircuitUnit@ u, bool isBomber)
@@ -196,6 +339,12 @@ namespace AirWaves {
         held.set("" + u.id, int(u.id));
         if (isBomber && holdSinceFrame < 0) holdSinceFrame = ai.frame;
         return t;
+    }
+
+    IUnitTask@ _MakeWaveTaskFor(CCircuitUnit@ u)
+    {
+        if (waveTask !is null) return waveTask;
+        return _MakeWaveBombTask(u);
     }
 
     IUnitTask@ _MakeWaveBombTask(CCircuitUnit@ u)
@@ -253,13 +402,17 @@ namespace AirWaves {
         if (holdSinceFrame < 0) holdSinceFrame = frame;
 
         const int minSize = Global::RoleSettings::Air::BomberWaveFirstSize;
-        const bool targetReached = (bombers >= nextWaveSize) && (fighters >= FightersFor(nextWaveSize));
-        // The time-out ignores the escort requirement: a side that cannot field
-        // fighters must still launch with whatever escort it has.
-        const bool timedOut = (bombers >= minSize)
+        const int required = Required();
+        const bool targetReached = (bombers >= required) && (fighters >= FightersFor(required));
+        // The time-out waives the escort requirement only: a side that cannot
+        // field fighters must still launch with whatever escort it has. The
+        // bomber floor stands - at high income a five-bomber wave was launching
+        // against a floor of fifty (CR-013).
+        const bool timedOut = (bombers >= minSize) && (bombers >= required)
             && (frame - holdSinceFrame) >= Global::RoleSettings::Air::BomberWaveMaxHoldSeconds * SECOND;
         if (!targetReached && !timedOut) return;
-        _Launch(frame, targetReached ? "target reached" : "hold time-out");
+        _Launch(frame, targetReached ? ("target " + required + " reached (income floor " + IncomeFloor() + ")")
+                                     : ("hold time-out at " + bombers + "/" + required));
     }
 
     void _Launch(int frame, const string &in reason)
@@ -268,6 +421,8 @@ namespace AirWaves {
         waveFighters.deleteAll();
         waveBombTasks.deleteAll();
         launchQueue.deleteAll();
+        mopUp.deleteAll();
+        @waveTask = null;
         nextVipIdx = 0;
 
         array<IUnitTask@> aborted;
@@ -277,6 +432,11 @@ namespace AirWaves {
         const int launchedFighters = int(launchQueue.getSize()) - launchedBombers;
 
         ++waveIndex;
+        @waveTask = _PlanWave(launchedBombers);
+        {
+            array<string>@ ids = waveBombers.getKeys();
+            for (uint i = 0; i < ids.length(); ++i) mopUp.set(ids[i], true);
+        }
         lastWaveSize = launchedBombers;
         lastLaunchFighters = launchedFighters;
         lastLaunchFrame = frame;
@@ -405,12 +565,13 @@ namespace AirWaves {
 
         const int bombers = int(heldBombers.getSize());
         const int fighters = int(heldFighters.getSize());
-        const int targetFighters = FightersFor(nextWaveSize);
+        const int required = Required();
+        const int targetFighters = FightersFor(required);
 
         string name = "";
         if (fighters < FightersFor(bombers) && fighters < targetFighters) {
             name = UnitHelpers::GetT2FighterForSide(side);      // escort lags the bombers
-        } else if (bombers < nextWaveSize) {
+        } else if (bombers < required) {
             name = UnitHelpers::GetT2WaveBomberForSide(side);
         } else if (fighters < targetFighters) {
             name = UnitHelpers::GetT2FighterForSide(side);
@@ -420,7 +581,7 @@ namespace AirWaves {
         CCircuitDef@ d = ai.GetCircuitDef(name);
         if (d is null || !d.IsAvailable(ai.frame)) return null;
         GenericHelpers::LogUtil("[AIR][Waves] Production: " + name + " (held bombers=" + bombers
-            + "/" + nextWaveSize + " fighters=" + fighters + "/" + targetFighters + ")", 3);
+            + "/" + required + " fighters=" + fighters + "/" + targetFighters + ")", 3);
         return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NORMAL, d, pos, 64.f));
     }
 
@@ -440,7 +601,12 @@ namespace AirWaves {
 
     void OnTaskRemoved(IUnitTask@ task)
     {
-        if (task is null || waveBombTasks.getSize() == 0) return;
+        if (task is null) return;
+        if (waveTask !is null && waveTask is task) {
+            @waveTask = null;
+            GenericHelpers::LogUtil("[AIR][Waves] Wave " + waveIndex + " run over; survivors mop up on the native bomb task", 1);
+        }
+        if (waveBombTasks.getSize() == 0) return;
         array<string>@ keys = waveBombTasks.getKeys();
         for (uint i = 0; i < keys.length(); ++i) {
             IUnitTask@ t = null;

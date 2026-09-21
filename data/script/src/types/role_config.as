@@ -34,6 +34,11 @@ funcdef void AiMakeDefence(int cluster, const AIFloat3& in pos);
 // setup. Called once, after the role's InitHandler. See helpers/porc_helpers.as.
 funcdef void PorcChainDelegate(const string &in side);
 
+// Base layout plan: the role reserves the ground for the buildings it intends
+// to place (labs, nano block, energy rows) once at setup, after the porc
+// chain. See helpers/layout_helpers.as and doc/base-layout.md.
+funcdef void LayoutPlanDelegate(const string &in side);
+
 // Dynamic role matching: boolean match; first registered match wins
 funcdef bool RoleMatchDelegate(AiRole preferredMapRole, const string &in side, const AIFloat3& in pos, const string &in defaultStartFactory);
 
@@ -76,6 +81,7 @@ class RoleConfig {
 
     AiMakeDefence@ AiMakeDefenceHandler;
     PorcChainDelegate@ PorcChainHandler;
+    LayoutPlanDelegate@ LayoutPlanHandler;
 
     SelectFactoryDelegate@ SelectFactoryHandler;
     RoleMatchDelegate@ RoleMatchHandler; // optional role-specific match predicate

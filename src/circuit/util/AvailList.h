@@ -42,6 +42,21 @@ public:
 	bool IsAvail(CCircuitDef* buildDef) const { return avail.find(buildDef) != avail.end(); }
 	bool HasAvail() const { return !infos.empty(); }
 	const T* GetAvailInfo(const CCircuitDef* cdef) const;
+	// Apply func to the def's data in both places it lives: the canonical entry
+	// (external queries) and the copy the selection list uses (CR-009).
+	template <typename F> bool UpdateInfo(const CCircuitDef* cdef, F func) {
+		auto it = allInfos.find(cdef);
+		if (it == allInfos.end()) {
+			return false;
+		}
+		func(it->second.data);
+		for (SAvailInfo& info : infos) {
+			if (info.cdef == cdef) {
+				func(info.data);
+			}
+		}
+		return true;
+	}
 	CCircuitDef* GetFirstDef() const { return infos.front().cdef; }
 	template <typename F> CCircuitDef* GetBestDef(F filterFunc) const;
 	template <typename F> CCircuitDef* GetWorstDef(F filterFunc) const;

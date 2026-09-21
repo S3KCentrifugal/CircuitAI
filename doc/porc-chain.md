@@ -83,8 +83,9 @@ and `ForSide(table, side)` for the per-side name tables.
 | Role | Handler | Edit |
 | --- | --- | --- |
 | SUPPORT | `Support_PorcChain` | Swaps the side's Juno for its ranged tactical launcher — `armemp`, `cortron`, `legperdition`. See [`roles/support.md`](roles/support.md#porcupine-chain-the-launcher-swap). |
+| AIR | `Air_PorcChain` | A full replacement order that leads with flak and long-range AA and repeats them; fewer ground pieces; Juno, gates, LRPCs, EMP kept. See [`roles/air.md`](roles/air.md#porc-air-denial-first). |
 
-The other five roles keep the default. Their orderings are a tuning exercise
+The other four roles keep the default. Their orderings are a tuning exercise
 that wants game evidence first.
 
 ### Position is a budget threshold

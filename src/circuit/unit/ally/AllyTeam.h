@@ -114,6 +114,18 @@ public:
 
 	CCircuitAI* GetAuthority() const { return circuit; }
 	void SetAuthority(CCircuitAI* authority);
+
+	/*
+	 * Reclaim marks shared by the whole ally team. Each AI keeps its own
+	 * reclaimUnits map, so a teammate's nanos and builders could not see what
+	 * it was reclaiming and repaired the structure out from under it. A unit
+	 * marked here is never a repair or assist candidate for any AI on the
+	 * team. Counted, because two AIs may mark the same unit; pruned when the
+	 * unit is gone, since the engine reuses unit ids.
+	 */
+	void MarkReclaim(ICoreUnit::Id unitId) { ++reclaimMarks[unitId]; }
+	void UnmarkReclaim(ICoreUnit::Id unitId);
+	bool IsReclaimMarked(ICoreUnit::Id unitId) const { return reclaimMarks.find(unitId) != reclaimMarks.end(); }
 private:
 	void DelegateAuthority();
 	void ApplyAuthority(CCircuitAI* newOwner);
@@ -128,6 +140,7 @@ private:
 	int lastUpdate;
 	AllyUnits friendlyUnits;  // owner
 	CQuadField quadField;
+	std::map<ICoreUnit::Id, int> reclaimMarks;  // unitId: number of AIs reclaiming it
 
 	std::map<int, SClusterTeam> occupants;  // Cluster owner on start. clusterId: SClusterTeam
 	std::map<terrain::SArea*, SAreaTeam> habitants;  // Area habitants on start.

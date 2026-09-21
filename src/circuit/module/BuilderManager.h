@@ -15,6 +15,7 @@
 
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 #include <unordered_set>
 
@@ -267,11 +268,41 @@ public:
 	void AddBuildPower(CCircuitUnit* unit);
 	void DelBuildPower(CCircuitUnit* unit);
 	float GetBuildPower() const { return buildPower; }
+	float GetBuildPowerNear(const springai::AIFloat3& position, float radius) const;
+	// Only the immobile assist power (construction turrets) within radius, in
+	// workertime units: the planner's turret target ignores the commander and
+	// constructors passing through (D-066 follow-up).
+	float GetStaticBuildPowerNear(const springai::AIFloat3& position, float radius) const;
+	// Experimental build mode (D-064, doc/experimental-build.md): a builder
+	// stops at the engine's own build range (reach + buildee radius, x0.9),
+	// gets one construction command with no command timeout, and inside
+	// experimentalDirectRange the engine walks the last leg itself. Off by
+	// default; a role's script turns it on for its own AI instance only.
+	bool IsExperimentalBuild() const { return experimentalBuild; }
+	float GetExperimentalDirectRange() const { return experimentalDirectRange; }
+	float GetExperimentalSearchRadius() const { return experimentalSearchRadius; }
+	// D-066: the nearest live, untaken order of `type` in native's queue that
+	// this builder may take (defence, sensors, the watchdog's repairs). The
+	// script pulls them when its sequence says so; nothing else assigns them
+	// in the experimental system.
+	IUnitTask* FindQueuedTask(CCircuitUnit* builder, IBuilderTask::BuildType type);
+	// Turret assist (D-065): the own unit being reclaimed that this builder
+	// can reach without moving (nearest), and the unfinished structure of
+	// `def` it can reach (nearest); null when none.
+	CCircuitUnit* FindReclaimTargetFor(CCircuitUnit* builder);
+	CCircuitUnit* FindUnfinishedFor(CCircuitUnit* builder, const CCircuitDef* def);
+	// Structures of `def` under construction (ours), and the nearest one to a
+	// point within radius; for the planner's turret focus (D-063 follow-up 5).
+	int GetUnfinishedCount(const CCircuitDef* def) const;
+	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	int GetQueuedBuildCount(IBuilderTask::BuildType type, const CCircuitDef* buildDef) const;
 	bool CanEnqueueTask(const unsigned mod = 8) const { return buildTasksCount < workers.size() * mod; }
 	const std::set<IBuilderTask*>& GetTasks(IBuilderTask::BuildType type) const;
 	void ActivateTask(IBuilderTask* task);
 
 	IBuilderTask* Enqueue(const TaskB::SBuildTask& ti);
+	IBuilderTask* EnqueueLayout(const TaskB::SBuildTask& ti, const std::string& groupName, CCircuitUnit* builder);
+	IBuilderTask* EnqueueFactoryNano(const TaskB::SBuildTask& ti, CCircuitUnit* builder);
 	IUnitTask* Enqueue(const TaskB::SServBTask& ti);
 	virtual CRetreatTask* EnqueueRetreat() override;
 	inline IBuilderTask* EnqueueB(const TaskB::SServBTask& ti) {
@@ -293,9 +324,9 @@ public:
 	void MarkRepairUnit(ICoreUnit::Id targetId, CBRepairTask* task) {
 		repairUnits[targetId] = task;
 	}
-	void MarkReclaimUnit(CAllyUnit* target, CBReclaimTask* task) {
-		reclaimUnits[target] = task;
-	}
+	// Reclaim bookkeeping is mirrored into CAllyTeam so every AI on the team
+	// stops repairing the unit; see CAllyTeam::MarkReclaim.
+	void MarkReclaimUnit(CAllyUnit* target, CBReclaimTask* task);
 
 	bool IsBuilderInArea(CCircuitDef* buildDef, const springai::AIFloat3& position) const;  // Check if build-area has proper builder
 	bool HasFreeAssists(CCircuitUnit* builder) const;
@@ -304,9 +335,10 @@ public:
 	IBuilderTask* GetRepairTask(ICoreUnit::Id unitId) const;
 	IBuilderTask* GetReclaimFeatureTask(const springai::AIFloat3& pos, float radius) const;
 	IBuilderTask* GetResurrectTask(const springai::AIFloat3& pos, float radius) const;
-	void RegisterReclaim(CAllyUnit* unit) { reclaimUnits[unit] = nullptr; }
-	void UnregisterReclaim(CAllyUnit* unit) { reclaimUnits.erase(unit); }
-	bool IsReclaimUnit(CAllyUnit* unit) const { return reclaimUnits.find(unit) != reclaimUnits.end(); }
+	void RegisterReclaim(CAllyUnit* unit);
+	void UnregisterReclaim(CAllyUnit* unit);
+	// True when this AI or ANY teammate is reclaiming the unit.
+	bool IsReclaimUnit(CAllyUnit* unit) const;
 	bool IsReclaimFeature(const springai::AIFloat3& pos, float radius) const {
 		return GetReclaimFeatureTask(pos, radius) != nullptr;
 	}
@@ -322,8 +354,31 @@ public:
 	void IncGuardCount() { ++guardCount; }
 	void DecGuardCount() { --guardCount; }
 
+	/*
+	 * Unused default tasks. Every role's builder policy calls DefaultMakeTask
+	 * before its own ladder so that a native mex/geo task can win, and then
+	 * usually returns something else. DefaultMakeTask ENQUEUES what it
+	 * returns - an energy structure, a nano, a Wait - so the abandoned task
+	 * stayed in buildTasks for ASSIGN_TIMEOUT and the next idle builder took
+	 * it: with three constructors that was a native solar, a script solar and
+	 * a script advanced solar under construction at once. MakeTask now
+	 * remembers the tasks DefaultMakeTask created for THIS call and aborts the
+	 * ones the caller did not take. Tasks DefaultMakeTask merely found in the
+	 * queue, and the mex tasks MakeEconomyTasks leaves for pickup on purpose,
+	 * are untouched.
+	 */
+	virtual IUnitTask* MakeTask(CCircuitUnit* unit) override;
+	virtual void DiscardUnusedTask(IUnitTask* task) override;
+	void AbortLayoutTasks();
+
 private:
 	virtual IUnitTask* DefaultMakeTask(CCircuitUnit* unit) override;
+	IUnitTask* DefaultMakeTaskImpl(CCircuitUnit* unit);
+	IUnitTask* lastEnqueued = nullptr;        // most recent task any Enqueue created
+	std::vector<IUnitTask*> freshDefaults;    // created by DefaultMakeTask during the current MakeTask
+	IUnitTask* freshMade = nullptr;           // MakeTask's return value, if it was one of freshDefaults
+	int discardCount = 0;
+	int discardLogFrame = 0;
 	IBuilderTask* MakeEnergizerTask(CCircuitUnit* unit, const CQueryCostMap* query);
 	IBuilderTask* MakeCommTask(CCircuitUnit* unit, const CQueryCostMap* query, float sqMaxBaseRange);
 	IBuilderTask* MakeBuilderTask(CCircuitUnit* unit, const CQueryCostMap* query);
@@ -343,6 +398,7 @@ private:
 	std::map<CAllyUnit*, IBuilderTask*> unfinishedUnits;
 	std::map<ICoreUnit::Id, CBRepairTask*> repairUnits;
 	std::map<CAllyUnit*, CBReclaimTask*> reclaimUnits;
+	std::map<CAllyUnit*, ICoreUnit::Id> reclaimIds;  // the id behind each key: UnregisterReclaim may get a freed pointer (CR-001)
 	std::vector<std::set<IBuilderTask*>> buildTasks;  // UnitDef based tasks
 	unsigned int assistCount;  // builders that can assist
 	unsigned int guardCount;  // assist guards
@@ -354,6 +410,9 @@ private:
 	std::map<CCircuitUnit*, std::shared_ptr<IPathQuery>> costQueries;  // IPathQuery owner
 	std::map<CCircuitUnit*, int> dangerTime;  // unit: frame
 	int dangerHysteresis;  // frames
+	bool experimentalBuild = false;          // script property (D-064, D-066: the whole experimental build system)
+	float experimentalDirectRange = 1600.f;  // elmos
+	float experimentalSearchRadius = 512.f;  // elmos: how far from the asked anchor a site may be packed (D-066)
 
 	CCircuitDef* terraDef = nullptr;
 	std::unordered_map<IBuilderTask::BT, std::unordered_map<CCircuitDef*, SBuildChain*>> buildChains;  // owner

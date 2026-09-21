@@ -30,7 +30,11 @@ public:
 	 * Nothing here retries by itself - a ferry that failed is a ferry whose
 	 * caller should fall back to walking the unit.
 	 */
-	enum class EState: char {IDLE = 0, TO_CARGO, LOADING, TO_DROP, UNLOADING, DONE, FAILED};
+	// DUMPING comes after FAILED so the script's state numbers keep: a failed
+	// run whose cargo is still in the air first sets it down on the nearest
+	// clear ground, then latches FAILED - script must never be handed a
+	// constructor that is still inside the transport.
+	enum class EState: char {IDLE = 0, TO_CARGO, LOADING, TO_DROP, UNLOADING, DONE, FAILED, DUMPING};
 
 	CFerryTask(ITaskModule* mgr);
 	virtual ~CFerryTask();
@@ -60,6 +64,13 @@ private:
 	// separates "carried" from "stood under the transport".
 	bool IsLifted(CCircuitUnit* cargo, int frame) const;
 	void GoTo(CCircuitUnit* unit, const springai::AIFloat3& pos);
+	// The engine refuses an unload onto occupied ground and says nothing; a
+	// recipient's start position is its base. Ask the engine for the nearest
+	// clear footprint for the cargo instead; `around` when it finds none.
+	springai::AIFloat3 FindLandingSpot(CCircuitUnit* cargo, const springai::AIFloat3& around, float radius) const;
+	// Park the cargo in a builder Wait so it stops taking build orders and
+	// walking away from the pickup.
+	void HoldCargo(CCircuitUnit* cargo);
 	void Enter(EState next);
 	bool IsExpired(int frame) const;
 	void Fail(const char* why);
@@ -70,6 +81,9 @@ private:
 	springai::AIFloat3 holdPos;
 	int stateFrame;    // frame the current state was entered
 	int loadRetries;
+	int unloadRetries;
+	int landedTicks = 0;  // consecutive updates the cargo was seen on the ground while unloading
+	springai::AIFloat3 landPos;  // where the unload was actually ordered
 };
 
 } // namespace circuit

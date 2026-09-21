@@ -136,7 +136,8 @@ where it activates and then builds nothing is - see
 | `LaneSpacing` | 900 | sideways offset between factory lanes |
 | `MapMargin` | 200 | keep waypoints this far from the map edge |
 | `RefocusMinutes` | 6 | rotate the focus to the next enemy spot |
-| `UnitByFactory` | bot labs, vehicle plants, hover plants per side | which unit each T1 factory spams |
+| `UnitByFactory` | bot labs and vehicle plants per side (hover plants removed, D-038) | which unit each T1 factory spams |
+| `AllowLandLocked` | false | a land-locked start (`Global::Map::LandLocked`) never spams; its T1 factories keep their role logic. Logged once at level 1 (D-052) |
 
 ## Notes
 

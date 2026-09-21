@@ -410,7 +410,15 @@ namespace EconomyHelpers {
         int maxNanos,
         float metalCurrent,
         float buildWhenOverMetal,
-        float energyPercent
+        float energyPercent,
+        // How many nanos the reserves branch may add beyond the income-derived
+        // target. Without it that branch is "metal >= buildWhenOverMetal and
+        // energy >= 90% -> build a nano", true on every idle poll of a
+        // floating economy, with no relation to demand and no ceiling short of
+        // maxNanos: TECH queued construction turrets one after another with
+        // nothing under construction for them to assist. Default keeps every
+        // other caller's behaviour except the runaway.
+        int reserveSurplus = 2
     )
     {
         int have = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetT1NanoUnitNames());
@@ -421,7 +429,7 @@ namespace EconomyHelpers {
         // Second, reserve-driven path: if reserves are healthy, also permit nano.
         bool reservesOk = ShouldBuildT1Nano_ByReserves(metalCurrent, buildWhenOverMetal, energyPercent);
 
-        bool result = (have < want) || reservesOk;
+        bool result = (have < want) || (reservesOk && have < want + reserveSurplus);
         GenericHelpers::LogUtil(
             "[Econ] ShouldBuildT1Nano: have=" + have + " want(E,M)=" + wantEnergy + "," + wantMetal + " => use=" + want +
             " reservesOk=" + (reservesOk ? "true" : "false") +

@@ -8,6 +8,7 @@
 #include "../helpers/objective_executor.as"
 #include "../types/strategic_objectives.as"
 #include "../manager/factory_production.as"
+#include "../helpers/sea_constructor_helpers.as"
 
 namespace RoleTactical {
 
@@ -240,6 +241,30 @@ namespace RoleTactical {
 
 	}
 
+	// A construction ship - the one SEA donates (manager/sea_assist.as) or any
+	// other - runs SEA's naval ladder with SEA's numbers: T2 shipyard, mex
+	// upgrades, naval converter, nanos for the shipyard, tidals. Before this
+	// the ship had its seeded shipyard and nothing else it could reach, so it
+	// built the yard and idled (D-042).
+	IUnitTask@ Tactical_SeaConstructor_AiMakeTask(CCircuitUnit@ builder, IUnitTask@ defaultTask)
+	{
+		if (!Global::RoleSettings::Tactical::SeaConstructorMimicsSea) return defaultTask;
+		const CCircuitDef@ udef = builder.circuitDef;
+		SeaConstructor::Settings@ s = SeaConstructor::FromSea();
+		IUnitTask@ t = null;
+		if (SeaConstructor::IsT1(udef)) {
+			if (builder is Builder::primaryT1SeaConstructor) {
+				@t = SeaConstructor::T1Ladder(builder, s, "TACTICAL");
+			} else {
+				@t = SeaConstructor::AssistPrimary(builder, s, 160 * SECOND);
+			}
+		} else if (SeaConstructor::IsT2(udef)) {
+			@t = SeaConstructor::T2Ladder(builder, s, "TACTICAL");
+			if (t is null) @t = SeaConstructor::AssistPrimary(builder, s, 120 * SECOND);
+		}
+		return (t !is null) ? t : defaultTask;
+	}
+
 	IUnitTask@ Tactical_BuilderAiMakeTask(CCircuitUnit@ builder) {
 		GenericHelpers::LogUtil("[Tactical_BuilderAiMakeTask] called for builder", 3);
 		// Create default task only at return sites via Builder helper (no pre-creation)
@@ -283,6 +308,9 @@ namespace RoleTactical {
                     }
                 }
             }
+		}
+		if (SeaConstructor::IsT1(udef) || SeaConstructor::IsT2(udef)) {
+			return Tactical_SeaConstructor_AiMakeTask(builder, defaultTask);
 		}
 		CCircuitUnit@ tactical = Builder::GetTacticalConstructor();
 		if (tactical !is null && builder is tactical) {

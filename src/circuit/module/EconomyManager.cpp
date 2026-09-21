@@ -16,6 +16,7 @@
 #include "resource/EnergyManager.h"
 #include "resource/EnergyGrid.h"
 #include "task/builder/FactoryTask.h"
+#include "task/builder/MexTask.h"
 #include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "util/GameAttribute.h"
@@ -33,6 +34,9 @@
 #include "FeatureDef.h"
 #include "Team.h"
 #include "Log.h"
+
+#include <algorithm>
+#include <limits>
 
 namespace circuit {
 
@@ -742,6 +746,173 @@ float CEconomyManager::GetEnergyMake(CCircuitDef* cdef) const
 	}
 	const SEnergyExt* energyExt = energyDefs.GetAvailInfo(cdef);
 	return (energyExt == nullptr) ? 0.f : energyExt->make;
+}
+
+float CEconomyManager::GetEnergyUse(CCircuitDef* cdef) const
+{
+	const SConvertExt* convertExt = (cdef == nullptr) ? nullptr : convertDefs.GetAvailInfo(cdef);
+	return (convertExt == nullptr) ? 0.f : convertExt->energyUse;
+}
+
+static CMetalData::IndicesDists GetNearestSpotsWithin(
+		const CMetalManager* metalMgr, const AIFloat3& center, float radius)
+{
+	CMetalData::IndicesDists spots;
+	if ((metalMgr == nullptr) || (radius <= 0.f)) {
+		return spots;
+	}
+	metalMgr->FindSpotsInRadius(center, radius, spots);
+	std::sort(spots.begin(), spots.end(), [](const auto& lhs, const auto& rhs) {
+		return lhs.second < rhs.second;
+	});
+	return spots;
+}
+
+int CEconomyManager::GetMexSpotCountWithin(
+		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots)
+{
+	if ((builder == nullptr) || (builder->GetCircuitDef() == nullptr)) {
+		return 0;
+	}
+	if (maxSpots <= 0) {
+		maxSpots = std::numeric_limits<int>::max();  // every spot inside the radius (D-063)
+	}
+	const CMetalData::IndicesDists spots = GetNearestSpotsWithin(
+			circuit->GetMetalManager(), center, radius);
+	int count = 0;
+	for (const auto& spot : spots) {
+		if (circuit->GetTerrainManager()->CanReachAtSafe(
+				builder, circuit->GetMetalManager()->GetSpots()[spot.first].position,
+				builder->GetCircuitDef()->GetBuildDistance())) {
+			if (++count >= maxSpots) {
+				break;
+			}
+		}
+	}
+	return count;
+}
+
+int CEconomyManager::GetClaimedMexCountWithin(
+		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots)
+{
+	if ((builder == nullptr) || (builder->GetCircuitDef() == nullptr)) {
+		return 0;
+	}
+	if (maxSpots <= 0) {
+		maxSpots = std::numeric_limits<int>::max();
+	}
+	CMetalManager* metalMgr = circuit->GetMetalManager();
+	const CMetalData::IndicesDists spots = GetNearestSpotsWithin(metalMgr, center, radius);
+	int count = 0;
+	int considered = 0;
+	for (const auto& spot : spots) {
+		if (!circuit->GetTerrainManager()->CanReachAtSafe(
+				builder, metalMgr->GetSpots()[spot.first].position,
+				builder->GetCircuitDef()->GetBuildDistance())) {
+			continue;
+		}
+		if (++considered > maxSpots) {
+			break;
+		}
+		if (!metalMgr->IsOpenSpot(spot.first) || !IsOpenMexSpot(spot.first)) {
+			++count;
+		}
+	}
+	return count;
+}
+
+IBuilderTask* CEconomyManager::EnqueueMexWithin(
+		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
+{
+	if ((builder == nullptr) || (builder->GetCircuitDef() == nullptr)) {
+		return nullptr;
+	}
+	if (maxSpots <= 0) {
+		maxSpots = std::numeric_limits<int>::max();  // every spot inside the radius (D-063)
+	}
+	CMetalManager* metalMgr = circuit->GetMetalManager();
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3 from = builder->GetPos(frame);
+	// Idempotent: a mex task already queued for a spot in the radius and not
+	// yet taken is handed back before a new spot is closed. Native re-asks a
+	// busy builder every few seconds; without this every ask closed another
+	// spot with a task nobody would run (D-063 follow-up).
+	{
+		IBuilderTask* best = nullptr;
+		float bestSq = std::numeric_limits<float>::max();
+		const float radiusSq = SQUARE(radius);
+		for (IBuilderTask* task : circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::MEX)) {
+			// A half-built mex whose builder was taken off it counts too: it is
+			// finished before a new spot is opened.
+			if ((task == nullptr) || task->IsDead() || !task->GetAssignees().empty()
+					|| (task->GetBuildDef() == nullptr) || !builder->GetCircuitDef()->CanBuild(task->GetBuildDef())) {
+				continue;
+			}
+			const AIFloat3& pos = task->GetPosition();
+			if ((pos.SqDistance2D(center) > radiusSq)
+					|| !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())) {
+				continue;
+			}
+			const float sq = from.SqDistance2D(pos);
+			if (sq < bestSq) {
+				bestSq = sq;
+				best = task;
+			}
+		}
+		if (best != nullptr) {
+			return best;
+		}
+	}
+	CMetalData::IndicesDists spots = GetNearestSpotsWithin(metalMgr, center, radius);
+	// The cap keeps the maxSpots *open, reachable* spots nearest the centre
+	// (a taken third spot no longer ends a three-mex opening at two); the
+	// order of work among them is nearest the builder first, so the opening
+	// walks a chain and not a star (D-063).
+	CMetalData::IndicesDists open;
+	for (const auto& spot : spots) {
+		if (int(open.size()) >= maxSpots) {
+			break;
+		}
+		const AIFloat3& pos = metalMgr->GetSpots()[spot.first].position;
+		if (!metalMgr->IsOpenSpot(spot.first) || !IsOpenMexSpot(spot.first)
+				|| !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())
+				|| (allyAware && terrainMgr->IsZoneAlly(pos))) {  // expansion (D-066) leaves the allies' ground alone; the opening does not
+			continue;
+		}
+		open.emplace_back(spot.first, from.SqDistance2D(pos));
+	}
+	std::sort(open.begin(), open.end(), [](const auto& lhs, const auto& rhs) {
+		return lhs.second < rhs.second;
+	});
+	const std::vector<CCircuitDef*>& mexDefs = metalDefs.GetBuildDefs(builder->GetCircuitDef());
+	for (const auto& spot : open) {
+		const AIFloat3& pos = metalMgr->GetSpots()[spot.first].position;
+		for (CCircuitDef* mexDef : mexDefs) {
+			if ((mexDef == nullptr) || !mexDef->IsAvailable(frame) || !terrainMgr->CanBeBuiltAt(mexDef, pos)) {
+				continue;
+			}
+			IBuilderTask* task = circuit->GetBuilderManager()->Enqueue(TaskB::Spot(
+					IBuilderTask::BuildType::MEX, IBuilderTask::Priority::NOW, mexDef, pos, spot.first));
+			if ((task != nullptr) && (task->GetBuildType() == IBuilderTask::BuildType::MEX)) {
+				static_cast<CBMexTask*>(task)->SetIgnoreAlly(!allyAware);
+			}
+			return task;
+		}
+	}
+	return nullptr;
+}
+
+int CEconomyManager::GetMexTaskCountWithin(const AIFloat3& center, float radius) const
+{
+	const float radiusSq = SQUARE(radius);
+	int count = 0;
+	for (const IBuilderTask* task : circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::MEX)) {
+		if ((task != nullptr) && !task->IsDead() && (task->GetPosition().SqDistance2D(center) <= radiusSq)) {
+			++count;
+		}
+	}
+	return count;
 }
 
 CCircuitDef* CEconomyManager::GetLowEnergy(const AIFloat3& pos, float& outMake, const CCircuitUnit* builder) const
@@ -1468,6 +1639,9 @@ IBuilderTask* CEconomyManager::UpdateFactoryTasks(const AIFloat3& position, CCir
 	ZoneScoped;
 
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
+	if (holdStartFactory && (circuit->GetFactoryManager()->GetFactoryCount() == 0)) {
+		return nullptr;
+	}
 	if (!builderMgr->CanEnqueueTask(64) || isEnergyRequired) {
 		return nullptr;
 	}
@@ -1639,6 +1813,12 @@ IBuilderTask* CEconomyManager::UpdateStorageTasks()
 {
 	ZoneScoped;
 
+	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
+		return nullptr;  // D-066: storage and pylons are the script's
+	}
+	if (!autoStorageEnabled) {
+		return UpdatePylonTasks();
+	}
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	if (!builderMgr->CanEnqueueTask(32)) {
 		return nullptr;
@@ -1757,6 +1937,9 @@ IBuilderTask* CEconomyManager::CheckMobileAssistRequired(const AIFloat3& positio
 
 void CEconomyManager::StartFactoryJob()
 {
+	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
+		return;  // D-066: the script places and orders every factory
+	}
 	CFactoryManager* factoryMgr = circuit->GetFactoryManager();
 	if ((factoryMgr->GetFactoryCount() == 0) && circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::FACTORY).empty()) {
 		CCircuitUnit* comm = circuit->GetSetupManager()->GetCommander();
@@ -1950,6 +2133,9 @@ bool CEconomyManager::CheckAssistRequired(const AIFloat3& position, CCircuitUnit
 {
 	outTask = nullptr;
 
+	if (!assistNanoEnabled) {
+		return false;  // the role's script owns nano policy
+	}
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	const int nanoQueued = builderMgr->GetTasks(IBuilderTask::BuildType::NANO).size();
 	CFactoryManager* factoryMgr = circuit->GetFactoryManager();
@@ -1989,7 +2175,7 @@ bool CEconomyManager::CheckAssistRequired(const AIFloat3& position, CCircuitUnit
 	eiRequire += assistDef->GetUpkeepE();
 	// FIXME: Mex and other buildings have energy upkeep that's not counted.
 	//        It also doesn't count mobile buildpower
-	if (GetAvgMetalIncome() < factoryMgr->GetMetalRequire() * factoryMgr->GetFacModM() + (nanoQueued + 1) * miRequire) {
+	if (GetAvgMetalIncome() < factoryMgr->GetMetalRequire() * factoryMgr->GetFacModM() + (nanoQueued + 1) * miRequire * assistNanoIncomeMod) {
 		return true;
 	}
 	if ((GetAvgEnergyIncome() < factoryMgr->GetEnergyRequire() * factoryMgr->GetFacModE() + (nanoQueued + 1) * eiRequire)
@@ -2133,7 +2319,8 @@ bool CEconomyManager::HasNoPurpose(const CCircuitDef::Id defId) const
 
 void CEconomyManager::ReclaimOldConvert(const SConvertExt* convertExt)
 {
-	if (circuit->IsLoadSave() || (reclConvertEff <= 0.f) || (IsEnergyFull() && !IsEnergyStalling())) {
+	if (circuit->IsLoadSave() || (reclConvertEff <= 0.f)
+			|| (!reclaimOldConvertersAlways && IsEnergyFull() && !IsEnergyStalling())) {
 		return;
 	}
 	float energyNet = GetAvgEnergyIncome() - GetEnergyPull();
@@ -2167,6 +2354,39 @@ void CEconomyManager::ReclaimOldConvert(const SConvertExt* convertExt)
 			}
 		}
 	}
+}
+
+void CEconomyManager::SetEnergyCondition(CCircuitDef* cdef, int limit, float metalIncome, float energyIncome)
+{
+	if (cdef == nullptr) {
+		return;
+	}
+	const SEnergyExt* info = energyDefs.GetAvailInfo(cdef);
+	if (info == nullptr) {
+		circuit->LOG("ECONOMY: SetEnergyCondition: %s is not an energy def", cdef->GetDef()->GetName());
+		return;
+	}
+	// Both the canonical entry and the selection list's copy (CR-009).
+	energyDefs.UpdateInfo(cdef, [limit, metalIncome, energyIncome](SEnergyExt& ext) {
+		if (limit >= 0) {
+			ext.cond.limit = limit;
+		}
+		if (metalIncome >= 0.f) {
+			ext.cond.metalIncome = metalIncome;
+		}
+		if (energyIncome >= 0.f) {
+			ext.cond.energyIncome = energyIncome;
+		}
+	});
+	info = energyDefs.GetAvailInfo(cdef);
+	circuit->LOG("ECONOMY: %s energy condition now limit %i, metal income %.0f, energy income %.0f",
+			cdef->GetDef()->GetName(), info->cond.limit, info->cond.metalIncome, info->cond.energyIncome);
+}
+
+int CEconomyManager::GetEnergyLimit(CCircuitDef* cdef) const
+{
+	const SEnergyExt* info = (cdef == nullptr) ? nullptr : energyDefs.GetAvailInfo(cdef);
+	return (info == nullptr) ? -1 : info->cond.limit;
 }
 
 void CEconomyManager::ReclaimOldEnergy(const SEnergyExt* energyExt)

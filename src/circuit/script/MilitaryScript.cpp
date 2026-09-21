@@ -85,12 +85,15 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectProperty("CMilitaryManager", "const float armyCost", asOFFSET(CMilitaryManager, armyCost)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "int porcMode", asOFFSET(CMilitaryManager, porcMode)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "float porcBudgetMod", asOFFSET(CMilitaryManager, porcBudgetMod)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CMilitaryManager", "int porcAllyAA", asOFFSET(CMilitaryManager, porcAllyAA)); ASSERT(r >= 0);
 
 	// NOTE: Config's "quota" scattered across CMilitaryManager, CEnemyManager, CThreatMap, CFactoryManager, CSetupManager
 	r = engine->RegisterObjectType("SQuotaMilitary", 0, asOBJ_REF | asOBJ_NOCOUNT); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "SQuotaMilitary quota", 0); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SQuotaMilitary", "uint scout", asOFFSET(CMilitaryManager, maxScouts)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SQuotaMilitary", "float attack", asOFFSET(CMilitaryManager, minAttackers)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("SQuotaMilitary", "float attackWait", asOFFSET(CMilitaryManager, attackWaitSeconds)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("SQuotaMilitary", "float attackScale", asOFFSET(CMilitaryManager, attackScale)); ASSERT(r >= 0);
 	r = engine->RegisterObjectType("SRaidQuota", 0, asOBJ_REF | asOBJ_NOCOUNT); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SQuotaMilitary", "SRaidQuota raid", 0); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SRaidQuota", "float min", asOFFSET(CMilitaryManager::SRaidQuota, min), asOFFSET(CMilitaryManager, raid), false); ASSERT(r >= 0);

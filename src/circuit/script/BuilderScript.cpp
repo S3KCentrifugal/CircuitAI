@@ -20,6 +20,18 @@ static void ConstructSResourceVal(SResource* mem, float m, float e)
 	new(mem) SResource{m, e};
 }
 
+static IUnitTask* CBuilderManager_FindQueuedTask(CBuilderManager* mgr, CCircuitUnit* builder, int type)
+{
+	return mgr->FindQueuedTask(builder, static_cast<IBuilderTask::BuildType>(type));
+}
+
+static int CBuilderManager_GetQueuedBuildCount(
+		CBuilderManager* manager, int type, const CCircuitDef* buildDef)
+{
+	return manager->GetQueuedBuildCount(
+			static_cast<IBuilderTask::BuildType>(type), buildDef);
+}
+
 CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 		: ITaskModuleScript(scr, mgr)
 {
@@ -65,10 +77,23 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterGlobalProperty("CBuilderManager aiBuilderMgr", manager); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CBuilderManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ Enqueue(const SBuildTask& in)", asMETHODPR(CBuilderManager, Enqueue, (const TaskB::SBuildTask&), IBuilderTask*), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ EnqueueLayout(const SBuildTask& in, const string& in, CCircuitUnit@)", asMETHOD(CBuilderManager, EnqueueLayout), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ EnqueueFactoryNano(const SBuildTask& in, CCircuitUnit@)", asMETHOD(CBuilderManager, EnqueueFactoryNano), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ Enqueue(const SServBTask& in)", asMETHODPR(CBuilderManager, Enqueue, (const TaskB::SServBTask&), IUnitTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CBuilderManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "uint GetWorkerCount() const", asMETHOD(CBuilderManager, GetWorkerCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "float GetBuildPowerNear(const AIFloat3& in, float) const", asMETHOD(CBuilderManager, GetBuildPowerNear), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "float GetStaticBuildPowerNear(const AIFloat3& in, float) const", asMETHOD(CBuilderManager, GetStaticBuildPowerNear), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "int GetQueuedBuildCount(int, const CCircuitDef@) const", asFUNCTION(CBuilderManager_GetQueuedBuildCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "int dangerHysteresis", asOFFSET(CBuilderManager, dangerHysteresis)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "bool experimentalBuild", asOFFSET(CBuilderManager, experimentalBuild)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindReclaimTargetFor(CCircuitUnit@)", asMETHOD(CBuilderManager, FindReclaimTargetFor), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedFor(CCircuitUnit@, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedFor), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "int GetUnfinishedCount(const CCircuitDef@) const", asMETHOD(CBuilderManager, GetUnfinishedCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedNear(const AIFloat3& in, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedNear), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "float experimentalDirectRange", asOFFSET(CBuilderManager, experimentalDirectRange)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "float experimentalSearchRadius", asOFFSET(CBuilderManager, experimentalSearchRadius)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ FindQueuedTask(CCircuitUnit@, int type)", asFUNCTION(CBuilderManager_FindQueuedTask), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 
 }
 

@@ -24,6 +24,10 @@ class MapConfig {
     StartSpot@[] StartSpots; // optional list of predefined start spots (may be empty)
     dictionary FactoryWeights; // optional: role -> (dictionary of factoryName -> weight)
     array<Objectives::StrategicObjective@> Objectives;  // optional list of strategic objectives
+    // Optional TECH overrides. Zero keeps Global::RoleSettings::Tech defaults.
+    float TechOpeningMexRadius = 0.0f;   // D-063: radius of the mex-first opening
+    int TechOpeningMexCap = 0;           // 0 = every spot inside the radius
+    int TechLayoutNanoRows = 0;          // turret rows in the box
 
     MapConfig(string mapNameMatch, dictionary unitLimits) {
         _mapNameMatch = mapNameMatch;

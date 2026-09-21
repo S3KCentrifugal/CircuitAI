@@ -41,6 +41,7 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | `FRONT` | `front.as` | 1028 | `RoleFront` | [front.md](front.md) |
 | `AIR` | `air.as` | 1042 | `RoleAir` | [air.md](air.md) |
 | `TECH` | `tech.as` | 1923 | `RoleTech` | [tech.md](tech.md) |
+| `TECH` | `tech_build.as` | 216 | `TechBuild` | [tech_build.md](tech_build.md) |
 | `SEA` | `sea.as` | 903 | `RoleSea` | [sea.md](sea.md) |
 | `SUPPORT` | `support.as` | 497 | `RoleSupport` | [support.md](support.md) |
 | `TACTICAL` | `tactical.as` | 709 | `RoleTactical` | [tactical.md](tactical.md) |
@@ -54,6 +55,7 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | [front.md](front.md) | FRONT - land army and forward pressure |
 | [air.md](air.md) | AIR - aircraft plants, air constructors, wind economy |
 | [tech.md](tech.md) | TECH - economy-first, T2/T3 race, unit-cap system |
+| [tech_build.md](tech_build.md) | TECH - the experimental build system (D-066): the whole builder sequence when `Tech::ExperimentalBuild` is on |
 | [sea.md](sea.md) | SEA - naval production and water expansion |
 | [support.md](support.md) | SUPPORT - hybrid economic substitute, no factory task handler |
 | [tactical.md](tactical.md) | TACTICAL - mobile-builder role, forces the hover plant opening |
@@ -95,6 +97,7 @@ slots, and calls `RoleConfigs::Register(cfg)`.
 | `SelectFactoryHandler` | `SelectFactoryDelegate` | factory selection at start / reset |
 | `RoleMatchHandler` | `RoleMatchDelegate` | `RoleConfigs::Match()`, first match wins |
 | `PorcChainHandler` | `PorcChainDelegate` | porcupine chain ordering, once at setup |
+| `LayoutPlanHandler` | `LayoutPlanDelegate` | base layout reservations, once at setup after the porc chain |
 
 Plain fields: `role` (the `AiRole`), `UnitMaxOverrides` (a `dictionary` of
 unit name to cap) and `switchInterval` (int, managed per role).
@@ -143,15 +146,16 @@ row to see how consistently a slot is used.
 | `FactoryAiUnitAdded` | yes | no | yes | no | yes | no |
 | `FactoryAiUnitRemoved` | yes | no | yes | no | yes | no |
 | `MilitaryAiMakeTaskHandler` | no | yes | yes | no | no | no |
-| `MilitaryAiUnitAdded` | yes | no | no | no | no | no |
+| `MilitaryAiUnitAdded` | yes | no | yes | no | no | no |
 | `MilitaryAiUnitRemoved` | no | yes | no | no | no | no |
 | `MilitaryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
 | `AiMakeDefenceHandler` | no | no | yes | no | no | no |
-| `PorcChainHandler` | no | no | no | no | yes | no |
+| `PorcChainHandler` | no | yes | no | no | yes | no |
+| `LayoutPlanHandler` | no | no | yes | no | no | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `FactoryAiTaskRemovedHandler` | no | no | no | no | no | no |
-| **Slots filled** | **17** | **17** | **19** | **14** | **16** | **14** |
+| **Slots filled** | **17** | **18** | **19** | **14** | **16** | **14** |
 
 Thirteen slots are filled by every role. That common set is the de-facto role
 interface; everything below it in the table is an exception worth understanding

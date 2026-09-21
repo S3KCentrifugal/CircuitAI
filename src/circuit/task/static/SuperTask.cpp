@@ -17,6 +17,7 @@
 #include "unit/CircuitWDef.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
+#include "spring/SpringCallback.h"
 
 #include "spring/SpringMap.h"
 
@@ -41,6 +42,7 @@ CSuperTask::CSuperTask(ITaskModule* mgr)
 		, targetFrame(0)
 		, targetPos(-RgtVector)
 		, isTargetOverride(false)
+		, stockSinceFrame(-1)
 {
 }
 
@@ -131,6 +133,31 @@ void CSuperTask::Update()
 		return;
 	}
 
+	const float mapDiag = std::sqrt(SQUARE(float(CTerrainManager::GetTerrainWidth())) + SQUARE(float(CTerrainManager::GetTerrainHeight())));
+	const bool isRegional = (cdef->GetMaxRange() < mapDiag);
+
+	// A stockpiled launcher whose range does not cover the map - Perdition
+	// (2300), Catalyst (2250) - cannot be aimed by the group scan below. Enemy
+	// groups are k-means cells, 1 + sqrt(N) of them for the whole map, and a
+	// cell's centroid is almost never within 2300 of a static that sits in one
+	// of our clusters: every logged tick read inRange=0 while the enemy stood
+	// inside reach. Scan units instead, as EMP and Juno do, and value the aim
+	// point by the metal inside the blast. The shot is still subject to the
+	// stockpile floor, so it is not thrown at a lone scout.
+	if (cdef->IsAttrStock() && isRegional && (empWd != nullptr)) {
+		const float floor = StockedShotFloor(unit, cdef, frame, empWd->GetCostMShot());
+		if (SelectLauncherTarget(unit, cdef, floor)) {
+			ExecuteAttack(unit);
+		} else {
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+			SetTarget(nullptr);
+			targetFrame = frame;
+		}
+		return;
+	}
+
 	CInfluenceMap* inflMap = circuit->GetInflMap();
 	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
 	const float maxSqRange = SQUARE(cdef->GetMaxRange());
@@ -152,8 +179,6 @@ void CSuperTask::Update()
 	// Junos (32000) and nukes (72000) worked. For regional weapons require only enemy
 	// presence at the group; the own-squad exclusion and cost floor below still apply.
 	// Map-range weapons keep the strict rule so they are never spent on the front line.
-	const float mapDiag = std::sqrt(SQUARE(float(CTerrainManager::GetTerrainWidth())) + SQUARE(float(CTerrainManager::GetTerrainHeight())));
-	const bool isRegional = (cdef->GetMaxRange() < mapDiag);
 	int inRange = 0, rejInfl = 0, rejSquad = 0, rejIgnore = 0;
 	auto isTargetValid = [&avoidTasks, frame, sqAoe, inflMap, circuit, isRegional, &rejInfl, &rejSquad, &rejIgnore](const CEnemyManager::SEnemyGroup& group) {
 		// Ally influence and own tasks avoidance
@@ -226,7 +251,9 @@ void CSuperTask::Update()
 	// NOTE: for a stockpile weapon CWeaponDef::GetCostM() is the per-second
 	//       stockpiling rate, not the cost of a shot; comparing it against a
 	//       group's absolute metal cost left Juno with a ~2.7 metal floor.
-	const float maxCost = cdef->IsAttrStock() ? cdef->GetWeaponDef()->GetCostMShot() : cdef->GetCostM() * 0.01f;
+	const float maxCost = cdef->IsAttrStock()
+			? StockedShotFloor(unit, cdef, frame, cdef->GetWeaponDef()->GetCostMShot())
+			: cdef->GetCostM() * 0.01f;
 
 	if ((groupIdx < 0) || (cost < maxCost)) {
 		// Diagnostic for a super weapon that never fires: which gate rejected every
@@ -308,7 +335,7 @@ void CSuperTask::Update()
  *    the target may no longer be visible.
  */
 bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
-		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify)
+		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
@@ -320,7 +347,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		float value;
 	};
 	std::vector<SAreaCand> cands;
-	int rejRange = 0, rejStale = 0, rejClass = 0;
+	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
 
 	for (const SEnemyData& e : circuit->GetEnemyManager()->GetHostileDatas()) {
 		if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore()) {
@@ -347,6 +374,18 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		if (position.SqDistance2D(e.pos) >= maxSqRange) {
 			++rejRange;
 			continue;
+		}
+		if (avoidFriendly) {
+			// A damaging blast on our own units is never worth it, whatever the
+			// enemy value inside it (CR-005). The engine query is per candidate;
+			// candidates are the hostiles in range, a few dozen at most.
+			auto& friendlies = circuit->GetCallback()->GetFriendlyUnitsIn(e.pos, std::sqrt(sqAoe));
+			const bool hit = !friendlies.empty();
+			utils::free(friendlies);
+			if (hit) {
+				++rejFriendly;
+				continue;
+			}
 		}
 		cands.push_back({e.pos, rank, value});
 	}
@@ -378,11 +417,14 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		}
 	}
 
+	if ((bestIdx >= 0) && (bestValue < minValue)) {
+		bestIdx = -1;  // the richest aim point is not worth the shot yet; see StockedShotFloor
+	}
 	if (bestIdx < 0) {
 		if ((frame / TARGET_DELAY) % 6 == 0) {
-			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i minTargets=%i",
+			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i minTargets=%i bestValue=%.0f minValue=%.0f",
 					tag, cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange(),
-					cands.size(), rejClass, rejRange, rejStale, minTargets);
+					cands.size(), rejClass, rejRange, rejStale, minTargets, bestValue, minValue);
 		}
 		return false;
 	}
@@ -397,6 +439,56 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				int(targetPos.x), int(targetPos.z));
 	}
 	return true;
+}
+
+/*
+ * A stockpiled shot is already paid for. The longer it waits, the less a
+ * target has to be worth; with several stocked, any target at all. Shared by
+ * the group scan (nukes, Junos without a pulse block) and the launcher scan.
+ */
+float CSuperTask::StockedShotFloor(CCircuitUnit* unit, CCircuitDef* cdef, int frame, float shotCost)
+{
+	const int stock = unit->GetUnit()->GetStockpile();
+	if (stock <= 0) {
+		stockSinceFrame = -1;
+		return shotCost;
+	}
+	if (stockSinceFrame < 0) {
+		stockSinceFrame = frame;
+	}
+	const CMilitaryManager::SStockInfo& st = manager->GetCircuit()->GetMilitaryManager()->GetStockInfo();
+	float fraction = 1.f;
+	if (st.patienceSeconds > 0.f) {
+		fraction -= float(frame - stockSinceFrame) / (st.patienceSeconds * FRAMES_PER_SEC);
+	}
+	if ((st.fullFireCount > 0) && (stock >= st.fullFireCount)) {
+		fraction = 0.f;
+	}
+	return shotCost * std::max(st.minFraction, fraction);
+}
+
+/*
+ * Tactical launchers (Perdition napalm, Catalyst tactical nuke) do plain area
+ * damage, so the worth of an aim point is the metal inside the blast. Every
+ * hostile the weapon's target category allows is a candidate - a napalm
+ * missile cannot hit aircraft - and the best aim point is the densest clump,
+ * structures first only when configured. The floor passed in keeps the shot
+ * for something worth its cost until patience runs out.
+ */
+bool CSuperTask::SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, float minValue)
+{
+	const CMilitaryManager::SStockInfo& st = manager->GetCircuit()->GetMilitaryManager()->GetStockInfo();
+	const int canTargetCat = cdef->GetTargetCategory();
+	return SelectAreaTarget(unit, cdef, "LAUNCHER", SQUARE(cdef->GetAoe()),
+			st.launcherMinTargets, st.launcherMobileMaxAge,
+			[&st, canTargetCat](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+		if ((canTargetCat & edef->GetCategory()) == 0) {
+			return false;  // outside the weapon's target category (aircraft for napalm)
+		}
+		rank = (st.launcherStructuresFirst && !edef->IsMobile()) ? 0 : 1;
+		value = e.cost;
+		return true;
+	}, minValue, /*avoidFriendly*/ true);
 }
 
 /*
@@ -598,10 +690,13 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 		const bool isMobile = edef->IsMobile();
 		if (!isMobile && edef->IsRespRoleAny(emp.antiNukeRole)) {
 			rank = 0;
-		} else if (!isMobile) {
-			rank = 1;  // every other structure, ranked by value below
+		} else if (!isMobile && (!emp.structuresFirst || e.cost >= emp.structuresFirstMinCost)) {
+			rank = 1;  // a large structure: LRPC, bastion, silo, AFUS, gantry
 		} else {
-			rank = emp.structuresFirst ? 2 : 1;
+			// Everything else - cheap structures and every mobile - by cost.
+			// A target that cannot be stunned was already rejected above, so
+			// "highest metal cost except EMP-immune" is what this rank is.
+			rank = 2;
 		}
 		// Value is metal: it floats Ragnarok, AFUS, gantry and silo above a cheap
 		// turret without any of them needing to be tagged.

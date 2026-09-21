@@ -7,6 +7,7 @@
 #include "../types/terrain.as"
 #include "../helpers/objective_helpers.as"
 #include "../manager/factory_production.as"
+#include "../helpers/sea_constructor_helpers.as"
 
 namespace RoleSea {
 
@@ -57,6 +58,10 @@ namespace RoleSea {
 
         // Change attack gate (power threshold, not a headcount)
         aiMilitaryMgr.quota.attack = Global::RoleSettings::Sea::MilitaryAttackThreshold;
+
+        // Waves: reachable-threat bar and a wait cap (see Global::Military)
+        aiMilitaryMgr.quota.attackWait = Global::RoleSettings::Sea::MilitaryAttackWaitSeconds;
+        aiMilitaryMgr.quota.attackScale = Global::RoleSettings::Sea::MilitaryAttackScale;
 
         // Change raid thresholds (power)
         aiMilitaryMgr.quota.raid.min = Global::RoleSettings::Sea::MilitaryRaidMinPower; 
@@ -473,9 +478,10 @@ namespace RoleSea {
         // Specialize only sea constructors; everything else falls back to cached default
         string uname = udef.GetName();
         // Include Legion's non-standard T1 constructor name explicitly (no 'cs' suffix)
-        bool isT1SeaConstructor = (uname == "armcs" || uname == "corcs" || uname == "legnavyconship");
-        // T2 sea constructors typically use the 'acsub' suffix (e.g., armacsub/coracsub)
-        bool isT2SeaConstructor = (uname.length() >= 5 && uname.substr(uname.length() - 5, 5) == "acsub");
+        // By the unit-helper lists: the old "acsub" suffix test missed Legion's
+        // leganavyconsub, which then only ever got the default task.
+        bool isT1SeaConstructor = SeaConstructor::IsT1(udef);
+        bool isT2SeaConstructor = SeaConstructor::IsT2(udef);
 
         if (isT1SeaConstructor) {
             return Sea_T1Constructor_AiMakeTask(builder, defaultTask);
@@ -606,11 +612,8 @@ namespace RoleSea {
         // Determine cap: 50 metal income per lab (e.g., 100 -> 2 labs)
         int seaLabCap = int(metalIncome / 75.0f);
 
-        string side = Global::AISettings::Side;
-        array<string> labs;
-        labs = { "armasy", "corasy" };
-            
-        UnitHelpers::BatchApplyUnitCaps(labs, seaLabCap);
+        // All three sides' T2 shipyards, legadvshipyard included (D-039).
+        UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2Shipyards(), seaLabCap);
     }
 
     void Sea_IncomeBuilderLimits(float metalIncome) {
@@ -624,161 +627,42 @@ namespace RoleSea {
     ******************************************************************************/
 
     IUnitTask@ Sea_T1Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask) {
-        // Snapshot economy
-    float mi = aiEconomyMgr.metal.income;
-    float ei = aiEconomyMgr.energy.income;
-        bool isEnergyFull = aiEconomyMgr.isEnergyFull;
-
+        float mi = aiEconomyMgr.metal.income;
+        float ei = aiEconomyMgr.energy.income;
         AIFloat3 conLocation = u.GetPos(ai.frame);
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         // First, try to satisfy any SEA PRIMARY objectives (e.g., seaplane platform then tidal spam)
         IUnitTask@ objTask = Sea_TryHandleObjective(u, conLocation, unitSide, mi, ei);
         if (objTask !is null) return objTask;
+        // The ladder itself is shared with every role that owns a construction
+        // ship (helpers/sea_constructor_helpers.as, D-042), with SEA's numbers.
+        SeaConstructor::Settings@ s = SeaConstructor::FromSea();
         if (u is Builder::primaryT1SeaConstructor) {
-            
-
-            // Consider upgrading to a T2 Shipyard if economy and prerequisites allow
-           // if (!Builder::IsT2ShipyardQueued) {
-            int t2ShipyardCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2Shipyards());
-            bool hasPrimaryT1Shipyard = (Factory::primaryT1Shipyard !is null);
-            if (EconomyHelpers::ShouldBuildT2Shipyard(
-                mi,
-                ei,
-                aiEconomyMgr.metal.current,
-                Global::RoleSettings::Sea::MinimumMetalIncomeForT2Shipyard,
-                Global::RoleSettings::Sea::RequiredMetalCurrentForT2Shipyard,
-                Global::RoleSettings::Sea::MinimumEnergyIncomeForT2Shipyard,
-                t2ShipyardCount,
-                Global::RoleSettings::Sea::MaxT2Shipyards,
-                hasPrimaryT1Shipyard
-            )) {
-                AIFloat3 anchor = Factory::GetT1ShipyardPos();
-                IUnitTask@ tT2Sy = Builder::EnqueueT2Shipyard(unitSide, anchor, SQUARE_SIZE * 60, 600 * SECOND);
-                if (tT2Sy !is null) return tT2Sy;
-            }
-           // }
-
-            // A mex upgrade outranks the whole energy ladder: best metal per metal,
-            // and the supply of spots is finite. See doc/known-issues.md KI-213.
-            if (Global::RoleSettings::MexUpgradeFirst)
-            {
-            	IUnitTask@ tMexUp = EconomyHelpers::EnqueueMexUpgradeIfFirst(u, Global::Map::StartPos,
-            			Global::RoleSettings::MexUpgradeRadius,
-            			Global::RoleSettings::MexUpgradeMaxConcurrent, "SEA");
-            	if (tMexUp !is null) return tMexUp;
-            }
-
-            // Build Naval Energy Converter?
-            if (EconomyHelpers::ShouldBuildT1EnergyConverter(
-                mi,
-                ei,
-                aiEconomyMgr.energy.current,
-                aiEconomyMgr.energy.storage,
-                Global::RoleSettings::Sea::BuildT1ConvertersUntilMetalIncome,
-                Global::RoleSettings::Sea::BuildT1ConvertersMinimumEnergyIncome,
-                Global::RoleSettings::Sea::BuildT1ConvertersMinimumEnergyCurrentPercent
-            )) {
-                IUnitTask@ tConv = Builder::EnqueueT1NavalEnergyConverter(unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
-                if (tConv !is null) return tConv;
-            }
-
-            // Build a T1 naval nano caretaker if income-based target or reserves-based condition is met
-            float energyPercent = (aiEconomyMgr.energy.storage > 0.0f)
-                ? (aiEconomyMgr.energy.current / aiEconomyMgr.energy.storage)
-                : 0.0f;
-            // Only build nanos if we have a preferred factory to anchor around
-            if (Factory::GetPreferredFactory() !is null && EconomyHelpers::ShouldBuildT1Nano(
-                ei,
-                mi,
-                Global::RoleSettings::Sea::NanoEnergyPerUnit,
-                Global::RoleSettings::Sea::NanoMetalPerUnit,
-                Global::RoleSettings::Sea::NanoMaxCount,
-                aiEconomyMgr.metal.current,
-                Global::RoleSettings::Sea::NanoBuildWhenOverMetal,
-                energyPercent
-            )) {
-                // Centralized selection with per-factory nano caps; water labs use naval nanos automatically
-                CCircuitUnit@ targetFactory = Factory::SelectFactoryNeedingNano();
-                if (targetFactory !is null) {
-                    IUnitTask@ tNano = Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::NORMAL);
-                    if (tNano !is null) return tNano;
-                }
-            }
-
-            // Prefer tidals at sea instead of solars
-            if (EconomyHelpers::ShouldBuildT1Solar(ei, Global::RoleSettings::Sea::TidalEnergyIncomeMinimum)) {
-                IUnitTask@ tTidal = Builder::EnqueueT1Tidal(unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
-                if (tTidal !is null) return tTidal;
-            }
-            
-        } else if (EconomyHelpers::ShouldAssistPrimaryWorker(ei, Global::RoleSettings::Sea::AssistPrimaryWorkerEnergyIncomeMinimum)) {
-            return GuardHelpers::AssignWorkerGuard(u, Builder::primaryT1SeaConstructor, Task::Priority::HIGH, true, 160 * SECOND);
+            IUnitTask@ t = SeaConstructor::T1Ladder(u, s, "SEA");
+            if (t !is null) return t;
+        } else {
+            IUnitTask@ t = SeaConstructor::AssistPrimary(u, s, 160 * SECOND);
+            if (t !is null) return t;
         }
-
         // Default fallback
         return defaultTask;
     }
 
     IUnitTask@ Sea_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask) {
-        // Snapshot economy
-        float mi = aiEconomyMgr.metal.income;
-        float ei = aiEconomyMgr.energy.income;
-        bool isEnergyFull = aiEconomyMgr.isEnergyFull;
-
-        string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
-        AIFloat3 conLocation = u.GetPos(ai.frame);
-
         if (u is Builder::freelanceT2SeaConstructor) {
             // Freelance T2 sea constructors do default tasks for now
             return defaultTask;
         }
-
         if (u is Builder::primaryT2SeaConstructor) {
-            bool isEnergyLessThan90Percent = aiEconomyMgr.energy.current < aiEconomyMgr.energy.storage * Global::RoleSettings::Sea::EnergyStorageLowPercent;
-
-            // Advanced naval energy converter (underwater MMM) when energy is healthy
-            if (EconomyHelpers::ShouldBuildT2EnergyConverter(
-                mi,
-                ei,
-                isEnergyLessThan90Percent,
-                isEnergyFull,
-                Global::RoleSettings::Sea::MinimumMetalIncomeForAdvConverter,
-                Global::RoleSettings::Sea::MinimumEnergyIncomeForAdvConverter
-            )) {
-                AIFloat3 anchorConv = Factory::GetT2ShipyardPos();
-                IUnitTask@ tConv2 = Builder::EnqueueAdvNavalEnergyConverter(unitSide, anchorConv, SQUARE_SIZE * 32, SECOND * 60);
-                if (tConv2 !is null) return tConv2;
-            }
-            // Build a naval fusion reactor if fusion policy allows and none exist yet
-            if (EconomyHelpers::ShouldBuildFusionReactor(
-                mi,
-                ei,
-                isEnergyLessThan90Percent,
-                Global::RoleSettings::Sea::MinimumMetalIncomeForFUS,
-                Global::RoleSettings::Sea::MinimumEnergyIncomeForFUS,
-                Global::RoleSettings::Sea::MaxEnergyIncomeForFUS
-            )) {
-                string navalFusName = UnitHelpers::GetNavalFusionNameForSide(unitSide);
-                CCircuitDef@ navalFus = (navalFusName.length() == 0 ? null : ai.GetCircuitDef(navalFusName));
-                int have = (navalFus is null ? 0 : navalFus.count);
-                if (navalFus !is null && have < 1) {
-                    AIFloat3 anchor = Factory::GetT2ShipyardPos();
-                    IUnitTask@ tNF = Builder::EnqueueNavalFUS(unitSide, anchor, SQUARE_SIZE * 32, SECOND * 300);
-                    if (tNF !is null) return tNF;
-                }
-            }
-
-            // Consider assisting the primary T1 sea worker when energy is low
-            if (EconomyHelpers::ShouldAssistPrimaryWorker(ei, Global::RoleSettings::Sea::AssistPrimaryWorkerEnergyIncomeMinimum) && Builder::primaryT1SeaConstructor !is null) {
-                return GuardHelpers::AssignWorkerGuard(u, Builder::primaryT1SeaConstructor, Task::Priority::HIGH, true, 120 * SECOND);
-            }
+            SeaConstructor::Settings@ s = SeaConstructor::FromSea();
+            IUnitTask@ t = SeaConstructor::T2Ladder(u, s, "SEA");
+            if (t !is null) return t;
+            @t = SeaConstructor::AssistPrimary(u, s, 120 * SECOND);
+            if (t !is null) return t;
         }
-
         // Default fallback
         return defaultTask;
     }
-
-
 
     /******************************************************************************
 

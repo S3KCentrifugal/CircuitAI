@@ -6,6 +6,7 @@
 #include "helpers/role_helpers.as"
 #include "helpers/limits_helpers.as"
 #include "helpers/porc_helpers.as"
+#include "helpers/layout_helpers.as"
 #include "global.as"
 #include "maps.as"
 #include "maps/factory_mapping.as"
@@ -272,6 +273,9 @@ namespace Setup {
 		// the table but only builds it when a role enables dynamic production, and
 		// no role does; without this every cached enemy threat and cost stays 0.
 		FactoryProduction::BuildRoleCaches();
+		// Wave policy defaults for every role; a role overrides in its Init.
+		aiMilitaryMgr.quota.attackWait = Global::Military::AttackWaitSeconds;
+		aiMilitaryMgr.quota.attackScale = Global::Military::AttackScale;
 		// Register per-role configs 
 		RegisterRoles();
 
@@ -351,6 +355,7 @@ namespace Setup {
 		// Snapshot per-def caps / ignore flags / main roles before any role touches them,
 		// so a runtime role switch (Commands::SwitchRole) can restore the baseline.
 		Commands::DefState::Snapshot();
+		Commands::NativeState::Snapshot();
 
 		// Apply role-specific startup limits if provided
 		RoleConfigs::ApplyStartLimits();
@@ -362,6 +367,11 @@ namespace Setup {
 		// Porcupine chain last: a role delegate sees its own caps already applied,
 		// and the content-option tiers depend on CheckModOptions having run.
 		PorcHelpers::ApplyForRole();
+
+		// Layout plan after that: it needs the start position (captured just
+		// above) and runs before the native chooser places the start factory,
+		// so the first lab lands on its reserved site.
+		LayoutHelpers::ApplyForRole();
 
 		GenericHelpers::LogUtil("Setup complete role=" + derivedRole + " landLocked=" + landLocked, 1);
 	}

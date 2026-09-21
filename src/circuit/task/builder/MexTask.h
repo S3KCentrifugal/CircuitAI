@@ -14,6 +14,10 @@ namespace circuit {
 
 class CBMexTask final: public IBuilderTask {
 public:
+	// A home-cluster order (D-063): never abandoned because an allied structure
+	// appeared within the ally zone; the spot is this AI's by the opening.
+	void SetIgnoreAlly(bool value) { ignoreAlly = value; }
+	bool IsIgnoreAlly() const { return ignoreAlly; }
 	CBMexTask(ITaskModule* mgr, Priority priority,
 			  CCircuitDef* buildDef, int spotId, const springai::AIFloat3& position,
 			  SResource cost, int timeout);
@@ -43,6 +47,7 @@ private:
 
 	int spotId;
 	int blockCount;
+	bool ignoreAlly = false;
 };
 
 } // namespace circuit

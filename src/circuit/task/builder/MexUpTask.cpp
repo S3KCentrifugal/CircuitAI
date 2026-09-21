@@ -96,7 +96,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 	const int frame = circuit->GetLastFrame();
 	if (target != nullptr) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdRepair(target, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+			unit->CmdRepair(target, UNIT_CMD_OPTION, CmdTimeout(frame));
 		)
 		return true;
 	}
@@ -104,7 +104,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, frame + FRAMES_PER_SEC * 60);
+			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
 		return true;
 	}
@@ -117,7 +117,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 
 	if (geom::is_valid(buildPos)) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, frame + FRAMES_PER_SEC * 60);
+			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
 		return true;
 	}

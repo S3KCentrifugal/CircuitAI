@@ -47,6 +47,18 @@ void CArtilleryTask::AssignTo(CCircuitUnit* unit)
 	IFighterTask::AssignTo(unit);
 
 	unit->CmdSetMoveState(CCircuitDef::MoveType::HOLD_POS);
+	/*
+	 * This task only ever ORDERS a structure (FindTarget skips IsMobile), but a
+	 * unit holding position on fire-at-will shoots whatever wanders into range,
+	 * so a Longbow parked at a porc line spent its salvos on passing boats. For
+	 * `siege`-tagged artillery, return fire: it engages its ordered target and
+	 * anything that attacks it, and nothing else. Restored to fire-at-will when
+	 * the unit leaves the task, so a retreat or a squad reassignment behaves
+	 * as before. Config-driven: the attribute is the switch.
+	 */
+	if (unit->GetCircuitDef()->IsAttrSiege()) {
+		unit->CmdSetFireState(CCircuitDef::FireType::RETURN);
+	}
 
 	int squareSize = manager->GetCircuit()->GetPathfinder()->GetSquareSize();
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -63,6 +75,9 @@ void CArtilleryTask::AssignTo(CCircuitUnit* unit)
 
 void CArtilleryTask::RemoveAssignee(CCircuitUnit* unit)
 {
+	if (unit->GetCircuitDef()->IsAttrSiege()) {
+		unit->CmdSetFireState(CCircuitDef::FireType::OPEN);
+	}
 	IFighterTask::RemoveAssignee(unit);
 	if (units.empty()) {
 		manager->AbortTask(this);

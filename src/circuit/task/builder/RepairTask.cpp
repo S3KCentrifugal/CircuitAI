@@ -91,7 +91,9 @@ bool CBRepairTask::Reevaluate(CCircuitUnit* unit)
 	}
 
 	CAllyUnit* repTarget = (target != nullptr) ? target : circuit->GetFriendlyUnit(targetId);
-	if ((repTarget != nullptr) && (repTarget->GetUnit()->GetHealth() < repTarget->GetUnit()->GetMaxHealth())) {
+	if ((repTarget != nullptr) && (repTarget->GetUnit()->GetHealth() < repTarget->GetUnit()->GetMaxHealth())
+		&& !static_cast<CBuilderManager*>(manager)->IsReclaimUnit(repTarget))  // marked for reclaim since we started
+	{
 		buildPos = repTarget->GetPos(circuit->GetLastFrame());
 	} else {
 		manager->AbortTask(this);

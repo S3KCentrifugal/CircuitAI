@@ -37,6 +37,11 @@ inline bool SBlockingMap::IsStruct(int x, int z) const
 	return static_cast<SM>(grid[z * columns + x].structMask);
 }
 
+inline bool SBlockingMap::IsReserved(int x, int z) const
+{
+	return grid[z * columns + x].structMask == StructMask::RESERVED;
+}
+
 inline void SBlockingMap::MarkBlocker(int x, int z, StructType structType, SM notIgnoreMask)
 {
 	SBlockCell& cell = grid[z * columns + x];
@@ -95,6 +100,15 @@ inline void SBlockingMap::AddStruct(int x, int z, StructType structType, SM notI
 	cell.structMask = GetStructMask(structType);
 }
 
+inline void SBlockingMap::ReStruct(int x, int z, StructType structType, SM notIgnoreMask)
+{
+	SBlockCell& cell = grid[z * columns + x];
+	if (cell.blockerCounts[static_cast<ST>(structType)] < BLOCK_VAL) {
+		cell.notIgnoreMask = notIgnoreMask;
+	}
+	cell.structMask = GetStructMask(structType);
+}
+
 inline void SBlockingMap::DelStruct(int x, int z, StructType structType, SM notIgnoreMask)
 {
 	SBlockCell& cell = grid[z * columns + x];
@@ -108,6 +122,39 @@ inline void SBlockingMap::DelStruct(int x, int z, StructType structType, SM notI
 		cell.notIgnoreMask = 0;
 	}
 	cell.structMask = StructMask::NONE;
+}
+
+inline void SBlockingMap::AddReservationUnderlay(int x, int z, SM notIgnoreMask)
+{
+	SBlockCell& cell = grid[z * columns + x];
+	const ST index = static_cast<ST>(StructType::RESERVED);
+	if (cell.blockerCounts[index]++ == 0) {
+		SBlockCellLow& cellLow = gridLow[z / GRID_RATIO_LOW * columnsLow + x / GRID_RATIO_LOW];
+		if (++cellLow.blockerCounts[index] == BLOCK_THRESHOLD) {
+			cellLow.blockerMask |= static_cast<SM>(StructMask::RESERVED);
+		}
+	}
+	if (cell.structMask == StructMask::NONE) {
+		cell.notIgnoreMask = notIgnoreMask;
+		cell.structMask = StructMask::RESERVED;
+	}
+}
+
+inline void SBlockingMap::DelReservationUnderlay(int x, int z)
+{
+	SBlockCell& cell = grid[z * columns + x];
+	const ST index = static_cast<ST>(StructType::RESERVED);
+	if ((cell.blockerCounts[index] == 0) || (--cell.blockerCounts[index] != 0)) {
+		return;
+	}
+	SBlockCellLow& cellLow = gridLow[z / GRID_RATIO_LOW * columnsLow + x / GRID_RATIO_LOW];
+	if (cellLow.blockerCounts[index]-- == BLOCK_THRESHOLD) {
+		cellLow.blockerMask &= ~static_cast<SM>(StructMask::RESERVED);
+	}
+	if (cell.structMask == StructMask::RESERVED) {
+		cell.notIgnoreMask = 0;
+		cell.structMask = StructMask::NONE;
+	}
 }
 
 inline bool SBlockingMap::IsZoneAlly(int xAlly, int zAlly) const

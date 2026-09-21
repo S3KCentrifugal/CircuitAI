@@ -72,6 +72,12 @@ public:
 	float GetPylonRange() const { return pylonRange; }
 	float GetMetalMake(CCircuitDef* cdef) const;  // script
 	float GetEnergyMake(CCircuitDef* cdef) const;  // script
+	float GetEnergyUse(CCircuitDef* cdef) const;  // script: converter consumption
+	int GetMexSpotCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
+	int GetClaimedMexCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
+	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false);
+	// Live mex tasks (assigned or queued) whose spot lies within radius of center (D-063).
+	int GetMexTaskCountWithin(const springai::AIFloat3& center, float radius) const;
 	CCircuitDef* GetLowEnergy(const springai::AIFloat3& pos, float& outMake, const CCircuitUnit* builder = nullptr) const;
 	void AddEconomyDefs(const std::set<CCircuitDef*>& buildDefs);  // add available economy defs
 	void RemoveEconomyDefs(const std::set<CCircuitDef*>& buildDefs);
@@ -225,6 +231,15 @@ private:
 	};
 	CAvailList<SEnergyExt> energyDefs;
 	void ReclaimOldEnergy(const SEnergyExt* energyExt);
+	/*
+	 * Script lever on the energy table (D-047). economy.json is shared by every
+	 * role; a role that wants a different cap or income gate on one energy def
+	 * sets it here after setup and nobody else is affected. -1 leaves a field.
+	 */
+public:
+	void SetEnergyCondition(CCircuitDef* cdef, int limit, float metalIncome, float energyIncome);
+	int GetEnergyLimit(CCircuitDef* cdef) const;
+private:
 
 	float ecoStep = 0.f;
 	float ecoFactor = 0.f;
@@ -276,6 +291,14 @@ private:
 	bool isEnergyRequired;
 	float reclConvertEff;
 	float reclEnergyEff;
+	// Native assist nanos (CheckAssistRequired): a factory that "needs upgrade"
+	// gets a HIGH-priority construction turret whenever income covers it. Per
+	// instance, so a role can hand nano policy to its script (D-051).
+	bool assistNanoEnabled = true;
+	float assistNanoIncomeMod = 1.f;  // multiplies the income a new assist nano must be covered by
+	bool holdStartFactory = false;  // TECH bootstrap: native factory scheduling waits
+	bool autoStorageEnabled = true;  // TECH owns storage ordering in script
+	bool reclaimOldConvertersAlways = false;  // TECH recycles T1 converters into advanced economy
 	float startMexTravel;
 
 	struct SResourceInfo {

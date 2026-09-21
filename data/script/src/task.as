@@ -55,8 +55,21 @@ namespace Task {
 		SUPPORT,
 		SUPER,
 		ROUTE,   // CRouteTask: script-owned waypoint route (Spam::)
+		FERRY,   // CFerryTask: transport ferry (Team::Ferry), created natively
+		WAVE,    // CAirWaveTask: script-planned bomber wave (AirWaves::)
 		_SIZE_
 	}
+
+	// CAirWaveTask methods; doc/air-wave-attacks.md
+	enum WaveMode {
+		CARPET = 0,  // line abreast at the stand-off, attack-move through the front
+		FLANK,       // the same line, rotated to one side of the front
+		PINCER,      // two lines from both sides at once
+		STRIKE,      // dive on one high-value unit (T3 / big static), quietest bearing
+		DEEP,        // the deepest qualifying static, quietest bearing
+		FEINT        // form on the front line, hold there, then carpet
+	}
+	const float WAVE_SMART_BEARING = 999.0f;
 
 }  // namespace Task
 
@@ -324,6 +337,10 @@ namespace TaskS {
 	SFightTask Route()
 	{
 		return Common(Task::FightType::ROUTE);
+	}
+	SFightTask Wave()
+	{
+		return Common(Task::FightType::WAVE);
 	}
 
 }  // namespace TaskF

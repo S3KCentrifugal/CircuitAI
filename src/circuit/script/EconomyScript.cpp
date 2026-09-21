@@ -8,12 +8,35 @@
 #include "script/EconomyScript.h"
 #include "script/ScriptManager.h"
 #include "module/EconomyManager.h"
+#include "task/builder/BuilderTask.h"
 #include "util/ExtAS.h"
 #include "angelscript/include/angelscript.h"
 
 namespace circuit {
 
 using namespace springai;
+
+static void CEconomyManager_SetEnergyCondition(CEconomyManager* mgr, const CCircuitDef* cdef, int limit, float mi, float ei)
+{
+	mgr->SetEnergyCondition(const_cast<CCircuitDef*>(cdef), limit, mi, ei);
+}
+
+static int CEconomyManager_GetEnergyLimit(CEconomyManager* mgr, const CCircuitDef* cdef)
+{
+	return mgr->GetEnergyLimit(const_cast<CCircuitDef*>(cdef));
+}
+
+static IUnitTask* CEconomyManager_EnqueueMexWithinAware(
+		CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
+{
+	return mgr->EnqueueMexWithin(builder, center, radius, maxSpots, allyAware);
+}
+
+static IUnitTask* CEconomyManager_EnqueueMexWithin(
+		CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots)
+{
+	return mgr->EnqueueMexWithin(builder, center, radius, maxSpots);
+}
 
 CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 		: IModuleScript(scr, mgr)
@@ -38,9 +61,23 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isEnergyFull", asOFFSET(CEconomyManager, isEnergyFull)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "float reclConvertEff", asOFFSET(CEconomyManager, reclConvertEff)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "float reclEnergyEff", asOFFSET(CEconomyManager, reclEnergyEff)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CEconomyManager", "bool assistNanoEnabled", asOFFSET(CEconomyManager, assistNanoEnabled)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CEconomyManager", "float assistNanoIncomeMod", asOFFSET(CEconomyManager, assistNanoIncomeMod)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CEconomyManager", "bool holdStartFactory", asOFFSET(CEconomyManager, holdStartFactory)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CEconomyManager", "bool autoStorageEnabled", asOFFSET(CEconomyManager, autoStorageEnabled)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CEconomyManager", "bool reclaimOldConvertersAlways", asOFFSET(CEconomyManager, reclaimOldConvertersAlways)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "float startMexTravel", asOFFSET(CEconomyManager, startMexTravel)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetMetalMake(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetMetalMake), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetEnergyMake(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetEnergyMake), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "float GetEnergyUse(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetEnergyUse), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexSpotCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetMexSpotCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetClaimedMexCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetClaimedMexCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asFUNCTION(CEconomyManager_EnqueueMexWithin), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int, bool allyAware)", asFUNCTION(CEconomyManager_EnqueueMexWithinAware), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexTaskCountWithin(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetMexTaskCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
+	// Per-role energy table overrides (D-047); -1 keeps a field.
+	r = engine->RegisterObjectMethod("CEconomyManager", "void SetEnergyCondition(const CCircuitDef@, int limit, float metalIncome, float energyIncome)", asFUNCTION(CEconomyManager_SetEnergyCondition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEnergyLimit(const CCircuitDef@) const", asFUNCTION(CEconomyManager_GetEnergyLimit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 }
 
 CEconomyScript::~CEconomyScript()

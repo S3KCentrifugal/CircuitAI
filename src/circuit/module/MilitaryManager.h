@@ -169,6 +169,11 @@ public:
 		int mobileMaxAge = 0;        // frames a mobile's last known position stays usable
 		int minTargets = 1;
 		bool structuresFirst = true;  // only structures get an uncapped stun
+		// Only structures at or above this cost keep their rank above mobiles;
+		// cheaper ones compete with mobiles on cost. "Large statics first, then
+		// the most expensive thing in range" - a 1 020-metal wall should not
+		// outrank a 5 000-metal experimental just for being a building.
+		float structuresFirstMinCost = 1500.f;
 	};
 	const SEmpInfo& GetEmpInfo() const { return empInfo; }
 
@@ -205,6 +210,28 @@ public:
 		bool groupMixedDefs = true;
 	};
 	const SBomberInfo& GetBomberInfo() const { return bomberInfo; }
+
+	/*
+	 * Stockpile patience. A stockpiled super weapon - nuke, EMP, Juno - only
+	 * fires at a group worth at least its shot cost. That floor treats metal
+	 * that is ALREADY SPENT as the price of firing, and group value is only
+	 * what the AI can currently see, so a silo sat with three missiles while
+	 * a discovered base "was not worth it" and died with them. The floor now
+	 * decays with how long a shot has been waiting, and collapses once enough
+	 * shots are stocked: a wave of a poor target beats a full tube.
+	 * Configured under "stockpile" in behaviour.json.
+	 */
+	struct SStockInfo {
+		float patienceSeconds = 240.f;  // floor decays from 1.0 to minFraction over this
+		float minFraction = 0.25f;      // never below this fraction of the shot cost
+		int fullFireCount = 2;          // at this many stocked, the floor is minFraction now
+		// Regional stockpiled launchers (Perdition, Catalyst) aim by unit scan,
+		// CSuperTask::SelectLauncherTarget, not by enemy-group centroid.
+		int launcherMobileMaxAge = 900;       // frames a mobile's last known position stays usable
+		int launcherMinTargets = 1;           // raise to require a clump inside the blast
+		bool launcherStructuresFirst = false; // rank any structure above any mobile
+	};
+	const SStockInfo& GetStockInfo() const { return stockInfo; }
 
 	/*
 	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
@@ -302,6 +329,9 @@ public:
 	 * than straight at the enemy start. See doc/spam-routes.md.
 	 */
 	springai::AIFloat3 GetCombatFocusPos() const;
+	float GetMinAttackers() const { return minAttackers; }
+	float GetAttackWaitSeconds() const { return attackWaitSeconds; }
+	float GetAttackScale() const { return attackScale; }
 	void UpdateDefence();
 	void MakeBaseDefence(const springai::AIFloat3& pos);
 
@@ -396,6 +426,16 @@ private:
 	} raid;
 	unsigned int maxScouts = 0;
 	float minAttackers = 0.f;
+	/*
+	 * Attack-wave policy, script-set through quota.attackWait / quota.attackScale.
+	 * attackScale > 0 switches a DEFEND squad's promotion bar from the map-wide
+	 * second-strongest enemy group to the strongest group the squad can
+	 * actually REACH, scaled - a naval squad no longer waits to outweigh a land
+	 * army it will never meet. attackWaitSeconds > 0 promotes a squad that has
+	 * waited that long at or above minAttackers. Both 0 = legacy behaviour.
+	 */
+	float attackWaitSeconds = 0.f;
+	float attackScale = 0.f;
 	struct SThreatQuota {
 		float min;
 		float len;
@@ -412,6 +452,7 @@ private:
 	SPulseInfo pulseInfo;
 	SEmpInfo empInfo;
 	SBomberInfo bomberInfo;
+	SStockInfo stockInfo;
 	SSensorInfo sensorInfo;
 
 	unsigned int preventCount = 0;
@@ -422,6 +463,12 @@ private:
 	// 2 forces the full porcupine order; budgetMod scales the per-point income budget.
 	int porcMode = 0;
 	float porcBudgetMod = 1.f;
+	// aiMilitaryMgr.porcAllyAA: when set, the porc pass also visits clusters
+	// inside an ALLY's zone and builds only anti-air there. An AIR role's whole
+	// value to its team is air denial, and its teammates' clusters are where
+	// the enemy air actually goes. Ground defence in an ally's zone stays off:
+	// that is the ally's own porc.
+	int porcAllyAA = 0;
 	CCircuitDef* bigGunDef;
 
 	std::vector<SSideInfo> sideInfos;

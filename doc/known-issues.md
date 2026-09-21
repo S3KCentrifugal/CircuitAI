@@ -427,11 +427,21 @@ units moving down the lane, or by a
 
 ---
 
-### KI-110 — A stockpiled super weapon holds its shot until it dies
+### KI-110 — Closed: a stockpiled super weapon holds its shot until it dies
 
-Decision: [D-010](decisions.md#d-010--the-nuke-cost-floor-is-a-regression-left-unfixed-pending-a-decision) — open, awaiting a call on the floor.
+Decision: [D-010](decisions.md#d-010--the-nuke-cost-floor-is-a-regression-left-unfixed-pending-a-decision) (diagnosis),
+[D-035](decisions.md#d-035--a-stockpiled-shots-floor-decays-while-it-waits) (fix).
 
-**Severity**: High
+**Resolution.** Item 1 of the proposal below is built: the floor decays from
+the shot cost to `min_fraction` over `patience_seconds` and collapses at
+`full_fire_count` stocked (`CSuperTask::StockedShotFloor`, the `stockpile`
+block in `behaviour.json`). Item 2 is built for the tactical launchers only
+([D-036](decisions.md#d-036--tactical-launchers-aim-by-unit-scan-and-super-statics-bypass-role-policy):
+aim points valued by metal inside the AoE); the nuke and Juno still value a
+k-means cell. Item 3 is not addressed. Not Played. See
+[`launcher-targets.md`](launcher-targets.md#the-floor).
+
+**Severity**: High — **fixed, not yet played**
 **Location**: `CSuperTask::Update`, the `maxCost` floor
 (`src/circuit/task/static/SuperTask.cpp`); group value in
 `CEnemyManager::KMeansIteration` (`src/circuit/unit/enemy/EnemyManager.cpp`)
@@ -547,6 +557,49 @@ range where group value decides anything.
 **Verification.** A silo that has held a stocked missile past the patience
 window fires at the best target available, and the `SUPER ... no target` line
 shows `minCost` falling over successive reports rather than sitting at 1500.
+
+---
+
+### KI-111 — Bases are laid out by a nearest-free spiral and clog
+
+Decision: [D-029](decisions.md#d-029--layout-is-reservations-first-script-pushes-the-plan-native-owns-the-nano-block) (proposal),
+[D-043](decisions.md#d-043--reservations-are-built-tech-reserves-its-labs-a-4x10-nano-block-and-six-advanced-solars) (steps 1-4 built for TECH).
+
+**Resolution so far.** The reservation mechanism is native. TECH uses
+canonical atomic factory/nano/exit clusters and one full or half rear economy
+module; all other roles deliberately retain the normal placement path. Shared
+allied reservations remain open. See [`base-layout.md`](base-layout.md).
+
+**Severity**: Medium — **partly fixed (TECH), not yet played**
+**Location**: `CTerrainManager::FindBuildSite` / `GetSearchOffsetTable`
+(`src/circuit/terrain/TerrainManager.cpp`), `IBuilderTask::FindFacing`
+(`src/circuit/task/builder/BuilderTask.cpp`), the `caretaker` class in
+`data/config/*/block_map.json`, every script `Enqueue*` anchor
+
+**Problem.** Every structure is placed at the nearest free spot to an anchor
+that is usually the constructor's own position, using a search table sorted
+by squared distance. Spacing comes from the block map, which is right for
+explosions and blind to everything else, and the nano class reserves
+nothing. Facing is away from the nearest map edge, never toward the lane.
+Nothing reserves a corridor. The result is a spiral outward from wherever
+the builder stood: nanos in every gap, energy interleaved with production,
+labs facing the map edge, no room for the army. AIR and TECH bases are a
+clogged mess; FRONT's forward anchors hide the same spiral at each step.
+Teammates know each other's start positions and roles and nothing about
+each other's layouts.
+
+**Proposed solution.** [`base-layout.md`](base-layout.md), in six landable
+stages: row-major search inside an oriented rectangle; zone facing; lane
+reservation in the blocking map; a `CLayoutPlan` of zones and lanes with a
+per-role `LayoutPlanHandler`; the base rectangle and exit corridor shared
+over the roster; FRONT re-anchoring on advance. Native owns geometry and the
+blocking map; script owns which zones, how big, which way, and what to share.
+
+**Verification.** In a played game: nanos in blocks beside labs and not in
+exits; labs facing the lane; fusions ≥ 480 apart; a visible clear corridor
+from the production row to the front; two allied bases with a clear link
+between them; and no drop in the number of structures placed per minute
+(the cost of reserving ground).
 
 ---
 
@@ -1675,6 +1728,18 @@ registration mismatches, signature errors or namespace mistakes.
 This is the single largest drag on script work in this repository and the reason
 several of the issues above are "decide, then play a game to find out".
 
+**Interim (2026-09-20).** `tools/knowledge/check_script_api.py` checks every
+native member the script uses against the source registrations and, with
+`--dll`, against the installed binary (plus a size sanity check for an
+unstripped or mid-build copy). It does not compile the script; it catches
+the script/DLL mismatch class, which caused two of the three game-start
+failures of 2026-09-20. The runbook is `.claude/skills/ai-not-moving/SKILL.md`.
+History of "does not move at start": 2026-09-20 `out` used as an
+identifier (`eco_planner.as`); 2026-09-20 `const CCircuitDef@` passed to a
+non-const parameter; 2026-09-20 script deployed ahead of the DLL that
+registers `FindReclaimTargetFor` / `FindUnfinishedFor` (the DLL in the
+install was also a 307 MB mid-build copy).
+
 **Proposed solution.** Build a small host that links the vendored AngelScript
 from `src/lib/angelscript/`, registers the same surface as
 `src/circuit/script/InitScript.cpp` with stub implementations, and compiles a
@@ -1800,6 +1865,213 @@ document ends with a source marker in the same form as the other role
 documents.
 
 ---
+
+### KI-405 — Layout corridors and zones are not shared with allies
+
+**Severity**: Medium
+**Location**: `data/script/src/manager/layout.as`, `src/circuit/terrain/TerrainManager.cpp` (zones)
+
+**Problem.** The factory exit rectangles, nano blocks, economy-module zone and
+access corridor are cells in *this* AI's blocking map (D-060). An allied BARb,
+or a human, can still build across TECH's factory exits or on its planned
+economy ground; only native's bus path (marked when a factory finishes,
+`AddBusPath`) is visible to allied BARb instances through the ally zone.
+Sharing reservations over the roster (`barbres`, D-029 step 5) is the
+planned fix and is not built; neither is a second complex or a port
+complex (design step 7).
+
+**Status.** Open. Recorded 2026-09-20 with D-053; locations updated for D-060.
+
+### KI-406 — Closed: layout state is authoritative across save/load
+
+**Severity**: Low — **fixed, not Played**
+**Location**: `data/script/src/manager/layout.as`, `src/circuit/terrain/TerrainManager.cpp` (`SaveLayout` / `LoadLayout`)
+
+**Resolution.** D-060 removed script-owned numeric group/zone identity. Native
+now serializes named group and zone registries, slot order and claim state,
+factory-line metadata and module tier before builder tasks. `Layout::Adopt`
+recognises those names and re-reads the restored metadata. Loaded task pins
+therefore resolve against the same native plan.
+
+**Status.** Fixed statically by D-060. Save/load remains part of KI-407's
+in-game verification plan.
+
+### KI-407 — Native TECH layout refactor is not yet Played
+
+**Superseded in part by D-063.** The economy module, its full/half selection
+and its AFUS/converter progression no longer exist; the factory pair, its
+rear nano blocks, exits, pins and save/load are still the things to verify.
+The turret box and the economy packing are
+[KI-409](#ki-409--the-turret-box-and-the-mex-first-opening-are-not-yet-played).
+
+**Severity**: Medium
+**Location**: `src/circuit/terrain/BaseLayoutGeometry.h`,
+`src/circuit/terrain/TerrainManager.cpp`,
+`src/circuit/task/builder/BuilderTask.cpp`,
+`data/script/src/manager/layout.as`
+
+**Problem.** The deterministic geometry has standalone unit coverage, but the
+integrated plan has not been loaded in BAR. Static checks cannot prove that
+the engine accepts every reserved footprint, constructors can reach the
+far-to-near sequence, factory exits remain clear under real unit movement, or
+save/load reattaches live pinned tasks correctly.
+
+**Proposed solution.** Play one Armada/Cortex/Legion TECH game on open terrain
+and one constrained map. With `/barblayout` enabled, verify the T1 `2 x 1`
+and T2 `3 x 2` rear clusters, 320-elmo exits, full-before-half module
+selection, deliberate factory-block completion, default 24/12 and Supreme
+32/16 reserved module nanos growing by regional demand, one AFUS frame at a
+time, four baseline converters and surplus-gated fifths. Save while one module task is claimed and one structure is
+under construction, reload, and confirm the same named plan and pending-build
+blocker continue. Switch away from TECH with a pinned or already-started
+layout task and confirm it aborts and ordinary placement resumes.
+
+**Verification.** Open. Geometry tests and static checkers are not a substitute
+for these played cases.
+
+### KI-408 — TECH eco progression is not yet Played
+
+**Superseded in part by D-063.** The three-mex/six-wind/lab/storage opener
+and the module rows are gone; what remains to verify from this entry is the
+converter surplus rule, native automatic storage off, and the recycling of
+obsolete converters. The new opening and turret rule are
+[KI-409](#ki-409--the-turret-box-and-the-mex-first-opening-are-not-yet-played).
+
+**Severity**: Medium
+**Location**: `data/script/src/roles/tech.as` (`Opening`),
+`data/script/src/manager/eco_planner.as`,
+`data/script/src/manager/layout.as`,
+`src/circuit/module/EconomyManager.cpp`
+
+**Problem.** D-062 makes the opener and mature economy deterministic: three
+Supreme home mexes, six winds, T1 bot lab, one storage; regional build-power
+rows; actual converter consumption; and automatic recycling of obsolete
+converters. The native and script code compile, but no played game has yet
+shown that factory scheduling stays held for exactly the intended window,
+that the commander takes the three home spots rather than the fourth spot,
+or that the regional nano/converter progression remains resource-positive.
+
+**Proposed solution.** Play both Supreme TECH starts with startup decision
+logging enabled. Confirm `MEX 1/3` through `3/3`, six wind decisions, the
+first bot-lab frame before storage, no second ordinary energy storage, and no
+advanced converter until bank >=90% and ten-second net surplus covers its
+native energy use. At +70, +100, +150 and +190 metal, inspect `/barblayout`
+and the regional build-power logs to confirm rows are armed progressively.
+Finish an advanced converter and AFUS, then confirm obsolete T1 converter and
+energy structures are reclaimed without pulling the economy into a stall.
+
+**Verification.** Open. Static geometry and checker results do not substitute
+for these played scenarios.
+
+### KI-409 — The turret box and the mex-first opening are not yet Played
+
+**Severity**: Medium
+**Location**: `data/script/src/manager/layout.as` (`PlanBox`, `Place`,
+`NanoTask`), `data/script/src/manager/eco_planner.as` (`Decide`),
+`data/script/src/roles/tech.as` (`Opening`, the FACTORY honour in
+`Tech_BuilderAiMakeTask`), `src/circuit/terrain/TerrainManager.cpp`
+(`PackNearGroup`), `src/circuit/module/EconomyManager.cpp`
+(`EnqueueMexWithin`)
+
+**Problem.** D-063 was Played once (2026-09-20): the box fit on both
+Supreme tech starts (40 x 28, 24 slots), winds packed 48 elmos from a
+turret, the lab followed the opening by 50 s. The opening broke: native's
+re-ask of a busy builder made the opener close every spot with a queued
+order in five seconds and declare itself complete after one built mex
+(fixed the same day: idempotent `EnqueueMexWithin`, the opener keeps the
+mex it is on and completes only when no order is pending). The second game
+showed the orders in the right sequence but the commander abandoned the
+second and third frames: the ally-zone abort in `CBMexTask::Reevaluate`
+(fixed the same day: opening orders are exempt, half-built orders are handed
+back first). The third game froze after the lab: the re-ask churn described
+in D-063 follow-up 3 (fixed the same day: a constructor keeps its
+construction; the energy ratio ramp is 8 to 20 over +5 to +40). Still
+untested:
+the fixed opening end to end (`home mex order N at (x, z)` lines one at a
+time, `complete ... no mex order is pending` after the last mex stands);
+that the packer's "nearest a turret" order gives the compact base intended
+and not a strip along row 0 (the first eight winds all sat 48 elmos from
+row 0); that the 8 BP per metal turret target neither starves build power
+nor floods turrets (the T1 constructor asked for a turret at +9 metal
+against a target of 79); that a pinned task whose slot the engine refuses
+is aborted and the slot reused rather than left claimed.
+
+**Proposed solution.** Play both Supreme TECH starts with the overlay on.
+Check, in order: `[Layout] turret box AxD cells ...` at frame 0 with its
+ground score and slot count; `[TECH][Opening] home mex N` lines nearest the
+commander first and `complete after N mexes` before `RESERVE: served
+<lab>`; the lab within a minute of the opening's end; `[Eco] next: ...`
+choices matching the state they print; `RESERVE: packed <def> ... N from a
+turret` distances under 400 and rising slowly; turrets appearing on row 0
+first. Save and load with a packed task pending and confirm the box ints
+(`tech.box.*`) and the pin come back. Then tune `LayoutBoxMinScore`,
+`EcoBuildPowerPerMetal` and `OpeningMaxSeconds` from what was seen.
+
+**Verification.** Open.
+
+### KI-411 — The experimental build system is not yet Played
+
+**Severity**: High (it replaces the whole builder sequence for TECH)
+**Location**: `data/script/src/roles/tech_build.as`,
+`data/script/src/roles/tech.as` (`Tech_Init`, `Tech_BuilderAiMakeTask`),
+`src/circuit/module/BuilderManager.cpp` (`DefaultMakeTask`, `FindQueuedTask`),
+`src/circuit/terrain/TerrainManager.cpp` (`PackNearPoint`),
+`src/circuit/module/EconomyManager.cpp` (`StartFactoryJob`, `UpdateStorageTasks`)
+
+**Problem.** D-066 is Built, not Played. Untested: that no TECH builder
+ever idles (every rung returns null only when the next applies; the tail
+is assist, guard, wait); that the start factory is ordered the first ask
+after the opening and lands on the pair's slot; that mex expansion neither
+starves the base of a constructor nor sends one across the map
+(`EcoMexExpandRadius` 2,500); that the strategic rungs still fire with a
+null default (they return null when they have nothing); that native's
+queued defence orders are taken by the sequence and packed near their
+anchor by `PackNearPoint` rather than left to time out; that
+`PackNearPoint`'s block-mask allowance leaves factory exits free; that
+turning the switch off gives the stock ladder with no leftover (no layout
+lines, no opening lines, native's start factory as before).
+
+**Proposed solution.** One game with the switch on watching
+`[TECH][Build] experimental build system on`, `start factory ordered`,
+`expands a mex`, `RESERVE: packed ... near`, and no `discarded ... default
+task` lines for TECH; then one game with `Tech::ExperimentalBuild = false`
+confirming the stock lines and behaviour.
+
+**Verification.** Open.
+
+### KI-410 — Experimental build mode is not yet Played
+
+**Severity**: Medium
+**Location**: `src/circuit/task/builder/BuilderTask.cpp` (`TryEngage`,
+`EngageRange`, `CmdTimeout`), `src/circuit/module/BuilderManager.h`,
+`data/script/src/roles/tech.as` (`Tech_Init`)
+
+**Problem.** D-064 is Built, not Played. Untested: that the engine's
+`MoveInBuildRange` stops a commander given a build command from 1,600
+elmos exactly at the range edge on this engine build; that cancelling the
+travel action with `StateFinish` from inside `Update` leaves no stale
+waypoint order (a queued move would still be walked); that `engaged` is
+cleared on every path a unit leaves a task by (idle, removed, task
+aborted); that a construction command without a timeout is never left
+standing on a site the AI has given up (the watchdog's "lost" test and the
+task's own abort must still take it away); that the threat guard
+(`THREAT_MIN` at the site) is neither too timid nor too bold for the direct
+leg.
+
+**Proposed solution.** Play one TECH game watching the commander's opening:
+it should stop on the near edge of its build range for every mex, never
+walk over a spot, and the nanolathe should run without a restart until each
+mex stands (`[TECH][Build] experimental build mode on` at init). Then a T1
+constructor building winds in the box: one approach, one start per wind. If
+a unit ever stands still with a build command and no progress, check the
+watchdog `OnUnitMoveFailed` path and the task abort; if a unit walks past a
+site, log `TryEngage` distances against `EngageRange`. The same game
+verifies D-065: with a T1 lab reclaim under way every turret in reach
+should switch to it (`[TECH][Turret] <id> reclaims`), and a turret next to
+a wind and an advanced converter under construction should assist the
+converter first.
+
+**Verification.** Open.
 
 ## Indexed elsewhere
 

@@ -78,7 +78,19 @@ namespace Spam {
     dictionary rejectByFactory;    // factory id string -> last reason logged
     int lastIdleReportFrame = -1;
 
-    bool IsEnabled() { return Global::Spam::Enabled; }
+    bool IsEnabled()
+    {
+        if (!Global::Spam::Enabled) return false;
+        if (Global::Map::LandLocked && !Global::Spam::AllowLandLocked) {
+            if (!landLockedReported) {
+                landLockedReported = true;
+                GenericHelpers::LogUtil("[Spam] Off: this start is land-locked; the T1 factories keep their role logic (Global::Spam::AllowLandLocked)", 1);
+            }
+            return false;
+        }
+        return true;
+    }
+    bool landLockedReported = false;
     bool IsActive() { return active; }
 
     bool IsSpamDef(const CCircuitDef@ d)
@@ -109,10 +121,12 @@ namespace Spam {
                 // units are ordinary front-line combat units and the roles should
                 // keep using them as such. Report the shortfall occasionally so
                 // "never activated" is distinguishable from "never evaluated".
-                if (lastIdleReportFrame < 0 || (ai.frame - lastIdleReportFrame) >= MINUTE) {
+                // Level 1, every two minutes: LOG_LEVEL is 1, and "never activated"
+                // has to be tellable from "never evaluated" in a game log.
+                if (lastIdleReportFrame < 0 || (ai.frame - lastIdleReportFrame) >= 2 * MINUTE) {
                     lastIdleReportFrame = ai.frame;
                     GenericHelpers::LogUtil("[Spam] Idle: mi=" + int(mi) + "/" + int(Global::Spam::MinMetalIncome)
-                        + " ei=" + int(ei) + "/" + int(Global::Spam::MinEnergyIncome), 3);
+                        + " ei=" + int(ei) + "/" + int(Global::Spam::MinEnergyIncome), 1);
                 }
             }
             if (mi >= Global::Spam::MinMetalIncome && ei >= Global::Spam::MinEnergyIncome) {
@@ -316,7 +330,7 @@ namespace Spam {
         task.SetLanes(Global::Spam::UnitLanes, Global::Spam::UnitLaneSpacing, Global::Spam::EndSpread);
         routeByFactory.set(key, @task);
         GenericHelpers::LogUtil("[Spam] Route created for factory " + factory.id + " lane " + lane
-            + " -> (" + int(Destination().x) + "," + int(Destination().z) + ")", 2);
+            + " -> (" + int(Destination().x) + "," + int(Destination().z) + ")", 1);
         return task;
     }
 
@@ -363,7 +377,7 @@ namespace Spam {
         rejectByFactory.set(key, why);
         if (why.length() == 0) return;   // memo cleared on success; nothing to say
         GenericHelpers::LogUtil("[Spam] " + factory.circuitDef.GetName() + " (" + factory.id
-            + ") not spamming: " + why, 3);
+            + ") not spamming: " + why, 1);
     }
 
     IUnitTask@ FactoryMakeTask(CCircuitUnit@ factory)

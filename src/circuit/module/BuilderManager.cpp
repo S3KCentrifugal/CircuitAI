@@ -46,6 +46,7 @@
 #include "task/builder/CombatTask.h"
 #include "task/builder/BuildChain.h"
 #include "CircuitAI.h"
+#include "unit/ally/AllyTeam.h"
 #include "util/Utils.h"
 #include "util/Profiler.h"
 #include "json/json.h"
@@ -53,6 +54,9 @@
 #include "spring/SpringCallback.h"
 
 #include "Log.h"
+
+#include <algorithm>
+#include <limits>
 
 namespace circuit {
 
@@ -210,7 +214,7 @@ void CBuilderManager::InitHandlers()
 	 * building handlers
 	 */
 	auto buildingDamagedHandler = [this](CCircuitUnit* unit, CEnemyInfo* attacker) {
-		if (!unit->IsAttrNoRepair()) {
+		if (!unit->IsAttrNoRepair() && !IsReclaimUnit(unit)) {
 			Enqueue(TaskB::Repair(IBuilderTask::Priority::HIGH, unit));
 		}
 	};
@@ -621,6 +625,185 @@ const std::set<IBuilderTask*>& CBuilderManager::GetTasks(IBuilderTask::BuildType
 	return buildTasks[static_cast<IBuilderTask::BT>(type)];
 }
 
+float CBuilderManager::GetBuildPowerNear(const AIFloat3& position, float radius) const
+{
+	const float sqRadius = SQUARE(std::max(0.f, radius));
+	const int frame = circuit->GetLastFrame();
+	float power = 0.f;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if ((cdef == nullptr) || !cdef->IsAbleToAssist()) {
+			continue;
+		}
+		if (unit->GetPos(frame).SqDistance2D(position) <= sqRadius) {
+			// The def's build speed is per frame (commander 10, turret 6.7);
+			// the game and the planner talk in workertime per second.
+			power += cdef->GetBuildSpeed() * FRAMES_PER_SEC;
+		}
+	}
+	return power;
+}
+
+float CBuilderManager::GetStaticBuildPowerNear(const AIFloat3& position, float radius) const
+{
+	const float sqRadius = SQUARE(std::max(0.f, radius));
+	const int frame = circuit->GetLastFrame();
+	float power = 0.f;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if ((cdef == nullptr) || cdef->IsMobile() || !cdef->IsAbleToAssist()) {
+			continue;
+		}
+		if (unit->GetPos(frame).SqDistance2D(position) <= sqRadius) {
+			power += cdef->GetBuildSpeed() * FRAMES_PER_SEC;
+		}
+	}
+	return power;
+}
+
+int CBuilderManager::GetUnfinishedCount(const CCircuitDef* def) const
+{
+	int count = 0;
+	for (const auto& kv : unfinishedUnits) {
+		CAllyUnit* au = kv.first;
+		if ((au != nullptr) && (au->GetCircuitDef() == def)) {
+			++count;
+		}
+	}
+	return count;
+}
+
+CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float radius, const CCircuitDef* def)
+{
+	// def == nullptr: any structure of ours under construction (D-066).
+	const int frame = circuit->GetLastFrame();
+	const float radiusSq = SQUARE(radius);
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : unfinishedUnits) {
+		CAllyUnit* au = kv.first;
+		if ((au == nullptr) || ((def != nullptr) && (au->GetCircuitDef() != def))) {
+			continue;
+		}
+		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
+		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		const float sq = unit->GetPos(frame).SqDistance2D(pos);
+		if ((sq <= radiusSq) && (sq < bestSq)) {
+			bestSq = sq;
+			best = unit;
+		}
+	}
+	return best;
+}
+
+// D-065: reach of a builder to a structure, the engine's rule (build distance
+// plus the buildee's model radius).
+static bool InReachOf(CCircuitUnit* builder, CCircuitUnit* unit, int frame)
+{
+	const float reach = builder->GetCircuitDef()->GetBuildDistance() + unit->GetCircuitDef()->GetRadius();
+	return builder->GetPos(frame).SqDistance2D(unit->GetPos(frame)) <= SQUARE(reach);
+}
+
+CCircuitUnit* CBuilderManager::FindReclaimTargetFor(CCircuitUnit* builder)
+{
+	if (builder == nullptr) {
+		return nullptr;
+	}
+	const int frame = circuit->GetLastFrame();
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : reclaimIds) {
+		CCircuitUnit* unit = circuit->GetTeamUnit(kv.second);
+		if ((unit == nullptr) || unit->IsDead() || (unit == builder) || !InReachOf(builder, unit, frame)) {
+			continue;
+		}
+		const float sq = builder->GetPos(frame).SqDistance2D(unit->GetPos(frame));
+		if (sq < bestSq) {
+			bestSq = sq;
+			best = unit;
+		}
+	}
+	return best;
+}
+
+CCircuitUnit* CBuilderManager::FindUnfinishedFor(CCircuitUnit* builder, const CCircuitDef* def)
+{
+	if ((builder == nullptr) || (def == nullptr)) {
+		return nullptr;
+	}
+	const int frame = circuit->GetLastFrame();
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : unfinishedUnits) {
+		CAllyUnit* au = kv.first;
+		if ((au == nullptr) || (au->GetCircuitDef() != def)) {
+			continue;
+		}
+		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
+		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt() || !InReachOf(builder, unit, frame)) {
+			continue;
+		}
+		const float sq = builder->GetPos(frame).SqDistance2D(unit->GetPos(frame));
+		if (sq < bestSq) {
+			bestSq = sq;
+			best = unit;
+		}
+	}
+	return best;
+}
+
+IUnitTask* CBuilderManager::FindQueuedTask(CCircuitUnit* builder, IBuilderTask::BuildType type)
+{
+	if ((builder == nullptr) || (type < IBuilderTask::BuildType::FACTORY) || (type >= IBuilderTask::BuildType::_SIZE_)) {
+		return nullptr;
+	}
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3& from = builder->GetPos(frame);
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	IBuilderTask* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (IBuilderTask* task : GetTasks(type)) {
+		if ((task == nullptr) || task->IsDead() || !task->GetAssignees().empty() || !task->CanAssignTo(builder)) {
+			continue;
+		}
+		const AIFloat3& pos = task->GetPosition();
+		if (geom::is_valid(pos) && !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())) {
+			continue;
+		}
+		const float sq = geom::is_valid(pos) ? from.SqDistance2D(pos) : 0.f;
+		if (sq < bestSq) {
+			bestSq = sq;
+			best = task;
+		}
+	}
+	return best;
+}
+
+int CBuilderManager::GetQueuedBuildCount(IBuilderTask::BuildType type, const CCircuitDef* buildDef) const
+{
+	if ((type < IBuilderTask::BuildType::FACTORY) || (type >= IBuilderTask::BuildType::_SIZE_)) {
+		return 0;
+	}
+	int count = 0;
+	for (const IBuilderTask* task : GetTasks(type)) {
+		if ((task != nullptr) && !task->IsDead() && (task->GetTarget() == nullptr)
+				&& ((buildDef == nullptr) || (task->GetBuildDef() == buildDef))) {
+			++count;
+		}
+	}
+	return count;
+}
+
 void CBuilderManager::ActivateTask(IBuilderTask* task)
 {
 	if ((task->GetType() == IUnitTask::Type::BUILDER) && (task->GetBuildType() < IBuilderTask::BuildType::_SIZE_)) {
@@ -741,7 +924,36 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 	} else {
 		task->Deactivate();
 	}
+	lastEnqueued = task;
 	TaskAdded(task);
+	return task;
+}
+
+IBuilderTask* CBuilderManager::EnqueueLayout(
+		const TaskB::SBuildTask& ti, const std::string& groupName, CCircuitUnit* builder)
+{
+	IBuilderTask* task = Enqueue(ti);
+	if ((task == nullptr) || !circuit->GetTerrainManager()->PinLayoutTask(task, groupName, builder)) {
+		if (task != nullptr) {
+			AbortTask(task);
+		}
+		return nullptr;
+	}
+	return task;
+}
+
+IBuilderTask* CBuilderManager::EnqueueFactoryNano(const TaskB::SBuildTask& ti, CCircuitUnit* builder)
+{
+	if ((builder == nullptr) || (circuit->GetTerrainManager()->GetFactoryNanoAvailable() <= 0)) {
+		return nullptr;
+	}
+	IBuilderTask* task = Enqueue(ti);
+	if ((task == nullptr) || !circuit->GetTerrainManager()->PinFactoryNanoTask(task, builder)) {
+		if (task != nullptr) {
+			AbortTask(task);
+		}
+		return nullptr;
+	}
 	return task;
 }
 
@@ -766,6 +978,7 @@ IUnitTask* CBuilderManager::Enqueue(const TaskB::SServBTask& ti)
 	}
 
 	updateTasks.push_back(task);
+	lastEnqueued = task;
 	TaskAdded(task);
 	return task;
 }
@@ -774,6 +987,7 @@ CRetreatTask* CBuilderManager::EnqueueRetreat()
 {
 	CRetreatTask* task = new CRetreatTask(this);
 	updateTasks.push_back(task);
+	lastEnqueued = task;
 	TaskAdded(task);
 	return task;
 }
@@ -808,7 +1022,9 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 					repairUnits.erase(static_cast<CBRepairTask*>(taskB)->GetTargetId());
 				} break;
 				case IBuilderTask::BuildType::RECLAIM: {
-					reclaimUnits.erase(taskB->GetTarget());
+					if (taskB->GetTarget() != nullptr) {
+						UnregisterReclaim(taskB->GetTarget());
+					}
 				} break;
 				case IBuilderTask::BuildType::RESURRECT: {
 				} break;
@@ -822,6 +1038,48 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 		default: break;
 	}
 	ITaskModule::DequeueTask(task, done);
+}
+
+void CBuilderManager::MarkReclaimUnit(CAllyUnit* target, CBReclaimTask* task)
+{
+	if ((reclaimUnits.find(target) == reclaimUnits.end()) && (circuit->GetAllyTeam() != nullptr)) {
+		circuit->GetAllyTeam()->MarkReclaim(target->GetId());
+	}
+	reclaimUnits[target] = task;
+	reclaimIds[target] = target->GetId();
+}
+
+void CBuilderManager::RegisterReclaim(CAllyUnit* unit)
+{
+	if ((reclaimUnits.find(unit) == reclaimUnits.end()) && (circuit->GetAllyTeam() != nullptr)) {
+		circuit->GetAllyTeam()->MarkReclaim(unit->GetId());
+	}
+	reclaimUnits[unit] = nullptr;
+	reclaimIds[unit] = unit->GetId();
+}
+
+void CBuilderManager::UnregisterReclaim(CAllyUnit* unit)
+{
+	// `unit` is only a key here, never dereferenced: the mex-upgrade task calls
+	// this for the extractor it reclaimed, which may already be freed (CR-001).
+	auto it = reclaimIds.find(unit);
+	const bool known = (it != reclaimIds.end());
+	const ICoreUnit::Id id = known ? it->second : -1;
+	if (known) {
+		reclaimIds.erase(it);
+	}
+	if ((reclaimUnits.erase(unit) > 0) && known && (circuit->GetAllyTeam() != nullptr)) {
+		circuit->GetAllyTeam()->UnmarkReclaim(id);
+	}
+}
+
+bool CBuilderManager::IsReclaimUnit(CAllyUnit* unit) const
+{
+	if (reclaimUnits.find(unit) != reclaimUnits.end()) {
+		return true;
+	}
+	const CAllyTeam* allyTeam = circuit->GetAllyTeam();
+	return (allyTeam != nullptr) && allyTeam->IsReclaimMarked(unit->GetId());
 }
 
 void CBuilderManager::FallbackTask(CCircuitUnit* unit)
@@ -935,7 +1193,69 @@ bool CBuilderManager::CanUpGeo(CCircuitDef* cdef) const
 	return (it != workerDefs.end()) && it->second.canUpGeo;
 }
 
+IUnitTask* CBuilderManager::MakeTask(CCircuitUnit* unit)
+{
+	freshDefaults.clear();
+	freshMade = nullptr;
+	IUnitTask* task = ITaskModule::MakeTask(unit);  // script policy, DefaultMakeTask inside
+	for (IUnitTask* def : freshDefaults) {
+		if (def == task) {
+			freshMade = task;
+		} else if (!def->IsDead() && def->GetAssignees().empty()) {
+			AbortTask(def);
+			++discardCount;
+		}
+	}
+	freshDefaults.clear();
+	const int frame = circuit->GetLastFrame();
+	if ((discardCount > 0) && (frame - discardLogFrame >= FRAMES_PER_SEC * 60)) {
+		circuit->LOG("BUILDER: discarded %i unused default task(s) in the last minute", discardCount);
+		discardCount = 0;
+		discardLogFrame = frame;
+	}
+	return task;
+}
+
+void CBuilderManager::DiscardUnusedTask(IUnitTask* task)
+{
+	if ((task != nullptr) && (task == freshMade) && !task->IsDead() && task->GetAssignees().empty()) {
+		AbortTask(task);
+		++discardCount;
+	}
+	freshMade = nullptr;
+}
+
+void CBuilderManager::AbortLayoutTasks()
+{
+	std::vector<IBuilderTask*> tasks;
+	for (const auto& byType : buildTasks) {
+		for (IBuilderTask* task : byType) {
+			if ((task != nullptr) && task->IsLayoutOwned() && !task->IsDead()) {
+				tasks.push_back(task);
+			}
+		}
+	}
+	for (IBuilderTask* task : tasks) {
+		AbortTask(task);
+	}
+}
+
 IUnitTask* CBuilderManager::DefaultMakeTask(CCircuitUnit* unit)
+{
+	if (experimentalBuild) {
+		return nullptr;  // D-066: the script's sequence is the only source of work
+	}
+	IUnitTask* const before = lastEnqueued;
+	IUnitTask* task = DefaultMakeTaskImpl(unit);
+	// Fresh: this call created the task it returns. Not fresh: it returned a
+	// task already in the queue, which belongs to whoever queued it.
+	if ((task != nullptr) && (task == lastEnqueued) && (task != before)) {
+		freshDefaults.push_back(task);
+	}
+	return task;
+}
+
+IUnitTask* CBuilderManager::DefaultMakeTaskImpl(CCircuitUnit* unit)
 {
 	const int frame = circuit->GetLastFrame();
 	const AIFloat3& pos = unit->GetPos(frame);
@@ -1542,7 +1862,7 @@ void CBuilderManager::Watchdog()
 		if (!unit->GetCircuitDef()->IsMobile()
 			&& (unfinishedUnits.find(unit) == unfinishedUnits.end())
 			&& (repairUnits.find(unit->GetId()) == repairUnits.end())
-			&& (reclaimUnits.find(unit) == reclaimUnits.end()))
+			&& !IsReclaimUnit(unit))
 		{
 			Unit* u = unit->GetUnit();
 			if (!unit->IsFinished()) {  // u->IsBeingBuilt()
@@ -1598,6 +1918,7 @@ void CBuilderManager::Load(std::istream& is)
 	/*
 	 * Restore data
 	 */
+	circuit->GetTerrainManager()->LoadLayout(is);  // before the tasks: they hold reservation ids (CR-003)
 	for (size_t i = 0; i < buildTasks.size(); ++i) {
 		uint32_t size;
 		utils::binary_read(is, size);
@@ -1690,6 +2011,7 @@ void CBuilderManager::Save(std::ostream& os) const
 	/*
 	 * Save tasks
 	 */
+	circuit->GetTerrainManager()->SaveLayout(os);
 	for (size_t i = 0; i < buildTasks.size(); ++i) {
 		const std::set<IBuilderTask*>& tasks = buildTasks[i];
 		uint32_t size = tasks.size();

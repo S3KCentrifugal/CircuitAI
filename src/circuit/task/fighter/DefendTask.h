@@ -30,6 +30,7 @@ public:
 //	void SetWantedTarget(CEnemyInfo* enemy) { SetTarget(enemy); }
 
 	FightType GetPromote() const { return promote; }
+	int GetCreatedFrame() const { return createdFrame; }
 
 protected:
 	float GetMaxPower() const { return maxPower; }
@@ -47,6 +48,7 @@ private:
 	FightType check;
 	FightType promote;
 	float maxPower;
+	int createdFrame;   // for the wait cap; see Update()
 };
 
 } // namespace circuit

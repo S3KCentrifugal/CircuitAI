@@ -92,6 +92,10 @@ namespace Ferry {
     bool transportHoldApplied = false;
     int  cargoId = -1;             // constructor in flight
     int  cargoRecipient = -1;
+    // Constructors waiting for the transport, oldest first. A run in flight
+    // used to mean "walk it"; now it means "next".
+    array<int> queuedCargo;
+    array<int> queuedRecipient;
 
     bool IsEnabled() { return Global::Ferry::Enabled; }
 
@@ -302,7 +306,58 @@ namespace Ferry {
         if (unit.id == transportId) {
             transportId = -1;
             transportHoldApplied = false;
-            GenericHelpers::LogUtil("[Ferry] transport lost; donations walk until the next request lands", 2);
+            GenericHelpers::LogUtil("[Ferry] transport lost; donations walk until the next request lands", 1);
+            _WalkQueue("transport lost");
+        }
+        for (uint i = 0; i < queuedCargo.length(); ++i) {
+            if (queuedCargo[i] == unit.id) {
+                queuedCargo.removeAt(i);
+                queuedRecipient.removeAt(i);
+                break;
+            }
+        }
+    }
+
+    // No transport to wait for: every queued constructor walks now.
+    void _WalkQueue(const string &in why)
+    {
+        while (queuedCargo.length() > 0) {
+            const int id = queuedCargo[0];
+            const int to = queuedRecipient[0];
+            queuedCargo.removeAt(0);
+            queuedRecipient.removeAt(0);
+            CCircuitUnit@ u = ai.GetTeamUnit(id);
+            if (u is null || to < 0 || to == ai.teamId) continue;
+            array<CCircuitUnit@> give(1);
+            @give[0] = u;
+            ai.GiveUnits(give, to);
+            GenericHelpers::LogUtil("[Ferry] TECH: " + why + "; gave queued constructor " + id + " to team " + to, 1);
+        }
+    }
+
+    // The transport is free: start the oldest queued run.
+    void _StartNext()
+    {
+        while (queuedCargo.length() > 0) {
+            const int id = queuedCargo[0];
+            const int to = queuedRecipient[0];
+            queuedCargo.removeAt(0);
+            queuedRecipient.removeAt(0);
+            CCircuitUnit@ u = ai.GetTeamUnit(id);
+            if (u is null) continue;
+            Team::Roster::Entry@ e = Team::Roster::Get(to);
+            if (e !is null && TryCarry(u, to, e.startPos)) {
+                GenericHelpers::LogUtil("[Ferry] TECH: next run from the queue: " + id + " to team " + to
+                    + " (" + queuedCargo.length() + " still waiting)", 1);
+                return;
+            }
+            // No roster entry or the ferry refused: this one walks.
+            if (to >= 0 && to != ai.teamId) {
+                array<CCircuitUnit@> give(1);
+                @give[0] = u;
+                ai.GiveUnits(give, to);
+                GenericHelpers::LogUtil("[Ferry] TECH: could not start a run for " + id + "; gave it to team " + to, 1);
+            }
         }
     }
 
@@ -324,11 +379,21 @@ namespace Ferry {
     {
         if (!IsEnabled()) return _Refuse("ferry disabled");
         if (cargo is null || recipient < 0) return _Refuse("no cargo or no recipient");
-        if (cargoId >= 0) return _Refuse("a run is already in flight (cargo " + cargoId + ")");
         CCircuitUnit@ t = Transport();
         if (t is null) return _Refuse("no transport owned (transportId=" + transportId + ")");
         CFerryTask@ task = TaskOf(t);
         if (task is null) return _Refuse("transport " + t.id + " has no CFerryTask yet");
+        if (cargoId >= 0) {
+            // A run is in flight: queue behind it rather than walk. "If an air
+            // transport is available always deliver it" - it is, just busy.
+            if (queuedCargo.find(cargo.id) < 0) {
+                queuedCargo.insertLast(cargo.id);
+                queuedRecipient.insertLast(recipient);
+            }
+            GenericHelpers::LogUtil("[Ferry] TECH: queued " + cargo.id + " for team " + recipient
+                + " behind cargo " + cargoId + " (" + queuedCargo.length() + " waiting)", 1);
+            return true;
+        }
         if (!task.SetCargo(cargo.id, dropPos)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
         cargoId = cargo.id;
         cargoRecipient = recipient;
@@ -361,6 +426,7 @@ namespace Ferry {
         cargoRecipient = -1;
         CFerryTask@ task = TaskOf(Transport());
         if (task !is null) task.Reset();   // sends it home
+        _StartNext();
     }
 
     /**************************************************************************

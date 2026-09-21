@@ -19,6 +19,7 @@ namespace circuit {
 
 class CCircuitDef;
 class CAllyUnit;
+class CTerrainManager;
 
 struct SBuildChain;
 
@@ -127,6 +128,14 @@ protected:
 	CCircuitUnit* GetNextAssignee();
 	void Update(CCircuitUnit* unit);
 	virtual bool Reevaluate(CCircuitUnit* unit);
+	// Experimental build mode (D-064): the manager's flag; the engine's build
+	// range for this unit and site (reach + buildee radius, x0.9); the command
+	// timeout (none in the mode); engage when inside the range, or inside the
+	// direct range on safe ground, cancelling the AI path.
+	bool IsExperimental() const;
+	float EngageRange(CCircuitUnit* unit);
+	int CmdTimeout(int frame) const;
+	bool TryEngage(CCircuitUnit* unit);
 	void UpdatePath(CCircuitUnit* unit);
 	void ApplyPath(const CQueryPathSingle* query);
 	void HideAssignee(CCircuitUnit* unit);
@@ -151,6 +160,18 @@ protected:
 	CCircuitUnit* target;  // FIXME: Replace target with unitId
 	springai::AIFloat3 buildPos;
 	int facing;
+	int reservationId;  // CTerrainManager reservation this site was served from; -1 = none
+	int pinnedReservation;  // an exact layout task: serve exactly this slot; -1 = none
+	bool pinRequired;
+	bool pinFailed;
+	bool layoutOwned;
+	void TakeReservation(CTerrainManager* terrainMgr);  // after a FindBuildSite that may have served one
+public:
+	bool PinReservation(int id);
+	void RequireReservation() { pinRequired = true; pinnedReservation = -1; layoutOwned = true; }
+	bool IsLayoutOwned() const { return layoutOwned; }
+	int GetReservationId() const { return reservationId; }
+protected:
 	IBuilderTask* nextTask;  // old list style
 	CCircuitUnit* initiator;
 
@@ -161,6 +182,7 @@ protected:
 
 	std::set<CCircuitUnit*> traveled;
 	std::set<CCircuitUnit*> executors;
+	std::set<CCircuitUnit*> engaged;  // D-064: units whose construction command stands (a second one restarts the nanolathe)
 
 #ifdef DEBUG_VIS
 	virtual void Log() override;

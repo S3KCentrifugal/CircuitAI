@@ -884,6 +884,34 @@ if (options !is null) {
 bool legionEnabled = legion == "1";
 ```
 
+### `CEconomyManager aiEconomyMgr` additions (D-047)
+
+```angelscript
+float reclEnergyEff;   // old energy is reclaimed when a finished def scores more than this x its score; native default 20
+bool assistNanoEnabled;      // native CheckAssistRequired nanos for this instance (D-051); default true
+float assistNanoIncomeMod;   // scales the income a native assist nano must be covered by; default 1
+void SetEnergyCondition(const CCircuitDef@ def, int limit, float metalIncome, float energyIncome);  // this instance only; -1 keeps a field
+int GetEnergyLimit(const CCircuitDef@ def) const;
+```
+
+### `CAirWaveTask`
+
+A script-planned bomber wave (`doc/air-wave-attacks.md`): made with
+`aiMilitaryMgr.Enqueue(TaskF::Wave())` and reached with
+`cast<CAirWaveTask>(cast<IFighterTask>(t))`.
+
+```angelscript
+void SetPlan(int mode, const AIFloat3& in aim, float formDistance, float spacing, float overrun,
+             int formTimeout, int holdFrames, float bearingDeg, int groups);   // mode: Task::WaveMode; bearing 999 = Task::WAVE_SMART_BEARING
+bool PickStrikeTarget(const AIFloat3& in from, int preference, float minStaticCost, bool includeHeavy);  // 0 value near `from`, 1 deepest
+int GetState() const;          // 0 PLANNED, 1 FORMING, 2 HOLDING, 3 ATTACKING, 4 DONE
+int GetMode() const;
+AIFloat3 GetAim() const;
+int GetStrikeTargetId() const;
+float GetBearingDeg() const;
+int GetFormedCount() const;
+```
+
 ### `CTerrainManager aiTerrainMgr`
 
 ```angelscript
@@ -892,7 +920,129 @@ float GetLandPercent() const;
 float SetAllyZoneRange(float range);
 int GetTerrainWidth() const;    // map size in elmos
 int GetTerrainHeight() const;
+
+// Reservations (doc/base-layout.md, D-043). Facing: 0 south (+z), 1 east, 2 north, 3 west.
+int ReserveBuilding(const CCircuitDef@ def, const AIFloat3& in pos, int facing, int ttlFrames = 0);   // id, -1 refused
+int ReserveGrid(const CCircuitDef@ def, const AIFloat3& in frontCentre, int facing, int cols, int rows, int gap, int ttlFrames = 0);  // group, 0 none
+int ReserveNanoBlockAt(const CCircuitDef@ nanoDef, const CCircuitDef@ facDef, const AIFloat3& in facPos, int facing, int cols, int rows, int gap);
+int ReserveNanoBlock(CCircuitUnit@ factory, const CCircuitDef@ nanoDef, int cols, int rows, int gap);   // behind a standing factory
+bool CanReserveBuilding(const CCircuitDef@ def, const AIFloat3& in pos, int facing);   // dry run, no marks, no log
+float BuildableFraction(const CCircuitDef@ def, const AIFloat3& in centre, float halfAcross, float halfAlong, int facing);   // 0..1
+void ReleaseReservation(int id);
+void ReleaseGroup(int group);
+bool IsReserved(const AIFloat3& in pos) const;
+int GetReservationCount(const CCircuitDef@ def) const;   // unconsumed
+float reservationMatchRadius;   // serve a reservation only within this of the search anchor; 0 = anywhere
+
+// High-level layout (doc/layout-design.md, D-060). JSON permits it and TECH opts in.
+bool SetLayoutEnabled(bool enabled);
+bool IsLayoutEnabled() const;
+bool IsLayoutConfigured() const;
+bool PlanFactoryPair(const string& in name, const CCircuitDef@ t1Factory,
+    const CCircuitDef@ t2Factory, const CCircuitDef@ nano,
+    const AIFloat3& in base, int facing, int sideOffsetCells, int forwardOffsetCells);
+int GetFactoryNanoAvailable() const;
+int GetFactoryNanoActive() const;
+bool HasLayoutGroup(const string& in name) const;
+int GetLayoutGroupTotal(const string& in name) const;
+int GetLayoutGroupBuilt(const string& in name) const;
+int GetLayoutGroupStarted(const string& in name) const;
+int GetLayoutGroupAvailable(const string& in name) const;
+int GetLayoutInt(const string& in name, int fallback = 0) const;
+AIFloat3 GetLayoutGroupCenter(const string& in name) const;
+
+// Low-level reservation compatibility surface.
+int ReserveZone(const AIFloat3& in centre, int facing, float halfAcross, float halfAlong, bool corridor);  // zone id, 0 none; cells held RESERVED; a corridor is never laid
+int ReserveExitCone(CCircuitUnit@ factory, float length, float margin);   // corridor in front of a standing factory
+void ReleaseZone(int id);
+bool IsZoneClear(int id) const;                      // no structure on its cells
+int LayBand(int zone, const CCircuitDef@ def, const AIFloat3& in frontCentre, int facing, int cols, int rows, int gap,
+            bool armed, bool anyReach, bool tenant, int group = 0);   // grid inside a zone; idempotent; returns the group
+void ArmGroup(int group, bool armed);                // held slots are planned but not served
+void ReleaseUnconsumed(int group);                   // tenants no longer wanted: unserved slots go, built ones stay
+int GetGroupCount(int group, bool unconsumedOnly) const;
+int NextSlot(int group, const AIFloat3& in near) const;    // nearest armed unconsumed slot, -1 none
+int NextBuilt(int group, const AIFloat3& in near) const;   // nearest slot whose structure stands, -1 none
+int NextSlotAny(int group, const AIFloat3& in near) const; // nearest unconsumed, unclaimed slot, armed or held (D-063)
+void SetLayoutInt(const string& in name, int value);       // script metadata in the saved registry (tech.box.*)
+// Turret box packing (D-063): one footprint of def on the free cells of a zone nearest to any slot of
+// nanoGroup, within maxReach of it (0 = that def's build distance) and at least minNanoDist from every one;
+// ties nearest `anchor`. Returns an armed any-reach reservation id in `group` (0 = none), -1 when nothing fits.
+int PackNearGroup(int zone, const CCircuitDef@ def, int nanoGroup, int facing, const AIFloat3& in anchor,
+                  float maxReach, float minNanoDist, int group);
+bool CanPackNearGroup(int zone, const CCircuitDef@ def, int nanoGroup, int facing, float maxReach, float minNanoDist);  // the dry run
+AIFloat3 GetReservationPos(int id) const;
+int GetReservationFacing(int id) const;
+CCircuitUnit@ GetReservationUnit(int id) const;     // the structure on a zone slot, null none
+float FlatFraction(const AIFloat3& in centre, int facing, float halfAcross, float halfAlong, float maxSlope) const;  // engine slope units (1 - cos)
+string DescribeLayout() const;                       // "kind:name:x:z:facing:w:d:state;..." for the widget overlay
 ```
+
+`aiBuilderMgr.EnqueueLayout(const SBuildTask& in, const string& in group,
+CCircuitUnit@ builder)`
+claims the next native slot in reservation order and returns a task pinned to
+that exact slot. It returns `null` if no claim is possible. A required pin that
+later becomes invalid aborts through the normal task lifecycle and never falls
+through to ordinary placement.
+
+`aiBuilderMgr.EnqueueFactoryNano(const SBuildTask& in, CCircuitUnit@ builder)`
+does the same for the next reachable rear-nano slot belonging to a completed
+factory. `aiTerrainMgr.GetFactoryNanoAvailable()` and
+`GetFactoryNanoActive()` expose aggregate factory-cluster progress.
+
+Regional and queued build facts:
+
+```angelscript
+float aiBuilderMgr.GetBuildPowerNear(const AIFloat3& in position, float radius) const;
+int aiBuilderMgr.GetQueuedBuildCount(int buildType, const CCircuitDef@ def) const;
+```
+
+TECH's opener/economy facts and controls:
+
+```angelscript
+bool aiEconomyMgr.holdStartFactory;
+bool aiEconomyMgr.autoStorageEnabled;
+bool aiEconomyMgr.reclaimOldConvertersAlways;
+float aiEconomyMgr.GetEnergyUse(const CCircuitDef@ def) const;
+int aiEconomyMgr.GetMexSpotCountWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
+int aiEconomyMgr.GetClaimedMexCountWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
+IUnitTask@ aiEconomyMgr.EnqueueMexWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
+// D-063: maxSpots <= 0 means every spot inside the radius; the spots the cap keeps are the nearest to
+// `center`, the one enqueued is the nearest open, reachable, buildable one to the *builder*. Idempotent:
+// an untaken mex order in the radius is returned before a new spot is closed.
+int aiEconomyMgr.GetMexTaskCountWithin(const AIFloat3& in center, float radius) const;  // live mex orders, assigned or queued
+// Experimental build mode (D-064, doc/experimental-build.md): this AI instance's builders stop at the
+// engine's build range, get one construction command, no command timeout; inside the direct range the
+// engine walks the last leg. Off by default; TECH sets both in Tech_Init.
+bool aiBuilderMgr.experimentalBuild;
+float aiBuilderMgr.experimentalDirectRange;
+// Turret assist (D-065): the own unit being reclaimed within this builder's reach (build distance plus the
+// target's model radius), nearest; the unfinished structure of `def` within reach, nearest; null when none.
+CCircuitUnit@ aiBuilderMgr.FindReclaimTargetFor(CCircuitUnit@ builder);
+CCircuitUnit@ aiBuilderMgr.FindUnfinishedFor(CCircuitUnit@ builder, const CCircuitDef@ def);
+int aiBuilderMgr.GetUnfinishedCount(const CCircuitDef@ def) const;                 // our structures of def under construction
+CCircuitUnit@ aiBuilderMgr.FindUnfinishedNear(const AIFloat3& in pos, float radius, const CCircuitDef@ def);  // nearest of them within radius
+// GetBuildPowerNear returns workertime units (commander 300, turret 200), not the engine's per-frame figure.
+float aiBuilderMgr.GetStaticBuildPowerNear(const AIFloat3& in pos, float radius) const;  // turrets only, workertime units
+// The experimental build system (D-066): with experimentalBuild on, DefaultMakeTask returns null for this
+// instance and FindBuildSite never spirals (planned slot, exact spot, or PackNearPoint within the radius).
+float aiBuilderMgr.experimentalSearchRadius;
+IUnitTask@ aiBuilderMgr.FindQueuedTask(CCircuitUnit@ builder, int type);   // nearest live untaken order of a Task::BuildType this builder may take
+IUnitTask@ aiEconomyMgr.EnqueueMexWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots, bool allyAware);  // allyAware: skip allied ground, ally abort kept
+```
+
+Map economy constants on `ai` (D-058): `float GetWindMin() const`,
+`GetWindMax()`, `GetWindCur()`, `GetTidalStrength()`, and
+`int GetMetalSpotCount() const`.
+
+Low-level exact pinning: `bool AiPinReservation(IUnitTask@ task, int id)`
+makes the task's next site search serve exactly that slot (armed or not),
+`int AiTaskReservationId(IUnitTask@ task)` reads the slot a task was served
+(-1 none). `aiSetupMgr.GetLanePos()` returns the lane point native computes
+for the front (`CSetupManager::CalcLanePos`); a layout faces it.
+
+`CCircuitDef` gained `int GetFootprintX() const` / `GetFootprintZ() const`,
+the footprint in 16-elmo cells the reservation API measures in.
 
 Terrain globals:
 
@@ -960,9 +1110,16 @@ bool isEnergyEmpty;
 bool isEnergyFull;
 float reclConvertEff;
 float reclEnergyEff;
+bool holdStartFactory;
+bool autoStorageEnabled;
+bool reclaimOldConvertersAlways;
 float startMexTravel;
 float GetMetalMake(const CCircuitDef@ def) const;
 float GetEnergyMake(const CCircuitDef@ def) const;
+float GetEnergyUse(const CCircuitDef@ def) const;
+int GetMexSpotCountWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
+int GetClaimedMexCountWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
+IUnitTask@+ EnqueueMexWithin(CCircuitUnit@ builder, const AIFloat3& in center, float radius, int maxSpots);
 ```
 
 Economy gate:
@@ -983,11 +1140,25 @@ bool CanAffordFactory(CCircuitDef@ factoryDef)
 ```angelscript
 IUnitTask@+ DefaultMakeTask(CCircuitUnit@ unit);
 IUnitTask@+ Enqueue(const SBuildTask& in request);
+IUnitTask@+ EnqueueLayout(const SBuildTask& in request, const string& in group, CCircuitUnit@ builder);
+IUnitTask@+ EnqueueFactoryNano(const SBuildTask& in request, CCircuitUnit@ builder);
 IUnitTask@+ Enqueue(const SServBTask& in request);
 IUnitTask@+ EnqueueRetreat();
 uint GetWorkerCount() const;
+float GetBuildPowerNear(const AIFloat3& in position, float radius) const;
+int GetQueuedBuildCount(int buildType, const CCircuitDef@ def) const;
 int dangerHysteresis;
 ```
+
+`DefaultMakeTask` **enqueues** the task it returns when it has to create one
+(an energy structure, a nano, a `Wait`); it does not merely choose. A policy
+that calls it first and then returns something else leaves that task in the
+queue - it used to be picked up by the next idle builder. Since
+[D-037](decisions.md#d-037--builders-focus-one-energy-structure-and-unused-default-tasks-are-discarded)
+`CBuilderManager::MakeTask` aborts any task `DefaultMakeTask` created for the
+current call that the policy did not return, so the pre-create-then-override
+pattern is safe. Tasks it *found* in the queue, and the mex tasks the native
+economy leaves for pickup, are not touched.
 
 Custom policies should return a native default when they do not deliberately
 replace it:

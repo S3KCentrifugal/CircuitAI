@@ -1144,6 +1144,17 @@ namespace UnitHelpers {
         return "armsy"; // default
     }
 
+    // Legion has its own T2 shipyard. legnavyconship / leganavyconsub / legch
+    // build legadvshipyard and cannot build corasy; a corasy task for a Legion
+    // side sits unassignable until its timeout (D-039).
+    string GetT2ShipyardForSide(const string &in side)
+    {
+        if (side == "armada") return "armasy";
+        if (side == "cortex") return "corasy";
+        if (side == "legion") return "legadvshipyard";
+        return "armasy"; // default
+    }
+
     // Seaplane platforms across factions
     array<string> GetAllSeaplanePlatforms() {
         array<string> ids;
@@ -1305,6 +1316,34 @@ namespace UnitHelpers {
         
         GenericHelpers::LogUtil("[UnitHelpers] GetAdvSolarNameForSide: no matching side '" + side + "', defaulting to armada", 2);
         return "armadvsol";
+    }
+
+    string GetWindNameForSide(const string &in side)
+    {
+        if (side == "cortex") return "corwin";
+        if (side == "legion") return "legwin";
+        return "armwin";
+    }
+
+    string GetEnergyStorageNameForSide(const string &in side)
+    {
+        if (side == "cortex") return "corestor";
+        if (side == "legion") return "legestor";
+        return "armestor";
+    }
+
+    string GetMetalStorageNameForSide(const string &in side)
+    {
+        if (side == "cortex") return "cormstor";
+        if (side == "legion") return "legmstor";
+        return "armmstor";
+    }
+
+    string GetGeoNameForSide(const string &in side)
+    {
+        if (side == "cortex") return "corgeo";
+        if (side == "legion") return "leggeo";
+        return "armgeo";
     }
 
     string GetEnergyConverterNameForSide(const string &in side)

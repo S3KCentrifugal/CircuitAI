@@ -6,6 +6,7 @@
  */
 
 #include "task/fighter/DefendTask.h"
+#include "Log.h"
 #include "map/InfluenceMap.h"
 #include "map/ThreatMap.h"
 #include "module/MilitaryManager.h"
@@ -38,6 +39,7 @@ CDefendTask::CDefendTask(ITaskModule* mgr, const AIFloat3& position,
 		, check(check)
 		, promote(promote)
 		, maxPower(maxPower * powerMod)
+		, createdFrame(mgr->GetCircuit()->GetLastFrame())
 {
 	this->position = position;
 }
@@ -106,7 +108,24 @@ void CDefendTask::Update()
 	 */
 	if (updCount % 32 == 1) {
 		CMilitaryManager* militaryMgr = static_cast<CMilitaryManager*>(manager);
-		if ((attackPower >= maxPower) || !militaryMgr->GetTasks(check).empty()) {
+		/*
+		 * Wait cap. maxPower is re-set every 5 s from the strongest enemy group
+		 * (see CMilitaryManager::UpdateDefenceTasks), so a squad that never
+		 * outgrows it never attacks: cruisers were seen massing for most of a
+		 * game against a threat they could not reach. A role that sets
+		 * quota.attackWait promotes any squad that has waited that long and is
+		 * at least the base attack quota - a wave now beats parity never.
+		 */
+		const float waitSec = militaryMgr->GetAttackWaitSeconds();
+		const int frame = manager->GetCircuit()->GetLastFrame();
+		const bool waitedOut = (waitSec > 0.f) && (promote == FightType::ATTACK)
+				&& (frame - createdFrame > int(waitSec * FRAMES_PER_SEC))
+				&& (attackPower >= militaryMgr->GetMinAttackers());
+		if (waitedOut) {
+			manager->GetCircuit()->LOG("DEFEND: squad of %i waited %.0fs at power %.0f (needed %.0f); attacking anyway",
+					int(units.size()), float(frame - createdFrame) / FRAMES_PER_SEC, attackPower, maxPower);
+		}
+		if ((attackPower >= maxPower) || waitedOut || !militaryMgr->GetTasks(check).empty()) {
 			IFighterTask* task = militaryMgr->Enqueue(TaskF::Common(promote));
 			decltype(units) tmpUnits = units;
 			for (CCircuitUnit* unit : tmpUnits) {
@@ -204,6 +223,9 @@ void CDefendTask::Merge(ISquadTask* task)
 		)
 	}
 	units.insert(rookies.begin(), rookies.end());
+	// The wait cap counts from the older squad: merging into a newer one must
+	// not restart it, or repeated merges defer the attack for ever (CR-012).
+	createdFrame = std::min(createdFrame, static_cast<CDefendTask*>(task)->GetCreatedFrame());
 	maxPower = std::max(maxPower, static_cast<CDefendTask*>(task)->GetMaxPower());
 	attackPower += task->GetAttackPower();
 	const std::set<CCircuitUnit*>& sh = task->GetShields();

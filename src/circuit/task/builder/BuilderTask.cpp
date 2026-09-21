@@ -31,6 +31,10 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "Log.h"
+
+#include <climits>
+#include <cmath>
 
 namespace circuit {
 
@@ -67,6 +71,11 @@ IBuilderTask::IBuilderTask(ITaskModule* mgr, Priority priority,
 		, target(nullptr)
 		, buildPos(-RgtVector)
 		, facing(UNIT_NO_FACING)
+		, reservationId(-1)
+		, pinnedReservation(-1)
+		, pinRequired(false)
+		, pinFailed(false)
+		, layoutOwned(false)
 		, nextTask(nullptr)
 		, initiator(nullptr)
 		, buildFails(0)
@@ -89,6 +98,11 @@ IBuilderTask::IBuilderTask(ITaskModule* mgr, Type type, BuildType buildType)
 		, target(nullptr)
 		, buildPos(-RgtVector)
 		, facing(UNIT_NO_FACING)
+		, reservationId(-1)
+		, pinnedReservation(-1)
+		, pinRequired(false)
+		, pinFailed(false)
+		, layoutOwned(false)
 		, nextTask(nullptr)
 		, initiator(nullptr)
 		, savedIncome({0.f, 0.f})
@@ -169,6 +183,7 @@ void IBuilderTask::RemoveAssignee(CCircuitUnit* unit)
 	IUnitTask::RemoveAssignee(unit);
 	traveled.erase(unit);
 	executors.erase(unit);
+	engaged.erase(unit);
 
 	HideAssignee(unit);
 }
@@ -182,8 +197,14 @@ void IBuilderTask::Update()
 {
 	decltype(traveled) tmpTraveled = traveled;
 	for (CCircuitUnit* unit : tmpTraveled) {
+		if (IsExperimental() && (engaged.find(unit) != engaged.end())) {
+			continue;  // D-064: its command stands
+		}
 		if (!Execute(unit)) {
 			return;
+		}
+		if (IsExperimental()) {
+			engaged.insert(unit);
 		}
 	}
 	traveled.clear();
@@ -241,6 +262,13 @@ void IBuilderTask::Cancel()
 	if ((target == nullptr) && geom::is_valid(buildPos)) {
 		SetBuildPos(-RgtVector);
 	}
+	if ((target == nullptr) && (reservationId >= 0)) {
+		// Never started: the planned site goes back on hold for the next task.
+		manager->GetCircuit()->GetTerrainManager()->RestoreReservation(reservationId);
+		reservationId = -1;
+	} else if ((target == nullptr) && pinRequired && (pinnedReservation >= 0)) {
+		manager->GetCircuit()->GetTerrainManager()->UnclaimReservation(pinnedReservation);
+	}
 
 	// Destructor will take care of the nextTask queue
 }
@@ -257,7 +285,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 	const int frame = circuit->GetLastFrame();
 	if (target != nullptr) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdRepair(target, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+			unit->CmdRepair(target, UNIT_CMD_OPTION, CmdTimeout(frame));
 		)
 		return true;
 	}
@@ -265,7 +293,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, frame + FRAMES_PER_SEC * 60);
+			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
 		return true;
 	}
@@ -281,7 +309,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		utils::free(friendlies);
 		if (alu != nullptr) {
 			TRY_UNIT(circuit, unit,
-				unit->CmdRepair(alu, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+				unit->CmdRepair(alu, UNIT_CMD_OPTION, CmdTimeout(frame));
 			)
 			return true;
 		}
@@ -296,8 +324,13 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 
 	if (geom::is_valid(buildPos)) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, frame + FRAMES_PER_SEC * 60);
+			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
+	} else if (pinFailed) {
+		circuit->LOG("RESERVE: aborting %s task after required slot %i failed",
+				buildDef->GetDef()->GetName(), pinnedReservation);
+		manager->AbortTask(this);
+		return false;
 	} else {
 		if (geom::is_in_range(circuit->GetSetupManager()->GetBasePos(), position, searchRadius)) {  // base must be full
 			circuit->GetSetupManager()->FindNewBase(unit);
@@ -312,8 +345,11 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 
 void IBuilderTask::OnUnitIdle(CCircuitUnit* unit)
 {
+	engaged.erase(unit);  // D-064: the engine finished or dropped the command; a new one is due
 	if (++buildFails <= 2) {  // Workaround due to engine's ability randomly disregard orders
-		Execute(unit);
+		if (Execute(unit) && IsExperimental()) {
+			engaged.insert(unit);
+		}
 	} else if (buildFails <= TASK_RETRIES) {
 		RemoveAssignee(unit);
 	} else if (target == nullptr) {
@@ -389,6 +425,10 @@ void IBuilderTask::SetTarget(CCircuitUnit* unit)
 		terrainMgr->DelBlocker(buildDef, buildPos, facing);
 	}
 	target = unit;
+	if ((unit != nullptr) && (reservationId >= 0)) {
+		terrainMgr->FinishReservation(reservationId, unit->GetId());  // the structure exists; the plan is met
+		reservationId = -1;
+	}
 	if (unit != nullptr) {
 		facing = unit->GetUnit()->GetBuildingFacing();
 		buildDef = unit->GetCircuitDef();
@@ -439,9 +479,78 @@ CCircuitUnit* IBuilderTask::GetNextAssignee()
 
 void IBuilderTask::Update(CCircuitUnit* unit)
 {
-	if (Reevaluate(unit) && !unit->GetTravelAct()->IsFinished()) {
+	if (!Reevaluate(unit)) {
+		return;
+	}
+	if (IsExperimental()) {
+		// D-064: in range, or near enough for the engine to walk the last leg
+		// itself, the command is given now; no AI waypoints past the range.
+		if (TryEngage(unit) || (units.find(unit) == units.end())) {
+			return;
+		}
+	}
+	if (!unit->GetTravelAct()->IsFinished()) {
 		UpdatePath(unit);  // Execute(unit) within OnTravelEnd
 	}
+}
+
+/*
+ * Experimental build mode (D-064, doc/experimental-build.md)
+ */
+bool IBuilderTask::IsExperimental() const
+{
+	const CBuilderManager* builderMgr = dynamic_cast<const CBuilderManager*>(manager);
+	return (builderMgr != nullptr) && builderMgr->IsExperimentalBuild();
+}
+
+float IBuilderTask::EngageRange(CCircuitUnit* unit)
+{
+	// The engine's rule (Recoil BuilderCAI::GetBuildRange / MoveInBuildRange):
+	// in range when |builder - site| <= buildDistance + modelRadius(buildee);
+	// its own move goal is 0.9 of that. The same numbers, so the AI never
+	// asks for a step the engine would not take.
+	float radius = 0.f;
+	if (target != nullptr) {
+		radius = target->GetCircuitDef()->GetRadius();
+	} else if (buildDef != nullptr) {
+		radius = buildDef->GetRadius();
+	}
+	return (unit->GetCircuitDef()->GetBuildDistance() + radius) * 0.9f;
+}
+
+int IBuilderTask::CmdTimeout(int frame) const
+{
+	// A construction command that the engine drops after 60 s restarts the
+	// nanolathe on every retry; in the mode the AI's task timeout is the limit.
+	return IsExperimental() ? INT_MAX : frame + FRAMES_PER_SEC * 60;
+}
+
+bool IBuilderTask::TryEngage(CCircuitUnit* unit)
+{
+	if (engaged.find(unit) != engaged.end()) {
+		return true;
+	}
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3& pos = unit->GetPos(circuit->GetLastFrame());
+	const float dist = std::sqrt(pos.SqDistance2D(GetPosition()));
+	if (dist > EngageRange(unit)) {
+		const CBuilderManager* builderMgr = static_cast<const CBuilderManager*>(manager);
+		if (dist > builderMgr->GetExperimentalDirectRange()) {
+			return false;  // far: the AI path (threat-aware) brings it to the range
+		}
+		circuit->GetThreatMap()->SetThreatType(unit);
+		if (circuit->GetThreatMap()->GetThreatAt(GetPosition()) >= THREAT_MIN) {
+			return false;  // the last leg is not safe to walk blind
+		}
+	}
+	if (!unit->GetTravelAct()->IsFinished()) {
+		unit->GetTravelAct()->StateFinish();  // no more waypoints; the engine walks into range
+	}
+	if (!Execute(unit)) {
+		return false;  // no site, fallback or abort: the unit is no longer ours to path
+	}
+	engaged.insert(unit);
+	return true;
 }
 
 bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
@@ -467,7 +576,9 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	const AIFloat3& pos = unit->GetPos(frame);
-	const float buildRangeExt = cdef->GetBuildDistance() + circuit->GetPathfinder()->GetSquareSize();
+	const float buildRangeExt = IsExperimental()
+			? EngageRange(unit)
+			: cdef->GetBuildDistance() + circuit->GetPathfinder()->GetSquareSize();
 	if (geom::is_in_range(pos, GetPosition(), buildRangeExt)
 		&& (circuit->GetInflMap()->GetInfluenceAt(pos) > -INFL_EPS))
 	{
@@ -540,6 +651,9 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 		manager->AssignTask(unit, task);
 		return false;
 	}
+	// Same kind of work as the current task: keep the current one. The task
+	// just made for this re-evaluation is not used by anyone.
+	manager->DiscardUnusedTask(task);
 	return true;
 }
 
@@ -549,7 +663,7 @@ void IBuilderTask::UpdatePath(CCircuitUnit* unit)
 	// TODO: Check IsForceUpdate, shield charge and retreat
 
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	const float range = cdef->GetBuildDistance();
+	const float range = IsExperimental() ? EngageRange(unit) : cdef->GetBuildDistance();  // D-064: the goal is the range circle
 	const AIFloat3& endPos = GetPosition();
 	if (canAutoAbort && (target == nullptr)
 		&& !circuit->GetTerrainManager()->CanReachAtSafe(unit, endPos, range, cdef->GetPower()))
@@ -664,7 +778,47 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 	CTerrainManager::TerrainPredicate predicate = [terrainMgr, builder](const AIFloat3& p) {
 		return terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
-	SetBuildPos(terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate));
+	if (reservationId >= 0) {
+		// A retry: the slot served before is handed back before another search,
+		// else it stays consumed with no structure on it (CR-010).
+		SetBuildPos(-RgtVector);
+		terrainMgr->RestoreReservation(reservationId);
+		reservationId = -1;
+	}
+	if (pinRequired && (pinnedReservation < 0)) {
+		pinFailed = true;
+		SetBuildPos(-RgtVector);
+		return;
+	}
+	terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired);
+	const AIFloat3 bp = terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate);
+	TakeReservation(terrainMgr);
+	pinFailed = pinRequired && (reservationId < 0);
+	SetBuildPos(bp);
+}
+
+bool IBuilderTask::PinReservation(int id)
+{
+	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
+	pinRequired = true;
+	layoutOwned = true;
+	pinnedReservation = id;
+	pinFailed = (id < 0) || !terrainMgr->ClaimReservation(id);
+	return !pinFailed;
+}
+
+void IBuilderTask::TakeReservation(CTerrainManager* terrainMgr)
+{
+	const int rid = terrainMgr->TakeReservedId();
+	if (rid < 0) {
+		return;
+	}
+	reservationId = rid;
+	layoutOwned = true;
+	const int rf = terrainMgr->TakeReservedFacing();
+	if (rf >= 0) {
+		facing = rf;  // the plan's facing, not the map-edge default
+	}
 }
 
 void IBuilderTask::FindFacing(const springai::AIFloat3& pos)
@@ -886,7 +1040,12 @@ void IBuilderTask::ExecuteChain(SBuildChain* chain)
 	utils::binary_##func(stream, facing);				\
 	utils::binary_##func(stream, savedIncome.metal);	\
 	utils::binary_##func(stream, savedIncome.energy);	\
-	utils::binary_##func(stream, buildFails);
+	utils::binary_##func(stream, buildFails);			\
+	utils::binary_##func(stream, reservationId);		\
+	utils::binary_##func(stream, pinnedReservation);	\
+	utils::binary_##func(stream, pinRequired);			\
+	utils::binary_##func(stream, pinFailed);			\
+	utils::binary_##func(stream, layoutOwned);
 
 bool IBuilderTask::Load(std::istream& is)
 {
@@ -904,6 +1063,9 @@ bool IBuilderTask::Load(std::istream& is)
 	position = AIFloat3(positionF3);
 	buildPos = AIFloat3(buildPosF3);
 
+	if ((target == nullptr) && (buildDef != nullptr) && geom::is_valid(buildPos)) {
+		circuit->GetTerrainManager()->AddBlocker(buildDef, buildPos, facing);
+	}
 	if ((target != nullptr) && (buildType != BuildType::REPAIR) && (buildType != BuildType::RECLAIM)) {
 		circuit->GetBuilderManager()->MarkUnfinishedUnit(target, this);
 	}

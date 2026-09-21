@@ -22,6 +22,7 @@ line numbers when navigating.
 - [Known defects](#known-defects)
 - [Transport ferry](#transport-ferry)
 - [Late-game expansion](#late-game-expansion)
+- [Porc: air denial first](#porc-air-denial-first)
 - [Related](#related)
 
 ## Intent
@@ -291,14 +292,27 @@ ATTACK-promoting defend tasks every 5 s. Held ids live in `heldBombers` and
 `heldFighters`.
 
 **Launch** (`AirWaves::Update`, from `Air_MainUpdate`): when the hold has
-`nextWaveSize` bombers and `FightersFor(nextWaveSize)` fighters, or when
+`Required()` bombers and `FightersFor(Required())` fighters, or when
 `BomberWaveFirstSize` bombers have been held for `BomberWaveMaxHoldSeconds`
-(escort requirement waived). Every distinct hold task is aborted once; its units
+(escort requirement waived). `Required()` is the survival-grown
+`nextWaveSize` raised to the **income floor**: `BomberWaveSizePerIncomeStep`
+(50) bombers per `BomberWaveIncomeStep` (100) of sliding-minimum metal income
+- 50 at +100, 100 at +200 - see
+[`../air-wave-attacks.md`](../air-wave-attacks.md#wave-size) (D-045). Every distinct hold task is aborted once; its units
 fall back to the native idle task and re-enter `Military::AiMakeTask` within a
 few seconds, where the launch queue hands out wave tasks for
 `BomberWaveReleaseWindowSeconds`. Latecomers rejoin the hold.
 
-**Wave tasks.** One `TaskF::Common(BOMB)` per bomber def. Native
+**Wave tasks.** Every launched bomber is handed one native `CAirWaveTask`
+(`TaskF::Wave()`) carrying the plan `AirWaves::_PlanWave` drew for the wave:
+one of six attack methods - CARPET, FLANK, PINCER, STRIKE, DEEP, FEINT - a
+line abreast at a stand-off, an attack vector, and parallel attack-move lanes
+through the aim or a dive on a chosen high-value unit. When the run is over
+the task aborts itself and each survivor gets the plain bomb task once
+(`mopUp`) before rejoining the hold. All of it is
+[`../air-wave-attacks.md`](../air-wave-attacks.md). What follows describes
+that plain bomb task, which is also the fallback when no wave task could be
+made. One `TaskF::Common(BOMB)` per bomber def. Native
 `CBombTask::CanAssignTo` used to require an identical def, which made a mixed
 Blizzard/Stiletto/Liche wave fly as parallel bomb groups each picking its own
 target; with the `bomber` config block's `group_mixed_defs` (default true) any
@@ -452,10 +466,41 @@ to the map by `Air_ClampToMap`. Every rung logs at level 1 as
 `[AIR][Late] ...`. Settings are in `Global::RoleSettings::Air`, the
 `LATE-GAME EXPANSION` block.
 
+## Porc: air denial first
+
+AIR is the second role to register a `PorcChainHandler`
+([`../porc-chain.md`](../porc-chain.md)). Three changes, all in `Air_Init`
+and `Air_PorcChain`:
+
+**The chain leads with AA.** Position in the porc chain is a budget
+threshold, and the default land order never builds flak at all - `armflak`
+is in the unit list but the `land` sequence never references it - while
+Mercury sits at position 12 behind ~14 000 cumulative metal. `AirLandChain`
+puts flak at positions 2 and 5, long-range AA at 7, and repeats both down
+the chain (flak x4, Mercury/Screamer/Xyston x4). It pays for that by
+dropping the duplicate beamers, the Overwatch and three of the six
+Rattlesnakes. **Kept at their counts:** Juno (position 6), the three gates,
+the three LRPCs, the two EMP/tactical launchers, Ragnarok. Water is the
+default chain.
+
+**Porc reaches full mode mid game.** `Global::Porc` decides when a cluster
+gets the whole chain rather than the preventive count, and the per-visit
+budget. AIR overrides it in `Air_Init`: `PorcLateGameMinutes` 12 (default
+25), `PorcLateGameMetalIncome` 50 (120), `PorcLateGameEnergyIncome` 800
+(1 500), `PorcLateBudgetMod` 1.5 (1.0).
+
+**Allied clusters get AA too.** `aiMilitaryMgr.porcAllyAA = 1`
+(`PorcAlliedClustersAA`). Natively, the porc pass only visited clusters this
+AI owns, and `DefaultMakeDefence` returned immediately inside an ally's
+zone. With the flag, the pass also visits every cluster in an ally's zone
+and builds **only anti-air** there - `IsRoleAA()` defs from the chain, with
+the ground entries skipped and not counted against the walk. The ally's
+own porc still owns the ground defence.
+
 ## Related
 
 - [README.md](README.md) - the role contract and cross-role findings.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: b514633b515706267420dcf5190c1820643ca713; lines: 1193 -->
+<!-- source: data/script/src/roles/air.as; blob: e5c9e03c3c31e449d064b1a7cfe9fec5eb8253e2; lines: 1258 -->

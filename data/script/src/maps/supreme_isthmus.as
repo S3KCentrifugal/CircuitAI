@@ -39,7 +39,16 @@ namespace SupremeIsthmus {
 		return limits;
 	}
 
-	MapConfig config = MapConfig("Supreme Isthmus", getMapUnitLimits(), spots, getFactoryWeights());
+	MapConfig MakeConfig()
+	{
+		MapConfig result = MapConfig("Supreme Isthmus", getMapUnitLimits(), spots, getFactoryWeights());
+		// TECH opens on every mex within the default 2000 elmos (D-063); the
+		// tech starts here have room for four turret rows in the box.
+		result.TechLayoutNanoRows = 4;
+		return result;
+	}
+
+	MapConfig config = MakeConfig();
 
 	// Register strategic objectives for Supreme Isthmus
 	void registerObjectives()

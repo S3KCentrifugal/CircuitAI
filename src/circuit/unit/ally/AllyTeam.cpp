@@ -140,6 +140,14 @@ void CAllyTeam::Release()
 	quadField.Kill();
 }
 
+void CAllyTeam::UnmarkReclaim(ICoreUnit::Id unitId)
+{
+	auto it = reclaimMarks.find(unitId);
+	if ((it != reclaimMarks.end()) && (--it->second <= 0)) {
+		reclaimMarks.erase(it);
+	}
+}
+
 void CAllyTeam::ForceUpdateFriendlyUnits()
 {
 	--lastUpdate;
@@ -163,6 +171,16 @@ void CAllyTeam::UpdateFriendlyUnits()
 	friendlyUnits.clear();
 	COOAICallback* clb = circuit->GetCallback();
 	const std::vector<Unit*>& units = clb->GetFriendlyUnits();
+	if (!reclaimMarks.empty()) {
+		// Drop marks on units that no longer exist: ids are reused by the engine.
+		std::unordered_set<int> alive;
+		for (Unit* u : units) {
+			alive.insert(u->GetUnitId());
+		}
+		for (auto it = reclaimMarks.begin(); it != reclaimMarks.end();) {
+			it = (alive.find(it->first) == alive.end()) ? reclaimMarks.erase(it) : std::next(it);
+		}
+	}
 	for (Unit* u : units) {
 		int unitId = u->GetUnitId();
 		CCircuitDef::Id unitDefId = clb->Unit_GetDefId(unitId);

@@ -44,8 +44,17 @@ private:
 	 * first) and value (tie-break inside a rank).
 	 */
 	using TClassify = std::function<bool (const SEnemyData&, CCircuitDef*, int&, float&)>;
+	// minValue: the best aim point must sum to at least this, else no target.
+	// avoidFriendly: an aim point whose blast holds one of our own units is
+	// rejected (damaging weapons: Perdition, Catalyst). EMP and Juno do no damage.
 	bool SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
-			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify);
+			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
+			float minValue = 0.f, bool avoidFriendly = false);
+	// Tactical launchers (Perdition, Catalyst): the richest blast in range.
+	bool SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, float minValue);
+	// The metal a target must be worth for a stockpiled shot; decays while the
+	// shot waits (CMilitaryManager::SStockInfo).
+	float StockedShotFloor(CCircuitUnit* unit, CCircuitDef* cdef, int frame, float shotCost);
 	// Juno: the highest-priority sensor/EW target in range.
 	bool SelectPulseTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	// Juno fallback: ground we cover with radar but read nothing from, which
@@ -57,6 +66,7 @@ private:
 	int targetFrame;
 	springai::AIFloat3 targetPos;
 	bool isTargetOverride;
+	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty
 };
 
 } // namespace circuit

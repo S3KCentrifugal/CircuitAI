@@ -108,7 +108,7 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 	const int frame = circuit->GetLastFrame();
 	if (target != nullptr) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdRepair(target, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+			unit->CmdRepair(target, UNIT_CMD_OPTION, CmdTimeout(frame));
 		)
 		return true;
 	}
@@ -119,7 +119,7 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 			state = State::ENGAGE;  // isFirstTry = false
 //			metalMgr->SetOpenSpot(index, false);
 			TRY_UNIT(circuit, unit,
-				unit->CmdBuild(buildDef, buildPos, facing, 0, frame + FRAMES_PER_SEC * 60);
+				unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 			)
 			return true;
 		} else {
@@ -140,7 +140,10 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 bool CBMexTask::Reevaluate(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
-	if (circuit->IsAllyAware()) {
+	// The ally-zone abort below dropped TECH's opening mexes mid-construction
+	// as allies' first structures were marked (D-063 follow-up); a home order
+	// is exempt.
+	if (circuit->IsAllyAware() && !ignoreAlly) {
 		auto closeTask = [this, circuit]() {
 			circuit->GetEconomyManager()->SetOpenMexSpot(spotId, true);
 			spotId = 0;  // prevent spot opening on Cancel
@@ -259,7 +262,7 @@ bool CBMexTask::CheckLandBlock(CCircuitUnit* unit)
 				AIFloat3 newPos = pos + dir * (step * i);
 				unit->CmdMoveTo(newPos, UNIT_COMMAND_OPTION_SHIFT_KEY);
 			}
-			unit->CmdBuild(buildDef, buildPos, facing, UNIT_COMMAND_OPTION_SHIFT_KEY, frame + FRAMES_PER_SEC * 60);
+			unit->CmdBuild(buildDef, buildPos, facing, UNIT_COMMAND_OPTION_SHIFT_KEY, CmdTimeout(frame));
 		);
 		return true;
 	}

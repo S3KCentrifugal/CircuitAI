@@ -148,6 +148,37 @@ namespace Global {
         float SeedShake = 256.0f;
     }
 
+    namespace ConstructorRequest {
+        // T2 constructors from TECH on request (Team::Donation, D-041). TECH
+        // always answers a request: one extra constructor from its advanced
+        // lab, flown by the ferry transport when it owns one.
+        bool Enabled = true;
+        // Requester side: a non-TECH BARb with no T2 constructor and no T2 lab
+        // of its own asks once its sliding-minimum metal income clears this.
+        float RequestMinMetalIncome = 15.0f;
+        int MaxRequests = 1;               // automatic requests per game
+        int RequestCooldownSeconds = 300;  // between re-asks (no TECH on the team yet)
+        // TECH side: an order the lab has not delivered within this is re-placed.
+        int OrderTimeoutSeconds = 240;
+        // SUPPORT ("front tech") techs on its own: no automatic request from it
+        // (D-046). An explicit RequestConstructor() is still always served.
+        bool AutoRequestFromSupport = false;
+    }
+
+    // Attack-wave policy for every role (a role overrides in its Init).
+    // A DEFEND squad promotes to ATTACK when its power reaches a bar that native
+    // re-sets every 5 s from the enemy's groups. The legacy bar was the map-wide
+    // second-strongest group - a naval squad waited to outweigh a land army it
+    // could never reach, and cruisers massed for most of a game; sprinters and
+    // blitz did the same in a TECH base. AttackScale > 0 switches the bar to the
+    // strongest group the squad can actually REACH, times this; AttackWaitSeconds
+    // > 0 sends any squad that has waited that long at or above quota.attack.
+    // Either at 0 restores the legacy rule for that half.
+    namespace Military {
+        float AttackWaitSeconds = 180.0f;
+        float AttackScale = 0.8f;
+    }
+
     namespace Spam {
         bool Enabled = true;
         // Both sliding-minimum incomes must clear these to activate ...
@@ -160,6 +191,11 @@ namespace Global {
         // factories. Do not lower these to "make spam happen sooner": that
         // takes combat units away from the roles that still need them.
         float MinMetalIncome = 60.0f;
+        // A start the land army cannot leave (Global::Map::LandLocked, from the
+        // map config's start spots) never spams: the units would walk to the
+        // shore and stand there. TECH on Tundra Continents was making Grunts
+        // for nothing (D-052). True lets such a start spam anyway.
+        bool AllowLandLocked = false;
         float MinEnergyIncome = 1500.0f;
         // ... and either falling under this fraction of its threshold deactivates
         float ReleaseFraction = 0.7f;
@@ -187,8 +223,10 @@ namespace Global {
         // Which unit each T1 factory spams; factories not listed keep their role logic
         dictionary UnitByFactory = {
             {"armlab", "armpw"},   {"corlab", "corak"},    {"leglab", "leggob"},
-            {"armvp", "armflash"}, {"corvp", "corgator"},  {"legvp", "leghades"},
-            {"armhp", "armsh"},    {"corhp", "corsh"},     {"leghp", "legsh"}
+            {"armvp", "armflash"}, {"corvp", "corgator"},  {"legvp", "leghades"}
+            // Hover plants are deliberately absent: hovers are wanted as
+            // ordinary combat units all game (D-038), so armsh/corsh/legsh no
+            // longer carry the spam attribute either.
         };
     }
 
@@ -219,6 +257,152 @@ namespace Global {
 
             // NukeLimit: maximum number of nukes allowed for TECH role
             int NukeLimit = 20;
+
+            /******************** FLOATING METAL ********************/
+            // Every gate in the T2 constructor ladder is income-based, so a
+            // full bank on a modest income built nothing: the converter wanted
+            // 1200 energy income, the fusions their own floors, the silo its
+            // own - and the T1 constructors, whose only floating rule was "metal
+            // over 1000 -> another nano", spammed construction turrets. This
+            // ladder runs first while metal is floating and spends the bank.
+            float FloatMetalCurrent = 2500.0f;     // or aiEconomyMgr.isMetalFull
+            float FloatMetalIncome = 25.0f;        // floor, so a dead economy does not qualify
+            float FloatConverterMinEnergyIncome = 800.0f;   // a converter needs energy to convert
+            float FloatAFUSMetalCurrent = 6000.0f;          // advanced fusion above this, fusion below
+            int FloatMaxNukeSilos = 1;             // silos this ladder will start (NukeLimit still caps)
+            // Reserve-driven nanos beyond the income target (see ShouldBuildT1Nano).
+            int NanoReserveSurplus = 2;
+
+            /******************** ENERGY FOCUS ********************/
+            // One energy structure at a time: before any energy rung, a
+            // constructor assists the T1 energy structure already under
+            // construction (Builder::EnqueueAssistEnergy), up to this many on
+            // it. Build power on one solar finishes it sooner than two half
+            // built, and the assist ends with the structure.
+            bool EnergyFocusAssist = true;
+            int EnergyFocusMaxAssists = 3;
+
+            /******************** BASE LAYOUT ********************/
+            // JSON permits the native mechanism for experimental profiles;
+            // TECH is the only role that opts its AI instance in. Native owns
+            // exact footprint geometry, atomic reservations and save/load.
+            // Script owns candidate order and mature-module progression.
+            // The experimental build system (D-066), one master switch. On:
+            // TECH's own sequence (roles/tech_build.as) is the only source of
+            // work, native's chooser and its start-factory and storage jobs
+            // are silent for this instance, and native's site search never
+            // spirals (planned slot, exact spot, or the free footprint nearest
+            // the asked anchor within ExperimentalSearchRadius). Off: TECH runs
+            // the stock ladder and stock placement like every other role.
+            bool ExperimentalBuild = true;
+            float ExperimentalBuildDirectRange = 1600.0f;   // D-064: the engine walks the last leg inside this
+            float ExperimentalSearchRadius = 512.0f;        // D-066: how far from an anchor a site may be packed
+            float ExpAssistRadius = 1500.0f;                // a constructor with nothing to build assists within this
+            float EcoMexExpandRadius = 2500.0f;             // constructors expand to the nearest open spot within this ...
+            float EcoMexExpandUntilIncome = 60.0f;          // ... while metal income is under this
+            bool LayoutEnabled = true;                      // the planned base (needs ExperimentalBuild)
+            // The opening (D-063): the OpeningMexCap reachable mexes nearest
+            // the start within this radius, taken nearest the commander first,
+            // before any other structure (cap 0 = all of them). Played: the
+            // fourth spot was 944 elmos out toward an ally, and the third
+            // already drains the 1,000 E bank; three, then the next step.
+            // Native's start factory is held until then, at most
+            // OpeningMaxSeconds, never past the commander.
+            float OpeningMexRadius = 2000.0f;
+            int OpeningMexCap = 3;
+            int OpeningMaxSeconds = 240;
+            // After the opening the commander stays home: native mex defaults
+            // farther than this from the start are left to the constructors
+            // (played: the ladder's mex-first rule sent it off to a fourth mex).
+            float CommanderMexRadiusAfterOpening = 600.0f;
+            int LayoutFactorySideStepCells = 4;
+            int LayoutFactorySideTries = 4;
+            int LayoutFactoryForwardStepCells = 4;
+            int LayoutFactoryForwardTries = 2;
+            // The turret box (D-063): the rectangle behind the factory pair
+            // that holds the planned construction turrets (invisible until
+            // built) and every economy structure, packed on the cells nearest
+            // a turret. Searched largest first over rear and side offsets; a
+            // size is taken when its best ground clears LayoutBoxMinScore.
+            int LayoutBoxAcrossCells = 40;           // 640 elmos
+            int LayoutBoxDepthCells = 44;            // 704 elmos: four turret rows at a 14-cell pitch
+            int LayoutBoxShrinkCells = 8;
+            int LayoutBoxMinAcrossCells = 24;
+            int LayoutBoxMinDepthCells = 16;
+            int LayoutBoxSideStepCells = 4;
+            int LayoutBoxSideTries = 4;
+            int LayoutBoxRearStepCells = 4;
+            int LayoutBoxRearTries = 3;
+            float LayoutBoxMinScore = 0.75f;         // flat fraction x buildable fraction
+            float LayoutBoxMaxSlope = 0.02f;         // engine slope (1 - cos), about 11 degrees
+            int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
+            int LayoutBoxNanoRows = 3;               // Supreme overrides this to four in its MapConfig
+            float LayoutConverterNanoGap = 0.0f;     // elmos an advanced converter keeps from a turret slot (its death kills one within 173)
+            float LayoutFusionNanoGap = 0.0f;        // ... a fusion (379); density and shared build power were chosen over firebreaks
+            int LayoutFallbackShakeCells = 8;        // no box: economy within this of the factory nanos (the only spiral left)
+            bool LayoutOverlay = false;              // push the plan to the team-link widget (/barblayout toggles it too)
+
+            /******************** ECO PLANNER (D-058) ********************/
+            // EcoPlanner (manager/eco_planner.as): a deterministic function of
+            // wind range, tidal, incomes, banks and what stands that names the
+            // next economy structure; re-evaluated every time a constructor asks.
+            // It replaces the solar / advanced solar / converter / fusion rungs
+            // of this role's ladders; mexes stay native's. doc/eco-planner.md.
+            bool EcoPlannerEnabled = true;
+            float EcoEnergyRatioLow = 8.0f;          // E per M wanted at EcoEnergyRampStart metal
+            float EcoEnergyRatioHigh = 20.0f;        // ... and from EcoEnergyRampEnd up (T2 economies)
+            float EcoEnergyRampStart = 5.0f;
+            float EcoEnergyRampEnd = 40.0f;
+            float EcoEnergyReserve = 60.0f;          // E/s wanted on top (the commander's 30 and build draw)
+            float EcoEnergyLowPercent = 0.25f;       // bank below this and pull over income = draining
+            float EcoConvertEnergyPercent = 0.90f;   // bank at this = floating: convert the surplus
+            float EcoFloatMetalPercent = 0.80f;      // metal bank at this = invest in energy anyway
+            float EcoAffordSeconds = 90.0f;          // a lump is affordable within this many seconds of income
+            float EcoWindMinimum = 7.0f;             // effective wind E/s under this and turbines are not an option
+            float EcoWindLullFloor = 4.0f;           // min wind under this discounts the average ...
+            float EcoWindLullFactor = 0.7f;          // ... by this
+            float EcoAdvSolarMinMetalIncome = 6.0f;  // an advanced solar's 350 lump waits for this income (or the bank)
+            int EcoStorageWinds = 4;                 // this many winds and no energy storage: build one
+            float EcoStorageSeconds = 20.0f;         // energy storage under this many seconds of income: another
+            int EcoMaxEnergyStorages = 1;
+            float EcoStorageMinMetalBank = 150.0f;   // no storage order on an empty bank (played: the rule looped at 0 metal)
+            int EcoMaxMetalStorages = 2;
+            int EcoMetalMapSpots = 150;              // this many metal spots or more counts as a metal map
+            bool EcoOneEnergyAtATime = true;         // no new energy structure while one is under construction (unless the bank drains)
+            // Build power (D-063): a turret goes up when the assist power around
+            // the base is under this much per metal income - about what T2 work
+            // spends - or more when metal floats; the layout picks the slot,
+            // nearest the factories first.
+            float EcoBuildPowerPerMetal = 8.0f;
+            float EcoBuildPowerFloatFactor = 1.5f;
+            float EcoBuildPowerRadius = 700.0f;
+            float EcoTurretMinMetalIncome = 8.0f;
+            float EcoTurretBankFraction = 0.5f;      // this share of a turret's metal banked before one starts
+            int EcoMaxConcurrentNanos = 1;           // orders plus turrets under construction; the rest assist
+            float EcoTurretAssistRadius = 1200.0f;   // a constructor assists a turret going up within this of the base centre
+
+            /******************** ECONOMY SWITCH (D-054) ********************/
+            // TECH starts on the shared economy.json defaults (native reclaim
+            // efficiency 20, json energy limits, native assist nanos on) and
+            // switches to its own settings below - ReclaimEnergyEff,
+            // EnergyLimit*, AssistNano* - once both incomes reach these floors.
+            // false: the settings apply at init, as before.
+            bool EconomySwitchEnabled = true;
+            float EconomySwitchMetalIncome = 20.0f;
+            float EconomySwitchEnergyIncome = 1000.0f;
+
+            /******************** ENERGY (per-role, D-047) ********************/
+            // economy.json is shared by every role; these go through
+            // aiEconomyMgr and change only this instance.
+            // Old energy is reclaimed when a finished energy def scores more
+            // than reclEnergyEff x the old def's score (native default 20 -
+            // never for a solar against an advanced solar). 2 reclaims solars
+            // once advanced solars stand and advanced solars once a fusion does.
+            float ReclaimEnergyEff = 2.0f;
+            bool ReclaimOldConvertersAlways = true;
+            // Caps on the energy table for this role; -1 keeps economy.json's.
+            int EnergyLimitSolar = -1;
+            int EnergyLimitAdvSolar = -1;
 
             /******************** TECH BASE SETTINGS ********************/
             // All settings applied to tech role at game start, logic can change throughout game
@@ -367,6 +551,10 @@ namespace Global {
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
             int MinimumT2ConstructorBots = 1;
+            // T2 constructors TECH keeps before it builds any for an ally's
+            // request (played: every one it made was ferried away, and the
+            // advanced lab built nothing else).
+            int DonationKeepT2Constructors = 2;
 
             /******************** BUILDER CAP LIMITS ********************/
             // Hard caps for T1/T2 land builders used when computing income-based limits
@@ -407,22 +595,38 @@ namespace Global {
             int StartCapT1CombatUnits = 0;
             int StartCapT2CombatUnits = 0;
 
-            /******************** AIR NANO POLICY ********************/
-            // How much income per additional T1 nano caretaker; and cap
+            /******************** NANO POLICY ********************/
+            // How much income per additional T1 nano caretaker; and cap.
+            // 15 metal per nano (was 10): at +30 that is two turrets, not
+            // three, while the T2 lab is still paying for its first
+            // constructor (D-051).
             float NanoEnergyPerUnit = 200.0f; // energy per nano
-            float NanoMetalPerUnit = 10.0f;   // metal per nano
-            int NanoMaxCount = 200;  
+            float NanoMetalPerUnit = 15.0f;   // metal per nano
+            int NanoMaxCount = 200;
+            // No new nano while the first T2 constructors are being paid for
+            // (a T2 bot lab stands and fewer than MinimumT2ConstructorBots
+            // exist), nor while the bank is below NanoMinMetalCurrent: a
+            // turret then only deepens the stall on the constructor.
+            bool NanoHoldForFirstT2Constructors = true;
+            float NanoMinMetalCurrent = 150.0f;
+            // Native assist nanos (CEconomyManager::CheckAssistRequired) are a
+            // second, script-blind source of HIGH-priority turrets; TECH turns
+            // them off and owns the count above. Set true to restore them,
+            // AssistNanoIncomeMod then scales the income they must be covered by.
+            bool AssistNanoEnabled = false;
+            float AssistNanoIncomeMod = 1.0f;
             // Reserves-based nano condition: build when metalCurrent >= threshold
             float NanoBuildWhenOverMetal = 1000.0f;
 
 
-            /******************** T2 CONSTRUCTOR DONATION ********************/
-            // Team::Donation (manager/donation.as): keep the first KeepCount T2
-            // constructors, then give the next N to the closest allies, N drawn once
-            // from weight(k) = Decay^(k-1) over 1..min(Max, allies).
-            int T2DonationKeepCount = 2;
-            int T2DonationMax = 7;
-            float T2DonationDecay = 0.6f;
+            /******************** T2 BOT DONATION ********************/
+            // Team::Donation (manager/donation.as): give N of the T2 combat bots
+            // the advanced lab batches to the closest allies, N drawn once from
+            // weight(k) = Decay^(k-Min) over Min..Max. Constructors are never part
+            // of this; a teammate that wants one asks (Global::ConstructorRequest).
+            int T2BotDonationMin = 2;
+            int T2BotDonationMax = 7;
+            float T2BotDonationDecay = 0.6f;
 
             /******************** NUCLEAR SILO THRESHOLDS ********************/
             // First strike: how long the first silo keeps the farthest Tech start as its
@@ -525,6 +729,20 @@ namespace Global {
             float RequiredMetalCurrentForT2AircraftPlant = 50.0f;
             float RequiredEnergyIncomeForT2AircraftPlant = 1200.0f;
             int MaxT2AircraftPlants = 1;
+
+            /******************** PORC: AIR DENIAL ********************/
+            // AIR porcs earlier, harder, and for the whole team. Global::Porc
+            // decides when a cluster gets the full chain (by time or income)
+            // and how big each visit's budget is; these override it in
+            // Air_Init so AIR reaches full porc mid game rather than late.
+            int PorcLateGameMinutes = 12;
+            float PorcLateGameMetalIncome = 50.0f;
+            float PorcLateGameEnergyIncome = 800.0f;
+            float PorcLateBudgetMod = 1.5f;
+            // Build anti-air in allied clusters too (native porcAllyAA): the
+            // enemy air goes where the allies are, and ground defence there
+            // stays the ally's own business.
+            bool PorcAlliedClustersAA = true;
 
             /******************** LATE-GAME EXPANSION ********************/
             // AIR sat at max metal late: one T2 air plant, nanos capped by
@@ -638,6 +856,34 @@ namespace Global {
             int BomberWaveReleaseWindowSeconds = 15;
             // Minimum metal income before the T2 plant produces wave aircraft.
             float BomberWaveProductionMetalIncome = 40.0f;
+            // Income floor on the wave size (D-045): every IncomeStep of metal
+            // income adds SizePerIncomeStep bombers to what a wave must hold
+            // before it launches - at +100 a wave is 50, at +200 it is 100.
+            // The survival growth still applies above the floor.
+            float BomberWaveIncomeStep = 100.0f;
+            int BomberWaveSizePerIncomeStep = 50;
+
+            /******************** WAVE ATTACK METHODS ********************/
+            // Each launch draws a method by these weights (doc/air-wave-attacks.md).
+            // 0 removes a method.
+            float WaveWeightCarpet = 3.0f;
+            float WaveWeightFlank = 2.0f;
+            float WaveWeightPincer = 1.0f;
+            float WaveWeightStrike = 2.0f;
+            float WaveWeightDeep = 1.0f;
+            float WaveWeightFeint = 1.0f;
+            // Geometry, elmos: the line forms FormDistance short of the aim,
+            // lanes Spacing apart, and runs Overrun past it.
+            float WaveFormDistance = 1400.0f;
+            float WaveLaneSpacing = 96.0f;
+            float WaveOverrun = 900.0f;
+            int WaveFormTimeoutSeconds = 45;   // go anyway if the line is not formed by then
+            float WaveFlankMinDeg = 55.0f;     // FLANK bearing off the base->aim line
+            float WaveFlankMaxDeg = 95.0f;
+            float WavePincerDeg = 45.0f;       // PINCER: both lines this far off the line
+            int WaveFeintHoldSeconds = 25;     // FEINT: hold the formed line this long
+            // STRIKE / DEEP target filter: statics at or above this cost, plus T3 ("heavy") mobiles.
+            float WaveStrikeMinStaticCost = 2500.0f;
 
             /******************** HEAVY AIR STRIKE POLICY (Legion/Cortex) ********************/
             // Maintain a bounded late-game heavy-air force for Legion/Cortex.
@@ -867,6 +1113,10 @@ namespace Global {
             int MilitaryScoutCap = 3;
             // Attack gate (required power to trigger attack waves)
             float MilitaryAttackThreshold = 1.0f;
+            // SEA waves: shorter wait and a lower bar than the global default -
+            // a navy that sits is a navy that loses the water.
+            float MilitaryAttackWaitSeconds = 120.0f;
+            float MilitaryAttackScale = 0.7f;
             // Raid thresholds (power)
             float MilitaryRaidMinPower = 1.0f;
             float MilitaryRaidAvgPower = 5.0f;
@@ -1003,6 +1253,9 @@ namespace Global {
             // clamped to MaxHoverPlants. Defaults: +1 per 50 metal income, max 3 plants total.
             float MetalIncomePerExtraHoverPlant = 50.0f;
             int MaxHoverPlants = 3;
+            // A construction ship TACTICAL owns runs SEA's naval ladder with
+            // SEA's numbers (helpers/sea_constructor_helpers.as, D-042).
+            bool SeaConstructorMimicsSea = true;
 
             /******************** DYNAMIC FACTORY PRODUCTION ********************/
             // Toggle for role-based dynamic factory production system (replaces factory.json logic)

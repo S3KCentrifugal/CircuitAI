@@ -8,6 +8,9 @@
 #include "../helpers/limits_helpers.as"
 #include "roster.as"
 #include "widget_link.as"
+#include "layout.as"
+#include "../helpers/porc_helpers.as"
+#include "../helpers/layout_helpers.as"
 
 /******************************************************************************
 
@@ -56,6 +59,77 @@ namespace Commands {
     const string Prefix = "barb|";
     const int SwitchCooldownFrames = 10 * SECOND;
     int lastSwitchFrame = -1000000;
+
+    // The native manager settings a role's InitHandler may change: captured once
+    // at Setup, restored before the next role's InitHandler runs (CR-007).
+    namespace NativeState {
+        bool taken = false;
+        float reclEnergyEff;
+        bool assistNanoEnabled;
+        float assistNanoIncomeMod;
+        bool holdStartFactory;
+        bool experimentalBuild;
+        float experimentalDirectRange;
+        float experimentalSearchRadius;
+        bool autoStorageEnabled;
+        bool reclaimOldConvertersAlways;
+        uint quotaScout;
+        float quotaAttack;
+        float quotaAttackWait;
+        float quotaAttackScale;
+        float raidMin;
+        float raidAvg;
+        int porcMode;
+        float porcBudgetMod;
+        int porcAllyAA;
+        void Snapshot()
+        {
+            if (taken) return;
+            reclEnergyEff = aiEconomyMgr.reclEnergyEff;
+            assistNanoEnabled = aiEconomyMgr.assistNanoEnabled;
+            assistNanoIncomeMod = aiEconomyMgr.assistNanoIncomeMod;
+            holdStartFactory = aiEconomyMgr.holdStartFactory;
+            experimentalBuild = aiBuilderMgr.experimentalBuild;
+            experimentalDirectRange = aiBuilderMgr.experimentalDirectRange;
+            experimentalSearchRadius = aiBuilderMgr.experimentalSearchRadius;
+            autoStorageEnabled = aiEconomyMgr.autoStorageEnabled;
+            reclaimOldConvertersAlways = aiEconomyMgr.reclaimOldConvertersAlways;
+            quotaScout = aiMilitaryMgr.quota.scout;
+            quotaAttack = aiMilitaryMgr.quota.attack;
+            quotaAttackWait = aiMilitaryMgr.quota.attackWait;
+            quotaAttackScale = aiMilitaryMgr.quota.attackScale;
+            raidMin = aiMilitaryMgr.quota.raid.min;
+            raidAvg = aiMilitaryMgr.quota.raid.avg;
+            porcMode = aiMilitaryMgr.porcMode;
+            porcBudgetMod = aiMilitaryMgr.porcBudgetMod;
+            porcAllyAA = aiMilitaryMgr.porcAllyAA;
+            taken = true;
+            GenericHelpers::LogUtil("[Commands] Native manager state snapshot taken", 3);
+        }
+        void Restore()
+        {
+            if (!taken) return;
+            aiEconomyMgr.reclEnergyEff = reclEnergyEff;
+            aiEconomyMgr.assistNanoEnabled = assistNanoEnabled;
+            aiEconomyMgr.assistNanoIncomeMod = assistNanoIncomeMod;
+            aiEconomyMgr.holdStartFactory = holdStartFactory;
+            aiBuilderMgr.experimentalBuild = experimentalBuild;
+            aiBuilderMgr.experimentalDirectRange = experimentalDirectRange;
+            aiBuilderMgr.experimentalSearchRadius = experimentalSearchRadius;
+            aiEconomyMgr.autoStorageEnabled = autoStorageEnabled;
+            aiEconomyMgr.reclaimOldConvertersAlways = reclaimOldConvertersAlways;
+            aiMilitaryMgr.quota.scout = quotaScout;
+            aiMilitaryMgr.quota.attack = quotaAttack;
+            aiMilitaryMgr.quota.attackWait = quotaAttackWait;
+            aiMilitaryMgr.quota.attackScale = quotaAttackScale;
+            aiMilitaryMgr.quota.raid.min = raidMin;
+            aiMilitaryMgr.quota.raid.avg = raidAvg;
+            aiMilitaryMgr.porcMode = porcMode;
+            aiMilitaryMgr.porcBudgetMod = porcBudgetMod;
+            aiMilitaryMgr.porcAllyAA = porcAllyAA;
+            GenericHelpers::LogUtil("[Commands] Native manager state restored", 2);
+        }
+    }
 
     namespace DefState {
         bool taken = false;
@@ -122,6 +196,12 @@ namespace Commands {
             SwitchRole(parts[3]);
             return true;
         }
+        // barb|layout|<team>|on|off : push the planned base to the widget's overlay (D-053)
+        if (cmd == "layout" && parts.length() >= 4) {
+            Layout::SetOverlay(parts[3] == "on");
+            if (!Layout::planned) WidgetLink::Send("layout", "0|0|none");
+            return true;
+        }
         GenericHelpers::LogUtil("[Commands] Unknown command: " + data, 2);
         return true;
     }
@@ -162,16 +242,24 @@ namespace Commands {
         }
 
         GenericHelpers::LogUtil("[Commands] Role switch " + current + " -> " + roleName + " requested by widget", 1);
+        // Leave: the old role's layout (reservations, zones, the native flag)
+        // and the native manager settings its InitHandler changed (CR-007).
+        Layout::OnRoleLeave();
+        NativeState::Restore();
         DefState::Restore();
 
         Global::AISettings::Role = role;
         Global::Map::StartRole = role;
         @Global::AISettings::RoleCfg = cfg;
         @Global::profileController.RoleCfg = cfg;
-        RoleConfigs::ApplyStartLimits();
+        RoleConfigs::ApplyStartLimits();   // runs the incoming InitHandler
 
         dictionary@ merged = LimitsHelpers::ComputeAndStoreMergedUnitLimits(Global::Map::Config, role);
         UnitHelpers::ApplyUnitLimits(merged);
+
+        // Enter: the incoming role's porc chain and layout plan, as Setup does.
+        PorcHelpers::ApplyForRole();
+        LayoutHelpers::ApplyForRole();
 
         lastSwitchFrame = ai.frame;
         Team::Roster::Reannounce();

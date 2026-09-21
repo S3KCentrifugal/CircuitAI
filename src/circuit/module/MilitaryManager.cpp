@@ -24,6 +24,7 @@
 #include "task/fighter/GuardTask.h"
 #include "task/fighter/RouteTask.h"
 #include "task/fighter/FerryTask.h"
+#include "task/fighter/AirWaveTask.h"
 #include "task/fighter/DefendTask.h"
 #include "task/fighter/ScoutTask.h"
 #include "task/fighter/RaidTask.h"
@@ -466,6 +467,7 @@ void CMilitaryManager::ReadConfig()
 		empInfo.mobileMaxAge = empCfg.get("mobile_max_age", 30).asInt() * FRAMES_PER_SEC;
 		empInfo.minTargets = std::max(1, empCfg.get("min_targets", 1).asInt());
 		empInfo.structuresFirst = empCfg.get("structures_first", true).asBool();
+		empInfo.structuresFirstMinCost = empCfg.get("structures_first_min_cost", 1500.f).asFloat();
 		empInfo.isEnabled = isRoles && (empInfo.empableFlag != 0);
 		circuit->LOG("CONFIG %s: emp %s | empable=0x%x declineRate=%.0f minStun=%.1fs mobileMaxAge=%is",
 				cfgName.c_str(), empInfo.isEnabled ? "enabled" : "disabled",
@@ -495,6 +497,19 @@ void CMilitaryManager::ReadConfig()
 			cfgName.c_str(), bomberInfo.isEnabled ? "enabled" : "disabled",
 			bomberInfo.killMargin, bomberInfo.focusCost, bomberInfo.areaMinTargets,
 			bomberInfo.areaRadius, int(bomberInfo.groupMixedDefs));
+
+	const Json::Value& stockCfg = root["stockpile"];
+	if (!stockCfg.isNull()) {
+		stockInfo.patienceSeconds = std::max(0.f, stockCfg.get("patience_seconds", 240.f).asFloat());
+		stockInfo.minFraction = std::min(1.f, std::max(0.f, stockCfg.get("min_fraction", 0.25f).asFloat()));
+		stockInfo.fullFireCount = std::max(0, stockCfg.get("full_fire_count", 2).asInt());
+		stockInfo.launcherMobileMaxAge = std::max(0, stockCfg.get("launcher_mobile_max_age", 30).asInt()) * FRAMES_PER_SEC;
+		stockInfo.launcherMinTargets = std::max(1, stockCfg.get("launcher_min_targets", 1).asInt());
+		stockInfo.launcherStructuresFirst = stockCfg.get("launcher_structures_first", false).asBool();
+	}
+	circuit->LOG("CONFIG %s: stockpile patience=%.0fs minFraction=%.2f fullFireCount=%i launcher(maxAge=%is minTargets=%i structuresFirst=%i)",
+			cfgName.c_str(), stockInfo.patienceSeconds, stockInfo.minFraction, stockInfo.fullFireCount,
+			stockInfo.launcherMobileMaxAge / FRAMES_PER_SEC, stockInfo.launcherMinTargets, int(stockInfo.launcherStructuresFirst));
 
 	/*
 	 * Mobile sensor escort. Reuses the same "jammer" and "radar" role tags the
@@ -815,6 +830,9 @@ IFighterTask* CMilitaryManager::Enqueue(const TaskF::SFightTask& ti)
 		case IFighterTask::FightType::FERRY: {
 			task = new CFerryTask(this);  // script-owned transport ferry (Team::Ferry)
 		} break;
+		case IFighterTask::FightType::WAVE: {
+			task = new CAirWaveTask(this);  // script-planned bomber wave (AirWaves::)
+		} break;
 	}
 
 	fightTasks[static_cast<IFighterTask::FT>(ti.type)].insert(task);
@@ -873,7 +891,11 @@ void CMilitaryManager::DefaultMakeDefence(int cluster, const AIFloat3& pos)
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 
-	if (terrainMgr->IsZoneAlly(pos)) {
+	// Inside an ally's zone this AI builds nothing - unless porcAllyAA is set,
+	// in which case it builds only the chain's anti-air there and leaves the
+	// ground defence to the ally.
+	const bool allyAAOnly = terrainMgr->IsZoneAlly(pos);
+	if (allyAAOnly && (porcAllyAA == 0)) {
 		return;
 	}
 
@@ -1027,6 +1049,9 @@ void CMilitaryManager::DefaultMakeDefence(int cluster, const AIFloat3& pos)
 		CCircuitDef* defDef = defenders[i];
 		if (!defDef->IsAvailable(frame) || (defDef->IsRoleAA() && (enemyMgr->GetEnemyCost(ROLE_TYPE(AIR)) < 1.f))) {
 			continue;
+		}
+		if (allyAAOnly && !defDef->IsRoleAA()) {
+			continue;  // an ally's cluster: AA only, and its cost does not count against the walk
 		}
 		totalCost += defDef->GetCostM();
 		if (skip(defDef)) {
@@ -1660,16 +1685,47 @@ void CMilitaryManager::UpdateDefenceTasks()
 //		if (groupIdx >= 0) {
 //			dt->SetMaxPower(std::max(minAttackers, enemyGroups[groupIdx].threat));
 //		}
-		dt->SetMaxPower(std::max(minAttackers, circuit->GetEnemyManager()->GetPreMaxGroupThreat()));
+		if (attackScale <= 0.f) {
+			// Legacy: the map-wide second-strongest enemy group, whatever domain it is in.
+			dt->SetMaxPower(std::max(minAttackers, circuit->GetEnemyManager()->GetPreMaxGroupThreat()));
+			continue;
+		}
+		// Reachable rule: the strongest enemy group the squad's leader can path
+		// to. A cruiser squad is measured against what it can fight, not the
+		// enemy's land army; a land squad likewise ignores the enemy navy.
+		CCircuitUnit* leader = dt->GetLeader();
+		float threat = -1.f;
+		if (leader != nullptr) {
+			CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+			for (const CEnemyManager::SEnemyGroup& g : circuit->GetEnemyManager()->GetEnemyGroups()) {
+				if (g.units.empty() || !terrainMgr->CanMoveToPos(leader->GetArea(), g.pos)) {
+					continue;
+				}
+				threat = std::max(threat, g.influence);
+			}
+		}
+		if (threat < 0.f) {  // nothing reachable is known: fall back to the legacy bar
+			threat = circuit->GetEnemyManager()->GetPreMaxGroupThreat();
+		}
+		dt->SetMaxPower(std::max(minAttackers, threat * attackScale));
 	}
 
 	/*
-	 * Porc update
+	 * Porc update. Our own clusters, plus - with porcAllyAA - every cluster
+	 * that sits in an ally's zone, which DefaultMakeDefence then treats as
+	 * AA-only.
 	 */
+	CTerrainManager* porcTerrain = circuit->GetTerrainManager();
+	auto wantsPorc = [this, mm, porcTerrain, &clusters](int index) {
+		if (mm->IsClusterQueued(index) || mm->IsClusterFinished(index)) {
+			return true;
+		}
+		return (porcAllyAA != 0) && porcTerrain->IsZoneAlly(clusters[index].position);
+	};
 	decltype(defenceIdx) prevIdx = defenceIdx;
 	while (defenceIdx < clusters.size()) {
 		int index = defenceIdx++;
-		if (mm->IsClusterQueued(index) || mm->IsClusterFinished(index)) {
+		if (wantsPorc(index)) {
 			MakeDefence(index);
 			return;
 		}
@@ -1677,7 +1733,7 @@ void CMilitaryManager::UpdateDefenceTasks()
 	defenceIdx = 0;
 	while (defenceIdx < prevIdx) {
 		int index = defenceIdx++;
-		if (mm->IsClusterQueued(index) || mm->IsClusterFinished(index)) {
+		if (wantsPorc(index)) {
 			MakeDefence(index);
 			return;
 		}

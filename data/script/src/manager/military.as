@@ -23,6 +23,20 @@ namespace Military {
 			return aiMilitaryMgr.DefaultMakeTask(u);
 		}
 
+		// Super statics - nuke and EMP silos, Juno, Perdition, Catalyst - are
+		// commandfire weapons: they fire ONLY on an explicit order, and the only
+		// thing that orders them is the native CSuperTask. A role's military
+		// policy is about its army; TECH's returns null for every unit below
+		// +50 metal income, which left its Juno and Catalyst with no task and
+		// no target selection until the economy caught up. Same shape as the
+		// transport guard above: decided here, before any policy sees the unit.
+		if (u !is null && u.circuitDef !is null && !u.circuitDef.IsMobile()
+			&& u.circuitDef.IsRoleAny(Unit::Role::SUPER.mask)) {
+			GenericHelpers::LogUtil("[Military] super static " + u.circuitDef.GetName() + "(" + u.id
+				+ ") -> native CSuperTask", 1);
+			return aiMilitaryMgr.DefaultMakeTask(u);
+		}
+
 		IUnitTask@ t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
 

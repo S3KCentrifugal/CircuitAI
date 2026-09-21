@@ -319,6 +319,14 @@ namespace RoleAir {
 
         // Apply AIR role settings
         aiTerrainMgr.SetAllyZoneRange(Global::RoleSettings::Air::AllyRange);
+
+        // Porc cadence: reach the full chain mid game, spend more per visit,
+        // and put AA on the allies' clusters as well as our own.
+        Global::Porc::LateGameMinutes = Global::RoleSettings::Air::PorcLateGameMinutes;
+        Global::Porc::LateGameMetalIncome = Global::RoleSettings::Air::PorcLateGameMetalIncome;
+        Global::Porc::LateGameEnergyIncome = Global::RoleSettings::Air::PorcLateGameEnergyIncome;
+        Global::Porc::LateBudgetMod = Global::RoleSettings::Air::PorcLateBudgetMod;
+        aiMilitaryMgr.porcAllyAA = Global::RoleSettings::Air::PorcAlliedClustersAA ? 1 : 0;
         // Change scout cap (unit count)
         aiMilitaryMgr.quota.scout = Global::RoleSettings::Air::MilitaryScoutCap;
 
@@ -1160,6 +1168,61 @@ namespace RoleAir {
         return match;
     }
 
+    /**************************************************************************
+     PORC CHAIN
+
+     Position in the chain is a budget threshold (doc/porc-chain.md), and the
+     default land order never reaches flak at all - armflak is not in the
+     land sequence, and Mercury sits at position 12 behind ~14k of metal. For
+     an air role that is backwards: its value to the team is air denial.
+
+     This order leads with flak, puts long-range AA where a well-funded
+     cluster actually reaches, and repeats both down the chain; it drops the
+     duplicate beamers, the Overwatch and three of the six Rattlesnakes to
+     pay for it. Juno stays at position 6, the gates, the LRPCs, the EMP
+     launchers and Ragnarok keep their counts. Water is the default.
+     **************************************************************************/
+    dictionary AirLandChain = {
+        {"armada", array<string> = {
+            "armllt", "armrl", "armflak", "armbeamer", "armcir", "armflak", "armjuno", "armmercury",
+            "armamd", "armamb", "armflak", "armmercury", "armgate", "armanni", "armbrtha", "armflak",
+            "armemp", "armmercury", "armnanotc", "armnanotc", "armbrtha", "armgate", "armbrtha",
+            "armmercury", "armgate", "armemp", "armamb", "armvulc", "armamb", "armamb"}},
+        {"cortex", array<string> = {
+            "corllt", "corrl", "corflak", "corhllt", "cormadsam", "corflak", "corjuno", "corscreamer",
+            "corfmd", "cortoast", "corflak", "corscreamer", "corgate", "cordoom", "corint", "corflak",
+            "cortron", "corscreamer", "cornanotc", "cornanotc", "corint", "corgate", "corint",
+            "corscreamer", "corgate", "cortron", "cortoast", "corbuzz", "cortoast", "cortoast"}},
+        {"legion", array<string> = {
+            "leglht", "legrl", "legflak", "leghive", "leglupara", "legflak", "legjuno", "leglraa",
+            "legabm", "legbastion", "legflak", "leglraa", "legdeflector", "legcluster", "leglrpc", "legflak",
+            "legperdition", "leglraa", "legnanotc", "legnanotc", "leglrpc", "legdeflector", "leglrpc",
+            "leglraa", "legdeflector", "legperdition", "legbastion", "legstarfall", "legbastion", "legbastion"}}
+    };
+
+    void Air_PorcChain(const string &in side)
+    {
+        array<string>@ land = null;
+        if (AirLandChain.exists(side)) {
+            AirLandChain.get(side, @land);
+        }
+        if (land is null || land.length() == 0) {
+            GenericHelpers::LogUtil("[Porc] AIR: no chain for side " + side + "; keeping the default", 2);
+            PorcHelpers::ApplyDefaultChains(side);
+            return;
+        }
+        // Content tiers (Extra Units, scavengers) go on the end, as for every role.
+        if (Global::ModOptions::ExperimentalExtraUnits) {
+            PorcHelpers::AppendTier(@land, @PorcHelpers::ExtraUnitsLand, side, "experimentalextraunits");
+        }
+        if (Global::ModOptions::ScavUnitsForPlayers) {
+            PorcHelpers::AppendTier(@land, @PorcHelpers::ScavUnitsLand, side, "scavunitsforplayers");
+        }
+        aiMilitaryMgr.SetPorcChain(side, false, land);
+        aiMilitaryMgr.SetPorcChain(side, true, PorcHelpers::DefaultChain(side, true));
+        GenericHelpers::LogUtil("[Porc] AIR: " + side + " air-denial chain set (" + land.length() + " entries)", 1);
+    }
+
     void Register() {
         if (RoleConfigs::Get(AiRole::AIR) !is null) return;
         RoleConfig@ cfg = RoleConfig(AiRole::AIR, cast<MainUpdateDelegate@>(@Air_MainUpdate));
@@ -1187,6 +1250,8 @@ namespace RoleAir {
         @cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Air_MilitaryAiMakeTask);
         @cfg.MilitaryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@Air_MilitaryAiUnitRemoved);
         @cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_MilitaryAiTaskRemoved);
+
+        @cfg.PorcChainHandler = cast<PorcChainDelegate@>(@Air_PorcChain);
 
         RoleConfigs::Register(cfg);
     }

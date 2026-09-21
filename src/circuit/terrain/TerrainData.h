@@ -225,6 +225,10 @@ private:
 	std::shared_ptr<circuit::IMainJob> UpdateAreas();
 	void ScheduleUsersUpdate();
 public:
+	// Engine slope map, one value per 16x16 elmos (1 - cos of the slope; a
+	// movedef's maxSlope is in the same units). For layout flatness scoring.
+	const FloatVec& GetSlopeMap() const { return slopeMap; }
+	int GetSlopeMapXSize() const { return slopeMapXSize; }
 	void OnAreaUsersUpdated();
 	SAreaData* GetNextAreaData() {
 		return (pAreaData.load() == &areaData0) ? &areaData1 : &areaData0;

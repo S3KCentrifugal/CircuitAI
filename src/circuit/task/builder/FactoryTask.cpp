@@ -78,7 +78,17 @@ void CBFactoryTask::Cancel()
 
 void CBFactoryTask::Activate()
 {
-	manager->GetCircuit()->GetFactoryManager()->ApplySwitchFrame();
+	CCircuitAI* circuit = manager->GetCircuit();
+	CFactoryManager* factoryMgr = circuit->GetFactoryManager();
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	const bool isProductionFactory = factoryMgr->GetFactoryDef(buildDef) != nullptr;
+	if (!IsLayoutOwned() && terrainMgr->IsLayoutEnabled() && isProductionFactory && buildDef->IsLander()) {
+		const int reservation = terrainMgr->AcquireFactoryReservation(buildDef);
+		if ((reservation < 0) || !PinReservation(reservation)) {
+			RequireReservation();
+		}
+	}
+	factoryMgr->ApplySwitchFrame();
 	IBuilderTask::Activate();
 }
 
@@ -86,14 +96,28 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	CMap* map = circuit->GetMap();
-	if ((facing != UNIT_NO_FACING) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	// A served slot is kept across retries (D-055): the fixed-facing return
+	// below used to move a lab back to the shaken anchor on a second Execute.
+	if ((reservationId >= 0) && geom::is_valid(buildPos) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+		return;
+	}
+	// While a slot for this def is planned, the search runs so it is served.
+	const bool planned = terrainMgr->IsLayoutEnabled() && (terrainMgr->GetReservationCount(buildDef) > 0);
+	if (!pinRequired && !planned && (facing != UNIT_NO_FACING) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
 		SetBuildPos(pos);
 		return;
+	}
+	if (reservationId >= 0) {
+		// The served slot is no longer possible: hand it back before searching
+		// again, else it stays consumed with no structure on it (CR-010).
+		SetBuildPos(-RgtVector);
+		terrainMgr->RestoreReservation(reservationId);
+		reservationId = -1;
 	}
 
 	FindFacing(pos);
 
-	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	CTerrainManager::TerrainPredicate predicate;
 	if (reprDef == nullptr) {
 		predicate = [terrainMgr, builder](const AIFloat3& p) {
@@ -108,9 +132,24 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	}
 	const float testSize = std::max(buildDef->GetDef()->GetXSize(), buildDef->GetDef()->GetZSize()) * SQUARE_SIZE;
 	auto checkFacing = [this, map, terrainMgr, testSize, &predicate, &pos, searchRadius]() {
+		if (pinRequired && (pinnedReservation < 0)) {
+			pinFailed = true;
+			return false;
+		}
+		terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired);
 		AIFloat3 bp = terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate);
 		if (!geom::is_valid(bp)) {
+			pinFailed = pinRequired;
 			return false;
+		}
+		TakeReservation(terrainMgr);  // a reserved factory site carries its own facing
+		pinFailed = pinRequired && (reservationId < 0);
+		if (reservationId >= 0) {
+			// A planned slot: its exit cone is planned too. The front test below
+			// used to refuse it for a rock in front, and the slot stayed consumed
+			// while the lab went to the spiral (D-055).
+			SetBuildPos(bp);
+			return true;
 		}
 
 		// decides if a factory should face the opposite direction due to bad terrain

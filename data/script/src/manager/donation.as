@@ -1,46 +1,66 @@
-// T2 constructor hand-out from the TECH role to its closest allies.
+// TECH's hand-outs to its allies: T2 combat bots by plan, T2 constructors on request.
 #include "../define.as"
 #include "../global.as"
 #include "../helpers/generic_helpers.as"
 #include "../helpers/unit_helpers.as"
+#include "../helpers/unitdef_helpers.as"
 #include "../helpers/map_helpers.as"
+#include "../types/ai_role.as"
 #include "roster.as"
 #include "widget_link.as"
 #include "ferry.as"
+#include "economy.as"
 
 /******************************************************************************
 
-T2 CONSTRUCTOR DONATION
+DONATION
 
-A TECH instance reaches T2 long before its allies. It keeps the first
-KeepCount T2 constructors for itself and then gives the next N it builds
-away, one per build, each to the closest allied BARb that has not received one
-yet (closest by start position from the team roster; allies without a roster
-entry come last, and with no roster at all the lead team is used).
+Two separate hand-outs, both from the TECH role (D-041).
 
-N is drawn once, when the first T2 constructor appears, from a decreasing
-distribution over 1..MaxCount clipped to the number of allies:
+1. T2 COMBAT BOTS, BY PLAN. A TECH instance batches the fast T2 bot from its
+   advanced lab (Sprinter / Fiend / Hoplite, or the amphibious bot on a
+   landlocked start) long before its allies have a T2 lab. It gives N of
+   those away, one per build, each to the closest allied BARb that has had
+   the fewest so far (closest by start position from the team roster; allies
+   without a roster entry come last, with no roster at all the lead team).
 
-    weight(k) = Decay^(k-1)          k = 1 .. min(MaxCount, allies)
-    P(k)      = weight(k) / sum
+   N is drawn once, when the first such bot appears, from a decreasing
+   distribution over T2BotDonationMin..T2BotDonationMax:
 
-so one constructor is the most likely outcome and the largest count the
-least; with Decay 0.6 and seven allies P(1) ~ 0.41 and P(7) ~ 0.02. The
-draw uses AiRandom, the AI's own generator. An ally that already received a
-constructor is skipped until everyone has one, so N never exceeds the team
-size and each donation goes to a different teammate as long as N <= allies.
+       weight(k) = Decay^(k-Min)      k = Min .. Max
+       P(k)      = weight(k) / sum
+
+   so the minimum is the most likely outcome and the maximum the least. The
+   draw uses AiRandom, the AI's own generator. Constructors are NOT part of
+   this: TECH keeps every T2 constructor it builds for itself unless asked.
+
+2. T2 CONSTRUCTORS, ON REQUEST. Any teammate may ask (`barbdon|conreq`).
+   TECH always answers: the request goes on a queue, the advanced bot lab
+   builds one extra constructor ahead of everything else, and the next T2
+   constructor to finish goes to the oldest requester - flown by the ferry
+   transport when TECH owns one (manager/ferry.as), walked with ai.GiveUnits
+   when it does not. The requester side asks on its own from Update():
+   a non-TECH BARb with no T2 constructor and no T2 lab of its own, whose
+   sliding-minimum metal income clears Global::ConstructorRequest::
+   RequestMinMetalIncome, asks once (MaxRequests), with a cooldown for the
+   case where no TECH is on the team yet. SUPPORT ("front tech") techs on
+   its own and never asks automatically (AutoRequestFromSupport). Roles may
+   also call RequestConstructor(why) directly, and TECH always serves that.
 
 Transfers use ai.GiveUnits, which detaches the unit from every task on the
 donor before the engine moves it; the recipient adopts it through its normal
-unit-given path. This replaces the old rule "give the third T2 constructor to
-the lead team".
+unit-given path.
 
 ******************************************************************************/
 namespace Team {
 namespace Donation {
-    int built = 0;             // T2 constructors this instance has produced
-    int planned = -1;          // donations still to make; -1 = not drawn yet
-    int given = 0;
+
+    const string MSG = "barbdon";
+
+    // ---- T2 combat bots (TECH side)
+    int botsBuilt = 0;         // donated-class bots this instance has produced
+    int botPlanned = -1;       // donations still to make; -1 = not drawn yet
+    int botGiven = 0;
     // team id string -> count, read and written as int64 (see D-019) and
     // ALWAYS read through Count() below. Two rules of the dictionary add-on
     // bit this table, one after the other:
@@ -49,11 +69,21 @@ namespace Donation {
     //   2. get(key, int64&out c) on a key that does not exist returns false
     //      and leaves c UNDEFINED: an &out argument is an uninitialised
     //      temporary copied back regardless of the return value, so the
-    //      "= 0" initialiser is overwritten with junk. Every count read as
-    //      ~1e6+, PickRecipient never chose anyone, and no constructor was
-    //      ever donated or ferried.
+    //      "= 0" initialiser is overwritten with junk.
     // Never trust an &out after a failed get: check exists() first.
     dictionary givenTo;
+
+    // ---- T2 constructors on request (TECH side)
+    array<int> pendingRequests;   // requester team ids, oldest first
+    int ordered = 0;              // extra constructors ordered and not yet built
+    int orderedFrame = -1;        // when the last order was placed
+    int constructorsGiven = 0;
+
+    // ---- requester side
+    int requestsSent = 0;
+    int lastRequestFrame = -1;
+
+    bool IsEnabled() { return Global::ConstructorRequest::Enabled; }
 
     int64 Count(int teamId)
     {
@@ -69,17 +99,26 @@ namespace Donation {
         givenTo.set("" + teamId, Count(teamId) + 1);
     }
 
-    // How many to donate: one draw from the decreasing distribution, clipped to the allies.
-    int DrawCount(int allies)
+    // The bots the plan gives away: what TECH's advanced bot lab batches.
+    bool IsDonatedBotDef(const CCircuitDef@ d)
     {
-        int maxCount = Global::RoleSettings::Tech::T2DonationMax;
-        if (allies < maxCount) maxCount = allies;
-        if (maxCount <= 0) return 0;
-        const float decay = Global::RoleSettings::Tech::T2DonationDecay;
-        array<float> weights(maxCount);
+        if (d is null) return false;
+        const string n = d.GetName();
+        if (UnitHelpers::GetAllFastT2Bots().find(n) >= 0) return true;
+        return UnitHelpers::GetAllAmphibiousT2Bots().find(n) >= 0;
+    }
+
+    // How many to donate: one draw from the decreasing distribution over minCount..maxCount.
+    int DrawCount(int minCount, int maxCount)
+    {
+        if (minCount < 0) minCount = 0;
+        if (maxCount < minCount) maxCount = minCount;
+        const int span = maxCount - minCount + 1;
+        const float decay = Global::RoleSettings::Tech::T2BotDonationDecay;
+        array<float> weights(span);
         float sum = 0.0f;
         float w = 1.0f;
-        for (int k = 0; k < maxCount; ++k) {
+        for (int k = 0; k < span; ++k) {
             weights[k] = w;
             sum += w;
             w *= decay;
@@ -89,9 +128,9 @@ namespace Donation {
         if (roll > 999) roll = 999;
         const float target = (float(roll) + 0.5f) / 1000.0f * sum;
         float acc = 0.0f;
-        for (int k = 0; k < maxCount; ++k) {
+        for (int k = 0; k < span; ++k) {
             acc += weights[k];
-            if (target < acc) return k + 1;
+            if (target < acc) return minCount + k;
         }
         return maxCount;
     }
@@ -113,7 +152,7 @@ namespace Donation {
         return ordered;
     }
 
-    // Closest ally that has received the fewest constructors so far.
+    // Closest ally that has received the fewest bots so far.
     int PickRecipient()
     {
         array<int> ordered = AlliesByDistance();
@@ -132,81 +171,231 @@ namespace Donation {
         return best;
     }
 
-    // Builder::AiUnitAdded of the TECH role: called for every finished builder.
-    void OnConstructorBuilt(CCircuitUnit@ unit)
+    // Hand a unit to a teammate: flown by the ferry when one is owned and
+    // free (constructors only - that is what the ferry is for), walked with
+    // GiveUnits otherwise. True when it changed hands or is in the air.
+    bool _Deliver(CCircuitUnit@ unit, int recipient, const string &in what, bool tryFerry)
     {
-        if (unit is null || unit.circuitDef is null) return;
-        if (!Team::IsT2Constructor(unit.circuitDef)) return;
-        ++built;
-        // Level 1 on purpose: LOG_LEVEL is 1 in define.as, so anything at 2
-        // never reaches the log. Four T2 constructors were built in one game
-        // and the log could not say whether this ran four times, twice, or
-        // once - every branch below except the give itself was level 2.
-        GenericHelpers::LogUtil("[Team][Donation] T2 constructor #" + built + ": " + unit.circuitDef.GetName()
-            + "(" + unit.id + ") planned=" + planned + " given=" + given
-            + " keep=" + Global::RoleSettings::Tech::T2DonationKeepCount, 1);
-
-        if (planned < 0) {
-            const int allies = int(Team::Roster::AllyTeamIds().length());
-            planned = DrawCount(allies);
-            GenericHelpers::LogUtil("[Team][Donation] Plan: keep " + Global::RoleSettings::Tech::T2DonationKeepCount
-                + ", donate " + planned + " of the following T2 constructors (allies=" + allies + ")", 1);
-        }
-        // Say why nothing happens. A finished T2 constructor standing next to
-        // an idle ferry transport looks like a broken pickup; the first
-        // KeepCount are simply ours, and after the plan is met the rest are too.
-        if (built <= Global::RoleSettings::Tech::T2DonationKeepCount) {
-            GenericHelpers::LogUtil("[Team][Donation] keeping " + unit.circuitDef.GetName() + " (built "
-                + built + " of keep " + Global::RoleSettings::Tech::T2DonationKeepCount
-                + "; donations start at #" + (Global::RoleSettings::Tech::T2DonationKeepCount + 1) + ")", 1);
-            return;
-        }
-        if (given >= planned) {
-            GenericHelpers::LogUtil("[Team][Donation] keeping " + unit.circuitDef.GetName()
-                + " (plan met: " + given + "/" + planned + ")", 1);
-            return;
-        }
-
-        const int recipient = PickRecipient();
-        // Every path into PickRecipient already excludes our own team - AllyTeamIds
-        // filters it and the lead-team fallback returns -1 - but a gift to
-        // ourselves would silently consume a donation slot, so assert it here
-        // rather than trust three call sites to stay correct.
-        if (recipient == ai.teamId) {
-            GenericHelpers::LogUtil("[Team][Donation] BUG: recipient resolved to our own team "
-                + recipient + "; keeping the constructor", 1);
-            return;
-        }
-        if (recipient < 0) {
-            GenericHelpers::LogUtil("[Team][Donation] No recipient (no allies or we lead alone); keeping " + unit.circuitDef.GetName(), 1);
-            return;
-        }
+        if (unit is null || recipient < 0 || recipient == ai.teamId) return false;
         const string name = unit.circuitDef.GetName();
         const int unitId = unit.id;
-
-        // Fly it if a ferry is free. Team::Ferry hands the unit over itself
-        // once the drop lands, so the accounting below still runs exactly
-        // once either way. A refusal - no transport yet, one already in the
-        // air, the transport dead - falls through to the walk.
-        {
+        if (tryFerry) {
+            // Team::Ferry hands the unit over itself once the drop lands. A
+            // refusal - no transport yet, one already in the air, the
+            // transport dead - falls through to the walk.
             Team::Roster::Entry@ e = Team::Roster::Get(recipient);
             if (e !is null && Team::Ferry::TryCarry(unit, recipient, e.startPos)) {
-                ++given;
-                Bump(recipient);
-                GenericHelpers::LogUtil("[Team][Donation] " + name + "(" + unitId
+                GenericHelpers::LogUtil("[Team][Donation] " + what + " " + name + "(" + unitId
                     + ") being ferried to team " + recipient, 1);
-                return;
+                return true;
             }
         }
-
         array<CCircuitUnit@> give(1);
         @give[0] = unit;   // valid handle this frame
         ai.GiveUnits(give, recipient);
-        ++given;
-        Bump(recipient);
-        GenericHelpers::LogUtil("[Team][Donation] Gave " + name + " (id=" + unitId + ") to team " + recipient
-            + " (" + given + "/" + planned + ")", 1);
-        WidgetLink::Send("donation", name + "|" + recipient + "|" + given + "|" + planned);
+        GenericHelpers::LogUtil("[Team][Donation] Gave " + what + " " + name + " (id=" + unitId
+            + ") to team " + recipient, 1);
+        WidgetLink::Send("donation", name + "|" + recipient);
+        return true;
+    }
+
+    /**************************************************************************
+     T2 combat bots. Military::AiUnitAdded of the TECH role.
+     **************************************************************************/
+    void OnCombatBotBuilt(CCircuitUnit@ unit)
+    {
+        if (Global::AISettings::Role != AiRole::TECH) return;
+        if (unit is null || unit.circuitDef is null || !IsDonatedBotDef(unit.circuitDef)) return;
+        ++botsBuilt;
+        if (botPlanned < 0) {
+            botPlanned = DrawCount(Global::RoleSettings::Tech::T2BotDonationMin,
+                                   Global::RoleSettings::Tech::T2BotDonationMax);
+            GenericHelpers::LogUtil("[Team][Donation] Plan: donate " + botPlanned + " T2 bots (min "
+                + Global::RoleSettings::Tech::T2BotDonationMin + ", max "
+                + Global::RoleSettings::Tech::T2BotDonationMax + ")", 1);
+        }
+        if (botGiven >= botPlanned) return;   // plan met; the rest are ours, quietly
+
+        const int recipient = PickRecipient();
+        if (recipient == ai.teamId) {
+            GenericHelpers::LogUtil("[Team][Donation] BUG: recipient resolved to our own team; keeping the bot", 1);
+            return;
+        }
+        if (recipient < 0) {
+            GenericHelpers::LogUtil("[Team][Donation] No recipient (no allies or we lead alone); keeping "
+                + unit.circuitDef.GetName(), 1);
+            return;
+        }
+        if (_Deliver(unit, recipient, "T2 bot #" + botsBuilt, false)) {
+            ++botGiven;
+            Bump(recipient);
+            GenericHelpers::LogUtil("[Team][Donation] T2 bots given " + botGiven + "/" + botPlanned, 1);
+        }
+    }
+
+    /**************************************************************************
+     T2 constructors on request. TECH side.
+     **************************************************************************/
+    bool _IsPending(int teamId)
+    {
+        return pendingRequests.find(teamId) >= 0;
+    }
+
+    // T2 constructors on this team now (a parked delivery still counts until
+    // it is handed over, so at most one extra is ever kept).
+    int _OwnT2Constructors()
+    {
+        return UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+    }
+
+    // Builder::AiUnitAdded of the TECH role: every finished builder passes here.
+    void OnConstructorBuilt(CCircuitUnit@ unit)
+    {
+        if (Global::AISettings::Role != AiRole::TECH) return;
+        if (unit is null || unit.circuitDef is null) return;
+        if (!Team::IsT2Constructor(unit.circuitDef)) return;
+        if (ordered > 0) --ordered;
+        if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
+            GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
+                + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);
+            return;
+        }
+        if (pendingRequests.length() == 0) {
+            GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
+                + unit.id + ") is ours: no request pending", 1);
+            return;
+        }
+        const int recipient = pendingRequests[0];
+        pendingRequests.removeAt(0);
+        if (_Deliver(unit, recipient, "requested constructor", true)) {
+            ++constructorsGiven;
+            AiSendMessage(MSG + "|sent|" + unit.id, recipient);
+        }
+    }
+
+    // Factory::AiMakeTask asks here before the role handler, as it asks the
+    // ferry. Returns a constructor order for TECH's advanced bot lab while
+    // requests outnumber what is already ordered; null otherwise.
+    IUnitTask@ FactoryMakeTask(CCircuitUnit@ factory)
+    {
+        if (!IsEnabled() || Global::AISettings::Role != AiRole::TECH) return null;
+        if (factory is null || factory.circuitDef is null) return null;
+        // An order that produced nothing within the timeout (lab died, def
+        // capped) is forgotten so the next lab poll re-orders. Checked before
+        // the count gate: with one request and one dead order the gate used to
+        // return first and the time-out was never reached (CR-014).
+        if (ordered > 0 && orderedFrame >= 0
+            && (ai.frame - orderedFrame) > Global::ConstructorRequest::OrderTimeoutSeconds * SECOND) {
+            GenericHelpers::LogUtil("[Team][Donation] constructor order timed out; re-ordering", 1);
+            ordered = 0;
+        }
+        if (int(pendingRequests.length()) <= ordered) {
+            return null;
+        }
+        // TECH's own first: no order for an ally while TECH has fewer T2
+        // constructors than it keeps (Tech::DonationKeepT2Constructors).
+        if (_OwnT2Constructors() < Global::RoleSettings::Tech::DonationKeepT2Constructors) {
+            return null;
+        }
+        if (!UnitHelpers::IsT2BotLab(factory.circuitDef.GetName())) return null;
+        array<string> ctors = UnitHelpers::GetT2BotConstructors(Global::AISettings::Side);
+        if (ctors.length() == 0) return null;
+        CCircuitDef@ d = ai.GetCircuitDef(ctors[0]);
+        if (d is null || !d.IsAvailable(ai.frame)) return null;
+        IUnitTask@ order = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH,
+                d, factory.GetPos(ai.frame), 64.f));
+        if (order is null) return null;   // nothing ordered, nothing counted (CR-014)
+        ++ordered;
+        orderedFrame = ai.frame;
+        GenericHelpers::LogUtil("[Team][Donation] TECH: ordered " + ctors[0] + " for team "
+            + pendingRequests[0] + " (pending " + pendingRequests.length() + ", ordered " + ordered + ")", 1);
+        return order;
+    }
+
+    /**************************************************************************
+     Requester side.
+     **************************************************************************/
+    bool _HasTechAlly()
+    {
+        array<Team::Roster::Entry@>@ all = Team::Roster::All();
+        if (all is null) return false;
+        for (uint i = 0; i < all.length(); ++i) {
+            Team::Roster::Entry@ e = all[i];
+            if (e !is null && e.teamId != ai.teamId && e.role == AiRole::TECH) return true;
+        }
+        return false;
+    }
+
+    // Ask the team's TECH for a T2 constructor. Any role may call this.
+    bool RequestConstructor(const string &in why)
+    {
+        if (!IsEnabled()) return false;
+        if (Global::AISettings::Role == AiRole::TECH) return false;
+        if (lastRequestFrame >= 0
+            && (ai.frame - lastRequestFrame) < Global::ConstructorRequest::RequestCooldownSeconds * SECOND) {
+            return false;
+        }
+        lastRequestFrame = ai.frame;
+        ++requestsSent;
+        AiSendMessage(MSG + "|conreq");
+        GenericHelpers::LogUtil("[Team][Donation] requested a T2 constructor from TECH (" + why + ")", 1);
+        WidgetLink::Send("donation", "conreq|" + requestsSent);
+        return true;
+    }
+
+    // Main::AiUpdate, every 30 frames: the automatic request.
+    // Roles that tech on their own never ask automatically. A SUPPORT
+    // ("front tech") player builds its own T2; an unrequested constructor
+    // there is a gift it did not need. An explicit RequestConstructor() from
+    // any role is still always served (D-046).
+    bool _AutoRequestsForRole()
+    {
+        const AiRole role = Global::AISettings::Role;
+        if (role == AiRole::TECH) return false;
+        if (role == AiRole::SUPPORT && !Global::ConstructorRequest::AutoRequestFromSupport) return false;
+        return true;
+    }
+
+    void Update()
+    {
+        if (!IsEnabled() || !_AutoRequestsForRole()) return;
+        if (requestsSent >= Global::ConstructorRequest::MaxRequests) return;
+        if (Economy::GetMinMetalIncomeLast10s() < Global::ConstructorRequest::RequestMinMetalIncome) return;
+        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors()) > 0) return;
+        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) > 0) return;
+        if (!_HasTechAlly()) return;
+        RequestConstructor("+" + int(Global::ConstructorRequest::RequestMinMetalIncome)
+            + " metal, no T2 constructor, no T2 lab");
+    }
+
+    // Team::HandleMessage. Both sides.
+    bool HandleMessage(const string &in msg, int fromTeamId)
+    {
+        array<string>@ p = msg.split("|");
+        if (p.length() < 2 || p[0] != MSG) return false;
+        if (p[1] == "conreq") {
+            if (Global::AISettings::Role != AiRole::TECH) return true;
+            if (!IsEnabled() || fromTeamId == ai.teamId) return true;
+            if (_IsPending(fromTeamId)) {
+                GenericHelpers::LogUtil("[Team][Donation] TECH: team " + fromTeamId + " already has a request pending", 1);
+                return true;
+            }
+            pendingRequests.insertLast(fromTeamId);
+            AiSendMessage(MSG + "|ack", fromTeamId);
+            GenericHelpers::LogUtil("[Team][Donation] TECH: constructor request from team " + fromTeamId
+                + " queued (pending " + pendingRequests.length() + ")", 1);
+            return true;
+        }
+        if (p[1] == "ack") {
+            GenericHelpers::LogUtil("[Team][Donation] team " + fromTeamId + " (TECH) is building our constructor", 1);
+            return true;
+        }
+        if (p[1] == "sent") {
+            GenericHelpers::LogUtil("[Team][Donation] team " + fromTeamId + " sent constructor "
+                + (p.length() >= 3 ? p[2] : "?"), 1);
+            return true;
+        }
+        return false;
     }
 }  // namespace Donation
 }  // namespace Team

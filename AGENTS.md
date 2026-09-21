@@ -109,6 +109,11 @@ This is the implementation target for every AngelScript and profile change.
 | `data/script/src/helpers/` | Stateless helpers grouped by domain: builder, collection, defense, economy, factory, generic, guard, limits, map, objective (with `objective_executor.as`), porc, role, role-limit, task, unit, and unitdef. |
 | `data/script/src/manager/sea_assist.as` | SEA donates one T1 construction ship to a TACTICAL ally at +50 metal income, and TACTICAL lifts its zero shipyard caps once it owns a sea constructor. |
 | `data/script/src/manager/ferry.as` | Transport ferry policy: the AIR/TECH request protocol over `AiSendMessage`, and the donation hand-over. See `doc/transport-ferry.md`. |
+| `data/script/src/helpers/sea_constructor_helpers.as` | The naval economy ladder a construction ship runs (T2 shipyard, mex upgrades, naval converter, nanos, tidals; advanced converter and naval fusion for a T2 sub), parameterised by a `Settings` object so SEA and TACTICAL share one policy. See `doc/roles/sea.md` and `doc/roles/tactical.md`. |
+| `data/script/src/helpers/layout_helpers.as` | Base-layout policy entry point and lane-facing selection; canonical footprint and slot geometry is native. See `doc/base-layout.md`. |
+| `data/script/src/roles/tech_build.as` | `TechBuild` (D-066): TECH's experimental build system, the only source of builder work when `Tech::ExperimentalBuild` is on - turrets, keep-current, the opening, the start factory on its slot, mex expansion, the T2 lab gate, the planner, the strategic rungs, native's queued orders, assist, guard, wait; never null. See `doc/roles/tech.md`. |
+| `data/script/src/manager/eco_planner.as` | `EcoPlanner` (D-058/D-063): TECH's one next-building function after the mex-first opening - energy draining, energy floating (converter), build power short or metal floating (turret), energy below target, storage - offering only what the turret box can hold and placing through `Layout::Place`. See `doc/eco-planner.md`. |
+| `data/script/src/manager/layout.as` | `Layout` (D-060/D-063): TECH's policy shell over native layout geometry. It chooses the factory-pair candidate, fits the turret box behind it (rows of invisible turrets reserved slot by slot on the flattest buildable rectangle), adopts named state after load, and packs every economy structure and turret against the turret rows (native `PackNearGroup`, `NextSlotAny`), pinned. See `doc/layout-design.md`. |
 | `data/script/src/helpers/porc_helpers.as` | Porcupine chain policy: reads the config-seeded chain through `aiMilitaryMgr.GetPorcChain`, appends the content-option tiers, and lets a role rewrite it. See `doc/porc-chain.md`. |
 | `data/script/src/misc/commander.as` | Commander-specific script policy. |
 
@@ -130,7 +135,7 @@ This is the implementation target for every AngelScript and profile change.
 | `src/circuit/unit/` | `CircuitDef` (UnitDef wrapper and classification), `CircuitUnit`, `CircuitWDef` (weapon defs), `CoreUnit`, `FactoryData`, and the `action/`, `ally/`, `enemy/` subtrees. Classification and economy logic that reads BAR custom parameters lives here. |
 | `src/circuit/map/` | `MapManager`, `ThreatMap`, `InfluenceMap`, `GridAnalyzer`. |
 | `src/circuit/resource/` | Resource model: `MetalData`, `EnergyData`, `EnergyManager`, `EnergyGrid`, `EnergyLink`, `EnergyNode`, `GridLink`. |
-| `src/circuit/terrain/` | `TerrainManager`, `TerrainData`, blocking-map geometry (`BlockingMap`, `BlockCircle`, `BlockMask`, `BlockRectangle`), and `path/` with `PathFinder`, `MicroPather`, `PathQuery`, `PathInfo`, and the cost and line query maps. |
+| `src/circuit/terrain/` | `TerrainManager`, `TerrainData`, blocking-map geometry (`BlockingMap`, `BlockCircle`, `BlockMask`, `BlockRectangle`), `BaseLayoutGeometry.h` (dependency-free half-cell factory/module geometry), and `path/` with `PathFinder`, `MicroPather`, `PathQuery`, `PathInfo`, and the cost and line query maps. |
 | `src/circuit/setup/` | `SetupManager`, `SetupData`, `DefenceData`: start position, faction selection, and defence layout. |
 | `src/circuit/scheduler/` | `Scheduler` and `SchedulerJob` for deferred and periodic work. |
 | `src/circuit/spring/` | Adapters over Recoil's generated C++ AI wrapper: `SpringCallback`, `SpringEngine`, `SpringMap`, `SpringUnit`. |
@@ -155,11 +160,23 @@ This is the implementation target for every AngelScript and profile change.
 | `doc/decisions.md` | **The decision record**: why changes were made, what was rejected, and how far each is verified. Links directly to every file a decision touched. Read before reversing anything surprising; add to it whenever you make a judgement call. |
 | `doc/known-issues.md` | **The register of diagnosed but unresolved problems**, one entry per issue with problem, proposed solution and verification. Read before starting work; add to it whenever you leave something unfixed. Indexes the deep-dive documents below rather than duplicating them. |
 | `doc/transport-ferry.md` | The AIR-to-TECH transport ferry: the hand-over protocol, `CFerryTask`, and how a donated T2 constructor is flown instead of walked. |
+| `doc/base-layout.md` | Current TECH layout architecture: JSON/script gating, native half-cell geometry, atomic factory clusters and full/half economy modules, exact pin lifecycle, save/load, and standalone tests. |
+| `doc/reviews/2026-09-20-uncommitted-code-review.md` | The external review of the 2026-09-20 change set: 25 findings, verified accurate. |
+| `doc/reviews/2026-09-20-code-review-fixes.md` | The fixes applied for D-059, one section per finding with before/after code, diagrams and screenshot placeholders. |
+| `doc/reviews/2026-09-20-uncommitted-highlights.md` | The 100 highlights of the uncommitted change set as of 2026-09-20, grouped by area, with the state (what is built, deployed, played) and the loose ends. |
+| `doc/reviews/2026-09-20-d062-review.md` | Review of the D-060 / D-062 economy and layout rebuild: what was verified, seven findings (R-1 the opener can hold the start factory for ever), recommendation. No code changed. |
+| `doc/eco-planner.md` | The eco planner (D-058): the meta's numbers, the inputs, the function, worked openings, where each structure goes, settings. |
+| `doc/experimental-build.md` | D-064: the experimental build mode - the engine's build-range rule quoted from Recoil, the goal-region theory (stop on the disc `0.9 (reach + model radius)`, one command per engagement, no command timeout, the engine walks the last leg inside 1,600 elmos), the alternatives rejected, settings, what to watch. TECH only. Not Played. |
+| `doc/tech-eco-meta.md` | D-062: TECH's three-resource model, Supreme three-mex/six-wind opener, queued-aware storage, converter surplus rules, regional build power, compact recycling layout, and four-row Supreme profile. |
+| `doc/layout-design.md` | D-060 and D-063: TECH's layout design - the exact factory pair with rear nano clusters and exits, the turret box (terrain-fitted rectangle, turret rows as invisible slots, economy packed nearest a turret within reach), ordered pins, atomic reservations, JSON/script gating and save/load adoption; the D-060 economy module kept as record. Not Played. |
 | `doc/sensor-escort.md` | Mobile radar/jammer escort rationing: the one-per-squad cap, the squad-value ranking that orders it, and the `sensor` block in `behaviour.json`. |
 | `doc/bomber-targeting.md` | Diagnosed but unfixed bomber-targeting investigation with a phased remediation plan. |
 | `doc/t2-constructor-stall.md` | Diagnosed but unfixed T2 constructor stall after mex upgrades, with three options awaiting a decision. |
 | `doc/juno-targets.md` | Juno target-priority policy: the four pulse target classes and their order, the `pulse` block in `behaviour.json`, `CSuperTask::SelectPulseTarget`, and what happens when nothing qualifies. Game mechanics live in the shared knowledge base. |
 | `doc/emp-targets.md` | EMP target-priority policy: the stun-viability arithmetic, the rank order, the `emp` block in `behaviour.json`, `CSuperTask::SelectEmpTarget`, and what happens when nothing qualifies. Game mechanics live in the shared knowledge base. |
+| `doc/start-position-control.md` | Research: how an AI could choose its start position without engine or game changes - the engine's `Game_sendStartPosition` path, why BAR discards it for AI teams (`AllowStartPosition`), BAR's `aiPlacedPosition` LuaRules message, and a proposal to broker it through the host widget. Proposal only. |
+| `doc/air-wave-attacks.md` | AIR bomber waves: the income-scaled wave size, the line-abreast formation, the attack vector and the six attack methods (CARPET, FLANK, PINCER, STRIKE, DEEP, FEINT), `CAirWaveTask` and its script API. |
+| `doc/launcher-targets.md` | Tactical launcher (Perdition, Catalyst) targeting: why the enemy-group scan never saw a target at 2300 range, `CSuperTask::SelectLauncherTarget`, the decaying stockpile floor, the `stockpile` block in `behaviour.json`, and who hands a super static its task. |
 | `doc/knowledge/README.md` | Index of CircuitAI-specific knowledge and the pointer to the shared game knowledge base. |
 | `doc/knowledge/90-agent-decision-guides/` | Agent decision guides tied to this AI's hooks: `90-decision-architecture.md`, `91-build-order-selection.md`, `92-response-tables.md`, `93-engagement-rules.md`, `94-economy-policies.md`, `95-open-questions.md`. |
 | `doc/knowledge/barb-unit-config.md` | Generated: every reachable unit's roles, attributes, limits, threat, factory lists, and script references across all profiles, joined to the shared unit cache, plus the configuration gap lists. |
@@ -172,11 +189,16 @@ This is the implementation target for every AngelScript and profile change.
 | `tools/knowledge/barb_report.py` | Regenerates `doc/knowledge/barb-unit-config.md`. Run `python tools/knowledge/barb_report.py` after profile or unit-cache changes. |
 | `tools/knowledge/check_unit_helpers.py` | Validates every quoted unit id in `data/script/src` against the shared game cache (unknown, unreachable, wrong faction or tier, per-side branches) and reports combat-list coverage. Exit 1 on findings. |
 | `tools/knowledge/check_doc_links.py` | Verifies that every relative Markdown link under `doc/`, `data/script/`, `skills/` and the root instruction files resolves to a file that exists. Exit 1 on findings. Run before finishing any documentation change. |
+| `tools/knowledge/check_script_api.py` | Verifies every `aiXxx.Member` the AngelScript policy uses is registered in `src/circuit/script/*.cpp`, and with `--dll <installed SkirmishAI.dll>` that the registration strings are inside that binary and the file is a stripped ~7 MB build. Run before every launch; a script deployed ahead of its DLL leaves every AI standing at frame 0. |
+| `.claude/skills/ai-not-moving/SKILL.md` | The runbook for "the commander does not move at game start": find the last game's `ERR` lines in `infolog.txt`, the message-to-cause table, script/DLL parity with the checker, the deploy rules (ship script and DLL together; never copy from the Recoil install dir mid-build), what to do when there are no `ERR` lines, where to record the case. |
 | `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |
 | `doc/spam-routes.md` | The economy-gated spam feature: `spam` attribute, `Global::Spam` settings, `Spam::` manager, native `CRouteTask`, focus and lane geometry. |
-| `tools/widgets/gui_barb_team_link.lua` | LuaUI widget for the host machine: displays what allied BARb instances mirror through `ai.CallUI` (`data/script/src/manager/widget_link.as`): the team roster and orphan-rescue events. Copy into the BAR `LuaUI/Widgets` folder. |
+| `tools/widgets/gui_barb_team_link.lua` | LuaUI widget for the host machine, docked as a "Player / AI" tab strip on top of the bottom-right player-list stack; the AI tab opens a panel of the list's width above the strip, adding to the stack (D-061): Team and AI dropdown menus, then the selected AI's status, the runtime role selector, Query / Overlay / Query all, the event log. Displays what allied BARb instances mirror through `ai.CallUI` (`data/script/src/manager/widget_link.as`), including the team roster, orphan-rescue events, and `/barblayout` rendering of native layout zones and slot states. Copy into the BAR `LuaUI/Widgets` folder. |
+| `tools/widgets/deploy_widgets.py` | Copies every `tools/widgets/*.lua` into the local BAR install. **For the owner to run**: the assistant never writes to the game install (2026-09-21). |
+| `.claude/settings.json` | Claude Code project settings. The PostToolUse widget-deploy hook was removed on 2026-09-21: nothing may write to the live game folder. |
 | `.githooks/pre-commit` | Refuses a commit that stages a role script without its document, and runs `check_role_docs.py` when either is staged. Enable with `git config core.hooksPath .githooks`. |
 | `CMakeLists.txt` | Native build definition. Building requires integration into an engine checkout and Recoil's generated C++ AI wrapper. |
+| `tests/CMakeLists.txt`, `tests/base_layout_geometry_test.cpp` | Standalone C++20 tests for dependency-free base-layout geometry; configure with `cmake -S tests -B build-layout-tests`. The root `CIRCUIT_BUILD_TESTS` option adds the same target when CircuitAI is configured by its engine parent. |
 | `VERSION` | AI version string. |
 | `platform/angelscript/jit/` | AngelScript JIT compiler sources (`as_jit.cpp`, `virtual_asm*`). Platform support, not policy. |
 | `util/` | Development aids that are not shipped: `boost_log.sh`, `cpu_load.cpp`, `crash_test.py`, the `fibR.as` and `fibR.lua` benchmarks, `gdb.cmd` and `gdb.sh`, `head.script`, `tracy.txt`, `weight_normal.txt`. |
@@ -283,6 +305,175 @@ When changing classification or economy logic, check BAR values used by CircuitA
 - Avoid changing the legacy profiles (`easy`, `medium`, `hard`, `hard_aggressive`) and the shared-framework profiles (`experimental_balanced`, `experimental_hard`, `experimental_terrible`) together unless the requirement explicitly spans them.
 - When a change is scoped to one profile family, record the other family in `doc/known-issues.md` rather than leaving the gap undocumented.
 
+## Native C++20
+
+These instructions live at the repository root so one canonical rule set
+covers every project-owned C++ directory. Apply them to new or modified code
+in `src/AIExport.*` and `src/circuit/`. Apply the general portability and
+safety rules to a project-owned utility only when the current task targets it.
+
+- `src/lib/` is vendored. Do not modernize, restyle, or otherwise edit it
+  unless the task explicitly targets that dependency; prefer an attributable
+  upstream patch.
+- `platform/angelscript/jit/` is platform and ABI support. Preserve its
+  calling-convention, executable-memory, and architecture assumptions, and
+  require targeted platform validation for any change there.
+- `util/cpu_load.cpp` is a standalone development aid, not shipped AI code;
+  do not impose engine-wrapper, task, or scheduler patterns on it.
+- Apply these rules incrementally to lines and interfaces changed for the
+  current task. Do not refactor, format, rename, or "modernize" unrelated C++
+  merely to make old code conform.
+
+### Language and portability
+
+- CircuitAI's target is **C++20** (`CMakeLists.txt`), even though the current
+  Recoil parent builds the engine as C++23. Do not use C++23 language or
+  library features in CircuitAI code.
+- Use standard C++20 rather than compiler extensions. Keep new code portable
+  across the supported GCC/MinGW, Clang/AppleClang, and MSVC code paths; gate
+  genuine OS, architecture, or ABI differences explicitly.
+- Preserve the existing ABI at generated Recoil wrapper, C export, save-file,
+  and AngelScript boundaries. Do not change enum widths, POD layout, field
+  order, calling conventions, or serialized representation incidentally.
+- Use fixed-width integer types when the width is part of an ABI, wire, or
+  persistent format. Elsewhere, use the domain's existing type and make
+  narrowing or signed/unsigned conversions explicit and range-checked.
+
+### Ownership and lifetime
+
+- Prefer values and RAII. Use `std::unique_ptr` for new sole ownership and
+  `std::shared_ptr` only when ownership is genuinely shared.
+- Treat an unannotated raw pointer as borrowed and nullable. Document any
+  exceptional owning raw pointer required by a generated wrapper, intrusive
+  AngelScript reference counting, or an existing manager/task ownership
+  contract. Do not add ordinary bare `new`/`delete` pairs when ownership can
+  be transferred immediately to an RAII owner.
+- Do not mechanically wrap intrusive `IRefCounter` objects or manager-owned
+  tasks in standard smart pointers; follow their existing `AddRef`/`Release`
+  or enqueue/dequeue ownership contract.
+- A unit, enemy, engine-wrapper object, or container element pointer can become
+  invalid after destruction, transfer, callback dispatch, or container
+  mutation. Store a stable ID across frames, queued work, and save/load, then
+  resolve and null-check it at the point of use.
+- Remove pointer-keyed bookkeeping while the pointee is still alive. Never
+  dereference a raw pointer after erasing it from the structure that recorded
+  its lifetime.
+
+### Interfaces and type safety
+
+- Make local values, parameters, and member functions `const` when mutation is
+  not intended. Prefer references for mandatory synchronous objects and
+  pointers for optional or reseatable objects.
+- Initialize every value. Prefer scoped enums, `explicit` single-argument
+  constructors, `override` on overrides, and `final` when extension is not
+  supported. Consider `[[nodiscard]]` for new result/status APIs whose failure
+  must be handled.
+- Avoid C-style casts. Use the narrowest C++ cast that expresses the operation,
+  and validate a downcast unless the surrounding type discriminator proves it.
+  Reserve `reinterpret_cast` and `const_cast` for documented ABI or legacy API
+  boundaries.
+- Validate lower and upper bounds before indexing or converting signed values
+  to unsigned values. Check divisors, normalize/clamp floating-point inputs
+  before inverse trigonometry, and reject non-finite or invalid positions at
+  engine boundaries.
+- Include what a header uses so it can compile independently; forward-declare
+  only when a complete type is unnecessary. A `.cpp` should include its own
+  header first. Do not put `using namespace` directives in headers.
+
+### Containers and algorithms
+
+- Account for iterator, reference, span, and element-pointer invalidation on
+  every mutation. Use the iterator returned by `erase`, snapshot keys/items
+  when callbacks can mutate the source, and do not structurally mutate a
+  container from a range loop unless the operation is proven safe.
+- Use `find`/`contains` for lookup. Do not use `operator[]` when a missing key
+  must not insert a value.
+- Reserve container capacity when the final or maximum size is predictable.
+  Do not retain pointers into a `vector` after growth, and do not call
+  `reserve()` repeatedly before individual appends.
+- Prefer a direct scan or standard algorithm when it is clearer and no slower;
+  do not sort a collection merely to select one minimum or maximum.
+
+### Tasks, callbacks, and concurrency
+
+- Every task must have an explicit terminal lifecycle: completion,
+  cancellation, timeout, destruction, and loss of the final assignee must
+  remove it from manager/scheduler containers and produce the expected script
+  callback exactly once.
+- A queued lambda must not capture stack references. Capturing `this` or a raw
+  pointer requires a documented guarantee that the object outlives the job,
+  or an explicit cancellation/weak-lifetime mechanism.
+- Worker jobs operate only on owned or immutable snapshots and return
+  engine-facing effects to the main thread. Do not call generated engine
+  wrappers, mutate module state, or invoke AngelScript from worker threads
+  unless that exact API is documented as thread-safe.
+- Preserve CircuitAI's scheduler shutdown ordering. A query's `weak_ptr`
+  protects the query, not other raw objects captured by its completion
+  callback.
+
+### Engine, policy, and AngelScript boundaries
+
+- C++ provides mechanism; AngelScript or JSON owns build orders, priorities,
+  strategic thresholds, and other policy. If mechanism must be native because
+  script lacks data or commands, expose a script/JSON lever rather than
+  hardcoding the policy.
+- Treat an AngelScript declaration string, C++ signature, calling convention,
+  object flags, property offset, and handle annotation as one ABI contract.
+  Use the overload-safe registration macro where needed and check every
+  registration result.
+- Preserve `@`, `@+`, `asOBJ_NOCOUNT`, intrusive reference-counting, and
+  borrowed-lifetime semantics. A native method is not available to script
+  until it is registered.
+- Do not let exceptions escape a C export, generated engine callback, worker
+  entry point, destructor, or AngelScript native-call boundary. Translate
+  failures using the existing status, logging, cleanup, and exception-guard
+  pattern.
+- Issue commands only to a currently valid unit through the established
+  guarded command path. Revalidate IDs and task ownership after callbacks that
+  can destroy, transfer, or reassign units.
+
+### Persistence, units, and performance
+
+- When new state affects behavior after load, update `Save` and `Load`
+  together or reconstruct the state deterministically before tasks resume.
+  Serialize stable IDs and explicit fields, never pointers, padding, or whole
+  polymorphic objects. Validate stream state, counts, IDs, and enum ranges
+  before allocation or indexing, and version intentional format changes.
+- Keep simulation frames, seconds, elmos/world units, map squares, grid cells,
+  ordinary distances, and squared distances explicit in names and
+  conversions. Use `FRAMES_PER_SEC` for simulation time; reserve
+  `std::chrono` for wall-clock work.
+- Prefer squared-distance comparisons when only ordering or a threshold is
+  needed. Use existing map/geometry validity and correction helpers rather
+  than duplicating coordinate rules.
+- In per-frame, per-unit, and candidate-scan paths, avoid repeated allocation,
+  deallocation, string formatting, logging, native lookups, and shared-pointer
+  churn. Reuse buffers or cache snapshots only when ownership and invalidation
+  are clear; profile before adding complex caches.
+
+### C++ validation
+
+- Run diagnostics for each edited C++ file and the smallest relevant existing
+  checks. Build the CircuitAI target in a writable Recoil integration
+  environment when native code changes; never build in the trusted read-only
+  Recoil checkout.
+- Treat warnings in changed code as defects even when the engine suppresses
+  warnings for legacy Skirmish AI submodules. Run `git diff --check`.
+- For a binding change, inspect every AngelScript caller, update
+  `doc/angelscript-references.md`, and load each affected profile in BAR.
+- For lifecycle, threading, save/load, targeting, or command changes, static
+  compilation is insufficient: exercise the affected runtime path and record
+  honestly whether it was Built, Checked, Symbolised, or Played.
+
+Research basis: the
+[C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)
+(used as gradual guidance, not a mandate to rewrite legacy code), CMake's
+[`CXX_STANDARD`](https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html)
+contract, the
+[C++20 compiler support table](https://en.cppreference.com/w/cpp/compiler_support/20.html),
+and the current CircuitAI/Recoil ownership, scheduler, wrapper, serialization,
+and build contracts.
+
 ## Decisions
 
 `doc/decisions.md` records why changes were made. `known-issues.md` says what
@@ -363,6 +554,7 @@ Use the cheapest focused validation available in this repository, then broaden a
 - Run diagnostics for edited C++ or AngelScript files.
 - For configuration changes, parse the changed JSON and check referenced UnitDef names/build edges against the effective BAR data pipeline.
 - Use `git diff --check` before finishing.
+- The assistant never writes to the live BAR install (`%LOCALAPPDATA%\Programs\Beyond-All-Reason`): change and build only; the owner deploys the build output (`build-amd64-windows/install/AI/Skirmish/BARb/stable/`, script and DLL together). Before a launch the owner can run `python tools/knowledge/check_script_api.py --dll "<installed SkirmishAI.dll>"` (it only reads the DLL); see `.claude/skills/ai-not-moving/SKILL.md`.
 - After touching any Markdown, run `python tools/knowledge/check_doc_links.py`; a link to a document that does not exist asserts an answer that is not there.
 - After touching `data/script/src/roles/` or `doc/roles/`, run `python tools/knowledge/check_role_docs.py`; after touching unit id lists in `data/script/src`, run `python tools/knowledge/check_unit_helpers.py`. Both must exit 0.
 - Runtime AngelScript changes require loading the affected profile in BAR because this repository has no standalone AngelScript compilation target.

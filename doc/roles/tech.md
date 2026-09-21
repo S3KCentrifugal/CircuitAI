@@ -4,8 +4,8 @@ Reference for the `TECH` AngelScript role: how it is loaded, which native
 callbacks reach it, which registered C++ APIs it depends on, how its decisions
 are actually gated, and where it is currently broken.
 
-Source: `data/script/src/roles/tech.as` (1923 lines), namespace `RoleTech`. Line
-references are as of branch `smrt`, 2026-09-17. Prefer function names over line numbers when
+Source: `data/script/src/roles/tech.as` (2432 lines), namespace `RoleTech`. Line
+references are as of branch `smrt`, 2026-09-20. Prefer function names over line numbers when
 navigating.
 
 ## Contents
@@ -21,6 +21,7 @@ navigating.
 - [Known defects](#known-defects)
 - [Fix plan](#fix-plan)
 - [Optimisation opportunities](#optimisation-opportunities)
+- [Floating metal](#floating-metal)
 - [Transport ferry](#transport-ferry)
 
 ## Intent
@@ -87,7 +88,9 @@ manager namespace implements them and dispatches to the active role through a
 Two further slots are script-only and have no native lookup: `InitHandler`
 (`Tech_Init`, run once from `Setup` after the role is matched) and
 `RoleMatchHandler` (`Tech_RoleMatch`, the predicate `RoleConfigs::Match` asks
-to claim a start spot for TECH).
+to claim a start spot for TECH). `LayoutPlanHandler` is also script-only:
+`LayoutHelpers::ApplyForRole` invokes `Tech_LayoutPlan` after TECH's limits
+and porcupine chain are applied.
 
 Callbacks C++ looks up that **nothing** implements, so the native default
 applies silently:
@@ -233,15 +236,62 @@ when not.
 
 ### Tech_BuilderAiMakeTask
 
-Pre-computes the native `defaultTask`, then overrides. MEX/MEXUP/GEO/GEOUP and
-ENERGY default tasks are returned immediately. Otherwise dispatch by constructor
+Pre-computes the native `defaultTask` (`Builder::MakeDefaultTaskWithLog`),
+then overrides. A MEX/GEO/GEOUP default is returned immediately and a MEXUP
+default is redirected to an owned mex. Otherwise dispatch by constructor
 type - `Tech_Commander_AiMakeTask`, `Tech_T1BotConstructor_AiMakeTask`,
 `Tech_T2BotConstructor_AiMakeTask`, `Tech_T2FastAssistBotConstructor_AiMakeTask`,
 `Tech_T1AirConstructor_AiMakeTask`, `Tech_T2AirConstructor_AiMakeTask` - each an ordered ladder of
 `EconomyHelpers::Should*` income predicates calling `Builder::EnqueueXxx`
 wrappers. Energy branches are gated by `Tech_RedirectEnergyToReactor`, which
 diverts to `Builder::EnqueueAssistReactor` while a Fusion or Advanced Fusion is
-under construction.
+under construction, and otherwise to `Builder::EnqueueAssistEnergy` while the
+T1 energy structure the script last queued is under construction (see
+[Energy focus](#energy-focus)).
+
+### Energy focus
+
+Three constructors used to have three energy structures going at once - a
+solar, an advanced solar and a second solar - each at a third of the build
+power, while the user's expectation is one structure at a time finished
+fast. Two causes, one native and one in this role
+([D-037](../decisions.md#d-037--builders-focus-one-energy-structure-and-unused-default-tasks-are-discarded)):
+
+1. **The pre-created default task was never thrown away.**
+   `aiBuilderMgr.DefaultMakeTask` does not just *pick* a task, it **enqueues**
+   the one it returns - `CEconomyManager::UpdateEnergyTasks` adds an ENERGY
+   task to the builder queue, and the ladder's own solar is a FACTORY-type
+   task that the native energy count never sees. When the ladder returned its
+   own task, the native one stayed in the queue for `ASSIGN_TIMEOUT` (300 s)
+   and the next idle constructor took it. Every role's builder policy has the
+   same shape, so this is fixed natively: `CBuilderManager::MakeTask`
+   remembers the tasks `DefaultMakeTask` created for that call and aborts the
+   ones the policy did not return; `IBuilderTask::Reevaluate` discards the
+   one it makes and does not use. The native line
+   `BUILDER: discarded N unused default task(s) in the last minute` shows it
+   working.
+2. **Nothing assisted.** The only assist the ladder knew was the reactor one.
+   `Builder::EnergyBuildTask` now tracks the last T1 solar, advanced solar or
+   converter the script queued; `Tech_RedirectEnergyToReactor` calls
+   `Builder::EnqueueAssistEnergy` before every energy rung, which puts up to
+   `EnergyFocusMaxAssists` (3) constructors onto that structure with a
+   `Repair` task. A repair of an unfinished structure is the engine's assist,
+   and the task **ends when the structure completes**, so the constructor
+   re-plans immediately instead of trailing another builder.
+
+Related stall: a constructor blocked by the solar cooldown used to *guard the
+previous builder* for 200 s (`Builder::TryAssignBuilderAssistOnCooldown`),
+which outlived the solar by minutes and looked like a stalled constructor.
+It now assists the structure when one is up, and otherwise guards for
+`COOLDOWN_GUARD_TIMEOUT_FRAMES` (30 s).
+
+| Setting (`Global::RoleSettings::Tech`) | Default | Effect |
+| --- | --- | --- |
+| `EnergyFocusAssist` | true | false restores the old ladder (each constructor starts its own structure) |
+| `EnergyFocusMaxAssists` | 3 | constructors allowed on one energy structure at a time |
+
+Level-1 log: `[BUILDER] EnqueueAssistEnergy: <def>(<id>) assists=k/max`.
+Not Played.
 
 ### Landlocked water expansion
 
@@ -276,15 +326,15 @@ strong:
   naval and hover combat lists are not part of the T1 combat cap, so the native
   chooser builds them normally.
 
-### T2 constructor donation
+### Donations
 
-`Tech_BuilderAiUnitAdded` calls `Team::Donation::OnConstructorBuilt` for every
-finished builder. The first `T2DonationKeepCount` (2) T2 constructors stay;
-the next N are given away one per build, each to the closest allied BARb by
-roster start position that has received the fewest so far. N is drawn once
-from `weight(k) = T2DonationDecay^(k-1)` over 1..min(`T2DonationMax`, allies),
-so a single donation is the most likely and seven the least. This replaced the
-fixed "third T2 constructor to the lead team" rule.
+Two hand-outs, both in `Team::Donation` (`manager/donation.as`), see
+[Donations](#donations-t2-bots-by-plan-constructors-on-request) below.
+`Tech_MilitaryAiUnitAdded` (wired to `MilitaryAiUnitAdded`) calls
+`OnCombatBotBuilt` for every finished military unit: N of the T2 combat bots
+the advanced lab batches go to the closest allies. `Tech_BuilderAiUnitAdded`
+calls `OnConstructorBuilt` for every finished builder: a T2 constructor goes
+to the oldest teammate that asked for one, and is otherwise TECH's own.
 
 ### Nuke first strike (fixed 2026-09-18 crash)
 
@@ -413,42 +463,107 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
   native `MakeBuilderTask` stall gating plus `MEXUP` not being in
   `IsIgnoreStallingPull`; fix undecided.
 
-## How many constructors are donated
+## Donations: T2 bots by plan, constructors on request
 
-`Team::Donation` decides once, when the **first** T2 constructor is built
-(`planned < 0`), and never again:
+Decision: [D-041](../decisions.md#d-041--tech-donates-t2-bots-by-plan-and-t2-constructors-only-on-request).
 
-1. **Keep first.** The first `T2DonationKeepCount` (2) constructors are
-   TECH's own; `OnConstructorBuilt` returns early until `built` exceeds it.
-2. **Draw the count.** `DrawCount(allies)` takes `T2DonationMax` (7) clipped
-   to the number of allies on the roster, builds a geometric weight list
-   `1, 0.6, 0.36, ...` (`T2DonationDecay` 0.6), and makes **one** roll in
-   0-999 over the cumulative weights. With seven allies the sum is ~2.43, so
-   the odds are roughly 41% one, 25% two, 15% three, 9% four, 5% five, 3%
-   six, 2% seven. That number is the plan for the whole game.
-3. **Pick a recipient per constructor.** `PickRecipient` is the *closest*
-   ally with the *fewest* donations so far (`givenTo`), ties to the closer.
-   With the count round-trip fixed (D-019) that spreads them across distinct
-   allies; before it, every count read as 0 and the closest ally got all of
-   them.
-4. **Stop at the plan.** `given >= planned` ends it; a constructor built
-   after that is TECH's.
+**T2 combat bots, by plan.** `Team::Donation::OnCombatBotBuilt` runs from
+`Tech_MilitaryAiUnitAdded` for every finished military unit and acts on the
+bots the advanced lab batches - `GetAllFastT2Bots()` (Sprinter, Fiend,
+Hoplite) and `GetAllAmphibiousT2Bots()` for landlocked starts:
 
-Step 3 was broken twice by the same dictionary, in opposite directions -
-first every count read 0 (closest ally got everything), then every count
-read junk (nobody got anything, `PickRecipient -> team -1`). Both are
-[D-019](../decisions.md#d-019--donation-counts-are-read-and-written-as-int64)
-and [D-025](../decisions.md#d-025--a-dictionary-out-is-undefined-after-a-miss-check-exists-first);
-the counts now go through one `exists()`-guarded `Count()`.
+1. **Draw the count once**, when the first such bot appears:
+   `DrawCount(T2BotDonationMin, T2BotDonationMax)` builds a geometric weight
+   list `1, 0.6, 0.36, ...` (`T2BotDonationDecay`) over Min..Max and makes
+   one roll in 0-999 over the cumulative weights, so the minimum (2) is the
+   most likely outcome and the maximum (7) the least. That is the plan for
+   the game.
+2. **Pick a recipient per bot.** `PickRecipient` is the *closest* ally with
+   the *fewest* donations so far (`givenTo`, read through the
+   `exists()`-guarded `Count()` - [D-019](../decisions.md#d-019--donation-counts-are-read-and-written-as-int64),
+   [D-025](../decisions.md#d-025--a-dictionary-out-is-undefined-after-a-miss-check-exists-first)).
+3. **Give it** with `ai.GiveUnits`; the recipient's military adopts it. The
+   ferry is not involved: it exists for constructors.
+4. **Stop at the plan.** `botGiven >= botPlanned` ends it silently.
 
-Every call logs `T2 constructor #N: <def>(id) planned=P given=G keep=K`,
-then its decision: `keeping ... (built N of keep 2; donations start at #3)`,
-`keeping ... (plan met)`, `No recipient`, or `PickRecipient -> team T (count
-C of A allies)` followed by the ferry's `being ferried` or `Gave`. All at
-**level 1** - `define.as` has `LOG_LEVEL = 1`, and anything logged at 2 never
-appears, which is why a game with four T2 constructors and no donation could
-not be explained from its log: the counting and the refusals were all
-level 2.
+**T2 constructors, on request.** TECH never donates a constructor on its
+own. Any teammate may ask - `Team::Donation::RequestConstructor(why)`, which
+broadcasts `barbdon|conreq` - and `Update()` asks automatically for a
+non-TECH BARb that has no T2 constructor and no T2 lab of its own once its
+sliding-minimum metal income clears `Global::ConstructorRequest::
+RequestMinMetalIncome` (15) - but only once a TECH ally is on the roster
+(`_HasTechAlly`), and at most `MaxRequests` (1) times, so under the default
+there is no automatic retry; `RequestCooldownSeconds` only spaces requests
+when the limit is raised. TECH always answers:
+
+1. `HandleMessage` queues the requester (`pendingRequests`) and replies
+   `ack`.
+2. `Team::Donation::FactoryMakeTask` runs from `Factory::AiMakeTask` before
+   the role handler, like the ferry's: while requests outnumber orders, the
+   advanced bot lab's next task is one T2 constructor at HIGH priority. An
+   order the lab has not delivered within `OrderTimeoutSeconds` is
+   re-placed.
+3. `OnConstructorBuilt` gives the next T2 constructor to finish to the
+   oldest requester - **flown by the ferry transport when TECH owns one**
+   (`Team::Ferry::TryCarry`, [`../transport-ferry.md`](../transport-ferry.md)),
+   walked with `ai.GiveUnits` when it does not - and sends `sent|<id>`.
+
+| Setting | Default | Where |
+| --- | --- | --- |
+| `T2BotDonationMin` / `Max` / `Decay` | 2 / 7 / 0.6 | `Global::RoleSettings::Tech` |
+| `Enabled` | true | `Global::ConstructorRequest` |
+| `RequestMinMetalIncome` | 15 | requester's sliding-minimum metal income |
+| `MaxRequests` | 1 | automatic requests per game per requester |
+| `RequestCooldownSeconds` | 300 | between re-asks |
+| `AutoRequestFromSupport` | false | SUPPORT ("front tech") techs on its own and never asks automatically; its explicit `RequestConstructor` is still served ([D-046](../decisions.md#d-046--support-never-receives-an-unrequested-t2-constructor)) |
+| `OrderTimeoutSeconds` | 240 | TECH re-places an undelivered order after this |
+
+Every decision logs at **level 1**: `Plan: donate N T2 bots`,
+`PickRecipient -> team T`, `Gave T2 bot #k`, `constructor request from team
+T queued`, `TECH: ordered <def> for team T`, `requested constructor ...
+being ferried` / `Gave requested constructor`, and `is ours: no request
+pending` for a constructor nobody asked for.
+
+**Known limits.** With two TECH players on a team both answer a request, so
+the requester may receive two constructors. A requester with no TECH ally
+never asks. Not Played.
+
+**Donations keep TECH's own first.** `Team::Donation` orders no T2
+constructor for an ally, and keeps a built one, while TECH owns fewer than
+`DonationKeepT2Constructors` (2); played, every one it built was ferried
+away and the advanced lab built nothing else.
+
+## Floating metal
+
+TECH was seen queuing construction turrets one after another with nothing
+under construction for them to assist, metal overflowing, and no advanced
+converter or nuclear silo started. Two causes, one per constructor tier.
+
+**T1 constructors.** `EconomyHelpers::ShouldBuildT1Nano` returned
+`(have < want) || reservesOk`, and `reservesOk` is "metal >= 1000 and energy
+>= 90%" - true on every idle poll of a floating economy, unrelated to demand,
+with no ceiling short of `NanoMaxCount` (200). That is the spam. The
+reserves branch is now capped: it may add at most `NanoReserveSurplus` (2)
+nanos beyond the income-derived target.
+
+**T2 constructors.** Every rung of `Tech_T2BotConstructor_AiMakeTask` -
+gantry, advanced converter, anti-nuke, advanced fusion, fusion, silo - is
+gated on *income*. A full bank on a modest income clears none of them: the
+converter wants 1 200 energy income, the fusions their own floors, the silo
+its own. So the bank sat.
+
+`Tech_FloatSpend` now runs at the top of both policies while metal is
+floating - the gate is `Tech_IsFloating`: `aiEconomyMgr.isMetalFull`, or
+current >= `FloatMetalCurrent` 2 500, with income >= `FloatMetalIncome` 25
+either way:
+
+| Constructor | Floating action |
+| --- | --- |
+| T2 | advanced converter if energy income >= `FloatConverterMinEnergyIncome` (800); otherwise the energy first - advanced fusion when the bank is >= `FloatAFUSMetalCurrent` (6 000), a fusion below that; then a nuclear silo if fewer than `FloatMaxNukeSilos` (1) exist or are queued |
+| T1 | guard the primary T2 constructor - it cannot build any of the above, so it assists the one that can; with no T2 constructor, the normal ladder with capped nanos |
+
+Every action logs at level 1 as `[TECH][Float] ...`. Settings are the
+`FLOATING METAL` block in `Global::RoleSettings::Tech`.
 
 ## Transport ferry
 
@@ -472,7 +587,254 @@ military unit until metal income reaches 50, which withheld the transport's
 `Military::AiMakeTask` now routes any ferry transport to the native default
 task before this handler runs - see
 [`../transport-ferry.md`](../transport-ferry.md), trap 7. Full sequence and limits in
-[`../transport-ferry.md`](../transport-ferry.md).
+[`../transport-ferry.md`](../transport-ferry.md). The same guard covers every
+immobile `super` def - Juno, Catalyst, the silo - so a TECH launcher gets its
+`CSuperTask` at completion rather than at +50 income
+([`../launcher-targets.md`](../launcher-targets.md#who-gives-the-launcher-its-task)).
+
+## The experimental build system (D-066): the hard split
+
+`Tech::ExperimentalBuild` (true) is the one switch. `Tech_Init` sets
+`aiBuilderMgr.experimentalBuild` for this instance only, and
+`Tech_BuilderAiMakeTask`'s first line hands every ask to
+`TechBuild::MakeTask` ([`tech_build.as`](../../data/script/src/roles/tech_build.as)),
+which never returns null, so native's chooser (`DefaultMakeTask`, empty for
+the instance) is never reached. Natively the start-factory and storage jobs
+are silent and `holdStartFactory` stays on; the script orders the lab on
+its reserved slot right after the opening. Placement for the instance is
+never the spiral: a planned slot, an exact spot, or the free footprint
+nearest the task's anchor within `ExperimentalSearchRadius` (512), packed,
+reserved and served (`PackNearPoint`, block masks respected). Sequence:
+turrets, keep-current, opening, start factory, mex expansion (constructors,
+`EcoMexExpandRadius` 2,500 while income is under `EcoMexExpandUntilIncome`
+60, allied ground excluded), T2 lab gate, the planner, the strategic rungs,
+native's queued defence/sensor/repair orders (`aiBuilderMgr.FindQueuedTask`),
+assist within `ExpAssistRadius`, guard the primary factory, wait.
+
+With the switch off nothing of this runs: no layout, no opening, no
+planner, `assistNanoEnabled` as the economy settings say, native's start
+factory, the stock ladder rungs and the stock placement - the same path as
+every other role. Not Played:
+[`KI-411`](../known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
+
+## Experimental build mode (D-064)
+
+`Tech_Init` sets `aiBuilderMgr.experimentalBuild` (from
+`Tech::ExperimentalBuild`, true) and `experimentalDirectRange` (1,600) for
+this AI instance only. In the mode every builder task's goal is the
+engine's own build range - `0.9 x (buildDistance + buildee model radius)`,
+the rule of Recoil's `MoveInBuildRange` - so no waypoint is ever placed
+inside it; within the direct range on safe ground the AI cancels its path
+and gives the construction command at once, and the engine walks the
+shortest path to the range disc; a unit gets one command per engagement and
+never a second on arrival or re-evaluation; construction commands carry no
+60 s timeout. The turret-box packer breaks ties by the asking builder's
+position. Design, the engine rule and the alternatives:
+[`../experimental-build.md`](../experimental-build.md). Not Played:
+[`KI-410`](../known-issues.md#ki-410--experimental-build-mode-is-not-yet-played).
+`Commands::NativeState` snapshots and restores both properties on a role
+switch.
+
+## Construction turrets: what they assist (D-065)
+
+A static builder's ask goes to `Tech_TurretAssist` before anything else:
+a structure of ours being reclaimed within the turret's reach is reclaimed
+(HIGH); else the first structure under construction within reach, in the
+order advanced converter, turret, advanced fusion, T1 converter, fusion,
+advanced solar, solar, wind, energy storage, metal storage, mex
+(`Tech_T1MexName` names the side's T1 extractor), gets a HIGH repair task; else native's default assist (whatever is in range, the
+factory). Reach is native (`aiBuilderMgr.FindReclaimTargetFor`,
+`FindUnfinishedFor`: build distance plus the target's model radius), so a
+turret never gets a target it cannot touch. Level 2 logs `[TECH][Turret]
+<id> reclaims <def>` / `assists <def>`.
+
+## Base layout plan
+
+Decisions:
+[D-060](../decisions.md#d-060--tech-layout-uses-native-canonical-clusters-and-an-ordered-economy-module)
+(the factory pair) and
+[D-063](../decisions.md#d-063--the-turret-box-invisible-construction-turrets-first-the-economy-packed-against-them)
+(the opening, the turret box, the next-building function). The design is
+[`../layout-design.md`](../layout-design.md); the native mechanism is
+[`../base-layout.md`](../base-layout.md); the economy model is
+[`../tech-eco-meta.md`](../tech-eco-meta.md).
+
+**Opening (`Opening`, commander only).** Before any other structure the
+commander claims the `OpeningMexCap` (3) reachable mexes nearest the start
+within `OpeningMexRadius` (2,000 elmos), taken nearest to itself first
+(`aiEconomyMgr.EnqueueMexWithin` keeps the cap's *open, reachable* spots
+nearest the centre and orders them by the builder's position; cap 0 = all). Played: a fourth
+spot 944 elmos out toward an ally, and the third mex already empties the
+1,000 E bank, so three and then the planner's energy. One order at a
+time: native re-asks a busy builder every few seconds (`IBuilderTask::Update`
+swaps only when the kind differs), so the opener answers a re-ask with the
+mex the commander is on, and `EnqueueMexWithin` hands back an untaken order
+in the radius before it closes a new spot. Native's start-factory job is
+held (`holdStartFactory`) until no open reachable spot and no pending order
+(`aiEconomyMgr.GetMexTaskCountWithin`) is left, or `OpeningMaxSeconds` (240)
+pass, or the commander is gone (`Opening::Tick` from `Tech_EconomyUpdate`).
+`[TECH][Opening] home mex order N at (x, z), D from start` and `complete
+after N mexes, S s: <reason>` log at level 1. The commander is exempt from
+native's wait-on-empty-energy rule, so the mexes build at the energy
+trickle. An opening order is also exempt from the ally-zone abort in
+`CBMexTask::Reevaluate` (`SetIgnoreAlly`), which otherwise drops a mex task,
+frame and all, once an allied structure is marked within `AllyRange` of the
+spot; a half-built order whose builder was taken off it is handed back
+before a new spot is opened. After the opening the commander stays home: a native mex or geo default
+farther than `CommanderMexRadiusAfterOpening` (600 elmos) from the start
+is skipped (`farMex`; the unused default is discarded natively) and left to
+the constructors, whose defaults are not capped. Both the skip and a taken
+mex log at level 1 (`[TECH] commander skips a native mex ...` /
+`takes a native mex ...`). Played: the ladder's mex-first rule had been
+sending the commander to a fourth spot inside 2,000 elmos after the
+opening, and the opening itself ends early when one of the three nearest
+spots is not open (`complete after 2 mexes`).
+
+**The factory is honoured.** A FACTORY default task is returned the moment
+native asks, before every layout and economy rung. The one exception: energy
+is stalling (`isEnergyStalling`) and the planner names a solar, wind or
+advanced solar this constructor can build now; that goes first and logs
+`[TECH] factory waits: energy stalling, <key> first`.
+
+**A construction is kept.** Native re-asks a busy builder every few seconds
+while it walks to its site and swaps only when the kind differs; the TECH
+ladder answers such a re-ask for a constructor on any construction task
+(build type below `REPAIR`) with that same task. Every other answer made a
+new packed and pinned task nobody ran (played: 50 advanced solars packed
+for 9 served), an answer of another kind pulled the builder off the turret
+it was walking to (17 served, 3 built), and the phantom queue was handed
+back as defaults and discarded, so native's own mex expansion never ran.
+
+**Only TECH.** Experimental JSON permits layout support, but the native
+manager starts disabled. `Tech_Init` is the only role hook that calls
+`Layout::Enable(true)`; every non-TECH role retains normal placement.
+
+**Factory clusters (D-060).** `Tech_LayoutPlan` tries the lane-facing
+direction and both perpendicular facings with deterministic cell offsets
+(`LayoutFactory*`); native commits the T1/T2 pair atomically with each lab's
+rear nano block and a 20-cell exit rectangle.
+
+**The turret box (D-063).** Directly behind the pair's rear nanos,
+`Layout::PlanBox` searches a rectangle of `LayoutBoxAcrossCells x
+LayoutBoxDepthCells` (40 x 44), shrinking by `LayoutBoxShrinkCells` down to
+`LayoutBoxMinAcrossCells x LayoutBoxMinDepthCells`, over `LayoutBoxRear*` and
+`LayoutBoxSide*` offsets, scoring each candidate by `FlatFraction`
+(`LayoutBoxMaxSlope`) times `BuildableFraction` of the turret def; the
+largest size whose best candidate clears `LayoutBoxMinScore` (0.75) is
+reserved as a zone. Turret rows are laid with `LayBand`, one slot at a time
+(a refused slot is a hole), at a pitch of `LayoutBoxShelfCells` (12) plus a
+turret depth, up to `LayoutBoxNanoRows` (3; Supreme 4). The slots are held,
+not armed: only the planner's pinned tasks take them. The box is mirrored
+in native layout ints (`tech.box.*`) and adopted after a load.
+`[Layout] turret box AxD cells at (x, z), ... ground P%: zone Z, R rows, S
+of T turret slots` logs at level 1; without a box the fallback (economy
+within `LayoutFallbackShakeCells` of the factory nanos) is logged once.
+
+**Everything against the turrets, each def in one group.** `Layout::Place`
+asks native `PackNearGroup` for the free box cells nearest to any turret
+slot (built or not), within the turret's reach and at least
+`LayoutConverterNanoGap` / `LayoutFusionNanoGap` from every slot (both 0 by
+default). Once a structure or planned slot of the same def stands in the
+box, the cell nearest that group wins first, so the winds form one
+contiguous block and the converters another; ties go to the asking builder.
+The task is pinned to that footprint and never spirals. `[Layout]
+no room in the turret box for <def>` means the planner's choice is skipped,
+not placed elsewhere. `Layout::CanPlace` is the dry run the planner uses
+before offering an option.
+
+**Turrets on demand.** `Layout::NanoTask` builds a factory's own rear slot
+first (D-060), then the box row nearest the factories (`NextSlotAny`). The
+planner asks for one when the assist build power within
+`EcoBuildPowerRadius` of `Layout::BaseCentre` is under `EcoBuildPowerPerMetal`
+(8) times the metal income (times `EcoBuildPowerFloatFactor` when metal
+floats), with `EcoTurretMinMetalIncome` and `EcoTurretBankFraction` as
+guards, and only while `Layout::CanPlaceTurret`; the power measured is the
+turrets' alone (`aiBuilderMgr.GetStaticBuildPowerNear`), since the commander
+and constructors passing through hid every shortage when they counted. One
+turret at a time
+(`EcoMaxConcurrentNanos` 1, orders plus turrets under construction): a
+mobile constructor that asks while one is going up assists it
+(`aiBuilderMgr.FindUnfinishedNear` within `EcoTurretAssistRadius`) instead
+of starting another, so build power is focused. Native's own assist nanos
+are off for TECH from `Tech_Init` (`assistNanoEnabled = false`), not only
+after the economy switch. Build power is measured in workertime units
+(commander 300, turret 200): played, the per-frame figure the native
+helper used to return (10 for the commander) against a per-second target
+made the turret rule fire for ever - eleven turrets per TECH at +20 metal.
+The old `ShouldBuildT1Nano` rung runs only with `EcoPlannerEnabled` false,
+and then through `EcoPlanner::Enqueue("nano")` too, as do the old converter
+and fusion rungs and the float spend (`"advconv"`, `"afus"`, `"fusion"`):
+the ladder never places anything itself. `Tech_IsBuilding`
+keeps the assist redirects from pulling a constructor off a structure it has
+already started or is walking to build (D-050).
+
+**Persistence and reset.** Native named groups, zones, ints and claims are
+saved before builder tasks; script adopts by name (`Layout::Adopt`). Leaving
+TECH aborts layout-owned tasks before releasing the registry.
+
+**Seeing it.** `/barblayout` draws the native registry: held turret slots
+yellow, claimed orange, served cyan, built blue; the box zone as a
+rectangle. The manual `/barbroute` verbs of D-053 are gone.
+
+**Not Played.** See
+[`KI-409`](../known-issues.md#ki-409--the-turret-box-and-the-mex-first-opening-are-not-yet-played).
+
+### The eco planner (D-058, D-063)
+
+The solar, advanced solar, wind, converter, fusion, advanced fusion, storage
+and construction-turret decisions of the T1 and T2 constructor ladders and
+the commander's are one deterministic function of the game's state,
+`EcoPlanner::Next` / `Execute`
+([`manager/eco_planner.as`](../../data/script/src/manager/eco_planner.as)),
+called before the old rungs; those rungs run only when `EcoPlannerEnabled`
+is false. Inputs: the map's wind range, energy and metal income, banks and
+storage, what stands, the assist build power around the box, the planned
+turret slots left, the constructor tiers on the field, queued storage,
+converters and turrets, and what the asking constructor can build and the
+box can hold. Output: the next structure, or nothing (the ladder continues
+with factories, defence and military). The order: energy draining, energy
+floating (converter), build power short or metal floating (turret), energy
+below target, storage, metal floating (best-payback energy). The formula,
+the numbers and the settings (`Tech::Eco*`) are
+in [`../eco-planner.md`](../eco-planner.md).
+
+### Energy settings, this role only
+
+`economy.json` is shared by every role. TECH changes its own instance of
+`CEconomyManager` (D-047) - but not at init: **it starts on the shared
+defaults and switches** (`Tech_ApplyEconomySettings`, from
+`Tech_EconomyUpdate`) once the 10-second minimum metal income reaches
+`EconomySwitchMetalIncome` (20) and energy income reaches
+`EconomySwitchEnergyIncome` (1000), D-054. `EconomySwitchEnabled` false
+applies them in `Tech_Init` as before. Both moments log at level 1
+(`[TECH][Economy] on shared defaults ...`, `[TECH][Economy] own settings
+at +M metal, +E energy: ...`). The settings that wait:
+
+| Setting (`Global::RoleSettings::Tech`) | Default | Effect |
+| --- | --- | --- |
+| `ReclaimEnergyEff` | 2.0 | `aiEconomyMgr.reclEnergyEff`: when an energy def finishes, every standing energy def near the base whose score x this is below the new one's is reclaimed (income permitting). Native default 20 never reclaims a solar (score 0.026) against an advanced solar (0.225); 2 does, and reclaims advanced solars once a fusion stands |
+| `ReclaimOldConvertersAlways` | true | an advanced converter marks obsolete T1 converters for reclaim even while the energy bank is full, recycling their footprint and metal into the higher tier |
+| `EnergyLimitSolar` / `EnergyLimitAdvSolar` | -1 (keep json) | `aiEconomyMgr.SetEnergyCondition(def, limit, -1, -1)` caps this role's count of the def |
+
+`aiEconomyMgr.SetEnergyCondition(def, limit, metalIncome, energyIncome)` and
+`GetEnergyLimit(def)` are the general lever; any role may use them.
+
+### Construction turrets early (D-051)
+
+Two sources of turrets: the ladder's nano rung (`ShouldBuildT1Nano`, one per
+`NanoMetalPerUnit` of metal income, plus `NanoReserveSurplus` on a full bank)
+and native `CEconomyManager::CheckAssistRequired`, which hands any factory
+that "needs upgrade" a HIGH-priority nano whenever income covers it - a
+source the script never saw. Played: TECH metal-stalled its first T2
+constructor under turrets from both. Now:
+
+| Setting (`Global::RoleSettings::Tech`) | Default | Effect |
+| --- | --- | --- |
+| `NanoMetalPerUnit` | 15 (was 10) | at +30 metal two turrets, not three |
+| `NanoHoldForFirstT2Constructors` | true | no nano from the ladder while a T2 bot lab stands and fewer than `MinimumT2ConstructorBots` T2 constructors exist |
+| `NanoMinMetalCurrent` | 150 | no nano from the ladder while the bank is below this |
+| `AssistNanoEnabled` | false | `aiEconomyMgr.assistNanoEnabled`: native assist nanos off for this instance; the script owns the count |
+| `AssistNanoIncomeMod` | 1.0 | `aiEconomyMgr.assistNanoIncomeMod`: when enabled, scales the income a native assist nano must be covered by |
 
 ## Related
 
@@ -482,4 +844,4 @@ task before this handler runs - see
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: a12ac3f5bfe1ec4de5ba271ad6fcce5cbbd39f23; lines: 2064 -->
+<!-- source: data/script/src/roles/tech.as; blob: 44600830a5e5542f74e7952c42705db34fe3c484; lines: 2507 -->

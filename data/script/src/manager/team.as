@@ -149,6 +149,7 @@ namespace Team {
         }
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (Ferry::HandleMessage(msg, fromTeamId)) return;
+        if (Donation::HandleMessage(msg, fromTeamId)) return;
         if (SeaAssist::HandleMessage(msg, fromTeamId)) return;
         HandleOrphanMessage(msg, fromTeamId);
     }

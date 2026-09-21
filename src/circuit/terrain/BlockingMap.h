@@ -22,13 +22,15 @@ namespace circuit {
 
 struct SBlockingMap {
 	enum class StructType: unsigned short {
-		FACTORY = 0, MEX, GEO, PYLON, CONVERT, ENGY_LOW, ENGY_MID, ENGY_HIGH, DEF_LOW, DEF_MID, DEF_HIGH, SPECIAL, NANO, TERRA, UNKNOWN, _SIZE_
+		FACTORY = 0, MEX, GEO, PYLON, CONVERT, ENGY_LOW, ENGY_MID, ENGY_HIGH, DEF_LOW, DEF_MID, DEF_HIGH, SPECIAL, NANO, TERRA, UNKNOWN,
+		RESERVED,  // ground held for a planned construction (CTerrainManager reservations); no config class, no ignore list names it
+		_SIZE_
 	};
 	enum class StructMask: unsigned short {NONE = 0x0000, ALL = 0xFFFF,
 		FACTORY = 0x0001,      MEX = 0x0002,      GEO = 0x0004,     PYLON = 0x0008,
 		CONVERT = 0x0010, ENGY_LOW = 0x0020, ENGY_MID = 0x0040, ENGY_HIGH = 0x0080,
 		DEF_LOW = 0x0100,  DEF_MID = 0x0200, DEF_HIGH = 0x0400,   SPECIAL = 0x0800,
-		   NANO = 0x1000,    TERRA = 0x2000,  UNKNOWN = 0x4000};
+		   NANO = 0x1000,    TERRA = 0x2000,  UNKNOWN = 0x4000, RESERVED = 0x8000};
 	using ST = std::underlying_type<StructType>::type;
 	using SM = std::underlying_type<StructMask>::type;
 	using StructTypes = std::map<std::string, StructType>;
@@ -41,11 +43,20 @@ struct SBlockingMap {
 	inline bool IsBlocked(int x, int z, SM notIgnoreMask) const;  // IsBlocked for struct
 	inline bool IsBlockedLow(int xLow, int zLow, SM notIgnoreMask) const;
 	inline bool IsStruct(int x, int z) const;  // Is blocked by any struct
+	inline bool IsReserved(int x, int z) const;  // held by a reservation and nothing else
 	inline void MarkBlocker(int x, int z, StructType structType, SM notIgnoreMask);
 	inline void AddBlocker(int x, int z, StructType structType);
 	inline void DelBlocker(int x, int z, StructType structType);
 	inline void AddStruct(int x, int z, StructType structType, SM notIgnoreMask);
 	inline void DelStruct(int x, int z, StructType structType, SM notIgnoreMask);
+	// A layout zone remains reserved underneath a real structure. Track that
+	// low-resolution reservation independently from the visible structMask so
+	// load/reset can balance the count while the structure is still standing.
+	inline void AddReservationUnderlay(int x, int z, SM notIgnoreMask);
+	inline void DelReservationUnderlay(int x, int z);
+	// Put a struct mark back on a cell whose count was never taken down (a
+	// layout zone's cell after the structure on it went): no low-res counting.
+	inline void ReStruct(int x, int z, StructType structType, SM notIgnoreMask);
 
 	inline bool IsZoneAlly(int xAlly, int zAlly) const;
 	inline void AddZoneAlly(int xAlly, int zAlly);

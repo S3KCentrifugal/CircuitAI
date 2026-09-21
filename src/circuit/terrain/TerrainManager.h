@@ -9,12 +9,14 @@
 #define SRC_CIRCUIT_TERRAIN_TERRAINMANAGER_H_
 
 #include "terrain/BlockingMap.h"
+#include "terrain/BaseLayoutGeometry.h"
 #include "unit/CoreUnit.h"
 #include "unit/CircuitDef.h"
 
 #include "AIFloat3.h"
 
 #include <unordered_map>
+#include <string>
 #include <deque>
 #include <functional>
 
@@ -32,6 +34,7 @@ namespace circuit {
 class CCircuitAI;
 class IBlockMask;
 class IPathQuery;
+class IBuilderTask;
 class CPathInfo;
 class CCircuitUnit;
 
@@ -93,6 +96,170 @@ public:
 	void DelZoneOwn(const springai::AIFloat3& pos) { MarkZoneOwn(pos, false); }
 	float SetAllyZoneRange(float range);  // range/radius in elmos
 
+	/*
+	 * Reservations (doc/base-layout.md, D-043). A reservation is a footprint the
+	 * placement search treats as occupied by everyone except the construction
+	 * it was reserved for. TECH asks the native planner for atomic factory
+	 * clusters and a rear economy module. FindBuildSite serves a matching
+	 * reserved site before it runs the nearest-free spiral, and every other
+	 * search flows around the reserved ground. A served reservation is
+	 * consumed (its cells unmarked, the pending build's own blocker takes
+	 * over); the task hands it back with RestoreReservation if it is
+	 * cancelled before construction starts, and forgets it with
+	 * FinishReservation once the structure exists.
+	 */
+	struct SReservation {
+		int id;
+		CCircuitDef* def;
+		springai::AIFloat3 pos;  // snapped build position
+		int facing;
+		int group;       // 0 = none; ReserveGrid gives every slot of a grid one group
+		int untilFrame;  // 0 = until released
+		bool consumed;   // served to a task; cells are unmarked (kept marked inside a zone)
+		bool armed;      // servable; a held slot is planned but not yet offered (layout phases)
+		bool anyReach;   // a static builder def is served regardless of the search anchor
+		bool tenant;     // an early def on a successor's ground: forgotten when its structure goes
+		int zone;        // 0 = a plain reservation; else the zone it was laid in
+		int unitId;      // the structure built on it (zone slots only), 0 = none
+		int order;       // deterministic order inside a named group
+		bool claimed;    // an exact pinned task owns the slot, before/while it is served
+	};
+	// One footprint. Refuses (-1, logged) off-map, unbuildable, or overlapping ground.
+	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
+	// cols x rows footprints of cdef behind frontCentre (the middle of the grid's
+	// front edge), rows receding away from `facing`, `gap` cells between them.
+	// Slots the terrain refuses are skipped. Returns the group id, 0 if nothing fit.
+	int ReserveGrid(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap, int ttlFrames = 0);
+	// A nano block tight against the back of a factory footprint (built or reserved).
+	int ReserveNanoBlockAt(CCircuitDef* nanoDef, CCircuitDef* facDef, const springai::AIFloat3& facPos, int facing, int cols, int rows, int gap);
+	// The same behind a standing factory: position and facing read from the unit.
+	int ReserveNanoBlock(CCircuitUnit* factory, CCircuitDef* nanoDef, int cols, int rows, int gap);
+	// Dry run of ReserveBuilding: would it be accepted? No marks, no log.
+	bool CanReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	// Fraction of a rectangle - centred at `centre`, halfAcross to each side of
+	// `facing`, halfAlong forward and back - on which cdef could be placed now:
+	// in the map, not blocked or reserved, terrain-typed for it and accepted
+	// by the engine. Probed every 32 elmos. A plan is laid where this is
+	// highest, so the nano block keeps open ground on both sides.
+	float BuildableFraction(CCircuitDef* cdef, const springai::AIFloat3& centre, float halfAcross, float halfAlong, int facing);
+	void ReleaseReservation(int id);
+	void ReleaseGroup(int group);
+	bool IsReserved(const springai::AIFloat3& pos) const;
+	int GetReservationCount(CCircuitDef* cdef) const;  // unconsumed
+	// Handshake with IBuilderTask: a FindBuildSite that served a reserved site
+	// leaves the reservation's id and facing here for the caller to take.
+	int TakeReservedId() { const int id = lastReservedId; lastReservedId = -1; return id; }
+	int TakeReservedFacing() { const int f = lastReservedFacing; lastReservedFacing = -1; return f; }
+	void RestoreReservation(int id);  // task cancelled before construction: hold the ground again
+	void FinishReservation(int id, int unitId = 0);   // construction started: forget a plain slot, remember a zone slot's unit
+	bool ClaimReservation(int id);
+	void UnclaimReservation(int id);
+	// Serve a reservation only within this distance of the search anchor;
+	// 0 = any distance, so a planned site wins wherever the builder stands.
+	float reservationMatchRadius = 0.f;
+
+	/*
+	 * Layout (doc/layout-design.md, D-060). Zones and corridors are rectangles
+	 * of cells held RESERVED for the life of the plan. A zone is laid with
+	 * bands (grids of one def, LayBand) whose slots are served like any
+	 * reservation while armed; a corridor is never laid, so nothing of ours is
+	 * placed on it. A slot served inside a zone keeps its cells marked (the
+	 * structure's own blocker takes over on top), and when the structure goes
+	 * the cells are marked again (DelBlocker), so zone ground never leaks to
+	 * the spiral. A final def's slot is restored when its structure dies; a
+	 * tenant's slot is forgotten, the ground going to the successor band.
+	 * High-level factory/module plans add named groups and exact slot order.
+	 * All of it is inert unless JSON permits it and TECH opts in.
+	 */
+	bool layoutEnabled = false;
+	bool SetLayoutEnabled(bool enabled);
+	bool IsLayoutEnabled() const { return layoutEnabled; }
+	bool IsLayoutConfigured() const { return layoutConfigured; }
+	struct SZone {
+		int id;
+		int2 c1, c2;   // cell rectangle [c1, c2)
+		bool corridor;
+		int cells;     // cells it holds (the free ones at reserve time)
+	};
+	// A rectangle centred at `centre`, halfAcross to each side of `facing`,
+	// halfAlong forward and back. Free cells are marked, blocked ones are
+	// holes. Returns the zone id, 0 when nothing could be marked.
+	int ReserveZone(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, bool corridor);
+	// A corridor in front of a standing factory: its width plus `margin` each
+	// side, `length` forward from its front edge (the engine sends new units
+	// out through the front). Returns the corridor's zone id, 0 if none.
+	int ReserveExitCone(CCircuitUnit* factory, float length, float margin);
+	void ReleaseZone(int id);
+	bool IsZoneClear(int id) const;  // no structure on any of its cells
+	// A grid of cdef inside a zone: every slot on the zone's cells, none on a
+	// structure or another slot. Idempotent - a slot that already exists (same
+	// def, same position) is not duplicated, so a successor band may be laid
+	// again as its tenants' ground clears. group 0 = a new group, else the
+	// slots join that group. Returns the group, 0 when nothing was placed and
+	// no group was given.
+	int LayBand(int zone, CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap,
+			bool armed, bool anyReach, bool tenant, int group = 0);
+	void ArmGroup(int group, bool armed);
+	void ReleaseUnconsumed(int group);  // tenants no longer wanted: unserved slots go, built ones stay
+	int GetGroupCount(int group, bool unconsumedOnly) const;
+	int NextSlot(int group, const springai::AIFloat3& anchor) const;   // nearest armed unconsumed slot, -1 = none
+	int NextBuilt(int group, const springai::AIFloat3& anchor) const;  // nearest slot whose structure stands, -1 = none
+	springai::AIFloat3 GetReservationPos(int id) const;
+	int GetReservationFacing(int id) const;
+	CCircuitUnit* GetReservationUnit(int id) const;
+	// Share of the rectangle whose slope is at most maxSlope (engine units, 1 - cos).
+	float FlatFraction(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, float maxSlope) const;
+	// A builder task calls this right before its FindBuildSite: only then may a
+	// search serve a reservation (CR-002: a movement, pylon or terraform search
+	// must never consume a planned slot it cannot own). id >= 0 pins the search
+	// to that slot (a routed builder's task).
+	void BeginReservedSearch(int pinnedId, bool required) {
+		reservationSearch = true;
+		pinnedReservation = pinnedId;
+		pinnedReservationRequired = required;
+	}
+	bool PlanFactoryPair(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
+			CCircuitDef* nanoDef, const springai::AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells);
+	int AcquireFactoryReservation(CCircuitDef* factoryDef);
+	bool PinLayoutTask(IBuilderTask* task, const std::string& groupName, CCircuitUnit* builder);
+	bool PinFactoryNanoTask(IBuilderTask* task, CCircuitUnit* builder);
+	int GetFactoryNanoAvailable() const;
+	int GetFactoryNanoActive() const;
+	bool HasLayoutGroup(const std::string& name) const;
+	int GetLayoutGroupTotal(const std::string& name) const;
+	int GetLayoutGroupBuilt(const std::string& name) const;
+	int GetLayoutGroupStarted(const std::string& name) const;
+	int GetLayoutGroupAvailable(const std::string& name) const;
+	int GetLayoutInt(const std::string& name, int fallback = 0) const;
+	springai::AIFloat3 GetLayoutGroupCenter(const std::string& name) const;
+	void SetLayoutInt(const std::string& name, int value) { layoutInts[name] = value; }
+	// Turret box (D-063): one footprint of cdef packed inside a zone, on the
+	// cells nearest to any slot of nanoGroup (the invisible turrets, built or
+	// not), no farther than maxReach from the nearest one (0 = that def's own
+	// build distance) and no nearer than minNanoDist to any; ties go to the
+	// candidate nearest `anchor` (the factory line). Returns the reservation
+	// id, armed and any-reach, in `group`; -1 when nothing fits.
+	int PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor,
+			float maxReach, float minNanoDist, int group);
+	// The dry run of PackNearGroup: would a footprint fit? Nothing is marked.
+	bool CanPackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float maxReach, float minNanoDist);
+	// D-066: the experimental system's placement when no planned slot was
+	// served: the free footprint of cdef nearest to `pos` within `radius`
+	// (cell-exact, deterministic, the def's block mask respected), reserved
+	// and served to the asking task like a planned slot. -RgtVector when none.
+	springai::AIFloat3 PackNearPoint(CCircuitDef* cdef, const springai::AIFloat3& pos, float radius, int facing, TerrainPredicate& predicate);
+	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
+	// task may take a held slot; NextSlot serves the armed ones only).
+	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;
+	// "kind:def:x:z:facing:w:d:state;..." for the widget overlay (cells of 16 elmos).
+	std::string DescribeLayout() const;
+	// Everything of the layout goes: reservations, zones, marks, the flag (a role switch).
+	void ResetLayout();
+	// Save/load of the whole layout state (CR-003); called by CBuilderManager
+	// before its tasks so their reservation ids resolve.
+	void SaveLayout(std::ostream& os) const;
+	void LoadLayout(std::istream& is);
+
 	bool ResignAllyBuilding(CCircuitUnit* unit);
 
 	void ApplyAuthority();
@@ -142,6 +309,68 @@ private:
 
 	int allyZoneCells;  // side of a square
 	SBlockingMap blockingMap;
+	std::map<int, SReservation> reservations;
+	std::map<std::string, int> layoutGroups;
+	std::map<std::string, int> layoutZones;
+	std::map<std::string, int> layoutInts;
+	int nextReservationId = 1;
+	int nextGroupId = 1;
+	int lastReservedId = -1;
+	int lastReservedFacing = -1;
+	bool ReservationCells(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int2& c1, int2& c2) const;
+	bool IsReservationFree(const int2& c1, const int2& c2) const;
+	void MarkReservation(const int2& c1, const int2& c2, bool mark);
+	void ExpireReservations();
+	std::map<int, SZone> zones;
+	int nextZoneId = 1;
+	std::vector<unsigned short> zoneMap;  // cell -> zone id, 0 = none
+	int pinnedReservation = -1;
+	bool pinnedReservationRequired = false;
+	bool reservationSearch = false;   // set by BeginReservedSearch, consumed by the next FindBuildSite
+	bool layoutRefusalLogged = false;
+	bool layoutConfigured = false;
+	bool factoryLineReady = false;
+	int factoryLineFacing = 0;
+	base_layout::Point factoryRearCentre;
+	int factoryLineLeft2 = 0;
+	int factoryLineRight2 = 0;
+	CCircuitDef::Id layoutNanoDefId = -1;
+	int nextFactoryCluster = 1;
+	bool RectCells(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, int2& c1, int2& c2) const;
+	bool IsRectFree(const base_layout::Rect& rect) const;
+	int ReserveExactZone(const std::string& name, const base_layout::Rect& rect, bool corridor);
+	int EnsureLayoutGroup(const std::string& name);
+	int GetLayoutGroupId(const std::string& name) const;
+	int GetNextLayoutSlot(const std::string& name, CCircuitUnit* builder, CCircuitDef* buildDef);
+	int GetNextLayoutSlot(int group, CCircuitUnit* builder, CCircuitDef* buildDef);
+	std::vector<int> GetCompletedFactoryNanoGroups() const;
+	bool CanReserveFactoryCluster(const base_layout::FactoryCluster& cluster,
+			CCircuitDef* factoryDef, CCircuitDef* nanoDef);
+	bool ReserveFactoryCluster(const std::string& name, const base_layout::FactoryCluster& cluster,
+			CCircuitDef* factoryDef, CCircuitDef* nanoDef, int& factoryReservation);
+	void ReleaseLayoutPrefix(const std::string& prefix);
+	int ZoneAt(int x, int z) const;
+	// Cells free for a slot: unblocked, or held by `zone` itself (its marks and
+	// its other structures' yards), and not under another unconsumed slot.
+	bool IsSlotFree(const int2& c1, const int2& c2, int zone, int ignoreId) const;
+	struct SPackCandidate {
+		springai::AIFloat3 pos;
+		float nanoSq;    // squared distance to the nearest slot of the nano group
+		float anchorSq;  // squared distance to the tie-break anchor
+		float sameSq;    // squared distance to the nearest standing or planned structure of the same def (max when none)
+	};
+	std::vector<SPackCandidate> PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup, int facing,
+			const springai::AIFloat3& anchor, float maxReach, float minNanoDist) const;
+	void UnmarkSlot(const int2& c1, const int2& c2);  // served: cells go, except a zone's own marks
+	int FindSlotAt(CCircuitDef* cdef, const springai::AIFloat3& pos) const;
+	void RemarkZoneCells(int2 c1, int2 c2);
+	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
+	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,
+			bool armed, bool anyReach, bool tenant, int zone, bool quiet);
+	int ReserveGridEx(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap,
+			int ttlFrames, bool armed, bool anyReach, bool tenant, int zone, int group);
+	bool FindReservedSite(CCircuitDef* cdef, const springai::AIFloat3& pos, TerrainPredicate& predicate,
+			springai::AIFloat3& outPos, int& outFacing, int& outId);
 	std::unordered_map<CCircuitDef::Id, IBlockMask*> blockInfos;  // owner
 	void MarkBlockerByMask(const SStructure& building, bool block, IBlockMask* mask);
 	void MarkBlocker(const SStructure& building, bool block);

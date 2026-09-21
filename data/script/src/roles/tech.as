@@ -17,6 +17,9 @@
 #include "../helpers/map_helpers.as"
 #include "../manager/builder.as"
 #include "../manager/team.as"
+#include "../manager/layout.as"
+#include "../manager/eco_planner.as"
+#include "tech_build.as"
 
 namespace RoleTech
 {
@@ -25,6 +28,7 @@ namespace RoleTech
 	bool hasAppliedT1VehicleEcoThreshold = false;
 	// One-way gate to unlock advanced storages when economy is ready
 	bool hasUnlockedAdvancedStorage = false;
+	bool economySwitched = false;   // TECH's own economy settings applied (D-054)
 	// One-way gate: have the T2 rush bots had their engine cap restored?
 	bool hasUncappedRushBots = false;
 	// One-way gate: after first T2 bot lab, allow one T1 metal storage (raise cap to 1)
@@ -48,6 +52,120 @@ namespace RoleTech
 	// hardcoded cap would silently ignore.
 	dictionary g_rushBotEngineCaps;
 
+	// The opening (D-063): before any other structure the commander claims
+	// every mex it can reach within OpeningMexRadius of the start, nearest
+	// to itself first (native orders the spots by the builder's position), so
+	// it walks a chain and not a star. Native's start-factory job is held
+	// until then and released the moment the mexes are claimed, or at the
+	// deadline, or when the commander is lost (R-1 of the D-062 review).
+	namespace Opening
+	{
+		bool complete = false;
+		int startFrame = 0;
+		int claimed = 0;
+
+		float MexRadius()
+		{
+			return (Global::Map::Config.TechOpeningMexRadius > 0.0f)
+				? Global::Map::Config.TechOpeningMexRadius
+				: Global::RoleSettings::Tech::OpeningMexRadius;
+		}
+
+		int MexCap()
+		{
+			return (Global::Map::Config.TechOpeningMexCap > 0)
+				? Global::Map::Config.TechOpeningMexCap
+				: Global::RoleSettings::Tech::OpeningMexCap;   // 0 = every spot inside the radius
+		}
+
+		void Init()
+		{
+			const int labs = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotLabs());
+			complete = labs > 0;
+			startFrame = ai.frame;
+			claimed = 0;
+			aiEconomyMgr.holdStartFactory = true;   // for the whole game: the script orders every factory (D-066)
+			// TECH owns storage order (the planner); the native periodic storage
+			// job otherwise races it and counts only completed stores.
+			aiEconomyMgr.autoStorageEnabled = false;
+			if (!complete)
+			{
+				string which = " (all)";
+				if (MexCap() > 0) which = " (nearest " + MexCap() + ")";
+				GenericHelpers::LogUtil("[TECH][Opening] mexes within " + int(MexRadius()) + " elmos first"
+					+ which + "; start factory held up to " + Global::RoleSettings::Tech::OpeningMaxSeconds + " s", 1);
+			}
+		}
+
+		void Finish(const string &in reason)
+		{
+			if (complete) return;
+			complete = true;
+			// Native's start-factory job stays off (D-066): TechBuild orders the
+			// lab on its reserved slot the next time a builder asks.
+			GenericHelpers::LogUtil("[TECH][Opening] complete after " + claimed + " mexes, "
+				+ int((ai.frame - startFrame) / SECOND) + " s: " + reason + "; the lab is next", 1);
+		}
+
+		// The commander defs carry the COMM role; any of them standing counts.
+		bool CommanderAlive()
+		{
+			array<string> names = { "armcom", "corcom", "legcom" };
+			for (uint i = 0; i < names.length(); ++i)
+			{
+				CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+				if (d !is null && UnitHelpers::IsCommander(d) && d.count > 0) return true;
+			}
+			return false;
+		}
+
+		// From Tech_EconomyUpdate: the deadline and the commander's death end
+		// the hold whatever the mex count.
+		void Tick()
+		{
+			if (complete || !Global::RoleSettings::Tech::ExperimentalBuild) return;
+			if (ai.frame - startFrame > Global::RoleSettings::Tech::OpeningMaxSeconds * SECOND)
+			{
+				Finish("deadline");
+				return;
+			}
+			if (!CommanderAlive())
+			{
+				Finish("no commander");
+			}
+		}
+
+		IUnitTask@ MakeTask(CCircuitUnit@ unit)
+		{
+			if (complete || unit is null || unit.circuitDef is null
+				|| !UnitHelpers::IsCommander(unit.circuitDef)) return null;
+			// Native re-asks a busy builder every few seconds and swaps only
+			// when the kind differs: the mex the commander is on is the answer.
+			IBuilderTask@ cur = (unit.task is null) ? null : cast<IBuilderTask>(unit.task);
+			if (cur !is null && Task::BuildType(cur.GetBuildType()) == Task::BuildType::MEX)
+				return unit.task;
+			// An untaken mex order in the radius is handed back before a new spot
+			// is closed (native), so one order exists at a time.
+			IUnitTask@ mex = aiEconomyMgr.EnqueueMexWithin(unit, Global::Map::StartPos, MexRadius(), MexCap());
+			if (mex !is null)
+			{
+				IBuilderTask@ order = cast<IBuilderTask>(mex);
+				AIFloat3 at = Global::Map::StartPos;
+				if (order !is null) at = order.GetBuildPos();
+				++claimed;
+				GenericHelpers::LogUtil("[TECH][Opening] home mex order " + claimed + " at (" + int(at.x) + ", " + int(at.z) + "), "
+					+ int(sqrt(MapHelpers::SqDist(at, Global::Map::StartPos))) + " from start", 1);
+				return mex;
+			}
+			// No open spot left: complete only once no mex order in the radius
+			// is still pending (one may be assigned to another builder).
+			if (aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, MexRadius()) > 0)
+				return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+			Finish("every reachable spot inside the radius is taken and no mex order is pending");
+			return null;
+		}
+	}
+
 	/******************************************************************************
 
 	INITIALIZATION
@@ -58,6 +176,39 @@ namespace RoleTech
 
 		// Apply TECH role settings
 		aiTerrainMgr.SetAllyZoneRange(Global::RoleSettings::Tech::AllyRange);
+		// The experimental build system (D-066): on, this instance's builders
+		// are sequenced by TechBuild and placed by the layout; native chooses
+		// nothing and spirals nowhere. Off, TECH is stock like every other role.
+		if (Global::RoleSettings::Tech::ExperimentalBuild)
+		{
+			Layout::Enable(Global::RoleSettings::Tech::LayoutEnabled);
+			aiEconomyMgr.assistNanoEnabled = false;   // the planner owns turrets (D-063)
+			aiBuilderMgr.experimentalBuild = true;
+			aiBuilderMgr.experimentalDirectRange = Global::RoleSettings::Tech::ExperimentalBuildDirectRange;
+			aiBuilderMgr.experimentalSearchRadius = Global::RoleSettings::Tech::ExperimentalSearchRadius;
+			Opening::Init();
+			GenericHelpers::LogUtil("[TECH][Build] experimental build system on: direct range "
+				+ int(aiBuilderMgr.experimentalDirectRange) + ", search radius " + int(aiBuilderMgr.experimentalSearchRadius), 1);
+		}
+		else
+		{
+			aiBuilderMgr.experimentalBuild = false;
+			GenericHelpers::LogUtil("[TECH][Build] experimental build system off: stock ladder and placement", 1);
+		}
+
+		// The role's own economy settings (D-047, D-051) wait for the income
+		// floors (D-054); until then the shared economy.json defaults stand.
+		if (Global::RoleSettings::Tech::EconomySwitchEnabled)
+		{
+			GenericHelpers::LogUtil("[TECH][Economy] on shared defaults (reclEnergyEff=" + aiEconomyMgr.reclEnergyEff
+				+ ", assist nanos " + (aiEconomyMgr.assistNanoEnabled ? "on" : "off") + ") until +"
+				+ int(Global::RoleSettings::Tech::EconomySwitchMetalIncome) + " metal and +"
+				+ int(Global::RoleSettings::Tech::EconomySwitchEnergyIncome) + " energy", 1);
+		}
+		else
+		{
+			Tech_ApplyEconomySettings("at init");
+		}
 		// Change scout cap (unit count)
 		aiMilitaryMgr.quota.scout = Global::RoleSettings::Tech::MilitaryScoutCap;
 
@@ -79,6 +230,30 @@ namespace RoleTech
 
 		// Log all strategic objectives with distance from start
 		ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::TECH, "TECH");
+	}
+
+	// TECH's economy settings, this instance only (economy.json is shared):
+	// reclaim old energy sooner (D-047), cap solars if asked, and take the nano
+	// count away from native assist (D-051). Applied at init when the switch
+	// is off, else from Tech_EconomyUpdate once income clears both floors (D-054).
+	void Tech_ApplyEconomySettings(const string &in when)
+	{
+		economySwitched = true;
+		aiEconomyMgr.reclEnergyEff = Global::RoleSettings::Tech::ReclaimEnergyEff;
+		aiEconomyMgr.reclaimOldConvertersAlways = Global::RoleSettings::Tech::ReclaimOldConvertersAlways;
+		aiEconomyMgr.assistNanoEnabled = Global::RoleSettings::Tech::AssistNanoEnabled;
+		aiEconomyMgr.assistNanoIncomeMod = Global::RoleSettings::Tech::AssistNanoIncomeMod;
+		const string side = Global::AISettings::Side;
+		CCircuitDef@ solar = ai.GetCircuitDef(UnitHelpers::GetSolarNameForSide(side));
+		CCircuitDef@ adv = ai.GetCircuitDef(UnitHelpers::GetAdvSolarNameForSide(side));
+		if (solar !is null && Global::RoleSettings::Tech::EnergyLimitSolar >= 0)
+			aiEconomyMgr.SetEnergyCondition(solar, Global::RoleSettings::Tech::EnergyLimitSolar, -1.0f, -1.0f);
+		if (adv !is null && Global::RoleSettings::Tech::EnergyLimitAdvSolar >= 0)
+			aiEconomyMgr.SetEnergyCondition(adv, Global::RoleSettings::Tech::EnergyLimitAdvSolar, -1.0f, -1.0f);
+		GenericHelpers::LogUtil("[TECH][Economy] own settings " + when + ": reclEnergyEff=" + Global::RoleSettings::Tech::ReclaimEnergyEff
+			+ " assist nanos " + (Global::RoleSettings::Tech::AssistNanoEnabled ? "on" : "off")
+			+ " solar limit " + (solar is null ? -1 : aiEconomyMgr.GetEnergyLimit(solar))
+			+ " adv solar limit " + (adv is null ? -1 : aiEconomyMgr.GetEnergyLimit(adv)), 1);
 	}
 
 	// The units whose engine cap Tech snapshots at start and releases at the rush gate:
@@ -313,6 +488,13 @@ namespace RoleTech
 		GenericHelpers::LogUtil("[TECH] Nuke first-strike override released; native targeting resumes", 2);
 	}
 
+	// T2 combat bots from the advanced lab: the donation plan gives N of them
+	// to the closest allies (Team::Donation::OnCombatBotBuilt, D-041).
+	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
+	{
+		Team::Donation::OnCombatBotBuilt(unit);
+	}
+
 	void Tech_MilitaryAiTaskRemoved(IUnitTask @task, bool done)
 	{
 		if (g_nukeFirstStrikeTask !is null && task is g_nukeFirstStrikeTask)
@@ -342,6 +524,14 @@ namespace RoleTech
 		float energyIncome = aiEconomyMgr.energy.income;
 		float metalCurrent = aiEconomyMgr.metal.current;
 
+		// Economy switch (D-054): the role's own settings once both incomes clear the floors.
+		if (!economySwitched && Global::RoleSettings::Tech::EconomySwitchEnabled
+			&& metalIncome >= Global::RoleSettings::Tech::EconomySwitchMetalIncome
+			&& energyIncome >= Global::RoleSettings::Tech::EconomySwitchEnergyIncome)
+		{
+			Tech_ApplyEconomySettings("at +" + int(metalIncome) + " metal, +" + int(energyIncome) + " energy");
+		}
+
 		// Ensure factory assist is required when we have a T2 lab but no T2 constructors yet
 		// This helps bootstrap the first T2 constructor quickly
 		if (hasT2Lab && t2ConstructionBotCount < 1)
@@ -350,7 +540,11 @@ namespace RoleTech
 			GenericHelpers::LogUtil("[TECH][Assist] Forcing factory assist: T2 lab present, T2 constructors=0", 3);
 		}
 
+		Opening::Tick();
 		Tech_IncomeBuilderLimits(metalIncome);
+		// The native plan owns geometry and slot state; this refreshes restored
+		// state and the optional overlay.
+		Layout::Update(metalIncome, hasT2Lab, t2ConstructionBotCount);
 
 		// --- Unlock advanced storages when economy is strong enough ---
 		if (!hasUnlockedAdvancedStorage && metalIncome >= 100.0f)
@@ -957,6 +1151,20 @@ namespace RoleTech
 		return aiFactoryMgr.DefaultMakeTask(u);
 	}
 
+	/**************************************************************************
+	 BASE LAYOUT
+
+	 Pushed once at setup (LayoutHelpers::ApplyForRole), before the native
+	 chooser places the start factory. Native code plans the exact factory
+	 clusters and the full/half mature-economy module; script selects candidates
+	 and controls progression. Settings:
+	 Global::RoleSettings::Tech::Layout*. Doc: doc/layout-design.md.
+	 **************************************************************************/
+	void Tech_LayoutPlan(const string &in side)
+	{
+		Layout::Plan(side);
+	}
+
 	string Tech_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_SelectFactoryHandler", 4);
@@ -1185,7 +1393,7 @@ namespace RoleTech
 			unit.AddAttribute(Unit::Attr::BASE.type);
 		}
 
-		Team::Donation::OnConstructorBuilt(unit);   // keep the first few T2 constructors, hand the next N to the closest allies
+		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
 		if (Team::IsT2Constructor(d))
 		{
 			aiFactoryMgr.isAssistRequired = false;
@@ -1199,6 +1407,15 @@ namespace RoleTech
 	IUnitTask @Tech_BuilderAiMakeTask(CCircuitUnit @u)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_BuilderAiMakeTask", 4);
+		// The hard split (D-066): the experimental system is a different
+		// sequence and never reaches the stock rungs below.
+		if (Global::RoleSettings::Tech::ExperimentalBuild)
+		{
+			IUnitTask @tExp = TechBuild::MakeTask(u);
+			if (tExp !is null)
+				return tExp;
+			return aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND));
+		}
 		// Pre-create a default task to return if no other rules trigger
 		IUnitTask @defaultTask = Builder::MakeDefaultTaskWithLog(u.id, "TECH");
 		// If the default task is a BUILDER and its build type is MEX/MEXUP/GEO/GEOUP, don't override it; return immediately.
@@ -1266,6 +1483,11 @@ namespace RoleTech
 		GenericHelpers::LogUtil("[TECH] Econ snapshot metalIncome=" + metalIncome + " energyIncome=" + energyIncome, 2);
 
 		const CCircuitDef @udef = (u is null ? null : u.circuitDef);
+
+		// Turrets and every economy structure come from the planner's one
+		// next-building function (EcoPlanner::Decide, D-063), reached through
+		// the commander and constructor branches below; nothing is placed
+		// outside the turret box.
 
 		bool isCommander = UnitHelpers::IsCommander(udef);
 
@@ -1483,6 +1705,55 @@ namespace RoleTech
 
 	******************************************************************************/
 
+	// Turret assist priority (D-065). Static builders never walk, so "in
+	// reach" is decided natively from the turret's build distance and the
+	// target's radius. Order: any reclaim of ours in reach; then the first
+	// structure under construction in reach of: advanced converter, turret,
+	// advanced fusion, T1 converter, fusion, advanced solar, solar, wind,
+	// then the other economy structures (storages, mex); null lets native's
+	// default assist pick whatever else is in range.
+	string Tech_T1MexName(const string &in side)
+	{
+		if (side == "cortex") return "cormex";
+		if (side == "legion") return "legmex";
+		return "armmex";
+	}
+
+	IUnitTask @Tech_TurretAssist(CCircuitUnit @u)
+	{
+		if (u is null || u.circuitDef is null) return null;
+		CCircuitUnit @reclaim = aiBuilderMgr.FindReclaimTargetFor(u);
+		if (reclaim !is null)
+		{
+			GenericHelpers::LogUtil("[TECH][Turret] " + u.id + " reclaims " + reclaim.circuitDef.GetName(), 2);
+			return aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, reclaim, 120 * SECOND));
+		}
+		const string side = Global::AISettings::Side;
+		array<string> order = {
+			UnitHelpers::GetAdvEnergyConverterNameForSide(side),
+			UnitHelpers::GetT1NanoNameForSide(side),
+			UnitHelpers::GetAdvFusionNameForSide(side),
+			UnitHelpers::GetEnergyConverterNameForSide(side),
+			UnitHelpers::GetFusionNameForSide(side),
+			UnitHelpers::GetAdvSolarNameForSide(side),
+			UnitHelpers::GetSolarNameForSide(side),
+			UnitHelpers::GetWindNameForSide(side),
+			UnitHelpers::GetEnergyStorageNameForSide(side),
+			UnitHelpers::GetMetalStorageNameForSide(side),
+			Tech_T1MexName(side)
+		};
+		for (uint i = 0; i < order.length(); ++i)
+		{
+			CCircuitDef @def = ai.GetCircuitDef(order[i]);
+			if (def is null) continue;
+			CCircuitUnit @target = aiBuilderMgr.FindUnfinishedFor(u, def);
+			if (target is null) continue;
+			GenericHelpers::LogUtil("[TECH][Turret] " + u.id + " assists " + order[i], 2);
+			return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 120 * SECOND));
+		}
+		return null;
+	}
+
 	IUnitTask @Tech_Commander_AiMakeTask(CCircuitUnit @u, IUnitTask @defaultTask, float metalIncome)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_Commander_AiMakeTask", 4);
@@ -1494,6 +1765,21 @@ namespace RoleTech
 
 		GenericHelpers::LogUtil("[TECH] No commander-specific task, using pre-created default", 2);
 		// Use the pre-created default task passed from caller when no commander-specific path applies
+		// The commander opens the economy by the planner (D-058); a native default
+		// that is a mex or geo keeps priority (checked by the caller).
+		if (Global::RoleSettings::Tech::EcoPlannerEnabled)
+		{
+			const string ecoKey = EcoPlanner::Next(u, metalIncome, aiEconomyMgr.energy.income);
+			if (ecoKey.length() > 0)
+			{
+				IUnitTask @redirect = Tech_RedirectEnergyToReactor("eco planner: " + ecoKey, u);
+				if (redirect !is null)
+					return redirect;
+				IUnitTask @tEco = EcoPlanner::Execute(ecoKey, u);
+				if (tEco !is null)
+					return tEco;
+			}
+		}
 		return defaultTask;
 	}
 
@@ -1508,19 +1794,134 @@ namespace RoleTech
 	// produces nothing until it completes. Returns an assist task when a Fusion or
 	// Advanced Fusion is in progress, otherwise null so the caller proceeds normally.
 	// A merely queued reactor does not qualify - see Builder::GetReactorUnderConstruction.
-	IUnitTask @Tech_RedirectEnergyToReactor(const string &in what)
+	// Before any energy rung: finish what is already going up. A reactor
+	// first, then the T1 energy structure the script last queued
+	// (Global::RoleSettings::Tech::EnergyFocus*). Returns null when nothing is
+	// under construction or it has its share of assists, and the rung proceeds.
+	// True when the constructor is already on a construction task: a build in
+	// progress, or a site it is walking to. The assist rungs never pull such a
+	// unit off its job (D-050); the re-evaluation that asked is told "keep it".
+	bool Tech_IsBuilding(CCircuitUnit @u)
 	{
+		if (u is null || u.task is null) return false;
+		IBuilderTask @cur = cast<IBuilderTask>(u.task);
+		if (cur is null) return false;
+		return Task::BuildType(cur.GetBuildType()) < Task::BuildType::REPAIR;
+	}
+
+	IUnitTask @Tech_RedirectEnergyToReactor(const string &in what, CCircuitUnit @u = null)
+	{
+		if (Tech_IsBuilding(u)) return null;
 		IUnitTask @assist = Builder::EnqueueAssistReactor(Task::Priority::HIGH, 60 * SECOND);
 		if (assist !is null)
 		{
 			GenericHelpers::LogUtil("[TECH][Energy] Reactor under construction; redirecting "
 				+ what + " to assist it instead", 2);
+			return assist;
+		}
+		if (Global::RoleSettings::Tech::EnergyFocusAssist)
+		{
+			@assist = Builder::EnqueueAssistEnergy(Task::Priority::NORMAL, 60 * SECOND,
+				Global::RoleSettings::Tech::EnergyFocusMaxAssists);
+			if (assist !is null)
+			{
+				GenericHelpers::LogUtil("[TECH][Energy] energy structure under construction; redirecting "
+					+ what + " to assist it instead", 2);
+			}
 		}
 		return assist;
 	}
 
+	/**************************************************************************
+	 FLOATING METAL
+
+	 Spend a full bank. Runs at the top of both constructor policies and
+	 returns null unless metal is floating (Global::RoleSettings::Tech::Float*).
+
+	 T2 constructors: an advanced converter if there is energy income to
+	 convert, otherwise the energy first - an advanced fusion when rich, a
+	 fusion when not - then a nuclear silo if none is planned. Every one of
+	 these has an income gate further down the ladder that a full bank on a
+	 modest income never clears; here the bank itself is the justification.
+
+	 T1 constructors cannot build any of those. Their best use while floating
+	 is to assist the T2 constructor that can, so they guard it. Only when
+	 there is no T2 constructor do they fall through to the normal ladder,
+	 whose nano rung is now capped at NanoReserveSurplus beyond the target.
+	 **************************************************************************/
+	bool Tech_IsFloating(float metalIncome)
+	{
+		if (metalIncome < Global::RoleSettings::Tech::FloatMetalIncome) return false;
+		return aiEconomyMgr.isMetalFull
+			|| aiEconomyMgr.metal.current >= Global::RoleSettings::Tech::FloatMetalCurrent;
+	}
+
+	IUnitTask @Tech_FloatSpend(CCircuitUnit @u, bool isT2, float metalIncome, float energyIncome)
+	{
+		if (u is null || u.circuitDef is null) return null;
+		if (!Tech_IsFloating(metalIncome)) return null;
+		const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+		const float bank = aiEconomyMgr.metal.current;
+
+		if (!isT2)
+		{
+			if (Builder::primaryT2BotConstructor !is null && !(u is Builder::primaryT2BotConstructor))
+			{
+				GenericHelpers::LogUtil("[TECH][Float] T1 constructor " + u.id + " assists the T2 constructor (metal "
+					+ int(bank) + ")", 1);
+				return GuardHelpers::AssignWorkerGuard(u, Builder::primaryT2BotConstructor, Task::Priority::HIGH, true, 60 * SECOND);
+			}
+			return null;   // nothing a T1 constructor can spend it on; normal ladder, capped nanos
+		}
+
+		AIFloat3 at = Factory::GetT2BotLabPos();
+		if (energyIncome >= Global::RoleSettings::Tech::FloatConverterMinEnergyIncome)
+		{
+			IUnitTask @t = EcoPlanner::Enqueue("advconv", u);
+			if (t !is null)
+			{
+				GenericHelpers::LogUtil("[TECH][Float] advanced converter (metal " + int(bank) + ", energy income " + int(energyIncome) + ")", 1);
+				return t;
+			}
+		}
+		else
+		{
+			if (bank >= Global::RoleSettings::Tech::FloatAFUSMetalCurrent)
+			{
+				IUnitTask @t = EcoPlanner::Enqueue("afus", u);
+				if (t !is null)
+				{
+					GenericHelpers::LogUtil("[TECH][Float] advanced fusion (metal " + int(bank) + ", energy income " + int(energyIncome) + ")", 1);
+					return t;
+				}
+			}
+			IUnitTask @t = EcoPlanner::Enqueue("fusion", u);
+			if (t !is null)
+			{
+				GenericHelpers::LogUtil("[TECH][Float] fusion (metal " + int(bank) + ", energy income " + int(energyIncome) + ")", 1);
+				return t;
+			}
+		}
+
+		const int silos = EconomyHelpers::GetNukeSiloCount() + Builder::NukeSiloQueuedCount;
+		if (silos < Global::RoleSettings::Tech::FloatMaxNukeSilos)
+		{
+			IUnitTask @t = Builder::EnqueueNukeSilo(side, at, SQUARE_SIZE * 32, SECOND * 300);
+			if (t !is null)
+			{
+				GenericHelpers::LogUtil("[TECH][Float] nuclear silo (metal " + int(bank) + ")", 1);
+				return t;
+			}
+		}
+		return null;
+	}
+
 	IUnitTask @Tech_T1BotConstructor_AiMakeTask(CCircuitUnit @u, float metalIncome, float energyIncome, IUnitTask @defaultTask)
 	{
+		{
+			IUnitTask @tFloat = Tech_FloatSpend(u, false, metalIncome, energyIncome);
+			if (tFloat !is null) return tFloat;
+		}
 		GenericHelpers::LogUtil("[TECH] Enter Tech_T1BotConstructor_AiMakeTask", 4);
 		// Economy snapshot is provided by caller (to avoid repeated global reads)
 
@@ -1619,7 +2020,21 @@ namespace RoleTech
 		}
 
 		// ********************** ENERGY/CONVERTER/SOLAR CHECKS********************** //
-		if (EconomyHelpers::ShouldBuildT1EnergyConverter(
+		// The eco planner (D-058) decides solars, winds, converters and storages.
+		if (Global::RoleSettings::Tech::EcoPlannerEnabled)
+		{
+			const string ecoKey = EcoPlanner::Next(u, metalIncome, energyIncome);
+			if (ecoKey.length() > 0)
+			{
+				IUnitTask @redirect = Tech_RedirectEnergyToReactor("eco planner: " + ecoKey, u);
+				if (redirect !is null)
+					return redirect;
+				IUnitTask @tEco = EcoPlanner::Execute(ecoKey, u);
+				if (tEco !is null)
+					return tEco;
+			}
+		}
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildT1EnergyConverter(
 				metalIncome,
 				energyIncome,
 				aiEconomyMgr.energy.current,
@@ -1628,7 +2043,7 @@ namespace RoleTech
 				Global::RoleSettings::Tech::BuildT1ConvertersMinimumEnergyIncome,
 				Global::RoleSettings::Tech::BuildT1ConvertersMinimumEnergyCurrentPercent))
 		{
-			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 energy converter");
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 energy converter", u);
 			if (redirect !is null)
 				return redirect;
 			IUnitTask @tConv = Builder::EnqueueT1EnergyConverter(unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 30);
@@ -1637,11 +2052,11 @@ namespace RoleTech
 		}
 
 		// Build regular solar?
-		if (EconomyHelpers::ShouldBuildT1Solar(
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildT1Solar(
 				/*ei*/ energyIncome,
 				/*min*/ Global::RoleSettings::Tech::SolarEnergyIncomeMinimum))
 		{
-			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 solar");
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("T1 solar", u);
 			if (redirect !is null)
 				return redirect;
 			IUnitTask @tSolar = Builder::EnqueueT1Solar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 75);
@@ -1651,8 +2066,13 @@ namespace RoleTech
 
 		// Build a T1 nano caretaker if under desired target (income-based) or reserves allow
 		float energyPercent = (aiEconomyMgr.energy.storage > 0.0f) ? (aiEconomyMgr.energy.current / aiEconomyMgr.energy.storage) : 0.0f;
+		// Not while the first T2 constructors are being paid for, nor with an
+		// empty bank: the turret would only deepen the stall (D-051).
+		const bool nanoHeld = Global::RoleSettings::Tech::NanoHoldForFirstT2Constructors
+			&& t2LabCount > 0 && t2ConstructionBotCount < Global::RoleSettings::Tech::MinimumT2ConstructorBots;
+		const bool nanoBankLow = aiEconomyMgr.metal.current < Global::RoleSettings::Tech::NanoMinMetalCurrent;
 		// Only build nanos if we have a preferred factory to anchor around
-		if (Factory::GetPreferredFactory() !is null && EconomyHelpers::ShouldBuildT1Nano(
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && !nanoHeld && !nanoBankLow && Factory::GetPreferredFactory() !is null && EconomyHelpers::ShouldBuildT1Nano(
 														   energyIncome,
 														   metalIncome,
 														   Global::RoleSettings::Tech::NanoEnergyPerUnit,
@@ -1660,17 +2080,20 @@ namespace RoleTech
 														   Global::RoleSettings::Tech::NanoMaxCount,
 														   aiEconomyMgr.metal.current,
 														   Global::RoleSettings::Tech::NanoBuildWhenOverMetal,
-														   energyPercent))
+														   energyPercent,
+														   Global::RoleSettings::Tech::NanoReserveSurplus))
 		{
 			// Always place nano near our preferred factory location, not the constructor's current position
 			AIFloat3 nanoPos = Factory::GetPreferredFactoryPos();
-			IUnitTask @tNano = Builder::EnqueueT1Nano(unitSide, nanoPos, /*shake*/ SQUARE_SIZE * 24, /*timeout*/ 30);
+			IUnitTask @tNano = EcoPlanner::Enqueue("nano", u);
+			if (tNano is null && !Layout::HasComplex())
+				@tNano = Builder::EnqueueT1Nano(unitSide, nanoPos, /*shake*/ SQUARE_SIZE * 24, /*timeout*/ 30);
 			if (tNano !is null)
 				return tNano;
 		}
 
 		// Advanced T1 solar decision via unified helper with TECH thresholds and T2 gating
-			if (EconomyHelpers::ShouldBuildT1AdvancedSolar(
+			if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildT1AdvancedSolar(
 				/*energyIncome*/ energyIncome,
 				/*metalIncome*/ metalIncome,
 				/*energyIncomeMinimumThreshold*/ Global::RoleSettings::Tech::AdvancedSolarEnergyIncomeMinimum,
@@ -1681,7 +2104,7 @@ namespace RoleTech
 				/*enableT2ProgressGate*/ true,
 				/*metalIncomeFallbackMinimum*/ 6.0f))
 		{
-				IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced solar");
+				IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced solar", u);
 				if (redirect !is null)
 					return redirect;
 				IUnitTask @tAdvSolar = Builder::EnqueueT1AdvancedSolar(u.id, unitSide, conLocation, SQUARE_SIZE * 32, SECOND * 75);
@@ -1753,6 +2176,10 @@ namespace RoleTech
 
 	IUnitTask @Tech_T2BotConstructor_AiMakeTask(CCircuitUnit @u, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent, IUnitTask @defaultTask)
 	{
+		{
+			IUnitTask @tFloat = Tech_FloatSpend(u, true, metalIncome, energyIncome);
+			if (tFloat !is null) return tFloat;
+		}
 
 		string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
@@ -1778,7 +2205,21 @@ namespace RoleTech
 		if (tWater !is null)
 			return tWater;
 
-		if (EconomyHelpers::ShouldBuildT2EnergyConverter(
+		// The eco planner (D-058) decides converters, fusions and storages.
+		if (Global::RoleSettings::Tech::EcoPlannerEnabled)
+		{
+			const string ecoKey = EcoPlanner::Next(u, metalIncome, energyIncome);
+			if (ecoKey.length() > 0)
+			{
+				IUnitTask @redirect = Tech_RedirectEnergyToReactor("eco planner: " + ecoKey, u);
+				if (redirect !is null)
+					return redirect;
+				IUnitTask @tEco = EcoPlanner::Execute(ecoKey, u);
+				if (tEco !is null)
+					return tEco;
+			}
+		}
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildT2EnergyConverter(
 				/*metalIncome*/ metalIncome,
 				/*energyIncome*/ energyIncome,
 				/*energy<90%*/ isEnergyLessThan90Percent,
@@ -1787,10 +2228,10 @@ namespace RoleTech
 				/*reqEi*/ Global::RoleSettings::Tech::MinimumEnergyIncomeForAdvConverter))
 		{
 			GenericHelpers::LogUtil("[TECH] Economy OK to build Advanced Energy Converter", 2);
-			IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced energy converter");
+			IUnitTask @redirect = Tech_RedirectEnergyToReactor("advanced energy converter", u);
 			if (redirect !is null)
 				return redirect;
-			IUnitTask @tConv = Builder::EnqueueAdvEnergyConverter(unitSide, Factory::GetT2BotLabPos(), SQUARE_SIZE * 32, SECOND * 60);
+			IUnitTask @tConv = EcoPlanner::Enqueue("advconv", u);
 			if (tConv !is null)
 				return tConv;
 		}
@@ -1835,7 +2276,7 @@ namespace RoleTech
 				return tAmd;
 		}
 
-		if (EconomyHelpers::ShouldBuildAdvancedFusionReactor(
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildAdvancedFusionReactor(
 				/*mi*/ metalIncome,
 				/*ei*/ energyIncome,
 				/*energy<90%*/ isEnergyLessThan90Percent,
@@ -1866,13 +2307,13 @@ namespace RoleTech
 			}
 			else
 			{
-				IUnitTask @tAfus = Builder::EnqueueAFUS(unitSide, Factory::GetT2BotLabPos(), SQUARE_SIZE * 32, SECOND * 300);
+				IUnitTask @tAfus = EcoPlanner::Enqueue("afus", u);
 				if (tAfus !is null)
 					return tAfus;
 			}
 		}
 
-		if (EconomyHelpers::ShouldBuildFusionReactor(
+		if (!Global::RoleSettings::Tech::EcoPlannerEnabled && EconomyHelpers::ShouldBuildFusionReactor(
 				/*mi*/ metalIncome,
 				/*ei*/ energyIncome,
 				/*energy<90%*/ isEnergyLessThan90Percent,
@@ -1881,7 +2322,7 @@ namespace RoleTech
 				/*maxEi*/ Global::RoleSettings::Tech::MaxEnergyIncomeForFUS))
 		{
 			GenericHelpers::LogUtil("[TECH] Economy OK to build fusion reactor", 2);
-			IUnitTask @tFus = Builder::EnqueueFUS(unitSide, Factory::GetT2BotLabPos(), SQUARE_SIZE * 32, SECOND * 300);
+			IUnitTask @tFus = EcoPlanner::Enqueue("fusion", u);
 			if (tFus !is null)
 				return tFus;
 		}
@@ -2050,11 +2491,13 @@ namespace RoleTech
 
 		@cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate @>(@Tech_MilitaryAiMakeTask);
 		@cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate @>(@Tech_MilitaryAiTaskRemoved);
+		@cfg.MilitaryAiUnitAdded = cast<AiUnitAddedDelegate @>(@Tech_MilitaryAiUnitAdded);
 
 		@cfg.SelectFactoryHandler = cast<SelectFactoryDelegate @>(@Tech_SelectFactoryHandler);
 		@cfg.EconomyUpdateHandler = cast<EconomyUpdateDelegate @>(@Tech_EconomyUpdate);
 
 		@cfg.AiMakeDefenceHandler = cast<AiMakeDefence @>(@Tech_AiMakeDefence);
+		@cfg.LayoutPlanHandler = cast<LayoutPlanDelegate @>(@Tech_LayoutPlan);
 
 		@cfg.RoleMatchHandler = cast<RoleMatchDelegate @>(@Tech_RoleMatch);
 

@@ -1,5 +1,10 @@
     // Mono-space font required
 	{
+		// Native base-layout mechanism is permitted for this profile; TECH must
+		// also opt its own AI instance in. Other roles retain normal placement.
+		"layout": {
+			"enabled": true
+		},
 		//attack = 0.3 means enemy threat = enemy_threat*0.3																																																																																																																																																																																																																																																			[Reworked by [SMRT]Felnious[AI]]
 		//and attack group select only targets that have threat lower than the group's power. Power is like threat, but behaviour.json has separate modifiers for threat (enemy) and power (own).
 		//with attack=0.8..1.0 AI acts more careful, if it would also fight superior enemy near own static defences then those values would be great. 
@@ -86,7 +91,8 @@
 			"min_stun": 5.0,             // seconds; below this the shot is not worth its cost
 			"mobile_max_age": 30,        // seconds a mobile target's last known position stays usable
 			"min_targets": 1,
-			"structures_first": true     // only structures get an uncapped stun
+			"structures_first": true,
+			"structures_first_min_cost": 1500  // only statics this expensive outrank mobiles; below it, highest cost wins     // only structures get an uncapped stun
 		},
 
 		// Bombers. A pass is alpha damage: it kills or it is wasted, so a group
@@ -104,6 +110,23 @@
 			"approach_samples": 8,    // threat-map probes on the ring to pick the run-in bearing
 			"approach_ring": 1200,
 			"group_mixed_defs": true  // one line for a mixed wave instead of parallel per-def groups
+		},
+		"stockpile": {
+			// Stockpiled super weapons (nukes, the tactical launchers, and any stockpiled weapon on the
+			// generic group scan - not the EMP and Juno policies, which target from their own branches
+			// before this floor is reached) only fire at a group worth their shot
+			// cost - metal that is already spent. A silo held three missiles against a
+			// discovered base because the visible group value never reached 1500. The floor
+			// now decays with waiting time and collapses once enough shots are stocked.
+			"patience_seconds": 240,   // floor decays from full to min_fraction over this
+			"min_fraction": 0.25,      // never below this fraction of the shot cost
+			"full_fire_count": 2,      // this many stocked: floor is min_fraction immediately
+			// Tactical launchers (Perdition 2300, Catalyst 2250) aim by scanning units in range
+			// and valuing the metal inside the blast; enemy-group centroids never came within
+			// reach of a launcher sat in a cluster (every logged tick: inRange=0).
+			"launcher_mobile_max_age": 30,     // seconds a mobile's last known position stays usable
+			"launcher_min_targets": 1,         // raise to require a clump inside the blast
+			"launcher_structures_first": false // true ranks any structure above any mobile
 		},
 		"sensor": {
 			// Mobile radar and jammer escorts. They carry the `support` main role,
@@ -1893,7 +1916,7 @@
 			// ARMADA HOVERS
 	
 			"armsh": {
-				"role": ["raider"], "attribute": ["spam"],
+				"role": ["raider"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2374,7 +2397,7 @@
 			// CORTEX HOVERS
 
 			"corsh": {
-				"role": ["raider"], "attribute": ["spam"],
+				"role": ["raider"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

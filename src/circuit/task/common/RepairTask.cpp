@@ -185,6 +185,10 @@ CAllyUnit* IRepairTask::FindUnitToAssist(CCircuitUnit* unit)
 		if ((u->GetHealth() < u->GetMaxHealth()) && (u->GetVel().SqLength2D() <= maxSpeed)) {
 			target = circuit->GetFriendlyUnit(u);
 			if (target != nullptr) {
+				if (circuit->GetBuilderManager()->IsReclaimUnit(target)) {
+					target = nullptr;  // being reclaimed by us or a teammate: never repair it
+					continue;
+				}
 				break;
 			}
 		}
