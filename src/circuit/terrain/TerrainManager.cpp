@@ -729,9 +729,13 @@ AIFloat3 CTerrainManager::FindBuildSite(CCircuitDef* cdef, const AIFloat3& pos,
 		pinnedReservationRequired = false;
 		return -RgtVector;
 	}
-	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
+	if (circuit->GetBuilderManager()->IsExperimentalBuild() && !cdef->IsMobile()) {
 		// D-066: never the stock spiral for this instance. The site is the
 		// free footprint nearest the asked anchor, reserved and served.
+		// Structures only (D-068): a recruit, rally or retreat asks for a free
+		// spot for a mobile unit, and a packed reservation for one is never
+		// forgotten (no structure ever stands on it) - 21 of them blocked the
+		// turret box on 2026-09-21. Those asks take the stock search below.
 		const float radius = std::min(searchRadius, circuit->GetBuilderManager()->GetExperimentalSearchRadius());
 		return PackNearPoint(cdef, pos, radius, facing, predicate);
 	}
@@ -2232,6 +2236,42 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 	return -RgtVector;
 }
 
+AIFloat3 CTerrainManager::FindApproachPoint(CCircuitUnit* unit, const AIFloat3& site, float radius)
+{
+	if ((unit == nullptr) || (radius <= 0.f)) {
+		return -RgtVector;
+	}
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3& from = unit->GetPos(frame);
+	float dx = from.x - site.x, dz = from.z - site.z;
+	const float len = std::sqrt(dx * dx + dz * dz);
+	if (len < 1.f) {
+		dx = 1.f; dz = 0.f;
+	} else {
+		dx /= len; dz /= len;
+	}
+	const SBlockingMap::SM walkable = static_cast<SBlockingMap::SM>(
+			static_cast<unsigned short>(SBlockingMap::StructMask::ALL) & ~static_cast<unsigned short>(SBlockingMap::StructMask::RESERVED));
+	CMap* map = circuit->GetMap();
+	for (int k = 0; k < 16; ++k) {
+		// 0, +22.5, -22.5, +45, -45, ... degrees off the unit's own bearing
+		const float a = 0.3926991f * float((k + 1) / 2) * ((k % 2 == 0) ? 1.f : -1.f);
+		const float c = std::cos(a), s = std::sin(a);
+		AIFloat3 p(site.x + (dx * c - dz * s) * radius, 0.f, site.z + (dx * s + dz * c) * radius);
+		CorrectPosition(p);
+		p.y = map->GetElevationAt(p.x, p.z);
+		const int cx = int(p.x) / (SQUARE_SIZE * 2), cz = int(p.z) / (SQUARE_SIZE * 2);
+		if (!blockingMap.IsInBounds(cx, cz) || blockingMap.IsBlocked(cx, cz, walkable)) {
+			continue;
+		}
+		if (!CanMoveToPos(unit->GetArea(), p)) {
+			continue;
+		}
+		return p;
+	}
+	return -RgtVector;
+}
+
 int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
 {
 	int best = -1;
@@ -2355,6 +2395,151 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 	return out;
 }
 
+bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& pos, int facing) const
+{
+	// D-072: a constructor was walled in by a turbine cluster. Every free cell
+	// of the zone must stay connected to the zone's edge once this footprint
+	// stands; planned slots count as standing (they will).
+	auto zit = zones.find(zone);
+	if ((zit == zones.end()) || (cdef == nullptr)) {
+		return false;
+	}
+	const SZone& z = zit->second;
+	int2 f1, f2;
+	if (!ReservationCells(cdef, pos, facing, f1, f2)) {
+		return false;
+	}
+	const int w = z.c2.x - z.c1.x;
+	const int h = z.c2.y - z.c1.y;
+	if ((w <= 0) || (h <= 0)) {
+		return false;
+	}
+	std::vector<char> open(w * h, 0);
+	for (int cz = z.c1.y; cz < z.c2.y; ++cz) {
+		for (int cx = z.c1.x; cx < z.c2.x; ++cx) {
+			const bool inFoot = (cx >= f1.x) && (cx < f2.x) && (cz >= f1.y) && (cz < f2.y);
+			open[(cz - z.c1.y) * w + (cx - z.c1.x)] = (!inFoot && IsSlotFree(int2(cx, cz), int2(cx + 1, cz + 1), zone, -1)) ? 1 : 0;
+		}
+	}
+	std::vector<char> seen(w * h, 0);
+	std::vector<int> stack;
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			if (((x == 0) || (x == w - 1) || (y == 0) || (y == h - 1)) && open[y * w + x] && !seen[y * w + x]) {
+				seen[y * w + x] = 1;
+				stack.push_back(y * w + x);
+			}
+		}
+	}
+	while (!stack.empty()) {
+		const int i = stack.back();
+		stack.pop_back();
+		const int x = i % w, y = i / w;
+		const int nb[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (const auto& d : nb) {
+			const int nx = x + d[0], ny = y + d[1];
+			if ((nx < 0) || (ny < 0) || (nx >= w) || (ny >= h)) {
+				continue;
+			}
+			const int j = ny * w + nx;
+			if (open[j] && !seen[j]) {
+				seen[j] = 1;
+				stack.push_back(j);
+			}
+		}
+	}
+	for (int i = 0; i < w * h; ++i) {
+		if (open[i] && !seen[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int CTerrainManager::CountGroupSlotsWithin(int group, const AIFloat3& pos, float radius) const
+{
+	int n = 0;
+	const float sq = SQUARE(radius);
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.group == group) && (r.pos.SqDistance2D(pos) <= sq)) {
+			++n;
+		}
+	}
+	return n;
+}
+
+int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos) const
+{
+	auto zit = zones.find(zone);
+	if ((zit == zones.end()) || (cdef == nullptr)) {
+		return -1;
+	}
+	const SZone& z = zit->second;
+	const float half = base_layout::HALF_CELL_ELMOS;
+	const AIFloat3 centre((z.c1.x + z.c2.x) * half, 0.f, (z.c1.y + z.c2.y) * half);
+	// every free footprint in the zone within a slot's reach of some slot: the candidates the packer would consider
+	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, centre, 0.f, 0.f);
+	if (cands.empty()) {
+		return -1;
+	}
+	std::vector<AIFloat3> slots;
+	for (const auto& kv : reservations) {
+		if (kv.second.group == nanoGroup) {
+			slots.push_back(kv.second.pos);
+		}
+	}
+	// forward along the facing (SOUTH 0 +z, EAST 1 +x, NORTH 2 -z, WEST 3 -x)
+	const float fx = (facing == 1) ? 1.f : ((facing == 3) ? -1.f : 0.f);
+	const float fz = (facing == 0) ? 1.f : ((facing == 2) ? -1.f : 0.f);
+	const float reachSq = SQUARE(reach);
+	int best = -1;
+	float bestFront = -1e30f, bestNano = 1e30f;
+	AIFloat3 bestPos;
+	for (const SPackCandidate& c : cands) {
+		AIFloat3 cp = c.pos;
+		cp.y = circuit->GetMap()->GetElevationAt(cp.x, cp.z);
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), cp, facing) || LeavesPocket(zone, cdef, c.pos, facing)) {
+			continue;
+		}
+		int n = 0;
+		for (const AIFloat3& s : slots) {
+			if (s.SqDistance2D(c.pos) <= reachSq) {
+				++n;
+			}
+		}
+		const float front = (c.pos.x - centre.x) * fx + (c.pos.z - centre.z) * fz;
+		if ((n > best) || ((n == best) && ((front > bestFront + 1.f) || ((std::fabs(front - bestFront) <= 1.f) && (c.nanoSq < bestNano))))) {
+			best = n;
+			bestFront = front;
+			bestNano = c.nanoSq;
+			bestPos = c.pos;
+		}
+	}
+	if (best >= 0) {
+		outPos = bestPos;
+	}
+	return best;
+}
+
+int CTerrainManager::PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group)
+{
+	AIFloat3 pos;
+	const int score = PickMost(zone, cdef, nanoGroup, facing, reach, pos);
+	if (score < 0) {
+		return -1;
+	}
+	pos.y = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+	// like PackNearGroup: the slot stays armed for the pinned task's own search
+	const int id = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
+	if (id < 0) {
+		return -1;
+	}
+	circuit->LOG("RESERVE: packed %s at (%.0f, %.0f) facing %i in zone %i where %i slots of group %i reach (id %i)",
+			cdef->GetDef()->GetName(), pos.x, pos.z, facing, zone, score, nanoGroup, id);
+	return id;
+}
+
 int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor,
 		float maxReach, float minNanoDist, int group)
 {
@@ -2366,6 +2551,12 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 		}
 		AIFloat3 pos = c.pos;
 		pos.y = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), pos, facing)) {
+			continue;  // D-073: the engine's own test; a box's unflat part refused an advanced fusion at serve time
+		}
+		if (LeavesPocket(zone, cdef, pos, facing)) {
+			continue;  // D-072: never wall off free cells inside the box
+		}
 		const int id = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
 		if (id >= 0) {
 			circuit->LOG("RESERVE: packed %s at (%.0f, %.0f) facing %i in zone %i, %.0f from a turret (id %i, group %i, %i candidates)",

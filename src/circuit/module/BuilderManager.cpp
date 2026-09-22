@@ -57,6 +57,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <cmath>
 
 namespace circuit {
 
@@ -1850,6 +1851,19 @@ void CBuilderManager::Watchdog()
 			}
 		}
 		if (isLost) {
+			if (experimentalBuild) {
+				// D-066 diagnostics: a builder standing still with no resource
+				// use outside its range - or with its command queue empty.
+				const AIFloat3& wpos = worker->GetPos(circuit->GetLastFrame());
+				const IBuilderTask* taskB = (task->GetType() == IUnitTask::Type::BUILDER) ? static_cast<const IBuilderTask*>(task) : nullptr;
+				const AIFloat3 tpos = (taskB != nullptr) ? taskB->GetPosition() : AIFloat3(-RgtVector);
+				circuit->LOG("EXP: watchdog: %s(%i) lost on %s at (%.0f, %.0f), site (%.0f, %.0f), dist %.0f, reach %.0f, commands %s, waiting %s",
+						worker->GetCircuitDef()->GetDef()->GetName(), worker->GetId(),
+						((taskB != nullptr) && (taskB->GetBuildDef() != nullptr)) ? taskB->GetBuildDef()->GetDef()->GetName() : "task",
+						wpos.x, wpos.z, tpos.x, tpos.z, std::sqrt(wpos.SqDistance2D(tpos)),
+						worker->GetCircuitDef()->GetBuildDistance() + (((taskB != nullptr) && (taskB->GetBuildDef() != nullptr)) ? taskB->GetBuildDef()->GetRadius() : 0.f),
+						circuit->GetCallback()->Unit_HasCommands(worker->GetId()) ? "yes" : "no", worker->IsWaiting() ? "yes" : "no");
+			}
 			task->OnUnitMoveFailed(worker);
 		}
 	}

@@ -186,6 +186,11 @@ namespace Roster {
         const string key = "" + e.teamId;
         const bool isNew = !entries.exists(key);
         entries.set(key, @e);
+        if (isNew && e.teamId != ai.teamId) {
+            // D-072: a metal spot belongs to the team whose start is nearest; the
+            // ally-aware mex enqueue needs the allies' starts
+            aiEconomyMgr.AddAllyStart(e.startPos);
+        }
         if (isNew) {
             GenericHelpers::LogUtil("[Team][Roster] Team " + e.teamId + " (AI " + e.skirmishAIId + "): role=" + RoleName(e.role)
                 + " side=" + e.side + " start=(" + int(e.startPos.x) + "," + int(e.startPos.z) + ") factory=" + e.startFactory

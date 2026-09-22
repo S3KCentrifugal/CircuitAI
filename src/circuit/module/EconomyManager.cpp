@@ -821,6 +821,19 @@ int CEconomyManager::GetClaimedMexCountWithin(
 	return count;
 }
 
+bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos) const
+{
+	// D-072: the spot is ours when no ally's start position is nearer to it
+	// than our own (a Voronoi split of the map by start positions).
+	const float own = circuit->GetSetupManager()->GetStartPos().SqDistance2D(pos);
+	for (const springai::AIFloat3& s : allyStarts) {
+		if (s.SqDistance2D(pos) < own) {
+			return false;
+		}
+	}
+	return true;
+}
+
 IBuilderTask* CEconomyManager::EnqueueMexWithin(
 		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
 {
@@ -877,7 +890,7 @@ IBuilderTask* CEconomyManager::EnqueueMexWithin(
 		const AIFloat3& pos = metalMgr->GetSpots()[spot.first].position;
 		if (!metalMgr->IsOpenSpot(spot.first) || !IsOpenMexSpot(spot.first)
 				|| !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())
-				|| (allyAware && terrainMgr->IsZoneAlly(pos))) {  // expansion (D-066) leaves the allies' ground alone; the opening does not
+				|| (allyAware && (terrainMgr->IsZoneAlly(pos) || !IsOwnSpot(pos)))) {  // D-066/D-072: the allies' ground and the allies' spots are theirs
 			continue;
 		}
 		open.emplace_back(spot.first, from.SqDistance2D(pos));

@@ -76,6 +76,12 @@ public:
 	int GetMexSpotCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
 	int GetClaimedMexCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
 	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false);
+	// D-072: a metal spot belongs to the team whose start position is nearest
+	// to it; the script feeds the allies' starts (the roster) and the ally-aware
+	// mex enqueue leaves the others' spots alone.
+	void ClearAllyStarts() { allyStarts.clear(); }
+	void AddAllyStart(const springai::AIFloat3& pos) { allyStarts.push_back(pos); }
+	bool IsOwnSpot(const springai::AIFloat3& pos) const;
 	// Live mex tasks (assigned or queued) whose spot lies within radius of center (D-063).
 	int GetMexTaskCountWithin(const springai::AIFloat3& center, float radius) const;
 	CCircuitDef* GetLowEnergy(const springai::AIFloat3& pos, float& outMake, const CCircuitUnit* builder = nullptr) const;
@@ -331,6 +337,7 @@ private:
 
 	std::shared_ptr<IMainJob> morph;
 	std::set<CCircuitUnit*> morphees;
+	std::vector<springai::AIFloat3> allyStarts;  // D-072
 };
 
 } // namespace circuit

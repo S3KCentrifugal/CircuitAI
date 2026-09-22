@@ -21,7 +21,7 @@ grep -n " ERR " /tmp/game.log | head
 
 `infolog.txt` holds every game since the last restart of the client; the
 `Load script` line of the *last* game is the boundary. Each `ERR` line names
-`file (line, column) : ERR : message`. No `ERR` lines and still no movement:
+`file (line, column) : ERR  : message` (two spaces after ERR; grep for `ERR\s+:`). No `ERR` lines and still no movement:
 go to step 4.
 
 ## 2. Map the message to its cause

@@ -180,10 +180,19 @@ void IBuilderTask::RemoveAssignee(CCircuitUnit* unit)
 		initiator = nullptr;
 	}
 
+	if (IsExperimental() && (buildDef != nullptr) && (unit->GetCircuitDef() != nullptr)) {
+		// D-070 diagnostics: who leaves which order, and with what left
+		CCircuitAI* circuit = manager->GetCircuit();
+		const AIFloat3& p = unit->GetPos(circuit->GetLastFrame());
+		circuit->LOG("EXP: leave: %s(%i) off %s at (%.0f, %.0f), site (%.0f, %.0f), %i other(s) left, target %s, fails %i",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), buildDef->GetDef()->GetName(), p.x, p.z,
+				GetPosition().x, GetPosition().z, int(units.size()) - 1, (target != nullptr) ? "yes" : "no", buildFails);
+	}
 	IUnitTask::RemoveAssignee(unit);
 	traveled.erase(unit);
 	executors.erase(unit);
 	engaged.erase(unit);
+	approaching.erase(unit);
 
 	HideAssignee(unit);
 }
@@ -346,6 +355,29 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 void IBuilderTask::OnUnitIdle(CCircuitUnit* unit)
 {
 	engaged.erase(unit);  // D-064: the engine finished or dropped the command; a new one is due
+	if (IsExperimental() && (buildDef != nullptr)) {
+		CCircuitAI* circuit = manager->GetCircuit();
+		const AIFloat3& upos = unit->GetPos(circuit->GetLastFrame());
+		const bool arrived = (approaching.erase(unit) > 0);
+		circuit->LOG("EXP: idle: %s(%i) on %s at (%.0f, %.0f), site (%.0f, %.0f), target %s, fails %i%s",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), buildDef->GetDef()->GetName(),
+				upos.x, upos.z, GetPosition().x, GetPosition().z, (target != nullptr) ? "yes" : "no", buildFails + 1,
+				arrived ? " (arrived at the approach point)" : "");
+		if (arrived) {
+			// The walk to the approach point ended: now the construction command,
+			// from inside the range. Not a failure.
+			if (Execute(unit)) {
+				engaged.insert(unit);
+			}
+			return;
+		}
+		// The engine dropped the command while the unit was outside the range
+		// (its own goal on the circle was blocked): walk to a free point first.
+		const float dist = std::sqrt(upos.SqDistance2D(GetPosition()));
+		if ((dist > EngageRange(unit)) && Approach(unit)) {
+			return;
+		}
+	}
 	if (++buildFails <= 2) {  // Workaround due to engine's ability randomly disregard orders
 		if (Execute(unit) && IsExperimental()) {
 			engaged.insert(unit);
@@ -525,9 +557,36 @@ int IBuilderTask::CmdTimeout(int frame) const
 	return IsExperimental() ? INT_MAX : frame + FRAMES_PER_SEC * 60;
 }
 
+bool IBuilderTask::Approach(CCircuitUnit* unit)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	if (!geom::is_valid(GetPosition())) {
+		return false;
+	}
+	// Inside the engine's range with a margin, on ground no structure holds.
+	const AIFloat3 ap = circuit->GetTerrainManager()->FindApproachPoint(unit, GetPosition(), EngageRange(unit) - SQUARE_SIZE * 2);
+	if (!geom::is_valid(ap)) {
+		return false;
+	}
+	if (!unit->GetTravelAct()->IsFinished()) {
+		unit->GetTravelAct()->StateFinish();
+	}
+	TRY_UNIT(circuit, unit,
+		unit->CmdMoveTo(ap, 0, INT_MAX);
+	)
+	engaged.erase(unit);
+	approaching.insert(unit);
+	const AIFloat3& upos = unit->GetPos(circuit->GetLastFrame());
+	circuit->LOG("EXP: approach: %s(%i) at (%.0f, %.0f) walks to (%.0f, %.0f), %.0f from the %s site (%.0f, %.0f)",
+			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), upos.x, upos.z, ap.x, ap.z,
+			std::sqrt(ap.SqDistance2D(GetPosition())), (buildDef != nullptr) ? buildDef->GetDef()->GetName() : "task",
+			GetPosition().x, GetPosition().z);
+	return true;
+}
+
 bool IBuilderTask::TryEngage(CCircuitUnit* unit)
 {
-	if (engaged.find(unit) != engaged.end()) {
+	if ((engaged.find(unit) != engaged.end()) || (approaching.find(unit) != approaching.end())) {
 		return true;
 	}
 	CCircuitAI* circuit = manager->GetCircuit();
@@ -541,6 +600,11 @@ bool IBuilderTask::TryEngage(CCircuitUnit* unit)
 		circuit->GetThreatMap()->SetThreatType(unit);
 		if (circuit->GetThreatMap()->GetThreatAt(GetPosition()) >= THREAT_MIN) {
 			return false;  // the last leg is not safe to walk blind
+		}
+		// Our own approach point, not the engine's: a free, walkable point on
+		// the range circle. The command follows when the walk ends.
+		if (Approach(unit)) {
+			return true;
 		}
 	}
 	if (!unit->GetTravelAct()->IsFinished()) {
@@ -559,7 +623,11 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 
 	// FIXME: Replace const 1000.0f with build time?
 	CEconomyManager* ecoMgr = circuit->GetEconomyManager();
-	if (canAutoAbort
+	// D-066: the experimental sequence owns its orders; native's income-drop
+	// abort (a >1000-metal build dropped when average income falls under 60 %
+	// of what it was at order time) fired right after TECH's opening and
+	// threw the commander off its lab, which the sequence then re-ordered.
+	if (!IsExperimental() && canAutoAbort
 		&& (target == nullptr)
 		&& (cost.metal > 1000.f)
 		&& (((ecoMgr->GetAvgMetalIncome() < savedIncome.metal * 0.6f) && (ecoMgr->GetAvgMetalIncome() * 2.0f < ecoMgr->GetMetalPull()))
@@ -625,7 +693,12 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 			}
 			TRY_UNIT(circuit, unit,
 				unit->CmdBARPriority(prio ? 1.f : 0.f);
-				if (unit->GetTravelAct()->IsFinished()) {
+				// D-070: not in the experimental system. The wait made the builder
+				// idle, each idle counted as a build failure, and the third threw
+				// the builder off its order (played: the first lab and the opening
+				// solars took minutes whenever energy was empty). The sequence
+				// manages energy itself; a slow build beats an abandoned one.
+				if (!IsExperimental() && unit->GetTravelAct()->IsFinished()) {
 					unit->CmdWait(ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
 							&& (buildType != BuildType::STORE) && (buildType != BuildType::RECLAIM));
 				}

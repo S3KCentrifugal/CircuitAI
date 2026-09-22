@@ -300,6 +300,29 @@ namespace Global {
             float ExpAssistRadius = 1500.0f;                // a constructor with nothing to build assists within this
             float ExpOrderRadius = 2000.0f;                 // native's queued defence/radar/repair orders are taken only within this of the base
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
+            float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
+            float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
+            int ExpSpamLabs = 1;                            // T1 labs kept for the spam economy once its gate is open and the advanced lab stands
+            bool ExpTurretNearLab = true;                   // D-069: the next box turret slot is the one nearest a standing lab, not the one nearest the pair's centre
+            float ExpLabBuildPowerReach = 260.0f;           // D-069: elmos within which static build power (turrets) counts for a lab site: a nano's build distance plus the lab's radius
+            float ExpLabSiteRadius = 480.0f;                // D-069, superseded by D-073 (no longer read): the lab site is the turret-layout footprint the most turret slots reach
+            string RushObjective = "auto";                  // D-070: t2 | fusion | afus | nuke | gantry | titan | eco (no chain) | auto (the role picks: afus)
+            // D-070: the commander's home mexes are the opening's (OpeningMexRadius / OpeningMexCap: the
+            // spots within 700 of the start, at most 3 - three on Supreme Isthmus, one or none elsewhere),
+            // the lab follows at once, and the constructors claim the rest within ChainMexFarRadius
+            float ChainMexFarRadius = 2500.0f;
+            int ChainMaxMexes = 6;                          // D-070: mexes the chain claims in all
+            // D-070: energy by the map's wind, deterministically. Expected turbine output is the average of the
+            // map's min and max wind (capped at a turbine's 25). Turbines are chosen when their metal per E/s is
+            // under the solar's by ChainWindMargin and the max wind reaches ChainWindMaxMin (a lull must be worth
+            // riding out). The first energy structure is a solar when the current wind is under ChainWindBootstrap.
+            float ChainWindMargin = 1.25f;
+            float ChainWindMaxMin = 12.0f;
+            float ChainWindBootstrap = 5.0f;
+            float ChainAssistRadius = 4000.0f;
+            float ChainParallelCostM = 400.0f;
+            float ChainStepStallSeconds = 120.0f;           // D-070: a chain step with no progress for this long is skipped (an unreachable frame must not end the rush)              // D-070: structures cheaper than this (metal) are built one per builder in parallel; dearer ones get every builder on one frame              // D-070: every builder inside this joins the current step's frame
+            float ExpCombatMetalIncome = 200.0f;            // D-068: under this 10 s metal income TECH's labs make no combat unit (rush bots stay capped, no scout/fast-bot batches); 0 = never
             float EcoMexExpandRadius = 2500.0f;             // constructors expand to the nearest open spot within this ...
             float EcoMexExpandUntilIncome = 60.0f;          // ... while metal income is under this
             bool LayoutEnabled = true;                      // the planned base (needs ExperimentalBuild)
@@ -340,6 +363,7 @@ namespace Global {
             int LayoutBoxRearTries = 3;
             float LayoutBoxMinScore = 0.75f;         // flat fraction x buildable fraction
             float LayoutBoxMaxSlope = 0.02f;         // engine slope (1 - cos), about 11 degrees
+            int LayoutBoxMaxExtra = 4;               // D-072: boxes grown behind the first when it is full (each with its own turret rows)
             int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
             int LayoutBoxNanoRows = 3;               // Supreme overrides this to four in its MapConfig
             float LayoutConverterNanoGap = 0.0f;     // elmos an advanced converter keeps from a turret slot (its death kills one within 173)
@@ -372,6 +396,10 @@ namespace Global {
             int EcoMaxEnergyStorages = 1;
             float EcoStorageMinMetalBank = 150.0f;   // no storage order on an empty bank (played: the rule looped at 0 metal)
             float EcoConverterUse = 70.0f;           // a T1 converter's draw; a surplus of twice this converts even while energy is going up
+            float EcoAssistRadius = 1200.0f;         // a builder assists the energy structure going up only within this of itself (bots are slow)
+            float EcoFusionEnergyIncome = 300.0f;    // from this energy income, a T2 builder answers "energy" with a fusion (advanced when its metal gate passes); T1 builders leave energy alone
+            int ExpDefenceLLT = 1;                   // base defence after the first turret: light laser turrets ...
+            int ExpDefenceAA = 1;                    // ... and light AA turrets, near the factories
             int EcoMaxMetalStorages = 2;
             int EcoMetalMapSpots = 150;              // this many metal spots or more counts as a metal map
             bool EcoOneEnergyAtATime = true;         // no new energy structure while one is under construction (unless the bank drains)
@@ -453,7 +481,7 @@ namespace Global {
             /******************** TECH ECONOMY SETTINGS ********************/
             //Minimum incomes levels before T2 bot lab will be built
             float MinimumMetalIncomeForT2Lab = 18.0f; 
-            float MinimumEnergyIncomeForT2Lab = 500.0f;
+            float MinimumEnergyIncomeForT2Lab = 250.0f;
             // Additional gating: require at least this much stored metal and cap total T2 bot labs
             float RequiredMetalCurrentForT2Lab = 1000.0f;
             int MaxT2BotLabs = 3;

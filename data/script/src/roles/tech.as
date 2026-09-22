@@ -20,6 +20,8 @@
 #include "../manager/layout.as"
 #include "../manager/eco_planner.as"
 #include "tech_build.as"
+#include "tech_rules.as"
+#include "tech_chain.as"
 
 namespace RoleTech
 {
@@ -209,6 +211,7 @@ namespace RoleTech
 			Opening::Init();
 			GenericHelpers::LogUtil("[TECH][Build] experimental build system on: direct range "
 				+ int(aiBuilderMgr.experimentalDirectRange) + ", search radius " + int(aiBuilderMgr.experimentalSearchRadius), 1);
+			TechChain::Init();   // D-070: the rush chain, after the opening so it can take the opening over
 		}
 		else
 		{
@@ -274,6 +277,22 @@ namespace RoleTech
 			+ " assist nanos " + (Global::RoleSettings::Tech::AssistNanoEnabled ? "on" : "off")
 			+ " solar limit " + (solar is null ? -1 : aiEconomyMgr.GetEnergyLimit(solar))
 			+ " adv solar limit " + (adv is null ? -1 : aiEconomyMgr.GetEnergyLimit(adv)), 1);
+	}
+
+	// D-068: the one income under which TECH's labs make no combat unit while the
+	// experimental build system is on. The legacy gates (the T2 rush's early gate,
+	// the bot-lab and vehicle-plant expansion gates) are raised to it, never
+	// lowered; 0 means never. Off the switch, the legacy gate is returned as is.
+	// Played (2026-09-21, Supreme Isthmus): the rush gate (100) opened at 17 min
+	// on a reclaim-inflated 10 s income and the advanced lab made Fiends and Ducks.
+	float Tech_CombatGate(float legacyGate)
+	{
+		if (!Global::RoleSettings::Tech::ExperimentalBuild)
+			return legacyGate;
+		const float g = Global::RoleSettings::Tech::ExpCombatMetalIncome;
+		if (g <= 0.0f)
+			return 1.0e9f;
+		return (g > legacyGate) ? g : legacyGate;
 	}
 
 	// The units whose engine cap Tech snapshots at start and releases at the rush gate:
@@ -561,6 +580,8 @@ namespace RoleTech
 		}
 
 		Opening::Tick();
+		TechBuild::Tick();
+		TechChain::Tick();
 		Tech_IncomeBuilderLimits(metalIncome);
 		// The native plan owns geometry and slot state; this refreshes restored
 		// state and the optional overlay.
@@ -638,11 +659,18 @@ namespace RoleTech
 			// re-cap these defs; this runs after those and is a no-op when already correct.
 			if (Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH))
 			{
-				const float rushGate = Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyBotLabExpansion;
+				const float rushGate = Tech_CombatGate(Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyBotLabExpansion);
 				if (!hasUncappedRushBots && metalIncome >= rushGate)
 				{
 					hasUncappedRushBots = true;
+					GenericHelpers::LogUtil("[TECH][Factory] combat production unlocked at +" + metalIncome + " metal (gate " + rushGate + ")", 1);
 					Tech_UncapRushBots("metalIncome " + metalIncome + " >= rush gate " + rushGate);
+					if (Global::RoleSettings::Tech::ExperimentalBuild)
+					{
+						// The T1 scouts' cap is lifted here, at the same gate (D-068)
+						array<string> t1BotScouts = UnitHelpers::GetAllT1BotScouts();
+						UnitHelpers::BatchApplyUnitCaps(t1BotScouts, 100);
+					}
 				}
 				else if (hasUncappedRushBots)
 				{
@@ -670,6 +698,8 @@ namespace RoleTech
 
 			// Ensure high caps for T1 bot scouts (ticks and equivalents)
 			// armada: armflea (Tick), cortex: corak (raider), legion: leggob (light skirm)
+			// With the experimental system on this waits for the combat gate (D-068).
+			if (!Global::RoleSettings::Tech::ExperimentalBuild)
 			{
 				array<string> t1BotScouts = UnitHelpers::GetAllT1BotScouts();
 				UnitHelpers::BatchApplyUnitCaps(t1BotScouts, 100);
@@ -892,9 +922,10 @@ namespace RoleTech
 		}
 		// Select income gate based on strategy: use rush threshold when T2_RUSH is enabled
 		const bool isEarlyBotLabExpansionEnabled = Global::RoleSettings::Tech::HasStrategy(Strategy::T2_RUSH);
-		const float botLabGate = isEarlyBotLabExpansionEnabled ? Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyBotLabExpansion : Global::RoleSettings::Tech::MetalIncomeThresholdForBotLabExpansion;
+		// D-068: with the experimental system on both gates are at least ExpCombatMetalIncome
+		const float botLabGate = Tech_CombatGate(isEarlyBotLabExpansionEnabled ? Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyBotLabExpansion : Global::RoleSettings::Tech::MetalIncomeThresholdForBotLabExpansion);
 
-		const float vehiclePlantGate = isEarlyBotLabExpansionEnabled ? Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyVehiclePlantExpansion : Global::RoleSettings::Tech::MetalIncomeThresholdForVehiclePlantExpansion;
+		const float vehiclePlantGate = Tech_CombatGate(isEarlyBotLabExpansionEnabled ? Global::RoleSettings::Tech::MetalIncomeThresholdForEarlyVehiclePlantExpansion : Global::RoleSettings::Tech::MetalIncomeThresholdForVehiclePlantExpansion);
 
 		GenericHelpers::LogUtil("[TECH][Factory] Strategy gate: EarlyBotLabExpansion=" + (isEarlyBotLabExpansionEnabled ? "on" : "off") + " botLabGate=" + botLabGate + " vehiclePlantGate=" + vehiclePlantGate, 4);
 
@@ -1375,6 +1406,11 @@ namespace RoleTech
 
 	void Tech_AiMakeDefence(int cluster, const AIFloat3& in pos)
 	{
+		// The experimental system (D-066) defends its base itself: one light
+		// laser and one light AA after the first turret (TechBuild::Defence).
+		// Native's porc chain - up to junos and launchers - is not asked.
+		if (Global::RoleSettings::Tech::ExperimentalBuild)
+			return;
 		// float metalIncome = Economy::GetMetalIncome();
 		float metalIncome = Economy::GetMinMetalIncomeLast10s();
 
@@ -1689,6 +1725,8 @@ namespace RoleTech
 			g_fastAssistBotCap = 5 * int(metalIncome / 20.0f);
 		}
 		// if (g_fastAssistBotCap < 5) g_fastAssistBotCap = 1;
+		// A rush chain spends its energy on the chain, not on assist bots (D-070)
+		if (TechChain::Active() && g_fastAssistBotCap > 2) g_fastAssistBotCap = 2;
 
 		array<string> faList = UnitHelpers::GetFastAssistBots(side);
 		UnitHelpers::BatchApplyUnitCaps(faList, g_fastAssistBotCap);
@@ -1769,7 +1807,8 @@ namespace RoleTech
 			CCircuitUnit @target = aiBuilderMgr.FindUnfinishedFor(u, def);
 			if (target is null) continue;
 			GenericHelpers::LogUtil("[TECH][Turret] " + u.id + " assists " + order[i], 2);
-			return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 120 * SECOND));
+			// 30 s: a reclaim that begins meanwhile is taken at the next ask.
+			return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 30 * SECOND));
 		}
 		return null;
 	}

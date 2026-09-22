@@ -136,6 +136,9 @@ protected:
 	float EngageRange(CCircuitUnit* unit);
 	int CmdTimeout(int frame) const;
 	bool TryEngage(CCircuitUnit* unit);
+	// Move to a free point on the range circle; the construction command
+	// follows on arrival (the idle event). True when a move was given.
+	bool Approach(CCircuitUnit* unit);
 	void UpdatePath(CCircuitUnit* unit);
 	void ApplyPath(const CQueryPathSingle* query);
 	void HideAssignee(CCircuitUnit* unit);
@@ -183,6 +186,7 @@ protected:
 	std::set<CCircuitUnit*> traveled;
 	std::set<CCircuitUnit*> executors;
 	std::set<CCircuitUnit*> engaged;  // D-064: units whose construction command stands (a second one restarts the nanolathe)
+	std::set<CCircuitUnit*> approaching;  // D-064: units walking to their approach point; the arrival idle gives the command
 
 #ifdef DEBUG_VIS
 	virtual void Log() override;

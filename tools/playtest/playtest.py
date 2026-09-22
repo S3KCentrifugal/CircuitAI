@@ -1,0 +1,725 @@
+#!/usr/bin/env python
+"""Playtest: launch a BAR skirmish with the freshly built BARb, watch its log, stop it.
+
+    python tools/playtest/playtest.py run   [--roles TECH,FRONT] [--minutes 12] [--speed 3]
+    python tools/playtest/playtest.py stage      # copy the build + script tree into the playtest dir
+    python tools/playtest/playtest.py launch     # start the engine on the staged game (no watching)
+    python tools/playtest/playtest.py watch      # follow the log of a running game and judge it
+    python tools/playtest/playtest.py stop       # kill the playtest engine (never the user's own game)
+
+Nothing here writes under the BAR install. The engine runs with its own
+write directory (default C:\\bardev\\barb-playtest): the AI under test is
+staged there as BARbTest/test, the start script, settings, the camera
+widget, the infolog and the screenshots all live there. The install is read
+for the engine, the game archives, the maps and the last lobby script
+(modoptions template) only.
+
+Doc: tools/playtest/README.md. Skill: .claude/skills/playtest/SKILL.md.
+"""
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+BAR_DATA = LOCALAPPDATA / "Programs" / "Beyond-All-Reason" / "data"  # read-only
+BUILD_AI = Path(r"C:\bardev\bar-RecoilEngine\build-amd64-windows\install\AI\Skirmish\BARb\stable")
+DEFAULT_DIR = Path(r"C:\bardev\barb-playtest")
+AI_SHORT = "BARbTest"
+AI_VERSION = "test"
+PROD_AI_SHORT = "SMRTBARb"
+PROD_AI_VERSION = "stable"
+FPS = 30
+ROLE_INT = {"FRONT": 0, "AIR": 1, "TECH": 2, "SEA": 3, "SUPPORT": 4, "TACTICAL": 5}
+SIDES = ["armada", "cortex", "legion"]
+
+
+def log(msg):
+    print("[playtest] " + msg, flush=True)
+
+
+def die(msg, code=2):
+    log("ERROR: " + msg)
+    sys.exit(code)
+
+
+# --------------------------------------------------------------------------- reading the install
+
+def read_prod_script():
+    """The lobby's last start script: game type, map and the modoptions block."""
+    p = BAR_DATA / "_script.txt"
+    if not p.exists():
+        return {}, {}
+    txt = p.read_text(encoding="utf-8", errors="replace")
+    top = {}
+    for key in ("gametype", "mapname"):
+        m = re.search(r"^\s*%s\s*=\s*(.+?);\s*$" % key, txt, re.M | re.I)
+        if m:
+            top[key] = m.group(1).strip()
+    mod = {}
+    m = re.search(r"\[modoptions\]\s*\{(.*?)\}", txt, re.S | re.I)
+    if m:
+        for line in m.group(1).splitlines():
+            line = line.strip()
+            if "=" in line and line.endswith(";"):
+                k, v = line[:-1].split("=", 1)
+                mod[k.strip()] = v.strip()
+    return top, mod
+
+
+def latest_game_version():
+    """The newest 'byar:test' rapid tag, the game the lobby plays."""
+    for repo in (BAR_DATA / "rapid").glob("*/byar/versions.gz"):
+        try:
+            import gzip
+            data = gzip.open(repo).read().decode("utf-8", "replace")
+        except Exception:
+            continue
+        tests = [l for l in data.splitlines() if l.startswith("byar:test,")]
+        if tests:
+            return tests[-1].split(",")[-1]
+    return None
+
+
+def engine_dir(name=None):
+    root = BAR_DATA / "engine"
+    if name:
+        d = root / name
+        if not (d / "spring.exe").exists():
+            die("engine %s has no spring.exe" % d)
+        return d
+    # the engine the lobby used last, from the infolog header
+    info = BAR_DATA / "infolog.txt"
+    if info.exists():
+        with open(info, "r", encoding="utf-8", errors="replace") as f:
+            head = f.read(20000)
+        m = re.search(r"engine/([^/\"]+)/springsettings\.cfg", head)
+        if m and (root / m.group(1) / "spring.exe").exists():
+            return root / m.group(1)
+    cands = [d for d in root.iterdir() if (d / "spring.exe").exists()]
+    if not cands:
+        die("no engine with spring.exe under %s" % root)
+    return max(cands, key=lambda d: d.stat().st_mtime)
+
+
+def map_file_for(map_name, override=None):
+    if override:
+        return Path(override)
+    base = re.sub(r"\s+v?[\d.]+$", "", map_name.strip(), flags=re.I).lower().replace(" ", "_")
+    p = REPO / "data" / "script" / "src" / "maps" / (base + ".as")
+    if not p.exists():
+        die("no AI map file for '%s' (looked for %s); pass --map-file" % (map_name, p))
+    return p
+
+
+def map_spots(map_name, override=None):
+    """Start spots as the AI's map file lists them: [(x, z, ROLE), ...] in file order."""
+    p = map_file_for(map_name, override)
+    txt = p.read_text(encoding="utf-8", errors="replace")
+    spots = re.findall(r"StartSpot\(\s*AIFloat3\(\s*([\d.]+)\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)\s*,\s*AiRole::(\w+)", txt)
+    if not spots:
+        die("no StartSpot entries in %s" % p)
+    return [(float(x), float(z), role) for x, z, role in spots]
+
+
+def map_archive_present(map_name):
+    stem = map_name.lower().replace(" ", "_")
+    return any((BAR_DATA / "maps").glob(stem + "*.sd*"))
+
+
+# --------------------------------------------------------------------------- staging
+
+def sha16(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:16]
+
+
+def stage(args):
+    d = Path(args.dir)
+    d.mkdir(parents=True, exist_ok=True)
+    ai_dst = d / "AI" / "Skirmish" / AI_SHORT / AI_VERSION
+    ai_dst.mkdir(parents=True, exist_ok=True)
+
+    dll_src = Path(args.dll) if args.dll else BUILD_AI / "SkirmishAI.dll"
+    if not dll_src.exists():
+        die("no DLL at %s (build first)" % dll_src)
+    if dll_src.stat().st_size > 50 * (1 << 20):
+        die("%s is %d bytes: an unstripped mid-build copy, wait for the build" % (dll_src, dll_src.stat().st_size))
+    shutil.copy2(dll_src, ai_dst / "SkirmishAI.dll")
+    dbg = dll_src.with_suffix(".dbg")
+    if dbg.exists():
+        shutil.copy2(dbg, ai_dst / "SkirmishAI.dbg")
+
+    data_src = Path(args.data) if args.data else REPO / "data"
+    for sub in ("config", "script"):
+        if (ai_dst / sub).exists():
+            shutil.rmtree(ai_dst / sub)
+        shutil.copytree(data_src / sub, ai_dst / sub, ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy2(data_src / "AIOptions.lua", ai_dst / "AIOptions.lua")
+    # setting overrides inside Global::RoleSettings::Tech of the STAGED global.as only
+    for kv in (args.set or []):
+        key, _, val = kv.partition("=")
+        gp = ai_dst / "script" / "src" / "global.as"
+        g = gp.read_text(encoding="utf-8")
+        a = g.index("namespace Tech {")
+        b = g.index("\n        }", a)
+        block = g[a:b]
+        pat = re.compile(r"^(\s*(?:int|float|bool|string)\s+%s\s*=\s*)([^;]+);" % re.escape(key.strip()), re.M)
+        if not pat.search(block):
+            die("--set %s: no such Tech setting" % key)
+        block = pat.sub(lambda m: m.group(1) + val.strip() + ";", block, count=1)
+        gp.write_text(g[:a] + block + g[b:], encoding="utf-8")
+        log("set Tech::%s = %s" % (key.strip(), val.strip()))
+
+    info = (data_src / "AIInfo.lua").read_text(encoding="utf-8")
+    info, n1 = re.subn(r"value\s*=\s*'[^']*',(\s*-- AI name - !This comment is used for parsing!)",
+                       "value  = '%s',\\1" % AI_SHORT, info)
+    info, n2 = re.subn(r"value\s*=\s*'[^']*',(\s*-- AI version - !This comment is used for parsing!)",
+                       "value  = '%s',\\1" % AI_VERSION, info)
+    if n1 != 1 or n2 != 1:
+        die("AIInfo.lua markers not found (shortName %d, version %d)" % (n1, n2))
+    info = info.replace("value  = 'BARbarIAn'", "value  = 'BARb playtest'")
+    (ai_dst / "AIInfo.lua").write_text(info, encoding="utf-8")
+
+    # settings: the user's, read once, with the playtest overrides on top
+    prod_cfg = BAR_DATA / "springsettings.cfg"
+    lines = prod_cfg.read_text(encoding="utf-8", errors="replace").splitlines() if prod_cfg.exists() else []
+    overrides = {
+        "SpringData": str(BAR_DATA).replace("/", "\\"),
+        "Fullscreen": "0",
+        "WindowBorderless": "0",
+        "XResolutionWindowed": str(args.width),
+        "YResolutionWindowed": str(args.height),
+        "XResolution": str(args.width),
+        "YResolution": str(args.height),
+        "WindowPosX": "0",
+        "WindowPosY": "0",
+        "LogFlush": "1",
+    }
+    out = []
+    seen = set()
+    for line in lines:
+        m = re.match(r"\s*(\w+)\s*=", line)
+        if m and m.group(1) in overrides:
+            out.append("%s = %s" % (m.group(1), overrides[m.group(1)]))
+            seen.add(m.group(1))
+        else:
+            out.append(line)
+    for k, v in overrides.items():
+        if k not in seen:
+            out.append("%s = %s" % (k, v))
+    (d / "springsettings.cfg").write_text("\n".join(out) + "\n", encoding="utf-8")
+
+    # the camera / screenshot / speed / end widget
+    wdir = d / "LuaUI" / "Widgets"
+    wdir.mkdir(parents=True, exist_ok=True)
+    shots = []
+    for tok in (args.shots or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        minute, _, height = tok.partition("@")
+        shots.append("{ minute = %s, height = %s }" % (float(minute), float(height) if height else args.cam_height))
+    cfg = ("{ role = %r, team = %d, speed = %s, end_minute = %s, forcestart = true, "
+           "log_prefix = '[Playtest]', shots = { %s } }") % (
+        args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots))
+    tpl = (HERE / "widgets" / "playtest_camera.lua").read_text(encoding="utf-8")
+    (wdir / "playtest_camera.lua").write_text(tpl.replace("__CFG__", cfg), encoding="utf-8")
+
+    (d / "screenshots").mkdir(exist_ok=True)
+    manifest = {
+        "staged": dt.datetime.now().isoformat(timespec="seconds"),
+        "dll": str(dll_src), "dll_sha256_16": sha16(dll_src), "dll_bytes": dll_src.stat().st_size,
+        "data": str(data_src), "ai": "%s/%s" % (AI_SHORT, AI_VERSION),
+    }
+    (d / "staged.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    log("staged %s (%s, %d bytes) + %s into %s" % (dll_src.name, manifest["dll_sha256_16"], manifest["dll_bytes"], data_src, ai_dst))
+    return manifest
+
+
+# --------------------------------------------------------------------------- the start script
+
+def choose_teams(args, spots):
+    """Teams in script order: team 0 is the AI under test on its role's spot."""
+    n = len(spots)
+    half = n // 2
+    west = list(range(0, half))
+    east = list(range(half, n))
+    if args.ally_spots:
+        west = [int(t) - 1 for t in re.split(r"[,\s]+", args.ally_spots.strip()) if t]
+        east = [i for i in range(n) if i not in west]
+    want = None if args.roles.lower() == "all" else {r.strip().upper() for r in args.roles.split(",")}
+    if want is not None:
+        want.add(args.role.upper())
+
+    def pick(indices, role):
+        return [i for i in indices if spots[i][2] == role]
+
+    tech = pick(west, args.role.upper())
+    if not tech:
+        die("no %s spot on the ally side of the map file" % args.role)
+    teams = []  # (spot index, allyteam, ai kind, side)
+    teams.append((tech[0], 0, "test", args.side))
+    others = "test" if args.others == "test" else ("prod" if args.others == "prod" else None)
+    k = 0
+    for ally, indices in ((0, west), (1, east)):
+        for i in indices:
+            if i == tech[0]:
+                continue
+            role = spots[i][2]
+            if want is not None and role not in want:
+                continue
+            if ally == 0 and others is None:
+                continue
+            kind = others if ally == 0 else (others or "test")
+            side = SIDES[k % len(SIDES)]
+            k += 1
+            teams.append((i, ally, kind, side))
+    if not any(t[1] == 1 for t in teams):
+        # the game ends at once with nobody to fight: keep one enemy
+        j = east[0]
+        teams.append((j, 1, others or "test", "armada"))
+    return teams
+
+
+COLOURS = ["0.2 0.6 1.0", "1.0 0.5 0.1", "0.3 0.9 0.3", "0.9 0.3 0.9", "0.9 0.9 0.2", "0.4 0.9 0.9",
+           "0.9 0.4 0.4", "0.6 0.6 0.6", "0.1 0.3 0.8", "0.8 0.3 0.0", "0.1 0.6 0.1", "0.6 0.1 0.6",
+           "0.7 0.7 0.0", "0.0 0.6 0.6", "0.6 0.0 0.0", "0.3 0.3 0.3"]
+
+
+def write_script(args, d):
+    top, mod = read_prod_script()
+    game = args.game or top.get("gametype") or latest_game_version()
+    if not game:
+        die("no game version: pass --game 'Beyond All Reason test-...'")
+    map_name = args.map or top.get("mapname") or "Supreme Isthmus v1.7"
+    if not map_name:
+        die("no map: pass --map")
+    if not map_archive_present(map_name):
+        log("WARNING: no archive for '%s' under %s/maps; the engine will fail to load it" % (map_name, BAR_DATA))
+    spots = map_spots(map_name, args.map_file)
+    teams = choose_teams(args, spots)
+
+    mod = {k: v for k, v in mod.items() if not k.startswith("mapmetadata_")}
+    now = dt.datetime.now()
+    # Legion is on in every playtest (owner's rule), the map stays what the lobby last played (Supreme Isthmus)
+    # zero bonus is the benchmark baseline (D-072): the AI income multiplier is 1 and every team's handicap 0
+    # unless --bonus asks for a handicap on team 0
+    mod.update({"allowuserwidgets": "1", "experimentallegionfaction": "1", "ai_incomemultiplier": "1", "date_year": str(now.year), "date_month": "%02d" % now.month,
+                "date_day": "%02d" % now.day, "date_hour": "%02d" % now.hour})
+    for kv in args.modoption or []:
+        k, _, v = kv.partition("=")
+        mod[k.strip()] = v.strip()
+
+    ai_opts = {}
+    for kv in args.ai_option or []:
+        k, _, v = kv.partition("=")
+        ai_opts[k.strip()] = v.strip()
+
+    L = ["[GAME]", "{",
+         "\tGameType=%s;" % game, "\tMapName=%s;" % map_name,
+         "\tStartPosType=3;", "\tIsHost=1;", "\tHostIP=127.0.0.1;", "\tHostPort=0;",
+         "\tMyPlayerName=Playtest;", "\tNumPlayers=1;", "\tGameStartDelay=0;", "\tNoHelperAIs=0;",
+         "\t[MODOPTIONS]", "\t{"]
+    for k in sorted(mod):
+        L.append("\t\t%s=%s;" % (k, mod[k]))
+    # The spectator gets a team of its own in a third allyteam. BAR's game_end
+    # gadget treats every AI hosted by an inactive player as uncontrolled and
+    # wipes out that player's allyteam (except in 1v1); the local client is
+    # inactive until it has finished loading, so a spectator sharing allyteam
+    # 0 with the AIs killed the whole west side at frame 1. Its own team spawns
+    # a commander that BAR kills at once (a team whose players all spectate).
+    spec_team = len(teams)
+    L += ["\t}", "\t[ALLYTEAM0] { NumAllies=0; }", "\t[ALLYTEAM1] { NumAllies=0; }", "\t[ALLYTEAM2] { NumAllies=0; }",
+          "\t[PLAYER0] { Name=Playtest; Spectator=1; Team=%d; IsFromDemo=0; Rank=0; }" % spec_team,
+          "\t[TEAM%d] { AllyTeam=2; TeamLeader=0; Side=armada; RgbColor=0.5 0.5 0.5; StartPosX=64; StartPosZ=64; Handicap=0; }" % spec_team]
+    for t, (si, ally, kind, side) in enumerate(teams):
+        x, z, role = spots[si]
+        L += ["\t[TEAM%d]" % t, "\t{", "\t\tAllyTeam=%d;" % ally, "\t\tTeamLeader=0;",
+              "\t\tSide=%s;" % side, "\t\tRgbColor=%s;" % COLOURS[t % len(COLOURS)],
+              "\t\tStartPosX=%d;" % int(x), "\t\tStartPosZ=%d;" % int(z), "\t\tHandicap=%d;" % (int(args.bonus) if (t == 0 and args.bonus) else 0), "\t}"]
+        short, ver = (AI_SHORT, AI_VERSION) if kind == "test" else (PROD_AI_SHORT, PROD_AI_VERSION)
+        L += ["\t[AI%d]" % t, "\t{", "\t\tShortName=%s;" % short, "\t\tVersion=%s;" % ver,
+              "\t\tName=%s-%s-%d;" % (short, role.lower(), t), "\t\tTeam=%d;" % t, "\t\tHost=0;", "\t\tIsFromDemo=0;"]
+        if ai_opts:
+            L.append("\t\t[OPTIONS] { %s }" % " ".join("%s=%s;" % kv for kv in ai_opts.items()))
+        L += ["\t}"]
+    L += ["}", ""]
+    (d / "script.txt").write_text("\n".join(L), encoding="utf-8")
+    plan = [{"team": t, "spot": si + 1, "x": spots[si][0], "z": spots[si][1], "role": spots[si][2],
+             "ally": ally, "ai": kind, "side": side} for t, (si, ally, kind, side) in enumerate(teams)]
+    (d / "teams.json").write_text(json.dumps({"game": game, "map": map_name, "teams": plan}, indent=2), encoding="utf-8")
+    log("script: %s on %s, %d AIs (%s under test as team 0 on spot P%d, %s)" % (
+        game, map_name, len(teams), args.role, teams[0][0] + 1, args.side))
+    return plan
+
+
+# --------------------------------------------------------------------------- the engine process
+
+def pid_file(d):
+    return Path(d) / "playtest.pid"
+
+
+def launch(args):
+    d = Path(args.dir)
+    if not (d / "script.txt").exists() or not (d / "AI" / "Skirmish" / AI_SHORT / AI_VERSION / "SkirmishAI.dll").exists():
+        die("nothing staged in %s: run 'stage' first" % d)
+    if running_pids(d):
+        die("a playtest engine is already running (pids %s): 'stop' it first" % running_pids(d))
+    eng = engine_dir(args.engine)
+    exe = eng / ("spring-headless.exe" if getattr(args, "headless", False) else "spring.exe")
+    # a fresh infolog per run; the previous one is kept with its run
+    info = d / "infolog.txt"
+    if info.exists():
+        try:
+            info.unlink()
+        except OSError:
+            pass
+    for old in (d / "screenshots").glob("*.png"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    cmd = [str(exe), "--write-dir", str(d), str(d / "script.txt")]
+    log("launch: " + " ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=str(eng), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    pid_file(d).write_text(str(proc.pid), encoding="utf-8")
+    (d / "launched.json").write_text(json.dumps({"pid": proc.pid, "engine": str(eng),
+                                                 "at": dt.datetime.now().isoformat(timespec="seconds")}), encoding="utf-8")
+    log("engine pid %d, engine %s" % (proc.pid, eng.name))
+    return proc.pid
+
+
+def running_pids(d):
+    """Engine processes started on this write dir, and no other spring.exe."""
+    needle = str(d).replace("/", "\\").lower()
+    ps = ("Get-CimInstance Win32_Process -Filter \"Name='spring.exe' or Name='spring-headless.exe'\" | "
+          "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }")
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30).stdout
+    except Exception:
+        return []
+    pids = []
+    for line in out.splitlines():
+        pid, _, cl = line.partition("|")
+        if needle in cl.lower() and pid.strip().isdigit():
+            pids.append(int(pid))
+    return pids
+
+
+def stop(args, quiet=False):
+    d = Path(args.dir)
+    pids = set(running_pids(d))
+    pf = pid_file(d)
+    if pf.exists():
+        try:
+            pids.add(int(pf.read_text().strip()))
+        except ValueError:
+            pass
+    killed = []
+    for pid in pids:
+        r = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+        if r.returncode == 0:
+            killed.append(pid)
+    if pf.exists():
+        pf.unlink()
+    if not quiet:
+        log("stopped %s" % (killed if killed else "nothing (no playtest engine running)"))
+    return killed
+
+
+# --------------------------------------------------------------------------- watching the log
+
+FRAME_RE = re.compile(r"\[f=(-?\d+)\]")
+AI_RE = re.compile(r":::AI LOG:S:(\d+):T:(\d+):F:(-?\d+):L::(.*)$")
+DETAILS_RE = re.compile(r"\[GameDetails\] skirmishAI=(\d+) team=(\d+) .*? role=(\d+)")
+TIMELINE_RE = re.compile(r"\[Rule\] |\[Eco\] next|\[TECH\]\[Build\]|\[TECH\]\[Opening\]|\[TECH\]\[Factory\]|\[TECH\]\[Labs\]|\[Layout\]|\[Team\]\[Roster\]|\[Playtest\]")
+NATIVE_RE = re.compile(r"Skirmish AI <[^>]*>: (EXP: |RESERVE: |BUILDER: |CBFactoryTask: )")
+
+
+def load_checks(path):
+    p = Path(path)
+    if not p.exists():
+        p = HERE / "checks" / (str(path) + ".json")
+    if not p.exists():
+        die("no checks file %s" % path)
+    return json.loads(p.read_text(encoding="utf-8")), p
+
+
+def watch(args):
+    d = Path(args.dir)
+    checks, checks_path = load_checks(args.checks)
+    stop_minute = float(args.minutes) if args.minutes else float(checks.get("stop_minute", 12))
+    stop_frame = int(stop_minute * 60 * FPS)
+    info = d / "infolog.txt"
+    launched = json.loads((d / "launched.json").read_text()) if (d / "launched.json").exists() else {}
+    role_int = ROLE_INT.get(args.role.upper(), 2)
+
+    expects = [dict(e, seen=None) for e in checks.get("expect", [])]
+    forbids = list(checks.get("forbid", []))
+    pass_on = checks.get("pass_on")
+    for e in expects:
+        e["re"] = re.compile(e["pattern"])
+    for f in forbids:
+        f["re"] = re.compile(f["pattern"])
+    if pass_on:
+        pass_on["re"] = re.compile(pass_on["pattern"])
+
+    frame = 0
+    sid = None            # skirmish AI id of the team under test
+    failures = []
+    timeline = []
+    native = []
+    errors = []
+    widget_loaded = False
+    verdict = None
+    reason = ""
+    started = time.time()
+    wall_limit = float(args.wall_minutes) * 60 if args.wall_minutes else (stop_minute * 90 + 240)
+    pos = 0
+    buf = ""
+    last_report = 0
+
+    def minute(fr):
+        return fr / (60.0 * FPS)
+
+    def scope_ok(scope, this_sid):
+        if scope in (None, "tech", "test"):
+            return sid is not None and this_sid == sid
+        return True
+
+    while True:
+        if info.exists():
+            with open(info, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(pos)
+                chunk = f.read()
+                pos = f.tell()
+            buf += chunk
+            lines = buf.split("\n")
+            buf = lines.pop()
+            for line in lines:
+                line = line.rstrip("\r")
+                fm = FRAME_RE.search(line)
+                if fm:
+                    frame = max(frame, int(fm.group(1)))
+                if "[Playtest] widget loaded" in line:
+                    widget_loaded = True
+                if re.search(r": ERR\s+:", line) or "Fix compilation errors" in line:
+                    errors.append(line)
+                am = AI_RE.search(line)
+                this_sid = None
+                text = line
+                if am:
+                    this_sid = int(am.group(1))
+                    text = am.group(4)
+                    if sid is None:
+                        dm = DETAILS_RE.search(text)
+                        if dm and int(dm.group(2)) == 0 and int(dm.group(3)) == role_int:
+                            sid = int(dm.group(1))
+                            log("team 0 is skirmish AI %d (%s)" % (sid, args.role))
+                    if sid is not None and this_sid == sid and TIMELINE_RE.search(text):
+                        timeline.append((frame, text))
+                elif NATIVE_RE.search(line):
+                    native.append((frame, line.split(">: ", 1)[-1]))
+                if "[Playtest]" in line and not am:
+                    timeline.append((frame, line.split("] ", 1)[-1] if "] " in line else line))
+                for fb in forbids:
+                    if fb.get("after_minute") and minute(frame) < float(fb["after_minute"]):
+                        continue
+                    if fb["re"].search(text if am else line) and scope_ok(fb.get("scope", "any"), this_sid):
+                        failures.append("forbid '%s' hit at %.1f min: %s" % (fb["key"], minute(frame), (text if am else line)[-200:]))
+                        verdict = "FAIL"
+                        reason = "forbidden line"
+                for e in expects:
+                    if e["seen"] is None and e["re"].search(text if am else line) and scope_ok(e.get("scope", "tech"), this_sid):
+                        e["seen"] = (frame, (text if am else line)[-200:])
+                        if e.get("after_key"):
+                            other = next((o for o in expects if o["key"] == e["after_key"]), None)
+                            if other is None or other["seen"] is None or other["seen"][0] > frame:
+                                failures.append("'%s' came before '%s' (%.1f min)" % (e["key"], e["after_key"], minute(frame)))
+                                verdict = "FAIL"
+                                reason = "order"
+                if pass_on and pass_on["re"].search(text if am else line) and scope_ok(pass_on.get("scope", "tech"), this_sid):
+                    verdict = verdict or "PASS"
+                    reason = reason or "pass_on '%s'" % pass_on["key"]
+        # deadlines
+        for e in expects:
+            if e["seen"] is None and e.get("by_minute") is not None and minute(frame) > float(e["by_minute"]):
+                failures.append("'%s' not seen by %.1f min" % (e["key"], float(e["by_minute"])))
+                e["seen"] = (None, "missed")
+                verdict = "FAIL"
+                reason = "deadline"
+        alive = bool(running_pids(d)) if (time.time() - last_report) > 5 else True
+        if (time.time() - last_report) > 5:
+            last_report = time.time()
+            log("%.1f min, frame %d, %d timeline lines, %d failures%s" % (minute(frame), frame, len(timeline), len(failures),
+                                                                        "" if sid is not None else ", team 0 not identified yet"))
+        if verdict == "FAIL" and not args.keep_going:
+            break
+        if frame >= stop_frame:
+            verdict = verdict or "PASS"
+            reason = reason or "reached %.0f min" % stop_minute
+            break
+        if not alive and frame > 0:
+            verdict = verdict or ("FAIL" if frame < stop_frame else "PASS")
+            reason = reason or "engine exited at %.1f min" % minute(frame)
+            break
+        if not alive and frame == 0 and time.time() - started > 90:
+            verdict = "FAIL"
+            reason = "engine exited before the game started"
+            break
+        if time.time() - started > wall_limit:
+            verdict = verdict or "FAIL"
+            reason = reason or "wall clock limit"
+            break
+        time.sleep(float(args.poll))
+
+    missing = [e["key"] for e in expects if e["seen"] is None or e["seen"][0] is None]
+    if verdict == "PASS" and missing:
+        verdict = "FAIL"
+        reason = "expected lines never seen: " + ", ".join(missing)
+    if verdict is None:
+        verdict = "FAIL"
+    if errors:
+        verdict = "FAIL"
+        reason = "script errors"
+
+    if not args.no_stop:
+        stop(args, quiet=True)
+
+    # the report
+    run_dir = d / "runs" / dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    shots = sorted((d / "screenshots").glob("*.png"))
+    for s in shots:
+        shutil.copy2(s, run_dir / s.name)
+    if info.exists():
+        shutil.copy2(info, run_dir / "infolog.txt")
+    staged = json.loads((d / "staged.json").read_text()) if (d / "staged.json").exists() else {}
+    teams = json.loads((d / "teams.json").read_text()) if (d / "teams.json").exists() else {}
+    R = ["# Playtest report: %s" % verdict, "",
+         "- Verdict: **%s** (%s)" % (verdict, reason),
+         "- Game time reached: %.1f min (frame %d); wall %.0f s" % (minute(frame), frame, time.time() - started),
+         "- DLL: %s (%s); AI %s; staged %s" % (staged.get("dll"), staged.get("dll_sha256_16"), staged.get("ai"), staged.get("staged")),
+         "- Map: %s; game: %s; teams: %s" % (teams.get("map"), teams.get("game"),
+                                            ", ".join("%d=%s/%s/%s" % (t["team"], t["role"], t["side"], t["ai"]) for t in teams.get("teams", []))),
+         "- Team 0 (under test): skirmish AI %s, role %s" % (sid, args.role),
+         "- Checks: %s; widget loaded: %s" % (checks_path.name, "yes" if widget_loaded else "not seen in log"),
+         "- Log: %s" % (run_dir / "infolog.txt"), ""]
+    R += ["## Checks", "", "| Check | Result | Line |", "| --- | --- | --- |"]
+    for e in expects:
+        if e["seen"] and e["seen"][0] is not None:
+            R.append("| expect `%s` | seen at %.1f min | `%s` |" % (e["key"], minute(e["seen"][0]), e["seen"][1].replace("|", "/")))
+        else:
+            R.append("| expect `%s` | **missing**%s | |" % (e["key"], (" (by %s min)" % e["by_minute"]) if e.get("by_minute") else ""))
+    for fb in forbids:
+        hits = [f for f in failures if f.startswith("forbid '%s'" % fb["key"])]
+        R.append("| forbid `%s` | %s | %s |" % (fb["key"], ("**hit**" if hits else "clean"), ("`%s`" % hits[0].split(": ", 1)[-1].replace("|", "/")) if hits else ""))
+    if failures:
+        R += ["", "## Failures", ""] + ["- " + f for f in failures]
+    if errors:
+        R += ["", "## Script errors", "", "```"] + errors[:20] + ["```"]
+    R += ["", "## Screenshots", ""] + (["- %s" % (run_dir / s.name) for s in shots] or ["- none"])
+    R += ["", "## Timeline (team 0)", "", "```"]
+    R += ["%6.2f  %s" % (minute(fr), t[:220]) for fr, t in timeline[:args.timeline_lines]]
+    if len(timeline) > args.timeline_lines:
+        R.append("... %d more" % (len(timeline) - args.timeline_lines))
+    R += ["```", "", "## Native lines (all AIs, first %d)" % 120, "", "```"]
+    R += ["%6.2f  %s" % (minute(fr), t[:220]) for fr, t in native[:120]]
+    R += ["```", ""]
+    report = "\n".join(R)
+    (run_dir / "report.md").write_text(report, encoding="utf-8")
+    (d / "report.md").write_text(report, encoding="utf-8")
+    print(report if args.print_report else "\n".join(R[:9 + len(expects) + len(forbids) + 4]))
+    log("report: %s" % (run_dir / "report.md"))
+    return 0 if verdict == "PASS" else 1
+
+
+# --------------------------------------------------------------------------- main
+
+def add_common(p):
+    p.add_argument("--dir", default=str(DEFAULT_DIR), help="the engine's write directory for playtests")
+    p.add_argument("--role", default="TECH", help="the role under test (team 0 takes its spot on the ally side)")
+
+
+def add_stage_args(p):
+    p.add_argument("--dll", help="SkirmishAI.dll to test (default: the docker build's install copy)")
+    p.add_argument("--data", help="AI data dir with config/ script/ AIOptions.lua AIInfo.lua (default: the repo's data/)")
+    p.add_argument("--set", action="append", help='override a Global::RoleSettings::Tech setting in the staged script, e.g. --set RushObjective=\'"afus"\'')
+    p.add_argument("--speed", default="1", help="game speed the widget sets at frame 1 (setminspeed/setmaxspeed)")
+    p.add_argument("--minutes", default=None, help="game minutes to play (default: the checks file's stop_minute)")
+    p.add_argument("--shots", default="1,3,6,10", help="screenshot minutes, each optionally @height, e.g. 2@1500,6,10@3000")
+    p.add_argument("--cam-height", default="2200", help="overhead camera height for screenshots")
+    p.add_argument("--width", default="1920")
+    p.add_argument("--height", default="1080")
+
+
+def add_script_args(p):
+    p.add_argument("--map", help="map name as the lobby shows it (default: the last lobby script's)")
+    p.add_argument("--map-file", help="the AI map file with the StartSpot table (default: derived from the map name)")
+    p.add_argument("--game", help="game archive name (default: the last lobby script's, else the newest byar:test)")
+    p.add_argument("--roles", default="all", help="roles to field on both sides, e.g. TECH,FRONT; 'all' = every spot")
+    p.add_argument("--others", default="test", choices=["test", "prod", "none"],
+                   help="the other AIs: this build (test), the deployed SMRTBARb (prod), or enemies only (none)")
+    p.add_argument("--side", default="cortex", choices=SIDES, help="the side of the AI under test")
+    p.add_argument("--ally-spots", help="1-based spot numbers of the ally side, e.g. '1,2,3,4,5,6,7,8' (default: first half)")
+    p.add_argument("--modoption", action="append", help="key=value override in [MODOPTIONS]")
+    p.add_argument("--ai-option", action="append", help="key=value in every test AI's [OPTIONS], e.g. profile=experimental_hard")
+    p.add_argument("--engine", help="engine folder name under the install's engine/ (default: the one the lobby used last)")
+    p.add_argument("--bonus", default=None, help="handicap percent for team 0 only (e.g. 50); benchmarks run at 0")
+    p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window, no widget, no screenshots; log only")
+
+
+def add_watch_args(p):
+    p.add_argument("--checks", default="tech_opening", help="checks file (name under tools/playtest/checks or a path)")
+    p.add_argument("--poll", default="1.0")
+    p.add_argument("--wall-minutes", default=None)
+    p.add_argument("--keep-going", action="store_true", help="do not stop at the first failure")
+    p.add_argument("--no-stop", action="store_true", help="leave the game running after the verdict")
+    p.add_argument("--print-report", action="store_true")
+    p.add_argument("--timeline-lines", type=int, default=400)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("stage"); add_common(p); add_stage_args(p); add_script_args(p)
+    p = sub.add_parser("launch"); add_common(p); add_script_args(p)
+    p = sub.add_parser("watch"); add_common(p); add_watch_args(p); p.add_argument("--minutes", default=None)
+    p = sub.add_parser("stop"); add_common(p)
+    p = sub.add_parser("run"); add_common(p); add_stage_args(p); add_script_args(p); add_watch_args(p)
+    args = ap.parse_args()
+
+    if args.cmd == "stop":
+        stop(args)
+        return 0
+    if args.cmd in ("stage", "run"):
+        if args.minutes is None:
+            checks, _ = load_checks(args.checks) if hasattr(args, "checks") else ({}, None)
+            args.minutes = str(checks.get("stop_minute", 12))
+        stage(args)
+        write_script(args, Path(args.dir))
+        if args.cmd == "stage":
+            return 0
+    if args.cmd in ("launch", "run"):
+        launch(args)
+        if args.cmd == "launch":
+            return 0
+    return watch(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -83,11 +83,20 @@ From that, three rules:
 1. **The AI's goal is the range circle**, `EngageRange = 0.9 (r + rho)`,
    in `UpdatePath` (path goal range), in `Reevaluate` (the in-range test)
    and in `TryEngage`. No waypoint is ever placed inside the disc.
-2. **The last leg is the engine's.** Inside `experimentalDirectRange`
-   (1,600 elmos) on ground the threat map calls safe, the AI cancels its
-   travel action and gives the construction command at once; the engine
-   walks the shortest path to the disc and starts. Farther, or under threat,
-   the threat-aware AI path is used up to the circle, then the command.
+2. **The last leg is one move to a chosen point on the circle.** Inside
+   `experimentalDirectRange` (1,600 elmos) on ground the threat map calls
+   safe, the AI cancels its travel action and moves the unit to an
+   *approach point*: a point on the circle of `EngageRange - 16` around
+   the site, the nearest of sixteen bearings starting from the unit's own,
+   whose cell no structure holds and which lies in the unit's movement
+   area (`CTerrainManager::FindApproachPoint`). The construction command is
+   given when that move ends (the idle event), from inside the range.
+   Played before this: the engine's own goal, the point on the circle
+   straight toward the unit, sat on packed structures in the base; the
+   engine dropped the command every five seconds (`EXP: idle ... target
+   yes, fails 1, 2, 3`), and the task removed the unit. Farther, or under
+   threat, the threat-aware AI path is used up to the circle, then the
+   approach point.
 3. **One command per engagement.** A unit is `engaged` once its command is
    given; `Update`, `OnTravelEnd` and re-evaluations never issue another.
    The set is cleared for a unit when the engine reports it idle (finished
@@ -103,6 +112,15 @@ Alternatives looked at and not taken:
 | Solving site order as a TSP over pending sites | Over-engineering; the planner issues one site at a time. The nearest-neighbour heuristic is used where it is free: the packer breaks ties by the asking builder's position. |
 | Distance-transform packing (Felzenszwalb EDT) | Same result as the brute-force nearest-turret scan for a 40 x 44-cell box; not worth the code. |
 | Custom waypoint following with a range-aware last hop | Reimplements `MoveInBuildRange` worse. |
+
+## Packed sites are for structures only
+
+`FindBuildSite` takes the experimental branch (pack nearest the anchor,
+reserve, serve) only for a static def. A recruit, rally or retreat task
+asks it for a free spot for a *mobile* unit; a packed reservation for one
+is never forgotten because no structure ever stands on it, and 21 of them
+filled the turret box on 2026-09-21 (D-068). Those asks use the stock
+search.
 
 ## Placement, the same idea
 

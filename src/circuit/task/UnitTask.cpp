@@ -14,7 +14,10 @@
 #include "unit/CircuitUnit.h"
 #include "unit/action/AntiCapAction.h"
 #include "CircuitAI.h"
+#include "module/BuilderManager.h"
 #include "util/Utils.h"
+
+#include "Log.h"
 
 namespace circuit {
 
@@ -118,6 +121,11 @@ void IUnitTask::OnUnitMoveFailed(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
+	if (circuit->GetBuilderManager()->IsExperimentalBuild() && (type == Type::BUILDER)) {
+		const AIFloat3& upos = unit->GetPos(frame);
+		circuit->LOG("EXP: move failed: %s(%i) at (%.0f, %.0f); a radial move of 256 follows and the command queue is replaced",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), upos.x, upos.z);
+	}
 	AIFloat3 pos = geom::get_radial_pos(unit->GetPos(frame), SQUARE_SIZE * 32);
 	CTerrainManager::CorrectPosition(pos);
 	TRY_UNIT(circuit, unit,

@@ -9,6 +9,7 @@
 #include "../helpers/map_helpers.as"
 #include "builder.as"
 #include "layout.as"
+#include "economy.as"
 
 /******************************************************************************
 
@@ -31,7 +32,9 @@ The order it produces, from the meta (doc/eco-planner.md for the numbers):
      the source with the lowest metal per E/s the constructor can build,
      the bank can pay within EcoAffordSeconds, and the box can hold.
   2. The advanced lab the moment its income gate passes: it unlocks the
-     T2 constructors that upgrade mexes and build advanced converters.
+     T2 constructors that upgrade mexes and build advanced converters; and
+     a T2 builder's first job is the nearest owned mex not yet upgraded
+     (MexUpgradeRadius, MexUpgradeMaxConcurrent at a time).
   3. Energy floating (bank near full) or a surplus twice a converter's draw:
      a converter; advanced when a T2 constructor asks. Energy under
      construction does not block it - the surplus is measured.
@@ -78,6 +81,8 @@ namespace EcoPlanner {
         int t2Cons;
         bool t2Lab;
         int t2LabQueued;
+        AIFloat3 mexUpPos;          // nearest owned T1 mex a T2 builder could upgrade (x < 0: none)
+        int mexUpsQueued;
         int solars;
         int advSolars;
         int winds;
@@ -98,7 +103,8 @@ namespace EcoPlanner {
         float buildPowerNear;       // static assist build power around the base (turrets), workertime units
         bool builderIsT2;
         const CCircuitDef@ builderDef;    // the asking constructor: only its build options are offered (CR-006)
-        bool energyBuilding;        // an energy structure of ours is under construction
+        bool energyBuilding;        // an energy structure of ours is ordered or under construction
+        bool energyAssistable;      // ... and its frame exists within EcoAssistRadius of the asking builder
     }
 
     class Option {
@@ -114,6 +120,7 @@ namespace EcoPlanner {
 
     string lastChoice = "";
     int lastLogFrame = -100000;
+    int lastT2GateLog = -100000;
 
     // ---------------------------------------------------------------- numbers
 
@@ -218,13 +225,42 @@ namespace EcoPlanner {
         // through; played, they hid the shortage and no turret was ever built.
         s.buildPowerNear = aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius);
         s.builderIsT2 = (u !is null && u.circuitDef !is null) ? (UnitHelpers::GetConstructorTier(u.circuitDef) >= 2) : false;
+        s.mexUpPos = AIFloat3(-1.0f, 0.0f, -1.0f);
+        s.mexUpsQueued = 0;
+        if (s.builderIsT2) {
+            CCircuitDef@ t2mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(side));
+            if (t2mex !is null && u.circuitDef.CanBuild(t2mex)) {
+                s.mexUpsQueued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), t2mex);
+                s.mexUpPos = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
+                    Global::RoleSettings::MexUpgradeRadius);
+            }
+        }
         @s.builderDef = (u is null) ? null : u.circuitDef;
         // An energy structure is "in progress" from the order on, not only once
         // its frame exists: played, two advanced solars were started at once
         // while the first constructor was still walking.
         s.energyBuilding = (Builder::GetEnergyUnderConstruction() !is null)
             || (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null) > 0);
+        s.energyAssistable = false;
+        {
+            CCircuitUnit@ frame = Builder::GetEnergyUnderConstruction();
+            if (frame !is null && u !is null) {
+                const float r = Global::RoleSettings::Tech::EcoAssistRadius;
+                s.energyAssistable = MapHelpers::SqDist(frame.GetPos(ai.frame), u.GetPos(ai.frame)) <= r * r;
+            }
+        }
         return s;
+    }
+
+    // A def the constructor could build now: exists, available (not capped)
+    // and the box holds it. The storage rules used to name a capped metal
+    // storage every ask (TECH caps it at 0 until the advanced lab).
+    bool Buildable(const string &in name, const State@ s)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        if (d is null || !d.IsAvailable(ai.frame)) return false;
+        if (s.builderDef !is null && !s.builderDef.CanBuild(d)) return false;
+        return Layout::CanPlace(d);
     }
 
     int Count(const string &in name)
@@ -299,10 +335,21 @@ namespace EcoPlanner {
     }
 
     // The cheapest energy per E/s the bank can pay; else the cheapest lump.
+    // With a T2 builder asking and energy income at EcoFusionEnergyIncome or
+    // more, the reactor is the answer whatever the ratio says: the base has
+    // outgrown solars (owner's rule; played, advanced solars kept coming).
     string PickEnergy(const State@ s, string &out why, const string &in reason)
     {
         array<Option@> opts = EnergyOptions(s);
         if (opts.length() == 0) return "";
+        if (s.builderIsT2 && s.eIncome >= Global::RoleSettings::Tech::EcoFusionEnergyIncome) {
+            for (uint i = 0; i < opts.length(); ++i) {
+                if (opts[i].key == "afus") { why = reason + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: advanced fusion"; return "afus"; }
+            }
+            for (uint i = 0; i < opts.length(); ++i) {
+                if (opts[i].key == "fusion") { why = reason + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: fusion"; return "fusion"; }
+            }
+        }
         if (Affordable(opts[0], s)) {
             why = reason + "; cheapest per E/s";
             return opts[0].key;
@@ -347,9 +394,28 @@ namespace EcoPlanner {
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         if (lab is null || !lab.IsAvailable(ai.frame) || !s.builderDef.CanBuild(lab)) return "";
         if (s.mIncome < Global::RoleSettings::Tech::MinimumMetalIncomeForT2Lab
-            || s.eIncome < Global::RoleSettings::Tech::MinimumEnergyIncomeForT2Lab) return "";
+            || s.eIncome < Global::RoleSettings::Tech::MinimumEnergyIncomeForT2Lab) {
+            if (ai.frame - lastT2GateLog > 60 * SECOND) {
+                lastT2GateLog = ai.frame;
+                GenericHelpers::LogUtil("[Eco] advanced lab waits: +" + int(s.mIncome) + " metal, " + int(s.eIncome)
+                    + " energy under the gate (" + int(Global::RoleSettings::Tech::MinimumMetalIncomeForT2Lab) + " / "
+                    + int(Global::RoleSettings::Tech::MinimumEnergyIncomeForT2Lab) + ")", 1);
+            }
+            return "";
+        }
         why = "advanced lab: +" + int(s.mIncome) + " metal, " + int(s.eIncome) + " energy clear the gate";
         return "t2lab";
+    }
+
+    // A T2 builder upgrades the nearest owned T1 mex within MexUpgradeRadius
+    // of the start: the best metal per cost there is, and the reason the lab
+    // came first. Played: with native's chooser closed, no upgrade ever came.
+    string PickMexUpgrade(const State@ s, string &out why)
+    {
+        if (!s.builderIsT2 || s.mexUpPos.x < 0.0f) return "";
+        if (s.mexUpsQueued >= Global::RoleSettings::MexUpgradeMaxConcurrent) return "";
+        why = "T2 builder; owned mex at (" + int(s.mexUpPos.x) + ", " + int(s.mexUpPos.z) + ") to upgrade";
+        return "mexup";
     }
 
     // Build power: a turret when the assist power around the base is under
@@ -394,14 +460,27 @@ namespace EcoPlanner {
         const bool oneAtATime = s.energyBuilding && Global::RoleSettings::Tech::EcoOneEnergyAtATime;
         string key;
 
-        // 1. energy draining: the base is stalling, energy before anything.
+        // 1. energy draining: the base is stalling, energy before anything -
+        //    but one structure at a time even now. A second builder asking
+        //    while one is going up assists it if it is within EcoAssistRadius
+        //    (build power focused, walking capped); played, three advanced
+        //    solars went up in parallel.
         if (draining) {
-            key = PickEnergy(s, why, "energy draining, bank " + int(s.eCur) + "/" + int(s.eStor) + ", pull " + int(s.ePull) + " over " + int(s.eIncome));
-            if (key.length() > 0) return key;
+            if (!s.energyBuilding) {
+                key = PickEnergy(s, why, "energy draining, bank " + int(s.eCur) + "/" + int(s.eStor) + ", pull " + int(s.ePull) + " over " + int(s.eIncome));
+                if (key.length() > 0) return key;
+            } else if (s.energyAssistable) {
+                why = "energy draining and a structure is going up; assist it";
+                return "assistenergy";
+            }
         }
 
         // 2. the advanced lab the moment its gate passes.
         key = PickT2Lab(s, why);
+        if (key.length() > 0) return key;
+
+        // 2b. a T2 builder upgrades the owned mexes first.
+        key = PickMexUpgrade(s, why);
         if (key.length() > 0) return key;
 
         // 3. energy floating, or a surplus that carries a converter twice over:
@@ -417,27 +496,34 @@ namespace EcoPlanner {
         if (key.length() > 0) return key;
 
         // 5. energy below the target for this income, and not floating: one
-        //    structure at a time (D-037). A full bank is not a shortage.
-        if (deficit > 0.0f && !floatingE && !oneAtATime) {
+        //    structure at a time (D-037). A full bank is not a shortage. Once
+        //    a T2 constructor exists and energy income is past the fusion
+        //    threshold, T1 builders leave energy to the reactors.
+        const bool fusionEra = (s.t2Cons > 0) && (s.eIncome >= Global::RoleSettings::Tech::EcoFusionEnergyIncome);
+        if (deficit > 0.0f && !floatingE && !oneAtATime && (s.builderIsT2 || !fusionEra)) {
             key = PickEnergy(s, why, "energy " + int(s.eIncome) + " below target " + int(target));
             if (key.length() > 0) return key;
+        }
+        if (deficit > 0.0f && !floatingE && oneAtATime && s.energyAssistable) {
+            why = "energy below target and a structure is going up; assist it";
+            return "assistenergy";
         }
 
         // 6. storage
         if (s.winds >= Global::RoleSettings::Tech::EcoStorageWinds
-            && s.estors + s.estorsQueued < 1 && s.mIncome >= 4.0f && Layout::CanPlace(ai.GetCircuitDef(UnitHelpers::GetEnergyStorageNameForSide(Global::AISettings::Side)))) {
+            && s.estors + s.estorsQueued < 1 && s.mIncome >= 4.0f && Buildable(UnitHelpers::GetEnergyStorageNameForSide(Global::AISettings::Side), s)) {
             why = s.winds + " winds and no energy storage: buffer the lulls";
             return "estor";
         }
         if (s.estors + s.estorsQueued < Global::RoleSettings::Tech::EcoMaxEnergyStorages
             && s.eStor < s.eIncome * Global::RoleSettings::Tech::EcoStorageSeconds && s.mIncome >= 15.0f
             && s.mCur >= Global::RoleSettings::Tech::EcoStorageMinMetalBank
-            && Layout::CanPlace(ai.GetCircuitDef(UnitHelpers::GetEnergyStorageNameForSide(Global::AISettings::Side)))) {
+            && Buildable(UnitHelpers::GetEnergyStorageNameForSide(Global::AISettings::Side), s)) {
             why = "energy storage holds under " + int(Global::RoleSettings::Tech::EcoStorageSeconds) + " s of income";
             return "estor";
         }
         if (aiEconomyMgr.isMetalFull && s.mstors + s.mstorsQueued < Global::RoleSettings::Tech::EcoMaxMetalStorages && s.mIncome >= 20.0f
-            && Layout::CanPlace(ai.GetCircuitDef(UnitHelpers::GetMetalStorageNameForSide(Global::AISettings::Side)))) {
+            && Buildable(UnitHelpers::GetMetalStorageNameForSide(Global::AISettings::Side), s)) {
             why = "metal bank full at +" + int(s.mIncome) + "; metal storage";
             return "mstor";
         }
@@ -496,10 +582,20 @@ namespace EcoPlanner {
     IUnitTask@ Enqueue(const string &in key, CCircuitUnit@ u)
     {
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
+        if (key == "mexup") {
+            CCircuitDef@ t2mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
+            AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
+                Global::RoleSettings::MexUpgradeRadius);
+            if (t2mex is null || at.x < 0.0f) return null;
+            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, t2mex, at, -1));
+        }
         if (key == "t2lab") {
-            IUnitTask@ lab = Builder::EnqueueT2BotLabIfNeeded(Global::AISettings::Side, Global::Map::StartPos, 0.0f, 300 * SECOND);
-            if (lab !is null) GenericHelpers::LogUtil("[Eco] advanced lab ordered on the pair's reserved slot", 1);
-            return lab;
+            // The site is the layout's call (D-069): the pair's slot or the
+            // footprint the most static build power reaches.
+            return Layout::T2LabTask(300 * SECOND);
+        }
+        if (key == "assistenergy") {
+            return Builder::EnqueueAssistEnergy(Task::Priority::HIGH, 60 * SECOND, Global::RoleSettings::Tech::EnergyFocusMaxAssists);
         }
         if (key == "assistnano") {
             CCircuitDef@ nanoDef = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
@@ -522,7 +618,10 @@ namespace EcoPlanner {
     // reactor under construction instead" rule, then Execute.
     string Next(CCircuitUnit@ u, float metalIncome, float energyIncome)
     {
-        if (!Global::RoleSettings::Tech::ExperimentalBuild || !Global::RoleSettings::Tech::EcoPlannerEnabled || u is null) return "";
+        // With the experimental system on, the rule table (roles/tech_rules.as)
+        // calls the Pick* pieces itself and this entry answers nothing, so the
+        // legacy rungs it still reuses cannot run the planner a second time.
+        if (Global::RoleSettings::Tech::ExperimentalBuild || !Global::RoleSettings::Tech::EcoPlannerEnabled || u is null) return "";
         State@ s = Read(u, metalIncome, energyIncome);
         string why;
         const string key = Decide(s, why);

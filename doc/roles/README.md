@@ -41,7 +41,9 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | `FRONT` | `front.as` | 1028 | `RoleFront` | [front.md](front.md) |
 | `AIR` | `air.as` | 1042 | `RoleAir` | [air.md](air.md) |
 | `TECH` | `tech.as` | 1923 | `RoleTech` | [tech.md](tech.md) |
-| `TECH` | `tech_build.as` | 216 | `TechBuild` | [tech_build.md](tech_build.md) |
+| `TECH` | `tech_build.as` | 310 | `TechBuild` | [tech_build.md](tech_build.md) |
+| `TECH` | `tech_rules.as` | 341 | `TechRules` | [tech_rules.md](tech_rules.md) |
+| `TECH` | `tech_chain.as` | 336 | `TechChain` | [tech_chain.md](tech_chain.md) |
 | `SEA` | `sea.as` | 903 | `RoleSea` | [sea.md](sea.md) |
 | `SUPPORT` | `support.as` | 497 | `RoleSupport` | [support.md](support.md) |
 | `TACTICAL` | `tactical.as` | 709 | `RoleTactical` | [tactical.md](tactical.md) |
@@ -55,7 +57,9 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | [front.md](front.md) | FRONT - land army and forward pressure |
 | [air.md](air.md) | AIR - aircraft plants, air constructors, wind economy |
 | [tech.md](tech.md) | TECH - economy-first, T2/T3 race, unit-cap system |
-| [tech_build.md](tech_build.md) | TECH - the experimental build system (D-066): the whole builder sequence when `Tech::ExperimentalBuild` is on |
+| [tech_build.md](tech_build.md) | TECH - the experimental build system (D-066): the acts the rule table calls when `Tech::ExperimentalBuild` is on |
+| [tech_rules.md](tech_rules.md) | TECH - the ordered rule table (D-067) that is the whole builder sequence in experimental mode; the T1-lab cases |
+| [tech_chain.md](tech_chain.md) | TECH - the rush chain (D-070): one objective, the computed build order, every builder on it, then the economy |
 | [sea.md](sea.md) | SEA - naval production and water expansion |
 | [support.md](support.md) | SUPPORT - hybrid economic substitute, no factory task handler |
 | [tactical.md](tactical.md) | TACTICAL - mobile-builder role, forces the hover plant opening |

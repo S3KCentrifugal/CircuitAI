@@ -170,8 +170,8 @@ Builder::AiMakeTask()  per builder  -> Tech_BuilderAiMakeTask()
 
 | Category | Start cap | Raised later? |
 | --- | --- | --- |
-| T1 combat units | `0` | only T1 **bot scouts** and **vehicle scouts** to 100, and only at `mi >= 200` |
-| T2 combat units | `0` | only the **gated T2 bots** (`Tech_GetGatedT2Bots`: rush bots Sprinter/Fiend/Hoplite plus amphibious Platypus/Duck/Telchine). Their engine caps are snapshotted before the blanket cap and restored by `Tech_UncapRushBots` in `Tech_EconomyUpdate` once `mi >= MetalIncomeThresholdForEarlyBotLabExpansion` (100), one-way. Everything else never |
+| T1 combat units | `0` | only T1 **bot scouts** and **vehicle scouts** to 100, and only at `mi >= 200`; with the experimental system on, bot scouts wait for the combat gate below (D-068) |
+| T2 combat units | `0` | only the **gated T2 bots** (`Tech_GetGatedT2Bots`: rush bots Sprinter/Fiend/Hoplite plus amphibious Platypus/Duck/Telchine). Their engine caps are snapshotted before the blanket cap and restored by `Tech_UncapRushBots` in `Tech_EconomyUpdate` once `mi >= MetalIncomeThresholdForEarlyBotLabExpansion` (100), one-way - raised to `ExpCombatMetalIncome` (200; 0 = never) by `Tech_CombatGate` while the experimental system is on, together with the bot-lab and vehicle-plant batch gates of `Tech_FactoryAiMakeTask` ([D-068](../decisions.md#d-068--tech-makes-no-combat-unit-before-the-combat-gate-packed-sites-are-for-structures-only)); logged once as `[TECH][Factory] combat production unlocked`. Everything else never |
 | T1/T2 air combat | `0` | never |
 | Fast-assist bots | `50`, then dynamic | `Tech_IncomeBuilderLimits`: `5*floor(mi/45)` below 100 income, `5*floor(mi/20)` above |
 | T1 bot labs | `1` | to 3 at `mi >= 200` |
@@ -598,6 +598,8 @@ immobile `super` def - Juno, Catalyst, the silo - so a TECH launcher gets its
 `aiBuilderMgr.experimentalBuild` for this instance only, and
 `Tech_BuilderAiMakeTask`'s first line hands every ask to
 `TechBuild::MakeTask` ([`tech_build.as`](../../data/script/src/roles/tech_build.as)),
+which since D-067 evaluates the rule table in
+[`tech_rules.md`](tech_rules.md) (`roles/tech_rules.as`) and
 which never returns null, so native's chooser (`DefaultMakeTask`, empty for
 the instance) is never reached. Natively the start-factory and storage jobs
 are silent and `holdStartFactory` stays on; the script orders the lab on
@@ -848,4 +850,4 @@ constructor under turrets from both. Now:
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: ca4c857fc60a55763532b1289b53b6855597eea6; lines: 2527 -->
+<!-- source: data/script/src/roles/tech.as; blob: 5b68064cbc01651944597c4bb4fb41ce625253a6; lines: 2566 -->

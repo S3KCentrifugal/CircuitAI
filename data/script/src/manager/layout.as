@@ -60,6 +60,9 @@ namespace Layout {
     int boxAcross = 0;   // cells
     int boxDepth = 0;    // cells
     int boxRows = 0;
+    array<int> extraZones;      // D-072: boxes grown behind the first when it was full
+    AIFloat3 lastBoxCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
+    int lastBoxDepth = 0;
     AIFloat3 boxCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
     AIFloat3 factoryCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
 
@@ -97,6 +100,9 @@ namespace Layout {
         boxCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
         factoryCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
         @nano = null;
+        extraZones.resize(0);
+        lastBoxCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
+        lastBoxDepth = 0;
     }
 
     void OnRoleLeave()
@@ -162,6 +168,12 @@ namespace Layout {
             float(aiTerrainMgr.GetLayoutInt(BOX + ".centre_z", -1)));
         factoryCentre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(BOX + ".factory_x", -1)), 0.0f,
             float(aiTerrainMgr.GetLayoutInt(BOX + ".factory_z", -1)));
+        extraZones.resize(0);
+        const int extra = aiTerrainMgr.GetLayoutInt(BOX + ".extra_count", 0);
+        for (int i = 0; i < extra; ++i) extraZones.insertLast(aiTerrainMgr.GetLayoutInt(BOX + ".extra" + i, 0));
+        lastBoxCentre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(BOX + ".last_x", int(boxCentre.x))), 0.0f,
+            float(aiTerrainMgr.GetLayoutInt(BOX + ".last_z", int(boxCentre.z))));
+        lastBoxDepth = aiTerrainMgr.GetLayoutInt(BOX + ".last_depth", boxDepth);
         string box = ", no turret box";
         if (HasBox()) {
             box = ", turret box zone " + boxZone + " " + boxAcross + "x" + boxDepth + " cells, "
@@ -320,6 +332,11 @@ namespace Layout {
                 boxAcross = across;
                 boxDepth = depth;
                 boxCentre = bestCentre;
+                lastBoxCentre = bestCentre;
+                lastBoxDepth = depth;
+                aiTerrainMgr.SetLayoutInt(BOX + ".last_x", int(bestCentre.x));
+                aiTerrainMgr.SetLayoutInt(BOX + ".last_z", int(bestCentre.z));
+                aiTerrainMgr.SetLayoutInt(BOX + ".last_depth", depth);
                 // Turret rows: the first touches the pair's nanos, then one every
                 // shelf plus a turret depth, as many as the depth holds. Each
                 // slot is laid on its own: refused ground is a hole, not a veto.
@@ -357,6 +374,75 @@ namespace Layout {
         }
         return false;
     }
+
+    // D-072: when the box is full, another box of the same width directly
+    // behind the last one, with its own turret rows in the same group, so
+    // energy, converters, fusions and labs stay tight to the turret cluster
+    // instead of scattering around the base centre.
+    int growFailFrame = -100000;
+    bool GrowBox()
+    {
+        if (!HasBox() || lastBoxCentre.x < 0.0f || nano is null) return false;
+        if (int(extraZones.length()) >= Global::RoleSettings::Tech::LayoutBoxMaxExtra) return false;
+        if (ai.frame - growFailFrame < 60 * SECOND) return false;   // a failed search is not repeated every ask
+        const AIFloat3 fwd = Fwd(facing);
+        const AIFloat3 sideVec = Side(facing);
+        const float cell = SQUARE_SIZE * 2;
+        const int across = boxAcross;
+        const int shrink = Global::RoleSettings::Tech::LayoutBoxShrinkCells;
+        const int minDepth = Global::RoleSettings::Tech::LayoutBoxMinDepthCells;
+        const float minScore = Global::RoleSettings::Tech::LayoutBoxMinScore;
+        // behind the last box first; then beside the first box on either hand
+        // (played: the ground behind the base on Supreme Isthmus scored under
+        // the floor and the base scattered); the best ground wins
+        const AIFloat3 rearFront = lastBoxCentre - fwd * (float(lastBoxDepth) * 0.5f * cell);
+        const AIFloat3 firstFront = boxCentre + fwd * (float(boxDepth) * 0.5f * cell);
+        for (int depth = Global::RoleSettings::Tech::LayoutBoxDepthCells; depth >= minDepth; depth -= shrink) {
+            array<AIFloat3> fronts = { rearFront, firstFront + sideVec * (float(across) * cell), firstFront - sideVec * (float(across) * cell) };
+            array<string> names = { "behind", "beside (right)", "beside (left)" };
+            float best = -1.0f; int bestIdx = -1; AIFloat3 bestCentre;
+            for (uint i = 0; i < fronts.length(); ++i) {
+                const AIFloat3 centre = fronts[i] - fwd * (float(depth) * 0.5f * cell);
+                const float score = BoxScore(centre, across, depth);
+                if (score >= minScore && score > best) { best = score; bestIdx = int(i); bestCentre = centre; }
+            }
+            if (bestIdx < 0) continue;
+            const int zone = aiTerrainMgr.ReserveZone(bestCentre, facing, float(across) * SQUARE_SIZE, float(depth) * SQUARE_SIZE, false);
+            if (zone == 0) continue;
+            const AIFloat3 front = fronts[bestIdx];
+            const int nanoAlong = Along(nano, facing);
+            const int nanoAcross = Across(nano, facing);
+            const int pitch = Global::RoleSettings::Tech::LayoutBoxShelfCells + nanoAlong;
+            const int cols = (nanoAcross > 0) ? across / nanoAcross : 0;
+            int rows = 0;
+            for (int row = 0; row < NanoRows(); ++row) {
+                if (row * pitch + nanoAlong > depth) break;
+                const AIFloat3 rowFront = front - fwd * (float(row * pitch) * cell);
+                const int group = aiTerrainMgr.LayBand(zone, nano, rowFront, facing, cols, 1, 0, false, true, false, nanoGroup);
+                if (group > 0) nanoGroup = group;
+                ++rows;
+            }
+            extraZones.insertLast(zone);
+            if (bestIdx == 0) { lastBoxCentre = bestCentre; lastBoxDepth = depth; }
+            aiTerrainMgr.SetLayoutInt(BOX + ".extra_count", int(extraZones.length()));
+            aiTerrainMgr.SetLayoutInt(BOX + ".extra" + (extraZones.length() - 1), zone);
+            aiTerrainMgr.SetLayoutInt(BOX + ".last_x", int(lastBoxCentre.x));
+            aiTerrainMgr.SetLayoutInt(BOX + ".last_z", int(lastBoxCentre.z));
+            aiTerrainMgr.SetLayoutInt(BOX + ".last_depth", lastBoxDepth);
+            aiTerrainMgr.SetLayoutInt(BOX + ".nano_group", nanoGroup);
+            GenericHelpers::LogUtil("[Layout] turret box full: grown " + names[bestIdx] + " by " + across + "x" + depth + " cells at ("
+                + int(bestCentre.x) + ", " + int(bestCentre.z) + "), ground " + int(best * 100.0f) + "%: zone " + zone + ", " + rows
+                + " turret rows (box " + (extraZones.length() + 1) + ")", 1);
+            return true;
+        }
+        growFailFrame = ai.frame;
+        GenericHelpers::LogUtil("[Layout] turret box full and no ground behind or beside it scores " + int(minScore * 100.0f) + "%; retried in a minute", 1);
+        return false;
+    }
+
+    // Every box zone, the first first: the older box fills before the newer
+    int ZoneCount() { return HasBox() ? 1 + int(extraZones.length()) : 0; }
+    int ZoneAt(int i) { return (i == 0) ? boxZone : extraZones[i - 1]; }
 
     void Plan(const string& in side)
     {
@@ -435,7 +521,9 @@ namespace Layout {
     {
         if (def is null) return false;
         if (!HasBox()) return true;
-        return aiTerrainMgr.CanPackNearGroup(boxZone, def, nanoGroup, facing, 0.0f, MinNanoDist(def));
+        for (int i = 0; i < ZoneCount(); ++i)
+            if (aiTerrainMgr.CanPackNearGroup(ZoneAt(i), def, nanoGroup, facing, 0.0f, MinNanoDist(def))) return true;
+        return true;   // the box grows when it is full (Place)
     }
 
     // Enqueue a structure on the box cells nearest to a turret, pinned to
@@ -457,9 +545,14 @@ namespace Layout {
             return aiBuilderMgr.Enqueue(TaskB::Common(type, priority, def, FactoryNanoCentre(),
                 float(Global::RoleSettings::Tech::LayoutFallbackShakeCells) * SQUARE_SIZE * 2, true, timeout));
         }
-        const int id = aiTerrainMgr.PackNearGroup(boxZone, def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
+        int id = -1;
+        for (int i = 0; i < ZoneCount() && id < 0; ++i)
+            id = aiTerrainMgr.PackNearGroup(ZoneAt(i), def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
+        if (id < 0 && GrowBox()) {
+            id = aiTerrainMgr.PackNearGroup(ZoneAt(ZoneCount() - 1), def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
+        }
         if (id < 0) {
-            GenericHelpers::LogUtil("[Layout] no room in the turret box for " + def.GetName(), 1);
+            GenericHelpers::LogUtil("[Layout] no room in the turret boxes for " + def.GetName(), 1);
             return null;
         }
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
@@ -487,7 +580,24 @@ namespace Layout {
             if (t !is null) return t;
         }
         if (!HasBox()) return null;
-        const int id = aiTerrainMgr.NextSlotAny(nanoGroup, factoryCentre);
+        if (aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0 && !GrowBox()) return null;   // D-072: more rows behind
+        // D-069: the slot nearest a standing lab, whichever lab that is, so
+        // every turret reaches a lab; the pair's centre only when no lab stands.
+        int id = -1;
+        if (Global::RoleSettings::Tech::ExpTurretNearLab) {
+            float bestSq = 1.0e30f;
+            array<string>@ keys = Factory::allFactories.getKeys();
+            for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+                CCircuitUnit@ f = null; if (!Factory::allFactories.get(keys[i], @f) || f is null) continue;
+                const AIFloat3 fp = f.GetPos(ai.frame);
+                const int cand = aiTerrainMgr.NextSlotAny(nanoGroup, fp);
+                if (cand < 0) continue;
+                const float sq = MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(cand), fp);
+                if (sq < bestSq) { bestSq = sq; id = cand; }
+            }
+            if (id >= 0) GenericHelpers::LogUtil("[Layout] turret slot " + id + ", " + int(sqrt(bestSq)) + " from the nearest lab", 2);
+        }
+        if (id < 0) id = aiTerrainMgr.NextSlotAny(nanoGroup, factoryCentre);
         if (id < 0) return null;
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, priority, nano, pos, 0.0f, true, 120 * SECOND));
@@ -495,6 +605,63 @@ namespace Layout {
         if (!AiPinReservation(t, id)) {
             GenericHelpers::LogUtil("[Layout] could not pin a turret to slot " + id, 1);
         }
+        return t;
+    }
+
+    // The advanced lab's site (D-069): the pair's planned slot, unless a free
+    // footprint within ExpLabSiteRadius of it has strictly more static build
+    // power (turrets, workertime) within ExpLabBuildPowerReach - then that
+    // footprint, reserved and pinned, facing as the pair does. Every block,
+    // zone and exit cone is honoured by CanReserveBuilding. The first lab is
+    // the exception (tech_build.as: at the commander). Null when the lab
+    // cannot be ordered now (cooldown, def unavailable, nothing enqueued).
+    IUnitTask@ T2LabTask(int timeout)
+    {
+        const string side = Global::AISettings::Side;
+        CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
+        if (t2 is null || !t2.IsAvailable(ai.frame)) return null;
+        if (!Builder::IsT2BotFactoryOffCooldown()) return null;
+        // D-073: the site is scored by the turret slots (standing or planned) that
+        // reach it, front first among equals: the pair's planned slot against the
+        // best free footprint inside the turret layout (owner: "on the turret
+        // layout, tight, the more build power in range of the factory the better;
+        // its units leave for the front late").
+        const float reach = Global::RoleSettings::Tech::ExpLabBuildPowerReach;
+        const int t2Slot = aiTerrainMgr.GetLayoutInt(FACTORY_ROOT + ".t2_slot", -1);
+        AIFloat3 pairPos = (t2Slot >= 0) ? aiTerrainMgr.GetReservationPos(t2Slot) : Global::Map::StartPos;
+        if (pairPos.x < 0.0f) pairPos = Global::Map::StartPos;
+        const int pairScore = (nanoGroup > 0) ? aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, pairPos, reach) : 0;
+        int bestScore = pairScore;
+        int bestZone = 0;
+        AIFloat3 bestPos = pairPos;
+        for (int i = 0; i < ZoneCount(); ++i) {
+            AIFloat3 p;
+            const int s = aiTerrainMgr.PickMost(ZoneAt(i), t2, nanoGroup, facing, reach, p);
+            if (s > bestScore) { bestScore = s; bestZone = ZoneAt(i); bestPos = p; }
+        }
+        if (bestZone == 0 && HasBox() && GrowBox()) {
+            AIFloat3 p;
+            const int s = aiTerrainMgr.PickMost(ZoneAt(ZoneCount() - 1), t2, nanoGroup, facing, reach, p);
+            if (s > bestScore) { bestScore = s; bestZone = ZoneAt(ZoneCount() - 1); bestPos = p; }
+        }
+        if (bestZone == 0) {
+            IUnitTask@ t = Builder::EnqueueT2BotLabIfNeeded(side, Global::Map::StartPos, 0.0f, timeout);
+            if (t !is null) GenericHelpers::LogUtil("[Layout] advanced lab on the pair's slot (" + int(pairPos.x) + ", " + int(pairPos.z)
+                + "): " + pairScore + " turret slots within " + int(reach) + "; no footprint in the turret layout is reached by more", 1);
+            return t;
+        }
+        const int id = aiTerrainMgr.PackNearGroupMost(bestZone, t2, nanoGroup, facing, reach, 0);
+        if (id < 0) {
+            GenericHelpers::LogUtil("[Layout] advanced lab: the turret-layout footprint could not be reserved; the pair's slot is used", 1);
+            return Builder::EnqueueT2BotLabIfNeeded(side, Global::Map::StartPos, 0.0f, timeout);
+        }
+        const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
+        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, t2, p, null, 0.0f, false, true, timeout));
+        if (t is null) { aiTerrainMgr.ReleaseReservation(id); return null; }
+        if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[Layout] could not pin the advanced lab to slot " + id, 1);
+        Builder::MarkT2BotFactoryEnqueued();
+        GenericHelpers::LogUtil("[Layout] advanced lab in the turret layout at (" + int(p.x) + ", " + int(p.z) + "): " + bestScore
+            + " turret slots within " + int(reach) + " reach it, the pair's slot " + pairScore + "; front first among equals", 1);
         return t;
     }
 

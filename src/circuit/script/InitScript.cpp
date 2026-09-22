@@ -265,6 +265,14 @@ static int CTerrainManager_PackNearGroup(CTerrainManager* terrainMgr, int zone, 
 	return terrainMgr->PackNearGroup(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anchor, maxReach, minNanoDist, group);
 }
 
+static int CTerrainManager_PickMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos)
+{
+	return terrainMgr->PickMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, outPos);
+}
+static int CTerrainManager_PackNearGroupMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group)
+{
+	return terrainMgr->PackNearGroupMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, group);
+}
 static bool CTerrainManager_CanPackNearGroup(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup,
 		int facing, float maxReach, float minNanoDist)
 {
@@ -291,6 +299,8 @@ static float CCircuitAI_WindMin(CCircuitAI* circuit) { return circuit->GetMap()-
 static float CCircuitAI_WindMax(CCircuitAI* circuit) { return circuit->GetMap()->GetMaxWind(); }
 static float CCircuitAI_WindCur(CCircuitAI* circuit) { return circuit->GetMap()->GetCurWind(); }
 static float CCircuitAI_Tidal(CCircuitAI* circuit) { return circuit->GetMap()->GetTidalStrength(); }
+// D-072: the engine's per-team income multiplier (the lobby's handicap / bonus)
+static float CCircuitAI_IncomeMultiplier(CCircuitAI* circuit) { return circuit->GetGame()->GetTeamIncomeMultiplier(circuit->GetTeamId()); }
 static int CCircuitAI_MetalSpots(CCircuitAI* circuit) { return (int)circuit->GetMetalManager()->GetSpots().size(); }
 
 static AIFloat3 CSetupManager_GetLanePos(CSetupManager* setupMgr)
@@ -911,6 +921,9 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotAny(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextSlotAny), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetLayoutInt(const string& in, int)", asMETHOD(CTerrainManager, SetLayoutInt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, float maxReach, float minNanoDist, int group)", asFUNCTION(CTerrainManager_PackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PickMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, AIFloat3& out)", asFUNCTION(CTerrainManager_PickMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroupMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, int group)", asFUNCTION(CTerrainManager_PackNearGroupMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CountGroupSlotsWithin(int group, const AIFloat3& in, float) const", asMETHOD(CTerrainManager, CountGroupSlotsWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetReservationPos(int) const", asMETHOD(CTerrainManager, GetReservationPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationFacing(int) const", asMETHOD(CTerrainManager, GetReservationFacing), asCALL_THISCALL); ASSERT(r >= 0);
@@ -924,6 +937,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CCircuitAI", "float GetWindCur() const", asFUNCTION(CCircuitAI_WindCur), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "float GetTidalStrength() const", asFUNCTION(CCircuitAI_Tidal), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "int GetMetalSpotCount() const", asFUNCTION(CCircuitAI_MetalSpots), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitAI", "float GetIncomeMultiplier() const", asFUNCTION(CCircuitAI_IncomeMultiplier), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("int AiTaskReservationId(IUnitTask@)", asFUNCTION(IBuilderTask_GetReservationId), asCALL_CDECL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainHeight() const", asFUNCTION(CTerrainManager_GetTerrainHeight), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 

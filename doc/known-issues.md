@@ -2033,11 +2033,48 @@ lines, no opening lines, native's start factory as before).
 
 **Proposed solution.** One game with the switch on watching
 `[TECH][Build] experimental build system on`, `start factory ordered`,
-`expands a mex`, `RESERVE: packed ... near`, and no `discarded ... default
+`EXP: watchdog: ... lost` / `EXP: move failed` around the third mex (the
+start-stop-walk-back glitch of 2026-09-21),
+`expands a mex`, `RESERVE: packed ... near` (structures only, never a
+mobile def: D-068), `[Rule] <key>` lines showing which row chose each task
+(D-067: `lab.t1.opening` once, `lab.t1.reclaim` after `lab.t2`, never
+`lab.t1.opening` again), `[TECH][Factory] combat production unlocked` only
+past +200 metal, and no `discarded ... default
 task` lines for TECH; then one game with `Tech::ExperimentalBuild = false`
 confirming the stock lines and behaviour.
 
+**Verification.** Partly Played (2026-09-21/22): twelve headless tech-versus-tech
+benchmark loops (D-070, `doc/benchmarks/tech-rush.md`) exercised the whole
+sequence with the rush chain on; every rush target was met. Open: a real 8v8
+with enemy pressure, and the switch-off game.
+
+### KI-412 — A walking experimental builder is occasionally swapped off a fresh order
+
+**Severity**: Medium (a lost order costs a minute or two of one builder)
+**Location**: `data/script/src/roles/tech_rules.as` (`keep.current`),
+`data/script/src/roles/tech_build.as` (`KeepCurrent`, `[TECH][Keep]` diagnostic),
+`src/circuit/task/builder/BuilderTask.cpp` (`Reevaluate`, `EXP: leave` / `EXP: swap`)
+
+**Problem.** Played by the owner (2026-09-22): the commander stopped building
+the T1 lab twice as if interrupted, then finished it. In the benchmark logs
+the same shape appears a few times per game as `EXP: swap: corcom from task
+type 5 to task type 5` followed by `EXP: leave: ... off corsolar ..., target
+no, fails 0`: native's out-of-range re-evaluation asked the table and took a
+different-kind task (an assist) although the unit held its build task and
+the `keep.current` row should have returned it. The D-071 energy wait was one
+cause and is fixed; the remaining swaps could not be reproduced in four
+diagnostic games with the `[TECH][Keep]` trace on.
+
+**Proposed solution.** Leave the `[TECH][Keep]` trace at level 3 and the
+native `EXP: leave` / `EXP: swap` lines in place; when a swap appears with
+the keep trace visible (set it to level 1 for a run), read what the table
+saw at that ask. If `u.task` is not the build task at that moment, keep the
+current task natively in the experimental system for any unit that holds a
+construction task without a frame yet.
+
 **Verification.** Open.
+
+---
 
 ### KI-410 — Experimental build mode is not yet Played
 

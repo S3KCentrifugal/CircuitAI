@@ -26,6 +26,9 @@ static int CEconomyManager_GetEnergyLimit(CEconomyManager* mgr, const CCircuitDe
 	return mgr->GetEnergyLimit(const_cast<CCircuitDef*>(cdef));
 }
 
+static void CEconomyManager_ClearAllyStarts(CEconomyManager* mgr) { mgr->ClearAllyStarts(); }
+static void CEconomyManager_AddAllyStart(CEconomyManager* mgr, const AIFloat3& pos) { mgr->AddAllyStart(pos); }
+
 static IUnitTask* CEconomyManager_EnqueueMexWithinAware(
 		CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
 {
@@ -74,6 +77,8 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetClaimedMexCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetClaimedMexCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asFUNCTION(CEconomyManager_EnqueueMexWithin), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int, bool allyAware)", asFUNCTION(CEconomyManager_EnqueueMexWithinAware), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "void ClearAllyStarts()", asFUNCTION(CEconomyManager_ClearAllyStarts), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "void AddAllyStart(const AIFloat3& in)", asFUNCTION(CEconomyManager_AddAllyStart), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexTaskCountWithin(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetMexTaskCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	// Per-role energy table overrides (D-047); -1 keeps a field.
 	r = engine->RegisterObjectMethod("CEconomyManager", "void SetEnergyCondition(const CCircuitDef@, int limit, float metalIncome, float energyIncome)", asFUNCTION(CEconomyManager_SetEnergyCondition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

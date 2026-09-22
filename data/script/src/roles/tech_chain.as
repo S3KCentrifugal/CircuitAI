@@ -1,0 +1,389 @@
+/******************************************************************************
+
+TECH rush chain (D-070): one objective, one computed build chain, every
+builder on it, then the ordinary economy.
+
+`Tech::RushObjective` names the goal: t2, fusion, afus, nuke, gantry, titan,
+eco (no chain) or auto (the role's own choice). `Init` turns the objective
+and the map (effective wind, the home mex cluster) into an ordered list of
+cumulative targets - "6 mex, 2 solars, the lab, 4 solars, the advanced lab,
+2 T2 mex upgrades, 12 solars, a T2 turret, the advanced fusion" - the lines
+the rush simulator found fastest (rjm.bar.docs tools/knowledge/rush_sim.py,
+the rush table in 70-strategy/77-eco-tech-player.md). `Next(u)` is the
+`chain.next` row of the rule table: the first target not yet met is the
+current step; a builder assists it when its frame exists, waits briefly when
+an order for it is out, orders it when it can build it, and otherwise hands
+back null so the economy rows keep it useful. Constructor counts go through
+the factory rules (`MinimumT1ConstructorBots`, `MinimumT2ConstructorBots`),
+caps through `Tick`. When every target is met the chain is done, once, and
+the table continues as if there had been no chain.
+
+Trace: `[TECH][Chain] objective ...: <steps>` at init; `[TECH][Chain] step
+k/n <key> <have>/<target>: ordered|assist|waiting by <def> <id>` on change;
+`[TECH][Chain] complete at <s> s`.
+
+******************************************************************************/
+namespace TechChain
+{
+    class Step
+    {
+        string key;          // mex solar wind advsolar lab alab moho nano nanot2 fusion afus silo gantry
+        string defName;
+        int target;          // cumulative count of this def that must stand
+        float radius;        // mex steps: the spots within this of the start; 0 = the default
+        bool exhausted;      // mex steps: no open spot left in the radius
+        Step(const string &in k, const string &in d, int t, float r = 0.0f) { key = k; defName = d; target = t; radius = r; exhausted = false; }
+    }
+
+    string objective = "eco";
+    array<Step@> steps;
+    float bonus = 1.0f;        // D-072: the income multiplier this AI plays with (1 = zero bonus, the benchmark baseline)
+
+    // The engine's per-team income multiplier (the lobby's handicap) times
+    // the ai_incomemultiplier modoption. Deterministic, read once.
+    float IncomeBonus()
+    {
+        float b = ai.GetIncomeMultiplier();
+        if (b <= 0.0f) b = 1.0f;
+        dictionary@ mo = aiSetupMgr.GetModOptions();
+        if (mo !is null && mo.exists("ai_incomemultiplier")) {
+            string v; mo.get("ai_incomemultiplier", v);
+            const float m = parseFloat(v);
+            if (m > 0.0f) b *= m;
+        }
+        return b;
+    }
+    int wantCk = 2;
+    int wantAck = 1;
+    bool active = false;
+    bool done = false;
+    int startFrame = 0;
+    string lastTrace = "";
+    int stallStep = -1;        // the step last seen as current ...
+    int stallHave = -1;        // ... with this count ...
+    int stallFrame = 0;        // ... since this frame; no progress for ChainStepStallSeconds skips it
+    array<bool> skipped;
+    int pendingStep = -1;      // an order for this step went out ...
+    int pendingFrame = 0;      // ... at this frame; invisible to the queued and unfinished counts until its frame exists
+    int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
+
+    bool Active() { return active && !done; }
+
+    string DefFor(const string &in key)
+    {
+        const string side = Global::AISettings::Side;
+        if (key == "mex") return RoleTech::Tech_T1MexName(side);
+        if (key == "moho") return UnitHelpers::GetT2MexNameForSide(side);
+        if (key == "solar") return UnitHelpers::GetSolarNameForSide(side);
+        if (key == "wind") return UnitHelpers::GetWindNameForSide(side);
+        if (key == "advsolar") return UnitHelpers::GetAdvSolarNameForSide(side);
+        if (key == "lab") return UnitHelpers::GetT1BotLabForSide(side);
+        if (key == "alab") return UnitHelpers::GetT2BotLabForSide(side);
+        if (key == "nano") return UnitHelpers::GetT1NanoNameForSide(side);
+        if (key == "nanot2") { if (side == "cortex") return "cornanotct2"; if (side == "legion") return "legnanotct2"; return "armnanotct2"; }
+        if (key == "fusion") return UnitHelpers::GetFusionNameForSide(side);
+        if (key == "afus") return UnitHelpers::GetAdvFusionNameForSide(side);
+        if (key == "silo") { if (side == "cortex") return "corsilo"; if (side == "legion") return "legsilo"; return "armsilo"; }
+        if (key == "gantry") return UnitHelpers::GetLandGantryForSide(side);
+        return "";
+    }
+
+    Task::BuildType TypeFor(const string &in key)
+    {
+        if (key == "mex") return Task::BuildType::MEX;
+        if (key == "moho") return Task::BuildType::MEXUP;
+        if (key == "lab" || key == "alab" || key == "gantry" || key == "silo") return Task::BuildType::FACTORY;
+        if (key == "nano" || key == "nanot2") return Task::BuildType::NANO;
+        return Task::BuildType::ENERGY;
+    }
+
+    void Add(const string &in key, int target, float radius = 0.0f)
+    {
+        steps.insertLast(Step(key, DefFor(key), target, radius));
+    }
+
+    // Expected turbine output: the average of the map's min and max wind,
+    // capped at a turbine's 25 (the wind walks between the bounds; the
+    // storage the economy rows add rides out the lulls).
+    float WindExpected()
+    {
+        float avg = (ai.GetWindMin() + ai.GetWindMax()) * 0.5f;
+        if (avg > 25.0f) avg = 25.0f;
+        if (avg < 0.0f) avg = 0.0f;
+        return avg;
+    }
+
+    // Turbines or solars, from the numbers: metal per E/s of a turbine at the
+    // expected wind against the solar's, with a margin, and a max wind worth
+    // riding the lulls for (Supreme Isthmus: min 1, max 19 -> 4.3 metal per
+    // E/s against the solar's 7.8: turbines).
+    string EnergyChoice(string &out why)
+    {
+        const string side = Global::AISettings::Side;
+        CCircuitDef@ wind = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(side));
+        CCircuitDef@ solar = ai.GetCircuitDef(UnitHelpers::GetSolarNameForSide(side));
+        const float avg = WindExpected();
+        if (wind is null || solar is null || avg < 1.0f) { why = "no turbine def or no wind"; return "solar"; }
+        const float windMetalPerE = wind.costM / avg;
+        const float solarMetalPerE = solar.costM / 20.0f;
+        const bool useWind = (windMetalPerE * Global::RoleSettings::Tech::ChainWindMargin < solarMetalPerE)
+            && (ai.GetWindMax() >= Global::RoleSettings::Tech::ChainWindMaxMin);
+        why = "wind " + int(ai.GetWindMin()) + " to " + int(ai.GetWindMax()) + ", expected " + int(avg) + ", now " + int(ai.GetWindCur())
+            + ": " + int(windMetalPerE * 10.0f) / 10.0f + " metal per E/s a turbine, " + int(solarMetalPerE * 10.0f) / 10.0f + " a solar";
+        return useWind ? "wind" : "solar";
+    }
+
+    // The role's own pick when the setting says auto: the advanced fusion,
+    // the eco player's core structure; the benchmarks set the others.
+    string Choose()
+    {
+        return "afus";
+    }
+
+    void Init()
+    {
+        steps.resize(0);
+        active = false; done = false;
+        stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
+        objective = Global::RoleSettings::Tech::RushObjective;
+        if (objective == "auto") objective = Choose();
+        if (!Global::RoleSettings::Tech::ExperimentalBuild || objective == "eco" || objective.length() == 0) {
+            GenericHelpers::LogUtil("[TECH][Chain] no rush objective: the economy rules run from the start", 1);
+            return;
+        }
+        string windWhy;
+        const string energy = EnergyChoice(windWhy);
+        const bool useWind = (energy == "wind");
+        // solar counts from the simulator; turbines scaled to the same energy;
+        // an income bonus (D-072: the engine's multiplier from the lobby's
+        // handicap, times the ai_incomemultiplier modoption) makes every
+        // generator and mex give more, so the counts shrink by it
+        bonus = IncomeBonus();
+        float scale = 1.0f / bonus;
+        if (useWind) scale *= 20.0f / WindExpected();
+        // played: the advanced lab starves on four solars (constructors and mexes drain what the simulator did not model) and floats energy on eight: six before it
+        int e1 = int(2.0f * scale + 0.5f), e2 = int(6.0f * scale + 0.5f), e3 = int(14.0f * scale + 0.5f), e4 = int(10.0f * scale + 0.5f);
+        const int mexes = Global::RoleSettings::Tech::ChainMaxMexes;
+        wantCk = 2; wantAck = 1;
+
+        // The commander claims the opening's home mexes (the spots within
+        // OpeningMexRadius, at most OpeningMexCap: three on Supreme Isthmus,
+        // one or none on other maps) and drops the lab at once; the far spots
+        // are the constructors' (played: a commander sent 1,500 elmos out for
+        // a fourth mex before the lab).
+        Add("mex", Global::RoleSettings::Tech::OpeningMexCap, Global::RoleSettings::Tech::OpeningMexRadius);
+        Add("lab", 1);
+        Add(energy, e1);
+        Add("mex", mexes, Global::RoleSettings::Tech::ChainMexFarRadius);
+        Add(energy, e2);
+        Add("alab", 1);
+        if (objective == "fusion") {
+            Add("fusion", 1);
+        } else if (objective == "afus") {
+            // owner's rule (D-072): the T2 mex upgrades before the fusion; the energy
+            // block ahead of both because the upgrades drain 7,700 each and, in the
+            // game, energy is the constraint after the advanced lab.
+            // The T2 turret needs the extra-units pack (not in play): two T1
+            // turrets carry the build power.
+            wantAck = 2;
+            Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("afus", 1);
+        } else if (objective == "nuke") {
+            wantAck = 2;
+            // played: two advanced solars cost four minutes on an energy-starved base; the fusion and the solars carry the silo
+            Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("silo", 1);
+        } else if (objective == "gantry") {
+            wantAck = 2;
+            Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("gantry", 1);
+        } else if (objective == "titan") {
+            wantAck = 2;
+            Add(energy, e3); Add("moho", 4); Add("fusion", 1); Add("nano", 2); Add("gantry", 1);
+        } else if (objective != "t2") {
+            GenericHelpers::LogUtil("[TECH][Chain] unknown objective '" + objective + "': treated as t2", 1);
+            objective = "t2";
+        }
+        active = true;
+        startFrame = ai.frame;
+        skipped.resize(steps.length());
+        for (uint i = 0; i < skipped.length(); ++i) skipped[i] = false;
+        Global::RoleSettings::Tech::MinimumT1ConstructorBots = wantCk;
+        Global::RoleSettings::Tech::MinimumT2ConstructorBots = wantAck;
+        // The chain owns the mexes: the opening's rows stay quiet.
+        RoleTech::Opening::Finish("the rush chain owns the opening");
+        string line = "";
+        for (uint i = 0; i < steps.length(); ++i) line += (i > 0 ? ", " : "") + steps[i].key + " " + steps[i].target;
+        GenericHelpers::LogUtil("[TECH][Chain] objective " + objective + " (" + energy + ": " + windWhy + "; income bonus x"
+            + int(bonus * 100.0f) / 100.0f + "; " + wantCk + " T1 cons, " + wantAck + " T2 cons): " + line, 1);
+        Tick();
+    }
+
+    // Caps re-asserted every economy update: the start caps and the merged
+    // map limits would otherwise hide a solar past the fourth, a fusion, a
+    // gantry or a silo from IsAvailable.
+    void Tick()
+    {
+        if (!Active()) return;
+        for (uint i = 0; i < steps.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(steps[i].defName);
+            if (d is null) continue;
+            if (d.maxThisUnit < steps[i].target) d.maxThisUnit = steps[i].target;
+        }
+    }
+
+    int Standing(const Step@ s, CCircuitDef@ d)
+    {
+        int have = d.count - aiBuilderMgr.GetUnfinishedCount(d);
+        if (s.key == "mex") {
+            CCircuitDef@ m = ai.GetCircuitDef(DefFor("moho"));
+            if (m !is null) have += m.count;
+        }
+        return have;
+    }
+
+    void Trace(const string &in what, int i, const Step@ s, int have, CCircuitUnit@ u)
+    {
+        const string key = s.key + "|" + i + "|" + what + "|" + have;
+        const bool changed = (key != lastTrace);
+        lastTrace = key;
+        GenericHelpers::LogUtil("[TECH][Chain] step " + (i + 1) + "/" + steps.length() + " " + s.key + " " + have + "/" + s.target + ": " + what
+            + " by " + u.circuitDef.GetName() + " " + u.id, changed ? 1 : 3);
+    }
+
+    IUnitTask@ Order(int i, Step@ s, CCircuitDef@ d, CCircuitUnit@ u)
+    {
+        const string key = s.key;
+        if (key == "mex") {
+            const float radius = (s.radius > 0.0f) ? s.radius : Global::RoleSettings::Tech::OpeningMexRadius;
+            // ally-aware (D-072): the allies' ground and the spots nearer their starts are theirs
+            IUnitTask@ t = aiEconomyMgr.EnqueueMexWithin(u, Global::Map::StartPos, radius, 0, true);
+            if (t is null && aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, radius) == 0) {
+                s.exhausted = true;
+                GenericHelpers::LogUtil("[TECH][Chain] no open mex spot within " + int(radius) + ": mex step " + (i + 1) + " ends at " + Standing(s, d), 1);
+            }
+            return t;
+        }
+        if (key == "lab") return TechBuild::StartFactory(u);
+        if (key == "alab") return Layout::T2LabTask(300 * SECOND);
+        if (key == "moho") {
+            AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            if (at.x < 0.0f) return null;
+            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
+        }
+        if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
+        if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
+        if (key == "gantry") return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        // energy, the T2 turret: the turret box first, then the nearest free
+        // footprint to the base centre (native packs it, D-066)
+        if (key == "wind" && ai.GetWindCur() < Global::RoleSettings::Tech::ChainWindBootstrap) {
+            // the first generator while the wind is down is a solar: a turbine
+            // costs 175 energy the bank must lend and gives nothing back yet
+            CCircuitDef@ solar = ai.GetCircuitDef(DefFor("solar"));
+            CCircuitDef@ w = d;
+            if (solar !is null && (w.count + solar.count) == 0) {
+                GenericHelpers::LogUtil("[TECH][Chain] wind is " + int(ai.GetWindCur()) + " now and nothing generates: the first energy is a solar", 1);
+                @d = solar;
+            }
+        }
+        const Task::BuildType type = TypeFor(key);
+        // short timeouts: an order nobody reaches is released in two minutes,
+        // and the chain simply orders again
+        IUnitTask@ t = Layout::Place(type, Task::Priority::HIGH, d, 120 * SECOND, u);
+        if (t is null) {
+            @t = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, d, Layout::BaseCentre(), 600.0f, true, 120 * SECOND));
+        }
+        return t;
+    }
+
+    IUnitTask@ Next(CCircuitUnit@ u)
+    {
+        if (!Active() || u is null || u.circuitDef is null) return null;
+        bool unmet = false;   // some step is not met, whether or not this builder could help
+        for (uint i = 0; i < steps.length(); ++i) {
+            Step@ s = steps[i];
+            CCircuitDef@ d = ai.GetCircuitDef(s.defName);
+            if (d is null) continue;
+            if (s.key == "mex" && s.exhausted) continue;
+            // the first lab is reclaimed once the advanced lab begins (D-066): its step is met from then on
+            if (s.key == "lab" && TechBuild::IntoT2()) continue;
+            if (i < skipped.length() && skipped[i]) continue;
+            const int have = Standing(s, d);
+            if (have >= s.target) continue;
+            unmet = true;
+            // the current step: no progress for ChainStepStallSeconds skips it
+            if (stallStep != int(i) || stallHave != have) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
+            else if (i + 1 < steps.length() && ai.frame - stallFrame > int(Global::RoleSettings::Tech::ChainStepStallSeconds) * SECOND) {
+                // never the objective itself (played: an advanced fusion whose site
+                // the engine refused was skipped and the chain declared itself done)
+                skipped[i] = true;
+                GenericHelpers::LogUtil("[TECH][Chain] step " + (i + 1) + "/" + steps.length() + " " + s.key + " " + have + "/" + s.target
+                    + " made no progress for " + int(Global::RoleSettings::Tech::ChainStepStallSeconds) + " s: skipped", 1);
+                continue;
+            }
+            const int unfinished = aiBuilderMgr.GetUnfinishedCount(d);
+            int queued = aiBuilderMgr.GetQueuedBuildCount(int(TypeFor(s.key)), d);
+            if (s.key == "silo") queued += aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::BIG_GUN), d);
+            bool can = u.circuitDef.CanBuild(d);
+            // the far mex step belongs to the constructors: the commander stays home
+            if (s.key == "mex" && s.radius > Global::RoleSettings::Tech::OpeningMexRadius && UnitHelpers::IsCommander(u.circuitDef)) can = false;
+            const bool cheap = (d.costM < Global::RoleSettings::Tech::ChainParallelCostM);
+            // An order of this step that lost its builder (played: the engine drops
+            // a builder off a fresh order without any event) is taken over by the
+            // next builder that can build it, before anything else is ordered.
+            if (queued > 0 && can) {
+                IUnitTask@ q = aiBuilderMgr.FindQueuedTask(u, int(TypeFor(s.key)));
+                IBuilderTask@ qb = (q is null) ? null : cast<IBuilderTask>(q);
+                if (qb !is null && qb.buildDef is d) { Trace("takes the queued order", int(i), s, have, u); return q; }
+            }
+            // an order of ours that has no frame yet is invisible to both counts
+            const bool pending = (pendingStep == int(i)) && (have == pendingHave) && (unfinished == 0) && (ai.frame - pendingFrame < 120 * SECOND);
+            const int inFlight = unfinished + queued + (pending ? 1 : 0);
+            if (cheap) {
+                // one per builder, in parallel: a solar is not worth a walk to assist
+                if (can && have + inFlight < s.target) {
+                    IUnitTask@ t = Order(int(i), s, d, u);
+                    if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have + inFlight, u); return t; }
+                }
+                if (unfinished > 0) {
+                    // near first; when nothing else is left to order, anywhere
+                    CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame), 600.0f, d);
+                    if (frame is null && have + inFlight >= s.target) @frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, d);
+                    if (frame !is null) { Trace("assist", int(i), s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+                }
+                if (s.key == "mex" && s.exhausted) continue;
+                // a builder that cannot build this step goes on to the next it can
+                // (played: the commander idled two minutes while the constructors
+                // fetched the far mexes); one that can, but has nothing to add,
+                // is the economy rows' until the step stands
+                // nothing to add to a cheap step in flight: on to the next step
+                // (played: the advanced lab waited 84 s for the last turbine)
+                continue;
+            }
+            if (unfinished > 0) {
+                CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, d);
+                if (frame !is null) {
+                    Trace("assist", int(i), s, have, u);
+                    return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND));
+                }
+            }
+            if (!can) continue;   // the next step this builder can build
+            if (queued > 0 || pending) {
+                // an order is out and no frame exists yet: the economy rows keep
+                // this builder useful (played: waiting here stalled the base for
+                // the five minutes an abandoned solar order took to time out)
+                Trace("order out; economy meanwhile", int(i), s, have, u);
+                return null;
+            }
+            IUnitTask@ t = Order(int(i), s, d, u);
+            if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have, u); return t; }
+            if (s.key == "mex" && s.exhausted) continue;
+            Trace("cannot order yet", int(i), s, have, u);
+            return null;
+        }
+        if (unmet) return null;   // this builder skipped what it cannot build; the chain goes on
+        if (!done) {
+            done = true;
+            GenericHelpers::LogUtil("[TECH][Chain] complete: objective " + objective + " reached at " + int((ai.frame - startFrame) / SECOND)
+                + " s; the economy rules continue", 1);
+        }
+        return null;
+    }
+}

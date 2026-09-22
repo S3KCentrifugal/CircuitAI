@@ -1,0 +1,35 @@
+{
+  "_doc": "Rush benchmark for objective nuke: the milestone must finish by 16.5 min (D-070). pass_on ends the run the moment it lands.",
+  "stop_minute": 17.5,
+  "expect": [
+    {
+      "key": "chain",
+      "pattern": "\\[TECH\\]\\[Chain\\] objective nuke",
+      "by_minute": 0.5,
+      "scope": "tech"
+    },
+    {
+      "key": "milestone",
+      "pattern": "\\[Playtest\\] finished (armsilo|corsilo|legsilo) team 0",
+      "by_minute": 16.5,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script error",
+      "pattern": ": ERR\\s+:",
+      "scope": "any"
+    },
+    {
+      "key": "combat early",
+      "pattern": "combat production unlocked",
+      "scope": "tech"
+    }
+  ],
+  "pass_on": {
+    "key": "milestone",
+    "pattern": "\\[Playtest\\] finished (armsilo|corsilo|legsilo) team 0",
+    "scope": "any"
+  }
+}

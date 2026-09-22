@@ -3,7 +3,7 @@
 Script: [`data/script/src/roles/tech_build.as`](../../data/script/src/roles/tech_build.as),
 namespace `TechBuild`. Decision:
 [D-066](../decisions.md#d-066--the-experimental-build-system-a-hard-split-tech-only-one-switch).
-Role document: [`tech.md`](tech.md). Not Played:
+Role document: [`tech.md`](tech.md). Sequence: [`tech_rules.md`](tech_rules.md) (D-067). Not Played:
 [KI-411](../known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
 
 ## Intent
@@ -21,19 +21,28 @@ three seconds and is asked again.
 
 ## The sequence
 
-| Rung | Function | Who | What |
-| --- | --- | --- | --- |
-| 1 | `Tech_TurretAssist` (tech.as), `AssistAny`, `Wait` | static builders | reclaim in reach, then the economy under construction in the D-065 order, then any structure under construction within 700 elmos, then wait 5 s |
-| 2 | `KeepCurrent` | every builder | the construction it is on (build type below `REPAIR`) when native re-asks while it walks |
-| 3 | `Opening::MakeTask` (tech.as) | commander | the nearest `OpeningMexCap` mexes, nearest to itself first |
-| 4 | `StartFactory` | any builder that can | the T1 bot lab, ordered once the opening is complete, on the pair's reserved slot; native's start-factory job is silent and `holdStartFactory` stays on for the whole game |
-| 5 | `ExpandMex` | constructors | the nearest open spot the builder can reach within `EcoMexExpandRadius` (every spot inside it considered, nearest first), allied ground excluded, while metal income is under `EcoMexExpandUntilIncome`; logs `expands to a mex at (x, z)` and, once a minute, `no open mex spot within R` |
-| 6 | `Planner` | every builder | `EcoPlanner::Next` / `Execute` behind `Tech_RedirectEnergyToReactor`: energy, converters, turrets, storages, all packed into the turret box |
-| 7 | `Tech_Commander_AiMakeTask` / `Strategic` | commander / constructors | the role's strategic rungs as they stand (recycle, T2 lab gate, nukes, anti-nuke, gantry, water factories, T2 constructor policy) with a null default, so they return null when they have nothing |
-| 8 | `QueuedOrder` | constructors only | native's queued defence, radar, sonar, repair and bunker orders, nearest first (`aiBuilderMgr.FindQueuedTask`), only within `ExpOrderRadius` of the base centre (native's sensor job queues radars map-wide and the watchdog queues repairs anywhere) |
-| 9 | `AssistAny` | constructors; the commander within `ExpCommanderHomeRadius` | the nearest structure of ours under construction within `ExpAssistRadius` |
-| 10 | `GuardFactory` | constructors | guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
-| 11 | `Wait` | everyone | 3 s, then ask again |
+Since [D-067](../decisions.md#d-067--techs-build-sequence-is-one-ordered-rule-table)
+the sequence is the rule table in [`tech_rules.md`](tech_rules.md);
+`MakeTask` is `TechRules::Evaluate(u)` with a 3 s wait if the table
+answers null (it cannot: its last row is `wait`). This file holds the acts
+the rows call. Each names a def and asks `Layout` or native for the site; none
+computes one.
+
+| Act | Who calls it (row) | What |
+| --- | --- | --- |
+| `Tech_TurretAssist` (tech.as), `AssistAny`, `Wait` | `turret.assist`, `turret.any`, `turret.wait` | reclaim in reach, then the economy under construction in the D-065 order, then any structure under construction within 700 elmos, then wait 5 s |
+| `KeepCurrent` | `keep.current` | the construction it is on (build type below `REPAIR`) when native re-asks while it walks |
+| `Opening::MakeTask` (tech.as) | `opening.mex` | the nearest `OpeningMexCap` mexes, nearest to the commander first |
+| `ReclaimT1Lab` | `lab.t1.reclaim` | once the advanced lab's frame exists and the metal bank has room for the lab's metal (D-072: reclaim past the cap is lost; the advanced lab's build makes the room), reclaim the T1 bot lab: one native reclaim task that every builder within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) joins; turrets in reach take it first, and their assist tasks are 30 s so they re-ask soon |
+| `StartFactory` | `lab.t1.opening`, `lab.t1.recover`, `lab.t1.spam` | a T1 bot lab. By the commander: on the nearest buildable footprint within `ExpFirstLabRadius` (224) of where it stands whose edge is at least `ExpFirstLabClearance` (32) from the commander (a factory ordered on top of its builder has its command dropped by the engine), reserved and pinned - it is a throwaway, reclaimed once the advanced lab begins, so no walking; `Tick` holds an exit cone in front of it while it stands. By a constructor: the pair's reserved slot. Native's start-factory job is silent and `holdStartFactory` stays on for the whole game. The `IntoT2` guard lives in the table, not here |
+| `ExpandMex` | `mex.expand` | the nearest open spot the builder can reach within `EcoMexExpandRadius` (every spot inside it considered, nearest first), allied ground excluded; logs `expands to a mex at (x, z)` and, once a minute, `no open mex spot within R` |
+| `EcoPlanner::Pick*` / `Enqueue`, `Layout::T2LabTask` (D-073: the advanced lab where the most turret slots reach it, front first) | `energy.*`, `lab.t2`, `mex.upgrade`, `energy.convert`, `turret.build`, `storage.*` | the planner's pieces, called one at a time by the rows that own them: energy, converters, the advanced lab, mex upgrades, turrets, storages, all packed into the turret box |
+| `Tech_Commander_AiMakeTask` / `Strategic` | `legacy.strategic` | the role's strategic rungs as they stand (recycle, nukes, anti-nuke, gantry, water factories, T2 constructor policy) with a null default; the planner they used to call answers nothing in this mode |
+| `Defence` | `defence.base` | once the first turret stands: `ExpDefenceLLT` (1) light laser and `ExpDefenceAA` (1) light AA turrets near the factories (packed by native nearest the pair, outside the planned zones); nothing else, and native's porc chain is not asked (`Tech_AiMakeDefence` returns at once) |
+| `QueuedOrder` | `order.repair` | native's queued repair orders for our own unfinished structures, nearest first (`aiBuilderMgr.FindQueuedTask`), within `ExpOrderRadius` of the base centre; native's defence, radar and sonar orders are left alone |
+| `AssistAny` | `assist.any` | the nearest structure of ours under construction within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) |
+| `GuardFactory` | `guard.factory` | guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
+| `Wait` | `wait` | 3 s, then ask again |
 
 ## Placement
 
@@ -51,6 +60,7 @@ Mex and geo orders are exact spots.
 | `ExperimentalSearchRadius` | 512 | how far from an anchor a site may be packed |
 | `ExpAssistRadius` | 1500 | rung 9's radius |
 | `ExpOrderRadius` | 2000 | rung 8's radius from the base centre |
+| `ExpDefenceLLT` / `ExpDefenceAA` | 1 / 1 | rung 7b's counts |
 | `ExpCommanderHomeRadius` | 800 | the commander's assist radius after the opening; it never takes rung 8 |
 | `EcoMexExpandRadius` / `EcoMexExpandUntilIncome` | 2500 / 60 | rung 5 |
 
@@ -68,4 +78,4 @@ near (x, z) at (x, z), D away` for every packed site, `RESERVE: no site for
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: a309255eb5f460079ca6ab8117711631b4fa3a5b; lines: 252 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 0f9bc0162869c5150409495cb6a7c85eb0bb55e5; lines: 334 -->

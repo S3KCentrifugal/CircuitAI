@@ -185,6 +185,8 @@ public:
 	// halfAlong forward and back. Free cells are marked, blocked ones are
 	// holes. Returns the zone id, 0 when nothing could be marked.
 	int ReserveZone(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, bool corridor);
+	// D-072: would this footprint cut the zone's free cells into a pocket no unit could leave?
+	bool LeavesPocket(int zone, CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
 	// A corridor in front of a standing factory: its width plus `margin` each
 	// side, `length` forward from its front edge (the engine sends new units
 	// out through the front). Returns the corridor's zone id, 0 if none.
@@ -241,6 +243,15 @@ public:
 	// id, armed and any-reach, in `group`; -1 when nothing fits.
 	int PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor,
 			float maxReach, float minNanoDist, int group);
+	// D-073: the free footprint of cdef inside the zone that the most slots
+	// of nanoGroup (standing or planned) reach within `reach`, front first
+	// among equals (the zone's forward side along `facing`), then nearest a
+	// slot. PickMost is the dry run (score, position); PackNearGroupMost
+	// reserves it like PackNearGroup and returns the id, -1 when none.
+	int PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, springai::AIFloat3& outPos) const;
+	int PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group);
+	// slots of a group (standing or planned) within radius of pos
+	int CountGroupSlotsWithin(int group, const springai::AIFloat3& pos, float radius) const;
 	// The dry run of PackNearGroup: would a footprint fit? Nothing is marked.
 	bool CanPackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float maxReach, float minNanoDist);
 	// D-066: the experimental system's placement when no planned slot was
@@ -248,6 +259,10 @@ public:
 	// (cell-exact, deterministic, the def's block mask respected), reserved
 	// and served to the asking task like a planned slot. -RgtVector when none.
 	springai::AIFloat3 PackNearPoint(CCircuitDef* cdef, const springai::AIFloat3& pos, float radius, int facing, TerrainPredicate& predicate);
+	// D-064: a point on the circle of `radius` around `site`, nearest the
+	// unit's side, on cells no structure holds (planned ground is walkable)
+	// and inside the unit's movement area; -RgtVector when none of sixteen.
+	springai::AIFloat3 FindApproachPoint(CCircuitUnit* unit, const springai::AIFloat3& site, float radius);
 	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
 	// task may take a held slot; NextSlot serves the armed ones only).
 	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;

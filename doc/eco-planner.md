@@ -112,6 +112,8 @@ bpShort    = static assist build power (turrets only) within EcoBuildPowerRadius
 windEff    = min((windMin + windMax) / 2, 25) x (windMin < EcoWindLullFloor ? EcoWindLullFactor : 1)
 
 options(constructor) =
+    (a T2 builder with E >= EcoFusionEnergyIncome: advanced fusion if its gate passes, else fusion, whatever the ratio;
+     a T1 builder in that state: no energy at all)
     solar; advanced solar if M >= EcoAdvSolarMinMetalIncome or mB >= its cost;
     wind if windEff >= EcoWindMinimum;
     and for a T2 constructor: fusion if M >= MinimumMetalIncomeForFUS,
@@ -123,9 +125,13 @@ options(constructor) =
 decide:
   0. (opening, roles/tech.as) every reachable mex within OpeningMexRadius, nearest
      the commander first; then native's start factory
-  1. if draining:                     options[0] if affordable, else the cheapest lump
+  1. if draining and no energy build is in progress: options[0] if affordable, else the cheapest lump;
+     if draining and one is going up within EcoAssistRadius of the builder: assist it ("assistenergy",
+     up to EnergyFocusMaxAssists helpers); else nothing here - never a second one in parallel
   2. the advanced lab, if none stands or is queued, the constructor can build it,
      M >= MinimumMetalIncomeForT2Lab and E >= MinimumEnergyIncomeForT2Lab
+  2b. a T2 builder: the nearest owned T1 mex within MexUpgradeRadius of the start, while fewer
+     than MexUpgradeMaxConcurrent upgrades are queued ("mexup", an exact spot)
   3. if (floatingE or surplus >= 2 x EcoConverterUse), not energy-stalling, and the
      actual surplus covers the converter's native energy use (energy under construction
      does not block this):
@@ -139,7 +145,8 @@ decide:
      M >= EcoTurretMinMetalIncome, mB >= EcoTurretBankFraction x turret cost:
          turret (nano) on the next planned slot, nearest the factories
   4. if deficit > 0, not floatingE (a full bank is not a shortage), and no energy build
-     is active (EcoOneEnergyAtATime; an order counts from the moment it is placed):
+     is active (EcoOneEnergyAtATime; an order counts from the moment it is placed);
+     if one is active and its frame is within EcoAssistRadius: assist it
          options[0] if affordable, else the cheapest lump
   5. energy storage if winds >= EcoStorageWinds and none stands or is queued;
      energy storage if eS < E x EcoStorageSeconds and built+queued is below the cap;
@@ -219,6 +226,8 @@ nanos through the ordinary search, logged once. Nothing else spirals.
 | `EcoMaxEnergyStorages` / `EcoMaxMetalStorages` | 1 / 2 | queued work counts toward each cap |
 | `EcoStorageMinMetalBank` | 150 | no storage order under this much banked metal (the rule looped at 0) |
 | `EcoConverterUse` | 70 | a T1 converter's draw; twice this surplus converts even while energy is under construction |
+| `EcoAssistRadius` | 1200 | a builder assists the energy structure going up only within this of itself |
+| `EcoFusionEnergyIncome` | 300 | from this energy income a T2 builder answers "energy" with a fusion (advanced fusion once `MinimumMetalIncomeForAFUS`), and T1 builders leave energy to the reactors |
 | `EcoMetalMapSpots` | 150 | metal spots at or above this: a metal map |
 | `EcoBuildPowerPerMetal` | 8 | assist BP wanted around the base per metal income (about what T2 work spends) |
 | `EcoBuildPowerFloatFactor` | 1.5 | ... times this when metal floats |
@@ -232,7 +241,10 @@ nanos through the ordinary search, logged once. Nothing else spirals.
 
 The gates it shares with the ladder: `MinimumMetalIncomeForFUS`,
 `MinimumMetalIncomeForAFUS`, `MinimumMetalIncomeForAdvConverter`,
-`BuildT1ConvertersUntilMetalIncome`.
+`BuildT1ConvertersUntilMetalIncome`, and for the advanced lab
+`MinimumMetalIncomeForT2Lab` (18) / `MinimumEnergyIncomeForT2Lab` (250;
+was 500, which held the lab back at +24 metal while the base floated).
+`[Eco] advanced lab waits: ...` logs once a minute while the gate holds.
 
 ## What it does not do
 
@@ -245,6 +257,19 @@ The gates it shares with the ladder: `MinimumMetalIncomeForFUS`,
   (`Layout::NanoTask`). The planner touches the layout through five calls
   only: `Place`, `NanoTask`, `CanPlace`, `CanPlaceTurret`, `BaseCentre`.
   The ladder's old rungs and the float spend go through `EcoPlanner::Enqueue`.
+
+## With the experimental system on (D-067)
+
+`Next` answers nothing when `Tech::ExperimentalBuild` is on. The rule table
+([`roles/tech_rules.md`](roles/tech_rules.md)) calls the pieces itself,
+one per row: `Read` for the state, `PickEnergy`, `PickConverter`,
+`PickT2Lab`, `PickMexUpgrade`, `PickTurret`, the storage checks, and
+`Enqueue(key, u)` to turn a key into a task. The order of those calls is
+the table's, not `Decide`'s; `Decide` remains the order for the legacy
+ladder with the switch off.
+
+The `t2lab` key hands the site to `Layout::T2LabTask` (D-069): the pair's
+slot, or the footprint the most static build power reaches.
 
 ## Logs
 

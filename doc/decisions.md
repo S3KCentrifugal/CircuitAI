@@ -80,6 +80,13 @@ found to be wrong.
 - [D-064 — Experimental build mode: builders stop at the engine's build range](#d-064--experimental-build-mode-builders-stop-at-the-engines-build-range)
 - [D-065 — TECH's construction turrets: reclaim first, then the economy under construction in a fixed order](#d-065--techs-construction-turrets-reclaim-first-then-the-economy-under-construction-in-a-fixed-order)
 - [D-066 — The experimental build system: a hard split, TECH only, one switch](#d-066--the-experimental-build-system-a-hard-split-tech-only-one-switch)
+- [D-067 — TECH's build sequence is one ordered rule table](#d-067--techs-build-sequence-is-one-ordered-rule-table)
+- [D-068 — TECH makes no combat unit before the combat gate; packed sites are for structures only](#d-068--tech-makes-no-combat-unit-before-the-combat-gate-packed-sites-are-for-structures-only)
+- [D-069 — Turrets beside the nearest lab; the advanced lab where the most build power reaches](#d-069--turrets-beside-the-nearest-lab-the-advanced-lab-where-the-most-build-power-reaches)
+- [D-070 — The TECH rush chain: one objective, one computed build order, then the economy](#d-070--the-tech-rush-chain-one-objective-one-computed-build-order-then-the-economy)
+- [D-071 — No energy wait for experimental builders; a builder leaving an order is logged](#d-071--no-energy-wait-for-experimental-builders-a-builder-leaving-an-order-is-logged)
+- [D-072 — Owner's rules from play: spot ownership, income bonus, deferred reclaim, no pockets, the box grows, upgrades before the fusion](#d-072--owners-rules-from-play-spot-ownership-income-bonus-deferred-reclaim-no-pockets-the-box-grows-upgrades-before-the-fusion)
+- [D-073 — The advanced lab where the most turret slots reach it, front first](#d-073--the-advanced-lab-where-the-most-turret-slots-reach-it-front-first)
 - [Process decisions](#process-decisions)
 - [Maintaining this record](#maintaining-this-record)
 
@@ -2906,11 +2913,521 @@ assists only within `ExpCommanderHomeRadius` (800) before guarding the
 factory; constructors take queued orders only within `ExpOrderRadius`
 (2,000) of the base centre.
 
-**Status.** Built (follow-ups 3 to 6 are script only, on DLL `4ba9b805...`),
-not Played; see
+**Played, 2026-09-21 (follow-ups 5 and 6).** The owner: economic sequence
+and placement work well; one glitch on the third mex - the commander
+started it, stopped, walked backward, started again, finished, then built
+the lab. Two native candidates, both ending in `OnUnitMoveFailed`'s random
+256-elmo move that replaces the command queue: the builder watchdog's
+"lost" test (standing still with zero resource use outside
+`buildDistance + model radius` - true of an energy-stalled nanolathe a
+hair outside range) and the engine's own move-failed event (blocked while
+walking into range). **Follow-up 7 (native, diagnostics only):** both paths
+log at level 1 for an experimental instance (`EXP: watchdog: ... lost on
+... dist D, reach R, commands yes/no, waiting yes/no` and `EXP: move
+failed: ...`), so the next log names the cause before the behaviour is
+changed.
+
+**Played, 2026-09-21 (follow-up 6).** After the T2 lab the T2 constructors
+never upgraded a mex: upgrades came only from native's default chooser
+(closed for the instance) and from a redirect in the legacy ladder head
+that the experimental sequence does not run. **Follow-up 8 (script only):**
+the planner's rule 2b - a T2 builder upgrades the nearest owned T1 mex
+within `MexUpgradeRadius`, `MexUpgradeMaxConcurrent` at a time, as an exact
+spot - right after the T2 lab and before converters.
+
+**Played, 2026-09-21.** Far too much defence of the wrong kind (three
+junos among it) and never a fusion - advanced solars kept coming. The
+defence came from two native sources the sequence still honoured:
+`Tech_AiMakeDefence` handing clusters to native's porc chain (which runs
+to junos), and native's own queued defence/radar orders taken by the
+queued-orders rung. The energy choice was the ratio: an advanced solar's
+4.4 metal per E/s beats a fusion's 4.5. **Follow-up 9 (script only):**
+the experimental instance never asks native's porc chain and never takes
+native's defence, radar or sonar orders; its base defence is one light
+laser and one light AA near the factories once the first turret stands
+(`ExpDefenceLLT`, `ExpDefenceAA`); and from `EcoFusionEnergyIncome` (300)
+a T2 builder answers "energy" with a fusion (advanced fusion once its metal
+gate passes) while T1 builders leave energy to the reactors.
+
+**Played, 2026-09-21.** Three T1 constructors built three advanced solars
+in parallel: the "energy draining" rule bypassed the one-at-a-time limit so
+a stalling base would not wait, and each asker started its own.
+**Follow-up 10 (script only):** draining or short, a builder asking while
+an energy structure is going up assists it if its frame is within
+`EcoAssistRadius` (1,200) of the builder (`assistenergy`, up to
+`EnergyFocusMaxAssists`), and otherwise moves on; nobody starts a second.
+
+**Follow-up 11 (2026-09-21, script only).** Owner's rule: once the T2
+lab's construction begins, the T1 bot lab is reclaimed, all idle build power
+in range joins, and turrets put reclaim before factory assist. Rung 3b of
+the sequence orders the reclaim for every builder within range once the
+advanced lab's frame exists (one native task, joined by all); the turret
+rung already took reclaims first, and its assist tasks are now 30 s so a
+turret switches within that.
+
+**Follow-up 12 (2026-09-21, script only).** Owner's rule: the first T1
+bot lab is always reclaimed, so it need not follow the plan; what matters
+is that it goes up inside the commander's build range. The commander now
+reserves the nearest buildable footprint within `ExpFirstLabRadius` (160)
+of itself, the factory task is pinned to it, and once the lab stands an
+exit cone (320 elmos, 32 margin) is held in front of it until it is gone,
+so nothing is packed where its units come out. The pair's planned T1 slot
+is left reserved; a constructor building the first lab still uses it.
+
+**Played, 2026-09-21 (follow-up 12).** Right sequence to the lab, then the
+commander "glitched out" several times on the lab and was asked for work
+mid-build (`[Eco] next: wind ... by corcom` at 57 s). The lab task was
+served once only, so it was not aborted and re-ordered: the commander was
+taken off it by the idle path (engine drops the command, two retries, then
+removal). The likely trigger is follow-up 12's own placement: ring 0 put the
+lab's footprint under the commander, and a factory ordered on top of its
+builder cannot start. **Follow-up 13:** the first lab's footprint edge
+stays `ExpFirstLabClearance` (32) clear of the commander within
+`ExpFirstLabRadius` (224); natively, the income-drop auto-abort (a
+>1,000-metal build dropped when average income falls under 60 % of its
+order-time value, which fires right after an opening) is off for the
+experimental instance, and every idle event on a construction logs
+`EXP: idle: ...` so the next game names the trigger.
+
+**Played, 2026-09-21.** T1 constructors stalled after the second turret
+with +21 to +24 metal, 350 to 395 energy and a full bank, choosing "metal
+storage" every ask: the advanced lab's energy gate was 500, and the metal
+storage it kept naming is capped at zero for TECH until the advanced lab
+stands, so nothing was built. **Follow-up 14 (script only):**
+`MinimumEnergyIncomeForT2Lab` is 250; the storage rules check that the def
+is available and buildable before naming it; the lab gate logs
+`[Eco] advanced lab waits: ...` once a minute while it holds.
+
+**Played, 2026-09-21 (follow-up 13 DLL).** The diagnostics named the
+interruption: `EXP: idle: armcom on armlab ... target yes, fails 1 / 2 / 3`
+every five seconds from 154 to 166 elmos, the same on the third mex at 212
+and later on winds. The engine drops the construction command when its own
+move-into-range goal - the point on the range circle straight toward the
+unit - is unreachable, which in a packed base it often is; after three the
+task removes the unit and the frame decays. **Follow-up 15 (native):** the
+AI chooses the approach point itself (`FindApproachPoint`: a free, walkable
+point on the circle nearest the unit's bearing), moves the unit there, and
+gives the construction command on arrival; an idle outside the range
+re-approaches instead of retrying in place. `EXP: approach: ...` logs each
+move.
+
+**Played, 2026-09-21.** The commander rebuilt the T1 lab beside the
+advanced lab's frame: the reclaim emptied the T1 lab count and
+`StartFactory` only asked "no T1 lab standing or queued". The legacy
+ladder's "into T2, no T1 lab" gate had not been carried over.
+**Follow-up 16 (script only):** `TechBuild::IntoT2` (advanced lab ordered,
+framed or standing) gates `StartFactory` and drives the reclaim rung.
+
+**Status.** Built (follow-up 15 DLL, in the build folder for the owner to
+deploy; follow-ups 8 to 14 and 16 script), not Played; see
 [KI-411](known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
 
 ---
+
+## D-067 — TECH's build sequence is one ordered rule table
+
+**Date:** 2026-09-21. **Status:** Built (script only; the build16 DLL
+`704a77e2` needs no change). Not Played:
+[KI-411](known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
+
+**Problem.** Played (D-066 follow-ups): the T1 lab was rebuilt by the
+commander while the advanced lab was under construction. The rule "never a
+T1 lab once into T2" existed, but the sequence was a hand-written function
+of nested ifs in `TechBuild::MakeTask`, and the gate sat inside one rung
+(`StartFactory`) where a later edit reordered around it. The user asked for
+a decoupled structure that handles every case a player would build a T1
+bot lab in, traceably, and for the game understanding behind it to stay
+documented.
+
+**When a player builds a T1 bot lab** (researched: the official economy
+guide, the 2026 community guide, the knowledge base's openings, team-roles,
+spam and scaling pages; written up as
+[`77-eco-tech-player.md`](../../rjm.bar.docs/knowledge/70-strategy/77-eco-tech-player.md)):
+
+| Case | TECH does it? |
+| --- | --- |
+| Game start, for constructors | yes: a throwaway at the commander, reclaimed when the advanced lab begins |
+| Every constructor lost and no lab standing | yes: the commander rebuilds one |
+| Late game, spam economy on, advanced lab standing | yes: on the pair's slot, `ExpSpamLabs` (1) of them |
+| Fighting a T1 front | no: TECH does not fight lane battles |
+| A second early lab | no: turrets on one lab and the advanced lab beat two labs |
+
+**Decision.** The sequence is a table (`roles/tech_rules.as`, namespace
+`TechRules`): rows of `(key, who, when[], act, note)` evaluated top to
+bottom against one context built once per ask; the first row whose mask
+and predicates hold and whose act returns a task wins. Predicates are named
+functions over the context and reused (`IntoT2` guards both the reclaim row
+and, negated, the opening-lab row; `NoConstructors` + `NoLabAtAll` the
+recover row; `SpamGate` + `T2LabStands` + `SpamLabsWanted` the spam row).
+The acts are the existing `TechBuild` functions and the planner's `Pick*`
+pieces, called directly; `EcoPlanner::Next` answers nothing when the
+experimental system is on so the legacy strategic rungs the table still
+reuses cannot run the planner a second time. `TechBuild::MakeTask` is now
+`TechRules::Evaluate` with a 3 s wait if the table returns null (it cannot:
+the last row is `wait`). Every winning row logs `[Rule] <key> for <def>
+<id> | ...` at level 1 on change, so a played game shows which row chose
+what and why.
+
+The row order is the policy: turrets first (D-065), keep-current, the
+opening, T1-lab reclaim, T1-lab opening, T1-lab recover, mex expansion
+while metal is the bottleneck, energy when draining (assist the one going
+up before starting another), the advanced lab, T2 mex upgrades, converters
+from measured surplus, turrets, energy when short, storages, energy when
+metal floats, spam labs, the legacy strategic rungs, the two-turret
+defence, native's repairs, assist, guard, wait.
+
+**Not changed.** Placement (`Layout`, native `PackNearGroup`/`PackNearPoint`),
+the acts themselves, the legacy ladder for every other role and for TECH
+with the switch off. No native change.
+
+**Files.** [`tech_rules.as`](../data/script/src/roles/tech_rules.as) (new),
+[`tech_build.as`](../data/script/src/roles/tech_build.as) (`MakeTask` is the
+evaluator; the inline sequence removed),
+[`tech.as`](../data/script/src/roles/tech.as) (include),
+[`eco_planner.as`](../data/script/src/manager/eco_planner.as) (`Next` silent
+in experimental mode), [`global.as`](../data/script/src/global.as)
+(`ExpSpamLabs`), [`roles/tech_rules.md`](roles/tech_rules.md) (new),
+[`roles/tech_build.md`](roles/tech_build.md), [`roles/tech.md`](roles/tech.md),
+[`eco-planner.md`](eco-planner.md), [`roles/README.md`](roles/README.md),
+[`../AGENTS.md`](../AGENTS.md), and the knowledge base's
+`70-strategy/77-eco-tech-player.md` (new, linked from `75-team-roles.md`
+and the README map).
+
+**Played** (headless playtest, 2026-09-21, two AIs, 2 min): `[Rule] table of 27
+rules loaded`, `opening.mex` twice, then the first lab traced as
+`lab.t1.recover`: the opening act had just marked the opening complete and
+the context's flag was stale, so the opening-lab row was skipped and the
+recover row (no lab, no constructor) took the same act. Fixed the same day:
+`OpeningDone` reads the flag live, and the recover row also requires it.
+
+**What to watch.** `[Rule] lab.t1.opening` once, before the first turret;
+`[Rule] lab.t1.reclaim` when `[Rule] lab.t2` has fired; never
+`lab.t1.opening` after that; `lab.t1.recover` only with no constructor and
+no lab; `lab.t1.spam` only after the advanced lab stands with the spam gate
+open.
+
+## D-068 — TECH makes no combat unit before the combat gate; packed sites are for structures only
+
+**Date:** 2026-09-21. **Status:** Built (script + native, build17). Not
+Played: [KI-411](known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
+
+**Played** (Supreme Isthmus, TECH as Cortex, the D-066 script): at 17
+minutes the advanced lab made eleven Fiends and ten Ducks while the user saw
++58 metal. Two findings from the log:
+
+1. `[Eco]` lines put the 10 s income at +87 to +90 a minute earlier, and the
+   first Fiend was packed at f=30555, right after the T1 lab reclaim and the
+   first mex upgrades: the `T2_RUSH` strategy (on by default) releases the
+   rush bots' cap (Fiend) and the amphibious bots' cap (Duck) at
+   `MetalIncomeThresholdForEarlyBotLabExpansion` (100) on
+   `GetMinMetalIncomeLast10s`, which counts reclaim. The script's batch then
+   ordered ten Fiends and native's factory chooser, with Ducks in the
+   advanced lab's "support" role, filled the gaps with Ducks. The user's
+   rule: a tech player does not build combat units early, and often not mid
+   game.
+2. Every one of those recruits produced `RESERVE: packed corpyro/coramph
+   near ...`: `CRecruitTask` asks `FindBuildSite` for a free spot for the
+   unit it builds, and the experimental branch (D-066) packed and reserved a
+   footprint for a *mobile* def. Nothing ever stands on such a slot, so the
+   registry never forgets it; `[Layout] no room in the turret box` began at
+   f=30571, 16 frames after the first one.
+
+**Decision.**
+
+- *Combat gate.* `Tech::ExpCombatMetalIncome` (200; 0 = never) is the one
+  income under which TECH's labs make no combat unit while the experimental
+  system is on. `Tech_CombatGate(legacy)` raises every legacy gate to it and
+  never lowers one: the rush-bot cap release, the T1 scout cap lift (moved to
+  the same moment), the T1/T2 bot-lab batches and the vehicle-plant batches.
+  Native's factory chooser is covered because the caps stay at zero. The
+  moment is logged once at level 1: `[TECH][Factory] combat production
+  unlocked at +M metal (gate G)`. Off the switch the legacy gates are
+  returned as they were.
+- *Packed sites are for structures only.* `CTerrainManager::FindBuildSite`
+  takes the D-066 branch only for `!cdef->IsMobile()`; a recruit, rally or
+  retreat ask for a mobile def goes to the stock search, as before D-066.
+
+**Why 200.** The knowledge base's scaling page puts +60 metal at the
+gantry and +100 to +200 in the late game; the user's rule is "not early,
+often not mid". 200 is the legacy `MetalIncomeThresholdForBotLabExpansion`,
+so a game without the rush strategy behaves as it did; the rush's 100 no
+longer applies to TECH in this mode.
+
+**Files.** [`global.as`](../data/script/src/global.as),
+[`tech.as`](../data/script/src/roles/tech.as) (`Tech_CombatGate`,
+`Tech_EconomyUpdate`, `Tech_FactoryAiMakeTask`),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`roles/tech.md`](roles/tech.md), [`roles/tech_rules.md`](roles/tech_rules.md),
+[`experimental-build.md`](experimental-build.md), and the knowledge base's
+`77-eco-tech-player.md`.
+
+**What to watch.** No `RESERVE: packed <mobile def>` line ever; `[TECH][Factory]
+combat production unlocked` only past +200 metal; no Fiend, Duck or scout
+from a TECH lab before it.
+
+## D-069 — Turrets beside the nearest lab; the advanced lab where the most build power reaches
+
+**Date:** 2026-09-21. **Status:** Built (script only). Not Played:
+[KI-411](known-issues.md#ki-411--the-experimental-build-system-is-not-yet-played).
+
+**Request** (owner, after a game with the D-067/D-068 script that was "almost
+a perfect build"): construction turrets as close to the closest lab as
+possible, to maximise their use; a lab, the first one excepted, placed in
+range of the most build power possible while honouring the build constraints.
+
+**Decision.** Two rules in `Layout` (`manager/layout.as`), both switchable:
+
+- *Turret slot* (`ExpTurretNearLab`, true). `Layout::NanoTask` takes a
+  completed factory's own rear slot first as before (D-060); for a box slot it
+  asks `NextSlotAny` once per standing lab (`Factory::allFactories`) with that
+  lab's position as the anchor and keeps the (slot, lab) pair with the
+  shortest distance. Off, or with no lab standing, the anchor is the pair's
+  centre as before. Level 2: `[Layout] turret slot <id>, <d> from the nearest lab`.
+- *Advanced lab site* (`ExpLabSiteRadius`, 480; `ExpLabBuildPowerReach`, 260).
+  `Layout::T2LabTask` scores the pair's planned T2 slot by
+  `GetStaticBuildPowerNear(slot, reach)` (turrets only, workertime), then
+  every reservable footprint (`CanReserveBuilding`: blocks, zones, exit
+  cones, the box) on rings two cells apart out to the radius, and orders the
+  lab on the pair's slot unless a footprint has strictly more static build
+  power in reach - then on that footprint, reserved and pinned, facing as the
+  pair. The economy planner's `t2lab` key calls it. Level 1:
+  `[Layout] advanced lab on the pair's slot (...)` or `[Layout] advanced lab
+  off the pair's slot: (...) has static build power B ..., the slot A`.
+  The reach is a nano's build distance plus a lab's radius; the radius keeps
+  the lab inside the base. The first lab keeps D-066's rule: at the
+  commander, a throwaway.
+
+**Why this shape.** The pair's slot already touches the box's first turret
+row, so with turrets placed by the first rule the slot usually wins and
+nothing moves; the rule earns its keep when the turrets stand elsewhere
+(around the first lab at the commander) and the pair's slot would leave
+them idle. Both rules read the world once per order and change no other
+placement.
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as),
+[`eco_planner.as`](../data/script/src/manager/eco_planner.as),
+[`global.as`](../data/script/src/global.as), [`layout-design.md`](layout-design.md),
+[`eco-planner.md`](eco-planner.md), the knowledge base's `77-eco-tech-player.md`.
+
+**What to watch.** `[Layout] turret slot ... from the nearest lab` under
+about 250 elmos; the advanced-lab line naming both scores; the turrets that
+stand when the advanced lab is ordered all within reach of it.
+
+## D-070 — The TECH rush chain: one objective, one computed build order, then the economy
+
+**Date:** 2026-09-21. **Status:** Built (script only); benchmarked by the
+playtest loop, results in [`benchmarks/tech-rush.md`](benchmarks/tech-rush.md).
+
+**Goal set by the owner.** The TECH role must reach every rush milestone at
+or under the low end of the realistic range of the knowledge base's rush
+table (T2 lab 6:30, fusion 11:30, advanced fusion 18:00, nuke silo 16:30,
+gantry 16:00, first T3 26:00; floors 5:26, 9:56, 15:41, 14:17, 13:59, 22:52),
+be able to pick a rush objective and put all build planning on it, then
+continue with an optimised economy; the build chains are to be calculated
+from the map's resources; screenshots at several periods; benchmarks
+tracked in markdown.
+
+**Decision.**
+
+- *Calculation.* `rjm.bar.docs/tools/knowledge/rush_sim.py` simulates one
+  player second by second from the zero-bonus start and searches openings
+  and late tails for the earliest completion of each objective; its winning
+  lines are the chains in `roles/tech_chain.as` (solar counts, scaled to
+  turbines when the map's effective wind reaches `ChainWindMin`).
+- *Execution.* `TechChain` (namespace, `roles/tech_chain.as`) holds the
+  chain as cumulative targets and is the `chain.next` row of the rule table
+  (D-067), placed after keep-current and the T1-lab reclaim and before every
+  economy row: assist the current step's frame, wait for its order, or order
+  it through the act that owns the placement; a builder that cannot help gets
+  null and the economy rows keep it useful. `Tick` keeps the caps open. Done
+  once, the table continues.
+- *Objective.* `Tech::RushObjective` (`auto` = the role's pick, `afus`).
+  The playtest's `--set RushObjective="..."` sets it per benchmark run.
+- *Measurement.* The camera widget logs every structure the team under test
+  finishes (`[Playtest] finished <def> team 0 at <min> min`) and its income
+  each minute; `tools/playtest/benchmark.py record <run>` turns a run into a
+  row of `doc/benchmarks/tech-rush.md` with the best-so-far table; checks
+  files `rush_<objective>.json` pass the moment the milestone lands.
+
+**Files.** [`tech_chain.as`](../data/script/src/roles/tech_chain.as) (new),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as) (row, predicate, act),
+[`tech.as`](../data/script/src/roles/tech.as) (include, `Init`, `Tick`),
+[`global.as`](../data/script/src/global.as) (five settings),
+[`roles/tech_chain.md`](roles/tech_chain.md) (new),
+[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md) (new, generated),
+[`../tools/playtest/benchmark.py`](../tools/playtest/benchmark.py) (new),
+[`../tools/playtest/playtest.py`](../tools/playtest/playtest.py) (`--set`),
+[`../tools/playtest/widgets/playtest_camera.lua`](../tools/playtest/widgets/playtest_camera.lua),
+`tools/playtest/checks/rush_*.json` (new).
+
+**Played** (2026-09-21/22, twelve benchmark loops, headless tech versus
+tech on Supreme Isthmus v1.7, speed 8, zero bonus; every run in
+[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md)). Every target met
+with build19 and the chain as documented in `roles/tech_chain.md`:
+
+| Objective | Target | Achieved | Simulator floor |
+| --- | ---: | ---: | ---: |
+| T2 lab | 6:30 | 6:14 | 5:26 |
+| Fusion | 11:30 | 10:44 | 9:56 |
+| Advanced fusion | 18:00 | 14:05 | 15:41 |
+| Nuke silo | 16:30 | 12:38 | 14:17 |
+| Gantry | 16:00 | 13:19 | 13:59 |
+| First T3 | 26:00 | 16:03 | 22:52 |
+
+The late objectives beat the simulator's floors because the economy rows
+that run beside the chain (mex expansion by the T1 constructors, T2 mex
+upgrades) put the real metal income far above the six-spot simulation.
+What the loops fixed on the way, each a decision inside `tech_chain.as`:
+the first lab is met once the advanced lab begins (it is reclaimed); a
+builder never waits on an order out (an abandoned order stalled the base
+five minutes); cheap items build in parallel, dear ones focused; the chain
+remembers its own fresh order until the count rises; a builder skips steps
+it cannot build and the chain completes only when every target stands
+(a T1 constructor running out of steps had ended the chain at 6 min and the
+strategic rungs then built a silo instead of the advanced fusion); the
+commander keeps the home cluster and the constructors fetch the far spots;
+the energy block and the fusion precede the T2 mex upgrades; eight solars
+before the advanced lab; no T2 turret (needs the extra-units pack) and no
+advanced solars; the fast-assist cap is two during a chain; the legacy
+strategic and spam rows sleep during a chain. The native cause of the
+two-minute solars was D-071.
+
+**Played by the owner (2026-09-22, Supreme Isthmus):** the commander went
+far for a fourth mex before the lab; ten solars on a wind map; energy income
+outscaling metal with no converter. Three deterministic rules replaced the
+guesses: the home mexes are the opening's (within `OpeningMexRadius` 700, at
+most `OpeningMexCap` 3) and the lab follows at once; energy is chosen from
+the map's wind numbers (`EnergyChoice`: turbine metal per E/s at the expected
+wind against the solar's, a margin, a max-wind floor, a solar first while the
+current wind is down); and the `energy.convert` row fires when energy income
+passes `EcoEnergyRatioHigh` times the metal income with metal not floating,
+granting a T1 converter's draw without a measured surplus.
+
+**What to watch.** `[TECH][Chain] objective ...` at start; `step k/n`
+lines advancing in order with every builder on one frame; the benchmark
+row's milestone at or under the target.
+
+## D-071 — No energy wait for experimental builders; a builder leaving an order is logged
+
+**Date:** 2026-09-22. **Status:** Built (native, build19) and Played in the
+rush benchmarks.
+
+**Found by the benchmarks.** The first lab and the opening solars took two
+minutes each in some runs, with no engine event in the log. Two native
+diagnostics (`EXP: leave: <unit> off <def> ... fails N` in
+`IBuilderTask::RemoveAssignee`, `EXP: swap: <unit> from task type A to B` in
+`ITaskModule::AssignTask`) showed the commander leaving the lab order
+with `fails 3, target yes`: native's in-range re-evaluation puts a builder
+on `CmdWait` while energy is empty (for anything but energy, geo, storage
+and reclaim); the wait makes the unit idle, `OnUnitIdle` counts each idle
+as a build failure, and the third throws the builder off its order. The
+order then sits queued until its timeout.
+
+**Decision.** In the experimental build system (`IsExperimental()`) the
+re-evaluation issues no `CmdWait`: the sequence manages energy itself and a
+slow build beats an abandoned one. Off the switch nothing changes. The two
+diagnostics stay (they print only for experimental builder tasks).
+
+**Files.** [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp),
+[`TaskModule.cpp`](../src/circuit/module/TaskModule.cpp).
+
+## D-072 — Owner's rules from play: spot ownership, income bonus, deferred reclaim, no pockets, the box grows, upgrades before the fusion
+
+**Date:** 2026-09-22. **Status:** Built (script + native, build20); benchmarked
+after (see `benchmarks/tech-rush.md`).
+
+**Played by the owner (Supreme Isthmus, the D-070 script).** Six findings,
+each now a deterministic rule:
+
+1. *A constructor took an ally's mex.* A metal spot belongs to the team whose
+   start position is nearest to it (a Voronoi split by start positions).
+   Native `CEconomyManager::IsOwnSpot` keeps the allies' start positions
+   (fed by the roster, `AddAllyStart`, as allied BARb teams announce
+   themselves) and the ally-aware mex enqueue skips spots nearer to an
+   ally's start. The chain's mex steps and the expansion row are ally-aware.
+2. *Bonus games.* Every playtest and benchmark runs at zero bonus
+   (`ai_incomemultiplier=1`, every team `Handicap=0`) as the baseline;
+   `--bonus 50` gives team 0 a handicap for a bonus test. The AI reads its
+   own bonus deterministically: the engine's per-team income multiplier
+   (`ai.GetIncomeMultiplier()`, the lobby's handicap) times the
+   `ai_incomemultiplier` modoption. The chain divides its energy counts by
+   it (every generator and mex gives more); the economy rows already work
+   on measured income, which includes the bonus.
+3. *Reclaiming the T1 lab at full metal storage.* Reclaimed metal past the
+   cap is lost, so the reclaim waits until the bank has room for the lab's
+   metal; the advanced lab's build makes that room, and it is part-built by
+   then, as the owner intends.
+4. *A constructor walled in by turbines.* Native `LeavesPocket`: a box
+   candidate is refused when its footprint would cut the zone's free cells
+   into a pocket not connected to the zone's edge (flood fill; planned slots
+   count as standing).
+5. *Structures scattered when the box was full.* The box grows: when no
+   zone has room (or no turret slot is left), `Layout::GrowBox` reserves
+   another box of the same width behind the last or beside the first,
+   whichever ground scores best (played: behind the Supreme Isthmus base
+   nothing scored), with its own turret rows in the same group, up to
+   `LayoutBoxMaxExtra` (4); a failed search is retried a minute later. Energy,
+   converters, fusions and the advanced lab keep packing tight to the
+   turret cluster; the advanced-lab site search also rings the turret
+   cluster's centre. Only the first lab is exempt (D-066).
+6. *A fusion before the mex upgrades.* The tails put the T2 mex upgrades
+   before the fusion (owner's economic rule); the energy block stays ahead
+   of both because the upgrades drain 7,700 energy each.
+
+**Files.** [`EconomyManager.h/.cpp`](../src/circuit/module/EconomyManager.cpp),
+[`EconomyScript.cpp`](../src/circuit/script/EconomyScript.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`TerrainManager.h/.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`roster.as`](../data/script/src/manager/roster.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`global.as`](../data/script/src/global.as) (`LayoutBoxMaxExtra`),
+[`../tools/playtest/playtest.py`](../tools/playtest/playtest.py) (`--bonus`).
+
+**What to watch.** `[TECH][Chain] objective ... income bonus x1` in a
+benchmark and `x1.5` in a `--bonus 50` game; `[Layout] turret box full:
+grown by ...`; `[TECH][Build] T1 lab reclaim deferred: metal ...`; no
+constructor at an ally's spot.
+
+## D-073 — The advanced lab where the most turret slots reach it, front first
+
+**Date:** 2026-09-22. **Status:** Built (native, build21; script).
+
+**Played by the owner.** With D-069/D-072 the advanced lab landed on the
+turret layout but toward the back of the base: the site was scored by
+*standing* turrets within reach at a moment when few stood, and the ring
+search ranged over free ground outside the box. The owner's rule: the lab
+sits on the turret layout, tight, where the most build power reaches it,
+and since its units leave for the front late in the game, forward.
+
+**Decision.** Native `PickMost` (dry run) and `PackNearGroupMost` (reserve):
+among the free footprints inside a box zone that the packer would consider,
+the one reached within `ExpLabBuildPowerReach` by the most slots of the
+turret group, standing or planned (every slot becomes a turret), front
+first among equals (forward along the layout's facing from the zone's
+centre), then nearest a slot; pockets refused (D-072). `Layout::T2LabTask`
+scores the pair's planned slot the same way (`CountGroupSlotsWithin`) and
+takes the box footprint only when it is reached by strictly more slots;
+when no zone has a footprint it grows the box first. The D-069 ring search
+over free ground is gone; `ExpLabSiteRadius` is no longer read.
+
+**Files.** [`TerrainManager.h/.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as).
+
+**Played (benchmarks).** The first build reserved the slot as already
+served, so the pinned task aborted and the pair's slot rescued it three
+minutes later (T2 7:27); fixed the same day (T2 5:38). The box packer also
+reserved an advanced-fusion footprint on the box's unflat part, which the
+engine refused at serve time; every packer now applies the engine's own
+`IsPossibleToBuildAt` before reserving, and the chain's stall guard never
+skips the objective step itself.
+
+**What to watch.** `[Layout] advanced lab in the turret layout at (x, z): N
+turret slots within 260 reach it, the pair's slot M; front first among
+equals` and the native `RESERVE: packed <alab> ... where N slots of group G
+reach`.
 
 ## Process decisions
 

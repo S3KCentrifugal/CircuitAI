@@ -92,6 +92,32 @@ TECH's economy.
 centre are native layout ints (`tech.box.*`), saved with the registry and
 adopted by name after a load.
 
+## Turrets beside a lab, the advanced lab beside the turrets (D-069)
+
+`Layout::NanoTask` gives a box slot the anchor of the nearest standing lab
+(every lab in `Factory::allFactories` asks `NextSlotAny` for its nearest
+free slot; the shortest pair wins), so each turret reaches a lab;
+`ExpTurretNearLab` off restores the pair's centre as the anchor.
+`Layout::T2LabTask` orders the advanced lab on the pair's planned slot
+unless a free footprint inside the turret layout is reached within
+`ExpLabBuildPowerReach` (260) by strictly more turret slots, standing or
+planned (native `PickMost`, front first among equals, D-073); then that
+footprint, reserved, pinned and facing as the pair. The first lab is
+placed by `tech_build.as` at the commander (D-066). Decision:
+[D-069](decisions.md#d-069--turrets-beside-the-nearest-lab-the-advanced-lab-where-the-most-build-power-reaches).
+
+## The box grows, and never walls a unit in (D-072)
+
+When no box zone has room for a structure, or no turret slot is left,
+`Layout::GrowBox` reserves another box of the same width behind the last
+one or beside the first (whichever ground scores best), with its own turret
+rows in the same group (up to `LayoutBoxMaxExtra`), so energy, converters, fusions and labs keep packing
+tight to the turret cluster instead of scattering around the base centre.
+Native `LeavesPocket` refuses a packed footprint that would cut the zone's
+free cells into a pocket not connected to the zone's edge (a constructor
+was walled in by turbines). Decision:
+[D-072](decisions.md#d-072--owners-rules-from-play-spot-ownership-income-bonus-deferred-reclaim-no-pockets-the-box-grows-upgrades-before-the-fusion).
+
 ## Goals
 
 - TECH alone opts into planned placement.
