@@ -265,6 +265,10 @@ static int CTerrainManager_PackNearGroup(CTerrainManager* terrainMgr, int zone, 
 	return terrainMgr->PackNearGroup(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anchor, maxReach, minNanoDist, group);
 }
 
+static bool CTerrainManager_IsExitClear(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing, float length, float margin)
+{
+	return terrainMgr->IsExitClear(const_cast<CCircuitDef*>(cdef), pos, facing, length, margin);
+}
 static int CTerrainManager_PickMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos)
 {
 	return terrainMgr->PickMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, outPos);
@@ -524,6 +528,12 @@ bool CInitScript::InitConfig(const std::string& profile,
 	//       And re-creating CScriptManager is not worth the effort.
 //	r = script->GetEngine()->RemoveConfigGroup(CScriptManager::initName.c_str()); ASSERT(r >= 0);
 	return true;
+}
+
+// D-076: a retiring structure ends its production and queue at once.
+static void CCircuitUnit_CmdStop(CCircuitUnit* unit)
+{
+	unit->CmdStop();
 }
 
 void CInitScript::RegisterCore()
@@ -861,6 +871,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetFireState(int)", asMETHOD(CCircuitUnit, TrySetFireState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetMoveState(int)", asMETHOD(CCircuitUnit, TrySetMoveState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SelfDestruct(bool)", asMETHOD(CCircuitUnit, CmdSelfD), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdStop()", asFUNCTION(CCircuitUnit_CmdStop), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitUnit", "IUnitTask@ const task", asOFFSET(CCircuitUnit, task)); ASSERT(r >= 0);
 	// RulesParams accessor on Unit
 	r = engine->RegisterObjectMethod("CCircuitUnit", "float GetRulesParam(const string& in, float) const", asFUNCTION(CCircuitUnit_GetRulesParamFloat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
@@ -919,9 +930,11 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlot(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextSlot), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextBuilt(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextBuilt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotAny(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextSlotAny), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotConnected(int group, const AIFloat3& in centre) const", asMETHOD(CTerrainManager, NextSlotConnected), asCALL_THISCALL); ASSERT(r >= 0);  // D-077
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetLayoutInt(const string& in, int)", asMETHOD(CTerrainManager, SetLayoutInt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, float maxReach, float minNanoDist, int group)", asFUNCTION(CTerrainManager_PackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PickMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, AIFloat3& out)", asFUNCTION(CTerrainManager_PickMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsExitClear(const CCircuitDef@, const AIFloat3& in, int facing, float length, float margin) const", asFUNCTION(CTerrainManager_IsExitClear), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroupMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, int group)", asFUNCTION(CTerrainManager_PackNearGroupMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int CountGroupSlotsWithin(int group, const AIFloat3& in, float) const", asMETHOD(CTerrainManager, CountGroupSlotsWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

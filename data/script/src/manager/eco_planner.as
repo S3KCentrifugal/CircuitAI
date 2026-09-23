@@ -282,6 +282,7 @@ namespace EcoPlanner {
         // Only what the asking constructor can build: a commander has no
         // advanced solar, a T1 constructor no fusion (CR-006).
         if (s.builderDef !is null && !s.builderDef.CanBuild(d)) return null;
+        if (Global::energyAllowed !is null && !Global::energyAllowed(name)) return null;   // D-077: no T1 energy in the fusion era
         // Only what the turret box holds within a turret's reach (D-063).
         if (!Layout::CanPlace(d)) return null;
         Option@ o = Option();
@@ -365,8 +366,15 @@ namespace EcoPlanner {
     string PickConverter(const State@ s, float surplus, string &out why)
     {
         const string side = Global::AISettings::Side;
+        // D-079: while energy floats (the chain's bank-based test) converters go
+        // ConverterParallel at a time and the surplus is read as at least half
+        // the income, the pull being inflated by whatever is under construction
+        // (played: one T2 converter in three and a half minutes at a full bank)
+        const bool floats = TechChain::EnergyFloats();
+        const int par = floats ? Global::RoleSettings::Tech::ConverterParallel : 1;
+        if (floats && surplus < s.eIncome * 0.5f) surplus = s.eIncome * 0.5f;
         Option@ adv = Make("advconv", UnitHelpers::GetAdvEnergyConverterNameForSide(side), s, true);
-        if (s.builderIsT2 && adv !is null && s.advConvsQueued == 0
+        if (s.builderIsT2 && adv !is null && s.advConvsQueued < par
             && surplus >= adv.energyUse
             && s.mIncome >= Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter) {
             why = "energy floating, surplus " + int(surplus) + " carries "
@@ -374,7 +382,7 @@ namespace EcoPlanner {
             return adv.key;
         }
         Option@ t1 = Make("t1conv", UnitHelpers::GetEnergyConverterNameForSide(side), s, false);
-        if (t1 !is null && s.t1ConvsQueued == 0
+        if (t1 !is null && s.t1ConvsQueued < par
             && (!s.builderIsT2 || s.mIncome < Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter)
             && surplus >= t1.energyUse
             && s.mIncome < Global::RoleSettings::Tech::BuildT1ConvertersUntilMetalIncome) {

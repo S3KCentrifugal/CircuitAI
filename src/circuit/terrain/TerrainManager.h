@@ -249,6 +249,11 @@ public:
 	// slot. PickMost is the dry run (score, position); PackNearGroupMost
 	// reserves it like PackNearGroup and returns the id, -1 when none.
 	int PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, springai::AIFloat3& outPos) const;
+	// D-074: is the ground in front of a factory placed at pos (its exit,
+	// `length` deep, the footprint's width plus `margin` each side) free of
+	// standing structures and of planned slots? A factory is never placed
+	// where anything stands or will stand in its exit.
+	bool IsExitClear(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, float length, float margin) const;
 	int PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group);
 	// slots of a group (standing or planned) within radius of pos
 	int CountGroupSlotsWithin(int group, const springai::AIFloat3& pos, float radius) const;
@@ -266,6 +271,11 @@ public:
 	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
 	// task may take a held slot; NextSlot serves the armed ones only).
 	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;
+	// D-077: the next unconsumed, unclaimed slot of a group growing outward from
+	// centre: the first is the one nearest centre; every later one is the slot
+	// nearest a consumed slot of the group, ties broken towards centre, so the
+	// turrets form one connected cluster around the layout's middle.
+	int NextSlotConnected(int group, const springai::AIFloat3& centre) const;
 	// "kind:def:x:z:facing:w:d:state;..." for the widget overlay (cells of 16 elmos).
 	std::string DescribeLayout() const;
 	// Everything of the layout goes: reservations, zones, marks, the flag (a role switch).

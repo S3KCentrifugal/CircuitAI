@@ -527,6 +527,33 @@ int CBuilderManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 #endif
 			taskB->UpdateTarget(unit);
 			MarkUnfinishedUnit(unit, taskB);
+		} else if (IsExperimentalBuild()) {
+			// D-074: the builder's task was swapped between the order and the
+			// frame; the frame belongs to the task that ordered it (same def,
+			// same site), never to a reclaim (played: the commander reclaimed
+			// the lab it had just started).
+			IBuilderTask* owner = nullptr;
+			for (const auto& byType : buildTasks) {
+				for (IBuilderTask* t : byType) {
+					if ((t != nullptr) && !t->IsDead() && (t->GetTarget() == nullptr) && (t->GetBuildDef() != nullptr)
+						&& (*t->GetBuildDef() == *unit->GetCircuitDef()) && t->IsEqualBuildPos(unit))
+					{
+						owner = t;
+						break;
+					}
+				}
+				if (owner != nullptr) {
+					break;
+				}
+			}
+			if (owner != nullptr) {
+				owner->UpdateTarget(unit);
+				MarkUnfinishedUnit(unit, owner);
+				circuit->LOG("EXP: frame: %s(%i) adopted by the task that ordered it", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
+			} else {
+				circuit->LOG("EXP: frame: %s(%i) has no task of its own; left standing for the sequence to assist",
+						unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
+			}
 		} else {
 			// reclaim lost unit
 			AssignTask(builder, Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH, unit)));
@@ -680,6 +707,29 @@ int CBuilderManager::GetUnfinishedCount(const CCircuitDef* def) const
 		}
 	}
 	return count;
+}
+
+CCircuitUnit* CBuilderManager::FindOwnNear(const AIFloat3& pos, float radius, const CCircuitDef* def)
+{
+	const int frame = circuit->GetLastFrame();
+	const float radiusSq = radius * radius;
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || ((def != nullptr) && (unit->GetCircuitDef() != def))) {
+			continue;
+		}
+		if (unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		const float sq = pos.SqDistance2D(unit->GetPos(frame));
+		if ((sq <= radiusSq) && (sq < bestSq)) {
+			bestSq = sq;
+			best = unit;
+		}
+	}
+	return best;
 }
 
 CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float radius, const CCircuitDef* def)
@@ -1081,6 +1131,60 @@ bool CBuilderManager::IsReclaimUnit(CAllyUnit* unit) const
 	}
 	const CAllyTeam* allyTeam = circuit->GetAllyTeam();
 	return (allyTeam != nullptr) && allyTeam->IsReclaimMarked(unit->GetId());
+}
+
+int CBuilderManager::TurretsOnReclaim(int targetId, float margin, bool apply)
+{
+	CCircuitUnit* target = circuit->GetTeamUnit(targetId);
+	if ((target == nullptr) || target->IsDead()) {
+		return -1;
+	}
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3& tpos = target->GetPos(frame);
+	IBuilderTask* join = nullptr;
+	int off = 0;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* u = kv.second;
+		if ((u == nullptr) || u->IsDead() || (u == target)) {
+			continue;
+		}
+		CCircuitDef* cdef = u->GetCircuitDef();
+		if (cdef->IsMobile() || !cdef->IsAbleToAssist() ||  // a turret has no build options: IsBuilder is false for it (played)
+				 u->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		const float reach = cdef->GetBuildDistance() + margin;
+		if (u->GetPos(frame).SqDistance2D(tpos) > reach * reach) {
+			continue;
+		}
+		IUnitTask* t = u->GetTask();
+		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::PLAYER)) {
+			continue;
+		}
+		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::BUILDER)) {
+			IBuilderTask* bt = static_cast<IBuilderTask*>(t);
+			if ((bt->GetBuildType() == IBuilderTask::BuildType::RECLAIM) && (bt->GetTarget() == target)) {
+				continue;  // already on it
+			}
+		}
+		++off;
+		if (!apply) {
+			continue;
+		}
+		if (t != nullptr) {
+			t->RemoveAssignee(u);
+		}
+		if (join == nullptr) {
+			join = Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH, target, FRAMES_PER_SEC * 300));
+		}
+		join->AssignTo(u);
+		join->Start(u);
+		static_cast<CBuilderScript*>(script)->TaskAssigned(u);
+	}
+	if (apply && (off > 0)) {
+		circuit->LOG("EXP: turrets: %i join the reclaim of %s(%i)", off, target->GetCircuitDef()->GetDef()->GetName(), targetId);
+	}
+	return off;
 }
 
 void CBuilderManager::FallbackTask(CCircuitUnit* unit)

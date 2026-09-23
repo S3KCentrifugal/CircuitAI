@@ -88,6 +88,52 @@ namespace TechChain
         return "";
     }
 
+    bool IsEnergyKey(const string &in key)
+    {
+        return key == "wind" || key == "solar" || key == "advsolar" || key == "fusion" || key == "afus";
+    }
+
+    // D-079 (owner's rule): energy is sufficient when the bank sits at
+    // EcoConvertEnergyPercent of storage for ChainEnergyFloatSeconds (the pull is
+    // not read); then no energy structure is ordered, whoever
+    // asks: the surplus goes to converters and the AI chases metal. Played:
+    // the advanced fusion was ordered at +1,450 energy over a full 10k bank.
+    // The engine's pull is inflated by the build in progress (played: +1,159
+    // over the pull a second after an order made at a full bank), so the bank
+    // is read: full for ChainEnergyFloatSeconds means nothing can spend it.
+    int energyFullSince = -1;
+    array<float> energyBank;   // one sample a second, the last ChainEnergyFloatSeconds
+    void TrackEnergy()
+    {
+        const float stor = aiEconomyMgr.energy.storage;
+        const bool full = (stor > 0.0f) && (aiEconomyMgr.energy.current >= Global::RoleSettings::Tech::EcoConvertEnergyPercent * stor);
+        if (!full) energyFullSince = -1;
+        else if (energyFullSince < 0) energyFullSince = ai.frame;
+        energyBank.insertLast(aiEconomyMgr.energy.current);
+        const uint keep = uint(Global::RoleSettings::Tech::ChainEnergyFloatSeconds) + 1;
+        while (energyBank.length() > keep) energyBank.removeAt(0);
+    }
+    bool EnergyRising() { return energyBank.length() >= 2 && energyBank[energyBank.length() - 1] - energyBank[0] >= Global::RoleSettings::Tech::ChainEnergyFloatRise; }
+    float EnergyFullSeconds() { return (energyFullSince < 0) ? 0.0f : float(ai.frame - energyFullSince) / float(SECOND); }
+    bool EnergyFloats()
+    {
+        if (EnergyFullSeconds() >= Global::RoleSettings::Tech::ChainEnergyFloatSeconds) return true;
+        // a full bank with income clearly over the pull is floating now, however new
+        // (played: the advanced fusion ordered 15 s after the fusion at +1,291)
+        const float surplus = aiEconomyMgr.energy.income - aiEconomyMgr.energy.pull;
+        if (energyFullSince >= 0 && surplus > Global::RoleSettings::Tech::ChainEnergyFloatMax) return true;
+        // the bank rising with the surplus: floating within seconds, whatever
+        // the level (played: the advanced fusion ordered the second the fusion
+        // finished, bank 30 % and climbing at +700; a positive surplus reading
+        // is honest, the build in progress can only make it smaller)
+        return EnergyRising() && surplus > Global::RoleSettings::Tech::ChainEnergyFloatMax;
+    }
+    string FloatWhy()
+    {
+        return "energy floats (bank " + int(aiEconomyMgr.energy.current) + " of " + int(aiEconomyMgr.energy.storage) + " full for " + int(EnergyFullSeconds())
+            + " s, +" + int(aiEconomyMgr.energy.income - aiEconomyMgr.energy.pull) + " over the pull): converters first";
+    }
+
     Task::BuildType TypeFor(const string &in key)
     {
         if (key == "mex") return Task::BuildType::MEX;
@@ -221,6 +267,7 @@ namespace TechChain
     // gantry or a silo from IsAvailable.
     void Tick()
     {
+        TrackEnergy();   // D-079
         if (!Active()) return;
         for (uint i = 0; i < steps.length(); ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(steps[i].defName);
@@ -293,9 +340,49 @@ namespace TechChain
         return t;
     }
 
+    // D-074 (owner's rule, deterministic): while the T1 lab stands and no T1
+    // constructor is alive, the commander's 300 build power goes on the lab -
+    // the first constructor out is the early game's build power.
+    int firstConLog = -100000;
+    IUnitTask@ CommanderOnFirstConstructor(CCircuitUnit@ u)
+    {
+        if (!UnitHelpers::IsCommander(u.circuitDef)) return null;
+        CCircuitUnit@ lab = Factory::primaryT1BotLab;
+        if (lab is null || lab is u || Lifecycle::IsRetiring(lab)) return null;   // D-076
+        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors()) > 0) return null;
+        IUnitTask@ g = GuardHelpers::AssignWorkerGuard(u, lab, Task::Priority::HIGH, true, 20 * SECOND);
+        if (g !is null && ai.frame - firstConLog > 30 * SECOND) {
+            firstConLog = ai.frame;
+            GenericHelpers::LogUtil("[TECH][Chain] the commander assists the T1 lab until the first constructor is out", 1);
+        }
+        return g;
+    }
+
     IUnitTask@ Next(CCircuitUnit@ u)
     {
         if (!Active() || u is null || u.circuitDef is null) return null;
+        {
+            IUnitTask@ g = CommanderOnFirstConstructor(u);
+            if (g !is null) return g;
+        }
+        // D-075: a cheap step's frame beside the builder is finished before
+        // anything else (played: two turret frames were left to decay while
+        // every builder walked to the fusion, which comes first in the chain)
+        {
+            const AIFloat3 here = u.GetPos(ai.frame);
+            for (uint i = 0; i < steps.length(); ++i) {
+                Step@ s = steps[i];
+                CCircuitDef@ d = ai.GetCircuitDef(s.defName);
+                if (d is null || (i < skipped.length() && skipped[i])) continue;
+                if (d.costM >= Global::RoleSettings::Tech::ChainParallelCostM) continue;
+                const int have = Standing(s, d);
+                if (have >= s.target || aiBuilderMgr.GetUnfinishedCount(d) == 0) continue;
+                CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(here, Global::RoleSettings::Tech::ChainNearFrameRadius, d);
+                if (frame is null) continue;
+                Trace("finishes the frame beside it", int(i), s, have, u);
+                return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND));
+            }
+        }
         bool unmet = false;   // some step is not met, whether or not this builder could help
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
@@ -304,21 +391,26 @@ namespace TechChain
             if (s.key == "mex" && s.exhausted) continue;
             // the first lab is reclaimed once the advanced lab begins (D-066): its step is met from then on
             if (s.key == "lab" && TechBuild::IntoT2()) continue;
+            // the advanced lab is reclaimed once the advanced fusion is under way (D-078): its step is met from then on
+            if (s.key == "alab" && TechBuild::IntoAfus()) continue;
             if (i < skipped.length() && skipped[i]) continue;
             const int have = Standing(s, d);
             if (have >= s.target) continue;
             unmet = true;
-            // the current step: no progress for ChainStepStallSeconds skips it
-            if (stallStep != int(i) || stallHave != have) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
+            const int unfinished = aiBuilderMgr.GetUnfinishedCount(d);
+            // the current step: no progress for ChainStepStallSeconds skips it;
+            // a frame under construction is progress (D-075; played: the
+            // fusion was skipped at 11:21 while it was being built)
+            if (stallStep != int(i) || stallHave != have || unfinished > 0) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
             else if (i + 1 < steps.length() && ai.frame - stallFrame > int(Global::RoleSettings::Tech::ChainStepStallSeconds) * SECOND) {
                 // never the objective itself (played: an advanced fusion whose site
                 // the engine refused was skipped and the chain declared itself done)
                 skipped[i] = true;
+                Invariants::ChainStepSkipped(s.key, unfinished);   // D-076: INV-003
                 GenericHelpers::LogUtil("[TECH][Chain] step " + (i + 1) + "/" + steps.length() + " " + s.key + " " + have + "/" + s.target
                     + " made no progress for " + int(Global::RoleSettings::Tech::ChainStepStallSeconds) + " s: skipped", 1);
                 continue;
             }
-            const int unfinished = aiBuilderMgr.GetUnfinishedCount(d);
             int queued = aiBuilderMgr.GetQueuedBuildCount(int(TypeFor(s.key)), d);
             if (s.key == "silo") queued += aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::BIG_GUN), d);
             bool can = u.circuitDef.CanBuild(d);
@@ -338,6 +430,11 @@ namespace TechChain
             const int inFlight = unfinished + queued + (pending ? 1 : 0);
             if (cheap) {
                 // one per builder, in parallel: a solar is not worth a walk to assist
+                if (can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats()) {
+                    stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
+                    Trace(FloatWhy(), int(i), s, have, u);
+                    continue;
+                }
                 if (can && have + inFlight < s.target) {
                     IUnitTask@ t = Order(int(i), s, d, u);
                     if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have + inFlight, u); return t; }
@@ -354,7 +451,10 @@ namespace TechChain
                 // fetched the far mexes); one that can, but has nothing to add,
                 // is the economy rows' until the step stands
                 // nothing to add to a cheap step in flight: on to the next step
-                // (played: the advanced lab waited 84 s for the last turbine)
+                // (played: the advanced lab waited 84 s for the last turbine);
+                // said at level 1 when the counts change (D-075: a turret step
+                // went silent for four minutes)
+                if (can) Trace("nothing to add (unfinished " + unfinished + ", queued " + queued + (pending ? ", pending" : "") + ")", int(i), s, have, u);
                 continue;
             }
             if (unfinished > 0) {
@@ -371,6 +471,11 @@ namespace TechChain
                 // the five minutes an abandoned solar order took to time out)
                 Trace("order out; economy meanwhile", int(i), s, have, u);
                 return null;
+            }
+            if (IsEnergyKey(s.key) && EnergyFloats()) {
+                stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
+                Trace(FloatWhy(), int(i), s, have, u);
+                return null;   // the economy rows: energy.convert eats the surplus
             }
             IUnitTask@ t = Order(int(i), s, d, u);
             if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have, u); return t; }

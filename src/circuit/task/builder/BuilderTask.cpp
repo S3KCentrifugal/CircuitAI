@@ -324,6 +324,26 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		}
 	}
 
+	// D-074: our own frame may already stand on the site (an idle retry after
+	// the engine dropped the command, or the frame-created event still to
+	// come); take it as the target instead of searching and aborting the pin.
+	if (IsExperimental() && (buildDef != nullptr) && geom::is_valid(buildPos)) {
+		for (const auto& kv : circuit->GetTeamUnits()) {
+			CCircuitUnit* u = kv.second;
+			if ((u != nullptr) && !u->IsDead() && (u->GetCircuitDef() == buildDef) && u->GetUnit()->IsBeingBuilt()
+				&& (u->GetPos(frame).SqDistance2D(buildPos) < float(SQUARE_SIZE * 8) * float(SQUARE_SIZE * 8)))
+			{
+				UpdateTarget(u);
+				static_cast<CBuilderManager*>(manager)->MarkUnfinishedUnit(u, this);
+				circuit->LOG("EXP: adopt: %s(%i) takes its standing %s frame at (%.0f, %.0f) as the target",
+						unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), buildDef->GetDef()->GetName(), buildPos.x, buildPos.z);
+				TRY_UNIT(circuit, unit,
+					unit->CmdRepair(u, UNIT_CMD_OPTION, CmdTimeout(frame));
+				)
+				return true;
+			}
+		}
+	}
 	// Alter/randomize position
 	AIFloat3 pos = (shake > .0f) ? geom::get_near_pos(position, shake) : position;
 	CTerrainManager::CorrectPosition(pos);
@@ -511,6 +531,19 @@ CCircuitUnit* IBuilderTask::GetNextAssignee()
 
 void IBuilderTask::Update(CCircuitUnit* unit)
 {
+	if (IsExperimental() && (target != nullptr) && (engaged.find(unit) != engaged.end())
+		&& !manager->GetCircuit()->GetEconomyManager()->IsEnergyEmpty())
+	{
+		// (only a builder that already holds its command: a builder just
+		// assigned to a standing frame still needs Execute below - played:
+		// every builder idled five minutes on a full bank)
+		// D-074 (owner's rule): construction has begun; the builder is not
+		// re-evaluated, moved or re-pathed until it ends, unless energy is
+		// empty. Played: the in-range re-evaluation moved the commander off
+		// the first lab's held exit cone every five seconds ("obstructed"),
+		// each move dropping the build command.
+		return;
+	}
 	if (!Reevaluate(unit)) {
 		return;
 	}

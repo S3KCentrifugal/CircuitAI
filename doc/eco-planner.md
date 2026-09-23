@@ -205,6 +205,21 @@ Without a box (no ground behind the pair clears `LayoutBoxMinScore`), every
 economy structure goes within `LayoutFallbackShakeCells` of the factory
 nanos through the ordinary search, logged once. Nothing else spirals.
 
+## Converters in parallel while energy floats (D-079)
+
+`PickConverter` orders one converter at a time, but while the chain's
+bank-based `EnergyFloats` holds it allows `ConverterParallel` (3) queued at
+once and reads the surplus as at least half the income, because the
+engine's pull is inflated by whatever is under construction (played: one
+T2 converter in three and a half minutes at a full bank).
+
+## The energy veto (D-077)
+
+`Make` asks `Global::energyAllowed` (TECH's `TechBuild::EnergyAllowed`)
+before offering an energy def: no wind or solar once a fusion stands, no
+advanced solar once an advanced fusion is under way. The same hook guards
+the shared builder helpers, so the legacy rows cannot order them either.
+
 ## Settings
 
 `Global::RoleSettings::Tech`:

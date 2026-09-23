@@ -87,6 +87,7 @@ found to be wrong.
 - [D-071 — No energy wait for experimental builders; a builder leaving an order is logged](#d-071--no-energy-wait-for-experimental-builders-a-builder-leaving-an-order-is-logged)
 - [D-072 — Owner's rules from play: spot ownership, income bonus, deferred reclaim, no pockets, the box grows, upgrades before the fusion](#d-072--owners-rules-from-play-spot-ownership-income-bonus-deferred-reclaim-no-pockets-the-box-grows-upgrades-before-the-fusion)
 - [D-073 — The advanced lab where the most turret slots reach it, front first](#d-073--the-advanced-lab-where-the-most-turret-slots-reach-it-front-first)
+- [D-074 — A builder never moves once construction has begun; own frames are adopted, never reclaimed; the commander on the first constructor; factory exits kept clear](#d-074--a-builder-never-moves-once-construction-has-begun-own-frames-are-adopted-never-reclaimed-the-commander-on-the-first-constructor-factory-exits-kept-clear)
 - [Process decisions](#process-decisions)
 - [Maintaining this record](#maintaining-this-record)
 
@@ -3428,6 +3429,517 @@ skips the objective step itself.
 turret slots within 260 reach it, the pair's slot M; front first among
 equals` and the native `RESERVE: packed <alab> ... where N slots of group G
 reach`.
+
+## D-074 — A builder never moves once construction has begun; own frames are adopted, never reclaimed; the commander on the first constructor; factory exits kept clear
+
+**Date:** 2026-09-22. **Status:** Built (native, build24; script).
+
+**Played by the owner.** The commander kept repositioning after starting
+the T1 lab, interrupting the build; the advanced lab was placed facing a
+construction turret so its units could not leave. The owner's rules: after
+construction has begun a builder does not move at all unless energy hits
+zero; the commander always helps the first constructor out of the first
+lab, deterministically; a factory is never placed where a structure stands
+or a planned structure will stand in its exit.
+
+**Diagnosis (native, three causes).** (1) `Reevaluate`'s in-range branch
+moves a builder standing on a "structure" cell 64 elmos away every five
+seconds; the first lab's held exit cone (D-066) counts as one, so the
+commander standing in front of its lab was moved off it, each move
+replacing the build command. (2) After such a drop, `OnUnitIdle` retried
+`Execute` with the frame standing but no target: the site was "not
+possible" (the frame is there), the pinned reservation was already served,
+and the task aborted (`aborting <lab> task after required slot -1 failed`).
+(3) When the builder's task had been swapped between the order and the
+frame's creation, the frame-created handler reclaimed the fresh frame.
+
+**Decision.**
+
+- *No movement.* `IBuilderTask::Update` returns at once for an experimental
+  builder that already holds its build command (`engaged`) on a task whose
+  frame exists, while energy is not empty: no re-evaluation, no obstruction
+  move, no re-path. A builder newly assigned to a standing frame still gets
+  its command (the first cut returned for every assignee and the base idled
+  five minutes on a full bank). The engine's own build-range handling stays.
+- *Adopt, do not abort or reclaim.* `Execute` takes an own unfinished frame
+  of the task's def within four squares of the site as its target before
+  any site search; the frame-created handler, when the builder's task does
+  not own the frame, gives it to the task that ordered it (same def, same
+  site) and never reclaims it.
+- *The commander on the first constructor.* `TechChain::CommanderOnFirstConstructor`:
+  while the T1 lab stands and no T1 constructor is alive, the commander
+  guards (assists) the lab; a count, not a timer.
+- *Exits clear.* Native `IsExitClear(def, pos, facing, 320, 32)`: the ground
+  in front of a factory footprint, the exit cone's size, holds no structure
+  cell and overlaps no planned slot of any group. Applied in `PickMost`
+  (the advanced lab in the turret layout), in `PackNearPoint` (gantries and
+  labs placed by the stock search) and in the first lab's ring search; the
+  advanced lab's exit cone is held once it stands, like the first lab's.
+
+**Files.** [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`TerrainManager.h/.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as).
+
+**Played (benchmarks, build25).** T2 lab 6:23, advanced fusion 14:56, both
+met; no builder left a started construction in either game; the commander
+assisted the lab until the first constructor was out. With the exit rule no
+footprint inside the turret box qualifies for the advanced lab (something
+always stands or is planned in front of it), so the lab returns to the pair's
+planned slot, whose exit is clear by design; the score there counts only the
+box's slots, not the pair's own turret block beside it. A few turbine orders
+still lose their pinned slot and their frames are left standing for the
+sequence to assist (KI-412 keeps the trace).
+
+**What to watch.** No `EXP: leave` of a builder with `target yes`; `EXP:
+adopt` / `EXP: frame ... adopted` instead of `aborting ... required slot -1`;
+`[TECH][Chain] the commander assists the T1 lab until the first constructor
+is out`; the advanced lab's exit cone held; no factory with a turret slot
+in front of it.
+
+## D-075 — Build power scales with the bank: a turret whenever metal income outruns spending during a construction
+
+**Date:** 2026-09-22. **Status:** Built (script only, no native change); Played, see below.
+
+**Played (15-minute screenshot game, build25, run `20260922-133909`).** The
+advanced fusion was ordered at 11:21 and finished at 15:32 while the metal
+bank climbed from 1,280 to 3,398 and energy sat full: the tail was build-power
+limited. The playtest widget reported no construction turret because its
+`isBuilding` filter needs a yardmap, which BAR's turrets lack (fixed in the
+widget); the AI's own `defence.base` gate shows the first turret stood by
+11:25. The owner's rule: "If
+metal income is higher than metal spending that means one of two things. If
+no construction has started (excluding construction turrets) build the next
+highest priority building. If there is a building under construction but
+metal income is still high that means build a construction turret."
+
+**Diagnosis (KI-413, KI-414).** (1) The chain's two turret frames (step 10,
+placed 8:10 and 8:57) were abandoned at 10:10: every builder that asked the
+chain while the fusion (step 9, dear) was unfinished was sent to the fusion,
+because the step loop meets the fusion before the turrets; the engine's
+construction decay killed the frames. (2) At 11:21 the stall guard skipped
+the fusion step "made no progress for 120 s" although the fusion had been
+under construction since 10:00: `Standing` counts finished units only, so any
+dear item that takes longer than `ChainStepStallSeconds` looked stalled.
+(3) From 11:21 the turret step was never traced: the cheap branch is silent
+when it has nothing to add, so whether a stale queued order or a refused slot
+blocked it was invisible. (4) `turret.build` needs the bank at
+`EcoFloatMetalPercent` (80 %) of storage to call metal floating; the bank sat
+at 33 to 78 % while rising by 700 a minute. (5) The T1 constructors fell to
+`defence.base`, which re-ordered a light laser at the factory centre fifteen
+times in two minutes; native refused every site ("no site for corrl within
+512"), the whole box being held cells.
+
+**Decision.**
+
+1. The owner's rule is a row of its own, `power.turret`, placed before
+   `chain.next` so it applies during and after a rush: when the metal bank
+   is full for `PowerAheadSeconds` (15) or has risen by `PowerAheadRise`
+   (30) over that window (income above spending, read from the bank; see
+   below), the bank holds `PowerTurretBankFactor` (1.5) turret costs, energy is not stalling and a
+   structure of ours is under construction within `ChainAssistRadius`, the
+   builder orders a construction turret on the box slot nearest a lab
+   (`Layout::NanoTask`), `PowerTurretsConcurrent` (2) at a time; the rest
+   assist the turret going up. The rule stops once static build power near
+   the base reaches `PowerBuildPowerPerMetal` (20) workertime per metal/s of
+   income (played: without the cap the first game built 45 turrets in the
+   three minutes after the advanced fusion, when converters kept a structure
+   under construction while income outran the pull). The cap does not apply
+   while the metal bank has been full for `PowerAheadSeconds`: a full bank
+   with a structure under construction is build power short whatever the
+   ratio says (played on build29, run `20260922-202036`: the advanced fusion
+   took six minutes at a full 8,000 bank with the rule at its cap). The first half of the rule, nothing under
+   construction, is the rows that follow: `chain.next` while a rush runs,
+   then the economy rows in their order. Logged as `[TECH][Power] +N metal
+   over a pull of P with B banked while <def> is under construction: turret
+   by <builder>`; a refused slot as `[TECH][Power] no turret slot`.
+2. The chain finishes a cheap step's frame beside the builder before anything
+   else: within `ChainNearFrameRadius` (600) of the builder, before the step
+   loop, so a dear step further down the chain no longer pulls every builder
+   off a turret or a turbine that is a few seconds from done.
+3. The stall guard counts a frame under construction as progress: the stall
+   clock resets while `GetUnfinishedCount` of the step's def is above zero.
+4. The cheap branch says at level 1, when the counts change, why it has
+   nothing to add: `nothing to add (unfinished U, queued Q[, pending])`.
+5. `Defence` orders each def at most `ExpDefenceMaxOrders` (3) times and
+   searches `ExpDefenceRadius` (900) around the factory centre instead of
+   native's 512, so a base whose box holds every near cell gets its light
+   laser on the box's edge or gives up, never a loop.
+
+**Why the pull, and why not (played on build28).** The engine's metal pull
+is the demand of every builder and factory this frame; it is inflated by a
+dear build in progress, so during the advanced fusion the bank sat full
+for a minute with income under the pull and the rule stayed silent (INV-004
+fired four times, run `20260922-193856`). The rule now reads the bank:
+`TechBuild::MetalAhead` is true when the bank has sat at
+`InvariantFloatPercent` (90 %) of storage for `PowerAheadSeconds` (15) or
+risen by `PowerAheadRise` (30) over that window, from a once-a-second
+sample in `TechBuild::Tick`. `isMetalFull` and the 80 % float test answer a
+different question (is the bank about to overflow) and were the reason
+`turret.build` stayed quiet for four minutes of rising bank.
+
+**Files.** [`tech_rules.as`](../data/script/src/roles/tech_rules.as)
+(`power.turret`, `MetalAhead`, `StructureBuilding`, `DoPowerTurret`, the
+context's `mPull` / `aheadM` / `building`),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as) (near-frame
+pre-pass, stall guard, cheap-branch trace),
+[`tech_build.as`](../data/script/src/roles/tech_build.as) (`Defence` cap and
+radius), [`global.as`](../data/script/src/global.as) (`ChainNearFrameRadius`,
+`PowerAheadSeconds`, `PowerAheadRise`, `PowerTurretBankFactor`, `PowerTurretsConcurrent`,
+`ExpDefenceMaxOrders`, `ExpDefenceRadius`);
+[`tech_rules.md`](roles/tech_rules.md), [`tech_chain.md`](roles/tech_chain.md),
+[`tech_build.md`](roles/tech_build.md), KI-413 and KI-414 in
+[`known-issues.md`](known-issues.md).
+
+**Played (graphical, run `20260922-142706`, zero bonus, tech vs tech).** T2
+lab 5:38, T2 mex 8:01, fusion 11:17, advanced fusion 15:37; turrets at 5:55,
+10:14 and 11:44 from the rule, seven more in the half minute after the
+advanced fusion, ten in all against the cap; the metal bank stayed between
+356 and 585 during the advanced fusion's build (3,398 before); no chain step
+skipped; two base-defence orders in the game. Open: after the objective the
+bank climbs to 8,098 by 20:00 at +150 metal because nothing dear is ordered
+once the chain is done (converters, storages and a T1 lab only), which is
+the post-objective priority list, not this rule.
+
+**What to watch.** `[TECH][Power]` lines during the fusion and the advanced
+fusion with `finished cornanotc` following them; the metal bank under 1,000
+during the tail; no chain step skipped while its frame is under construction;
+at most three `base defence:` orders per def.
+
+## D-076 — One lifecycle state per structure; invariants checked in every game; the actor matrix
+
+**Date:** 2026-09-22. **Status:** Built (script; native `CmdStop` binding, build26); Played, see below.
+
+**Played by the owner.** A Lazarus was being built at the T1 bot lab while
+a T1 constructor and a construction turret were reclaiming it. The owner's
+question: which methodology stops bugs of this shape from repeating.
+
+**Diagnosis.** `ReclaimT1Lab` enqueued the reclaim and kept the lab's id in a
+variable only it read. `Tech_FactoryAiMakeTask` still saw a live T1 lab and
+kept it producing; the turret rows saw a reclaim in reach and joined. Three
+actors, three ideas of what the lab was. The class: from D-063 to D-075 every
+decision added a rule inside one actor, none enumerated the other actors on
+the same object, and none left a check behind (the commander re-asked off
+its lab, D-074; turret frames decayed, D-075; the T1 lab reclaimed at full
+storage, D-072; the light-laser loop, D-075). Each was fixed where it was
+seen and verified by one log reading.
+
+**Decision.** The practice in
+[`practice-invariants.md`](practice-invariants.md), enforced by
+`tools/knowledge/check_invariants.py` in the pre-commit hook:
+
+1. **One lifecycle state per structure.** `Lifecycle`
+   (`data/script/src/manager/lifecycle.as`): retiring and gone, recorded once
+   by the act that decides them, read by every actor. `TechBuild::Tick` retires
+   the T1 lab the moment the advanced lab is under way (`IntoT2`); `Retire`
+   stops the unit and its queue (`CCircuitUnit::CmdStop`, new script binding),
+   so the unit inside the factory is dropped; `Tech_FactoryAiMakeTask` returns
+   nothing for a retiring factory; `GuardFactory` and
+   `CommanderOnFirstConstructor` refuse a retiring lab; the reclaim rule is the
+   only act that targets it, and turrets joining the reclaim is allowed.
+   `Tech_FactoryAiUnitRemoved` forgets it. Logged as `[LIFECYCLE] <def> <id>
+   retiring: <why>` and `... gone`.
+2. **Invariants checked in the game.** `Invariants`
+   (`data/script/src/manager/invariants.as`), ticked once a second from the
+   role's tick and from its unit-added hooks, logs `[INVARIANT] INV-nnn ...`
+   when a promise is broken, one line a minute per subject. Every playtest
+   check file forbids that line, so the benchmark loop is the regression
+   suite. The register is [`invariants.md`](invariants.md).
+3. **The actor matrix.** [`actor-matrix.md`](actor-matrix.md): per object,
+   every actor and the state it reads; every rule row of the TECH table must
+   appear in it.
+4. **Play the fix.** A decision from here on names the run that played it.
+
+**Invariant.** INV-001: a retiring factory produces nothing. INV-002: a frame
+of ours under construction has build power on it within
+`InvariantFrameSeconds`. INV-003: the chain never skips a step whose frame is
+under construction. INV-004: metal does not float while a structure is under
+construction and static build power is under the income target. INV-005:
+only the throwaway T1 lab is ever retired.
+
+**Played (headless, build26, run of 2026-09-22 18:58).** The practice paid
+for itself in its first game: `[LIFECYCLE] corlab 4481 retiring` at 3:57,
+then `[INVARIANT] INV-001 a retiring factory produced corck` at 3:59, and
+two later `[LIFECYCLE] corlab ... retiring` lines at 16:28 and 21:02 for T1
+labs the spam rows had just built. Two causes: (1) `CmdStop` drops the unit
+inside the factory (the engine's `CFactory::StopBuild` refunds and kills it)
+but native's recruit task still held the factory and re-issued the build on
+idle, so the retire now aborts the factory's task first
+(`CFactoryManager::AbortTask`, new script binding, build27); (2) the retire
+keyed on "the primary T1 lab while the advanced lab is under way", which is
+also true of every later spam lab. The throwaway is now decided once: the
+lab standing at the moment `IntoT2` first holds (`throwawayLabId`, -2 for
+none); only it retires and only it is reclaimed; INV-005 says so.
+
+**Enforcement.** `check_invariants.py` fails a commit when a logged `INV-nnn`
+has no register row (or a row has no logger), when a check file does not
+forbid `[INVARIANT]`, when a TECH rule key is missing from the actor matrix,
+or when a decision from D-076 on has no `**Invariant` paragraph. AGENTS.md
+names the practice in the workflow and validation sections.
+
+**Files.** [`lifecycle.as`](../data/script/src/manager/lifecycle.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`tech.as`](../data/script/src/roles/tech.as) (includes, tick, the factory
+task maker, the unit hooks), [`tech_build.as`](../data/script/src/roles/tech_build.as)
+(`Tick` retires, `GuardFactory`), [`tech_chain.as`](../data/script/src/roles/tech_chain.as)
+(`CommanderOnFirstConstructor`, INV-003 at the skip),
+[`global.as`](../data/script/src/global.as) (`LifecycleMemorySeconds`,
+`Invariant*`), [`InitScript.cpp`](../src/circuit/script/InitScript.cpp)
+(`CmdStop`), every `tools/playtest/checks/*.json`,
+[`check_invariants.py`](../tools/knowledge/check_invariants.py),
+[`.githooks/pre-commit`](../.githooks/pre-commit),
+[`practice-invariants.md`](practice-invariants.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`AGENTS.md`](../AGENTS.md), the TECH role documents.
+
+**Played.** Headless, build27, run `20260922-191613`: `[LIFECYCLE] corlab 30286
+retiring` at the advanced lab's order, `... gone` after the reclaim, no unit
+produced by it after the retire, no `[INVARIANT]` line in nine minutes, two
+turrets from the power rule at 4:33 and 4:43. The first build26 game that
+printed INV-001 and the double retire is described under **Invariant**.
+
+**What to watch.** `[LIFECYCLE] corlab N retiring` at the advanced lab's
+order, no unit finished by that lab after it, no `[INVARIANT]` line in any
+benchmark run; a run that prints one names the promise that broke.
+
+## D-077 — Turrets grow outward from the layout's centre; T1 energy is reclaimed once fusion-tier income carries the base
+
+**Date:** 2026-09-22. **Status:** Built (script; native `NextSlotConnected`, `FindOwnNear`, build27); Played once, see below.
+
+**Owner's rules.** "Construction turrets should always start at the center
+of the planned layout, and build out connecting to central construction
+turrets and moving outward. This way the most buildings are in range of the
+build power." And: "when energy income reaches a sufficient level windmills,
+solars, and advanced solars should be reclaimed. solars/winds reclaimed at
+the same level, and advanced solars reclaimed at a slightly higher level.
+Certainly by the time an afus is built all wind/solar/advanced solar should
+be reclaimed. Research the tech/eco meta for when to reclaim."
+
+**Meta.** The official economy guide: solars are built early when metal
+outruns energy and "you can reclaim them to get all this metal back"; reclaim
+returns the full metal cost (`modrules.reclaim`, knowledge base
+`77-eco-tech-player.md`). Players on wind maps reclaim the turbine field
+once a fusion carries the base, and everything T1 once an advanced fusion
+stands, for the metal (40 per turbine, 155 per solar, 370 per advanced
+solar) and the space in the middle of the base. The knowledge base section
+"When to reclaim energy" holds the facts and sources.
+
+**Decision.**
+
+1. **Turrets from the centre outward.** `NextSlotConnected(group, centre)`
+   (native): the first turret takes the box slot nearest the box centre;
+   every later one takes the unconsumed slot nearest an already consumed
+   slot of the group, ties broken towards the centre (score: four times the
+   distance to the nearest taken slot, plus the distance to the centre). The
+   cluster is connected and grows outward, so the most structures sit inside
+   the build power. `Layout::NanoTask` uses it when `ExpTurretCentreOut`
+   (true); off restores D-069's nearest-lab choice.
+2. **Energy reclaim by income level.** The `energy.reclaim` row (mobile
+   builders, before `power.turret`): once a fusion stands and energy is not
+   stalling, winds and solars are reclaimed when energy income without the
+   T1 sources covers the pull by `ReclaimT1EnergyMargin` (1.25); advanced
+   solars when income without every T1 and advanced-solar source covers it
+   by `ReclaimAdvSolarMargin` (1.5); an advanced fusion reclaims all of them
+   regardless. Nearest the base centre first (`FindOwnNear`, native), within
+   `ReclaimEnergyRadius` (1500), `ReclaimEnergyConcurrent` (2) targets in
+   flight. Per-unit output for the sums: solar 20, advanced solar 75,
+   turbine the map's expected wind. Native's `ReclaimOldEnergy`
+   (`reclEnergyEff`) is switched off under the experimental build so the row
+   is the one owner of the decision. Logged as `[TECH][Reclaim] <def> <id>:
+   energy +E without T T1 and A adv-solar covers a pull of P (fusion
+   stands); by <builder>`.
+
+**Invariant.** INV-006: no wind, solar or advanced solar stands
+`InvariantReclaimSeconds` (180) after an advanced fusion does.
+
+**Played (headless, build27, run `20260922-192117`).** Fusion 10:38,
+advanced fusion 14:11 (the best so far), `[TECH][Reclaim] corwin ...` from
+the fusion on. INV-006 fired at 17:11 with 27 structures standing and the
+count rising to 32: two causes, both fixed in the same decision. (1) The
+legacy strategic rows and the planner kept ordering advanced solars and
+turbines after the advanced fusion (`legacy.strategic` for the T2
+constructors; the planner's payback rows), so the field grew while it was
+being reclaimed. One owner now: `TechBuild::EnergyAllowed`, registered as
+`Global::energyAllowed`, is asked by the shared builder helpers
+(`EnqueueT1Solar`, `EnqueueT1AdvancedSolar`, `EnqueueT1Wind`) and by the
+planner's `Make`: no wind or solar once a fusion stands, no advanced solar
+once an advanced fusion is under way. (2) The reclaim's in-flight memory
+held two slots for 90 s each whatever happened to the target, so 28
+turbines would have taken twenty minutes; a target that is gone leaves the
+memory at once (`ai.GetTeamUnit`) and `ReclaimEnergyConcurrent` is 4.
+
+**Actors.** `energy.reclaim` is added to the actor matrix under the banks
+and energy; `Layout::NanoTask` under the turret slot.
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`NextSlotConnected`), [`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp)
+(`FindOwnNear`), [`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as) (`ReclaimEnergy`),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as) (`energy.reclaim`),
+[`tech.as`](../data/script/src/roles/tech.as) (`reclEnergyEff` off),
+[`invariants.as`](../data/script/src/manager/invariants.as) (INV-006),
+[`global.as`](../data/script/src/global.as), [`invariants.md`](invariants.md),
+[`actor-matrix.md`](actor-matrix.md), [`layout-design.md`](layout-design.md),
+the TECH role documents, the knowledge base.
+
+**What to watch.** `[Layout] turret slot N, D from the box centre
+(connected)` with D small for the first and every later turret adjacent to
+one that stands; `[TECH][Reclaim]` lines after the fusion, none before; no
+`[INVARIANT] INV-006`; the metal from the reclaim landing in the bank with
+room for it.
+
+## D-078 — The advanced lab is reclaimed while the advanced fusion is built; every turret in range joins any reclaim at once
+
+**Date:** 2026-09-22. **Status:** Built (script; native `TurretsOnReclaim`, build28); not yet Played.
+
+**Owner's rules.** "The T2 lab should be getting reclaimed whenever an
+advanced fusion is under construction, and if the metal storage is available
+to store the metal cost of the lab. Also, whenever a reclaim task is issued
+by any constructor, all construction turrets in range must immediately stop
+and assist with reclaiming."
+
+**Decision.**
+
+1. **The advanced lab retires into the advanced fusion.** `TechBuild::Tick`
+   (the owner of the state, D-076) retires `Factory::primaryT2BotLab` the
+   moment an advanced fusion frame exists (`AfusUnderWay`) and the metal bank
+   has room for the lab's metal (`BankHasRoomFor`, the D-072 rule that
+   reclaimed metal past the cap is lost): its native task is aborted, the
+   unit stopped, `[LIFECYCLE] coralab N retiring`. The `lab.t2.reclaim` row
+   (mobile builders, after `lab.t1.reclaim`) has every builder reclaim it
+   while the bank keeps room. `lab.t2` no longer orders an advanced lab once
+   an advanced fusion is under way or standing (`NoAfusYet`), and the chain's
+   `alab` step counts as met from then on, so the lab is not rebuilt.
+2. **Turrets join every reclaim now.** Native `TurretsOnReclaim(targetId,
+   margin, apply)`: every construction turret within its build distance plus
+   `ReclaimTurretMargin` (48) of the target that is not already reclaiming
+   it is taken off its task and put on one shared reclaim of the target.
+   `TechBuild::PullTurrets` calls it from every reclaim the role orders (the
+   throwaway lab, the advanced lab, the energy structures), once per target
+   per 30 s, logged as `[TECH][Reclaim] N turret(s) pulled onto <def> <id>`
+   and natively as `EXP: turrets: N join the reclaim of <def>(<id>)`. The
+   same call with `apply` false is INV-008's probe.
+
+**Played (headless, build28, run `20260922-193856`).** `[LIFECYCLE]
+coralab 432 retiring` during the advanced fusion and `gone` after it; no
+turret was ever pulled: `TurretsOnReclaim` recognised a turret by
+`IsBuilder`, which is false for a construction turret (no build options).
+It reads `IsAbleToAssist` now, as `GetStaticBuildPowerNear` does
+(build29).
+
+**Invariant.** INV-007: an advanced lab never stays active while an
+advanced fusion is under construction and the bank has room for its metal.
+INV-008: every construction turret in range of a reclaim of ours is on it
+within `InvariantReclaimJoinSeconds` (10).
+
+**Actors.** The advanced lab's rows in the actor matrix gain the retire and
+the reclaim; the turret rows gain the native pull.
+
+**Files.** [`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp)
+(`TurretsOnReclaim`), [`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`tech_build.as`](../data/script/src/roles/tech_build.as) (`IntoAfus`,
+`AfusUnderWay`, `BankHasRoomFor`, `PullTurrets`, `ReclaimT2Lab`, the retire
+in `Tick`, INV-007), [`tech_rules.as`](../data/script/src/roles/tech_rules.as)
+(`lab.t2.reclaim`, `NoAfusYet`), [`tech_chain.as`](../data/script/src/roles/tech_chain.as)
+(the `alab` step), [`invariants.as`](../data/script/src/manager/invariants.as)
+(INV-008), [`global.as`](../data/script/src/global.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md), the
+TECH role documents.
+
+**What to watch.** `[LIFECYCLE] coralab N retiring` within seconds of the
+advanced fusion frame once the bank has room; `EXP: turrets: N join` on
+every reclaim; no `[INVARIANT] INV-007` or `INV-008`; the lab's metal in the
+bank, not lost past the cap.
+
+## D-079 — No energy structure while energy floats: the surplus is converted and the AI chases metal
+
+**Date:** 2026-09-22. **Status:** Built (script only); not yet Played.
+
+**Played by the owner.** "Advanced fusion was started with an 1100 energy
+surplus. This continues to happen ... The cause needs to be documented and
+fixed, so always the AI is chasing metal and energy is sufficient."
+
+**Cause, documented.** Not a race and not a bad reading. The rush chain
+(D-070) orders each unmet step the moment a builder is free and the site
+exists, with no energy check of any kind: `Next` walks the steps in order
+and the energy steps (`wind`, `solar`, `advsolar`, `fusion`, `afus`) were
+ordered exactly like a mex or a lab. In run `20260922-192117` the fusion
+went down at 8:46 with the bank at 92 % and the advanced fusion at 10:39
+with the bank at 98 % and income +545, a minute before the fusion's own
++850 arrived; by 11:00 income was +1,407 over a full 10k bank and stayed
+there for four minutes while the advanced fusion was built. The converters
+that would have turned that surplus into metal are economy rows
+(`energy.convert`), which the chain outranks while it runs: the first T2
+converter came at 14:47, after the advanced fusion. The same shape
+recurred in every rush game since D-070 because nothing in the design
+asked whether energy was needed.
+
+**Decision.** Energy is sufficient when the bank has sat at
+`EcoConvertEnergyPercent` (90 %) of storage for `ChainEnergyFloatSeconds`
+(15), or is at that level now with income over the pull by more than
+`ChainEnergyFloatMax` (300): `TechChain::EnergyFloats`, from a once-a-second
+sample in `TechChain::Tick`. A third test, the bank up by `ChainEnergyFloatRise`
+(100) over the window with the same surplus, whatever its level, catches
+the second a fusion completes (played on build29, runs `20260922-195815`
+and `20260922-201105`: the advanced fusion was ordered at 85 % and +1,394,
+then at 30 % and climbing +700 the second the fusion finished). A positive
+surplus reading is honest: the build in progress can only make it smaller. And a float-gated copy of the converter row,
+`energy.convert.float`, sits ahead of `chain.next` in the table, so
+floating energy is converted whatever the chain is doing: in that run no
+converter went up during the four minutes of the advanced fusion at a full
+bank because every builder was the chain's. `PickConverter` orders `ConverterParallel` (3) converters at once while
+the float holds and reads the surplus as at least half the income (run
+`20260922-201552`: the advanced fusion waited from 11:30 to 15:08 for one
+T2 converter ordered one at a time from a pull-inflated surplus). The first
+test needs no pull at all; the second catches the moment a fusion completes (played on build29, run
+`20260922-195358`: the advanced fusion was ordered fifteen seconds after
+the fusion at +1,291, before the bank had been full for fifteen seconds).
+The bank is read before the pull: the engine's pull is
+inflated by the build in progress (played on build28: the advanced fusion
+was ordered at a full 10k bank with the pull above income, and INV-009
+read +1,159 over the pull one second later). A full bank means nothing can
+spend the income, whatever the pull says. While it holds, no energy structure of any tier is ordered by anyone: the chain's
+cheap energy steps are passed over for the step after them, its dear steps
+(fusion, advanced fusion) return the builder to the economy rows where
+`energy.convert` eats the surplus, and `TechBuild::EnergyAllowed` (the
+`Global::energyAllowed` hook, D-077) vetoes every energy def for the planner
+and the shared builder helpers. Waiting for need resets the stall guard, so
+the fusion step is not skipped for it. Traced as `[TECH][Chain] step k/n
+afus 0/1: energy floats (+S over the pull, bank B of C): converters first`.
+A T2 converter draws 600 E for 10.3 metal (370 metal, 21,000 energy), a T1
+one 70 E for 1 metal (1 metal, 1,250 energy), so the surplus of that game
+was two T2 converters and twenty metal a second; the advanced fusion is
+ordered once the converters have eaten the surplus and the bank falls.
+
+**Invariant.** INV-009: no energy structure is ordered while energy
+floats (a new energy frame appearing after the bank has been full for
+`InvariantFloatOrderSeconds`, 45, long enough that the order itself was
+made while floating).
+
+**Played (headless, build28, run `20260922-193856`, before the bank-based
+definition).** Fusion 11:13, advanced fusion 17:23; INV-009 fired for the
+fusion and the advanced fusion (ordered with the pull above income at a
+full bank) and for turbines and a solar the same way; INV-004 fired four
+times for a full metal bank during the advanced fusion with `power.turret`
+silent for the same pull reason. Both definitions now read the bank.
+
+**Files.** [`tech_chain.as`](../data/script/src/roles/tech_chain.as)
+(`IsEnergyKey`, `EnergyFloats`, `FloatWhy`, the two gates),
+[`tech_build.as`](../data/script/src/roles/tech_build.as) (`EnergyAllowed`),
+[`invariants.as`](../data/script/src/manager/invariants.as) (INV-009),
+[`global.as`](../data/script/src/global.as) (`ChainEnergyFloatSeconds`, `ChainEnergyFloatMax`, `InvariantFloatOrderSeconds`),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+the TECH role documents, the knowledge base.
+
+**What to watch.** `converters first` traces before the fusion and the
+advanced fusion, `finished cormmkr` before `finished corafus`, the energy
+bank under 90 % when `afus 0/1: ordered` is logged, no `[INVARIANT]
+INV-009`, and a later advanced fusion than 14:11 accepted as the price of
+not floating: the benchmark row says which.
 
 ## Process decisions
 

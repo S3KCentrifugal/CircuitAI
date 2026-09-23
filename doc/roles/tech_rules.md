@@ -39,13 +39,17 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 4 | `keep.current` | mobile | - | the construction the builder is on, when native re-asks |
 | 5 | `opening.mex` | commander | `OpeningPending` | the nearest `OpeningMexCap` mexes within `OpeningMexRadius` |
 | 6 | `lab.t1.reclaim` | mobile | `IntoT2` | every builder in range reclaims the T1 lab |
+| 6a00 | `lab.t2.reclaim` | mobile | `T2LabRetiring` | D-078: the advanced lab is retiring (an advanced fusion is under construction and the bank has room for its metal): every builder reclaims it, turrets in range are pulled on |
+| 6a0 | `energy.reclaim` | mobile | `EnergyReclaimable`, `NotStalling` | D-077: a fusion stands; winds and solars reclaimed when income without them covers the pull by `ReclaimT1EnergyMargin`, advanced solars at `ReclaimAdvSolarMargin`, all once an advanced fusion stands; nearest the base centre first |
+| 6a0c | `energy.convert.float` | mobile | `EnergyFloatsBank`, `NotStalling` | D-079: before the chain, so floating energy (the chain's bank-based `EnergyFloats`) is converted whatever the chain is doing (played: no converter during a four-minute advanced fusion at a full bank) |
+| 6a | `power.turret` | mobile | `MetalAhead`, `StructureBuilding`, `NotStalling` | D-075, the owner's rule: the metal bank full for `PowerAheadSeconds` or risen by `PowerAheadRise` (income above spending, read from the bank) with `PowerTurretBankFactor` turret costs banked while a structure is under construction: a turret on the box slot nearest a lab, `PowerTurretsConcurrent` at a time, until static build power reaches `PowerBuildPowerPerMetal` x metal income (no cap while the bank has been full for `PowerAheadSeconds`); else assist the turret going up |
 | 6b | `chain.next` | mobile | `ChainActive` | the rush chain's current step (D-070, [`tech_chain.md`](tech_chain.md)): assist its frame, wait for its order, or order it |
 | 7 | `lab.t1.opening` | mobile | `OpeningDone`, `NotIntoT2`, `NoT1Lab` | the throwaway first lab at the commander; a constructor uses the pair's slot |
 | 8 | `lab.t1.recover` | commander | `OpeningDone`, `NoConstructors`, `NoLabAtAll` | every constructor and lab lost: rebuild a T1 lab |
 | 9 | `mex.expand` | constructors | `OpeningDone`, `MetalBottleneck` | the nearest open spot within `EcoMexExpandRadius` |
 | 10 | `energy.draining` | mobile | `Draining`, `EnergyIdle` | cheapest energy per E/s; a fusion in the fusion era |
 | 11 | `energy.assist` | mobile | `Draining`, `EnergyBusy`, `EnergyAssistable` | assist the energy structure going up |
-| 12 | `lab.t2` | constructors | `OpeningDone` | the advanced lab once +18 metal / 250 energy clear |
+| 12 | `lab.t2` | constructors | `OpeningDone`, `NoAfusYet` | the advanced lab once +18 metal / 250 energy clear |
 | 13 | `mex.upgrade` | T2 constructors | - | the nearest owned T1 mex within `MexUpgradeRadius`, one at a time |
 | 14 | `energy.convert` | mobile | `ConverterWanted` (`ConverterSurplus` or `EnergyOutscalesMetal`: energy income past `EcoEnergyRatioHigh` x metal with metal not floating), `NotStalling` | a converter; when energy outscales metal a T1 converter's draw is granted without a measured surplus |
 | 15 | `turret.build` | mobile | - | a turret when static build power is short or metal floats; else assist the one going up |
@@ -95,9 +99,12 @@ before `ExpCombatMetalIncome` (200) while the experimental system is on
 
 ## Settings
 
-`ExpSpamLabs` (1) here; everything else the rows read is documented with
+`ExpSpamLabs` (1) and the build-power rule's `PowerAheadSeconds` (15) and `PowerAheadRise` (30) (the bank, not the pull),
+`PowerTurretBankFactor` (1.5), `PowerTurretsConcurrent` (2) and
+`PowerBuildPowerPerMetal` (20) (D-075) here;
+everything else the rows read is documented with
 its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 84669d1b1bc91c71b5571c2fa87d9e0d87c081b6; lines: 364 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 740edc3971248784c0db766f4ca0e89771e49539; lines: 425 -->

@@ -92,6 +92,17 @@ TECH's economy.
 centre are native layout ints (`tech.box.*`), saved with the registry and
 adopted by name after a load.
 
+## Turrets from the centre outward (D-077)
+
+The owner's rule: turrets start at the centre of the planned layout and
+grow outward as one connected cluster, so the most structures sit inside the
+build power. `Layout::NanoTask` asks native `NextSlotConnected(group,
+boxCentre)`: the first turret takes the slot nearest the box centre; every
+later one the free slot nearest an already taken slot, ties broken towards
+the centre. `ExpTurretCentreOut` (true) selects it; off restores D-069.
+Decision:
+[D-077](decisions.md#d-077--turrets-grow-outward-from-the-layouts-centre-t1-energy-is-reclaimed-once-fusion-tier-income-carries-the-base).
+
 ## Turrets beside a lab, the advanced lab beside the turrets (D-069)
 
 `Layout::NanoTask` gives a box slot the anchor of the nearest standing lab
@@ -105,6 +116,15 @@ planned (native `PickMost`, front first among equals, D-073); then that
 footprint, reserved, pinned and facing as the pair. The first lab is
 placed by `tech_build.as` at the commander (D-066). Decision:
 [D-069](decisions.md#d-069--turrets-beside-the-nearest-lab-the-advanced-lab-where-the-most-build-power-reaches).
+
+## A factory's exit stays clear (D-074)
+
+Native `IsExitClear`: the ground in front of a factory footprint (320 elmos
+deep, the footprint's width plus 32 each side) must hold no structure and
+overlap no planned slot of any group. The advanced lab's layout search, the
+stock packer for gantries and labs, and the first lab's ring search all
+refuse a site whose exit is not clear; the advanced lab's exit cone is held
+once it stands, like the first lab's.
 
 ## The box grows, and never walls a unit in (D-072)
 

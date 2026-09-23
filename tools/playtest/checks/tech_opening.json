@@ -66,6 +66,11 @@
       "key": "default task",
       "pattern": "discarded \\d+ unused default task",
       "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "tech"
     }
   ]
 }

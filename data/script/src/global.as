@@ -4,7 +4,15 @@
 //#include "types/profile.as"
 #include "types/profile_controller.as"
 
+// D-077: a role may veto an energy def by name before any act orders it (the
+// shared builder helpers and the eco planner ask); TECH sets it to
+// TechBuild::EnergyAllowed so no wind or solar is ordered once a fusion
+// stands and no advanced solar once an advanced fusion is under way.
+funcdef bool EnergyAllowedFn(const string &in defName);
+
 namespace Global {
+
+    EnergyAllowedFn@ energyAllowed = null;
 
     namespace Map {
         StartSpot@ NearestMapStartPosition;
@@ -322,6 +330,34 @@ namespace Global {
             float ChainAssistRadius = 4000.0f;
             float ChainParallelCostM = 400.0f;
             float ChainStepStallSeconds = 120.0f;           // D-070: a chain step with no progress for this long is skipped (an unreachable frame must not end the rush)              // D-070: structures cheaper than this (metal) are built one per builder in parallel; dearer ones get every builder on one frame              // D-070: every builder inside this joins the current step's frame
+            float ChainNearFrameRadius = 600.0f;            // D-075: a chain frame of a cheap step within this of the builder is finished before anything else
+            float PowerTurretBankFactor = 1.5f;             // D-075: ... and the bank holds this many turret costs
+            float PowerBuildPowerPerMetal = 20.0f;          // D-075: the rule stops at this much static build power (workertime) per metal/s of income (played: 45 turrets in three minutes without it)
+            int PowerTurretsConcurrent = 2;                 // D-075: turrets under construction at once for build-power scaling; the rest assist them
+            int ExpDefenceMaxOrders = 3;                    // D-075: base-defence orders per def; native refusing the site this often ends the rung (played: 15 refusals in 2 min)
+            float ExpDefenceRadius = 900.0f;                // D-075: base-defence site search radius around the factory centre (the box's cells are all held)
+            float LifecycleMemorySeconds = 120.0f;         // D-076: a retired factory's position is remembered this long after it is gone (INV-001)
+            float InvariantFactoryRadius = 200.0f;          // D-076: INV-001 - a mobile unit appearing within this of a retiring factory was produced by it
+            float InvariantFrameRadius = 320.0f;            // D-076: INV-002 - build power counted within this of a frame
+            float InvariantFrameSeconds = 60.0f;            // D-076: INV-002 - a frame with no build power for this long is abandoned
+            float InvariantFloatPercent = 0.9f;             // D-076: INV-004 - the metal bank at this share of storage is floating
+            float InvariantFloatSeconds = 60.0f;            // D-076: INV-004 - ... for this long while a structure is under construction with build power short
+            bool ExpTurretCentreOut = true;                // D-077: turrets start at the box centre and grow outward as one connected cluster (NextSlotConnected); off = D-069 nearest-lab
+            float ReclaimT1EnergyMargin = 1.25f;            // D-077: winds and solars are reclaimed once a fusion stands and energy income without them covers the pull by this
+            float ReclaimAdvSolarMargin = 1.5f;             // D-077: advanced solars once income without every T1/adv source covers the pull by this; an advanced fusion reclaims all
+            float ReclaimEnergyRadius = 2500.0f;            // D-077: energy structures within this of the base centre, nearest first
+            int ReclaimEnergyConcurrent = 4;                // D-077: energy reclaims in flight at once
+            float InvariantReclaimSeconds = 240.0f;         // D-077: INV-006 - T1 or advanced-solar energy standing this long after an advanced fusion is a violation
+            float ReclaimTurretMargin = 48.0f;              // D-078: a turret within its build distance plus this of a reclaim target joins the reclaim at once
+            float InvariantReclaimJoinSeconds = 10.0f;      // D-078: INV-008 - a turret in range of a reclaim of ours off it this long is a violation
+            float InvariantT2ReclaimSeconds = 15.0f;        // D-078: INV-007 - an advanced lab not retiring this long into an advanced fusion with bank room is a violation
+            float ChainEnergyFloatMax = 300.0f;             // D-079: ... or the bank at EcoConvertEnergyPercent with income over the pull by this now (played: the advanced fusion ordered 15 s after the fusion at +1,291)
+            float ChainEnergyFloatRise = 100.0f;            // D-079: ... or the bank above half of storage, up by this over ChainEnergyFloatSeconds, with income over the pull by ChainEnergyFloatMax (the moment a fusion completes)
+            int ConverterParallel = 3;                      // D-079: converters queued at once while energy floats (one at a time otherwise); the pull-inflated surplus is replaced by half the income while floating
+            float ChainEnergyFloatSeconds = 15.0f;          // D-079: the energy bank at EcoConvertEnergyPercent of storage for this long = energy floats: no energy structure is ordered, converters first (the pull is inflated by the build in progress, so the bank is read, not the pull)
+            float InvariantFloatOrderSeconds = 45.0f;       // D-079: INV-009 - an energy frame appearing after the bank has been full this long was ordered while floating
+            float PowerAheadSeconds = 15.0f;                // D-075: the metal bank at InvariantFloatPercent of storage for this long, or risen by PowerAheadRise over it = income above spending
+            float PowerAheadRise = 30.0f;                   // D-075: ... the rise over PowerAheadSeconds that counts as the bank rising
             float ExpCombatMetalIncome = 200.0f;            // D-068: under this 10 s metal income TECH's labs make no combat unit (rush bots stay capped, no scout/fast-bot batches); 0 = never
             float EcoMexExpandRadius = 2500.0f;             // constructors expand to the nearest open spot within this ...
             float EcoMexExpandUntilIncome = 60.0f;          // ... while metal income is under this

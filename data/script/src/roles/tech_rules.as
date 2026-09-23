@@ -82,6 +82,10 @@ namespace TechRules {
         bool floatingM;
         float surplus;
         bool fusionEra;
+        // D-075: build-power scaling (the owner's rule)
+        float mPull;                // metal demand this frame
+        bool aheadM;                // the metal bank full or rising (TechBuild::MetalAhead) with a bank of PowerTurretBankFactor turrets
+        CCircuitUnit@ building;     // the nearest structure of ours under construction within ChainAssistRadius, or null
     }
 
     Ctx@ Build(CCircuitUnit@ u)
@@ -110,6 +114,17 @@ namespace TechRules {
             || ((s.mStor > 0.0f) && (s.mCur >= Global::RoleSettings::Tech::EcoFloatMetalPercent * s.mStor) && (s.mIncome >= 5.0f));
         c.surplus = s.eIncome - s.ePull;
         c.fusionEra = (s.t2Cons > 0) && (s.eIncome >= Global::RoleSettings::Tech::EcoFusionEnergyIncome);
+        c.mPull = aiEconomyMgr.metal.pull;
+        {
+            CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+            const float bank = (nano is null) ? 1.0e9f : nano.costM * Global::RoleSettings::Tech::PowerTurretBankFactor;
+            c.aheadM = TechBuild::MetalAhead() && (s.mCur >= bank);   // read from the bank, not the pull (D-075 played)
+        }
+        @c.building = null;
+        if (c.aheadM) {
+            CCircuitUnit@ f = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, null);
+            if (f !is null && f.circuitDef !is null && !f.circuitDef.IsMobile()) @c.building = f;
+        }
         return c;
     }
 
@@ -141,6 +156,12 @@ namespace TechRules {
     bool EnergyBusy(Ctx@ c)       { return c.eco.energyBuilding; }
     bool EnergyAssistable(Ctx@ c) { return c.eco.energyAssistable; }
     bool NotStalling(Ctx@ c)      { return !aiEconomyMgr.isEnergyStalling; }
+    bool T2LabRetiring(Ctx@ c)    { return Factory::primaryT2BotLab !is null && Lifecycle::IsRetiring(Factory::primaryT2BotLab); }   // D-078
+    bool NoAfusYet(Ctx@ c)        { return !TechBuild::IntoAfus(); }   // D-078: no advanced lab is ordered once the advanced fusion is under way
+    bool EnergyFloatsBank(Ctx@ c) { return TechChain::EnergyFloats(); }   // D-079: the bank-based float, the chain's definition
+    bool EnergyReclaimable(Ctx@ c){ const EcoPlanner::State@ s = c.eco; return (s.fusions > 0 || s.afus > 0) && (s.winds + s.solars + s.advSolars) > 0; }   // D-077
+    bool MetalAhead(Ctx@ c)       { return c.aheadM; }                 // D-075: income above spending, the bank rising
+    bool StructureBuilding(Ctx@ c){ return c.building !is null; }      // D-075: a structure of ours is under construction
     bool ConverterSurplus(Ctx@ c) { return c.floatingE || c.surplus >= 2.0f * Global::RoleSettings::Tech::EcoConverterUse; }
     // Energy income past EcoEnergyRatioHigh times the metal income and metal not
     // floating: the energy is worth more as metal (played: ten solars, no converter)
@@ -215,6 +236,42 @@ namespace TechRules {
         const string key = EcoPlanner::PickConverter(c.eco, surplus, why);
         if (key.length() == 0) return null;
         return ByKey(c, key);
+    }
+    // D-075, the owner's rule: metal income above spending while a structure
+    // is under construction means build power is short: a construction
+    // turret (the box slot nearest a lab), PowerTurretsConcurrent at a time;
+    // the rest assist the turret going up. When nothing is under
+    // construction the rows below order the next structure by priority.
+    int powerTurretNoSlotLog = -100000;
+    IUnitTask@ DoReclaimT2Lab(Ctx@ c) { return TechBuild::ReclaimT2Lab(c.u); }   // D-078
+    IUnitTask@ DoEnergyReclaim(Ctx@ c) { return TechBuild::ReclaimEnergy(c.u, c.eco); }   // D-077
+    IUnitTask@ DoPowerTurret(Ctx@ c)
+    {
+        const EcoPlanner::State@ s = c.eco;
+        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        if (nano is null || !nano.IsAvailable(ai.frame)) return null;
+        // build power scales with income: at the target, the rows below spend the metal instead
+        // ... unless the metal bank has been full for PowerAheadSeconds: a full
+        // bank with a structure under construction is build power short whatever
+        // the ratio says (played: the advanced fusion took six minutes at a full
+        // bank with the rule at its cap; the cap exists for the idle base after
+        // the objective, D-075)
+        if (!TechBuild::MetalFullLong() && s.buildPowerNear >= s.mIncome * Global::RoleSettings::Tech::PowerBuildPowerPerMetal) return null;
+        const bool onNano = (c.building.circuitDef is nano);
+        if (!onNano && s.nanosBuilding < Global::RoleSettings::Tech::PowerTurretsConcurrent && c.d.CanBuild(nano)) {
+            IUnitTask@ t = Layout::NanoTask(c.u, Task::Priority::HIGH);
+            if (t !is null) {
+                GenericHelpers::LogUtil("[TECH][Power] +" + int(s.mIncome) + " metal, " + TechBuild::MetalAheadWhy() + " (" + int(s.mCur) + " of " + int(s.mStor)
+                    + ") while " + c.building.circuitDef.GetName() + " is under construction: turret by " + c.d.GetName() + " " + c.u.id, 1);
+                return t;
+            }
+            if (ai.frame - powerTurretNoSlotLog > 30 * SECOND) {
+                powerTurretNoSlotLog = ai.frame;
+                GenericHelpers::LogUtil("[TECH][Power] no turret slot for " + c.d.GetName() + " (" + (s.turretSlot ? "slot yes" : "slot no") + ")", 1);
+            }
+        }
+        if (s.nanosBuilding > 0) return ByKey(c, "assistnano");
+        return null;
     }
     IUnitTask@ DoTurret(Ctx@ c)
     {
@@ -294,13 +351,17 @@ namespace TechRules {
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
         table.insertLast(Rule("opening.mex",       COMMANDER,    W1(@OpeningPending), @DoOpening,      "the nearest OpeningMexCap mexes within OpeningMexRadius"));
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));
+        table.insertLast(Rule("lab.t2.reclaim",     MOBILE,       W1(@T2LabRetiring), @DoReclaimT2Lab, "D-078: the advanced lab is retiring (an advanced fusion is under construction, the bank has room): every builder reclaims it, turrets in range join"));
+        table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim winds and solars nearest the base centre; advanced solars at ReclaimAdvSolarMargin; an advanced fusion reclaims all"));
+        table.insertLast(Rule("energy.convert.float", MOBILE,     W2(@EnergyFloatsBank, @NotStalling), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
+        table.insertLast(Rule("power.turret",      MOBILE,       W3(@MetalAhead, @StructureBuilding, @NotStalling), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, PowerTurretsConcurrent at a time, else assist the turret going up"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
         table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W3(@OpeningDone, @NoConstructors, @NoLabAtAll), @DoStartFactory, "every constructor and every lab lost: the commander rebuilds a T1 lab"));
         table.insertLast(Rule("mex.expand",        CONSTRUCTORS, W2(@OpeningDone, @MetalBottleneck), @DoExpandMex,    "the nearest open spot within EcoMexExpandRadius while metal is the bottleneck"));
         table.insertLast(Rule("energy.draining",   MOBILE,       W2(@Draining, @EnergyIdle), @DoEnergy,       "the base is stalling: cheapest energy per E/s, a fusion in the fusion era"));
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));
-        table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W1(@OpeningDone), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab)"));
+        table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYet), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab)"));
         table.insertLast(Rule("mex.upgrade",       CON_T2,       W0(), @DoMexUpgrade,   "the nearest owned T1 mex within MexUpgradeRadius, one at a time"));
         table.insertLast(Rule("energy.convert",    MOBILE,       W2(@ConverterWanted, @NotStalling), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
         table.insertLast(Rule("turret.build",      MOBILE,       W0(), @DoTurret,       "static build power under EcoBuildPowerPerMetal x metal, or metal floating: a turret on its slot; else assist the one going up"));

@@ -40,6 +40,11 @@
 
 namespace circuit {
 
+// D-074: the exit a factory keeps clear, in elmos (the first lab's exit cone: 320 long, 32 margin)
+static constexpr float EXIT_CLEAR_LENGTH = 320.f;
+static constexpr float EXIT_CLEAR_MARGIN = 32.f;
+
+
 using namespace springai;
 using namespace terrain;
 
@@ -2212,6 +2217,9 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 		if (!CanBeBuiltAt(cdef, p) || !map->IsPossibleToBuildAt(unitDef, p, facing) || !predicate(p)) {
 			continue;
 		}
+		if (!cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, p, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;  // D-074
+		}
 		const int id = ReserveBuildingEx(cdef, p, facing, 0, 0, true, true, false, 0, true);
 		if (id < 0) {
 			continue;
@@ -2270,6 +2278,39 @@ AIFloat3 CTerrainManager::FindApproachPoint(CCircuitUnit* unit, const AIFloat3& 
 		return p;
 	}
 	return -RgtVector;
+}
+
+int CTerrainManager::NextSlotConnected(int group, const AIFloat3& centre) const
+{
+	std::vector<const SReservation*> taken;
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.group == group) && (r.consumed || r.claimed)) {
+			taken.push_back(&r);
+		}
+	}
+	int best = -1;
+	float bestScore = std::numeric_limits<float>::max();
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.group != group) || r.consumed || r.claimed) {
+			continue;
+		}
+		const float toCentre = std::sqrt(centre.SqDistance2D(r.pos));
+		float score = toCentre;
+		if (!taken.empty()) {
+			float nearest = std::numeric_limits<float>::max();
+			for (const SReservation* t : taken) {
+				nearest = std::min(nearest, std::sqrt(t->pos.SqDistance2D(r.pos)));
+			}
+			score = nearest * 4.f + toCentre;  // adjacency first, the centre breaks ties
+		}
+		if (score < bestScore) {
+			bestScore = score;
+			best = r.id;
+		}
+	}
+	return best;
 }
 
 int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
@@ -2469,6 +2510,54 @@ int CTerrainManager::CountGroupSlotsWithin(int group, const AIFloat3& pos, float
 	return n;
 }
 
+bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int facing, float length, float margin) const
+{
+	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
+		return true;
+	}
+	if ((facing < 0) || (facing > 3)) {
+		facing = UNIT_FACING_SOUTH;
+	}
+	UnitDef* unitDef = cdef->GetDef();
+	const float width = ((((facing & 1) == 0) ? unitDef->GetXSize() : unitDef->GetZSize()) / 2) * (SQUARE_SIZE * 2);
+	const float depth = ((((facing & 1) == 1) ? unitDef->GetXSize() : unitDef->GetZSize()) / 2) * (SQUARE_SIZE * 2);
+	AIFloat3 fwd;
+	switch (facing) {
+		default:
+		case UNIT_FACING_SOUTH: fwd = AIFloat3(0.f, 0.f, 1.f);  break;
+		case UNIT_FACING_EAST:  fwd = AIFloat3(1.f, 0.f, 0.f);  break;
+		case UNIT_FACING_NORTH: fwd = AIFloat3(0.f, 0.f, -1.f); break;
+		case UNIT_FACING_WEST:  fwd = AIFloat3(-1.f, 0.f, 0.f); break;
+	}
+	const AIFloat3 centre = pos + fwd * (depth * 0.5f + length * 0.5f);
+	int2 c1, c2;
+	if (!RectCells(centre, facing, width * 0.5f + margin, length * 0.5f, c1, c2)) {
+		return false;
+	}
+	for (int z = c1.y; z < c2.y; ++z) {
+		for (int x = c1.x; x < c2.x; ++x) {
+			if (!blockingMap.IsInBounds(x, z) || blockingMap.IsStruct(x, z)) {
+				return false;
+			}
+		}
+	}
+	// planned slots (any group) whose footprint overlaps the exit
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if (r.def == nullptr) {
+			continue;
+		}
+		int2 r1, r2;
+		if (!ReservationCells(r.def, r.pos, r.facing, r1, r2)) {
+			continue;
+		}
+		if ((r1.x < c2.x) && (r2.x > c1.x) && (r1.y < c2.y) && (r2.y > c1.y)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos) const
 {
 	auto zit = zones.find(zone);
@@ -2501,6 +2590,9 @@ int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int fa
 		cp.y = circuit->GetMap()->GetElevationAt(cp.x, cp.z);
 		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), cp, facing) || LeavesPocket(zone, cdef, c.pos, facing)) {
 			continue;
+		}
+		if (!cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, c.pos, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;  // D-074: a factory's exit stays clear of structures and planned slots
 		}
 		int n = 0;
 		for (const AIFloat3& s : slots) {

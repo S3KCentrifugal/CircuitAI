@@ -64,6 +64,10 @@ chain is idempotent: it never re-orders what stands or is queued.
 
 ## How a step is executed (`Next`)
 
+Before any step: while the T1 lab stands and no T1 constructor is alive,
+the commander guards the lab so its 300 build power makes the first
+constructor (D-074, a count, not a timer).
+
 For each step in order whose target is not met:
 
 1. a builder that cannot build it goes on to the next step it can (the
@@ -86,7 +90,19 @@ For each step in order whose target is not met:
    rises, its frame appears or two minutes pass, because a fresh order is
    invisible to both the queued and the unfinished counts;
 6. a step with no progress for `ChainStepStallSeconds` is skipped, so an
-   unreachable site cannot end the rush; never the objective step itself;
+   unreachable site cannot end the rush; never the objective step itself; a
+   frame under construction is progress (D-075: the fusion was skipped while
+   it was being built);
+6a. an energy step (`wind`, `solar`, `advsolar`, `fusion`, `afus`) is not
+   ordered while energy floats (`EnergyFloats`: the bank at
+   `EcoConvertEnergyPercent` of storage for `ChainEnergyFloatSeconds`; the
+   pull is not read, a build in progress inflates it):
+   a cheap one is passed over, a dear one returns the builder to the economy
+   rows for converters (D-079); the wait resets the stall clock;
+6b. before the step loop, a cheap step's unfinished frame within
+   `ChainNearFrameRadius` of the builder is finished first (D-075: two
+   turret frames decayed while every builder walked to the fusion), and a
+   cheap step with nothing to add says so at level 1 when its counts change;
 7. orders go through the acts that own the placement: mex
    `EnqueueMexWithin` nearest first; lab `TechBuild::StartFactory`; advanced
    lab `Layout::T2LabTask`; T2 mex the nearest un-upgraded mex; turret
@@ -121,7 +137,20 @@ so its rows stay quiet, and sets `MinimumT1ConstructorBots` (2) and
 | `ChainWindBootstrap` | 5 | the first generator is a solar while the current wind is under this |
 | `ChainAssistRadius` | 4000 | every builder inside it joins a dear item's frame |
 | `ChainParallelCostM` | 400 | cheaper structures are built one per builder in parallel |
-| `ChainStepStallSeconds` | 120 | a step with no progress for this long is skipped |
+| `ChainStepStallSeconds` | 120 | a step with no progress for this long is skipped; a frame under construction is progress |
+| `ChainNearFrameRadius` | 600 | a cheap step's frame within this of the builder is finished before anything else |
+| `ChainEnergyFloatSeconds` / `ChainEnergyFloatMax` | 15 / 300 | the energy bank at `EcoConvertEnergyPercent` of storage this long, or at it now with income over the pull by this: energy floats, no energy step is ordered (D-079) |
+
+## Lifecycle and invariants (D-076)
+
+`CommanderOnFirstConstructor` refuses a retiring lab (`Lifecycle::IsRetiring`).
+The `alab` step counts as met once an advanced fusion is under way
+(`TechBuild::IntoAfus`, D-078), as the `lab` step does once the advanced lab
+begins, so a reclaimed lab is not re-ordered.
+The stall guard reports INV-003 (`Invariants::ChainStepSkipped`) if it ever
+skips a step whose frame is under construction; with D-075 that cannot
+happen by construction, and the check says so if it does. See
+[`../invariants.md`](../invariants.md).
 
 ## Related
 
@@ -129,4 +158,4 @@ so its rows stay quiet, and sets `MinimumT1ConstructorBots` (2) and
 - [`tech_build.md`](tech_build.md) - the acts.
 - [`../eco-planner.md`](../eco-planner.md) - the economy that continues after the chain.
 
-<!-- source: data/script/src/roles/tech_chain.as; blob: ca241f47f838ddcb3141f85bd21c1adf4939d32b; lines: 389 -->
+<!-- source: data/script/src/roles/tech_chain.as; blob: 2d6726e678ddef7d22fda1adc8e27ba705efd159; lines: 494 -->

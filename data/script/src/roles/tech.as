@@ -19,6 +19,8 @@
 #include "../manager/team.as"
 #include "../manager/layout.as"
 #include "../manager/eco_planner.as"
+#include "../manager/lifecycle.as"
+#include "../manager/invariants.as"
 #include "tech_build.as"
 #include "tech_rules.as"
 #include "tech_chain.as"
@@ -212,6 +214,7 @@ namespace RoleTech
 			GenericHelpers::LogUtil("[TECH][Build] experimental build system on: direct range "
 				+ int(aiBuilderMgr.experimentalDirectRange) + ", search radius " + int(aiBuilderMgr.experimentalSearchRadius), 1);
 			TechChain::Init();   // D-070: the rush chain, after the opening so it can take the opening over
+			@Global::energyAllowed = @TechBuild::EnergyAllowed;   // D-077: no T1 energy in the fusion era, whoever orders it
 		}
 		else
 		{
@@ -262,7 +265,9 @@ namespace RoleTech
 	void Tech_ApplyEconomySettings(const string &in when)
 	{
 		economySwitched = true;
-		aiEconomyMgr.reclEnergyEff = Global::RoleSettings::Tech::ReclaimEnergyEff;
+		// D-077: with the experimental build the energy.reclaim row owns energy
+		// reclaim (one owner per decision); native's ReclaimOldEnergy is off
+		aiEconomyMgr.reclEnergyEff = Global::RoleSettings::Tech::ExperimentalBuild ? 0.0f : Global::RoleSettings::Tech::ReclaimEnergyEff;
 		aiEconomyMgr.reclaimOldConvertersAlways = Global::RoleSettings::Tech::ReclaimOldConvertersAlways;
 		aiEconomyMgr.assistNanoEnabled = Global::RoleSettings::Tech::AssistNanoEnabled;
 		aiEconomyMgr.assistNanoIncomeMod = Global::RoleSettings::Tech::AssistNanoIncomeMod;
@@ -531,6 +536,7 @@ namespace RoleTech
 	// to the closest allies (Team::Donation::OnCombatBotBuilt, D-041).
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
+		Invariants::OnUnitAdded(unit);   // D-076: INV-001
 		Team::Donation::OnCombatBotBuilt(unit);
 	}
 
@@ -582,6 +588,7 @@ namespace RoleTech
 		Opening::Tick();
 		TechBuild::Tick();
 		TechChain::Tick();
+		Invariants::Tick();   // D-076: the role's promises, checked once a second
 		Tech_IncomeBuilderLimits(metalIncome);
 		// The native plan owns geometry and slot state; this refreshes restored
 		// state and the optional overlay.
@@ -906,6 +913,13 @@ namespace RoleTech
 			return aiFactoryMgr.DefaultMakeTask(u);
 		}
 
+		// D-076: a retiring factory produces nothing (played: the T1 lab built a
+		// Lazarus while a constructor and a turret were reclaiming it)
+		if (Lifecycle::IsRetiring(u))
+		{
+			GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + " " + u.id + " is retiring: no production", 3);
+			return null;
+		}
 		// Determine side from factory unit name
 		string side = UnitHelpers::GetSideForUnitName(facDef.GetName());
 		const AIFloat3 pos = u.GetPos(ai.frame);
@@ -1318,6 +1332,7 @@ namespace RoleTech
 	void Tech_FactoryAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_FactoryAiUnitRemoved", 4);
+		Lifecycle::Forget(unit);   // D-076
 		// Lab tracking is now centralized in Factory::AiUnitRemoved
 	}
 
@@ -1429,6 +1444,7 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
+		Invariants::OnUnitAdded(unit);   // D-076: INV-001
 		// Donation hook: when the 3rd T2 constructor is created, donate it to the team leader
 		if (unit is null)
 			return;

@@ -82,6 +82,22 @@ if printf '%s\n' $staged | grep -qE '^(data/script/src/roles/.*\.as|doc/roles/.*
     fi
 fi
 
+# 5. Practice check (D-076): invariant ids match doc/invariants.md, every
+#    playtest check forbids a broken invariant, every rule row is in the
+#    actor matrix, every decision from D-076 on names its invariant.
+if printf '%s\n' $staged | grep -qE '^(data/script/src/.*\.as|doc/(invariants|actor-matrix|decisions)\.md|doc/roles/.*\.md|tools/playtest/checks/.*\.json)$'; then
+    py=$(command -v python3 || command -v python)
+    if [ -n "$py" ]; then
+        if ! "$py" tools/knowledge/check_invariants.py; then
+            echo >&2
+            echo "pre-commit: the invariant practice is not met (see above); doc/practice-invariants.md says what to add." >&2
+            exit 1
+        fi
+    else
+        note="${note} python not found; tools/knowledge/check_invariants.py was not run."
+    fi
+fi
+
 if [ -n "$note" ]; then
     echo "pre-commit note: $note" >&2
 fi

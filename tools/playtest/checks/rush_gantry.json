@@ -25,6 +25,11 @@
       "key": "combat early",
       "pattern": "combat production unlocked",
       "scope": "tech"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "tech"
     }
   ],
   "pass_on": {

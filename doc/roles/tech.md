@@ -842,6 +842,20 @@ constructor under turrets from both. Now:
 | `AssistNanoEnabled` | false | `aiEconomyMgr.assistNanoEnabled`: native assist nanos off for this instance; the script owns the count |
 | `AssistNanoIncomeMod` | 1.0 | `aiEconomyMgr.assistNanoIncomeMod`: when enabled, scales the income a native assist nano must be covered by |
 
+## Lifecycle and invariants (D-076)
+
+`tech.as` includes `manager/lifecycle.as` and `manager/invariants.as`.
+`Tech_FactoryAiMakeTask` returns nothing for a factory that `Lifecycle` marks
+retiring (played: the T1 lab produced a Lazarus while it was being
+reclaimed). `Tech_FactoryAiUnitRemoved` calls `Lifecycle::Forget`;
+`Tech_BuilderAiUnitAdded` and `Tech_MilitaryAiUnitAdded` call
+`Invariants::OnUnitAdded` (INV-001); the role's tick calls
+`Invariants::Tick` once a second (INV-002, INV-004). A broken promise is
+logged as `[INVARIANT] INV-nnn` and fails every playtest. The practice is
+[`../practice-invariants.md`](../practice-invariants.md); the register
+[`../invariants.md`](../invariants.md); who acts on what
+[`../actor-matrix.md`](../actor-matrix.md).
+
 ## Related
 
 - `doc/angelscript-references.md` - script loading model, callback contracts,
@@ -850,4 +864,4 @@ constructor under turrets from both. Now:
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: 5b68064cbc01651944597c4bb4fb41ce625253a6; lines: 2566 -->
+<!-- source: data/script/src/roles/tech.as; blob: dfbad546847fa42d7437222245caacb282d8f7bb; lines: 2582 -->

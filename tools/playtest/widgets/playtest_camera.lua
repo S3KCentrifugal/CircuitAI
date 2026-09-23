@@ -111,7 +111,9 @@ function widget:UnitFinished(unitID, unitDefID, unitTeam)
 	if not ud then return end
 	local team = CFG.team or 0
 	if unitTeam ~= team then return end
-	if ud.isBuilding or (ud.metalCost or 0) >= 2000 then
+	-- every immobile unit: isBuilding needs a yardmap, which BAR's construction
+	-- turrets lack, so they were never reported (found 2026-09-22)
+	if ud.isImmobile or (ud.metalCost or 0) >= 2000 then
 		local n = Spring.GetGameFrame()
 		echo(string.format("finished %s team %d at %.2f min", ud.name, unitTeam, n / (60 * FPS)))
 	end

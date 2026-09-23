@@ -584,7 +584,14 @@ namespace Layout {
         // D-069: the slot nearest a standing lab, whichever lab that is, so
         // every turret reaches a lab; the pair's centre only when no lab stands.
         int id = -1;
-        if (Global::RoleSettings::Tech::ExpTurretNearLab) {
+        // D-077 (owner's rule): turrets start at the centre of the planned
+        // layout and grow outward as one connected cluster, so the most
+        // structures sit in range of the build power.
+        if (Global::RoleSettings::Tech::ExpTurretCentreOut && boxCentre.x >= 0.0f) {
+            id = aiTerrainMgr.NextSlotConnected(nanoGroup, boxCentre);
+            if (id >= 0) GenericHelpers::LogUtil("[Layout] turret slot " + id + ", " + int(sqrt(MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(id), boxCentre))) + " from the box centre (connected)", 2);
+        }
+        if (id < 0 && Global::RoleSettings::Tech::ExpTurretNearLab) {
             float bestSq = 1.0e30f;
             array<string>@ keys = Factory::allFactories.getKeys();
             for (uint i = 0; keys !is null && i < keys.length(); ++i) {

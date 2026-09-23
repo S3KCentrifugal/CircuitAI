@@ -83,11 +83,77 @@ namespace TechBuild {
     // so nothing is packed where its units come out. A constructor building
     // the first lab (commander lost) takes the pair's reserved slot instead.
     int firstLabExitZone = 0;
+    int t2LabExitZone = 0;        // D-074: the advanced lab's exit is held the same way
 
     // Progressing into T2: the advanced lab is ordered, framed or standing.
     // No T1 lab is ordered from then on - the first one is being reclaimed
     // to pay for it (played: the commander rebuilt the T1 lab beside the
     // advanced lab's frame the moment the reclaim emptied the count).
+    // D-078: an advanced fusion exists as a frame or stands.
+    bool IntoAfus()
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        return d !is null && (d.count > 0 || aiBuilderMgr.GetUnfinishedCount(d) > 0);
+    }
+    // ... is under construction now.
+    bool AfusUnderWay()
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        return d !is null && aiBuilderMgr.GetUnfinishedCount(d) > 0;
+    }
+    // D-077: the one owner of "may this energy def still be ordered": no wind
+    // or solar once a fusion stands (they are being reclaimed), no advanced
+    // solar once an advanced fusion is under way. Registered as
+    // Global::energyAllowed for the shared builder helpers and the planner.
+    bool EnergyAllowed(const string &in name)
+    {
+        const string side = Global::AISettings::Side;
+        const bool t1 = (name == UnitHelpers::GetWindNameForSide(side)) || (name == UnitHelpers::GetSolarNameForSide(side));
+        const bool adv = (name == UnitHelpers::GetAdvSolarNameForSide(side));
+        const bool big = (name == UnitHelpers::GetFusionNameForSide(side)) || (name == UnitHelpers::GetAdvFusionNameForSide(side));
+        if (!t1 && !adv && !big) return true;
+        // D-079: no energy structure of any tier while energy floats; the
+        // surplus is converted and the AI chases metal
+        if (TechChain::EnergyFloats()) return false;
+        if (big) return true;
+        CCircuitDef@ fus = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
+        const bool fusionUp = (fus !is null && fus.count - aiBuilderMgr.GetUnfinishedCount(fus) > 0) || IntoAfus();
+        if (t1 && fusionUp) return false;
+        if (adv && IntoAfus()) return false;
+        return true;
+    }
+    // D-075 (owner's rule, read from the bank): metal income is above spending
+    // when the bank has sat at InvariantFloatPercent of storage for
+    // PowerAheadSeconds or risen by PowerAheadRise over that window. The
+    // engine's pull is inflated by the build in progress (played: a full bank
+    // with income under the pull for a minute), so it is not read.
+    array<float> metalBank;   // one sample a second, the last PowerAheadSeconds
+    int metalFullSince = -1;
+    void TrackMetal()
+    {
+        const float stor = aiEconomyMgr.metal.storage;
+        const float cur = aiEconomyMgr.metal.current;
+        const bool full = (stor > 0.0f) && (cur >= Global::RoleSettings::Tech::InvariantFloatPercent * stor);
+        if (!full) metalFullSince = -1; else if (metalFullSince < 0) metalFullSince = ai.frame;
+        metalBank.insertLast(cur);
+        const uint keep = uint(Global::RoleSettings::Tech::PowerAheadSeconds) + 1;
+        while (metalBank.length() > keep) metalBank.removeAt(0);
+    }
+    bool MetalFullLong() { return metalFullSince >= 0 && ai.frame - metalFullSince >= int(Global::RoleSettings::Tech::PowerAheadSeconds) * SECOND; }
+    bool MetalRising() { return metalBank.length() >= 2 && metalBank[metalBank.length() - 1] - metalBank[0] >= Global::RoleSettings::Tech::PowerAheadRise; }
+    bool MetalAhead() { return MetalFullLong() || MetalRising(); }
+    string MetalAheadWhy()
+    {
+        if (MetalFullLong()) return "bank full for " + int((ai.frame - metalFullSince) / SECOND) + " s";
+        if (MetalRising()) return "bank up " + int(metalBank[metalBank.length() - 1] - metalBank[0]) + " in " + int(metalBank.length() - 1) + " s";
+        return "bank steady";
+    }
+    bool BankHasRoomFor(CCircuitUnit@ unit, float fallback)
+    {
+        const float metal = (unit is null || unit.circuitDef is null) ? fallback : unit.circuitDef.costM;
+        return aiEconomyMgr.metal.current + metal <= aiEconomyMgr.metal.storage;
+    }
+
     bool IntoT2()
     {
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
@@ -122,6 +188,7 @@ namespace TechBuild {
                     const float a = 6.2831853f * float(k) / float(n);
                     AIFloat3 p = AIFloat3(at.x + cos(a) * float(r) * step, 0.0f, at.z + sin(a) * float(r) * step);
                     if (!aiTerrainMgr.CanReserveBuilding(lab, p, facing)) continue;
+                    if (!aiTerrainMgr.IsExitClear(lab, p, facing, 320.0f, 32.0f)) continue;   // D-074: nothing stands or will stand in its exit
                     const int id = aiTerrainMgr.ReserveBuilding(lab, p, facing, 0);
                     if (id < 0) continue;
                     p = aiTerrainMgr.GetReservationPos(id);
@@ -144,6 +211,42 @@ namespace TechBuild {
     // From Tech_EconomyUpdate: the first lab's exit cone, held while it stands.
     void Tick()
     {
+        TrackMetal();   // D-075
+        // D-076: the T1 lab retires the moment the advanced lab is under way.
+        // One state, read by every actor: production stops (Lifecycle::Retire
+        // stops the unit, the factory rows return nothing), guards and the
+        // commander's help end, only the reclaim touches it (lab.t1.reclaim).
+        if (IntoT2() && !throwawayDecided) {
+            // the throwaway is the lab standing when the advanced lab begins;
+            // any T1 lab built later (lab.t1.spam) is a keeper (played: spam
+            // labs were retired the moment they became the primary lab)
+            throwawayDecided = true;
+            throwawayLabId = (Factory::primaryT1BotLab is null) ? -2 : Factory::primaryT1BotLab.id;
+        }
+        CCircuitUnit@ tlab = Factory::primaryT1BotLab;
+        if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab)) {
+            if (tlab.task !is null) aiFactoryMgr.AbortTask(tlab.task);   // native's recruit task would re-issue the build on idle
+            Lifecycle::Retire(tlab, "the advanced lab is under way; the throwaway T1 lab is reclaimed (D-066)");
+        }
+        // D-078 (owner's rule): the advanced lab retires the moment an advanced
+        // fusion is under construction and the bank has room for its metal
+        {
+            CCircuitUnit@ t2 = Factory::primaryT2BotLab;
+            const bool due = (t2 !is null) && AfusUnderWay() && BankHasRoomFor(t2, 2500.0f);
+            if (due && !Lifecycle::IsRetiring(t2)) {
+                if (t2.task !is null) aiFactoryMgr.AbortTask(t2.task);
+                Lifecycle::Retire(t2, "an advanced fusion is under construction and the bank has room for the lab's metal (D-078)");
+            }
+            // INV-007: it never stays active while that holds
+            if (due && !Lifecycle::IsRetiring(t2)) {
+                if (t2DueSince < 0) t2DueSince = ai.frame;
+                else if (ai.frame - t2DueSince >= int(Global::RoleSettings::Tech::InvariantT2ReclaimSeconds) * SECOND)
+                    Invariants::Violation("INV-007", "" + t2.id, "advanced lab " + t2.id + " is active while an advanced fusion is under construction and the bank has room");
+            } else t2DueSince = -1;
+        }
+        // INV-005: only the throwaway T1 lab is ever retired
+        if (tlab !is null && tlab.id != throwawayLabId && Lifecycle::IsRetiring(tlab))
+            Invariants::Violation("INV-005", "" + tlab.id, "T1 lab " + tlab.id + " is retiring but the throwaway is " + throwawayLabId);
         if (!Global::RoleSettings::Tech::ExperimentalBuild) return;
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (firstLabExitZone == 0 && lab !is null && Layout::HasComplex()) {
@@ -154,19 +257,48 @@ namespace TechBuild {
             GenericHelpers::LogUtil("[TECH][Build] first lab gone: its exit (zone " + firstLabExitZone + ") released", 1);
             firstLabExitZone = 0;
         }
+        CCircuitUnit@ t2lab = Factory::primaryT2BotLab;
+        if (t2LabExitZone == 0 && t2lab !is null && Layout::HasComplex()) {
+            t2LabExitZone = aiTerrainMgr.ReserveExitCone(t2lab, 320.0f, 32.0f);
+            if (t2LabExitZone > 0) GenericHelpers::LogUtil("[TECH][Build] advanced lab's exit held (zone " + t2LabExitZone + ")", 1);
+        } else if (t2LabExitZone > 0 && t2lab is null) {
+            aiTerrainMgr.ReleaseZone(t2LabExitZone);
+            t2LabExitZone = 0;
+        }
     }
 
     // The T1 bot lab is reclaimed the moment the advanced lab's frame exists
     // (owner's rule): every idle builder within `radius` of it joins the one
     // native reclaim task, turrets in reach put it before anything else
     // (Tech_TurretAssist), and the metal pays for the T2 lab.
+    // D-078 (owner's rule): whenever a reclaim is ordered, every construction
+    // turret in range stops what it does and joins it now (native
+    // TurretsOnReclaim). Targets are remembered for INV-008.
+    dictionary reclaimTargets;    // unit id -> frame of the order
+    dictionary turretsPulledAt;   // unit id -> frame the turrets were pulled
+    void PullTurrets(CCircuitUnit@ target)
+    {
+        if (target is null || target.circuitDef is null) return;
+        const string key = "" + target.id;
+        reclaimTargets.set(key, int64(ai.frame));
+        int64 last = -100000; turretsPulledAt.get(key, last);
+        if (ai.frame - int(last) < 30 * SECOND) return;
+        turretsPulledAt.set(key, int64(ai.frame));
+        const int n = aiBuilderMgr.TurretsOnReclaim(target.id, Global::RoleSettings::Tech::ReclaimTurretMargin, true);
+        GenericHelpers::LogUtil("[TECH][Reclaim] " + n + " turret(s) pulled onto " + target.circuitDef.GetName() + " " + target.id, (n > 0) ? 1 : 3);
+    }
+
     int t1LabReclaimId = -1;
     int reclaimDeferLog = -100000;
+    int throwawayLabId = -1;      // D-076: the T1 lab standing when the advanced lab began; -2 = none
+    int t2DueSince = -1;          // D-078: INV-007 clock
+    bool throwawayDecided = false;
 
     IUnitTask@ ReclaimT1Lab(CCircuitUnit@ u, float radius)
     {
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (lab is null || lab is u) return null;
+        if (lab.id != throwawayLabId) return null;   // D-076: only the throwaway lab; a later spam lab is a keeper
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         if (t2 is null) return null;
         if (!IntoT2()) return null;   // not begun yet
@@ -186,6 +318,7 @@ namespace TechBuild {
         }
         if (MapHelpers::SqDist(u.GetPos(ai.frame), lab.GetPos(ai.frame)) > radius * radius) return null;
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, lab, 180 * SECOND));
+        if (t !is null) PullTurrets(lab);   // D-078
         if (t !is null && t1LabReclaimId != lab.id) {
             t1LabReclaimId = lab.id;
             GenericHelpers::LogUtil("[TECH][Build] the advanced lab is under way: reclaiming the T1 bot lab " + lab.id
@@ -250,6 +383,7 @@ namespace TechBuild {
     // factories, packed by native nearest that anchor outside the planned
     // zones. Nothing more: TECH is a back-line role and the rest is the
     // team's.
+    array<int> defenceOrders = { 0, 0 };   // D-075: orders per def; native refusing the site ExpDefenceMaxOrders times ends the rung
     IUnitTask@ Defence(CCircuitUnit@ u)
     {
         if (aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius) <= 0.0f)
@@ -261,13 +395,83 @@ namespace TechBuild {
             CCircuitDef@ def = ai.GetCircuitDef(names[i]);
             if (def is null || !def.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(def)) continue;
             if (def.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), def) >= wanted[i]) continue;
+            if (defenceOrders[i] >= Global::RoleSettings::Tech::ExpDefenceMaxOrders) continue;
             AIFloat3 anchor = Layout::factoryCentre;
             if (anchor.x < 0.0f) anchor = Global::Map::StartPos;
-            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::NORMAL, def, anchor, 0.0f, true, 120 * SECOND));
-            if (t !is null) GenericHelpers::LogUtil("[TECH][Build] base defence: " + names[i] + " near the factories", 1);
+            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::NORMAL, def, anchor, Global::RoleSettings::Tech::ExpDefenceRadius, true, 120 * SECOND));
+            if (t !is null) { defenceOrders[i]++; GenericHelpers::LogUtil("[TECH][Build] base defence: " + names[i] + " near the factories (order " + defenceOrders[i] + " of " + Global::RoleSettings::Tech::ExpDefenceMaxOrders + ")", 1); }
             return t;
         }
         return null;
+    }
+
+    // D-077 (owner's rule): winds and solars are reclaimed once a fusion
+    // stands and energy income without them still covers the pull by
+    // ReclaimT1EnergyMargin; advanced solars once income without every T1 and
+    // advanced-solar source covers it by ReclaimAdvSolarMargin; an advanced
+    // fusion reclaims all of them. Nearest the base centre first, so the
+    // middle of the layout is freed for the fusion era. Per-unit output:
+    // solar 20, advanced solar 75, turbine the map's expected wind.
+    dictionary reclaimInFlight;   // unit id -> frame ordered
+    int ReclaimsInFlight()
+    {
+        array<string>@ keys = reclaimInFlight.getKeys();
+        int n = 0;
+        for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+            int64 at = 0; reclaimInFlight.get(keys[i], at);
+            // gone (reclaimed) or stale: no longer in flight (played: 28 turbines took
+            // twenty minutes with two slots held 90 s each)
+            if (ai.frame - int(at) > 90 * SECOND || ai.GetTeamUnit(int(parseInt(keys[i]))) is null) reclaimInFlight.delete(keys[i]); else ++n;
+        }
+        return n;
+    }
+    IUnitTask@ ReclaimEnergy(CCircuitUnit@ u, const EcoPlanner::State@ s)
+    {
+        if (u is null || s is null) return null;
+        const bool afusUp = s.afus > 0;
+        if (s.fusions <= 0 && !afusUp) return null;
+        const float wind = TechChain::WindExpected();
+        const float t1Make = s.winds * wind + s.solars * 20.0f;
+        const float advMake = s.advSolars * 75.0f;
+        const float pull = s.ePull;
+        const bool t1Ok = afusUp || (s.eIncome - t1Make >= pull * Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
+        const bool advOk = afusUp || (s.eIncome - t1Make - advMake >= pull * Global::RoleSettings::Tech::ReclaimAdvSolarMargin);
+        if (ReclaimsInFlight() >= Global::RoleSettings::Tech::ReclaimEnergyConcurrent) return null;
+        const string side = Global::AISettings::Side;
+        array<string> names;
+        if (t1Ok && s.winds > 0) names.insertLast(UnitHelpers::GetWindNameForSide(side));
+        if (t1Ok && s.solars > 0) names.insertLast(UnitHelpers::GetSolarNameForSide(side));
+        if (advOk && s.advSolars > 0) names.insertLast(UnitHelpers::GetAdvSolarNameForSide(side));
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (d is null) continue;
+            CCircuitUnit@ target = aiBuilderMgr.FindOwnNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ReclaimEnergyRadius, d);
+            if (target is null) continue;
+            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::NORMAL, target, 120 * SECOND));
+            if (t is null) continue;
+            PullTurrets(target);   // D-078
+            const string key = "" + target.id;
+            if (!reclaimInFlight.exists(key)) {
+                reclaimInFlight.set(key, int64(ai.frame));
+                GenericHelpers::LogUtil("[TECH][Reclaim] " + names[i] + " " + target.id + ": energy +" + int(s.eIncome) + " without " + int(t1Make)
+                    + " T1 and " + int(advMake) + " adv-solar covers a pull of " + int(pull) + (afusUp ? " (advanced fusion stands)" : " (fusion stands)") + "; by " + u.circuitDef.GetName() + " " + u.id, 1);
+            }
+            return t;
+        }
+        return null;
+    }
+
+    // D-078 (owner's rule): the advanced lab is reclaimed whenever an advanced
+    // fusion is under construction and the bank has room for its metal
+    // (Tick retires it; this is the order). Every turret in range joins.
+    IUnitTask@ ReclaimT2Lab(CCircuitUnit@ u)
+    {
+        CCircuitUnit@ lab = Factory::primaryT2BotLab;
+        if (lab is null || lab is u || !Lifecycle::IsRetiring(lab)) return null;
+        if (!BankHasRoomFor(lab, 2500.0f)) return null;
+        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, lab, 180 * SECOND));
+        if (t !is null) PullTurrets(lab);
+        return t;
     }
 
     IUnitTask@ AssistAny(CCircuitUnit@ u, float radius)
@@ -280,7 +484,7 @@ namespace TechBuild {
     IUnitTask@ GuardFactory(CCircuitUnit@ u)
     {
         CCircuitUnit@ fac = Factory::primaryT1BotLab;
-        if (fac is null || fac is u) return null;
+        if (fac is null || fac is u || Lifecycle::IsRetiring(fac)) return null;   // D-076: nobody guards a retiring lab
         return GuardHelpers::AssignWorkerGuard(u, fac, Task::Priority::LOW, true, 20 * SECOND);
     }
 

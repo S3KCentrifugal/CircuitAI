@@ -74,3 +74,22 @@ Status per objective: the best run so far, updated by the tracker.
 | 20260922-113354 | afus | 24.1 | 1:17 | 5:29 | 8:00 | 11:04 | - | - | - | - | 15/18/77 | e551884be9d1a298 | loop 19 |
 | 20260922-114626 | t2 | 13.2 | 1:12 | 5:39 | - | - | - | - | - | - | 16/35/- | 35b2e513b2786ef3 | loop 20: D-073 (build23) |
 | 20260922-114949 | afus | 24.2 | 1:15 | 5:19 | 7:46 | 10:49 | 15:35 | 21:54 | - | - | 15/34/34 | 35b2e513b2786ef3 | loop 20: D-073 (build23) |
+| 20260922-122531 | afus | 24.1 | 1:11 | 9:20 | 14:55 | 18:53 | - | - | - | - | 15/15/22 | 9c202b7969b529f8 | loop 21: D-074 (build24) |
+| 20260922-122211 | t2 | 13.1 | 1:13 | 9:07 | 11:19 | - | - | - | - | - | 19/18/- | 9c202b7969b529f8 | loop 21 (build24) |
+| 20260922-123807 | t2 | 13.1 | 1:11 | 6:23 | 8:17 | - | - | - | - | - | 17/50/- | bcf633613e3ca0f3 | loop 22: D-074 (build25) |
+| 20260922-124128 | afus | 24.1 | 1:14 | 5:31 | 7:49 | 11:19 | 14:56 | - | - | - | 15/31/61 | bcf633613e3ca0f3 | loop 22: D-074 (build25) |
+| 20260922-133909 | afus | 15.6 | 1:17 | 5:46 | 8:15 | 11:25 | 15:32 | - | - | - | 13/35/66 | bcf633613e3ca0f3 | 15-minute screenshot game, build25; two turret frames abandoned and the T1 cons cycled on an unplaceable LLT 11:25-13:21 (KI-413, KI-414) |
+| 20260922-140903 | afus | 24.2 | 1:11 | 6:17 | 8:37 | 12:05 | 15:31 | 20:08 | - | - | 15/29/54 | bcf633613e3ca0f3 | D-075 verify: power.turret row, chain near-frame pre-pass, stall guard counts frames |
+| 20260922-142706 | afus | 20.6 | 1:28 | 5:38 | 8:01 | 11:17 | 15:37 | - | - | - | 13/29/48 | bcf633613e3ca0f3 | D-075 played: power.turret capped at 20 BP per metal; turrets 5:55/10:14/11:44 then 7 after the AFUS; metal bank 356-585 during the AFUS build; bank 8,098 at 20 min with nothing dear ordered after the objective |
+| 20260922-185810 | afus | 17.2 | 1:14 | 6:13 | 8:08 | 11:29 | 14:57 | - | - | - | 15/8/57 | cb86dda8e1a5d5a9 | D-076 played: lifecycle retire, invariants tick, build26 |
+| 20260922-192117 | afus | 24.1 | 1:11 | 5:46 | 7:59 | 10:38 | 14:11 | - | - | - | 15/43/71 | 6fc7e95b0d8a1726 | D-077 played: energy.reclaim, centre-out turrets, build27 |
+| 20260922-193458 | afus | 24.5 | - | - | - | - | - | - | - | - | 0/0/0 | cfbbac357f63aaf4 | D-076..079 played on build28: lifecycle, invariants, energy reclaim, turret pull, no energy float |
+| 20260922-193856 | afus | 24.2 | 1:13 | 6:25 | 8:01 | 11:13 | 17:23 | - | - | - | 15/31/52 | cfbbac357f63aaf4 | D-076..079 played on build28: lifecycle, invariants, energy reclaim, turret pull, no energy float |
+| 20260922-195358 | afus | 24.2 | 1:11 | 6:13 | 8:13 | 11:11 | 15:07 | - | - | - | 15/38/61 | cd41084e2cf2b147 | D-076..079 played on build29: bank-based float, turret pull fixed |
+| 20260922-195815 | afus | 24.1 | 1:11 | 6:06 | 7:48 | 11:52 | 16:33 | - | - | - | 7/38/82 | cd41084e2cf2b147 | D-079 played: float = bank full 15 s or full now with +300 over the pull; build29 |
+| 20260922-200246 | afus | 24.1 | 1:13 | 6:16 | 7:50 | 10:25 | 16:43 | - | - | - | 15/45/78 | cd41084e2cf2b147 | D-079 played: float = full 15 s | full+300 | half+rising+300; energy.convert before the chain; build29 |
+| 20260922-200658 | afus | 24.5 | - | - | - | - | - | - | - | - | 0/0/0 | cd41084e2cf2b147 | D-079 played: energy.convert.float before the chain; build29 |
+| 20260922-201105 | afus | 24.2 | 1:11 | 6:06 | 7:41 | 11:16 | 17:01 | - | - | - | 13/28/59 | cd41084e2cf2b147 | D-079 played: energy.convert.float before the chain; build29 |
+| 20260922-201552 | afus | 24.2 | 1:11 | 6:17 | 8:17 | 11:29 | 19:05 | - | - | - | 15/34/83 | cd41084e2cf2b147 | D-079 played: rising-bank surplus test at any level; build29 |
+| 20260922-202036 | afus | 24.2 | 1:11 | 5:42 | 7:32 | 11:09 | 18:44 | - | - | - | 15/34/78 | cd41084e2cf2b147 | D-079 played: converters in parallel while floating; build29 |
+| 20260922-202500 | afus | 24.1 | 1:11 | 6:06 | 7:45 | 10:22 | 16:08 | - | - | - | 14/44/57 | cd41084e2cf2b147 | D-075/D-079 played: no turret cap at a full bank; converters first; build29 |

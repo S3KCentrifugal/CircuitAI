@@ -113,6 +113,15 @@ Alternatives looked at and not taken:
 | Distance-transform packing (Felzenszwalb EDT) | Same result as the brute-force nearest-turret scan for a 40 x 44-cell box; not worth the code. |
 | Custom waypoint following with a range-aware last hop | Reimplements `MoveInBuildRange` worse. |
 
+## No movement once construction has begun (D-074)
+
+An experimental builder whose frame exists is not re-evaluated, moved or
+re-pathed until the build ends, unless energy is empty. Its own standing
+frame is adopted as the target before any site search, and a frame whose
+builder was swapped away is given to the task that ordered it, never
+reclaimed. Played: the in-range re-evaluation's obstruction move threw the
+commander off the first lab every five seconds.
+
 ## Packed sites are for structures only
 
 `FindBuildSite` takes the experimental branch (pack nearest the anchor,

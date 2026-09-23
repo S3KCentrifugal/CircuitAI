@@ -295,6 +295,14 @@ public:
 	// point within radius; for the planner's turret focus (D-063 follow-up 5).
 	int GetUnfinishedCount(const CCircuitDef* def) const;
 	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	// D-077: the nearest finished unit of ours of def within radius of pos (null def: any).
+	CCircuitUnit* FindOwnNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	// D-078 (owner's rule): every construction turret within its build distance
+	// (+ margin) of the unit targetId that is not already reclaiming it. With
+	// apply, each is taken off its task and put on one shared reclaim of the
+	// target now. Returns how many were off it (before applying); -1 if the
+	// target is gone.
+	int TurretsOnReclaim(int targetId, float margin, bool apply);
 	int GetQueuedBuildCount(IBuilderTask::BuildType type, const CCircuitDef* buildDef) const;
 	bool CanEnqueueTask(const unsigned mod = 8) const { return buildTasksCount < workers.size() * mod; }
 	const std::set<IBuilderTask*>& GetTasks(IBuilderTask::BuildType type) const;

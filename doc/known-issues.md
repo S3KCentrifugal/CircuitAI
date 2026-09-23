@@ -2076,6 +2076,136 @@ construction task without a frame yet.
 
 ---
 
+### KI-413 — The rush chain's tail leaves its construction turrets to decay and skips a step that is being built
+
+**Severity**: Medium (the advanced fusion took 3.5 min at +66 metal with 3,400 metal banked)
+**Location**: `data/script/src/roles/tech_chain.as` (`Next`: the stall guard, the cheap
+branch's silent `Order`), `data/script/src/manager/layout.as` (`NanoTask`)
+
+**Problem.** Played (build25, run `20260922-133909`, TECH vs TECH, objective
+`afus`, zero bonus): the two construction turret frames of the `nano 2` step
+were placed at 8:10 and 8:57 and abandoned at 10:10 (`EXP: leave: cornecro off
+cornanotc`) because every builder that asked the chain while the fusion (step 9,
+dear) was unfinished was sent to assist the fusion: the step loop meets the
+fusion before the turrets. The engine's construction decay then killed the
+frames. At 11:21 the stall guard skipped the fusion step ("made no progress for
+120 s") although the fusion had been under construction since 10:00: `Standing`
+counts finished units only, so a dear item that takes longer than
+`ChainStepStallSeconds` to build always looks stalled. From 11:21 no builder
+traced the turret step at all (no order, no assist): the cheap branch returns
+nothing silently when `Order` yields null, so whether `NanoTask` refused a slot
+or a stale queued task filled `inFlight` is not visible in the log. The
+advanced fusion (ordered 11:21, finished 15:32) was built by the two T2
+constructors and the commander while the metal bank climbed from 1,280 to
+3,398 and energy sat full: the tail was build-power limited. The playtest
+widget reported no turret because its `isBuilding` filter needs a yardmap,
+which BAR's turrets lack (widget fixed); the AI's own `defence.base` gate
+shows the first turret stood by 11:25.
+
+**Proposed solution.** (1) Reset the stall clock while `GetUnfinishedCount(d)
+> 0` (an item under construction is progress), or measure progress by the
+frame's build percentage. (2) Trace the cheap branch's null order at level 1
+(`cannot order yet`, like the dear branch) so the next game shows the cause.
+(3) Let a builder finish a cheap frame it stands next to before walking to a
+dear frame: in the step loop, an unfinished cheap step whose frame is within
+`600` of the builder wins over a later dear step's assist. (4) Adopt orphan
+frames of chain steps in `TechChain::Tick` before decay: a frame with no
+builder for 10 s gets the nearest idle builder.
+
+**Verification.** Built in
+[D-075](decisions.md#d-075--build-power-scales-with-the-bank-a-turret-whenever-metal-income-outruns-spending-during-a-construction):
+(1), (2) and (3) as the near-frame pre-pass, the stall guard and the
+cheap-branch trace, plus the `power.turret` row; (4) not done. Played (run
+`20260922-142706`): turrets at 5:55, 10:14 and 11:44 before the advanced
+fusion, the metal bank 356 to 585 during its build, no step skipped. Kept
+open for (4) only.
+
+---
+
+### KI-414 — The base-defence rule re-orders a light laser that native cannot place
+
+**Severity**: Low (a T1 constructor wasted 2 min; the cycle stops when the chain resumes)
+**Location**: `data/script/src/roles/tech_build.as` (`Defence`),
+`data/script/src/roles/tech_rules.as` (`defence.base`),
+`src/circuit/terrain/TerrainManager.cpp` (`FindBuildSite` experimental branch)
+
+**Problem.** Same run: between 11:25 and 13:21 the `defence.base` row fired
+six times for the T1 constructors and `[TECH][Build] base defence: corrl near
+the factories` was logged 15 times, each followed by native `RESERVE: no site
+for corrl within 512 of (908, 10740) (848 candidates, 401 tried)`: the anchor
+is the factory centre inside the turret box, every cell within 512 is held by
+the layout, and the experimental site search refuses them. The task dies, the
+builder asks again, the row fires again. Nothing was built and the constructor
+walked to the approach point five times instead of assisting the advanced
+fusion.
+
+**Proposed solution.** Count failed orders per def in `Defence` and stop after
+two, or anchor the light laser at the box's front edge (the turret rows'
+facing side, radius 600) where cells are free; a `[TECH][Build] no site for
+<def>` line at level 1 when native refuses.
+
+**Verification.** Built in D-075 as `ExpDefenceMaxOrders` (3) and
+`ExpDefenceRadius` (900); Played (run `20260922-142706`): two `base
+defence:` orders in twenty minutes, the light laser finished at 9:47.
+
+---
+
+### KI-415 — After the rush objective the metal bank floats: nothing dear is ordered
+
+**Severity**: Medium (at +150 metal the bank reached 8,098 by 20:00)
+**Location**: `data/script/src/roles/tech_rules.as` (the rows after `chain.next`),
+`data/script/src/roles/tech_chain.as` (`complete`)
+
+**Problem.** Played (run `20260922-142706`): the chain declared the advanced
+fusion reached at 15:37 and from then on the economy rows ordered converters,
+two metal storages, T2 mex upgrades and a T1 lab, while the metal bank rose
+781, 1,332, 4,602, 7,366, 8,098 at 16:00 to 20:00 with energy full. The
+`power.turret` rule (D-075) stops at its build-power target, as intended;
+the owner's first rule ("no construction started: build the next highest
+priority building") has no dear item to point at once the chain is done:
+`legacy.strategic` (a silo at 20:34 in run `20260922-140903`) is the only
+row that spends thousands, and it waits on its own gates.
+
+**Proposed solution.** A post-objective list for the chain (`TechChain`
+`Init` with a second objective when the first is met: `afus` then `gantry`,
+or a second advanced fusion, or `nanot2` turrets plus a second advanced lab
+for the spam economy), so `chain.next` keeps ordering dear items as long as
+metal income outruns spending. Deterministic from the same wind and income
+inputs as the first chain.
+
+**Verification.** Open.
+
+---
+
+### KI-416 — The advanced lab produced a unit two seconds after retiring; converter orders are slow to land
+
+**Severity**: Low (one T2 unit; a slower energy-to-metal turn than intended)
+**Location**: `data/script/src/roles/tech_build.as` (`Tick`, the D-078 retire),
+`data/script/src/manager/lifecycle.as` (`Retire`), `data/script/src/roles/tech_rules.as`
+(`energy.convert.float`), `data/script/src/manager/eco_planner.as` (`PickConverter`)
+
+**Problem.** Run `20260922-201105` (build29): `[LIFECYCLE] coralab 8411
+retiring` at 11:17 and `[INVARIANT] INV-001 a retiring factory produced
+corfast 25475` at 11:18: the advanced lab's native task was aborted and the
+unit stopped, as for the throwaway T1 lab where no unit ever followed the
+retire, yet a T2 assist bot came out. Either the engine's stop reached the
+factory after the unit rolled out, or the unit was seconds from done and
+assisting builders finished it. Same run: `energy.convert.float` fired six
+times between 12:00 and 15:00 with the energy bank full, and one T2
+converter finished before the advanced fusion; the other orders left no
+frame in time.
+
+**Proposed solution.** Log the factory's build progress and queue at the
+retire (native, `Unit_HasCommands` and the frame being built) to tell the
+two apart; for the converters, trace `PickConverter`'s answer and
+`Layout::Place`'s result at level 1 for the float row, and let the row order
+`ReclaimEnergyConcurrent` converters in parallel when the surplus is above
+one converter's draw.
+
+**Verification.** Open.
+
+---
+
 ### KI-410 — Experimental build mode is not yet Played
 
 **Severity**: Medium

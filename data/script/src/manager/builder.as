@@ -1448,6 +1448,7 @@ namespace Builder {
 			return null;
 		}
 
+		if (Global::energyAllowed !is null && !Global::energyAllowed(UnitHelpers::GetSolarNameForSide(unitSide))) return null;   // D-077
 		CCircuitDef@ solar = ai.GetCircuitDef(UnitHelpers::GetSolarNameForSide(unitSide));
 		if (solar is null || !solar.IsAvailable(ai.frame)) {
 			return null;
@@ -1478,6 +1479,7 @@ namespace Builder {
 		}
 		CCircuitDef@ advancedSolar = ai.GetCircuitDef(UnitHelpers::GetAdvSolarNameForSide(unitSide));
 		if (advancedSolar is null || !advancedSolar.IsAvailable(ai.frame)) return null;
+		if (Global::energyAllowed !is null && !Global::energyAllowed(advancedSolar.GetName())) return null;   // D-077
 		IUnitTask@ t = aiBuilderMgr.Enqueue(
 			TaskB::Factory(Task::Priority::NORMAL, advancedSolar, anchor, advancedSolar, squareSize, false, true, timeoutFrames)
 		);
@@ -1542,6 +1544,7 @@ namespace Builder {
 	{
 		CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(unitSide));
 		if (def is null || !def.IsAvailable(ai.frame)) return null;
+		if (Global::energyAllowed !is null && !Global::energyAllowed(def.GetName())) return null;   // D-077
 		IUnitTask@ t = aiBuilderMgr.Enqueue(
 			TaskB::Common(Task::BuildType::ENERGY, prio, def, anchor, shake, true, timeoutFrames)
 		);

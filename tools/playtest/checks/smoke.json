@@ -32,6 +32,11 @@
       "key": "script error",
       "pattern": ": ERR\\s+:",
       "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "tech"
     }
   ]
 }
