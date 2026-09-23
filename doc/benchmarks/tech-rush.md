@@ -93,3 +93,6 @@ Status per objective: the best run so far, updated by the tracker.
 | 20260922-201552 | afus | 24.2 | 1:11 | 6:17 | 8:17 | 11:29 | 19:05 | - | - | - | 15/34/83 | cd41084e2cf2b147 | D-079 played: rising-bank surplus test at any level; build29 |
 | 20260922-202036 | afus | 24.2 | 1:11 | 5:42 | 7:32 | 11:09 | 18:44 | - | - | - | 15/34/78 | cd41084e2cf2b147 | D-079 played: converters in parallel while floating; build29 |
 | 20260922-202500 | afus | 24.1 | 1:11 | 6:06 | 7:45 | 10:22 | 16:08 | - | - | - | 14/44/57 | cd41084e2cf2b147 | D-075/D-079 played: no turret cap at a full bank; converters first; build29 |
+| 20260922-211142 | afus | 24.0 | 1:14 | 7:13 | 8:52 | 11:31 | 19:53 | - | - | - | 13/38/78 | cd41084e2cf2b147 | D-080 played: endgame plan phase 1 (auto = team 0 nuke); build29 |
+| 20260922-211838 | afus | 24.1 | 1:14 | 6:10 | 8:20 | 11:26 | 21:02 | 13:39 | - | - | 15/38/25 | cd41084e2cf2b147 | D-080 played: reclaimed energy steps count as met; plan nuke phase 1 |
+| 20260922-212555 | afus | 24.1 | 1:13 | 6:48 | 8:23 | 11:09 | 15:58 | 19:34 | - | - | 15/45/61 | cd41084e2cf2b147 | D-080 played: retired energy steps met; parallel afus on the ladder; plan nuke |

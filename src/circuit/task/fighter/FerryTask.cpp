@@ -15,6 +15,8 @@
 #include "task/fighter/FerryTask.h"
 #include "module/MilitaryManager.h"
 #include "module/BuilderManager.h"
+#include "terrain/TerrainManager.h"
+#include "spring/SpringCallback.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitDef.h"
 #include "CircuitAI.h"
@@ -140,8 +142,39 @@ AIFloat3 CFerryTask::FindLandingSpot(CCircuitUnit* cargo, const AIFloat3& around
 	if ((cargo == nullptr) || (cargo->GetCircuitDef()->GetDef() == nullptr)) {
 		return around;
 	}
-	const AIFloat3 spot = circuit->GetMap()->FindClosestBuildSite(cargo->GetCircuitDef()->GetDef(), around, radius, 0, UNIT_FACING_SOUTH);
-	return geom::is_valid(spot) ? spot : around;
+	// D-091: FindClosestBuildSite with a mobile def ignored the buildings and
+	// water around an ally's start and returned the same refused spot on every
+	// retry (played: `dump retry 9 ... at (11488, 4720)`). Our search: the
+	// cargo's move type reaches it, no structure covers it, and never a spot
+	// the engine already refused.
+	const AIFloat3 spot = circuit->GetTerrainManager()->FindDropSpot(cargo, around, radius, refusedDrops, SQUARE_SIZE * 8);
+	if (geom::is_valid(spot)) {
+		return spot;
+	}
+	circuit->LOG("FERRY: no standing room for cargo %i within %.0f of (%.0f, %.0f)", cargoId, radius, around.x, around.z);
+	return around;
+}
+
+// D-091: the cargo stands on a factory's footprint (just rolled out, or parked
+// there by HoldCargo's stop). yardPos is that factory's position.
+bool CFerryTask::OnFactoryYard(CCircuitUnit* cargo, int frame)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3& p = cargo->GetPos(frame);
+	for (int id : circuit->GetCallback()->GetFriendlyUnitIdsIn(p, SQUARE_SIZE * 12, false)) {
+		CCircuitUnit* u = circuit->GetTeamUnit(id);
+		if ((u == nullptr) || (u == cargo) || u->GetCircuitDef()->IsMobile() || !u->GetCircuitDef()->IsBuilder()) {
+			continue;
+		}
+		const AIFloat3& f = u->GetPos(frame);
+		const float hx = u->GetCircuitDef()->GetDef()->GetXSize() * SQUARE_SIZE * 0.5f;
+		const float hz = u->GetCircuitDef()->GetDef()->GetZSize() * SQUARE_SIZE * 0.5f;
+		if ((std::fabs(p.x - f.x) <= hx) && (std::fabs(p.z - f.z) <= hz)) {
+			yardPos = f;
+			return true;
+		}
+	}
+	return false;
 }
 
 void CFerryTask::HoldCargo(CCircuitUnit* cargo)
@@ -222,6 +255,8 @@ bool CFerryTask::SetCargo(int id, const AIFloat3& pos)
 	loadRetries = 0;
 	unloadRetries = 0;
 	landedTicks = 0;
+	groundTicks = 0;
+	refusedDrops.clear();
 	Enter(EState::TO_CARGO);
 	HoldCargo(cargo);
 	CCircuitUnit* transport = GetTransport();
@@ -279,13 +314,36 @@ void CFerryTask::Update()
 				return;
 			}
 			const AIFloat3& cPos = cargo->GetPos(frame);
+			// D-091: a unit still being built, or still on its factory's yard, cannot
+			// be loaded (played: the transport hovered at the lab trying to lift a
+			// constructor that was not out yet); the transport waits beside it and the
+			// cargo is walked off the yard first
+			if (cargo->GetUnit()->IsBeingBuilt()) {
+				stateFrame = frame;  // waiting on the factory is not a failure to reach
+				GoTo(transport, cPos);
+				return;
+			}
+			if (OnFactoryYard(cargo, frame)) {
+				stateFrame = frame;
+				float dx = cPos.x - yardPos.x, dz = cPos.z - yardPos.z;
+				const float len = std::sqrt(dx * dx + dz * dz);
+				if (len < 1.f) { dx = 0.f; dz = 1.f; } else { dx /= len; dz /= len; }
+				const AIFloat3 away(cPos.x + dx * 160.f, cPos.y, cPos.z + dz * 160.f);
+				const AIFloat3 out = circuit->GetTerrainManager()->FindDropSpot(cargo, away, 240.f, {}, 0.f);
+				if (geom::is_valid(out)) {
+					TRY_UNIT(circuit, cargo,
+						cargo->CmdMoveTo(out, 0, frame + FRAMES_PER_SEC * 20);
+					)
+				}
+				GoTo(transport, cPos);
+				return;
+			}
 			if (transport->GetPos(frame).SqDistance2D(cPos) < SQUARE(FERRY_DROP_DIST)) {
-				// The flight to the drop is queued behind the load, so the
-				// transport leaves the moment the engine finishes loading and
-				// never waits on this task's detection (D-056).
+				// D-091: only the load; the flight to the drop is ordered once the
+				// cargo is seen lifted (played: a load the engine refused left the queued
+				// move to fly the transport off empty)
 				TRY_UNIT(circuit, transport,
 					transport->CmdLoadUnits({cargo}, 0, frame + FERRY_LOAD_TIMEOUT);
-					transport->CmdMoveTo(dropPos, UNIT_COMMAND_OPTION_SHIFT_KEY, frame + FERRY_LOAD_TIMEOUT + FERRY_TRAVEL_TIMEOUT);
 				)
 				Enter(EState::LOADING);
 			} else if (IsExpired(frame)) {
@@ -324,6 +382,22 @@ void CFerryTask::Update()
 			if (GetCargo() == nullptr) {
 				Fail("cargo lost in flight");
 				return;
+			}
+			// D-091: never fly on without it: the cargo on the ground for two updates
+			// means the load did not hold; back to it and load again
+			if (unloadRetries == 0) {
+				groundTicks = IsLifted(GetCargo(), frame) ? 0 : (groundTicks + 1);
+				if (groundTicks >= 2) {
+					groundTicks = 0;
+					if (++loadRetries > FERRY_LOAD_RETRIES) {
+						Fail("cargo not carried");
+						return;
+					}
+					circuit->LOG("FERRY: cargo %i is not aboard; back to load it (retry %i)", cargoId, loadRetries);
+					Enter(EState::TO_CARGO);
+					GoTo(transport, GetCargo()->GetPos(frame));
+					return;
+				}
 			}
 			if (transport->GetPos(frame).SqDistance2D(dropPos) < SQUARE(FERRY_DROP_DIST)) {
 				CCircuitUnit* cargo = GetCargo();
@@ -370,6 +444,7 @@ void CFerryTask::Update()
 				} else {
 					// The spot was not clear after all (a unit walked onto it, the
 					// engine disagreed). Widen the search from where we hover.
+					refusedDrops.push_back(landPos);  // D-091: never this spot again
 					landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * (unloadRetries + 1));
 					dropPos = landPos;
 					circuit->LOG("FERRY: unload retry %i for cargo %i at (%.0f, %.0f)", unloadRetries, cargoId, landPos.x, landPos.z);
@@ -394,6 +469,7 @@ void CFerryTask::Update()
 				// the engine does not detach a unit that changes team (CR-004).
 				// Try a wider landing spot from wherever the transport hovers.
 				++unloadRetries;
+				refusedDrops.push_back(landPos);  // D-091
 				landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * (unloadRetries + 1));
 				circuit->LOG("FERRY: dump retry %i for cargo %i at (%.0f, %.0f); still lifted, not given", unloadRetries, cargoId, landPos.x, landPos.z);
 				TRY_UNIT(circuit, transport,

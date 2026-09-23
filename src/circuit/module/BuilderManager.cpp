@@ -56,6 +56,7 @@
 #include "Log.h"
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
 #include <cmath>
 
@@ -757,6 +758,28 @@ CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float rad
 	return best;
 }
 
+int CBuilderManager::CountUnfinishedNear(const AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except)
+{
+	const int frame = circuit->GetLastFrame();
+	const float radiusSq = SQUARE(radius);
+	int n = 0;
+	for (const auto& kv : unfinishedUnits) {
+		CAllyUnit* au = kv.first;
+		if ((au == nullptr) || (au->GetCircuitDef() == nullptr) || (au->GetCircuitDef() == except)
+				|| au->GetCircuitDef()->IsMobile() || (au->GetCircuitDef()->GetCostM() < minCostM)) {
+			continue;
+		}
+		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
+		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		if (unit->GetPos(frame).SqDistance2D(pos) <= radiusSq) {
+			++n;
+		}
+	}
+	return n;
+}
+
 // D-065: reach of a builder to a structure, the engine's rule (build distance
 // plus the buildee's model radius).
 static bool InReachOf(CCircuitUnit* builder, CCircuitUnit* unit, int frame)
@@ -825,6 +848,15 @@ IUnitTask* CBuilderManager::FindQueuedTask(CCircuitUnit* builder, IBuilderTask::
 	float bestSq = std::numeric_limits<float>::max();
 	for (IBuilderTask* task : GetTasks(type)) {
 		if ((task == nullptr) || task->IsDead() || !task->GetAssignees().empty() || !task->CanAssignTo(builder)) {
+			continue;
+		}
+		// D-093: with the layout on, an economy order the layout did not place is
+		// never adopted (played: the chain's take-over walked the commander to a
+		// turbine 467 elmos outside the layout)
+		if (experimentalBuild && !task->IsLayoutOwned()
+			&& ((type == IBuilderTask::BuildType::ENERGY) || (type == IBuilderTask::BuildType::CONVERT)
+				|| (type == IBuilderTask::BuildType::STORE) || (type == IBuilderTask::BuildType::NANO)))
+		{
 			continue;
 		}
 		const AIFloat3& pos = task->GetPosition();
@@ -1135,6 +1167,8 @@ bool CBuilderManager::IsReclaimUnit(CAllyUnit* unit) const
 
 int CBuilderManager::TurretsOnReclaim(int targetId, float margin, bool apply)
 {
+	const auto t0 = std::chrono::steady_clock::now();
+	struct SAtExit { CCircuitAI* c; std::chrono::steady_clock::time_point t0; ~SAtExit() { const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (ms > 20.0) c->LOG("SLOW: TurretsOnReclaim took %.0f ms", ms); } } atExit{circuit, t0};
 	CCircuitUnit* target = circuit->GetTeamUnit(targetId);
 	if ((target == nullptr) || target->IsDead()) {
 		return -1;

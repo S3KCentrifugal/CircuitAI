@@ -434,7 +434,7 @@ namespace EcoPlanner {
     // starting another - build power is focused, not spread.
     string PickTurret(const State@ s, bool floatingM, string &out why)
     {
-        if (s.nanosQueued + s.nanosBuilding >= Global::RoleSettings::Tech::EcoMaxConcurrentNanos) {
+        if (Layout::TurretsCapped()) {   // D-097: the calculation, not a fixed 1
             if (s.nanosBuilding > 0 && !s.builderIsCommander && s.builderDef !is null && s.builderDef.IsMobile()) {
                 why = "a turret is under construction; assist it";
                 return "assistnano";

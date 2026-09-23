@@ -74,6 +74,9 @@ public:
 	float GetEnergyMake(CCircuitDef* cdef) const;  // script
 	float GetEnergyUse(CCircuitDef* cdef) const;  // script: converter consumption
 	int GetMexSpotCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
+	// D-086: the centroid of the maxSpots metal spots nearest center within radius
+	// (0 = all); center itself when there is none. Known from the map at setup.
+	springai::AIFloat3 GetMexCentroidWithin(const springai::AIFloat3& center, float radius, int maxSpots) const;
 	int GetClaimedMexCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
 	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false);
 	// D-072: a metal spot belongs to the team whose start position is nearest

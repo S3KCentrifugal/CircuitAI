@@ -3546,7 +3546,10 @@ times in two minutes; native refused every site ("no site for corrl within
    the base reaches `PowerBuildPowerPerMetal` (20) workertime per metal/s of
    income (played: without the cap the first game built 45 turrets in the
    three minutes after the advanced fusion, when converters kept a structure
-   under construction while income outran the pull). The cap does not apply
+   under construction while income outran the pull). Before the advanced lab
+   is under way only a bank full for `PowerAheadSeconds` counts, not a rising
+   one (played on build30: a rising bank of 800 sent the commander to a
+   turret at 4:00 and the advanced lab came at 7:13). The cap does not apply
    while the metal bank has been full for `PowerAheadSeconds`: a full bank
    with a structure under construction is build power short whatever the
    ratio says (played on build29, run `20260922-202036`: the advanced fusion
@@ -3940,6 +3943,1062 @@ advanced fusion, `finished cormmkr` before `finished corafus`, the energy
 bank under 90 % when `afus 0/1: ordered` is logged, no `[INVARIANT]
 INV-009`, and a later advanced fusion than 14:11 accepted as the price of
 not floating: the benchmark row says which.
+
+## D-080 — The endgame plans, the metal ladder after the objective, and the income gates for combat
+
+**Date:** 2026-09-22. **Status:** Built, phase 1 (script); Played, see below. Phase 2 is native and open (KI-417, KI-418).
+
+**Owner's rules.** TECH is largely responsible for ending the game: the
+others hold the enemy while TECH builds a massive economy, switching into
+combat when the team needs it and back to eco. TECH never produces mobile
+combat units until +200 metal a second, or +500 when rushing straight to
+the best T3. After the economic objective it follows one of: (A) a nuclear
+silo the fastest way, the first shot at the enemy tech location on the
+opposite side of the map, then normal targeting; (B) +200 metal, T2 fast
+assault units, a new economic objective of +500, then mass T3 with many
+turrets; (C) +500 before any combat unit; (D) +300, then an end-game
+long-range cannon (Ragnarok, Calamity, Starfall) on safe high ground that
+sees beyond the front. From +200 metal T2 construction aircraft are the
+mobile build power, built as build power needs grow alongside turrets;
+with more than five of them, every land constructor guards an allied land
+constructor. This also answers KI-415 (the bank floated to 12k after the
+objective because nothing dear was ordered).
+
+**Decision (phase 1, built).**
+
+1. **The plan.** `TechPlan` (`tech_plan.as`): `EndgamePlan` is `nuke`,
+   `t2rush`, `t3rush` or `lrpc`; `auto` is deterministic from the team id
+   (team 0 nuke, 1 t2rush, 2 t3rush, 3 lrpc, and round), so a lobby with
+   several TECH players spreads the plans and the same lobby gives the same
+   plan. Logged as `[TECH][Plan] <plan> (combat gate +N metal; ...)`.
+2. **The ladder.** When the rush objective stands, the chain loads the
+   plan's next phase (`TechPlan::NextPhase`) and keeps running. An `income`
+   step is climbed, not built: while the 10-second metal income is under the
+   target a builder gets, in order, nothing while energy floats (the
+   `energy.convert.float` row converts), the nearest T2 mex upgrade it can
+   build, the advanced fusion under construction to assist, or the next
+   advanced fusion to order. Phases: nuke = [silo unless it was the
+   objective, income 200], [T2 air plant, income 500]; t2rush = [T2 air
+   plant, income 200], [income 500, gantry]; t3rush = [T2 air plant, income
+   500, gantry]; lrpc = [T2 air plant, income 300, cannon], [income 500].
+   The chain's `lab` and `alab` guards, the stall guard and the float gate
+   apply as before; `aap` (T2 air plant, `Builder::EnqueueT2AirPlant`) and
+   `lrpc` (`Builder::EnqueueLRPC` at the start position, native's site
+   search) are new step keys.
+3. **The combat gate.** `Tech_CombatGate` reads `TechPlan::CombatGate`:
+   `PlanT3RushCombatGate` (500) for t3rush, else `PlanCombatGate` (200);
+   `ExpCombatMetalIncome` 0 still means never. Plan B's T2 fast assault
+   units are what the factory rows produce once the gate opens; T3 in mass is
+   the gantry's production, and the many turrets are D-075's rule at a full
+   bank.
+4. **Build power from +200.** The T2 air plant's production makes T2
+   construction aircraft up to `TechPlan::AirConstructorsWanted`: none under
+   `PlanAirConstructorsFromMetal` (200), one per `PlanAirConstructorPerMetal`
+   (40) of income, at most `PlanMaxAirConstructors` (12).
+
+**Phase 2 (native, open).** KI-418: the nuke's first shot at the enemy tech
+location opposite (the military manager's big-gun dice has no such rule) and
+the cannon on high ground with sight beyond the front; KI-417: land
+constructors guarding allied constructors (the script cannot see allied
+units; a `FindAllyNear` binding is the proposal).
+
+**Played (headless, build29, run `20260922-211142`).** The plan never began:
+the chain's turbine steps read as unmet once D-077 had reclaimed the
+turbines, so it rebuilt them (INV-009 caught a turbine frame at a full
+bank) and never completed. An energy step whose era is over (`TechBuild::EnergyRetired`: wind and
+solar once a fusion stands, advanced solar once an advanced fusion is under
+way) now counts as met; the first version used the float veto for it and
+completed the chain at 9:29 while energy floated. The ladder orders a
+second advanced fusion while the metal bank is full (`LadderParallelAfus`,
+2): run `20260922-211838` sat at a full 12,700 bank for five minutes
+assisting one (INV-011 fired, as it should).
+
+**Played (headless, build29, run `20260922-212555`).** Advanced fusion 15:58,
+`complete: objective afus` at 16:24, `plan nuke phase 1: silo 1, income 200`,
+the silo at 19:34, three more advanced fusions by 23:53 with converters
+between them, 40 turrets, metal income +243 at 24:00 against +150 with a
+12k bank floating before D-080. INV-011 fired twice in the first two
+minutes of the phase while the silo and the advanced fusion were on order
+with no frame yet; the ladder caught up. Phase 2 of the plan (the T2 air
+plant and income 500) begins past the 24-minute window of the run. INV-010 flagged Lazarus and fast-assist bots, which are build power;
+they are excluded.
+
+**Invariant.** INV-010: no mobile combat unit of ours appears while metal
+income is under the plan's gate (commanders, constructors, air
+constructors, resurrection and fast-assist bots are build power, not
+combat). INV-011: past the objective the metal bank
+does not float for `InvariantLadderFloatSeconds` (60) while an income step
+of the plan is unmet.
+
+**Files.** [`tech_plan.as`](../data/script/src/roles/tech_plan.as) (new),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as) (income steps,
+`Ladder`, `LadderUnmet`, the phase hand-over, `aap` and `lrpc`),
+[`tech.as`](../data/script/src/roles/tech.as) (`Tech_CombatGate`, the T2 air
+constructor target, `TechPlan::Init`),
+[`invariants.as`](../data/script/src/manager/invariants.as) (INV-010,
+INV-011), [`global.as`](../data/script/src/global.as) (`EndgamePlan`,
+`Plan*`, `InvariantLadderFloatSeconds`), [`tech_plan.md`](roles/tech_plan.md)
+(new), [`tech_chain.md`](roles/tech_chain.md), [`tech.md`](roles/tech.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`known-issues.md`](known-issues.md) (KI-415, KI-417, KI-418), the knowledge
+base.
+
+**What to watch.** `[TECH][Chain] plan <plan> phase 1: ...` right after
+`complete: objective`, `mex upgrade` and `advanced fusion ordered` ladder
+traces, the metal bank under 90 % while an income step is unmet, no combat
+unit before the gate, T2 construction aircraft from +200, and no
+`[INVARIANT] INV-010` or `INV-011`.
+
+## D-081 — The turret cluster is a block of four touching rows filled across, with a forward cluster planned in clear space
+
+**Date:** 2026-09-22. **Status:** Built (script; native `NextSlotConnected` scoring and `IsZoneAlly` binding, build30); Played, see below.
+
+**Owner's rules.** "When building construction turrets in the cluster it
+should not just be doing one row at a time, it needs to pack construction
+turrets close together. Ideally 4 rows per cluster of construction turrets,
+working on all rows concurrently. 3 rows is ok if map space is minimal. A
+flat area check around base should be done to determine how big the main
+base cluster can be and plan at least one cluster forward in clear space,
+reposition if taken by allies."
+
+**Why it ran along one row.** The rows were a turret's depth plus a
+twelve-cell shelf apart (D-063's shelf for the structures between rows),
+so the nearest free slot to a taken one was always in the same row, and
+D-077's adjacency rule followed that row to its end before starting the
+next. The shelf also spread the block: 192 elmos of other structures
+between every two rows of turrets.
+
+**Decision.**
+
+1. **A block.** `LayoutTurretBlock` (true): the rows touch (the pitch is
+   the turret's depth) and the shelf for the other structures lies behind
+   the block. `LayoutBoxNanoRows` is 4; the rows come first and the shelf is
+   what is left behind them (a first version demanded the shelf too and
+   fit no box on Supreme Isthmus: the base scattered), a box under
+   `LayoutBoxMinRows` (3) rows is not planned, and INV-012 says so if it
+   ever is. The
+   flat-area check is D-063's box search, which shrinks the box until the
+   ground's flat-and-buildable score clears `LayoutBoxMinScore` (75 %):
+   that is what sizes the main cluster.
+2. **Filled across.** Native `NextSlotConnected` now scores a free slot by
+   its distance to a taken slot plus its distance to the centroid of the
+   taken slots, so the block grows outward from its seed across every row
+   at once instead of along one. The seed is the nearest standing lab
+   (D-069's reason: the first turrets must reach a lab; a first version
+   seeded from the box centre, 500 elmos from the labs, and the advanced lab
+   slipped to 7:01), the box centre only while no lab stands.
+3. **A forward cluster.** `Layout::PlanForwardBox`, called when the main
+   box is planned and retried every minute from `Update` while none stands:
+   a box of the main box's width `LayoutForwardGapCells` (8) ahead of the
+   main box's front, straight ahead or half a box to either side, the best
+   ground that scores and is not native's ally zone (`IsZoneAlly`, the
+   ground around allied builder structures). Its rows are laid in their own
+   turret group, so `NanoTask` takes them only when the main block has no
+   free slot, and `GrowBox` grows behind only when both are full.
+4. **Repositioned when taken.** `Layout::CheckForward` every ten seconds:
+   the forward cluster's centre inside an ally zone releases its group and
+   zone and plans again `LayoutForwardStepCells` (12) further forward, up
+   to `LayoutForwardTries` (3) times. Logged as `[Layout] forward cluster
+   ... taken by an ally: given up` and `[Layout] forward cluster AxD cells at
+   (x, z), N cells ahead ...`.
+
+**Invariant.** INV-012: the main turret cluster has at least
+`LayoutBoxMinRows` rows. INV-013: a main cluster has a forward cluster
+planned within `InvariantForwardSeconds` (120), unless every re-plan was
+used up.
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as)
+(`PlanBox`, `GrowBox`, `PlanForwardBox`, `CheckForward`, `NanoTask`,
+`CanPlaceTurret`, the restored ints), [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`NextSlotConnected`), [`InitScript.cpp`](../src/circuit/script/InitScript.cpp)
+(`IsZoneAlly`), [`invariants.as`](../data/script/src/manager/invariants.as)
+(INV-013), [`global.as`](../data/script/src/global.as),
+[`layout-design.md`](layout-design.md), [`invariants.md`](invariants.md),
+[`actor-matrix.md`](actor-matrix.md).
+
+**Played (graphical, build30, runs `20260922-220128`, `220819`, `221338`).**
+`[Layout] turret box 40x20 cells ... 4 rows, 47 of 52 turret slots` and
+`[Layout] forward cluster 40x44 cells at (1216, 10164), 8 cells ahead of the
+main cluster, ground 99%: 4 rows, 52 turret slots` in every run; the block
+fills across its rows from the lab side. The first two runs lost the
+opening (advanced lab 7:13 and 7:01) to a block seeded 500 elmos from the
+labs and to the power rule's rising-bank test before the advanced lab;
+with the lab seed and the full-bank-only test the third run had the
+advanced lab at 6:04, the fusion at 11:31 and 21 turrets by 15:30. No
+ally took the forward cluster in a tech-versus-tech game, so the re-plan
+is Built, not Played. INV-001 (KI-416) and INV-008 each fired once.
+
+**What to watch.** `[Layout] turret box ... 4 rows`, `[Layout] forward
+cluster ...` right after it, turrets appearing in a compact block from the
+middle outward in the screenshots, the forward cluster filling once the
+block is full, no `[INVARIANT] INV-012` or `INV-013`.
+
+## D-082 — The turret block is placed for the ground around it: a halo of packing space on both sides and behind, scored with the block
+
+**Date:** 2026-09-23. **Status:** Built (script only); Played, see below.
+
+**Played by the owner (screenshot).** Fusions and other structures stood
+far from the construction turrets, and the first turrets stood against the
+mountain with no build space on that side; offset from the mountain, more
+ground would have been in reach of the turrets.
+
+**Cause.** `BoxScore` scored only the block's own footprint (flat fraction
+times buildable fraction), so a block flush against a mountain scored the
+same as one in the open, and the side search reached at most 16 cells (256
+elmos). The box zone was the block plus the strip behind the rows: with
+D-081's touching rows a 40x20 box left an 8-cell strip, a fusion did not fit
+(`no room for corfus in zone 7`), and it went to the box grown 640 elmos
+beside, or through the chain's fallback to native's search around the base
+centre.
+
+**Decision.**
+
+1. **The halo.** `LayoutHaloCells` (18, 288 elmos, inside a turret's 400
+   reach): the ground the structures will stand on is the block plus a halo
+   on both sides and behind it, never in front (the factory pair is there).
+   `HaloScore` scores it like the block; `PlanBox` and `GrowBox` rank the
+   candidates whose block clears `LayoutBoxMinScore` by the halo's score,
+   the block's own score breaking ties, and the zone is reserved with the
+   halo (`HaloCentre`, `HaloHalfAcross`, `HaloHalfAlong`). The log says
+   `ground N%, halo M%`. `PackNearGroup` packs nearest a turret first, so
+   converters, fusions and labs surround the block.
+2. **A wider search, beside the pair too.** `LayoutBoxSideStepCells` 6 and
+   `LayoutBoxSideTries` 8: the block can move 48 cells (768 elmos) either
+   way. Candidates level with or ahead of the pair's rear line
+   (`LayoutBoxForwardTries` 4 steps of negative rear) are allowed when the
+   side offset clears the pair's span plus `LayoutBoxBesideClearCells` (4):
+   a pair with a mountain behind it gets its block beside it in the open.
+   Halo scores within `LayoutHaloQuantum` (5 %) tie and the nearer candidate
+   wins, so a 2 % better halo does not buy a 500-elmo longer walk.
+
+**Invariant.** INV-014: every economy structure the layout places stands
+within `InvariantReachElmos` (450) of a turret slot, and none is ordered
+through the chain's fallback outside the layout.
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as) (`HaloScore`
+and the halo helpers, `PlanBox`, `GrowBox`, `Place`),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as) (the fallback),
+[`global.as`](../data/script/src/global.as), [`layout-design.md`](layout-design.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+**Played (graphical, build30, runs `20260922-224209`, `225008`, `225544`).**
+With the halo alone the block stayed behind the pair against the mountain
+(`side 36, ground 79%, halo 44%`; the advanced lab walked to it at 7:32).
+With the beside-the-pair candidates it stood in the open north of the pair:
+`turret box 40x44 cells at (640, 9972), rear -16, side 48, ground 95%,
+halo 66%`, four rows filling across from the lab side, the converters 48
+to 76 elmos from a turret, the energy storage 57, the fusion 64, the
+advanced fusion 120, the advanced lab where 16 slots reach it, no
+`no room for corfus`, no INV-014. The opening's turbines stay at the start
+700 elmos south, where the commander built them, and are reclaimed by
+D-077; the advanced lab came at 6:55.
+
+**What to watch.** `[Layout] turret box ... side S` with S away from the
+mountain and `halo` above 80 %, the fusion and the converters packed beside
+or behind the block in the screenshots, no `no room for corfus`, no
+`[INVARIANT] INV-014`.
+
+## D-083 — The main cluster is centred on the start; built turrets outrank planned slots for placement; the placement probe is memoised
+
+**Date:** 2026-09-23. **Status:** Built (script; native `PackCandidates` ranking and probe cap, build31; `PickMost` ranked before tested, build33); Played, see below.
+
+**Played by the owner.** The game froze for about fifteen seconds when an
+energy converter was placed, and again at the second. The base spread was
+far too high: the farthest buildings a long way apart. The owner's rules:
+place buildings in range of construction turrets first, and secondarily
+where turrets are planned; do not place the first turrets far from the
+starting mexes, centred on them or slightly offset.
+
+**Cause of the freeze.** `Layout::CanPlace` asked native
+`CanPackNearGroup` for every energy and converter option of every builder
+that asked the planner, several times a second. Each probe walked every
+cell of the zone against every turret slot of the group (with D-082's halo:
+4,700 cells by 100 slots) and tried up to 400 candidates with the engine's
+build test. Tens of probes a second on a large zone stalled the simulation;
+a converter's order was where it showed. Not the converter itself.
+
+**Cause of the spread.** D-082 let the block stand beside the pair (700
+elmos from the start) while the commander's opening (three mexes, the
+throwaway lab, the first turbines) stays at the start: two bases.
+
+**Decision.**
+
+1. **The probe is memoised.** `CanPlace` keeps its answer per def for
+   `LayoutCanPlaceMemoSeconds` (2); native's `CanPackNearGroup` tries at
+   most forty candidates. The order path (`Place`, `PackNearGroup`) is
+   unchanged: it runs once per order.
+2. **Built turrets first.** Native `PackCandidates` ranks a candidate by
+   its distance to the nearest served slot (a turret that stands or is
+   being built); a merely planned slot counts as `PLANNED_SLOT_PENALTY`
+   (256 elmos) further than it is. The reach test still admits any slot, so
+   a zone with only planned turrets still packs; among candidates, the ones
+   in range of real build power win.
+3. **The block at the start.** `LayoutBoxAtStart` (true): `PlanBox` centres
+   its candidates on the start position (the home mexes around it), offset
+   by the side and rear search, never over a pair factory slot
+   (`InBlock` with `LayoutBoxPairClearCells` 6), ranked by the halo in
+   quanta and then by distance to the start, so the block is centred or
+   slightly offset from the starting mexes, and the block grows from the
+   start side (`NanoTask` seeds `NextSlotConnected` with the start position;
+   played on build31: seeded from the nearest lab, and the advanced lab
+   having been placed among the planned slots at the far corner, the block
+   grew from that corner 600 elmos from the start). Off, the D-082
+   pair-relative search is back.
+
+**The freeze, measured (build32, run `20260922-235412`).** `SLOW:
+PackNearGroupMost took 8475 ms`, once, at the advanced lab's placement
+(D-073's `PickMost`): it ran the engine's build test, the zone flood fill
+and the exit-cone test on every one of the thousands of candidates of the
+halo zone before scoring it. The owner saw it as a freeze at a converter
+because the converter and the lab were ordered together. The probe memo
+(item 1) was right but was not the cost. Build33: `PickMost` scores every
+candidate cheaply, sorts, and runs the dear tests down the ranked list
+until one passes.
+
+**Invariant.** INV-014 (D-082) still holds; the freeze has no invariant of
+its own: a sim stall is the engine's to report. Diagnosis instead: every
+layout native over 20 ms logs `SLOW: <function> took N ms` (build32), so
+the next stall names its cause (KI-419).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`PackCandidates`, `CanPackNearGroup`), [`layout.as`](../data/script/src/manager/layout.as)
+(`CanPlace`, `PlanBox`, `InBlock`), [`global.as`](../data/script/src/global.as),
+[`layout-design.md`](layout-design.md), [`actor-matrix.md`](actor-matrix.md).
+
+**Played (graphical, build33, runs `20260923-000940` and `001634`).**
+`turret box 40x44 cells at (978, 9990), from the start rear -12, side 30,
+ground 98%, halo 91%`: the block 500 elmos north-east of the start on the
+open plateau, one cluster with the converters, storages, fusion and
+advanced fusion 200 to 220 elmos from a built turret, the opening's T1 lab
+and turbines at the start; 59 to 60 fps at ten and fourteen minutes where
+the D-082 runs had 14 to 33; the advanced lab's placement 205 and 294 ms
+where build32 measured 8,475. With D-084 the advanced lab came at 6:39
+and the fusion at 11:14.
+
+**What to watch.** Frame rate steady at a converter order; `[Layout] turret
+box ... from the start rear R, side S` with small R and S; converters and
+the fusion packed next to standing turrets, not next to empty slots; the
+farthest structure of the base within a few hundred elmos of the block.
+
+## D-084 — A dear chain order outranks the float-converter and power-turret rows until its frame exists
+
+**Date:** 2026-09-23. **Status:** Built (script only); Played: run `20260923-001634`, the advanced lab ordered 4:21, its first builder at 5:02, finished 6:39 (7:29 before), the bank at zero by 6:00.
+
+**Played (build33, run `20260923-000940`).** The advanced lab was ordered
+at 4:31 and its first builder arrived at 6:06; meanwhile the metal bank sat
+at 1,399 of 1,400 for two minutes and the builders built converters and
+turrets. The `energy.convert.float` row (D-079) and the `power.turret` row
+(D-075) sit ahead of `chain.next`, so a full bank and floating energy sent
+every builder that asked to them, the order's own assignee included once
+it was re-asked. The two rows exist for a base whose chain is waiting on
+the float or building a dear frame; neither meant to starve an order that
+has no frame yet.
+
+**Decision.** `TechChain::DearOrderPending`: a dear step (cost at or above
+`ChainParallelCostM`) with an order out and no frame. While it holds the
+two rows do not fire (`NoDearOrderPending`), so the next builder asked takes
+the queued order and the frame appears; once the frame exists the rows are
+back, which is the D-075 case (a full bank while a structure is under
+construction means build power is short).
+
+**Invariant.** INV-015: a dear chain order does not wait more than
+`InvariantDearOrderSeconds` (45) for its first builder.
+
+**Files.** [`tech_chain.as`](../data/script/src/roles/tech_chain.as)
+(`DearOrderPending`, `DearOrderPendingSeconds`),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as) (the two rows),
+[`invariants.as`](../data/script/src/manager/invariants.as) (INV-015),
+[`global.as`](../data/script/src/global.as), [`invariants.md`](invariants.md),
+[`actor-matrix.md`](actor-matrix.md), [`tech_rules.md`](roles/tech_rules.md),
+[`tech_chain.md`](roles/tech_chain.md).
+
+**What to watch.** `alab 0/1: ordered` followed by a frame within a minute
+and the bank falling; no `[INVARIANT] INV-015`.
+
+## D-085 — The advanced lab stands where the turrets are, or will be first: served slots weigh three, ties go to the block's seed
+
+**Date:** 2026-09-23. **Status:** Built (script; native `PickMost`, build37); Played: run `20260923-020738`, the
+footprint reserved at plan time at (1272, 10376), 495 elmos from the seed with 15 slots within reach, the lab
+ordered on it and finished 7:16, the first block turrets 100 to 150 elmos from it, no INV-016.
+
+**Played by the owner (screenshot) and in run `20260923-001634`.** The
+advanced lab stood at (1272, 9608), the north edge of the block, while the
+first turrets were built at (1160 to 1256, 10232 to 10280), 650 elmos
+south: no turret reached it for minutes. D-073 placed the lab where the most
+turret *slots* reach, front first among equals; at 4:21 every slot is
+planned and the front is the edge away from the start, while D-083 fills
+the block from the start side.
+
+**Decision.** Native `PickMost` (the advanced lab's site) counts a served
+slot (a turret stands or is being built) three times a planned one, and
+breaks ties by nearness to the block's seed instead of the front. The seed
+is one function, `Layout::TurretSeed`: the start position when the box is
+planned at the start (D-083), else the nearest standing lab; `NanoTask`
+fills the block from it and `T2LabTask` passes it to the placement. The
+lab therefore stands at the start side of the block, where the first
+turrets go, and once turrets stand it stands among them.
+
+**Played (build35, run `20260923-013242`).** The same site, (1272, 9608):
+with every slot planned the count alone decided and the far edge is where
+the most slots reach; the tie-break never applied, and INV-016 fired. So a
+planned slot counts only within `SEED_SLOT_RADIUS` (560 elmos) of the
+seed, the slots the block fills first (every planned slot when none is
+that near), served slots always. The exit-cone test moved ahead of the
+flood fill in the ranked walk (the placement had grown to 942 ms). Build36.
+Build36 played (run `20260923-014719`): the 400-try cap of the ranked walk
+was spent on the best-ranked sites inside the block, all facing planned
+slots and failing the exit test, and the lab fell back to the pair's slot
+(INV-016 again). The cap is gone: the exit test is cheap and the flood fill
+runs only for sites that pass it. Build37. Build37 played (run
+`20260923-020127`): still the fallback, and the log said why: the opening's
+twelve turbines had packed along the block's seed-side row, the very
+ground the lab needed, so no footprint with a clear exit was left near the
+seed. The lab's footprint is therefore reserved when the box is planned,
+on empty ground (`Layout::labSlot`, `tech.box.lab_slot`, the same
+`PackNearGroupMost` with the seed), and `T2LabTask` orders the lab on it,
+pinned; the pair's slot and the search remain the fallbacks.
+
+**Invariant.** INV-016: the advanced lab, once it has stood
+`InvariantLabReachSeconds` (90), has static build power within
+`ExpLabBuildPowerReach` (260).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`PickMost`, `PackNearGroupMost`), [`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as) (`TurretSeed`, `NanoTask`,
+`T2LabTask`), [`invariants.as`](../data/script/src/manager/invariants.as)
+(INV-016), [`global.as`](../data/script/src/global.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`layout-design.md`](layout-design.md).
+
+**What to watch.** `advanced lab in the turret layout at (x, z)` within a
+few hundred elmos of the start, the first block turrets beside it, no
+`[INVARIANT] INV-016`.
+
+## D-086 — The home mexes anchor the layout; the advanced lab goes next to a standing turret
+
+**Date:** 2026-09-23. **Status:** Built (script; native `GetMexCentroidWithin`, exit test in `PackNearGroup`, build38); Played: run `20260923-150457`, home centre 78 elmos from the start, box ranked by halo 95 % at 500 elmos from it (the nearer ground is mountain), the lab on its planned slot 120 to 170 elmos from the first block turrets, no INV-016, 60 fps. The advanced lab finished at 7:38, later than D-083's 6:39: the walk to the block. Role-switch fix (script only): `Layout::OnRoleLeave` clears TECH's energy veto and anchors.
+
+**Owner's rules (screenshot of an Armada TECH).** The advanced lab stood far
+from the build power. The turrets start at the centre of the layout and
+spread from there; the place to start them is near the home mexes, where
+most builders are by then, to minimise walking. Whenever a building is
+placed, pick the position closest to the construction turrets while
+honouring the layout.
+
+**Decision.**
+
+1. **One anchor: the home mexes.** Native `GetMexCentroidWithin(start,
+   OpeningMexRadius, OpeningMexCap)` is the centroid of the home mex spots,
+   known from the map at setup. `Layout::HomeCentre` (logged once as
+   `[Layout] home centre (x, z), D from the start`) is the box search's
+   anchor (`PlanBox`), the seed the block fills from (`TurretSeed`, D-081
+   and D-083) and the lab's tie-break (D-085). `LayoutSeedAtHomeMexes`
+   (true); off, the start position as in D-083.
+2. **The lab next to a standing turret.** The footprint reserved at plan
+   time (D-085) is kept only while a standing turret is within
+   `LayoutLabServedReach` (300). Once a turret stands and none reaches the
+   footprint, `T2LabTask` releases it and packs the lab with `PackNearGroup`,
+   the packer every economy structure uses: nearest a served turret slot
+   (planned slots count 256 elmos further, D-083), ties to the seed, exit
+   clear (native `PackNearGroup` now runs the exit test for factories, D-074).
+   Logged as `[Layout] advanced lab moved from its planned slot ... next to a
+   standing turret`.
+3. **Every other building** was already packed nearest a served turret
+   (D-083); unchanged.
+
+**Invariant.** INV-016 (D-085) covers it: the advanced lab with no static
+build power within reach 90 s after it stands.
+
+**Files.** [`EconomyManager.cpp`](../src/circuit/module/EconomyManager.cpp)
+(`GetMexCentroidWithin`), [`EconomyScript.cpp`](../src/circuit/script/EconomyScript.cpp),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`PackNearGroup` exit test), [`layout.as`](../data/script/src/manager/layout.as)
+(`HomeCentre`, `TurretSeed`, `PlanBox`, `T2LabTask`),
+[`global.as`](../data/script/src/global.as), [`layout-design.md`](layout-design.md),
+[`actor-matrix.md`](actor-matrix.md).
+
+**What to watch.** `home centre` within a few hundred elmos of the start;
+the box and the first turret around it; the lab either on its planned slot
+with a turret beside it or `moved ... next to a standing turret`; no
+INV-016.
+
+## D-087 — Close enough beats best: the block nearest the home mexes among good-enough ground, the lab nearest the seed among well-reached sites
+
+**Date:** 2026-09-23. **Status:** Built (script; native `PickMost` cap, build39); not yet Played.
+
+**Played by the owner.** The game froze and unfroze after the sixth turbine
+and the first constructor, and the advanced lab was started far from the
+mexes. The owner's install ran build30 with the D-082 script: the 8.5 s
+`PickMost` (fixed in build33, D-083) and the box beside the pair (fixed by
+D-083 to D-086). Build38 in a sixteen-AI game with four TECH AIs (run
+`20260923-151545`) logged no layout call over 20 ms. It still showed the
+walk: the box ranked by halo first stood 690 elmos from the home mexes
+(`side -42, halo 86%`), one lab site was the most-reached one 1,139 elmos
+from the seed, and one TECH found no lab site with a clear exit in the
+pair's facing and fell back to the pair's slot with no turret in reach.
+
+**Decision.**
+
+1. **The box**: a halo at `LayoutHaloMin` (70 %) is good enough; among
+   good-enough candidates the nearest the home centre wins; only when none
+   is good enough does the better halo win.
+2. **The lab site** (native `PickMost`): the slot count is capped at
+   `LAB_SLOTS_ENOUGH` (8, weighted as before); past it the site nearest the
+   seed wins.
+3. **The lab fallback**: before the pair's slot, `T2LabTask` packs the lab
+   nearest a turret slot with the nearest-turret packer, in the pair's
+   facing and then the other three, exit clear. Logged as `[Layout] advanced
+   lab nearest a turret slot at (x, z) facing F`.
+
+**Invariant.** INV-016 (D-085) covers the lab; no new invariant.
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)
+(`PickMost`), [`layout.as`](../data/script/src/manager/layout.as) (`PlanBox`
+ranking, `T2LabTask` fallback), [`global.as`](../data/script/src/global.as).
+
+**What to watch.** `turret box ... side S` with small S; `advanced lab's
+footprint reserved at ... D from the seed` with D a few hundred elmos; no
+`advanced lab on the pair's slot`; no `SLOW:` line.
+
+## D-088 — Same-def structures fill a rectangle; the block and its turrets grow from the advanced lab; the lab may face any way
+
+**Date:** 2026-09-23. **Status:** Built (script; native `PackCandidates` centroid, build40); not yet Played.
+
+**Played by the owner (screenshot, D-086 script).** The T1 eco structures
+formed an L instead of a filled rectangle; the advanced lab stood nowhere
+near the construction turrets, which stood beside the T1 lab. The owner
+asked whether those turrets were in the layout, and for a log of the
+distance from the nearest turret to the advanced lab: not flush, as the T1
+lab's are, means the placement is wrong.
+
+**Causes.** (1) The packer ranked a cell by its distance to the nearest
+structure of the same def, which grows a line along whatever it touches
+first. (2) The turrets beside the T1 lab are the pair's factory-nano slots,
+part of the layout but not of the block; `NanoTask` served them first, so
+the first turrets, and the turbines packed nearest a served turret, grew at
+the throwaway lab. (3) The advanced lab had to face the pair's direction;
+from every site on the home side of the block its exit pointed into
+planned turret slots, so only far-edge sites passed (build39 run: 1,099
+elmos from the home centre).
+
+**Decision.**
+
+1. Native `PackCandidates` ranks by distance to the centroid of the same-def
+   group (standing and planned): the group grows as a filled block.
+2. With the block at the home mexes (`LayoutBoxAtStart`) no factory-nano
+   slot is served; every turret goes into the block.
+3. The advanced lab's site at plan time is searched in all four facings;
+   among sites with `LayoutLabMinSlots` (8, weighted) slots in reach, the
+   nearest the home centre wins. The block then fills from the lab's
+   footprint (`TurretSeed`), so the first turrets stand flush with it.
+4. `[Layout] advanced lab N: nearest construction turret D elmos (flush |
+   not flush)` is logged whenever the distance changes by 16 or more.
+
+**Invariant.** INV-017: 90 s after the advanced lab stands, the nearest
+construction turret is within `LayoutLabFlushElmos` (160, centre to
+centre).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as), [`invariants.md`](invariants.md),
+[`layout-design.md`](layout-design.md).
+
+**What to watch.** Turbines and converters as filled rectangles in the
+screenshots; `advanced lab's footprint reserved ... D from the home centre`
+with D a few hundred; `nearest construction turret ... (flush)`; no INV-017.
+
+## D-089 — Guard tasks are unregistered by the task, not by looking the guarded unit up (crash fix)
+
+**Date:** 2026-09-23. **Status:** Built (native, build42); not yet Played.
+
+**Played by the owner.** The game crashed at 1:39:24 with an access
+violation in the AI. The installed DLL was an unstripped 308 MB copy taken
+while a build was running, so it carried its own symbols: frame 0
+`ITaskModule::DequeueTask` (TaskModule.cpp:103), called from
+`CMilitaryManager::UnitDestroyed` (MilitaryManager.cpp:759) on a unit's
+death.
+
+**Cause.** `guardTasks` maps a guarded unit to its `CFGuardTask`.
+`CMilitaryManager::DequeueTask` removed the entry with
+`guardTasks.erase(GetTeamUnit(vipId))`; when the guarded unit had already
+left the team (died first, or was given to an ally), `GetTeamUnit` returned
+null, nothing was erased, and the entry stayed keyed by the freed unit's
+address while the task itself was freed. A later unit allocated at the same
+address found the entry when it died and `AbortTask` ran on freed memory.
+Not a TECH layout change; the military manager is shared by every role.
+
+**Decision.** `DequeueTask` erases every entry whose task is the one being
+dequeued; `UnitDestroyed` erases the entry before aborting its task.
+
+**Invariant.** None in script: a native use-after-free has no in-game
+signal before it crashes. The playtests run long all-roles games to reach
+the same unit churn.
+
+**Files.** [`MilitaryManager.cpp`](../src/circuit/module/MilitaryManager.cpp).
+
+## D-090 — The pocket test is local and budgeted; the block fills from the advanced lab wherever it stands
+
+**Date:** 2026-09-23. **Status:** Built (native, script; build43); not yet Played.
+
+**Played (build41, run `20260923-160056`).** D-088's rectangle ordering
+tried many cells between standing structures first, each rejected by
+`LeavesPocket`, which flood-filled the whole halo zone: about 1,100 calls
+at 36 to 38 ms, the stutter again. And no lab site reached D-088's eight
+slots, so no footprint was reserved; the fallback placed the lab and the
+turrets filled from the home centre, 633 to 681 elmos from it (INV-016 and
+INV-017 both fired, the log line gave the distance).
+
+**Decision.** `LeavesPocket` flood-fills a window of 8 cells around the
+footprint instead of the zone, the window's border counting as open
+ground; `PackNearGroup` runs at most 40 pocket tests a call.
+`LayoutLabMinSlots` is 4. `TurretSeed` is the advanced lab itself (standing,
+or its frame) once it exists, then its reserved footprint, then the home
+centre: the turrets fill from the lab however it was placed.
+
+**Invariant.** INV-017 (D-088).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`layout.as`](../data/script/src/manager/layout.as), [`global.as`](../data/script/src/global.as).
+
+## D-091 — The ferry loads only a finished unit off its factory yard, flies only once the cargo is aboard, and lands only where the cargo can stand
+
+**Date:** 2026-09-23. **Status:** Built (native, build44); not yet Played.
+
+**Played by the owner.** The transport flew to the lab and glitched trying
+to lift a unit before it could be picked up; and units were not dropped off,
+seen over water and suspected at buildings. The owner's rule: before the
+transport leaves to deliver it must be sure the unit is aboard, retrying if
+necessary.
+
+**Causes (from the owner's log and `FerryTask.cpp`).**
+
+1. `SetCargo` runs when the donation fires, which can be while the
+   constructor is still being built or standing on the lab's yard, and
+   `HoldCargo` stops it there. `TO_CARGO` issued the load regardless.
+2. The flight to the drop was queued behind the load (shift move, D-056).
+   A load the engine refused left the queued move to fly the transport off
+   empty; `LOADING` then waited out its 20 s and sent it back.
+3. The landing spot came from `FindClosestBuildSite` with the cargo's mobile
+   def, which ignores the buildings and water around an ally's start, and
+   every retry asked again around the same point: the owner's log shows
+   `unload retry 1`, `2`, then `dump retry 4` to `9`, all at (11488, 4720).
+
+**Decision.**
+
+1. `TO_CARGO` waits beside a cargo that is being built (the deadline
+   restarts), and walks a cargo standing on a factory's footprint 160 elmos
+   off it (`OnFactoryYard`) before the load is ordered.
+2. The load is ordered alone; the flight to the drop is ordered only when
+   `LOADING` sees the cargo lifted. In `TO_DROP` a cargo on the ground for
+   two updates means the load did not hold: back to `TO_CARGO`, within the
+   load retries. Logged as `FERRY: cargo N is not aboard; back to load it`.
+3. Native `CTerrainManager::FindDropSpot`: rings every 32 elmos around the
+   drop, the nearest point whose cell and neighbours are free of structures
+   and reservations, that the cargo's move type reaches, not in water for a
+   unit that cannot swim, and at least 64 elmos from every spot the engine
+   already refused (`refusedDrops`, filled on each unload and dump retry).
+   Logged as `FERRY: no standing room ...` when none.
+
+**Invariant.** None in script: the ferry's states are native and already
+deadline-bound; the log lines above are the signal.
+
+**Files.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp),
+[`FerryTask.h`](../src/circuit/task/fighter/FerryTask.h),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`transport-ferry.md`](transport-ferry.md).
+
+
+## D-092 — A factory's exit may cross a layout zone's open ground
+
+**Date:** 2026-09-23. **Status:** Built (native, build45); not yet Played.
+
+**Played (build43, run `20260923-162126`).** `RESERVE: no room for coralab in zone 7 (1210
+candidates, 401 tried)` in all four facings; the lab went to the pair's slot and its nearest
+turret stood 237 elmos away (INV-017). `IsExitClear` (D-074) rejected every cell with any
+struct mark, and `ReserveZone` marks every cell of a zone RESERVED: no lab inside the block's
+halo could have a clear exit.
+
+**Decision.** A cell whose only mark is the zone's RESERVED underlay is open ground for the
+exit test; standing structures still block it, and planned slots are tested by their
+reservations as before. The build that carries it also has D-091's ferry fix (build44 failed
+on a missing include in `FerryTask.cpp`, now added).
+
+**Invariant.** INV-017 (D-088).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp) (`IsExitClear`),
+[`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp) (include).
+
+## D-093 — TECH's economy is placed only by the layout: native's own energy planner is off, and the queue take-over adopts only layout orders
+
+**Date:** 2026-09-23. **Status:** Built (native, build46); not yet Played.
+
+**Played by the owner (screenshot, build43).** The early turbines spread
+out instead of growing side by side as a rectangle in the layout, far from
+the T1 lab; bots and commanders walk slowly, so the early base cannot
+sprawl. The owner's log: every turbine the chain ordered through the layout
+packed 48 elmos from the last (`packed armwin at (11480, 2136)`, `(11432,
+2136)`, `(11464, 2088)`, ...); the stray ones came from `[TECH][Chain] step
+3/11 wind 2/3: takes the queued order`, which adopted a turbine order with
+no layout slot, placed by native's point packer 467 elmos from its anchor
+(`packed armwin near (11489, 2093) at (11160, 2424), 467 away`), and a
+commander walked to one 400 elmos west of the home mexes.
+
+**Cause.** Native's economy planner (`CEconomyManager::MakeEconomyTasks`,
+`UpdateEnergyTasks`) still ran for TECH: `MakeCommTask`, `MakeBuilderTask`
+and `CreateBuilderTask` call it whenever a native default task is asked
+for. D-066 had gated storage and the start factory, not energy. Its orders
+went to the builder queue at native's positions, and the chain's queued-order
+take-over (D-070) adopted them.
+
+**Decision.** With the experimental build on (TECH only), native's
+`MakeEconomyTasks` and `UpdateEnergyTasks` return nothing, and
+`FindQueuedTask` never returns an energy, converter, storage or turret order
+the layout did not place (`IsLayoutOwned`). Every economy structure of TECH
+is placed by `Layout::Place`, which packs same-def structures as a rectangle
+nearest a turret (D-083, D-088). Other roles are unaffected.
+
+**Invariant.** INV-014 (D-082): a TECH economy structure ordered outside the
+layout.
+
+**Files.** [`EconomyManager.cpp`](../src/circuit/module/EconomyManager.cpp),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp).
+
+## D-094 — The layout's ranking rules live once, in a tested header; the layout script's repeated blocks are helpers
+
+**Date:** 2026-09-23. **Status:** Played (build47: no script error, no stutter, no off-layout turbine; the one INV-017 found a pre-existing gap, D-095).
+
+**Owner's request.** Look for duplication in the new layout code and the
+building-sequence code; refactor the experimental code to remove it and make
+it reusable, so bugs are easier to find; do not break the sequencing, which
+works; write unit tests.
+
+**Survey (native, `TerrainManager.cpp`).** The layout's rules were written
+inline, each in the function that used it: the served-versus-planned
+turret distance (D-083) and the same-def centroid (D-088) in
+`PackCandidates`; the connected block fill (D-077/D-081) with its own
+centroid in `NextSlotConnected`; the lab site's weighted slot count, cap and
+seed tie-break (D-085/D-087) in `PickMost`; the pocket flood fill (D-072) in
+`LeavesPocket`; the ring search and refused-spot test (D-091) in
+`FindDropSpot`. Two centroids, three nearest-point loops, three sort
+comparators, none testable without the engine.
+
+**Survey (layout script, `layout.as`).** The turret rows were laid by three
+copies of one loop (`PlanBox`, `GrowBox`, `PlanForwardBox`), and the copies
+had drifted: the forward cluster always laid touching rows whatever
+`LayoutTurretBlock` said. The advanced lab was ordered by three copies of the
+same enqueue, pin, mark and log block in `T2LabTask`. The box searches ranked
+their candidates by three different rules: `PlanBox` by D-087 (nearest
+good-enough halo), `GrowBox` by the best halo, `PlanForwardBox` by the best
+block score.
+
+**Survey (sequencing: `tech_chain.as`, `tech_rules.as`, `tech_build.as`,
+`eco_planner.as`). Reported, not changed (owner: it works).**
+1. Three definitions of "energy floats": the rule context's and the
+   planner's (bank at `EcoConvertEnergyPercent` now) and the chain's
+   `EnergyFloats` (the bank over a 15 s window or the surplus test, D-079).
+   `energy.convert` reads the first, `energy.convert.float` the second, so
+   the two converter rows can disagree on the same frame.
+2. Two definitions of "metal floating": `isMetalFull` or the bank at
+   `EcoFloatMetalPercent` (rules, planner) and `TechBuild::MetalFullLong` (90 %
+   for 15 s, D-075).
+3. `TechBuild::EnergyAllowed` and `EnergyRetired` repeat the same fusion and
+   advanced-fusion era test; "standing = count - unfinished" is written out in
+   four places.
+4. The two lab retirements in `TechBuild::Tick` (abort the native task, then
+   `Lifecycle::Retire`) and `ReclaimT1Lab` / `ReclaimT2Lab` share their shape.
+Each is a candidate for the same treatment once a change there is wanted;
+item 1 is the one most likely to hide a bug.
+
+**Decision.**
+
+1. `src/circuit/terrain/LayoutRanking.h` (engine-free, `circuit::layout_rank`):
+   `Centroid`, `NearestSq`, `NextConnected`, `TurretDistanceSq`, `PackKey` and
+   `PackBefore`, `Slot`, `WeightedSlots`, `SiteKey`, `MakeSiteKey` and
+   `SiteBefore`, `LeavesPocket` on a grid, `RingOrder` and `ClearOf`. The five
+   terrain-manager functions gather their inputs from the engine and call
+   these; each rule exists once.
+2. `layout.as`: `LayRows` lays a box's turret rows (all three callers, the
+   forward cluster now honouring `LayoutTurretBlock`); `BetterBox` is the one
+   box-ranking rule (D-087), used by `PlanBox` and `GrowBox` (nearness to the
+   home centre); `OrderLabOn` orders the advanced lab on a reserved footprint
+   (all three sites of `T2LabTask`).
+3. Unit tests, `tests/layout_ranking_test.cpp` (49 checks), each named after
+   the owner's rule or the played bug it guards: the first turret on the
+   seed's side; twelve turrets span three or more of four rows within five
+   columns, each touching the block (D-081); served beats planned (D-083);
+   twelve same-def structures fill a box of at most 20 cells, no side over
+   five (D-088, the L); the pack order; weighted slots near the seed (D-085);
+   past eight slots the site nearest the seed wins (D-087, the 1,099-elmo
+   lab); pockets; drop-spot rings nearest first and never a refused spot again
+   (D-091, the owner's log). `bash tools/run_native_tests.sh` builds them with
+   the build container's compiler and runs them; `tests/CMakeLists.txt`
+   registers them for `CIRCUIT_BUILD_TESTS`.
+
+**Behaviour.** Native: identical by construction (the same arithmetic,
+moved). Script: identical but for the two corrections above (the forward
+cluster's rows, `GrowBox` ranking by D-087).
+
+**Invariant.** The unit tests; `run_native_tests.sh` is part of validation
+(AGENTS.md).
+
+**Files.** [`LayoutRanking.h`](../src/circuit/terrain/LayoutRanking.h),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`layout_ranking_test.cpp`](../tests/layout_ranking_test.cpp),
+[`tests/CMakeLists.txt`](../tests/CMakeLists.txt),
+[`run_native_tests.sh`](../tools/run_native_tests.sh),
+[`layout-design.md`](layout-design.md), [`AGENTS.md`](../AGENTS.md).
+
+## D-095 — The advanced lab's site is flush with a turret slot before it is near the home centre
+
+**Date:** 2026-09-23. **Status:** Built (native, script; build48); unit-tested; not yet Played.
+
+**Played (build47, D-094's check).** Clean on everything D-094 could have
+broken: no script errors, one `SLOW` call per timer (36 ms at most), no
+turbine packed off the layout, the box, the lab's planned footprint and the
+forward cluster all logged. One violation: `INV-017 the advanced lab's
+nearest construction turret is 176 elmos away, not flush (160)`. The lab's
+footprint was reserved 16 elmos from the home centre with 9 slots in reach,
+but no slot within 160 of it. Build45's lab was flush at 160 by chance: the
+D-087 ranking (enough slots, then the nearest the seed) never asked whether a
+site touches a slot. The D-094 port of `NextConnected` and the site rule was
+checked line by line against the pre-refactor code: the same score, the same
+order. The gap predates the refactor.
+
+**Decision.** A lab site gets a `flush` key: a turret slot of the group
+(served or planned) within `LayoutLabFlushElmos`. `layout_rank::SiteBefore`
+ranks by slots (capped at `LAB_SLOTS_ENOUGH`), then flush, then nearness to
+the seed, then nearness to a turret. `PickMost` and `PackNearGroupMost` take
+the flush distance from the script (one setting, no native copy). The plan-time
+choice among the four facings in `PlanBox` prefers a flush site before a
+nearer one; its log line now counts the flush slots.
+
+**Invariant.** INV-017 (unchanged): 90 s after the advanced lab stands its
+nearest construction turret is within `LayoutLabFlushElmos`. Unit test
+`TestSiteFlushBeforeNearer` (the played 176 against 160).
+
+**Files.** [`LayoutRanking.h`](../src/circuit/terrain/LayoutRanking.h),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`layout_ranking_test.cpp`](../tests/layout_ranking_test.cpp),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-096 — Labs face the nearest enemy from the front side of the block, and nothing is packed into a factory's exit
+
+**Date:** 2026-09-23. **Status:** Played (build49 with the script of build50: runs `20260923-184749` and `20260923-185441`).
+
+**Owner's report.** The advanced lab was not facing the front line, stood on
+the wrong side of the turret cluster, and was walled in by windmills. A lab
+must be able to make units that walk out toward the enemy: later labs make
+combat units, and they should flow toward the nearest enemy, with possibly
+more than one front.
+
+**Played (build48, run `20260923-174316`).** The pair faced 1 (east, toward
+the enemy on Supreme Isthmus); the advanced lab's footprint was reserved at
+plan time facing 2 (north), into its own turret column. Two causes:
+
+1. D-088 let the lab take any of the four facings and kept the site nearest
+   the home centre. Nothing asked which way the enemy is, or which side of
+   the block the lab stands on.
+2. The exit was never protected. `IsExitClear` tests the exit once, when the
+   site is picked. Nothing kept later structures out of it. A corridor
+   (`ReserveZone(..., true)`) holds only cells nobody else holds, and the
+   lab's exit lies inside the turret box's zone: even the T1 lab's corridor
+   logged `0 of 200 held`. Windmills packed by `PackNearGroup` inside the zone
+   could, and did, land in the exit.
+
+**Decision.**
+
+1. The front. `Layout::FrontTarget()` is the nearest seen enemy group whose
+   cost is at least `LayoutFrontMinCost` (native `CEnemyManager::GetNearestGroupPos`,
+   new binding), else the map centre. `LabFacing()` faces from the home
+   centre toward it. `LabFacings()` is that facing, then the two beside it,
+   never the one away from the enemy. At plan time the lab takes the first of
+   these with a site that enough slots reach. The first order searches (at
+   order time) face `LabFacing()`, since an enemy may have been seen by then.
+   The D-086 relocation keeps the planned facing.
+2. The side. `layout_rank::SiteBefore` gains an `ahead` key between build
+   power and flush: a site ahead of the turret slots' centroid along its
+   facing, so its units leave away from the block (`AheadOf`, `FacingForward`).
+3. The exit. `CTerrainManager::FactoryExitLanes()` lists the exit lane
+   (`ExitLaneCells`, the rectangle `IsExitClear` always tested: 320 elmos
+   long, 32 elmos of margin a side) of every factory reservation and standing
+   factory. `PackCandidates` refuses any footprint that overlaps one, so the
+   windmills, converters, fusions and labs the layout packs keep out of
+   every exit. This applies only to TECH, because the layout packer is
+   TECH's only.
+
+4. The front line (played, run `20260923-184749`: the ranked search alone put
+   the lab 726 elmos from the home centre at the block's north end. The
+   block's zone ends about 10 elmos past turret row 0, the D-060 factory line,
+   so no site in front of the block was inside it). When the block faces the
+   front, `ReserveFrontLab` reserves the lab directly in front of the block
+   first, its back to turret row 0. It tries from touching the row out to
+   `LayoutLabFrontGapCells` (3) cells, slides along the block's width, and
+   takes the free, buildable footprint with a clear exit nearest the home
+   centre. The ranked search is the fallback.
+
+**Played.** Run `20260923-185441`: `advanced lab on the front line at (1290,
+10376) facing 1, 1 cells ahead of turret row 0`. It faces 1, the front is
+1, 0 structures stand in its exit lane, and its nearest turret is 112 elmos
+(flush). No invariant fired. The screenshot at 12 min shows the lab facing
+east with open ground ahead, its turrets behind it, and the windmill block
+behind them.
+
+**Invariant.** INV-018: 90 s after the advanced lab stands, it faces
+`LabFacing()` and no structure of ours stands in its exit lane
+(`CountStructuresInExit`, new binding). The facing, the front and the count
+are logged on change. Unit tests `TestSiteAheadOfTheBlock` and
+`TestExitLanes`.
+
+**Not in this decision.** Where the units go once they are out is the
+military manager's job. Only the exit direction is set here.
+
+**Files.** [`LayoutRanking.h`](../src/circuit/terrain/LayoutRanking.h),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`EnemyManager.h`](../src/circuit/unit/enemy/EnemyManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`layout_ranking_test.cpp`](../tests/layout_ranking_test.cpp),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`layout-design.md`](layout-design.md).
+
+## D-097 — Construction turrets go up one at a time until the metal and the nearby build power pay for more
+
+**Date:** 2026-09-23. **Status:** Played (script; build49's DLL, run `20260923-185441`).
+
+**Owner's report.** Far too many construction turrets were built at once. In
+the early game that stalled the economy (the owner's screenshot: five frames
+up together). Parallel is right once the economy has grown; before that,
+idle constructors should assist the turret going up.
+
+**Cause.** Three paths order a turret: the chain's `nano` step, the
+`power.turret` rule and the economy rows' turret pick. Each had its own cap:
+the chain one frame per builder for a cheap step, the rule
+`PowerTurretsConcurrent` (2) counting frames already started, and the rows
+`EcoMaxConcurrentNanos` (1). The rule's count missed orders whose frame had
+not started, so five builders asking within a second each passed it. Build48
+logged five `turret by corck` orders between frames 8897 and 9313.
+
+**Decision.** One calculation, `Layout::TurretsAllowed()`, enforced where
+every turret order passes (`Layout::NanoTask`). With k turrets in flight,
+the nearby build power B (mobile and static, within `EcoBuildPowerRadius` of
+the base centre, `GetBuildPowerNear`) finishes them in k x T / B seconds
+(T = the turret's buildtime, 5300). In that time the bank M and the income I
+must pay k x C (C = its metal cost, 230):
+
+- by build power: k <= B x `PowerTurretBatchSeconds` (20) / T, so each
+  still finishes fast;
+- by metal: k x (C - I x T / B) <= M, so they are paid in full without a
+  stall.
+
+The smaller of the two, at least 1, at most `PowerTurretsMax` (8). In flight
+means orders not yet started plus frames under construction. A capped
+builder assists the turret going up: the rule's `assistnano`, the economy
+rows' `assistnano`, and the chain's assist, which now reaches anywhere in
+the base when the turret step is capped. `PowerTurretsConcurrent` and
+`EcoMaxConcurrentNanos` are gone.
+
+**Worked numbers.** Early: the commander and two constructors, B = 270, so
+1 by build power; one turret at a time. Run `20260923-185441` at 9.3 min: B
+= 1,290, 4 by build power; a bank of 284 at +29/s gave 2 by metal, then 3
+at 395, then 4 at 451. The turrets went up 1, 2, 3, 4 as the bank allowed.
+
+**Played.** Run `20260923-185441`: `turrets: order 1 of 1 allowed (build
+power 270 ...)` at 5.9 min; later `order 3 of 4 allowed (build power 1290 (4
+by power), bank 451 + 29/s (4 by metal))`. INV-019 did not fire. Earlier run
+`20260923-184749`, against build48: the advanced lab finished at 6.47 min
+(build48: 7.26). Metal at 10 min was +29.6/s (build48: +24.4). The bank never
+floated.
+
+**Invariant.** INV-019: no more turret frames stand unfinished than
+`TurretsAllowed()` for `InvariantTurretFlightSeconds` (30).
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as)
+(`TurretsAllowed`, `TurretsInFlight`, `TurretsCapped`, the gate in
+`NanoTask`), [`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`eco_planner.as`](../data/script/src/manager/eco_planner.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as), [`invariants.md`](invariants.md),
+[`actor-matrix.md`](actor-matrix.md), [`eco-planner.md`](eco-planner.md),
+[`roles/tech.md`](roles/tech.md).
+
+## D-098 — The front is the lane the pair faces; a dear frame takes a build-power slot, and a turret going up is finished first
+
+**Date:** 2026-09-23. **Status:** Played (build51, run `20260923-193604`, 16 AIs); script packaged in build52.
+
+**Owner's report.** The layout looked broken; from the owner's start the
+factory's right orientation was south but it faced west; a construction
+turret and the lab built at once early stall the economy; with metal high,
+build power is assisted first.
+
+**Finding: the owner's game ran an old build.** The engine logged
+`duplicate Skirmish AI Info found for Skirmish AI SMRTBARb stable` in three
+folders (`SMRTBARb`, `SMRTBARb_V1`, `SMRTBARbzzz`) and `using dir
+.../SMRTBARbzzz/stable`, a DLL of 09-21 13:45 (sha256 `9e5274f9…`) whose
+script has neither D-096 nor D-097. The log's lines are that build's (the
+pre-D-094 text `advanced lab in the turret layout at ... front first among
+equals`). The folders are the owner's to rename; nothing was written there.
+
+**Still true of the new code.** D-096's front was the straight line to the
+map centre: from the north-east start (11437, 1864) that is west, across the
+cliffs. The owner's right answer, south, is the lane (native's point on our
+side's front line), which the factory pair has always faced.
+
+**Decision.**
+
+1. `Layout::FrontTarget()` is the lane when it is known (more than 100
+   elmos from home), else the map centre. A seen enemy group of
+   `LayoutFrontMinCost` replaces it only when it is nearer home: a second
+   front. The plan log names the lane and the pair's facing.
+2. INV-018 compares the lab with the facing it was ordered with
+   (`LabPlannedFacing`, saved by `OrderLabOn`), and never away from the
+   current front, so a front seen later does not flag a standing lab.
+3. Build-power slots. `Layout::TurretSlots()` is D-097's number. Every dear
+   frame (`ChainParallelCostM` or more, not a turret) under construction near
+   the base takes one slot (native `CBuilderManager::CountUnfinishedNear`, new
+   binding). `TurretsAllowed()` is what is left. With one slot, the advanced
+   lab under construction leaves no turret. `power.turret`, when capped with
+   no turret frame to assist, puts the builder on the structure going up.
+4. A turret first. The chain orders a dear step only while a slot is free
+   (`Layout::BuildSlotFree()`); otherwise, with a turret frame up, the
+   builder finishes that turret (`Layout::TurretFrame()`), and the step is
+   ordered with the added power. Cheap steps and the chain's order are
+   unchanged.
+5. INV-019 compares turret frames with the slots, not with what is left, so
+   a turret started before the lab is not a violation once the lab starts.
+
+**Played (run `20260923-193604`, 16 AIs as in the owner's game).** The lane
+was known. The north-east TECH base (team 9) logged `the front is (8192,
+8192): the labs face 0 (lane (8192, 8192), the pair faces 0)`: south, as the
+owner said. The south-west base faced 2. Both advanced labs stood on the
+front line, faced the front, and had 0 structures in the exit lane. No
+invariant fired. Team 0: the lab was ordered at 2.8 min; at 3.7 min, with
+build power 630 (2 slots), `1 dear frames take a slot` left one turret
+beside it. The lab finished at 5.70 min, the earliest of the day, with the
+bank spent from 1,188 to 18 and no float. `PowerTurretBatchSeconds` (20) is
+the setting that decides when two slots exist. At 10 s, the commander and two
+constructors would give one slot, and no turret would go up beside the lab.
+
+**Invariant.** INV-018 (facing as ordered, never away, exit lane clear) and
+INV-019 (turret frames within the slots), as amended above.
+
+**Files.** [`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`BuilderManager.h`](../src/circuit/module/BuilderManager.h),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
 
 ## Process decisions
 

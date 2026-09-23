@@ -158,6 +158,7 @@ namespace TechRules {
     bool NotStalling(Ctx@ c)      { return !aiEconomyMgr.isEnergyStalling; }
     bool T2LabRetiring(Ctx@ c)    { return Factory::primaryT2BotLab !is null && Lifecycle::IsRetiring(Factory::primaryT2BotLab); }   // D-078
     bool NoAfusYet(Ctx@ c)        { return !TechBuild::IntoAfus(); }   // D-078: no advanced lab is ordered once the advanced fusion is under way
+    bool NoDearOrderPending(Ctx@ c) { return !TechChain::DearOrderPending(); }   // D-084
     bool EnergyFloatsBank(Ctx@ c) { return TechChain::EnergyFloats(); }   // D-079: the bank-based float, the chain's definition
     bool EnergyReclaimable(Ctx@ c){ const EcoPlanner::State@ s = c.eco; return (s.fusions > 0 || s.afus > 0) && (s.winds + s.solars + s.advSolars) > 0; }   // D-077
     bool MetalAhead(Ctx@ c)       { return c.aheadM; }                 // D-075: income above spending, the bank rising
@@ -239,7 +240,7 @@ namespace TechRules {
     }
     // D-075, the owner's rule: metal income above spending while a structure
     // is under construction means build power is short: a construction
-    // turret (the box slot nearest a lab), PowerTurretsConcurrent at a time;
+    // turret (the box slot nearest a lab), Layout::TurretsAllowed at a time (D-097);
     // the rest assist the turret going up. When nothing is under
     // construction the rows below order the next structure by priority.
     int powerTurretNoSlotLog = -100000;
@@ -250,6 +251,10 @@ namespace TechRules {
         const EcoPlanner::State@ s = c.eco;
         CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
         if (nano is null || !nano.IsAvailable(ai.frame)) return null;
+        // before the advanced lab the rush owns the builders: only a bank that
+        // has sat full for PowerAheadSeconds counts (played: a rising bank of 800
+        // sent the commander to a turret at 4:00 and the advanced lab came at 7:13)
+        if (!TechBuild::IntoT2() && !TechBuild::MetalFullLong()) return null;
         // build power scales with income: at the target, the rows below spend the metal instead
         // ... unless the metal bank has been full for PowerAheadSeconds: a full
         // bank with a structure under construction is build power short whatever
@@ -258,7 +263,7 @@ namespace TechRules {
         // the objective, D-075)
         if (!TechBuild::MetalFullLong() && s.buildPowerNear >= s.mIncome * Global::RoleSettings::Tech::PowerBuildPowerPerMetal) return null;
         const bool onNano = (c.building.circuitDef is nano);
-        if (!onNano && s.nanosBuilding < Global::RoleSettings::Tech::PowerTurretsConcurrent && c.d.CanBuild(nano)) {
+        if (!onNano && !Layout::TurretsCapped() && c.d.CanBuild(nano)) {   // D-097: queued orders count too
             IUnitTask@ t = Layout::NanoTask(c.u, Task::Priority::HIGH);
             if (t !is null) {
                 GenericHelpers::LogUtil("[TECH][Power] +" + int(s.mIncome) + " metal, " + TechBuild::MetalAheadWhy() + " (" + int(s.mCur) + " of " + int(s.mStor)
@@ -271,6 +276,10 @@ namespace TechRules {
             }
         }
         if (s.nanosBuilding > 0) return ByKey(c, "assistnano");
+        // D-098 (owner's rule): metal high while a structure is going up and no
+        // turret may start: this builder's power goes on that structure
+        if (c.building !is null && c.d.IsMobile())
+            return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, c.building, 60 * SECOND));
         return null;
     }
     IUnitTask@ DoTurret(Ctx@ c)
@@ -353,8 +362,8 @@ namespace TechRules {
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));
         table.insertLast(Rule("lab.t2.reclaim",     MOBILE,       W1(@T2LabRetiring), @DoReclaimT2Lab, "D-078: the advanced lab is retiring (an advanced fusion is under construction, the bank has room): every builder reclaims it, turrets in range join"));
         table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim winds and solars nearest the base centre; advanced solars at ReclaimAdvSolarMargin; an advanced fusion reclaims all"));
-        table.insertLast(Rule("energy.convert.float", MOBILE,     W2(@EnergyFloatsBank, @NotStalling), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
-        table.insertLast(Rule("power.turret",      MOBILE,       W3(@MetalAhead, @StructureBuilding, @NotStalling), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, PowerTurretsConcurrent at a time, else assist the turret going up"));
+        table.insertLast(Rule("energy.convert.float", MOBILE,     W3(@EnergyFloatsBank, @NotStalling, @NoDearOrderPending), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
+        table.insertLast(Rule("power.turret",      MOBILE,       W4(@MetalAhead, @StructureBuilding, @NotStalling, @NoDearOrderPending), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, Layout::TurretsAllowed at a time (D-097), else assist the turret going up"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
         table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W3(@OpeningDone, @NoConstructors, @NoLabAtAll), @DoStartFactory, "every constructor and every lab lost: the commander rebuilds a T1 lab"));

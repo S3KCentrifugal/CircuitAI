@@ -74,6 +74,7 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetEnergyMake(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetEnergyMake), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetEnergyUse(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetEnergyUse), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexSpotCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetMexSpotCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "AIFloat3 GetMexCentroidWithin(const AIFloat3& in, float, int) const", asMETHOD(CEconomyManager, GetMexCentroidWithin), asCALL_THISCALL); ASSERT(r >= 0);  // D-086
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetClaimedMexCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetClaimedMexCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asFUNCTION(CEconomyManager_EnqueueMexWithin), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int, bool allyAware)", asFUNCTION(CEconomyManager_EnqueueMexWithinAware), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

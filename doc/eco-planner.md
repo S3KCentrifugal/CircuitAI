@@ -137,8 +137,8 @@ decide:
      does not block this):
          advanced converter if a T2 constructor asks and M clears its gate
          T1 converter if M < BuildT1ConvertersUntilMetalIncome
-  3b. turrets, one at a time: orders not started + turrets under construction
-     >= EcoMaxConcurrentNanos (1):
+  3b. turrets, Layout::TurretsAllowed() at a time (D-097): orders not started +
+     turrets under construction >= the calculation (nearby build power, bank, income):
          a mobile non-commander constructor assists the turret going up within
          EcoTurretAssistRadius of the base centre ("assistnano"); else nothing here
      otherwise if bpShort (or floatingM) and Layout::CanPlaceTurret(),
@@ -249,7 +249,7 @@ the shared builder helpers, so the legacy rows cannot order them either.
 | `EcoBuildPowerRadius` | 700 | the radius the BP is measured in |
 | `EcoTurretMinMetalIncome` | 8 | no turret under this income |
 | `EcoTurretBankFraction` | 0.5 | this share of a turret's metal banked before one starts |
-| `EcoMaxConcurrentNanos` | 1 | turret orders plus turrets under construction at once; the rest assist |
+| (`EcoMaxConcurrentNanos`, removed) | - | replaced by `Layout::TurretsAllowed()` (D-097) |
 | `EcoTurretAssistRadius` | 1200 | a constructor assists a turret going up within this of the base centre |
 | `OpeningMexRadius` / `OpeningMexCap` | 2000 / 3 | the opening's mexes: the cap's spots nearest the start inside the radius (0 = all) |
 | `OpeningMaxSeconds` | 240 | the start factory is released by then whatever the count |

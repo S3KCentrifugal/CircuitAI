@@ -100,6 +100,23 @@ public:
 	bool IsAirValid() const { return GetEnemyThreat(ROLE_TYPE(AA)) <= maxAAThreat; }
 
 	const std::vector<SEnemyGroup>& GetEnemyGroups() const { return enemyGroups; }
+	// D-096: the known enemy group nearest `from` whose cost is at least minCost;
+	// (-1, 0, -1) when none is known
+	springai::AIFloat3 GetNearestGroupPos(const springai::AIFloat3& from, float minCost) const {
+		springai::AIFloat3 best(-1.f, 0.f, -1.f);
+		float bestSq = std::numeric_limits<float>::max();
+		for (const SEnemyGroup& g : enemyGroups) {
+			if (g.units.empty() || (g.cost < minCost)) {
+				continue;
+			}
+			const float sq = from.SqDistance2D(g.pos);
+			if (sq < bestSq) {
+				bestSq = sq;
+				best = g.pos;
+			}
+		}
+		return best;
+	}
 	const springai::AIFloat3& GetEnemyPos() const { return enemyPos; }
 	float GetMinGroupThreat() const { return enemyGroups[minThreatGroupIdx].influence; }
 	float GetPreMaxGroupThreat() const { return enemyGroups[preMaxThreatGroupIdx].influence; }

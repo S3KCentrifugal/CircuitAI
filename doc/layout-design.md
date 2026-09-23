@@ -92,6 +92,89 @@ TECH's economy.
 centre are native layout ints (`tech.box.*`), saved with the registry and
 adopted by name after a load.
 
+## Where the rules live (D-094)
+
+Every ranking rule of the layout is written once in `src/circuit/terrain/LayoutRanking.h`
+(engine-free, unit-tested in `tests/layout_ranking_test.cpp`, run with
+`bash tools/run_native_tests.sh`); the terrain manager gathers slots and cells
+and asks it. In the script, `LayRows` lays turret rows, `BetterBox` ranks box
+candidates and `OrderLabOn` orders the advanced lab. The lab's site is flush
+with a turret slot before it is near the home centre (D-095). The labs face
+the nearest enemy from the front side of the block, and nothing is packed into
+a factory's exit lane (D-096); the advanced lab stands on the block's front
+line, its back to turret row 0. Turrets go up as many at a time as the nearby
+build power and the metal pay for (D-097). Decision:
+[D-094](decisions.md#d-094--the-layouts-ranking-rules-live-once-in-a-tested-header-the-layout-scripts-repeated-blocks-are-helpers).
+
+## Rectangles, and the block grows from the advanced lab (D-088)
+
+Same-def structures are packed nearest the centroid of their group, so they
+fill a rectangle instead of a line. With the block at the home mexes the
+pair's factory-nano slots are not used. The advanced lab's site is chosen
+in any facing, nearest the home centre among sites eight slots reach, and
+the block fills from it, so its first turrets stand flush (INV-017, the
+distance logged). Decision:
+[D-088](decisions.md#d-088--same-def-structures-fill-a-rectangle-the-block-and-its-turrets-grow-from-the-advanced-lab-the-lab-may-face-any-way).
+
+## The home mexes anchor the layout; the lab next to a standing turret (D-086)
+
+`Layout::HomeCentre`, the centroid of the home mex spots from native
+`GetMexCentroidWithin`, anchors the box search, seeds the block and breaks
+the lab's ties: the builders are at the mexes when the turrets begin. The
+advanced lab keeps its planned footprint only while a standing turret is
+within `LayoutLabServedReach`; otherwise it is packed nearest a standing
+turret like every other building, exit clear. Decision:
+[D-086](decisions.md#d-086--the-home-mexes-anchor-the-layout-the-advanced-lab-goes-next-to-a-standing-turret).
+
+## The advanced lab at the seed side of the block (D-085)
+
+`PickMost` weighs a served turret slot three times a planned one and breaks
+ties by nearness to `Layout::TurretSeed` (the start position, or the
+nearest lab when the box is behind the pair), the same seed the block
+fills from, so the lab stands where the first turrets go. INV-016 says so
+if it stands 90 s with no turret in reach. Decision:
+[D-085](decisions.md#d-085--the-advanced-lab-stands-where-the-turrets-are-or-will-be-first-served-slots-weigh-three-ties-go-to-the-blocks-seed).
+
+## The block at the start, built turrets first, the probe memoised (D-083)
+
+The owner's rules after D-082: the first turrets near the starting mexes,
+centred or slightly offset; buildings in range of built turrets first,
+planned slots second; and a fifteen-second freeze at a converter order.
+`LayoutBoxAtStart` centres the box search on the start position (never
+over a pair factory slot); native `PackCandidates` ranks candidates by the
+nearest served slot with planned slots penalised by 256 elmos;
+`Layout::CanPlace` memoises the native probe for `LayoutCanPlaceMemoSeconds`
+and the probe tries forty candidates at most. Decision:
+[D-083](decisions.md#d-083--the-main-cluster-is-centred-on-the-start-built-turrets-outrank-planned-slots-for-placement-the-placement-probe-is-memoised).
+
+## The block is placed for the ground around it (D-082)
+
+The owner's finding: the first turrets stood against a mountain and the
+fusion far from them. The box is scored and its zone reserved with a halo
+of `LayoutHaloCells` on both sides and behind the block (never in front,
+where the factory pair is), candidates whose block clears the floor ranked
+by the halo's ground, and the side search reaches `LayoutBoxSideTries` x
+`LayoutBoxSideStepCells` cells either way and may stand beside the pair
+(`LayoutBoxForwardTries`, `LayoutBoxBesideClearCells`), so the block moves
+off the mountain and the structures pack around it within a turret's reach
+(INV-014). Decision:
+[D-082](decisions.md#d-082--the-turret-block-is-placed-for-the-ground-around-it-a-halo-of-packing-space-on-both-sides-and-behind-scored-with-the-block).
+
+## A block of touching rows, filled across, and a forward cluster (D-081)
+
+The owner's rule: turrets are packed close, four rows per cluster (three
+when the ground is tight), every row worked at once; a flat-area check
+sizes the main cluster and at least one cluster is planned forward in
+clear space, moved on if an ally takes it. `LayoutTurretBlock` makes the
+rows touch with the shelf behind the block; `LayoutBoxNanoRows` is four
+and `LayoutBoxMinRows` three (INV-012); native `NextSlotConnected` fills
+the block outward from the centroid of the taken slots. `PlanForwardBox`
+plans the forward cluster `LayoutForwardGapCells` ahead in ground that
+scores and is not an ally zone, in its own turret group; `CheckForward`
+gives it up and re-plans further forward when `IsZoneAlly` says an ally
+took it (INV-013). Decision:
+[D-081](decisions.md#d-081--the-turret-cluster-is-a-block-of-four-touching-rows-filled-across-with-a-forward-cluster-planned-in-clear-space).
+
 ## Turrets from the centre outward (D-077)
 
 The owner's rule: turrets start at the centre of the planned layout and

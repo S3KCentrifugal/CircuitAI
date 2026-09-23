@@ -33,6 +33,14 @@ namespace Invariants {
         if (u is null || u.circuitDef is null || !u.circuitDef.IsMobile()) return;
         if (Lifecycle::RetiringNear(u.GetPos(ai.frame), Global::RoleSettings::Tech::InvariantFactoryRadius))
             Violation("INV-001", "" + u.id, "a retiring factory produced " + u.circuitDef.GetName() + " " + u.id);
+        // INV-010: no mobile combat unit under the plan's income gate (D-080)
+        const string name = u.circuitDef.GetName();
+        const bool builder = UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) > 0 || UnitHelpers::IsAirConstructor(u.circuitDef)
+            || UnitHelpers::GetAllRezBots().find(name) >= 0 || UnitHelpers::GetAllFastAssistBots().find(name) >= 0   // reclaimers and assist bots are build power, not combat
+            || u.circuitDef.IsRoleAny(Unit::Role::TRANS.mask);   // D-093: the ferry's transport is logistics (played: armatlas and corvalk flagged)
+        const float mi = Economy::GetMinMetalIncomeLast10s();
+        if (!builder && mi < TechPlan::CombatGate())
+            Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
 
     // INV-003: the chain never skips a step whose frame is under construction.
@@ -46,6 +54,13 @@ namespace Invariants {
     int frameSince = 0;
     int floatSince = -1;
     int afusSince = -1;
+    int t2LabSince = -1;
+    int lastLabTurretDist = -2;
+    int lastLabFacing = -2;       // D-096: INV-018's log on change
+    int lastLabExitCount = -1;
+    int noForwardSince = -1;
+    int turretsOverSince = -1;    // D-097: INV-019
+    int ladderFloatSince = -1;
     dictionary energyFrames;   // energy def name -> unfinished count last tick (INV-009)
     dictionary offSince;   // reclaim target id -> frame turrets were first seen off it (INV-008)
 
@@ -116,6 +131,82 @@ namespace Invariants {
                 energyFrames.set(energy[i], int64(now));
             }
         }
+
+        // INV-011: past the objective the metal bank does not float while an
+        // income step is unmet (D-080, the KI-415 promise)
+        if (TechChain::LadderUnmet() && floating) {
+            if (ladderFloatSince < 0) ladderFloatSince = ai.frame;
+            else if (ai.frame - ladderFloatSince >= int(Global::RoleSettings::Tech::InvariantLadderFloatSeconds) * SECOND)
+                Violation("INV-011", "ladder", "metal floating at " + int(cur) + " of " + int(stor) + " for " + int(Global::RoleSettings::Tech::InvariantLadderFloatSeconds) + " s with an income step of the plan unmet");
+        } else ladderFloatSince = -1;
+
+        // INV-013: a main cluster has a forward cluster planned within
+        // InvariantForwardSeconds, unless every re-plan was used up (D-081)
+        if (Layout::HasBox() && !Layout::ForwardPlanned() && !Layout::ForwardGivenUp()) {
+            if (noForwardSince < 0) noForwardSince = ai.frame;
+            else if (ai.frame - noForwardSince >= int(Global::RoleSettings::Tech::InvariantForwardSeconds) * SECOND)
+                Violation("INV-013", "forward", "the main turret cluster has had no forward cluster planned for " + int(Global::RoleSettings::Tech::InvariantForwardSeconds) + " s");
+        } else noForwardSince = -1;
+
+        // INV-016: the advanced lab stands within a turret's reach (D-085)
+        {
+            CCircuitUnit@ t2 = Factory::primaryT2BotLab;
+            if (t2 is null) t2LabSince = -1;
+            else {
+                if (t2LabSince < 0) t2LabSince = ai.frame;
+                else if (ai.frame - t2LabSince >= int(Global::RoleSettings::Tech::InvariantLabReachSeconds) * SECOND
+                    && aiBuilderMgr.GetStaticBuildPowerNear(t2.GetPos(ai.frame), Global::RoleSettings::Tech::ExpLabBuildPowerReach) <= 0.0f)
+                    Violation("INV-016", "" + t2.id, "the advanced lab " + t2.id + " has stood " + int(Global::RoleSettings::Tech::InvariantLabReachSeconds) + " s with no turret within " + int(Global::RoleSettings::Tech::ExpLabBuildPowerReach));
+                // D-088 (owner's ask): the distance from the advanced lab to the nearest
+                // construction turret, logged when it changes; INV-017 when not flush
+                CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+                CCircuitUnit@ n = (nano is null) ? null : aiBuilderMgr.FindOwnNear(t2.GetPos(ai.frame), 3000.0f, nano);
+                const int d = (n is null) ? -1 : int(sqrt(MapHelpers::SqDist(n.GetPos(ai.frame), t2.GetPos(ai.frame))));
+                if (d != lastLabTurretDist && (d < 0 || lastLabTurretDist < 0 || abs(d - lastLabTurretDist) >= 16)) {
+                    lastLabTurretDist = d;
+                    GenericHelpers::LogUtil("[Layout] advanced lab " + t2.id + ": nearest construction turret " + ((d < 0) ? "none" : ("" + d + " elmos"))
+                        + ((d >= 0 && d <= int(Global::RoleSettings::Tech::LayoutLabFlushElmos)) ? " (flush)" : " (not flush)"), 1);
+                }
+                if (ai.frame - t2LabSince >= int(Global::RoleSettings::Tech::InvariantLabReachSeconds) * SECOND && d > int(Global::RoleSettings::Tech::LayoutLabFlushElmos))
+                    Violation("INV-017", "" + t2.id, "the advanced lab's nearest construction turret is " + d + " elmos away, not flush (" + int(Global::RoleSettings::Tech::LayoutLabFlushElmos) + ")");
+                // INV-018 (D-096): the advanced lab faces the front and nothing of ours
+                // stands in its exit lane, so what it makes walks out toward the enemy
+                const int labF = aiTerrainMgr.GetBuildingFacing(t2);
+                // D-098: the facing it was ordered with (the front then); never away from the front now
+                const int planned = Layout::LabPlannedFacing();
+                const int frontF = (planned >= 0) ? planned : Layout::LabFacing();
+                const int inExit = aiTerrainMgr.CountStructuresInExit(t2);
+                if (labF != lastLabFacing || inExit != lastLabExitCount) {
+                    lastLabFacing = labF; lastLabExitCount = inExit;
+                    GenericHelpers::LogUtil("[Layout] advanced lab " + t2.id + ": faces " + labF + ", the front " + frontF + ", "
+                        + inExit + " structures in its exit lane", 1);
+                }
+                if (ai.frame - t2LabSince >= int(Global::RoleSettings::Tech::InvariantLabReachSeconds) * SECOND
+                    && (labF != frontF || labF == (Layout::LabFacing() + 2) % 4 || inExit > 0))
+                    Violation("INV-018", "" + t2.id, "the advanced lab faces " + labF + " (the front " + frontF + ") with " + inExit + " structures in its exit lane");
+            }
+        }
+
+        // INV-019 (D-097): no more turret frames stand unfinished than
+        // Layout::TurretsAllowed for InvariantTurretFlightSeconds (played: five
+        // at once in the early game, the metal stalled)
+        {
+            CCircuitDef@ nd = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+            const int frames = (nd is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(nd);
+            string why;
+            // the slots, not what is left after the dear frames: a turret started
+            // before the lab is not a violation once the lab starts (D-098)
+            const int allowed = Layout::TurretSlots(why);
+            if (frames > allowed) {
+                if (turretsOverSince < 0) turretsOverSince = ai.frame;
+                else if (ai.frame - turretsOverSince >= int(Global::RoleSettings::Tech::InvariantTurretFlightSeconds) * SECOND)
+                    Violation("INV-019", "turrets", "" + frames + " turret frames under construction, " + allowed + " allowed (" + why + ")");
+            } else turretsOverSince = -1;
+        }
+
+        // INV-015: a dear chain order does not wait for its first builder (D-084)
+        if (TechChain::DearOrderPendingSeconds() >= Global::RoleSettings::Tech::InvariantDearOrderSeconds)
+            Violation("INV-015", "dear", "a dear chain order has had no frame for " + int(Global::RoleSettings::Tech::InvariantDearOrderSeconds) + " s");
 
         // INV-008: every construction turret in range of a reclaim of ours is
         // on it (the owner's rule, D-078).

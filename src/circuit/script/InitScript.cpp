@@ -269,13 +269,13 @@ static bool CTerrainManager_IsExitClear(CTerrainManager* terrainMgr, const CCirc
 {
 	return terrainMgr->IsExitClear(const_cast<CCircuitDef*>(cdef), pos, facing, length, margin);
 }
-static int CTerrainManager_PickMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos)
+static int CTerrainManager_PickMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, const AIFloat3& seed, AIFloat3& outPos)
 {
-	return terrainMgr->PickMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, outPos);
+	return terrainMgr->PickMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, flush, seed, outPos);
 }
-static int CTerrainManager_PackNearGroupMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group)
+static int CTerrainManager_PackNearGroupMost(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, int group, const AIFloat3& seed)
 {
-	return terrainMgr->PackNearGroupMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, group);
+	return terrainMgr->PackNearGroupMost(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, reach, flush, group, seed);
 }
 static bool CTerrainManager_CanPackNearGroup(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup,
 		int facing, float maxReach, float minNanoDist)
@@ -931,15 +931,18 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextBuilt(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextBuilt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotAny(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextSlotAny), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotConnected(int group, const AIFloat3& in centre) const", asMETHOD(CTerrainManager, NextSlotConnected), asCALL_THISCALL); ASSERT(r >= 0);  // D-077
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsZoneAlly(const AIFloat3& in) const", asMETHOD(CTerrainManager, IsZoneAlly), asCALL_THISCALL); ASSERT(r >= 0);  // D-081
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetLayoutInt(const string& in, int)", asMETHOD(CTerrainManager, SetLayoutInt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, float maxReach, float minNanoDist, int group)", asFUNCTION(CTerrainManager_PackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
-	r = engine->RegisterObjectMethod("CTerrainManager", "int PickMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, AIFloat3& out)", asFUNCTION(CTerrainManager_PickMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PickMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, float flush, const AIFloat3& in seed, AIFloat3& out)", asFUNCTION(CTerrainManager_PickMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsExitClear(const CCircuitDef@, const AIFloat3& in, int facing, float length, float margin) const", asFUNCTION(CTerrainManager_IsExitClear), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
-	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroupMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, int group)", asFUNCTION(CTerrainManager_PackNearGroupMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroupMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, float flush, int group, const AIFloat3& in seed)", asFUNCTION(CTerrainManager_PackNearGroupMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int CountGroupSlotsWithin(int group, const AIFloat3& in, float) const", asMETHOD(CTerrainManager, CountGroupSlotsWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetReservationPos(int) const", asMETHOD(CTerrainManager, GetReservationPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationFacing(int) const", asMETHOD(CTerrainManager, GetReservationFacing), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CountStructuresInExit(CCircuitUnit@) const", asMETHOD(CTerrainManager, CountStructuresInExit), asCALL_THISCALL); ASSERT(r >= 0);  // D-096
+	r = engine->RegisterObjectMethod("CTerrainManager", "int GetBuildingFacing(CCircuitUnit@) const", asMETHOD(CTerrainManager, GetBuildingFacing), asCALL_THISCALL); ASSERT(r >= 0);  // D-096
 	r = engine->RegisterObjectMethod("CTerrainManager", "CCircuitUnit@ GetReservationUnit(int) const", asMETHOD(CTerrainManager, GetReservationUnit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float FlatFraction(const AIFloat3& in centre, int facing, float halfAcross, float halfAlong, float maxSlope) const", asMETHOD(CTerrainManager, FlatFraction), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "string DescribeLayout() const", asMETHOD(CTerrainManager, DescribeLayout), asCALL_THISCALL); ASSERT(r >= 0);
@@ -964,6 +967,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CEnemyManager", "float GetEnemyThreat(Type) const", asMETHODPR(CEnemyManager, GetEnemyThreat, (CCircuitDef::RoleT) const, float), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEnemyManager", "const float mobileThreat", asOFFSET(CEnemyManager, mobileThreat)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEnemyManager", "float GetEnemyCost(Type) const", asMETHOD(CEnemyManager, GetEnemyCost), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEnemyManager", "AIFloat3 GetNearestGroupPos(const AIFloat3& in, float minCost) const", asMETHOD(CEnemyManager, GetNearestGroupPos), asCALL_THISCALL); ASSERT(r >= 0);  // D-096
 	r = engine->RegisterObjectProperty("CEnemyManager", "float maxAAThreat", asOFFSET(CEnemyManager, maxAAThreat)); ASSERT(r >= 0);
 
 	CThreatMap* thrMap = circuit->GetThreatMap();

@@ -44,6 +44,7 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | `TECH` | `tech_build.as` | 310 | `TechBuild` | [tech_build.md](tech_build.md) |
 | `TECH` | `tech_rules.as` | 341 | `TechRules` | [tech_rules.md](tech_rules.md) |
 | `TECH` | `tech_chain.as` | 336 | `TechChain` | [tech_chain.md](tech_chain.md) |
+| `TECH` | `tech_plan.as` | - | `TechPlan` | [tech_plan.md](tech_plan.md) |
 | `SEA` | `sea.as` | 903 | `RoleSea` | [sea.md](sea.md) |
 | `SUPPORT` | `support.as` | 497 | `RoleSupport` | [support.md](support.md) |
 | `TACTICAL` | `tactical.as` | 709 | `RoleTactical` | [tactical.md](tactical.md) |
@@ -60,6 +61,7 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | [tech_build.md](tech_build.md) | TECH - the experimental build system (D-066): the acts the rule table calls when `Tech::ExperimentalBuild` is on |
 | [tech_rules.md](tech_rules.md) | TECH - the ordered rule table (D-067) that is the whole builder sequence in experimental mode; the T1-lab cases |
 | [tech_chain.md](tech_chain.md) | TECH - the rush chain (D-070): one objective, the computed build order, every builder on it, then the economy |
+| [tech_plan.md](tech_plan.md) | TECH - the endgame plans (D-080): nuke, T2 rush, T3 rush or the cannon after the objective, the metal ladder, the combat gates, T2 construction aircraft |
 | [sea.md](sea.md) | SEA - naval production and water expansion |
 | [support.md](support.md) | SUPPORT - hybrid economic substitute, no factory task handler |
 | [tactical.md](tactical.md) | TACTICAL - mobile-builder role, forces the hover plant opening |

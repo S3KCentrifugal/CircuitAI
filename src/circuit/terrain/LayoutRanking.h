@@ -1,0 +1,315 @@
+#ifndef SRC_CIRCUIT_TERRAIN_LAYOUTRANKING_H_
+#define SRC_CIRCUIT_TERRAIN_LAYOUTRANKING_H_
+
+// D-094: the pure ranking rules of the TECH layout, free of engine types so
+// they can be unit-tested (tests/layout_ranking_test.cpp). CTerrainManager
+// gathers slots, footprints and grid cells from its own state and asks these
+// functions which one comes first; every rule lives here once.
+//
+//   NextConnected      - the next turret slot of a block (D-077, D-081)
+//   TurretDistanceSq   - served turrets outrank planned ones (D-083)
+//   PackBefore         - the order structures are packed in (D-066, D-088)
+//   WeightedSlots,
+//   SiteBefore         - the advanced lab's site (D-085, D-087, D-095, D-096)
+//   AheadOf            - a site on the side of the block its exit points to (D-096)
+//   CellRect, Overlaps - a footprint against the factories' exit lanes (D-096)
+//   LeavesPocket       - a footprint may not wall off free cells (D-072, D-090)
+//   RingOrder          - the points a drop-spot search tries, nearest first (D-091)
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+#include <utility>
+#include <vector>
+
+namespace circuit::layout_rank {
+
+struct Pt {
+	float x = 0.f;
+	float z = 0.f;
+};
+
+inline float Sq(const Pt& a, const Pt& b)
+{
+	const float dx = a.x - b.x, dz = a.z - b.z;
+	return dx * dx + dz * dz;
+}
+
+inline float Dist(const Pt& a, const Pt& b)
+{
+	return std::sqrt(Sq(a, b));
+}
+
+// The mean of pts; `fallback` when there is none.
+inline Pt Centroid(const std::vector<Pt>& pts, const Pt& fallback)
+{
+	if (pts.empty()) {
+		return fallback;
+	}
+	Pt c;
+	for (const Pt& p : pts) {
+		c.x += p.x;
+		c.z += p.z;
+	}
+	c.x /= float(pts.size());
+	c.z /= float(pts.size());
+	return c;
+}
+
+// D-096: the unit forward vector of an engine facing (SOUTH 0 +z, EAST 1 +x,
+// NORTH 2 -z, WEST 3 -x).
+inline Pt FacingForward(int facing)
+{
+	switch (facing) {
+		case 1: return Pt{1.f, 0.f};
+		case 2: return Pt{0.f, -1.f};
+		case 3: return Pt{-1.f, 0.f};
+		default: return Pt{0.f, 1.f};
+	}
+}
+
+// D-096: the site stands on the side of the block its exit points to: ahead of
+// the slots' centroid along `fwd`. False with no slots.
+inline bool AheadOf(const Pt& site, const std::vector<Pt>& slots, const Pt& fwd)
+{
+	if (slots.empty()) {
+		return false;
+	}
+	const Pt c = Centroid(slots, site);
+	return (site.x - c.x) * fwd.x + (site.z - c.z) * fwd.z > 0.f;
+}
+
+// D-096: a cell rectangle [x1, x2) x [z1, z2).
+struct CellRect {
+	int x1 = 0, z1 = 0, x2 = 0, z2 = 0;
+};
+
+inline bool Overlaps(const CellRect& a, const CellRect& b)
+{
+	return (a.x1 < b.x2) && (b.x1 < a.x2) && (a.z1 < b.z2) && (b.z1 < a.z2);
+}
+
+inline bool OverlapsAny(const CellRect& r, const std::vector<CellRect>& lanes)
+{
+	for (const CellRect& l : lanes) {
+		if (Overlaps(r, l)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Squared distance from p to the nearest of pts; max float when none.
+inline float NearestSq(const Pt& p, const std::vector<Pt>& pts)
+{
+	float best = std::numeric_limits<float>::max();
+	for (const Pt& q : pts) {
+		best = std::min(best, Sq(p, q));
+	}
+	return best;
+}
+
+// D-077/D-081: the index into `freeSlots` of the next turret of a block. With
+// nothing taken, the slot nearest the seed; otherwise the slot touching the
+// block (distance to its nearest taken slot) nearest the block's centroid, so
+// the block fills across every row from its middle. -1 when none is free.
+inline int NextConnected(const std::vector<Pt>& freeSlots, const std::vector<Pt>& taken, const Pt& seed)
+{
+	const Pt centroid = Centroid(taken, seed);
+	int best = -1;
+	float bestScore = std::numeric_limits<float>::max();
+	for (std::size_t i = 0; i < freeSlots.size(); ++i) {
+		const float toCentroid = Dist(freeSlots[i], centroid);
+		const float score = taken.empty() ? toCentroid : (std::sqrt(NearestSq(freeSlots[i], taken)) + toCentroid);
+		if (score < bestScore) {
+			bestScore = score;
+			best = int(i);
+		}
+	}
+	return best;
+}
+
+// D-083: the rank distance to the turrets. A served slot (a turret stands or is
+// being built) counts at its distance; a planned one `plannedPenalty` elmos
+// further. Inputs are squared distances (max float for none).
+inline float TurretDistanceSq(float servedSq, float plannedSq, float plannedPenalty)
+{
+	if (plannedSq < std::numeric_limits<float>::max()) {
+		const float d = std::sqrt(plannedSq) + plannedPenalty;
+		plannedSq = d * d;
+	}
+	return std::min(servedSq, plannedSq);
+}
+
+// The keys a packing candidate is ranked by.
+struct PackKey {
+	float turretSq = 0.f;  // TurretDistanceSq
+	float anchorSq = 0.f;  // to the asking builder or the seed: the tie-break
+	float groupSq = std::numeric_limits<float>::max();  // D-088: to the centroid of the same-def group
+};
+
+// D-066/D-088: same-def structures first grow their own group as a filled
+// block (nearest its centroid), then nearest a turret, then nearest the anchor.
+inline bool PackBefore(const PackKey& a, const PackKey& b, bool grouped)
+{
+	if (grouped && (a.groupSq != b.groupSq)) {
+		return a.groupSq < b.groupSq;
+	}
+	if (a.turretSq != b.turretSq) {
+		return a.turretSq < b.turretSq;
+	}
+	return a.anchorSq < b.anchorSq;
+}
+
+struct Slot {
+	Pt pos;
+	bool served = false;
+};
+
+// D-085: true when any slot lies within seedRadius of the seed.
+inline bool AnyNearSeed(const std::vector<Slot>& slots, const Pt& seed, float seedRadius)
+{
+	const float r2 = seedRadius * seedRadius;
+	for (const Slot& s : slots) {
+		if (Sq(s.pos, seed) <= r2) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// D-085: the build power a lab site would see. A served slot within reach
+// counts servedWeight, a planned one 1 - and only within seedRadius of the
+// seed when any slot is that near (the slots the block fills first).
+inline int WeightedSlots(const Pt& site, const std::vector<Slot>& slots, float reach,
+		const Pt& seed, float seedRadius, int servedWeight)
+{
+	const bool nearSeed = AnyNearSeed(slots, seed, seedRadius);
+	const float reach2 = reach * reach, seed2 = seedRadius * seedRadius;
+	int n = 0;
+	for (const Slot& s : slots) {
+		if (Sq(s.pos, site) > reach2) {
+			continue;
+		}
+		if (s.served) {
+			n += servedWeight;
+		} else if (!nearSeed || (Sq(s.pos, seed) <= seed2)) {
+			n += 1;
+		}
+	}
+	return n;
+}
+
+// The keys a lab site is ranked by.
+struct SiteKey {
+	int slots = 0;          // WeightedSlots capped at `enough` (D-087)
+	bool ahead = false;     // D-096: on the side of the block the exit points to
+	bool flush = false;     // D-095: a turret slot within the flush distance
+	float seedDist = 0.f;   // to the seed: nearer wins among equals (D-085)
+	float turretSq = 0.f;   // the last tie-break
+	Pt pos;
+};
+
+// `slotSq`: to the nearest turret slot of any kind, unpenalised; `flushDist` <= 0
+// turns the D-095 key off.
+inline SiteKey MakeSiteKey(const Pt& site, int weightedSlots, int enough, const Pt& seed, float turretSq,
+		float slotSq = std::numeric_limits<float>::max(), float flushDist = 0.f, bool ahead = false)
+{
+	const bool flush = (flushDist > 0.f) && (slotSq <= flushDist * flushDist);
+	return SiteKey{std::min(weightedSlots, enough), ahead, flush, Dist(site, seed), turretSq, site};
+}
+
+// D-085/D-087/D-095/D-096: more slots (up to enough) first, then ahead of the
+// block (the owner's rule: the lab stands on the front side, its units walk out
+// toward the enemy), then flush with a turret slot (the lab touches its turrets
+// as the T1 lab touches its nanos), then nearer the seed (1 elmo counts as
+// equal), then nearer a turret.
+inline bool SiteBefore(const SiteKey& a, const SiteKey& b)
+{
+	if (a.slots != b.slots) {
+		return a.slots > b.slots;
+	}
+	if (a.ahead != b.ahead) {
+		return a.ahead;
+	}
+	if (a.flush != b.flush) {
+		return a.flush;
+	}
+	if (std::fabs(a.seedDist - b.seedDist) > 1.f) {
+		return a.seedDist < b.seedDist;
+	}
+	return a.turretSq < b.turretSq;
+}
+
+// D-072/D-090: `open` is a w x h grid (row-major) of cells a unit could stand on
+// once the footprint stands (the footprint's own cells false). True when some
+// open cell is not connected (4-neighbour) to the grid's border.
+inline bool LeavesPocket(const std::vector<char>& open, int w, int h)
+{
+	if ((w <= 0) || (h <= 0) || (int(open.size()) < w * h)) {
+		return false;
+	}
+	std::vector<char> seen(std::size_t(w) * h, 0);
+	std::vector<int> stack;
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			const int i = y * w + x;
+			if (((x == 0) || (x == w - 1) || (y == 0) || (y == h - 1)) && open[i] && !seen[i]) {
+				seen[i] = 1;
+				stack.push_back(i);
+			}
+		}
+	}
+	while (!stack.empty()) {
+		const int i = stack.back();
+		stack.pop_back();
+		const int x = i % w, y = i / w;
+		const int nb[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (const auto& d : nb) {
+			const int nx = x + d[0], ny = y + d[1];
+			if ((nx < 0) || (ny < 0) || (nx >= w) || (ny >= h)) {
+				continue;
+			}
+			const int j = ny * w + nx;
+			if (open[j] && !seen[j]) {
+				seen[j] = 1;
+				stack.push_back(j);
+			}
+		}
+	}
+	for (int i = 0; i < w * h; ++i) {
+		if (open[i] && !seen[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// D-091: the points a spot search tries, nearest first: the centre, then rings
+// every `step` elmos out to maxRadius, `bearings` points a ring.
+inline std::vector<Pt> RingOrder(const Pt& around, float maxRadius, float step, int bearings)
+{
+	std::vector<Pt> out;
+	if ((step <= 0.f) || (bearings <= 0)) {
+		return out;
+	}
+	for (float r = 0.f; r <= maxRadius; r += step) {
+		const int n = (r < 1.f) ? 1 : bearings;
+		for (int k = 0; k < n; ++k) {
+			const float a = 6.2831853f * float(k) / float(n);
+			out.push_back(Pt{around.x + std::cos(a) * r, around.z + std::sin(a) * r});
+		}
+	}
+	return out;
+}
+
+// True when p is at least avoidRadius from every point of avoid.
+inline bool ClearOf(const Pt& p, const std::vector<Pt>& avoid, float avoidRadius)
+{
+	return NearestSq(p, avoid) >= avoidRadius * avoidRadius;
+}
+
+}  // namespace circuit::layout_rank
+
+#endif  // SRC_CIRCUIT_TERRAIN_LAYOUTRANKING_H_

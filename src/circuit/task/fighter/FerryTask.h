@@ -83,6 +83,10 @@ private:
 	int loadRetries;
 	int unloadRetries;
 	int landedTicks = 0;  // consecutive updates the cargo was seen on the ground while unloading
+	bool OnFactoryYard(CCircuitUnit* cargo, int frame);
+	springai::AIFloat3 yardPos;
+	int groundTicks = 0;  // D-091: consecutive updates the cargo was on the ground in flight to the drop
+	std::vector<springai::AIFloat3> refusedDrops;  // D-091: landing spots the engine did not unload at
 	springai::AIFloat3 landPos;  // where the unload was actually ordered
 };
 

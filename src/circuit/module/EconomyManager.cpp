@@ -768,6 +768,28 @@ static CMetalData::IndicesDists GetNearestSpotsWithin(
 	return spots;
 }
 
+AIFloat3 CEconomyManager::GetMexCentroidWithin(const AIFloat3& center, float radius, int maxSpots) const
+{
+	if (maxSpots <= 0) {
+		maxSpots = std::numeric_limits<int>::max();
+	}
+	const CMetalData::IndicesDists spots = GetNearestSpotsWithin(circuit->GetMetalManager(), center, radius);
+	AIFloat3 sum = ZeroVector;
+	int count = 0;
+	for (const auto& spot : spots) {
+		sum += circuit->GetMetalManager()->GetSpots()[spot.first].position;
+		if (++count >= maxSpots) {
+			break;
+		}
+	}
+	if (count == 0) {
+		return center;
+	}
+	sum /= float(count);
+	sum.y = center.y;
+	return sum;
+}
+
 int CEconomyManager::GetMexSpotCountWithin(
 		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots)
 {
@@ -1208,6 +1230,10 @@ bool CEconomyManager::IsEnoughEnergyIncome(CCircuitDef const* buildDef, CCircuit
 IBuilderTask* CEconomyManager::MakeEconomyTasks(const AIFloat3& position, CCircuitUnit* unit)
 {
 	ZoneScoped;
+	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
+		return nullptr;  // D-093: TECH's layout places its economy; native's own energy and
+		                 // mex orders sprawled outside it (played: turbines 400 elmos out)
+	}
 
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	if (!builderMgr->CanEnqueueTask()) {
@@ -1467,6 +1493,10 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCircuitUnit* unit)
 {
 	ZoneScoped;
+	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
+		return nullptr;  // D-093: TECH's layout places its economy; native's own energy and
+		                 // mex orders sprawled outside it (played: turbines 400 elmos out)
+	}
 
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	if (!builderMgr->CanEnqueueTask(32)) {

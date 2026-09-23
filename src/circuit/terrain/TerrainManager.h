@@ -10,6 +10,7 @@
 
 #include "terrain/BlockingMap.h"
 #include "terrain/BaseLayoutGeometry.h"
+#include "terrain/LayoutRanking.h"
 #include "unit/CoreUnit.h"
 #include "unit/CircuitDef.h"
 
@@ -248,13 +249,24 @@ public:
 	// among equals (the zone's forward side along `facing`), then nearest a
 	// slot. PickMost is the dry run (score, position); PackNearGroupMost
 	// reserves it like PackNearGroup and returns the id, -1 when none.
-	int PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, springai::AIFloat3& outPos) const;
+	// D-085: served slots (a turret stands or is being built) count SERVED_SLOT_WEIGHT
+	// times a planned one; among equals the candidate nearest `seed` (where the
+	// block grows from) wins, so the lab stands where the turrets are or will be first.
+	int PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, const springai::AIFloat3& seed, springai::AIFloat3& outPos) const;  // D-095: flush = LayoutLabFlushElmos
 	// D-074: is the ground in front of a factory placed at pos (its exit,
 	// `length` deep, the footprint's width plus `margin` each side) free of
 	// standing structures and of planned slots? A factory is never placed
 	// where anything stands or will stand in its exit.
 	bool IsExitClear(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, float length, float margin) const;
-	int PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group);
+	// D-096: the cells a factory's exit lane covers (IsExitClear's rectangle)
+	bool ExitLaneCells(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, float length, float margin, int2& c1, int2& c2) const;
+	// D-096: the exit lanes of every planned and standing factory of the layout;
+	// nothing is packed into one
+	std::vector<layout_rank::CellRect> FactoryExitLanes() const;
+	// D-096: INV-018 - own structures (not mobile) whose footprint stands in the factory's exit lane
+	int CountStructuresInExit(CCircuitUnit* factory) const;
+	int GetBuildingFacing(CCircuitUnit* unit) const;
+	int PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, int group, const springai::AIFloat3& seed);
 	// slots of a group (standing or planned) within radius of pos
 	int CountGroupSlotsWithin(int group, const springai::AIFloat3& pos, float radius) const;
 	// The dry run of PackNearGroup: would a footprint fit? Nothing is marked.
@@ -268,6 +280,12 @@ public:
 	// unit's side, on cells no structure holds (planned ground is walkable)
 	// and inside the unit's movement area; -RgtVector when none of sixteen.
 	springai::AIFloat3 FindApproachPoint(CCircuitUnit* unit, const springai::AIFloat3& site, float radius);
+	// D-091: the nearest point to `around` within maxRadius where `cargo` can stand:
+	// its own move type reaches it (no water for a bot), no structure or reserved
+	// footprint covers it, and it is at least `avoidRadius` from every point in
+	// `avoid` (spots the engine already refused). -RgtVector when none.
+	springai::AIFloat3 FindDropSpot(CCircuitUnit* cargo, const springai::AIFloat3& around, float maxRadius,
+			const std::vector<springai::AIFloat3>& avoid, float avoidRadius);
 	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
 	// task may take a held slot; NextSlot serves the armed ones only).
 	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;

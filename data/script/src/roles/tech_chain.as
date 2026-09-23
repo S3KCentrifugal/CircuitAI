@@ -69,6 +69,35 @@ namespace TechChain
 
     bool Active() { return active && !done; }
 
+    // D-084: a dear step (fusion, advanced lab, advanced fusion, silo, gantry)
+    // has an order out and no frame yet: every builder belongs to it until
+    // its frame exists (played: the advanced lab's order waited 95 s while
+    // the builders converted and built turrets on a full bank).
+    int dearPendingSince = -1;
+    bool DearOrderPending()
+    {
+        if (!Active()) return false;
+        for (uint i = 0; i < steps.length(); ++i) {
+            Step@ s = steps[i];
+            if (s.key == "income" || (i < skipped.length() && skipped[i])) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(s.defName);
+            if (d is null || d.costM < Global::RoleSettings::Tech::ChainParallelCostM) continue;
+            if (Standing(s, d) >= s.target) continue;
+            if (aiBuilderMgr.GetUnfinishedCount(d) > 0) return false;   // the frame exists: assists, turrets and converters as usual
+            int queued = aiBuilderMgr.GetQueuedBuildCount(int(TypeFor(s.key)), d);
+            if (s.key == "silo") queued += aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::BIG_GUN), d);
+            const bool pending = (pendingStep == int(i)) && (ai.frame - pendingFrame < 120 * SECOND);
+            return queued > 0 || pending;
+        }
+        return false;
+    }
+    float DearOrderPendingSeconds()
+    {
+        if (!DearOrderPending()) { dearPendingSince = -1; return 0.0f; }
+        if (dearPendingSince < 0) dearPendingSince = ai.frame;
+        return float(ai.frame - dearPendingSince) / float(SECOND);
+    }
+
     string DefFor(const string &in key)
     {
         const string side = Global::AISettings::Side;
@@ -85,6 +114,8 @@ namespace TechChain
         if (key == "afus") return UnitHelpers::GetAdvFusionNameForSide(side);
         if (key == "silo") { if (side == "cortex") return "corsilo"; if (side == "legion") return "legsilo"; return "armsilo"; }
         if (key == "gantry") return UnitHelpers::GetLandGantryForSide(side);
+        if (key == "aap") return UnitHelpers::GetT2AirPlantForSide(side);      // D-080
+        if (key == "lrpc") return UnitHelpers::GetLRPCNameForSide(side);       // D-080
         return "";
     }
 
@@ -138,7 +169,8 @@ namespace TechChain
     {
         if (key == "mex") return Task::BuildType::MEX;
         if (key == "moho") return Task::BuildType::MEXUP;
-        if (key == "lab" || key == "alab" || key == "gantry" || key == "silo") return Task::BuildType::FACTORY;
+        if (key == "lab" || key == "alab" || key == "gantry" || key == "silo" || key == "aap") return Task::BuildType::FACTORY;
+        if (key == "lrpc") return Task::BuildType::BIG_GUN;   // D-080
         if (key == "nano" || key == "nanot2") return Task::BuildType::NANO;
         return Task::BuildType::ENERGY;
     }
@@ -318,6 +350,10 @@ namespace TechChain
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
         if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
         if (key == "gantry") return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        if (key == "aap") return Builder::EnqueueT2AirPlant(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);   // D-080
+        // D-080 phase 1: the cannon at the start position, native's site search;
+        // high ground with sight beyond the front is KI-418
+        if (key == "lrpc") return Builder::EnqueueLRPC(Global::AISettings::Side, Global::Map::StartPos, 400.0f, 300 * SECOND, Task::Priority::HIGH);
         // energy, the T2 turret: the turret box first, then the nearest free
         // footprint to the base centre (native packs it, D-066)
         if (key == "wind" && ai.GetWindCur() < Global::RoleSettings::Tech::ChainWindBootstrap) {
@@ -335,6 +371,7 @@ namespace TechChain
         // and the chain simply orders again
         IUnitTask@ t = Layout::Place(type, Task::Priority::HIGH, d, 120 * SECOND, u);
         if (t is null) {
+            Invariants::Violation("INV-014", d.GetName(), d.GetName() + " ordered outside the layout (no room in the turret boxes): native's site search around the base centre");   // D-082
             @t = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, d, Layout::BaseCentre(), 600.0f, true, 120 * SECOND));
         }
         return t;
@@ -375,6 +412,7 @@ namespace TechChain
                 CCircuitDef@ d = ai.GetCircuitDef(s.defName);
                 if (d is null || (i < skipped.length() && skipped[i])) continue;
                 if (d.costM >= Global::RoleSettings::Tech::ChainParallelCostM) continue;
+                if (IsEnergyKey(s.key) && TechBuild::EnergyRetired(s.defName)) continue;   // D-077
                 const int have = Standing(s, d);
                 if (have >= s.target || aiBuilderMgr.GetUnfinishedCount(d) == 0) continue;
                 CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(here, Global::RoleSettings::Tech::ChainNearFrameRadius, d);
@@ -386,9 +424,22 @@ namespace TechChain
         bool unmet = false;   // some step is not met, whether or not this builder could help
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
+            // D-080: an income step is climbed, not built: converters while energy
+            // floats, T2 mex upgrades, the next advanced fusion, until metal income
+            // reaches the target (the economy rows get the builder when the ladder
+            // has nothing for it)
+            if (s.key == "income") {
+                if (Economy::GetMinMetalIncomeLast10s() >= float(s.target)) continue;
+                unmet = true;
+                return Ladder(u, int(i), s);
+            }
             CCircuitDef@ d = ai.GetCircuitDef(s.defName);
             if (d is null) continue;
             if (s.key == "mex" && s.exhausted) continue;
+            // an energy step the veto refuses (a fusion stands, D-077) is met from
+            // then on: its turbines were reclaimed on purpose (played: the chain
+            // rebuilt them and never completed)
+            if (IsEnergyKey(s.key) && TechBuild::EnergyRetired(s.defName)) continue;
             // the first lab is reclaimed once the advanced lab begins (D-066): its step is met from then on
             if (s.key == "lab" && TechBuild::IntoT2()) continue;
             // the advanced lab is reclaimed once the advanced fusion is under way (D-078): its step is met from then on
@@ -442,7 +493,9 @@ namespace TechChain
                 if (unfinished > 0) {
                     // near first; when nothing else is left to order, anywhere
                     CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame), 600.0f, d);
-                    if (frame is null && have + inFlight >= s.target) @frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, d);
+                    // D-097: a turret step at its parallel limit assists the turret going up, wherever it is
+                    if (frame is null && (have + inFlight >= s.target || (s.key == "nano" && Layout::TurretsCapped())))
+                        @frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, d);
                     if (frame !is null) { Trace("assist", int(i), s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
                 }
                 if (s.key == "mex" && s.exhausted) continue;
@@ -477,6 +530,17 @@ namespace TechChain
                 Trace(FloatWhy(), int(i), s, have, u);
                 return null;   // the economy rows: energy.convert eats the surplus
             }
+            // D-098 (owner's rule): a dear frame and a turret at once stall the
+            // early economy; with a turret going up and no build-power slot free
+            // for this step (Layout::TurretSlots), every hand finishes the turret
+            // first, then the step is ordered with that power
+            if (!Layout::BuildSlotFree()) {
+                CCircuitUnit@ tf = Layout::TurretFrame();
+                if (tf !is null) {
+                    Trace("finishes the turret first (no build-power slot)", int(i), s, have, u);
+                    return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, tf, 60 * SECOND));
+                }
+            }
             IUnitTask@ t = Order(int(i), s, d, u);
             if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have, u); return t; }
             if (s.key == "mex" && s.exhausted) continue;
@@ -488,7 +552,59 @@ namespace TechChain
             done = true;
             GenericHelpers::LogUtil("[TECH][Chain] complete: objective " + objective + " reached at " + int((ai.frame - startFrame) / SECOND)
                 + " s; the economy rules continue", 1);
+            // D-080: the plan's next phase, if it has one
+            array<Step@>@ next = TechPlan::NextPhase(objective);
+            if (next !is null && next.length() > 0) {
+                steps = next;
+                skipped.resize(0); skipped.resize(steps.length());
+                stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
+                done = false; startFrame = ai.frame;
+                objective = TechPlan::PhaseName();
+                string line = "";
+                for (uint i = 0; i < steps.length(); ++i) line += (i > 0 ? ", " : "") + steps[i].key + " " + steps[i].target;
+                GenericHelpers::LogUtil("[TECH][Chain] plan " + objective + ": " + line, 1);
+            }
         }
         return null;
+    }
+
+    // D-080: one rung of the metal ladder for this builder.
+    IUnitTask@ Ladder(CCircuitUnit@ u, int i, Step@ s)
+    {
+        const int have = int(Economy::GetMinMetalIncomeLast10s());
+        if (EnergyFloats()) { Trace(FloatWhy(), i, s, have, u); return null; }   // energy.convert.float
+        // T2 mex upgrades first: the cheapest metal there is
+        CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
+        if (moho !is null && u.circuitDef.CanBuild(moho)) {
+            Step tmp("moho", DefFor("moho"), 99);
+            IUnitTask@ t = Order(i, @tmp, moho, u);
+            if (t !is null) { Trace("mex upgrade", i, s, have, u); return t; }
+        }
+        // then the next advanced fusion, every builder on one frame
+        CCircuitDef@ afus = ai.GetCircuitDef(DefFor("afus"));
+        if (afus is null) return null;
+        const int building = aiBuilderMgr.GetUnfinishedCount(afus);
+        // a full metal bank means the ladder is build-power and order bound, not
+        // metal bound: another advanced fusion in parallel, up to LadderParallelAfus
+        const bool another = TechBuild::MetalFullLong() && building < Global::RoleSettings::Tech::LadderParallelAfus && u.circuitDef.CanBuild(afus);
+        if (building > 0 && !another) {
+            CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, afus);
+            if (frame !is null) { Trace("assist the advanced fusion", i, s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+        }
+        if (!u.circuitDef.CanBuild(afus)) return null;
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), afus) > 0) { Trace("advanced fusion order out", i, s, have, u); return null; }
+        Step tmp2("afus", DefFor("afus"), 99);
+        IUnitTask@ t2 = Order(i, @tmp2, afus, u);
+        if (t2 !is null) Trace("advanced fusion ordered", i, s, have, u);
+        return t2;
+    }
+
+    // D-080: an income step of the current phase is unmet (INV-011).
+    bool LadderUnmet()
+    {
+        if (!Active()) return false;
+        for (uint i = 0; i < steps.length(); ++i)
+            if (steps[i].key == "income" && Economy::GetMinMetalIncomeLast10s() < float(steps[i].target)) return true;
+        return false;
     }
 }

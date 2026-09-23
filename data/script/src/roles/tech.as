@@ -24,6 +24,7 @@
 #include "tech_build.as"
 #include "tech_rules.as"
 #include "tech_chain.as"
+#include "tech_plan.as"
 
 namespace RoleTech
 {
@@ -214,6 +215,7 @@ namespace RoleTech
 			GenericHelpers::LogUtil("[TECH][Build] experimental build system on: direct range "
 				+ int(aiBuilderMgr.experimentalDirectRange) + ", search radius " + int(aiBuilderMgr.experimentalSearchRadius), 1);
 			TechChain::Init();   // D-070: the rush chain, after the opening so it can take the opening over
+			TechPlan::Init();    // D-080: what follows the objective
 			@Global::energyAllowed = @TechBuild::EnergyAllowed;   // D-077: no T1 energy in the fusion era, whoever orders it
 		}
 		else
@@ -294,9 +296,10 @@ namespace RoleTech
 	{
 		if (!Global::RoleSettings::Tech::ExperimentalBuild)
 			return legacyGate;
-		const float g = Global::RoleSettings::Tech::ExpCombatMetalIncome;
-		if (g <= 0.0f)
+		// D-080: the plan's gate (200, or 500 for the T3 rush); ExpCombatMetalIncome 0 keeps "never"
+		if (Global::RoleSettings::Tech::ExpCombatMetalIncome <= 0.0f)
 			return 1.0e9f;
+		const float g = TechPlan::CombatGate();
 		return (g > legacyGate) ? g : legacyGate;
 	}
 
@@ -1111,7 +1114,8 @@ namespace RoleTech
 			}
 
 			// If this factory is the PRIMARY T2 aircraft plant and we're under 50 T2 air constructors, build one
-			if (Factory::primaryT2AirPlant !is null && u.id == Factory::primaryT2AirPlant.id && t2AirCtorCount < 100)
+			// D-080: T2 construction aircraft are the mobile build power from +200 metal, one per PlanAirConstructorPerMetal
+			if (Factory::primaryT2AirPlant !is null && u.id == Factory::primaryT2AirPlant.id && t2AirCtorCount < TechPlan::AirConstructorsWanted())
 			{
 				string ctorName2 = UnitHelpers::GetT2AirConstructorNameForSide(side);
 				CCircuitDef @ctorDef2 = ai.GetCircuitDef(ctorName2);

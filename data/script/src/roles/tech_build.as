@@ -105,6 +105,19 @@ namespace TechBuild {
     // or solar once a fusion stands (they are being reclaimed), no advanced
     // solar once an advanced fusion is under way. Registered as
     // Global::energyAllowed for the shared builder helpers and the planner.
+    // D-077: an energy def whose era is over: wind and solar once a fusion
+    // stands, advanced solar once an advanced fusion is under way. The chain
+    // counts such a step as met (its structures were reclaimed on purpose).
+    bool EnergyRetired(const string &in name)
+    {
+        const string side = Global::AISettings::Side;
+        const bool t1 = (name == UnitHelpers::GetWindNameForSide(side)) || (name == UnitHelpers::GetSolarNameForSide(side));
+        const bool adv = (name == UnitHelpers::GetAdvSolarNameForSide(side));
+        if (!t1 && !adv) return false;
+        CCircuitDef@ fus = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
+        const bool fusionUp = (fus !is null && fus.count - aiBuilderMgr.GetUnfinishedCount(fus) > 0) || IntoAfus();
+        return (t1 && fusionUp) || (adv && IntoAfus());
+    }
     bool EnergyAllowed(const string &in name)
     {
         const string side = Global::AISettings::Side;

@@ -41,8 +41,8 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 6 | `lab.t1.reclaim` | mobile | `IntoT2` | every builder in range reclaims the T1 lab |
 | 6a00 | `lab.t2.reclaim` | mobile | `T2LabRetiring` | D-078: the advanced lab is retiring (an advanced fusion is under construction and the bank has room for its metal): every builder reclaims it, turrets in range are pulled on |
 | 6a0 | `energy.reclaim` | mobile | `EnergyReclaimable`, `NotStalling` | D-077: a fusion stands; winds and solars reclaimed when income without them covers the pull by `ReclaimT1EnergyMargin`, advanced solars at `ReclaimAdvSolarMargin`, all once an advanced fusion stands; nearest the base centre first |
-| 6a0c | `energy.convert.float` | mobile | `EnergyFloatsBank`, `NotStalling` | D-079: before the chain, so floating energy (the chain's bank-based `EnergyFloats`) is converted whatever the chain is doing (played: no converter during a four-minute advanced fusion at a full bank) |
-| 6a | `power.turret` | mobile | `MetalAhead`, `StructureBuilding`, `NotStalling` | D-075, the owner's rule: the metal bank full for `PowerAheadSeconds` or risen by `PowerAheadRise` (income above spending, read from the bank) with `PowerTurretBankFactor` turret costs banked while a structure is under construction: a turret on the box slot nearest a lab, `PowerTurretsConcurrent` at a time, until static build power reaches `PowerBuildPowerPerMetal` x metal income (no cap while the bank has been full for `PowerAheadSeconds`); else assist the turret going up |
+| 6a0c | `energy.convert.float` | mobile | `EnergyFloatsBank`, `NotStalling`, `NoDearOrderPending` | D-079: before the chain, so floating energy (the chain's bank-based `EnergyFloats`) is converted whatever the chain is doing (played: no converter during a four-minute advanced fusion at a full bank) |
+| 6a | `power.turret` | mobile | `MetalAhead`, `StructureBuilding`, `NotStalling`, `NoDearOrderPending` (D-084) | D-075, the owner's rule: the metal bank full for `PowerAheadSeconds` or risen by `PowerAheadRise` (income above spending, read from the bank) with `PowerTurretBankFactor` turret costs banked while a structure is under construction: a turret on the box slot nearest a lab, `PowerTurretsConcurrent` at a time, until static build power reaches `PowerBuildPowerPerMetal` x metal income (no cap while the bank has been full for `PowerAheadSeconds`); else assist the turret going up |
 | 6b | `chain.next` | mobile | `ChainActive` | the rush chain's current step (D-070, [`tech_chain.md`](tech_chain.md)): assist its frame, wait for its order, or order it |
 | 7 | `lab.t1.opening` | mobile | `OpeningDone`, `NotIntoT2`, `NoT1Lab` | the throwaway first lab at the commander; a constructor uses the pair's slot |
 | 8 | `lab.t1.recover` | commander | `OpeningDone`, `NoConstructors`, `NoLabAtAll` | every constructor and lab lost: rebuild a T1 lab |
@@ -100,11 +100,11 @@ before `ExpCombatMetalIncome` (200) while the experimental system is on
 ## Settings
 
 `ExpSpamLabs` (1) and the build-power rule's `PowerAheadSeconds` (15) and `PowerAheadRise` (30) (the bank, not the pull),
-`PowerTurretBankFactor` (1.5), `PowerTurretsConcurrent` (2) and
+`PowerTurretBankFactor` (1.5), `PowerTurretBatchSeconds` (20) and `PowerTurretsMax` (8) (D-097) and
 `PowerBuildPowerPerMetal` (20) (D-075) here;
 everything else the rows read is documented with
 its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 740edc3971248784c0db766f4ca0e89771e49539; lines: 425 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: cd602a8160ad30fde42521b9c4da46fee1f6f123; lines: 434 -->

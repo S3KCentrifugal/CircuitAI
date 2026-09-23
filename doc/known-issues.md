@@ -2173,7 +2173,10 @@ for the spam economy), so `chain.next` keeps ordering dear items as long as
 metal income outruns spending. Deterministic from the same wind and income
 inputs as the first chain.
 
-**Verification.** Open.
+**Verification.** Built in
+[D-080](decisions.md#d-080--the-endgame-plans-the-metal-ladder-after-the-objective-and-the-income-gates-for-combat)
+as the plans' income steps and the metal ladder; INV-011 says so. Open until
+Played.
 
 ---
 
@@ -2203,6 +2206,88 @@ two apart; for the converters, trace `PickConverter`'s answer and
 one converter's draw.
 
 **Verification.** Open.
+
+---
+
+### KI-417 — Land constructors do not guard allied constructors once the air constructors carry the base
+
+**Severity**: Medium (the owner's rule for +200 metal: TECH helps whatever the team builds)
+**Location**: `data/script/src/roles/tech_plan.as`, `data/script/src/roles/tech_rules.as`,
+`src/circuit/script/BuilderScript.cpp`
+
+**Problem.** D-080 phase 2: with more than five T2 construction aircraft,
+every land constructor of TECH should spread out and guard an allied land
+constructor. The script cannot see allied units: nothing enumerates them
+and `GuardHelpers::AssignWorkerGuard` takes our own `CCircuitUnit`.
+
+**Proposed solution.** A native `FindAllyNear(pos, radius, def)` over
+`circuit->GetFriendlyUnits`, bound like `FindOwnNear`, returning an
+`CAllyUnit` handle the guard task accepts; a `guard.ally` row for T1 and T2
+land constructors when `AirConstructorsWanted` is above five and met, one
+constructor per allied constructor, nearest first, deterministic by id.
+
+**Verification.** Open.
+
+---
+
+### KI-418 — The nuke's first target and the cannon's high ground are native work
+
+**Severity**: Medium (D-080 plans A and D are half built)
+**Location**: `src/circuit/module/MilitaryManager.cpp` (`DiceBigGun`,
+`GetBigGunPos`), `data/script/src/roles/tech_chain.as` (`lrpc` order)
+
+**Problem.** The owner's rule: the nuke fires first at the tech location on
+the opposite side of the map, then normal targeting; the long-range cannon
+stands on safe high ground that sees well beyond the front with no mountain
+in its range. Native's big-gun targeting dices; the cannon is ordered at the
+start position with native's site search.
+
+**Proposed solution.** Native: a first-shot rule for the silo (the enemy
+start position mirrored from ours, or the enemy base the team's threat map
+marks as the eco base) exposed to the script as a one-shot target; a
+`FindHighGroundSite(def, minHeight, sightRadius)` search scoring elevation,
+distance behind the front and unobstructed range, bound for the `lrpc`
+step. Both are decisions of their own.
+
+**Verification.** Open.
+
+---
+
+### KI-419 — A fifteen-second sim stall at a converter order; the frame rate falls with the halo zone
+
+**Severity**: High (the owner's game froze twice; playtests at 14 to 33 fps where they ran at 60)
+**Location**: `src/circuit/terrain/TerrainManager.cpp` (`PackCandidates`, `PackNearGroup`,
+`CanPackNearGroup`, `LeavesPocket`), `data/script/src/manager/layout.as` (`CanPlace`, `Place`)
+
+**Problem.** Played by the owner (build30, D-082 script): the game froze for
+about fifteen seconds when an energy converter was placed, and again at the
+second. In the playtests the frame rate at ten minutes was 59 to 60 before
+D-082 (runs `221338`) and 14 to 33 after it (`224209`, `225544`, `233718`),
+so the cost scales with the halo zone (76 x 62 cells). D-083 memoised the
+planner's `CanPlace` probe and capped its tries; the rate at ten minutes was
+still 14 on build31, so the probe was not the whole cost.
+
+**Proposed solution.** Measure before guessing: build32 logs
+`SLOW: <function> took N ms` for every layout native over 20 ms
+(`PackNearGroup`, `PackNearGroupMost`, `CanPackNearGroup`, `LeavesPocket`,
+`ReserveBuildingEx`, `LayBand`, `FlatFraction`, `BuildableFraction`,
+`ReserveZone`, `IsExitClear`, `NextSlotConnected`, `TurretsOnReclaim`). The
+first suspect after the probe is `PackNearGroup` itself: a zone walk of
+4,700 cells against 100 slots, a sort of the candidates, and up to 400
+candidates each flood-filling the zone in `LeavesPocket`. The fix follows
+the measurement: a candidate cache per zone invalidated on reservation
+change, or `LeavesPocket` on the chosen candidate only.
+
+**Verification.** Measured on build32 (run `20260922-235412`): `SLOW:
+PackNearGroupMost took 8475 ms`, once, at the advanced lab's placement;
+nothing else over 20 ms but two 30 ms `LeavesPocket` calls. `PickMost`
+(D-073) ran the engine's build test, the zone flood fill and the exit-cone
+test on every candidate of the halo zone before scoring it. Built (build33):
+the cheap score first, the dear tests only down the ranked list until one
+passes. Played (build33, runs `20260923-000940`, `001634`): the same call
+205 and 294 ms, nothing else over 25 ms, 59 to 60 fps. Left open for the
+294 ms itself (a candidate cache per zone, drafted, not built) and for the
+16-AI game the owner plays.
 
 ---
 

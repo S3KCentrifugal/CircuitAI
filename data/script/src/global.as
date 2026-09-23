@@ -314,6 +314,17 @@ namespace Global {
             bool ExpTurretNearLab = true;                   // D-069: the next box turret slot is the one nearest a standing lab, not the one nearest the pair's centre
             float ExpLabBuildPowerReach = 260.0f;           // D-069: elmos within which static build power (turrets) counts for a lab site: a nano's build distance plus the lab's radius
             float ExpLabSiteRadius = 480.0f;                // D-069, superseded by D-073 (no longer read): the lab site is the turret-layout footprint the most turret slots reach
+            string EndgamePlan = "auto";                   // D-080: nuke | t2rush | t3rush | lrpc | auto (deterministic from the team id) - what follows the rush objective
+            float PlanCombatGate = 200.0f;                  // D-080: no mobile combat unit under this metal income (every plan)
+            float PlanT3RushCombatGate = 500.0f;            // D-080: ... the t3rush plan's gate
+            float PlanLrpcMetal = 300.0f;                   // D-080: the lrpc plan's income before the long-range cannon
+            float PlanAirConstructorsFromMetal = 200.0f;    // D-080: from this income T2 construction aircraft are the mobile build power
+            float PlanAirConstructorPerMetal = 40.0f;       // D-080: one T2 air constructor per this much income ...
+            int PlanMaxAirConstructors = 12;                // D-080: ... at most this many
+            int LadderParallelAfus = 2;                     // D-080: advanced fusions under construction at once on the ladder while the metal bank is full
+            float InvariantLabReachSeconds = 90.0f;         // D-085 INV-016 / D-088 INV-017 patience         // D-085: INV-016 - the advanced lab standing this long with no static build power within ExpLabBuildPowerReach is a violation
+            float InvariantDearOrderSeconds = 45.0f;        // D-084: INV-015 - a dear chain order with no frame this long is a violation
+            float InvariantLadderFloatSeconds = 60.0f;      // D-080: INV-011 - the metal bank full this long with an income step unmet is a violation
             string RushObjective = "auto";                  // D-070: t2 | fusion | afus | nuke | gantry | titan | eco (no chain) | auto (the role picks: afus)
             // D-070: the commander's home mexes are the opening's (OpeningMexRadius / OpeningMexCap: the
             // spots within 700 of the start, at most 3 - three on Supreme Isthmus, one or none elsewhere),
@@ -333,7 +344,14 @@ namespace Global {
             float ChainNearFrameRadius = 600.0f;            // D-075: a chain frame of a cheap step within this of the builder is finished before anything else
             float PowerTurretBankFactor = 1.5f;             // D-075: ... and the bank holds this many turret costs
             float PowerBuildPowerPerMetal = 20.0f;          // D-075: the rule stops at this much static build power (workertime) per metal/s of income (played: 45 turrets in three minutes without it)
-            int PowerTurretsConcurrent = 2;                 // D-075: turrets under construction at once for build-power scaling; the rest assist them
+            // D-097: how many construction turrets go up at once (Layout::TurretsAllowed):
+            // as many as the nearby build power finishes within PowerTurretBatchSeconds
+            // and the bank plus income pays for in full; never under 1, never over
+            // PowerTurretsMax; the other builders assist the turret going up
+            float PowerTurretBatchSeconds = 20.0f;
+            int PowerTurretsMax = 8;
+            float PowerTurretBuildTime = 5300.0f;           // the T1 construction turret's buildtime (cornanotc, armnanotc, legnanotc: 5300 in BAR's unitdefs)
+            float InvariantTurretFlightSeconds = 30.0f;     // D-097: INV-019's patience
             int ExpDefenceMaxOrders = 3;                    // D-075: base-defence orders per def; native refusing the site this often ends the rung (played: 15 refusals in 2 min)
             float ExpDefenceRadius = 900.0f;                // D-075: base-defence site search radius around the factory centre (the box's cells are all held)
             float LifecycleMemorySeconds = 120.0f;         // D-076: a retired factory's position is remembered this long after it is gone (INV-001)
@@ -355,7 +373,7 @@ namespace Global {
             float ChainEnergyFloatRise = 100.0f;            // D-079: ... or the bank above half of storage, up by this over ChainEnergyFloatSeconds, with income over the pull by ChainEnergyFloatMax (the moment a fusion completes)
             int ConverterParallel = 3;                      // D-079: converters queued at once while energy floats (one at a time otherwise); the pull-inflated surplus is replaced by half the income while floating
             float ChainEnergyFloatSeconds = 15.0f;          // D-079: the energy bank at EcoConvertEnergyPercent of storage for this long = energy floats: no energy structure is ordered, converters first (the pull is inflated by the build in progress, so the bank is read, not the pull)
-            float InvariantFloatOrderSeconds = 45.0f;       // D-079: INV-009 - an energy frame appearing after the bank has been full this long was ordered while floating
+            float InvariantFloatOrderSeconds = 90.0f;        // D-079: INV-009 - an energy frame appearing after the bank has been full this long was ordered while floating
             float PowerAheadSeconds = 15.0f;                // D-075: the metal bank at InvariantFloatPercent of storage for this long, or risen by PowerAheadRise over it = income above spending
             float PowerAheadRise = 30.0f;                   // D-075: ... the rise over PowerAheadSeconds that counts as the bank rising
             float ExpCombatMetalIncome = 200.0f;            // D-068: under this 10 s metal income TECH's labs make no combat unit (rush bots stay capped, no scout/fast-bot batches); 0 = never
@@ -392,16 +410,37 @@ namespace Global {
             int LayoutBoxDepthCells = 44;            // 704 elmos: four turret rows at a 14-cell pitch
             int LayoutBoxShrinkCells = 8;
             int LayoutBoxMinAcrossCells = 24;
-            int LayoutBoxMinDepthCells = 16;
-            int LayoutBoxSideStepCells = 4;
-            int LayoutBoxSideTries = 4;
+            int LayoutBoxMinDepthCells = 16;         // D-081: three touching turret rows (9 cells) and what is left is the shelf (played: 21 fit no box on Supreme Isthmus)
+            int LayoutBoxSideStepCells = 6;          // D-082: wider side search, so the block can move off a mountain (6 x 6 = 36 cells = 576 elmos either way)
+            int LayoutBoxSideTries = 8;              // D-082: up to 48 cells (768 elmos) either way, enough to stand beside the pair
+            int LayoutBoxForwardTries = 4;           // D-082: box candidates level with or ahead of the pair's rear line (negative rear), only beside the pair
+            int LayoutBoxBesideClearCells = 4;       // D-082: cells between the pair's footprints and a box standing beside them
+            float LayoutHaloMin = 0.70f;             // D-087: a box whose halo scores this is good enough; among good enough the nearest the home mexes wins (played: 86 % halo 690 elmos away beat 75 % next to the mexes)
+            float LayoutHaloQuantum = 0.05f;         // D-082: halo scores within this of each other tie; the nearer candidate wins
             int LayoutBoxRearStepCells = 4;
             int LayoutBoxRearTries = 3;
             float LayoutBoxMinScore = 0.75f;         // flat fraction x buildable fraction
             float LayoutBoxMaxSlope = 0.02f;         // engine slope (1 - cos), about 11 degrees
+            bool LayoutSeedAtHomeMexes = true;       // D-086: the block, the first turret and the advanced lab are anchored on the centre of the home mex spots (where the builders are after the opening), not the start position
+            float LayoutLabServedReach = 300.0f;
+            int LayoutLabMinSlots = 4;               // D-090: 8 found no site on Supreme (best 7)               // D-088: a lab site needs this many turret slots within reach (weighted) to be considered
+            int LayoutLabFrontGapCells = 3;          // D-096: the advanced lab's front-line site may stand this many cells ahead of turret row 0 (the zone's edge, a rock)
+            float LayoutFrontMinCost = 1500.0f;      // D-096: a seen enemy group counts as a front at this metal cost; until one is seen the front is the map centre
+            float LayoutLabFlushElmos = 160.0f;      // D-088: INV-017 - the nearest turret to the advanced lab, centre to centre, flush like the pair's nanos at the T1 lab     // D-086: the advanced lab keeps its planned footprint only if a standing turret is within this; else it is packed nearest a standing turret
+            bool LayoutBoxAtStart = true;            // D-083: the main cluster is planned around the start position (the home mexes), not behind the factory pair
+            int LayoutBoxPairClearCells = 6;         // D-083: a candidate block whose rectangle plus this margin holds a pair factory slot is skipped
+            float LayoutCanPlaceMemoSeconds = 2.0f;  // D-083: Layout::CanPlace remembers its answer per def this long (the native probe was asked hundreds of times a second: the 15 s freeze)
+            int LayoutHaloCells = 18;                // D-082: the halo of packing ground on both sides and behind the turret block (288 elmos, inside a turret's 400 reach); the box is scored and its zone reserved with it
+            float InvariantReachElmos = 450.0f;      // D-082: INV-014 - a packed economy structure further than this from every turret slot is a violation
             int LayoutBoxMaxExtra = 4;               // D-072: boxes grown behind the first when it is full (each with its own turret rows)
             int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
-            int LayoutBoxNanoRows = 3;               // Supreme overrides this to four in its MapConfig
+            int LayoutBoxNanoRows = 4;               // D-081: four turret rows per cluster (a MapConfig may override)
+            bool LayoutTurretBlock = true;           // D-081: the rows touch (a solid block filled across every row), the shelf for other structures behind it; off = a shelf between rows
+            int LayoutBoxMinRows = 3;                // D-081: a cluster with fewer rows than this is not planned (INV-012)
+            int LayoutForwardGapCells = 8;           // D-081: clear cells between the main cluster's front and the forward cluster
+            int LayoutForwardStepCells = 12;         // D-081: each re-plan of the forward cluster moves it this much further forward
+            int LayoutForwardTries = 3;              // D-081: re-plans of the forward cluster when an ally takes its ground
+            float InvariantForwardSeconds = 120.0f;  // D-081: INV-013 - a main cluster without a forward cluster this long is a violation
             float LayoutConverterNanoGap = 0.0f;     // elmos an advanced converter keeps from a turret slot (its death kills one within 173)
             float LayoutFusionNanoGap = 0.0f;        // ... a fusion (379); density and shared build power were chosen over firebreaks
             int LayoutFallbackShakeCells = 8;        // no box: economy within this of the factory nanos (the only spiral left)
@@ -448,7 +487,6 @@ namespace Global {
             float EcoBuildPowerRadius = 700.0f;
             float EcoTurretMinMetalIncome = 8.0f;
             float EcoTurretBankFraction = 0.5f;      // this share of a turret's metal banked before one starts
-            int EcoMaxConcurrentNanos = 1;           // orders plus turrets under construction; the rest assist
             float EcoTurretAssistRadius = 1200.0f;   // a constructor assists a turret going up within this of the base centre
 
             /******************** ECONOMY SWITCH (D-054) ********************/

@@ -92,7 +92,17 @@ For each step in order whose target is not met:
 6. a step with no progress for `ChainStepStallSeconds` is skipped, so an
    unreachable site cannot end the rush; never the objective step itself; a
    frame under construction is progress (D-075: the fusion was skipped while
-   it was being built);
+   it was being built); an energy step the veto refuses (a fusion stands,
+   D-077) counts as met, its turbines having been reclaimed on purpose;
+6d. `DearOrderPending` (D-084): a dear step with an order out and no frame
+   holds the `energy.convert.float` and `power.turret` rows so the next
+   builder asked takes the order; INV-015 if it waits 45 s;
+6c. when every step stands, the chain loads the plan's next phase
+   (`TechPlan::NextPhase`, D-080, [tech_plan.md](tech_plan.md)) and runs
+   on; an `income` step is climbed, not built (`Ladder`: nothing while
+   energy floats, the nearest T2 mex upgrade, the advanced fusion to assist
+   or to order); `aap` orders the T2 air plant and `lrpc` the long-range
+   cannon;
 6a. an energy step (`wind`, `solar`, `advsolar`, `fusion`, `afus`) is not
    ordered while energy floats (`EnergyFloats`: the bank at
    `EcoConvertEnergyPercent` of storage for `ChainEnergyFloatSeconds`; the
@@ -158,4 +168,4 @@ happen by construction, and the check says so if it does. See
 - [`tech_build.md`](tech_build.md) - the acts.
 - [`../eco-planner.md`](../eco-planner.md) - the economy that continues after the chain.
 
-<!-- source: data/script/src/roles/tech_chain.as; blob: 2d6726e678ddef7d22fda1adc8e27ba705efd159; lines: 494 -->
+<!-- source: data/script/src/roles/tech_chain.as; blob: a746f9b246cce90e92959c9a532e9278e9404a11; lines: 610 -->

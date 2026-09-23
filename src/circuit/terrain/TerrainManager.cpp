@@ -6,6 +6,7 @@
  */
 
 #include "terrain/TerrainManager.h"
+#include "terrain/LayoutRanking.h"
 #include "terrain/BlockRectangle.h"
 #include "terrain/BlockCircle.h"
 #include "terrain/path/PathFinder.h"
@@ -35,6 +36,22 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
+#include <chrono>
+
+// D-083 diagnosis (KI-419): any layout call over SLOW_CALL_MS is logged with its
+// cost, so a sim stall names the function that caused it.
+namespace {
+inline circuit::layout_rank::Pt ToPt(const springai::AIFloat3& p) { return circuit::layout_rank::Pt{p.x, p.z}; }  // D-094
+constexpr double SLOW_CALL_MS = 20.0;
+struct SSlowCall {
+	const char* name; circuit::CCircuitAI* ai; std::chrono::steady_clock::time_point t0;
+	SSlowCall(const char* n, circuit::CCircuitAI* a) : name(n), ai(a), t0(std::chrono::steady_clock::now()) {}
+	~SSlowCall() {
+		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+		if (ms > SLOW_CALL_MS) { ai->LOG("SLOW: %s took %.0f ms", name, ms); }
+	}
+};
+}
 #include <cstdio>
 #include <string_view>
 
@@ -868,6 +885,7 @@ int CTerrainManager::ReserveBuilding(CCircuitDef* cdef, const AIFloat3& position
 int CTerrainManager::ReserveBuildingEx(CCircuitDef* cdef, const AIFloat3& position, int facing, int ttlFrames, int group,
 		bool armed, bool anyReach, bool tenant, int zone, bool quiet)
 {
+	SSlowCall slow("ReserveBuildingEx", circuit);
 	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
 		return -1;
 	}
@@ -1055,6 +1073,7 @@ bool CTerrainManager::CanReserveBuilding(CCircuitDef* cdef, const AIFloat3& posi
 
 float CTerrainManager::BuildableFraction(CCircuitDef* cdef, const AIFloat3& centre, float halfAcross, float halfAlong, int facing)
 {
+	SSlowCall slow("BuildableFraction", circuit);
 	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
 		return 0.f;
 	}
@@ -1958,6 +1977,7 @@ void CTerrainManager::OnStructureGone(CCircuitDef* cdef, const AIFloat3& pos)
 
 int CTerrainManager::ReserveZone(const AIFloat3& centre, int facing, float halfAcross, float halfAlong, bool corridor)
 {
+	SSlowCall slow("ReserveZone", circuit);
 	if (!layoutEnabled) {
 		return 0;
 	}
@@ -2069,6 +2089,7 @@ bool CTerrainManager::IsZoneClear(int id) const
 int CTerrainManager::LayBand(int zone, CCircuitDef* cdef, const AIFloat3& frontCentre, int facing, int cols, int rows, int gap,
 		bool armed, bool anyReach, bool tenant, int group)
 {
+	SSlowCall slow("LayBand", circuit);
 	auto it = zones.find(zone);
 	if ((it == zones.end()) || it->second.corridor) {
 		return 0;
@@ -2244,6 +2265,54 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 	return -RgtVector;
 }
 
+AIFloat3 CTerrainManager::FindDropSpot(CCircuitUnit* cargo, const AIFloat3& around, float maxRadius,
+		const std::vector<AIFloat3>& avoid, float avoidRadius)
+{
+	if (cargo == nullptr) {
+		return -RgtVector;
+	}
+	const SBlockingMap::SM solid = static_cast<SBlockingMap::SM>(SBlockingMap::StructMask::ALL);
+	CMap* map = circuit->GetMap();
+	std::vector<layout_rank::Pt> refused;  // D-091 via D-094
+	for (const AIFloat3& q : avoid) {
+		refused.push_back(ToPt(q));
+	}
+	// rings every 32 elmos, 16 bearings a ring: the nearest acceptable point wins
+	for (const layout_rank::Pt& rp : layout_rank::RingOrder(ToPt(around), maxRadius, 32.f, 16)) {
+		{
+			AIFloat3 p(rp.x, 0.f, rp.z);
+			CorrectPosition(p);
+			p.y = map->GetElevationAt(p.x, p.z);
+			if (!layout_rank::ClearOf(ToPt(p), refused, avoidRadius)) {
+				continue;
+			}
+			// the cell and its neighbours free of structures and reservations (a
+			// unit set down needs room; the engine refused spots between buildings)
+			const int cx = int(p.x) / (SQUARE_SIZE * 2), cz = int(p.z) / (SQUARE_SIZE * 2);
+			bool blocked = false;
+			for (int dz = -1; dz <= 1 && !blocked; ++dz) {
+				for (int dx = -1; dx <= 1 && !blocked; ++dx) {
+					if (!blockingMap.IsInBounds(cx + dx, cz + dz) || blockingMap.IsBlocked(cx + dx, cz + dz, solid)) {
+						blocked = true;
+					}
+				}
+			}
+			if (blocked) {
+				continue;
+			}
+			// the cargo's own move type: water, cliffs and unreachable pockets refused
+			if (!CanMoveToPos(cargo->GetArea(), p)) {
+				continue;
+			}
+			if (!cargo->GetCircuitDef()->IsAbleToSwim() && !cargo->GetCircuitDef()->IsAmphibious() && (p.y < 0.f)) {
+				continue;  // a land unit is not set down in water
+			}
+			return p;
+		}
+	}
+	return -RgtVector;
+}
+
 AIFloat3 CTerrainManager::FindApproachPoint(CCircuitUnit* unit, const AIFloat3& site, float radius)
 {
 	if ((unit == nullptr) || (radius <= 0.f)) {
@@ -2282,35 +2351,24 @@ AIFloat3 CTerrainManager::FindApproachPoint(CCircuitUnit* unit, const AIFloat3& 
 
 int CTerrainManager::NextSlotConnected(int group, const AIFloat3& centre) const
 {
-	std::vector<const SReservation*> taken;
+	SSlowCall slow("NextSlotConnected", circuit);
+	// D-077/D-081, ranked by layout_rank::NextConnected (D-094)
+	std::vector<layout_rank::Pt> taken, freeSlots;
+	std::vector<int> freeIds;
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
-		if ((r.group == group) && (r.consumed || r.claimed)) {
-			taken.push_back(&r);
-		}
-	}
-	int best = -1;
-	float bestScore = std::numeric_limits<float>::max();
-	for (const auto& kv : reservations) {
-		const SReservation& r = kv.second;
-		if ((r.group != group) || r.consumed || r.claimed) {
+		if (r.group != group) {
 			continue;
 		}
-		const float toCentre = std::sqrt(centre.SqDistance2D(r.pos));
-		float score = toCentre;
-		if (!taken.empty()) {
-			float nearest = std::numeric_limits<float>::max();
-			for (const SReservation* t : taken) {
-				nearest = std::min(nearest, std::sqrt(t->pos.SqDistance2D(r.pos)));
-			}
-			score = nearest * 4.f + toCentre;  // adjacency first, the centre breaks ties
-		}
-		if (score < bestScore) {
-			bestScore = score;
-			best = r.id;
+		if (r.consumed || r.claimed) {
+			taken.push_back(ToPt(r.pos));
+		} else {
+			freeSlots.push_back(ToPt(r.pos));
+			freeIds.push_back(r.id);
 		}
 	}
-	return best;
+	const int k = layout_rank::NextConnected(freeSlots, taken, ToPt(centre));
+	return (k < 0) ? -1 : freeIds[k];
 }
 
 int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
@@ -2350,14 +2408,18 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 	if ((facing < 0) || (facing > 3)) {
 		facing = UNIT_FACING_SOUTH;
 	}
-	std::vector<AIFloat3> nanos;
+	// D-083 (owner's rule): a structure goes in range of a turret that stands or
+	// is being built first, and only then where a turret is merely planned: a
+	// planned slot counts as PLANNED_SLOT_PENALTY elmos further than it is.
+	constexpr float PLANNED_SLOT_PENALTY = 256.f;
+	std::vector<std::pair<AIFloat3, bool>> nanos;  // slot position, served (consumed)
 	float reach = maxReach;
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
 		if (r.group != nanoGroup) {
 			continue;
 		}
-		nanos.push_back(r.pos);
+		nanos.emplace_back(r.pos, r.consumed);
 		if ((reach <= 0.f) && (r.def != nullptr)) {
 			reach = r.def->GetBuildDistance();
 		}
@@ -2397,47 +2459,63 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 			}
 		}
 	}
+	std::vector<layout_rank::Pt> samePts;  // D-088 via D-094
+	for (const AIFloat3& s : same) {
+		samePts.push_back(ToPt(s));
+	}
+	const layout_rank::Pt sameCentroid = layout_rank::Centroid(samePts, layout_rank::Pt{});
+	// D-096 (played: windmills packed across the advanced lab's exit): no footprint
+	// in a planned or standing factory's exit lane; the zone's corridor could not
+	// hold these cells, the zone already does
+	const std::vector<layout_rank::CellRect> lanes = FactoryExitLanes();
 	for (int cz = z.c1.y; cz + dz <= z.c2.y; ++cz) {
 		for (int cx = z.c1.x; cx + dx <= z.c2.x; ++cx) {
 			const AIFloat3 pos((2 * cx + dx) * half, 0.f, (2 * cz + dz) * half);
-			float nearSq = std::numeric_limits<float>::max();
+			float nearSq = std::numeric_limits<float>::max();   // the nearest slot of any kind: the reach test
+			float builtSq = std::numeric_limits<float>::max();  // the nearest served slot
+			float plannedSq = std::numeric_limits<float>::max();
 			bool tooClose = false;
-			for (const AIFloat3& n : nanos) {
-				const float sq = pos.SqDistance2D(n);
+			for (const auto& n : nanos) {
+				const float sq = pos.SqDistance2D(n.first);
 				if (sq < minSq) {
 					tooClose = true;
 					break;
 				}
 				nearSq = std::min(nearSq, sq);
+				if (n.second) {
+					builtSq = std::min(builtSq, sq);
+				} else {
+					plannedSq = std::min(plannedSq, sq);
+				}
 			}
 			if (tooClose || (nearSq > reachSq)) {
 				continue;
 			}
+			nearSq = layout_rank::TurretDistanceSq(builtSq, plannedSq, PLANNED_SLOT_PENALTY);  // D-083 via D-094
 			if (!IsSlotFree(int2(cx, cz), int2(cx + dx, cz + dz), zone, -1)) {
 				continue;
 			}
-			float sameSq = std::numeric_limits<float>::max();
-			for (const AIFloat3& s : same) {
-				sameSq = std::min(sameSq, pos.SqDistance2D(s));
+			if (layout_rank::OverlapsAny(layout_rank::CellRect{cx, cz, cx + dx, cz + dz}, lanes)) {
+				continue;  // D-096
 			}
+			// D-088: nearest the centroid of the group, not nearest any member: nearest
+			// member grows a line (played: the turbines formed an L); the centroid grows
+			// a filled block whose free edge cells are always the nearest
+			const float sameSq = same.empty() ? std::numeric_limits<float>::max() : layout_rank::Sq(ToPt(pos), sameCentroid);
 			out.push_back(SPackCandidate{pos, nearSq, anchor.SqDistance2D(pos), sameSq});
 		}
 	}
 	const bool grouped = !same.empty();
 	std::sort(out.begin(), out.end(), [grouped](const SPackCandidate& a, const SPackCandidate& b) {
-		if (grouped && (a.sameSq != b.sameSq)) {
-			return a.sameSq < b.sameSq;   // tight against the group first
-		}
-		if (a.nanoSq != b.nanoSq) {
-			return a.nanoSq < b.nanoSq;   // then nearest a turret
-		}
-		return a.anchorSq < b.anchorSq;
+		return layout_rank::PackBefore(layout_rank::PackKey{a.nanoSq, a.anchorSq, a.sameSq},
+				layout_rank::PackKey{b.nanoSq, b.anchorSq, b.sameSq}, grouped);  // D-066/D-088 via D-094
 	});
 	return out;
 }
 
 bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& pos, int facing) const
 {
+	SSlowCall slow("LeavesPocket", circuit);
 	// D-072: a constructor was walled in by a turbine cluster. Every free cell
 	// of the zone must stay connected to the zone's edge once this footprint
 	// stands; planned slots count as standing (they will).
@@ -2445,11 +2523,19 @@ bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& 
 	if ((zit == zones.end()) || (cdef == nullptr)) {
 		return false;
 	}
-	const SZone& z = zit->second;
+	const SZone& zone0 = zit->second;
 	int2 f1, f2;
 	if (!ReservationCells(cdef, pos, facing, f1, f2)) {
 		return false;
 	}
+	// D-090: a footprint can only cut off cells near it; the flood fill runs in a
+	// window of POCKET_WINDOW cells around the footprint (clipped to the zone),
+	// the window's border counting as open ground (played: 1,100 whole-zone
+	// fills of a halo zone at 37 ms each, the stutter)
+	constexpr int POCKET_WINDOW = 8;
+	struct { int2 c1, c2; } z;
+	z.c1 = int2(std::max(zone0.c1.x, f1.x - POCKET_WINDOW), std::max(zone0.c1.y, f1.y - POCKET_WINDOW));
+	z.c2 = int2(std::min(zone0.c2.x, f2.x + POCKET_WINDOW), std::min(zone0.c2.y, f2.y + POCKET_WINDOW));
 	const int w = z.c2.x - z.c1.x;
 	const int h = z.c2.y - z.c1.y;
 	if ((w <= 0) || (h <= 0)) {
@@ -2462,39 +2548,7 @@ bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& 
 			open[(cz - z.c1.y) * w + (cx - z.c1.x)] = (!inFoot && IsSlotFree(int2(cx, cz), int2(cx + 1, cz + 1), zone, -1)) ? 1 : 0;
 		}
 	}
-	std::vector<char> seen(w * h, 0);
-	std::vector<int> stack;
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			if (((x == 0) || (x == w - 1) || (y == 0) || (y == h - 1)) && open[y * w + x] && !seen[y * w + x]) {
-				seen[y * w + x] = 1;
-				stack.push_back(y * w + x);
-			}
-		}
-	}
-	while (!stack.empty()) {
-		const int i = stack.back();
-		stack.pop_back();
-		const int x = i % w, y = i / w;
-		const int nb[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-		for (const auto& d : nb) {
-			const int nx = x + d[0], ny = y + d[1];
-			if ((nx < 0) || (ny < 0) || (nx >= w) || (ny >= h)) {
-				continue;
-			}
-			const int j = ny * w + nx;
-			if (open[j] && !seen[j]) {
-				seen[j] = 1;
-				stack.push_back(j);
-			}
-		}
-	}
-	for (int i = 0; i < w * h; ++i) {
-		if (open[i] && !seen[i]) {
-			return true;
-		}
-	}
-	return false;
+	return layout_rank::LeavesPocket(open, w, h);  // D-072/D-090 via D-094
 }
 
 int CTerrainManager::CountGroupSlotsWithin(int group, const AIFloat3& pos, float radius) const
@@ -2510,10 +2564,10 @@ int CTerrainManager::CountGroupSlotsWithin(int group, const AIFloat3& pos, float
 	return n;
 }
 
-bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int facing, float length, float margin) const
+bool CTerrainManager::ExitLaneCells(CCircuitDef* cdef, const AIFloat3& pos, int facing, float length, float margin, int2& c1, int2& c2) const
 {
 	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
-		return true;
+		return false;
 	}
 	if ((facing < 0) || (facing > 3)) {
 		facing = UNIT_FACING_SOUTH;
@@ -2521,22 +2575,99 @@ bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int fa
 	UnitDef* unitDef = cdef->GetDef();
 	const float width = ((((facing & 1) == 0) ? unitDef->GetXSize() : unitDef->GetZSize()) / 2) * (SQUARE_SIZE * 2);
 	const float depth = ((((facing & 1) == 1) ? unitDef->GetXSize() : unitDef->GetZSize()) / 2) * (SQUARE_SIZE * 2);
-	AIFloat3 fwd;
-	switch (facing) {
-		default:
-		case UNIT_FACING_SOUTH: fwd = AIFloat3(0.f, 0.f, 1.f);  break;
-		case UNIT_FACING_EAST:  fwd = AIFloat3(1.f, 0.f, 0.f);  break;
-		case UNIT_FACING_NORTH: fwd = AIFloat3(0.f, 0.f, -1.f); break;
-		case UNIT_FACING_WEST:  fwd = AIFloat3(-1.f, 0.f, 0.f); break;
-	}
+	const layout_rank::Pt f = layout_rank::FacingForward(facing);
+	const AIFloat3 fwd(f.x, 0.f, f.z);
 	const AIFloat3 centre = pos + fwd * (depth * 0.5f + length * 0.5f);
+	return RectCells(centre, facing, width * 0.5f + margin, length * 0.5f, c1, c2);
+}
+
+std::vector<layout_rank::CellRect> CTerrainManager::FactoryExitLanes() const
+{
+	std::vector<layout_rank::CellRect> lanes;
+	auto add = [&](CCircuitDef* d, const AIFloat3& p, int f) {
+		int2 c1, c2;
+		if (ExitLaneCells(d, p, f, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN, c1, c2)) {
+			lanes.push_back(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y});
+		}
+	};
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.def != nullptr) && !r.def->IsMobile() && r.def->IsBuilder()) {
+			add(r.def, r.pos, r.facing);
+		}
+	}
+	const int frame = circuit->GetLastFrame();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* u = kv.second;
+		if ((u == nullptr) || u->IsDead() || (u->GetCircuitDef() == nullptr)) {
+			continue;
+		}
+		CCircuitDef* d = u->GetCircuitDef();
+		if (!d->IsMobile() && d->IsBuilder()) {
+			add(d, u->GetPos(frame), u->GetUnit()->GetBuildingFacing());
+		}
+	}
+	return lanes;
+}
+
+int CTerrainManager::GetBuildingFacing(CCircuitUnit* unit) const
+{
+	return (unit == nullptr) ? -1 : unit->GetUnit()->GetBuildingFacing();
+}
+
+int CTerrainManager::CountStructuresInExit(CCircuitUnit* factory) const
+{
+	if ((factory == nullptr) || (factory->GetCircuitDef() == nullptr)) {
+		return 0;
+	}
+	const int frame = circuit->GetLastFrame();
 	int2 c1, c2;
-	if (!RectCells(centre, facing, width * 0.5f + margin, length * 0.5f, c1, c2)) {
+	if (!ExitLaneCells(factory->GetCircuitDef(), factory->GetPos(frame), factory->GetUnit()->GetBuildingFacing(),
+			EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN, c1, c2)) {
+		return 0;
+	}
+	const layout_rank::CellRect lane{c1.x, c1.y, c2.x, c2.y};
+	const float cell = SQUARE_SIZE * 2;
+	int n = 0;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* u = kv.second;
+		if ((u == nullptr) || (u == factory) || u->IsDead() || (u->GetCircuitDef() == nullptr) || u->GetCircuitDef()->IsMobile()) {
+			continue;
+		}
+		UnitDef* ud = u->GetCircuitDef()->GetDef();
+		const int f = u->GetUnit()->GetBuildingFacing();
+		const float hx = (((f & 1) == 0) ? ud->GetXSize() : ud->GetZSize()) * SQUARE_SIZE * 0.5f;
+		const float hz = (((f & 1) == 0) ? ud->GetZSize() : ud->GetXSize()) * SQUARE_SIZE * 0.5f;
+		const AIFloat3 p = u->GetPos(frame);
+		const layout_rank::CellRect r{int(std::floor((p.x - hx) / cell)), int(std::floor((p.z - hz) / cell)),
+				int(std::ceil((p.x + hx) / cell)), int(std::ceil((p.z + hz) / cell))};
+		if (layout_rank::Overlaps(r, lane)) {
+			++n;
+		}
+	}
+	return n;
+}
+
+bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int facing, float length, float margin) const
+{
+	SSlowCall slow("IsExitClear", circuit);
+	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
+		return true;
+	}
+	if ((facing < 0) || (facing > 3)) {
+		facing = UNIT_FACING_SOUTH;
+	}
+	int2 c1, c2;
+	if (!ExitLaneCells(cdef, pos, facing, length, margin, c1, c2)) {
 		return false;
 	}
 	for (int z = c1.y; z < c2.y; ++z) {
 		for (int x = c1.x; x < c2.x; ++x) {
-			if (!blockingMap.IsInBounds(x, z) || blockingMap.IsStruct(x, z)) {
+			// D-092: a layout zone marks every cell RESERVED; that mark alone is open
+			// ground (planned slots are tested below by their reservations). Played:
+			// no advanced lab inside the block's halo ever had a clear exit, so it went
+			// to the pair's slot away from the turrets.
+			if (!blockingMap.IsInBounds(x, z) || (blockingMap.IsStruct(x, z) && !blockingMap.IsReserved(x, z))) {
 				return false;
 			}
 		}
@@ -2558,8 +2689,16 @@ bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int fa
 	return true;
 }
 
-int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, AIFloat3& outPos) const
+int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, const AIFloat3& seed, AIFloat3& outPos) const
 {
+	constexpr int SERVED_SLOT_WEIGHT = 3;  // D-085
+	// D-085 (played): with every slot planned, the count alone sent the lab to the
+	// far edge; a planned slot counts only within SEED_SLOT_RADIUS of the seed, the
+	// slots the block fills first. When none is, every planned slot counts.
+	constexpr float SEED_SLOT_RADIUS = 560.f;
+	// D-087: enough build power is enough; past LAB_SLOTS_ENOUGH the site nearest
+	// the seed wins (played: the most-reached site was 1,139 elmos from the seed)
+	constexpr int LAB_SLOTS_ENOUGH = 8;
 	auto zit = zones.find(zone);
 	if ((zit == zones.end()) || (cdef == nullptr)) {
 		return -1;
@@ -2572,52 +2711,54 @@ int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int fa
 	if (cands.empty()) {
 		return -1;
 	}
-	std::vector<AIFloat3> slots;
+	std::vector<layout_rank::Slot> slots;  // D-085 via D-094
+	std::vector<layout_rank::Pt> slotPts;  // D-095
 	for (const auto& kv : reservations) {
 		if (kv.second.group == nanoGroup) {
-			slots.push_back(kv.second.pos);
+			slots.push_back(layout_rank::Slot{ToPt(kv.second.pos), kv.second.consumed});
+			slotPts.push_back(ToPt(kv.second.pos));
 		}
 	}
-	// forward along the facing (SOUTH 0 +z, EAST 1 +x, NORTH 2 -z, WEST 3 -x)
-	const float fx = (facing == 1) ? 1.f : ((facing == 3) ? -1.f : 0.f);
-	const float fz = (facing == 0) ? 1.f : ((facing == 2) ? -1.f : 0.f);
-	const float reachSq = SQUARE(reach);
-	int best = -1;
-	float bestFront = -1e30f, bestNano = 1e30f;
-	AIFloat3 bestPos;
+	// KI-419 (D-083): the cheap score first for every candidate, the dear tests
+	// (the engine's build test, the pocket flood fill, the exit cone) only down
+	// the ranked list until one passes (played: 8.5 s for one advanced lab).
+	std::vector<layout_rank::SiteKey> ranked;
+	ranked.reserve(cands.size());
 	for (const SPackCandidate& c : cands) {
-		AIFloat3 cp = c.pos;
+		const int n = layout_rank::WeightedSlots(ToPt(c.pos), slots, reach, ToPt(seed), SEED_SLOT_RADIUS, SERVED_SLOT_WEIGHT);
+		ranked.push_back(layout_rank::MakeSiteKey(ToPt(c.pos), n, LAB_SLOTS_ENOUGH, ToPt(seed), c.nanoSq,
+				layout_rank::NearestSq(ToPt(c.pos), slotPts), flush,  // D-095: flush with a slot before nearer the seed
+				layout_rank::AheadOf(ToPt(c.pos), slotPts, layout_rank::FacingForward(facing))));  // D-096: the front side first
+	}
+	std::sort(ranked.begin(), ranked.end(), layout_rank::SiteBefore);
+	// no try cap (played: the best-ranked sites inside the block all face planned
+	// slots and fail the exit test; 400 of them exhausted the cap and the lab
+	// fell back to the pair's slot); the exit test is cheap and the flood fill
+	// runs only for sites that pass it
+	for (const layout_rank::SiteKey& r : ranked) {
+		const AIFloat3 site(r.pos.x, 0.f, r.pos.z);
+		AIFloat3 cp = site;
 		cp.y = circuit->GetMap()->GetElevationAt(cp.x, cp.z);
-		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), cp, facing) || LeavesPocket(zone, cdef, c.pos, facing)) {
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), cp, facing)) {
 			continue;
 		}
-		if (!cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, c.pos, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
-			continue;  // D-074: a factory's exit stays clear of structures and planned slots
+		if (!cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, site, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;  // D-074: a factory's exit stays clear of structures and planned slots (cheap: before the flood fill)
 		}
-		int n = 0;
-		for (const AIFloat3& s : slots) {
-			if (s.SqDistance2D(c.pos) <= reachSq) {
-				++n;
-			}
+		if (LeavesPocket(zone, cdef, site, facing)) {
+			continue;
 		}
-		const float front = (c.pos.x - centre.x) * fx + (c.pos.z - centre.z) * fz;
-		if ((n > best) || ((n == best) && ((front > bestFront + 1.f) || ((std::fabs(front - bestFront) <= 1.f) && (c.nanoSq < bestNano))))) {
-			best = n;
-			bestFront = front;
-			bestNano = c.nanoSq;
-			bestPos = c.pos;
-		}
+		outPos = site;
+		return r.slots;
 	}
-	if (best >= 0) {
-		outPos = bestPos;
-	}
-	return best;
+	return -1;
 }
 
-int CTerrainManager::PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, int group)
+int CTerrainManager::PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float reach, float flush, int group, const AIFloat3& seed)
 {
+	SSlowCall slow("PackNearGroupMost", circuit);
 	AIFloat3 pos;
-	const int score = PickMost(zone, cdef, nanoGroup, facing, reach, pos);
+	const int score = PickMost(zone, cdef, nanoGroup, facing, reach, flush, seed, pos);
 	if (score < 0) {
 		return -1;
 	}
@@ -2635,6 +2776,9 @@ int CTerrainManager::PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGrou
 int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor,
 		float maxReach, float minNanoDist, int group)
 {
+	SSlowCall slow("PackNearGroup", circuit);
+	constexpr int POCKET_TESTS_MAX = 40;  // D-090
+	int pocketTests = 0;
 	const std::vector<SPackCandidate> candidates = PackCandidates(zone, cdef, nanoGroup, facing, anchor, maxReach, minNanoDist);
 	int tried = 0;
 	for (const SPackCandidate& c : candidates) {
@@ -2646,8 +2790,11 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), pos, facing)) {
 			continue;  // D-073: the engine's own test; a box's unflat part refused an advanced fusion at serve time
 		}
-		if (LeavesPocket(zone, cdef, pos, facing)) {
-			continue;  // D-072: never wall off free cells inside the box
+		if (!cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, c.pos, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;  // D-086: a factory packed nearest a turret keeps its exit clear (D-074)
+		}
+		if ((++pocketTests <= POCKET_TESTS_MAX) && LeavesPocket(zone, cdef, pos, facing)) {
+			continue;  // D-072: never wall off free cells inside the box (D-090: at most POCKET_TESTS_MAX tests a call)
 		}
 		const int id = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
 		if (id >= 0) {
@@ -2663,10 +2810,11 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 
 bool CTerrainManager::CanPackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float maxReach, float minNanoDist)
 {
+	SSlowCall slow("CanPackNearGroup", circuit);
 	const std::vector<SPackCandidate> candidates = PackCandidates(zone, cdef, nanoGroup, facing, ZeroVector, maxReach, minNanoDist);
 	int tried = 0;
 	for (const SPackCandidate& c : candidates) {
-		if (++tried > 400) {
+		if (++tried > 40) {  // D-083: a yes/no asked many times a second; forty tries answer it
 			break;
 		}
 		AIFloat3 pos = c.pos;
@@ -2701,6 +2849,7 @@ CCircuitUnit* CTerrainManager::GetReservationUnit(int id) const
 
 float CTerrainManager::FlatFraction(const AIFloat3& centre, int facing, float halfAcross, float halfAlong, float maxSlope) const
 {
+	SSlowCall slow("FlatFraction", circuit);
 	const auto& slopes = terrainData->GetSlopeMap();
 	const int xsize = terrainData->GetSlopeMapXSize();
 	if (slopes.empty() || (xsize <= 0)) {

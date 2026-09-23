@@ -753,7 +753,9 @@ int CMilitaryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 	auto itgt = guardTasks.find(unit);
 	if (itgt != guardTasks.end()) {
-		AbortTask(itgt->second);
+		CFGuardTask* guard = itgt->second;
+		guardTasks.erase(itgt);  // D-089: the entry goes first; AbortTask cannot find this unit by id any more
+		AbortTask(guard);
 	}
 
 	auto search = destroyedHandler.find(unit->GetCircuitDef()->GetId());
@@ -856,7 +858,14 @@ void CMilitaryManager::DequeueTask(IUnitTask* task, bool done)
 			IFighterTask* taskF = static_cast<IFighterTask*>(task);
 			fightTasks[static_cast<IFighterTask::FT>(taskF->GetFightType())].erase(taskF);
 			if (taskF->GetFightType() == IFighterTask::FightType::GUARD) {
-				guardTasks.erase(circuit->GetTeamUnit(static_cast<CFGuardTask*>(taskF)->GetVipId()));
+				// D-089: erase by the task, not by looking the VIP up: a VIP already gone
+				// from the team (dead, given away) returned null, the entry stayed keyed
+				// by the freed unit pointer, and a later unit allocated at that address
+				// found it in UnitDestroyed and aborted the freed task (played: access
+				// violation in DequeueTask at 1:39:24)
+				for (auto it = guardTasks.begin(); it != guardTasks.end(); ) {
+					it = (it->second == taskF) ? guardTasks.erase(it) : std::next(it);
+				}
 			}
 		} break;
 		default: break;

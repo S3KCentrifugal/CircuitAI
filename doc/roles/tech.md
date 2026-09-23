@@ -757,8 +757,8 @@ floats), with `EcoTurretMinMetalIncome` and `EcoTurretBankFraction` as
 guards, and only while `Layout::CanPlaceTurret`; the power measured is the
 turrets' alone (`aiBuilderMgr.GetStaticBuildPowerNear`), since the commander
 and constructors passing through hid every shortage when they counted. One
-turret at a time
-(`EcoMaxConcurrentNanos` 1, orders plus turrets under construction): a
+turret at a time while the economy is small, more as the calculation allows
+(`Layout::TurretsAllowed()`, D-097, orders plus turrets under construction): a
 mobile constructor that asks while one is going up assists it
 (`aiBuilderMgr.FindUnfinishedNear` within `EcoTurretAssistRadius`) instead
 of starting another, so build power is focused. Native's own assist nanos
@@ -856,6 +856,14 @@ logged as `[INVARIANT] INV-nnn` and fails every playtest. The practice is
 [`../invariants.md`](../invariants.md); who acts on what
 [`../actor-matrix.md`](../actor-matrix.md).
 
+## The endgame plan (D-080)
+
+`Tech_Init` calls `TechPlan::Init` after the chain; `Tech_CombatGate` reads
+`TechPlan::CombatGate` (+200, or +500 for the T3 rush) so no mobile combat
+unit is produced under it; the T2 air plant's production makes T2
+construction aircraft up to `TechPlan::AirConstructorsWanted` from +200
+metal. See [tech_plan.md](tech_plan.md).
+
 ## Related
 
 - `doc/angelscript-references.md` - script loading model, callback contracts,
@@ -864,4 +872,4 @@ logged as `[INVARIANT] INV-nnn` and fails every playtest. The practice is
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: dfbad546847fa42d7437222245caacb282d8f7bb; lines: 2582 -->
+<!-- source: data/script/src/roles/tech.as; blob: 15038bdd88b54c323db5df3c70d3e9bd0b3a0454; lines: 2586 -->

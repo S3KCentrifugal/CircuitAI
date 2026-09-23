@@ -131,6 +131,14 @@ Script surface: `SetHoldPos(pos)`, `SetCargo(unitId, dropPos)`, `GetState()`,
 the script side holds it across frames and `CFerryTask` resolves it through
 `CCircuitAI::GetTeamUnit`.
 
+**D-091 supersedes the queued flight below.** The load is ordered alone, only
+for a finished cargo off its factory's yard; the flight to the drop is ordered
+when the cargo is seen lifted, and a cargo back on the ground in flight is
+loaded again. Landing spots come from `CTerrainManager::FindDropSpot` (free of
+structures, reachable by the cargo's move type, dry for a land unit, never a
+spot the engine refused). See
+[D-091](decisions.md#d-091--the-ferry-loads-only-a-finished-unit-off-its-factory-yard-flies-only-once-the-cargo-is-aboard-and-lands-only-where-the-cargo-can-stand).
+
 **Load verification is by height, and the flight does not wait for it.**
 The C++ wrapper exposes no `GetTransporter`, so the task infers the load from
 the cargo being **lifted off the terrain** at all - `FERRY_LIFT_HEIGHT` is

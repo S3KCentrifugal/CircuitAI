@@ -295,6 +295,8 @@ public:
 	// point within radius; for the planner's turret focus (D-063 follow-up 5).
 	int GetUnfinishedCount(const CCircuitDef* def) const;
 	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	// D-098: structures of ours under construction within radius costing at least minCostM, `except` not counted
+	int CountUnfinishedNear(const springai::AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except);
 	// D-077: the nearest finished unit of ours of def within radius of pos (null def: any).
 	CCircuitUnit* FindOwnNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
 	// D-078 (owner's rule): every construction turret within its build distance
