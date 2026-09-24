@@ -68,6 +68,7 @@ namespace Invariants {
     dictionary factoriesSeen;     // D-104: INV-029
     dictionary retiredT2Seen;     // D-105: INV-031
     int overflowSince = -1;       // D-106: INV-033
+    int airRolesOpenSince = -1;   // D-107: INV-034
     int t2ConsAtHigh = 0;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
@@ -350,6 +351,21 @@ namespace Invariants {
                     Violation("INV-033", "share", "metal over " + int(Global::RoleSettings::Tech::TeamShareMetalAbove * 100.0f)
                         + "% for 60 s while team " + roomFor + " has " + int(TeamEconomy::Metal(roomFor, TeamEconomy::FREE)) + " free");
                 overflowSince = ai.frame;
+            }
+        }
+
+        // INV-034 (D-107): with two or more T2 air constructors both dedicated
+        // roles are held within 60 s
+        {
+            CCircuitDef@ aca = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
+            const int n = (aca is null) ? 0 : (aca.count - aiBuilderMgr.GetUnfinishedCount(aca));
+            const bool open = n >= 2 && (TechBuild::airConvId < 0 || TechBuild::airAfusId < 0
+                || ai.GetTeamUnit(TechBuild::airConvId) is null || ai.GetTeamUnit(TechBuild::airAfusId) is null);
+            if (!open) airRolesOpenSince = -1;
+            else if (airRolesOpenSince < 0) airRolesOpenSince = ai.frame;
+            else if (ai.frame - airRolesOpenSince >= 60 * SECOND) {
+                Violation("INV-034", "air", "" + n + " T2 air constructors but a dedicated role (converters " + TechBuild::airConvId + ", advanced fusions " + TechBuild::airAfusId + ") is open");
+                airRolesOpenSince = ai.frame;
             }
         }
 

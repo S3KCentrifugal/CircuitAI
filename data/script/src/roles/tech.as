@@ -1853,6 +1853,19 @@ namespace RoleTech
 			return aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, reclaim, 120 * SECOND));
 		}
 		const string side = Global::AISettings::Side;
+		// D-107 (owner's rule): after the reclaim, the same switch as the air
+		// constructors: the advanced converter first while energy overflows, the
+		// advanced fusion first the moment the converters cannot stay on
+		if (TechBuild::ConvertersStarve())
+		{
+			CCircuitDef @af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+			CCircuitUnit @afFrame = (af is null) ? null : aiBuilderMgr.FindUnfinishedFor(u, af);
+			if (afFrame !is null)
+			{
+				GenericHelpers::LogUtil("[TECH][Turret] " + u.id + " assists the advanced fusion: the converters cannot stay on (D-107)", 2);
+				return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, afFrame, 30 * SECOND));
+			}
+		}
 		array<string> order = {
 			UnitHelpers::GetAdvEnergyConverterNameForSide(side),
 			UnitHelpers::GetT1NanoNameForSide(side),

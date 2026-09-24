@@ -41,6 +41,7 @@ step.
 | INV-031 | The advanced lab is not retired while the advanced fusion is funded without it (bank + income x its remaining build time covers `AfusFundedShare` of its cost). | `Invariants::Tick`: a newly retiring advanced lab against `TechBuild::AfusFunded`. | [D-105](decisions.md#d-105--metal-is-spent-labs-kept-once-online-or-when-the-advanced-fusion-is-funded-t2-constructors-reclaim-last-t1-constructors-add-build-power-first) |
 | INV-032 | No converter is ordered while the metal bank is full. | `EcoPlanner::Execute`: a converter key with `TechBuild::MetalFullLong`. | [D-105](decisions.md#d-105--metal-is-spent-labs-kept-once-online-or-when-the-advanced-fusion-is-funded-t2-constructors-reclaim-last-t1-constructors-add-build-power-first) |
 | INV-033 | TECH's metal bank does not sit over `TeamShareMetalAbove` for 60 s while a live teammate has a quarter of our storage free. | `Invariants::Tick`: our bank against the team economy snapshot. | [D-106](decisions.md#d-106--teammates-economies-are-readable-from-script-tech-gives-its-overflowing-metal-to-the-lowest-filled-teammate) |
+| INV-034 | With two or more T2 air constructors, both dedicated roles (advanced converters, advanced fusions) are held within 60 s. | `Invariants::Tick`: `TechBuild::airConvId`, `airAfusId` against the T2 air constructor count. | [D-107](decisions.md#d-107--two-dedicated-air-constructors-one-for-advanced-converters-one-for-advanced-fusions-the-rest-and-the-turrets-follow-the-energy) |
 | INV-004 | Metal does not float while a structure is under construction and static build power is under the income target. | `Invariants::Tick`: the bank at `InvariantFloatPercent` of storage for `InvariantFloatSeconds` with a frame standing and static build power under `PowerBuildPowerPerMetal` x metal income. | D-076 (from D-075) |
 
 ## Settings (`Global::RoleSettings::Tech`)
@@ -60,6 +61,7 @@ step.
 | `InvariantNoRoomSeconds` | 120 | INV-020's patience |
 | `AfusFundedShare` / `AfusBuildTime` / `AfusProjectionRadius` | 0.85 / 330000 / 600 | D-105: the advanced lab kept when the advanced fusion is funded |
 | `ReclaimOtherPowerRadius` | 600 | D-105: a T2 constructor reclaims only with no other build power this near the target |
+| `ConverterStarveEnergyShare` | 0.5 | D-107: the energy bank under this share (or stalling): the converters cannot stay on |
 | `TeamShareMetalAbove` / `TeamShareMetalBudget` / `TeamShareCheckSeconds` / `TeamShareMinAmount` | 0.95 / 0.20 / 5 / 25 | D-106: the overflow donation |
 | `SpamLabMetalStep` / `SpamLabsMax` | 100 / 6 | D-105: spam labs scale with income from +200 |
 | `T2ConstructorCap` / `T2ConstructorBankShare` | 60 / 0.5 | D-103: T2 constructors made up to the cap while the metal bank is over the share |

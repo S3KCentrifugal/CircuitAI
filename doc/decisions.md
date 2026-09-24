@@ -5619,6 +5619,65 @@ storage free.
 [`roles/tech-requirements.md`](roles/tech-requirements.md),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
 
+## D-107 — Two dedicated air constructors, one for advanced converters, one for advanced fusions; the rest and the turrets follow the energy
+
+**Date:** 2026-09-24. **Status:** Played (script; build73's DLL; run `20260924-171343`).
+
+**Owner's rule.** As soon as the first two air constructors are finished,
+one is dedicated to building advanced energy converters only, the other to
+advanced fusions only; they always build them. The remaining air
+constructors build energy converters while energy is overflowing, and switch
+at once to assisting the advanced fusion under construction when the
+converters do not have enough energy to stay on. Every construction turret
+in range of an economy building assists the same way, after its other
+priorities such as a reclaim.
+
+**Decision.**
+
+1. The air constructors are the T2 ones (`coraca`, `armaca`, `legaca`): the
+   advanced converter and the advanced fusion are T2 structures, not in a T1
+   air constructor's build options. `TechBuild::AirConRole` claims the roles
+   in the order the air constructors first ask for work (right after
+   `keep.current`): the first builds advanced converters, the second advanced
+   fusions; a role freed by a death goes to the next one that asks.
+2. Rule `air.dedicated`: the dedicated two always order their own structure
+   through the layout (converters in sets of 5, advanced fusions flush in sets
+   of 3, D-101), assisting a frame of their own kind when the layout has no
+   site.
+3. Rule `air.flex`, the other T2 air constructors: advanced converters while
+   energy floats (`TechChain::EnergyFloats`); the nearest advanced fusion
+   frame the moment the converters cannot stay on (`TechBuild::ConvertersStarve`:
+   the energy bank under `ConverterStarveEnergyShare` (0.5) of storage, or
+   stalling; BAR's conversion level is 75% of storage by default); else the
+   normal rows.
+4. Turrets (`Tech_TurretAssist`): after the reclaim, the advanced fusion in
+   reach first when the converters starve; otherwise the existing order
+   (advanced converter first).
+
+The dedicated converter builder builds regardless of the metal bank (the
+owner's "always"), which D-105's converter gate does not apply to; its metal
+goes to teammates through D-106 when the bank is full in a team game.
+
+**Played.** Run `20260924-171343` (tech versus tech, 36 min): the first T2
+air constructor took the converter role at 23:00, the second the advanced
+fusions 10 s later; `air.flex` fired 106 times; eight advanced fusions by
+28:22 and 116 advanced converters after 25 min; energy +25,900 and metal
++466 at 34 min, the metal bank at its cap (no teammate in a 1v1). Run
+`20260924-171703` ended at 22:54: team 0's nuke silo stood at 21:14 and the
+game ended with team 0 whole (117 units), the nuke plan's first shot (the
+same end at 22:54 as `20260924-150157`). INV-034 silent.
+
+**Invariant.** INV-034: with two or more T2 air constructors, both dedicated
+roles are held within 60 s.
+
+**Files.** [`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`roles/tech-requirements.md`](roles/tech-requirements.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

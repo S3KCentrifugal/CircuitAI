@@ -310,6 +310,7 @@ namespace Global {
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
             float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
+            float ConverterStarveEnergyShare = 0.5f;        // D-107: the energy bank under this share of storage (or stalling) means the converters cannot stay on (BAR's conversion level is 75% by default)
             float TeamShareMetalAbove = 0.95f;              // D-106: our metal bank over this share of storage triggers the team economy check and a donation
             float TeamShareMetalBudget = 0.20f;             // D-106: at most this share of our metal storage is given per donation, the lowest-filled teammate first
             float TeamShareCheckSeconds = 5.0f;             // D-106: a donation at most this often (the engine's share command settles each slow update)

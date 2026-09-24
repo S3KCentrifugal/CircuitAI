@@ -208,6 +208,8 @@ namespace TechRules {
         return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, near, 30 * SECOND));
     }
     IUnitTask@ DoWaitShort(Ctx@ c)      { return TechBuild::Wait(5 * SECOND); }
+    IUnitTask@ DoAirDedicated(Ctx@ c)   { return TechBuild::AirDedicated(c.u); }   // D-107
+    IUnitTask@ DoAirFlexible(Ctx@ c)    { return TechBuild::AirFlexible(c.u); }    // D-107
     IUnitTask@ DoT1Turret(Ctx@ c)       { return Layout::NanoTask(c.u, Task::Priority::HIGH); }   // D-105
     // D-105: a turret assists the nearest producing factory within its reach
     IUnitTask@ DoTurretFactory(Ctx@ c)
@@ -403,6 +405,8 @@ namespace TechRules {
         table.insertLast(Rule("turret.factory",    TURRET,       W1(@MetalFloodedLong), @DoTurretFactory, "D-105: the metal bank full and nothing to build in reach: assist a producing factory in reach (production is the sink)"));
         table.insertLast(Rule("turret.wait",       TURRET,       W0(), @DoWaitShort,    "5 s"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
+        table.insertLast(Rule("air.dedicated",     CON_T2,       W0(), @DoAirDedicated, "D-107: the first two T2 air constructors: one only advanced energy converters, the other only advanced fusions, always"));
+        table.insertLast(Rule("air.flex",          CON_T2,       W0(), @DoAirFlexible,  "D-107: the other T2 air constructors: advanced converters while energy overflows, the advanced fusion going up when the converters cannot stay on"));
         table.insertLast(Rule("opening.mex",       COMMANDER,    W1(@OpeningPending), @DoOpening,      "the nearest OpeningMexCap mexes within OpeningMexRadius"));
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));
         table.insertLast(Rule("lab.t2.reclaim",     MOBILE,       W1(@T2LabRetiring), @DoReclaimT2Lab, "D-078: the advanced lab is retiring (an advanced fusion is under construction, the bank has room): every builder reclaims it, turrets in range join"));

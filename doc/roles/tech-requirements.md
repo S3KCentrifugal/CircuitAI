@@ -61,6 +61,7 @@ is edited in place with the decision that changed it.
 | S14 | Before reclaiming the advanced lab, a metal projection: bank + income x the advanced fusion's remaining build time; if it covers 85% of the advanced fusion's cost, the lab is kept. | D-105 | INV-031 |
 | S15 | T1 constructors add build power before assisting T2 constructions; reclaiming stays the higher priority. | D-105 | (rule order: `power.t1` after the reclaim rows) |
 | S17 | Whenever TECH's metal store is over 95%, refresh the team economy and give up to 20% of TECH's metal capacity to the lowest-filled teammate(s), filling their storage: a fallback so no metal is lost to overflow when TECH's build power cannot keep up. | D-106 | INV-033 |
+| S18 | The first two T2 air constructors are dedicated: one always builds advanced energy converters, the other always advanced fusions. The other air constructors build converters while energy overflows and assist the advanced fusion the moment converters cannot stay on; every construction turret in range does the same after reclaim. | D-107 | INV-034 |
 | S16 | The metal is spent: a full bank is a waste (no converters then; production and build power are the sinks: T2 constructors, spam labs scaling with income, turrets assisting factories). | D-105 | INV-032, INV-011 |
 
 ## Tools the owner asked for

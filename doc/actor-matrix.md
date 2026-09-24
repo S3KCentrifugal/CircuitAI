@@ -35,6 +35,9 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
+| `air.dedicated` (D-107) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; INV-034 |
+| `air.flex` (D-107) | energy floats, converters starve | other T2 air constructors: converters while energy floats, assist the advanced fusion when converters starve |
+| turret assist order (`Tech_TurretAssist`, D-065, D-107) | reclaim in reach, converters starve | reclaim first; the advanced fusion first when converters starve, else the advanced converter first |
 | overflow donation (`TechBuild::ShareOverflow`, `TeamEconomy`, D-106) | our metal bank, every teammate's snapshot (refreshed first) | up to 20% of our storage to the lowest-filled live teammates, filling their free storage, when over 95% after the opening; INV-033 |
 | advanced-lab retirement gate (`TechBuild::AfusFunded`, D-105) | bank, income, the advanced fusion frame's progress and build power | the lab kept when 85% of the advanced fusion's cost will be earned; INV-031 |
 | T2 constructor reclaim (`TechBuild::T2MayReclaim`, D-105) | other build power near the target | a T2 constructor reclaims only as a last resort |

@@ -326,6 +326,85 @@ namespace TechBuild {
         return UnitHelpers::GetT1BotLabForSide(side);
     }
 
+    // D-107 (owner's rule): the first two T2 air constructors are dedicated: one
+    // only ever builds advanced energy converters, the other only advanced
+    // fusions. A role freed by a death goes to the next air constructor that asks.
+    int airConvId = -1;
+    int airAfusId = -1;
+    bool IsT2AirCon(CCircuitUnit@ u)
+    {
+        return u !is null && u.circuitDef !is null && u.circuitDef.GetName() == UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side);
+    }
+    // 1: converters, 2: advanced fusions, 0: not dedicated (the role is claimed here)
+    int AirConRole(CCircuitUnit@ u)
+    {
+        if (!IsT2AirCon(u)) return 0;
+        if (airConvId >= 0 && ai.GetTeamUnit(airConvId) is null) airConvId = -1;
+        if (airAfusId >= 0 && ai.GetTeamUnit(airAfusId) is null) airAfusId = -1;
+        if (u.id == airConvId) return 1;
+        if (u.id == airAfusId) return 2;
+        if (airConvId < 0) {
+            airConvId = u.id;
+            GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + " is dedicated to advanced energy converters (D-107)", 1);
+            return 1;
+        }
+        if (airAfusId < 0) {
+            airAfusId = u.id;
+            GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + " is dedicated to advanced fusions (D-107)", 1);
+            return 2;
+        }
+        return 0;
+    }
+    // D-107: the converters cannot stay on (the bank under
+    // ConverterStarveEnergyShare of storage, or stalling)
+    bool ConvertersStarve()
+    {
+        const float s = aiEconomyMgr.energy.storage;
+        return aiEconomyMgr.isEnergyStalling || (s > 0.0f && aiEconomyMgr.energy.current < Global::RoleSettings::Tech::ConverterStarveEnergyShare * s);
+    }
+    IUnitTask@ AssistNearestOf(CCircuitUnit@ u, const string &in defName)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(defName);
+        if (d is null) return null;
+        CCircuitUnit@ fr = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame), Global::RoleSettings::Tech::ChainAssistRadius, d);
+        if (fr is null) return null;
+        return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, fr, 60 * SECOND));
+    }
+    IUnitTask@ BuildByLayout(CCircuitUnit@ u, const string &in defName, Task::BuildType type)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(defName);
+        if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
+        return Layout::Place(type, Task::Priority::HIGH, d, 300 * SECOND, u);
+    }
+    // the dedicated two: always their own structure (assist their own kind's
+    // frame when the layout has no site)
+    IUnitTask@ AirDedicated(CCircuitUnit@ u)
+    {
+        const string side = Global::AISettings::Side;
+        const int role = AirConRole(u);
+        if (role == 1) {
+            const string conv = UnitHelpers::GetAdvEnergyConverterNameForSide(side);
+            IUnitTask@ t = BuildByLayout(u, conv, Task::BuildType::CONVERT);
+            return (t !is null) ? t : AssistNearestOf(u, conv);
+        }
+        if (role == 2) {
+            const string afus = UnitHelpers::GetAdvFusionNameForSide(side);
+            IUnitTask@ t = BuildByLayout(u, afus, Task::BuildType::ENERGY);
+            return (t !is null) ? t : AssistNearestOf(u, afus);
+        }
+        return null;
+    }
+    // the rest of the T2 air constructors: converters while energy overflows; the
+    // advanced fusion going up the moment the converters cannot stay on
+    IUnitTask@ AirFlexible(CCircuitUnit@ u)
+    {
+        if (!IsT2AirCon(u) || AirConRole(u) != 0) return null;
+        const string side = Global::AISettings::Side;
+        if (ConvertersStarve()) return AssistNearestOf(u, UnitHelpers::GetAdvFusionNameForSide(side));
+        if (TechChain::EnergyFloats()) return BuildByLayout(u, UnitHelpers::GetAdvEnergyConverterNameForSide(side), Task::BuildType::CONVERT);
+        return null;
+    }
+
     // D-106 (owner's rule): a fallback so no metal is lost to overflow when our
     // build power cannot keep up: whenever the metal bank is over
     // TeamShareMetalAbove of storage, refresh every teammate's economy and give
