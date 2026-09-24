@@ -108,7 +108,9 @@ ground around it within a turret's reach is used, then the forward cluster,
 and no reservation stands in a factory's exit (D-099). Advanced fusions and
 converters go in sets flush against the turrets and lined up outward; ground
 TECH reclaims returns to the pool; a later T1 lab is placed by the layout
-(D-101). Decision:
+(D-101). Every factory, whoever orders it, stands flush against the turrets:
+ground factories facing the front with a clear exit, air factories in any
+facing (D-104). Decision:
 [D-094](decisions.md#d-094--the-layouts-ranking-rules-live-once-in-a-tested-header-the-layout-scripts-repeated-blocks-are-helpers).
 
 ## Rectangles, and the block grows from the advanced lab (D-088)

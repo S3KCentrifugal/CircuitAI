@@ -33,6 +33,11 @@ step.
 | INV-022 | A new set of advanced fusions or advanced converters starts flush against a turret (0 cells). | `Layout::Place`: `EdgeGapToGroup` of the set's first slot. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
 | INV-023 | A T1 lab that is not the first, begun while a turret stands, has a turret slot within `ExpLabBuildPowerReach`. | `Invariants::Tick`: a new primary T1 lab against `CountGroupSlotsWithin`. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
 | INV-024 | T1 energy is reclaimed only while a fusion or an advanced fusion stands finished (a frame is not a reactor). | `TechBuild::ReclaimEnergy`: `ReactorStands()` at each reclaim order. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
+| INV-025 | A T1 lab frame after the first starts only when a lab is wanted: fewer than `LabRebuildMinT1Cons` T1 constructors, or the economy online (`LabEcoOnlineMetalIncome`) with an advanced lab up. | `Invariants::Tick`: a new T1 lab frame against `TechBuild::T1Cons` and `EcoOnline`. | [D-102](decisions.md#d-102--labs-are-torn-down-for-metal-only-before-the-economy-is-online-a-lab-comes-back-only-when-wanted-the-advanced-lab-first) |
+| INV-026 | No lab is retired for its metal once the economy is online. | `Invariants::Tick`: a lab seen retiring with `TechBuild::EcoOnline`. | [D-102](decisions.md#d-102--labs-are-torn-down-for-metal-only-before-the-economy-is-online-a-lab-comes-back-only-when-wanted-the-advanced-lab-first) |
+| INV-027 | The plan's T1 air plant (`ap`) and advanced aircraft plant (`aap`) steps are never skipped. | `TechChain::Next`: the stall skip of those steps. | [D-103](decisions.md#d-103--the-air-labs-are-built-a-t1-air-plant-and-its-air-constructor-first-t2-constructors-while-the-metal-bank-is-over-half) |
+| INV-028 | With the metal bank over `T2ConstructorBankShare` and an advanced lab standing, a T2 constructor is added within 60 s until `T2ConstructorCap`. | `Invariants::Tick`: the T2 constructor count while the bank is high. | [D-103](decisions.md#d-103--the-air-labs-are-built-a-t1-air-plant-and-its-air-constructor-first-t2-constructors-while-the-metal-bank-is-over-half) |
+| INV-029 | A factory placed while a turret stands is within 1 cell of a turret slot. | `Invariants::Tick`: each new factory's `EdgeGapToGroup` to the main and forward clusters. | [D-104](decisions.md#d-104--every-factory-stands-flush-against-the-construction-turrets-air-factories-in-any-facing) |
 | INV-004 | Metal does not float while a structure is under construction and static build power is under the income target. | `Invariants::Tick`: the bank at `InvariantFloatPercent` of storage for `InvariantFloatSeconds` with a frame standing and static build power under `PowerBuildPowerPerMetal` x metal income. | D-076 (from D-075) |
 
 ## Settings (`Global::RoleSettings::Tech`)
@@ -50,6 +55,8 @@ step.
 | `InvariantLabReachSeconds` | 90 | INV-016's, INV-017's and INV-018's patience |
 | `InvariantTurretFlightSeconds` | 30 | INV-019's patience |
 | `InvariantNoRoomSeconds` | 120 | INV-020's patience |
+| `T2ConstructorCap` / `T2ConstructorBankShare` | 60 / 0.5 | D-103: T2 constructors made up to the cap while the metal bank is over the share |
+| `LabEcoOnlineMetalIncome` / `LabRebuildMinT1Cons` | 200 / 3 | D-102: the online economy and the T1 constructor count under which no lab is rebuilt |
 | `LayoutAfusSetSize` / `LayoutConvSetSize` / `LayoutSetHoldSeconds` | 3 / 5 / 300 | D-101: the set sizes and how long an unasked def's set slots are held |
 | `PowerTurretBatchSeconds` / `PowerTurretsMax` / `PowerTurretBuildTime` | 20 / 8 / 5300 | D-097's calculation: turrets the nearby build power finishes in this time, the ceiling, the turret's buildtime |
 | `LayoutLabFrontGapCells` | 3 | D-096: how far ahead of turret row 0 the front-line lab site may stand |

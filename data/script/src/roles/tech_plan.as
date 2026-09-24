@@ -68,11 +68,13 @@ namespace TechPlan {
                 if (objective != "nuke") s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
                 s.insertLast(TechChain::Step("income", "", gate200));
             } else if (phase == 2) {
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", gate500));
             }
         } else if (plan == "t2rush") {
             if (phase == 1) {
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", gate200));
             } else if (phase == 2) {
@@ -81,12 +83,14 @@ namespace TechPlan {
             }
         } else if (plan == "t3rush") {
             if (phase == 1) {
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", gate500));
                 s.insertLast(TechChain::Step("gantry", TechChain::DefFor("gantry"), 1));
             }
         } else if (plan == "lrpc") {
             if (phase == 1) {
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", lrpcAt));
                 s.insertLast(TechChain::Step("lrpc", TechChain::DefFor("lrpc"), 1));

@@ -230,8 +230,15 @@ def stage(args):
         tok = tok.strip()
         if not tok:
             continue
-        minute, _, height = tok.partition("@")
-        shots.append("{ minute = %s, height = %s }" % (float(minute), float(height) if height else args.cam_height))
+        # minute[@height[@x:z]]: x:z points the camera at a map position instead of the start
+        parts = tok.split("@")
+        minute = parts[0]
+        height = parts[1] if len(parts) > 1 and parts[1] else ""
+        focus = ""
+        if len(parts) > 2 and ":" in parts[2]:
+            fx, _, fz = parts[2].partition(":")
+            focus = ", x = %s, z = %s" % (float(fx), float(fz))
+        shots.append("{ minute = %s, height = %s%s }" % (float(minute), float(height) if height else args.cam_height, focus))
     cfg = ("{ role = %r, team = %d, speed = %s, end_minute = %s, forcestart = true, "
            "log_prefix = '[Playtest]', shots = { %s } }") % (
         args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots))
@@ -661,7 +668,7 @@ def add_stage_args(p):
     p.add_argument("--set", action="append", help='override a Global::RoleSettings::Tech setting in the staged script, e.g. --set RushObjective=\'"afus"\'')
     p.add_argument("--speed", default="1", help="game speed the widget sets at frame 1 (setminspeed/setmaxspeed)")
     p.add_argument("--minutes", default=None, help="game minutes to play (default: the checks file's stop_minute)")
-    p.add_argument("--shots", default="1,3,6,10", help="screenshot minutes, each optionally @height, e.g. 2@1500,6,10@3000")
+    p.add_argument("--shots", default="1,3,6,10", help="screenshot minutes, each optionally @height and @x:z (a map position to centre on), e.g. 2@1500,6,10@3000,27@1400@900:9700")
     p.add_argument("--cam-height", default="2200", help="overhead camera height for screenshots")
     p.add_argument("--width", default="1920")
     p.add_argument("--height", default="1080")

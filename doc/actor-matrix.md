@@ -35,6 +35,12 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
+| every factory order (`CBFactoryTask::FindBuildSite`, `PackFactoryFlush`, D-104) | registered clusters, front facing, air or ground | pinned flush against a turret; ground facing the front with its exit clear, air any facing; INV-029 |
+| air plants (`ap`, `aap` plan steps, `Layout::OrderFactory`, D-103) | air constructors | a T1 air plant, its one air constructor, then the advanced aircraft plant; INV-027 |
+| T2 constructor production (`Tech_FactoryAiMakeTask`, D-103) | metal bank share, T2 constructor count | one T2 constructor at the advanced lab while the bank is over half, to 60; INV-028 |
+| replacement factory (`TechBuild::ResetFactory`, native `isReset`, D-102) | T1 constructors, metal income, advanced labs | none with 3+ T1 constructors under +200; else the advanced lab first; INV-025 |
+| T1 lab after the first (`TechBuild::T1LabAllowed`, `StartFactory`, chain lab step, D-102) | constructors, advanced lab, `EcoOnline` | a restart always; else only with an advanced lab up and fewer than 3 T1 constructors or the economy online; INV-025 |
+| lab retirement (`TechBuild::Tick`, D-066, D-078, D-102) | `EcoOnline` | no lab retired once the economy is online; INV-026 |
 | factory placement (`ReserveFactorySite`, `Tech_SelectFactoryHandler`, `StartFactory`, D-101) | `TurretsStand()` | with a turret standing, the layout places the factory and native's replacement is pinned; anywhere only with none; INV-023 |
 | any layout reservation (`ReserveBuildingEx`, D-099) | the exit lanes of every planned and standing factory | refuses a footprint in one; INV-018 |
 | chain moho step (`TechChain`, D-100) | owned mexes within `ChainMohoRadius`, `TechBuild::MetalFullLong` | upgrades every one before the fusion; with metal floating a free builder goes on to the next step; INV-021 |

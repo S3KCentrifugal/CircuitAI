@@ -1992,9 +1992,18 @@ void CTerrainManager::MarkSlotRecycled(CCircuitDef* cdef, const AIFloat3& pos)
 
 int CTerrainManager::EdgeGapToGroup(CCircuitDef* cdef, const AIFloat3& pos, int facing, int group) const
 {
-	int2 c1, c2;
-	if ((cdef == nullptr) || !ReservationCells(cdef, pos, facing, c1, c2)) {
+	if (cdef == nullptr) {
 		return -1;
+	}
+	int2 c1, c2;
+	if (!ReservationCells(cdef, pos, facing, c1, c2)) {
+		// D-104: a standing unit's position need not be grid-aligned: its footprint from its size
+		UnitDef* ud = cdef->GetDef();
+		const float cell = SQUARE_SIZE * 2;
+		const float hx = (((facing & 1) == 0) ? ud->GetXSize() : ud->GetZSize()) * SQUARE_SIZE * 0.5f;
+		const float hz = (((facing & 1) == 0) ? ud->GetZSize() : ud->GetXSize()) * SQUARE_SIZE * 0.5f;
+		c1 = int2(int(std::floor((pos.x - hx) / cell)), int(std::floor((pos.z - hz) / cell)));
+		c2 = int2(int(std::ceil((pos.x + hx) / cell)), int(std::ceil((pos.z + hz) / cell)));
 	}
 	std::vector<layout_rank::CellRect> turrets;
 	for (const auto& kv : reservations) {
@@ -2007,33 +2016,43 @@ int CTerrainManager::EdgeGapToGroup(CCircuitDef* cdef, const AIFloat3& pos, int 
 	return turrets.empty() ? -1 : layout_rank::NearestEdgeGap(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, turrets);
 }
 
-int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count)
+bool CTerrainManager::PickFlushSite(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, bool needExit,
+		AIFloat3& outPos, int& outGap, AIFloat3& outTouch, int* outServedGap, bool ring)
 {
-	SSlowCall slow("PackSet", circuit);
-	if ((cdef == nullptr) || (count < 1)) {
-		return -1;
+	if (cdef == nullptr) {
+		return false;
 	}
-	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, anchor, 0.f, 0.f);
+	// D-104: factories scan the ring round the zone (the block's open front side,
+	// the factory line, lies there); economy sets stay in the zone, so the front
+	// is left to the factories (played: the sets took it, the rebuilt lab found
+	// no ground against a built turret)
+	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, anchor, 0.f, 0.f, ring);
 	if (cands.empty()) {
-		return -1;
+		return false;
 	}
 	struct STurret { layout_rank::CellRect rect; AIFloat3 pos; };
 	std::vector<STurret> turrets;
-	std::vector<layout_rank::CellRect> turretRects;
+	std::vector<layout_rank::CellRect> turretRects, servedRects;
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
 		int2 r1, r2;
 		if ((r.group == nanoGroup) && (r.def != nullptr) && ReservationCells(r.def, r.pos, r.facing, r1, r2)) {
 			turrets.push_back(STurret{layout_rank::CellRect{r1.x, r1.y, r2.x, r2.y}, r.pos});
 			turretRects.push_back(turrets.back().rect);
+			if (r.consumed) {
+				servedRects.push_back(turrets.back().rect);  // a turret built or going up
+			}
 		}
 	}
 	if (turrets.empty()) {
-		return -1;
+		return false;
 	}
 	// flush first (gap 0 to a turret slot), then the packer's own order (served
 	// turrets first, nearest the anchor): a stable sort keeps it among equals
-	struct SRanked { const SPackCandidate* c; int gap; };
+	// D-104: touching a turret that stands (or is going up) first, then touching a
+	// planned one (played: a rebuilt advanced lab flush against a planned slot,
+	// its nearest built turret 258 elmos away)
+	struct SRanked { const SPackCandidate* c; int gap; int servedGap; };
 	std::vector<SRanked> ranked;
 	ranked.reserve(cands.size());
 	for (const SPackCandidate& c : cands) {
@@ -2041,9 +2060,16 @@ int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int fac
 		if (!ReservationCells(cdef, c.pos, facing, c1, c2)) {
 			continue;
 		}
-		ranked.push_back(SRanked{&c, layout_rank::NearestEdgeGap(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, turretRects)});
+		const layout_rank::CellRect cr{c1.x, c1.y, c2.x, c2.y};
+		ranked.push_back(SRanked{&c, layout_rank::NearestEdgeGap(cr, turretRects), layout_rank::NearestEdgeGap(cr, servedRects)});
 	}
-	std::stable_sort(ranked.begin(), ranked.end(), [](const SRanked& a, const SRanked& b) { return a.gap < b.gap; });
+	std::stable_sort(ranked.begin(), ranked.end(), [](const SRanked& a, const SRanked& b) {
+		const bool aServed = (a.servedGap == 0), bServed = (b.servedGap == 0);
+		if (aServed != bServed) {
+			return aServed;
+		}
+		return a.gap < b.gap;
+	});
 	constexpr int POCKET_TESTS_MAX = 40;  // D-090
 	int pocketTests = 0, tried = 0;
 	for (const SRanked& rk : ranked) {
@@ -2055,48 +2081,152 @@ int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int fac
 		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), pos, facing)) {
 			continue;
 		}
+		if (needExit && !IsExitClear(cdef, pos, facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;  // D-104: a ground factory's units walk out
+		}
 		if ((++pocketTests <= POCKET_TESTS_MAX) && LeavesPocket(zone, cdef, pos, facing)) {
 			continue;
 		}
-		const int group = nextGroupId++;
-		const int first = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
-		if (first < 0) {
-			--nextGroupId;
-			continue;
-		}
-		setGroups.insert(group);
-		// the rest of the set: lined up away from the turret the first touches
 		int2 f1, f2;
 		ReservationCells(cdef, pos, facing, f1, f2);
 		const layout_rank::CellRect fr{f1.x, f1.y, f2.x, f2.y};
-		const STurret* touch = &turrets[0];
 		int touchGap = 1 << 20;
 		for (const STurret& tt : turrets) {
 			const int g = layout_rank::EdgeGap(fr, tt.rect);
 			if (g < touchGap) {
 				touchGap = g;
-				touch = &tt;
+				outTouch = tt.pos;
 			}
 		}
-		int sx = 0, sz = 0;
-		layout_rank::SetStep(pos.x, pos.z, touch->pos.x, touch->pos.z, f2.x - f1.x, f2.y - f1.y, sx, sz);
-		int laid = 1;
-		for (int k = 1; (k < count) && ((sx != 0) || (sz != 0)); ++k) {
-			AIFloat3 p(pos.x + float(sx * k) * SQUARE_SIZE * 2, 0.f, pos.z + float(sz * k) * SQUARE_SIZE * 2);
-			p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
-			if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), p, facing) || LeavesPocket(zone, cdef, p, facing)) {
-				break;
-			}
-			if (ReserveBuildingEx(cdef, p, facing, 0, group, true, true, false, zone, true) < 0) {
-				break;
-			}
-			++laid;
+		outPos = pos;
+		outGap = rk.gap;
+		if (outServedGap != nullptr) {
+			*outServedGap = rk.servedGap;
 		}
-		circuit->LOG("RESERVE: set of %i %s from (%.0f, %.0f), %i cell(s) from a turret, growing (%i, %i) cells a step (group %i, id %i)",
-				laid, cdef->GetDef()->GetName(), pos.x, pos.z, rk.gap, sx, sz, group, first);
-		return first;
+		return true;
 	}
-	return -1;
+	return false;
+}
+
+int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count)
+{
+	SSlowCall slow("PackSet", circuit);
+	if ((cdef == nullptr) || (count < 1)) {
+		return -1;
+	}
+	AIFloat3 pos, touch;
+	int gap = 0;
+	if (!PickFlushSite(zone, cdef, nanoGroup, facing, anchor, false, pos, gap, touch)) {
+		return -1;
+	}
+	const int group = nextGroupId++;
+	const int first = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
+	if (first < 0) {
+		--nextGroupId;
+		return -1;
+	}
+	setGroups.insert(group);
+	// the rest of the set: lined up away from the turret the first touches
+	int2 f1, f2;
+	ReservationCells(cdef, pos, facing, f1, f2);
+	int sx = 0, sz = 0;
+	layout_rank::SetStep(pos.x, pos.z, touch.x, touch.z, f2.x - f1.x, f2.y - f1.y, sx, sz);
+	int laid = 1;
+	for (int k = 1; (k < count) && ((sx != 0) || (sz != 0)); ++k) {
+		AIFloat3 p(pos.x + float(sx * k) * SQUARE_SIZE * 2, 0.f, pos.z + float(sz * k) * SQUARE_SIZE * 2);
+		p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), p, facing) || LeavesPocket(zone, cdef, p, facing)) {
+			break;
+		}
+		if (ReserveBuildingEx(cdef, p, facing, 0, group, true, true, false, zone, true) < 0) {
+			break;
+		}
+		++laid;
+	}
+	circuit->LOG("RESERVE: set of %i %s from (%.0f, %.0f), %i cell(s) from a turret, growing (%i, %i) cells a step (group %i, id %i)",
+			laid, cdef->GetDef()->GetName(), pos.x, pos.z, gap, sx, sz, group, first);
+	return first;
+}
+
+bool CTerrainManager::MakesAircraft(CCircuitAI* circuit, CCircuitDef* cdef)
+{
+	if (cdef == nullptr) {
+		return false;
+	}
+	for (CCircuitDef::Id id : cdef->GetBuildOptions()) {
+		CCircuitDef* o = circuit->GetCircuitDef(id);
+		if ((o != nullptr) && o->IsMobile() && o->IsAbleToFly()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int CTerrainManager::PackFactoryFlush(CCircuitDef* cdef, const AIFloat3& anchor)
+{
+	SSlowCall slow("PackFactoryFlush", circuit);
+	if (!layoutEnabled || (cdef == nullptr) || factoryZones.empty()) {
+		return -1;
+	}
+	// the owner's rule (D-101): with no turret of ours standing a factory goes anywhere
+	bool turretStands = false;
+	for (const auto& kv : reservations) {
+		for (const auto& zg : factoryZones) {
+			if ((kv.second.group == zg.second) && kv.second.consumed) {
+				turretStands = true;
+				break;
+			}
+		}
+		if (turretStands) {
+			break;
+		}
+	}
+	if (!turretStands) {
+		return -1;
+	}
+	const bool air = MakesAircraft(circuit, cdef);
+	const int front = ((factoryFront >= 0) && (factoryFront <= 3)) ? factoryFront : UNIT_FACING_SOUTH;
+	std::vector<int> facings = {front, (front + 1) % 4, (front + 3) % 4};
+	if (air) {
+		facings.push_back((front + 2) % 4);  // D-104: an air factory's units fly out; any facing
+	}
+	// over every cluster and facing: touching a turret that stands first, then
+	// the smallest gap; the front facing and the main cluster first among equals
+	// (played: a rebuilt advanced lab flush against the forward cluster's planned
+	// slots, 592 elmos from any built turret)
+	int bestGap = 1 << 20, bestZone = 0, bestFacing = front;
+	bool bestServed = false;
+	AIFloat3 bestPos;
+	for (int f : facings) {
+		for (const auto& zg : factoryZones) {
+			AIFloat3 pos, touch;
+			int gap = 0, servedGap = 1 << 20;
+			if (!PickFlushSite(zg.first, cdef, zg.second, f, anchor, !air, pos, gap, touch, &servedGap, true)) {
+				continue;
+			}
+			const bool served = (servedGap == 0);
+			if ((served && !bestServed) || ((served == bestServed) && (gap < bestGap))) {
+				bestGap = gap;
+				bestServed = served;
+				bestZone = zg.first;
+				bestFacing = f;
+				bestPos = pos;
+			}
+		}
+		if (bestServed && !air) {
+			break;  // touching a built turret in the preferred facing: no need to turn it
+		}
+	}
+	if (bestZone == 0) {
+		return -1;
+	}
+	const int id = ReserveBuildingEx(cdef, bestPos, bestFacing, 0, 0, true, true, false, bestZone, true);
+	if (id >= 0) {
+		circuit->LOG("RESERVE: factory %s flush at (%.0f, %.0f) facing %i, %i cell(s) from a turret%s%s (id %i)",
+				cdef->GetDef()->GetName(), bestPos.x, bestPos.z, bestFacing, bestGap, bestServed ? ", touching a built one" : ", planned slots only",
+				air ? ", air: any facing" : "", id);
+	}
+	return id;
 }
 
 int CTerrainManager::NextSetSlot(CCircuitDef* cdef) const
@@ -2590,7 +2720,7 @@ int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
  * construction turrets and never beyond their reach.
  */
 std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup,
-		int facing, const AIFloat3& anchor, float maxReach, float minNanoDist) const
+		int facing, const AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing) const
 {
 	std::vector<SPackCandidate> out;
 	if (!layoutEnabled || (cdef == nullptr) || (cdef->GetDef() == nullptr)) {
@@ -2711,7 +2841,9 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 		}
 	};
 	scan(z.c1, z.c2, false);
-	if (out.empty()) {
+	// D-104: a flush pick scans the ring always (played: the turret block's open
+	// front side lies outside its zone and was never offered to a factory)
+	if (out.empty() || alwaysRing) {
 		const int r = int(std::ceil(reach / (SQUARE_SIZE * 2)));
 		const int2 r1(std::max(0, z.c1.x - r), std::max(0, z.c1.y - r));
 		const int2 r2(std::min(blockingMap.columns, z.c2.x + r), std::min(blockingMap.rows, z.c2.y + r));

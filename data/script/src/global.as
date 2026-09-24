@@ -310,6 +310,8 @@ namespace Global {
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
             float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
+            float LabEcoOnlineMetalIncome = 200.0f;         // D-102: the economy is online: no lab is reclaimed for its metal, T1 labs are for spam, the advanced lab is rebuilt
+            int LabRebuildMinT1Cons = 3;                    // D-102: below LabEcoOnlineMetalIncome, this many T1 constructors and no lab is rebuilt
             int ExpSpamLabs = 1;                            // T1 labs kept for the spam economy once its gate is open and the advanced lab stands
             bool ExpTurretNearLab = true;                   // D-069: the next box turret slot is the one nearest a standing lab, not the one nearest the pair's centre
             float ExpLabBuildPowerReach = 260.0f;           // D-069: elmos within which static build power (turrets) counts for a lab site: a nano's build distance plus the lab's radius
@@ -664,6 +666,8 @@ namespace Global {
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
             int MinimumT2ConstructorBots = 1;
+            int T2ConstructorCap = 60;                      // D-103: T2 constructors (bot and air) produced up to this while the metal bank is over T2ConstructorBankShare
+            float T2ConstructorBankShare = 0.5f;            // D-103: the metal bank share of storage above which the advanced lab makes T2 constructors
             // T2 constructors TECH keeps before it builds any for an ally's
             // request (played: every one it made was ferried away, and the
             // advanced lab built nothing else).

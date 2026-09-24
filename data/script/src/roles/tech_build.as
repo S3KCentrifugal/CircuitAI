@@ -178,6 +178,7 @@ namespace TechBuild {
     IUnitTask@ StartFactory(CCircuitUnit@ u)
     {
         if (!RoleTech::Opening::complete || IntoT2()) return null;
+        if (!T1LabAllowed()) return null;   // D-102 (played: the chain's lab step reordered the T1 lab once the advanced lab was reclaimed)
         const string side = Global::AISettings::Side;
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         if (lab is null || !u.circuitDef.CanBuild(lab)) return null;
@@ -233,6 +234,52 @@ namespace TechBuild {
         return t;
     }
 
+    // D-102 (owner's rule): the economy is online at LabEcoOnlineMetalIncome;
+    // from then on labs are not reclaimed for metal and T1 labs are for spam
+    bool EcoOnline()
+    {
+        return Economy::GetMinMetalIncomeLast10s() >= Global::RoleSettings::Tech::LabEcoOnlineMetalIncome;
+    }
+    int T1Cons()
+    {
+        return UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
+    }
+    // D-102: the T2 phase has begun at least once (the advanced lab reclaimed later
+    // does not reopen the opening)
+    bool everIntoT2 = false;
+    bool WasIntoT2() { if (!everIntoT2 && IntoT2()) everIntoT2 = true; return everIntoT2; }
+    // D-102 (owner's rule): a T1 lab after the first: always for a restart (no
+    // constructor of any tier left); else only with an advanced lab standing, and
+    // with fewer than LabRebuildMinT1Cons T1 constructors or the economy online
+    bool T1LabAllowed()
+    {
+        if (!WasIntoT2()) return true;
+        const int cons = T1Cons() + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+        if (cons == 0) return true;
+        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) return false;
+        return T1Cons() < Global::RoleSettings::Tech::LabRebuildMinT1Cons || EcoOnline();
+    }
+    // D-102 (owner's rule): the lab native asks for when our last factory is gone
+    // (isReset). Below the online income with LabRebuildMinT1Cons T1 constructors,
+    // none: the constructors build, and the labs were torn down to feed the
+    // economy. Otherwise the advanced lab first; a T1 lab only once one stands.
+    // "" = none.
+    string ResetFactory()
+    {
+        const string side = Global::AISettings::Side;
+        if (T1Cons() >= Global::RoleSettings::Tech::LabRebuildMinT1Cons && !EcoOnline()) {
+            GenericHelpers::LogUtil("[TECH][Build] last factory gone: no lab rebuilt (" + T1Cons() + " T1 constructors, +"
+                + int(Economy::GetMinMetalIncomeLast10s()) + " metal under " + int(Global::RoleSettings::Tech::LabEcoOnlineMetalIncome) + ") (D-102)", 1);
+            return "";
+        }
+        CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
+        if (t2 !is null && t2.IsAvailable(ai.frame) && UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) {
+            GenericHelpers::LogUtil("[TECH][Build] last factory gone: the advanced lab first (D-102)", 1);
+            return t2.GetName();
+        }
+        return UnitHelpers::GetT1BotLabForSide(side);
+    }
+
     // From Tech_EconomyUpdate: the first lab's exit cone, held while it stands.
     void Tick()
     {
@@ -249,7 +296,8 @@ namespace TechBuild {
             throwawayLabId = (Factory::primaryT1BotLab is null) ? -2 : Factory::primaryT1BotLab.id;
         }
         CCircuitUnit@ tlab = Factory::primaryT1BotLab;
-        if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab)) {
+        // D-102: not once the economy is online (reclaiming a lab for metal is pointless late)
+        if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab) && !EcoOnline()) {
             if (tlab.task !is null) aiFactoryMgr.AbortTask(tlab.task);   // native's recruit task would re-issue the build on idle
             Lifecycle::Retire(tlab, "the advanced lab is under way; the throwaway T1 lab is reclaimed (D-066)");
         }
@@ -257,7 +305,7 @@ namespace TechBuild {
         // fusion is under construction and the bank has room for its metal
         {
             CCircuitUnit@ t2 = Factory::primaryT2BotLab;
-            const bool due = (t2 !is null) && AfusUnderWay() && BankHasRoomFor(t2, 2500.0f);
+            const bool due = (t2 !is null) && AfusUnderWay() && BankHasRoomFor(t2, 2500.0f) && !EcoOnline();   // D-102: not once the economy is online
             if (due && !Lifecycle::IsRetiring(t2)) {
                 if (t2.task !is null) aiFactoryMgr.AbortTask(t2.task);
                 Lifecycle::Retire(t2, "an advanced fusion is under construction and the bank has room for the lab's metal (D-078)");

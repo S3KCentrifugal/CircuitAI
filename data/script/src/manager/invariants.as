@@ -62,6 +62,11 @@ namespace Invariants {
     int turretsOverSince = -1;    // D-097: INV-019
     int fusionFramesLast = 0;     // D-100: INV-021
     int lastT1LabId = -1;         // D-101: INV-023
+    int t1LabFramesLast = 0;      // D-102: INV-025
+    int t2ConsHighSince = -1;     // D-103: INV-028
+    dictionary factoriesSeen;     // D-104: INV-029
+    int t2ConsAtHigh = 0;
+    dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
     int ladderFloatSince = -1;
     dictionary energyFrames;   // energy def name -> unfinished count last tick (INV-009)
@@ -241,6 +246,73 @@ namespace Invariants {
                 }
                 t1LabSeen = true;
                 lastT1LabId = l1.id;
+            }
+        }
+
+        // INV-025 (D-102): a T1 lab frame (not the first) starts only when a lab is
+        // wanted: fewer than LabRebuildMinT1Cons T1 constructors or the economy
+        // online, and then only with an advanced lab standing or under construction
+        {
+            CCircuitDef@ t1d = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side));
+            const int frames = (t1d is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(t1d);
+            if (frames > t1LabFramesLast && t1LabSeen) {
+                const bool wanted = TechBuild::T1Cons() < Global::RoleSettings::Tech::LabRebuildMinT1Cons || TechBuild::EcoOnline();
+                const bool t2Up = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) > 0;
+                if (!wanted || (TechBuild::EcoOnline() && !t2Up))
+                    Violation("INV-025", "t1lab", "a T1 lab frame started with " + TechBuild::T1Cons() + " T1 constructors at +"
+                        + int(Economy::GetMinMetalIncomeLast10s()) + " metal, advanced lab " + (t2Up ? "up" : "down"));
+            }
+            t1LabFramesLast = frames;
+        }
+        // INV-026 (D-102): no lab is retired for its metal once the economy is online
+        {
+            array<CCircuitUnit@> labs = { Factory::primaryT1BotLab, Factory::primaryT2BotLab };
+            for (uint i = 0; i < labs.length(); ++i) {
+                CCircuitUnit@ l = labs[i];
+                if (l is null || !Lifecycle::IsRetiring(l) || retiredLabsSeen.exists("" + l.id)) continue;
+                retiredLabsSeen.set("" + l.id, ai.frame);
+                if (TechBuild::EcoOnline())
+                    Violation("INV-026", "" + l.id, l.circuitDef.GetName() + " " + l.id + " retired at +" + int(Economy::GetMinMetalIncomeLast10s()) + " metal, the economy online");
+            }
+        }
+
+        // INV-028 (D-103): with the metal bank over T2ConstructorBankShare and an
+        // advanced lab standing, T2 constructors grow toward T2ConstructorCap
+        {
+            const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
+                + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
+            const float mStor = aiEconomyMgr.metal.storage;
+            const bool high = mStor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * mStor
+                && Factory::primaryT2BotLab !is null && !Lifecycle::IsRetiring(Factory::primaryT2BotLab)
+                && t2Cons < Global::RoleSettings::Tech::T2ConstructorCap;
+            if (!high || t2Cons > t2ConsAtHigh) { t2ConsHighSince = high ? ai.frame : -1; t2ConsAtHigh = t2Cons; }
+            else if (t2ConsHighSince < 0) { t2ConsHighSince = ai.frame; t2ConsAtHigh = t2Cons; }
+            else if (ai.frame - t2ConsHighSince >= 60 * SECOND) {
+                Violation("INV-028", "t2cons", "metal bank over " + int(Global::RoleSettings::Tech::T2ConstructorBankShare * 100.0f) + "% for 60 s, " + t2Cons + " T2 constructors, none added");
+                t2ConsHighSince = ai.frame;
+            }
+        }
+
+        // INV-029 (D-104): a factory placed while a turret stands is within a
+        // cell of a turret slot (the first lab is exempt: no turret stood)
+        {
+            array<string>@ keys = Factory::allFactories.getKeys();
+            for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+                if (factoriesSeen.exists(keys[i])) continue;
+                CCircuitUnit@ fac = null;
+                if (!Factory::allFactories.get(keys[i], @fac) || fac is null || fac.circuitDef is null) continue;
+                factoriesSeen.set(keys[i], ai.frame);
+                if (!Layout::TurretsStand()) continue;
+                const AIFloat3 fp = fac.GetPos(ai.frame);
+                const int ff = aiTerrainMgr.GetBuildingFacing(fac);
+                int gap = aiTerrainMgr.EdgeGapToGroup(fac.circuitDef, fp, ff, Layout::nanoGroup);
+                if (Layout::fwdGroup > 0) {
+                    const int g2 = aiTerrainMgr.EdgeGapToGroup(fac.circuitDef, fp, ff, Layout::fwdGroup);
+                    if (g2 >= 0 && (gap < 0 || g2 < gap)) gap = g2;
+                }
+                GenericHelpers::LogUtil("[Layout] factory " + fac.circuitDef.GetName() + " " + fac.id + " stands " + gap + " cell(s) from a turret", 1);
+                if (gap > 1)
+                    Violation("INV-029", "" + fac.id, fac.circuitDef.GetName() + " " + fac.id + " stands " + gap + " cells from the turrets, not tight");
             }
         }
 

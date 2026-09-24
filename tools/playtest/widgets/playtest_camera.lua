@@ -41,7 +41,7 @@ end
 
 function widget:Initialize()
 	for i, s in ipairs(CFG.shots or {}) do
-		shots[i] = { minute = s.minute, frame = math.floor(s.minute * 60 * FPS), height = s.height or 2200, done = false }
+		shots[i] = { minute = s.minute, frame = math.floor(s.minute * 60 * FPS), height = s.height or 2200, x = s.x, z = s.z, done = false }
 	end
 	echo(string.format("widget loaded: role %s, team %s, speed %s, %d shots, end at %s min",
 		tostring(CFG.role), tostring(CFG.team), tostring(CFG.speed), #shots, tostring(CFG.end_minute)))
@@ -143,7 +143,10 @@ function widget:GameFrame(n)
 	for _, s in ipairs(shots) do
 		if not s.done and n >= s.frame then
 			s.done = true
-			if resolveTarget() then
+			if s.x and s.z then
+				lookAt(s.x, s.z, s.height)   -- a map position given with the shot
+				pending = { frame = n + 6, minute = s.minute }
+			elseif resolveTarget() then
 				lookAt(target.x, target.z, s.height)
 				pending = { frame = n + 6, minute = s.minute }
 			else

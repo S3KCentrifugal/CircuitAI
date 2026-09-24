@@ -102,6 +102,18 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	if ((reservationId >= 0) && geom::is_valid(buildPos) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
 		return;
 	}
+	// D-104 (owner's rule): every factory, whoever ordered it, stands flush
+	// against the construction turrets once one stands; an order that already
+	// has its layout slot (pinned) keeps it
+	if (terrainMgr->IsLayoutEnabled() && !pinRequired && (pinnedReservation < 0) && (reservationId < 0)) {
+		const int flushId = terrainMgr->PackFactoryFlush(buildDef, pos);
+		if ((flushId >= 0) && !PinReservation(flushId)) {
+			terrainMgr->ReleaseReservation(flushId);
+			pinRequired = false;
+			pinnedReservation = -1;
+			pinFailed = false;
+		}
+	}
 	// While a slot for this def is planned, the search runs so it is served.
 	const bool planned = terrainMgr->IsLayoutEnabled() && (terrainMgr->GetReservationCount(buildDef) > 0);
 	if (!pinRequired && !planned && (facing != UNIT_NO_FACING) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {

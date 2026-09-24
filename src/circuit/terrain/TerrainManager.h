@@ -404,7 +404,7 @@ private:
 		float sameSq;    // squared distance to the nearest standing or planned structure of the same def (max when none)
 	};
 	std::vector<SPackCandidate> PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup, int facing,
-			const springai::AIFloat3& anchor, float maxReach, float minNanoDist) const;
+			const springai::AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing = false) const;  // D-104: alwaysRing scans the ring round the zone too
 	void UnmarkSlot(const int2& c1, const int2& c2);  // served: cells go, except a zone's own marks
 	int FindSlotAt(CCircuitDef* cdef, const springai::AIFloat3& pos) const;
 public:
@@ -414,6 +414,19 @@ public:
 	// D-101: a set of up to `count` footprints of cdef, the first flush against a
 	// turret slot of nanoGroup, the rest lined up away from it; the first id, -1
 	int PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, int count);
+	// D-104: the footprint of cdef nearest flush against a turret slot of nanoGroup
+	// (EdgeGap first, then the packer's order); needExit: a factory's exit clear
+	bool PickFlushSite(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, bool needExit,
+			springai::AIFloat3& outPos, int& outGap, springai::AIFloat3& outTouch, int* outServedGap = nullptr, bool ring = false);
+	// D-104: the clusters factories are packed against (the script registers them)
+	void ClearFactoryZones() { factoryZones.clear(); }
+	void AddFactoryZone(int zone, int group) { factoryZones.push_back(std::make_pair(zone, group)); }
+	void SetFactoryFront(int facing) { factoryFront = facing; }
+	// D-104: any factory, flush against a registered cluster's turrets: a ground
+	// factory facing the front (else a side, never away), exit clear; an air
+	// factory any facing, no exit test. -1 when no turret stands or no site
+	int PackFactoryFlush(CCircuitDef* cdef, const springai::AIFloat3& anchor);
+	static bool MakesAircraft(CCircuitAI* circuit, CCircuitDef* cdef);
 	// D-101: the next unserved slot of cdef in a set, nearest its turret first; -1
 	int NextSetSlot(CCircuitDef* cdef) const;
 	// D-101: the unserved slots of cdef's sets released; how many
@@ -427,6 +440,8 @@ public:
 private:
 	std::set<int> recycledSlots;   // D-101: reservation ids freed, not restored, when their structure goes
 	std::set<int> setGroups;       // D-101: groups laid by PackSet
+	std::vector<std::pair<int, int>> factoryZones;   // D-104: (zone, turret group), the main cluster first
+	int factoryFront = -1;                            // D-104: the facing the labs face (Layout::LabFacing)
 	void RemarkZoneCells(int2 c1, int2 c2);
 	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,

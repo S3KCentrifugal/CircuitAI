@@ -983,6 +983,44 @@ namespace RoleTech
 			}
 		}
 
+		// D-103 (owner's rule): the T1 air plant makes the air constructor that
+		// builds the advanced aircraft plant, while we have none
+		if (facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(side) && TechChain::AirConstructors() == 0)
+		{
+			CCircuitDef @airCon = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(side));
+			if (airCon !is null && airCon.IsAvailable(ai.frame))
+			{
+				GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + ": an air constructor for the advanced aircraft plant (D-103)", 1);
+				return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, airCon, pos, 64.f));
+			}
+		}
+
+		// D-103 (owner's rule): T2 constructors whenever the metal bank is over
+		// T2ConstructorBankShare of storage, up to T2ConstructorCap (bot and air)
+		if (UnitHelpers::IsT2BotLab(facDef.GetName()) || facDef.GetName() == UnitHelpers::GetT2AirPlantForSide(side))
+		{
+			const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
+				+ UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
+			const float stor = aiEconomyMgr.metal.storage;
+			const bool bankHigh = stor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * stor;
+			if (bankHigh && t2Cons < Global::RoleSettings::Tech::T2ConstructorCap)
+			{
+				const string conName = UnitHelpers::IsT2BotLab(facDef.GetName())
+					? UnitHelpers::GetT2BotConstructors(side)[0] : UnitHelpers::GetT2AirConstructorNameForSide(side);
+				CCircuitDef @t2c = ai.GetCircuitDef(conName);
+				if (t2c !is null)
+				{
+					if (t2c.maxThisUnit < Global::RoleSettings::Tech::T2ConstructorCap) t2c.maxThisUnit = Global::RoleSettings::Tech::T2ConstructorCap;
+					if (t2c.IsAvailable(ai.frame))
+					{
+						GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + ": T2 constructor " + (t2Cons + 1) + " of " + Global::RoleSettings::Tech::T2ConstructorCap
+							+ " (bank " + int(aiEconomyMgr.metal.current) + " of " + int(stor) + ") (D-103)", 1);
+						return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t2c, pos, 64.f));
+					}
+				}
+			}
+		}
+
 		// Check T2 constructor threshold
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()))
 		{
@@ -1243,10 +1281,13 @@ namespace RoleTech
 			if (Global::Map::NearestMapStartPosition !is null)
 			{
 				// Prefer configured map role weights; fallback to role-appropriate default if none found
-				const string fac = FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
-				// D-101 (owner's rule): native asks again when our last factory is gone
-				// (isReset); while a construction turret stands the new one is placed by
-				// the layout (played: the rebuilt T1 lab went back into its old footprint)
+				// D-102 (owner's rule): when our last factory is gone (isReset) the build
+				// sequence decides: no lab, or the advanced lab before a T1 lab
+				const string fac = isReset ? TechBuild::ResetFactory()
+					: FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				if (isReset && fac == "") return "none";
+				// D-101 (owner's rule): while a construction turret stands the new one is
+				// placed by the layout (played: the rebuilt T1 lab went back into its old footprint)
 				if (isReset && fac != "") aiTerrainMgr.SetResetFactorySlot(Layout::ReserveFactorySite(ai.GetCircuitDef(fac)));
 				return fac;
 			}

@@ -168,4 +168,4 @@ happen by construction, and the check says so if it does. See
 - [`tech_build.md`](tech_build.md) - the acts.
 - [`../eco-planner.md`](../eco-planner.md) - the economy that continues after the chain.
 
-<!-- source: data/script/src/roles/tech_chain.as; blob: 47ad30cf71b0755a6f2443e33dd5a5667664efba; lines: 656 -->
+<!-- source: data/script/src/roles/tech_chain.as; blob: 5aa3039b597d2978c3f0d5bf7c350363b798f78c; lines: 683 -->

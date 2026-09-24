@@ -5262,6 +5262,186 @@ slot within `ExpLabBuildPowerReach`. Unit test `TestFlushAndSetStep`.
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
 [`layout-design.md`](layout-design.md).
 
+## D-102 — Labs are torn down for metal only before the economy is online; a lab comes back only when wanted, the advanced lab first
+
+**Date:** 2026-09-24. **Status:** Played (script; build61's DLL, two benchmark games).
+
+**Owner's rule.** The T1 bot lab need not be rebuilt with 3 or more T1
+constructors and under +200 metal/s. For TECH, T1 labs make T1
+constructors (and reclaim bots) at the start; from +200 metal/s they make
+spam. The advanced lab goes back up before the T1 lab. Labs are torn down
+and reclaimed to feed their metal back into the economy; late in the game
+that is pointless. A sequencing change, not a layout one.
+
+**Played before (build60).** The T1 lab was reclaimed at about 4 min
+(D-066) and the advanced lab at the first advanced fusion (D-078). Native
+then saw no factory able to make builders (`CFactoryManager::DisableFactory`)
+and queued a T1 lab in the same frame. Once native was declined, the chain's
+`lab 1` step, met only while `IntoT2()`, read unmet again and reordered the
+T1 lab (INV-025 caught it within 25 s in both games).
+
+**Decision.**
+
+1. `LabEcoOnlineMetalIncome` (200): at or above it (`TechBuild::EcoOnline`)
+   no lab is retired for its metal (D-066 and D-078 gated), T1 labs are for
+   spam (`lab.t1.spam` needs it), and the advanced lab is rebuilt when none
+   stands (`lab.t2` again).
+2. Native's replacement factory (`isReset`): `TechBuild::ResetFactory`.
+   With `LabRebuildMinT1Cons` (3) or more T1 constructors below the online
+   income, none (the role handler returns `none`, `setup.as` returns no
+   factory). Otherwise the advanced lab while none stands, else the T1 lab.
+3. A T1 lab after the first (`TechBuild::T1LabAllowed`, read by
+   `StartFactory`): always for a restart (no constructor of any tier);
+   otherwise only with an advanced lab standing, and with fewer than 3 T1
+   constructors or the economy online. The chain's lab step is met for good
+   once the T2 phase has begun (`WasIntoT2`).
+
+**Played (headless, zero bonus, Supreme Isthmus).** Run `20260924-101238`:
+the advanced lab was reclaimed at the second advanced fusion, `last factory
+gone: no lab rebuilt (3 T1 constructors, +103 metal under 200)`, no T1 lab
+followed, and the advanced lab was rebuilt at 25:58 once income passed 200.
+Run `20260924-101630`: the advanced lab stood to the end; no lab was
+rebuilt. INV-025 and INV-026 silent in both. The fusion came at 17 to 18
+min in both: the stranded fusion order of D-101, not this change. The
+rebuilt advanced lab is not flush (INV-017): the front-line site of D-096
+is used; open.
+
+**Invariant.** INV-025: a T1 lab frame after the first starts only when a
+lab is wanted (fewer than 3 T1 constructors, or the economy online with an
+advanced lab up). INV-026: no lab is retired once the economy is online.
+
+**Files.** [`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`setup.as`](../data/script/src/setup.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-103 — The air labs are built: a T1 air plant and its air constructor first; T2 constructors while the metal bank is over half
+
+**Date:** 2026-09-24. **Status:** Played (script; build62's DLL; windowed runs `20260924-105433`, `20260924-110418`).
+
+**Owner's request.** Screenshots of the air labs being built. Produce T2
+constructors whenever metal is over 50%, to a cap of 60.
+
+**Found.** No air lab had ever been built. In every run that reached plan
+phase 2, `step 1/2 aap 0/1 made no progress for 120 s: skipped`. The
+advanced aircraft plant (`coraap`, `armaap`) is in the build options of the
+T1 and T2 air constructors only (`corca`, `coraca`), not of the T2 bot
+constructors TECH has. TECH never made a T1 air plant or an air
+constructor, so no builder could take the step.
+
+**Decision.**
+
+1. Plan phases: a T1 air plant step (`ap`) before every `aap` step. Both
+   air plants are placed by the layout (`Layout::OrderFactory`: a layout
+   site, pinned; the old spiral only if the layout has none).
+2. The T1 air plant makes one T1 air constructor while we have no air
+   constructor (`Tech_FactoryAiMakeTask`); that constructor builds the
+   advanced aircraft plant. Waiting for it is not a stall of the `aap` step.
+3. T2 constructors: while the metal bank is over `T2ConstructorBankShare`
+   (0.5) of storage and T2 constructors (bot and air) are under
+   `T2ConstructorCap` (60), the advanced lab (and the advanced aircraft
+   plant) makes one. A unit cap under 60 is raised to 60.
+4. Tooling: `--shots minute@height@x:z` points the camera at a map position
+   (the air plants stand 700 to 900 elmos from the start, outside the
+   start-centred frame).
+
+**Played.** Run `20260924-105433`: T1 air plant 26:13, advanced aircraft
+plant 28:07; T2 constructors 4 to 30 of 60 by about 22 min, each logged with
+the bank. Run `20260924-110418`: T1 air plant 24:41, advanced aircraft plant
+25:35, screenshots at 24.0, 24.5, 25.0 and 26.0 min sent to the owner.
+INV-028 fired twice in the first run, at 11.3 and 16.9 min (the bank over
+half, no T2 constructor added for 60 s); open. The advanced aircraft plant
+stands about 250 elmos from the turret block, not flush: open.
+
+**Invariant.** INV-027: the `ap` and `aap` steps are never skipped.
+INV-028: with the metal bank over `T2ConstructorBankShare` and an advanced
+lab standing, T2 constructors grow within 60 s until `T2ConstructorCap`.
+
+**Files.** [`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`tech_plan.as`](../data/script/src/roles/tech_plan.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`playtest.py`](../tools/playtest/playtest.py),
+[`playtest_camera.lua`](../tools/playtest/widgets/playtest_camera.lua),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-104 — Every factory stands flush against the construction turrets; air factories in any facing
+
+**Date:** 2026-09-24. **Status:** Played (build64).
+
+**Owner's rule.** All factory types, T1 and T2 air included, stand tight to
+the construction turrets; one whole side of the turrets was still open. Air
+factories need not face forward: their units fly and are not blocked by
+structures.
+
+**Before.** Factories were placed through many paths: the chain, the rule
+table, the legacy expansion code in `tech.as`, and native's own orders. Only
+the advanced lab's first site (D-096) and the D-101 layout sites asked for
+the turrets, and those ranked by distance to a turret centre, not by contact.
+The advanced aircraft plant stood about 250 elmos from the block.
+
+**Decision.**
+
+1. One place for all of them. Native's factory task (`CBFactoryTask::FindBuildSite`),
+   when TECH's layout is on and the order has no layout slot, pins it to
+   `CTerrainManager::PackFactoryFlush`. That takes the footprint with the
+   smallest gap to a turret slot (`PickFlushSite`, 0 = touching) over the
+   registered clusters (the main cluster's zones and their rings, then the
+   forward cluster). A ground factory faces the front, else a side, never
+   away, with its exit lane clear. An air factory (one that builds flying
+   units, `MakesAircraft`) takes any facing and skips the exit test. Only once
+   a turret of ours stands (D-101: the first lab goes anywhere).
+2. The script registers the clusters and the front (`Layout::RegisterFactoryZones`,
+   each `Layout::Update`). `ReserveFactorySite` (native's replacement factory,
+   `StartFactory`, the air plants) uses the same pick.
+3. An advanced lab after the first (its front-line footprint used) is ordered
+   flush the same way (`T2LabTask`).
+4. `PackSet` (D-101) shares `PickFlushSite`.
+5. The advanced aircraft plant's step is not a stall while its air
+   constructor lives and the plant is not yet framed (played: skipped while
+   the constructor walked to the site). If the plant can never be placed the
+   step now waits instead of being skipped.
+
+**Played.** Four builds to get there (build64 to build68), each found in play:
+build64 placed the air plants and the silo flush, but the rebuilt advanced
+lab went through `T2LabTask`'s ranked search (7 cells out, INV-029), now
+item 3. build65 put it flush, but against a planned slot of the forward
+cluster, 592 elmos from any built turret (INV-016/017): the pick now ranks
+touching a turret that stands (or is going up) first, across clusters and
+facings. build67: nothing touched a built turret, because the block's open
+front side lies outside its zone and the packer scans the ring only when the
+zone has nothing left; flush picks for factories now scan the ring always.
+Economy sets doing the same took the front side, so only factories scan it
+(build68).
+
+Run `20260924-131356` (build68): the nuke silo, the rebuilt advanced lab
+(facing the front), and the T1 air plant were each placed `touching a built
+one`; the advanced aircraft plant touched a planned slot (0 cells). Every
+factory logged 0 cells (the first lab 1, the D-096 front line). INV-016,
+INV-017, INV-027 and INV-029 silent; `PackFactoryFlush` 34 ms at most. The
+screenshot at 28 min shows the labs and the air plant on the block's
+front side, the advanced fusions and converters on the others.
+
+**Invariant.** INV-029: a factory placed while a turret stands is within 1
+cell of a turret slot (1, not 0: the D-096 front-line advanced lab stands 1
+cell ahead of turret row 0).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`FactoryTask.cpp`](../src/circuit/task/builder/FactoryTask.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`layout-design.md`](layout-design.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

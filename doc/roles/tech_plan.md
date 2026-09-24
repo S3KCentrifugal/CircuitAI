@@ -76,4 +76,4 @@ rule adds.
 - [tech.md](tech.md), [tech_chain.md](tech_chain.md), [tech_rules.md](tech_rules.md)
 - [../invariants.md](../invariants.md) (INV-010, INV-011), [../actor-matrix.md](../actor-matrix.md)
 
-<!-- source: data/script/src/roles/tech_plan.as; blob: 6540d36c3c9ecee31b2840f9a2013bedbe03e6d1; lines: 101 -->
+<!-- source: data/script/src/roles/tech_plan.as; blob: 8a4fbaa643337551283ed9cc727f4b0d6c120621; lines: 105 -->

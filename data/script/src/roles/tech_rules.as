@@ -143,6 +143,9 @@ namespace TechRules {
     bool NoLabAtAll(Ctx@ c)       { return c.t1Labs == 0 && c.t2Labs == 0 && !c.intoT2; }
     bool NoConstructors(Ctx@ c)   { return c.constructors == 0; }
     bool T2LabStands(Ctx@ c)      { return c.t2Labs > 0; }
+    bool EcoOnline(Ctx@ c)        { return TechBuild::EcoOnline(); }   // D-102
+    bool T2LabAgain(Ctx@ c)       { return c.t2Labs == 0 && TechBuild::EcoOnline(); }   // D-102: the advanced lab again once the economy is online
+    bool NoAfusYetOrAgain(Ctx@ c) { return !TechBuild::IntoAfus() || (c.t2Labs == 0 && TechBuild::EcoOnline()); }   // D-078, D-102
     bool SpamGate(Ctx@ c)         { return c.spamGate; }
     bool ChainActive(Ctx@ c)      { return TechChain::Active(); }
     bool ChainInactive(Ctx@ c)    { return !TechChain::Active(); }
@@ -334,6 +337,7 @@ namespace TechRules {
     array<When@> W2(When@ a1, When@ a2) { array<When@> a = {a1, a2}; return a; }
     array<When@> W3(When@ a1, When@ a2, When@ a3) { array<When@> a = {a1, a2, a3}; return a; }
     array<When@> W4(When@ a1, When@ a2, When@ a3, When@ a4) { array<When@> a = {a1, a2, a3, a4}; return a; }
+    array<When@> W5(When@ a1, When@ a2, When@ a3, When@ a4, When@ a5) { array<When@> a = {a1, a2, a3, a4, a5}; return a; }
 
     // ---------------------------------------------------------------- the table
 
@@ -370,7 +374,7 @@ namespace TechRules {
         table.insertLast(Rule("mex.expand",        CONSTRUCTORS, W2(@OpeningDone, @MetalBottleneck), @DoExpandMex,    "the nearest open spot within EcoMexExpandRadius while metal is the bottleneck"));
         table.insertLast(Rule("energy.draining",   MOBILE,       W2(@Draining, @EnergyIdle), @DoEnergy,       "the base is stalling: cheapest energy per E/s, a fusion in the fusion era"));
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));
-        table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYet), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab)"));
+        table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYetOrAgain), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab); again once the economy is online and none stands (D-102)"));
         table.insertLast(Rule("mex.upgrade",       CON_T2,       W0(), @DoMexUpgrade,   "the nearest owned T1 mex within MexUpgradeRadius, one at a time"));
         table.insertLast(Rule("energy.convert",    MOBILE,       W2(@ConverterWanted, @NotStalling), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
         table.insertLast(Rule("turret.build",      MOBILE,       W0(), @DoTurret,       "static build power under EcoBuildPowerPerMetal x metal, or metal floating: a turret on its slot; else assist the one going up"));
@@ -379,7 +383,7 @@ namespace TechRules {
         table.insertLast(Rule("storage.energy",    MOBILE,       W0(), @DoEnergyStorage, "one energy storage once winds carry the base, or the bank holds under EcoStorageSeconds"));
         table.insertLast(Rule("storage.metal",     MOBILE,       W0(), @DoMetalStorage, "metal storage when the bank is full"));
         table.insertLast(Rule("energy.float",      MOBILE,       W3(@MetalFloating, @EnergyAhead, @EnergyIdle), @DoBestPayback,  "metal floating with energy ahead: the best-payback source anyway"));
-        table.insertLast(Rule("lab.t1.spam",       CONSTRUCTORS, W4(@SpamGate, @T2LabStands, @SpamLabsWanted, @ChainInactive), @DoSpamLab,      "late game: T1 labs for the spam economy on the pair's slot"));
+        table.insertLast(Rule("lab.t1.spam",       CONSTRUCTORS, W5(@SpamGate, @EcoOnline, @T2LabStands, @SpamLabsWanted, @ChainInactive), @DoSpamLab,      "late game: T1 labs for the spam economy on the pair's slot, once the economy is online (D-102) and the advanced lab stands"));
         table.insertLast(Rule("legacy.strategic",  MOBILE,       W1(@ChainInactive), @DoLegacy,       "the role's strategic rungs as they stand (nukes, anti-nuke, gantry, water factories, T2 constructor policy)"));
         table.insertLast(Rule("defence.base",      CONSTRUCTORS, W1(@FirstTurretStands), @DoDefence,      "one light laser and one light AA near the factories"));
         table.insertLast(Rule("order.repair",      CONSTRUCTORS, W0(), @DoQueuedRepair, "native's queued repairs of our own unfinished structures within ExpOrderRadius"));

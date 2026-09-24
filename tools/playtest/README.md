@@ -147,3 +147,9 @@ log-only checks and for the 8v8.
   `maps/`.
 - A game the lobby is running at the same time shares the GPU and the CPU;
   stop one first.
+
+## Pointing the camera
+
+`--shots` takes `minute[@height[@x:z]]`: with `x:z` the camera centres on that
+map position instead of the start (D-103), for structures placed away from it,
+e.g. `--shots 25@1500@900:9660`.

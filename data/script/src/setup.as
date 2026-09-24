@@ -56,9 +56,11 @@ namespace Factory {
 			if (Global::profileController.RoleCfg !is null && Global::profileController.RoleCfg.SelectFactoryHandler !is null) {
 				string fac = Global::profileController.RoleCfg.SelectFactoryHandler(pos, isStart, isReset);
 				GenericHelpers::LogUtil("[Factory] Role handler returned '" + fac + "'", 2);
+				// D-102: a role may decline native's replacement factory ("none")
+				if (isReset && fac == "none") return null;
 				CCircuitDef@ def = (fac != "") ? ai.GetCircuitDef(fac) : null;
 				if (def !is null && def.IsAvailable(ai.frame)) {
-					Global::AISettings::StartFactory = fac;
+					if (!isReset) Global::AISettings::StartFactory = fac;
 					@result = def;
 				}
 			}

@@ -718,6 +718,7 @@ namespace Layout {
             facing = aiTerrainMgr.GetLayoutInt(FACTORY_ROOT + ".facing", facing);
         }
         if (planned && HasBox()) CheckForward();   // D-081
+        if (planned && HasBox()) RegisterFactoryZones();   // D-104
         if (overlay) SendOverlay();
     }
 
@@ -822,9 +823,30 @@ namespace Layout {
     // layout (next to the turrets, facing the front, exit clear); only with no
     // turret on the map (the first lab, or a restart after a wipe) anywhere. The
     // reservation is armed: native's factory task serves it. -1 when none.
+    // D-104: native packs every factory flush against these clusters (the main
+    // cluster first, then the forward one), facing the front
+    void RegisterFactoryZones()
+    {
+        aiTerrainMgr.ClearFactoryZones();
+        for (int i = 0; i < ZoneCount(); ++i) aiTerrainMgr.AddFactoryZone(ZoneAt(i), nanoGroup);
+        if (fwdZone != 0 && fwdGroup > 0) aiTerrainMgr.AddFactoryZone(fwdZone, fwdGroup);
+        aiTerrainMgr.SetFactoryFront(LabFacing());
+    }
+
     int ReserveFactorySite(CCircuitDef@ def)
     {
         if (def is null || !HasBox() || !TurretsStand()) return -1;
+        // D-104: flush against the turrets (air: any facing, no exit test)
+        RegisterFactoryZones();
+        {
+            const int fid = aiTerrainMgr.PackFactoryFlush(def, TurretSeed());
+            if (fid >= 0) {
+                const AIFloat3 fp = aiTerrainMgr.GetReservationPos(fid);
+                GenericHelpers::LogUtil("[Layout] " + def.GetName() + " flush against the turrets at (" + int(fp.x) + ", " + int(fp.z) + ") facing "
+                    + aiTerrainMgr.GetReservationFacing(fid) + " (D-104)", 1);
+                return fid;
+            }
+        }
         const array<int> labFacings = LabFacings();
         for (uint f = 0; f < labFacings.length(); ++f) {
             for (int i = 0; i < ZoneCount(); ++i) {
@@ -842,6 +864,19 @@ namespace Layout {
         }
         GenericHelpers::LogUtil("[Layout] no layout site for " + def.GetName() + " although a turret stands", 1);
         return -1;
+    }
+
+    // D-103: a factory ordered on a layout site (ReserveFactorySite), pinned;
+    // null when the layout has no site for it
+    IUnitTask@ OrderFactory(CCircuitDef@ def, int timeout)
+    {
+        const int id = ReserveFactorySite(def);
+        if (id < 0) return null;
+        const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
+        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, def, p, null, 0.0f, false, true, timeout));
+        if (t is null) { aiTerrainMgr.ReleaseReservation(id); return null; }
+        if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[Layout] could not pin " + def.GetName() + " to slot " + id, 1);
+        return t;
     }
 
     int noRoomSince = -1;     // D-099: INV-020
@@ -1224,6 +1259,13 @@ namespace Layout {
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
         if (t2 is null || !t2.IsAvailable(ai.frame)) return null;
         if (!Builder::IsT2BotFactoryOffCooldown()) return null;
+        // D-104 (owner's rule): an advanced lab after the first (its planned
+        // front-line footprint used) stands flush against the turrets, facing the
+        // front (played: the rebuilt lab 7 cells out through the ranked search)
+        if (TechBuild::WasIntoT2() && (labSlot < 0 || aiTerrainMgr.GetReservationPos(labSlot).x < 0.0f)) {
+            IUnitTask@ ft = OrderFactory(t2, timeout);
+            if (ft !is null) { Builder::MarkT2BotFactoryEnqueued(); return ft; }
+        }
         // D-073: the site is scored by the turret slots (standing or planned) that
         // reach it, front first among equals: the pair's planned slot against the
         // best free footprint inside the turret layout (owner: "on the turret

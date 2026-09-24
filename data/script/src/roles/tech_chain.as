@@ -122,6 +122,7 @@ namespace TechChain
         if (key == "silo") { if (side == "cortex") return "corsilo"; if (side == "legion") return "legsilo"; return "armsilo"; }
         if (key == "gantry") return UnitHelpers::GetLandGantryForSide(side);
         if (key == "aap") return UnitHelpers::GetT2AirPlantForSide(side);      // D-080
+        if (key == "ap") return UnitHelpers::GetT1AirPlantForSide(side);       // D-103: its air constructor builds the advanced aircraft plant
         if (key == "lrpc") return UnitHelpers::GetLRPCNameForSide(side);       // D-080
         return "";
     }
@@ -176,10 +177,22 @@ namespace TechChain
     {
         if (key == "mex") return Task::BuildType::MEX;
         if (key == "moho") return Task::BuildType::MEXUP;
-        if (key == "lab" || key == "alab" || key == "gantry" || key == "silo" || key == "aap") return Task::BuildType::FACTORY;
+        if (key == "lab" || key == "alab" || key == "gantry" || key == "silo" || key == "aap" || key == "ap") return Task::BuildType::FACTORY;
         if (key == "lrpc") return Task::BuildType::BIG_GUN;   // D-080
         if (key == "nano" || key == "nanot2") return Task::BuildType::NANO;
         return Task::BuildType::ENERGY;
+    }
+
+    // D-103: air constructors of ours, T1 and T2
+    int AirConstructors()
+    {
+        const string side = Global::AISettings::Side;
+        int n = 0;
+        CCircuitDef@ a1 = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(side));
+        CCircuitDef@ a2 = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(side));
+        if (a1 !is null) n += a1.count;
+        if (a2 !is null) n += a2.count;
+        return n;
     }
 
     void Add(const string &in key, int target, float radius = 0.0f)
@@ -388,6 +401,13 @@ namespace TechChain
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
         if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
         if (key == "gantry") return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        // D-103: both air plants placed by the layout (a turret stands); the old
+        // spiral only when the layout has no site
+        if (key == "ap" || key == "aap") {
+            IUnitTask@ lt = Layout::OrderFactory(d, 300 * SECOND);
+            if (lt !is null) return lt;
+            if (key == "ap") return Builder::EnqueueT1AirFactory(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
+        }
         if (key == "aap") return Builder::EnqueueT2AirPlant(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);   // D-080
         // D-080 phase 1: the cannon at the start position, native's site search;
         // high ground with sight beyond the front is KI-418
@@ -479,7 +499,7 @@ namespace TechChain
             // rebuilt them and never completed)
             if (IsEnergyKey(s.key) && TechBuild::EnergyRetired(s.defName)) continue;
             // the first lab is reclaimed once the advanced lab begins (D-066): its step is met from then on
-            if (s.key == "lab" && TechBuild::IntoT2()) continue;
+            if (s.key == "lab" && TechBuild::WasIntoT2()) continue;   // D-102: met for good once the T2 phase has begun
             // the advanced lab is reclaimed once the advanced fusion is under way (D-078): its step is met from then on
             if (s.key == "alab" && TechBuild::IntoAfus()) continue;
             if (i < skipped.length() && skipped[i]) continue;
@@ -490,12 +510,19 @@ namespace TechChain
             // the current step: no progress for ChainStepStallSeconds skips it;
             // a frame under construction is progress (D-075; played: the
             // fusion was skipped at 11:21 while it was being built)
-            if (stallStep != int(i) || stallHave != have || unfinished > 0) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
+            // D-103: the advanced aircraft plant waits for the T1 air plant's air
+            // constructor (only air constructors build it): not a stall
+            // D-104: nor while the air constructor lives and the plant is not yet
+            // framed (played: skipped while the constructor walked to the site)
+            const bool waitsForAirCon = (s.key == "aap") && (AirConstructors() == 0 || unfinished == 0);
+            if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
             else if (i + 1 < steps.length() && ai.frame - stallFrame > int(Global::RoleSettings::Tech::ChainStepStallSeconds) * SECOND) {
                 // never the objective itself (played: an advanced fusion whose site
                 // the engine refused was skipped and the chain declared itself done)
                 skipped[i] = true;
                 Invariants::ChainStepSkipped(s.key, unfinished);   // D-076: INV-003
+                if (s.key == "aap" || s.key == "ap")   // INV-027 (D-103): the air labs are built, not skipped
+                    Invariants::Violation("INV-027", s.key, "the " + s.key + " step made no progress for " + int(Global::RoleSettings::Tech::ChainStepStallSeconds) + " s and was skipped");
                 GenericHelpers::LogUtil("[TECH][Chain] step " + (i + 1) + "/" + steps.length() + " " + s.key + " " + have + "/" + s.target
                     + " made no progress for " + int(Global::RoleSettings::Tech::ChainStepStallSeconds) + " s: skipped", 1);
                 continue;
