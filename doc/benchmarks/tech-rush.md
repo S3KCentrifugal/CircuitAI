@@ -98,3 +98,10 @@ Status per objective: the best run so far, updated by the tracker.
 | 20260922-212555 | afus | 24.1 | 1:13 | 6:48 | 8:23 | 11:09 | 15:58 | 19:34 | - | - | 15/45/61 | cd41084e2cf2b147 | D-080 played: retired energy steps met; parallel afus on the ladder; plan nuke |
 | 20260923-222626 | afus | 28.2 | 1:13 | 5:38 | 7:23 | 10:29 | 18:38 | 19:32 | - | - | 16/38/74 | dbdc6bc1248a150c | D-100 A/B: ChainMohoRadius=0 (the recipe's 2 upgrades before the fusion) |
 | 20260923-223017 | afus | 28.2 | 1:13 | 5:37 | 7:41 | 15:34 | 17:42 | - | - | - | 16/43/98 | dbdc6bc1248a150c | D-100 A/B: ChainMohoRadius=2500 (every mex within 2500 upgraded first; fusion later, advanced fusion 56 s sooner) |
+| 20260923-233219 | afus | 28.2 | 1:11 | 5:43 | 7:40 | 15:35 | 18:29 | 21:03 | - | - | 15/51/82 | 3a95829d4a78da87 | D-101 flush sets, recycled ground (build59/60) |
+| 20260923-234951 | afus | 28.2 | 1:11 | 6:28 | 8:05 | 11:59 | 18:04 | 22:06 | - | - | 18/48/68 | 1dd99d8119eecc7f | D-101 flush sets, recycled ground (build59/60) |
+| 20260923-235346 | afus | 28.1 | 1:14 | 5:47 | 7:23 | 17:55 | 22:12 | - | - | - | 15/38/92 | 1dd99d8119eecc7f | D-101 flush sets, recycled ground (build59/60) |
+| 20260923-235818 | afus | 26.1 | 1:11 | 5:34 | 7:14 | 19:40 | 21:37 | - | - | - | 16/38/84 | 1dd99d8119eecc7f | D-101 flush sets, recycled ground (build59/60) |
+| 20260924-000156 | afus | 26.2 | 1:20 | 6:19 | 8:28 | 14:53 | 18:37 | 21:06 | - | - | 15/33/134 | 1dd99d8119eecc7f | D-101 flush sets, recycled ground (build59/60) |
+| 20260924-003349 | afus | 26.3 | 1:13 | 6:08 | 7:57 | 17:08 | 20:05 | - | - | - | 8/37/96 | 408380a4e425473e | D-101 + finished-reactor reclaim (build61) |
+| 20260924-003724 | afus | 26.2 | 1:14 | 5:50 | 7:38 | 17:57 | 22:59 | - | - | - | 6/41/102 | 408380a4e425473e | D-101 + finished-reactor reclaim (build61) |

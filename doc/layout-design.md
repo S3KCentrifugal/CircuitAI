@@ -105,7 +105,10 @@ a factory's exit lane (D-096); the advanced lab stands on the block's front
 line, its back to turret row 0. Turrets go up as many at a time as the nearby
 build power and the metal pay for (D-097). A full zone does not grow: the
 ground around it within a turret's reach is used, then the forward cluster,
-and no reservation stands in a factory's exit (D-099). Decision:
+and no reservation stands in a factory's exit (D-099). Advanced fusions and
+converters go in sets flush against the turrets and lined up outward; ground
+TECH reclaims returns to the pool; a later T1 lab is placed by the layout
+(D-101). Decision:
 [D-094](decisions.md#d-094--the-layouts-ranking-rules-live-once-in-a-tested-header-the-layout-scripts-repeated-blocks-are-helpers).
 
 ## Rectangles, and the block grows from the advanced lab (D-088)

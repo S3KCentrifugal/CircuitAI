@@ -182,6 +182,18 @@ namespace TechBuild {
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         if (lab is null || !u.circuitDef.CanBuild(lab)) return null;
         if (lab.count > 0 || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) > 0) return null;
+        // D-101 (owner's rule): only with no construction turret standing may the
+        // lab go anywhere; with one, the layout places it
+        if (Layout::TurretsStand()) {
+            const int id = Layout::ReserveFactorySite(lab);
+            if (id >= 0) {
+                const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
+                IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, lab, p, null, 0.0f, false, true, 300 * SECOND));
+                if (t is null) { aiTerrainMgr.ReleaseReservation(id); return null; }
+                if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[TECH][Build] could not pin the T1 lab to slot " + id, 1);
+                return t;
+            }
+        }
         if (UnitHelpers::IsCommander(u.circuitDef) && Layout::HasComplex()) {
             const AIFloat3 at = u.GetPos(ai.frame);
             const int facing = Layout::facing;
@@ -438,11 +450,25 @@ namespace TechBuild {
         }
         return n;
     }
+    // D-101: the reactors that stand finished (a def's count includes its frames;
+    // played: an advanced fusion frame counted as standing, 29 turbines were
+    // reclaimed with no reactor finished, energy fell to +123 and the frame never
+    // finished)
+    int FinishedOf(const string &in name)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        return (d is null) ? 0 : (d.count - aiBuilderMgr.GetUnfinishedCount(d));
+    }
+    bool ReactorStands()
+    {
+        const string side = Global::AISettings::Side;
+        return FinishedOf(UnitHelpers::GetFusionNameForSide(side)) + FinishedOf(UnitHelpers::GetAdvFusionNameForSide(side)) > 0;
+    }
     IUnitTask@ ReclaimEnergy(CCircuitUnit@ u, const EcoPlanner::State@ s)
     {
         if (u is null || s is null) return null;
-        const bool afusUp = s.afus > 0;
-        if (s.fusions <= 0 && !afusUp) return null;
+        const bool afusUp = FinishedOf(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) > 0;
+        if (!ReactorStands()) return null;
         const float wind = TechChain::WindExpected();
         const float t1Make = s.winds * wind + s.solars * 20.0f;
         const float advMake = s.advSolars * 75.0f;
@@ -460,6 +486,9 @@ namespace TechBuild {
             if (d is null) continue;
             CCircuitUnit@ target = aiBuilderMgr.FindOwnNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ReclaimEnergyRadius, d);
             if (target is null) continue;
+            // INV-024 (D-101): T1 energy is reclaimed only while a reactor stands finished
+            if (!ReactorStands())
+                Invariants::Violation("INV-024", target.circuitDef.GetName(), target.circuitDef.GetName() + " " + target.id + " reclaimed with no finished fusion or advanced fusion");
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::NORMAL, target, 120 * SECOND));
             if (t is null) continue;
             PullTurrets(target);   // D-078

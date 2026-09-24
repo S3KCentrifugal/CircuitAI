@@ -1966,6 +1966,175 @@ void CTerrainManager::RemarkZoneCells(int2 c1, int2 c2)
 	}
 }
 
+void CTerrainManager::MarkSlotRecycled(CCircuitDef* cdef, const AIFloat3& pos)
+{
+	if (!layoutEnabled || (cdef == nullptr)) {
+		return;
+	}
+	int best = -1;
+	float bestSq = SQUARE(SQUARE_SIZE * 4);
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.def != cdef) || !r.consumed) {
+			continue;
+		}
+		const float sq = r.pos.SqDistance2D(pos);
+		if (sq <= bestSq) {
+			bestSq = sq;
+			best = r.id;
+		}
+	}
+	if ((best >= 0) && recycledSlots.insert(best).second) {
+		circuit->LOG("RESERVE: %s at (%.0f, %.0f) is being reclaimed: its slot will be freed (id %i)",
+				cdef->GetDef()->GetName(), pos.x, pos.z, best);
+	}
+}
+
+int CTerrainManager::EdgeGapToGroup(CCircuitDef* cdef, const AIFloat3& pos, int facing, int group) const
+{
+	int2 c1, c2;
+	if ((cdef == nullptr) || !ReservationCells(cdef, pos, facing, c1, c2)) {
+		return -1;
+	}
+	std::vector<layout_rank::CellRect> turrets;
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		int2 r1, r2;
+		if ((r.group == group) && (r.def != nullptr) && ReservationCells(r.def, r.pos, r.facing, r1, r2)) {
+			turrets.push_back(layout_rank::CellRect{r1.x, r1.y, r2.x, r2.y});
+		}
+	}
+	return turrets.empty() ? -1 : layout_rank::NearestEdgeGap(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, turrets);
+}
+
+int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count)
+{
+	SSlowCall slow("PackSet", circuit);
+	if ((cdef == nullptr) || (count < 1)) {
+		return -1;
+	}
+	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, anchor, 0.f, 0.f);
+	if (cands.empty()) {
+		return -1;
+	}
+	struct STurret { layout_rank::CellRect rect; AIFloat3 pos; };
+	std::vector<STurret> turrets;
+	std::vector<layout_rank::CellRect> turretRects;
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		int2 r1, r2;
+		if ((r.group == nanoGroup) && (r.def != nullptr) && ReservationCells(r.def, r.pos, r.facing, r1, r2)) {
+			turrets.push_back(STurret{layout_rank::CellRect{r1.x, r1.y, r2.x, r2.y}, r.pos});
+			turretRects.push_back(turrets.back().rect);
+		}
+	}
+	if (turrets.empty()) {
+		return -1;
+	}
+	// flush first (gap 0 to a turret slot), then the packer's own order (served
+	// turrets first, nearest the anchor): a stable sort keeps it among equals
+	struct SRanked { const SPackCandidate* c; int gap; };
+	std::vector<SRanked> ranked;
+	ranked.reserve(cands.size());
+	for (const SPackCandidate& c : cands) {
+		int2 c1, c2;
+		if (!ReservationCells(cdef, c.pos, facing, c1, c2)) {
+			continue;
+		}
+		ranked.push_back(SRanked{&c, layout_rank::NearestEdgeGap(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, turretRects)});
+	}
+	std::stable_sort(ranked.begin(), ranked.end(), [](const SRanked& a, const SRanked& b) { return a.gap < b.gap; });
+	constexpr int POCKET_TESTS_MAX = 40;  // D-090
+	int pocketTests = 0, tried = 0;
+	for (const SRanked& rk : ranked) {
+		if (++tried > 400) {
+			break;
+		}
+		AIFloat3 pos = rk.c->pos;
+		pos.y = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), pos, facing)) {
+			continue;
+		}
+		if ((++pocketTests <= POCKET_TESTS_MAX) && LeavesPocket(zone, cdef, pos, facing)) {
+			continue;
+		}
+		const int group = nextGroupId++;
+		const int first = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
+		if (first < 0) {
+			--nextGroupId;
+			continue;
+		}
+		setGroups.insert(group);
+		// the rest of the set: lined up away from the turret the first touches
+		int2 f1, f2;
+		ReservationCells(cdef, pos, facing, f1, f2);
+		const layout_rank::CellRect fr{f1.x, f1.y, f2.x, f2.y};
+		const STurret* touch = &turrets[0];
+		int touchGap = 1 << 20;
+		for (const STurret& tt : turrets) {
+			const int g = layout_rank::EdgeGap(fr, tt.rect);
+			if (g < touchGap) {
+				touchGap = g;
+				touch = &tt;
+			}
+		}
+		int sx = 0, sz = 0;
+		layout_rank::SetStep(pos.x, pos.z, touch->pos.x, touch->pos.z, f2.x - f1.x, f2.y - f1.y, sx, sz);
+		int laid = 1;
+		for (int k = 1; (k < count) && ((sx != 0) || (sz != 0)); ++k) {
+			AIFloat3 p(pos.x + float(sx * k) * SQUARE_SIZE * 2, 0.f, pos.z + float(sz * k) * SQUARE_SIZE * 2);
+			p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+			if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), p, facing) || LeavesPocket(zone, cdef, p, facing)) {
+				break;
+			}
+			if (ReserveBuildingEx(cdef, p, facing, 0, group, true, true, false, zone, true) < 0) {
+				break;
+			}
+			++laid;
+		}
+		circuit->LOG("RESERVE: set of %i %s from (%.0f, %.0f), %i cell(s) from a turret, growing (%i, %i) cells a step (group %i, id %i)",
+				laid, cdef->GetDef()->GetName(), pos.x, pos.z, rk.gap, sx, sz, group, first);
+		return first;
+	}
+	return -1;
+}
+
+int CTerrainManager::NextSetSlot(CCircuitDef* cdef) const
+{
+	int best = -1, bestOrder = 1 << 20;
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.def != cdef) || r.consumed || r.claimed || (setGroups.count(r.group) == 0)) {
+			continue;
+		}
+		// the set's own order: the footprint nearest the turret first
+		const int key = r.group * 64 + r.order;
+		if (key < bestOrder) {
+			bestOrder = key;
+			best = r.id;
+		}
+	}
+	return best;
+}
+
+int CTerrainManager::ReleaseSetSlots(CCircuitDef* cdef)
+{
+	std::vector<int> ids;
+	for (const auto& kv : reservations) {
+		const SReservation& r = kv.second;
+		if ((r.def == cdef) && !r.consumed && !r.claimed && (setGroups.count(r.group) > 0)) {
+			ids.push_back(r.id);
+		}
+	}
+	for (int id : ids) {
+		ReleaseReservation(id);
+	}
+	if (!ids.empty()) {
+		circuit->LOG("RESERVE: %i unused %s set slot(s) released", int(ids.size()), cdef->GetDef()->GetName());
+	}
+	return int(ids.size());
+}
+
 void CTerrainManager::OnStructureGone(CCircuitDef* cdef, const AIFloat3& pos)
 {
 	const int id = FindSlotAt(cdef, pos);
@@ -1979,6 +2148,15 @@ void CTerrainManager::OnStructureGone(CCircuitDef* cdef, const AIFloat3& pos)
 	}
 	if (r.tenant) {
 		circuit->LOG("RESERVE: tenant %s at (%.0f, %.0f) gone; its ground goes to the successor band (id %i)",
+				cdef->GetDef()->GetName(), pos.x, pos.z, id);
+		reservations.erase(it);
+		return;
+	}
+	if (recycledSlots.erase(id) > 0) {
+		// D-101 (played: 38 turbines, 10 converters and the T1 lab reclaimed, each
+		// slot restored for its own def; the advanced fusions went elsewhere and the
+		// rebuilt lab went back into the old footprint)
+		circuit->LOG("RESERVE: %s at (%.0f, %.0f) reclaimed; its ground is free again (id %i)",
 				cdef->GetDef()->GetName(), pos.x, pos.z, id);
 		reservations.erase(it);
 		return;

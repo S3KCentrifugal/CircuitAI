@@ -81,6 +81,12 @@ namespace TechChain
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
             if (s.key == "income" || (i < skipped.length() && skipped[i])) continue;
+            // D-101 (played: with the metal floating the builders went past the
+            // upgrades (D-100), the last upgrade order waited with no frame, this
+            // blocked the converters, energy floated 600 s and the chain held the
+            // advanced fusion for the converters: none by 28 min): an upgrade is not
+            // a dear order worth waiting on while the metal floats
+            if (s.key == "moho" && TechBuild::MetalFullLong()) continue;
             CCircuitDef@ d = ai.GetCircuitDef(s.defName);
             if (d is null || d.costM < Global::RoleSettings::Tech::ChainParallelCostM) continue;
             if (Standing(s, d) >= s.target) continue;
@@ -318,6 +324,7 @@ namespace TechChain
     void Tick()
     {
         TrackEnergy();   // D-079
+        Layout::TickSets();   // D-101
         if (!Active()) return;
         for (uint i = 0; i < steps.length(); ++i) {
             // D-100 (owner: the fusion started with the mexes near it still T1; it

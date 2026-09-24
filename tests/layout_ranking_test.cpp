@@ -255,6 +255,23 @@ void TestRingSkipsTheZone()
 	Check(Inside(CellRect{47, 57, 50, 60}, zone), "flush with the far corner is inside");
 }
 
+// D-101 (owner: advanced fusions flush against the turrets, then lined up
+// moving away from them): touching is gap 0, one free cell is gap 1, and a set
+// steps along the axis away from the turret it touches.
+void TestFlushAndSetStep()
+{
+	const CellRect turret{10, 10, 12, 12};
+	Check(EdgeGap(CellRect{12, 10, 18, 16}, turret) == 0, "sharing an edge is flush");
+	Check(EdgeGap(CellRect{13, 10, 19, 16}, turret) == 1, "one free cell between is gap 1");
+	Check(EdgeGap(CellRect{12, 12, 18, 18}, turret) == 0, "corner to corner touches");
+	Check(NearestEdgeGap(CellRect{20, 20, 26, 26}, {turret, CellRect{26, 20, 28, 22}}) == 0, "the nearest turret decides");
+	int sx = 0, sz = 0;
+	SetStep(240.f, 176.f, 176.f, 176.f, 6, 6, sx, sz);
+	Check(sx == 6 && sz == 0, "east of the turret: the set grows east by one footprint");
+	SetStep(176.f, 100.f, 176.f, 176.f, 6, 4, sx, sz);
+	Check(sx == 0 && sz == -4, "north of the turret: the set grows north");
+}
+
 // D-072/D-090: pockets.
 void TestLeavesPocket()
 {
@@ -312,6 +329,7 @@ int main()
 	TestSiteAheadOfTheBlock();
 	TestExitLanes();
 	TestRingSkipsTheZone();
+	TestFlushAndSetStep();
 	TestLeavesPocket();
 	TestRingOrderAndClearOf();
 	if (failures > 0) {

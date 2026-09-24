@@ -1383,7 +1383,16 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 				// queue new factory with builder
 				CCircuitDef* facDef = GetFactoryToBuild(-RgtVector, true, true);
 				if (facDef != nullptr) {
-					builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, -RgtVector, GetRepresenter(facDef)));
+					// D-101: the role reserved the site (the layout, while a turret stands):
+					// the task goes there, pinned (played: unpinned, native's own search
+					// reserved a footprint beside the old lab and built there)
+					CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+					const int slot = terrainMgr->TakeResetFactorySlot();
+					const AIFloat3 at = (slot >= 0) ? terrainMgr->GetReservationPos(slot) : -RgtVector;
+					IBuilderTask* task = builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, at, GetRepresenter(facDef)));
+					if ((slot >= 0) && (task != nullptr) && !task->PinReservation(slot)) {
+						circuit->LOG("RESERVE: replacement %s could not be pinned to slot %i", facDef->GetDef()->GetName(), slot);
+					}
 				}
 			}
 		}

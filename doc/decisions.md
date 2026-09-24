@@ -5138,6 +5138,130 @@ floats.
 [`roles/tech_chain.md`](roles/tech_chain.md),
 [`benchmarks/tech-rush.md`](benchmarks/tech-rush.md).
 
+## D-101 — Reclaimed ground is recycled; advanced fusions and converters go in flush sets; a later T1 lab is placed by the layout
+
+**Date:** 2026-09-24. **Status:** Played (build60 and build61; ten benchmark games).
+
+**Owner's request.** Advanced fusions flush against the construction
+turrets, with no space. The space of structures TECH reclaims should be
+recycled. When the first advanced fusion of a set is queued, reserve up to 2
+more in a line moving away from the turrets; after each set (sometimes 1
+where space is small) the next starts flush against the turrets again.
+Advanced converters the same way, up to 5 a set. The T1 lab rebuilt in its
+old footprint is the same bug. With no construction turret of ours on the
+map (the start, or a restart after a wipe), a T1 lab may go anywhere;
+otherwise it follows the layout. The benchmark to the first advanced fusion
+must not suffer.
+
+**Verified cause (the owner's game, build58).** `OnStructureGone` restores a
+zone slot for its own def when the structure goes. It was restored 38 times
+for turbines, 10 for T1 converters, 2 for solars and 1 for an advanced
+solar, each reclaimed on purpose, so their ground stayed held for their own
+def. It was also restored for the T1 lab (`armlab at (640, 10224) lost; slot
+restored (id 1)`), and when native re-queued a factory after the last one
+went (`FactoryManager`, `GetFactoryToBuild(-RgtVector, true, true)`), the
+lab was served on it again.
+
+**Decision.**
+
+1. Recycling. Every reclaim task on our own structure (`CBuilderManager`,
+   whoever orders it) marks its slot (`MarkSlotRecycled`). When the
+   structure goes, the slot is erased, `reclaimed; its ground is free
+   again`. A structure lost to the enemy keeps its slot.
+2. Flush sets. `PackSet` ranks the packer's candidates by the cells between
+   the footprint and the nearest turret slot (`EdgeGap`, 0 = touching), then
+   the packer's own order. It reserves the first, then lines up to `count` -
+   1 more away from the turret it touches (`SetStep`), stopping at the first
+   refused footprint. `Layout::Place` serves the set's next slot
+   (`NextSetSlot`) before starting a new set, for advanced fusions
+   (`LayoutAfusSetSize` 3) and advanced converters (`LayoutConvSetSize` 5).
+   A def not asked for `LayoutSetHoldSeconds` (300) has its unserved set
+   slots released (`TickSets`).
+3. The T1 lab. `Layout::TurretsStand()`: with a turret standing, a factory
+   is placed by the layout (`ReserveFactorySite`: facing the front, nearest
+   a turret, exit clear). Native's replacement factory is pinned to that
+   slot (`SetResetFactorySlot`, read by `FactoryManager`; played: unpinned,
+   native's own search reserved a footprint beside the old lab). The same
+   applies to `TechBuild::StartFactory`. With no turret, anywhere.
+4. A deadlock D-100 had left (played on the first D-101 run: no advanced
+   fusion by 28 min). With the metal floating, the builders go past the
+   upgrades. The last upgrade order waited with no frame, D-084's
+   pending-order test then blocked the converters, energy floated for 600
+   s, and the chain held the advanced fusion for converters (D-079). An
+   upgrade is not a pending dear order while the metal floats.
+
+**Played (build60; headless, zero bonus, Supreme Isthmus, afus objective).**
+Reclaimed ground freed 65 to 69 times a game; 0 to 2 slots restored (lost
+to the enemy). Sets started 0 cells from a turret, except once the flush
+ground was used (4 to 5 cells, INV-022). The rebuilt T1 lab went to the
+layout's slot `(1168, 9392)`, pinned, and INV-023 stayed silent.
+
+| run | fusion | first advanced fusion |
+| --- | --- | --- |
+| D-100 (build57 script, one game) | 15:34 | 17:42 |
+| D-101 1 (before the pin) | 15:35 | 18:29 |
+| D-101 2 | 11:59 | 18:04 |
+| D-101 3 | 17:55 | 22:12 |
+| D-101 4 | 19:40 | 21:37 |
+| D-101 5 | 14:53 | 18:37 |
+
+The median, 18:37, is 55 s after D-100's single game. The two slow games
+share one cause, a sequencing interaction rather than the layout. The
+chain's fusion order waited with no builder for 2.8 min (INV-015) while
+every T2 builder took `mex.upgrade`. With the metal floating, the economy
+rows started an advanced fusion first. INV-015 fired in D-100's own
+benchmark game too; D-100's longer upgrade list makes it bite more often.
+Not fixed here: it is sequencing, which the owner asked to keep; reported
+for a decision.
+
+5. A reactor frame is not a reactor (played, windowed run `20260924-001038`:
+   the energy-reclaim rule read `afus > 0` from a def count that includes
+   frames. An advanced fusion frame with no reactor finished had 29
+   turbines reclaimed, energy fell from +704 to +123 with a bank of 1, and
+   the frame never finished). `TechBuild::ReactorStands()` counts finished
+   fusions and advanced fusions only, for the rule and its predicate. This
+   is an older D-077 bug, reachable once D-100 let an advanced fusion start
+   early while the metal floats. INV-024.
+
+**Played after item 5 (build61).** Windowed run `20260924-001847`: fusion
+11:56, first advanced fusion 16:52, five by 24 min, energy +12,987 at 24
+min. The screenshot shows the advanced fusions touching the turret block,
+three in a line outward, and converters in rows of five from the turrets.
+
+| build61 run | sets | fusion | first advanced fusion |
+| --- | --- | --- | --- |
+| `20260924-001847` (windowed) | on | 11:56 | 16:52 |
+| `20260924-003349` | on | 17:08 | 20:05 |
+| `20260924-003724` | on | 17:57 | 22:59 |
+| `20260924-004113` | off (set sizes 1) | 16:49 | 18:50 |
+| `20260924-004506` | off (set sizes 1) | 17:25 | 20:29 |
+
+With the sets off the objective is no sooner: the spread is the fusion's
+start, the stranded fusion order above, not the layout. Against D-100's
+one game (17:42) the median is later; D-100's own spread was never
+measured.
+
+**Invariant.** INV-022: a new set's first footprint touches a turret.
+INV-024: T1 energy is reclaimed only while a fusion or an advanced fusion
+stands finished. INV-023: a T1 lab that is not the first, while a turret stands, has a turret
+slot within `ExpLabBuildPowerReach`. Unit test `TestFlushAndSetStep`.
+
+**Files.** [`LayoutRanking.h`](../src/circuit/terrain/LayoutRanking.h),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`FactoryManager.cpp`](../src/circuit/module/FactoryManager.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`layout_ranking_test.cpp`](../tests/layout_ranking_test.cpp),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`layout-design.md`](layout-design.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

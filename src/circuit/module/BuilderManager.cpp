@@ -976,6 +976,11 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 					return it->second;
 				}
 				task = new CBReclaimTask(this, ti.priority, ti.ref.target, ti.timeout);
+				// D-101: our own structure reclaimed on purpose: its layout ground is freed when it goes
+				CCircuitUnit* own = circuit->GetTeamUnit(ti.ref.target->GetId());
+				if ((own != nullptr) && (own->GetCircuitDef() != nullptr) && !own->GetCircuitDef()->IsMobile()) {
+					circuit->GetTerrainManager()->MarkSlotRecycled(own->GetCircuitDef(), own->GetPos(circuit->GetLastFrame()));
+				}
 			} else {
 				task = new CBReclaimTask(this, ti.priority, ti.position, ti.cost, ti.timeout, ti.f.radius, ti.b.isMetal);
 			}

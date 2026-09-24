@@ -786,6 +786,64 @@ namespace Layout {
     // Enqueue a structure on the box cells nearest to a turret, pinned to
     // that exact footprint. Null when nothing fits: the caller must not fall
     // back to the spiral (the walking cap, D-063).
+    // D-101: the set size for a def, 0 for a def placed one at a time
+    int SetSizeOf(CCircuitDef@ def)
+    {
+        const string side = Global::AISettings::Side;
+        if (def.GetName() == UnitHelpers::GetAdvFusionNameForSide(side)) return Global::RoleSettings::Tech::LayoutAfusSetSize;
+        if (def.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(side)) return Global::RoleSettings::Tech::LayoutConvSetSize;
+        return 0;
+    }
+
+    dictionary setAsk;   // D-101: def name -> the frame Place last asked for it
+
+    // D-101: a set's unserved slots go back to the pool once nothing has asked
+    // for its def for LayoutSetHoldSeconds (the plan moved on)
+    void TickSets()
+    {
+        array<string>@ keys = setAsk.getKeys();
+        for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+            int at = 0;
+            if (!setAsk.get(keys[i], at)) continue;
+            if (ai.frame - at < int(Global::RoleSettings::Tech::LayoutSetHoldSeconds) * SECOND) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(keys[i]);
+            if (d !is null) aiTerrainMgr.ReleaseSetSlots(d);
+            setAsk.delete(keys[i]);
+        }
+    }
+
+    // D-101 (owner's rule): a construction turret of ours stands
+    bool TurretsStand()
+    {
+        return nano !is null && (nano.count - aiBuilderMgr.GetUnfinishedCount(nano)) > 0;
+    }
+
+    // D-101 (owner's rule): while a turret stands, a factory is placed by the
+    // layout (next to the turrets, facing the front, exit clear); only with no
+    // turret on the map (the first lab, or a restart after a wipe) anywhere. The
+    // reservation is armed: native's factory task serves it. -1 when none.
+    int ReserveFactorySite(CCircuitDef@ def)
+    {
+        if (def is null || !HasBox() || !TurretsStand()) return -1;
+        const array<int> labFacings = LabFacings();
+        for (uint f = 0; f < labFacings.length(); ++f) {
+            for (int i = 0; i < ZoneCount(); ++i) {
+                const int id = aiTerrainMgr.PackNearGroup(ZoneAt(i), def, nanoGroup, labFacings[f], TurretSeed(), 0.0f, 0.0f, 0);
+                if (id < 0) continue;
+                const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
+                GenericHelpers::LogUtil("[Layout] " + def.GetName() + " placed by the layout at (" + int(p.x) + ", " + int(p.z) + ") facing " + labFacings[f]
+                    + ": a turret stands, so not anywhere (D-101)", 1);
+                return id;
+            }
+            if (fwdZone != 0 && fwdGroup > 0) {
+                const int id = aiTerrainMgr.PackNearGroup(fwdZone, def, fwdGroup, labFacings[f], fwdCentre, 0.0f, 0.0f, 0);
+                if (id >= 0) return id;
+            }
+        }
+        GenericHelpers::LogUtil("[Layout] no layout site for " + def.GetName() + " although a turret stands", 1);
+        return -1;
+    }
+
     int noRoomSince = -1;     // D-099: INV-020
     int noRoomLog = -100000;
     string noRoomDef = "";
@@ -807,6 +865,35 @@ namespace Layout {
                 float(Global::RoleSettings::Tech::LayoutFallbackShakeCells) * SQUARE_SIZE * 2, true, timeout));
         }
         int id = -1;
+        // D-101 (owner's rule): advanced fusions and advanced converters go in sets,
+        // the first flush against a turret, the rest lined up away from it; the
+        // set's next slot before a new set; a new set flush against the turrets again
+        const int setSize = SetSizeOf(def);
+        if (setSize > 0) {
+            setAsk.set(def.GetName(), ai.frame);
+            id = aiTerrainMgr.NextSetSlot(def);
+            bool fresh = false;
+            for (int i = 0; i < ZoneCount() && id < 0; ++i) {
+                id = aiTerrainMgr.PackSet(ZoneAt(i), def, nanoGroup, facing, anchor, setSize);
+                fresh = id >= 0;
+            }
+            if (id < 0 && fwdZone != 0 && fwdGroup > 0) {
+                id = aiTerrainMgr.PackSet(fwdZone, def, fwdGroup, facing, anchor, setSize);
+                fresh = id >= 0;
+            }
+            if (fresh) {
+                const AIFloat3 sp = aiTerrainMgr.GetReservationPos(id);
+                int gap = aiTerrainMgr.EdgeGapToGroup(def, sp, aiTerrainMgr.GetReservationFacing(id), nanoGroup);
+                if (fwdGroup > 0) {
+                    const int fg = aiTerrainMgr.EdgeGapToGroup(def, sp, aiTerrainMgr.GetReservationFacing(id), fwdGroup);
+                    if (fg >= 0 && (gap < 0 || fg < gap)) gap = fg;
+                }
+                GenericHelpers::LogUtil("[Layout] new set of " + def.GetName() + " at (" + int(sp.x) + ", " + int(sp.z) + "), " + gap + " cell(s) from a turret", 1);
+                // INV-022 (D-101): the first of a set touches a turret
+                if (gap != 0)
+                    Invariants::Violation("INV-022", def.GetName(), "a new set of " + def.GetName() + " starts " + gap + " cell(s) from the turrets, not flush");
+            }
+        }
         for (int i = 0; i < ZoneCount() && id < 0; ++i)
             id = aiTerrainMgr.PackNearGroup(ZoneAt(i), def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
         // D-099 (played: 130 advanced converters filled the main box and the

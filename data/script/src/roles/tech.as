@@ -1243,7 +1243,12 @@ namespace RoleTech
 			if (Global::Map::NearestMapStartPosition !is null)
 			{
 				// Prefer configured map role weights; fallback to role-appropriate default if none found
-				return FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				const string fac = FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				// D-101 (owner's rule): native asks again when our last factory is gone
+				// (isReset); while a construction turret stands the new one is placed by
+				// the layout (played: the rebuilt T1 lab went back into its old footprint)
+				if (isReset && fac != "") aiTerrainMgr.SetResetFactorySlot(Layout::ReserveFactorySite(ai.GetCircuitDef(fac)));
+				return fac;
 			}
 			else
 			{

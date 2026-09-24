@@ -160,7 +160,7 @@ namespace TechRules {
     bool NoAfusYet(Ctx@ c)        { return !TechBuild::IntoAfus(); }   // D-078: no advanced lab is ordered once the advanced fusion is under way
     bool NoDearOrderPending(Ctx@ c) { return !TechChain::DearOrderPending(); }   // D-084
     bool EnergyFloatsBank(Ctx@ c) { return TechChain::EnergyFloats(); }   // D-079: the bank-based float, the chain's definition
-    bool EnergyReclaimable(Ctx@ c){ const EcoPlanner::State@ s = c.eco; return (s.fusions > 0 || s.afus > 0) && (s.winds + s.solars + s.advSolars) > 0; }   // D-077
+    bool EnergyReclaimable(Ctx@ c){ const EcoPlanner::State@ s = c.eco; return TechBuild::ReactorStands() && (s.winds + s.solars + s.advSolars) > 0; }   // D-077; D-101: a finished reactor, not a frame
     bool MetalAhead(Ctx@ c)       { return c.aheadM; }                 // D-075: income above spending, the bank rising
     bool StructureBuilding(Ctx@ c){ return c.building !is null; }      // D-075: a structure of ours is under construction
     bool ConverterSurplus(Ctx@ c) { return c.floatingE || c.surplus >= 2.0f * Global::RoleSettings::Tech::EcoConverterUse; }

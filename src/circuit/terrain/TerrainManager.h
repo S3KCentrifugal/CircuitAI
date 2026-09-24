@@ -17,6 +17,7 @@
 #include "AIFloat3.h"
 
 #include <unordered_map>
+#include <set>
 #include <string>
 #include <deque>
 #include <functional>
@@ -406,6 +407,26 @@ private:
 			const springai::AIFloat3& anchor, float maxReach, float minNanoDist) const;
 	void UnmarkSlot(const int2& c1, const int2& c2);  // served: cells go, except a zone's own marks
 	int FindSlotAt(CCircuitDef* cdef, const springai::AIFloat3& pos) const;
+public:
+	// D-101: our own structure is being reclaimed: when it goes, its layout slot
+	// is freed, not restored (the ground returns to the pool)
+	void MarkSlotRecycled(CCircuitDef* cdef, const springai::AIFloat3& pos);
+	// D-101: a set of up to `count` footprints of cdef, the first flush against a
+	// turret slot of nanoGroup, the rest lined up away from it; the first id, -1
+	int PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, int count);
+	// D-101: the next unserved slot of cdef in a set, nearest its turret first; -1
+	int NextSetSlot(CCircuitDef* cdef) const;
+	// D-101: the unserved slots of cdef's sets released; how many
+	int ReleaseSetSlots(CCircuitDef* cdef);
+	// D-101: cells between the footprint at pos and the nearest turret slot of the group
+	int EdgeGapToGroup(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int group) const;
+	// D-101: the role's slot for native's replacement factory (the last factory gone); -1 = none
+	void SetResetFactorySlot(int id) { resetFactorySlot = id; }
+	int TakeResetFactorySlot() { const int id = resetFactorySlot; resetFactorySlot = -1; return id; }
+	int resetFactorySlot = -1;
+private:
+	std::set<int> recycledSlots;   // D-101: reservation ids freed, not restored, when their structure goes
+	std::set<int> setGroups;       // D-101: groups laid by PackSet
 	void RemarkZoneCells(int2 c1, int2 c2);
 	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,

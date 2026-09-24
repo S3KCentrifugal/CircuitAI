@@ -30,6 +30,9 @@ step.
 | INV-019 | No more construction-turret frames stand unfinished than `Layout::TurretSlots()` for `InvariantTurretFlightSeconds`. | `Invariants::Tick`: `GetUnfinishedCount` of the turret def against the slots (D-098). | [D-097](decisions.md#d-097--construction-turrets-go-up-one-at-a-time-until-the-metal-and-the-nearby-build-power-pay-for-more) |
 | INV-020 | The layout does not refuse an economy structure for lack of room for `InvariantNoRoomSeconds`. | `Layout::Place`: the frame room was first missing, reset when a structure is packed. | [D-099](decisions.md#d-099--structures-fill-the-ground-within-reach-of-a-clusters-turrets-then-the-next-cluster-no-reservation-in-a-factorys-exit) |
 | INV-021 | A fusion frame does not start while a mex of ours within `ChainMohoRadius` is still T1 with no upgrade under way, unless the metal floats. | `Invariants::Tick`: a new fusion frame against `MexTracker::GetNearestNonUpgradedMexInRange`. | [D-100](decisions.md#d-100--every-mex-near-the-start-is-upgraded-before-the-fusion-unless-the-metal-floats) |
+| INV-022 | A new set of advanced fusions or advanced converters starts flush against a turret (0 cells). | `Layout::Place`: `EdgeGapToGroup` of the set's first slot. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
+| INV-023 | A T1 lab that is not the first, begun while a turret stands, has a turret slot within `ExpLabBuildPowerReach`. | `Invariants::Tick`: a new primary T1 lab against `CountGroupSlotsWithin`. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
+| INV-024 | T1 energy is reclaimed only while a fusion or an advanced fusion stands finished (a frame is not a reactor). | `TechBuild::ReclaimEnergy`: `ReactorStands()` at each reclaim order. | [D-101](decisions.md#d-101--reclaimed-ground-is-recycled-advanced-fusions-and-converters-go-in-flush-sets-a-later-t1-lab-is-placed-by-the-layout) |
 | INV-004 | Metal does not float while a structure is under construction and static build power is under the income target. | `Invariants::Tick`: the bank at `InvariantFloatPercent` of storage for `InvariantFloatSeconds` with a frame standing and static build power under `PowerBuildPowerPerMetal` x metal income. | D-076 (from D-075) |
 
 ## Settings (`Global::RoleSettings::Tech`)
@@ -47,6 +50,7 @@ step.
 | `InvariantLabReachSeconds` | 90 | INV-016's, INV-017's and INV-018's patience |
 | `InvariantTurretFlightSeconds` | 30 | INV-019's patience |
 | `InvariantNoRoomSeconds` | 120 | INV-020's patience |
+| `LayoutAfusSetSize` / `LayoutConvSetSize` / `LayoutSetHoldSeconds` | 3 / 5 / 300 | D-101: the set sizes and how long an unasked def's set slots are held |
 | `PowerTurretBatchSeconds` / `PowerTurretsMax` / `PowerTurretBuildTime` | 20 / 8 / 5300 | D-097's calculation: turrets the nearby build power finishes in this time, the ceiling, the turret's buildtime |
 | `LayoutLabFrontGapCells` | 3 | D-096: how far ahead of turret row 0 the front-line lab site may stand |
 | `LayoutFrontMinCost` | 1500 | the metal cost at which a seen enemy group becomes the front (D-096) |

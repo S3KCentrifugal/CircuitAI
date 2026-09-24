@@ -33,6 +33,9 @@ decides the end; everything else reads it.
 | --- | --- | --- |
 | turret gate (`Layout::NanoTask`, D-097, D-098) | turret orders in flight, dear frames under construction (one slot each), `TurretSlots()` (bank, income, nearby build power) | refuses a new turret when the in-flight count reaches the calculation; the chain step, `power.turret` and the economy rows then assist; INV-019 |
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
+| set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
+| reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
+| factory placement (`ReserveFactorySite`, `Tech_SelectFactoryHandler`, `StartFactory`, D-101) | `TurretsStand()` | with a turret standing, the layout places the factory and native's replacement is pinned; anywhere only with none; INV-023 |
 | any layout reservation (`ReserveBuildingEx`, D-099) | the exit lanes of every planned and standing factory | refuses a footprint in one; INV-018 |
 | chain moho step (`TechChain`, D-100) | owned mexes within `ChainMohoRadius`, `TechBuild::MetalFullLong` | upgrades every one before the fusion; with metal floating a free builder goes on to the next step; INV-021 |
 | economy rows' energy pick (`EcoPlanner::PickEnergy`, D-100) | `TechChain::MohosPending` | no fusion or advanced fusion while upgrades are pending |

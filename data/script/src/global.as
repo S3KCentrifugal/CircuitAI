@@ -427,6 +427,9 @@ namespace Global {
             float LayoutLabServedReach = 300.0f;
             int LayoutLabMinSlots = 4;               // D-090: 8 found no site on Supreme (best 7)               // D-088: a lab site needs this many turret slots within reach (weighted) to be considered
             int LayoutLabFrontGapCells = 3;          // D-096: the advanced lab's front-line site may stand this many cells ahead of turret row 0 (the zone's edge, a rock)
+            int LayoutAfusSetSize = 3;               // D-101: advanced fusions per set: the first flush against a turret, the rest lined up away from it
+            int LayoutConvSetSize = 5;               // D-101: advanced converters per set, the same way
+            float LayoutSetHoldSeconds = 300.0f;     // D-101: a set's unserved slots are released when nothing asked for its def this long
             float LayoutFrontMinCost = 1500.0f;      // D-096: a seen enemy group counts as a front at this metal cost; until one is seen the front is the map centre
             float LayoutLabFlushElmos = 160.0f;      // D-088: INV-017 - the nearest turret to the advanced lab, centre to centre, flush like the pair's nanos at the T1 lab     // D-086: the advanced lab keeps its planned footprint only if a standing turret is within this; else it is packed nearest a standing turret
             bool LayoutBoxAtStart = true;            // D-083: the main cluster is planned around the start position (the home mexes), not behind the factory pair

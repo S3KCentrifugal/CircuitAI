@@ -872,4 +872,4 @@ metal. See [tech_plan.md](tech_plan.md).
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: 15038bdd88b54c323db5df3c70d3e9bd0b3a0454; lines: 2586 -->
+<!-- source: data/script/src/roles/tech.as; blob: 492b07e389a02128094b27e87e7b323593c050ba; lines: 2591 -->

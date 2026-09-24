@@ -61,6 +61,8 @@ namespace Invariants {
     int noForwardSince = -1;
     int turretsOverSince = -1;    // D-097: INV-019
     int fusionFramesLast = 0;     // D-100: INV-021
+    int lastT1LabId = -1;         // D-101: INV-023
+    bool t1LabSeen = false;
     int ladderFloatSince = -1;
     dictionary energyFrames;   // energy def name -> unfinished count last tick (INV-009)
     dictionary offSince;   // reclaim target id -> frame turrets were first seen off it (INV-008)
@@ -223,6 +225,23 @@ namespace Invariants {
                     Violation("INV-021", "fusion", "a fusion frame started with a T1 mex at (" + int(t1.x) + ", " + int(t1.z) + ") not upgraded");
             }
             fusionFramesLast = frames;
+        }
+
+        // INV-023 (D-101): a T1 lab after the first, while a turret stands, is
+        // placed by the layout: a turret slot within ExpLabBuildPowerReach
+        {
+            CCircuitUnit@ l1 = Factory::primaryT1BotLab;
+            if (l1 !is null && l1.id != lastT1LabId) {
+                if (t1LabSeen && Layout::TurretsStand()) {
+                    const AIFloat3 lp = l1.GetPos(ai.frame);
+                    const float reach = Global::RoleSettings::Tech::ExpLabBuildPowerReach;
+                    if (aiTerrainMgr.CountGroupSlotsWithin(Layout::nanoGroup, lp, reach) == 0
+                        && (Layout::fwdGroup == 0 || aiTerrainMgr.CountGroupSlotsWithin(Layout::fwdGroup, lp, reach) == 0))
+                        Violation("INV-023", "" + l1.id, "a T1 lab rebuilt at (" + int(lp.x) + ", " + int(lp.z) + ") with no turret slot within " + int(reach) + " while turrets stand");
+                }
+                t1LabSeen = true;
+                lastT1LabId = l1.id;
+            }
         }
 
         // INV-015: a dear chain order does not wait for its first builder (D-084)

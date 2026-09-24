@@ -96,6 +96,42 @@ inline bool Inside(const CellRect& inner, const CellRect& outer)
 	return (inner.x1 >= outer.x1) && (inner.x2 <= outer.x2) && (inner.z1 >= outer.z1) && (inner.z2 <= outer.z2);
 }
 
+// D-101: the cells between two footprints, 0 when they touch or overlap
+// (the larger of the gaps along x and z: a diagonal neighbour one cell off is 1)
+inline int EdgeGap(const CellRect& a, const CellRect& b)
+{
+	const int gx = std::max(0, std::max(b.x1 - a.x2, a.x1 - b.x2));
+	const int gz = std::max(0, std::max(b.z1 - a.z2, a.z1 - b.z2));
+	return std::max(gx, gz);
+}
+
+// D-101: the smallest EdgeGap from `r` to any of `others`; a large number when none
+inline int NearestEdgeGap(const CellRect& r, const std::vector<CellRect>& others)
+{
+	int best = 1 << 20;
+	for (const CellRect& o : others) {
+		best = std::min(best, EdgeGap(r, o));
+	}
+	return best;
+}
+
+// D-101: the unit step (cells) a set of footprints grows by, away from the
+// turret it touches: along the axis where the site lies further from the
+// turret's centre, footprint-sized. (0, 0) when the centres coincide.
+inline void SetStep(float siteX, float siteZ, float turretX, float turretZ, int sizeX, int sizeZ, int& stepX, int& stepZ)
+{
+	const float dx = siteX - turretX, dz = siteZ - turretZ;
+	stepX = 0; stepZ = 0;
+	if ((dx == 0.f) && (dz == 0.f)) {
+		return;
+	}
+	if (std::fabs(dx) >= std::fabs(dz)) {
+		stepX = (dx > 0.f) ? sizeX : -sizeX;
+	} else {
+		stepZ = (dz > 0.f) ? sizeZ : -sizeZ;
+	}
+}
+
 inline bool OverlapsAny(const CellRect& r, const std::vector<CellRect>& lanes)
 {
 	for (const CellRect& l : lanes) {
