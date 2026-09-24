@@ -274,6 +274,11 @@ static int CTerrainManager_PackSet(CTerrainManager* terrainMgr, int zone, const 
 	return terrainMgr->PackSet(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anchor, count);
 }
 
+static float CCircuitUnit_GetBuildProgress(CCircuitUnit* u)
+{
+	return ((u == nullptr) || (u->GetUnit() == nullptr)) ? 1.f : u->GetUnit()->GetBuildProgress();   // D-105
+}
+
 static int CTerrainManager_PackFactoryFlush(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& anchor)
 {
 	return terrainMgr->PackFactoryFlush(const_cast<CCircuitDef*>(cdef), anchor);
@@ -890,6 +895,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectProperty("CCircuitUnit", "const CCircuitDef@ circuitDef", asOFFSET(CCircuitUnit, circuitDef)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "const AIFloat3& GetPos(int)", asMETHODPR(CCircuitUnit, GetPos, (int), const AIFloat3&), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void AddAttribute(Type)", asMETHOD(CCircuitUnit, AddAttribute), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitUnit", "float GetBuildProgress()", asFUNCTION(CCircuitUnit_GetBuildProgress), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-105
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void DelAttribute(Type)", asMETHOD(CCircuitUnit, DelAttribute), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void TglAttribute(Type)", asMETHOD(CCircuitUnit, TglAttribute), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "bool IsAttrAny(Mask) const", asMETHOD(CCircuitUnit, IsAttrAny), asCALL_THISCALL); ASSERT(r >= 0);

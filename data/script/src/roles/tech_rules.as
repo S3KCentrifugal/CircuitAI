@@ -144,12 +144,29 @@ namespace TechRules {
     bool NoConstructors(Ctx@ c)   { return c.constructors == 0; }
     bool T2LabStands(Ctx@ c)      { return c.t2Labs > 0; }
     bool EcoOnline(Ctx@ c)        { return TechBuild::EcoOnline(); }   // D-102
+    // D-105: the post-objective plan keeps the chain active for good (its income
+    // ladder); once the economy is online the spam labs do not wait for it
+    bool ChainDoneOrOnline(Ctx@ c) { return !TechChain::Active() || TechBuild::EcoOnline(); }
+    bool NotMetalFull(Ctx@ c)     { return !TechBuild::MetalFullLong(); }   // D-105: converters make metal; a full bank wastes it
+    bool DearFrameUp(Ctx@ c)      { return aiBuilderMgr.CountUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius, Global::RoleSettings::Tech::ChainParallelCostM, null) > 0; }   // D-105
+    bool TurretRoom(Ctx@ c)       { return !Layout::TurretsCapped() && Layout::CanPlaceTurret(); }   // D-105
+    bool MetalFloodedLong(Ctx@ c) { return TechBuild::MetalFullLong(); }   // D-105
     bool T2LabAgain(Ctx@ c)       { return c.t2Labs == 0 && TechBuild::EcoOnline(); }   // D-102: the advanced lab again once the economy is online
     bool NoAfusYetOrAgain(Ctx@ c) { return !TechBuild::IntoAfus() || (c.t2Labs == 0 && TechBuild::EcoOnline()); }   // D-078, D-102
     bool SpamGate(Ctx@ c)         { return c.spamGate; }
     bool ChainActive(Ctx@ c)      { return TechChain::Active(); }
     bool ChainInactive(Ctx@ c)    { return !TechChain::Active(); }
-    bool SpamLabsWanted(Ctx@ c)   { return c.t1Labs < Global::RoleSettings::Tech::ExpSpamLabs; }
+    // D-105 (played: income +300 to +600 with the bank full and one spam lab):
+    // the spam labs scale with income, ExpSpamLabs at the online income, one more
+    // per SpamLabMetalStep above it, up to SpamLabsMax
+    int SpamLabsFor(float mi)
+    {
+        int n = Global::RoleSettings::Tech::ExpSpamLabs;
+        if (mi > Global::RoleSettings::Tech::LabEcoOnlineMetalIncome)
+            n += int((mi - Global::RoleSettings::Tech::LabEcoOnlineMetalIncome) / Global::RoleSettings::Tech::SpamLabMetalStep);
+        return (n > Global::RoleSettings::Tech::SpamLabsMax) ? Global::RoleSettings::Tech::SpamLabsMax : n;
+    }
+    bool SpamLabsWanted(Ctx@ c)   { return c.t1Labs < SpamLabsFor(c.mi) && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), null) == 0; }
     bool MetalBottleneck(Ctx@ c)  { return c.mi < Global::RoleSettings::Tech::EcoMexExpandUntilIncome; }
     bool Draining(Ctx@ c)         { return c.draining; }
     bool NotDraining(Ctx@ c)      { return !c.draining; }
@@ -191,6 +208,25 @@ namespace TechRules {
         return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, near, 30 * SECOND));
     }
     IUnitTask@ DoWaitShort(Ctx@ c)      { return TechBuild::Wait(5 * SECOND); }
+    IUnitTask@ DoT1Turret(Ctx@ c)       { return Layout::NanoTask(c.u, Task::Priority::HIGH); }   // D-105
+    // D-105: a turret assists the nearest producing factory within its reach
+    IUnitTask@ DoTurretFactory(Ctx@ c)
+    {
+        const float reach = 400.0f;   // the construction turret's builddistance (cornanotc, armnanotc, legnanotc)
+        const AIFloat3 here = c.u.GetPos(ai.frame);
+        array<string>@ keys = Factory::allFactories.getKeys();
+        CCircuitUnit@ best = null;
+        float bestSq = 1.0e30f;
+        for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+            CCircuitUnit@ fac = null;
+            if (!Factory::allFactories.get(keys[i], @fac) || fac is null || fac.task is null || Lifecycle::IsRetiring(fac)) continue;
+            const float sq = MapHelpers::SqDist(here, fac.GetPos(ai.frame));
+            const float r = reach + ((fac.circuitDef is null) ? 48.0f : float(fac.circuitDef.GetFootprintX() > fac.circuitDef.GetFootprintZ() ? fac.circuitDef.GetFootprintX() : fac.circuitDef.GetFootprintZ()) * 4.0f);
+            if (sq <= r * r && sq < bestSq) { bestSq = sq; @best = fac; }
+        }
+        if (best is null) return null;
+        return GuardHelpers::AssignWorkerGuard(c.u, best, Task::Priority::LOW, true, 20 * SECOND);
+    }
     IUnitTask@ DoWait(Ctx@ c)           { return TechBuild::Wait(3 * SECOND); }
     IUnitTask@ DoKeepCurrent(Ctx@ c)    { return TechBuild::KeepCurrent(c.u); }
     IUnitTask@ DoChain(Ctx@ c)          { return TechChain::Next(c.u); }
@@ -203,8 +239,12 @@ namespace TechRules {
     IUnitTask@ DoStartFactory(Ctx@ c)   { return TechBuild::StartFactory(c.u); }
     IUnitTask@ DoSpamLab(Ctx@ c)
     {
-        // The pair's planned T1 slot is still reserved: the reserved search serves it.
-        IUnitTask@ t = Builder::EnqueueT1BotLab(Global::AISettings::Side, Global::Map::StartPos, 0.0f, 300 * SECOND, Task::Priority::NORMAL);
+        // D-105 (played: served the pair's old T1 slot, 32 to 45 cells from the
+        // turrets, INV-029): flush against the turrets (D-104); the pair's slot
+        // only when the layout has no site
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side));
+        IUnitTask@ t = (lab is null) ? null : Layout::OrderFactory(lab, 300 * SECOND);
+        if (t is null) @t = Builder::EnqueueT1BotLab(Global::AISettings::Side, Global::Map::StartPos, 0.0f, 300 * SECOND, Task::Priority::NORMAL);
         if (t !is null) GenericHelpers::LogUtil("[Rule] spam lab: the spam gate is open (+" + int(c.mi) + " metal, " + int(c.ei) + " energy)", 1);
         return t;
     }
@@ -360,13 +400,17 @@ namespace TechRules {
         if (table.length() > 0) return;
         table.insertLast(Rule("turret.assist",     TURRET,       W0(), @DoTurretAssist, "reclaim in reach, then the economy under construction by the D-065 order"));
         table.insertLast(Rule("turret.any",        TURRET,       W0(), @DoTurretAny,    "any structure of ours under construction within reach"));
+        table.insertLast(Rule("turret.factory",    TURRET,       W1(@MetalFloodedLong), @DoTurretFactory, "D-105: the metal bank full and nothing to build in reach: assist a producing factory in reach (production is the sink)"));
         table.insertLast(Rule("turret.wait",       TURRET,       W0(), @DoWaitShort,    "5 s"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
         table.insertLast(Rule("opening.mex",       COMMANDER,    W1(@OpeningPending), @DoOpening,      "the nearest OpeningMexCap mexes within OpeningMexRadius"));
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));
         table.insertLast(Rule("lab.t2.reclaim",     MOBILE,       W1(@T2LabRetiring), @DoReclaimT2Lab, "D-078: the advanced lab is retiring (an advanced fusion is under construction, the bank has room): every builder reclaims it, turrets in range join"));
         table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim winds and solars nearest the base centre; advanced solars at ReclaimAdvSolarMargin; an advanced fusion reclaims all"));
-        table.insertLast(Rule("energy.convert.float", MOBILE,     W3(@EnergyFloatsBank, @NotStalling, @NoDearOrderPending), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
+        // D-105 (owner's rule): T1 constructors add build power before assisting a
+        // T2 construction; the reclaim rows above stay first
+        table.insertLast(Rule("power.t1",          CON_T1,       W2(@DearFrameUp, @TurretRoom), @DoT1Turret,     "D-105: a dear frame is up and the turret calculation has room: a T1 constructor adds a construction turret rather than assist"));
+        table.insertLast(Rule("energy.convert.float", MOBILE,     W4(@EnergyFloatsBank, @NotStalling, @NoDearOrderPending, @NotMetalFull), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
         table.insertLast(Rule("power.turret",      MOBILE,       W4(@MetalAhead, @StructureBuilding, @NotStalling, @NoDearOrderPending), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, Layout::TurretsAllowed at a time (D-097), else assist the turret going up"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
@@ -376,14 +420,14 @@ namespace TechRules {
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));
         table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYetOrAgain), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab); again once the economy is online and none stands (D-102)"));
         table.insertLast(Rule("mex.upgrade",       CON_T2,       W0(), @DoMexUpgrade,   "the nearest owned T1 mex within MexUpgradeRadius, one at a time"));
-        table.insertLast(Rule("energy.convert",    MOBILE,       W2(@ConverterWanted, @NotStalling), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
+        table.insertLast(Rule("energy.convert",    MOBILE,       W3(@ConverterWanted, @NotStalling, @NotMetalFull), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
         table.insertLast(Rule("turret.build",      MOBILE,       W0(), @DoTurret,       "static build power under EcoBuildPowerPerMetal x metal, or metal floating: a turret on its slot; else assist the one going up"));
         table.insertLast(Rule("energy.short",      MOBILE,       W3(@EnergyShort, @EnergyIdle, @EnergyForMe), @DoEnergy,       "below the energy target and nothing going up: cheapest energy per E/s"));
         table.insertLast(Rule("energy.assist2",    MOBILE,       W3(@EnergyShort, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "below target and one is going up within EcoAssistRadius: assist it"));
         table.insertLast(Rule("storage.energy",    MOBILE,       W0(), @DoEnergyStorage, "one energy storage once winds carry the base, or the bank holds under EcoStorageSeconds"));
         table.insertLast(Rule("storage.metal",     MOBILE,       W0(), @DoMetalStorage, "metal storage when the bank is full"));
         table.insertLast(Rule("energy.float",      MOBILE,       W3(@MetalFloating, @EnergyAhead, @EnergyIdle), @DoBestPayback,  "metal floating with energy ahead: the best-payback source anyway"));
-        table.insertLast(Rule("lab.t1.spam",       CONSTRUCTORS, W5(@SpamGate, @EcoOnline, @T2LabStands, @SpamLabsWanted, @ChainInactive), @DoSpamLab,      "late game: T1 labs for the spam economy on the pair's slot, once the economy is online (D-102) and the advanced lab stands"));
+        table.insertLast(Rule("lab.t1.spam",       CONSTRUCTORS, W5(@SpamGate, @EcoOnline, @T2LabStands, @SpamLabsWanted, @ChainDoneOrOnline), @DoSpamLab,      "late game: T1 labs for the spam economy on the pair's slot, once the economy is online (D-102) and the advanced lab stands"));
         table.insertLast(Rule("legacy.strategic",  MOBILE,       W1(@ChainInactive), @DoLegacy,       "the role's strategic rungs as they stand (nukes, anti-nuke, gantry, water factories, T2 constructor policy)"));
         table.insertLast(Rule("defence.base",      CONSTRUCTORS, W1(@FirstTurretStands), @DoDefence,      "one light laser and one light AA near the factories"));
         table.insertLast(Rule("order.repair",      CONSTRUCTORS, W0(), @DoQueuedRepair, "native's queued repairs of our own unfinished structures within ExpOrderRadius"));

@@ -3,6 +3,7 @@
 #include "../helpers/unit_helpers.as"
 #include "lifecycle.as"
 #include "layout.as"
+#include "team_economy.as"
 
 // D-076: the invariants the TECH role promises, checked once a second in the
 // game and written to the log as "[INVARIANT] INV-nnn ..." when broken. Every
@@ -65,6 +66,8 @@ namespace Invariants {
     int t1LabFramesLast = 0;      // D-102: INV-025
     int t2ConsHighSince = -1;     // D-103: INV-028
     dictionary factoriesSeen;     // D-104: INV-029
+    dictionary retiredT2Seen;     // D-105: INV-031
+    int overflowSince = -1;       // D-106: INV-033
     int t2ConsAtHigh = 0;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
@@ -313,6 +316,40 @@ namespace Invariants {
                 GenericHelpers::LogUtil("[Layout] factory " + fac.circuitDef.GetName() + " " + fac.id + " stands " + gap + " cell(s) from a turret", 1);
                 if (gap > 1)
                     Violation("INV-029", "" + fac.id, fac.circuitDef.GetName() + " " + fac.id + " stands " + gap + " cells from the turrets, not tight");
+            }
+        }
+
+        // INV-031 (D-105): the advanced lab is not retired while the advanced
+        // fusion is funded without it
+        {
+            CCircuitUnit@ l2 = Factory::primaryT2BotLab;
+            if (l2 !is null && Lifecycle::IsRetiring(l2) && !retiredT2Seen.exists("" + l2.id)) {
+                retiredT2Seen.set("" + l2.id, ai.frame);
+                string why;
+                if (TechBuild::AfusFunded(why))
+                    Violation("INV-031", "" + l2.id, "the advanced lab " + l2.id + " retired while the advanced fusion was funded: " + why);
+            }
+        }
+
+        // INV-033 (D-106): our metal bank does not sit over TeamShareMetalAbove for
+        // 60 s while a live teammate has room for metal (the snapshot is the one
+        // the donation refreshed)
+        {
+            const float mStor = aiEconomyMgr.metal.storage;
+            const bool high = mStor > 0.0f && aiEconomyMgr.metal.current >= Global::RoleSettings::Tech::TeamShareMetalAbove * mStor;
+            if (!high) overflowSince = -1;
+            else if (overflowSince < 0) overflowSince = ai.frame;
+            else if (ai.frame - overflowSince >= 60 * SECOND) {
+                int roomFor = -1;
+                for (int i = 0; i < TeamEconomy::Count(); ++i) {
+                    const int tid = TeamEconomy::TeamAt(i);
+                    if (tid >= 0 && TeamEconomy::Alive(tid) && TeamEconomy::Frame(tid) >= 0
+                        && TeamEconomy::Metal(tid, TeamEconomy::FREE) >= 0.25f * mStor) { roomFor = tid; break; }
+                }
+                if (roomFor >= 0)
+                    Violation("INV-033", "share", "metal over " + int(Global::RoleSettings::Tech::TeamShareMetalAbove * 100.0f)
+                        + "% for 60 s while team " + roomFor + " has " + int(TeamEconomy::Metal(roomFor, TeamEconomy::FREE)) + " free");
+                overflowSince = ai.frame;
             }
         }
 

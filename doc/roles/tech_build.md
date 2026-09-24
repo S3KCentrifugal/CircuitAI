@@ -103,4 +103,4 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: ee79454a0abca28d5d56ed9995eb81f25ef3bebd; lines: 628 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 1061d026f8f2b80b2648b43100492aa11a2f86ec; lines: 756 -->

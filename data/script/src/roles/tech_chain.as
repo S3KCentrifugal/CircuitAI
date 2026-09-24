@@ -546,7 +546,7 @@ namespace TechChain
             const int inFlight = unfinished + queued + (pending ? 1 : 0);
             if (cheap) {
                 // one per builder, in parallel: a solar is not worth a walk to assist
-                if (can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats()) {
+                if (can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105: no converter hold with the metal bank full
                     stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
                     Trace(FloatWhy(), int(i), s, have, u);
                     continue;
@@ -598,7 +598,7 @@ namespace TechChain
                 Trace("order out; economy meanwhile", int(i), s, have, u);
                 return null;
             }
-            if (IsEnergyKey(s.key) && EnergyFloats()) {
+            if (IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105
                 stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
                 Trace(FloatWhy(), int(i), s, have, u);
                 return null;   // the economy rows: energy.convert eats the surplus
@@ -645,7 +645,7 @@ namespace TechChain
     IUnitTask@ Ladder(CCircuitUnit@ u, int i, Step@ s)
     {
         const int have = int(Economy::GetMinMetalIncomeLast10s());
-        if (EnergyFloats()) { Trace(FloatWhy(), i, s, have, u); return null; }   // energy.convert.float
+        if (EnergyFloats() && !TechBuild::MetalFullLong()) { Trace(FloatWhy(), i, s, have, u); return null; }   // energy.convert.float; D-105
         // T2 mex upgrades first: the cheapest metal there is
         CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
         if (moho !is null && u.circuitDef.CanBuild(moho)) {

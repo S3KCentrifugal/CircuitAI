@@ -758,6 +758,28 @@ CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float rad
 	return best;
 }
 
+float CBuilderManager::GetBuildPowerNearExcept(const AIFloat3& position, float radius, const CCircuitDef* ex1, const CCircuitDef* ex2,
+		const CCircuitUnit* exUnit) const
+{
+	const float sqRadius = SQUARE(std::max(0.f, radius));
+	const int frame = circuit->GetLastFrame();
+	float power = 0.f;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || (unit == exUnit) || unit->IsDead() || unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if ((cdef == nullptr) || !cdef->IsAbleToAssist() || (cdef == ex1) || (cdef == ex2)) {
+			continue;
+		}
+		if (unit->GetPos(frame).SqDistance2D(position) <= sqRadius) {
+			power += cdef->GetBuildSpeed() * FRAMES_PER_SEC;
+		}
+	}
+	return power;
+}
+
 int CBuilderManager::CountUnfinishedNear(const AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except)
 {
 	const int frame = circuit->GetLastFrame();

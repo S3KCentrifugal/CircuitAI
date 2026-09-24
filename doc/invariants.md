@@ -38,6 +38,9 @@ step.
 | INV-027 | The plan's T1 air plant (`ap`) and advanced aircraft plant (`aap`) steps are never skipped. | `TechChain::Next`: the stall skip of those steps. | [D-103](decisions.md#d-103--the-air-labs-are-built-a-t1-air-plant-and-its-air-constructor-first-t2-constructors-while-the-metal-bank-is-over-half) |
 | INV-028 | With the metal bank over `T2ConstructorBankShare` and an advanced lab standing, a T2 constructor is added within 60 s until `T2ConstructorCap`. | `Invariants::Tick`: the T2 constructor count while the bank is high. | [D-103](decisions.md#d-103--the-air-labs-are-built-a-t1-air-plant-and-its-air-constructor-first-t2-constructors-while-the-metal-bank-is-over-half) |
 | INV-029 | A factory placed while a turret stands is within 1 cell of a turret slot. | `Invariants::Tick`: each new factory's `EdgeGapToGroup` to the main and forward clusters. | [D-104](decisions.md#d-104--every-factory-stands-flush-against-the-construction-turrets-air-factories-in-any-facing) |
+| INV-031 | The advanced lab is not retired while the advanced fusion is funded without it (bank + income x its remaining build time covers `AfusFundedShare` of its cost). | `Invariants::Tick`: a newly retiring advanced lab against `TechBuild::AfusFunded`. | [D-105](decisions.md#d-105--metal-is-spent-labs-kept-once-online-or-when-the-advanced-fusion-is-funded-t2-constructors-reclaim-last-t1-constructors-add-build-power-first) |
+| INV-032 | No converter is ordered while the metal bank is full. | `EcoPlanner::Execute`: a converter key with `TechBuild::MetalFullLong`. | [D-105](decisions.md#d-105--metal-is-spent-labs-kept-once-online-or-when-the-advanced-fusion-is-funded-t2-constructors-reclaim-last-t1-constructors-add-build-power-first) |
+| INV-033 | TECH's metal bank does not sit over `TeamShareMetalAbove` for 60 s while a live teammate has a quarter of our storage free. | `Invariants::Tick`: our bank against the team economy snapshot. | [D-106](decisions.md#d-106--teammates-economies-are-readable-from-script-tech-gives-its-overflowing-metal-to-the-lowest-filled-teammate) |
 | INV-004 | Metal does not float while a structure is under construction and static build power is under the income target. | `Invariants::Tick`: the bank at `InvariantFloatPercent` of storage for `InvariantFloatSeconds` with a frame standing and static build power under `PowerBuildPowerPerMetal` x metal income. | D-076 (from D-075) |
 
 ## Settings (`Global::RoleSettings::Tech`)
@@ -55,6 +58,10 @@ step.
 | `InvariantLabReachSeconds` | 90 | INV-016's, INV-017's and INV-018's patience |
 | `InvariantTurretFlightSeconds` | 30 | INV-019's patience |
 | `InvariantNoRoomSeconds` | 120 | INV-020's patience |
+| `AfusFundedShare` / `AfusBuildTime` / `AfusProjectionRadius` | 0.85 / 330000 / 600 | D-105: the advanced lab kept when the advanced fusion is funded |
+| `ReclaimOtherPowerRadius` | 600 | D-105: a T2 constructor reclaims only with no other build power this near the target |
+| `TeamShareMetalAbove` / `TeamShareMetalBudget` / `TeamShareCheckSeconds` / `TeamShareMinAmount` | 0.95 / 0.20 / 5 / 25 | D-106: the overflow donation |
+| `SpamLabMetalStep` / `SpamLabsMax` | 100 / 6 | D-105: spam labs scale with income from +200 |
 | `T2ConstructorCap` / `T2ConstructorBankShare` | 60 / 0.5 | D-103: T2 constructors made up to the cap while the metal bank is over the share |
 | `LabEcoOnlineMetalIncome` / `LabRebuildMinT1Cons` | 200 / 3 | D-102: the online economy and the T1 constructor count under which no lab is rebuilt |
 | `LayoutAfusSetSize` / `LayoutConvSetSize` / `LayoutSetHoldSeconds` | 3 / 5 / 300 | D-101: the set sizes and how long an unasked def's set slots are held |

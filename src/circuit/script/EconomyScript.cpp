@@ -75,6 +75,16 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetEnergyUse(const CCircuitDef@) const", asMETHOD(CEconomyManager, GetEnergyUse), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexSpotCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetMexSpotCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "AIFloat3 GetMexCentroidWithin(const AIFloat3& in, float, int) const", asMETHOD(CEconomyManager, GetMexCentroidWithin), asCALL_THISCALL); ASSERT(r >= 0);  // D-086
+	// D-106: allied teams' economies (humans included), refreshed on demand, and resource sending
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool UpdateTeamEconomy(int)", asMETHOD(CEconomyManager, UpdateTeamEconomy), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int UpdateAllTeamEconomy()", asMETHOD(CEconomyManager, UpdateAllTeamEconomy), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetAllyTeamCount()", asMETHOD(CEconomyManager, GetAllyTeamCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetAllyTeamIdAt(int)", asMETHOD(CEconomyManager, GetAllyTeamIdAt), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "float GetTeamEco(int, int, int) const", asMETHOD(CEconomyManager, GetTeamEco), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetTeamEcoFrame(int) const", asMETHOD(CEconomyManager, GetTeamEcoFrame), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsTeamAlive(int) const", asMETHOD(CEconomyManager, IsTeamAlive), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool SendResourceTo(int, float, int)", asMETHOD(CEconomyManager, SendResourceTo), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "float GetOwnEco(int, int)", asMETHOD(CEconomyManager, GetOwnEco), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetClaimedMexCountWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asMETHOD(CEconomyManager, GetClaimedMexCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int)", asFUNCTION(CEconomyManager_EnqueueMexWithin), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexWithin(CCircuitUnit@, const AIFloat3& in, float, int, bool allyAware)", asFUNCTION(CEconomyManager_EnqueueMexWithinAware), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

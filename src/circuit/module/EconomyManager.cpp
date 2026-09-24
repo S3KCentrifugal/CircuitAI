@@ -30,6 +30,8 @@
 #include "AISCommands.h"
 #include "Resource.h"
 #include "Economy.h"
+#include "unit/ally/AllyTeam.h"
+#include "Game.h"
 #include "Feature.h"
 #include "FeatureDef.h"
 #include "Team.h"
@@ -766,6 +768,135 @@ static CMetalData::IndicesDists GetNearestSpotsWithin(
 		return lhs.second < rhs.second;
 	});
 	return spots;
+}
+
+void CEconomyManager::RefreshAllyTeamIds()
+{
+	allyTeamIds.clear();
+	CAllyTeam* allyTeam = circuit->GetAllyTeam();
+	if (allyTeam == nullptr) {
+		return;
+	}
+	for (int tid : allyTeam->GetTeamIds()) {
+		if (tid != circuit->GetTeamId()) {
+			allyTeamIds.push_back(tid);
+		}
+	}
+	std::sort(allyTeamIds.begin(), allyTeamIds.end());
+}
+
+bool CEconomyManager::UpdateTeamEconomy(int teamId)
+{
+	if (allyTeamIds.empty()) {
+		RefreshAllyTeamIds();
+	}
+	if (std::find(allyTeamIds.begin(), allyTeamIds.end(), teamId) == allyTeamIds.end()) {
+		return false;
+	}
+	springai::Game* game = circuit->GetGame();
+	STeamEco& te = teamEco[teamId];
+	te.teamId = teamId;
+	te.frame = circuit->GetLastFrame();
+	auto fill = [game, teamId](STeamRes& r, int resId) {
+		using F = TeamEcoField;
+		r.v[static_cast<int>(F::CURRENT)]  = game->GetTeamResourceCurrent(teamId, resId);
+		r.v[static_cast<int>(F::STORAGE)]  = game->GetTeamResourceStorage(teamId, resId);
+		r.v[static_cast<int>(F::INCOME)]   = game->GetTeamResourceIncome(teamId, resId);
+		r.v[static_cast<int>(F::USAGE)]    = game->GetTeamResourceUsage(teamId, resId);
+		r.v[static_cast<int>(F::PULL)]     = game->GetTeamResourcePull(teamId, resId);
+		r.v[static_cast<int>(F::SHARE)]    = game->GetTeamResourceShare(teamId, resId);
+		r.v[static_cast<int>(F::SENT)]     = game->GetTeamResourceSent(teamId, resId);
+		r.v[static_cast<int>(F::RECEIVED)] = game->GetTeamResourceReceived(teamId, resId);
+		r.v[static_cast<int>(F::EXCESS)]   = game->GetTeamResourceExcess(teamId, resId);
+		r.v[static_cast<int>(F::FREE)]     = std::max(0.f, r.v[static_cast<int>(F::STORAGE)] - HIDDEN_STORAGE - r.v[static_cast<int>(F::CURRENT)]);
+	};
+	fill(te.metal, metalRes->GetResourceId());
+	fill(te.energy, energyRes->GetResourceId());
+	te.alive = te.metal.v[static_cast<int>(TeamEcoField::INCOME)] > 0.f;
+	return true;
+}
+
+int CEconomyManager::UpdateAllTeamEconomy()
+{
+	RefreshAllyTeamIds();
+	int n = 0;
+	for (int tid : allyTeamIds) {
+		if (UpdateTeamEconomy(tid)) {
+			++n;
+		}
+	}
+	return n;
+}
+
+int CEconomyManager::GetAllyTeamCount()
+{
+	if (allyTeamIds.empty()) {
+		RefreshAllyTeamIds();
+	}
+	return int(allyTeamIds.size());
+}
+
+int CEconomyManager::GetAllyTeamIdAt(int index)
+{
+	if (allyTeamIds.empty()) {
+		RefreshAllyTeamIds();
+	}
+	return ((index >= 0) && (index < int(allyTeamIds.size()))) ? allyTeamIds[index] : -1;
+}
+
+float CEconomyManager::GetTeamEco(int teamId, int resource, int field) const
+{
+	auto it = teamEco.find(teamId);
+	if ((it == teamEco.end()) || (field < 0) || (field >= static_cast<int>(TeamEcoField::_SIZE_))) {
+		return -1.f;
+	}
+	return (resource == 0) ? it->second.metal.v[field] : it->second.energy.v[field];
+}
+
+int CEconomyManager::GetTeamEcoFrame(int teamId) const
+{
+	auto it = teamEco.find(teamId);
+	return (it == teamEco.end()) ? -1 : it->second.frame;
+}
+
+bool CEconomyManager::IsTeamAlive(int teamId) const
+{
+	auto it = teamEco.find(teamId);
+	return (it != teamEco.end()) && it->second.alive;
+}
+
+bool CEconomyManager::SendResourceTo(int resource, float amount, int teamId)
+{
+	if ((amount <= 0.f) || (teamId == circuit->GetTeamId())) {
+		return false;
+	}
+	springai::Resource* res = (resource == 0) ? metalRes : energyRes;
+	// D-106: the engine's handler answers a resource send with -2 (metal) or -3
+	// (energy) and the C bridge turns any non-zero answer into false, although
+	// the share message has already gone out (CAICallback::SendResources); the
+	// answer is not a result. The send is checked by our SENT field later.
+	economy->SendResource(res, amount, teamId);
+	circuit->LOG("ECONOMY: sent %.0f %s to team %i", amount, (resource == 0) ? "metal" : "energy", teamId);
+	return true;
+}
+
+float CEconomyManager::GetOwnEco(int resource, int field)
+{
+	springai::Resource* res = (resource == 0) ? metalRes : energyRes;
+	using F = TeamEcoField;
+	switch (static_cast<F>(field)) {
+		case F::CURRENT:  return economy->GetCurrent(res);
+		case F::STORAGE:  return economy->GetStorage(res);
+		case F::INCOME:   return economy->GetIncome(res);
+		case F::USAGE:    return economy->GetUsage(res);
+		case F::PULL:     return economy->GetPull(res);
+		case F::SHARE:    return economy->GetShare(res);
+		case F::SENT:     return economy->GetSent(res);
+		case F::RECEIVED: return economy->GetReceived(res);
+		case F::EXCESS:   return economy->GetExcess(res);
+		case F::FREE:     return std::max(0.f, economy->GetStorage(res) - HIDDEN_STORAGE - economy->GetCurrent(res));
+		default:          return -1.f;
+	}
 }
 
 AIFloat3 CEconomyManager::GetMexCentroidWithin(const AIFloat3& center, float radius, int maxSpots) const

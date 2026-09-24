@@ -14,6 +14,8 @@
 #include "AIFloat3.h"
 
 #include <set>
+#include <map>
+#include <vector>
 #include <memory>
 
 namespace springai {
@@ -77,6 +79,30 @@ public:
 	// D-086: the centroid of the maxSpots metal spots nearest center within radius
 	// (0 = all); center itself when there is none. Known from the map at setup.
 	springai::AIFloat3 GetMexCentroidWithin(const springai::AIFloat3& center, float radius, int maxSpots) const;
+
+	// D-106: the latest economic state of every allied team (human or AI), kept
+	// per team from the ally team's list (CAllyTeam::GetTeamIds, our own team
+	// excluded) and refreshed on demand before a decision that needs it
+	enum class TeamEcoField: int { CURRENT = 0, STORAGE, INCOME, USAGE, PULL, SHARE, SENT, RECEIVED, EXCESS, FREE, _SIZE_ };
+	struct STeamRes {
+		float v[static_cast<int>(TeamEcoField::_SIZE_)] = {};
+	};
+	struct STeamEco {
+		int teamId = -1;
+		int frame = -1;   // the frame of the last update, -1 never
+		bool alive = false;   // metal income above 0 (the engine has no dead-team query for an AI)
+		STeamRes metal, energy;
+	};
+	bool UpdateTeamEconomy(int teamId);   // false: not an ally, or our own team
+	int UpdateAllTeamEconomy();           // how many teammates were updated
+	int GetAllyTeamCount();               // teammates, our own team excluded
+	int GetAllyTeamIdAt(int index);       // -1 out of range
+	float GetTeamEco(int teamId, int resource, int field) const;   // resource 0 metal, 1 energy; -1 unknown
+	int GetTeamEcoFrame(int teamId) const;
+	bool IsTeamAlive(int teamId) const;
+	bool SendResourceTo(int resource, float amount, int teamId);   // resource 0 metal, 1 energy
+	// our own economy's fields the script lacked (D-106)
+	float GetOwnEco(int resource, int field);
 	int GetClaimedMexCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
 	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false);
 	// D-072: a metal spot belongs to the team whose start position is nearest
@@ -170,6 +196,9 @@ private:
 	Handlers1 finishedHandler;
 	EHandlers destroyedHandler;
 
+	std::map<int, STeamEco> teamEco;   // D-106
+	std::vector<int> allyTeamIds;      // D-106: sorted, our own team excluded
+	void RefreshAllyTeamIds();
 	springai::Resource* metalRes;
 	springai::Resource* energyRes;
 	springai::Economy* economy;

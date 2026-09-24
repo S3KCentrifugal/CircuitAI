@@ -624,6 +624,9 @@ namespace EcoPlanner {
         }
         CCircuitDef@ def = DefOf(key);
         if (def is null || !def.IsAvailable(ai.frame)) return null;
+        // INV-032 (D-105): no converter is ordered while the metal bank is full
+        if ((key == "t1conv" || key == "advconv") && TechBuild::MetalFullLong())
+            Invariants::Violation("INV-032", key, "a " + def.GetName() + " ordered with the metal bank full for " + int(Global::RoleSettings::Tech::PowerAheadSeconds) + " s");
         const Task::BuildType type = TypeOf(key);
         const Task::Priority prio = (key == "fusion" || key == "afus") ? Task::Priority::HIGH : Task::Priority::NORMAL;
         IUnitTask@ t = Layout::Place(type, prio, def, TimeoutOf(key), u);

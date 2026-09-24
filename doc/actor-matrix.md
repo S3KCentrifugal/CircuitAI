@@ -35,6 +35,12 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
+| overflow donation (`TechBuild::ShareOverflow`, `TeamEconomy`, D-106) | our metal bank, every teammate's snapshot (refreshed first) | up to 20% of our storage to the lowest-filled live teammates, filling their free storage, when over 95% after the opening; INV-033 |
+| advanced-lab retirement gate (`TechBuild::AfusFunded`, D-105) | bank, income, the advanced fusion frame's progress and build power | the lab kept when 85% of the advanced fusion's cost will be earned; INV-031 |
+| T2 constructor reclaim (`TechBuild::T2MayReclaim`, D-105) | other build power near the target | a T2 constructor reclaims only as a last resort |
+| `power.t1` (D-105) | dear frame up, turret room | a T1 constructor adds a turret before assisting |
+| `turret.factory` (D-105) | metal bank full, producing factory in reach | a turret assists factory production |
+| converter rows (`energy.convert*`, D-105) | `MetalFullLong` | no converter while the metal bank is full; INV-032 |
 | every factory order (`CBFactoryTask::FindBuildSite`, `PackFactoryFlush`, D-104) | registered clusters, front facing, air or ground | pinned flush against a turret; ground facing the front with its exit clear, air any facing; INV-029 |
 | air plants (`ap`, `aap` plan steps, `Layout::OrderFactory`, D-103) | air constructors | a T1 air plant, its one air constructor, then the advanced aircraft plant; INV-027 |
 | T2 constructor production (`Tech_FactoryAiMakeTask`, D-103) | metal bank share, T2 constructor count | one T2 constructor at the advanced lab while the bank is over half, to 60; INV-028 |

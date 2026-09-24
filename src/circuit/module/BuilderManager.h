@@ -297,6 +297,8 @@ public:
 	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
 	// D-098: structures of ours under construction within radius costing at least minCostM, `except` not counted
 	int CountUnfinishedNear(const springai::AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except);
+	// D-105: the build power (workertime) within radius, the two defs and one unit not counted
+	float GetBuildPowerNearExcept(const springai::AIFloat3& pos, float radius, const CCircuitDef* ex1, const CCircuitDef* ex2, const CCircuitUnit* exUnit) const;
 	// D-077: the nearest finished unit of ours of def within radius of pos (null def: any).
 	CCircuitUnit* FindOwnNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
 	// D-078 (owner's rule): every construction turret within its build distance

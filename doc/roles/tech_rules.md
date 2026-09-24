@@ -107,4 +107,4 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: d1794b2f1072840e914aa08026b913a3c066e909; lines: 438 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 9a372ed4a9176fe62fcd42ba9b90ab5a960649c5; lines: 482 -->

@@ -5442,6 +5442,183 @@ cell ahead of turret row 0).
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
 [`layout-design.md`](layout-design.md).
 
+## D-105 — Metal is spent: labs kept once online or when the advanced fusion is funded; T2 constructors reclaim last; T1 constructors add build power first
+
+**Date:** 2026-09-24. **Status:** Played (build69; six headless games).
+
+**Owner's rules.** T2 constructors reclaim only as a last resort, when no
+other unit with build power is in range of the unit being reclaimed;
+otherwise they carry on with their build orders. Before reclaiming the
+advanced lab, project the metal: current store plus current income over the
+advanced fusion's construction; if 85 % or more of the advanced fusion's
+cost will have been earned, the reclaim is unnecessary. T1 constructors add
+build power before assisting T2 constructions; reclaiming stays the higher
+priority. The economy works so well that the metal is not spent fast enough:
+analyse and correct. From +200 metal there is no economic reason to reclaim a
+factory (later it may go for other reasons: blocked, or its ground rezoned
+for economy). Record every requirement of the conversation in this repo and
+the docs repo, and keep them current.
+
+**Analysis (build68, run `20260924-131356`).** Metal income climbed from +140
+at 17 min to +343 at 31 min; the bank sat at its cap (12,000 to 14,700) from
+17 min on. In that window the turrets assisted structures only; the post-
+objective plan's `income 500` step waited on `energy floats` and its answer
+was more converters, which make metal into a full bank; T2 constructors came
+only once the advanced aircraft plant stood (30 min), then drained the bank
+from 14,700 to 10,400 in two minutes. And the rebuilt advanced lab was
+reclaimed again at about 27 min with income at +309: `EcoOnline` read the
+10-second minimum, which dips under 200 at a higher average. Production is
+the sink that works; the labs were being taken away from it.
+
+**Decision.**
+
+1. `TechBuild::EcoOnline` is latched: once the 10-second minimum reaches
+   `LabEcoOnlineMetalIncome` (200) the economy stays online, so no lab is
+   reclaimed for metal from then on (D-102's rule, now holding).
+2. `TechBuild::AfusFunded`: bank + income x (1 - progress) x `AfusBuildTime`
+   (330,000) / the build power within `AfusProjectionRadius` (600) of the
+   advanced fusion frame; covering `AfusFundedShare` (0.85) of its cost keeps
+   the advanced lab (D-078 gated). New binding `CCircuitUnit::GetBuildProgress`.
+3. `TechBuild::T2MayReclaim`: a T2 constructor (bot or air) takes the T1 lab,
+   advanced lab or energy reclaim only when no other build power (native
+   `GetBuildPowerNearExcept`, T2 constructors and the target not counted) is
+   within `ReclaimOtherPowerRadius` (600) of the target.
+4. Rule `power.t1` (T1 constructors, after the reclaim rows): with a dear
+   frame (400+ metal) up and room in the turret calculation, a construction
+   turret rather than an assist.
+5. No converter while the metal bank is full (`MetalFullLong`): the converter
+   rows gated, and the chain's converter hold (D-079) lifted then.
+6. Rule `turret.factory`: a turret with nothing in reach and the metal bank
+   full assists (guards) a producing factory in its 400-elmo reach.
+7. Spam labs scale with income: `ExpSpamLabs` at +200, one more per
+   `SpamLabMetalStep` (100) above it, up to `SpamLabsMax` (6); they do not
+   wait for the post-objective chain once online (its income ladder keeps it
+   active for good), and each is ordered flush against the turrets
+   (`Layout::OrderFactory`; played: served the pair's old slot, 32 to 45 cells
+   out, INV-029).
+8. The requirements of the conversation are gathered in
+   [`roles/tech-requirements.md`](roles/tech-requirements.md); the game facts
+   and played evidence in the docs repo's `77-eco-tech-player.md` (labs as a
+   metal bank, the air labs, the turret block, a full bank).
+
+**Played.** Six headless games, tech versus tech, zero bonus, Supreme Isthmus.
+
+| run | items in | first advanced fusion | late bank |
+| --- | --- | --- | --- |
+| `20260924-141707` | 1-6 | 17:35 | full at 28 to 31 min (+280 to +301) |
+| `20260924-142340` | 1-6 | 20:09 | drained to 3,200 at 24 min, full at 31 (+605) |
+| `20260924-144525` | 1-7 (spam labs not yet flush) | 17:22 | drains to 7,600 at 26 min, near full at 30 |
+| `20260924-144948` | 1-7 (spam labs not yet flush) | 17:22 | drained to 172 at 24 min, near full at 30 |
+| `20260924-145840` | 1-8 | 19:43 | team 0's base destroyed at 26 to 27 min (163 units to 64 in a minute, 145 structures lost to the enemy: most likely team 1's first nuke on the compact base) |
+| `20260924-150157` | 1-8 | 19:05 | game ended at 22.9 min (cause not read) |
+
+The advanced lab was kept by the projection in every game that reached it
+(`bank 5308 + 69/s x 61 s = 9551 against 8245`); the economy latched online
+at +200 and no lab was retired after; T2 constructors reached the cap of 60;
+`power.t1` fired 40 to 61 times a game. The first advanced fusion: 17:22 to
+20:09 (median about 18:30, against 18:37 in D-101's ten games). The bank
+still refills late in most games: production is the sink and it is still
+short of the income past +300. Open: more production for the late income
+(the spam labs make at most one or two before 32 min), INV-028 (T2
+constructor production stalls with the bank over half), and the nuke: a TECH
+base is one blast domain (the shared page's 26-structure-explosions) and
+TECH builds no anti-nuke before the enemy tech's silo fires.
+
+**Invariant.** INV-031: the advanced lab is not retired while the advanced
+fusion is funded without it. INV-032: no converter is ordered while the metal
+bank is full. INV-026 (D-102) now holds with the latch.
+
+**Files.** [`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`BuilderManager.h`](../src/circuit/module/BuilderManager.h),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`eco_planner.as`](../data/script/src/manager/eco_planner.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`roles/tech-requirements.md`](roles/tech-requirements.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-106 — Teammates' economies are readable from script; TECH gives its overflowing metal to the lowest-filled teammate
+
+**Date:** 2026-09-24. **Status:** Played (build72).
+
+**Owner's request.** Wire in the bindings to see every teammate's economy,
+players included, using the existing list of teammates; every economic
+detail, available storage included; a function to update one teammate's
+state and one for all, run before decisions such as which teammate needs
+metal when TECH is about to overflow. TECH: whenever its metal store is over
+95%, trigger the team economy check and send metal to whichever teammate is
+lowest, filling their storage, up to 20% of TECH's capacity. A fallback so no
+metal is lost to overflow when TECH's build power cannot keep up.
+
+**Engine facts (verified in `bar-RecoilEngine`, recorded in the docs repo's
+`15-construction-economy-rules.md`).** An AI reads any allied team's
+resources, human or AI (`Game_getTeamResource*`; -1 for an enemy without
+cheats). It cannot set a share slider (Lua only). It gives resources with
+the send-resources command. That command's handler answers -2 (metal) or -3
+(energy), and the C bridge turns any non-zero answer into `false` although
+the share message has already gone out: the return value is not a result
+(played: 40 sends logged as refused).
+
+**Decision.**
+
+1. Native `CEconomyManager` keeps one snapshot per teammate, built on the ally
+   team's list (`CAllyTeam::GetTeamIds`, the start script's teams of our
+   allyteam, our own team excluded): bank, storage, income, usage, pull,
+   share slider, sent, received, excess, and free storage, for metal and
+   energy, with the frame of the update and alive (metal income above 0; the
+   engine has no dead-team query for an AI). `UpdateTeamEconomy(team)` and
+   `UpdateAllTeamEconomy()` refresh it on demand; `GetOwnEco` exposes our own
+   fields the script lacked; `SendResourceTo(resource, amount, team)` sends.
+   All bound to script.
+2. Script `TeamEconomy` (`manager/team_economy.as`): `UpdateTeam`,
+   `UpdateAll`, `Count`, `TeamAt`, `Alive`, `Frame`, `Metal`/`Energy(team,
+   field)`, `OwnMetal`/`OwnEnergy`, `MetalFill`, `SendMetal`/`SendEnergy`,
+   `Describe`.
+3. TECH (`TechBuild::ShareOverflow`, each economy tick): with the metal bank
+   at `TeamShareMetalAbove` (0.95) of storage or more, at most every
+   `TeamShareCheckSeconds` (5), refresh every teammate and give up to
+   `TeamShareMetalBudget` (0.20) of our storage, the lowest-filled live
+   teammate first, each up to its free storage, gifts under
+   `TeamShareMinAmount` (25) not sent. Not before the opening is complete:
+   the start bank is the opening's metal (played: 420 metal given away at
+   15 s). Each check logs what the engine counts as sent.
+
+**Played.** 16-AI headless games on Supreme Isthmus, zero bonus, the two TECH AIs
+(teams 0 and 9) each with seven teammates.
+
+Run `20260924-155346` (build71): every send logged "refused", the engine's
+non-zero answer; the first donation went out at 15 s from the start bank.
+Run `20260924-160941`: the refusal removed, but the opening's own flag was
+already set at 15 s and 420 metal still went out; the gate is now the first
+T1 lab standing.
+
+Run `20260924-161847` (build72 + the lab gate): no donation before the first
+lab. Team 0 gave 6 times (240 to 680 metal, each to a teammate 0 to 15%
+full), team 9 7 times. The arrival is confirmed: `after the donation: we
+sent 916; team 8 received 898`, and `we sent 931; team 10 received 508, team
+8 received 408`; teammates 0 to 2% full stood at 443 to 753 right after.
+About 2% of a gift is lost on the way (916 sent, 898 received), which may
+be BAR's resource-sharing tax. The engine's SENT and RECEIVED cover one slow
+update, so a read that misses that window shows 0. INV-033 did not fire.
+
+**Invariant.** INV-033: TECH's metal bank does not sit over
+`TeamShareMetalAbove` for 60 s while a live teammate has a quarter of our
+storage free.
+
+**Files.** [`EconomyManager.cpp`](../src/circuit/module/EconomyManager.cpp),
+[`EconomyManager.h`](../src/circuit/module/EconomyManager.h),
+[`EconomyScript.cpp`](../src/circuit/script/EconomyScript.cpp),
+[`team_economy.as`](../data/script/src/manager/team_economy.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`roles/tech-requirements.md`](roles/tech-requirements.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

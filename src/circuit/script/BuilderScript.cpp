@@ -92,6 +92,7 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterObjectMethod("CBuilderManager", "int GetUnfinishedCount(const CCircuitDef@) const", asMETHOD(CBuilderManager, GetUnfinishedCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedNear(const AIFloat3& in, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedNear), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "int CountUnfinishedNear(const AIFloat3& in, float, float, const CCircuitDef@)", asMETHOD(CBuilderManager, CountUnfinishedNear), asCALL_THISCALL); ASSERT(r >= 0);  // D-098
+	r = engine->RegisterObjectMethod("CBuilderManager", "float GetBuildPowerNearExcept(const AIFloat3& in, float, const CCircuitDef@, const CCircuitDef@, const CCircuitUnit@) const", asMETHOD(CBuilderManager, GetBuildPowerNearExcept), asCALL_THISCALL); ASSERT(r >= 0);  // D-105
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindOwnNear(const AIFloat3& in, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindOwnNear), asCALL_THISCALL); ASSERT(r >= 0);  // D-077
 	r = engine->RegisterObjectMethod("CBuilderManager", "int TurretsOnReclaim(int, float, bool)", asMETHOD(CBuilderManager, TurretsOnReclaim), asCALL_THISCALL); ASSERT(r >= 0);  // D-078
 	r = engine->RegisterObjectProperty("CBuilderManager", "float experimentalDirectRange", asOFFSET(CBuilderManager, experimentalDirectRange)); ASSERT(r >= 0);
