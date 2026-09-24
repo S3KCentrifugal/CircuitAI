@@ -1818,10 +1818,25 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 		// An exact layout task: this slot or nothing. The caller aborts a
 		// required-pin failure instead of silently falling through to the spiral.
 		auto it = reservations.find(pinned);
-		if ((it == reservations.end()) || it->second.consumed || (it->second.def != cdef)
-			|| !map->IsPossibleToBuildAt(cdef->GetDef(), it->second.pos, it->second.facing) || !predicate(it->second.pos))
-		{
-			circuit->LOG("RESERVE: pinned slot %i for %s cannot be served", pinned, cdef->GetDef()->GetName());
+		const char* why = (it == reservations.end()) ? "gone"
+			: it->second.consumed ? "consumed"
+			: (it->second.def != cdef) ? "another def"
+			: (it->second.serveFails >= kDeadSlotFails) ? "dead"
+			: !map->IsPossibleToBuildAt(cdef->GetDef(), it->second.pos, it->second.facing) ? "the engine refuses the ground"
+			: !predicate(it->second.pos) ? "out of the builder's reach"
+			: nullptr;
+		if (why != nullptr) {
+			// D-108 (played: one held advanced-fusion slot the engine refused was
+			// offered again after every abort, and no advanced fusion went up for
+			// the last nine minutes): a slot refused kDeadSlotFails times is dead;
+			// its ground stays held so it is not packed again, and it is not offered
+			if ((it != reservations.end()) && (std::string(why) == "the engine refuses the ground")
+				&& (++it->second.serveFails == kDeadSlotFails))
+			{
+				circuit->LOG("RESERVE: slot %i for %s at (%.0f, %.0f) is dead after %i refusals: its ground stays held, the set moves on",
+						pinned, cdef->GetDef()->GetName(), it->second.pos.x, it->second.pos.z, kDeadSlotFails);
+			}
+			circuit->LOG("RESERVE: pinned slot %i for %s cannot be served: %s", pinned, cdef->GetDef()->GetName(), why);
 			return false;
 		}
 		best = &it->second;
@@ -2108,7 +2123,7 @@ bool CTerrainManager::PickFlushSite(int zone, CCircuitDef* cdef, int nanoGroup, 
 	return false;
 }
 
-int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count)
+int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count, bool ring)
 {
 	SSlowCall slow("PackSet", circuit);
 	if ((cdef == nullptr) || (count < 1)) {
@@ -2116,7 +2131,7 @@ int CTerrainManager::PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int fac
 	}
 	AIFloat3 pos, touch;
 	int gap = 0;
-	if (!PickFlushSite(zone, cdef, nanoGroup, facing, anchor, false, pos, gap, touch)) {
+	if (!PickFlushSite(zone, cdef, nanoGroup, facing, anchor, false, pos, gap, touch, nullptr, ring)) {
 		return -1;
 	}
 	const int group = nextGroupId++;
@@ -2234,7 +2249,7 @@ int CTerrainManager::NextSetSlot(CCircuitDef* cdef) const
 	int best = -1, bestOrder = 1 << 20;
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
-		if ((r.def != cdef) || r.consumed || r.claimed || (setGroups.count(r.group) == 0)) {
+		if ((r.def != cdef) || r.consumed || r.claimed || (setGroups.count(r.group) == 0) || (r.serveFails >= kDeadSlotFails)) {
 			continue;
 		}
 		// the set's own order: the footprint nearest the turret first
@@ -2252,7 +2267,7 @@ int CTerrainManager::ReleaseSetSlots(CCircuitDef* cdef)
 	std::vector<int> ids;
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
-		if ((r.def == cdef) && !r.consumed && !r.claimed && (setGroups.count(r.group) > 0)) {
+		if ((r.def == cdef) && !r.consumed && !r.claimed && (setGroups.count(r.group) > 0) && (r.serveFails < kDeadSlotFails)) {
 			ids.push_back(r.id);
 		}
 	}

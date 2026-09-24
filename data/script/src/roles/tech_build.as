@@ -335,12 +335,58 @@ namespace TechBuild {
     {
         return u !is null && u.circuitDef !is null && u.circuitDef.GetName() == UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side);
     }
+    // D-108: every T2 air constructor seen, so a freed role is handed on at once
+    dictionary airConsSeen;
+    // D-108: a role whose builder is gone goes at once to another T2 air
+    // constructor of ours that holds no role
+    // D-108: a builder handed a role drops a job of another kind at once
+    // (keep.current would otherwise finish it first; played: the new advanced
+    // fusion builder was still on a converter)
+    void DropOtherJob(int id, int role)
+    {
+        CCircuitUnit@ u = ai.GetTeamUnit(id);
+        if (u is null || u.task is null) return;
+        IBuilderTask@ bt = cast<IBuilderTask>(u.task);
+        if (bt is null || bt.buildDef is null) return;
+        const string side = Global::AISettings::Side;
+        const string own = (role == 1) ? UnitHelpers::GetAdvEnergyConverterNameForSide(side) : UnitHelpers::GetAdvFusionNameForSide(side);
+        if (bt.buildDef.GetName() == own) return;
+        GenericHelpers::LogUtil("[TECH][Air] " + id + " drops " + bt.buildDef.GetName() + " for its role (D-108)", 1);
+        aiBuilderMgr.AbortTask(u.task);
+    }
+    void RefillAirRoles()
+    {
+        if (airConvId >= 0 && ai.GetTeamUnit(airConvId) is null) { airConvId = -1; GenericHelpers::LogUtil("[TECH][Air] the converter builder is gone (D-108)", 1); }
+        if (airAfusId >= 0 && ai.GetTeamUnit(airAfusId) is null) { airAfusId = -1; GenericHelpers::LogUtil("[TECH][Air] the advanced fusion builder is gone (D-108)", 1); }
+        if (airConvId >= 0 && airAfusId >= 0) return;
+        array<string>@ keys = airConsSeen.getKeys();
+        for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+            const int id = parseInt(keys[i]);
+            CCircuitUnit@ cand = ai.GetTeamUnit(id);
+            if (cand is null) { airConsSeen.delete(keys[i]); continue; }
+            if (id == airConvId || id == airAfusId) continue;
+            // the advanced fusions first: the role that stalled the economy (D-108)
+            if (airAfusId < 0) { airAfusId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the advanced fusions (D-108)", 1); DropOtherJob(id, 2); }
+            else if (airConvId < 0) { airConvId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the converters (D-108)", 1); DropOtherJob(id, 1); }
+            if (airConvId >= 0 && airAfusId >= 0) return;
+        }
+    }
+    bool AirRoleVacant() { RefillAirRoles(); return airConvId < 0 || airAfusId < 0; }
+    bool IsDedicatedAirCon(CCircuitUnit@ u) { return u !is null && (u.id == airConvId || u.id == airAfusId); }
+    // D-108: a newly finished air constructor fills a vacant role before anything
+    // else (the donation) can take it
+    bool ClaimOnBuilt(CCircuitUnit@ u)
+    {
+        if (!IsT2AirCon(u)) return false;
+        return AirConRole(u) != 0;
+    }
+
     // 1: converters, 2: advanced fusions, 0: not dedicated (the role is claimed here)
     int AirConRole(CCircuitUnit@ u)
     {
         if (!IsT2AirCon(u)) return 0;
-        if (airConvId >= 0 && ai.GetTeamUnit(airConvId) is null) airConvId = -1;
-        if (airAfusId >= 0 && ai.GetTeamUnit(airAfusId) is null) airAfusId = -1;
+        airConsSeen.set("" + u.id, ai.frame);
+        RefillAirRoles();
         if (u.id == airConvId) return 1;
         if (u.id == airAfusId) return 2;
         if (airConvId < 0) {
@@ -377,22 +423,41 @@ namespace TechBuild {
         return Layout::Place(type, Task::Priority::HIGH, d, 300 * SECOND, u);
     }
     // the dedicated two: always their own structure (assist their own kind's
-    // frame when the layout has no site)
+    // frame when the layout has no site). D-108: never anything else: with no
+    // site and no frame they wait, and say why (played: the advanced fusion
+    // builder fell through to converters and turrets, and the advanced fusions
+    // stopped at six)
+    int airWaitLog = -100000;
+    // D-108 (played: the advanced fusions stopped at six): TECH's start caps
+    // (StartCapAdvancedFusionReactors 0) and the rush chain's step target (1)
+    // pin maxThisUnit, so the dedicated builder's structure read "not available
+    // (2 of 1)" while other paths, which do not check it, built a few more. A
+    // held role's structure is always one short of its cap.
+    void LiftCapForRole(const string &in name)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        if (d is null || d.maxThisUnit > d.count) return;
+        d.maxThisUnit = d.count + 1;
+        GenericHelpers::LogUtil("[TECH][Air] " + name + " cap lifted to " + d.maxThisUnit + " for its dedicated builder (D-108)", 2);
+    }
     IUnitTask@ AirDedicated(CCircuitUnit@ u)
     {
         const string side = Global::AISettings::Side;
         const int role = AirConRole(u);
-        if (role == 1) {
-            const string conv = UnitHelpers::GetAdvEnergyConverterNameForSide(side);
-            IUnitTask@ t = BuildByLayout(u, conv, Task::BuildType::CONVERT);
-            return (t !is null) ? t : AssistNearestOf(u, conv);
+        if (role == 0) return null;
+        const string name = (role == 1) ? UnitHelpers::GetAdvEnergyConverterNameForSide(side) : UnitHelpers::GetAdvFusionNameForSide(side);
+        LiftCapForRole(name);
+        IUnitTask@ t = BuildByLayout(u, name, (role == 1) ? Task::BuildType::CONVERT : Task::BuildType::ENERGY);
+        if (t is null) @t = AssistNearestOf(u, name);
+        if (t !is null) return t;
+        if (ai.frame - airWaitLog > 30 * SECOND) {
+            airWaitLog = ai.frame;
+            CCircuitDef@ d = ai.GetCircuitDef(name);
+            string why = (d is null) ? "no def" : (!d.IsAvailable(ai.frame) ? ("not available (" + d.count + " of " + d.maxThisUnit + ")")
+                : (!u.circuitDef.CanBuild(d) ? "cannot build it" : "no site in the layout"));
+            GenericHelpers::LogUtil("[TECH][Air] dedicated " + u.id + " waits for " + name + ": " + why + " (D-108)", 1);
         }
-        if (role == 2) {
-            const string afus = UnitHelpers::GetAdvFusionNameForSide(side);
-            IUnitTask@ t = BuildByLayout(u, afus, Task::BuildType::ENERGY);
-            return (t !is null) ? t : AssistNearestOf(u, afus);
-        }
-        return null;
+        return Wait(3 * SECOND);
     }
     // the rest of the T2 air constructors: converters while energy overflows; the
     // advanced fusion going up the moment the converters cannot stay on
@@ -430,6 +495,10 @@ namespace TechBuild {
     void ShareOverflow()
     {
         VerifyShare();
+        RefillAirRoles();                                  // D-108
+        if (airConvId >= 0) LiftCapForRole(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));   // D-108
+        if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
+        if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108
         const float stor = aiEconomyMgr.metal.storage;
         const float cur = aiEconomyMgr.metal.current;
         // not the start bank: until the first lab has stood a full bank is the

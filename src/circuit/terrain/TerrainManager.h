@@ -125,7 +125,9 @@ public:
 		int unitId;      // the structure built on it (zone slots only), 0 = none
 		int order;       // deterministic order inside a named group
 		bool claimed;    // an exact pinned task owns the slot, before/while it is served
+		int serveFails = 0;  // D-108: the engine refused to build on it this often (runtime only); dead at kDeadSlotFails
 	};
+	static constexpr int kDeadSlotFails = 3;  // D-108: a slot the engine refuses this often is never served again; its ground stays held
 	// One footprint. Refuses (-1, logged) off-map, unbuildable, or overlapping ground.
 	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
 	// cols x rows footprints of cdef behind frontCentre (the middle of the grid's
@@ -413,7 +415,7 @@ public:
 	void MarkSlotRecycled(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	// D-101: a set of up to `count` footprints of cdef, the first flush against a
 	// turret slot of nanoGroup, the rest lined up away from it; the first id, -1
-	int PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, int count);
+	int PackSet(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, int count, bool ring = false);  // D-108: ring = the ground round the zone within turret reach
 	// D-104: the footprint of cdef nearest flush against a turret slot of nanoGroup
 	// (EdgeGap first, then the packer's order); needExit: a factory's exit clear
 	bool PickFlushSite(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const springai::AIFloat3& anchor, bool needExit,

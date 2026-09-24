@@ -787,6 +787,46 @@ namespace Layout {
     // Enqueue a structure on the box cells nearest to a turret, pinned to
     // that exact footprint. Null when nothing fits: the caller must not fall
     // back to the spiral (the walking cap, D-063).
+    // D-108: a new set of def: the clusters' zones first (main, then forward),
+    // then, when no zone has room, the ring round each zone within turret reach
+    // (played: the converters filled every zone and the advanced fusions found no
+    // site after six)
+    int PackSetAnywhere(CCircuitDef@ def, const AIFloat3& in anchor, int setSize)
+    {
+        for (int pass = 0; pass < 2; ++pass) {
+            const bool ring = (pass == 1);
+            for (int i = 0; i < ZoneCount(); ++i) {
+                const int id = aiTerrainMgr.PackSet(ZoneAt(i), def, nanoGroup, facing, anchor, setSize, ring);
+                if (id >= 0) return id;
+            }
+            if (fwdZone != 0 && fwdGroup > 0) {
+                const int id = aiTerrainMgr.PackSet(fwdZone, def, fwdGroup, facing, anchor, setSize, ring);
+                if (id >= 0) return id;
+            }
+        }
+        return -1;
+    }
+
+    // D-108: while the advanced fusions have a dedicated builder, the next set of
+    // their ground is always held ahead, so the converters cannot take it
+    int afusAheadLog = -100000;
+    int afusAheadTry = -100000;
+    void HoldAfusSetAhead()
+    {
+        if (!HasBox()) return;
+        CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        if (af is null || aiTerrainMgr.NextSetSlot(af) >= 0) return;
+        if (ai.frame - afusAheadTry < 10 * SECOND) return;   // a failed search is not repeated every tick
+        afusAheadTry = ai.frame;
+        setAsk.set(af.GetName(), ai.frame);   // held, not released as unasked
+        const int id = PackSetAnywhere(af, TurretSeed(), SetSizeOf(af));
+        if (id >= 0 || ai.frame - afusAheadLog > 60 * SECOND) {
+            afusAheadLog = ai.frame;
+            const AIFloat3 p = (id >= 0) ? aiTerrainMgr.GetReservationPos(id) : AIFloat3(-1.0f, 0.0f, -1.0f);
+            GenericHelpers::LogUtil("[Layout] advanced fusion set held ahead" + ((id >= 0) ? (" at (" + int(p.x) + ", " + int(p.z) + ")") : ": no room") + " (D-108)", 1);
+        }
+    }
+
     // D-101: the set size for a def, 0 for a def placed one at a time
     int SetSizeOf(CCircuitDef@ def)
     {
@@ -908,12 +948,8 @@ namespace Layout {
             setAsk.set(def.GetName(), ai.frame);
             id = aiTerrainMgr.NextSetSlot(def);
             bool fresh = false;
-            for (int i = 0; i < ZoneCount() && id < 0; ++i) {
-                id = aiTerrainMgr.PackSet(ZoneAt(i), def, nanoGroup, facing, anchor, setSize);
-                fresh = id >= 0;
-            }
-            if (id < 0 && fwdZone != 0 && fwdGroup > 0) {
-                id = aiTerrainMgr.PackSet(fwdZone, def, fwdGroup, facing, anchor, setSize);
+            if (id < 0) {
+                id = PackSetAnywhere(def, anchor, setSize);
                 fresh = id >= 0;
             }
             if (fresh) {

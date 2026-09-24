@@ -77,14 +77,20 @@ void CScoutTask::Update()
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 
+	// D-108 crash (played, frame 60373): Execute can move a unit to another task,
+	// which erases it from `units` mid-loop; iterate a copy, as IFighterTask::Update
+	// does, and skip a unit that has left meanwhile
+	decltype(units) tmpUnits = units;
 	if ((++updCount % 2 == 0) && (frame >= lastTouched + FRAMES_PER_SEC)) {
 		lastTouched = frame;
-		for (CCircuitUnit* unit : units) {
-			Execute(unit, true);
+		for (CCircuitUnit* unit : tmpUnits) {
+			if (units.find(unit) != units.end()) {
+				Execute(unit, true);
+			}
 		}
 	} else {
-		for (CCircuitUnit* unit : units) {
-			if (unit->IsForceUpdate(frame)) {
+		for (CCircuitUnit* unit : tmpUnits) {
+			if ((units.find(unit) != units.end()) && unit->IsForceUpdate(frame)) {
 				Execute(unit, true);
 			}
 		}
@@ -278,7 +284,7 @@ void CScoutTask::ApplyTargetPath(const CQueryPathMulti* query, bool isUpdating)
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
 
-	if (!pPath->posPath.empty()) {
+	if (!pPath->posPath.empty() && (unit->GetTravelAct() != nullptr)) {
 		position = pPath->posPath.back();
 		unit->GetTravelAct()->SetPath(pPath);
 	} else {
@@ -292,7 +298,9 @@ void CScoutTask::FallbackScout(CCircuitUnit* unit, bool isUpdating)
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	CThreatMap* threatMap = circuit->GetThreatMap();
 	const AIFloat3& pos = unit->GetPos(circuit->GetLastFrame());
-	const AIFloat3& threatPos = unit->GetTravelAct()->IsActive() ? position : pos;
+	// D-108 crash: the travel action is null after ClearAct() (see IFighterTask::OnUnitIdle)
+	ITravelAction* travelAct = unit->GetTravelAct();
+	const AIFloat3& threatPos = ((travelAct != nullptr) && travelAct->IsActive()) ? position : pos;
 	// NOTE: Use max(unit_threat, THREAT_MIN) for no-weapon scouts
 	bool proceed = isUpdating && (threatMap->GetThreatAt(unit, threatPos) < std::max(threatMap->GetUnitPower(unit), THREAT_MIN) * powerMod);
 	if (!proceed) {
@@ -322,7 +330,7 @@ void CScoutTask::ApplyScoutPath(const CQueryPathSingle* query)
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
 
-	if (pPath->path.size() > 2) {
+	if ((pPath->path.size() > 2) && (unit->GetTravelAct() != nullptr)) {
 //		position = path.back();
 		unit->GetTravelAct()->SetPath(pPath);
 		return;
@@ -330,7 +338,9 @@ void CScoutTask::ApplyScoutPath(const CQueryPathSingle* query)
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
-	unit->GetTravelAct()->StateWait();
+	if (unit->GetTravelAct() != nullptr) {
+		unit->GetTravelAct()->StateWait();
+	}
 	TRY_UNIT(circuit, unit,
 		unit->CmdMoveTo(position, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
 	)

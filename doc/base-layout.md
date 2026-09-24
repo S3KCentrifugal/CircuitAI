@@ -1,5 +1,7 @@
 # Base layout
 
+> **Current picture:** [`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md) explains the layout and the build sequence as they play today (D-108). This file records how the design got there; where the two disagree (for example, the box no longer grows: D-099), that page is current.
+
 CircuitAI normally places structures with the existing nearest-free search.
 The experimental profiles additionally permit a native reservation mechanism,
 but only TECH opts its AI instance into it. This keeps every other role and

@@ -255,6 +255,11 @@ namespace Donation {
         if (unit is null || unit.circuitDef is null) return;
         if (!Team::IsT2Constructor(unit.circuitDef)) return;
         if (ordered > 0) --ordered;
+        // D-108: a T2 air constructor that fills (or holds) a dedicated role is TECH's
+        if (TechBuild::ClaimOnBuilt(unit) || TechBuild::IsDedicatedAirCon(unit)) {
+            GenericHelpers::LogUtil("[Team][Donation] " + unit.circuitDef.GetName() + "(" + unit.id + ") is TECH's dedicated air constructor: kept (D-108)", 1);
+            return;
+        }
         if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
             GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
                 + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);

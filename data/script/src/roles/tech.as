@@ -995,6 +995,19 @@ namespace RoleTech
 			}
 		}
 
+		// D-108 (owner's rule): a dedicated air role with no builder to take it is
+		// filled first, whatever the bank and the cap
+		if (facDef.GetName() == UnitHelpers::GetT2AirPlantForSide(side) && TechBuild::AirRoleVacant())
+		{
+			CCircuitDef @aca = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(side));
+			if (aca !is null)
+			{
+				if (aca.maxThisUnit <= aca.count) aca.maxThisUnit = aca.count + 1;
+				GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + ": a T2 air constructor for a vacant dedicated role (D-108)", 1);
+				return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, aca, pos, 64.f));
+			}
+		}
+
 		// D-103 (owner's rule): T2 constructors whenever the metal bank is over
 		// T2ConstructorBankShare of storage, up to T2ConstructorCap (bot and air)
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()) || facDef.GetName() == UnitHelpers::GetT2AirPlantForSide(side))

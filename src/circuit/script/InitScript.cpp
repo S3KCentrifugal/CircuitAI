@@ -269,9 +269,9 @@ static bool CTerrainManager_IsExitClear(CTerrainManager* terrainMgr, const CCirc
 {
 	return terrainMgr->IsExitClear(const_cast<CCircuitDef*>(cdef), pos, facing, length, margin);
 }
-static int CTerrainManager_PackSet(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count)
+static int CTerrainManager_PackSet(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor, int count, bool ring)
 {
-	return terrainMgr->PackSet(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anchor, count);
+	return terrainMgr->PackSet(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anchor, count, ring);
 }
 
 static float CCircuitUnit_GetBuildProgress(CCircuitUnit* u)
@@ -972,7 +972,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetReservationPos(int) const", asMETHOD(CTerrainManager, GetReservationPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationFacing(int) const", asMETHOD(CTerrainManager, GetReservationFacing), asCALL_THISCALL); ASSERT(r >= 0);
-	r = engine->RegisterObjectMethod("CTerrainManager", "int PackSet(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, int count)", asFUNCTION(CTerrainManager_PackSet), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PackSet(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, int count, bool ring)", asFUNCTION(CTerrainManager_PackSet), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101, D-108
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSetSlot(const CCircuitDef@) const", asFUNCTION(CTerrainManager_NextSetSlot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetResetFactorySlot(int)", asMETHOD(CTerrainManager, SetResetFactorySlot), asCALL_THISCALL); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ClearFactoryZones()", asMETHOD(CTerrainManager, ClearFactoryZones), asCALL_THISCALL); ASSERT(r >= 0);  // D-104

@@ -2,7 +2,8 @@
 
 The register of every requirement the owner has stated for the TECH role,
 in the owner's terms, each with the decision that implements it and the
-invariant that checks it in play. The decisions carry the evidence
+invariant that checks it in play. How the layout and the build sequence work today, in one page:
+[`tech-layout-and-sequence.md`](tech-layout-and-sequence.md). The decisions carry the evidence
 ([`decisions.md`](../decisions.md)); the invariants are listed in
 [`invariants.md`](../invariants.md). The game mechanics and theory behind
 them live in the shared knowledge base,
@@ -62,6 +63,7 @@ is edited in place with the decision that changed it.
 | S15 | T1 constructors add build power before assisting T2 constructions; reclaiming stays the higher priority. | D-105 | (rule order: `power.t1` after the reclaim rows) |
 | S17 | Whenever TECH's metal store is over 95%, refresh the team economy and give up to 20% of TECH's metal capacity to the lowest-filled teammate(s), filling their storage: a fallback so no metal is lost to overflow when TECH's build power cannot keep up. | D-106 | INV-033 |
 | S18 | The first two T2 air constructors are dedicated: one always builds advanced energy converters, the other always advanced fusions. The other air constructors build converters while energy overflows and assist the advanced fusion the moment converters cannot stay on; every construction turret in range does the same after reclaim. | D-107 | INV-034 |
+| S19 | The dedicated advanced-fusion air constructor has one duty and is never interrupted by any other process; the converter one likewise; if either is destroyed it is replaced and both roles stay filled. Advanced fusions keep going up past six. | D-108 | INV-034 to INV-037 |
 | S16 | The metal is spent: a full bank is a waste (no converters then; production and build power are the sinks: T2 constructors, spam labs scaling with income, turrets assisting factories). | D-105 | INV-032, INV-011 |
 
 ## Tools the owner asked for

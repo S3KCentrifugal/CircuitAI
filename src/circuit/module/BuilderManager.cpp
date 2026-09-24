@@ -483,6 +483,10 @@ void CBuilderManager::Init()
 
 int CBuilderManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 {
+	// D-108 crash: a new unit may be allocated where a freed one's stale
+	// unfinishedUnits key points; that entry (and its dead task) is not this unit's
+	unfinishedUnits.erase(unit);
+
 	auto search = createdHandler.find(unit->GetCircuitDef()->GetId());
 	if (search != createdHandler.end()) {
 		search->second(unit, builder);
@@ -578,6 +582,9 @@ int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 	if (iter != unfinishedUnits.end()) {
 		DoneTask(iter->second);
 	}
+	// D-108 crash: the entry goes with the frame even when its task was already
+	// dequeued (DequeueTask erases by the task's current target only)
+	unfinishedUnits.erase(unit);
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
 		DoneTask(itre->second);
@@ -621,6 +628,10 @@ int CBuilderManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	if (iter != unfinishedUnits.end()) {
 		AbortTask(iter->second);
 	}
+	// D-108 crash: a dead unit never stays a key; the scans over unfinishedUnits
+	// (FindUnfinishedFor, FindUnfinishedNear, CountUnfinishedNear,
+	// GetUnfinishedCount) dereference it, and the unit is freed after this event
+	unfinishedUnits.erase(unit);
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
 		AbortTask(itre->second);
@@ -636,6 +647,19 @@ int CBuilderManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	}
 
 	return 0; //signaling: OK
+}
+
+// D-108 crash (the owner's team game, build78): a unit that leaves our team
+// (captured, or given to a teammate) never reaches UnitDestroyed here, and
+// CCircuitAI frees it once it is marked dead; its unfinishedUnits key dangled
+int CBuilderManager::UnitCaptured(CCircuitUnit* unit, int oldTeamId, int newTeamId)
+{
+	auto iter = unfinishedUnits.find(unit);
+	if (iter != unfinishedUnits.end()) {
+		AbortTask(iter->second);
+	}
+	unfinishedUnits.erase(unit);
+	return IModule::UnitCaptured(unit, oldTeamId, newTeamId);
 }
 
 void CBuilderManager::AddBuildPower(CCircuitUnit* unit)
@@ -700,10 +724,14 @@ float CBuilderManager::GetStaticBuildPowerNear(const AIFloat3& position, float r
 
 int CBuilderManager::GetUnfinishedCount(const CCircuitDef* def) const
 {
+	// D-108 crash: the keys of unfinishedUnits are never dereferenced (one can
+	// outlive its unit); our live units are walked and looked up by pointer
 	int count = 0;
-	for (const auto& kv : unfinishedUnits) {
-		CAllyUnit* au = kv.first;
-		if ((au != nullptr) && (au->GetCircuitDef() == def)) {
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit != nullptr) && !unit->IsDead() && (unit->GetCircuitDef() == def)
+			&& (unfinishedUnits.find(unit) != unfinishedUnits.end()))
+		{
 			++count;
 		}
 	}
@@ -740,13 +768,11 @@ CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float rad
 	const float radiusSq = SQUARE(radius);
 	CCircuitUnit* best = nullptr;
 	float bestSq = std::numeric_limits<float>::max();
-	for (const auto& kv : unfinishedUnits) {
-		CAllyUnit* au = kv.first;
-		if ((au == nullptr) || ((def != nullptr) && (au->GetCircuitDef() != def))) {
-			continue;
-		}
-		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
-		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt()) {
+	for (const auto& kv : circuit->GetTeamUnits()) {  // D-108 crash: never the map's keys
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || ((def != nullptr) && (unit->GetCircuitDef() != def))
+			|| (unfinishedUnits.find(unit) == unfinishedUnits.end()) || !unit->GetUnit()->IsBeingBuilt())
+		{
 			continue;
 		}
 		const float sq = unit->GetPos(frame).SqDistance2D(pos);
@@ -785,14 +811,15 @@ int CBuilderManager::CountUnfinishedNear(const AIFloat3& pos, float radius, floa
 	const int frame = circuit->GetLastFrame();
 	const float radiusSq = SQUARE(radius);
 	int n = 0;
-	for (const auto& kv : unfinishedUnits) {
-		CAllyUnit* au = kv.first;
-		if ((au == nullptr) || (au->GetCircuitDef() == nullptr) || (au->GetCircuitDef() == except)
-				|| au->GetCircuitDef()->IsMobile() || (au->GetCircuitDef()->GetCostM() < minCostM)) {
+	for (const auto& kv : circuit->GetTeamUnits()) {  // D-108 crash: never the map's keys
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead()) {
 			continue;
 		}
-		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
-		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt()) {
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if ((cdef == nullptr) || (cdef == except) || cdef->IsMobile() || (cdef->GetCostM() < minCostM)
+			|| (unfinishedUnits.find(unit) == unfinishedUnits.end()) || !unit->GetUnit()->IsBeingBuilt())
+		{
 			continue;
 		}
 		if (unit->GetPos(frame).SqDistance2D(pos) <= radiusSq) {
@@ -812,7 +839,7 @@ static bool InReachOf(CCircuitUnit* builder, CCircuitUnit* unit, int frame)
 
 CCircuitUnit* CBuilderManager::FindReclaimTargetFor(CCircuitUnit* builder)
 {
-	if (builder == nullptr) {
+	if ((builder == nullptr) || builder->IsDead()) {
 		return nullptr;
 	}
 	const int frame = circuit->GetLastFrame();
@@ -834,19 +861,17 @@ CCircuitUnit* CBuilderManager::FindReclaimTargetFor(CCircuitUnit* builder)
 
 CCircuitUnit* CBuilderManager::FindUnfinishedFor(CCircuitUnit* builder, const CCircuitDef* def)
 {
-	if ((builder == nullptr) || (def == nullptr)) {
+	if ((builder == nullptr) || builder->IsDead() || (def == nullptr)) {
 		return nullptr;
 	}
 	const int frame = circuit->GetLastFrame();
 	CCircuitUnit* best = nullptr;
 	float bestSq = std::numeric_limits<float>::max();
-	for (const auto& kv : unfinishedUnits) {
-		CAllyUnit* au = kv.first;
-		if ((au == nullptr) || (au->GetCircuitDef() != def)) {
-			continue;
-		}
-		CCircuitUnit* unit = circuit->GetTeamUnit(au->GetId());
-		if ((unit == nullptr) || unit->IsDead() || !unit->GetUnit()->IsBeingBuilt() || !InReachOf(builder, unit, frame)) {
+	for (const auto& kv : circuit->GetTeamUnits()) {  // D-108 crash: never the map's keys
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || (unit->GetCircuitDef() != def)
+			|| (unfinishedUnits.find(unit) == unfinishedUnits.end()) || !unit->GetUnit()->IsBeingBuilt() || !InReachOf(builder, unit, frame))
+		{
 			continue;
 		}
 		const float sq = builder->GetPos(frame).SqDistance2D(unit->GetPos(frame));
@@ -1140,6 +1165,11 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 				} break;
 				default: {
 					unfinishedUnits.erase(taskB->GetTarget());
+					// D-108 crash: and every other entry of this task (a task whose
+					// target changed left its old frame behind, a dangling key once freed)
+					for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
+						itu = (itu->second == taskB) ? unfinishedUnits.erase(itu) : std::next(itu);
+					}
 				} break;
 			}
 			tasks.erase(it);

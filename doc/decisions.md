@@ -5678,6 +5678,123 @@ roles are held within 60 s.
 [`roles/tech-requirements.md`](roles/tech-requirements.md),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
 
+## D-108 — The dedicated air constructors are never interrupted, never capped, and always replaced
+
+**Date:** 2026-09-24. **Status:** Played (build78; runs `20260924-185830`, no enemy, and `20260924-190045`, tech versus tech; 36 min each, zero bonus, Supreme Isthmus). Advanced fusions: 11 by 33.7 min and 13 by 36.1 min (before: six to seven, the last at about 27 min), one every 60 to 90 s after 25 min; metal +600 and +727, energy +35,200 and +38,000 at 36 min. Both roles taken at 23.8/24.3 and 27.1/27.4 min; five dead slots given up in the first game, none needed in the second; no crash in either. INV-034, INV-035 and INV-036 silent; INV-037 fired once (32.6 min in the first game: ten advanced fusions stood or were building and the next frame came after three minutes).
+
+**Owner's report and rule.** "The tech player does not make more than 6
+AFUS, it kind of stalls after 6 shortly after the 20 minute mark. The
+economic scaling and placement was almost perfect until that point though,
+it seems to over produce energy converters and not place afus." The
+advanced-fusion air constructor has one dedicated duty and is not
+interrupted by any other process; the second is for energy converters; if
+either is destroyed it is replaced and both roles stay filled.
+
+**Causes found in play.**
+
+1. The cap (run `20260924-181224`): TECH starts with every advanced fusion
+   capped at `StartCapAdvancedFusionReactors` (0) and the rush chain raises
+   the cap only to its step target (1). The dedicated builder checks
+   `IsAvailable` (count under `maxThisUnit`), so from the first advanced
+   fusion on it logged `waits for corafus: not available (2 of 1)` for the
+   rest of the game; the fusions that did go up came from paths that do not
+   check the cap. This was the stall at six.
+2. The fall-through (run `20260924-171343`): with no site in the layout the
+   dedicated builder fell through the rule table to `chain.next`,
+   `energy.convert.float` and `power.turret` and was found building a
+   converter.
+3. The ground: converters (placed far more often) filled every zone; a new
+   set of advanced fusions found no flush site and the sets drifted away
+   from the turrets.
+4. The handover: a builder that took over a role finished its old job first
+   (`keep.current` runs before `air.dedicated`); INV-035 caught it.
+5. The dead slot (run `20260924-183010`, with the cap lifted): seven advanced
+   fusions by 27.8 min, then none for the last nine minutes. The held
+   advanced-fusion slot 204 was refused by the engine
+   (`RESERVE: pinned slot 204 for corafus cannot be served`); the task
+   aborted, the slot was unclaimed and `NextSetSlot` offered it again, to
+   every advanced-fusion order, to the end of the game.
+
+**Decision.**
+
+1. `air.dedicated` never falls through: the builder builds its own structure
+   through the layout, else assists a frame of its kind, else waits 3 s and
+   logs why (`TechBuild::AirDedicated`).
+2. A held role's structure is never capped: `TechBuild::LiftCapForRole`
+   raises `maxThisUnit` to one past the count before each order and on every
+   economy tick while the role is held.
+3. Roles are claimed when the unit is built (`ClaimOnBuilt`, from the
+   donation hook, which now keeps a dedicated unit); a role whose builder is
+   gone passes at once to another T2 air constructor of ours, the advanced
+   fusions first (`RefillAirRoles`), and that builder drops a job of another
+   kind (`DropOtherJob`, new builder binding `aiBuilderMgr.AbortTask`); with
+   none free the advanced aircraft plant makes one whatever the bank or the
+   T2 constructor cap.
+4. The ground: a new set is looked for in every zone, then the forward zone,
+   then the ring round each zone within turret reach (`Layout::PackSetAnywhere`,
+   native `PackSet(..., ring)`); while the fusion role is held the next set
+   of advanced-fusion ground is reserved ahead (`Layout::HoldAfusSetAhead`,
+   retried at most every 10 s).
+5. A dead slot: a pinned slot the engine refuses to build on
+   `kDeadSlotFails` (3) times is dead (`SReservation::serveFails`, runtime
+   only). It is never offered again (`NextSetSlot`), its ground stays held so
+   it is not packed again (`ReleaseSetSlots` keeps it), and the set moves on
+   or a new one is found. Every refusal now says why (gone, consumed, another
+   def, dead, the engine refuses the ground, out of the builder's reach).
+
+**Crash fixed on the way.** The owner's game of build74 crashed at frame
+37960 (about 21 min): an access violation at address 0 in
+`CAllyUnit::GetPos`, from `CBuilderManager::FindUnfinishedFor` (the turret
+assist of D-107, which scans every frame under construction). The map
+`unfinishedUnits` was cleared only when a task was dequeued, by the task's
+current target: a frame whose task had already gone, or whose task changed
+target, stayed as a key after the unit was freed. Now a unit is erased from
+it when it finishes or dies, and a dequeued task erases every entry that
+points to it. The same crash had ended run `20260924-181224` (build75) at
+31.7 min, first read as the end of the game; builds 76 and 77 played three
+long games without it.
+
+**The same crash again, in the owner's 16-AI game (build78, frame 43507).**
+Erasing on finish and death was not enough: in a team game a key still
+outlived its unit (`CCircuitAI` frees a unit as soon as it is marked dead,
+and not every way off the team reaches `CBuilderManager::UnitDestroyed`;
+the 1v1 tests never exercised them). The fix no longer depends on finding
+every path: the scans (`FindUnfinishedFor`, `FindUnfinishedNear`,
+`CountUnfinishedNear`, `GetUnfinishedCount`) walk our live team units and
+only look the map up by pointer, never dereferencing its keys; a captured
+unit is erased (`UnitCaptured`); a new unit erases any stale entry at its
+own address (`UnitCreated`: a freed unit's memory can be reused, and its old
+entry would complete a dead task); and a dead builder is refused.
+
+**A second crash, found in verification.** Run `20260924-184618` (build77)
+crashed at frame 60373 (33.5 min) in `CScoutTask::FallbackScout`, reached
+from `CScoutTask::Update` (upstream code, unchanged on this branch). The
+scout task called `GetTravelAct()->IsActive()` without the null check the
+fighter task has (a unit's travel action is null after `ClearAct()`), and
+iterated its own `units` set while `Execute` can move a unit to another task.
+Now it iterates a copy, skips a unit that has left, and guards every travel
+action call.
+
+**Invariants.** INV-035: a dedicated air constructor never holds a
+construction of another kind. INV-036: while a role is held, its structure
+is not capped for 10 s. INV-037: while the fusion role is held and the metal
+bank is over half full, a new advanced fusion appears at least every 180 s.
+
+**Files.** [`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`donation.as`](../data/script/src/manager/donation.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`ScoutTask.cpp`](../src/circuit/task/fighter/ScoutTask.cpp),
+[`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md),
+[`roles/tech-requirements.md`](roles/tech-requirements.md),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

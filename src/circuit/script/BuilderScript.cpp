@@ -76,6 +76,7 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterObjectType("CBuilderManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CBuilderManager aiBuilderMgr", manager); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CBuilderManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "void AbortTask(IUnitTask@)", asMETHODPR(CBuilderManager, AbortTask, (IUnitTask*), void), asCALL_THISCALL); ASSERT(r >= 0);  // D-108: a builder handed a dedicated role drops its other job
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ Enqueue(const SBuildTask& in)", asMETHODPR(CBuilderManager, Enqueue, (const TaskB::SBuildTask&), IBuilderTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ EnqueueLayout(const SBuildTask& in, const string& in, CCircuitUnit@)", asMETHOD(CBuilderManager, EnqueueLayout), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ EnqueueFactoryNano(const SBuildTask& in, CCircuitUnit@)", asMETHOD(CBuilderManager, EnqueueFactoryNano), asCALL_THISCALL); ASSERT(r >= 0);

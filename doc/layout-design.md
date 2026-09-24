@@ -1,5 +1,7 @@
 # TECH native base-layout design
 
+> **Current picture:** [`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md) explains the layout and the build sequence as they play today (D-108). This file records how the design got there; where the two disagree (for example, the box no longer grows: D-099), that page is current.
+
 This is the current design for TECH's planned base. It supersedes the
 script-composed bay/spine/tenant design recorded by D-053 and D-057 while
 retaining the repaired reservation lifecycle from D-059. D-063 replaced the

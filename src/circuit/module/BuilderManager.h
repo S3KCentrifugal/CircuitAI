@@ -260,6 +260,7 @@ public:
 	virtual int UnitIdle(CCircuitUnit* unit) override;
 	virtual int UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 	virtual int UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+	virtual int UnitCaptured(CCircuitUnit* unit, int oldTeamId, int newTeamId) override;  // D-108 crash
 
 	CCircuitDef* GetTerraDef() const { return terraDef; }
 

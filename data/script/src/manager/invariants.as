@@ -69,6 +69,11 @@ namespace Invariants {
     dictionary retiredT2Seen;     // D-105: INV-031
     int overflowSince = -1;       // D-106: INV-033
     int airRolesOpenSince = -1;   // D-107: INV-034
+    int airOffDutyLog = -100000;  // D-108: INV-035
+    int roleCappedSince = -1;     // D-108: INV-036
+    int roleCappedLog = -100000;  // D-108: INV-036
+    int afusSeenCount = -1;       // D-108: INV-037
+    int afusSeenFrame = -1;       // D-108: INV-037
     int t2ConsAtHigh = 0;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
@@ -366,6 +371,58 @@ namespace Invariants {
             else if (ai.frame - airRolesOpenSince >= 60 * SECOND) {
                 Violation("INV-034", "air", "" + n + " T2 air constructors but a dedicated role (converters " + TechBuild::airConvId + ", advanced fusions " + TechBuild::airAfusId + ") is open");
                 airRolesOpenSince = ai.frame;
+            }
+        }
+
+        // INV-036 (D-108): a held role's structure is never capped: the start caps
+        // and the chain's step targets must not stop a dedicated builder
+        // (10 s: a frame just placed meets the cap until the next economy tick lifts it)
+        {
+            const string cSide = Global::AISettings::Side;
+            string capped = "";
+            for (int r = 1; r <= 2; ++r) {
+                const int id = (r == 1) ? TechBuild::airConvId : TechBuild::airAfusId;
+                if (id < 0 || ai.GetTeamUnit(id) is null) continue;
+                CCircuitDef@ d = ai.GetCircuitDef((r == 1) ? UnitHelpers::GetAdvEnergyConverterNameForSide(cSide) : UnitHelpers::GetAdvFusionNameForSide(cSide));
+                if (d !is null && d.maxThisUnit <= d.count)
+                    capped = d.GetName() + " capped at " + d.maxThisUnit + " (" + d.count + " stand) while dedicated " + id + " holds its role";
+            }
+            if (capped.length() == 0) roleCappedSince = -1;
+            else if (roleCappedSince < 0) roleCappedSince = ai.frame;
+            else if (ai.frame - roleCappedSince >= 10 * SECOND && ai.frame - roleCappedLog >= 30 * SECOND) {
+                roleCappedLog = ai.frame;
+                Violation("INV-036", "air", capped);
+            }
+        }
+
+        // INV-037 (D-108): the advanced fusions keep going up: while the fusion
+        // role is held and the metal bank is over half full, a new advanced fusion
+        // (frame or finished) appears at least every 180 s
+        {
+            CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+            const float mS = aiEconomyMgr.metal.storage;
+            const bool watch = af !is null && TechBuild::airAfusId >= 0 && ai.GetTeamUnit(TechBuild::airAfusId) !is null
+                && mS > 0.0f && aiEconomyMgr.metal.current > 0.5f * mS;
+            if (!watch || af.count > afusSeenCount) { afusSeenCount = (af is null) ? -1 : af.count; afusSeenFrame = ai.frame; }
+            else if (ai.frame - afusSeenFrame >= 180 * SECOND) {
+                Violation("INV-037", "afus", "no new advanced fusion for 180 s (" + af.count + " stand or build) with the fusion role held and the metal bank over half");
+                afusSeenFrame = ai.frame;
+            }
+        }
+
+        // INV-035 (D-108): a dedicated T2 air constructor never holds a
+        // construction of another kind (it builds or assists its own, or waits)
+        {
+            const string aSide = Global::AISettings::Side;
+            for (int r = 1; r <= 2; ++r) {
+                const int id = (r == 1) ? TechBuild::airConvId : TechBuild::airAfusId;
+                const string own = (r == 1) ? UnitHelpers::GetAdvEnergyConverterNameForSide(aSide) : UnitHelpers::GetAdvFusionNameForSide(aSide);
+                CCircuitUnit@ du = (id < 0) ? null : ai.GetTeamUnit(id);
+                IBuilderTask@ bt = (du is null || du.task is null) ? null : cast<IBuilderTask>(du.task);
+                if (bt is null || bt.buildDef is null || bt.buildDef.GetName() == own) continue;
+                if (ai.frame - airOffDutyLog < 30 * SECOND) continue;
+                airOffDutyLog = ai.frame;
+                Violation("INV-035", "air", "dedicated " + id + " (" + own + ") holds " + bt.buildDef.GetName());
             }
         }
 
