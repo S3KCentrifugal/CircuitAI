@@ -342,22 +342,32 @@ namespace EcoPlanner {
     string PickEnergy(const State@ s, string &out why, const string &in reason)
     {
         array<Option@> opts = EnergyOptions(s);
+        // D-100 (owner: the fusion comes sooner once the mexes near it are
+        // upgraded; played: energy.short ordered the fusion with 3 of 8 upgraded,
+        // the upgrades' own drain making energy short): while upgrades are
+        // pending the rows answer with the other energy, the chain orders the fusion
+        const bool mohos = TechChain::MohosPending();
+        const string rsn = mohos ? (reason + "; mex upgrades pending, no fusion") : reason;
+        if (mohos) {
+            for (int i = int(opts.length()) - 1; i >= 0; --i)
+                if (opts[i].key == "fusion" || opts[i].key == "afus") opts.removeAt(uint(i));
+        }
         if (opts.length() == 0) return "";
         if (s.builderIsT2 && s.eIncome >= Global::RoleSettings::Tech::EcoFusionEnergyIncome) {
             for (uint i = 0; i < opts.length(); ++i) {
-                if (opts[i].key == "afus") { why = reason + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: advanced fusion"; return "afus"; }
+                if (opts[i].key == "afus") { why = rsn + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: advanced fusion"; return "afus"; }
             }
             for (uint i = 0; i < opts.length(); ++i) {
-                if (opts[i].key == "fusion") { why = reason + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: fusion"; return "fusion"; }
+                if (opts[i].key == "fusion") { why = rsn + "; T2 builder above " + int(Global::RoleSettings::Tech::EcoFusionEnergyIncome) + " energy: fusion"; return "fusion"; }
             }
         }
         if (Affordable(opts[0], s)) {
-            why = reason + "; cheapest per E/s";
+            why = rsn + "; cheapest per E/s";
             return opts[0].key;
         }
         Option@ cheapest = opts[0];
         for (uint i = 1; i < opts.length(); ++i) if (opts[i].cost < cheapest.cost) @cheapest = opts[i];
-        why = reason + "; nothing affordable, cheapest lump";
+        why = rsn + "; nothing affordable, cheapest lump";
         return cheapest.key;
     }
 

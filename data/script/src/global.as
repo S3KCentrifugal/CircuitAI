@@ -330,6 +330,7 @@ namespace Global {
             // spots within 700 of the start, at most 3 - three on Supreme Isthmus, one or none elsewhere),
             // the lab follows at once, and the constructors claim the rest within ChainMexFarRadius
             float ChainMexFarRadius = 2500.0f;
+            float ChainMohoRadius = 2500.0f;                // D-100: the moho step upgrades every mex of ours within this of the start (0: the recipe's count only)
             int ChainMaxMexes = 6;                          // D-070: mexes the chain claims in all
             // D-070: energy by the map's wind, deterministically. Expected turbine output is the average of the
             // map's min and max wind (capped at a turbine's 25). Turbines are chosen when their metal per E/s is

@@ -96,3 +96,5 @@ Status per objective: the best run so far, updated by the tracker.
 | 20260922-211142 | afus | 24.0 | 1:14 | 7:13 | 8:52 | 11:31 | 19:53 | - | - | - | 13/38/78 | cd41084e2cf2b147 | D-080 played: endgame plan phase 1 (auto = team 0 nuke); build29 |
 | 20260922-211838 | afus | 24.1 | 1:14 | 6:10 | 8:20 | 11:26 | 21:02 | 13:39 | - | - | 15/38/25 | cd41084e2cf2b147 | D-080 played: reclaimed energy steps count as met; plan nuke phase 1 |
 | 20260922-212555 | afus | 24.1 | 1:13 | 6:48 | 8:23 | 11:09 | 15:58 | 19:34 | - | - | 15/45/61 | cd41084e2cf2b147 | D-080 played: retired energy steps met; parallel afus on the ladder; plan nuke |
+| 20260923-222626 | afus | 28.2 | 1:13 | 5:38 | 7:23 | 10:29 | 18:38 | 19:32 | - | - | 16/38/74 | dbdc6bc1248a150c | D-100 A/B: ChainMohoRadius=0 (the recipe's 2 upgrades before the fusion) |
+| 20260923-223017 | afus | 28.2 | 1:13 | 5:37 | 7:41 | 15:34 | 17:42 | - | - | - | 16/43/98 | dbdc6bc1248a150c | D-100 A/B: ChainMohoRadius=2500 (every mex within 2500 upgraded first; fusion later, advanced fusion 56 s sooner) |

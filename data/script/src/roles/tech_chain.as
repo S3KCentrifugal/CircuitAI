@@ -30,9 +30,10 @@ namespace TechChain
         string key;          // mex solar wind advsolar lab alab moho nano nanot2 fusion afus silo gantry
         string defName;
         int target;          // cumulative count of this def that must stand
+        int base;            // D-100: the recipe's count; the moho step's target never drops under it
         float radius;        // mex steps: the spots within this of the start; 0 = the default
         bool exhausted;      // mex steps: no open spot left in the radius
-        Step(const string &in k, const string &in d, int t, float r = 0.0f) { key = k; defName = d; target = t; radius = r; exhausted = false; }
+        Step(const string &in k, const string &in d, int t, float r = 0.0f) { key = k; defName = d; target = t; base = t; radius = r; exhausted = false; }
     }
 
     string objective = "eco";
@@ -297,11 +298,41 @@ namespace TechChain
     // Caps re-asserted every economy update: the start caps and the merged
     // map limits would otherwise hide a solar past the fourth, a fusion, a
     // gantry or a silo from IsAvailable.
+    // D-100: the moho step is not met and a mex within ChainMexFarRadius is
+    // still T1 with no upgrade under way: the fusion waits for the upgrades
+    bool MohosPending()
+    {
+        if (!Active() || TechBuild::MetalFullLong() || Global::RoleSettings::Tech::ChainMohoRadius <= 0.0f) return false;   // metal floating: the upgrades are not what it waits on
+        for (uint i = 0; i < steps.length(); ++i) {
+            Step@ s = steps[i];
+            if (s.key != "moho" || (i < skipped.length() && skipped[i])) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(s.defName);
+            if (d is null || Standing(s, d) >= s.target) return false;
+            const AIFloat3 t1 = Economy::MexTracker::GetNearestNonUpgradedMexInRange(Global::Map::StartPos, Global::Map::StartPos,
+                Global::RoleSettings::Tech::ChainMohoRadius);
+            return t1.x >= 0.0f;
+        }
+        return false;
+    }
+
     void Tick()
     {
         TrackEnergy();   // D-079
         if (!Active()) return;
         for (uint i = 0; i < steps.length(); ++i) {
+            // D-100 (owner: the fusion started with the mexes near it still T1; it
+            // would have come sooner upgraded): the moho step upgrades every mex of
+            // ours within ChainMexFarRadius, the ground the mex steps took, the
+            // recipe's count at least
+            if (steps[i].key == "moho" && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f) {
+                const int near = Economy::MexTracker::GetOwnedMexCountInRange(Global::Map::StartPos, Global::RoleSettings::Tech::ChainMohoRadius);
+                const int want = (near > steps[i].base) ? near : steps[i].base;
+                if (want != steps[i].target) {
+                    GenericHelpers::LogUtil("[TECH][Chain] moho step: " + want + " (every mex within " + int(Global::RoleSettings::Tech::ChainMohoRadius)
+                        + " of the start, " + near + " owned; the recipe's " + steps[i].base + " at least)", 1);
+                    steps[i].target = want;
+                }
+            }
             CCircuitDef@ d = ai.GetCircuitDef(steps[i].defName);
             if (d is null) continue;
             if (d.maxThisUnit < steps[i].target) d.maxThisUnit = steps[i].target;
@@ -508,6 +539,14 @@ namespace TechChain
                 // said at level 1 when the counts change (D-075: a turret step
                 // went silent for four minutes)
                 if (can) Trace("nothing to add (unfinished " + unfinished + ", queued " + queued + (pending ? ", pending" : "") + ")", int(i), s, have, u);
+                continue;
+            }
+            // D-100: with the metal bank full for PowerAheadSeconds the upgrades are
+            // not what the metal waits on (played: 9 upgrades one at a time, the
+            // fusion 3 min later, 12,747 metal banked): an upgrade in flight keeps its
+            // builder and the next builder goes on to the next step
+            if (s.key == "moho" && (unfinished > 0 || queued > 0 || pending) && TechBuild::MetalFullLong()) {
+                Trace("metal floats: an upgrade is in flight, on to the next step", int(i), s, have, u);
                 continue;
             }
             if (unfinished > 0) {

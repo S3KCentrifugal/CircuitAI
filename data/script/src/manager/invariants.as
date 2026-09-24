@@ -60,6 +60,7 @@ namespace Invariants {
     int lastLabExitCount = -1;
     int noForwardSince = -1;
     int turretsOverSince = -1;    // D-097: INV-019
+    int fusionFramesLast = 0;     // D-100: INV-021
     int ladderFloatSince = -1;
     dictionary energyFrames;   // energy def name -> unfinished count last tick (INV-009)
     dictionary offSince;   // reclaim target id -> frame turrets were first seen off it (INV-008)
@@ -207,6 +208,21 @@ namespace Invariants {
                 else if (ai.frame - turretsOverSince >= int(Global::RoleSettings::Tech::InvariantTurretFlightSeconds) * SECOND)
                     Violation("INV-019", "turrets", "" + frames + " turret frames under construction, " + allowed + " allowed (" + why + ")");
             } else turretsOverSince = -1;
+        }
+
+        // INV-021 (D-100): a fusion frame is not started while a mex of ours
+        // within ChainMexFarRadius is still T1 with no upgrade under way
+        {
+            CCircuitDef@ fd = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
+            const int frames = (fd is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(fd);
+            // not while the metal floats (the fusion then goes ahead on purpose, D-100)
+            if (frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
+                const AIFloat3 t1 = Economy::MexTracker::GetNearestNonUpgradedMexInRange(Global::Map::StartPos, Global::Map::StartPos,
+                    Global::RoleSettings::Tech::ChainMohoRadius);
+                if (t1.x >= 0.0f)
+                    Violation("INV-021", "fusion", "a fusion frame started with a T1 mex at (" + int(t1.x) + ", " + int(t1.z) + ") not upgraded");
+            }
+            fusionFramesLast = frames;
         }
 
         // INV-015: a dear chain order does not wait for its first builder (D-084)

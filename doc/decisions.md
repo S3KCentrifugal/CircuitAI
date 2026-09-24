@@ -5081,6 +5081,63 @@ lack of room for `InvariantNoRoomSeconds` (120). Unit test
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
 [`layout-design.md`](layout-design.md).
 
+## D-100 — Every mex near the start is upgraded before the fusion, unless the metal floats
+
+**Date:** 2026-09-23. **Status:** Played (build57's DLL with this script; benchmark A/B recorded in [`tech-rush.md`](benchmarks/tech-rush.md)).
+
+**Owner's report.** The AI started a fusion before the mexes near it were
+upgraded; the fusion would have come sooner with them upgraded.
+
+**Played (the owner's game, build57, teams 8 and 11).** The recipe (D-072)
+says `moho 2`: two upgrades, then the fusion. Both AIs upgraded two and
+ordered the fusion around 7 min with more mexes still T1.
+
+**Decision.**
+
+1. The moho step's target is every mex of ours within `ChainMohoRadius`
+   (2500, the ground the chain's mex steps take), the recipe's count at
+   least. It is refreshed on every chain tick and logged when it changes.
+   `ChainMohoRadius` 0 restores the recipe's count.
+2. While upgrades are pending (`TechChain::MohosPending`), the economy
+   rows answer an energy shortage without a fusion or an advanced fusion.
+   The chain orders the fusion after the upgrades. Played before this item:
+   `energy.short` ordered the fusion with 3 of 8 upgraded, because the
+   upgrades' own energy drain made energy short.
+3. Unless the metal floats (`TechBuild::MetalFullLong`). Then the upgrades
+   are not what the metal waits on: an upgrade in flight keeps its builder,
+   the next builder goes on to the next step, and the rows' fusion hold is
+   lifted. Played before this item: 9 upgrades one at a time, the fusion at
+   15.51 min (12.45 before), 12,747 metal banked.
+
+**Benchmark (headless, zero bonus, Supreme Isthmus, afus objective; one
+game each).**
+
+| `ChainMohoRadius` | fusion | first advanced fusion | metal at 15 min | at 20 min |
+| --- | --- | --- | --- | --- |
+| 0 (the recipe's 2) | 10:29 | 18:38 | +74 | +120 |
+| 2500 (this decision) | 15:34 | 17:42 | +99 | +134 |
+
+The fusion comes 5 min later; the advanced fusion, the objective, 56 s
+sooner, on a larger income. The owner's rule holds for the objective, not
+for the fusion itself: after the advanced lab the fusion is limited by
+energy and build power, not metal. One game each is a small sample.
+
+**Seen, not changed.** INV-011 (metal floating past the objective with an
+income step unmet) in both variants. INV-010 and INV-015 after the advanced
+fusion in the 2500 game.
+
+**Invariant.** INV-021: a fusion frame does not start while a mex within
+`ChainMohoRadius` is still T1 with no upgrade under way, unless the metal
+floats.
+
+**Files.** [`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`eco_planner.as`](../data/script/src/manager/eco_planner.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`roles/tech_chain.md`](roles/tech_chain.md),
+[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.
