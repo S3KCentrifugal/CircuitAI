@@ -786,6 +786,10 @@ namespace Layout {
     // Enqueue a structure on the box cells nearest to a turret, pinned to
     // that exact footprint. Null when nothing fits: the caller must not fall
     // back to the spiral (the walking cap, D-063).
+    int noRoomSince = -1;     // D-099: INV-020
+    int noRoomLog = -100000;
+    string noRoomDef = "";
+
     IUnitTask@ Place(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder = null)
     {
         if (def is null) return null;
@@ -805,13 +809,28 @@ namespace Layout {
         int id = -1;
         for (int i = 0; i < ZoneCount() && id < 0; ++i)
             id = aiTerrainMgr.PackNearGroup(ZoneAt(i), def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
-        if (id < 0 && GrowBox()) {
-            id = aiTerrainMgr.PackNearGroup(ZoneAt(ZoneCount() - 1), def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
-        }
+        // D-099 (played: 130 advanced converters filled the main box and the
+        // economy stopped at +24k energy). Owner's rule: the box does not grow,
+        // a structure beyond it would be out of the turrets' reach; the ground
+        // around the turrets is used (native packs the ring around a full zone
+        // within a turret's reach), then the next nearest cluster: the forward
+        // one, served by its own turrets.
+        if (id < 0 && fwdZone != 0 && fwdGroup > 0)
+            id = aiTerrainMgr.PackNearGroup(fwdZone, def, fwdGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
         if (id < 0) {
-            GenericHelpers::LogUtil("[Layout] no room in the turret boxes for " + def.GetName(), 1);
+            if (noRoomSince < 0) noRoomSince = ai.frame;
+            // said once per def every 30 s (played: 4,139 lines in 20 minutes)
+            if (def.GetName() != noRoomDef || ai.frame - noRoomLog > 30 * SECOND) {
+                noRoomDef = def.GetName(); noRoomLog = ai.frame;
+                GenericHelpers::LogUtil("[Layout] no room within reach of any turret cluster for " + def.GetName()
+                    + " (" + int((ai.frame - noRoomSince) / SECOND) + " s without room)", 1);
+            }
+            // INV-020 (D-099): the economy is not refused for lack of room for long
+            if (ai.frame - noRoomSince >= int(Global::RoleSettings::Tech::InvariantNoRoomSeconds) * SECOND)
+                Invariants::Violation("INV-020", "room", "no layout room for " + def.GetName() + " for " + int((ai.frame - noRoomSince) / SECOND) + " s");
             return null;
         }
+        noRoomSince = -1;
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
         // INV-014 (D-082): every packed structure stands within a turret's reach of a slot
         if (aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, pos, Global::RoleSettings::Tech::InvariantReachElmos) == 0

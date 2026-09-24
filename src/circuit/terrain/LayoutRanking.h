@@ -90,6 +90,12 @@ inline bool Overlaps(const CellRect& a, const CellRect& b)
 	return (a.x1 < b.x2) && (b.x1 < a.x2) && (a.z1 < b.z2) && (b.z1 < a.z2);
 }
 
+// D-099: `inner` lies wholly inside `outer`
+inline bool Inside(const CellRect& inner, const CellRect& outer)
+{
+	return (inner.x1 >= outer.x1) && (inner.x2 <= outer.x2) && (inner.z1 >= outer.z1) && (inner.z2 <= outer.z2);
+}
+
 inline bool OverlapsAny(const CellRect& r, const std::vector<CellRect>& lanes)
 {
 	for (const CellRect& l : lanes) {

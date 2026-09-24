@@ -32,7 +32,8 @@ decides the end; everything else reads it.
 | Actor | Reads | Does |
 | --- | --- | --- |
 | turret gate (`Layout::NanoTask`, D-097, D-098) | turret orders in flight, dear frames under construction (one slot each), `TurretSlots()` (bank, income, nearby build power) | refuses a new turret when the in-flight count reaches the calculation; the chain step, `power.turret` and the economy rows then assist; INV-019 |
-| layout packer (`PackCandidates`, D-096) | the exit lanes of every planned and standing factory | packs no footprint into an exit lane; INV-018 |
+| layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
+| any layout reservation (`ReserveBuildingEx`, D-099) | the exit lanes of every planned and standing factory | refuses a footprint in one; INV-018 |
 | chain dear step (`TechChain`, D-098) | `Layout::BuildSlotFree()`, `Layout::TurretFrame()` | with no build-power slot free and a turret going up, finishes the turret before ordering the step |
 | `lab.t2` (`T2LabTask`, D-073, D-085, D-086) | its planned footprint, standing turrets within `LayoutLabServedReach`, `Layout::TurretSeed` (the home mex centre) | faces `LabFacing()`, the nearest enemy (else a facing beside it, never away, D-096); orders it where the most slots reach, served ones weighing three, ahead of the block (D-096), flush with a turret slot (`LayoutLabFlushElmos`, D-095), nearest the block's seed among equals; INV-016, INV-017, INV-018 |
 | `chain.next` (step `alab`) | count, frame | orders or assists it as a dear step |

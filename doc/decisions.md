@@ -4940,7 +4940,7 @@ factory's right orientation was south but it faced west; a construction
 turret and the lab built at once early stall the economy; with metal high,
 build power is assisted first.
 
-**Finding: the owner's game ran an old build.** The engine logged
+**Finding (corrected by D-099: the warning below does not name the DLL that runs; the game ran build50): the owner's game ran an old build.** The engine logged
 `duplicate Skirmish AI Info found for Skirmish AI SMRTBARb stable` in three
 folders (`SMRTBARb`, `SMRTBARb_V1`, `SMRTBARbzzz`) and `using dir
 .../SMRTBARbzzz/stable`, a DLL of 09-21 13:45 (sha256 `9e5274f9…`) whose
@@ -4999,6 +4999,87 @@ INV-019 (turret frames within the slots), as amended above.
 [`tech_rules.as`](../data/script/src/roles/tech_rules.as),
 [`invariants.as`](../data/script/src/manager/invariants.as),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-099 — Structures fill the ground within reach of a cluster's turrets, then the next cluster; no reservation in a factory's exit
+
+**Date:** 2026-09-23. **Status:** Built (native, script; build56); unit-tested; played on build54 and build55 (small box).
+
+**Owner's report.** At about +580 metal and +24k energy, the TECH player
+stopped building economy; with energy overflowing it should have built more
+converters. Then: the box does not need to grow, since buildings beyond it
+would be out of the turrets' reach, and there is plenty of buildable ground
+around the turrets. Once the ground in range of the turrets is used up,
+building moves on to the next closest turret cluster.
+
+**Played (the owner's game, build52; teams 8 and 11).** The two TECH AIs had
+packed 130 advanced converters (73 `cormmkr`, 57 `armmmkr`) into their main
+boxes. After that, every converter was refused: `no room in the turret boxes
+for cormmkr` 1,205 times and `armmmkr` 2,934 times. `GrowBox` found no ground
+behind or beside the box scoring 75%. Meanwhile the forward cluster (52
+turret slots on 95% flat ground) was offered only turrets, and the ground
+around the turrets outside the zone rectangle was never scanned.
+
+**Correction to D-098.** The engine's `duplicate Skirmish AI Info ... using
+dir .../SMRTBARbzzz` warning does not name the DLL that runs. The owner's
+earlier game ran build50 (it printed D-096's `the front is (6144, 6144): the
+labs face 3`), not the 09-21 build as D-098 said. The west facing was D-096's
+straight line to the map centre, which D-098 fixed.
+
+**Decision.**
+
+1. The ring. `PackCandidates` scans the zone first. When nothing in the zone
+   is left, it scans the ring of ground around the zone out to a turret's
+   reach (`Inside` skips what the zone scan covered). A footprint there must
+   be free ground, not another plan's zone, not a structure, not in a
+   factory's exit, and within reach of a slot. The pocket window is clipped
+   to the map, not the zone. The serve-time check holds a reservation that
+   stands partly outside its zone by its own mark (played on build53: 542
+   reserve-and-drop cycles at one ring site, "ground taken").
+2. The next cluster. `Layout::Place` packs the main cluster (its zones and
+   their rings), then the forward cluster measured against its own turrets.
+   It no longer grows the box. `NanoTask` still grows turret rows when every
+   slot is used.
+3. Exit lanes at the root. `ReserveBuildingEx` and `CanReserveBuilding`
+   refuse any footprint of the layout in a planned or standing factory's exit
+   lane, whoever asks. Played on build54: the first lab, reserved at the
+   commander, stood in the advanced lab's planned exit (INV-018, one
+   structure).
+4. The `no room` line is said once per def every 30 s, with how long room
+   has been missing.
+
+**Played (build54, box shrunk to 24x16 cells with a 2-cell halo so it fills
+within minutes).** 0 `ground taken`, no `no room` line; 28 turbines finished
+with 29 reservations (build53: 618). INV-018 still counted the first lab in
+the exit lane, which item 3 is for.
+
+**Played (build55, the same small box).** The first lab went to the pair's
+own slot, 0 `ground taken`, and the turbines filled the ground around the
+turrets outside the box (screenshot, 9 min). INV-018 still counted one
+structure: a metal extractor on a map spot south-east of the lab's exit.
+5. `CountStructuresInExit` does not count extractors: the spot is the
+   map's, and a 3x3 extractor does not wall a lab in (build56).
+
+**Played (build56, 16 AIs, normal box).** Both advanced labs on the front
+line, facing the lane, 0 structures in their exit lanes, no script error, no
+stutter. INV-016 fired on both TECH teams: the metal never floated, so the
+lab (4.98 min) came before any turret, as D-098 wants while build power is
+short, and the first turret followed at 9.5 min, 112 elmos from the lab
+(flush). INV-016 asked for a standing turret, a timing its D-085 purpose
+never meant.
+6. INV-016 checks placement: a turret or a planned turret slot within
+   `ExpLabBuildPowerReach` of the lab.
+
+**Invariant.** INV-020: the layout does not refuse an economy structure for
+lack of room for `InvariantNoRoomSeconds` (120). Unit test
+`TestRingSkipsTheZone`.
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`LayoutRanking.h`](../src/circuit/terrain/LayoutRanking.h),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`global.as`](../data/script/src/global.as),
+[`layout_ranking_test.cpp`](../tests/layout_ranking_test.cpp),
+[`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
+[`layout-design.md`](layout-design.md).
 
 ## Process decisions
 

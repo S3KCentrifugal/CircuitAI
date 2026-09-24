@@ -351,7 +351,8 @@ namespace Global {
             float PowerTurretBatchSeconds = 20.0f;
             int PowerTurretsMax = 8;
             float PowerTurretBuildTime = 5300.0f;           // the T1 construction turret's buildtime (cornanotc, armnanotc, legnanotc: 5300 in BAR's unitdefs)
-            float InvariantTurretFlightSeconds = 30.0f;     // D-097: INV-019's patience
+            float InvariantTurretFlightSeconds = 30.0f;
+            float InvariantNoRoomSeconds = 120.0f;          // D-099: INV-020's patience - the layout refusing economy structures for lack of room     // D-097: INV-019's patience
             int ExpDefenceMaxOrders = 3;                    // D-075: base-defence orders per def; native refusing the site this often ends the rung (played: 15 refusals in 2 min)
             float ExpDefenceRadius = 900.0f;                // D-075: base-defence site search radius around the factory centre (the box's cells are all held)
             float LifecycleMemorySeconds = 120.0f;         // D-076: a retired factory's position is remembered this long after it is gone (INV-001)

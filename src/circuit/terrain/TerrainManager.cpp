@@ -944,6 +944,15 @@ int CTerrainManager::ReserveBuildingEx(CCircuitDef* cdef, const AIFloat3& positi
 				cdef->GetDef()->GetName(), pos.x, pos.z, bx * (SQUARE_SIZE * 2), bz * (SQUARE_SIZE * 2), blocker, structed);
 		return -1;
 	}
+	// D-099 (played: the first lab reserved at the commander stood in the
+	// advanced lab's planned exit): no reservation of the layout in a planned or
+	// standing factory's exit lane, whoever asks
+	if (layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes())) {
+		if (!quiet) {
+			circuit->LOG("RESERVE: refused %s at (%.0f, %.0f): in a factory's exit lane", cdef->GetDef()->GetName(), pos.x, pos.z);
+		}
+		return -1;
+	}
 	MarkReservation(c1, c2, true);
 	const int id = nextReservationId++;
 	const int frame = circuit->GetLastFrame();
@@ -1068,7 +1077,8 @@ bool CTerrainManager::CanReserveBuilding(CCircuitDef* cdef, const AIFloat3& posi
 	CorrectPosition(pos);
 	pos = Pos2BuildPos(cdef, pos, facing);
 	int2 c1, c2;
-	return layoutEnabled && ReservationCells(cdef, pos, facing, c1, c2) && CanBeBuiltAt(cdef, pos) && IsSlotFree(c1, c2, 0, -1);
+	return layoutEnabled && ReservationCells(cdef, pos, facing, c1, c2) && CanBeBuiltAt(cdef, pos) && IsSlotFree(c1, c2, 0, -1)
+			&& !layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes());  // D-099
 }
 
 float CTerrainManager::BuildableFraction(CCircuitDef* cdef, const AIFloat3& centre, float halfAcross, float halfAlong, int facing)
@@ -1763,10 +1773,17 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 		int2 c1, c2;
 		bool held = ReservationCells(cdef, r.pos, r.facing, c1, c2);
 		if (held && (r.zone > 0)) {
-			held = IsSlotFree(c1, c2, r.zone, r.id);  // zone marks stay; a structure on the cells is what takes it
-			if (held) {
+			const bool free = IsSlotFree(c1, c2, r.zone, r.id);  // zone marks stay; a structure on the cells is what takes it
+			if (free) {
 				continue;
 			}
+			// D-099: a ring site stands (partly) outside its zone; those cells carry
+			// only this reservation's own mark, so it is held as a zone-less one is
+			// (played: 542 reserve-drop cycles at one ring site, "ground taken")
+			auto zit = zones.find(r.zone);
+			const bool inZone = (zit == zones.end()) || layout_rank::Inside(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y},
+					layout_rank::CellRect{zit->second.c1.x, zit->second.c1.y, zit->second.c2.x, zit->second.c2.y});
+			held = !inZone;
 		}
 		for (int z = c1.y; held && (z < c2.y); ++z) {
 			for (int x = c1.x; x < c2.x; ++x) {
@@ -2468,42 +2485,59 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 	// in a planned or standing factory's exit lane; the zone's corridor could not
 	// hold these cells, the zone already does
 	const std::vector<layout_rank::CellRect> lanes = FactoryExitLanes();
-	for (int cz = z.c1.y; cz + dz <= z.c2.y; ++cz) {
-		for (int cx = z.c1.x; cx + dx <= z.c2.x; ++cx) {
-			const AIFloat3 pos((2 * cx + dx) * half, 0.f, (2 * cz + dz) * half);
-			float nearSq = std::numeric_limits<float>::max();   // the nearest slot of any kind: the reach test
-			float builtSq = std::numeric_limits<float>::max();  // the nearest served slot
-			float plannedSq = std::numeric_limits<float>::max();
-			bool tooClose = false;
-			for (const auto& n : nanos) {
-				const float sq = pos.SqDistance2D(n.first);
-				if (sq < minSq) {
-					tooClose = true;
-					break;
+	// D-099 (owner: the box need not grow, there is buildable ground around the
+	// turrets): the zone first; when nothing in it is left, the ring of ground
+	// around it within a turret's reach of a slot (free ground only: another
+	// plan's zone, a structure or a factory's exit refuse, as inside)
+	auto scan = [&](const int2& a1, const int2& a2, bool ring) {
+		for (int cz = a1.y; cz + dz <= a2.y; ++cz) {
+			for (int cx = a1.x; cx + dx <= a2.x; ++cx) {
+				if (ring && layout_rank::Inside(layout_rank::CellRect{cx, cz, cx + dx, cz + dz},
+						layout_rank::CellRect{z.c1.x, z.c1.y, z.c2.x, z.c2.y})) {
+					continue;  // scanned with the zone
 				}
-				nearSq = std::min(nearSq, sq);
-				if (n.second) {
-					builtSq = std::min(builtSq, sq);
-				} else {
-					plannedSq = std::min(plannedSq, sq);
+				const AIFloat3 pos((2 * cx + dx) * half, 0.f, (2 * cz + dz) * half);
+				float nearSq = std::numeric_limits<float>::max();   // the nearest slot of any kind: the reach test
+				float builtSq = std::numeric_limits<float>::max();  // the nearest served slot
+				float plannedSq = std::numeric_limits<float>::max();
+				bool tooClose = false;
+				for (const auto& n : nanos) {
+					const float sq = pos.SqDistance2D(n.first);
+					if (sq < minSq) {
+						tooClose = true;
+						break;
+					}
+					nearSq = std::min(nearSq, sq);
+					if (n.second) {
+						builtSq = std::min(builtSq, sq);
+					} else {
+						plannedSq = std::min(plannedSq, sq);
+					}
 				}
+				if (tooClose || (nearSq > reachSq)) {
+					continue;
+				}
+				nearSq = layout_rank::TurretDistanceSq(builtSq, plannedSq, PLANNED_SLOT_PENALTY);  // D-083 via D-094
+				if (!IsSlotFree(int2(cx, cz), int2(cx + dx, cz + dz), zone, -1)) {
+					continue;
+				}
+				if (layout_rank::OverlapsAny(layout_rank::CellRect{cx, cz, cx + dx, cz + dz}, lanes)) {
+					continue;  // D-096
+				}
+				// D-088: nearest the centroid of the group, not nearest any member: nearest
+				// member grows a line (played: the turbines formed an L); the centroid grows
+				// a filled block whose free edge cells are always the nearest
+				const float sameSq = same.empty() ? std::numeric_limits<float>::max() : layout_rank::Sq(ToPt(pos), sameCentroid);
+				out.push_back(SPackCandidate{pos, nearSq, anchor.SqDistance2D(pos), sameSq});
 			}
-			if (tooClose || (nearSq > reachSq)) {
-				continue;
-			}
-			nearSq = layout_rank::TurretDistanceSq(builtSq, plannedSq, PLANNED_SLOT_PENALTY);  // D-083 via D-094
-			if (!IsSlotFree(int2(cx, cz), int2(cx + dx, cz + dz), zone, -1)) {
-				continue;
-			}
-			if (layout_rank::OverlapsAny(layout_rank::CellRect{cx, cz, cx + dx, cz + dz}, lanes)) {
-				continue;  // D-096
-			}
-			// D-088: nearest the centroid of the group, not nearest any member: nearest
-			// member grows a line (played: the turbines formed an L); the centroid grows
-			// a filled block whose free edge cells are always the nearest
-			const float sameSq = same.empty() ? std::numeric_limits<float>::max() : layout_rank::Sq(ToPt(pos), sameCentroid);
-			out.push_back(SPackCandidate{pos, nearSq, anchor.SqDistance2D(pos), sameSq});
 		}
+	};
+	scan(z.c1, z.c2, false);
+	if (out.empty()) {
+		const int r = int(std::ceil(reach / (SQUARE_SIZE * 2)));
+		const int2 r1(std::max(0, z.c1.x - r), std::max(0, z.c1.y - r));
+		const int2 r2(std::min(blockingMap.columns, z.c2.x + r), std::min(blockingMap.rows, z.c2.y + r));
+		scan(r1, r2, true);
 	}
 	const bool grouped = !same.empty();
 	std::sort(out.begin(), out.end(), [grouped](const SPackCandidate& a, const SPackCandidate& b) {
@@ -2534,8 +2568,11 @@ bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& 
 	// fills of a halo zone at 37 ms each, the stutter)
 	constexpr int POCKET_WINDOW = 8;
 	struct { int2 c1, c2; } z;
-	z.c1 = int2(std::max(zone0.c1.x, f1.x - POCKET_WINDOW), std::max(zone0.c1.y, f1.y - POCKET_WINDOW));
-	z.c2 = int2(std::min(zone0.c2.x, f2.x + POCKET_WINDOW), std::min(zone0.c2.y, f2.y + POCKET_WINDOW));
+	// D-099: clipped to the map, not the zone: a site in the ring around the zone
+	// stands outside it, and ground outside the zone can be walled in too
+	(void)zone0;
+	z.c1 = int2(std::max(0, f1.x - POCKET_WINDOW), std::max(0, f1.y - POCKET_WINDOW));
+	z.c2 = int2(std::min(blockingMap.columns, f2.x + POCKET_WINDOW), std::min(blockingMap.rows, f2.y + POCKET_WINDOW));
 	const int w = z.c2.x - z.c1.x;
 	const int h = z.c2.y - z.c1.y;
 	if ((w <= 0) || (h <= 0)) {
@@ -2633,6 +2670,9 @@ int CTerrainManager::CountStructuresInExit(CCircuitUnit* factory) const
 		CCircuitUnit* u = kv.second;
 		if ((u == nullptr) || (u == factory) || u->IsDead() || (u->GetCircuitDef() == nullptr) || u->GetCircuitDef()->IsMobile()) {
 			continue;
+		}
+		if (u->GetCircuitDef()->IsMex() || (u->GetCircuitDef()->GetExtractsM() > 0.f)) {
+			continue;  // D-099: an extractor stands where the map's metal spot is, and a 3x3 does not wall a lab in
 		}
 		UnitDef* ud = u->GetCircuitDef()->GetDef();
 		const int f = u->GetUnit()->GetBuildingFacing();

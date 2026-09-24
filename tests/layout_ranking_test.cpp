@@ -243,6 +243,18 @@ void TestExitLanes()
 	Check(!OverlapsAny(CellRect{12, 5, 14, 7}, {}), "no factory, no lane");
 }
 
+// D-099 (owner: build around the turrets, the box need not grow): the ring scan
+// skips footprints wholly inside the zone (already scanned) and keeps those that
+// reach outside it.
+void TestRingSkipsTheZone()
+{
+	const CellRect zone{10, 10, 50, 60};
+	Check(Inside(CellRect{10, 10, 13, 13}, zone), "a footprint on the zone's corner is inside");
+	Check(!Inside(CellRect{8, 10, 11, 13}, zone), "one cell past the edge is the ring's");
+	Check(!Inside(CellRect{48, 58, 51, 61}, zone), "the far corner, one cell out, is the ring's");
+	Check(Inside(CellRect{47, 57, 50, 60}, zone), "flush with the far corner is inside");
+}
+
 // D-072/D-090: pockets.
 void TestLeavesPocket()
 {
@@ -299,6 +311,7 @@ int main()
 	TestSiteFlushBeforeNearer();
 	TestSiteAheadOfTheBlock();
 	TestExitLanes();
+	TestRingSkipsTheZone();
 	TestLeavesPocket();
 	TestRingOrderAndClearOf();
 	if (failures > 0) {

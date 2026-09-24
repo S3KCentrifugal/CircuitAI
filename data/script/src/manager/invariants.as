@@ -154,9 +154,14 @@ namespace Invariants {
             if (t2 is null) t2LabSince = -1;
             else {
                 if (t2LabSince < 0) t2LabSince = ai.frame;
+                // D-099: a turret slot, planned or built, not a standing turret: the
+                // owner's sequencing (D-098) lets the lab come first while build power is
+                // short (played: the lab at 4.98 min, the first turret at 9.5 min, metal
+                // spent throughout); where the lab stands is what this checks
                 else if (ai.frame - t2LabSince >= int(Global::RoleSettings::Tech::InvariantLabReachSeconds) * SECOND
+                    && aiTerrainMgr.CountGroupSlotsWithin(Layout::nanoGroup, t2.GetPos(ai.frame), Global::RoleSettings::Tech::ExpLabBuildPowerReach) == 0
                     && aiBuilderMgr.GetStaticBuildPowerNear(t2.GetPos(ai.frame), Global::RoleSettings::Tech::ExpLabBuildPowerReach) <= 0.0f)
-                    Violation("INV-016", "" + t2.id, "the advanced lab " + t2.id + " has stood " + int(Global::RoleSettings::Tech::InvariantLabReachSeconds) + " s with no turret within " + int(Global::RoleSettings::Tech::ExpLabBuildPowerReach));
+                    Violation("INV-016", "" + t2.id, "the advanced lab " + t2.id + " has stood " + int(Global::RoleSettings::Tech::InvariantLabReachSeconds) + " s with no turret or turret slot within " + int(Global::RoleSettings::Tech::ExpLabBuildPowerReach));
                 // D-088 (owner's ask): the distance from the advanced lab to the nearest
                 // construction turret, logged when it changes; INV-017 when not flush
                 CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
