@@ -13,6 +13,8 @@
 #   SMRTBARb/stable/script/           data/script
 #   SMRTBARb/stable/SMRTBARb_VERSION.txt  version, commit, engine commit
 #
+# SMRTBARB_CHANNEL=test|prod adds the channel to the version (v1.958-test).
+#
 # Output: <out_dir>/SMRTBARb-v<version>.zip, and SMRTBARb-v<version>-dbg.zip when a
 # .dbg is given (crash symbolizing: keep it next to the DLL of the same build).
 set -euo pipefail
@@ -23,6 +25,8 @@ dbg="${3:-}"
 
 root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 version="$("$root/tools/release/version.sh")"
+# the release channel (test / prod), from the environment: part of every file name
+if [ -n "${SMRTBARB_CHANNEL:-}" ]; then version="${version}-${SMRTBARB_CHANNEL}"; fi
 commit="$(git -C "$root" rev-parse HEAD)"
 engine="$(tr -d ' \r\n' < "$root/.github/recoil-engine.ref" 2>/dev/null || echo unknown)"
 

@@ -7,20 +7,24 @@
 # mounts this repository as its AI/Skirmish/BARb (read-only, exactly as the local
 # build does), configures the engine once and compiles only the BARb target.
 #
-# Every run uploads the zip as a workflow artifact. A push to a release branch
-# (below) or a manual run with "release" ticked also publishes a GitHub release
-# tagged v<version> (tools/release/version.sh: MAJOR from SMRTBARb_VERSION,
-# MINOR = commit count, so every commit is a new minor version).
+# Every run uploads the zip as a workflow artifact. Releases come from two
+# channels, named after the branch:
+#   smrt-test -> tag v<version>-test, a GitHub pre-release
+#   smrt-prod -> tag v<version>-prod, the "Latest" release
+# (tools/release/version.sh: MAJOR from SMRTBARb_VERSION, MINOR = commit count).
+# The release notes are generated from the commits since the channel's previous
+# release (tools/release/notes.py): grouped, one line per change.
+# Pull requests (and other branches) build and upload the artifact only.
 name: SMRTBARb build and release
 
 on:
   push:
-    branches: [master, smrt]
+    branches: [smrt-test, smrt-prod]
   pull_request:
   workflow_dispatch:
     inputs:
       release:
-        description: Publish a GitHub release from this run
+        description: Publish a GitHub release from this run (smrt-test or smrt-prod only)
         type: boolean
         default: false
 
@@ -48,6 +52,15 @@ jobs:
         id: version
         run: |
           v="$(smrtbarb/tools/release/version.sh)"
+          case "${{ github.ref_name }}" in
+            smrt-prod) channel=prod ;;
+            smrt-test) channel=test ;;
+            *)         channel=dev ;;
+          esac
+          echo "base=$v" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "SMRTBARB_CHANNEL=$channel" >> "$GITHUB_ENV"
+          v="$v-$channel"
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "engine=$(tr -d ' \r\n' < smrtbarb/.github/recoil-engine.ref)" >> "$GITHUB_OUTPUT"
           echo "SMRTBARb v$v"
@@ -124,22 +137,21 @@ jobs:
 
       - name: Publish the GitHub release
         if: >-
-          (github.event_name == 'push') ||
-          (github.event_name == 'workflow_dispatch' && inputs.release)
+          (steps.version.outputs.channel != 'dev') &&
+          ((github.event_name == 'push') ||
+           (github.event_name == 'workflow_dispatch' && inputs.release))
         env:
           GH_TOKEN: ${{ github.token }}
         working-directory: smrtbarb
         run: |
           v="${{ steps.version.outputs.version }}"
           tag="v$v"
-          notes="SMRTBARb v$v (a fork of BARb).
-          Commit: ${{ github.sha }} on ${{ github.ref_name }}
-          Engine: beyond-all-reason/RecoilEngine@${{ steps.version.outputs.engine }}
-
-          Install: unzip SMRTBARb-v$v.zip into <BAR>/data/engine/<engine version>/AI/Skirmish/ (it creates SMRTBARb/stable/).
-          SMRTBARb-v$v-dbg.zip holds the debug symbols of this exact build, for reading a crash stack trace."
+          python3 tools/release/notes.py "${{ steps.version.outputs.base }}" "${{ steps.version.outputs.channel }}" > ../notes.md
+          cat ../notes.md
+          if [ "${{ steps.version.outputs.channel }}" = "prod" ]; then kind="--latest"; title="SMRTBARb v$v"; else kind="--prerelease"; title="SMRTBARb v$v (test)"; fi
           if gh release view "$tag" > /dev/null 2>&1; then
             gh release upload "$tag" ../dist/*.zip --clobber
+            gh release edit "$tag" --notes-file ../notes.md
           else
-            gh release create "$tag" ../dist/*.zip --target "${{ github.sha }}" --title "SMRTBARb v$v" --notes "$notes"
+            gh release create "$tag" ../dist/*.zip --target "${{ github.sha }}" --title "$title" --notes-file ../notes.md $kind
           fi
