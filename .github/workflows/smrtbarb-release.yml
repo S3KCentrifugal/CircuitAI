@@ -148,7 +148,7 @@ jobs:
           tag="v$v"
           python3 tools/release/notes.py "${{ steps.version.outputs.base }}" "${{ steps.version.outputs.channel }}" > ../notes.md
           cat ../notes.md
-          if [ "${{ steps.version.outputs.channel }}" = "prod" ]; then kind="--latest"; title="SMRTBARb v$v"; else kind="--prerelease"; title="SMRTBARb v$v (test)"; fi
+          if [ "${{ steps.version.outputs.channel }}" = "prod" ]; then kind="--latest"; title="SMRTBARb v$v"; else kind="--prerelease"; title="SMRTBARb v$v"; fi
           if gh release view "$tag" > /dev/null 2>&1; then
             gh release upload "$tag" ../dist/*.zip --clobber
             gh release edit "$tag" --notes-file ../notes.md
