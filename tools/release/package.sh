@@ -1,27 +1,37 @@
 #!/usr/bin/env bash
-# Package a built SkirmishAI.dll as the SMRTBARb release zip.
+# Package a built SMRTBARb library as the release archive of its platform.
 #
-#   tools/release/package.sh <SkirmishAI.dll> <out_dir> [SkirmishAI.dbg]
+#   tools/release/package.sh <SkirmishAI.dll | libSkirmishAI.so> <out_dir> [<debug file>]
 #
-# SMRTBARb is this fork's alias of BARb. The zip holds the folder the game loads,
-# unzipped into <BAR>/data/engine/<engine>/AI/Skirmish/:
+# SMRTBARb is this fork's alias of BARb. The platform follows the library:
+# SkirmishAI.dll is Windows (a .zip), libSkirmishAI.so is Linux (a .tar.gz, the
+# usual Linux archive; it keeps file modes). The archive holds the folder the
+# game loads, unpacked into <BAR>/data/engine/<engine>/AI/Skirmish/:
 #
 #   SMRTBARb/stable/AIInfo.lua        packaging/SMRTBARb/AIInfo.lua (shortName/name SMRTBARb)
 #   SMRTBARb/stable/AIOptions.lua     data/AIOptions.lua
-#   SMRTBARb/stable/SkirmishAI.dll    the build
+#   SMRTBARb/stable/SkirmishAI.dll    the build (Linux: libSkirmishAI.so)
 #   SMRTBARb/stable/config/           data/config
 #   SMRTBARb/stable/script/           data/script
-#   SMRTBARb/stable/SMRTBARb_VERSION.txt  version, commit, engine commit
+#   SMRTBARb/stable/SMRTBARb_VERSION.txt  version, platform, commit, engine commit
 #
 # SMRTBARB_CHANNEL=test|prod adds the channel to the version (v1.958-test).
 #
-# Output: <out_dir>/SMRTBARb-v<version>.zip, and SMRTBARb-v<version>-dbg.zip when a
-# .dbg is given (crash symbolizing: keep it next to the DLL of the same build).
+# Output: <out_dir>/SMRTBARb-v<version>-<platform>.<zip|tar.gz>, and
+# SMRTBARb-v<version>-<platform>-dbg.<zip|tar.gz> when a debug file is given
+# (crash symbolizing: keep it next to the library of the same build).
 set -euo pipefail
 
-dll="${1:?usage: package.sh <SkirmishAI.dll> <out_dir> [SkirmishAI.dbg]}"
-out="${2:?usage: package.sh <SkirmishAI.dll> <out_dir> [SkirmishAI.dbg]}"
+usage="usage: package.sh <SkirmishAI.dll | libSkirmishAI.so> <out_dir> [<debug file>]"
+lib="${1:?$usage}"
+out="${2:?$usage}"
 dbg="${3:-}"
+
+case "$(basename "$lib")" in
+  SkirmishAI.dll)    platform=windows; ext=zip ;;
+  libSkirmishAI.so)  platform=linux;   ext=tar.gz ;;
+  *) echo "error: $lib is neither SkirmishAI.dll nor libSkirmishAI.so" >&2; exit 1 ;;
+esac
 
 root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 version="$("$root/tools/release/version.sh")"
@@ -30,9 +40,9 @@ if [ -n "${SMRTBARB_CHANNEL:-}" ]; then version="${version}-${SMRTBARB_CHANNEL}"
 commit="$(git -C "$root" rev-parse HEAD)"
 engine="$(tr -d ' \r\n' < "$root/.github/recoil-engine.ref" 2>/dev/null || echo unknown)"
 
-size=$(wc -c < "$dll")
+size=$(wc -c < "$lib")
 if [ "$size" -gt $((50 * 1024 * 1024)) ]; then
-  echo "error: $dll is $size bytes: an unstripped build; split the debug info first" >&2
+  echo "error: $lib is $size bytes: an unstripped build; split the debug info first" >&2
   exit 1
 fi
 
@@ -53,34 +63,44 @@ PY
   fi
 }
 
+# archive <dir> <entry> <file>: the platform's archive
+archive() {
+  if [ "$ext" = zip ]; then
+    mkzip "$1" "$2" "$3"
+  else
+    tar --owner=0 --group=0 --numeric-owner -C "$1" -czf "$3" "$2"
+  fi
+}
+
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 dst="$stage/SMRTBARb/stable"
 mkdir -p "$dst"
 cp "$root/packaging/SMRTBARb/AIInfo.lua" "$dst/AIInfo.lua"
 cp "$root/data/AIOptions.lua" "$dst/AIOptions.lua"
-cp "$dll" "$dst/SkirmishAI.dll"
+cp "$lib" "$dst/$(basename "$lib")"
 cp -r "$root/data/config" "$dst/config"
 cp -r "$root/data/script" "$dst/script"
 find "$dst" -name '__pycache__' -type d -prune -exec rm -rf {} +
 cat > "$dst/SMRTBARb_VERSION.txt" <<EOF
 SMRTBARb v${version}
+platform ${platform}
 commit ${commit}
 engine ${engine}
 EOF
 
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
-zipname="SMRTBARb-v${version}.zip"
-rm -f "$out/$zipname"
-mkzip "$stage" SMRTBARb "$out/$zipname"
-echo "$out/$zipname"
+name="SMRTBARb-v${version}-${platform}.${ext}"
+rm -f "$out/$name"
+archive "$stage" SMRTBARb "$out/$name"
+echo "$out/$name"
 
 if [ -n "$dbg" ]; then
-  dbgzip="SMRTBARb-v${version}-dbg.zip"
-  rm -f "$out/$dbgzip"
+  dbgname="SMRTBARb-v${version}-${platform}-dbg.${ext}"
+  rm -f "$out/$dbgname"
   mkdir -p "$stage/dbg/SMRTBARb/stable"
-  cp "$dbg" "$stage/dbg/SMRTBARb/stable/SkirmishAI.dbg"
-  mkzip "$stage/dbg" SMRTBARb "$out/$dbgzip"
-  echo "$out/$dbgzip"
+  cp "$dbg" "$stage/dbg/SMRTBARb/stable/$(basename "$dbg")"
+  archive "$stage/dbg" SMRTBARb "$out/$dbgname"
+  echo "$out/$dbgname"
 fi

@@ -79,7 +79,7 @@ is edited in place with the decision that changed it.
 | Requirement | Where |
 | --- | --- |
 | The BARb widget: covers no other UI element, a better experience, an icon on every button; it must receive the AIs' messages. | D-113: `tools/widgets/gui_barb_team_link.lua` |
-| CI builds the AI with the Recoil docker harness and publishes `SMRTBARb-v<version>.zip` as a GitHub release; the minor version rises with every commit. | [`../release.md`](../release.md) |
+| CI builds the AI with the Recoil docker harness and publishes `SMRTBARb-v<version>.zip` as a GitHub release; the minor version rises with every commit. Every test or prod release carries both a Windows build (`-windows.zip`) and a Linux build (`-linux.tar.gz`). | [`../release.md`](../release.md) |
 | Every teammate's economy (players included, all fields, free storage) readable from script, refreshed for one teammate or all before a decision. | D-106: `TeamEconomy` (`manager/team_economy.as`), native `CEconomyManager` |
 | A playtest shot can centre the camera on a map position. | D-103: `--shots minute@height@x:z` |
 

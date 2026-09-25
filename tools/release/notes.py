@@ -101,10 +101,15 @@ def main():
     out += [
         "",
         "### Install",
-        "Unzip `SMRTBARb-%s.zip` into `<BAR>/data/engine/<engine version>/AI/Skirmish/` "
-        "(it creates `SMRTBARb/stable/`)." % tag,
+        "Unpack the file for your system into `<BAR>/data/engine/<engine version>/AI/Skirmish/` "
+        "(it creates `SMRTBARb/stable/`):",
         "",
-        "`SMRTBARb-%s-dbg.zip` holds the debug symbols of this build, for reading a crash report." % tag,
+        "| System | File |",
+        "| --- | --- |",
+        "| Windows | `SMRTBARb-%s-windows.zip` |" % tag,
+        "| Linux | `SMRTBARb-%s-linux.tar.gz` (`tar -xzf SMRTBARb-%s-linux.tar.gz`) |" % (tag, tag),
+        "",
+        "The `-dbg` files hold the debug symbols of the same build, for reading a crash report.",
     ]
     if prev:
         out += ["", "[Full list of commits](%s/compare/%s...%s)" % (REPO_URL, prev, tag)]

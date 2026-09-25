@@ -1,20 +1,23 @@
-# SMRTBARb: build the Skirmish AI with BAR's Recoil docker build harness and
-# publish it as a GitHub release.
+# SMRTBARb: build the Skirmish AI for Windows and Linux with BAR's Recoil docker
+# build harness and publish both as one GitHub release.
 #
 # SMRTBARb is this fork's alias of BARb (upstream: rlcevg/CircuitAI, branch
-# barbarian). The engine is not in this repository: the job checks out
+# barbarian). The engine is not in this repository: each build job checks out
 # beyond-all-reason/RecoilEngine at the commit pinned in .github/recoil-engine.ref,
 # mounts this repository as its AI/Skirmish/BARb (read-only, exactly as the local
 # build does), configures the engine once and compiles only the BARb target.
 #
-# Every run uploads the zip as a workflow artifact. Releases come from two
-# channels, named after the branch:
+# Two build jobs run side by side (amd64-windows, amd64-linux); each uploads its
+# archive (Windows .zip, Linux .tar.gz) and debug-symbols archive as a workflow
+# artifact. Releases come from two channels, named after the branch:
 #   smrt-test -> tag v<version>-test, a GitHub pre-release
 #   smrt-prod -> tag v<version>-prod, the "Latest" release
 # (tools/release/version.sh: MAJOR from SMRTBARb_VERSION, MINOR = commit count).
-# The release notes are generated from the commits since the channel's previous
-# release (tools/release/notes.py): grouped, one line per change.
-# Pull requests (and other branches) build and upload the artifact only.
+# The release job runs only when BOTH builds succeeded, and refuses to publish
+# unless both platforms' archives are present: a release always carries Windows
+# and Linux. The release notes are generated from the commits since the
+# channel's previous release (tools/release/notes.py).
+# Pull requests (and other branches) build and upload the artifacts only.
 name: SMRTBARb build and release
 
 on:
@@ -37,10 +40,23 @@ concurrency:
 
 jobs:
   build:
+    name: build (${{ matrix.os }})
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    strategy:
+      fail-fast: false   # see both platforms' results; the release needs both anyway
+      matrix:
+        include:
+          - os: windows
+            platform: amd64-windows
+            lib: SkirmishAI.dll
+            dbg: SkirmishAI.dbg
+          - os: linux
+            platform: amd64-linux
+            lib: libSkirmishAI.so
+            dbg: libSkirmishAI.dbg
     env:
-      PLATFORM: amd64-windows
+      PLATFORM: ${{ matrix.platform }}
     steps:
       - name: Check out SMRTBARb
         uses: actions/checkout@v4
@@ -57,13 +73,11 @@ jobs:
             smrt-test) channel=test ;;
             *)         channel=dev ;;
           esac
-          echo "base=$v" >> "$GITHUB_OUTPUT"
-          echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "SMRTBARB_CHANNEL=$channel" >> "$GITHUB_ENV"
           v="$v-$channel"
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "engine=$(tr -d ' \r\n' < smrtbarb/.github/recoil-engine.ref)" >> "$GITHUB_OUTPUT"
-          echo "SMRTBARb v$v"
+          echo "SMRTBARb v$v (${{ matrix.os }})"
 
       - name: Check out RecoilEngine
         uses: actions/checkout@v4
@@ -84,16 +98,16 @@ jobs:
       - name: Compiler cache
         uses: actions/cache@v4
         with:
-          path: engine/.cache/ccache-amd64-windows
-          key: ccache-${{ steps.version.outputs.engine }}-${{ github.sha }}
+          path: engine/.cache/ccache-${{ matrix.platform }}
+          key: ccache-${{ matrix.platform }}-${{ steps.version.outputs.engine }}-${{ github.sha }}
           restore-keys: |
-            ccache-${{ steps.version.outputs.engine }}-
+            ccache-${{ matrix.platform }}-${{ steps.version.outputs.engine }}-
 
       - name: Configure
         working-directory: engine
         env:
           CONTAINER_RUNTIME_EXTRA_ARGS: -v ${{ github.workspace }}/smrtbarb:/build/src/AI/Skirmish/BARb:ro
-        run: ./docker-build-v2/build.sh --configure windows
+        run: ./docker-build-v2/build.sh --configure ${{ matrix.os }}
 
       - name: Compile the BARb target only
         working-directory: engine
@@ -103,7 +117,7 @@ jobs:
           # a custom target skips the harness's install step, but its windows
           # post-step (split-debug-info.sh) still cds into install/: give it one
           mkdir -p "build-${PLATFORM}/install"
-          ./docker-build-v2/build.sh --compile windows --target BARb
+          ./docker-build-v2/build.sh --compile ${{ matrix.os }} --target BARb
 
       - name: Split the debug info (as the harness does for the engine)
         working-directory: engine
@@ -111,35 +125,82 @@ jobs:
           source docker-build-v2/images_versions.sh
           image="ghcr.io/beyond-all-reason/recoil-build-${PLATFORM}@${image_version[$PLATFORM]}"
           out="$PWD/build-${PLATFORM}/AI/Skirmish/BARb/data"
+          if [ ! -f "$out/${{ matrix.lib }}" ]; then
+            echo "::error::${{ matrix.lib }} not in $out; the build produced:"
+            find "$PWD/build-${PLATFORM}" -name '*SkirmishAI*' 2>/dev/null
+            exit 1
+          fi
           ls -la "$out"
-          docker run --rm -v "$out":/ai "$image" bash -c '
+          docker run --rm -v "$out":/ai -e LIB="${{ matrix.lib }}" -e DBG="${{ matrix.dbg }}" "$image" bash -c '
             set -e
             cd /ai
-            objcopy --only-keep-debug SkirmishAI.dll SkirmishAI.dbg
-            strip --strip-debug --strip-unneeded SkirmishAI.dll
-            objcopy --add-gnu-debuglink=SkirmishAI.dbg SkirmishAI.dll
-            chmod a+r SkirmishAI.dll SkirmishAI.dbg'
+            objcopy --only-keep-debug "$LIB" "$DBG"
+            strip --strip-debug --strip-unneeded "$LIB"
+            objcopy --add-gnu-debuglink="$DBG" "$LIB"
+            chmod a+r "$LIB" "$DBG"'
           ls -la "$out"
 
       - name: Package
         run: |
           out="engine/build-${PLATFORM}/AI/Skirmish/BARb/data"
-          smrtbarb/tools/release/package.sh "$out/SkirmishAI.dll" dist "$out/SkirmishAI.dbg"
+          smrtbarb/tools/release/package.sh "$out/${{ matrix.lib }}" dist "$out/${{ matrix.dbg }}"
           ls -la dist
-          unzip -l "dist/SMRTBARb-v${{ steps.version.outputs.version }}.zip" | tail -5
+          case "${{ matrix.os }}" in
+            windows) unzip -l dist/*-windows.zip | tail -5 ;;
+            linux)   tar -tzvf dist/*-linux.tar.gz | grep -v '/script/\|/config/' ;;
+          esac
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SMRTBARb-v${{ steps.version.outputs.version }}
-          path: dist/*.zip
+          name: SMRTBARb-v${{ steps.version.outputs.version }}-${{ matrix.os }}
+          path: dist/SMRTBARb-*
           if-no-files-found: error
 
+  release:
+    needs: build   # both platforms built, or no release
+    if: >-
+      (github.ref_name == 'smrt-test' || github.ref_name == 'smrt-prod') &&
+      ((github.event_name == 'push') ||
+       (github.event_name == 'workflow_dispatch' && inputs.release))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out SMRTBARb
+        uses: actions/checkout@v4
+        with:
+          path: smrtbarb
+          fetch-depth: 0   # the version, and the notes' commit range
+
+      - name: Version
+        id: version
+        run: |
+          v="$(smrtbarb/tools/release/version.sh)"
+          case "${{ github.ref_name }}" in
+            smrt-prod) channel=prod ;;
+            *)         channel=test ;;
+          esac
+          echo "base=$v" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "version=$v-$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Download both builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: SMRTBARb-v${{ steps.version.outputs.version }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: Both platforms present
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          ls -la dist
+          for f in "SMRTBARb-v$v-windows.zip" "SMRTBARb-v$v-windows-dbg.zip" \
+                   "SMRTBARb-v$v-linux.tar.gz" "SMRTBARb-v$v-linux-dbg.tar.gz"; do
+            test -s "dist/$f" || { echo "::error::missing $f: a release carries both platforms"; exit 1; }
+          done
+
       - name: Publish the GitHub release
-        if: >-
-          (steps.version.outputs.channel != 'dev') &&
-          ((github.event_name == 'push') ||
-           (github.event_name == 'workflow_dispatch' && inputs.release))
         env:
           GH_TOKEN: ${{ github.token }}
         working-directory: smrtbarb
@@ -148,10 +209,11 @@ jobs:
           tag="v$v"
           python3 tools/release/notes.py "${{ steps.version.outputs.base }}" "${{ steps.version.outputs.channel }}" > ../notes.md
           cat ../notes.md
-          if [ "${{ steps.version.outputs.channel }}" = "prod" ]; then kind="--latest"; title="SMRTBARb v$v"; else kind="--prerelease"; title="SMRTBARb v$v"; fi
+          title="SMRTBARb v$v"
+          if [ "${{ steps.version.outputs.channel }}" = "prod" ]; then kind="--latest"; else kind="--prerelease"; fi
           if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" ../dist/*.zip --clobber
+            gh release upload "$tag" ../dist/SMRTBARb-* --clobber
             gh release edit "$tag" --notes-file ../notes.md
           else
-            gh release create "$tag" ../dist/*.zip --target "${{ github.sha }}" --title "$title" --notes-file ../notes.md $kind
+            gh release create "$tag" ../dist/SMRTBARb-* --target "${{ github.sha }}" --title "$title" --notes-file ../notes.md $kind
           fi
