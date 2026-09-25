@@ -8,8 +8,9 @@ WIDGET LINK
 
 ai.CallUI(msg) is the engine's AI -> LuaUI channel: CAICallback::CallLuaUI
 invokes the unsynced callin RecvSkirmishAIMessage(aiTeam, dataStr) on the
-LuaUI of the machine that runs this AI instance, and BAR's widget handler
-forwards that callin to widgets (luaui/callins.lua). It is local only: the host
+LuaUI of the machine that runs this AI instance. BAR's widget handler does NOT
+forward that callin to widgets (it is not in barwidgets.lua's callInLists), so
+the widget installs the LuaUI global itself (D-113). It is local only: the host
 of the AIs sees it, playing or spectating; a client on another machine does not.
 It never reaches gadgets, other AIs or other players, so it is safe to mirror
 internal state through it.
@@ -22,6 +23,9 @@ them apart. Topics mirrored today:
     orphan    request / donate events of the orphan rescue (team.as)
     donation  T2 constructor hand-outs (donation.as)
     role      reply to a widget command (commands.as)
+    ferry     ferry runs (ferry.as); spam  on / off / front / focus (spam.as);
+    seaassist shipyard unlocks and hand-outs (sea_assist.as); layout  the
+              planned base for the overlay (layout.as)
 
 tools/widgets/gui_barb_team_link.lua is a widget that displays them.
 

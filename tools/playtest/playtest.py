@@ -244,6 +244,12 @@ def stage(args):
         args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots))
     tpl = (HERE / "widgets" / "playtest_camera.lua").read_text(encoding="utf-8")
     (wdir / "playtest_camera.lua").write_text(tpl.replace("__CFG__", cfg), encoding="utf-8")
+    # extra widgets under test (e.g. tools/widgets/gui_barb_team_link.lua), staged into
+    # the playtest's own write dir only, never the live game's
+    for extra in (args.extra_widget or []):
+        src = Path(extra)
+        (wdir / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        log("staged widget %s" % src.name)
 
     (d / "screenshots").mkdir(exist_ok=True)
     manifest = {
@@ -687,6 +693,7 @@ def add_script_args(p):
     p.add_argument("--ai-option", action="append", help="key=value in every test AI's [OPTIONS], e.g. profile=experimental_hard")
     p.add_argument("--engine", help="engine folder name under the install's engine/ (default: the one the lobby used last)")
     p.add_argument("--bonus", default=None, help="handicap percent for team 0 only (e.g. 50); benchmarks run at 0")
+    p.add_argument("--extra-widget", action="append", help="an extra LuaUI widget to stage into the playtest write dir (repeatable)")
     p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window, no widget, no screenshots; log only")
 
 

@@ -1,20 +1,22 @@
 -- BARb team link
 --
--- An "AI" tab beside the player list. The game's bottom-right player list
--- (AdvPlayersList) gets a two-tab strip docked on top of its stack - "Player"
--- and "AI". The AI tab opens a panel of the list's width ABOVE the strip, so
--- it adds to the stack and covers nothing: a Team menu and an AI menu at the
--- top, and under them the selected AI's status, its role selector (switches
--- the AI's role at runtime), the actions and the event log. "Player" folds
--- the panel away and leaves the strip.
+-- A control window for the allied BARb AIs, opened from a small launcher
+-- button beside the player list. The window floats over the map to the left
+-- of the player list (it never joins the player list's module stack, so it
+-- covers none of the game's own panels), can be dragged by its header, keeps
+-- its place between games and is always kept on screen.
+--
+-- Inside: the allied AIs as a list (colour, name, role, side), the selected
+-- AI's details, a role grid that switches the AI's role at runtime, actions
+-- (query, query all, the layout overlay) and the event log. Every button has
+-- an icon from the game's own art.
 --
 -- Install: copy into <BAR data dir>/LuaUI/Widgets/ and enable it (F11).
--- Toggle the tab: click it, /barblink, or Ctrl+Alt+B. Escape returns to Player.
---
--- Layout overlay (D-053): the Overlay button or /barblayout draws every
--- allied BARb's planned base on the ground - grey zones, red corridors, green
--- armed slots, yellow held slots, cyan slots being built, blue built, orange
--- tenants - and an arrow from the complex's origin toward its front.
+-- Open/close: the launcher, /barblink or Ctrl+Alt+B; Escape closes.
+-- Layout overlay (D-053): the eye button or /barblayout draws every allied
+-- BARb's planned base on the ground - grey zones, red corridors, green armed
+-- slots, yellow held, cyan being built, blue built, orange tenants - and an
+-- arrow from the complex's origin toward its front.
 --
 -- Both directions only work on the machine that runs the AIs (the host),
 -- playing or spectating:
@@ -23,30 +25,15 @@
 -- Commands carry the target team id and the AI ignores any other; the widget
 -- never broadcasts, so hosting two ally teams locally cannot cross-steer them.
 -- Wire formats: data/script/src/manager/widget_link.as and commands.as.
---
--- Docking follows the player list's module convention (unit totals, game
--- info, music, mascot): every module publishes GetPosition() = { top, left,
--- bottom, right, scale } and the next one stacks on it. This widget stacks on
--- whatever is topmost and publishes WG.barblink.GetPosition() for anything
--- that wants to stack on it in turn. Nothing overlaps: the strip sits on the
--- stack's top edge and the panel, when open, sits on the strip.
---
--- The game's widget handler orders both drawing and mouse input by layer with
--- the LOWEST layer on top (DrawScreen runs the list reversed, MousePress runs
--- it forwards); -6 keeps this widget above anything drawn in the corner.
---
--- Styling follows the game's FlowUI (WG.FlowUI element, rounded rects,
--- fonts) on Material 3 patterns at compact density: exposed dropdown menus
--- for Team and AI, assist chips for status, a segmented button for the role,
--- text buttons for actions, a dense list for events.
+-- Topics shown: roster, role, orphan, donation, ferry, spam, seaassist, layout.
 
 function widget:GetInfo()
 	return {
 		name    = "BARb team link",
-		desc    = "Allied BARb AIs as an AI tab beside the player list: roster, events, runtime role switching (host only)",
+		desc    = "Allied BARb AIs: roster, events, runtime role switching, layout overlay (host only)",
 		author  = "s3k-CircuitAI",
-		date    = "2026-09-20",
-		layer   = -6,     -- lowest layer is on top in this handler: drawn last, first to the mouse; the widget overlaps nothing
+		date    = "2026-09-25",
+		layer   = 0,
 		enabled = true,
 	}
 end
@@ -62,34 +49,48 @@ local ROLE_HINT = {
 	SUPPORT = "Economic support",
 	TACTICAL = "Mobile builders, hover opening",
 }
-local MAX_EVENTS = 80
+-- the game's own art (VFS paths); a missing file falls back to text only
+local ICON = {
+	FRONT    = "icons/bot_t2.png",
+	AIR      = "icons/air.png",
+	TECH     = "icons/fusion.png",
+	SEA      = "icons/ship.png",
+	SUPPORT  = "icons/worker.png",
+	TACTICAL = "icons/hover.png",
+	ai       = "LuaUI/Images/advplayerslist/cpu.dds",
+	team     = "LuaUI/Images/advplayerslist/ally.dds",
+	query    = "LuaUI/Images/advplayerslist/ping.dds",
+	queryall = "icons/radar_t2.png",
+	overlay  = "icons/eye.png",
+	close    = "LuaUI/Images/advplayerslist/cross.dds",
+	lead     = "LuaUI/Images/advplayerslist/indicator.dds",
+}
+local MAX_EVENTS = 120
 local QUERY_INTERVAL_FRAMES = 1800
-local STRIP_HEIGHT = 20          -- the tab strip, unscaled px (the unit-totals module is 22)
-local PANEL_HEIGHT = 236         -- the open AI panel, unscaled px; clamped to the screen
+local WIN_W, WIN_H = 300, 300   -- unscaled px
+local LAUNCHER = 26             -- unscaled px
 
--- Material 3 dark scheme, mapped onto the game's warm accent
 local C = {
-	onSurface        = { 0.92, 0.92, 0.92, 1 },
+	onSurface        = { 0.93, 0.93, 0.93, 1 },
 	onSurfaceVariant = { 0.66, 0.66, 0.68, 1 },
-	outline          = { 1, 1, 1, 0.14 },
-	outlineStrong    = { 1, 1, 1, 0.3 },
-	primary          = { 1, 0.9, 0.66, 1 },        -- BAR's tab accent
-	primaryContainer = { 1, 0.9, 0.66, 0.22 },
-	surfaceLow       = { 1, 1, 1, 0.035 },
-	surfaceHigh      = { 1, 1, 1, 0.08 },
-	surfaceMenu      = { 0.13, 0.13, 0.14, 0.98 },
+	outline          = { 1, 1, 1, 0.12 },
+	outlineStrong    = { 1, 1, 1, 0.28 },
+	primary          = { 1, 0.9, 0.66, 1 },
+	primaryContainer = { 1, 0.9, 0.66, 0.2 },
+	surface          = { 0.07, 0.07, 0.08, 0.93 },
+	surfaceHigh      = { 1, 1, 1, 0.06 },
+	surfaceMenu      = { 0.12, 0.12, 0.13, 0.98 },
 	hoverLayer       = { 1, 1, 1, 0.08 },
-	pressLayer       = { 1, 1, 1, 0.12 },
+	pressLayer       = { 1, 1, 1, 0.14 },
 	ok               = { 0.55, 0.85, 0.55, 1 },
 	warn             = { 1, 0.75, 0.4, 1 },
 	error            = { 1, 0.5, 0.5, 1 },
 }
 local SOUND_CLICK = "LuaUI/Sounds/buildbar_click.wav"
-local SOUND_HOVER = "LuaUI/Sounds/hover.wav"
 
 -- ---------------------------------------------------------------- engine locals
 
-local glColor, glRect, glText = gl.Color, gl.Rect, gl.Text
+local glColor, glRect, glText, glTexture, glTexRect = gl.Color, gl.Rect, gl.Text, gl.Texture, gl.TexRect
 local spEcho, spGetGameFrame, spGetMouseState = Spring.Echo, Spring.GetGameFrame, Spring.GetMouseState
 local spGetTeamList, spGetTeamInfo, spGetAIInfo, spGetTeamColor = Spring.GetTeamList, Spring.GetTeamInfo, Spring.GetAIInfo, Spring.GetTeamColor
 local spGetMyTeamID, spAreTeamsAllied, spGetSpectatingState = Spring.GetMyTeamID, Spring.AreTeamsAllied, Spring.GetSpectatingState
@@ -97,18 +98,13 @@ local spSendSkirmishAIMessage, spPlaySoundFile = Spring.SendSkirmishAIMessage, S
 local mathFloor, mathMax, mathMin = math.floor, math.max, math.min
 
 -- Only teams allied with the local player are listed, drawn and commanded
--- (CR-008): a host running both sides must not see the enemy BARb's plan
--- or steer its builders. A spectator sees every AI's overlay but may route
--- none of them.
-local function isSpectator()
-	return spGetSpectatingState() == true
-end
-
+-- (CR-008): a host running both sides must not see the enemy BARb's plan or
+-- steer its builders. A spectator sees every AI but may route none of them.
+local function isSpectator() return spGetSpectatingState() == true end
 local function isPermittedTeam(teamId)
 	if isSpectator() then return true end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
 end
-
 local function mayCommand(teamId)
 	if isSpectator() then return false end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
@@ -122,35 +118,33 @@ local RectRound, RectRoundOutline, UiElement
 local font, font2
 local hasFlowUI = false
 
-local strip = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
-local panel = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
-local docked = false
-local activeTab = "player"       -- "player" | "ai"
+local open = false               -- the window is shown
+local firstRun = true            -- no saved config yet: open once, so the widget is found
+local offX, offY = 0, 0          -- the user's drag, from the default place (scaled px)
+local launcher = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+local win = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+local dragging = nil             -- { mx, my, offX, offY } while the header is dragged
 
-local hit = {}                   -- rebuilt every draw: { x1, y1, x2, y2, id, action }
-local menuHit = {}               -- the open menu's items, checked before `hit`
+local hit = {}                   -- rebuilt every draw: { x1, y1, x2, y2, id, action, tooltip }
 local hoverId, pressedId = nil, nil
-local lastHoverSoundId = nil
-local openMenu = nil             -- "team" | "ai" | nil
-local menuRect = nil             -- { x1, y1, x2, y2 } of the open menu
 
-local ais = {}                   -- teamId -> { teamId, name, shortName, color, allyTeam, roster, lastReply, replyKind }
+local ais = {}                   -- teamId -> { teamId, name, color, allyTeam, roster, lastReply, replyKind }
 local aiOrder = {}
-local allyTeams = {}             -- sorted ally team ids that have a permitted AI
-local selectedAlly = nil
-local selected = nil
+local allyTeams = {}
+local selectedAlly, selected = nil, nil
 local events = {}
-local eventScroll = 0
+local eventScroll, listScroll = 0, 0
 local lastQueryFrame = -1
 local firstAnnounceFrame = nil
+local layoutShown = false
+local layoutData = {}
+local hookAIMessages, unhookAIMessages   -- defined with the message code below
 
 -- ---------------------------------------------------------------- helpers
 
 local function split(s, sep)
 	local out = {}
-	for piece in string.gmatch(s .. sep, "([^" .. sep .. "]*)" .. sep) do
-		out[#out + 1] = piece
-	end
+	for piece in string.gmatch(s .. sep, "([^" .. sep .. "]*)" .. sep) do out[#out + 1] = piece end
 	return out
 end
 
@@ -173,15 +167,13 @@ local function aisOfAlly(allyTeam)
 end
 
 local function refreshTeams()
-	local list = spGetTeamList() or {}
-	for _, teamId in ipairs(list) do
+	for _, teamId in ipairs(spGetTeamList() or {}) do
 		local _, _, isDead, isAI, _, allyTeam = spGetTeamInfo(teamId)
 		if isAI and not isDead and isPermittedTeam(teamId) then
-			local _, name, _, shortName = spGetAIInfo(teamId)
+			local _, name = spGetAIInfo(teamId)
 			local r, g, b = spGetTeamColor(teamId)
 			local e = ais[teamId] or { teamId = teamId }
 			e.name = name or ("AI " .. teamId)
-			e.shortName = shortName or ""
 			e.allyTeam = allyTeam or 0
 			e.color = { r or 1, g or 1, b or 1, 1 }
 			ais[teamId] = e
@@ -191,17 +183,16 @@ local function refreshTeams()
 	for id in pairs(ais) do aiOrder[#aiOrder + 1] = id end
 	table.sort(aiOrder, function(a, b)
 		local ea, eb = ais[a], ais[b]
-		if (ea.allyTeam or 0) ~= (eb.allyTeam or 0) then return (ea.allyTeam or 0) < (eb.allyTeam or 0) end
+		if ea.allyTeam ~= eb.allyTeam then return ea.allyTeam < eb.allyTeam end
 		return a < b
 	end)
 	allyTeams = {}
 	local seen = {}
 	for _, id in ipairs(aiOrder) do
-		local at = ais[id].allyTeam or 0
+		local at = ais[id].allyTeam
 		if not seen[at] then seen[at] = true; allyTeams[#allyTeams + 1] = at end
 	end
 	table.sort(allyTeams)
-	-- keep the selection valid: the player's own ally team first
 	if selectedAlly == nil or not seen[selectedAlly] then
 		local _, _, _, _, _, myAlly = spGetTeamInfo(spGetMyTeamID())
 		selectedAlly = seen[myAlly] and myAlly or allyTeams[1]
@@ -222,9 +213,7 @@ end
 
 local function send(teamId, msg)
 	local ok = spSendSkirmishAIMessage(teamId, msg)
-	if not ok then
-		addEvent(string.format("Team %d: no local AI received the command (not hosted here?)", teamId), "warn")
-	end
+	if not ok then addEvent(string.format("Team %d: no local AI received the command (not hosted here?)", teamId), "warn") end
 	return ok
 end
 
@@ -235,66 +224,49 @@ end
 
 local function playClick() spPlaySoundFile(SOUND_CLICK, 0.5, "ui") end
 
-local function setTab(tab)
-	activeTab = tab
-	openMenu = nil
-	if tab == "ai" then refreshTeams() end
-	if tab ~= "ai" and WG.guishader then WG.guishader.RemoveRect("barblink") end
+local function setOpen(v)
+	open = v
+	if v then refreshTeams() end
+	if not v and WG.guishader then WG.guishader.RemoveRect("barblink") end
 end
 
--- ---------------------------------------------------------------- docking
+-- ---------------------------------------------------------------- placement
 
--- The topmost published position of the player-list stack: { top, left, bottom, right, scale }.
-local function stackTop()
-	local function tableOf(f)
-		local p1, p2, p3, p4, p5 = f()
-		if type(p1) == "table" then return p1 end
-		if type(p1) == "number" and p5 then return { p1, p2, p3, p4, p5 } end
-		return nil
-	end
-	if WG.advplayerlist_mascot and WG.advplayerlist_mascot.GetPosition then
-		local p = tableOf(WG.advplayerlist_mascot.GetPosition)
+-- The player list's box: { top, left, bottom, right, scale }, or nil.
+local function playerList()
+	local api = WG.advplayerlist_api
+	if api and api.GetPosition then
+		local p = api.GetPosition()
 		if p and p[1] then return p end
-	end
-	if WG.displayinfo and WG.displayinfo.GetPosition then
-		local p = tableOf(WG.displayinfo.GetPosition)
-		if p and p[1] then return p end
-	end
-	if WG.unittotals and WG.unittotals.GetPosition then
-		local p = tableOf(WG.unittotals.GetPosition)
-		if p and p[1] then return p end
-	end
-	if WG.music and WG.music.GetPosition then
-		local p = tableOf(WG.music.GetPosition)
-		if p and p[1] then return p end
-	end
-	if WG.advplayerlist_api and WG.advplayerlist_api.GetPosition then
-		return WG.advplayerlist_api.GetPosition()
 	end
 	return nil
 end
 
--- The strip sits on the top edge of the stack; the open panel sits on the
--- strip. Both take the list's width. Nothing is covered.
-local function updateDock()
-	local listPos = WG.advplayerlist_api and WG.advplayerlist_api.GetPosition and WG.advplayerlist_api.GetPosition()
-	local top = stackTop()
-	local x1, x2, base
-	if listPos and listPos[1] and top and top[1] then
-		docked = true
-		scale = listPos[5] or 1
-		x1, x2, base = listPos[2], listPos[4], mathFloor(top[1])
+-- The launcher sits just left of the player list's top-left corner, the
+-- window to its left over the map; without a player list, the bottom-right
+-- corner. The user's drag is an offset from that place, clamped on screen.
+local function updatePlacement()
+	local list = playerList()
+	if list then
+		scale = list[5] or 1
 	else
-		docked = false
 		scale = (vsy / 1080) * (1 + (Spring.GetConfigFloat("ui_scale", 1) - 1) / 1.25)
-		x1, x2, base = vsx - mathFloor(220 * scale), vsx, 0
 	end
-	local stripH = mathFloor(STRIP_HEIGHT * scale)
-	strip.x1, strip.x2, strip.y1, strip.y2 = x1, x2, base, base + stripH
-	local panelH = mathMin(mathFloor(PANEL_HEIGHT * scale), mathMax(0, vsy - strip.y2 - mathFloor(4 * scale)))
-	panel.x1, panel.x2 = x1, x2
-	panel.y1 = strip.y2
-	panel.y2 = strip.y2 + ((activeTab == "ai") and panelH or 0)
+	local ls = mathFloor(LAUNCHER * scale)
+	local gap = mathFloor(4 * scale)
+	local ax, ay   -- the launcher's bottom-right corner
+	if list then
+		ax, ay = list[2] - gap, list[1] - ls
+	else
+		ax, ay = vsx - gap, mathFloor(220 * scale)
+	end
+	launcher.x1, launcher.y1, launcher.x2, launcher.y2 = ax - ls, ay, ax, ay + ls
+	local w, h = mathFloor(WIN_W * scale), mathMin(mathFloor(WIN_H * scale), vsy - 2 * gap)
+	local x2 = launcher.x1 - gap + offX
+	local y2 = launcher.y2 + offY
+	x2 = mathMax(w + gap, mathMin(vsx - gap, x2))
+	y2 = mathMax(h + gap, mathMin(vsy - gap, y2))
+	win.x1, win.y1, win.x2, win.y2 = x2 - w, y2 - h, x2, y2
 end
 
 -- ---------------------------------------------------------------- lifecycle
@@ -315,34 +287,41 @@ end
 function widget:ViewResize(newX, newY)
 	vsx, vsy = newX, newY
 	initFlowUI()
-	updateDock()
+	updatePlacement()
 end
 
 function widget:Initialize()
 	self:ViewResize(Spring.GetViewGeometry())
 	refreshTeams()
-	WG.barblink = {}
-	---Where this widget's stack ends, so a neighbour can stack against it: { top, left, bottom, right, scale }.
-	WG.barblink.GetPosition = function()
-		local top = (activeTab == "ai") and panel.y2 or strip.y2
-		return { top, strip.x1, strip.y1, strip.x2, scale }
-	end
+	if firstRun then open = true end
+	hookAIMessages()
+	WG.barblink = {
+		IsOpen = function() return open end,
+		SetOpen = setOpen,
+	}
 end
 
 function widget:Shutdown()
+	unhookAIMessages()
 	WG.barblink = nil
 	if WG.guishader then
 		WG.guishader.RemoveRect("barblink")
-		WG.guishader.RemoveRect("barblinkstrip")
+		WG.guishader.RemoveRect("barblinklauncher")
 	end
 end
 
 function widget:GetConfigData()
-	return { tab = activeTab }
+	return { open = open, offX = offX / mathMax(scale, 0.01), offY = offY / mathMax(scale, 0.01), overlay = layoutShown }
 end
 
 function widget:SetConfigData(data)
-	if data and (data.tab == "player" or data.tab == "ai") then activeTab = data.tab end
+	if type(data) ~= "table" then return end
+	if data.open ~= nil then
+		firstRun = false   -- a config of this version: its open state stands
+		open = data.open == true
+	end
+	offX = (tonumber(data.offX) or 0) * scale
+	offY = (tonumber(data.offY) or 0) * scale
 end
 
 function widget:GameFrame(n)
@@ -356,61 +335,19 @@ function widget:GameFrame(n)
 	end
 end
 
--- ---------------------------------------------------------------- messages
-
-function widget:RecvSkirmishAIMessage(aiTeam, dataStr)
-	if type(dataStr) ~= "string" or string.sub(dataStr, 1, 5) ~= "barb|" then return end
-	local p = split(dataStr, "|")
-	local topic, sender, senderAlly = p[2], tonumber(p[3]), tonumber(p[4])
-	if sender and not ais[sender] then refreshTeams() end
-	local e = sender and ais[sender]
-	if e and senderAlly then e.allyTeam = senderAlly end
-	if topic == "roster" then
-		local r = parseRoster(table.concat(p, "|", 6))
-		if r and ais[r.teamId] then
-			local target = ais[r.teamId]
-			firstAnnounceFrame = firstAnnounceFrame or spGetGameFrame()
-			if not target.roster then
-				addEvent(string.format("Team %d announced: %s, %s, start (%d, %d)%s", r.teamId, r.role, r.side, r.x or 0, r.z or 0,
-					r.leader and ", lead team" or ""), "info")
-			elseif target.roster.role ~= r.role then
-				addEvent(string.format("Team %d role changed: %s to %s", r.teamId, target.roster.role, r.role), "ok")
-			end
-			target.roster = r
-		end
-	elseif topic == "role" and e then
-		local role, status = p[5] or "?", p[6] or ""
-		e.lastReply = string.format("%s: %s", role, status)
-		e.replyKind = (status == "ok") and "ok" or ((string.sub(status, 1, 7) == "already") and "info" or "warn")
-		if status == "ok" and e.roster then e.roster.role = role end
-		addEvent(string.format("Team %d replied: %s (%s)", sender, status, role), e.replyKind)
-	elseif topic == "orphan" and e then
-		addEvent(string.format("Team %d orphan rescue: %s", sender, table.concat(p, " ", 5)), "warn")
-		spEcho("[BARb link] team " .. sender .. " orphan " .. table.concat(p, " ", 5))
-	elseif topic == "donation" and e then
-		addEvent(string.format("Team %d gave %s to team %s (%s of %s)", sender, p[5] or "?", p[6] or "?", p[7] or "?", p[8] or "?"), "ok")
-	elseif topic == "ferry" and e then
-		addEvent(string.format("Team %d ferry: %s", sender, table.concat(p, " ", 5)), "info")
-	elseif topic == "layout" and sender then
-		layoutReceive(sender, tonumber(p[5]) or 0, tonumber(p[6]) or 0, table.concat(p, "|", 7))
-	end
-end
-
 -- ---------------------------------------------------------------- layout overlay (D-053)
 
-layoutShown = false
-local layoutData = {}   -- [teamId] = { parts = {}, total = n, entries = {...} }
 local glDrawGroundQuad, glLineWidth, glBeginEnd, glVertex, glDepthTest = gl.DrawGroundQuad, gl.LineWidth, gl.BeginEnd, gl.Vertex, gl.DepthTest
 local GL_LINES = GL.LINES
 local spGetGroundHeight = Spring.GetGroundHeight
 local LAYOUT_COLOURS = {
-	zone = {0.65, 0.65, 0.65, 0.18},
-	corridor = {0.9, 0.2, 0.2, 0.22},
-	p = {0.2, 0.9, 0.2, 0.35},   -- planned, armed
-	h = {0.9, 0.8, 0.2, 0.30},   -- held
-	s = {0.2, 0.8, 0.9, 0.40},   -- served, being built
-	b = {0.2, 0.4, 1.0, 0.45},   -- built
-	t = {1.0, 0.6, 0.1, 0.35},   -- tenant
+	zone = { 0.65, 0.65, 0.65, 0.18 },
+	corridor = { 0.9, 0.2, 0.2, 0.22 },
+	p = { 0.2, 0.9, 0.2, 0.35 },   -- planned, armed
+	h = { 0.9, 0.8, 0.2, 0.30 },   -- held
+	s = { 0.2, 0.8, 0.9, 0.40 },   -- served, being built
+	b = { 0.2, 0.4, 1.0, 0.45 },   -- built
+	t = { 1.0, 0.6, 0.1, 0.35 },   -- tenant
 }
 
 local function layoutParse(teamId, text)
@@ -432,7 +369,7 @@ local function layoutParse(teamId, text)
 	addEvent(string.format("Team %d layout: %d slots, %d built", teamId, slots, built), "info")
 end
 
-function layoutReceive(teamId, idx, total, payload)
+local function layoutReceive(teamId, idx, total, payload)
 	if not isPermittedTeam(teamId) then return end   -- CR-008: never draw a non-allied plan
 	if total <= 0 then
 		layoutData[teamId] = nil
@@ -451,26 +388,24 @@ end
 local function setOverlay(on)
 	layoutShown = on
 	refreshTeams()
-	for _, id in ipairs(aiOrder) do send(id, "barb|layout|" .. id .. "|" .. (layoutShown and "on" or "off")) end
-	addEvent(layoutShown and "Layout overlay on: zones grey, corridors red, slots green (armed) / yellow (held) / cyan (building) / blue (built), tenants orange"
-		or "Layout overlay off", "info")
+	for _, id in ipairs(aiOrder) do send(id, "barb|layout|" .. id .. "|" .. (on and "on" or "off")) end
+	addEvent(on and "Layout overlay on: zones grey, corridors red, slots green / yellow / cyan / blue, tenants orange" or "Layout overlay off", "info")
 end
 
-local FACING_DIR = { [0] = {0, 1}, [1] = {1, 0}, [2] = {0, -1}, [3] = {-1, 0} }
+local FACING_DIR = { [0] = { 0, 1 }, [1] = { 1, 0 }, [2] = { 0, -1 }, [3] = { -1, 0 } }
 
 function widget:DrawWorld()
 	if not layoutShown then return end
 	glDepthTest(false)
-	for teamId, d in pairs(layoutData) do
+	for _, d in pairs(layoutData) do
 		for _, e in ipairs(d.entries or {}) do
 			if e.kind == "complex" then
 				local dir = FACING_DIR[e.facing] or FACING_DIR[0]
-				local x1, z1 = e.x, e.z
 				local x2, z2 = e.x + dir[1] * 240, e.z + dir[2] * 240
 				glColor(1, 1, 1, 0.9)
 				glLineWidth(3)
 				glBeginEnd(GL_LINES, function()
-					glVertex(x1, spGetGroundHeight(x1, z1) + 8, z1)
+					glVertex(e.x, spGetGroundHeight(e.x, e.z) + 8, e.z)
 					glVertex(x2, spGetGroundHeight(x2, z2) + 8, z2)
 				end)
 				glLineWidth(1)
@@ -492,20 +427,103 @@ function widget:DrawWorld()
 	glDepthTest(true)
 end
 
+-- ---------------------------------------------------------------- messages
+
+local function onAIMessage(aiTeam, dataStr)
+	if type(dataStr) ~= "string" or string.sub(dataStr, 1, 5) ~= "barb|" then return end
+	local p = split(dataStr, "|")
+	local topic, sender, senderAlly = p[2], tonumber(p[3]), tonumber(p[4])
+	if sender and not isPermittedTeam(sender) then return end   -- CR-008
+	if sender and not ais[sender] then refreshTeams() end
+	local e = sender and ais[sender]
+	if e and senderAlly then e.allyTeam = senderAlly end
+	local rest = table.concat(p, " ", 5)
+	if topic == "roster" then
+		local r = parseRoster(table.concat(p, "|", 6))
+		if r and ais[r.teamId] then
+			local target = ais[r.teamId]
+			firstAnnounceFrame = firstAnnounceFrame or spGetGameFrame()
+			if not target.roster then
+				addEvent(string.format("Team %d announced: %s, %s%s", r.teamId, r.role, r.side, r.leader and ", lead" or ""), "info")
+			elseif target.roster.role ~= r.role then
+				addEvent(string.format("Team %d role changed: %s to %s", r.teamId, target.roster.role, r.role), "ok")
+			end
+			target.roster = r
+			if target.lastReply and string.sub(target.lastReply, 1, 2) == "?:" then target.lastReply = nil; target.replyKind = nil end   -- "not ready" is answered
+		end
+	elseif topic == "role" and e then
+		local role, status = p[5] or "?", p[6] or ""
+		e.lastReply = string.format("%s: %s", role, status)
+		e.replyKind = (status == "ok") and "ok" or ((string.sub(status, 1, 7) == "already") and "info" or "warn")
+		if status == "ok" and e.roster then e.roster.role = role end
+		addEvent(string.format("Team %d replied: %s (%s)", sender, status, role), e.replyKind)
+	elseif topic == "orphan" and e then
+		addEvent(string.format("Team %d orphan rescue: %s", sender, rest), "warn")
+	elseif topic == "donation" and e then
+		addEvent(string.format("Team %d gave %s to team %s (%s of %s)", sender, p[5] or "?", p[6] or "?", p[7] or "?", p[8] or "?"), "ok")
+	elseif topic == "ferry" and e then
+		addEvent(string.format("Team %d ferry: %s", sender, rest), (p[5] == "done" or p[5] == "gave") and "ok" or ((p[5] == "fallback") and "warn" or "info"))
+	elseif topic == "spam" and e then
+		local what = p[5] or "?"
+		if what == "on" then addEvent(string.format("Team %d spam on (+%s metal, +%s energy)", sender, p[6] or "?", p[7] or "?"), "ok")
+		elseif what == "off" then addEvent(string.format("Team %d spam off (+%s metal, +%s energy)", sender, p[6] or "?", p[7] or "?"), "warn")
+		else addEvent(string.format("Team %d spam %s (%s, %s)", sender, what, p[6] or "?", p[7] or "?"), "info") end
+	elseif topic == "seaassist" and e then
+		addEvent(string.format("Team %d sea assist: %s", sender, rest), "info")
+	elseif topic == "layout" and sender then
+		layoutReceive(sender, tonumber(p[5]) or 0, tonumber(p[6]) or 0, table.concat(p, "|", 7))
+	end
+end
+
+-- BAR's widget handler (luaui/barwidgets.lua) does not forward the engine's
+-- RecvSkirmishAIMessage callin to widgets: it is not in its callInLists, and
+-- RegisterGlobal refuses engine callin names. So the widget installs the LuaUI
+-- global itself (getfenv(0) is LuaUI's global table; Script.UpdateCallIn makes
+-- the engine call it), chaining to any handler already there, and restores it
+-- on shutdown. Should the handler ever forward the callin, widget:Recv... is
+-- used instead and the global is left alone.
+local AI_CALLIN = "RecvSkirmishAIMessage"
+local hooked, previousGlobal = false, nil
+
+function widget:RecvSkirmishAIMessage(aiTeam, dataStr)
+	if hooked then return end
+	onAIMessage(aiTeam, dataStr)
+end
+
+hookAIMessages = function()
+	local G = getfenv and getfenv(0)
+	if type(G) ~= "table" or not (Script and Script.UpdateCallIn) then return end
+	previousGlobal = rawget(G, AI_CALLIN)
+	if previousGlobal ~= nil then return end   -- the handler (or another widget) delivers it: widget:Recv... gets it
+	rawset(G, AI_CALLIN, function(aiTeam, dataStr)
+		local ok, err = pcall(onAIMessage, aiTeam, dataStr)
+		if not ok then spEcho("[BARb link] message error: " .. tostring(err)) end
+		return nil
+	end)
+	Script.UpdateCallIn(AI_CALLIN)
+	hooked = true
+end
+
+unhookAIMessages = function()
+	if not hooked then return end
+	local G = getfenv and getfenv(0)
+	if type(G) == "table" then
+		rawset(G, AI_CALLIN, previousGlobal)
+		Script.UpdateCallIn(AI_CALLIN)
+	end
+	hooked = false
+end
+
 -- ---------------------------------------------------------------- drawing primitives
 
 local function px(v) return mathFloor(v * scale + 0.5) end
+local function inside(x, y, x1, y1, x2, y2) return x >= x1 and x <= x2 and y >= y1 and y <= y2 end
 
-local function inside(x, y, x1, y1, x2, y2)
-	return x >= x1 and x <= x2 and y >= y1 and y <= y2
-end
-
-local function roundRect(x1, y1, x2, y2, cs, color, color2)
+local function roundRect(x1, y1, x2, y2, cs, color)
 	if hasFlowUI then
-		RectRound(x1, y1, x2, y2, cs, 1, 1, 1, 1, color, color2 or color)
+		RectRound(x1, y1, x2, y2, cs, 1, 1, 1, 1, color, color)
 	else
-		glColor(color)
-		glRect(x1, y1, x2, y2)
+		glColor(color); glRect(x1, y1, x2, y2)
 	end
 end
 
@@ -526,8 +544,7 @@ local function text(f, s, x, y, size, opts, color)
 		f:Print(s, x, y, size, opts or "o")
 		f:End()
 	else
-		glColor(color)
-		glText(s, x, y, size, opts or "o")
+		glColor(color); glText(s, x, y, size, opts or "o")
 	end
 end
 
@@ -538,26 +555,29 @@ end
 
 local function fitText(f, s, size, maxW)
 	local out = s
-	while textWidth(f, out, size) > maxW and #out > 3 do
-		out = string.sub(out, 1, #out - 2) .. "."
-	end
+	while textWidth(f, out, size) > maxW and #out > 3 do out = string.sub(out, 1, #out - 2) .. "." end
 	return out
 end
 
+local iconOk = {}
+local function icon(path, x1, y1, x2, y2, color)
+	if not path then return false end
+	if iconOk[path] == nil then iconOk[path] = VFS.FileExists(path) == true end
+	if not iconOk[path] then return false end
+	glColor(color or { 1, 1, 1, 1 })
+	glTexture(path)
+	glTexRect(x1, y1, x2, y2)
+	glTexture(false)
+	return true
+end
+
 local function stateLayer(x1, y1, x2, y2, cs, id)
-	if pressedId == id then
-		roundRect(x1, y1, x2, y2, cs, C.pressLayer)
-	elseif hoverId == id then
-		roundRect(x1, y1, x2, y2, cs, C.hoverLayer)
-	end
+	if pressedId == id then roundRect(x1, y1, x2, y2, cs, C.pressLayer)
+	elseif hoverId == id then roundRect(x1, y1, x2, y2, cs, C.hoverLayer) end
 end
 
-local function register(x1, y1, x2, y2, id, action)
-	hit[#hit + 1] = { x1, y1, x2, y2, id, action }
-end
-
-local function registerMenu(x1, y1, x2, y2, id, action)
-	menuHit[#menuHit + 1] = { x1, y1, x2, y2, id, action }
+local function register(x1, y1, x2, y2, id, action, tooltip)
+	hit[#hit + 1] = { x1, y1, x2, y2, id, action, tooltip }
 end
 
 local function divider(x1, x2, y)
@@ -565,348 +585,275 @@ local function divider(x1, x2, y)
 	glRect(x1, y, x2, y + mathMax(1, px(1)))
 end
 
--- M3 assist chip, compact density
-local function chip(x, y, label, filled, color)
-	local h = px(15)
-	local w = textWidth(font, label, px(9)) + px(11)
-	if filled then
-		roundRect(x, y, x + w, y + h, px(4), color or C.primaryContainer)
-	else
-		outlineRect(x, y, x + w, y + h, px(4), C.outlineStrong)
+-- a square icon button; `on` shows it pressed in (a toggle)
+local function iconButton(x1, y1, size, path, id, action, tooltip, on, fallback)
+	local x2, y2 = x1 + size, y1 + size
+	if on then roundRect(x1, y1, x2, y2, px(4), C.primaryContainer) end
+	stateLayer(x1, y1, x2, y2, px(4), id)
+	local m = px(4)
+	if not icon(path, x1 + m, y1 + m, x2 - m, y2 - m, on and C.primary or C.onSurface) then
+		text(font2, fallback or "?", (x1 + x2) / 2, y1 + size * 0.5 - px(3.5), px(10), "oc", C.onSurface)
 	end
-	text(font, label, x + w / 2, y + h * 0.5 - px(3.3), px(9), "oc", filled and C.onSurface or C.onSurfaceVariant)
-	return x + w + px(4)
+	register(x1, y1, x2, y2, id, action, tooltip)
+	return x1 - size - px(2)
 end
 
--- M3 text / tonal button, compact
-local function button(x1, y1, x2, y2, label, id, action, tonal)
+-- a button with a leading icon and a label
+local function labelButton(x1, y1, x2, y2, path, label, id, action, tooltip, active, enabled)
 	local cs = px(4)
-	if tonal then roundRect(x1, y1, x2, y2, cs, C.primaryContainer) end
-	stateLayer(x1, y1, x2, y2, cs, id)
-	text(font2, label, (x1 + x2) / 2, y1 + (y2 - y1) * 0.5 - px(3.8), px(10), "oc", tonal and C.onSurface or C.primary)
-	register(x1, y1, x2, y2, id, action)
+	if active then roundRect(x1, y1, x2, y2, cs, C.primaryContainer)
+	else outlineRect(x1, y1, x2, y2, cs, C.outlineStrong) end
+	if enabled ~= false then stateLayer(x1, y1, x2, y2, cs, id) end
+	local h = y2 - y1
+	local isz = h - px(6)
+	local col = (enabled == false) and C.onSurfaceVariant or (active and C.primary or C.onSurface)
+	local tx = x1 + px(5)
+	if icon(path, tx, y1 + px(3), tx + isz, y1 + px(3) + isz, col) then tx = tx + isz + px(4) end
+	text(font2, fitText(font2, label, px(9), x2 - tx - px(3)), tx, y1 + h * 0.5 - px(3.4), px(9), "o", col)
+	if enabled ~= false then register(x1, y1, x2, y2, id, action, tooltip) end
 end
 
--- M3 exposed dropdown menu (outlined text field with a trailing arrow); the
--- open menu is drawn last so it overlays the content below it.
-local function dropdown(x1, y1, x2, y2, label, value, id, valueColor)
-	local cs = px(4)
-	local open = (openMenu == id)
-	outlineRect(x1, y1, x2, y2, cs, open and C.primary or C.outlineStrong)
-	if open then roundRect(x1 + px(1), y1 + px(1), x2 - px(1), y2 - px(1), cs, C.surfaceLow) end
-	stateLayer(x1, y1, x2, y2, cs, "dd" .. id)
-	-- floating label on the top edge
-	local lw = textWidth(font, label, px(7.5))
-	glColor(0.07, 0.07, 0.08, 1)
-	glRect(x1 + px(7), y2 - px(3), x1 + px(9) + lw, y2 + px(3))
-	text(font, label, x1 + px(8), y2 - px(2.5), px(7.5), "o", open and C.primary or C.onSurfaceVariant)
-	text(font, fitText(font, value, px(10), x2 - x1 - px(24)), x1 + px(8), y1 + (y2 - y1) * 0.5 - px(3.5), px(10), "o", valueColor or C.onSurface)
-	text(font2, open and "\226\150\180" or "\226\150\190", x2 - px(11), y1 + (y2 - y1) * 0.5 - px(3.5), px(9), "oc", C.onSurfaceVariant)
-	register(x1, y1, x2, y2, "dd" .. id, function()
-		playClick()
-		openMenu = (openMenu == id) and nil or id
-	end)
-end
+-- ---------------------------------------------------------------- draw
 
--- the open menu's list, drawn after everything else
-local function drawMenu(x1, x2, yTop, items, onPick)
-	local rowH = px(18)
-	local h = mathMax(1, #items) * rowH + px(6)
-	local y1 = yTop - h
-	if y1 < panel.y1 then y1 = panel.y1; yTop = y1 + h end
-	menuRect = { x1, y1, x2, yTop }
-	roundRect(x1, y1, x2, yTop, px(4), C.surfaceMenu)
-	outlineRect(x1, y1, x2, yTop, px(4), C.outlineStrong)
-	if WG.guishader then WG.guishader.InsertRect(x1, y1, x2, yTop, "barblinkmenu", widget) end
-	local y = yTop - px(3)
-	if #items == 0 then
-		text(font, "nothing", x1 + px(8), y - rowH * 0.5 - px(3.5), px(10), "o", C.onSurfaceVariant)
-	end
-	for _, it in ipairs(items) do
-		local iy1, iy2 = y - rowH, y
-		local mid = "mi" .. it.id
-		if it.selected then roundRect(x1 + px(2), iy1, x2 - px(2), iy2, px(3), C.primaryContainer) end
-		stateLayer(x1 + px(2), iy1, x2 - px(2), iy2, px(3), mid)
-		local tx = x1 + px(8)
-		if it.color then
-			roundRect(tx, iy1 + rowH / 2 - px(3.5), tx + px(7), iy1 + rowH / 2 + px(3.5), px(3.5), it.color)
-			tx = tx + px(11)
-		end
-		text(font, fitText(font, it.label, px(10), x2 - tx - px(6)), tx, iy1 + rowH * 0.5 - px(3.5), px(10), "o", it.selected and C.onSurface or C.onSurfaceVariant)
-		registerMenu(x1, iy1, x2, iy2, mid, function() playClick(); onPick(it); openMenu = nil end)
-		y = y - rowH
-	end
-end
-
--- ---------------------------------------------------------------- draw: the tab strip
-
-local function drawStrip()
-	local x1, y1, x2, y2 = strip.x1, strip.y1, strip.x2, strip.y2
-	local open = (activeTab == "ai")
+local function drawLauncher()
+	local x1, y1, x2, y2 = launcher.x1, launcher.y1, launcher.x2, launcher.y2
 	if hasFlowUI then
-		UiElement(x1, y1, x2, y2, open and 0 or 1, open and 0 or 1, 0, 0, 1, 1, 1, 1, WG.FlowUI.clampedOpacity)
+		UiElement(x1, y1, x2, y2, 1, 1, 1, 1, 1, 1, 1, 1, WG.FlowUI.clampedOpacity)
 	else
-		glColor(0.08, 0.08, 0.09, 0.92)
-		glRect(x1, y1, x2, y2)
+		roundRect(x1, y1, x2, y2, px(4), C.surface)
 	end
-	if WG.guishader then WG.guishader.InsertRect(x1, y1, x2, y2, "barblinkstrip", widget) end
-	local tabs = { { id = "player", label = "Player" }, { id = "ai", label = "AI" } }
-	local tabW = (x2 - x1) / #tabs
-	for i, t in ipairs(tabs) do
-		local tx1 = x1 + (i - 1) * tabW
-		local tx2 = tx1 + tabW
-		local active = (activeTab == t.id)
-		local hid = "strip" .. t.id
-		stateLayer(tx1, y1, tx2, y2, px(3), hid)
-		if i > 1 then
-			glColor(C.outlineStrong)
-			glRect(tx1, y1 + px(4), tx1 + mathMax(1, px(1)), y2 - px(4))
-		end
-		text(font2, t.label, (tx1 + tx2) / 2, y1 + (y2 - y1) * 0.5 - px(4), px(10.5), "oc", active and C.onSurface or C.onSurfaceVariant)
-		if active then
-			roundRect(tx1 + px(10), y1, tx2 - px(10), y1 + px(2), px(1), C.primary)
-		end
-		register(tx1, y1, tx2, y2, hid, function() playClick(); setTab(t.id) end)
+	if WG.guishader then WG.guishader.InsertRect(x1, y1, x2, y2, "barblinklauncher", widget) end
+	if open then roundRect(x1 + px(2), y1 + px(2), x2 - px(2), y2 - px(2), px(3), C.primaryContainer) end
+	stateLayer(x1, y1, x2, y2, px(4), "launcher")
+	local m = px(5)
+	if not icon(ICON.ai, x1 + m, y1 + m, x2 - m, y2 - m, open and C.primary or C.onSurface) then
+		text(font2, "AI", (x1 + x2) / 2, y1 + (y2 - y1) * 0.5 - px(4), px(10), "oc", C.onSurface)
 	end
+	register(x1, y1, x2, y2, "launcher", function() playClick(); setOpen(not open) end,
+		open and "Close the BARb AI window (Ctrl+Alt+B)" or "Allied BARb AIs: roster, roles, events (Ctrl+Alt+B)")
 end
 
--- ---------------------------------------------------------------- draw: the AI panel, in the list's frame
-
-local function drawPanel()
-	local x1, y1, x2, y2 = panel.x1, panel.y1, panel.x2, panel.y2
-	local w, h = x2 - x1, y2 - y1
-	if w < px(80) or h < px(40) then return end
+local function drawWindow()
+	local x1, y1, x2, y2 = win.x1, win.y1, win.x2, win.y2
 	if hasFlowUI then
-		UiElement(x1, y1, x2, y2, 1, 1, 0, 0, 1, 1, 1, 1, WG.FlowUI.clampedOpacity)
+		UiElement(x1, y1, x2, y2, 1, 1, 1, 1, 1, 1, 1, 1, WG.FlowUI.clampedOpacity)
 	else
-		glColor(0.08, 0.08, 0.09, 0.92)
-		glRect(x1, y1, x2, y2)
+		roundRect(x1, y1, x2, y2, px(6), C.surface)
 	end
 	if WG.guishader then WG.guishader.InsertRect(x1, y1, x2, y2, "barblink", widget) end
-
-	local pad = px(6)
+	local pad = px(7)
 	local left, right = x1 + pad, x2 - pad
-	local bottom = y1 + pad
-	local cy = y2 - pad - px(4)          -- room for the floating labels
+	local w = right - left
 
-	-- the two menus, side by side: Team | AI
-	local ddH = px(22)
-	local gap = px(5)
-	local teamW = mathFloor((right - left - gap) * 0.36)
-	local teamLabel = selectedAlly and ("Team " .. (selectedAlly + 1)) or "-"
+	-- header: title (drag handle), actions on the right
+	local hh = px(24)
+	local hy1 = y2 - hh
+	roundRect(x1 + px(1), hy1, x2 - px(1), y2 - px(1), px(5), C.surfaceHigh)
+	icon(ICON.ai, left, hy1 + px(5), left + px(14), hy1 + px(19), C.primary)
+	text(font2, "BARb AIs", left + px(18), hy1 + hh * 0.5 - px(4), px(11), "o", C.onSurface)
+	text(font, string.format("%d allied", #aiOrder), left + px(18) + textWidth(font2, "BARb AIs", px(11)) + px(6), hy1 + hh * 0.5 - px(3.5), px(8.5), "o", C.onSurfaceVariant)
+	register(x1, hy1, x2, y2, "header", function() end, "Drag to move")
+	local bs = px(20)
+	local bx = right - bs
+	local by = hy1 + (hh - bs) / 2
+	bx = iconButton(bx, by, bs, ICON.close, "close", function() playClick(); setOpen(false) end, "Close (Escape)", false, "x")
+	bx = iconButton(bx, by, bs, ICON.overlay, "overlay", function() playClick(); setOverlay(not layoutShown) end,
+		layoutShown and "Layout overlay on: click to hide (/barblayout)" or "Show every AI's planned base on the map (/barblayout)", layoutShown, "o")
+	bx = iconButton(bx, by, bs, ICON.queryall, "queryall", function() playClick(); queryAll() end, "Ask every AI for its details", false, "*")
+	local cy = hy1 - px(5)
+
+	-- ally-team chips (only when more than one ally team has an AI)
+	if #allyTeams > 1 then
+		local chH = px(18)
+		local cx = left
+		for _, at in ipairs(allyTeams) do
+			local label = "Team " .. (at + 1)
+			local cw = textWidth(font2, label, px(9)) + px(28)
+			labelButton(cx, cy - chH, cx + cw, cy, ICON.team, label, "ally" .. at, function()
+				playClick(); selectedAlly = at; selected = aisOfAlly(at)[1]; listScroll = 0
+			end, string.format("Show team %d's AIs (%d)", at + 1, #aisOfAlly(at)), at == selectedAlly)
+			cx = cx + cw + px(4)
+			if cx > right - px(40) then break end
+		end
+		cy = cy - chH - px(5)
+	end
+
+	-- the AI list
+	local ids = aisOfAlly(selectedAlly)
+	local rowH = px(19)
+	local maxRows = mathMin(5, mathMax(1, #ids))
+	local listH = maxRows * rowH
+	listScroll = mathMax(0, mathMin(listScroll, mathMax(0, #ids - maxRows)))
+	if #ids == 0 then
+		text(font, #aiOrder == 0 and "No allied BARb AI in this game." or "No AI on this team.", left, cy - px(12), px(9.5), "o", C.onSurfaceVariant)
+		cy = cy - px(18)
+	else
+		roundRect(left, cy - listH, right, cy, px(4), C.surfaceHigh)
+		for i = 1, maxRows do
+			local id = ids[i + listScroll]
+			if not id then break end
+			local a = ais[id]
+			local ry2 = cy - (i - 1) * rowH
+			local ry1 = ry2 - rowH
+			local sel = (id == selected)
+			if sel then roundRect(left + px(1), ry1 + px(1), right - px(1), ry2 - px(1), px(3), C.primaryContainer) end
+			stateLayer(left + px(1), ry1 + px(1), right - px(1), ry2 - px(1), px(3), "row" .. id)
+			roundRect(left + px(6), ry1 + rowH / 2 - px(4), left + px(14), ry1 + rowH / 2 + px(4), px(4), a.color)
+			local role = a.roster and a.roster.role or nil
+			local rx = right - px(4)
+			if role then
+				local rw = textWidth(font, role, px(8.5))
+				text(font, role, rx, ry1 + rowH * 0.5 - px(3.2), px(8.5), "or", sel and C.primary or C.onSurfaceVariant)
+				rx = rx - rw - px(3)
+				icon(ICON[role], rx - px(13), ry1 + px(3), rx, ry1 + rowH - px(3), sel and C.primary or C.onSurfaceVariant)
+				rx = rx - px(16)
+			end
+			if a.roster and a.roster.leader then
+				icon(ICON.lead, rx - px(11), ry1 + px(4), rx, ry1 + rowH - px(4), C.primary)
+				rx = rx - px(14)
+			end
+			text(font, fitText(font, a.name, px(9.5), rx - left - px(22)), left + px(19), ry1 + rowH * 0.5 - px(3.4), px(9.5), "o", sel and C.onSurface or C.onSurfaceVariant)
+			register(left, ry1, right, ry2, "row" .. id, function() playClick(); selected = id end,
+				string.format("Team %d: %s%s", id, a.name, a.roster and (", " .. a.roster.role .. ", " .. (a.roster.side or "?")) or ""))
+		end
+		if #ids > maxRows then
+			text(font, string.format("%d-%d of %d, scroll", listScroll + 1, listScroll + maxRows, #ids), right, cy - listH - px(9), px(7.5), "or", C.onSurfaceVariant)
+		end
+		cy = cy - listH - px(12)
+	end
+
+	-- the selected AI: details, role grid, query
 	local e = selected and ais[selected]
-	local aiLabel = e and e.name or (#aiOrder == 0 and "no allied AI" or "-")
-	dropdown(left, cy - ddH, left + teamW, cy, "Team", teamLabel, "team")
-	dropdown(left + teamW + gap, cy - ddH, right, cy, "AI", aiLabel, "ai", e and e.color or nil)
-	local menuTop = cy - ddH - px(2)
-	cy = cy - ddH - px(6)
-
-	-- the selected AI: status chips, one detail line
 	if e then
 		local r = e.roster
-		local cx = left
+		local cmd = mayCommand(e.teamId)
+		local line
 		if r then
-			cx = chip(cx, cy - px(15), r.role, true)
-			cx = chip(cx, cy - px(15), r.side, false)
-			if r.landLocked then cx = chip(cx, cy - px(15), "landlocked", false) end
-			if r.leader then cx = chip(cx, cy - px(15), "lead", false) end
+			line = string.format("team %d · %s · start %d, %d · %s%s", e.teamId, r.side or "?", r.x or 0, r.z or 0, r.factory or "-", r.landLocked and " · landlocked" or "")
 		else
-			local waited = firstAnnounceFrame == nil and spGetGameFrame() > 60 * 30
-			chip(cx, cy - px(15), waited and "not hosted here?" or "waiting for announcement", false)
+			line = (firstAnnounceFrame == nil and spGetGameFrame() > 60 * 30) and "no announcement: is this AI hosted here?" or "waiting for the AI's announcement"
 		end
+		local qs = px(18)
+		iconButton(right - qs, cy - qs + px(3), qs, ICON.query, "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end,
+			"Ask this AI for its details", false, "?")
+		text(font, fitText(font, line, px(8.5), w - qs - px(4)), left, cy - px(10), px(8.5), "o", C.onSurfaceVariant)
 		cy = cy - px(18)
-		if r then
-			text(font, fitText(font, string.format("team %d · start %d, %d · %s · spot %s", e.teamId, r.x or 0, r.z or 0, r.factory or "-",
-				(r.spot and r.spot >= 0) and tostring(r.spot) or "none"), px(8.5), w - 2 * pad), left, cy - px(9), px(8.5), "o", C.onSurfaceVariant)
-			cy = cy - px(12)
+
+		local segH = px(22)
+		local sgap = px(3)
+		local segW = (w - 2 * sgap) / 3
+		for i, role in ipairs(ROLES) do
+			local row = mathFloor((i - 1) / 3)
+			local col = (i - 1) % 3
+			local sx1 = left + col * (segW + sgap)
+			local sy2 = cy - row * (segH + sgap)
+			local active = r and r.role == role
+			labelButton(sx1, sy2 - segH, sx1 + segW, sy2, ICON[role], role, "role" .. role, function()
+				if active then return end
+				playClick()
+				addEvent(string.format("Team %d: switch to %s requested", e.teamId, role), "info")
+				send(e.teamId, "barb|setrole|" .. e.teamId .. "|" .. role)
+			end, role .. ": " .. (ROLE_HINT[role] or "") .. (cmd and "" or " (spectators cannot switch roles)"), active, cmd)
 		end
-		-- role: M3 segmented button in two rows of three
-		if cy - 2 * px(17) - px(3) >= bottom then
-			local segH = px(17)
-			local sgap = px(2)
-			local segW = (right - left - 2 * sgap) / 3
-			for i, role in ipairs(ROLES) do
-				local row = mathFloor((i - 1) / 3)
-				local col = (i - 1) % 3
-				local sx1 = left + col * (segW + sgap)
-				local sy2 = cy - row * (segH + sgap)
-				local sy1 = sy2 - segH
-				local active = r and r.role == role
-				local sid = "role" .. e.teamId .. role
-				if active then
-					roundRect(sx1, sy1, sx1 + segW, sy2, px(4), C.primaryContainer)
-				else
-					outlineRect(sx1, sy1, sx1 + segW, sy2, px(4), C.outlineStrong)
-				end
-				stateLayer(sx1, sy1, sx1 + segW, sy2, px(4), sid)
-				text(font2, role, sx1 + segW / 2, sy1 + segH * 0.5 - px(3.5), px(8.5), "oc", active and C.onSurface or C.onSurfaceVariant)
-				register(sx1, sy1, sx1 + segW, sy2, sid, function()
-					if r and r.role == role then return end
-					playClick()
-					addEvent(string.format("Team %d: switch to %s requested", e.teamId, role), "info")
-					send(e.teamId, "barb|setrole|" .. e.teamId .. "|" .. role)
-				end)
-			end
-			cy = cy - 2 * segH - sgap - px(3)
-			local replyColor = C.onSurfaceVariant
-			if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
-			text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or "tap a role to switch this AI", px(8.5), w - 2 * pad), left, cy - px(9), px(8.5), "o", replyColor)
-			cy = cy - px(12)
-		end
-		-- actions: text buttons in one row
-		if cy - px(18) >= bottom then
-			local bh = px(18)
-			local bw = (right - left - 2 * gap) / 3
-			button(left, cy - bh, left + bw, cy, "Query", "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end, false)
-			button(left + bw + gap, cy - bh, left + 2 * bw + gap, cy, layoutShown and "Overlay on" or "Overlay", "overlay", function() setOverlay(not layoutShown) end, layoutShown)
-			button(left + 2 * (bw + gap), cy - bh, right, cy, "Query all", "queryall", function() playClick(); queryAll() end, false)
-			cy = cy - bh - px(4)
-		end
-	else
-		text(font, #aiOrder == 0 and "No allied BARb AI in this game." or "Pick an AI above.", left, cy - px(10), px(9.5), "o", C.onSurfaceVariant)
+		cy = cy - 2 * segH - sgap - px(4)
+		local replyColor = C.onSurfaceVariant
+		if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
+		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "spectating: roles are read-only"), px(8.5), w),
+			left, cy - px(9), px(8.5), "o", replyColor)
 		cy = cy - px(14)
 	end
-	divider(x1, x2, cy)
-	cy = cy - px(2)
+	divider(x1 + px(4), x2 - px(4), cy)
+	cy = cy - px(4)
 
-	-- events: whatever height is left
-	local lineH = px(11.5)
+	-- events
+	local bottom = y1 + pad
+	local lineH = px(12)
 	local rows = mathFloor((cy - bottom) / lineH)
 	if rows >= 1 then
 		local total = #events
 		eventScroll = mathMax(0, mathMin(eventScroll, mathMax(0, total - rows)))
-		local first = total - eventScroll
 		local shown = 0
-		for i = first, 1, -1 do
+		for i = total - eventScroll, 1, -1 do
 			if shown >= rows then break end
 			local ev = events[i]
 			local ey = cy - shown * lineH
 			local col = C.onSurfaceVariant
 			if ev.kind == "ok" then col = C.ok elseif ev.kind == "warn" then col = C.warn elseif ev.kind == "error" then col = C.error end
 			text(font, frameToClock(ev.frame), left, ey - px(9.5), px(8), "o", C.onSurfaceVariant)
-			text(font, fitText(font, ev.text, px(8), w - 2 * pad - px(27)), left + px(27), ey - px(9.5), px(8), "o", col)
+			text(font, fitText(font, ev.text, px(8), w - px(30)), left + px(30), ey - px(9.5), px(8), "o", col)
 			shown = shown + 1
 		end
-		if total == 0 then
-			text(font, "No events yet.", left, cy - px(9.5), px(8.5), "o", C.onSurfaceVariant)
-		elseif total > rows then
-			text(font, string.format("%d more", total - rows), right, cy - px(9.5), px(8), "or", C.onSurfaceVariant)
-		end
-	end
-
-	-- the open menu, last
-	menuHit = {}
-	menuRect = nil
-	if openMenu == "team" then
-		local items = {}
-		for _, at in ipairs(allyTeams) do
-			items[#items + 1] = { id = "team" .. at, label = "Team " .. (at + 1) .. " (" .. #aisOfAlly(at) .. " AI)", selected = (at == selectedAlly), ally = at }
-		end
-		drawMenu(left, left + teamW, menuTop, items, function(it)
-			selectedAlly = it.ally
-			selected = aisOfAlly(selectedAlly)[1]
-		end)
-	elseif openMenu == "ai" then
-		local items = {}
-		for _, id in ipairs(aisOfAlly(selectedAlly)) do
-			local a = ais[id]
-			items[#items + 1] = { id = "ai" .. id, label = (a.name or ("AI " .. id)) .. (a.roster and (" · " .. a.roster.role) or ""), selected = (id == selected), color = a.color, teamId = id }
-		end
-		drawMenu(left + teamW + gap, right, menuTop, items, function(it) selected = it.teamId end)
-	elseif WG.guishader then
-		WG.guishader.RemoveRect("barblinkmenu")
+		if total == 0 then text(font, "No events yet.", left, cy - px(9.5), px(8.5), "o", C.onSurfaceVariant) end
 	end
 end
 
 function widget:DrawScreen()
 	hit = {}
 	if not hasFlowUI or not font then initFlowUI() end
-	updateDock()
-	if not docked and activeTab ~= "ai" then return end
-	drawStrip()
-	if activeTab == "ai" then drawPanel() else menuHit = {}; menuRect = nil end
+	updatePlacement()
+	drawLauncher()
+	if open then drawWindow() end
 
 	local mx, my = spGetMouseState()
 	local newHover = nil
 	for _, r in ipairs(hit) do
-		if inside(mx, my, r[1], r[2], r[3], r[4]) then newHover = r[5] end
-	end
-	for _, r in ipairs(menuHit) do
-		if inside(mx, my, r[1], r[2], r[3], r[4]) then newHover = r[5] end
+		if inside(mx, my, r[1], r[2], r[3], r[4]) and r[5] ~= "header" then newHover = r[5] end
 	end
 	hoverId = newHover
-	if hoverId and hoverId ~= lastHoverSoundId then
-		spPlaySoundFile(SOUND_HOVER, 0.04, "ui")
-		lastHoverSoundId = hoverId
-	end
 	glColor(1, 1, 1, 1)
 end
 
 -- ---------------------------------------------------------------- input
 
-local function overStrip(mx, my)
-	return docked and inside(mx, my, strip.x1, strip.y1, strip.x2, strip.y2)
-end
-
-local function overPanel(mx, my)
-	return activeTab == "ai" and inside(mx, my, panel.x1, panel.y1, panel.x2, panel.y2)
-end
+local function overLauncher(mx, my) return inside(mx, my, launcher.x1, launcher.y1, launcher.x2, launcher.y2) end
+local function overWindow(mx, my) return open and inside(mx, my, win.x1, win.y1, win.x2, win.y2) end
 
 function widget:IsAbove(mx, my)
-	return overStrip(mx, my) or overPanel(mx, my)
+	return overLauncher(mx, my) or overWindow(mx, my)
 end
 
 function widget:GetTooltip(mx, my)
+	local tip = nil
 	for _, r in ipairs(hit) do
-		if inside(mx, my, r[1], r[2], r[3], r[4]) then
-			local id = r[5]
-			for _, role in ipairs(ROLES) do
-				if string.sub(id, -#role) == role and string.sub(id, 1, 4) == "role" then
-					return role .. ": " .. (ROLE_HINT[role] or "")
-				end
-			end
-			if id == "stripai" then return "Allied BARb AIs (Ctrl+Alt+B, /barblink)" end
-			if id == "stripplayer" then return "The player list" end
-			if id == "query" then return "Ask this AI for its current details" end
-			if id == "queryall" then return "Ask every AI for its details" end
-			if id == "overlay" then return "Draw every AI's planned base on the map (/barblayout)" end
-		end
+		if inside(mx, my, r[1], r[2], r[3], r[4]) and r[7] then tip = r[7] end
 	end
-	return nil
+	return tip
 end
 
 function widget:MousePress(mx, my, mb)
-	if mb ~= 1 then return false end
-	if openMenu then
-		-- a press outside the open menu closes it; inside picks
-		if menuRect and inside(mx, my, menuRect[1], menuRect[2], menuRect[3], menuRect[4]) then
-			for _, r in ipairs(menuHit) do
-				if inside(mx, my, r[1], r[2], r[3], r[4]) then pressedId = r[5]; return true end
-			end
-			return true
-		end
-		openMenu = nil
-		if not (overStrip(mx, my) or overPanel(mx, my)) then return true end
-	end
-	if not (overStrip(mx, my) or overPanel(mx, my)) then return false end
+	if not (overLauncher(mx, my) or overWindow(mx, my)) then return false end
+	if mb ~= 1 then return true end
+	local top = nil
 	for _, r in ipairs(hit) do
-		if inside(mx, my, r[1], r[2], r[3], r[4]) then
-			pressedId = r[5]
-			return true
-		end
+		if inside(mx, my, r[1], r[2], r[3], r[4]) then top = r end
 	end
-	return true   -- a click on the panel's own surface stops here
+	if top and top[5] == "header" then
+		dragging = { mx, my, offX, offY }
+		return true
+	end
+	if top then pressedId = top[5] end
+	return true
+end
+
+function widget:MouseMove(mx, my, dx, dy, mb)
+	if dragging then
+		offX = dragging[3] + (mx - dragging[1])
+		offY = dragging[4] + (my - dragging[2])
+		updatePlacement()
+	end
 end
 
 function widget:MouseRelease(mx, my, mb)
+	if dragging then
+		dragging = nil
+		return false
+	end
 	if pressedId then
-		for _, list in ipairs({ menuHit, hit }) do
-			for _, r in ipairs(list) do
-				if r[5] == pressedId and inside(mx, my, r[1], r[2], r[3], r[4]) then
-					r[6]()
-					pressedId = nil
-					return false
-				end
+		for _, r in ipairs(hit) do
+			if r[5] == pressedId and inside(mx, my, r[1], r[2], r[3], r[4]) then
+				pressedId = nil
+				r[6]()
+				return false
 			end
 		end
 		pressedId = nil
@@ -916,30 +863,31 @@ end
 
 function widget:MouseWheel(up, value)
 	local mx, my = spGetMouseState()
-	if not overPanel(mx, my) then return false end
+	if not overWindow(mx, my) then return false end
+	-- over the AI list: scroll the list; elsewhere: the events
+	for _, r in ipairs(hit) do
+		if string.sub(r[5], 1, 3) == "row" and inside(mx, my, r[1], r[2], r[3], r[4]) then
+			listScroll = listScroll + (up and -1 or 1)
+			return true
+		end
+	end
 	eventScroll = eventScroll + (up and 1 or -1)
 	return true
 end
 
 function widget:TextCommand(cmd)
-	if cmd == "barblink" then
-		setTab(activeTab == "ai" and "player" or "ai")
-		return true
-	end
-	if cmd == "barblayout" then
-		setOverlay(not layoutShown)
-		return true
-	end
+	if cmd == "barblink" then setOpen(not open); return true end
+	if cmd == "barblayout" then setOverlay(not layoutShown); return true end
 	return false
 end
 
 function widget:KeyPress(key, mods, isRepeat)
 	if key == 98 and mods.ctrl and mods.alt and not isRepeat then   -- b
-		setTab(activeTab == "ai" and "player" or "ai")
+		setOpen(not open)
 		return true
 	end
-	if key == 27 and activeTab == "ai" then   -- escape
-		if openMenu then openMenu = nil else setTab("player") end
+	if key == 27 and open then   -- escape
+		setOpen(false)
 		return true
 	end
 	return false
