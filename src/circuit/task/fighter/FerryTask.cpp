@@ -15,6 +15,8 @@
 #include "task/fighter/FerryTask.h"
 #include "module/MilitaryManager.h"
 #include "module/BuilderManager.h"
+#include "task/builder/WaitTask.h"
+#include "spring/SpringUnit.h"
 #include "terrain/TerrainManager.h"
 #include "spring/SpringCallback.h"
 #include "unit/CircuitUnit.h"
@@ -23,6 +25,8 @@
 #include "util/Utils.h"
 
 #include "AISCommands.h"
+#include "Sim/Units/CommandAI/Command.h"
+#include "Command.h"
 #include "Log.h"
 #include "spring/SpringMap.h"
 
@@ -33,7 +37,7 @@ using namespace springai;
 // Deadlines per state, in frames.
 #define FERRY_TRAVEL_TIMEOUT	(FRAMES_PER_SEC * 90)
 #define FERRY_LOAD_TIMEOUT		(FRAMES_PER_SEC * 20)
-#define FERRY_UNLOAD_TIMEOUT	(FRAMES_PER_SEC * 20)
+#define FERRY_UNLOAD_TIMEOUT	(FRAMES_PER_SEC * 45)  // D-110: an air transport descends and lands within this; 20 s cut every unload short
 // A carried unit sits at the transport's own position in the horizontal
 // plane - but so does a unit the transport is hovering over, about to load.
 // 2D distance cannot tell those apart, and treating it as "loaded" made the
@@ -51,6 +55,7 @@ using namespace springai;
 #define FERRY_LIFT_HEIGHT		(SQUARE_SIZE / 2)
 #define FERRY_GROUND_TOLERANCE	1.f
 #define FERRY_LANDED_TICKS		2
+#define FERRY_UNLOAD_RADIUS		(SQUARE_SIZE * 32)  // D-110: the area unload's radius: the engine refuses an unload with no standing room for the cargo inside it (played: 96 at a teammate's start never found any)
 // Close enough to the drop to issue the unload.
 #define FERRY_DROP_DIST			(SQUARE_SIZE * 12)
 #define FERRY_LOAD_RETRIES		2
@@ -116,6 +121,47 @@ bool CFerryTask::IsLifted(CCircuitUnit* cargo, int frame) const
 	const AIFloat3& pos = cargo->GetPos(frame);
 	const float ground = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
 	return (pos.y - ground) > FERRY_LIFT_HEIGHT;
+}
+
+// D-110 (played: a constructor standing on a raised factory pad read as lifted;
+// the transport flew off empty, the unload never took and the run sat in
+// DUMPING for the rest of the game, every queued run behind it): aboard means
+// lifted AND under the transport in 2D. A unit left on a pad is left behind the
+// moment the transport moves, so "following" is the test that cannot be fooled.
+bool CFerryTask::IsAboard(CCircuitUnit* cargo, CCircuitUnit* transport, int frame) const
+{
+	if ((cargo == nullptr) || (transport == nullptr) || !IsLifted(cargo, frame)) {
+		return false;
+	}
+	return cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST);
+}
+
+// D-110 diagnostic (played: every unload refused while the cargo was aboard):
+// once per order, 2 s after it, what the transport is doing and where
+void CFerryTask::ReportUnload(CCircuitUnit* transport, CCircuitUnit* cargo, int frame)
+{
+	// every 5 s of the state (was once): whether the transport descends, and
+	// when its unload command goes and what replaces it
+	if ((transport == nullptr) || (frame - reportedFrame < FRAMES_PER_SEC * 5) || (frame - stateFrame < FRAMES_PER_SEC * 2)) {
+		return;
+	}
+	reportedFrame = frame;
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3& tp = transport->GetPos(frame);
+	const float tAbove = tp.y - circuit->GetMap()->GetElevationAt(tp.x, tp.z);
+	const int cmd = transport->GetCurrentCommand()->GetId();
+	const int queue = circuit->GetUnitAPI()->GetCMDQueueSize(transport->GetId());
+	circuit->LOG("FERRY: unload check | cargo=%i state=%i %is in, transport cmd=%i queue=%i (unload units=%i) at (%.0f, %.0f) %.0f above ground, %.0f from the spot (%.0f, %.0f); cargo aboard=%i",
+			cargoId, int(state_), (frame - stateFrame) / FRAMES_PER_SEC, cmd, queue, CMD_UNLOAD_UNITS, tp.x, tp.z, tAbove, std::sqrt(tp.SqDistance2D(landPos)), landPos.x, landPos.z,
+			(cargo != nullptr) && IsAboard(cargo, transport, frame) ? 1 : 0);
+}
+
+void CFerryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
+{
+	if (InRun()) {
+		return;  // D-110: the drop-off first
+	}
+	IFighterTask::OnUnitDamaged(unit, attacker);
 }
 
 void CFerryTask::Enter(EState next)
@@ -186,6 +232,10 @@ void CFerryTask::HoldCargo(CCircuitUnit* cargo)
 	}
 	IUnitTask* wait = builderMgr->Enqueue(TaskB::Wait(FERRY_HOLD_FRAMES));
 	if (wait != nullptr) {
+		CBWaitTask* hold = dynamic_cast<CBWaitTask*>(wait);
+		if (hold != nullptr) {
+			hold->SetHold(true);  // D-110: no retreat while the ferry owns it
+		}
 		builderMgr->AssignTask(cargo, wait);
 	}
 	TRY_UNIT(circuit, cargo,
@@ -203,12 +253,12 @@ void CFerryTask::Fail(const char* why)
 	// under our transport is what the "transferred without delivery" report
 	// was - the recipient owned a constructor it could not use and we kept
 	// flying it around.
-	if ((state_ != EState::DUMPING) && (transport != nullptr) && (cargo != nullptr) && IsLifted(cargo, frame)) {
+	if ((state_ != EState::DUMPING) && (transport != nullptr) && (cargo != nullptr) && IsAboard(cargo, transport, frame)) {
 		landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * 3);
 		circuit->LOG("FERRY: run failed (%s) | cargo=%i state=%i; setting it down at (%.0f, %.0f)",
 				why, cargoId, int(state_), landPos.x, landPos.z);
 		TRY_UNIT(circuit, transport,
-			transport->CmdUnloadUnit(landPos, cargo, 0, frame + FERRY_UNLOAD_TIMEOUT * 2);
+			transport->CmdUnloadUnitsInArea(landPos, FERRY_UNLOAD_RADIUS, 0, frame + FERRY_UNLOAD_TIMEOUT * 2);  // D-110
 		)
 		Enter(EState::DUMPING);
 		return;
@@ -359,19 +409,22 @@ void CFerryTask::Update()
 				Fail("cargo gone while loading");
 				return;
 			}
-			// No wrapper accessor reports the carrier, so infer it: a loaded
-			// unit is off the ground and at the transport's position. Height is
-			// the part that matters - see FERRY_LIFT_HEIGHT.
-			if (IsLifted(cargo, frame)
-				&& (cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST)))
-			{
+			// D-110 (played: no delivery in any run; the cargo on a raised pad read
+			// as lifted under the hovering transport, the flight order replaced
+			// the load and the transport left empty): leave only once the engine
+			// has finished the load command AND the cargo is aboard (lifted and
+			// under the transport); a finished load without it aboard is a retry
+			const bool loadPending = (frame - stateFrame < FRAMES_PER_SEC * 2)
+				|| (transport->GetCurrentCommand()->GetId() == CMD_LOAD_UNITS);
+			if (!loadPending && IsAboard(cargo, transport, frame)) {
+				circuit->LOG("FERRY: cargo %i aboard; flying to (%.0f, %.0f)", cargoId, dropPos.x, dropPos.z);
 				Enter(EState::TO_DROP);
 				GoTo(transport, dropPos);
-			} else if (IsExpired(frame)) {
+			} else if (!loadPending || IsExpired(frame)) {
 				if (++loadRetries > FERRY_LOAD_RETRIES) {
 					Fail("load did not take");
 				} else {
-					circuit->LOG("FERRY: load retry %i for cargo %i", loadRetries, cargoId);
+					circuit->LOG("FERRY: load retry %i for cargo %i (%s)", loadRetries, cargoId, loadPending ? "timed out" : "the load ended without it aboard");
 					HoldCargo(cargo);  // renew the park (CR-024)
 					Enter(EState::TO_CARGO);
 				}
@@ -386,7 +439,7 @@ void CFerryTask::Update()
 			// D-091: never fly on without it: the cargo on the ground for two updates
 			// means the load did not hold; back to it and load again
 			if (unloadRetries == 0) {
-				groundTicks = IsLifted(GetCargo(), frame) ? 0 : (groundTicks + 1);
+				groundTicks = IsAboard(GetCargo(), transport, frame) ? 0 : (groundTicks + 1);   // D-110: following, not just lifted
 				if (groundTicks >= 2) {
 					groundTicks = 0;
 					if (++loadRetries > FERRY_LOAD_RETRIES) {
@@ -408,8 +461,10 @@ void CFerryTask::Update()
 								dropPos.x, dropPos.z, cargoId, landPos.x, landPos.z);
 					}
 				}
+				// D-110: the area unload (what a player's unload order is): the engine
+				// finds the room within the radius, where the exact spot often failed
 				TRY_UNIT(circuit, transport,
-					transport->CmdUnloadUnit(landPos, cargo, 0, frame + FERRY_UNLOAD_TIMEOUT);
+					transport->CmdUnloadUnitsInArea(landPos, FERRY_UNLOAD_RADIUS, 0, frame + FERRY_UNLOAD_TIMEOUT);
 				)
 				Enter(EState::UNLOADING);
 			} else if (IsExpired(frame)) {
@@ -423,13 +478,16 @@ void CFerryTask::Update()
 				Fail("cargo gone while unloading");
 				return;
 			}
+			ReportUnload(transport, cargo, frame);  // D-110 diagnostic
 			// Landed when the cargo sits on the ground - exactly, for two
 			// updates running. A hanging unit is never exactly on the ground,
 			// and the engine does not detach a unit that changes team, so a
 			// give one update early would leave it under our transport (D-056).
+			// D-110: or not aboard any more (a raised drop spot is never exactly ground)
 			const AIFloat3& cPos = cargo->GetPos(frame);
 			const bool onGround = (cPos.y - circuit->GetMap()->GetElevationAt(cPos.x, cPos.z)) < FERRY_GROUND_TOLERANCE;
-			landedTicks = onGround ? (landedTicks + 1) : 0;
+			const bool landed = onGround || (!IsLifted(cargo, frame) && !IsAboard(cargo, transport, frame));
+			landedTicks = landed ? (landedTicks + 1) : 0;
 			if (landedTicks >= FERRY_LANDED_TICKS) {
 				circuit->LOG("FERRY: delivered cargo %i at (%.0f, %.0f)", cargoId, landPos.x, landPos.z);
 				Enter(EState::DONE);
@@ -456,8 +514,9 @@ void CFerryTask::Update()
 
 		case EState::DUMPING: {
 			CCircuitUnit* cargo = GetCargo();
-			if ((cargo == nullptr) || !IsLifted(cargo, frame)) {
-				circuit->LOG("FERRY: cargo %i set down after a failed run (%s)", cargoId, (cargo == nullptr) ? "gone" : "on the ground");
+			ReportUnload(transport, cargo, frame);  // D-110 diagnostic
+			if ((cargo == nullptr) || !IsAboard(cargo, transport, frame)) {
+				circuit->LOG("FERRY: cargo %i set down after a failed run (%s)", cargoId, (cargo == nullptr) ? "gone" : "not aboard");
 				cargoId = -1;
 				Enter(EState::FAILED);
 				if (geom::is_valid(holdPos)) {
@@ -473,7 +532,7 @@ void CFerryTask::Update()
 				landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * (unloadRetries + 1));
 				circuit->LOG("FERRY: dump retry %i for cargo %i at (%.0f, %.0f); still lifted, not given", unloadRetries, cargoId, landPos.x, landPos.z);
 				TRY_UNIT(circuit, transport,
-					transport->CmdUnloadUnit(landPos, cargo, 0, frame + FERRY_UNLOAD_TIMEOUT * 2);
+					transport->CmdUnloadUnitsInArea(landPos, FERRY_UNLOAD_RADIUS, 0, frame + FERRY_UNLOAD_TIMEOUT * 2);  // D-110
 				)
 				Enter(EState::DUMPING);
 			}

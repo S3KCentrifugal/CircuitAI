@@ -872,4 +872,13 @@ metal. See [tech_plan.md](tech_plan.md).
 - `skills/troubleshoot-bar-logs/SKILL.md` - reading the `:::AI LOG` stream to
   confirm any of the unconfirmed items above.
 
-<!-- source: data/script/src/roles/tech.as; blob: 067cd3b88758f3d83c5bf965ea73beb812cf48f2; lines: 2658 -->
+## D-108 and D-109 in the factory rows
+
+`Tech_FactoryAiMakeTask`: the advanced aircraft plant recruits a T2 air
+constructor whenever a dedicated air role is vacant (D-108, whatever the bank or
+the T2 constructor cap); the T1 air plant keeps `T1AirConstructorTarget` (6) T1
+air constructors (D-109: more than 5 release the T1 land constructors, see
+[`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
+puts the spam labs on repeat with their lane as the factory route (D-111).
+
+<!-- source: data/script/src/roles/tech.as; blob: 7fe0c1c1522a0433600eaaed8ada19cde173354c; lines: 2661 -->

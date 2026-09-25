@@ -190,6 +190,11 @@ private:
 	unsigned int actionIterator;
 
 	std::set<CCircuitUnit*> garbage;
+	// D-111 crash (the fifth use-after-free in one day: script and native keep raw
+	// unit pointers in many places): a dead unit's object is kept, marked dead and
+	// out of every task, until the AI is released; a stale pointer then reaches a
+	// dead unit, never freed memory, and no new unit can take its address
+	std::vector<CCircuitUnit*> graveyard;
 // <<< Units ---- END
 
 // >>> AIOptions.lua ---- BEGIN

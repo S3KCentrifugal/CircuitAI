@@ -120,6 +120,22 @@ void ITaskModule::TaskRemoved(IUnitTask* task, bool done)
 	static_cast<ITaskModuleScript*>(script)->TaskRemoved(task, done);
 }
 
+int ITaskModule::ForgetUnitEverywhere(CCircuitUnit* unit)
+{
+	int n = 0;
+	for (IUnitTask* task : updateTasks) {
+		if ((task != nullptr) && task->ForgetUnit(unit)) {
+			++n;
+		}
+	}
+	for (IUnitTask* task : {static_cast<IUnitTask*>(nilTask), static_cast<IUnitTask*>(idleTask), static_cast<IUnitTask*>(playerTask)}) {
+		if ((task != nullptr) && task->ForgetUnit(unit)) {
+			++n;
+		}
+	}
+	return n;
+}
+
 void ITaskModule::AssignPlayerTask(CCircuitUnit* unit)
 {
 	AssignTask(unit, playerTask);

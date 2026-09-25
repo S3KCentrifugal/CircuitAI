@@ -18,6 +18,13 @@ public:
 	virtual ~CBWaitTask();
 
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+
+	// D-110: a ferry's cargo park: no retreat, no self-destruct, nothing until the
+	// run ends (the owner: the cargo is not interrupted until the drop-off)
+	void SetHold(bool value) { isHold = value; }
+	bool IsHold() const { return isHold; }
+private:
+	bool isHold = false;
 };
 
 } // namespace circuit

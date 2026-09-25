@@ -58,13 +58,29 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 18 | `storage.energy` | mobile | - | one energy storage once winds carry the base or the bank is small |
 | 19 | `storage.metal` | mobile | - | metal storage when the bank is full |
 | 20 | `energy.float` | mobile | `MetalFloating`, `EnergyAhead`, `EnergyIdle` | best-payback energy anyway |
-| 21 | `lab.t1.spam` | constructors | `SpamGate`, `T2LabStands`, `SpamLabsWanted`, `ChainInactive` | a T1 lab on the pair's slot for the spam economy |
+| 21 | ~~`lab.t1.spam`~~ | - | - | removed by D-109: spam labs are built forward by the released T1 land constructors (`fwd.t1`) |
 | 22 | `legacy.strategic` | mobile | `ChainInactive` | the role's strategic rungs as they stand (nukes, anti-nuke, gantry, water factories, T2 constructor policy) |
 | 23 | `defence.base` | constructors | `FirstTurretStands` | one light laser and one light AA near the factories |
 | 24 | `order.repair` | constructors | - | native's queued repairs of our own unfinished structures within `ExpOrderRadius` |
 | 25 | `assist.any` | mobile | - | the nearest structure under construction within the builder's assist radius (commander: home radius) |
 | 26 | `guard.factory` | constructors | - | guard the primary T1 lab |
 | 27 | `wait` | mobile | - | 3 s |
+
+### Rows added by D-107 to D-111
+
+In table order (the full, current order is `TechRules::Init`, and the one-page
+picture is [`tech-layout-and-sequence.md`](tech-layout-and-sequence.md)):
+
+| Key | Who | When | Act |
+| --- | --- | --- | --- |
+| `turret.spam` | turrets | - | D-109: first turret row: the two turrets behind a spam lab always work for it (`TechForward::TurretFocus`) |
+| `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory |
+| `ferry.cargo` | mobile | - | D-110: the cargo of a ferry run keeps the ferry's hold until the drop-off; nothing else |
+| `land.recall` | constructors | - | D-109: a tier whose air constructors went down drops a forward job; the eco rows take the builder |
+| `air.dedicated` | T2 | - | D-107/D-108: the dedicated T2 air constructors: only advanced converters / advanced fusions, else wait |
+| `air.flex` | T2 | - | D-107: the other T2 air constructors follow the energy |
+| `fwd.t2.defend` | T2 | `LandCon`, `T2LandReleased` | D-109: mex-cluster defences, long-range AA then flak (`TechForward::DefendMexes`) |
+| `fwd.t1` | T1 | `LandCon`, `T1LandReleased` | D-109: the spam cluster (`TechForward::ForwardT1`) |
 
 "Who" masks: `COMMANDER`, `CON_T1`, `CON_T2`, `TURRET`; `MOBILE` is the
 first three, `CONSTRUCTORS` the middle two.
@@ -107,4 +123,4 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 3d1795e4423f7848a6e22c5463c043d3810840cc; lines: 486 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 1a4c481d339c3e0bdf3d46f1160340c4a4fa6cad; lines: 503 -->

@@ -40,6 +40,7 @@ is edited in place with the decision that changed it.
 | L9 | Advanced fusions stand flush against the turrets, in sets of up to 3 lined up away from them; a new set starts flush again. Advanced converters the same, up to 5 a set. | D-101 | INV-022 |
 | L10 | The ground of structures TECH reclaims is recycled by the layout. | D-101 | INV-024 |
 | L11 | With no construction turret of ours on the map (the start, or a restart after a wipe) a T1 lab may go anywhere; otherwise it follows the layout. | D-101 | INV-023 |
+| L13 | A spam cluster layout type: one or more T1 bot labs, each with two construction turrets directly behind it; the two turrets nearest a lab are always focused on that lab. Forward construction turret clusters are small and never block lanes. | D-109 | INV-038 |
 | L12 | Every factory type, T1 and T2 air included, stands tight to the construction turrets; air factories may face any way (their units fly). | D-104 | INV-029 |
 
 ## Build sequence and economy
@@ -64,6 +65,10 @@ is edited in place with the decision that changed it.
 | S17 | Whenever TECH's metal store is over 95%, refresh the team economy and give up to 20% of TECH's metal capacity to the lowest-filled teammate(s), filling their storage: a fallback so no metal is lost to overflow when TECH's build power cannot keep up. | D-106 | INV-033 |
 | S18 | The first two T2 air constructors are dedicated: one always builds advanced energy converters, the other always advanced fusions. The other air constructors build converters while energy overflows and assist the advanced fusion the moment converters cannot stay on; every construction turret in range does the same after reclaim. | D-107 | INV-034 |
 | S19 | The dedicated advanced-fusion air constructor has one duty and is never interrupted by any other process; the converter one likewise; if either is destroyed it is replaced and both roles stay filled. Advanced fusions keep going up past six. | D-108 | INV-034 to INV-037 |
+| S20 | Once the T2 air constructors are up, every T2 land constructor leaves the base to build defences around the mex clusters, long-range AA and flak first. | D-109 | INV-039 |
+| S21 | While more than 5 T1 air constructors are up, every T1 land constructor goes forward to build defences and T1 spam bot labs; idle ones build small construction turret clusters near the front to assist, not on a lane. | D-109 | INV-039 |
+| S22 | One T1 spam bot lab per +100 metal, started only once the T1 land constructors are free to leave the base (the air constructors do the base building and assisting). | D-109 | INV-038 |
+| S23 | If the air constructors of a tier go down, that tier's land constructors return first to an eco cluster that needs them. | D-109 | INV-040 |
 | S16 | The metal is spent: a full bank is a waste (no converters then; production and build power are the sinks: T2 constructors, spam labs scaling with income, turrets assisting factories). | D-105 | INV-032, INV-011 |
 
 ## Tools the owner asked for
@@ -78,6 +83,7 @@ is edited in place with the decision that changed it.
 | # | Requirement | Decision | Invariant |
 | --- | --- | --- | --- |
 | T1 | The ferry makes sure the unit is picked up (retrying), and never drops it in water or on a building. | D-091 | - |
+| T2 | The transport picks up the T2 constructor reliably; from the moment the transport is sent until the drop-off succeeds, neither the transport nor the constructor takes any other order. | D-110 | INV-041, INV-042 |
 
 ## Open
 

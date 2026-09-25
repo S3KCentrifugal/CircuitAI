@@ -5766,6 +5766,20 @@ unit is erased (`UnitCaptured`); a new unit erases any stale entry at its
 own address (`UnitCreated`: a freed unit's memory can be reused, and its old
 entry would complete a dead task); and a dead builder is refused.
 
+The 16-AI check of that fix (run `20260924-194344`, build80) crashed at
+25.8 min elsewhere with the same root: `CSRepairTask::Update` called
+`CmdWait` on a unit already freed while still in the task's set. Dropping
+the unit from its own task when it is freed was not enough (build81 crashed
+the same way at 30.2 min, run `20260924-200952`): the freed unit was listed
+by a task other than its current one. So at the one place a unit is freed
+(`CCircuitAI::DeleteTeamUnit`) it now leaves every task of every task module
+(`ITaskModule::ForgetUnitEverywhere` → `IUnitTask::ForgetUnit`), whatever
+path took it off the team, and the log says when it was found in a task
+other than its own (`D-108: freed unit N was still listed by K task(s) other
+than its own`). Played (build82, 16 AIs, run `20260924-202916`): 36 min, no
+crash; the line fired twice at 27.9 min, the two units that would have
+crashed the game.
+
 **A second crash, found in verification.** Run `20260924-184618` (build77)
 crashed at frame 60373 (33.5 min) in `CScoutTask::FallbackScout`, reached
 from `CScoutTask::Update` (upstream code, unchanged on this branch). The
@@ -5794,6 +5808,102 @@ bank is over half full, a new advanced fusion appears at least every 180 s.
 [`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md),
 [`roles/tech-requirements.md`](roles/tech-requirements.md),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
+
+## D-109 — The land constructors leave the base: mex-cluster defences and a forward spam cluster
+
+**Date:** 2026-09-24. **Status:** Played, partly (build83 to build88; late games reach it after 25 to 38 min).
+
+**Owner's rules.** Once the T2 air constructors are up, every T2 land constructor
+builds defences around the mex clusters, long-range AA and flak first. While more
+than 5 T1 air constructors are up, every T1 land constructor goes forward to build
+defences and T1 bot labs; idle ones build small construction-turret clusters near
+the front, not on a lane. A spam cluster layout type: one or more T1 bot labs, each
+with two construction turrets directly behind it; the two turrets nearest a lab
+always work for it. One spam lab per +100 metal, started only once the T1 land
+constructors are free to leave the base. If a tier's air constructors go down, its
+land constructors go back to an eco cluster first.
+
+**Decision.** `TechForward` ([`roles/tech_forward.md`](roles/tech_forward.md)):
+release switches (T2: both dedicated air roles held; T1: more than
+`T1AirReleaseAbove` T1 air constructors, the T1 air plant keeping 6); `fwd.t2.defend`
+(long-range AA then flak at every mex cluster outside the base, the rest help or
+follow); `fwd.t1` (the spam cluster: a row of labs toward the front, each reserved
+with a 2x1 nano block behind it and its exit clear, the first lab choosing the line,
+later labs beside it; one heavy AA behind each lab; 2x2 turret pads behind the end
+labs); `turret.spam` first among the turret rows; `land.recall` ahead of
+`keep.current`. Base spam labs (`lab.t1.spam`) removed. Native: every slot picker
+skips a dead slot; approach points avoid reserved ground (builders parked on the
+next turret slot and the engine dropped the build).
+
+**Played.** Build85: 13 long-range AA and 13 flak ordered at release; build84 to
+build88: rows of 2 to 5 labs, turret pads behind the row. INV-038 caught labs with
+1 of 2 turrets before the approach-point fix.
+
+**Invariants.** INV-038, INV-039, INV-040.
+
+**Files.** [`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp).
+
+## D-110 — The ferry picks up reliably and neither transport nor cargo is interrupted
+
+**Date:** 2026-09-24. **Status:** Pickup played (build86 on: every run "aboard"); drop-off not yet (diagnostic in build90).
+
+**Owner's report and rule.** The air transport does not pick up the T2 constructor;
+the constructor is given an order after the transport was sent. Both units must be
+uninterruptible until the drop-off has succeeded.
+
+**Causes found in play.** No delivery in any run. A constructor on a raised factory
+pad read as lifted (height above ground), so the flight order replaced the load and
+the transport left empty; the run then sat in DUMPING for the rest of the game
+("still lifted, not given") with the queue behind it, until the cargo's 600 s hold
+expired and TECH gave it economy work. Damage sent the transport home
+(`IFighterTask::OnUnitDamaged`) and could retreat the cargo.
+
+**Decision.** Aboard means lifted and following the transport; the load ends only
+when the engine finished the load command and the cargo is aboard; the cargo's hold
+ignores damage (`CBWaitTask::SetHold`) and the `ferry.cargo` rule keeps it; the run
+is not abandoned on damage; area unload (`FERRY_UNLOAD_RADIUS` 256), 45 s unload,
+the drop 300 short of the teammate's start. Open: BAR's
+`unit_airtransport_load_unload` allows an air unload only within 10 to 15 elmos; our
+transports are dropped from the unload within 5 s at cruise height (build90's
+`FERRY: unload check` lines, every 5 s of an unload).
+
+**Invariants.** INV-041, INV-042.
+
+**Files.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp),
+[`WaitTask.cpp`](../src/circuit/task/builder/WaitTask.cpp),
+[`ferry.as`](../data/script/src/manager/ferry.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as).
+
+## D-111 — Spam labs run on repeat, each on its own lane set as the factory route
+
+**Date:** 2026-09-24. **Status:** Played (build88: both labs on repeat, lanes 0 and 1).
+
+**Owner's report and rule.** The route from the factory is never set, or is cleared
+at once; repeat is not put on; each factory correlates directly to a lane.
+
+**Causes.** Native creates every factory with repeat off; a route was a task handed
+to each unit, never the factory's own orders; a unit joined the nearest spam lab's
+route, and lanes were numbered by creation order; TECH's start caps pinned the spam
+unit at 0 ("corak unavailable" from 28 min).
+
+**Decision.** New bindings `CmdRepeat`, `CmdFactoryRoute`. `TechForward::TickSpam`:
+each spam lab on repeat, its lane its place in the row (`Spam::SetFactoryLane`), that
+lane its factory route, re-applied when routes change (`Spam::routesVersion`), the
+spam unit's cap kept open. `Spam`: a repeat factory gets a wait, not another build,
+unless it produced nothing for `RepeatStallSeconds`; a unit runs its producer's lane
+for good.
+
+**Invariant.** INV-043: a spam unit given its lane stays on it.
+
+**Files.** [`spam.as`](../data/script/src/manager/spam.as),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp).
 
 ## Process decisions
 

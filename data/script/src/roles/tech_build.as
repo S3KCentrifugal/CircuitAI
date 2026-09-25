@@ -551,6 +551,7 @@ namespace TechBuild {
     {
         TrackMetal();   // D-075
         ShareOverflow();   // D-106
+        TechForward::Tick();   // D-109
         // D-076: the T1 lab retires the moment the advanced lab is under way.
         // One state, read by every actor: production stops (Lifecycle::Retire
         // stops the unit, the factory rows return nothing), guards and the

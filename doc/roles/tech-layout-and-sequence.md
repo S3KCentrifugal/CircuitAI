@@ -78,6 +78,34 @@ fusions, and a dead one is replaced at once.
 | Advanced fusion | a **set of up to 3**: the first flush against a turret, the others lined up away from it; the set's next slot before a new set | `Layout::Place` → `NextSetSlot` / `PackSetAnywhere` | D-101, D-108 |
 | Advanced energy converter | a **set of up to 5**, the same way | same | D-101 |
 | Anything else (fusion, storage, T1 converter, solars) | the cell nearest a turret, nearest the builder among equals | `Layout::Place` → `PackNearGroup` | D-063, D-064 |
+| T1 spam bot lab | the **spam cluster** (below), forward of the base, never in the base | `TechForward::ReserveNext` | D-109 |
+| Mex-cluster defence (long-range AA, flak) | at each mex cluster outside the base, native picks the site within 160 of its centre | `TechForward::DefendMexes` | D-109 |
+
+### The spam cluster (D-109)
+
+```
+   front  ->
+            [T]  [LAB]  ->  exit lane (kept clear)
+            [T]
+                 (lane: 2 cells)
+            [T]  [LAB]  ->
+            [T]
+   [pad 2x2]                         pads: behind the end labs' turrets
+```
+
+- A row of T1 bot labs about 1,400 elmos toward the front (never more than
+  45% of the way), all facing the front, 2 cells apart so every lab has its
+  own lane. The first lab picks the row line nearest the anchor that fits;
+  every later lab joins that line beside the others, never in front of or
+  behind a lab.
+- Each lab gets **two construction turrets directly behind it** (a nano
+  block tight against its back). Those two always work for that lab
+  (`turret.spam`, the first turret rule).
+- Small 2x2 turret pads behind the end labs' turrets, a cell of walking room
+  between, once the row holds two labs.
+- One heavy AA behind each lab.
+- One lab per +100 metal, up to `SpamLabsMax` (6), only while the T1 land
+  constructors are released (below).
 
 How a new set finds ground (`PackSetAnywhere`, D-108): each zone of the main
 cluster, then the forward zone; if none has room, the same again including
@@ -109,6 +137,7 @@ site. A failed search waits 10 s before the next try.
 | Economy | after the chain | the rule table's economy rows: converters while energy floats, turrets while metal floats, storage, energy when short | the rows below `chain.next` |
 | Online | +200 metal | the "economy online" latch (D-102, D-105): labs are no longer reclaimed for metal, spam labs scale with income, the T1 lab is not rebuilt while there are 3+ T1 constructors | `TechBuild::EcoOnline` |
 | Air | ~23 min | a T1 air plant, one T1 air constructor, the advanced aircraft plant (D-103); its T2 air constructors take the two dedicated roles (D-107, D-108) | factory production, `air.dedicated` |
+| Forward | from the air phase | the land constructors leave the base once the air constructors carry it (D-109, below) | `fwd.t2.defend`, `fwd.t1` |
 | Endgame | +200 / +500 | the nuke plan, T2 then T3 assault (D-080) | `legacy.strategic` |
 
 ### The rule table: every builder asks it, top to bottom
@@ -196,6 +225,32 @@ up together.
   storage, or stalling). The turrets make the same switch after their
   reclaim.
 
+### The land constructors leave the base (D-109)
+
+The air constructors build and assist in the base; the land constructors go
+out:
+
+| Tier | Released when | They do | Recalled when |
+| --- | --- | --- | --- |
+| T2 (bots) | both dedicated T2 air roles are held | defend the mex clusters outside the base: a long-range AA at each, then a flak at each, nearest first; the rest help a defence going up or follow a constructor carrying one | a dedicated role is open |
+| T1 (bots) | more than 5 T1 air constructors (the T1 air plant keeps 6) | the spam cluster: the next lab, each lab's two turrets, its AA, the pads; else assist what goes up there, else guard a spam lab | 5 or fewer T1 air constructors |
+
+A recalled land constructor drops its forward job (`land.recall`, ahead of
+`keep.current`) and the eco rows take it back to the eco clusters.
+
+### The ferry: donated constructors fly (D-091, D-110)
+
+In a team game TECH gives T2 constructors to teammates, flown by a transport
+it received from AIR. From the moment the transport is sent until the
+drop-off, the cargo and the transport take no other order:
+
+- the cargo is parked on a hold that ignores damage (no retreat) and the
+  `ferry.cargo` rule, first for every mobile builder, keeps it there;
+- the transport's run is not abandoned when it is hit;
+- "aboard" means lifted **and** following the transport, so a constructor
+  standing on a raised factory pad is never mistaken for cargo; a run always
+  ends (delivered or failed, and the next queued run starts).
+
 ### The metal bank (D-105, D-106)
 
 A full bank is wasted metal. The sinks, in order: build power (turrets),
@@ -233,6 +288,6 @@ bank is full (they turn energy into metal nobody can store).
 
 Layout: INV-012 to INV-014, INV-016 to INV-018, INV-020, INV-022 to INV-024,
 INV-029. Sequence: INV-004, INV-006 to INV-011, INV-019, INV-021, INV-025 to
-INV-028, INV-031 to INV-037. Each is described with its decision in
+INV-028, INV-031 to INV-042. Each is described with its decision in
 [`../invariants.md`](../invariants.md); what triggers which actor is in
 [`../actor-matrix.md`](../actor-matrix.md).

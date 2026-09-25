@@ -46,6 +46,13 @@ public:
 	virtual void Update() override;
 
 	virtual void OnUnitIdle(CCircuitUnit* unit) override;
+	// D-110: a run is never abandoned for a retreat (IFighterTask's default sends a
+	// damaged unit with no target home)
+	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+	bool IsAboard(CCircuitUnit* cargo, CCircuitUnit* transport, int frame) const;
+	void ReportUnload(CCircuitUnit* transport, CCircuitUnit* cargo, int frame);  // D-110 diagnostic
+	int reportedFrame = -1;
+	bool InRun() const { return (state_ != EState::IDLE) && (state_ != EState::DONE) && (state_ != EState::FAILED); }
 
 	// Script hooks
 	void SetHoldPos(const springai::AIFloat3& pos);

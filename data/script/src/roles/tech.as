@@ -985,7 +985,10 @@ namespace RoleTech
 
 		// D-103 (owner's rule): the T1 air plant makes the air constructor that
 		// builds the advanced aircraft plant, while we have none
-		if (facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(side) && TechChain::AirConstructors() == 0)
+		// D-109 (owner's rule): and keeps T1AirConstructorTarget of them: more than
+		// T1AirReleaseAbove carry the base so the T1 land constructors go forward
+		if (facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(side)
+			&& (TechChain::AirConstructors() == 0 || TechForward::T1AirCons() < Global::RoleSettings::Tech::T1AirConstructorTarget))
 		{
 			CCircuitDef @airCon = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(side));
 			if (airCon !is null && airCon.IsAvailable(ai.frame))

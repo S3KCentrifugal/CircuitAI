@@ -4,6 +4,7 @@
 #include "lifecycle.as"
 #include "layout.as"
 #include "team_economy.as"
+#include "../roles/tech_forward.as"
 
 // D-076: the invariants the TECH role promises, checked once a second in the
 // game and written to the log as "[INVARIANT] INV-nnn ..." when broken. Every
@@ -74,6 +75,9 @@ namespace Invariants {
     int roleCappedLog = -100000;  // D-108: INV-036
     int afusSeenCount = -1;       // D-108: INV-037
     int afusSeenFrame = -1;       // D-108: INV-037
+    int fwdIdleLogT1 = -100000;   // D-109: INV-039
+    int fwdIdleLogT2 = -100000;   // D-109: INV-039
+    int ferryLog = -100000;       // D-110: INV-041, INV-042
     int t2ConsAtHigh = 0;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
@@ -407,6 +411,71 @@ namespace Invariants {
             else if (ai.frame - afusSeenFrame >= 180 * SECOND) {
                 Violation("INV-037", "afus", "no new advanced fusion for 180 s (" + af.count + " stand or build) with the fusion role held and the metal bank over half");
                 afusSeenFrame = ai.frame;
+            }
+        }
+
+        // INV-041 (D-110): the cargo of a ferry run holds no construction order;
+        // INV-042: a run ends (delivered or failed) within 600 s (the cargo park, FERRY_HOLD_FRAMES)
+        if (Team::Ferry::cargoId >= 0 && ai.frame - ferryLog >= 30 * SECOND) {
+            CCircuitUnit@ cg = ai.GetTeamUnit(Team::Ferry::cargoId);
+            IBuilderTask@ cbt = (cg is null || cg.task is null) ? null : cast<IBuilderTask>(cg.task);
+            if (cbt !is null) {
+                ferryLog = ai.frame;
+                Violation("INV-041", "ferry", "cargo " + Team::Ferry::cargoId + " holds a build order ("
+                    + (cbt.buildDef is null ? "type " + int(cbt.GetBuildType()) : cbt.buildDef.GetName()) + ") during its run");
+            } else if (Team::Ferry::runStart >= 0 && ai.frame - Team::Ferry::runStart > 600 * SECOND) {
+                ferryLog = ai.frame;
+                Violation("INV-042", "ferry", "the run for cargo " + Team::Ferry::cargoId + " has lasted " + int((ai.frame - Team::Ferry::runStart) / SECOND) + " s");
+            }
+        }
+
+        // INV-038 (D-109): a spam lab standing for 180 s has both turrets behind it
+        {
+            const string sSide = Global::AISettings::Side;
+            CCircuitDef@ sLab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(sSide));
+            CCircuitDef@ sNano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(sSide));
+            for (uint i = 0; sLab !is null && sNano !is null && i < TechForward::labs.length(); ++i) {
+                TechForward::SpamLab@ s = TechForward::labs[i];
+                CCircuitUnit@ l = TechForward::LabAt(s, sLab);
+                if (l is null || l.GetBuildProgress() < 1.0f) { s.standFrame = -1; continue; }
+                if (s.standFrame < 0) { s.standFrame = ai.frame; continue; }
+                const int have = TechForward::TurretsOf(s, sNano);
+                if (ai.frame - s.standFrame >= 180 * SECOND && have < int(s.turretPos.length()) && ai.frame - s.invLog >= 60 * SECOND) {
+                    s.invLog = ai.frame;
+                    Violation("INV-038", "spam", "spam lab " + (i + 1) + " has stood " + int((ai.frame - s.standFrame) / SECOND) + " s with " + have + " of its "
+                        + s.turretPos.length() + " turrets");
+                }
+            }
+        }
+
+        // INV-039 (D-109): a released tier with forward work waiting orders some of it
+        // within 180 s (T1: a spam lab wanted; T2: a mex cluster without long-range AA)
+        {
+            const int t1Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
+            const int t2Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+            const int last1 = (TechForward::lastOrderT1 > TechForward::sinceT1) ? TechForward::lastOrderT1 : TechForward::sinceT1;
+            if (TechForward::sinceT1 >= 0 && t1Land > 0 && TechBuild::EcoOnline()
+                && int(TechForward::labs.length()) < TechForward::SpamLabsWanted(aiEconomyMgr.metal.income)
+                && ai.frame - last1 >= 180 * SECOND && ai.frame - fwdIdleLogT1 >= 180 * SECOND)
+            {
+                fwdIdleLogT1 = ai.frame;
+                Violation("INV-039", "t1", "T1 land constructors released " + int((ai.frame - TechForward::sinceT1) / SECOND) + " s, "
+                    + TechForward::labs.length() + " spam labs of " + TechForward::SpamLabsWanted(aiEconomyMgr.metal.income) + " wanted, no forward order for 180 s");
+            }
+            const int last2 = (TechForward::lastOrderT2 > TechForward::sinceT2) ? TechForward::lastOrderT2 : TechForward::sinceT2;
+            if (TechForward::sinceT2 >= 0 && t2Land > 0 && ai.frame - last2 >= 180 * SECOND && ai.frame - fwdIdleLogT2 >= 180 * SECOND) {
+                CCircuitDef@ lraa = ai.GetCircuitDef(UnitHelpers::GetStaticT2AARangeNameForSide(Global::AISettings::Side));
+                array<TechForward::MexCluster@> cl = TechForward::Clusters();
+                int open = 0;
+                for (uint i = 0; lraa !is null && i < cl.length(); ++i) {
+                    if (MapHelpers::SqDist(cl[i].c, Layout::BaseCentre()) < TechForward::Sq(Global::RoleSettings::Tech::MexDefenceBaseClear)) continue;
+                    if (!TechForward::Stands(cl[i].c, Global::RoleSettings::Tech::MexDefenceRadius, lraa)) ++open;
+                }
+                if (open > 0) {
+                    fwdIdleLogT2 = ai.frame;
+                    Violation("INV-039", "t2", "T2 land constructors released " + int((ai.frame - TechForward::sinceT2) / SECOND) + " s, "
+                        + open + " mex cluster(s) without long-range AA, no defence order for 180 s");
+                }
             }
         }
 

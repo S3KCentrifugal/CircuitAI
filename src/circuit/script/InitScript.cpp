@@ -23,6 +23,7 @@
 #include "task/fighter/AirWaveTask.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
+#include "AISCommands.h"
 #include "util/GameAttribute.h"
 #include "util/MaskHandler.h"
 #include "util/ExtAS.h"
@@ -566,6 +567,26 @@ static void CCircuitUnit_CmdStop(CCircuitUnit* unit)
 	unit->CmdStop();
 }
 
+// D-111: a factory's repeat flag (a spam lab keeps its one build cycling)
+static void CCircuitUnit_CmdRepeat(CCircuitUnit* unit, bool on)
+{
+	unit->GetUnit()->SetRepeat(on);
+}
+
+// D-111: a factory's route: the move orders every unit it builds leaves with.
+// The first replaces the factory's previous orders; the rest are queued behind.
+// Build orders are the factory's own queue and are untouched.
+static void CCircuitUnit_CmdFactoryRoute(CCircuitUnit* unit, const CScriptArray* route)
+{
+	if (route == nullptr) {
+		return;
+	}
+	for (asUINT i = 0; i < route->GetSize(); ++i) {
+		const AIFloat3& p = *static_cast<const AIFloat3*>(route->At(i));
+		unit->CmdMoveTo(p, (i == 0) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY);
+	}
+}
+
 void CInitScript::RegisterCore()
 {
 	asIScriptEngine* engine = script->GetEngine();
@@ -903,6 +924,8 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetMoveState(int)", asMETHOD(CCircuitUnit, TrySetMoveState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SelfDestruct(bool)", asMETHOD(CCircuitUnit, CmdSelfD), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdStop()", asFUNCTION(CCircuitUnit_CmdStop), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdRepeat(bool)", asFUNCTION(CCircuitUnit_CmdRepeat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdFactoryRoute(const array<AIFloat3>@+)", asFUNCTION(CCircuitUnit_CmdFactoryRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
 	r = engine->RegisterObjectProperty("CCircuitUnit", "IUnitTask@ const task", asOFFSET(CCircuitUnit, task)); ASSERT(r >= 0);
 	// RulesParams accessor on Unit
 	r = engine->RegisterObjectMethod("CCircuitUnit", "float GetRulesParam(const string& in, float) const", asFUNCTION(CCircuitUnit_GetRulesParamFloat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

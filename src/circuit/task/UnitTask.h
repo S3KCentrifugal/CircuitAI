@@ -49,6 +49,10 @@ public:
 	virtual bool CanAssignTo(CCircuitUnit* unit) const;
 	virtual void AssignTo(CCircuitUnit* unit);
 	virtual void RemoveAssignee(CCircuitUnit* unit);
+	// D-108 crash: drop a unit about to be freed from this task's sets, without
+	// handing it to the idle task (RemoveAssignee would), so no task keeps a
+	// dangling pointer (played: CSRepairTask::Update on a freed unit)
+	bool ForgetUnit(CCircuitUnit* unit) { pathQueries.erase(unit); return units.erase(unit) > 0; }
 
 	virtual void Start(CCircuitUnit* unit) = 0;  // <=> IAction::OnStart()
 	virtual void Update() = 0;

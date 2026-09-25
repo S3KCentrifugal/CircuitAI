@@ -26,6 +26,9 @@ CBWaitTask::~CBWaitTask()
 
 void CBWaitTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	if (isHold) {
+		return;  // D-110: the ferry owns this unit until the drop-off
+	}
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* cdef = unit->GetCircuitDef();

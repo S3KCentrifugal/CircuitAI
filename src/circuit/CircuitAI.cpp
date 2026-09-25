@@ -791,6 +791,10 @@ int CCircuitAI::Release(int reason)
 	}
 	teamUnits.clear();
 	garbage.clear();
+	for (CCircuitUnit* unit : graveyard) {  // D-111
+		delete unit;
+	}
+	graveyard.clear();
 	for (auto& kv : enemyInfos) {
 		delete kv.second;
 	}
@@ -1508,7 +1512,23 @@ void CCircuitAI::UnregisterTeamUnit(CCircuitUnit* unit)
 void CCircuitAI::DeleteTeamUnit(CCircuitUnit* unit)
 {
 	garbage.erase(unit);
-	delete unit;
+	// D-108 crash (16-AI game, build80): not every way off the team removes the
+	// unit from its task; the task then iterated a freed unit
+	IUnitTask* task = unit->GetTask();
+	if (task != nullptr) {
+		task->ForgetUnit(unit);  // its own task first, so `stray` counts only the others
+	}
+	int stray = 0;
+	for (auto& module : modules) {
+		ITaskModule* taskModule = dynamic_cast<ITaskModule*>(module.get());
+		if (taskModule != nullptr) {
+			stray += taskModule->ForgetUnitEverywhere(unit);
+		}
+	}
+	if (stray > 0) {
+		LOG("D-108: freed unit %i was still listed by %i task(s) other than its own", unit->GetId(), stray);
+	}
+	graveyard.push_back(unit);  // D-111: kept, not freed, until Release
 }
 
 void CCircuitAI::GiveUnits(std::vector<CCircuitUnit*>&& units, int newTeamId)

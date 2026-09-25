@@ -2477,7 +2477,7 @@ int CTerrainManager::GetGroupCount(int group, bool unconsumedOnly) const
 {
 	int count = 0;
 	for (const auto& kv : reservations) {
-		if ((kv.second.group == group) && (!unconsumedOnly || !kv.second.consumed)) {
+		if ((kv.second.group == group) && (!unconsumedOnly || (!kv.second.consumed && (kv.second.serveFails < kDeadSlotFails)))) {
 			++count;
 		}
 	}
@@ -2490,7 +2490,7 @@ int CTerrainManager::NextSlot(int group, const AIFloat3& anchor) const
 	float bestSq = std::numeric_limits<float>::max();
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
-		if ((r.group != group) || r.consumed || !r.armed) {
+		if ((r.group != group) || r.consumed || !r.armed || (r.serveFails >= kDeadSlotFails)) {
 			continue;
 		}
 		const float sq = anchor.SqDistance2D(r.pos);
@@ -2669,22 +2669,29 @@ AIFloat3 CTerrainManager::FindApproachPoint(CCircuitUnit* unit, const AIFloat3& 
 	}
 	const SBlockingMap::SM walkable = static_cast<SBlockingMap::SM>(
 			static_cast<unsigned short>(SBlockingMap::StructMask::ALL) & ~static_cast<unsigned short>(SBlockingMap::StructMask::RESERVED));
+	// D-109 (played: builders parked on the neighbouring planned turret slots
+	// of a spam lab, and the engine dropped every build command there): off
+	// reserved ground first; reserved ground only when nothing else is in reach
+	const SBlockingMap::SM solid = static_cast<SBlockingMap::SM>(static_cast<unsigned short>(SBlockingMap::StructMask::ALL));
 	CMap* map = circuit->GetMap();
-	for (int k = 0; k < 16; ++k) {
-		// 0, +22.5, -22.5, +45, -45, ... degrees off the unit's own bearing
-		const float a = 0.3926991f * float((k + 1) / 2) * ((k % 2 == 0) ? 1.f : -1.f);
-		const float c = std::cos(a), s = std::sin(a);
-		AIFloat3 p(site.x + (dx * c - dz * s) * radius, 0.f, site.z + (dx * s + dz * c) * radius);
-		CorrectPosition(p);
-		p.y = map->GetElevationAt(p.x, p.z);
-		const int cx = int(p.x) / (SQUARE_SIZE * 2), cz = int(p.z) / (SQUARE_SIZE * 2);
-		if (!blockingMap.IsInBounds(cx, cz) || blockingMap.IsBlocked(cx, cz, walkable)) {
-			continue;
+	for (int pass = 0; pass < 2; ++pass) {
+		const SBlockingMap::SM mask = (pass == 0) ? solid : walkable;
+		for (int k = 0; k < 16; ++k) {
+			// 0, +22.5, -22.5, +45, -45, ... degrees off the unit's own bearing
+			const float a = 0.3926991f * float((k + 1) / 2) * ((k % 2 == 0) ? 1.f : -1.f);
+			const float c = std::cos(a), s = std::sin(a);
+			AIFloat3 p(site.x + (dx * c - dz * s) * radius, 0.f, site.z + (dx * s + dz * c) * radius);
+			CorrectPosition(p);
+			p.y = map->GetElevationAt(p.x, p.z);
+			const int cx = int(p.x) / (SQUARE_SIZE * 2), cz = int(p.z) / (SQUARE_SIZE * 2);
+			if (!blockingMap.IsInBounds(cx, cz) || blockingMap.IsBlocked(cx, cz, mask)) {
+				continue;
+			}
+			if (!CanMoveToPos(unit->GetArea(), p)) {
+				continue;
+			}
+			return p;
 		}
-		if (!CanMoveToPos(unit->GetArea(), p)) {
-			continue;
-		}
-		return p;
 	}
 	return -RgtVector;
 }
@@ -2700,7 +2707,7 @@ int CTerrainManager::NextSlotConnected(int group, const AIFloat3& centre) const
 		if (r.group != group) {
 			continue;
 		}
-		if (r.consumed || r.claimed) {
+		if (r.consumed || r.claimed || (r.serveFails >= kDeadSlotFails)) {
 			taken.push_back(ToPt(r.pos));
 		} else {
 			freeSlots.push_back(ToPt(r.pos));
@@ -2717,7 +2724,7 @@ int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
 	float bestSq = std::numeric_limits<float>::max();
 	for (const auto& kv : reservations) {
 		const SReservation& r = kv.second;
-		if ((r.group != group) || r.consumed || r.claimed) {
+		if ((r.group != group) || r.consumed || r.claimed || (r.serveFails >= kDeadSlotFails)) {
 			continue;
 		}
 		const float sq = anchor.SqDistance2D(r.pos);

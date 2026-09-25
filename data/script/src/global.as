@@ -101,6 +101,7 @@ namespace Global {
     // transport for the TECH player on its team when TECH starts its first T2
     // lab; TECH uses it to fly donated T2 constructors to their recipients.
     namespace Ferry {
+        float DropPullback = 300.0f;     // D-110: the drop point is this far short of the teammate's start, toward our base (open ground)
         bool Enabled = true;
         // The light transports. They carry one unit of transportsize <= 3
         // and mass <= 750; a T2 constructor is 2x2 and, because the engine
@@ -217,6 +218,7 @@ namespace Global {
         // final waypoint - 0 converges every lane on the same endpoint, 1 keeps
         // full width; the run is aimed at one backline, so keep it small.
         int UnitLanes = 5;
+        int RepeatStallSeconds = 45;         // D-111: a factory on repeat that produced no spam unit for this long gets its build again
         float UnitLaneSpacing = 160.0f;
         float EndSpread = 0.35f;
         // Waypoints stay this far from the map edge
@@ -310,6 +312,22 @@ namespace Global {
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
             float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
+            // D-109 (owner's rules): the land constructors leave the base once the air constructors carry it
+            int T1AirReleaseAbove = 5;                      // D-109: more than this many T1 air constructors release the T1 land constructors
+            int T1AirConstructorTarget = 6;                 // D-109: the T1 air plant keeps this many T1 air constructors
+            float ForwardHomeRadius = 900.0f;               // D-109: a construction beyond this from the base centre is a forward job (dropped on a recall)
+            float MexClusterRadius = 600.0f;                // D-109: a mex within this of a cluster's centre joins the cluster
+            float MexDefenceBaseClear = 900.0f;             // D-109: mex clusters nearer the base centre are the eco layout's ground, not defended here
+            float MexDefenceRadius = 400.0f;                // D-109: a defence within this of a cluster's centre counts for it
+            float MexDefenceShake = 160.0f;                 // D-109: native picks the defence's site within this of the cluster's centre
+            int ForwardOrderHoldSeconds = 120;              // D-109: an order at one place is not repeated within this
+            float SpamForwardElmos = 1400.0f;               // D-109: the spam cluster's distance from the home centre toward the front
+            float SpamForwardMaxShare = 0.45f;              // D-109: never further than this share of the way to the front
+            int SpamLabGapCells = 2;                        // D-109: cells between two spam labs of the row (a lane each)
+            int SpamSearchLines = 12;                       // D-109: lines tried each way along the front direction for the first spam lab (4 cells apart)
+            int SpamRowTries = 12;                          // D-109: row positions tried for the next spam lab
+            float SpamClusterRadius = 600.0f;               // D-109: forward constructors assist what goes up within this of the spam cluster
+            int SpamPadsMax = 2;                            // D-109: small 2x2 forward turret pads at the lab row's ends
             float ConverterStarveEnergyShare = 0.5f;        // D-107: the energy bank under this share of storage (or stalling) means the converters cannot stay on (BAR's conversion level is 75% by default)
             float TeamShareMetalAbove = 0.95f;              // D-106: our metal bank over this share of storage triggers the team economy check and a donation
             float TeamShareMetalBudget = 0.20f;             // D-106: at most this share of our metal storage is given per donation, the lowest-filled teammate first

@@ -35,6 +35,11 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
+| `turret.spam` (D-109) | a spam lab stands | its two turrets behind it guard or build it; INV-038 |
+| `ferry.cargo` (D-110) | a ferry run carries this unit | the unit keeps the ferry's hold until the drop-off; INV-041 |
+| `land.recall` (D-109) | a tier's air constructors went down | its land constructors drop a forward job; INV-040 |
+| `fwd.t2.defend` (D-109) | both dedicated T2 air roles held | T2 land constructors: long-range AA then flak at every mex cluster outside the base; INV-039 |
+| `fwd.t1` (D-109) | more than 5 T1 air constructors | T1 land constructors: the spam cluster (labs, turrets, AA, pads); INV-038, INV-039 |
 | `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; never falls through (waits and says why); its structure's cap lifted while held; INV-034, INV-035, INV-036 |
 | air role refill (`TechBuild::RefillAirRoles`, `ClaimOnBuilt`, D-108) | a dedicated builder gone; a T2 air constructor built | the role passes at once (advanced fusions first), the new holder drops its other job; the advanced aircraft plant makes one when none is free; the donation keeps dedicated units |
 | advanced-fusion ground ahead (`Layout::HoldAfusSetAhead`, D-108) | the fusion role held, no set slot left | the next set of advanced-fusion ground reserved (zones, forward, then the ring within reach), retried every 10 s; INV-037 |

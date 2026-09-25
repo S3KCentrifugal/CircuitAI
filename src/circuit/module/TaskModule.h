@@ -59,6 +59,9 @@ public:
 	virtual CRetreatTask* EnqueueRetreat() { return nullptr; }
 
 	void AssignPlayerTask(CCircuitUnit* unit);
+	// D-108 crash: a unit about to be freed leaves every task of this module that
+	// still lists it (not only its current one); returns how many listed it
+	int ForgetUnitEverywhere(CCircuitUnit* unit);
 	void Resurrected(CCircuitUnit* unit);
 
 	void AddMetalPull(float value) { metalPull += value; }

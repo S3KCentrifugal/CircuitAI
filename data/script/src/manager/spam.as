@@ -54,6 +54,18 @@ namespace Spam {
     dictionary routeByFactory;     // factory id string -> CRouteTask@
     dictionary laneByFactory;      // factory id string -> int lane (0, 1, -1, 2, -2 ...)
     int lanesIssued = 0;
+    // D-111 (owner: each factory correlates directly to a lane): a spam unit
+    // runs the lane of the factory that built it, for good; the nearest
+    // factory only decides at its first sight (it spawns at its factory)
+    dictionary producerOf;         // unit id string -> factory id
+    int routesVersion = 0;         // bumped whenever any route changes (a role re-applies factory routes)
+    // D-111: factories a role put on repeat: their queue cycles by itself, so a
+    // factory that asks again is given a wait, not another build (the queue would
+    // grow by one every unit); the build is re-issued only once it stopped producing
+    dictionary repeatFactory;      // factory id string -> frame of the last build issued
+    dictionary lastProduced;       // factory id string -> frame its last spam unit was seen
+    dictionary routedUnits;        // unit id string -> factory id (INV-043)
+    int routeCheckFrame = -1;
     // Two different points, previously conflated:
     //   focus  - WHERE THE RUN ENDS. An enemy start spot; the destination is
     //            BehindEnemyDistance past it. Rotates on the refocus timer.
@@ -145,6 +157,7 @@ namespace Spam {
             WidgetLink::Send("spam", "off|" + int(mi) + "|" + int(ei));
             return;
         }
+        CheckRoutedUnits();   // D-111: INV-043
         if (lastFocusFrame >= 0 && (ai.frame - lastFocusFrame) >= Global::Spam::RefocusMinutes * MINUTE) {
             NextFocus();
         }
@@ -293,6 +306,37 @@ namespace Spam {
         return route;
     }
 
+    // D-111: a role fixes a factory's lane (TECH: the lab's place in its row)
+    void SetFactoryLane(CCircuitUnit@ factory, int lane)
+    {
+        if (factory is null) return;
+        const string key = "" + factory.id;
+        int cur = 0;
+        if (laneByFactory.get(key, cur) && cur == lane) return;
+        laneByFactory.set(key, lane);
+        CRouteTask@ task = null;
+        if (routeByFactory.get(key, @task) && task !is null) {
+            task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
+            ++routesVersion;
+        }
+        GenericHelpers::LogUtil("[Spam] factory " + factory.id + " runs lane " + lane + " (D-111)", 1);
+    }
+    // D-111: the waypoints of a factory's lane, for its factory route
+    array<AIFloat3> RouteOf(CCircuitUnit@ factory)
+    {
+        int lane = 0;
+        laneByFactory.get("" + factory.id, lane);
+        _EnsureFocus();
+        return BuildRoute(factory.GetPos(ai.frame), lane);
+    }
+    void SetRepeatFactory(CCircuitUnit@ factory)
+    {
+        if (factory is null) return;
+        const string key = "" + factory.id;
+        int f;
+        if (!repeatFactory.get(key, f)) repeatFactory.set(key, -100000);
+    }
+
     int _NextLane()
     {
         // 0, +1, -1, +2, -2, ...
@@ -329,6 +373,7 @@ namespace Spam {
         // single file.
         task.SetLanes(Global::Spam::UnitLanes, Global::Spam::UnitLaneSpacing, Global::Spam::EndSpread);
         routeByFactory.set(key, @task);
+        ++routesVersion;
         GenericHelpers::LogUtil("[Spam] Route created for factory " + factory.id + " lane " + lane
             + " -> (" + int(Destination().x) + "," + int(Destination().z) + ")", 1);
         return task;
@@ -346,6 +391,7 @@ namespace Spam {
             laneByFactory.get(keys[i], lane);
             task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
         }
+        ++routesVersion;
     }
 
     // Nearest known spam factory to a position (spam units spawn at their factory).
@@ -403,6 +449,20 @@ namespace Spam {
         }
         _Reject(factory, "");   // clears the memo so a later rejection logs again
         RouteFor(factory);   // make sure the lane exists before the first unit pops
+        {
+            const string key = "" + factory.id;
+            int issued;
+            if (repeatFactory.get(key, issued)) {
+                int seen = -100000;
+                lastProduced.get(key, seen);
+                const int since = (seen > issued) ? seen : issued;
+                if (ai.frame - since < Global::Spam::RepeatStallSeconds * SECOND) {
+                    return aiFactoryMgr.Enqueue(TaskS::Wait(false, 20 * SECOND));   // the repeat queue carries on
+                }
+                repeatFactory.set(key, ai.frame);
+                GenericHelpers::LogUtil("[Spam] " + factory.circuitDef.GetName() + " (" + factory.id + ") on repeat: " + unitName + " queued (D-111)", 1);
+            }
+        }
         return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NOW, d, factory.GetPos(ai.frame), 64.f));
     }
 
@@ -413,11 +473,43 @@ namespace Spam {
     {
         if (!IsEnabled() || u is null || !IsSpamDef(u.circuitDef)) return null;
         if (routeByFactory.getSize() == 0) return null;
-        CCircuitUnit@ factory = _NearestSpamFactory(u.GetPos(ai.frame));
-        if (factory is null) return null;
+        const string ukey = "" + u.id;
+        int fid = -1;
+        CCircuitUnit@ factory = null;
+        if (producerOf.get(ukey, fid)) @factory = ai.GetTeamUnit(fid);
+        if (factory is null) {
+            const bool first = (fid < 0);
+            @factory = _NearestSpamFactory(u.GetPos(ai.frame));
+            if (factory is null) return null;
+            producerOf.set(ukey, factory.id);
+            if (first) lastProduced.set("" + factory.id, ai.frame);
+        }
         CRouteTask@ task = RouteFor(factory);
         if (task is null) return null;
+        routedUnits.set(ukey, factory.id);
         return task;
+    }
+
+    // INV-043 (D-111): a spam unit given its lane stays on it (a unit found on
+    // another task names what took it: the owner saw routes cleared at once)
+    void CheckRoutedUnits()
+    {
+        if (ai.frame - routeCheckFrame < 10 * SECOND) return;
+        routeCheckFrame = ai.frame;
+        array<string>@ keys = routedUnits.getKeys();
+        int moved = 0;
+        string example = "";
+        for (uint i = 0; i < keys.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(int(parseInt(keys[i])));
+            if (u is null) { routedUnits.delete(keys[i]); producerOf.delete(keys[i]); continue; }
+            IFighterTask@ ft = (u.task is null) ? null : cast<IFighterTask>(u.task);
+            CRouteTask@ rt = (ft is null) ? null : cast<CRouteTask>(ft);
+            if (rt !is null) continue;
+            ++moved;
+            if (example.length() == 0) example = u.circuitDef.GetName() + " " + u.id + " now on task type " + ((u.task is null) ? -1 : int(u.task.GetType()));
+            routedUnits.delete(keys[i]);
+        }
+        if (moved > 0) Invariants::Violation("INV-043", "spam", moved + " spam unit(s) left their lane (" + example + ")");
     }
 
     void OnFactoryRemoved(CCircuitUnit@ factory)
@@ -430,6 +522,8 @@ namespace Spam {
         }
         routeByFactory.delete(key);
         laneByFactory.delete(key);
+        repeatFactory.delete(key);
+        lastProduced.delete(key);
     }
 
     void OnTaskRemoved(IUnitTask@ task)

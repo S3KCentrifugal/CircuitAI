@@ -91,6 +91,9 @@ namespace Ferry {
     int  transportId = -1;         // our ferry transport, once received
     bool transportHoldApplied = false;
     int  cargoId = -1;             // constructor in flight
+    int  runStart = -1;            // D-110: the frame the run in flight began (INV-042)
+    // D-110 (owner's rule): the cargo of a run is not interrupted until the drop-off
+    bool IsCargo(int id) { return cargoId >= 0 && id == cargoId; }
     int  cargoRecipient = -1;
     // Constructors waiting for the transport, oldest first. A run in flight
     // used to mean "walk it"; now it means "next".
@@ -394,9 +397,19 @@ namespace Ferry {
                 + " behind cargo " + cargoId + " (" + queuedCargo.length() + " waiting)", 1);
             return true;
         }
-        if (!task.SetCargo(cargo.id, dropPos)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
+        // D-110 (played: no unload ever took at a teammate's start, their busiest
+        // ground): the drop is FerryDropPullback short of it, toward our base
+        AIFloat3 drop = dropPos;
+        {
+            const float dx = Global::Map::StartPos.x - dropPos.x, dz = Global::Map::StartPos.z - dropPos.z;
+            const float len = sqrt(dx * dx + dz * dz);
+            const float pull = Global::Ferry::DropPullback;
+            if (len > 2.0f * pull) drop = AIFloat3(dropPos.x + dx / len * pull, dropPos.y, dropPos.z + dz / len * pull);
+        }
+        if (!task.SetCargo(cargo.id, drop)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
         cargoId = cargo.id;
         cargoRecipient = recipient;
+        runStart = ai.frame;
         GenericHelpers::LogUtil("[Ferry] TECH: carrying " + cargo.id + " to team " + recipient
             + " at (" + int(dropPos.x) + "," + int(dropPos.z) + ")", 1);
         WidgetLink::Send("ferry", "carry|" + cargo.id + "|" + recipient);
@@ -424,6 +437,7 @@ namespace Ferry {
         }
         cargoId = -1;
         cargoRecipient = -1;
+        runStart = -1;
         CFerryTask@ task = TaskOf(Transport());
         if (task !is null) task.Reset();   // sends it home
         _StartNext();
