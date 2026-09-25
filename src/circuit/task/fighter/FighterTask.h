@@ -29,6 +29,11 @@ public:
 
 	virtual void AssignTo(CCircuitUnit* unit) override;
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
+	virtual bool ForgetUnit(CCircuitUnit* unit) override {  // D-112 crash
+		cowards.erase(unit);
+		shields.erase(unit);
+		return IUnitTask::ForgetUnit(unit);
+	}
 
 	virtual void Update() override;
 

@@ -75,6 +75,21 @@ public:
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void AssignTo(CCircuitUnit* unit) override;
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
+	// D-112 crash: a unit about to be freed leaves every set of this task (the
+	// update loop iterates `traveled`), without RemoveAssignee's reassignment
+	virtual bool ForgetUnit(CCircuitUnit* unit) override {
+		if ((unitIt != units.end()) && (*unitIt == unit)) {
+			++unitIt;
+		}
+		if (initiator == unit) {
+			initiator = nullptr;
+		}
+		traveled.erase(unit);
+		executors.erase(unit);
+		engaged.erase(unit);
+		approaching.erase(unit);
+		return IUnitTask::ForgetUnit(unit);
+	}
 
 	virtual void Start(CCircuitUnit* unit) override;
 	virtual void Update() override;

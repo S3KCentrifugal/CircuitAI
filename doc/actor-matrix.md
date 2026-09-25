@@ -36,7 +36,7 @@ decides the end; everything else reads it.
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
 | `turret.spam` (D-109) | a spam lab stands | its two turrets behind it guard or build it; INV-038 |
-| `ferry.cargo` (D-110) | a ferry run carries this unit | the unit keeps the ferry's hold until the drop-off; INV-041 |
+| `ferry.cargo` (D-110, D-112) | the unit is a gift (in flight or queued) | in flight: the ferry's hold; queued: parked behind the base; nothing else until the drop-off; INV-041 |
 | `land.recall` (D-109) | a tier's air constructors went down | its land constructors drop a forward job; INV-040 |
 | `fwd.t2.defend` (D-109) | both dedicated T2 air roles held | T2 land constructors: long-range AA then flak at every mex cluster outside the base; INV-039 |
 | `fwd.t1` (D-109) | more than 5 T1 air constructors | T1 land constructors: the spam cluster (labs, turrets, AA, pads); INV-038, INV-039 |

@@ -94,6 +94,47 @@ namespace Ferry {
     int  runStart = -1;            // D-110: the frame the run in flight began (INV-042)
     // D-110 (owner's rule): the cargo of a run is not interrupted until the drop-off
     bool IsCargo(int id) { return cargoId >= 0 && id == cargoId; }
+    // D-112 (owner: a T2 constructor built for a teammate is allowed no action and
+    // given no order, so the pickup cannot go wrong): a gift is the one in flight
+    // or one queued behind it; from the moment it is a gift it is out of TECH's
+    // builder pool, parked behind the base on open ground, clear of the factory
+    // lanes and of TECH's own builders
+    bool IsGift(int id) { return IsCargo(id) || queuedCargo.find(id) >= 0; }
+    AIFloat3 runDrop;              // D-112: where the run in flight drops
+    dictionary runAttempts;        // D-112: unit id -> flown runs tried
+    // The parking spot of gift `slot`: ParkDistance behind our start (away from the
+    // map centre, where the labs face), gifts ParkSpacing apart side by side
+    AIFloat3 ParkSpot(int slot)
+    {
+        const float cx = float(AiTerrainWidth()) * 0.5f, cz = float(AiTerrainHeight()) * 0.5f;
+        float dx = Global::Map::StartPos.x - cx, dz = Global::Map::StartPos.z - cz;
+        float len = sqrt(dx * dx + dz * dz);
+        if (len < 1.0f) { dx = 1.0f; dz = 0.0f; len = 1.0f; }
+        dx /= len; dz /= len;
+        const float side = float((slot + 1) / 2) * Global::Ferry::ParkSpacing * ((slot % 2 == 1) ? 1.0f : -1.0f);
+        float x = Global::Map::StartPos.x + dx * Global::Ferry::ParkDistance - dz * side;
+        float z = Global::Map::StartPos.z + dz * Global::Ferry::ParkDistance + dx * side;
+        const float m = 64.0f;
+        x = (x < m) ? m : ((x > float(AiTerrainWidth()) - m) ? float(AiTerrainWidth()) - m : x);
+        z = (z < m) ? m : ((z > float(AiTerrainHeight()) - m) ? float(AiTerrainHeight()) - m : z);
+        return AIFloat3(x, 0.0f, z);
+    }
+    // Take a gift out of every task (its old task carries on without it) onto a
+    // long wait, and walk it to its parking spot once
+    // assign: true where no MakeTask will assign the returned task (queueing, a re-queue)
+    IUnitTask@ Park(CCircuitUnit@ u, bool assign = true)
+    {
+        if (u is null) return null;
+        const int slot = (queuedCargo.find(u.id) >= 0) ? queuedCargo.find(u.id) : 0;
+        const AIFloat3 spot = ParkSpot(slot);
+        IUnitTask@ w = aiBuilderMgr.Enqueue(TaskB::Wait(Global::Ferry::ParkWaitSeconds * SECOND));
+        if (w is null) return null;
+        if (assign) aiBuilderMgr.AssignTask(u, w);
+        if (MapHelpers::SqDist(u.GetPos(ai.frame), spot) > 64.0f * 64.0f) u.CmdMoveTo(spot);
+        GenericHelpers::LogUtil("[Ferry] TECH: gift " + u.circuitDef.GetName() + " " + u.id + " parked at (" + int(spot.x) + ", " + int(spot.z)
+            + "), no other order until its run (D-112)", 1);
+        return w;
+    }
     int  cargoRecipient = -1;
     // Constructors waiting for the transport, oldest first. A run in flight
     // used to mean "walk it"; now it means "next".
@@ -393,6 +434,10 @@ namespace Ferry {
                 queuedCargo.insertLast(cargo.id);
                 queuedRecipient.insertLast(recipient);
             }
+            // D-112: parked by the ferry.cargo rule at its next ask (a new gift is idle
+            // and asks at once). Not assigned here: this runs inside the unit-added
+            // hook, and native assigns the unit to its idle task right after it returns
+            // (an assignment here would leave the unit listed by two tasks)
             GenericHelpers::LogUtil("[Ferry] TECH: queued " + cargo.id + " for team " + recipient
                 + " behind cargo " + cargoId + " (" + queuedCargo.length() + " waiting)", 1);
             return true;
@@ -410,6 +455,8 @@ namespace Ferry {
         cargoId = cargo.id;
         cargoRecipient = recipient;
         runStart = ai.frame;
+        runDrop = drop;
+        { int64 n = 0; runAttempts.get("" + cargo.id, n); runAttempts.set("" + cargo.id, n + 1); }   // int64: the dictionary's integer type
         GenericHelpers::LogUtil("[Ferry] TECH: carrying " + cargo.id + " to team " + recipient
             + " at (" + int(dropPos.x) + "," + int(dropPos.z) + ")", 1);
         WidgetLink::Send("ferry", "carry|" + cargo.id + "|" + recipient);
@@ -427,6 +474,30 @@ namespace Ferry {
                 + (ft is null ? "gone" : "state " + ft.GetState()) + "); giving where it stands", 1);
         }
         CCircuitUnit@ cargo = (cargoId < 0) ? null : ai.GetTeamUnit(cargoId);
+        // D-112 (the owner's game: a gift still at base was handed over while the
+        // transport carried another unit): a failed run whose cargo is far from the
+        // drop gives nothing; the gift is parked and queued first for another run,
+        // FerryRunAttempts in all, then it walks
+        if (!delivered && cargo !is null && cargoRecipient >= 0
+            && MapHelpers::SqDist(cargo.GetPos(ai.frame), runDrop) > Global::Ferry::GiveNearDrop * Global::Ferry::GiveNearDrop)
+        {
+            int64 tries = 0;
+            runAttempts.get("" + cargoId, tries);
+            if (tries < Global::Ferry::FerryRunAttempts) {
+                GenericHelpers::LogUtil("[Ferry] TECH: cargo " + cargoId + " is not at the drop (" + int(sqrt(MapHelpers::SqDist(cargo.GetPos(ai.frame), runDrop)))
+                    + " away): not given; queued again for run " + (tries + 1) + " of " + Global::Ferry::FerryRunAttempts + " (D-112)", 1);
+                queuedCargo.insertAt(0, cargoId);
+                queuedRecipient.insertAt(0, cargoRecipient);
+                cargoId = -1;
+                Park(cargo);
+                cargoRecipient = -1;
+                runStart = -1;
+                CFerryTask@ rt = TaskOf(Transport());
+                if (rt !is null) rt.Reset();   // home, setting down whatever is aboard
+                _StartNext();
+                return;
+            }
+        }
         if (cargo !is null && cargoRecipient >= 0 && cargoRecipient != ai.teamId) {
             array<CCircuitUnit@> give(1);
             @give[0] = cargo;

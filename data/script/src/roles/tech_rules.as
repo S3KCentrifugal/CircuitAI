@@ -216,9 +216,11 @@ namespace TechRules {
     IUnitTask@ DoTurretSpam(Ctx@ c)     { return TechForward::TurretFocus(c.u); }  // D-109
     IUnitTask@ DoFerryCargo(Ctx@ c)                                                 // D-110
     {
-        if (!Team::Ferry::IsCargo(c.u.id)) return null;
-        if (c.u.task !is null && cast<IBuilderTask>(c.u.task) is null) return c.u.task;   // the ferry's hold
-        return TechBuild::Wait(5 * SECOND);
+        if (!Team::Ferry::IsGift(c.u.id)) return null;
+        // in flight: the ferry's own hold (native, damage-proof)
+        if (Team::Ferry::IsCargo(c.u.id) && c.u.task !is null && cast<IBuilderTask>(c.u.task) is null) return c.u.task;
+        // D-112: queued: parked behind the base, nothing else
+        return Team::Ferry::Park(c.u, false);   // the table's caller assigns it
     }
     IUnitTask@ DoLandRecall(Ctx@ c)     { return TechForward::Recall(c.u); }       // D-109
     IUnitTask@ DoDefendMexes(Ctx@ c)    { return TechForward::DefendMexes(c.u); }  // D-109
@@ -418,7 +420,7 @@ namespace TechRules {
         table.insertLast(Rule("turret.any",        TURRET,       W0(), @DoTurretAny,    "any structure of ours under construction within reach"));
         table.insertLast(Rule("turret.factory",    TURRET,       W1(@MetalFloodedLong), @DoTurretFactory, "D-105: the metal bank full and nothing to build in reach: assist a producing factory in reach (production is the sink)"));
         table.insertLast(Rule("turret.wait",       TURRET,       W0(), @DoWaitShort,    "5 s"));
-        table.insertLast(Rule("ferry.cargo",       MOBILE,       W0(), @DoFerryCargo,   "D-110: the cargo of a ferry run keeps the ferry's hold until the drop-off; nothing else"));
+        table.insertLast(Rule("ferry.cargo",       MOBILE,       W0(), @DoFerryCargo,   "D-110/D-112: a gift (in flight or queued) keeps the ferry's hold or its park behind the base until the drop-off; nothing else"));
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
         table.insertLast(Rule("air.dedicated",     CON_T2,       W0(), @DoAirDedicated, "D-107: the first two T2 air constructors: one only advanced energy converters, the other only advanced fusions, always"));

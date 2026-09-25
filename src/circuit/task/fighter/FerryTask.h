@@ -52,6 +52,8 @@ public:
 	bool IsAboard(CCircuitUnit* cargo, CCircuitUnit* transport, int frame) const;
 	void ReportUnload(CCircuitUnit* transport, CCircuitUnit* cargo, int frame);  // D-110 diagnostic
 	int reportedFrame = -1;
+	float baseLift = -1.f;
+	int loadDoneFrame = -1;  // D-112: the frame the engine finished the load command  // D-112: the cargo's height above ground when the load was issued (-1: not measured)
 	bool InRun() const { return (state_ != EState::IDLE) && (state_ != EState::DONE) && (state_ != EState::FAILED); }
 
 	// Script hooks

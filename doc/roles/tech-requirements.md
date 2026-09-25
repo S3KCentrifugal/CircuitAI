@@ -75,6 +75,8 @@ is edited in place with the decision that changed it.
 
 | Requirement | Where |
 | --- | --- |
+| The BARb widget: covers no other UI element, a better experience, an icon on every button; it must receive the AIs' messages. | D-113: `tools/widgets/gui_barb_team_link.lua` |
+| CI builds the AI with the Recoil docker harness and publishes `SMRTBARb-v<version>.zip` as a GitHub release; the minor version rises with every commit. | [`../release.md`](../release.md) |
 | Every teammate's economy (players included, all fields, free storage) readable from script, refreshed for one teammate or all before a decision. | D-106: `TeamEconomy` (`manager/team_economy.as`), native `CEconomyManager` |
 | A playtest shot can centre the camera on a map position. | D-103: `--shots minute@height@x:z` |
 
@@ -83,6 +85,7 @@ is edited in place with the decision that changed it.
 | # | Requirement | Decision | Invariant |
 | --- | --- | --- | --- |
 | T1 | The ferry makes sure the unit is picked up (retrying), and never drops it in water or on a building. | D-091 | - |
+| T3 | The T2 constructors built for teammates perform no action and take no order from birth until their drop-off, so the transport cannot pick up the wrong unit; a constructor at base is never handed over as delivered. | D-112 | INV-041 |
 | T2 | The transport picks up the T2 constructor reliably; from the moment the transport is sent until the drop-off succeeds, neither the transport nor the constructor takes any other order. | D-110 | INV-041, INV-042 |
 
 ## Open

@@ -416,6 +416,16 @@ namespace Invariants {
 
         // INV-041 (D-110): the cargo of a ferry run holds no construction order;
         // INV-042: a run ends (delivered or failed) within 600 s (the cargo park, FERRY_HOLD_FRAMES)
+        // D-112: every gift, queued ones included
+        for (uint gi = 0; gi < Team::Ferry::queuedCargo.length() && ai.frame - ferryLog >= 30 * SECOND; ++gi) {
+            CCircuitUnit@ qg = ai.GetTeamUnit(Team::Ferry::queuedCargo[gi]);
+            IBuilderTask@ qbt = (qg is null || qg.task is null) ? null : cast<IBuilderTask>(qg.task);
+            if (qbt !is null) {
+                ferryLog = ai.frame;
+                Violation("INV-041", "ferry", "queued gift " + qg.id + " holds a build order ("
+                    + (qbt.buildDef is null ? "type " + int(qbt.GetBuildType()) : qbt.buildDef.GetName()) + ")");
+            }
+        }
         if (Team::Ferry::cargoId >= 0 && ai.frame - ferryLog >= 30 * SECOND) {
             CCircuitUnit@ cg = ai.GetTeamUnit(Team::Ferry::cargoId);
             IBuilderTask@ cbt = (cg is null || cg.task is null) ? null : cast<IBuilderTask>(cg.task);

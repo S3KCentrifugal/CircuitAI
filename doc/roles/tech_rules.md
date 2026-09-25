@@ -75,7 +75,7 @@ picture is [`tech-layout-and-sequence.md`](tech-layout-and-sequence.md)):
 | --- | --- | --- | --- |
 | `turret.spam` | turrets | - | D-109: first turret row: the two turrets behind a spam lab always work for it (`TechForward::TurretFocus`) |
 | `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory |
-| `ferry.cargo` | mobile | - | D-110: the cargo of a ferry run keeps the ferry's hold until the drop-off; nothing else |
+| `ferry.cargo` | mobile | - | D-110/D-112: a gift for a teammate (in flight or queued) keeps the ferry's hold, or its park behind the base (`Team::Ferry::Park`), until the drop-off; nothing else |
 | `land.recall` | constructors | - | D-109: a tier whose air constructors went down drops a forward job; the eco rows take the builder |
 | `air.dedicated` | T2 | - | D-107/D-108: the dedicated T2 air constructors: only advanced converters / advanced fusions, else wait |
 | `air.flex` | T2 | - | D-107: the other T2 air constructors follow the energy |
@@ -123,4 +123,4 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 1a4c481d339c3e0bdf3d46f1160340c4a4fa6cad; lines: 503 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 8e2392859a23cad3d6d9f1dda10ac24feda107dc; lines: 505 -->

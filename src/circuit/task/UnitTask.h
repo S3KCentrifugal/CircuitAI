@@ -52,7 +52,9 @@ public:
 	// D-108 crash: drop a unit about to be freed from this task's sets, without
 	// handing it to the idle task (RemoveAssignee would), so no task keeps a
 	// dangling pointer (played: CSRepairTask::Update on a freed unit)
-	bool ForgetUnit(CCircuitUnit* unit) { pathQueries.erase(unit); return units.erase(unit) > 0; }
+	// virtual (D-112 crash): a task's own sets of units (a builder task's traveled /
+	// engaged / approaching, a fighter task's cowards / shields) forget it too
+	virtual bool ForgetUnit(CCircuitUnit* unit) { pathQueries.erase(unit); return units.erase(unit) > 0; }
 
 	virtual void Start(CCircuitUnit* unit) = 0;  // <=> IAction::OnStart()
 	virtual void Update() = 0;

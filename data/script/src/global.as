@@ -101,7 +101,12 @@ namespace Global {
     // transport for the TECH player on its team when TECH starts its first T2
     // lab; TECH uses it to fly donated T2 constructors to their recipients.
     namespace Ferry {
-        float DropPullback = 300.0f;     // D-110: the drop point is this far short of the teammate's start, toward our base (open ground)
+        float DropPullback = 300.0f;
+        float ParkDistance = 450.0f;      // D-112: gifts wait this far behind our start (away from the map centre)
+        float ParkSpacing = 80.0f;        // D-112: gifts park this far apart
+        int ParkWaitSeconds = 900;        // D-112: a gift's park (renewed at every ask)
+        float GiveNearDrop = 800.0f;      // D-112: a failed run gives its cargo only within this of the drop
+        int FerryRunAttempts = 2;         // D-112: flown runs tried for one gift before it walks     // D-110: the drop point is this far short of the teammate's start, toward our base (open ground)
         bool Enabled = true;
         // The light transports. They carry one unit of transportsize <= 3
         // and mass <= 750; a T2 constructor is 2x2 and, because the engine

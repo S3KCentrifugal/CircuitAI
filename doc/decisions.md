@@ -5905,6 +5905,113 @@ for good.
 [`tech_forward.as`](../data/script/src/roles/tech_forward.as),
 [`InitScript.cpp`](../src/circuit/script/InitScript.cpp).
 
+## D-112 — A teammate's T2 constructor is frozen from birth to drop-off; the ferry verifies what it carries
+
+**Date:** 2026-09-25. **Status:** Played (build93, 16 AIs, run `20260925-105935`, 30 min): 5 runs, every gift aboard on the first load, flown and handed over at its teammate (near the drop); no gift handed over from base, no re-queue, INV-041 and INV-042 silent, no crash. Build91 (before the rise grace) needed a load retry on nearly every run and looped one gift through failed loads (the attempt counter read an int64 as an int; fixed). Open: the engine still abandons our air unloads (D-110), so every run ends in the set-down-near-the-drop fallback.
+
+**Owner's report and rule.** The transport picked up a T2 constructor and delivered it,
+but the one delivered was TECH's own and a constructor still at base changed hands:
+it looked as if the transport failed to pick up one constructor and grabbed another.
+The T2 constructors built for teammates must perform no action and take no order, so
+the pickup cannot go wrong.
+
+**Verified in the owner's log (build90, team 12, cargo 26467).** "cargo 26467 aboard"
+at pickup; every 5 s check during the drop said 26467 was not aboard while the
+transport landed at the drop (it set a unit down there); the run was judged failed
+and the script gave 26467, at base, to the teammate. Gifts queued behind a busy
+transport had no hold at all and took TECH's economy orders (up to 4 queued), so at
+pickup a gift could be working, on a factory pad or among TECH's own T2 constructors;
+"aboard" (lifted and near) passes for a unit standing on a raised pad under the
+hovering transport.
+
+**Decision.**
+
+1. A gift (in flight or queued) is out of TECH's builder pool: the `ferry.cargo` rule
+   (first for every mobile builder) parks it (`Team::Ferry::Park`: a long wait, one
+   walk to a spot `ParkDistance` behind our start, gifts `ParkSpacing` apart) until
+   its run, when the ferry's native hold takes over. New binding
+   `aiBuilderMgr.AssignTask` (a unit leaves its old task, which carries on) and
+   `CmdMoveTo`.
+2. Aboard means risen: the cargo's height is recorded when the load is issued and it
+   must rise `FERRY_RISE` (16) above it, and follow the transport. The load ends only
+   when the engine finished the load command; the transport then sets off, and the
+   cargo has `FERRY_RISE_GRACE` (4 s) to show aboard before the load counts as failed.
+3. A failed run whose cargo is more than `GiveNearDrop` (800) from the drop gives
+   nothing: the gift is parked and queued again, `FerryRunAttempts` (2) flights in
+   all, then it walks.
+4. After every run the transport flies home and unloads whatever it holds there.
+5. Crash fixes on the way (build91): `ForgetUnit` is virtual; a builder task's
+   traveled / engaged / approaching sets and a fighter task's cowards / shields forget
+   a freed unit too.
+
+**Invariant.** INV-041 now covers the queued gifts as well as the one in flight.
+
+**Files.** [`ferry.as`](../data/script/src/manager/ferry.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`UnitTask.h`](../src/circuit/task/UnitTask.h),
+[`BuilderTask.h`](../src/circuit/task/builder/BuilderTask.h),
+[`FighterTask.h`](../src/circuit/task/fighter/FighterTask.h).
+
+## D-113 — The BARb widget: a floating window with icons that covers nothing, and it hears the AIs again
+
+**Date:** 2026-09-25. **Status:** Played (playtest screenshots, build93).
+
+**Owner's request.** Verify the widget that controls the BARb AIs; overhaul its UI for
+a better experience (it conflicts with and covers other UI elements); give every
+button a relevant icon.
+
+**Found.**
+- The widget docked into the player list's module stack: its tab strip and a 236 px
+  panel sat on the stack's top edge, over whatever else stacks there, and without a
+  player list it fell back to the screen corner.
+- **No widget received any AI message**: BAR's widget handler
+  (`luaui/barwidgets.lua`) does not forward the engine's `RecvSkirmishAIMessage`
+  callin (not in its `callInLists`, and `RegisterGlobal` refuses engine callin
+  names), so announcements, replies and events never arrived. Played: "no
+  announcement", no events.
+- The `spam` and `seaassist` topics were never handled; two names leaked as globals;
+  the menu blur outlived its tab.
+
+**Decision.** [`tools/widgets/gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua),
+rewritten:
+- a small launcher (the AI icon) just left of the player list's top-left corner; the
+  window floats over the map to its left, never joins the player list's stack, can be
+  dragged by its header, keeps its place and is clamped on screen; Ctrl+Alt+B,
+  `/barblink`, Escape as before;
+- inside: team chips (when more than one ally team has an AI), the AIs as a
+  scrollable list (colour, name, role icon), the selected AI's details, a 3x2 role
+  grid, the event log (spam and sea-assist events included); spectators see roles
+  read-only;
+- icons from the game's own art: FRONT `icons/bot_t2.png`, AIR `icons/air.png`, TECH
+  `icons/fusion.png`, SEA `icons/ship.png`, SUPPORT `icons/worker.png`, TACTICAL
+  `icons/hover.png`, query `advplayerslist/ping.dds`, query all `icons/radar_t2.png`,
+  overlay `icons/eye.png`, close `advplayerslist/cross.dds`, teams
+  `advplayerslist/ally.dds`, launcher `advplayerslist/cpu.dds`; a missing file falls
+  back to text;
+- the widget installs LuaUI's `RecvSkirmishAIMessage` global itself (`getfenv(0)`,
+  `Script.UpdateCallIn`), restored on shutdown; if a handler ever forwards the
+  callin, the widget's own `RecvSkirmishAIMessage` is used instead.
+
+`tools/playtest/playtest.py --extra-widget <file>` stages a widget into the
+playtest's own write dir (never the live game's) for screenshots.
+
+**Played.** A TECH 1v1 playtest (spectator view): the launcher and the window beside
+the player list, nothing covered; both AIs' announcements, replies and the role
+highlight arrived.
+
+**Invariant.** None in the AI: the widget is host-side LuaUI. It is checked by a
+playtest screenshot run (`--extra-widget`): the window beside the player list, the
+AIs' announcements and replies in its log.
+
+**Files.** [`gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua),
+[`widget_link.as`](../data/script/src/manager/widget_link.as),
+[`playtest.py`](../tools/playtest/playtest.py).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

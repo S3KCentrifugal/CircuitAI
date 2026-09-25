@@ -55,6 +55,8 @@ using namespace springai;
 #define FERRY_LIFT_HEIGHT		(SQUARE_SIZE / 2)
 #define FERRY_GROUND_TOLERANCE	1.f
 #define FERRY_LANDED_TICKS		2
+#define FERRY_RISE				(SQUARE_SIZE * 2)  // D-112: aboard = risen this much above where the cargo stood
+#define FERRY_RISE_GRACE		(FRAMES_PER_SEC * 4)  // D-112: time after the load for the cargo to rise
 #define FERRY_UNLOAD_RADIUS		(SQUARE_SIZE * 32)  // D-110: the area unload's radius: the engine refuses an unload with no standing room for the cargo inside it (played: 96 at a teammate's start never found any)
 // Close enough to the drop to issue the unload.
 #define FERRY_DROP_DIST			(SQUARE_SIZE * 12)
@@ -133,7 +135,15 @@ bool CFerryTask::IsAboard(CCircuitUnit* cargo, CCircuitUnit* transport, int fram
 	if ((cargo == nullptr) || (transport == nullptr) || !IsLifted(cargo, frame)) {
 		return false;
 	}
-	return cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST);
+	// D-112 (the owner's game: a gift constructor standing on a raised pad read as
+	// aboard; the transport flew off with another unit and the gift was handed
+	// over at base): the cargo must have risen from where it stood before the load
+	const AIFloat3& cp = cargo->GetPos(frame);
+	const float above = cp.y - manager->GetCircuit()->GetMap()->GetElevationAt(cp.x, cp.z);
+	if ((baseLift >= 0.f) && (above < baseLift + FERRY_RISE)) {
+		return false;
+	}
+	return cp.SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST);
 }
 
 // D-110 diagnostic (played: every unload refused while the cargo was aboard):
@@ -302,6 +312,8 @@ bool CFerryTask::SetCargo(int id, const AIFloat3& pos)
 	cargoId = id;
 	dropPos = pos;
 	landPos = -RgtVector;
+	baseLift = -1.f;  // D-112: measured when the load is issued
+	loadDoneFrame = -1;
 	loadRetries = 0;
 	unloadRetries = 0;
 	landedTicks = 0;
@@ -321,10 +333,17 @@ void CFerryTask::Reset()
 	cargoId = -1;
 	landPos = -RgtVector;
 	unloadRetries = 0;
+	baseLift = -1.f;
+	loadDoneFrame = -1;
 	Enter(EState::IDLE);
 	CCircuitUnit* transport = GetTransport();
 	if ((transport != nullptr) && geom::is_valid(holdPos)) {
 		GoTo(transport, holdPos);
+		// D-112: a unit still aboard (a failed run, a wrong load) is set down at
+		// home, never carried off; an empty transport finishes this at once
+		TRY_UNIT(manager->GetCircuit(), transport,
+			transport->CmdUnloadUnitsInArea(holdPos, FERRY_UNLOAD_RADIUS, UNIT_COMMAND_OPTION_SHIFT_KEY, manager->GetCircuit()->GetLastFrame() + FERRY_TRAVEL_TIMEOUT * 2);
+		)
 	}
 }
 
@@ -392,6 +411,8 @@ void CFerryTask::Update()
 				// D-091: only the load; the flight to the drop is ordered once the
 				// cargo is seen lifted (played: a load the engine refused left the queued
 				// move to fly the transport off empty)
+				// D-112: where it stands now, so "aboard" means it rose from here
+				baseLift = cPos.y - circuit->GetMap()->GetElevationAt(cPos.x, cPos.z);
 				TRY_UNIT(circuit, transport,
 					transport->CmdLoadUnits({cargo}, 0, frame + FERRY_LOAD_TIMEOUT);
 				)
@@ -416,11 +437,31 @@ void CFerryTask::Update()
 			// under the transport); a finished load without it aboard is a retry
 			const bool loadPending = (frame - stateFrame < FRAMES_PER_SEC * 2)
 				|| (transport->GetCurrentCommand()->GetId() == CMD_LOAD_UNITS);
+			// D-112: the load command ends while the transport is still low; the
+			// cargo rises as it climbs, so a finished load gets FERRY_RISE_GRACE to
+			// show the cargo aboard before it counts as a failed load (played: every
+			// run needed a retry, one gift failed three runs in a row)
+			if (loadPending) {
+				loadDoneFrame = -1;
+			} else if (loadDoneFrame < 0) {
+				loadDoneFrame = frame;
+				// the load ended with the cargo under the transport: set off, so the
+				// climb shows whether it is aboard (a loaded transport hovers low until
+				// ordered); the load itself is over, so this order cannot cut it short
+				if (cargo->GetPos(frame).SqDistance2D(transport->GetPos(frame)) < SQUARE(FERRY_LOADED_DIST)) {
+					GoTo(transport, dropPos);
+				}
+			}
+			const bool inGrace = !loadPending && (frame - loadDoneFrame < FERRY_RISE_GRACE);
 			if (!loadPending && IsAboard(cargo, transport, frame)) {
 				circuit->LOG("FERRY: cargo %i aboard; flying to (%.0f, %.0f)", cargoId, dropPos.x, dropPos.z);
+				loadDoneFrame = -1;
 				Enter(EState::TO_DROP);
 				GoTo(transport, dropPos);
+			} else if (inGrace && !IsExpired(frame)) {
+				// waiting for the rise
 			} else if (!loadPending || IsExpired(frame)) {
+				loadDoneFrame = -1;
 				if (++loadRetries > FERRY_LOAD_RETRIES) {
 					Fail("load did not take");
 				} else {
