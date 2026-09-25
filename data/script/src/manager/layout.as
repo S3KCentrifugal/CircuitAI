@@ -910,6 +910,12 @@ namespace Layout {
     // null when the layout has no site for it
     IUnitTask@ OrderFactory(CCircuitDef@ def, int timeout)
     {
+        // D-114: a land factory from +200 metal goes to a front factory cluster
+        if (def !is null) {
+            bool routed;
+            IUnitTask@ ft = TechFactories::Route(def.GetName(), null, routed);
+            if (routed) return ft;
+        }
         const int id = ReserveFactorySite(def);
         if (id < 0) return null;
         const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
@@ -1293,7 +1299,13 @@ namespace Layout {
     {
         const string side = Global::AISettings::Side;
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
-        if (t2 is null || !t2.IsAvailable(ai.frame)) return null;
+        if (t2 is null) return null;
+        {
+            bool routed;   // D-114: from +200 metal the advanced lab goes to a front factory cluster
+            IUnitTask@ ft = TechFactories::Route(t2.GetName(), null, routed);
+            if (routed) return ft;
+        }
+        if (!t2.IsAvailable(ai.frame)) return null;
         if (!Builder::IsT2BotFactoryOffCooldown()) return null;
         // D-104 (owner's rule): an advanced lab after the first (its planned
         // front-line footprint used) stands flush against the turrets, facing the

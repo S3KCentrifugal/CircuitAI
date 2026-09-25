@@ -749,6 +749,17 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	}
 	HideAssignee(unit);
 	IUnitTask* task = manager->MakeTask(unit);
+	// D-114 crash (owner's game, build94, F43291): MakeTask runs the script's
+	// policy for this unit, and a rule can drop THIS task (land.recall aborts a
+	// forward job). The unit is then no longer ours; carrying on used its cleared
+	// travel action in Approach. It takes what the policy made, or stays idle.
+	if (IsDead() || (units.find(unit) == units.end())) {
+		ShowAssignee(unit);  // RemoveAssignee hid it again: one Hide stands, as for any unit that left
+		if ((task != nullptr) && !task->IsDead() && (unit->GetTask() != task)) {
+			manager->AssignTask(unit, task);
+		}
+		return false;
+	}
 	ShowAssignee(unit);
 	if ((task != nullptr)
 		&& ((task->GetType() != IUnitTask::Type::BUILDER)

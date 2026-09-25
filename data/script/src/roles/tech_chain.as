@@ -400,7 +400,12 @@ namespace TechChain
         }
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
         if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
-        if (key == "gantry") return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        if (key == "gantry") {
+            bool routed;   // D-114: a front factory cluster from +200 metal
+            IUnitTask@ ft = TechFactories::Route(UnitHelpers::GetLandGantryForSide(Global::AISettings::Side), u, routed);
+            if (routed) return ft;
+            return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        }
         // D-103: both air plants placed by the layout (a turret stands); the old
         // spiral only when the layout has no site
         if (key == "ap" || key == "aap") {

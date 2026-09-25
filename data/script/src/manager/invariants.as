@@ -78,6 +78,8 @@ namespace Invariants {
     int fwdIdleLogT1 = -100000;   // D-109: INV-039
     int fwdIdleLogT2 = -100000;   // D-109: INV-039
     int ferryLog = -100000;       // D-110: INV-041, INV-042
+    int baseFactorySince = -1;    // D-114: INV-044
+    int baseFactoryLog = -100000; // D-114: INV-044
     int t2ConsAtHigh = 0;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
@@ -250,7 +252,8 @@ namespace Invariants {
         {
             CCircuitUnit@ l1 = Factory::primaryT1BotLab;
             if (l1 !is null && l1.id != lastT1LabId) {
-                if (t1LabSeen && Layout::TurretsStand()) {
+                // a front cluster's lab (D-114) stands at its own turret block: INV-038, INV-045
+                if (t1LabSeen && Layout::TurretsStand() && !TechFactories::IsClusterLab(l1)) {
                     const AIFloat3 lp = l1.GetPos(ai.frame);
                     const float reach = Global::RoleSettings::Tech::ExpLabBuildPowerReach;
                     if (aiTerrainMgr.CountGroupSlotsWithin(Layout::nanoGroup, lp, reach) == 0
@@ -284,7 +287,8 @@ namespace Invariants {
                 CCircuitUnit@ l = labs[i];
                 if (l is null || !Lifecycle::IsRetiring(l) || retiredLabsSeen.exists("" + l.id)) continue;
                 retiredLabsSeen.set("" + l.id, ai.frame);
-                if (TechBuild::EcoOnline())
+                // D-114: the base's land factories rezoned at the count are not retired for metal
+                if (TechBuild::EcoOnline() && !TechFactories::baseRetired.exists("" + l.id))
                     Violation("INV-026", "" + l.id, l.circuitDef.GetName() + " " + l.id + " retired at +" + int(Economy::GetMinMetalIncomeLast10s()) + " metal, the economy online");
             }
         }
@@ -316,6 +320,7 @@ namespace Invariants {
                 if (!Factory::allFactories.get(keys[i], @fac) || fac is null || fac.circuitDef is null) continue;
                 factoriesSeen.set(keys[i], ai.frame);
                 if (!Layout::TurretsStand()) continue;
+                if (TechFactories::IsClusterLab(fac)) continue;   // D-114: at its own turret block (INV-038, INV-045)
                 const AIFloat3 fp = fac.GetPos(ai.frame);
                 const int ff = aiTerrainMgr.GetBuildingFacing(fac);
                 int gap = aiTerrainMgr.EdgeGapToGroup(fac.circuitDef, fp, ff, Layout::nanoGroup);
@@ -439,22 +444,52 @@ namespace Invariants {
             }
         }
 
-        // INV-038 (D-109): a spam lab standing for 180 s has both turrets behind it
+        // INV-038 (D-109, D-114): a front cluster's factory standing for 180 s has
+        // its whole turret block
+        for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
+            TechFactories::Cluster@ s = TechFactories::clusters[i];
+            CCircuitUnit@ l = TechFactories::LabAt(s);
+            // INV-045 (D-114): a front cluster's factory frame starts only once its
+            // whole turret block stands finished
+            if (l !is null && !s.labSeen) {
+                s.labSeen = true;
+                const int done = TechFactories::FinishedTurrets(s);
+                if (done < s.slots)
+                    Violation("INV-045", "front", "front cluster " + (i + 1) + " (" + s.defName + ") started its factory with " + done + " of its "
+                        + s.slots + " turrets finished");
+            }
+            if (l is null || l.GetBuildProgress() < 1.0f) { s.standFrame = -1; continue; }
+            if (s.standFrame < 0) { s.standFrame = ai.frame; continue; }
+            const int have = TechFactories::TurretsOf(s);
+            if (ai.frame - s.standFrame >= 180 * SECOND && have < s.slots && ai.frame - s.invLog >= 60 * SECOND) {
+                s.invLog = ai.frame;
+                Violation("INV-038", "front", "front cluster " + (i + 1) + " (" + s.defName + ") has stood " + int((ai.frame - s.standFrame) / SECOND)
+                    + " s with " + have + " of its " + s.slots + " turrets");
+            }
+        }
+
+        // INV-046 (D-114): an open T2 or T3 front cluster has its factory within
+        // FrontClusterOpenSeconds of being planned
+        for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
+            TechFactories::Cluster@ s = TechFactories::clusters[i];
+            if (s.tier < 2 || s.labRes < 0 || s.plannedFrame < 0 || TechFactories::LabAt(s) !is null) continue;
+            if (ai.frame - s.plannedFrame >= Global::RoleSettings::Tech::FrontClusterOpenSeconds * SECOND && ai.frame - s.invOpenLog >= 120 * SECOND) {
+                s.invOpenLog = ai.frame;
+                Violation("INV-046", "front", "front cluster " + (i + 1) + " (" + s.defName + ") planned " + int((ai.frame - s.plannedFrame) / SECOND)
+                    + " s ago has no factory; " + TechFactories::FinishedTurrets(s) + " of its " + s.slots + " turrets stand");
+            }
+        }
+
+        // INV-044 (D-114): with FrontReclaimAtCount land factories on the map, no
+        // land factory stands at the main base for FrontBaseReclaimSeconds
         {
-            const string sSide = Global::AISettings::Side;
-            CCircuitDef@ sLab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(sSide));
-            CCircuitDef@ sNano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(sSide));
-            for (uint i = 0; sLab !is null && sNano !is null && i < TechForward::labs.length(); ++i) {
-                TechForward::SpamLab@ s = TechForward::labs[i];
-                CCircuitUnit@ l = TechForward::LabAt(s, sLab);
-                if (l is null || l.GetBuildProgress() < 1.0f) { s.standFrame = -1; continue; }
-                if (s.standFrame < 0) { s.standFrame = ai.frame; continue; }
-                const int have = TechForward::TurretsOf(s, sNano);
-                if (ai.frame - s.standFrame >= 180 * SECOND && have < int(s.turretPos.length()) && ai.frame - s.invLog >= 60 * SECOND) {
-                    s.invLog = ai.frame;
-                    Violation("INV-038", "spam", "spam lab " + (i + 1) + " has stood " + int((ai.frame - s.standFrame) / SECOND) + " s with " + have + " of its "
-                        + s.turretPos.length() + " turrets");
-                }
+            CCircuitUnit@ bf = TechFactories::BaseLandFactory();
+            if (bf is null) baseFactorySince = -1;
+            else if (baseFactorySince < 0) baseFactorySince = ai.frame;
+            else if (ai.frame - baseFactorySince >= Global::RoleSettings::Tech::FrontBaseReclaimSeconds * SECOND && ai.frame - baseFactoryLog >= 60 * SECOND) {
+                baseFactoryLog = ai.frame;
+                Violation("INV-044", "front", bf.circuitDef.GetName() + " " + bf.id + " still stands at the main base with " + TechFactories::LandFactoryCount()
+                    + " land factories on the map (" + int((ai.frame - baseFactorySince) / SECOND) + " s)");
             }
         }
 
@@ -463,14 +498,18 @@ namespace Invariants {
         {
             const int t1Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
             const int t2Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
-            const int last1 = (TechForward::lastOrderT1 > TechForward::sinceT1) ? TechForward::lastOrderT1 : TechForward::sinceT1;
-            if (TechForward::sinceT1 >= 0 && t1Land > 0 && TechBuild::EcoOnline()
-                && int(TechForward::labs.length()) < TechForward::SpamLabsWanted(aiEconomyMgr.metal.income)
+            // T1 spam work waits for the economy online (D-114), so the clock starts
+            // at the later of the release and that (played: fired the tick it latched)
+            const bool online = TechBuild::EcoOnline();   // first: it latches ecoOnlineFrame
+            int last1 = (TechForward::lastOrderT1 > TechForward::sinceT1) ? TechForward::lastOrderT1 : TechForward::sinceT1;
+            if (TechBuild::ecoOnlineFrame > last1) last1 = TechBuild::ecoOnlineFrame;
+            if (TechForward::sinceT1 >= 0 && t1Land > 0 && online
+                && int(TechForward::SpamClusters().length()) < TechForward::SpamLabsWanted(aiEconomyMgr.metal.income)
                 && ai.frame - last1 >= 180 * SECOND && ai.frame - fwdIdleLogT1 >= 180 * SECOND)
             {
                 fwdIdleLogT1 = ai.frame;
                 Violation("INV-039", "t1", "T1 land constructors released " + int((ai.frame - TechForward::sinceT1) / SECOND) + " s, "
-                    + TechForward::labs.length() + " spam labs of " + TechForward::SpamLabsWanted(aiEconomyMgr.metal.income) + " wanted, no forward order for 180 s");
+                    + TechForward::SpamClusters().length() + " spam labs of " + TechForward::SpamLabsWanted(aiEconomyMgr.metal.income) + " wanted, no forward order for 180 s");
             }
             const int last2 = (TechForward::lastOrderT2 > TechForward::sinceT2) ? TechForward::lastOrderT2 : TechForward::sinceT2;
             if (TechForward::sinceT2 >= 0 && t2Land > 0 && ai.frame - last2 >= 180 * SECOND && ai.frame - fwdIdleLogT2 >= 180 * SECOND) {

@@ -13,6 +13,7 @@
 #include "../manager/eco_planner.as"
 #include "../manager/spam.as"
 #include "tech_forward.as"
+#include "tech_factories.as"
 
 /******************************************************************************
 
@@ -193,6 +194,8 @@ namespace TechRules {
     bool EnergyForMe(Ctx@ c)      { return c.eco.builderIsT2 || !c.fusionEra; }   // in the fusion era T1 builders leave energy to T2
     bool FirstTurretStands(Ctx@ c){ return aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius) > 0.0f; }
     bool Always(Ctx@ c)           { return true; }
+    bool BaseFactoryToGo(Ctx@ c)  { return TechFactories::BaseLandFactory() !is null; }   // D-114
+    bool FrontClusterOpen(Ctx@ c) { return TechFactories::OpenAbove(2) || TechFactories::RefillWanted(1, 3); }   // D-114
     bool LandCon(Ctx@ c)          { return TechForward::IsLand(c.u); }        // D-109: a bot, not an air constructor
     bool T1LandReleased(Ctx@ c)   { return TechForward::T1Released(); }       // D-109
     bool T2LandReleased(Ctx@ c)   { return TechForward::T2Released(); }       // D-109
@@ -213,7 +216,9 @@ namespace TechRules {
     IUnitTask@ DoWaitShort(Ctx@ c)      { return TechBuild::Wait(5 * SECOND); }
     IUnitTask@ DoAirDedicated(Ctx@ c)   { return TechBuild::AirDedicated(c.u); }   // D-107
     IUnitTask@ DoAirFlexible(Ctx@ c)    { return TechBuild::AirFlexible(c.u); }    // D-107
-    IUnitTask@ DoTurretSpam(Ctx@ c)     { return TechForward::TurretFocus(c.u); }  // D-109
+    IUnitTask@ DoBaseFactoryReclaim(Ctx@ c) { return TechFactories::ReclaimBaseFactory(c.u); }   // D-114
+    IUnitTask@ DoFrontCluster(Ctx@ c)       { return TechFactories::OpenWork(c.u); }            // D-114
+    IUnitTask@ DoTurretSpam(Ctx@ c)     { return TechFactories::TurretFocus(c.u); }    // D-109, D-114: every front cluster's turrets
     IUnitTask@ DoFerryCargo(Ctx@ c)                                                 // D-110
     {
         if (!Team::Ferry::IsGift(c.u.id)) return null;
@@ -430,6 +435,8 @@ namespace TechRules {
         table.insertLast(Rule("opening.mex",       COMMANDER,    W1(@OpeningPending), @DoOpening,      "the nearest OpeningMexCap mexes within OpeningMexRadius"));
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));
         table.insertLast(Rule("lab.t2.reclaim",     MOBILE,       W1(@T2LabRetiring), @DoReclaimT2Lab, "D-078: the advanced lab is retiring (an advanced fusion is under construction, the bank has room): every builder reclaims it, turrets in range join"));
+        table.insertLast(Rule("lab.base.reclaim",   MOBILE,       W1(@BaseFactoryToGo), @DoBaseFactoryReclaim, "D-114: with 3 land factories on the map the base's land factories are retired and reclaimed; their ground goes back to the economy"));
+        table.insertLast(Rule("lab.front",          CONSTRUCTORS, W1(@FrontClusterOpen), @DoFrontCluster, "D-114: a front cluster's lost turret; an open T2 or T3 front factory cluster: its turrets, help on one going up, then its factory"));
         table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim winds and solars nearest the base centre; advanced solars at ReclaimAdvSolarMargin; an advanced fusion reclaims all"));
         // D-105 (owner's rule): T1 constructors add build power before assisting a
         // T2 construction; the reclaim rows above stay first

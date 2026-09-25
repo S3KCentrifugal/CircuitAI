@@ -2128,6 +2128,9 @@ namespace RoleTech
 					GenericHelpers::LogUtil("[TECH] T2 lab anchor: Fallback to T2 Bot Lab position (commander absent)", 4);
 				}
 			}
+			bool routedT2;   // D-114: a front factory cluster from +200 metal
+			IUnitTask @tLabF = TechFactories::Route(UnitHelpers::GetT2BotLabForSide(unitSide), u, routedT2);
+			if (routedT2) return tLabF;
 			IUnitTask @tLab = Builder::EnqueueT2BotLabIfNeeded(unitSide, anchorPos, SQUARE_SIZE * 20, SECOND * 300);
 			if (tLab !is null)
 				return tLab;
@@ -2273,7 +2276,10 @@ namespace RoleTech
 			if (t1LabCount < 5)
 			{
 				AIFloat3 preferredPosition = Factory::GetPreferredFactoryPos();
-				IUnitTask @tLab1 = Builder::EnqueueT1BotLab(unitSide, preferredPosition, SQUARE_SIZE * 24, 300 * SECOND, Task::Priority::NORMAL);
+				bool routedT1;   // D-114: a front factory cluster from +200 metal
+				IUnitTask @tLab1F = TechFactories::Route(UnitHelpers::GetT1BotLabForSide(unitSide), u, routedT1);
+				if (routedT1) { if (tLab1F !is null) return tLab1F; }
+				IUnitTask @tLab1 = routedT1 ? null : Builder::EnqueueT1BotLab(unitSide, preferredPosition, SQUARE_SIZE * 24, 300 * SECOND, Task::Priority::NORMAL);
 				if (tLab1 !is null)
 					return tLab1;
 			}
@@ -2286,7 +2292,11 @@ namespace RoleTech
 			if (t1VehCount < 3)
 			{
 				AIFloat3 preferredPosition = Factory::GetPreferredFactoryPos();
-				IUnitTask @tLabVeh = Builder::EnqueueT1VehiclePlant(unitSide, preferredPosition, SQUARE_SIZE * 24, 300 * SECOND, Task::Priority::NORMAL);
+				const string vpName = (unitSide == "armada") ? "armvp" : ((unitSide == "legion") ? "legvp" : "corvp");
+				bool routedVp;   // D-114: a front factory cluster from +200 metal
+				IUnitTask @tLabVehF = TechFactories::Route(vpName, u, routedVp);
+				if (routedVp) { if (tLabVehF !is null) return tLabVehF; }
+				IUnitTask @tLabVeh = routedVp ? null : Builder::EnqueueT1VehiclePlant(unitSide, preferredPosition, SQUARE_SIZE * 24, 300 * SECOND, Task::Priority::NORMAL);
 				if (tLabVeh !is null)
 					return tLabVeh;
 			}
@@ -2349,7 +2359,10 @@ namespace RoleTech
 				/*metalIncomePerGantry*/ Global::RoleSettings::Tech::MetalIncomePerGantry,
 				/*energyIncomePerGantry*/ Global::RoleSettings::Tech::EnergyIncomePerGantry))
 		{
-			IUnitTask @tGantry = Builder::EnqueueLandGantry(unitSide);
+			bool routedG;   // D-114: a front factory cluster from +200 metal
+			IUnitTask @tGantryF = TechFactories::Route(UnitHelpers::GetLandGantryForSide(unitSide), u, routedG);
+			if (routedG && tGantryF !is null) return tGantryF;
+			IUnitTask @tGantry = routedG ? null : Builder::EnqueueLandGantry(unitSide);
 			if (tGantry !is null)
 				return tGantry;
 		}

@@ -35,7 +35,10 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
-| `turret.spam` (D-109) | a spam lab stands | its two turrets behind it guard or build it; INV-038 |
+| `turret.spam` (D-109, D-114) | a front cluster's factory stands | the turrets behind it guard or build it; INV-038 |
+| front factory cluster (`TechFactories::Work`, `Route`, D-114) | a land factory wanted from +200 metal | the cluster planned at least 20% toward the front on flat, roomy ground; its turret block first, the factory once every turret stands; INV-038, INV-045 |
+| `lab.front` (D-114) | a standing front factory missing a turret; no advanced lab with the economy online; an open T2 or T3 front cluster (planned, factory not up) | any constructor reaching the row: the lost turret; a T2 front cluster planned; the open cluster's turrets, help on one going up, then its factory; INV-046 |
+| `lab.base.reclaim` (D-114) | `FrontReclaimAtCount` land factories on the map | the base's land factories retired and reclaimed, never rebuilt there while a land factory stands; their ground goes to the economy; INV-044 |
 | `ferry.cargo` (D-110, D-112) | the unit is a gift (in flight or queued) | in flight: the ferry's hold; queued: parked behind the base; nothing else until the drop-off; INV-041 |
 | `land.recall` (D-109) | a tier's air constructors went down | its land constructors drop a forward job; INV-040 |
 | `fwd.t2.defend` (D-109) | both dedicated T2 air roles held | T2 land constructors: long-range AA then flak at every mex cluster outside the base; INV-039 |

@@ -6012,6 +6012,133 @@ AIs' announcements and replies in its log.
 [`widget_link.as`](../data/script/src/manager/widget_link.as),
 [`playtest.py`](../tools/playtest/playtest.py).
 
+## D-114 — Land factories move toward the front in front factory clusters, turrets first
+
+**Date:** 2026-09-25. **Status:** Played. Build93, TECH 1v1, run `20260925-172313` (45 min): every front lab ordered only with its turret block standing, clusters from 32% to 56% toward the front, T2 and T3 clusters planned. Build95, 16 AIs, run `20260925-194132` (45 min, no crash): T1, T2 and T3 clusters built turrets-first (Legion TECH, team 9), one INV-025 (fixed below). Build96 (the gantry limits, one factory order per cluster): smoke-checked; its 45-minute 16-AI run was still in progress at commit. The owner's crash path (a recalled constructor) did not recur in play; its fix rests on the symbolised trace and the code.
+
+**Owner's rule.** The TECH role (not FRONT/SUPPORT's front tech; the two are
+distinct) moves its land factories gradually toward the front. From +200 metal each
+new land factory stands at least 20% closer to the front, further as needed: the
+first spot that fits a construction turret cluster with the factory. A front factory
+cluster is like a base cluster but holds only construction turrets and one lab: T1
+two turrets, T2 more, T3 more still. The turret cluster is always built first. Flat
+ground where the factory is placeable, away from allied buildings when possible,
+close when necessary. With 3 land factories of any tier, the ones in range of the
+main base's turret cluster are reclaimed and never rebuilt there; their zones become
+economic zones. With no land factory on the map the base may hold one again.
+
+**Decision.** A new module `TechFactories`
+([`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_factories.md`](roles/tech_factories.md)):
+- **Routing.** Every TECH land factory order (the layout's `OrderFactory` and
+  `T2LabTask`, the chain's `gantry`, the legacy lab paths of `tech.as`) passes
+  `TechFactories::Route` first; once the economy is online and a land factory
+  stands, front placement replaces the base's. The D-109 spam labs are the T1
+  clusters (`TechForward::SpamClusters`); D-109's own spam search is gone.
+- **The search.** From `FrontMinShare` (20%) of the way from home toward the front,
+  never behind the furthest cluster yet, up to `FrontMaxShare`, in
+  `FrontShareStep` steps with `FrontLateralTries` side positions. Every spot needs
+  the cluster's ground `FrontMinFlat` flat, the factory reservable and its exit
+  clear; pass 1 also wants a ring of `FrontClearCells` round it `FrontRoomyShare`
+  buildable and the site outside allied zones; pass 2 drops that room.
+- **The block.** T1 2 x 1, T2 2 x 2, T3 3 x 2 turrets directly behind the factory.
+- **Turrets first.** The factory is ordered only once every turret of its block
+  stands finished. The first played run ordered the lab in the same tick as the
+  turrets ("orders corlab for front cluster 1 (its 0 turrets stand)"): the gate only
+  asked whether a slot was free, and claimed slots answer no before any frame
+  exists. A slot the engine refuses (a dead slot) never fills, so after 240 s
+  without turret work the factory goes up behind the turrets that stand, logged.
+- **The base's factories.** Rule `lab.base.reclaim`: with `FrontReclaimAtCount` (3)
+  land factories on the map, a land factory within `FrontBaseRadius` of the base
+  centre is retired and reclaimed (`ReclaimBaseFactory`) and the layout's planned
+  factory footprints there are released to the economy
+  (`ReleaseBaseFactoryGround`). `Route` never sends a land factory to the base while
+  one stands; with none on the map the opening rules place one again.
+
+- **Carrying T2 and T3 clusters.** Rule `lab.front` (after `lab.base.reclaim`):
+  any constructor reaching it rebuilds a standing factory's lost turret, plans a
+  T2 front cluster when no advanced lab stands, and works an open T2 or T3
+  cluster. The first played run of this left the T2 cluster half-built for 7+
+  minutes: its only caller was `lab.t2`, far down the table, which the T2
+  constructors never reached while metal floated.
+- **The advanced lab first (D-102 kept).** Rezoning retires the base's advanced
+  lab too, as the rule asks. After that, and while an advanced lab is only a frame,
+  no T1 front lab is ordered and no new T1 cluster planned; the T2 cluster comes
+  first. Played: 6 INV-025 before this; one more on build95 (a T1 lab ordered
+  while the rezoned advanced lab was being reclaimed), so a retiring advanced lab
+  no longer counts. The cost the owner should know: T2
+  constructor production stops from the rezoning until the front advanced lab
+  stands.
+- **Losses.** A standing factory's lost turret is rebuilt (played: INV-038, a
+  cluster 56% forward lost both turrets). A lost factory is rebuilt at its
+  cluster, its footprint reserved again (played: native had forgotten the
+  reservation and a lab was ordered at (-1, 0)); if the ground is taken the
+  cluster is given up.
+- **Other invariants adjusted.** INV-023 and INV-029 exempt a front lab (it stands
+  at its own block); INV-026 exempts the rezoning; INV-039's T1 clock starts no
+  earlier than the economy online (it fired the tick the economy latched).
+
+- **A crash the rezoning exposed (build93, run `20260925-180954`, F53834).** Access
+  violation in `CIdleTask::Update` (`IdleTask.cpp:64`, symbolised with build93's
+  `.dbg`) in the frame team 1 rezoned its base. The idle task walked its
+  `updateUnits` set with an iterator and called `AssignTask` for each unit;
+  `AssignTask` runs the rule table, and `lab.base.reclaim` re-tasks other idle
+  units (the retired factory, the turrets pulled onto it), whose `RemoveAssignee`
+  erased them from the set under the iterator. The hazard is older (every turret
+  pull could hit it); the rezoning hit it squarely. Fixed in
+  [`IdleTask.cpp`](../src/circuit/task/IdleTask.cpp): the slice is taken out of
+  the set first, and each unit is assigned only while it is still in the idle
+  task (build94).
+
+- **The owner's game crashed on build94 (F43291, TECH as team 10).** Access
+  violation in `IBuilderTask::Approach` (`BuilderTask.cpp:604`, symbolised with
+  build94's `.dbg`; the deployed DLL's md5 matched build94). `lab.front` gave
+  `armck 9237`, a T1 land constructor whose tier was recalled (its air
+  constructors down, D-109), a turret for the T3 cluster. The task's own
+  `Reevaluate` ran the script policy (`MakeTask`); `land.recall` aborted that very
+  task, `lab.front` ordered the same turret again, `Reevaluate` kept "the current
+  task" (the aborted one), and `Update` walked on with the unit's actions cleared.
+  Two fixes: `Reevaluate` stops when the policy dropped its own task (the unit
+  takes what the policy made, or stays idle; build power balanced), in
+  [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp) (build95);
+  and `TechFactories::Work` and `Refill` give no front work to a recalled
+  constructor (`TechForward::Recalled`), so the two rows no longer fight.
+
+- **One factory order per cluster.** The factory's order is kept (a new
+  `IUnitTask.IsDead()` binding checks it before reuse); while it lives a capable
+  builder joins it (at most two), and a new order goes out only once it ended.
+  Played on build95: a T2 lab ordered and not started was re-ordered after
+  120 s, and the new order could not pin the slot the first one still held.
+
+- **The replaced paths' limits kept.** Played on build95 (16 AIs): team 9
+  planned four gantry clusters in 20 minutes; routing had bypassed
+  `EnqueueLandGantry`'s cap (`IsAvailable`) and its cooldown, and `Work` lifted
+  the cap. A new cluster is now planned only when the replaced path would have
+  ordered the factory (`MayPlan`); a gantry's cap is never lifted.
+
+**Rejected.** Reusing D-109's row-of-labs search: it anchored a fixed distance
+forward and packed labs beside each other, so it could not honour "the first spot
+20% closer" nor per-tier blocks.
+
+**Invariant.** INV-045 (new): a front cluster's factory frame starts only with its
+whole turret block finished. INV-044 (new): with the count reached, no land factory
+stands at the base for `FrontBaseReclaimSeconds`. INV-046 (new): an open T2 or T3
+cluster has its factory within `FrontClusterOpenSeconds`. INV-038 now covers every
+front cluster, not only the spam labs.
+
+**Not this decision.** INV-004, INV-014 and INV-022 (late-game converter and
+fusion packing, metal floating) fire at similar rates in 2-AI runs from
+2026-09-24, before D-114.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

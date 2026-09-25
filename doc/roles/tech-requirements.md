@@ -41,6 +41,9 @@ is edited in place with the decision that changed it.
 | L10 | The ground of structures TECH reclaims is recycled by the layout. | D-101 | INV-024 |
 | L11 | With no construction turret of ours on the map (the start, or a restart after a wipe) a T1 lab may go anywhere; otherwise it follows the layout. | D-101 | INV-023 |
 | L13 | A spam cluster layout type: one or more T1 bot labs, each with two construction turrets directly behind it; the two turrets nearest a lab are always focused on that lab. Forward construction turret clusters are small and never block lanes. | D-109 | INV-038 |
+| L14 | From +200 metal land factories move toward the front: each new one at least 20% closer to the front (further as needed), in a front factory cluster: the lab with construction turrets directly behind it (T1: 2, T2: 2 x 2, T3: 3 x 2), the turrets built first. Clusters go on flat ground where the factory fits, away from allied buildings when possible. | D-114 | INV-038, INV-045 |
+| L16 | A front cluster keeps its shape: a lost turret is rebuilt while its factory stands; a lost factory is rebuilt at its cluster. After the base's advanced lab is rezoned, the advanced lab comes back (at the front) before any new T1 lab (D-102's order). | D-114 | INV-038, INV-025, INV-046 |
+| L15 | With 3 land factories of any tier on the map, the land factories at the main base's turret cluster are reclaimed and not rebuilt; their ground becomes economic ground. With no land factory on the map, one may go at the main base again. | D-114 | INV-044 |
 | L12 | Every factory type, T1 and T2 air included, stands tight to the construction turrets; air factories may face any way (their units fly). | D-104 | INV-029 |
 
 ## Build sequence and economy

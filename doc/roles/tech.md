@@ -881,4 +881,4 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 7fe0c1c1522a0433600eaaed8ada19cde173354c; lines: 2661 -->
+<!-- source: data/script/src/roles/tech.as; blob: dd0a80983e321447afb4b864af9831b894d0d522; lines: 2674 -->

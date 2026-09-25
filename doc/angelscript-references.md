@@ -655,6 +655,7 @@ Type GetType() const;
 array<CCircuitUnit@>@ GetUnits() const;
 void Abort();
 void Done();
+bool IsDead() const;   // D-114: the task ended (a kept handle stays valid, its task may not)
 ```
 
 `IBuilderTask` extends `IUnitTask`:

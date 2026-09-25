@@ -18,6 +18,7 @@
 #include "../manager/builder.as"
 #include "../manager/layout.as"
 #include "tech_build.as"
+#include "tech_factories.as"
 
 namespace TechForward {
 
@@ -84,11 +85,19 @@ namespace TechForward {
     // Owner's rule: a tier whose air constructors went down sends its land
     // constructors back to an eco cluster first: a forward job is dropped and the
     // eco rows below take the builder (null: the table continues)
+    // A land constructor whose tier was released once and is recalled now: no
+    // forward work (D-114: lab.front handed a recalled constructor a front turret,
+    // land.recall aborted it in the same re-evaluation, and native crashed)
+    bool Recalled(CCircuitUnit@ u)
+    {
+        if (u is null || !IsLand(u)) return false;
+        const int tier = Tier(u);
+        return tier >= 1 && !Released(tier) && ((tier >= 2) ? everT2 : everT1);
+    }
     IUnitTask@ Recall(CCircuitUnit@ u)
     {
-        if (!IsLand(u)) return null;
+        if (!Recalled(u)) return null;
         const int tier = Tier(u);
-        if (tier < 1 || Released(tier) || !((tier >= 2) ? everT2 : everT1)) return null;
         if (!IsForwardJob(u)) return null;
         // INV-040 (D-109): a recalled land constructor drops its forward job within 60 s
         const int since = (tier >= 2) ? recallT2 : recallT1;
@@ -230,175 +239,19 @@ namespace TechForward {
 
     // ---------------------------------------------------------------- the spam cluster (T1)
 
-    // A spam cluster: T1 bot labs in a row across the front direction, each lab's
-    // exit clear toward the front and two construction turrets directly behind it
-    // (a nano block tight against its back), so no lab, turret or pad stands in
-    // another lab's lane. Small turret pads stand at the row's ends, behind the
-    // lab line.
-    class SpamLab {
-        int labRes = -1;        // the lab's reservation (forgotten by native once built)
-        AIFloat3 pos;           // the lab's site
-        int nanoGroup = 0;      // its two turrets' group
-        array<AIFloat3> turretPos;   // where its two turrets stand (script's record: built slots are forgotten)
-        int labId = -1;         // the lab unit, once seen
-        int orderedFrame = -100000;
-        int standFrame = -1;    // first seen finished (INV-038)
-        int invLog = -100000;
+    // D-109 / D-114: a spam lab is a T1 front factory cluster (TechFactories): the lab
+    // with two construction turrets directly behind it, turrets built first,
+    // placed at least FrontMinShare of the way toward the front. The clusters of
+    // this file: the T1 ones.
+    array<TechFactories::Cluster@> SpamClusters()
+    {
+        array<TechFactories::Cluster@> res;
+        for (uint i = 0; i < TechFactories::clusters.length(); ++i)
+            if (TechFactories::clusters[i].tier == 1) res.insertLast(TechFactories::clusters[i]);
+        return res;
     }
-    array<SpamLab@> labs;
-    bool planned = false;
-    AIFloat3 anchor;
-    int facing = 0;
     array<int> padGroups;
     array<AIFloat3> padCentres;
-    int planLog = -100000;
-
-    bool Plan()
-    {
-        if (planned) return true;
-        const AIFloat3 home = Layout::HomeCentre();
-        const AIFloat3 front = Layout::FrontTarget();
-        const float dx = front.x - home.x, dz = front.z - home.z;
-        const float dist = sqrt(dx * dx + dz * dz);
-        if (dist < 1.0f) return false;
-        float along = Global::RoleSettings::Tech::SpamForwardElmos;
-        const float cap = Global::RoleSettings::Tech::SpamForwardMaxShare * dist;
-        if (along > cap) along = cap;
-        anchor = AIFloat3(home.x + dx / dist * along, home.y, home.z + dz / dist * along);
-        facing = Layout::LabFacing();
-        planned = true;
-        GenericHelpers::LogUtil("[TECH][Forward] spam cluster anchored at (" + int(anchor.x) + ", " + int(anchor.z) + "), " + int(along)
-            + " toward the front, labs facing " + facing + " (D-109)", 1);
-        return true;
-    }
-
-    // D-109 (played: the row near the anchor had no room and the labs spread
-    // over 2,000 elmos): the labs stay one cluster. The first lab takes the
-    // first line near the anchor that fits (sliding along the front direction);
-    // every later lab joins that line, beside the labs already there, never in
-    // front of or behind one (its lane)
-    bool lineSet = false;
-    int searchTry = -100000;
-    float lineAlong = 0.0f;   // the row line's offset along the front direction from the anchor
-    AIFloat3 LinePos(CCircuitDef@ lab, float along, int k)
-    {
-        const int step = (k + 1) / 2;
-        const float sign = (k % 2 == 1) ? 1.0f : -1.0f;
-        const float pitch = float(Layout::Across(lab, facing) + Global::RoleSettings::Tech::SpamLabGapCells) * SQUARE_SIZE * 2;
-        const float off = (k == 0) ? 0.0f : sign * float(step) * pitch;
-        return anchor + Layout::Fwd(facing) * along + Layout::Side(facing) * off;
-    }
-    // the across-offset of the row's labs' middle, so a new lab goes beside them
-    float RowMiddle()
-    {
-        if (labs.length() == 0) return 0.0f;
-        const AIFloat3 sd = Layout::Side(facing);
-        float sum = 0.0f;
-        for (uint i = 0; i < labs.length(); ++i) sum += (labs[i].pos.x - anchor.x) * sd.x + (labs[i].pos.z - anchor.z) * sd.z;
-        return sum / float(labs.length());
-    }
-    bool SiteFits(CCircuitDef@ lab, const AIFloat3& in p)
-    {
-        return !aiTerrainMgr.IsZoneAlly(p) && aiTerrainMgr.CanReserveBuilding(lab, p, facing) && aiTerrainMgr.IsExitClear(lab, p, facing, 320.0f, 32.0f);
-    }
-
-    // Reserve the next lab site of the row with its two turrets behind it
-    SpamLab@ ReserveNext(CCircuitDef@ lab, CCircuitDef@ nano)
-    {
-        array<AIFloat3> cands;
-        const int across = Global::RoleSettings::Tech::SpamRowTries;
-        if (!lineSet) {
-            // D-109 (played: the free ground began ~775 elmos from the anchor and a
-            // narrow search found none): every line within SpamSearchLines steps of
-            // the anchor, 2 x SpamRowTries positions across each; the fit nearest
-            // the anchor takes the line
-            if (ai.frame - searchTry < 10 * SECOND) return null;
-            searchTry = ai.frame;
-            const float lineStep = 4.0f * SQUARE_SIZE * 2;
-            float bestSq = 1.0e30f;
-            for (int j = 0; j <= 2 * Global::RoleSettings::Tech::SpamSearchLines; ++j) {
-                const float along = float((j + 1) / 2) * lineStep * ((j % 2 == 1) ? 1.0f : -1.0f);
-                for (int k = 0; k < 2 * across; ++k) {
-                    const AIFloat3 p = LinePos(lab, along, k);
-                    const float sq = MapHelpers::SqDist(p, anchor);
-                    if (sq >= bestSq || !SiteFits(lab, p)) continue;
-                    bestSq = sq;
-                    if (cands.length() == 0) cands.insertLast(p); else cands[0] = p;
-                    lineAlong = along;
-                }
-            }
-        } else {
-            // beside the labs already in the row: nearest the row's middle first
-            const float mid = RowMiddle();
-            const AIFloat3 sd = Layout::Side(facing);
-            array<float> dist;
-            for (int k = 0; k < 2 * across; ++k) {
-                const AIFloat3 p = LinePos(lab, lineAlong, k);
-                if (!SiteFits(lab, p)) continue;
-                const float o = (p.x - anchor.x) * sd.x + (p.z - anchor.z) * sd.z;
-                const float d = abs(o - mid);
-                uint at = 0;
-                while (at < dist.length() && dist[at] <= d) ++at;
-                dist.insertAt(at, d);
-                cands.insertAt(at, p);
-            }
-        }
-        for (uint c = 0; c < cands.length(); ++c) {
-            const AIFloat3 p = cands[c];
-            const int id = aiTerrainMgr.ReserveBuilding(lab, p, facing);
-            if (id < 0) continue;
-            const AIFloat3 lp = aiTerrainMgr.GetReservationPos(id);
-            const int g = aiTerrainMgr.ReserveNanoBlockAt(nano, lab, lp, facing, 2, 1, 0);
-            if (g <= 0) { aiTerrainMgr.ReleaseReservation(id); continue; }
-            SpamLab@ s = SpamLab();
-            s.labRes = id;
-            s.pos = lp;
-            s.nanoGroup = g;
-            // the two slots: the one nearest each side of the lab
-            const float far = 400.0f;
-            const int a = aiTerrainMgr.NextSlotAny(g, lp + Layout::Side(facing) * far);
-            const int b = aiTerrainMgr.NextSlotAny(g, lp - Layout::Side(facing) * far);
-            if (a >= 0) s.turretPos.insertLast(aiTerrainMgr.GetReservationPos(a));
-            if (b >= 0 && b != a) s.turretPos.insertLast(aiTerrainMgr.GetReservationPos(b));
-            labs.insertLast(s);
-            lineSet = true;
-            GenericHelpers::LogUtil("[TECH][Forward] spam lab " + labs.length() + " reserved at (" + int(lp.x) + ", " + int(lp.z) + ") with "
-                + s.turretPos.length() + " turret slot(s) behind it (D-109)", 1);
-            return s;
-        }
-        if (ai.frame - planLog > 60 * SECOND) {
-            planLog = ai.frame;
-            GenericHelpers::LogUtil("[TECH][Forward] no spam lab site in the row near (" + int(anchor.x) + ", " + int(anchor.z) + ") (D-109)", 1);
-        }
-        return null;
-    }
-
-    // the lab standing (or going up) on a spam site
-    CCircuitUnit@ LabAt(SpamLab@ s, CCircuitDef@ lab)
-    {
-        if (s.labId >= 0) {
-            CCircuitUnit@ u = ai.GetTeamUnit(s.labId);
-            if (u !is null) return u;
-            s.labId = -1;
-        }
-        CCircuitUnit@ f = aiBuilderMgr.FindOwnNear(s.pos, 48.0f, lab);
-        if (f is null) @f = aiBuilderMgr.FindUnfinishedNear(s.pos, 48.0f, lab);
-        if (f !is null) s.labId = f.id;
-        return f;
-    }
-    CCircuitUnit@ TurretAt(const AIFloat3& in p, CCircuitDef@ nano)
-    {
-        CCircuitUnit@ t = aiBuilderMgr.FindOwnNear(p, 32.0f, nano);
-        if (t is null) @t = aiBuilderMgr.FindUnfinishedNear(p, 32.0f, nano);
-        return t;
-    }
-
-    int SpamLabsStanding(CCircuitDef@ lab)
-    {
-        int n = 0;
-        for (uint i = 0; i < labs.length(); ++i) if (LabAt(labs[i], lab) !is null) ++n;
-        return n;
-    }
 
     // Owner's rule: one T1 spam bot lab per SpamLabMetalStep (100) of metal
     // income, up to SpamLabsMax
@@ -408,79 +261,53 @@ namespace TechForward {
         return (n > Global::RoleSettings::Tech::SpamLabsMax) ? Global::RoleSettings::Tech::SpamLabsMax : n;
     }
 
-    IUnitTask@ OrderPinned(CCircuitUnit@ u, Task::BuildType type, CCircuitDef@ d, int id, const string &in what)
-    {
-        const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
-        IUnitTask@ t = (type == Task::BuildType::FACTORY)
-            ? aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::HIGH, d, p, null, 0.0f, false, true, 300 * SECOND))
-            : aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, d, p, 0.0f, true, 120 * SECOND));
-        if (t is null) return null;
-        if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[TECH][Forward] could not pin " + what + " to slot " + id, 1);
-        lastOrderT1 = ai.frame;
-        GenericHelpers::LogUtil("[TECH][Forward] " + u.circuitDef.GetName() + " " + u.id + " orders " + what + " at (" + int(p.x) + ", " + int(p.z) + ") (D-109)", 1);
-        return t;
-    }
-
-    // The released T1 land constructor's work, in order: the next spam lab while
-    // income asks for one; a lab's two turrets; the cluster's AA; idle: a small
-    // turret pad at a row end; else assist what goes up forward, else guard a lab.
+    // The released T1 land constructor's work, in order: the spam clusters (an
+    // open one's turrets, then its lab; a new one while income asks for it); the
+    // cluster's AA; idle: a small turret pad; else assist what goes up forward,
+    // else guard a spam lab.
     IUnitTask@ ForwardT1(CCircuitUnit@ u, float mi)
     {
         const string side = Global::AISettings::Side;
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(side));
-        if (lab is null || nano is null || !Plan()) return null;
+        if (lab is null || nano is null) return null;
+        array<TechFactories::Cluster@> spam = SpamClusters();
 
-        // 1. the spam labs: one per +100 metal; an unordered reserved site first
+        // 1. the spam clusters: turrets first, then the lab (TechFactories::Work)
         const bool gate = Global::Spam::Enabled && TechBuild::EcoOnline();
         if (gate && u.circuitDef.CanBuild(lab)) {
-            for (uint i = 0; i < labs.length(); ++i) {
-                SpamLab@ s = labs[i];
-                if (LabAt(s, lab) !is null || ai.frame - s.orderedFrame < 120 * SECOND) continue;
-                if (s.labRes < 0) continue;
-                IUnitTask@ t = OrderPinned(u, Task::BuildType::FACTORY, lab, s.labRes, "spam lab " + (i + 1));
-                if (t !is null) { s.orderedFrame = ai.frame; return t; }
-            }
-            if (int(labs.length()) < SpamLabsWanted(mi) && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) == 0) {
-                if (lab.maxThisUnit <= lab.count) lab.maxThisUnit = lab.count + 1;
-                SpamLab@ s = ReserveNext(lab, nano);
-                if (s !is null) {
-                    IUnitTask@ t = OrderPinned(u, Task::BuildType::FACTORY, lab, s.labRes, "spam lab " + labs.length() + " (+" + int(mi) + " metal)");
-                    if (t !is null) { s.orderedFrame = ai.frame; return t; }
-                }
-            }
+            const bool more = int(spam.length()) < SpamLabsWanted(mi) && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) == 0
+                && TechFactories::AdvancedLabUp();   // D-102: the advanced lab first
+            IUnitTask@ t = TechFactories::Work(lab, u, more);
+            if (t !is null) { lastOrderT1 = ai.frame; return t; }
         }
-        // 2. each lab's two turrets directly behind it
-        for (uint i = 0; i < labs.length(); ++i) {
-            SpamLab@ s = labs[i];
-            if (LabAt(s, lab) is null) continue;
-            const int id = aiTerrainMgr.NextSlotAny(s.nanoGroup, s.pos);
-            if (id < 0) continue;
-            IUnitTask@ t = OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret behind spam lab " + (i + 1));
-            if (t !is null) return t;
+        // 1b. a standing spam lab's lost turret (D-114, INV-038)
+        {
+            IUnitTask@ rt = TechFactories::Refill(u, 1, 1);
+            if (rt !is null) { lastOrderT1 = ai.frame; return rt; }
         }
-        // 3. the cluster's AA: one per lab, behind the lab line at its side
+        // 2. the cluster's AA: one per standing lab, behind its turrets
         CCircuitDef@ aa = ai.GetCircuitDef(UnitHelpers::GetStaticAAHeavyNameForSide(side));
         if (Buildable(u, aa)) {
-            for (uint i = 0; i < labs.length(); ++i) {
-                SpamLab@ s = labs[i];
-                if (LabAt(s, lab) is null) continue;
-                const AIFloat3 at = s.pos - Layout::Fwd(facing) * (float(Layout::Along(lab, facing) + 2 * Layout::Along(nano, facing) + 2) * SQUARE_SIZE);
+            for (uint i = 0; i < spam.length(); ++i) {
+                TechFactories::Cluster@ c = spam[i];
+                if (TechFactories::LabAt(c) is null) continue;
+                const AIFloat3 at = c.pos - Layout::Fwd(c.facing) * (float(Layout::Along(lab, c.facing) + 2 * Layout::Along(nano, c.facing) + 2) * SQUARE_SIZE);
                 if (Stands(at, 160.0f, aa) || RecentlyOrdered(at, aa.GetName())) continue;
-                IUnitTask@ t = OrderDefence(u, aa, at, 64.0f, "spam lab " + (i + 1) + "'s AA, behind the lab line");
+                IUnitTask@ t = OrderDefence(u, aa, at, 64.0f, "spam lab " + (i + 1) + "'s AA, behind its turrets");
                 if (t !is null) return t;
             }
         }
-        // 4. idle: a small pad of turrets at a row end, behind the lab line
-        IUnitTask@ pad = PadTurret(u, lab, nano);
+        // 3. idle: a small pad of turrets behind an end cluster
+        IUnitTask@ pad = PadTurret(u, lab, nano, spam);
         if (pad !is null) return pad;
-        // 5. assist what goes up forward, else guard the nearest spam lab
-        CCircuitUnit@ f = aiBuilderMgr.FindUnfinishedNear(anchor, Global::RoleSettings::Tech::SpamClusterRadius, null);
-        if (f !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, f, 30 * SECOND));
+        // 4. assist what goes up at a spam cluster, else guard the nearest spam lab
         CCircuitUnit@ best = null;
         float bestSq = 1.0e30f;
-        for (uint i = 0; i < labs.length(); ++i) {
-            CCircuitUnit@ l = LabAt(labs[i], lab);
+        for (uint i = 0; i < spam.length(); ++i) {
+            CCircuitUnit@ f = aiBuilderMgr.FindUnfinishedNear(spam[i].pos, Global::RoleSettings::Tech::SpamClusterRadius, null);
+            if (f !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, f, 30 * SECOND));
+            CCircuitUnit@ l = TechFactories::LabAt(spam[i]);
             if (l is null) continue;
             const float sq = MapHelpers::SqDist(l.GetPos(ai.frame), u.GetPos(ai.frame));
             if (sq < bestSq) { bestSq = sq; @best = l; }
@@ -490,71 +317,37 @@ namespace TechForward {
     }
 
     // Owner's rule: T1 constructors sent out and idle build small clusters of
-    // construction turrets near the front to assist, not on a lane: a 2x2 pad at
-    // an end of the lab row, its front edge on the labs' back line
-    IUnitTask@ PadTurret(CCircuitUnit@ u, CCircuitDef@ lab, CCircuitDef@ nano)
+    // construction turrets near the front to assist, not on a lane: a 2x2 pad
+    // behind the first and the last spam cluster's turrets, a cell of walking room
+    // between (D-109: never on the lab line)
+    IUnitTask@ PadTurret(CCircuitUnit@ u, CCircuitDef@ lab, CCircuitDef@ nano, array<TechFactories::Cluster@>@ spam)
     {
-        if (labs.length() < 2) return null;
+        if (spam.length() < 2) return null;
         for (uint i = 0; i < padGroups.length(); ++i) {
             const int id = aiTerrainMgr.NextSlotAny(padGroups[i], padCentres[i]);
-            if (id >= 0) return OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret on forward pad " + (i + 1));
+            if (id >= 0) { lastOrderT1 = ai.frame; return TechFactories::OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret on forward pad " + (i + 1)); }
         }
         if (int(padGroups.length()) >= Global::RoleSettings::Tech::SpamPadsMax) return null;
-        // the row's ends: the outermost reserved labs on each side
-        float lo = 1.0e30f, hi = -1.0e30f;
-        const AIFloat3 sd = Layout::Side(facing);
-        for (uint i = 0; i < labs.length(); ++i) {
-            const float o = (labs[i].pos.x - anchor.x) * sd.x + (labs[i].pos.z - anchor.z) * sd.z;
-            if (o < lo) lo = o;
-            if (o > hi) hi = o;
-        }
-        // D-109 (played: pads at the row's ends took the next lab sites and the
-        // row broke in two): behind the end labs' turret blocks, a cell of
-        // walking room between, never on the lab line
-        const float back = (float(Layout::Along(lab, facing)) * 0.5f + float(Layout::Along(nano, facing)) + 1.0f) * SQUARE_SIZE * 2;
-        array<float> ends = { hi, lo };
-        const uint e = padGroups.length() % 2;
-        const AIFloat3 fc = anchor + Layout::Fwd(facing) * lineAlong + sd * ends[e] - Layout::Fwd(facing) * back;
-        const int g = aiTerrainMgr.ReserveGrid(nano, fc, facing, 2, 2, 0);
+        TechFactories::Cluster@ c = (padGroups.length() % 2 == 0) ? spam[0] : spam[spam.length() - 1];
+        const float back = (float(Layout::Along(lab, c.facing)) * 0.5f + float(2 * Layout::Along(nano, c.facing)) + 1.0f) * SQUARE_SIZE * 2;
+        const AIFloat3 fc = c.pos - Layout::Fwd(c.facing) * back;
+        const int g = aiTerrainMgr.ReserveGrid(nano, fc, c.facing, 2, 2, 0);
         if (g <= 0) return null;
         padGroups.insertLast(g);
         padCentres.insertLast(fc);
-        GenericHelpers::LogUtil("[TECH][Forward] forward turret pad " + padGroups.length() + " reserved at (" + int(fc.x) + ", " + int(fc.z) + "), behind the lab line (D-109)", 1);
+        GenericHelpers::LogUtil("[TECH][Forward] forward turret pad " + padGroups.length() + " reserved at (" + int(fc.x) + ", " + int(fc.z) + "), behind a spam cluster (D-109)", 1);
         const int id = aiTerrainMgr.NextSlotAny(g, fc);
-        return (id < 0) ? null : OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret on forward pad " + padGroups.length());
-    }
-
-    // Owner's rule: the two turrets closest to a spam lab always work for that
-    // lab: its two slots directly behind it
-    IUnitTask@ TurretFocus(CCircuitUnit@ u)
-    {
-        if (u is null || labs.length() == 0) return null;
-        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side));
-        if (lab is null) return null;
-        const AIFloat3 p = u.GetPos(ai.frame);
-        for (uint i = 0; i < labs.length(); ++i) {
-            SpamLab@ s = labs[i];
-            bool mine = false;
-            for (uint k = 0; k < s.turretPos.length(); ++k) {
-                if (MapHelpers::SqDist(s.turretPos[k], p) <= Sq(32.0f)) { mine = true; break; }
-            }
-            if (!mine) continue;
-            CCircuitUnit@ l = LabAt(s, lab);
-            if (l is null) return null;
-            if (l.GetBuildProgress() < 1.0f) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, l, 30 * SECOND));
-            return GuardHelpers::AssignWorkerGuard(u, l, Task::Priority::HIGH, true, 60 * SECOND);
-        }
-        return null;
+        if (id < 0) return null;
+        lastOrderT1 = ai.frame;
+        return TechFactories::OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret on forward pad " + padGroups.length());
     }
 
     // D-111 (owner: the route from the factory is never set, repeat is not put
     // on, each factory correlates directly to a lane): while spam runs, every
-    // spam lab of ours is on repeat, runs the lane of its place in the row
-    // (0, +1, -1, ... as the row itself was laid out), and carries that lane as
-    // its factory route, so each unit leaves on it before any task is given;
-    // the spam unit is kept buildable (TECH's start caps pin T1 combat at 0:
-    // played, "corak unavailable" from 28 min)
-    int routesSeen = -1;
+    // spam lab of ours is on repeat, runs the lane of its place among the spam
+    // clusters (0, +1, -1, ...), and carries that lane as its factory route, so
+    // each unit leaves on it before any task is given; the spam unit is kept
+    // buildable (TECH's start caps pin T1 combat at 0)
     dictionary factoryRouteVersion;   // factory id -> Spam::routesVersion its route was set at
     void TickSpam()
     {
@@ -565,11 +358,11 @@ namespace TechForward {
         const string unitName = Spam::SpamUnitFor(lab);
         CCircuitDef@ su = (unitName.length() == 0) ? null : ai.GetCircuitDef(unitName);
         if (su !is null && su.maxThisUnit <= su.count + 5) su.maxThisUnit = su.count + 50;
-        for (uint i = 0; i < labs.length(); ++i) {
-            CCircuitUnit@ f = LabAt(labs[i], lab);
+        array<TechFactories::Cluster@> spam = SpamClusters();
+        for (uint i = 0; i < spam.length(); ++i) {
+            CCircuitUnit@ f = TechFactories::LabAt(spam[i]);
             if (f is null || f.GetBuildProgress() < 1.0f) continue;
             const string key = "" + f.id;
-            // the lane of the lab's place in the row, fixed for good
             const int lane = (i == 0) ? 0 : ((i % 2 == 1) ? int((i + 1) / 2) : -int(i / 2));
             Spam::SetFactoryLane(f, lane);
             Spam::SetRepeatFactory(f);
@@ -585,13 +378,5 @@ namespace TechForward {
                 GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " factory route set: " + route.length() + " waypoints on lane " + lane + " (D-111)", 2);
             }
         }
-    }
-
-    // INV-038 input: a standing spam lab and how many of its turrets stand
-    int TurretsOf(SpamLab@ s, CCircuitDef@ nano)
-    {
-        int n = 0;
-        for (uint k = 0; k < s.turretPos.length(); ++k) if (TurretAt(s.turretPos[k], nano) !is null) ++n;
-        return n;
     }
 }

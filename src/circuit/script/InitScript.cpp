@@ -1123,6 +1123,7 @@ void CInitScript::RegisterIUnitTask(asIScriptEngine* engine, const char* cls)
 	r = engine->RegisterObjectMethod(cls, "array<CCircuitUnit@>@ GetUnits() const", asFUNCTION(IUnitTask_GetUnits), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "void Abort()", asMETHOD(T, Abort), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "void Done()", asMETHOD(T, Done), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod(cls, "bool IsDead() const", asMETHODPR(T, IsDead, () const, bool), asCALL_THISCALL); ASSERT(r >= 0);  // D-114: a kept task handle is checked before reuse
 }
 
 template <class T>

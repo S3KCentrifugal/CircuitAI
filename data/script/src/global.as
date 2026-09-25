@@ -317,6 +317,24 @@ namespace Global {
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
             float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
+            // D-114 (owner's rules): land factories move toward the front in front factory clusters
+            float FrontMinShare = 0.2f;                     // D-114: a front cluster stands at least this share of the way from the base toward the front
+            float FrontMaxShare = 0.8f;                     // D-114: and no further than this
+            float FrontShareStep = 0.04f;                   // D-114: the search steps this share toward the front at a time
+            int FrontLateralTries = 6;                      // D-114: positions tried each side of the line at each step
+            float FrontMinFlat = 0.85f;                     // D-114: this share of the cluster's ground flat (LayoutBoxMaxSlope)
+            float FrontRoomyShare = 0.9f;                   // D-114: first pass: this share of the ground round the cluster buildable (away from other buildings)
+            int FrontClearCells = 4;                        // D-114: the room kept round a cluster in the first pass
+            int FrontT1TurretCols = 2;                      // D-114: a T1 lab's turret block: 2 x 1
+            int FrontT1TurretRows = 1;
+            int FrontT2TurretCols = 2;                      // D-114: a T2 lab's: 2 x 2
+            int FrontT2TurretRows = 2;
+            int FrontT3TurretCols = 3;                      // D-114: a gantry's: 3 x 2
+            int FrontT3TurretRows = 2;
+            int FrontReclaimAtCount = 3;                    // D-114: this many land factories on the map retire the base's land factories
+            float FrontBaseRadius = 1200.0f;                // D-114: a land factory within this of the base centre is the base's
+            int FrontBaseReclaimSeconds = 240;              // D-114: INV-044: a base land factory still standing this long after the count is reached
+            int FrontClusterOpenSeconds = 600;              // D-114: INV-046: an open T2 or T3 front cluster without its factory this long after it was planned
             // D-109 (owner's rules): the land constructors leave the base once the air constructors carry it
             int T1AirReleaseAbove = 5;                      // D-109: more than this many T1 air constructors release the T1 land constructors
             int T1AirConstructorTarget = 6;                 // D-109: the T1 air plant keeps this many T1 air constructors
@@ -326,11 +344,7 @@ namespace Global {
             float MexDefenceRadius = 400.0f;                // D-109: a defence within this of a cluster's centre counts for it
             float MexDefenceShake = 160.0f;                 // D-109: native picks the defence's site within this of the cluster's centre
             int ForwardOrderHoldSeconds = 120;              // D-109: an order at one place is not repeated within this
-            float SpamForwardElmos = 1400.0f;               // D-109: the spam cluster's distance from the home centre toward the front
-            float SpamForwardMaxShare = 0.45f;              // D-109: never further than this share of the way to the front
-            int SpamLabGapCells = 2;                        // D-109: cells between two spam labs of the row (a lane each)
-            int SpamSearchLines = 12;                       // D-109: lines tried each way along the front direction for the first spam lab (4 cells apart)
-            int SpamRowTries = 12;                          // D-109: row positions tried for the next spam lab
+            int SpamLabGapCells = 2;                        // D-109, D-114: cells between side-by-side search positions of a front cluster (a lane each)
             float SpamClusterRadius = 600.0f;               // D-109: forward constructors assist what goes up within this of the spam cluster
             int SpamPadsMax = 2;                            // D-109: small 2x2 forward turret pads at the lab row's ends
             float ConverterStarveEnergyShare = 0.5f;        // D-107: the energy bank under this share of storage (or stalling) means the converters cannot stay on (BAR's conversion level is 75% by default)

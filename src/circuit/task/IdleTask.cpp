@@ -12,6 +12,8 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
+#include <vector>
+
 namespace circuit {
 
 CIdleTask::CIdleTask(ITaskModule* mgr)
@@ -54,10 +56,14 @@ void CIdleTask::Update()
 		updateSlice = updateUnits.size() / TEAM_SLOWUPDATE_RATE;
 	}
 
+	// D-114 crash (build93, F53834): AssignTask runs the script's rule table, which
+	// can re-task OTHER idle units (a retired factory, turrets pulled onto a
+	// reclaim); RemoveAssignee then erased them from updateUnits under the running
+	// iterator. The slice is taken out of the set first, and each unit is assigned
+	// only while it is still ours to assign.
 	const int frame = manager->GetCircuit()->GetLastFrame();
-	auto it = updateUnits.begin();
-	unsigned int i = 0;
-	while (it != updateUnits.end()) {
+	std::vector<CCircuitUnit*> batch;
+	for (auto it = updateUnits.begin(); it != updateUnits.end();) {
 		CCircuitUnit* ass = *it;
 
 		// get rid of delayed by engine UnitIdle event from previous task
@@ -67,13 +73,19 @@ void CIdleTask::Update()
 		}
 
 		it = updateUnits.erase(it);
+		batch.push_back(ass);
 
-		manager->AssignTask(ass);  // should RemoveAssignee() on AssignTo()
-		ass->GetTask()->Start(ass);
-
-		if (++i >= updateSlice) {
+		if (batch.size() >= updateSlice) {
 			break;
 		}
+	}
+
+	for (CCircuitUnit* ass : batch) {
+		if (ass->IsDead() || (units.find(ass) == units.end())) {
+			continue;  // left the idle task while an earlier unit was assigned
+		}
+		manager->AssignTask(ass);  // should RemoveAssignee() on AssignTo()
+		ass->GetTask()->Start(ass);
 	}
 }
 

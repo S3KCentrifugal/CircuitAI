@@ -241,10 +241,12 @@ namespace TechBuild {
     // 10-second minimum dipped under 200 at +309 and the rebuilt advanced lab was
     // reclaimed; the owner: above +200 there is no economic reason to reclaim a factory)
     bool ecoOnlineLatched = false;
+    int ecoOnlineFrame = -1;          // the frame it latched (INV-039 measures from it)
     bool EcoOnline()
     {
         if (!ecoOnlineLatched && Economy::GetMinMetalIncomeLast10s() >= Global::RoleSettings::Tech::LabEcoOnlineMetalIncome) {
             ecoOnlineLatched = true;
+            ecoOnlineFrame = ai.frame;
             GenericHelpers::LogUtil("[TECH][Build] the economy is online (+" + int(Economy::GetMinMetalIncomeLast10s()) + " metal): no lab is reclaimed for metal from now on (D-102, D-105)", 1);
         }
         return ecoOnlineLatched;
