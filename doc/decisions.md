@@ -6014,7 +6014,7 @@ AIs' announcements and replies in its log.
 
 ## D-114 — Land factories move toward the front in front factory clusters, turrets first
 
-**Date:** 2026-09-25. **Status:** Played. Build93, TECH 1v1, run `20260925-172313` (45 min): every front lab ordered only with its turret block standing, clusters from 32% to 56% toward the front, T2 and T3 clusters planned. Build95, 16 AIs, run `20260925-194132` (45 min, no crash): T1, T2 and T3 clusters built turrets-first (Legion TECH, team 9), one INV-025 (fixed below). Build96 (the gantry limits, one factory order per cluster): smoke-checked; its 45-minute 16-AI run was still in progress at commit. The owner's crash path (a recalled constructor) did not recur in play; its fix rests on the symbolised trace and the code.
+**Date:** 2026-09-25. **Status:** Played. Build93, TECH 1v1, run `20260925-172313` (45 min): every front lab ordered only with its turret block standing, clusters from 32% to 56% toward the front, T2 and T3 clusters planned. Build95, 16 AIs, run `20260925-194132` (45 min, no crash): T1, T2 and T3 clusters built turrets-first (Legion TECH, team 9), one INV-025 (fixed below). Build96, 16 AIs, run `20260925-202445`: the gantry limits held (two gantry clusters in 20 minutes, not four), but the game died at 41 min in a recursion the build94 crash fix had introduced (below); build96 was never released to play. Build97 carries the corrected fix; see the entry's last bullets for its run.
 
 **Owner's rule.** The TECH role (not FRONT/SUPPORT's front tech; the two are
 distinct) moves its land factories gradually toward the front. From +200 metal each
@@ -6116,6 +6116,27 @@ economic zones. With no land factory on the map the base may hold one again.
   the cap. A new cluster is now planned only when the replaced path would have
   ordered the factory (`MayPlan`); a gantry's cap is never lifted.
 
+- **The build94 crash fix recursed (build96, F73809).** A recalled T2 land
+  constructor's far mex expansion counted as a forward job: `land.recall`
+  aborted it, `mex.expand` handed out the same mex, and `Reevaluate` (build96)
+  assigned that new task at once; its start re-evaluated, the recall aborted it
+  again, 6066 times in one frame until the stack overflowed and the process died
+  mid-line. Fixed in build97: `Reevaluate` leaves the unit with the idle task
+  (assigned on a later update, never re-entrantly); a mex or mex upgrade is not
+  a forward job; the recall aborts one unit's task at most once per 30 s.
+- **Duplicate advanced lab, a stalled factory order (build96).** With no land
+  factory the base rebuilt its advanced lab (the owner's rule); being a frame, it
+  did not count, and `lab.front` planned a second at the front. Now any advanced
+  lab, a frame included, means none is needed. That front order then never
+  became a frame for 12 minutes while builders cycled round the site (INV-046
+  caught it): a factory order with no frame for `FrontClusterStallSeconds` (300 s)
+  now gives its cluster up and releases the ground.
+- **Dictionary reads.** The new recall throttle, `searchTry` and D-111's
+  `factoryRouteVersion` read their frame values as `int64`, the dictionary's
+  integer type (D-112's attempt counter). Played logs show the `int` reads of the
+  last two worked (one "on repeat" line per spam lab), so this is consistency,
+  not a fix.
+
 **Rejected.** Reusing D-109's row-of-labs search: it anchored a fixed distance
 forward and packed labs beside each other, so it could not honour "the first spot
 20% closer" nor per-tier blocks.
@@ -6138,6 +6159,76 @@ fusion packing, metal floating) fire at similar rates in 2-AI runs from
 [`layout.as`](../data/script/src/manager/layout.as),
 [`invariants.as`](../data/script/src/manager/invariants.as),
 [`global.as`](../data/script/src/global.as).
+
+## D-115 — The host commands the AIs it hosts; camera fly-to; role switches played; crash guards
+
+**Date:** 2026-09-25. **Status:** Played (widget checks and a TECH/AIR swap, build98;
+the owner's switch chain replayed without a crash, build98). Open: the owner's
+build98 crash (below) did not reproduce; build99 adds the reporter that names it
+next time.
+
+**Owner's reports and requests.** The widget's buttons were not clickable in the
+owner's game; a way to fly the camera to an AI's commander (else its nearest
+factory); role swaps tested from 20 minutes into a game, after checking the
+widget works.
+
+**Found.**
+- The owner hosts AI-only games as a spectator (`[player0] spectator=1`), and
+  the widget let only a *player* allied with an AI switch its role (CR-008): for
+  a spectator every role button was drawn grey and registered no click.
+- The role switch itself (`Commands::SwitchRole`) was wired and working; it had
+  simply never been reachable from the owner's seat.
+
+**Decision.**
+- [`gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua): the host
+  commands the AIs it hosts (`Spring.GetAIInfo`'s hosting player is this
+  client): a spectating host every AI, a playing host its allies only (CR-008
+  kept for play). A fly-to button beside the query button, and a double-click on
+  an AI's row, move the camera to that AI's commander, else its factory nearest
+  its start; only when asked. `WG.barblink` exposes the same paths (`SetRole`,
+  `GoTo`, `MayCommand`, `Roster`, `LastReply`).
+- [`role_swap_test.lua`](../tools/playtest/widgets/role_swap_test.lua) drives
+  them in a playtest: the host check and a fly-to check at 2 min, TECH/AIR
+  swaps at 20, 30 and 40 min, and the owner's switch chain (TECH, FRONT, AIR,
+  SEA, FRONT at 8.5 to 18.5 min).
+- **Crash on the first swap (build97, F36014):** `IBuilderTask::Update` used a
+  builder's travel action after `CCircuitUnit::ClearAct` (a unit leaving another
+  task) had wiped it; the switch aborts and reassigns many tasks at once. Every
+  travel-action use in [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp)
+  is guarded now (no travel action: nothing to walk), as `FighterTask` already was.
+- **The owner's crash on build98 (F38302, after one AI was switched TECH, FRONT,
+  AIR, SEA, FRONT):** an access violation inside the script engine (`asBC_FREE`
+  released an object already freed, during `AiMakeTask` from
+  `IBuilderTask::Reevaluate`). The engine's trace names no AI and no script line;
+  replaying the chain did not crash. [`ScriptManager.cpp`](../src/circuit/script/ScriptManager.cpp)
+  now installs a reporter (a Windows vectored exception handler, first in the
+  chain, removed with the last AI): an access violation inside a script call
+  logs `SCRIPT CRASH` with the team and the script call stack before the engine's
+  crash handler runs (build99).
+- **Forward pads:** a pad the ground could not hold was kept empty (build98:
+  groups 123 and 124 with 0 of 4 slots filled `SpamPadsMax`); now released, and
+  retried at most once a minute ([`tech_forward.as`](../data/script/src/roles/tech_forward.as)).
+
+**Played.** Build98, 16 AIs: the spectating host may command all 16; fly-to put
+the camera on team 0's commander (0 elmos) in two runs (a third read 1,846 elmos
+while the window was in use); TECH/AIR swap at 20 min: both "ok", no crash
+(build97 crashed there); a manual switch clicked in the game window completed;
+the owner's chain replayed to 30 min without a crash.
+
+**Invariant.** None in the AI for the widget (host-side LuaUI): the playtest
+driver's `[RoleSwap]` lines are its check (host may command, camera on the
+target, each switch replied "ok"). The crash guards are checked by the swap run.
+
+**Not this decision.** Construction turrets told to "approach" a far site
+(`EXP: approach: armnanotc`, over a thousand a game since 2026-09-24): harmless,
+the engine ignores a move for a static unit.
+
+**Files.** [`gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua),
+[`role_swap_test.lua`](../tools/playtest/widgets/role_swap_test.lua),
+[`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp),
+[`ScriptManager.cpp`](../src/circuit/script/ScriptManager.cpp),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`playtest README`](../tools/playtest/README.md).
 
 ## Process decisions
 

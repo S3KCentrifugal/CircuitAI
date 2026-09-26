@@ -48,7 +48,7 @@ The spam labs of D-109 are the T1 clusters (`TechForward::SpamClusters`).
 | `MayPlan` | `Work` | a new cluster only when the replaced path would have ordered the factory: T1 always (`fwd.t1` counts them), an advanced lab when available or none stands, a gantry when available and off the gantry cooldown (planning one starts it); the cap is lifted for T1 and T2 only |
 | `Route` | `Layout::OrderFactory`, `Layout::T2LabTask`, the chain's `gantry`, the legacy lab paths in `tech.as` | a land factory order from +200 metal: the front cluster's next work, never the base's placement |
 | `RefillWanted`, `Refill` | rule `lab.front` (every tier), `TechForward::ForwardT1` (T1) | a standing factory's lost turret is rebuilt on its slot (INV-038) |
-| `AdvancedLabUp`, `AdvancedLabDef`, `NeedAdvancedLab` | `Work`, `OpenWork`, `TechForward::ForwardT1` | the advanced lab first: a T1 front lab waits for a finished one that is not retiring; with none and no open T2 cluster, `lab.front` plans one |
+| `AdvancedLabUp`, `AdvancedLabAny`, `AdvancedLabDef`, `NeedAdvancedLab` | `Work`, `OpenWork`, `TechForward::ForwardT1` | the advanced lab first: a T1 front lab waits for a finished one that is not retiring; with none at all (a frame counts, `AdvancedLabAny`) and no open T2 cluster, `lab.front` plans one |
 | `OpenAbove`, `OpenWork` | rule `lab.front` | a lost turret first, then the advanced lab's cluster when none stands, then an open T2 or T3 cluster carried to the end by any constructor reaching the row: its turrets, help on one going up, then its factory (the T1 clusters are `fwd.t1`'s) |
 | `TurretFocus` | rule `turret.spam` | a cluster's turrets guard (or build) its factory |
 | `BaseLandFactory`, `ReclaimBaseFactory`, `ReleaseBaseFactoryGround`, `baseRetired` | rule `lab.base.reclaim` | the base's land factories retired and reclaimed at the count (recorded, so INV-026 knows it is the rezoning, not a retirement for metal); its factory footprints released |
@@ -75,6 +75,7 @@ INV-044 (with the count reached, no land factory stands at the base for
 | `FrontReclaimAtCount` | 3 | land factories on the map that retire the base's |
 | `FrontBaseRadius` | 1200 | a land factory within this of the base centre is the base's |
 | `FrontBaseReclaimSeconds` | 240 | INV-044 |
+| `FrontClusterStallSeconds` | 300 | a factory order with no frame this long gives its cluster up (ground released) |
 | `FrontClusterOpenSeconds` | 600 | INV-046 |
 
-<!-- source: data/script/src/roles/tech_factories.as; blob: b0e474ffb06bc2e53810d69ca757540124b33372; lines: 531 -->
+<!-- source: data/script/src/roles/tech_factories.as; blob: 621f5724b67c7b3d30e1391ae775c11a1fcd19dc; lines: 560 -->

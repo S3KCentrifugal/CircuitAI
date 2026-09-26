@@ -112,9 +112,24 @@ namespace TechFactories {
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         return d;   // no IsAvailable: TECH's start caps hide it; Work lifts the cap
     }
+    // any advanced lab of ours not retiring, a frame included (played on build96:
+    // the base's new advanced lab was a frame, so a second was planned at the front)
+    bool AdvancedLabAny()
+    {
+        const array<string> t2 = UnitHelpers::GetAllT2BotLabs();
+        array<string>@ keys = Factory::allFactories.getKeys();
+        for (uint i = 0; keys !is null && i < keys.length(); ++i) {
+            CCircuitUnit@ f = null;
+            if (!Factory::allFactories.get(keys[i], @f) || f is null || f.circuitDef is null) continue;
+            if (ai.GetTeamUnit(f.id) is null || t2.find(f.circuitDef.GetName()) < 0) continue;
+            if (!Lifecycle::IsRetiring(f)) return true;
+        }
+        CCircuitDef@ d = AdvancedLabDef();
+        return d !is null && aiBuilderMgr.GetUnfinishedCount(d) > 0;
+    }
     bool NeedAdvancedLab()
     {
-        if (!Active() || AdvancedLabUp() || AdvancedLabDef() is null) return false;
+        if (!Active() || AdvancedLabAny() || AdvancedLabDef() is null) return false;
         for (uint i = 0; i < clusters.length(); ++i)
             if (clusters[i].tier == 2 && clusters[i].labRes >= 0 && LabAt(clusters[i]) is null) return false;   // one open already: OpenAbove carries it
         return true;
@@ -214,7 +229,7 @@ namespace TechFactories {
     {
         CCircuitDef@ nano = Nano();
         if (lab is null || nano is null) return null;
-        int t;
+        int64 t;
         if (searchTry.get(lab.GetName(), t) && ai.frame - t < 10 * SECOND) return null;
         const int tier = TierOf(lab.GetName());
         int cols, rows;
@@ -343,6 +358,20 @@ namespace TechFactories {
         // the factory's order still lives: a builder joins it (at most two), never
         // a second order (played: the re-order after 120 s could not pin the slot
         // the first order still held)
+        if (c.labTask !is null && !c.labTask.IsDead()
+            && ai.frame - c.orderedFrame >= Global::RoleSettings::Tech::FrontClusterStallSeconds * SECOND)
+        {
+            // the order never became a frame (played on build96: builders cycled
+            // round an advanced lab site for 12 minutes): the cluster is given up,
+            // its factory ground released; the next order plans another
+            aiBuilderMgr.AbortTask(c.labTask);
+            @c.labTask = null;
+            if (c.labRes >= 0) aiTerrainMgr.ReleaseReservation(c.labRes);
+            c.labRes = -1;
+            GenericHelpers::LogUtil("[TECH][Factories] front cluster " + idx + " (" + c.defName + "): its factory order made no frame in "
+                + Global::RoleSettings::Tech::FrontClusterStallSeconds + " s; given up (D-114)", 1);
+            return null;
+        }
         if (c.labTask !is null) {
             if (!c.labTask.IsDead()) {
                 if (c.labTask.GetUnits().length() < 2) return c.labTask;

@@ -334,6 +334,7 @@ namespace Global {
             int FrontReclaimAtCount = 3;                    // D-114: this many land factories on the map retire the base's land factories
             float FrontBaseRadius = 1200.0f;                // D-114: a land factory within this of the base centre is the base's
             int FrontBaseReclaimSeconds = 240;              // D-114: INV-044: a base land factory still standing this long after the count is reached
+            int FrontClusterStallSeconds = 300;             // D-114: a front factory order with no frame this long gives its cluster up
             int FrontClusterOpenSeconds = 600;              // D-114: INV-046: an open T2 or T3 front cluster without its factory this long after it was planned
             // D-109 (owner's rules): the land constructors leave the base once the air constructors carry it
             int T1AirReleaseAbove = 5;                      // D-109: more than this many T1 air constructors release the T1 land constructors

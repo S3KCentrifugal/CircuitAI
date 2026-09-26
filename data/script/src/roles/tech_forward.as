@@ -78,6 +78,10 @@ namespace TechForward {
         if (u is null || u.task is null) return false;
         IBuilderTask@ bt = cast<IBuilderTask>(u.task);
         if (bt is null) return false;
+        // economy work is not forward work, wherever it is (played on build96: a
+        // far mex expansion was aborted and handed out again in a loop)
+        const Task::BuildType kind = Task::BuildType(bt.GetBuildType());
+        if (kind == Task::BuildType::MEX || kind == Task::BuildType::MEXUP) return false;
         const AIFloat3 p = bt.GetBuildPos();
         if (p.x < 0.0f) return false;
         return MapHelpers::SqDist(p, Layout::BaseCentre()) > Sq(Global::RoleSettings::Tech::ForwardHomeRadius);
@@ -94,11 +98,16 @@ namespace TechForward {
         const int tier = Tier(u);
         return tier >= 1 && !Released(tier) && ((tier >= 2) ? everT2 : everT1);
     }
+    dictionary recallAborted;   // unit id -> frame of its last recall abort
     IUnitTask@ Recall(CCircuitUnit@ u)
     {
         if (!Recalled(u)) return null;
         const int tier = Tier(u);
         if (!IsForwardJob(u)) return null;
+        // one abort per unit per 30 s: a recall never churns a constructor
+        int64 last;
+        if (recallAborted.get("" + u.id, last) && ai.frame - last < 30 * SECOND) return null;
+        recallAborted.set("" + u.id, ai.frame);
         // INV-040 (D-109): a recalled land constructor drops its forward job within 60 s
         const int since = (tier >= 2) ? recallT2 : recallT1;
         if (since >= 0 && ai.frame - since > 60 * SECOND)
@@ -251,6 +260,7 @@ namespace TechForward {
         return res;
     }
     array<int> padGroups;
+    int padTryFrame = -100000;   // the last pad reservation attempt
     array<AIFloat3> padCentres;
 
     // Owner's rule: one T1 spam bot lab per SpamLabMetalStep (100) of metal
@@ -331,7 +341,12 @@ namespace TechForward {
         TechFactories::Cluster@ c = (padGroups.length() % 2 == 0) ? spam[0] : spam[spam.length() - 1];
         const float back = (float(Layout::Along(lab, c.facing)) * 0.5f + float(2 * Layout::Along(nano, c.facing)) + 1.0f) * SQUARE_SIZE * 2;
         const AIFloat3 fc = c.pos - Layout::Fwd(c.facing) * back;
+        if (ai.frame - padTryFrame < 60 * SECOND) return null;
+        padTryFrame = ai.frame;
         const int g = aiTerrainMgr.ReserveGrid(nano, fc, c.facing, 2, 2, 0);
+        // a pad the ground cannot hold is not kept (played on build98: two empty
+        // pads filled SpamPadsMax, so no pad ever went up)
+        if (g > 0 && aiTerrainMgr.GetGroupCount(g, false) < 4) { aiTerrainMgr.ReleaseGroup(g); return null; }
         if (g <= 0) return null;
         padGroups.insertLast(g);
         padCentres.insertLast(fc);
@@ -366,7 +381,7 @@ namespace TechForward {
             const int lane = (i == 0) ? 0 : ((i % 2 == 1) ? int((i + 1) / 2) : -int(i / 2));
             Spam::SetFactoryLane(f, lane);
             Spam::SetRepeatFactory(f);
-            int v = -1;
+            int64 v = -1;
             if (!factoryRouteVersion.get(key, v)) {
                 f.CmdRepeat(true);
                 GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " (" + f.id + ") on repeat, lane " + lane + " (D-111)", 1);

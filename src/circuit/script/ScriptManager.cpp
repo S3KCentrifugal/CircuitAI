@@ -29,9 +29,59 @@
 #include "angelscript/add_on/scriptbuilder/scriptbuilder.h"
 #include "angelscript/add_on/aatc/aatc.hpp"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 namespace circuit {
 
 using namespace springai;
+
+/*
+ * D-114 (the owner's game crashed in the script engine, build98: asBC_FREE
+ * released a freed object; the engine's stack trace names no AI and no script
+ * line). A crash inside a script call now logs, before the engine's own crash
+ * handler runs, which AI was executing and the script's call stack (function,
+ * section, line). It only reads and logs: the crash goes on to the engine.
+ */
+#ifdef _WIN32
+static thread_local CCircuitAI* scriptCrashAI = nullptr;   // the AI whose script runs on this thread
+static PVOID scriptCrashHandler = nullptr;
+static int scriptCrashUsers = 0;
+static bool scriptCrashReported = false;
+
+static LONG CALLBACK ScriptCrashReporter(PEXCEPTION_POINTERS info)
+{
+	if ((info == nullptr) || (info->ExceptionRecord == nullptr)
+		|| (info->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION))
+	{
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+	CCircuitAI* circuit = scriptCrashAI;
+	asIScriptContext* ctx = asGetActiveContext();
+	if ((circuit == nullptr) || (ctx == nullptr) || scriptCrashReported) {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+	scriptCrashReported = true;
+	circuit->LOG("SCRIPT CRASH: access violation in a script call of team %i (skirmish AI %i); the script stack, innermost first:",
+			circuit->GetTeamId(), circuit->GetSkirmishAIId());
+	for (asUINT i = 0; i < ctx->GetCallstackSize(); ++i) {
+		const asIScriptFunction* func = ctx->GetFunction(i);
+		const char* section = nullptr;
+		int column = 0;
+		const int line = ctx->GetLineNumber(i, &column, &section);
+		circuit->LOG("  #%u %s (%s:%i)", i, (func != nullptr) ? func->GetDeclaration(true, true) : "?",
+				(section != nullptr) ? section : "?", line);
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
 
 std::string CScriptManager::initName("init");
 std::string CScriptManager::mainName("main");
@@ -70,10 +120,24 @@ CScriptManager::CScriptManager(CCircuitAI* circuit)
 		, jit(nullptr)
 {
 	Init();
+#ifdef _WIN32
+	// first in the chain, so it runs before the engine's crash handler; one for
+	// every AI in the process, removed with the last (never left pointing into an
+	// unloaded DLL)
+	if (scriptCrashUsers++ == 0) {
+		scriptCrashHandler = AddVectoredExceptionHandler(1, ScriptCrashReporter);
+	}
+#endif
 }
 
 CScriptManager::~CScriptManager()
 {
+#ifdef _WIN32
+	if ((--scriptCrashUsers == 0) && (scriptCrashHandler != nullptr)) {
+		RemoveVectoredExceptionHandler(scriptCrashHandler);
+		scriptCrashHandler = nullptr;
+	}
+#endif
 	Release();
 }
 
@@ -269,7 +333,14 @@ bool CScriptManager::Exec(asIScriptContext* ctx)
 	ZoneText(declAt.c_str(), declAt.size());
 #endif
 
+#ifdef _WIN32
+	CCircuitAI* outerAI = scriptCrashAI;   // nested calls (script -> native -> script) restore it
+	scriptCrashAI = circuit;
 	int r = ctx->Execute();
+	scriptCrashAI = outerAI;
+#else
+	int r = ctx->Execute();
+#endif
 	if (r != asEXECUTION_FINISHED) {
 		// The execution didn't complete as expected. Determine what happened.
 		if (r == asEXECUTION_EXCEPTION) {

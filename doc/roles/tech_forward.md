@@ -66,4 +66,4 @@ constructor drops its forward job within 60 s); D-111's INV-043 lives in
 `Global::Spam::RepeatStallSeconds` (45): a factory on repeat that produced no spam
 unit for this long gets its build again (D-111).
 
-<!-- source: data/script/src/roles/tech_forward.as; blob: ce734a0b9bfab48db53f1f1a48f5b2a7222638d0; lines: 382 -->
+<!-- source: data/script/src/roles/tech_forward.as; blob: 95b9912469c59f9968dfce29b0149a555f548bc4; lines: 397 -->

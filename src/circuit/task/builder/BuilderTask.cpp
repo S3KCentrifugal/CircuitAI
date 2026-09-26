@@ -554,7 +554,12 @@ void IBuilderTask::Update(CCircuitUnit* unit)
 			return;
 		}
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
+	// D-114 crash (role-swap playtest, build97, F36014): a unit can be listed by
+	// a task with no travel action (CCircuitUnit::ClearAct on leaving another
+	// task wipes it; a role switch aborts and reassigns many at once). No travel
+	// action: nothing to walk, as FighterTask already assumes.
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
 		UpdatePath(unit);  // Execute(unit) within OnTravelEnd
 	}
 }
@@ -601,8 +606,9 @@ bool IBuilderTask::Approach(CCircuitUnit* unit)
 	if (!geom::is_valid(ap)) {
 		return false;
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
-		unit->GetTravelAct()->StateFinish();
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
+		travelAct->StateFinish();
 	}
 	TRY_UNIT(circuit, unit,
 		unit->CmdMoveTo(ap, 0, INT_MAX);
@@ -640,8 +646,9 @@ bool IBuilderTask::TryEngage(CCircuitUnit* unit)
 			return true;
 		}
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
-		unit->GetTravelAct()->StateFinish();  // no more waypoints; the engine walks into range
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
+		travelAct->StateFinish();  // no more waypoints; the engine walks into range
 	}
 	if (!Execute(unit)) {
 		return false;  // no site, fallback or abort: the unit is no longer ours to path
@@ -731,7 +738,7 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 				// the builder off its order (played: the first lab and the opening
 				// solars took minutes whenever energy was empty). The sequence
 				// manages energy itself; a slow build beats an abandoned one.
-				if (!IsExperimental() && unit->GetTravelAct()->IsFinished()) {
+				if (!IsExperimental() && ((unit->GetTravelAct() == nullptr) || unit->GetTravelAct()->IsFinished())) {
 					unit->CmdWait(ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
 							&& (buildType != BuildType::STORE) && (buildType != BuildType::RECLAIM));
 				}
@@ -752,12 +759,13 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	// D-114 crash (owner's game, build94, F43291): MakeTask runs the script's
 	// policy for this unit, and a rule can drop THIS task (land.recall aborts a
 	// forward job). The unit is then no longer ours; carrying on used its cleared
-	// travel action in Approach. It takes what the policy made, or stays idle.
+	// travel action in Approach. The unit stays with the idle task, which assigns
+	// it on a later update: assigning it here started the new task at once, whose
+	// own re-evaluation dropped it again, recursing until the stack overflowed
+	// (build96 playtest, F73809, 6066 recalls in one frame).
 	if (IsDead() || (units.find(unit) == units.end())) {
 		ShowAssignee(unit);  // RemoveAssignee hid it again: one Hide stands, as for any unit that left
-		if ((task != nullptr) && !task->IsDead() && (unit->GetTask() != task)) {
-			manager->AssignTask(unit, task);
-		}
+		manager->DiscardUnusedTask(task);
 		return false;
 	}
 	ShowAssignee(unit);
@@ -797,7 +805,9 @@ void IBuilderTask::UpdatePath(CCircuitUnit* unit)
 		|| (geom::is_in_range(basePos, startPos, baseDefRange)
 			&& (geom::is_in_range(basePos, endPos, baseDefRange))))
 	{
-		unit->GetTravelAct()->StateFinish();
+		if (unit->GetTravelAct() != nullptr) {
+			unit->GetTravelAct()->StateFinish();
+		}
 		return;
 	}
 
@@ -821,10 +831,14 @@ void IBuilderTask::ApplyPath(const CQueryPathSingle* query)
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
 
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if (travelAct == nullptr) {
+		return;  // it left the task (or lost its actions) while the path was computed
+	}
 	if (pPath->path.size() > 2) {
-		unit->GetTravelAct()->SetPath(pPath);
+		travelAct->SetPath(pPath);
 	} else {
-		unit->GetTravelAct()->StateFinish();
+		travelAct->StateFinish();
 	}
 }
 
