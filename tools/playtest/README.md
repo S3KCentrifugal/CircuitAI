@@ -148,6 +148,28 @@ log-only checks and for the 8v8.
 - A game the lobby is running at the same time shares the GPU and the CPU;
   stop one first.
 
+## Driving the BARb widget
+
+`--extra-widget` stages any widget into the playtest's own write dir
+(repeatable). Two go together:
+
+- `tools/widgets/gui_barb_team_link.lua`, the BARb team link widget itself;
+- `widgets/role_swap_test.lua`, which drives it through `WG.barblink` (the same
+  code paths as its buttons): at minute 2 it checks the host may command every
+  AI, flies the camera to team 0's commander (`GoTo`) and checks the camera
+  landed on it, and opens the window; at minutes 20, 30 and 40 it swaps a TECH
+  and an AIR AI of one ally team (`SetRole` on both) and logs each AI's reply 10 s
+  later. Every line is `[RoleSwap] ...`.
+
+```bash
+python tools/playtest/playtest.py run --roles all --speed 3 --minutes 45   --shots "21@2600,31@2600,41@2600" --keep-going   --extra-widget tools/widgets/gui_barb_team_link.lua   --extra-widget tools/playtest/widgets/role_swap_test.lua
+```
+
+A game to watch and drive by hand: `--shots ""` (the camera widget then never
+moves the camera), `--no-stop`, a long `--minutes`. The harness joins as a
+spectator; the team link widget lets the spectating host command the AIs it
+hosts.
+
 ## Pointing the camera
 
 `--shots` takes `minute[@height[@x:z]]`: with `x:z` the camera centres on that

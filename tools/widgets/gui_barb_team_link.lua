@@ -63,6 +63,7 @@ local ICON = {
 	queryall = "icons/radar_t2.png",
 	overlay  = "icons/eye.png",
 	close    = "LuaUI/Images/advplayerslist/cross.dds",
+	goto     = "LuaUI/Images/advplayerslist/camera.dds",
 	lead     = "LuaUI/Images/advplayerslist/indicator.dds",
 }
 local MAX_EVENTS = 120
@@ -95,18 +96,29 @@ local spEcho, spGetGameFrame, spGetMouseState = Spring.Echo, Spring.GetGameFrame
 local spGetTeamList, spGetTeamInfo, spGetAIInfo, spGetTeamColor = Spring.GetTeamList, Spring.GetTeamInfo, Spring.GetAIInfo, Spring.GetTeamColor
 local spGetMyTeamID, spAreTeamsAllied, spGetSpectatingState = Spring.GetMyTeamID, Spring.AreTeamsAllied, Spring.GetSpectatingState
 local spSendSkirmishAIMessage, spPlaySoundFile = Spring.SendSkirmishAIMessage, Spring.PlaySoundFile
+local spGetMyPlayerID, spGetTeamUnits, spGetUnitDefID = Spring.GetMyPlayerID, Spring.GetTeamUnits, Spring.GetUnitDefID
+local spGetUnitPosition, spSetCameraTarget, spGetTeamStartPosition = Spring.GetUnitPosition, Spring.SetCameraTarget, Spring.GetTeamStartPosition
 local mathFloor, mathMax, mathMin = math.floor, math.max, math.min
 
 -- Only teams allied with the local player are listed, drawn and commanded
--- (CR-008): a host running both sides must not see the enemy BARb's plan or
--- steer its builders. A spectator sees every AI but may route none of them.
+-- (CR-008): a host playing in a game must not see the enemy BARb's plan or
+-- steer its builders. A spectator sees every AI. Commanding needs the AI to be
+-- hosted by this client (it runs here, and only here does the message reach
+-- it): a spectating host commands every AI it hosts (an AI-only game, the
+-- owner's usual set-up; before this, every role button was greyed out there),
+-- a playing host only its allies.
 local function isSpectator() return spGetSpectatingState() == true end
 local function isPermittedTeam(teamId)
 	if isSpectator() then return true end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
 end
+local function hostedHere(teamId)
+	local _, _, host = spGetAIInfo(teamId)
+	return host ~= nil and host == spGetMyPlayerID()
+end
 local function mayCommand(teamId)
-	if isSpectator() then return false end
+	if not hostedHere(teamId) then return false end
+	if isSpectator() then return true end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
 end
 
@@ -139,6 +151,7 @@ local firstAnnounceFrame = nil
 local layoutShown = false
 local layoutData = {}
 local hookAIMessages, unhookAIMessages   -- defined with the message code below
+local lastRowClick = nil                 -- a row's last click (double-click flies the camera)
 
 -- ---------------------------------------------------------------- helpers
 
@@ -224,6 +237,60 @@ end
 
 local function playClick() spPlaySoundFile(SOUND_CLICK, 0.5, "ui") end
 
+-- a role switch request: the role grid's buttons and WG.barblink.SetRole
+local function requestRole(teamId, role)
+	if not mayCommand(teamId) then
+		addEvent(string.format("Team %d: switch to %s refused here (this AI is not hosted by you)", teamId, role), "warn")
+		return false
+	end
+	addEvent(string.format("Team %d: switch to %s requested", teamId, role), "info")
+	return send(teamId, "barb|setrole|" .. teamId .. "|" .. role)
+end
+
+-- Fly the camera to an AI: its commander, else its factory nearest its start
+-- (the owner's request). Only when asked: the widget never moves the camera
+-- by itself.
+local commanderDef, factoryDef = {}, {}
+for id, ud in pairs(UnitDefs) do
+	if ud.customParams and ud.customParams.iscommander then commanderDef[id] = true end
+	if ud.isFactory then factoryDef[id] = true end
+end
+local function focusUnit(teamId)
+	local units = spGetTeamUnits(teamId)
+	if not units then return nil end
+	local e = ais[teamId]
+	local bx, bz = e and e.roster and e.roster.x, e and e.roster and e.roster.z
+	if not bx then local sx, _, sz = spGetTeamStartPosition(teamId); bx, bz = sx, sz end
+	bx, bz = bx or 0, bz or 0
+	local best, bestD, bestKind = nil, math.huge, nil
+	for _, uid in ipairs(units) do
+		local d = spGetUnitDefID(uid)
+		local kind = (d and commanderDef[d]) and "commander" or ((d and factoryDef[d]) and "factory" or nil)
+		if kind and (bestKind ~= "commander" or kind == "commander") then
+			local x, _, z = spGetUnitPosition(uid)
+			if x then
+				local dist = (x - bx) * (x - bx) + (z - bz) * (z - bz)
+				if (kind == "commander" and bestKind ~= "commander") or dist < bestD then
+					best, bestD, bestKind = uid, dist, kind
+				end
+			end
+		end
+	end
+	return best, bestKind
+end
+local function goTo(teamId)
+	local uid, kind = focusUnit(teamId)
+	if not uid then
+		addEvent(string.format("Team %d: no commander or factory in view", teamId), "warn")
+		return false
+	end
+	local x, y, z = spGetUnitPosition(uid)
+	spSetCameraTarget(x, y, z, 0.4)
+	local name = UnitDefs[spGetUnitDefID(uid)] and UnitDefs[spGetUnitDefID(uid)].translatedHumanName or kind
+	addEvent(string.format("Camera: team %d's %s (%s)", teamId, kind, name or "?"), "info")
+	return true, uid, kind
+end
+
 local function setOpen(v)
 	open = v
 	if v then refreshTeams() end
@@ -298,6 +365,19 @@ function widget:Initialize()
 	WG.barblink = {
 		IsOpen = function() return open end,
 		SetOpen = setOpen,
+		-- the same paths as the buttons (tools/playtest drives them)
+		SetRole = function(teamId, role) return requestRole(teamId, role) end,
+		GoTo = function(teamId) return goTo(teamId) end,
+		MayCommand = function(teamId) return mayCommand(teamId) end,
+		-- teamId -> { role, allyTeam, name } of every listed AI that announced itself
+		Roster = function()
+			local out = {}
+			for id, e in pairs(ais) do
+				if e.roster then out[id] = { role = e.roster.role, allyTeam = e.allyTeam, name = e.name } end
+			end
+			return out
+		end,
+		LastReply = function(teamId) local e = ais[teamId]; return e and e.lastReply end,
 	}
 end
 
@@ -713,7 +793,13 @@ local function drawWindow()
 				rx = rx - px(14)
 			end
 			text(font, fitText(font, a.name, px(9.5), rx - left - px(22)), left + px(19), ry1 + rowH * 0.5 - px(3.4), px(9.5), "o", sel and C.onSurface or C.onSurfaceVariant)
-			register(left, ry1, right, ry2, "row" .. id, function() playClick(); selected = id end,
+			register(left, ry1, right, ry2, "row" .. id, function()
+				playClick()
+				local now = Spring.GetTimer()
+				if selected == id and lastRowClick and Spring.DiffTimers(now, lastRowClick) < 0.4 then goTo(id) end
+				selected = id
+				lastRowClick = now
+			end,
 				string.format("Team %d: %s%s", id, a.name, a.roster and (", " .. a.roster.role .. ", " .. (a.roster.side or "?")) or ""))
 		end
 		if #ids > maxRows then
@@ -734,9 +820,11 @@ local function drawWindow()
 			line = (firstAnnounceFrame == nil and spGetGameFrame() > 60 * 30) and "no announcement: is this AI hosted here?" or "waiting for the AI's announcement"
 		end
 		local qs = px(18)
-		iconButton(right - qs, cy - qs + px(3), qs, ICON.query, "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end,
+		local qx = iconButton(right - qs, cy - qs + px(3), qs, ICON.query, "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end,
 			"Ask this AI for its details", false, "?")
-		text(font, fitText(font, line, px(8.5), w - qs - px(4)), left, cy - px(10), px(8.5), "o", C.onSurfaceVariant)
+		iconButton(qx, cy - qs + px(3), qs, ICON.goto, "goto", function() playClick(); goTo(e.teamId) end,
+			"Fly the camera to this AI's commander (else its factory nearest its start); double-click a row does the same", false, ">")
+		text(font, fitText(font, line, px(8.5), w - 2 * qs - px(6)), left, cy - px(10), px(8.5), "o", C.onSurfaceVariant)
 		cy = cy - px(18)
 
 		local segH = px(22)
@@ -751,14 +839,13 @@ local function drawWindow()
 			labelButton(sx1, sy2 - segH, sx1 + segW, sy2, ICON[role], role, "role" .. role, function()
 				if active then return end
 				playClick()
-				addEvent(string.format("Team %d: switch to %s requested", e.teamId, role), "info")
-				send(e.teamId, "barb|setrole|" .. e.teamId .. "|" .. role)
-			end, role .. ": " .. (ROLE_HINT[role] or "") .. (cmd and "" or " (spectators cannot switch roles)"), active, cmd)
+				requestRole(e.teamId, role)
+			end, role .. ": " .. (ROLE_HINT[role] or "") .. (cmd and "" or " (only this AI's host can switch its role)"), active, cmd)
 		end
 		cy = cy - 2 * segH - sgap - px(4)
 		local replyColor = C.onSurfaceVariant
 		if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
-		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "spectating: roles are read-only"), px(8.5), w),
+		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "read-only: this AI is not hosted by you"), px(8.5), w),
 			left, cy - px(9), px(8.5), "o", replyColor)
 		cy = cy - px(14)
 	end
