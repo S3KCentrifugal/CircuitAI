@@ -300,6 +300,8 @@ public:
 	void QueueDrawPoint(const springai::AIFloat3& p, const std::string& label) { drawOps.push_back(SDrawOp{1, p, p, label}); }
 	void QueueDrawErase(const springai::AIFloat3& p) { drawOps.push_back(SDrawOp{2, p, p, std::string()}); }
 	int GetDrawQueueSize() const { return int(drawOps.size()); }
+	// D-124 (owner): a smiley face drawn on the map (map lines, the queue's pace)
+	void DrawSmiley(const springai::AIFloat3& centre, float radius);
 	void ClearDrawQueue() { drawOps.clear(); }
 	// the pace: up to `perBatch` items (1..20) a batch, batches `ms` apart (at
 	// least 55: the server's guard counts gaps under 50 ms)

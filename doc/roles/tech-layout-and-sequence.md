@@ -255,7 +255,10 @@ drop-off, the cargo and the transport take no other order:
 - the transport's run is not abandoned when it is hit;
 - "aboard" means lifted **and** following the transport, so a constructor
   standing on a raised factory pad is never mistaken for cargo; a run always
-  ends (delivered or failed, and the next queued run starts).
+  ends (delivered or failed, and the next queued run starts);
+- delivered, and given at once, as soon as the engine has finished the unload
+  (the transport's queue is empty) and the cargo is no longer aboard, even when
+  it stands on raised ground (D-122, INV-052).
 
 ### The metal bank (D-105, D-106)
 

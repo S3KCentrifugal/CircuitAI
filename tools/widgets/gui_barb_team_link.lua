@@ -131,7 +131,7 @@ local font, font2
 local hasFlowUI = false
 
 local open = false               -- the window is shown
-local firstRun = true            -- no saved config yet: open once, so the widget is found
+local firstRun = true            -- no saved config yet (owner: the window starts closed; the launcher shows it is there)
 local offX, offY = 0, 0          -- the user's drag, from the default place (scaled px)
 local launcher = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
 local win = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
@@ -360,7 +360,6 @@ end
 function widget:Initialize()
 	self:ViewResize(Spring.GetViewGeometry())
 	refreshTeams()
-	if firstRun then open = true end
 	hookAIMessages()
 	WG.barblink = {
 		IsOpen = function() return open end,

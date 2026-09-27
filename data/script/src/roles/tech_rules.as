@@ -14,6 +14,7 @@
 #include "../manager/spam.as"
 #include "tech_forward.as"
 #include "tech_factories.as"
+#include "tech_harbour.as"
 
 /******************************************************************************
 
@@ -57,6 +58,7 @@ namespace TechRules {
     const int CON_T1 = 2;
     const int CON_T2 = 4;
     const int TURRET = 8;
+    const int SEA_CON = 16;        // D-121: construction ships and subs (the harbour's; no land rule reaches them)
     const int MOBILE = COMMANDER | CON_T1 | CON_T2;
     const int CONSTRUCTORS = CON_T1 | CON_T2;
     const int ANY = MOBILE | TURRET;
@@ -95,6 +97,7 @@ namespace TechRules {
         @c.u = u;
         @c.d = u.circuitDef;
         if (!c.d.IsMobile()) c.who = TURRET;
+        else if (SeaConstructor::IsT1(c.d) || SeaConstructor::IsT2(c.d) || TechHarbour::IsHoverConstructor(c.d)) c.who = SEA_CON;   // D-121
         else if (UnitHelpers::IsCommander(c.d)) c.who = COMMANDER;
         else c.who = (UnitHelpers::GetConstructorTier(c.d) >= 2) ? CON_T2 : CON_T1;
         c.mi = Economy::GetMinMetalIncomeLast10s();
@@ -215,9 +218,13 @@ namespace TechRules {
     }
     IUnitTask@ DoWaitShort(Ctx@ c)      { return TechBuild::Wait(5 * SECOND); }
     IUnitTask@ DoAirDedicated(Ctx@ c)   { return TechBuild::AirDedicated(c.u); }   // D-107
+    IUnitTask@ DoAirDefend(Ctx@ c)      { return TechBuild::AirDefence(c.u); }     // D-123
     IUnitTask@ DoAirFlexible(Ctx@ c)    { return TechBuild::AirFlexible(c.u); }    // D-107
     IUnitTask@ DoBaseFactoryReclaim(Ctx@ c) { return TechFactories::ReclaimBaseFactory(c.u); }   // D-114
     IUnitTask@ DoFrontCluster(Ctx@ c)       { return TechFactories::OpenWork(c.u); }            // D-114
+    IUnitTask@ DoHarbourSea(Ctx@ c)     { return TechHarbour::SeaTask(c.u); }       // D-121
+    IUnitTask@ DoHarbourYard(Ctx@ c)    { return TechHarbour::LandTask(c.u); }      // D-121
+    IUnitTask@ DoHarbourFloat(Ctx@ c)   { return TechHarbour::CommanderFloat(c.u); } // D-121
     IUnitTask@ DoTurretSpam(Ctx@ c)     { return TechFactories::TurretFocus(c.u); }    // D-109, D-114: every front cluster's turrets
     IUnitTask@ DoFerryCargo(Ctx@ c)                                                 // D-110
     {
@@ -417,10 +424,14 @@ namespace TechRules {
     }
 
     array<Rule@> table;
+    Rule@ airDefendRule = Rule("air.defend", CONSTRUCTORS, W0(), @DoAirDefend, "D-123: in place of a wait");   // D-123: the trace of a wait replaced
 
     void Init()
     {
         if (table.length() > 0) return;
+        table.insertLast(Rule("harbour.sea",       SEA_CON,      W0(), @DoHarbourSea,   "D-121: construction ships and subs: the advanced shipyard, floating turrets, then the sea economy"));
+        table.insertLast(Rule("harbour.yard",      MOBILE,       W0(), @DoHarbourYard,  "D-121: an island TECH with its advanced fusions: the T1 shipyard offshore, once"));
+        table.insertLast(Rule("harbour.float",     COMMANDER,    W0(), @DoHarbourFloat, "D-121: an island TECH's commander: floating converters while energy floats (the land is for labs and fusions)"));
         table.insertLast(Rule("turret.spam",       TURRET,       W0(), @DoTurretSpam,   "D-109: the two turrets directly behind a spam lab always work for that lab"));
         table.insertLast(Rule("turret.assist",     TURRET,       W0(), @DoTurretAssist, "reclaim in reach, then the economy under construction by the D-065 order"));
         table.insertLast(Rule("turret.any",        TURRET,       W0(), @DoTurretAny,    "any structure of ours under construction within reach"));
@@ -464,6 +475,7 @@ namespace TechRules {
         table.insertLast(Rule("order.repair",      CONSTRUCTORS, W0(), @DoQueuedRepair, "native's queued repairs of our own unfinished structures within ExpOrderRadius"));
         table.insertLast(Rule("assist.any",        MOBILE,       W0(), @DoAssistAny,    "the nearest structure under construction within the builder's assist radius"));
         table.insertLast(Rule("guard.factory",     CONSTRUCTORS, W0(), @DoGuardFactory, "guard the primary T1 lab"));
+        table.insertLast(Rule("air.defend",        CONSTRUCTORS, W0(), @DoAirDefend,    "D-123 (owner): an air constructor with nothing else to do builds defences: the mex clusters' AA, then a ring round the base toward the front"));
         table.insertLast(Rule("wait",              MOBILE,       W0(), @DoWait,         "3 s, then ask again"));
         GenericHelpers::LogUtil("[Rule] table of " + table.length() + " rules loaded", 1);
     }
@@ -471,6 +483,7 @@ namespace TechRules {
     // ---------------------------------------------------------------- evaluation and trace
 
     dictionary lastKeyByUnit;   // unit id -> last key, for the level-1 change trace
+    dictionary lastIdleAsks;    // D-123: air constructor -> asks in a row while idle
 
     IUnitTask@ Evaluate(CCircuitUnit@ u)
     {
@@ -485,6 +498,21 @@ namespace TechRules {
             string last; lastKeyByUnit.get(id, last);
             if (last != sig) { lastKeyByUnit.set(id, sig); GenericHelpers::LogUtil("[Rule][ask] " + c.d.GetName() + " " + u.id + " holds " + sig, 3); }
         }
+        // D-123: an air constructor asked again and again while idle is being handed
+        // a job it never takes up (played: chain.next and power.turret, 60 s and
+        // more idle): after AirIdleAsks such asks, defences
+        if (UnitHelpers::IsAirConstructor(c.d)) {
+            const string ik = "idle" + u.id;
+            int64 asks = 0;
+            if (!lastIdleAsks.get(ik, asks)) asks = 0;
+            const bool idleNow = (u.task is null) || int(u.task.GetType()) == int(Task::Type::IDLE);
+            asks = idleNow ? asks + 1 : 0;
+            lastIdleAsks.set(ik, asks);
+            if (asks >= Global::RoleSettings::Tech::AirIdleAsks) {
+                IUnitTask@ dt = TechBuild::AirDefence(u);
+                if (dt !is null) { lastIdleAsks.set(ik, int64(0)); Trace(c, airDefendRule); return dt; }
+            }
+        }
         for (uint i = 0; i < table.length(); ++i) {
             Rule@ r = table[i];
             if ((r.who & c.who) == 0) continue;
@@ -493,6 +521,20 @@ namespace TechRules {
             if (!ok) continue;
             IUnitTask@ t = r.act(c);
             if (t is null) continue;
+            // D-123 (owner: an air constructor never does nothing): whichever row
+            // answered with a wait (played: the rush chain's "order out", 60 s
+            // idle), defences come first; the wait is dropped
+            if (UnitHelpers::IsAirConstructor(c.d)) {
+                IBuilderTask@ bt = cast<IBuilderTask>(t);
+                if (bt !is null && Task::BuildType(bt.GetBuildType()) == Task::BuildType::WAIT) {
+                    IUnitTask@ dt = TechBuild::AirDefence(c.u);
+                    if (dt !is null) {
+                        aiBuilderMgr.AbortTask(t);
+                        Trace(c, airDefendRule);
+                        return dt;
+                    }
+                }
+            }
             Trace(c, r);
             return t;
         }

@@ -262,6 +262,7 @@ namespace Commands {
     bool IntroEnabled = true;
     const int IntroStartFrame = 3 * SECOND;
     const int IntroHoldSeconds = 10;
+    const int IntroCreditsPercent = 5;   // owner: the credits in 5% of games, rolled once a game
     int introStage = 0;   // 0 waiting, 1 drawing the commander, 2 holding, 3 erasing, 4 drawing the credits, 5 holding, 6 erasing, 7 done
     int introHoldUntil = 0;
     void IntroTick()
@@ -286,6 +287,16 @@ namespace Commands {
             break;
         case 3:
             if (!erased) return;
+            {
+                const int roll = AiRandom(0, 99);
+                if (roll >= IntroCreditsPercent) {
+                    GenericHelpers::LogUtil("[Commands] intro done: the commander shown and erased; no credits this game (roll " + roll
+                        + ", shown under " + IntroCreditsPercent + ")", 1);
+                    introStage = 7;
+                    break;
+                }
+                GenericHelpers::LogUtil("[Commands] the credits this game (roll " + roll + ", shown under " + IntroCreditsPercent + ")", 1);
+            }
             Draw("credits");
             introStage = 4;
             break;

@@ -229,7 +229,9 @@ Evaluated top to bottom; the first branch that returns a task wins.
 8  T1/T2 vehicle plant? mi >= vehiclePlantGate -> 10x scout / main battle tank
 9  fallback           aiFactoryMgr.DefaultMakeTask(u); the T2 bot lab under the
                       combat gate waits instead (D-119)
-0  (first) a front cluster's turret: TechFactories::TurretFocus (D-119)
+0  (first) a front cluster's turret: TechFactories::TurretFocus (D-119);
+   an island TECH's hover plant and shipyards: TechHarbour::YardTask (D-121);
+   once the harbour runs, land labs make constructors only (HoldsLandCombat)
 ```
 
 `botLabGate` and `vehiclePlantGate` depend on `Strategy::T2_RUSH` (85% chance
@@ -887,4 +889,4 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 4b4b7f7d77b9c9acd4b48ec23d24004d8780a1c9; lines: 2704 -->
+<!-- source: data/script/src/roles/tech.as; blob: 66b809f2ee39c73bebb833d20dec5e4c765ca178; lines: 2722 -->

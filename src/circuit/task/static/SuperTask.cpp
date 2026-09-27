@@ -15,6 +15,8 @@
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
+
+#define SMILEY_RADIUS	400.f  // D-124: the face over a nuke's target
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
@@ -79,6 +81,26 @@ void CSuperTask::Update()
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitUnit* unit = *units.begin();
+
+	// D-124 (owner): a nuclear missile launched: a smiley face on the map over
+	// the target. A nuke silo's stockpile dropping is the launch
+	{
+		const std::string& name = unit->GetCircuitDef()->GetDef()->GetName();
+		if ((name == "armsilo") || (name == "corsilo") || (name == "legsilo")) {
+			const int stock = unit->GetUnit()->GetStockpile();
+			if ((lastStock >= 0) && (stock < lastStock)) {
+				AIFloat3 at = targetPos;
+				if (!isTargetOverride && (GetTarget() != nullptr)) {
+					at = GetTarget()->GetPos();
+				}
+				if (geom::is_valid(at)) {
+					circuit->LOG("NUKE: launched from %s(%i) at (%.0f, %.0f): a smiley on the target (D-124)", name.c_str(), unit->GetId(), at.x, at.z);
+					circuit->DrawSmiley(at, SMILEY_RADIUS);
+				}
+			}
+			lastStock = stock;
+		}
+	}
 
 	if (unit->Blocker() != nullptr) {
 		return;  // Do not interrupt current action

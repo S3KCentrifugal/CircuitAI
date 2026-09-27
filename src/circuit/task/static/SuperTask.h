@@ -64,6 +64,7 @@ private:
 	bool SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 
 	int targetFrame;
+	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
 	springai::AIFloat3 targetPos;
 	bool isTargetOverride;
 	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty

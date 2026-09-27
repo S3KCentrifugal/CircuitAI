@@ -2543,6 +2543,8 @@ int CTerrainManager::NextBuilt(int group, const AIFloat3& anchor) const
 	return best;
 }
 
+static constexpr int PACK_NEAR_POINT_TRIES = 2000;
+
 AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, float radius, int facing, TerrainPredicate& predicate)
 {
 	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
@@ -2593,7 +2595,7 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 	CMap* map = circuit->GetMap();
 	int tried = 0;
 	for (const SCand& c : cands) {
-		if (++tried > 400) {
+		if (++tried > PACK_NEAR_POINT_TRIES) {  // D-121: was 400 (Tundra: the 400 nearest free cells were all slopes)
 			break;
 		}
 		AIFloat3 p = c.pos;

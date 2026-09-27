@@ -105,6 +105,7 @@ namespace Global {
         float ParkDistance = 450.0f;      // D-112: gifts wait this far behind our start (away from the map centre)
         float ParkSpacing = 80.0f;        // D-112: gifts park this far apart
         int ParkWaitSeconds = 900;        // D-112: a gift's park (renewed at every ask)
+        int FerryUnloadSeconds = 15;      // D-122: INV-052: a run unloads within this
         float GiveNearDrop = 800.0f;      // D-112: a failed run gives its cargo only within this of the drop
         int FerryRunAttempts = 2;         // D-112: flown runs tried for one gift before it walks     // D-110: the drop point is this far short of the teammate's start, toward our base (open ground)
         bool Enabled = true;
@@ -316,6 +317,45 @@ namespace Global {
             float ExpOrderRadius = 2000.0f;                 // native's queued defence/radar/repair orders are taken only within this of the base
             float ExpCommanderHomeRadius = 800.0f;          // the commander assists only within this of the base after the opening
             float ExpFirstLabRadius = 224.0f;               // the first (throwaway) T1 lab goes on the nearest footprint within this of the commander ...
+            int FirstFactorySeconds = 300;                  // D-120: INV-050
+            // D-121: cramped ground (no planned pair): structures packed this far from the nearest lab,
+            // turrets near the labs: CrampedTurretsBase + one per CrampedTurretMetalStep of income, at most CrampedTurretsMax
+            // D-121: the harbour (an island TECH, Global::Map::LandLocked): after this many advanced
+            // fusions the economy moves to the water and the shipyards come; see roles/tech_harbour.as
+            bool HarbourEnabled = true;
+            int HarbourAfterAdvancedFusions = 2;
+            int HarbourLatestSeconds = 900;                 // ... or this far in once an advanced lab has stood (the island's ground runs out first; played: raids from 17 minutes)
+            // D-123: an air constructor with nothing else to do builds defences: the mex clusters' AA,
+            // then a ring round the base toward the front (AirDefenceMax of each kind at most)
+            int AirDefenceMax = 60;
+            int AirIdleAsks = 2;                            // D-123: asks in a row while idle before an air constructor takes defences instead
+            float AirDefenceRadius = 900.0f;
+            float AirDefenceRingStep = 300.0f;
+            int AirDefenceRingSize = 7;
+            float AirDefenceArc = 0.35f;
+            float AirDefenceShake = 320.0f;
+            int HarbourMaxT2Shipyards = 1;
+            int HarbourYardSeconds = 480;                   // INV-051: the advanced shipyard framed this soon after the harbour begins
+            int HarbourHoverConstructors = 3;               // the hover plant's constructors: they float out and build the advanced shipyard
+            float HarbourYardSearch = 1200.0f;              // the advanced shipyard's site search around the hover plant (deep water)
+            int HarbourT1SeaConstructors = 3;
+            int HarbourT2SeaConstructors = 4;
+            int HarbourTurrets = 10;                        // floating construction turrets at the yards
+            float HarbourTurretRadius = 320.0f;
+            float HarbourRadius = 900.0f;                   // the sea economy is packed this far from the yards
+            float HarbourEnergyLowShare = 0.3f;             // energy under this share of storage: energy first
+            float HarbourConverterEnergyShare = 0.6f;       // construction subs add floating advanced converters while energy is over this share, else a naval fusion
+            float HarbourTidalUntilEnergy = 1500.0f;        // T1 construction ships add tidals while energy income is under this
+            float HarbourCommanderMinEnergy = 150.0f;       // ... and only with this much energy income
+            int HarbourCommanderConverters = 30;            // before the harbour: the commander's floating converters while energy floats, at most
+            float HarbourCommanderReach = 1200.0f;          // ... placed within this of it (the nearest deep-enough water)
+            float CrampedPlaceRadius = 640.0f;
+            float CrampedReachElmos = 128.0f;              // D-121: a lab site counts as reachable when a land constructor gets this close
+            float CrampedTurretRadius = 256.0f;
+            int CrampedTurretsBase = 2;
+            float CrampedTurretMetalStep = 10.0f;
+            int CrampedTurretsMax = 16;
+            float CrampedFirstLabRadius = 800.0f;          // D-120: with no planned pair (cramped ground) the first lab searches this far from the commander
             float ExpFirstLabClearance = 32.0f;             // ... but its footprint edge stays at least this far from the commander's position
             // D-114 (owner's rules): land factories move toward the front in front factory clusters
             float FrontMinShare = 0.2f;                     // D-114: a front cluster stands at least this share of the way from the base toward the front

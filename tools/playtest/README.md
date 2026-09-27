@@ -170,6 +170,24 @@ moves the camera), `--no-stop`, a long `--minutes`. The harness joins as a
 spectator; the team link widget lets the spectating host command the AIs it
 hosts.
 
+The BARb AI window starts closed (owner: screenshots stay clear). The engine
+also loads the copy installed in the game, and an older copy opens itself on a
+fresh config, so `playtest_camera.lua` closes it in the first 10 seconds. A test
+that needs it open opens it later with `WG.barblink.SetOpen(true)`, as
+`role_swap_test.lua` does.
+
+## Measuring widgets
+
+Stage these with `--extra-widget`; each writes tagged lines to the infolog.
+
+| Widget | Lines | What it measures |
+| --- | --- | --- |
+| `widgets/build_area.lua` | `[BuildArea]` | The whole map's buildable ground at frame 30: a turret, a lab or an advanced fusion per 64-elmo cell, water by depth, tidal and wind. `build_area.py <infolog> --spot x,z --out map.png` draws it and measures it around a spot (D-120). |
+| `widgets/team_stats.lua` | `[TeamStats]` | Every 2 minutes, per team: metal income, damage dealt and taken, kills, combat army value, units produced; the minute team 0 first reaches each income milestone. |
+| `widgets/unit_census.lua` | `[Census]` | Live counts of watched unit types (T2 constructors, assist and assault bots, labs, turrets, spam units) and busy T1 labs (D-119). |
+| `widgets/gantry_watch.lua` | `[Gantry]` | The first TECH gantry: screenshots, build power, T3 production times. |
+| `widgets/intro_test.lua` | `[IntroTest]` | The start-of-game drawing as a spectator receives it. |
+
 ## Pointing the camera
 
 `--shots` takes `minute[@height[@x:z]]`: with `x:z` the camera centres on that

@@ -863,6 +863,32 @@ int CCircuitAI::Update(int frame)
 	return 0;  // signaling: OK
 }
 
+void CCircuitAI::DrawSmiley(const AIFloat3& centre, float radius)
+{
+	// North is up in the default view: z grows southward, so the eyes sit at -z
+	// and the mouth's arc below the centre, at +z
+	auto arc = [this](const AIFloat3& c, float r, float a0, float a1, int segs) {
+		const float mw = float(GetMap()->GetWidth() * SQUARE_SIZE), mh = float(GetMap()->GetHeight() * SQUARE_SIZE);
+		auto at = [&](float a) {
+			AIFloat3 p(c.x + std::cos(a) * r, 0.f, c.z + std::sin(a) * r);
+			p.x = std::clamp(p.x, 1.f, mw - 1.f);
+			p.z = std::clamp(p.z, 1.f, mh - 1.f);
+			return p;
+		};
+		AIFloat3 prev = at(a0);
+		for (int i = 1; i <= segs; ++i) {
+			const AIFloat3 next = at(a0 + (a1 - a0) * float(i) / float(segs));
+			QueueDrawLine(prev, next);
+			prev = next;
+		}
+	};
+	constexpr float PI2 = 6.2831853f;
+	arc(centre, radius, 0.f, PI2, 24);                                                          // the face
+	arc(AIFloat3(centre.x - radius * 0.35f, 0.f, centre.z - radius * 0.3f), radius * 0.1f, 0.f, PI2, 8);   // an eye
+	arc(AIFloat3(centre.x + radius * 0.35f, 0.f, centre.z - radius * 0.3f), radius * 0.1f, 0.f, PI2, 8);   // the other
+	arc(centre, radius * 0.55f, PI2 * 0.06f, PI2 * 0.44f, 10);                                  // the smile
+}
+
 void CCircuitAI::FlushDrawQueue()
 {
 	// D-118: wall-clock pacing, not frames: at a game speed of 3 three frames

@@ -10,6 +10,16 @@ States: framed (a frame is under construction), active (stands), retiring
 (`Lifecycle::IsRetiring`, D-076), gone. Retiring is set once by the act that
 decides the end; everything else reads it.
 
+## The harbour (an island TECH, D-121)
+
+| Actor | Reads | Does |
+| --- | --- | --- |
+| `harbour.float` (`CommanderFloat`) | land-locked start, energy full, energy income | the commander's floating converters before the harbour |
+| `harbour.yard` (`LandTask`) | `TechHarbour::Active`, a hover plant stands or is queued | a land constructor orders the hover plant on a reachable island footprint |
+| `harbour.sea` (`SeaTask`) | the advanced shipyard, the yards, energy low or full | the advanced shipyard (site picked by ring search), help on a yard going up, floating turrets, then converters, tidals and naval fusions; INV-051 |
+| `Tech_FactoryAiMakeTask` (`YardTask`, `HoldsLandCombat`) | the harbour runs | the hover plant makes hover constructors; the yards make construction ships and subs, then sea combat; land labs make no combat |
+| INV-010 | `TechHarbour::IsHarbourUnit` | harbour sea units are exempt from the combat gate |
+
 ## The T1 bot lab (`Factory::primaryT1BotLab`)
 
 | Actor | Reads | Does |
@@ -18,7 +28,7 @@ decides the end; everything else reads it.
 | `Lifecycle::Retire` | - | stops the unit and its queue (`CmdStop`), logs `[LIFECYCLE]` |
 | `Tech_FactoryAiMakeTask` | retiring | returns nothing for a retiring lab; native's factory manager gets no production for it |
 | `lab.t1.reclaim` (`ReclaimT1Lab`) | `throwawayLabId`, metal bank room (D-072) | the reclaim order for the throwaway only; the only act that may target a retiring lab |
-| `lab.t1.opening`, `lab.t1.recover` (`StartFactory`) | none stands | orders a T1 lab at the commander or on the pair's slot |
+| `lab.t1.opening`, `lab.t1.recover` (`StartFactory`) | none stands, `Layout::fallback` | orders a T1 lab at the commander (with no planned pair: any facing, up to 800 away, D-120) or on the pair's slot; INV-050 |
 | `guard.factory` (`GuardFactory`) | retiring, `IsSpamLab` | guards the lab; never a retiring one, never a spam lab (D-119) |
 | `chain.next` (`CommanderOnFirstConstructor`) | retiring, T1 constructor count, `IsSpamLab` | the commander helps the first constructor out; never at a retiring lab or a spam lab (D-119) |
 | `lab.t1.spam` (`SpamLab`) | `ChainInactive`, T2 lab stands | further T1 labs for the spam economy |
@@ -40,6 +50,7 @@ decides the end; everything else reads it.
 | `lab.front` (D-114) | a standing front factory missing a turret; no advanced lab with the economy online; an open T2 or T3 front cluster (planned, factory not up) | any constructor reaching the row: the lost turret; a T2 front cluster planned; the open cluster's turrets, help on one going up, then its factory; INV-046 |
 | `lab.base.reclaim` (D-114) | `FrontReclaimAtCount` land factories on the map | the base's land factories retired and reclaimed, never rebuilt there while a land factory stands; their ground goes to the economy; INV-044 |
 | `ferry.cargo` (D-110, D-112) | the unit is a gift (in flight or queued) | in flight: the ferry's hold; queued: parked behind the base; nothing else until the drop-off; INV-041 |
+| `CFerryTask` UNLOADING (native, D-122) | the transport's command queue, `IsAboard` | the run is delivered once the unload is over and the cargo not aboard (or it stands on the ground); `Team::Ferry::Update` gives it within a second; INV-052 |
 | `land.recall` (D-109) | a tier's air constructors went down | its land constructors drop a forward job; INV-040 |
 | `fwd.t2.defend` (D-109) | both dedicated T2 air roles held | T2 land constructors: long-range AA then flak at every mex cluster outside the base; INV-039 |
 | `fwd.t1` (D-109, D-119) | more than 5 T1 air constructors | T1 land constructors: the spam cluster (labs, turrets, AA, pads); helps only structures going up there, never guards a spam lab or helps its production; INV-038, INV-039, INV-049 |
@@ -48,7 +59,8 @@ decides the end; everything else reads it.
 | spam production (`Spam::FactoryMakeTask`, D-111, D-119) | spam active, a spam lab asks | the next spam unit at every ask (no repeat: native clears a factory's queue when a recruit finishes) |
 | spam lanes (`TechForward::TickSpam`, `Spam::SetSpreadLanes`, D-119) | the standing spam labs, the combat front, the focus | one lane per spam lab, `LaneSpacing` apart across the front, straight on to the enemy backline; re-spread when the count changes and every 30 s |
 | advanced lab production (`Tech_FactoryAiMakeTask`, D-103, D-119) | bank share, T2 construction bot count, fast assist cap | T2 construction bots to `T2BotConstructorCap` (10), fast assist bots to `FastAssistBotCap` (10), then fast assault bots; INV-028 |
-| `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; never falls through (waits and says why); its structure's cap lifted while held; INV-034, INV-035, INV-036 |
+| `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; with no site in the layout it builds defences meanwhile (D-123), else waits and says why; its structure's cap lifted while held; INV-034, INV-035, INV-036 |
+| `air.defend` (`TechBuild::AirDefence`, D-123) | an air constructor with nothing else to do | the mex clusters' long-range AA and flak, then a ring of T2 turrets and flak round the base toward the front, `AirDefenceMax` of each; INV-053 |
 | air role refill (`TechBuild::RefillAirRoles`, `ClaimOnBuilt`, D-108) | a dedicated builder gone; a T2 air constructor built | the role passes at once (advanced fusions first), the new holder drops its other job; the advanced aircraft plant makes one when none is free; the donation keeps dedicated units |
 | advanced-fusion ground ahead (`Layout::HoldAfusSetAhead`, D-108) | the fusion role held, no set slot left | the next set of advanced-fusion ground reserved (zones, forward, then the ring within reach), retried every 10 s; INV-037 |
 | dead slot (native `CTerrainManager`, D-108) | the engine refuses a pinned slot 3 times | the slot is never offered again, its ground stays held, the set moves on |

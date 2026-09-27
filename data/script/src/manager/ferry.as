@@ -73,7 +73,10 @@ namespace Ferry {
     // CFerryTask::EState. Mirrored rather than registered as an enum: only the
     // two terminal values matter to policy.
     const int StateIdle = 0;
+    const int StateUnloading = 4;
     const int StateDone = 5;
+    int unloadingSince = -1;      // INV-052 (D-122)
+    bool unloadFlagged = false;
     const int StateFailed = 6;
 
     // ---- AIR side
@@ -564,6 +567,16 @@ namespace Ferry {
                 return;
             }
             const int st = task.GetState();
+            // INV-052 (D-122): a run unloads within FerryUnloadSeconds (played: the
+            // cargo out at 7 s, the run done at 90+ s, the transport idle)
+            if (st == StateUnloading) {
+                if (unloadingSince < 0) unloadingSince = ai.frame;
+                else if (!unloadFlagged && ai.frame - unloadingSince > Global::Ferry::FerryUnloadSeconds * SECOND) {
+                    unloadFlagged = true;
+                    Invariants::Violation("INV-052", "" + cargoId, "ferry run for cargo " + cargoId + " unloading for "
+                        + int((ai.frame - unloadingSince) / SECOND) + " s");
+                }
+            } else { unloadingSince = -1; unloadFlagged = false; }
             if (st == StateDone) {
                 _Finish(true);
             } else if (st == StateFailed) {

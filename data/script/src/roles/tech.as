@@ -920,6 +920,13 @@ namespace RoleTech
 		// asked here, not by the builder rules: a front cluster's turret works for
 		// its own factory (D-109, D-114, D-117: rule turret.spam never reached
 		// them; it only saw turrets a reclaim pull had moved to the builder side)
+		// D-121: an island TECH's shipyards (the harbour)
+		if (UnitHelpers::IsT1Shipyard(facDef.GetName()) || UnitHelpers::IsT2Shipyard(facDef.GetName())
+			|| (TechHarbour::Enabled() && UnitHelpers::IsT1HoverPlant(facDef.GetName())))
+		{
+			IUnitTask@ yt = TechHarbour::YardTask(u);
+			if (yt !is null) return yt;
+		}
 		CCircuitDef@ clusterNano = TechFactories::Nano();
 		if (clusterNano !is null && facDef.GetName() == clusterNano.GetName() && TechFactories::ClusterOfTurret(u) !is null)
 		{
@@ -1196,6 +1203,10 @@ namespace RoleTech
 				}
 			}
 		}
+		// D-121: an island TECH's land labs make no combat units once the harbour
+		// runs (they cannot leave the island); constructors above still come
+		if (TechHarbour::HoldsLandCombat(facDef.GetName()))
+			return aiFactoryMgr.Enqueue(TaskS::Wait(false, 10 * SECOND));
 		GenericHelpers::LogUtil("[TECH][Factory] Checking bot lab for scout/fast bot enqueue", 4);
 		// float metalIncome = Global::Economy::GetMetalIncome();
 		// After builder production priorities, if this is a T1 bot lab and eco is strong, enqueue a block of scouts
@@ -1430,6 +1441,12 @@ namespace RoleTech
 
 	IUnitTask @Tech_MilitaryAiMakeTask(CCircuitUnit @u)
 	{
+		// D-121: an island TECH's fleet runs its yard's route to the enemy
+		if (u !is null && u.circuitDef !is null && TechHarbour::IsHarbourUnit(u.circuitDef))
+		{
+			IUnitTask @fleet = TechHarbour::FleetTask(u);
+			if (fleet !is null) return fleet;
+		}
 		float metalIncome = Economy::GetMinMetalIncomeLast10s();
 
 		// Check if this is a nuclear silo and we haven't targeted the farthest tech spot yet
@@ -1867,6 +1884,7 @@ namespace RoleTech
 			GenericHelpers::LogUtil("[TECH][Limits] Re-applying merged map+role unit limits (economy update)", 4);
 			UnitHelpers::ApplyUnitLimits(Global::Map::MergedUnitLimits);
 		}
+		TechHarbour::ReapplyCaps();   // D-121: the harbour's own units stay open
 	}
 
 	/******************************************************************************

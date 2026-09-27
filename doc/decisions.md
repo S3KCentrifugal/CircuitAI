@@ -5680,6 +5680,8 @@ roles are held within 60 s.
 
 ## D-108 — The dedicated air constructors are never interrupted, never capped, and always replaced
 
+*Amended by [D-123](#d-123--an-air-constructor-with-nothing-to-build-builds-defences): with no site in the layout for its structure, a dedicated builder builds defences meanwhile instead of waiting; the role is kept.*
+
 **Date:** 2026-09-24. **Status:** Played (build78; runs `20260924-185830`, no enemy, and `20260924-190045`, tech versus tech; 36 min each, zero bonus, Supreme Isthmus). Advanced fusions: 11 by 33.7 min and 13 by 36.1 min (before: six to seven, the last at about 27 min), one every 60 to 90 s after 25 min; metal +600 and +727, energy +35,200 and +38,000 at 36 min. Both roles taken at 23.8/24.3 and 27.1/27.4 min; five dead slots given up in the first game, none needed in the second; no crash in either. INV-034, INV-035 and INV-036 silent; INV-037 fired once (32.6 min in the first game: ten advanced fusions stood or were building and the next frame came after three minutes).
 
 **Owner's report and rule.** "The tech player does not make more than 6
@@ -6581,6 +6583,282 @@ construction bots, up to `T2BotConstructorCap`.
 [`unit_census.lua`](../tools/playtest/widgets/unit_census.lua),
 [`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
 [`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp).
+
+## D-120 — When the planned layout does not fit, TECH still builds; cramped maps get a measured layout choice
+
+**Date:** 2026-09-27. **Status:** Played (build106, Tundra Continents, 16 AIs,
+TECH on the north island). The two fixes are in. The layout choice and the
+harbour layout are a proposal, written in
+[`roles/tech-cramped-maps.md`](roles/tech-cramped-maps.md).
+
+**Owner's request.** TECH works well on flat maps; find a strategy for cramped
+maps such as Tundra Continents. Measure the build area to pick a layout, invent
+one if needed, and move to sea or air where the map calls for it.
+
+**Found.**
+- On Tundra, TECH had 4 units and +8 metal at 30 minutes.
+- The factory pair did not fit the island (`Layout::Plan`), so the fallback
+  switched the reservation registry off ("TECH retains normal placement").
+  Every TECH placement goes through that registry, so every site was refused.
+- With the registry kept on, the start lab still failed: it was ordered on a
+  pinned slot, and with no pair the slot is -1.
+
+**Decision.**
+- The fallback keeps the registry on and skips only the planned pair and turret
+  box ([`layout.as`](../data/script/src/manager/layout.as)).
+- The first lab uses the commander ring search in the fallback too, with any
+  facing, up to `CrampedFirstLabRadius` (800)
+  ([`tech_build.as`](../data/script/src/roles/tech_build.as)).
+- Played after both fixes: a lab, constructors, 33 turbines and +460 energy at
+  22 minutes, but +13 metal. The island has 3 mexes, and converters, the
+  advanced lab and turrets are still placed relative to the pair and box.
+
+**Proposed.** Measure the ground at the start: the largest connected lab patch,
+and floatable water against lab ground. Then pick an open, compact or
+**harbour** layout. The harbour layout keeps labs and advanced fusions on land
+and puts a quay of floating turrets with tidals, floating converters and naval
+fusions on the water. An island TECH fights by air (or by sea when no allied SEA
+role exists).
+
+**Invariant.** INV-050: a factory stands by `FirstFactorySeconds` (300). The
+stall also showed as INV-015 (a dear chain order with no frame).
+
+**Tools.** [`build_area.lua`](../tools/playtest/widgets/build_area.lua) and
+[`build_area.py`](../tools/playtest/build_area.py) survey and measure a map's
+buildable ground.
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-121 — An island TECH builds its land phase on cramped ground, then moves its economy and production to the water
+
+**Date:** 2026-09-27. **Status:** Played (build108 plus scripts), partly.
+- **Tundra 1v1 (TECH on both islands, 45 min).**
+  - Advanced lab at 3 to 7 min.
+  - Harbour at 15 min, then the hover plant and the advanced shipyard.
+  - The north island ends with 21 floating advanced converters, floating
+    turrets, tidals and a fleet of 66 ships (79k metal).
+  - Metal at 44 min: north +278 (was +8 before D-120, +13 after it), south
+    +400.
+  - No crash; INV-050 and INV-051 silent.
+- **Open 1: the fleets dealt no damage.** In a 1v1 their route leads to the
+  nearest empty start spot: Spam's focus takes every non-allied spot for an
+  enemy.
+- **Open 2: in a full 16-AI game the island TECH died at about 26 minutes,**
+  shelled by enemy fleets before its advanced shipyard stood. It has no sea
+  defence during the land phase.
+- **Land maps unaffected.** Supreme Isthmus had no harbour or cramped line;
+  its advanced lab came at 6.4 min and +500 metal at 30 min, against 34.3 min
+  before.
+
+**Owner's request.**
+- Build the harbour layout for Tundra: start with a bot lab, tech up to the T2
+  lab, upgrade mexes, then get a fusion down.
+- Once two advanced fusions stand, transition to the harbour. Land units can go
+  on building, since they will be isolated, but the priority becomes expanding
+  the sea economy and pumping out sea units.
+- T2 sea units are high priority after the second advanced fusion.
+- Land maps must be unaffected.
+
+**Found while building it** (each played on Tundra, 16 AIs):
+- **Cramped-ground placement, D-120's fallback with no planned pair.**
+  - Economy structures packed within 8 cells of the bare start found no site
+    (T1 converters, 1608 times).
+  - The advanced lab went "on the pair's slot" (-1).
+  - Turrets were never ordered: `NanoTask` and `CanPlaceTurret` required the
+    planned layout.
+  - Native's packed search gave up after the 400 nearest free cells, all
+    slopes on that island.
+- **Reach.** A ridge splits the north island. Lab sites across it were "out of
+  the builder's reach". Once reach was tested, the site near the first lab had
+  often been taken by wind turbines, and a site across the island was refused
+  where raiders stood (native serves a pinned slot only away from threat).
+- **Metal.** The island has 3 mexes. With the flat ground full, T1 converters
+  found no site, and metal stayed at +13 under the advanced lab's +18 gate.
+- **Land constructors cannot build the sea economy.** Tidals, floating
+  converters, naval fusions, floating turrets and the advanced shipyard need
+  construction ships, subs or hover constructors.
+- **The T1 shipyard needs water 30 deep,** further out than a land
+  constructor's reach ("no site for corsy at all ... reach=0"). Native's search
+  for the advanced shipyard also started from the island's middle.
+- **A crash, found in play.** A ring point off the map's edge made the native
+  reach test index a sector out of range. The D-117 crash reporter named it
+  ("SCRIPT CRASH ... Layout::CrampedLabSite").
+
+**Decision.**
+- **Cramped ground** (`Layout::fallback`, only when the planned pair does not
+  fit):
+  - structures are packed within `CrampedPlaceRadius` (640) of the nearest
+    lab;
+  - turrets go near the labs, as many as the income pays for
+    (`CrampedNanoTask`);
+  - the advanced lab's footprint is held beside the first lab when that lab is
+    placed (`ReserveCrampedLabSlot`: cramped ground's version of the pair),
+    else found by a ring search that skips unreachable and off-map points;
+  - INV-017 (flush) does not apply there.
+- **Native (build107, build108).**
+  - `PackNearPoint` tries 2000 candidates, not 400.
+  - The script can ask `CanReachAt(builder, pos, range)` (movement areas, no
+    threat).
+- **The harbour** ([`tech_harbour.as`](../data/script/src/roles/tech_harbour.as),
+  [`tech_harbour.md`](roles/tech_harbour.md)), only on a start the map file
+  flags land-locked:
+  - Before the harbour, the commander puts floating converters on the water
+    while energy floats.
+  - It begins at the second advanced fusion (owner), or 15 minutes in once an
+    advanced lab has stood. On Tundra's north island the second advanced fusion
+    never fits within reach, and raids begin around 17 minutes.
+  - A land constructor builds a **hover plant** on the island. Its hover
+    constructors float out and build the advanced shipyard first, on a site the
+    script picks, then floating turrets, tidals and floating converters.
+  - Construction subs alternate naval fusions and floating advanced
+    converters.
+  - The advanced yard pumps cruisers, missile ships and AA ships whatever the
+    income (INV-010 exempts them).
+  - Land labs make constructors only.
+  - Sea builders keep a construction they hold (`TechBuild::KeepCurrent`).
+    Played: a hover constructor left the ordered yard for a tidal on every
+    re-ask, and neither island's yard was built.
+  - Construction subs add floating advanced converters while energy is over
+    60% of storage, else a naval fusion.
+  - The harbour's unit caps are re-opened after TECH re-applies its limits.
+  - Harbour sea units run the advanced yard's route (Spam's route task).
+- **Land maps.** `Global::Map::LandLocked` is false there, so no harbour code
+  runs, and the cramped paths run only when the planned pair does not fit.
+  Played on Supreme Isthmus: no harbour or cramped line in the log.
+
+**Invariant.** INV-051: the advanced shipyard stands or is framed 480 s after
+the harbour begins.
+
+**Tools.** [`team_stats.lua`](../tools/playtest/widgets/team_stats.lua) and
+[`unit_census.lua`](../tools/playtest/widgets/unit_census.lua) measured each
+run.
+
+**Files.** [`tech_harbour.as`](../data/script/src/roles/tech_harbour.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp).
+
+## D-122 — A ferried constructor is given as soon as the transport has set it down
+
+**Date:** 2026-09-27. **Status:** Played (build109). Two 16-AI games, Supreme
+Isthmus and All That Glitters, 35 min: 18 deliveries. Each unloaded in 2.0 to
+6.5 s, with no unload retry and no failed run, and the gift followed within
+half a second. Before, in the owner's game, one delivery took over 90 s.
+
+**Owner's report.** When TECH delivers a T2 constructor it does not transfer
+the unit right away, and the light transport idles. It transfers eventually,
+but that is time the constructor could spend upgrading mexes.
+
+**Found (the owner's infolog, build106).**
+- The run entered UNLOADING, and 7 s later the cargo was out: "cargo aboard=0",
+  the transport's command queue empty.
+- The run still waited 45 s, retried the unload twice and waited again.
+- `CFerryTask` counted a delivery only when the cargo stood within 1 elmo of
+  the terrain height, or was "not lifted" (under 4 elmos above it) and not
+  aboard. The cargo stood higher than that: a pad or a ramp. Only after the
+  retries did the run end and the script give the unit.
+
+**Decision.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp)
+also counts the cargo as landed when the engine has finished the unload (the
+transport's command queue is empty) and the cargo is not aboard. `IsAboard`
+means risen above where the cargo stood and under the transport (D-110, D-112).
+The empty queue keeps a cargo still attached during the descent from being
+counted, so a unit is never given while it hangs under our transport (D-056).
+The transport heads home at once, and the script gives the unit on its next
+poll.
+
+**Invariant.** INV-052: a run unloads within `FerryUnloadSeconds` (15)
+([`ferry.as`](../data/script/src/manager/ferry.as)).
+
+**Files.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp),
+[`ferry.as`](../data/script/src/manager/ferry.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-123 — An air constructor with nothing to build builds defences
+
+**Date:** 2026-09-27. **Status:** STATUS123
+
+**Owner's report and rule.** Scaling worked well, but once 225 advanced energy
+converters were built every air constructor stopped moving. Was the layout
+grid exhausted, with no safe places left? Identify the cause. If air
+constructors ever get stuck or have nothing to do, never let them do nothing:
+always fall back, at the lowest priority, to building defences.
+
+**Found (the owner's infolog, Supreme Isthmus, 35 min, TECH Legion, AI 7).**
+- Yes: the layout was full. From about minute 29 the log says "no room within
+  reach of any turret cluster for legadveconv" and "for legafus" (INV-020, 94
+  s and more), and "advanced fusion set held ahead: no room".
+- The two dedicated builders "wait for legafus: no site in the layout". D-108
+  lets them do nothing else.
+- The other T2 air constructors went to "assist anything under construction".
+  With the layout full, nothing was under construction, and they stood still.
+- The rule table is asked for these units about 40 times a minute until
+  minute 29, and almost never after.
+
+**Decision.** `TechBuild::AirDefence`
+([`tech_build.as`](../data/script/src/roles/tech_build.as)):
+- first, long-range AA and flak at the mex clusters (D-109's `DefendMexes`);
+- else a ring of defences round the base centre, fanned about the direction of
+  the front, `AirDefenceRadius` (900) out and `AirDefenceRingStep` further
+  every `AirDefenceRingSize` places;
+- T2 anti-ground turrets and flak in turn (a T1 air constructor: light lasers
+  and heavy AA), at most `AirDefenceMax` (60) of each of six kinds (T2 turrets, flak, long-range AA, T2 artillery; light lasers and heavy AA for T1 air constructors).
+
+TECH's start caps hold land defences at 0; each one is lifted as it is ordered.
+It runs from:
+- the new lowest row `air.defend`, just above `wait`, for any air
+  constructor;
+- `AirDedicated`, when the layout has no site for the dedicated structure. The
+  role is kept and resumed as soon as a site frees; this amends D-108;
+- the rule evaluator, in place of any wait a row hands an air constructor.
+  Played: the rush chain's "order out" left one idle for 60 s;
+- the rule evaluator, after `AirIdleAsks` (2) asks in a row while the air
+  constructor is idle. Played: `chain.next` and `power.turret` kept handing
+  one a job it never took up.
+
+**Invariant.** INV-053: no T2 air constructor waits or idles at three samples
+in a row, 30 s apart
+([`invariants.as`](../data/script/src/manager/invariants.as)).
+
+**Files.** [`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-124 — A nuke launch draws a smiley face over its target; the credits show in 5% of games
+
+**Date:** 2026-09-27. **Status:** STATUS124
+
+**Owner's request.** Whenever a nuclear missile is launched, the AI draws a
+smiley face on the map over the target. The intro's second screen, the
+contributors, shows only 5% of the time.
+
+**Decision.**
+- **Smiley.** [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp)
+  watches a nuke silo's stockpile (`armsilo`, `corsilo`, `legsilo`); a drop is
+  a launch. `CCircuitAI::DrawSmiley` then puts a face over the target, `SMILEY_RADIUS`
+  (400 elmos): its outline, two eyes and a smile, about 50 map lines through
+  the paced draw queue of D-118. The target is the attacked unit's position, or
+  the aimed ground. Logged as "NUKE: launched ...". The face stays on the map.
+- **Credits.** [`commands.as`](../data/script/src/manager/commands.as) rolls
+  once a game after the first drawing is erased: under `IntroCreditsPercent`
+  (5) the credits follow, else the intro ends. The roll is logged either way.
+
+**Invariant.** None: drawing changes no game state (as D-118).
+
+**Files.** [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp),
+[`SuperTask.h`](../src/circuit/task/static/SuperTask.h),
+[`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`CircuitAI.h`](../src/circuit/CircuitAI.h),
+[`commands.as`](../data/script/src/manager/commands.as).
 
 ## Process decisions
 

@@ -525,9 +525,19 @@ void CFerryTask::Update()
 			// and the engine does not detach a unit that changes team, so a
 			// give one update early would leave it under our transport (D-056).
 			// D-110: or not aboard any more (a raised drop spot is never exactly ground)
+			// D-122 (the owner's game: the cargo was out at 7 s - "aboard=0", the
+			// transport's queue empty - but it stood more than FERRY_LIFT_HEIGHT
+			// above the terrain height (a pad, a ramp), so "not lifted" never held;
+			// the run sat in UNLOADING 45 s a retry, the transport idle, the gift not
+			// given): the engine has finished the unload (the transport's queue is
+			// empty) and the cargo is not aboard (IsAboard: risen above where it
+			// stood AND under the transport, D-110, D-112). The empty queue keeps a
+			// cargo still attached in the descent from counting (D-056)
 			const AIFloat3& cPos = cargo->GetPos(frame);
 			const bool onGround = (cPos.y - circuit->GetMap()->GetElevationAt(cPos.x, cPos.z)) < FERRY_GROUND_TOLERANCE;
-			const bool landed = onGround || (!IsLifted(cargo, frame) && !IsAboard(cargo, transport, frame));
+			const bool unloadOver = circuit->GetUnitAPI()->GetCMDQueueSize(transport->GetId()) == 0;
+			const bool notAboard = !IsAboard(cargo, transport, frame);
+			const bool landed = onGround || (!IsLifted(cargo, frame) && notAboard) || (unloadOver && notAboard);
 			landedTicks = landed ? (landedTicks + 1) : 0;
 			if (landedTicks >= FERRY_LANDED_TICKS) {
 				circuit->LOG("FERRY: delivered cargo %i at (%.0f, %.0f)", cargoId, landPos.x, landPos.z);

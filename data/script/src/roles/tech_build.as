@@ -207,11 +207,14 @@ namespace TechBuild {
                 return t;
             }
         }
-        if (UnitHelpers::IsCommander(u.circuitDef) && Layout::HasComplex()) {
+        // D-120: with no planned pair (Layout::fallback: cramped ground) the lab
+        // goes here too: the slot path below needs a planned slot and failed on
+        // every try (played: Tundra Continents, no lab in 30 minutes)
+        if (UnitHelpers::IsCommander(u.circuitDef) && (Layout::HasComplex() || Layout::fallback)) {
             const AIFloat3 at = u.GetPos(ai.frame);
-            const int facing = Layout::facing;
             const float step = SQUARE_SIZE * 2;
-            const int rings = int(Global::RoleSettings::Tech::ExpFirstLabRadius / step);
+            // D-120: cramped ground: the nearest footprint may be further out
+            const int rings = int((Layout::fallback ? Global::RoleSettings::Tech::CrampedFirstLabRadius : Global::RoleSettings::Tech::ExpFirstLabRadius) / step);
             // Never under the commander itself: a factory ordered on top of its
             // builder has its command dropped by the engine on every try (the
             // builder is in the way), which looked like a glitching commander.
@@ -220,9 +223,11 @@ namespace TechBuild {
             const float clear = float(lab.GetFootprintX() > lab.GetFootprintZ() ? lab.GetFootprintX() : lab.GetFootprintZ()) * 0.5f * step
                 + Global::RoleSettings::Tech::ExpFirstLabClearance;
             const int firstRing = int(clear / step) + 1;
+            const int tries = Layout::fallback ? 4 : 1;   // D-120: no planned facing: any
             for (int r = firstRing; r <= rings; ++r) {
                 const int n = 8 * r;
-                for (int k = 0; k < n; ++k) {
+                for (int k = 0; k < n; ++k) for (int fi = 0; fi < tries; ++fi) {
+                    const int facing = Layout::fallback ? (Layout::facing + fi) % 4 : Layout::facing;
                     const float a = 6.2831853f * float(k) / float(n);
                     AIFloat3 p = AIFloat3(at.x + cos(a) * float(r) * step, 0.0f, at.z + sin(a) * float(r) * step);
                     if (!aiTerrainMgr.CanReserveBuilding(lab, p, facing)) continue;
@@ -233,8 +238,9 @@ namespace TechBuild {
                     IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, lab, p, null, 0.0f, false, true, 300 * SECOND));
                     if (t is null) { aiTerrainMgr.ReleaseReservation(id); return null; }
                     if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[TECH][Build] could not pin the first lab to slot " + id, 1);
+                    if (Layout::fallback) Layout::ReserveCrampedLabSlot(p, u);   // D-121
                     GenericHelpers::LogUtil("[TECH][Build] first lab at the commander: (" + int(p.x) + ", " + int(p.z) + "), "
-                        + int(sqrt(MapHelpers::SqDist(p, at))) + " from it; the pair's slot stays planned", 1);
+                        + int(sqrt(MapHelpers::SqDist(p, at))) + " from it, facing " + facing + (Layout::fallback ? " (no planned pair, D-120)" : "; the pair's slot stays planned"), 1);
                     return t;
                 }
             }
@@ -470,7 +476,74 @@ namespace TechBuild {
                 : (!u.circuitDef.CanBuild(d) ? "cannot build it" : "no site in the layout"));
             GenericHelpers::LogUtil("[TECH][Air] dedicated " + u.id + " waits for " + name + ": " + why + " (D-108)", 1);
         }
+        // D-123 (owner: an air constructor never does nothing): with no site for its
+        // structure (played: the layout full at 225 advanced converters, both
+        // dedicated builders waited for the rest of the game) it builds defences
+        // meanwhile; the role is kept and taken up again the moment a site frees
+        {
+            CCircuitDef@ d = ai.GetCircuitDef(name);
+            if (d !is null && d.IsAvailable(ai.frame) && u.circuitDef.CanBuild(d)) {
+                IUnitTask@ dt = AirDefence(u);
+                if (dt !is null) return dt;
+            }
+        }
         return Wait(3 * SECOND);
+    }
+
+    // D-123 (owner: if air constructors get stuck or have nothing to do, never let
+    // them do nothing; always fall back, at the lowest priority, to defences). The
+    // mex clusters' long-range AA and flak first (D-109's work), then a ring of
+    // defences round the base toward the front, T2 anti-ground turrets and flak in
+    // turn (T1 air constructors: light lasers and AA), AirDefenceMax of each at most.
+    // TECH's start caps hold land defences at 0: Buildable lifts one at a time.
+    int airDefenceRing = 0;
+    int airDefenceLog = -100000;
+    IUnitTask@ AirDefence(CCircuitUnit@ u)
+    {
+        if (u is null || u.circuitDef is null || !UnitHelpers::IsAirConstructor(u.circuitDef)) return null;
+        IUnitTask@ t = TechForward::DefendMexes(u);
+        if (t !is null) return t;
+        const string side = Global::AISettings::Side;
+        // played: at +1000 metal twelve of each of four kinds were built in minutes
+        // and the constructors waited again: six kinds, AirDefenceMax (60) of each
+        array<CCircuitDef@> defs = {
+            ai.GetCircuitDef(UnitHelpers::GetStaticT2MediumTurretNameForSide(side)),
+            ai.GetCircuitDef(UnitHelpers::GetStaticT2AAFlakNameForSide(side)),
+            ai.GetCircuitDef(UnitHelpers::GetStaticT2AARangeNameForSide(side)),
+            ai.GetCircuitDef(UnitHelpers::GetStaticT2ArtilleryNameForSide(side)),
+            ai.GetCircuitDef(UnitHelpers::GetStaticLLTNameForSide(side)),
+            ai.GetCircuitDef(UnitHelpers::GetStaticAAHeavyNameForSide(side))
+        };
+        const AIFloat3 base = Layout::BaseCentre();
+        const AIFloat3 front = Layout::FrontTarget();
+        float dx = front.x - base.x, dz = front.z - base.z;
+        float len = sqrt(dx * dx + dz * dz);
+        if (len < 1.0f) { dx = 1.0f; dz = 0.0f; len = 1.0f; }
+        dx /= len; dz /= len;
+        for (int k = 0; k < 24; ++k) {
+            const int slot = airDefenceRing + k;
+            CCircuitDef@ d = defs[slot % defs.length()];
+            if (d is null || d.count >= Global::RoleSettings::Tech::AirDefenceMax) continue;
+            if (!TechForward::Buildable(u, d)) continue;
+            // round the base, fanned about the front: 0, +1, -1, +2, -2 ... steps of
+            // AirDefenceArc radians, further out every AirDefenceRingSize places
+            const int place = slot / int(defs.length());
+            const int side2 = ((place % Global::RoleSettings::Tech::AirDefenceRingSize) + 1) / 2 * (((place % 2) == 1) ? 1 : -1);
+            const float ang = float(side2) * Global::RoleSettings::Tech::AirDefenceArc;
+            const float r = Global::RoleSettings::Tech::AirDefenceRadius + Global::RoleSettings::Tech::AirDefenceRingStep * float(place / Global::RoleSettings::Tech::AirDefenceRingSize);
+            const float ca = cos(ang), sa = sin(ang);
+            const AIFloat3 p(base.x + (dx * ca - dz * sa) * r, 0.0f, base.z + (dx * sa + dz * ca) * r);
+            if (p.x < 64.0f || p.z < 64.0f || p.x > float(AiTerrainWidth()) - 64.0f || p.z > float(AiTerrainHeight()) - 64.0f) continue;
+            IUnitTask@ dt = TechForward::OrderDefence(u, d, p, Global::RoleSettings::Tech::AirDefenceShake, "nothing else to do: the base's defence ring (D-123)");
+            if (dt is null) continue;
+            airDefenceRing = slot + 1;
+            return dt;
+        }
+        if (ai.frame - airDefenceLog > 60 * SECOND) {
+            airDefenceLog = ai.frame;
+            GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + ": no defence left to build (D-123)", 1);
+        }
+        return null;
     }
     // the rest of the T2 air constructors: converters while energy overflows; the
     // advanced fusion going up the moment the converters cannot stay on

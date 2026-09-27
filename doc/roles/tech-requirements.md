@@ -52,6 +52,8 @@ is edited in place with the decision that changed it.
 | L22 | Factories assigned as spam (the late T1 labs of the front clusters, not the first bot lab) never have constructors assisting them: only their own two turrets. | D-119 | INV-049 |
 | L24 | A spam lab produces continuously, its two turrets building each unit with it. | D-119 | INV-048 |
 | L23 | Each forward T1 spam lab has its own lane; lanes are spaced apart, spread across the active battle front, and run straight on to the enemy backline. | D-119 | - |
+| L25 | An island TECH (Tundra Continents): bot lab, advanced lab, mex upgrades, a fusion; after the second advanced fusion the economy moves to the water and the priority is expanding the sea economy and pumping sea units, T2 sea units first. Land constructors keep building on the island. Land maps are unaffected. | D-121 | INV-051 |
+| L26 | An air constructor never does nothing: when stuck or with nothing to do it builds defences, at the lowest priority. | D-123 | INV-053 |
 | L12 | Every factory type, T1 and T2 air included, stands tight to the construction turrets; air factories may face any way (their units fly). | D-104 | INV-029 |
 
 ## Build sequence and economy

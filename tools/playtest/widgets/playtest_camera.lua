@@ -128,6 +128,13 @@ local function dumpEco(n)
 end
 
 function widget:GameFrame(n)
+	-- owner: the BARb AI window stays closed in tests, so screenshots are clear
+	-- (the installed copy may be an older one that opens itself on a fresh config;
+	-- a test that needs it opens it with WG.barblink.SetOpen(true) after this)
+	if n <= 300 and n % 30 == 0 and WG.barblink and WG.barblink.IsOpen and WG.barblink.IsOpen() then
+		WG.barblink.SetOpen(false)
+		echo("BARb AI window closed for the screenshots")
+	end
 	if n % 1800 == 0 then dumpEco(n) end
 	if n == 1 then Spring.SendCommands("luaui disablewidget Autoquit") end
 	if n == 1 or n == 90 then dumpTeams(n) end

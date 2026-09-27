@@ -350,6 +350,14 @@ static int IBuilderTask_GetReservationId(IUnitTask* task)
 }
 
 // Footprint in blocking-map cells (16 elmos), what the reservation API measures in.
+// D-121: a builder can walk (or float) to within range of pos (its movement
+// area's sectors). Threat is not asked: a site is planned for the game, and a
+// scout near it would veto it (played: every site refused with the Safe test)
+static bool CTerrainManager_CanReachAt(CTerrainManager* mgr, CCircuitUnit* unit, const AIFloat3& pos, float range)
+{
+	return (unit != nullptr) && mgr->CanReachAt(unit, pos, range);
+}
+
 static int CCircuitDef_GetFootprintX(const CCircuitDef* cdef)
 {
 	return (cdef->GetDef() == nullptr) ? 0 : cdef->GetDef()->GetXSize() / 2;
@@ -1008,6 +1016,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetReservationPos(int) const", asMETHOD(CTerrainManager, GetReservationPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsSlotDead(int) const", asMETHOD(CTerrainManager, IsSlotDead), asCALL_THISCALL); ASSERT(r >= 0);  // D-116
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanReachAt(CCircuitUnit@, const AIFloat3& in, float)", asFUNCTION(CTerrainManager_CanReachAt), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-121
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationFacing(int) const", asMETHOD(CTerrainManager, GetReservationFacing), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackSet(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, int count, bool ring)", asFUNCTION(CTerrainManager_PackSet), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101, D-108
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSetSlot(const CCircuitDef@) const", asFUNCTION(CTerrainManager_NextSetSlot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
