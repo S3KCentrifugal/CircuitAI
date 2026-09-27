@@ -229,8 +229,15 @@ void IBuilderTask::Update()
 void IBuilderTask::Stop(bool done)
 {
 	IUnitTask::Stop(done);
+	// D-117 crash (owner's game, build101, F25307): IUnitTask::Stop clears
+	// `units`, and unitIt was left on a freed node; a stopped task stays listed
+	// until the update loop drops it, so ForgetUnitEverywhere (a turret dying)
+	// then read and advanced the dangling iterator
+	unitIt = units.end();
 	traveled.clear();
 	executors.clear();
+	engaged.clear();
+	approaching.clear();
 
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	if ((buildDef != nullptr) && !economyMgr->IsIgnorePull(this)) {

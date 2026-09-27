@@ -83,6 +83,8 @@ namespace TechFactories {
         int plannedFrame = -1;       // INV-046
         bool built = false;          // its factory stood once: native forgot labRes, a rebuild re-reserves
         IUnitTask@ labTask;          // the factory's order while it lives (builders join it)
+        Row@ row;                    // D-117: a T1 spam lab's row
+        int rowK = 0;                // D-117: its place in the row (0 = the row's first lab)
         int invOpenLog = -100000;    // INV-046
     }
     array<Cluster@> clusters;
@@ -188,6 +190,33 @@ namespace TechFactories {
         }
         return false;
     }
+    // The turrets that stand finished before a cluster's factory is ordered: the
+    // whole block (D-114), a gantry's first FrontT3TurretsFirst of its 50 (D-119)
+    int TurretsBeforeLab(Cluster@ c)
+    {
+        if (c.tier >= 3 && Global::RoleSettings::Tech::FrontT3TurretsFirst < c.slots) return Global::RoleSettings::Tech::FrontT3TurretsFirst;
+        return c.slots;
+    }
+    // D-119: a lab placed for spam (a T1 front cluster's), never assisted but by its two turrets
+    bool IsSpamLab(CCircuitUnit@ u)
+    {
+        if (u is null) return false;
+        for (uint i = 0; i < clusters.length(); ++i) {
+            if (clusters[i].tier != 1) continue;
+            CCircuitUnit@ l = LabAt(clusters[i]);
+            if (l !is null && l.id == u.id) return true;
+        }
+        return false;
+    }
+    // D-119: `t` is one of the turrets of the cluster whose lab is `lab`
+    bool IsOwnTurret(CCircuitUnit@ t, CCircuitUnit@ lab)
+    {
+        if (t is null || t.circuitDef is null || t.circuitDef.IsMobile()) return false;
+        Cluster@ c = ClusterOfTurret(t);
+        if (c is null) return false;
+        CCircuitUnit@ l = LabAt(c);
+        return l !is null && lab !is null && l.id == lab.id;
+    }
     int CountTier(int tier)
     {
         int n = 0;
@@ -221,6 +250,175 @@ namespace TechFactories {
         return aiTerrainMgr.CanReserveBuilding(lab, p, facing) && aiTerrainMgr.IsExitClear(lab, p, facing, 320.0f, 32.0f);
     }
 
+    // ---------------------------------------------------------------- spam rows (D-117)
+
+    // Owner's rule: T1 spam labs stand side by side in rows of up to
+    // FrontRowMaxLabs, each with exactly its two turrets behind it; a row may be a
+    // single lab where the ground allows no more. A row never cramps the ground:
+    // beside it a lane FrontT3LaneCells wide, passable and held clear (a corridor:
+    // nothing of ours is placed on it) lets the largest T3 walk from the factories
+    // behind to the front. A row needs at least one such lane.
+    class Row {
+        AIFloat3 origin;             // the first lab's site (k = 0)
+        int facing = 0;
+        int minK = 0, maxK = 0;      // the labs' places, k across the row
+        int laneL = 0, laneR = 0;    // the corridor zones at each end (0 = none)
+        array<Cluster@> labs;
+    }
+    array<Row@> spamRows;
+
+    int RowPitchCells(CCircuitDef@ lab, CCircuitDef@ nano, int facing)
+    {
+        int cols, rows;
+        TurretBlock(1, cols, rows);
+        const int wide = (Layout::Across(lab, facing) > cols * Layout::Across(nano, facing)) ? Layout::Across(lab, facing) : cols * Layout::Across(nano, facing);
+        return wide + Global::RoleSettings::Tech::FrontRowGapCells;
+    }
+    AIFloat3 RowSlot(Row@ r, CCircuitDef@ lab, CCircuitDef@ nano, int k)
+    {
+        return r.origin + Layout::Side(r.facing) * (float(k * RowPitchCells(lab, nano, r.facing)) * SQUARE_SIZE * 2);
+    }
+    // The lane beside place k on side dir (-1 / +1): its centre, across the whole
+    // depth of the cluster (the lab, its turrets) and FrontT3LaneCells beyond
+    // both ends, so a unit can enter and leave it
+    void LaneBox(CCircuitDef@ lab, CCircuitDef@ nano, const AIFloat3& in slot, int facing, int dir, AIFloat3 &out centre, float &out halfAcross, float &out halfAlong)
+    {
+        int cols, rows;
+        TurretBlock(1, cols, rows);
+        const float cell = SQUARE_SIZE * 2;
+        const int lane = Global::RoleSettings::Tech::FrontT3LaneCells;
+        const int depth = Layout::Along(lab, facing) + rows * Layout::Along(nano, facing) + 2 * lane;
+        const int wide = RowPitchCells(lab, nano, facing) - Global::RoleSettings::Tech::FrontRowGapCells;
+        halfAcross = float(lane) * 0.5f * cell;
+        halfAlong = float(depth) * 0.5f * cell;
+        const float back = float(rows * Layout::Along(nano, facing)) * 0.5f * cell;   // the cluster's centre is behind the lab's
+        centre = slot + Layout::Side(facing) * (float(dir) * (float(wide) * 0.5f + float(lane) * 0.5f) * cell) - Layout::Fwd(facing) * back;
+    }
+    bool LanePassable(CCircuitDef@ nano, const AIFloat3& in centre, float halfAcross, float halfAlong, int facing)
+    {
+        const float m = 64.0f;
+        if (centre.x < m || centre.z < m || centre.x > float(AiTerrainWidth()) - m || centre.z > float(AiTerrainHeight()) - m) return false;
+        const float need = Global::RoleSettings::Tech::FrontLaneMinFlat;
+        return aiTerrainMgr.FlatFraction(centre, facing, halfAcross, halfAlong, Global::RoleSettings::Tech::LayoutBoxMaxSlope) >= need
+            && aiTerrainMgr.BuildableFraction(nano, centre, halfAcross, halfAlong, facing) >= need;
+    }
+    // Hold the lane beside place k on side dir as a corridor; 0 when it is not passable
+    // (`again`: a lane the row held a moment ago, put back without the test: wrecks
+    // or units on it since do not lose it, D-119, INV-047)
+    int HoldLane(CCircuitDef@ lab, CCircuitDef@ nano, const AIFloat3& in slot, int facing, int dir, bool again = false)
+    {
+        AIFloat3 c; float ha, hl;
+        LaneBox(lab, nano, slot, facing, dir, c, ha, hl);
+        if (!again && !LanePassable(nano, c, ha, hl, facing)) return 0;
+        return aiTerrainMgr.ReserveZone(c, facing, ha, hl, true);
+    }
+    // A new lab at the end of a row with room; the lane at that end moves out
+    // past it. Null when no row can take one.
+    dictionary rowWhy;   // row and end -> frame of its last reason logged
+    // D-119: which of Fits' tests a place fails, for the log
+    string WhyNotFits(CCircuitDef@ lab, CCircuitDef@ nano, const AIFloat3& in p, int facing, int rows)
+    {
+        const float cell = SQUARE_SIZE * 2;
+        const float halfAcross = float(Layout::Across(lab, facing)) * 0.5f * cell;
+        const float halfAlong = float(Layout::Along(lab, facing) + rows * Layout::Along(nano, facing)) * 0.5f * cell;
+        const AIFloat3 centre = p - Layout::Fwd(facing) * (float(rows * Layout::Along(nano, facing)) * 0.5f * cell);
+        const float m = 64.0f;
+        if (p.x < m || p.z < m || p.x > float(AiTerrainWidth()) - m || p.z > float(AiTerrainHeight()) - m) return "off the map";
+        if (aiTerrainMgr.FlatFraction(centre, facing, halfAcross, halfAlong, Global::RoleSettings::Tech::LayoutBoxMaxSlope)
+            < Global::RoleSettings::Tech::FrontMinFlat) return "the ground is not flat";
+        if (!aiTerrainMgr.CanReserveBuilding(lab, p, facing)) {
+            // which: our own reservations or zones on it, or ground/structures the engine refuses
+            int held = 0, cells = 0;
+            const int ax = Layout::Across(lab, facing), al = Layout::Along(lab, facing);
+            for (int i = 0; i < ax; ++i) for (int j = 0; j < al; ++j) {
+                const AIFloat3 q = p + Layout::Side(facing) * ((float(i) - float(ax - 1) * 0.5f) * cell) + Layout::Fwd(facing) * ((float(j) - float(al - 1) * 0.5f) * cell);
+                ++cells;
+                if (aiTerrainMgr.IsReserved(q)) ++held;
+            }
+            const float b = aiTerrainMgr.BuildableFraction(lab, p, halfAcross, float(al) * 0.5f * cell, facing);
+            return "the footprint is taken or refused (" + held + " of " + cells + " cells reserved by us, " + int(b * 100.0f) + "% buildable)";
+        }
+        if (!aiTerrainMgr.IsExitClear(lab, p, facing, 320.0f, 32.0f)) return "the exit is blocked";
+        return "unknown";
+    }
+    Cluster@ ExtendRow(CCircuitDef@ lab, CCircuitDef@ nano)
+    {
+        int cols, rows;
+        TurretBlock(1, cols, rows);
+        for (uint i = 0; i < spamRows.length(); ++i) {
+            Row@ r = spamRows[i];
+            if (int(r.labs.length()) >= Global::RoleSettings::Tech::FrontRowMaxLabs) continue;
+            for (int s = 0; s < 2; ++s) {
+                const int dir = (s == 0) ? 1 : -1;
+                const int k = (dir > 0) ? r.maxK + 1 : r.minK - 1;
+                const AIFloat3 p = RowSlot(r, lab, nano, k);
+                // the end's lane stands on the new place: let it go, try, else hold it again
+                const int old = (dir > 0) ? r.laneR : r.laneL;
+                if (old > 0) aiTerrainMgr.ReleaseZone(old);
+                bool placed = false;
+                int id = -1, g = 0, lane = 0;
+                string why = "";   // D-119: why a row did not grow (logged once a minute)
+                if (Fits(lab, nano, p, r.facing, rows, false)) {
+                    id = aiTerrainMgr.ReserveBuilding(lab, p, r.facing);
+                    if (id >= 0) {
+                        g = aiTerrainMgr.ReserveNanoBlockAt(nano, lab, aiTerrainMgr.GetReservationPos(id), r.facing, cols, rows, 0);
+                        if (g > 0 && aiTerrainMgr.GetGroupCount(g, false) >= cols * rows) {
+                            lane = HoldLane(lab, nano, aiTerrainMgr.GetReservationPos(id), r.facing, dir);
+                            // this end may close only when the other end still holds a lane
+                            placed = (lane > 0) || (((dir > 0) ? r.laneL : r.laneR) > 0);
+                            if (!placed) why = "no T3 lane would stay open";
+                        } else why = "its two turret slots are not free";
+                    } else why = "the lab's footprint cannot be reserved";
+                } else why = WhyNotFits(lab, nano, p, r.facing, rows);
+                const string whyKey = "" + i + ((dir > 0) ? "R" : "L");
+                int64 whyAt = -100000;
+                rowWhy.get(whyKey, whyAt);
+                if (!placed && ai.frame - whyAt >= 60 * SECOND) {
+                    rowWhy.set(whyKey, int64(ai.frame));
+                    GenericHelpers::LogUtil("[TECH][Factories] spam row " + (i + 1) + " cannot grow " + ((dir > 0) ? "right" : "left")
+                        + " at (" + int(p.x) + ", " + int(p.z) + "): " + why + " (D-119)", 1);
+                }
+                if (!placed) {
+                    if (lane > 0) aiTerrainMgr.ReleaseZone(lane);
+                    if (g > 0) aiTerrainMgr.ReleaseGroup(g);
+                    if (id >= 0) aiTerrainMgr.ReleaseReservation(id);
+                    const AIFloat3 edge = RowSlot(r, lab, nano, (dir > 0) ? r.maxK : r.minK);
+                    const int back = (old > 0) ? HoldLane(lab, nano, edge, r.facing, dir, true) : 0;
+                    if (dir > 0) r.laneR = back; else r.laneL = back;
+                    continue;
+                }
+                if (dir > 0) { r.maxK = k; r.laneR = lane; } else { r.minK = k; r.laneL = lane; }
+                Cluster@ c = NewCluster(lab, 1, id, aiTerrainMgr.GetReservationPos(id), r.facing, g, cols * rows, r.labs[0].share);
+                @c.row = r;
+                c.rowK = k;
+                r.labs.insertLast(c);
+                GenericHelpers::LogUtil("[TECH][Factories] T1 cluster " + clusters.length() + " for " + lab.GetName() + " joins spam row " + (i + 1)
+                    + " (lab " + r.labs.length() + " of up to " + Global::RoleSettings::Tech::FrontRowMaxLabs + ", side by side), 2 turrets behind it; T3 lanes: "
+                    + ((r.laneL > 0) ? "left" : "") + ((r.laneL > 0 && r.laneR > 0) ? " and " : "") + ((r.laneR > 0) ? "right" : "") + " (D-117)", 1);
+                return c;
+            }
+        }
+        return null;
+    }
+    Cluster@ NewCluster(CCircuitDef@ lab, int tier, int id, const AIFloat3& in lp, int facing, int g, int slots, float s)
+    {
+        Cluster@ c = Cluster();
+        c.defName = lab.GetName();
+        c.tier = tier;
+        c.labRes = id;
+        c.pos = lp;
+        c.facing = facing;
+        c.nanoGroup = g;
+        c.share = s;
+        c.slots = slots;   // turretPos is filled as each slot's turret is ordered
+        c.plannedFrame = ai.frame;
+        clusters.insertLast(c);
+        return c;
+    }
+
+    // D-119: a gantry's turret blocks, biggest first (cols, rows): 50, 40, 32, 24, 18, 6
+    const array<int> T3Blocks = { 10, 5, 8, 5, 8, 4, 6, 4, 6, 3, 3, 2 };
+
     // The first spot, at least FrontMinShare of the way toward the front (and no
     // nearer than the furthest cluster), where the cluster fits: along the line
     // from the home centre to the front, FrontShareStep at a time, and across it
@@ -234,6 +432,10 @@ namespace TechFactories {
         const int tier = TierOf(lab.GetName());
         int cols, rows;
         TurretBlock(tier, cols, rows);
+        if (tier == 1) {   // D-117: side by side in a row first
+            Cluster@ joined = ExtendRow(lab, nano);
+            if (joined !is null) return joined;
+        }
         const AIFloat3 home = Layout::HomeCentre();
         const AIFloat3 front = Layout::FrontTarget();
         const float dx = front.x - home.x, dz = front.z - home.z;
@@ -252,28 +454,54 @@ namespace TechFactories {
                 for (int k = 0; k <= 2 * Global::RoleSettings::Tech::FrontLateralTries; ++k) {
                     const float off = (k == 0) ? 0.0f : float((k + 1) / 2) * pitch * ((k % 2 == 1) ? 1.0f : -1.0f);
                     const AIFloat3 p(bx - uz * off, home.y, bz + ux * off);
-                    if (!Fits(lab, nano, p, facing, rows, roomy)) continue;
+                    // D-119: a gantry needs room for its smallest block; the biggest that fits is taken below
+                    if (!Fits(lab, nano, p, facing, (tier >= 3) ? T3Blocks[T3Blocks.length() - 1] : rows, roomy)) continue;
                     const int id = aiTerrainMgr.ReserveBuilding(lab, p, facing);
                     if (id < 0) continue;
                     const AIFloat3 lp = aiTerrainMgr.GetReservationPos(id);
-                    const int g = aiTerrainMgr.ReserveNanoBlockAt(nano, lab, lp, facing, cols, rows, 0);
-                    if (g <= 0 || aiTerrainMgr.GetGroupCount(g, false) < cols * rows) {
+                    int g = 0;
+                    int bc = cols, br = rows;
+                    // D-119 (owner): a gantry's block holds up to 50 turrets; where the
+                    // ground is smaller, the biggest block that fits
+                    for (uint o = 0; o < T3Blocks.length(); o += 2) {
+                        if (tier < 3 && o > 0) break;
+                        if (tier >= 3) { bc = T3Blocks[o]; br = T3Blocks[o + 1]; }
+                        g = aiTerrainMgr.ReserveNanoBlockAt(nano, lab, lp, facing, bc, br, 0);
+                        if (g > 0 && aiTerrainMgr.GetGroupCount(g, false) >= bc * br) break;
                         if (g > 0) aiTerrainMgr.ReleaseGroup(g);
+                        g = 0;
+                    }
+                    if (g <= 0) {
                         aiTerrainMgr.ReleaseReservation(id);
                         continue;
                     }
-                    Cluster@ c = Cluster();
-                    c.defName = lab.GetName();
-                    c.tier = tier;
-                    c.labRes = id;
-                    c.pos = lp;
-                    c.facing = facing;
-                    c.nanoGroup = g;
-                    c.share = s;
-                    c.slots = cols * rows;   // turretPos is filled as each slot's turret is ordered
-                    c.plannedFrame = ai.frame;
+                    cols = bc; rows = br;
+                    // D-117: a spam lab starts a row, and a row never cramps the
+                    // ground: at least one passable T3 lane beside it, held
+                    int laneL = 0, laneR = 0;
+                    if (tier == 1) {
+                        laneL = HoldLane(lab, nano, lp, facing, -1);
+                        laneR = HoldLane(lab, nano, lp, facing, 1);
+                        if (laneL <= 0 && laneR <= 0) {
+                            aiTerrainMgr.ReleaseGroup(g);
+                            aiTerrainMgr.ReleaseReservation(id);
+                            continue;
+                        }
+                    }
+                    Cluster@ c = NewCluster(lab, tier, id, lp, facing, g, cols * rows, s);
                     if (tier >= 3) Builder::MarkGantryEnqueued();
-                    clusters.insertLast(c);
+                    if (tier == 1) {
+                        Row@ r = Row();
+                        r.origin = lp;
+                        r.facing = facing;
+                        r.laneL = laneL;
+                        r.laneR = laneR;
+                        r.labs.insertLast(c);
+                        @c.row = r;
+                        spamRows.insertLast(r);
+                        GenericHelpers::LogUtil("[TECH][Factories] spam row " + spamRows.length() + " begins; T3 lanes: "
+                            + ((laneL > 0) ? "left" : "") + ((laneL > 0 && laneR > 0) ? " and " : "") + ((laneR > 0) ? "right" : "") + " (D-117)", 1);
+                    }
                     if (s > reachShare) reachShare = s;
                     GenericHelpers::LogUtil("[TECH][Factories] T" + tier + " cluster " + clusters.length() + " for " + lab.GetName() + " at (" + int(lp.x) + ", " + int(lp.z)
                         + "), " + int(s * 100.0f) + "% toward the front, " + (cols * rows) + " turrets behind it" + (roomy ? "" : " (close to other buildings: no roomier spot)") + " (D-114)", 1);
@@ -330,8 +558,14 @@ namespace TechFactories {
         Cluster@ c = OpenCluster(def, planNew && MayPlan(def));
         if (c is null) return null;
         const int idx = clusters.findByRef(c) + 1;
+        // D-119: a gantry is ordered once FrontT3TurretsFirst of its (up to 50)
+        // turrets stand; a builder that can build it takes that order first, the
+        // turret orders go on filling the block
+        const int first = TurretsBeforeLab(c);
+        const bool labDue = c.tier >= 3 && (c.labTask is null || c.labTask.IsDead()) && (u is null || u.circuitDef.CanBuild(def))
+            && FinishedTurrets(c) >= first;
         // 1. the turrets
-        const int sid = aiTerrainMgr.NextSlotAny(c.nanoGroup, c.pos);
+        const int sid = labDue ? -1 : aiTerrainMgr.NextSlotAny(c.nanoGroup, c.pos);
         if (sid >= 0 && (u is null || u.circuitDef.CanBuild(nano))) {
             const AIFloat3 sp = aiTerrainMgr.GetReservationPos(sid);
             bool known = false;
@@ -340,13 +574,13 @@ namespace TechFactories {
             c.turretFrame = ai.frame;
             return OrderPinned(u, Task::BuildType::NANO, nano, sid, "a turret for front cluster " + idx + " (" + c.defName + ")");
         }
-        CCircuitUnit@ tf = aiBuilderMgr.FindUnfinishedNear(c.pos, 200.0f, nano);
+        CCircuitUnit@ tf = labDue ? null : aiBuilderMgr.FindUnfinishedNear(c.pos, 200.0f, nano);
         if (tf !is null) { c.turretFrame = ai.frame; return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, tf, 30 * SECOND)); }
         // 2. the factory, once its whole turret block stands finished (played: the
         // factory was ordered with the turrets, "its 0 turrets stand"); while a
         // turret is ordered but not started, the cluster waits (INV-045)
         const int done = FinishedTurrets(c);
-        if (done < c.slots) {
+        if (done < first) {
             // a slot the engine refused (a dead slot) never fills: with no turret
             // work for 240 s, the factory goes up behind the turrets that stand
             if (done == 0 || c.turretFrame < 0 || ai.frame - c.turretFrame < 240 * SECOND) return null;
@@ -484,24 +718,81 @@ namespace TechFactories {
     }
 
     // The two turrets (or the block) behind a front factory always work for it
-    IUnitTask@ TurretFocus(CCircuitUnit@ u)
+    // D-117 (owner's rule): a spam lab's two turrets always assist that lab and
+    // nothing else: marked no_disrupt (native keeps them off the reclaim pull),
+    // and before the lab exists they wait for it instead of taking other work
+    TypeMask NO_DISRUPT = aiAttrMasker.GetTypeMask("no_disrupt");
+    Cluster@ ClusterOfTurret(CCircuitUnit@ u)
     {
-        if (u is null || clusters.length() == 0) return null;
+        if (u is null) return null;
         const AIFloat3 p = u.GetPos(ai.frame);
         for (uint i = 0; i < clusters.length(); ++i) {
-            Cluster@ c = clusters[i];
-            bool mine = false;
-            for (uint k = 0; k < c.turretPos.length(); ++k) {
-                if (MapHelpers::SqDist(c.turretPos[k], p) <= Sq(32.0f)) { mine = true; break; }
-            }
-            if (!mine) continue;
-            CCircuitUnit@ l = LabAt(c);
-            if (l is null) return null;   // the factory is not up yet: the table's other turret rows
-            if (l.GetBuildProgress() < 1.0f) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, l, 30 * SECOND));
-            return GuardHelpers::AssignWorkerGuard(u, l, Task::Priority::HIGH, true, 60 * SECOND);
+            for (uint k = 0; k < clusters[i].turretPos.length(); ++k)
+                if (MapHelpers::SqDist(clusters[i].turretPos[k], p) <= Sq(32.0f)) return clusters[i];
         }
         return null;
     }
+    // A cluster's turret works for its own factory. Turrets are the native factory
+    // manager's assistants (D-119): asked from Tech_FactoryAiMakeTask, they get
+    // factory-side tasks (native refuses a task of another manager): the factory
+    // frame, else the unit it is producing (unfinished at the lab), else a short
+    // wait. A turret a reclaim pull moved to the builder side is asked by the rule
+    // turret.spam and gets builder tasks (a guard of the lab).
+    IUnitTask@ TurretFocus(CCircuitUnit@ u, bool factorySide = false)
+    {
+        if (u is null || clusters.length() == 0) return null;
+        Cluster@ c = ClusterOfTurret(u);
+        if (c is null) return null;
+        if (c.tier == 1 && !u.IsAttrAny(NO_DISRUPT.mask)) u.AddAttribute(NO_DISRUPT.type);   // D-117
+        CCircuitUnit@ l = LabAt(c);
+        if (l is null) {
+            if (c.tier != 1) return null;   // the factory is not up yet: other work (its block, its frame)
+            // D-117: a spam lab's turrets wait for their lab
+            return factorySide ? aiFactoryMgr.Enqueue(TaskS::Wait(false, 5 * SECOND)) : TechBuild::Wait(5 * SECOND);
+        }
+        IUnitTask@ t = null;
+        if (factorySide) {
+            if (l.GetBuildProgress() < 1.0f) @t = aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, l));
+            else {
+                // what the lab is producing: a mobile frame in its yard
+                CCircuitUnit@ f = aiBuilderMgr.FindProducedNear(l.GetPos(ai.frame), LabYardRadius);
+                if (f !is null)
+                    @t = aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, f));
+                else
+                    @t = aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND));
+            }
+        } else {
+            if (l.GetBuildProgress() < 1.0f) @t = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, l, 30 * SECOND));
+            else @t = aiBuilderMgr.Enqueue(TaskB::Guard(Task::Priority::HIGH, l, false, 300 * SECOND));   // not interruptible
+        }
+        if (t !is null) {
+            focusOf.set("" + u.id, int64(l.id));   // D-119: for INV-048
+            focusFrame.set("" + u.id, int64(ai.frame));
+            if (!focusLogged.exists("" + u.id)) {
+                focusLogged.set("" + u.id, true);
+                GenericHelpers::LogUtil("[TECH][Factories] turret " + u.id + " works for its lab " + l.id + " (" + c.defName + ", "
+                    + (factorySide ? "factory side" : "builder side") + ") (D-119)", 1);
+            }
+        }
+        return t;
+    }
+    const float LabYardRadius = 96.0f;   // D-119: a unit in production stands within this of its lab's centre
+    // D-119: the lab each turret last worked for (INV-048: a native guard keeps its
+    // target as an id the script cannot read; a wait between two units has none)
+    dictionary focusOf;
+    dictionary focusFrame;   // D-119: turret id -> frame of its last task for its lab
+    dictionary focusLogged;
+    // A turret works for `lab` when its last task was for that lab and came within
+    // FocusFreshSeconds: a factory-side turret's tasks are seconds long (a unit in
+    // production, a 2 s wait), so an instant sample often finds it idle between two
+    bool GuardsLab(CCircuitUnit@ t, CCircuitUnit@ lab)
+    {
+        if (t is null || lab is null) return false;
+        int64 id = -1, at = -1;
+        if (!focusOf.get("" + t.id, id) || !focusFrame.get("" + t.id, at)) return false;   // D-025
+        return id == int64(lab.id) && ai.frame - int(at) <= FocusFreshSeconds * SECOND;
+    }
+    const int FocusFreshSeconds = 30;
 
     // ---------------------------------------------------------------- the base's land factories
 

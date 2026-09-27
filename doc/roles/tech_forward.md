@@ -19,7 +19,8 @@ clusters), the land constructors go out. The owner's rules:
   constructors stand (the T1 air plant keeps `T1AirConstructorTarget`, 6). They
   build the **spam cluster** forward: one T1 bot lab per +100 metal, each a T1
   front factory cluster of D-114 (its two turrets first, then the lab), its AA, and
-  small turret pads; else assist what goes up there, else guard a spam lab.
+  small turret pads; else help a structure going up there. A spam lab is never
+  guarded or assisted by a constructor, and its production is not helped (D-119).
 - A tier whose air constructors go down is **recalled**: its land constructors drop
   a forward job and the eco rows take them back to the eco clusters.
 
@@ -34,11 +35,11 @@ clusters), the land constructors go out. The owner's rules:
 | `Clusters` | `DefendMexes`, INV-039 | our mexes (`Economy::MexTracker::myMexes`) grouped within `MexClusterRadius` |
 | `DefendMexes` | `fwd.t2.defend` | long-range AA then flak at each cluster outside `MexDefenceBaseClear`; else help a defence going up, else follow a constructor carrying one |
 | `SpamClusters` | `ForwardT1`, `TickSpam`, INV-039 | the T1 clusters of `TechFactories` (D-114): the spam labs |
-| `ForwardT1` | `fwd.t1` | a spam cluster's turrets then its lab (`TechFactories::Work`, a new cluster while income asks for one), a standing spam lab's lost turret (`TechFactories::Refill`), one heavy AA behind each lab, a pad turret, assist, guard |
+| `ForwardT1` | `fwd.t1` | a spam cluster's turrets then its lab (`TechFactories::Work`, a new cluster while income asks for one), a standing spam lab's lost turret (`TechFactories::Refill`), one heavy AA behind each lab, a pad turret, help a structure going up at a spam cluster (never a spam lab or its units, D-119) |
 | `PadTurret` | `ForwardT1` | a 2x2 turret pad behind an end lab's turrets, a cell of walking room between (`SpamPadsMax`) |
 | `SpamLabsWanted` | `ForwardT1`, INV-039 | one spam lab per `SpamLabMetalStep` of income, at most `SpamLabsMax` |
 | `OrderPinned`, `OrderDefence`, `Buildable`, `Stands`, order bookkeeping | internal | pinned orders on reservations; a defence's cap lifted (TECH's start caps pin defences at 0) |
-| `TickSpam` | `Tick` (D-111) | while spam runs: each spam lab on repeat (`CmdRepeat`), its lane fixed by its place in the row (`Spam::SetFactoryLane`), that lane set as its factory route (`CmdFactoryRoute`, re-applied when `Spam::routesVersion` changes), the spam unit's cap kept open |
+| `TickSpam` | `Tick` (D-111, D-119) | while spam runs: each spam lab off repeat (D-119: native clears the queue when a recruit finishes; each ask gets the next unit); every standing spam lab its own spread lane across the active front (`Spam::SetSpreadLanes`: `LaneSpacing` apart, sorted by the labs' sideways places, straight on to the enemy backline; re-spread when the count changes and every 30 s), that lane set as its factory route (`CmdFactoryRoute`, re-applied when `Spam::routesVersion` changes), the spam unit's cap kept open |
 
 ## Invariants
 
@@ -66,4 +67,4 @@ constructor drops its forward job within 60 s); D-111's INV-043 lives in
 `Global::Spam::RepeatStallSeconds` (45): a factory on repeat that produced no spam
 unit for this long gets its build again (D-111).
 
-<!-- source: data/script/src/roles/tech_forward.as; blob: 95b9912469c59f9968dfce29b0149a555f548bc4; lines: 397 -->
+<!-- source: data/script/src/roles/tech_forward.as; blob: 31d47339ee479f2c4a1710dc5c9b4abced912e94; lines: 410 -->

@@ -38,6 +38,14 @@ namespace GuardHelpers {
         //     return null;
         // }
 
+        // INV-049 (D-119, owner): a spam lab is never assisted, but by its own two
+        // turrets. Every assist of a lab is a guard and every guard comes here, so
+        // the check is here: a violation is logged and the guard refused
+        if (TechFactories::IsSpamLab(target) && !TechFactories::IsOwnTurret(guard, target)) {
+            Invariants::Violation("INV-049", "" + guard.id, gdef.GetName() + " " + guard.id + " was sent to assist spam lab " + target.id + ": refused");
+            return null;
+        }
+
         IUnitTask@ task = aiBuilderMgr.Enqueue(
             TaskB::Guard(prio, target, interrupt, timeout)
         );

@@ -41,9 +41,17 @@ is edited in place with the decision that changed it.
 | L10 | The ground of structures TECH reclaims is recycled by the layout. | D-101 | INV-024 |
 | L11 | With no construction turret of ours on the map (the start, or a restart after a wipe) a T1 lab may go anywhere; otherwise it follows the layout. | D-101 | INV-023 |
 | L13 | A spam cluster layout type: one or more T1 bot labs, each with two construction turrets directly behind it; the two turrets nearest a lab are always focused on that lab. Forward construction turret clusters are small and never block lanes. | D-109 | INV-038 |
-| L14 | From +200 metal land factories move toward the front: each new one at least 20% closer to the front (further as needed), in a front factory cluster: the lab with construction turrets directly behind it (T1: 2, T2: 2 x 2, T3: 3 x 2), the turrets built first. Clusters go on flat ground where the factory fits, away from allied buildings when possible. | D-114 | INV-038, INV-045 |
+| L14 | From +200 metal land factories move toward the front: each new one at least 20% closer to the front (further as needed), in a front factory cluster: the lab with construction turrets directly behind it (T1: 2, T2: 2 x 2, T3: up to 50, D-119), the turrets built first. Clusters go on flat ground where the factory fits, away from allied buildings when possible. | D-114 | INV-038, INV-045 |
 | L16 | A front cluster keeps its shape: a lost turret is rebuilt while its factory stands; a lost factory is rebuilt at its cluster. After the base's advanced lab is rezoned, the advanced lab comes back (at the front) before any new T1 lab (D-102's order). | D-114 | INV-038, INV-025, INV-046 |
 | L15 | With 3 land factories of any tier on the map, the land factories at the main base's turret cluster are reclaimed and not rebuilt; their ground becomes economic ground. With no land factory on the map, one may go at the main base again. | D-114 | INV-044 |
+| L17 | TECH never ends up with no land factory because a planned footprint is unbuildable: ground the engine refuses is given up and the lab placed elsewhere; the T1 lab is kept until the advanced lab actually has a frame. | D-116 | INV-015 |
+| L18 | A spam lab's construction turrets (exactly two per lab) always assist that lab and are never taken for other work. | D-117 | INV-048 |
+| L19 | T1 spam labs stand side by side in rows of up to 4, each with its own two turrets; a row may be a single lab where the ground allows no more. | D-117 | - |
+| L20 | Spam rows never cramp the ground: the largest T3 can always walk from the factories behind them to the front line (a lane at least T3-wide held open beside every row). | D-117 | INV-047 |
+| L21 | A gantry's construction turret cluster has room for up to 50 turrets, and every slot is filled; the gantry goes up once the first 10 stand. | D-119 | INV-038 |
+| L22 | Factories assigned as spam (the late T1 labs of the front clusters, not the first bot lab) never have constructors assisting them: only their own two turrets. | D-119 | INV-049 |
+| L24 | A spam lab produces continuously, its two turrets building each unit with it. | D-119 | INV-048 |
+| L23 | Each forward T1 spam lab has its own lane; lanes are spaced apart, spread across the active battle front, and run straight on to the enemy backline. | D-119 | - |
 | L12 | Every factory type, T1 and T2 air included, stands tight to the construction turrets; air factories may face any way (their units fly). | D-104 | INV-029 |
 
 ## Build sequence and economy
@@ -60,7 +68,8 @@ is edited in place with the decision that changed it.
 | S8 | The mexes near the base are upgraded before the fusion (the advanced fusion comes sooner). | D-100 | INV-021 |
 | S9 | The T1 lab is not rebuilt with 3 or more T1 constructors under +200 metal; the advanced lab goes back up before a T1 lab; T1 labs make constructors at the start and spam from +200. | D-102 | INV-025 |
 | S10 | Labs are reclaimed for their metal only before the economy is online; from +200 metal there is no economic reason to reclaim a factory (later only if it is blocked or its ground is rezoned). | D-102, D-105 | INV-026 |
-| S11 | T2 constructors are produced whenever the metal bank is over 50%, to a cap of 60. | D-103 | INV-028 |
+| S11 | T2 constructors are produced whenever the metal bank is over 50%: T2 construction bots to a cap of 10 (D-119), T2 air constructors to 60. | D-103, D-119 | INV-028 |
+| S24 | Fast assist bots are capped at 10 for TECH; with both caps reached the T2 lab makes fast assault bots. | D-119 | INV-028 |
 | S12 | The air labs are built (a T1 air plant and its air constructor first: only air constructors build the advanced aircraft plant). | D-103 | INV-027 |
 | S13 | T2 constructors reclaim only as a last resort, when no other build power is in range of the target; otherwise they keep to their build orders. | D-105 | (enforced at the three reclaim acts) |
 | S14 | Before reclaiming the advanced lab, a metal projection: bank + income x the advanced fusion's remaining build time; if it covers 85% of the advanced fusion's cost, the lab is kept. | D-105 | INV-031 |

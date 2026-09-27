@@ -765,6 +765,12 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterGlobalFunction("void AiAddPoint(const AIFloat3& in, const string& in)", asMETHOD(CInitScript, AddPoint), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiDelPoint(const AIFloat3& in)", asMETHOD(CInitScript, DelPoint), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiAddLine(const AIFloat3& in, const AIFloat3& in)", asMETHOD(CInitScript, AddLine), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiQueueLine(const AIFloat3& in, const AIFloat3& in)", asMETHOD(CInitScript, QueueLine), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);  // D-118
+	r = engine->RegisterGlobalFunction("void AiQueuePoint(const AIFloat3& in, const string& in)", asMETHOD(CInitScript, QueuePoint), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiQueueErase(const AIFloat3& in)", asMETHOD(CInitScript, QueueErase), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("int AiDrawQueueSize()", asMETHOD(CInitScript, DrawQueueSize), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiDrawQueueClear()", asMETHOD(CInitScript, DrawQueueClear), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiDrawPace(int, int)", asMETHOD(CInitScript, DrawPace), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiPause(bool, const string& in)", asMETHOD(CInitScript, Pause), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("int AiDice(const array<float>@+)", asMETHOD(CInitScript, Dice), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("int AiNearestPointIdx(const AIFloat3& in, const array<AIFloat3>@+)", asMETHOD(CInitScript, NearestPointIdx), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
@@ -1001,6 +1007,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int CountGroupSlotsWithin(int group, const AIFloat3& in, float) const", asMETHOD(CTerrainManager, CountGroupSlotsWithin), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanPackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, float maxReach, float minNanoDist)", asFUNCTION(CTerrainManager_CanPackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetReservationPos(int) const", asMETHOD(CTerrainManager, GetReservationPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsSlotDead(int) const", asMETHOD(CTerrainManager, IsSlotDead), asCALL_THISCALL); ASSERT(r >= 0);  // D-116
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationFacing(int) const", asMETHOD(CTerrainManager, GetReservationFacing), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackSet(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, int count, bool ring)", asFUNCTION(CTerrainManager_PackSet), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101, D-108
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSetSlot(const CCircuitDef@) const", asFUNCTION(CTerrainManager_NextSetSlot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
@@ -1250,6 +1257,36 @@ void CInitScript::DelPoint(const AIFloat3& pos) const
 void CInitScript::AddLine(const AIFloat3& posA, const AIFloat3& posB) const
 {
 	circuit->GetDrawer()->AddLine(posA, posB);
+}
+
+void CInitScript::QueueLine(const AIFloat3& posA, const AIFloat3& posB) const
+{
+	circuit->QueueDrawLine(posA, posB);
+}
+
+void CInitScript::QueuePoint(const AIFloat3& pos, const std::string& msg) const
+{
+	circuit->QueueDrawPoint(pos, msg);
+}
+
+void CInitScript::QueueErase(const AIFloat3& pos) const
+{
+	circuit->QueueDrawErase(pos);
+}
+
+int CInitScript::DrawQueueSize() const
+{
+	return circuit->GetDrawQueueSize();
+}
+
+void CInitScript::DrawQueueClear() const
+{
+	circuit->ClearDrawQueue();
+}
+
+void CInitScript::DrawPace(int perBatch, int ms) const
+{
+	circuit->SetDrawPace(perBatch, ms);
 }
 
 void CInitScript::Pause(bool enable, const std::string& msg) const

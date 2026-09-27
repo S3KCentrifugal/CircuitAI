@@ -56,7 +56,7 @@ computes one.
 | `Defence` | `defence.base` | once the first turret stands: `ExpDefenceLLT` (1) light laser and `ExpDefenceAA` (1) light AA turrets near the factories (packed by native within `ExpDefenceRadius` of the factory centre, outside the planned zones), at most `ExpDefenceMaxOrders` orders per def (D-075: native refused the site fifteen times in a row); nothing else, and native's porc chain is not asked (`Tech_AiMakeDefence` returns at once) |
 | `QueuedOrder` | `order.repair` | native's queued repair orders for our own unfinished structures, nearest first (`aiBuilderMgr.FindQueuedTask`), within `ExpOrderRadius` of the base centre; native's defence, radar and sonar orders are left alone |
 | `AssistAny` | `assist.any` | the nearest structure of ours under construction within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) |
-| `GuardFactory` | `guard.factory` | never a retiring lab (D-076); guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
+| `GuardFactory` | `guard.factory` | never a retiring lab (D-076), never a spam lab (D-119); guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
 | `Wait` | `wait` | 3 s, then ask again |
 
 ## Placement
@@ -114,4 +114,4 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: 9cc773a40e9de15475c104a810955dcb5c0e4100; lines: 907 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 6e0bf054ff4d6c226977a5187b45d0f9646e5470; lines: 919 -->

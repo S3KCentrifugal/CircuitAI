@@ -225,6 +225,10 @@ def stage(args):
     # the camera / screenshot / speed / end widget
     wdir = d / "LuaUI" / "Widgets"
     wdir.mkdir(parents=True, exist_ok=True)
+    # only this run's widgets: an --extra-widget from an earlier run stayed in the
+    # write dir and ran again (played: an old draw test drew over the intro test)
+    for old in wdir.glob("*.lua"):
+        old.unlink()
     shots = []
     for tok in (args.shots or "").split(","):
         tok = tok.strip()
@@ -425,10 +429,14 @@ def running_pids(d):
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30).stdout
     except Exception:
         return []
+    # the exact write dir: "--write-dir <dir>" followed by a space, a quote or the
+    # end (a plain substring test matched C:ardevarb-playtest inside
+    # C:ardevarb-playtest-sim1, so one run's stop killed parallel runs)
+    pat = re.compile(r'--write-dir\s+"?' + re.escape(needle) + r'\\?"?(\s|$)')
     pids = []
     for line in out.splitlines():
         pid, _, cl = line.partition("|")
-        if needle in cl.lower() and pid.strip().isdigit():
+        if pat.search(cl.lower()) and pid.strip().isdigit():
             pids.append(int(pid))
     return pids
 

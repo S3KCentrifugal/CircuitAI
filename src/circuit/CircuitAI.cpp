@@ -851,6 +851,7 @@ int CCircuitAI::Update(int frame)
 		script->Update();
 	}
 	UpdateActions();
+	FlushDrawQueue();  // D-118
 
 #ifdef DEBUG_VIS
 	if (frame % FRAMES_PER_SEC == 0) {
@@ -860,6 +861,31 @@ int CCircuitAI::Update(int frame)
 #endif
 
 	return 0;  // signaling: OK
+}
+
+void CCircuitAI::FlushDrawQueue()
+{
+	// D-118: wall-clock pacing, not frames: at a game speed of 3 three frames
+	// are 33 ms apart, under the server's 50 ms
+	if (drawOps.empty()) {
+		return;
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (now - drawBatchTime < std::chrono::milliseconds(drawBatchMs)) {
+		return;
+	}
+	drawBatchTime = now;
+	for (int n = 0; (n < drawBatch) && !drawOps.empty(); ++n) {
+		const SDrawOp& op = drawOps.front();
+		if (op.type == 0) {
+			drawer->AddLine(op.a, op.b);
+		} else if (op.type == 1) {
+			drawer->AddPoint(op.a, op.label.c_str());
+		} else {
+			drawer->DeletePointsAndLines(op.a);
+		}
+		drawOps.pop_front();
+	}
 }
 
 int CCircuitAI::Message(int playerId, const char* message)

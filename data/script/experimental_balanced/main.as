@@ -89,6 +89,7 @@ namespace Main {
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
+		Commands::DrawTick();   // the widget's map drawing, paced under the server's flood guard
 		// Update cached enemy threat information roughly every 10 seconds (300 frames).
 		//if ((ai.frame % (10 * SECOND)) == 0) {
 		Military::UpdateEnemyThreatCache();

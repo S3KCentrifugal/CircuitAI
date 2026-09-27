@@ -449,6 +449,7 @@ namespace TechChain
         if (!UnitHelpers::IsCommander(u.circuitDef)) return null;
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (lab is null || lab is u || Lifecycle::IsRetiring(lab)) return null;   // D-076
+        if (TechFactories::IsSpamLab(lab)) return null;   // D-119
         if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors()) > 0) return null;
         IUnitTask@ g = GuardHelpers::AssignWorkerGuard(u, lab, Task::Priority::HIGH, true, 20 * SECOND);
         if (g !is null && ai.frame - firstConLog > 30 * SECOND) {

@@ -784,6 +784,30 @@ CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float rad
 	return best;
 }
 
+CCircuitUnit* CBuilderManager::FindProducedNear(const AIFloat3& pos, float radius)
+{
+	// D-119: FindUnfinishedNear sees only the structures our builder tasks raise;
+	// a unit in a factory's production is none of those. The nearest mobile unit
+	// of ours still being built within radius.
+	const int frame = circuit->GetLastFrame();
+	const float radiusSq = SQUARE(radius);
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || (unit->GetCircuitDef() == nullptr) || !unit->GetCircuitDef()->IsMobile()) {
+			continue;
+		}
+		const float sq = unit->GetPos(frame).SqDistance2D(pos);
+		if ((sq > radiusSq) || (sq >= bestSq) || !unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		bestSq = sq;
+		best = unit;
+	}
+	return best;
+}
+
 float CBuilderManager::GetBuildPowerNearExcept(const AIFloat3& position, float radius, const CCircuitDef* ex1, const CCircuitDef* ex2,
 		const CCircuitUnit* exUnit) const
 {
@@ -1251,6 +1275,9 @@ int CBuilderManager::TurretsOnReclaim(int targetId, float margin, bool apply)
 		IUnitTask* t = u->GetTask();
 		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::PLAYER)) {
 			continue;
+		}
+		if (u->IsAttrNoDisrupt()) {
+			continue;  // D-117: bound to its duty (a spam lab's turret assists that lab only)
 		}
 		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::BUILDER)) {
 			IBuilderTask* bt = static_cast<IBuilderTask*>(t);

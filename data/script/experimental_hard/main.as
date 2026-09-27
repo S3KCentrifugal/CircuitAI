@@ -88,6 +88,7 @@ namespace Main {
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
+		Commands::DrawTick();   // the widget's map drawing, paced under the server's flood guard
 		// Refresh the cached enemy threat/cost layers the role quotas read.
 		Military::UpdateEnemyThreatCache();
 		Military::UpdateEnemyCostCache();

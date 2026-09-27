@@ -74,7 +74,7 @@ picture is [`tech-layout-and-sequence.md`](tech-layout-and-sequence.md)):
 | Key | Who | When | Act |
 | --- | --- | --- | --- |
 | `turret.spam` | turrets | - | D-109, D-114: first turret row: the turrets behind a front cluster's factory always work for it (`TechFactories::TurretFocus`) |
-| `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory |
+| `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory, never a spam lab (D-119) |
 | `ferry.cargo` | mobile | - | D-110/D-112: a gift for a teammate (in flight or queued) keeps the ferry's hold, or its park behind the base (`Team::Ferry::Park`), until the drop-off; nothing else |
 | `lab.base.reclaim` | mobile | `BaseFactoryToGo` | D-114: with `FrontReclaimAtCount` land factories on the map, the base's land factories are retired and reclaimed (`TechFactories::ReclaimBaseFactory`) |
 | `lab.front` | constructors | `FrontClusterOpen` | D-114: a front cluster's lost turret; an open T2 or T3 front factory cluster: its turrets, help on one going up, then its factory (`TechFactories::OpenWork`) |
@@ -125,4 +125,4 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: f99550c8b6b3742b836f0de2af2f492ac80d3b91; lines: 512 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 8819684092a0d9dadda2f80591f62bc011116dcb; lines: 513 -->

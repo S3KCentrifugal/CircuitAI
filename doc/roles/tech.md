@@ -222,12 +222,14 @@ Evaluated top to bottom; the first branch that returns a task wins.
 2  T1 bot lab?        t1Ctors < MinimumT1ConstructorBots (2) -> recruit T1 constructor
 3  T2 bot lab?        t2Ctors < MinimumT2ConstructorBots (1) -> recruit T2 constructor
 4  T2 bot lab?        PRIMARY lab only: fast-assist bot if below dynamic cap
-                      and metal.current > 2000
+                      (at most FastAssistBotCap, 10, D-119) and metal.current > 2000
 5  primary air plant? air constructors < 100 -> recruit
 6  T1 bot lab?        mi >= botLabGate -> 10x T1 scout (or amphib AA if landlocked)
 7  T2 bot lab?        mi >= botLabGate -> 10x fast T2 bot (or amphib if landlocked)
 8  T1/T2 vehicle plant? mi >= vehiclePlantGate -> 10x scout / main battle tank
-9  fallback           aiFactoryMgr.DefaultMakeTask(u)
+9  fallback           aiFactoryMgr.DefaultMakeTask(u); the T2 bot lab under the
+                      combat gate waits instead (D-119)
+0  (first) a front cluster's turret: TechFactories::TurretFocus (D-119)
 ```
 
 `botLabGate` and `vehiclePlantGate` depend on `Strategy::T2_RUSH` (85% chance
@@ -380,6 +382,10 @@ it means TECH contributes nothing for a long opening and cannot defend itself.
 
 ### D4 - the fast-assist cap never saturates
 
+**Resolved by D-119:** the cap is clamped to `FastAssistBotCap` (10), and T2
+construction bots to `T2BotConstructorCap` (10); the lab then makes fast assault
+bots. The text below describes the state before.
+
 `g_fastAssistBotCap` is `5*floor(mi/20)` above 100 income - unbounded, with a
 2.5x discontinuity at exactly `mi = 100` (10 to 25). Fast-assist bots raise
 income, which raises the cap, so `haveAssist` never catches it. Before the
@@ -431,7 +437,7 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
 2. ~~Move `armfast` to the T2 list (D2).~~ Done in the unit-helper review.
 3. **Decouple the scout-cap release from `mi >= 200` (D3).** The gated T2 bots
    already release at `botLabGate`; the T1 scout raise still waits for 200.
-4. **Bound `g_fastAssistBotCap` (D4)** with an absolute ceiling, and replace the
+4. ~~Bound `g_fastAssistBotCap` (D4) with an absolute ceiling~~ (done, D-119: 10), and replace the
    `metal.current > 2000` stock test with an income or ratio test.
 5. **Implement `Economy::AiUnitAdded`/`AiUnitRemoved` and extend the script
    `Unit::UseAs` enum to all 14 values (D5).**
@@ -881,4 +887,4 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: dd0a80983e321447afb4b864af9831b894d0d522; lines: 2674 -->
+<!-- source: data/script/src/roles/tech.as; blob: 4b4b7f7d77b9c9acd4b48ec23d24004d8780a1c9; lines: 2704 -->

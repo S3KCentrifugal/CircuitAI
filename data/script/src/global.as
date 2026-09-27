@@ -329,11 +329,16 @@ namespace Global {
             int FrontT1TurretRows = 1;
             int FrontT2TurretCols = 2;                      // D-114: a T2 lab's: 2 x 2
             int FrontT2TurretRows = 2;
-            int FrontT3TurretCols = 3;                      // D-114: a gantry's: 3 x 2
-            int FrontT3TurretRows = 2;
+            int FrontT3TurretCols = 10;                     // D-119 (owner): a gantry's block holds up to 50 turrets: 10 x 5 (smaller blocks where the ground is smaller)
+            int FrontT3TurretRows = 5;
+            int FrontT3TurretsFirst = 10;                   // D-119: the gantry is ordered once this many of its turrets stand; the rest keep filling
             int FrontReclaimAtCount = 3;                    // D-114: this many land factories on the map retire the base's land factories
             float FrontBaseRadius = 1200.0f;                // D-114: a land factory within this of the base centre is the base's
             int FrontBaseReclaimSeconds = 240;              // D-114: INV-044: a base land factory still standing this long after the count is reached
+            int FrontRowMaxLabs = 4;                        // D-117: T1 spam labs side by side in a row of up to this many
+            int FrontRowGapCells = 3;                       // D-119: cells between two labs of a row: side by side, clear of the neighbour's blocker yard (block_map.json fac_bot: yard 6 = 3 cells each side; closer was always refused)
+            int FrontT3LaneCells = 6;                       // D-117: the lane kept open beside every spam row: the largest T3 movement classes (HBOT7, HTANK7) are 7 map squares = 3.5 cells wide, plus room
+            float FrontLaneMinFlat = 0.9f;                  // D-117: a lane counts as passable with this share of its ground flat (LayoutBoxMaxSlope) and free
             int FrontClusterStallSeconds = 300;             // D-114: a front factory order with no frame this long gives its cluster up
             int FrontClusterOpenSeconds = 600;              // D-114: INV-046: an open T2 or T3 front cluster without its factory this long after it was planned
             // D-109 (owner's rules): the land constructors leave the base once the air constructors carry it
@@ -715,6 +720,8 @@ namespace Global {
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
             int MinimumT2ConstructorBots = 1;
+            int T2BotConstructorCap = 10;                   // D-119 (owner): T2 construction bots at most this many for TECH (the T2 air constructors keep T2ConstructorCap)
+            int FastAssistBotCap = 10;                      // D-119 (owner): fast assist bots (Fark, Freaker, legaceb) at most this many
             int T2ConstructorCap = 60;                      // D-103: T2 constructors (bot and air) produced up to this while the metal bank is over T2ConstructorBankShare
             float T2ConstructorBankShare = 0.5f;            // D-103: the metal bank share of storage above which the advanced lab makes T2 constructors
             // T2 constructors TECH keeps before it builds any for an ally's
@@ -730,7 +737,7 @@ namespace Global {
             /******************** TECH START LIMIT CAPS ********************/
             // Initial caps applied at game start for the TECH role
             int StartCapRezBots = 0;
-            int StartCapFastAssistBots = 50;
+            int StartCapFastAssistBots = 10;                // D-119 (owner): was 50
 
             int StartCapT1BotLabs = 1;
             int StartCapT2BotLabs = 1;

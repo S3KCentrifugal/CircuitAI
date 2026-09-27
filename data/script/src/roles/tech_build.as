@@ -176,6 +176,17 @@ namespace TechBuild {
             || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), t2) > 0;
     }
 
+    // D-116: the advanced lab has begun: a frame or a finished lab, not only an
+    // order (played on All That Glitters, build99: the order's footprint was dead,
+    // every order aborted, yet the throwaway T1 lab was retired and reclaimed for
+    // an advanced lab that never had a frame, and TECH was left with no lab)
+    bool T2Begun()
+    {
+        CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
+        if (t2 is null) return false;
+        return t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0;
+    }
+
     IUnitTask@ StartFactory(CCircuitUnit@ u)
     {
         if (!RoleTech::Opening::complete || IntoT2()) return null;
@@ -558,7 +569,7 @@ namespace TechBuild {
         // One state, read by every actor: production stops (Lifecycle::Retire
         // stops the unit, the factory rows return nothing), guards and the
         // commander's help end, only the reclaim touches it (lab.t1.reclaim).
-        if (IntoT2() && !throwawayDecided) {
+        if (T2Begun() && !throwawayDecided) {   // D-116: a frame, not an order
             // the throwaway is the lab standing when the advanced lab begins;
             // any T1 lab built later (lab.t1.spam) is a keeper (played: spam
             // labs were retired the moment they became the primary lab)
@@ -651,7 +662,7 @@ namespace TechBuild {
         if (!T2MayReclaim(u, lab)) return null;   // D-105: T2 constructors only as a last resort
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         if (t2 is null) return null;
-        if (!IntoT2()) return null;   // not begun yet
+        if (!T2Begun()) return null;   // not begun yet (D-116: a frame, not an order)
         // D-072: reclaimed metal past the storage cap is lost, so the reclaim
         // waits until the bank has room for the lab's metal (the advanced lab's
         // build makes that room; it is part-built by then, as intended)
@@ -854,6 +865,7 @@ namespace TechBuild {
     {
         CCircuitUnit@ fac = Factory::primaryT1BotLab;
         if (fac is null || fac is u || Lifecycle::IsRetiring(fac)) return null;   // D-076: nobody guards a retiring lab
+        if (TechFactories::IsSpamLab(fac)) return null;   // D-119: a spam lab is never assisted (its two turrets only)
         return GuardHelpers::AssignWorkerGuard(u, fac, Task::Priority::LOW, true, 20 * SECOND);
     }
 

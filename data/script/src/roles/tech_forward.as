@@ -311,18 +311,14 @@ namespace TechForward {
         // 3. idle: a small pad of turrets behind an end cluster
         IUnitTask@ pad = PadTurret(u, lab, nano, spam);
         if (pad !is null) return pad;
-        // 4. assist what goes up at a spam cluster, else guard the nearest spam lab
-        CCircuitUnit@ best = null;
-        float bestSq = 1.0e30f;
+        // 4. help a STRUCTURE going up at a spam cluster (D-119, owner: a spam lab is
+        // never assisted by constructors: not guarded, and no help on the units it
+        // produces, which are unfinished units too)
         for (uint i = 0; i < spam.length(); ++i) {
             CCircuitUnit@ f = aiBuilderMgr.FindUnfinishedNear(spam[i].pos, Global::RoleSettings::Tech::SpamClusterRadius, null);
-            if (f !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, f, 30 * SECOND));
-            CCircuitUnit@ l = TechFactories::LabAt(spam[i]);
-            if (l is null) continue;
-            const float sq = MapHelpers::SqDist(l.GetPos(ai.frame), u.GetPos(ai.frame));
-            if (sq < bestSq) { bestSq = sq; @best = l; }
+            if (f !is null && f.circuitDef !is null && !f.circuitDef.IsMobile())
+                return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, f, 30 * SECOND));
         }
-        if (best !is null) return GuardHelpers::AssignWorkerGuard(u, best, Task::Priority::LOW, true, 30 * SECOND);
         return null;
     }
 
@@ -364,6 +360,8 @@ namespace TechForward {
     // each unit leaves on it before any task is given; the spam unit is kept
     // buildable (TECH's start caps pin T1 combat at 0)
     dictionary factoryRouteVersion;   // factory id -> Spam::routesVersion its route was set at
+    uint spreadCount = 0;
+    int spreadFrame = -100000;
     void TickSpam()
     {
         if (!Spam::active) return;
@@ -374,17 +372,32 @@ namespace TechForward {
         CCircuitDef@ su = (unitName.length() == 0) ? null : ai.GetCircuitDef(unitName);
         if (su !is null && su.maxThisUnit <= su.count + 5) su.maxThisUnit = su.count + 50;
         array<TechFactories::Cluster@> spam = SpamClusters();
+        // D-119 (owner): each spam lab runs its own lane, the lanes spread across
+        // the active front, apart, straight on to the enemy backline
+        array<CCircuitUnit@> labs;
+        for (uint i = 0; i < spam.length(); ++i) {
+            CCircuitUnit@ f = TechFactories::LabAt(spam[i]);
+            if (f !is null && f.GetBuildProgress() >= 1.0f) labs.insertLast(f);
+        }
+        if (labs.length() != spreadCount || ai.frame - spreadFrame >= 30 * SECOND) {
+            Spam::SetSpreadLanes(labs);
+            spreadCount = labs.length();
+            spreadFrame = ai.frame;
+        }
         for (uint i = 0; i < spam.length(); ++i) {
             CCircuitUnit@ f = TechFactories::LabAt(spam[i]);
             if (f is null || f.GetBuildProgress() < 1.0f) continue;
             const string key = "" + f.id;
             const int lane = (i == 0) ? 0 : ((i % 2 == 1) ? int((i + 1) / 2) : -int(i / 2));
             Spam::SetFactoryLane(f, lane);
-            Spam::SetRepeatFactory(f);
             int64 v = -1;
             if (!factoryRouteVersion.get(key, v)) {
-                f.CmdRepeat(true);
-                GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " (" + f.id + ") on repeat, lane " + lane + " (D-111)", 1);
+                // D-119: no repeat: native clears a factory's build queue whenever a
+                // recruit task finishes (CRecruitTask::Cancel), so a repeat queue
+                // lasted one unit and the lab then waited out RepeatStallSeconds.
+                // Each ask now gets the next unit (Spam::FactoryMakeTask)
+                f.CmdRepeat(false);
+                GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " (" + f.id + ") producing, lane " + lane + " (D-111, D-119)", 1);
             }
             if (v != Spam::routesVersion) {
                 array<AIFloat3> route = Spam::RouteOf(f);

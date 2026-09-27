@@ -85,6 +85,13 @@ private:
 	void AddPoint(const springai::AIFloat3& pos, const std::string& msg) const;
 	void DelPoint(const springai::AIFloat3& pos) const;
 	void AddLine(const springai::AIFloat3& posA, const springai::AIFloat3& posB) const;
+	// D-118: the paced map drawing queue (CCircuitAI::QueueDraw*)
+	void QueueLine(const springai::AIFloat3& posA, const springai::AIFloat3& posB) const;
+	void QueuePoint(const springai::AIFloat3& pos, const std::string& msg) const;
+	void QueueErase(const springai::AIFloat3& pos) const;
+	int DrawQueueSize() const;
+	void DrawQueueClear() const;
+	void DrawPace(int perBatch, int ms) const;
 	void Pause(bool enable, const std::string& msg) const;
 	int Dice(const CScriptArray* array) const;
 	int NearestPointIdx(const springai::AIFloat3& pos, const CScriptArray* array);

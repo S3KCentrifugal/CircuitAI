@@ -914,6 +914,19 @@ int CTerrainManager::ReserveBuildingEx(CCircuitDef* cdef, const AIFloat3& positi
 		}
 		return -1;
 	}
+	// D-116: CanBeBuiltAt is a sector test (the footprint's centre sector is in a
+	// usable area); it never sees the footprint's own cells. The engine's test
+	// decides at build time, so it decides here too (played on All That Glitters:
+	// an advanced lab footprint across a 161-elmo cliff was reserved, then refused
+	// by the engine at every order for 15 minutes). A zone band or a tenant slot
+	// is laid over our own structures on purpose, so they skip it.
+	if ((zone == 0) && !tenant && !IsEngineBuildable(cdef, pos, facing)) {
+		if (!quiet) {
+			circuit->LOG("RESERVE: refused %s at (%.0f, %.0f) facing %i: the engine refuses the ground (slope, water or a structure)",
+					cdef->GetDef()->GetName(), pos.x, pos.z, facing);
+		}
+		return -1;
+	}
 	if (zone > 0) {
 		const int existing = FindSlotAt(cdef, pos);
 		if (existing >= 0) {
@@ -1078,7 +1091,17 @@ bool CTerrainManager::CanReserveBuilding(CCircuitDef* cdef, const AIFloat3& posi
 	pos = Pos2BuildPos(cdef, pos, facing);
 	int2 c1, c2;
 	return layoutEnabled && ReservationCells(cdef, pos, facing, c1, c2) && CanBeBuiltAt(cdef, pos) && IsSlotFree(c1, c2, 0, -1)
-			&& !layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes());  // D-099
+			&& !layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes())  // D-099
+			&& IsEngineBuildable(cdef, pos, facing);  // D-116: last, the one engine call
+}
+
+bool CTerrainManager::IsEngineBuildable(CCircuitDef* cdef, const AIFloat3& buildPos, int facing) const
+{
+	// The engine's own build test: false for ground it will not build on (slope
+	// past the def's maxHeightDif, water or land the def cannot stand on, a
+	// structure); units standing there and reclaimable features pass (the
+	// builder moves them / reclaims them first)
+	return circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), buildPos, facing);
 }
 
 float CTerrainManager::BuildableFraction(CCircuitDef* cdef, const AIFloat3& centre, float halfAcross, float halfAlong, int facing)
@@ -3202,6 +3225,12 @@ AIFloat3 CTerrainManager::GetReservationPos(int id) const
 {
 	auto it = reservations.find(id);
 	return (it == reservations.end()) ? AIFloat3(-RgtVector) : it->second.pos;
+}
+
+bool CTerrainManager::IsSlotDead(int id) const
+{
+	auto it = reservations.find(id);
+	return (it != reservations.end()) && (it->second.serveFails >= kDeadSlotFails);
 }
 
 int CTerrainManager::GetReservationFacing(int id) const

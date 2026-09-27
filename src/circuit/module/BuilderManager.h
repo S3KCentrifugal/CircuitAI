@@ -296,6 +296,8 @@ public:
 	// point within radius; for the planner's turret focus (D-063 follow-up 5).
 	int GetUnfinishedCount(const CCircuitDef* def) const;
 	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	// D-119: a mobile unit of ours still being built near pos: what a factory there is producing
+	CCircuitUnit* FindProducedNear(const springai::AIFloat3& pos, float radius);
 	// D-098: structures of ours under construction within radius costing at least minCostM, `except` not counted
 	int CountUnfinishedNear(const springai::AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except);
 	// D-105: the build power (workertime) within radius, the two defs and one unit not counted

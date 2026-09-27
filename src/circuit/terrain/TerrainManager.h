@@ -212,6 +212,12 @@ public:
 	int NextBuilt(int group, const springai::AIFloat3& anchor) const;  // nearest slot whose structure stands, -1 = none
 	springai::AIFloat3 GetReservationPos(int id) const;
 	int GetReservationFacing(int id) const;
+	// D-116: the engine refused this slot kDeadSlotFails times; it is never served
+	// again (its ground stays held), so a plan pinned to it must choose new ground
+	bool IsSlotDead(int id) const;
+	// D-116: the engine's own build test for a snapped build position (the
+	// reservation checks ask it, so no plan holds ground the engine refuses)
+	bool IsEngineBuildable(CCircuitDef* cdef, const springai::AIFloat3& buildPos, int facing) const;
 	CCircuitUnit* GetReservationUnit(int id) const;
 	// Share of the rectangle whose slope is at most maxSlope (engine units, 1 - cos).
 	float FlatFraction(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, float maxSlope) const;

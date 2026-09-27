@@ -296,12 +296,12 @@ namespace Invariants {
         // INV-028 (D-103): with the metal bank over T2ConstructorBankShare and an
         // advanced lab standing, T2 constructors grow toward T2ConstructorCap
         {
-            const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
-                + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
+            // D-119: the advanced lab's constructors only, to T2BotConstructorCap
+            const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
             const float mStor = aiEconomyMgr.metal.storage;
             const bool high = mStor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * mStor
                 && Factory::primaryT2BotLab !is null && !Lifecycle::IsRetiring(Factory::primaryT2BotLab)
-                && t2Cons < Global::RoleSettings::Tech::T2ConstructorCap;
+                && t2Cons < Global::RoleSettings::Tech::T2BotConstructorCap;
             if (!high || t2Cons > t2ConsAtHigh) { t2ConsHighSince = high ? ai.frame : -1; t2ConsAtHigh = t2Cons; }
             else if (t2ConsHighSince < 0) { t2ConsHighSince = ai.frame; t2ConsAtHigh = t2Cons; }
             else if (ai.frame - t2ConsHighSince >= 60 * SECOND) {
@@ -450,13 +450,14 @@ namespace Invariants {
             TechFactories::Cluster@ s = TechFactories::clusters[i];
             CCircuitUnit@ l = TechFactories::LabAt(s);
             // INV-045 (D-114): a front cluster's factory frame starts only once its
-            // whole turret block stands finished
+            // whole turret block stands finished (a gantry: its first
+            // FrontT3TurretsFirst, D-119)
             if (l !is null && !s.labSeen) {
                 s.labSeen = true;
                 const int done = TechFactories::FinishedTurrets(s);
-                if (done < s.slots)
+                if (done < TechFactories::TurretsBeforeLab(s))
                     Violation("INV-045", "front", "front cluster " + (i + 1) + " (" + s.defName + ") started its factory with " + done + " of its "
-                        + s.slots + " turrets finished");
+                        + s.slots + " turrets finished (" + TechFactories::TurretsBeforeLab(s) + " wanted first)");
             }
             if (l is null || l.GetBuildProgress() < 1.0f) { s.standFrame = -1; continue; }
             if (s.standFrame < 0) { s.standFrame = ai.frame; continue; }
@@ -477,6 +478,40 @@ namespace Invariants {
                 s.invOpenLog = ai.frame;
                 Violation("INV-046", "front", "front cluster " + (i + 1) + " (" + s.defName + ") planned " + int((ai.frame - s.plannedFrame) / SECOND)
                     + " s ago has no factory; " + TechFactories::FinishedTurrets(s) + " of its " + s.slots + " turrets stand");
+            }
+        }
+
+        // INV-047 (D-117): every spam row keeps a T3 lane, and no structure stands
+        // on a lane it holds. INV-048: a standing spam lab's turret works for that
+        // lab (guards or repairs it) at every check
+        if (ai.frame % (60 * SECOND) < SECOND) {
+            for (uint i = 0; i < TechFactories::spamRows.length(); ++i) {
+                TechFactories::Row@ r = TechFactories::spamRows[i];
+                if (r.laneL <= 0 && r.laneR <= 0)
+                    Violation("INV-047", "lane", "spam row " + (i + 1) + " (" + r.labs.length() + " labs) holds no T3 lane");
+                if ((r.laneL > 0 && !aiTerrainMgr.IsZoneClear(r.laneL)) || (r.laneR > 0 && !aiTerrainMgr.IsZoneClear(r.laneR)))
+                    Violation("INV-047", "lane", "a structure stands on a T3 lane of spam row " + (i + 1));
+            }
+            for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
+                TechFactories::Cluster@ c = TechFactories::clusters[i];
+                if (c.tier != 1) continue;
+                CCircuitUnit@ l = TechFactories::LabAt(c);
+                if (l is null || l.GetBuildProgress() < 1.0f) continue;
+                for (uint k = 0; k < c.turretPos.length(); ++k) {
+                    CCircuitUnit@ t = TechFactories::TurretAt(c.turretPos[k]);
+                    if (t is null || t.GetBuildProgress() < 1.0f || t.task is null) continue;
+                    IBuilderTask@ bt = cast<IBuilderTask>(t.task);
+                    // D-119: its recent focus task (a guard keeps its target as an id; a
+                    // factory-side turret idles for moments between two units)
+                    if (TechFactories::GuardsLab(t, l) || (bt !is null && bt.target !is null && bt.target.id == l.id)) continue;
+                    {
+                        int64 rec = -1;
+                        if (!TechFactories::focusOf.get("" + t.id, rec)) rec = -1;   // D-025
+                        Violation("INV-048", "" + t.id, "spam cluster " + (i + 1) + "'s turret " + t.id + " is not working for its lab " + l.id
+                            + " (task type " + (bt is null ? -1 : int(bt.GetBuildType())) + ", target " + ((bt is null || bt.target is null) ? -1 : bt.target.id)
+                            + ", unit task type " + int(t.task.GetType()) + ", last focus on lab " + rec + ")");
+                    }
+                }
             }
         }
 

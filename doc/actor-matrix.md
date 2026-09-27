@@ -19,8 +19,8 @@ decides the end; everything else reads it.
 | `Tech_FactoryAiMakeTask` | retiring | returns nothing for a retiring lab; native's factory manager gets no production for it |
 | `lab.t1.reclaim` (`ReclaimT1Lab`) | `throwawayLabId`, metal bank room (D-072) | the reclaim order for the throwaway only; the only act that may target a retiring lab |
 | `lab.t1.opening`, `lab.t1.recover` (`StartFactory`) | none stands | orders a T1 lab at the commander or on the pair's slot |
-| `guard.factory` (`GuardFactory`) | retiring | guards the lab; never a retiring one |
-| `chain.next` (`CommanderOnFirstConstructor`) | retiring, T1 constructor count | the commander helps the first constructor out; never at a retiring lab |
+| `guard.factory` (`GuardFactory`) | retiring, `IsSpamLab` | guards the lab; never a retiring one, never a spam lab (D-119) |
+| `chain.next` (`CommanderOnFirstConstructor`) | retiring, T1 constructor count, `IsSpamLab` | the commander helps the first constructor out; never at a retiring lab or a spam lab (D-119) |
 | `lab.t1.spam` (`SpamLab`) | `ChainInactive`, T2 lab stands | further T1 labs for the spam economy |
 | `turret.assist` (`Tech_TurretAssist`) | reclaim targets in reach | joins the reclaim, which is allowed on a retiring lab |
 | `TechBuild::Tick` (exit cone) | lab stands | holds the exit cone until the lab is gone |
@@ -35,14 +35,19 @@ decides the end; everything else reads it.
 | layout packer (`PackCandidates`, D-096, D-099) | the exit lanes of every planned and standing factory; the zone, then the ring within a turret's reach | packs no footprint into an exit lane; the main cluster first, then the forward cluster (`Layout::Place`); INV-018, INV-020 |
 | set packer (`PackSet`, `Layout::Place`, D-101) | turret slots (edge gap), the set's unserved slots | advanced fusions in sets of 3 and advanced converters in sets of 5, flush then outward; INV-022 |
 | reclaim of our own structure (`CBuilderManager`, D-101) | the structure's layout slot | the slot is erased when it goes, not restored |
-| `turret.spam` (D-109, D-114) | a front cluster's factory stands | the turrets behind it guard or build it; INV-038 |
+| `turret.spam` (D-109, D-114, D-117, D-119) | a front cluster's factory stands (a spam lab's: always) | the turrets behind it build its frame, then the units it produces; a spam lab's two are `no_disrupt` (never pulled onto a reclaim) and wait for their lab before it exists; asked from `Tech_FactoryAiMakeTask` (turrets are the native factory manager's) with factory-side tasks, or by the rule with builder tasks; INV-038, INV-048 |
 | front factory cluster (`TechFactories::Work`, `Route`, D-114) | a land factory wanted from +200 metal | the cluster planned at least 20% toward the front on flat, roomy ground; its turret block first, the factory once every turret stands; INV-038, INV-045 |
 | `lab.front` (D-114) | a standing front factory missing a turret; no advanced lab with the economy online; an open T2 or T3 front cluster (planned, factory not up) | any constructor reaching the row: the lost turret; a T2 front cluster planned; the open cluster's turrets, help on one going up, then its factory; INV-046 |
 | `lab.base.reclaim` (D-114) | `FrontReclaimAtCount` land factories on the map | the base's land factories retired and reclaimed, never rebuilt there while a land factory stands; their ground goes to the economy; INV-044 |
 | `ferry.cargo` (D-110, D-112) | the unit is a gift (in flight or queued) | in flight: the ferry's hold; queued: parked behind the base; nothing else until the drop-off; INV-041 |
 | `land.recall` (D-109) | a tier's air constructors went down | its land constructors drop a forward job; INV-040 |
 | `fwd.t2.defend` (D-109) | both dedicated T2 air roles held | T2 land constructors: long-range AA then flak at every mex cluster outside the base; INV-039 |
-| `fwd.t1` (D-109) | more than 5 T1 air constructors | T1 land constructors: the spam cluster (labs, turrets, AA, pads); INV-038, INV-039 |
+| `fwd.t1` (D-109, D-119) | more than 5 T1 air constructors | T1 land constructors: the spam cluster (labs, turrets, AA, pads); helps only structures going up there, never guards a spam lab or helps its production; INV-038, INV-039, INV-049 |
+| `GuardHelpers::AssignWorkerGuard` (D-119) | `IsSpamLab`, `IsOwnTurret` | every guard of a lab passes here: a guard of a spam lab by anything but its own two turrets is refused; INV-049 |
+| `DoTurretFactory` (turret rows, D-119) | producing factories in reach, `IsSpamLab` | a turret assists the nearest producing factory, never a spam lab |
+| spam production (`Spam::FactoryMakeTask`, D-111, D-119) | spam active, a spam lab asks | the next spam unit at every ask (no repeat: native clears a factory's queue when a recruit finishes) |
+| spam lanes (`TechForward::TickSpam`, `Spam::SetSpreadLanes`, D-119) | the standing spam labs, the combat front, the focus | one lane per spam lab, `LaneSpacing` apart across the front, straight on to the enemy backline; re-spread when the count changes and every 30 s |
+| advanced lab production (`Tech_FactoryAiMakeTask`, D-103, D-119) | bank share, T2 construction bot count, fast assist cap | T2 construction bots to `T2BotConstructorCap` (10), fast assist bots to `FastAssistBotCap` (10), then fast assault bots; INV-028 |
 | `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; never falls through (waits and says why); its structure's cap lifted while held; INV-034, INV-035, INV-036 |
 | air role refill (`TechBuild::RefillAirRoles`, `ClaimOnBuilt`, D-108) | a dedicated builder gone; a T2 air constructor built | the role passes at once (advanced fusions first), the new holder drops its other job; the advanced aircraft plant makes one when none is free; the donation keeps dedicated units |
 | advanced-fusion ground ahead (`Layout::HoldAfusSetAhead`, D-108) | the fusion role held, no set slot left | the next set of advanced-fusion ground reserved (zones, forward, then the ring within reach), retried every 10 s; INV-037 |

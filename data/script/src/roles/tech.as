@@ -916,6 +916,17 @@ namespace RoleTech
 			return aiFactoryMgr.DefaultMakeTask(u);
 		}
 
+		// D-119: construction turrets are the native factory manager's assistants,
+		// asked here, not by the builder rules: a front cluster's turret works for
+		// its own factory (D-109, D-114, D-117: rule turret.spam never reached
+		// them; it only saw turrets a reclaim pull had moved to the builder side)
+		CCircuitDef@ clusterNano = TechFactories::Nano();
+		if (clusterNano !is null && facDef.GetName() == clusterNano.GetName() && TechFactories::ClusterOfTurret(u) !is null)
+		{
+			IUnitTask@ ft = TechFactories::TurretFocus(u, true);
+			if (ft !is null) return ft;
+		}
+
 		// D-076: a retiring factory produces nothing (played: the T1 lab built a
 		// Lazarus while a constructor and a turret were reclaiming it)
 		if (Lifecycle::IsRetiring(u))
@@ -1015,21 +1026,25 @@ namespace RoleTech
 		// T2ConstructorBankShare of storage, up to T2ConstructorCap (bot and air)
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()) || facDef.GetName() == UnitHelpers::GetT2AirPlantForSide(side))
 		{
-			const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
-				+ UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
+			// D-119 (owner): T2 construction bots at most T2BotConstructorCap; the
+			// T2 air constructors (the dedicated roles, D-107) keep T2ConstructorCap
+			const bool botLab = UnitHelpers::IsT2BotLab(facDef.GetName());
+			const int t2Cons = botLab ? UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
+				: UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
+			const int t2Cap = botLab ? Global::RoleSettings::Tech::T2BotConstructorCap : Global::RoleSettings::Tech::T2ConstructorCap;
 			const float stor = aiEconomyMgr.metal.storage;
 			const bool bankHigh = stor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * stor;
-			if (bankHigh && t2Cons < Global::RoleSettings::Tech::T2ConstructorCap)
+			if (bankHigh && t2Cons < t2Cap)
 			{
-				const string conName = UnitHelpers::IsT2BotLab(facDef.GetName())
+				const string conName = botLab
 					? UnitHelpers::GetT2BotConstructors(side)[0] : UnitHelpers::GetT2AirConstructorNameForSide(side);
 				CCircuitDef @t2c = ai.GetCircuitDef(conName);
 				if (t2c !is null)
 				{
-					if (t2c.maxThisUnit < Global::RoleSettings::Tech::T2ConstructorCap) t2c.maxThisUnit = Global::RoleSettings::Tech::T2ConstructorCap;
+					if (t2c.maxThisUnit < t2Cap) t2c.maxThisUnit = t2Cap;
 					if (t2c.IsAvailable(ai.frame))
 					{
-						GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + ": T2 constructor " + (t2Cons + 1) + " of " + Global::RoleSettings::Tech::T2ConstructorCap
+						GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + ": T2 constructor " + (t2Cons + 1) + " of " + t2Cap
 							+ " (bank " + int(aiEconomyMgr.metal.current) + " of " + int(stor) + ") (D-103)", 1);
 						return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, t2c, pos, 64.f));
 					}
@@ -1270,6 +1285,11 @@ namespace RoleTech
 					return last2;
 			}
 		}
+		// D-119: with its T2 constructors and fast assist bots capped, the advanced
+		// bot lab reaches this fallback under the combat gate, and native's choice is
+		// combat (played: Pyros at +91, INV-010): it waits for the gate instead
+		if (UnitHelpers::IsT2BotLab(facDef.GetName()) && metalIncome < botLabGate)
+			return aiFactoryMgr.Enqueue(TaskS::Wait(false, 5 * SECOND));
 		GenericHelpers::LogUtil("[TECH][Factory] No custom tasks applicable; using DefaultMakeTask for factory '" + facDef.GetName() + "'", 4);
 		return aiFactoryMgr.DefaultMakeTask(u);
 	}
@@ -1809,6 +1829,8 @@ namespace RoleTech
 		// if (g_fastAssistBotCap < 5) g_fastAssistBotCap = 1;
 		// A rush chain spends its energy on the chain, not on assist bots (D-070)
 		if (TechChain::Active() && g_fastAssistBotCap > 2) g_fastAssistBotCap = 2;
+		// D-119 (owner): never more than FastAssistBotCap (the T2 lab makes fast assault bots instead)
+		if (g_fastAssistBotCap > Global::RoleSettings::Tech::FastAssistBotCap) g_fastAssistBotCap = Global::RoleSettings::Tech::FastAssistBotCap;
 
 		array<string> faList = UnitHelpers::GetFastAssistBots(side);
 		UnitHelpers::BatchApplyUnitCaps(faList, g_fastAssistBotCap);
@@ -1830,6 +1852,14 @@ namespace RoleTech
 			/*maxCap*/ Global::RoleSettings::Tech::MaxT2Builders);
 
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetT2LandBuilders(side), t2BuilderCap);
+		// D-119: the T2 construction bots' hard cap, whatever raised it
+		{
+			array<string> t2Bots = UnitHelpers::GetAllT2BotConstructors();
+			for (uint i = 0; i < t2Bots.length(); ++i) {
+				CCircuitDef@ d = ai.GetCircuitDef(t2Bots[i]);
+				if (d !is null && d.maxThisUnit > Global::RoleSettings::Tech::T2BotConstructorCap) d.maxThisUnit = Global::RoleSettings::Tech::T2BotConstructorCap;
+			}
+		}
 
 		// Ensure merged map+role limits are reapplied after dynamic economy-based caps
 		if (Global::Map::MergedUnitLimits.getKeys().length() > 0)

@@ -242,6 +242,7 @@ namespace TechRules {
         for (uint i = 0; keys !is null && i < keys.length(); ++i) {
             CCircuitUnit@ fac = null;
             if (!Factory::allFactories.get(keys[i], @fac) || fac is null || fac.task is null || Lifecycle::IsRetiring(fac)) continue;
+            if (TechFactories::IsSpamLab(fac)) continue;   // D-119: its two turrets only
             const float sq = MapHelpers::SqDist(here, fac.GetPos(ai.frame));
             const float r = reach + ((fac.circuitDef is null) ? 48.0f : float(fac.circuitDef.GetFootprintX() > fac.circuitDef.GetFootprintZ() ? fac.circuitDef.GetFootprintX() : fac.circuitDef.GetFootprintZ()) * 4.0f);
             if (sq <= r * r && sq < bestSq) { bestSq = sq; @best = fac; }

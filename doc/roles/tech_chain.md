@@ -153,7 +153,8 @@ so its rows stay quiet, and sets `MinimumT1ConstructorBots` (2) and
 
 ## Lifecycle and invariants (D-076)
 
-`CommanderOnFirstConstructor` refuses a retiring lab (`Lifecycle::IsRetiring`).
+`CommanderOnFirstConstructor` refuses a retiring lab (`Lifecycle::IsRetiring`) and a
+spam lab (`TechFactories::IsSpamLab`, D-119).
 The `alab` step counts as met once an advanced fusion is under way
 (`TechBuild::IntoAfus`, D-078), as the `lab` step does once the advanced lab
 begins, so a reclaimed lab is not re-ordered.
@@ -168,4 +169,4 @@ happen by construction, and the check says so if it does. See
 - [`tech_build.md`](tech_build.md) - the acts.
 - [`../eco-planner.md`](../eco-planner.md) - the economy that continues after the chain.
 
-<!-- source: data/script/src/roles/tech_chain.as; blob: 6a0535dfd2032adf90386436ec4f8c8838a10b57; lines: 688 -->
+<!-- source: data/script/src/roles/tech_chain.as; blob: 0bb707c677fa977a3253dbae79135c8eda36ab81; lines: 689 -->

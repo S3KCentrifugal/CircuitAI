@@ -6230,6 +6230,358 @@ the engine ignores a move for a static unit.
 [`tech_forward.as`](../data/script/src/roles/tech_forward.as),
 [`playtest README`](../tools/playtest/README.md).
 
+## D-116 — An advanced lab footprint the engine refuses is given up; the T1 lab waits for a real frame
+
+**Date:** 2026-09-26. **Status:** Built (build101), played for regressions; the refused-site path itself not yet met in play. Build100 (the safety nets alone), partly played. The owner's infolog shows the cause. A headless replay on All That Glitters with an Armada TECH on the northern spot (build100, 16 AIs, 14 min) built the advanced lab, and the throwaway T1 lab was retired only once its frame existed (F6661, order at F5745). The harness starts the AI at the map file's spot (4211, 609), not the owner's (4286, 592), so the layout planned the footprint 144 elmos west, at (4056, 1048), and the engine accepted it: the dead-footprint branch itself is not yet played. In play it logs "[Layout] advanced lab's planned footprint ... refused by the engine (a dead slot)".
+
+**Owner's report.** In the owner's game on All That Glitters (build99) the TECH AI
+on one side never built its advanced lab and got stuck; the TECH AI on the other
+side played well.
+
+**Found (the owner's infolog).** Team 2 (Armada, the northern TECH spot):
+- F153: the layout reserved the advanced lab's footprint at (4200, 1048), slot 63;
+- F5335: the engine refused that ground three times ("pinned slot 63 for armalab
+  cannot be served: the engine refuses the ground"); the slot went dead (D-108:
+  never served again, its ground held) and the order was aborted;
+- from F10733, every advanced lab order was pinned to the same dead slot again
+  (`Layout::labSlot` still named it; `GetReservationPos` still answers for a dead
+  slot) and aborted at once: "no atomic factory cluster fits", "aborting armalab
+  task after required slot 63 failed", for 15 minutes (INV-015 every minute);
+- F10743: meanwhile the throwaway T1 lab was retired "because the advanced lab is
+  under way": `TechBuild::IntoT2` counts a queued order, and the order was queued,
+  so team 2 was left with no land factory at all.
+
+Team 3 (Legion, the southern spot) got its advanced lab at F5828 and went on to
+the advanced fusion. Both labs have the same 9 x 9 footprint and slope limit; the
+map is not a perfect mirror.
+
+**Why the ground was refused (probed in a game on the same map).** At (4200, 1048)
+the engine's own test (`Spring.TestBuildOrder`) answers BLOCKED: the footprint's
+ground runs from 167.6 to 328.8, a 161-elmo cliff across its east side, against
+an allowed 17 (`maxHeightDif`). No feature or unit stood on it. The accepted site
+144 elmos west spans 7.9, Legion's 7.1.
+
+**Which logic chose it.** `Layout::ReserveFrontLab` ([`layout.as`](../data/script/src/manager/layout.as))
+slides the advanced lab along the turret box's front edge and takes the
+candidate nearest the home centre that passes `CanReserveBuilding` and
+`IsExitClear`. The box itself is checked for flat ground (`FlatFraction`), the lab
+strip ahead of it is not. And the native reservation checks never asked the
+engine: `CanReserveBuilding` and `ReserveBuildingEx`
+([`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)) accept a
+footprint on `CanBeBuiltAt`, a sector test (is the footprint's centre sector in
+a usable movement area), plus the AI's own occupancy grid; the footprint's cells,
+their slope and what stands on them are never looked at. The engine's test,
+`IsPossibleToBuildAt`, ran only when a builder was sent to the slot. So any plan
+could reserve ground the engine will never build on.
+
+**Decision.**
+- **The fix at the source:** both native reservation checks (`CanReserveBuilding`,
+  `ReserveBuildingEx`) now also ask the engine (`IsEngineBuildable`, i.e.
+  `IsPossibleToBuildAt`) once the cheaper checks pass, so no plan reserves ground
+  the engine refuses: every reservation path is covered (the front lab, turret
+  grids, the packers, D-114's front clusters). The engine's test fails only for
+  lasting obstacles (slope, water, structures); units standing there and
+  reclaimable features pass. Zone bands and tenant slots, laid over our own
+  structures on purpose, skip it. A refusal logs "RESERVE: refused ... the engine
+  refuses the ground (slope, water or a structure)".
+- **Safety nets**, for ground that becomes unbuildable after it was reserved:
+- New native query `CTerrainManager::IsSlotDead` (script `aiTerrainMgr.IsSlotDead`).
+- [`layout.as`](../data/script/src/manager/layout.as) `T2LabTask`: a planned
+  advanced lab footprint that is dead is given up (logged); the lab goes through
+  the normal placement (the footprint most turret slots reach, else nearest a
+  turret slot). The dead ground stays held, so it is not chosen again.
+- [`tech_build.as`](../data/script/src/roles/tech_build.as): the throwaway T1 lab
+  is retired, and reclaimed, only once the advanced lab has begun: a frame or a
+  finished lab (`T2Begun`), not an order.
+
+**Invariant.** INV-015 (a dear chain order with no frame for 45 s) caught this in
+the owner's game. Build101 on All That Glitters and Supreme Isthmus (16 AIs,
+14 min each): no reservation refused by the engine at plan or build time, no dead
+slot, the same turret boxes and advanced lab sites as build100, no new slow
+calls (the `PackNearGroup` ones predate it).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as).
+
+## D-117 — Spam labs stand in rows of up to four, their two turrets bound to them, a T3 lane always open
+
+**Date:** 2026-09-26. **Status:** Played (build103 and later, TECH-vs-TECH). Rows began, each with at least one lane. Rows never grew past one lab: a flush neighbour stands in the lab's blocker yard, fixed in [D-119](#d-119--gantries-get-up-to-50-turrets-tech-caps-t2-constructors-and-fast-assist-bots-at-10-spam-labs-are-never-assisted-one-spread-lane-per-spam-lab). That entry also fixes a lane lost after a failed growth (INV-047) and the turrets that were never bound to their lab (INV-048).
+
+**Owner's rule.** For TECH's late-game T1 spam labs: the construction turrets that
+belong to a spam cluster are forced to assist its factory; exactly two turrets
+per spam lab; labs side by side in rows of up to four where the ground allows,
+each with its own two turrets, often a single lab per cluster; they never cramp
+the ground so far that T3 cannot get through: the largest T3 must be able to go
+from the factories behind these labs to the front line.
+
+**Found.** The turrets were bound only by the first turret row (`turret.spam`):
+before the lab stood they took other work, and the reclaim pull
+(`TurretsOnReclaim`, D-078) took every turret in reach, spam turrets included.
+Each spam lab was placed alone by D-114's search, 2 cells from the next, with no
+thought for passage.
+
+**Decision.**
+- **Bound turrets.** A T1 cluster's turrets are marked `no_disrupt`; native
+  `TurretsOnReclaim` now skips `no_disrupt` units; before their lab exists they
+  wait instead of taking other work; once it stands they guard it (repair it
+  while it is a frame). Exactly two per lab (`FrontT1TurretCols/Rows` 2 x 1).
+- **Rows.** A new T1 cluster first joins an existing spam row at either end
+  (`ExtendRow`), side by side (`FrontRowGapCells` 0), up to `FrontRowMaxLabs` (4);
+  else it starts a row through D-114's search.
+- **T3 lanes.** Beside each end of a row a lane `FrontT3LaneCells` (6) wide, over
+  the cluster's whole depth and the same beyond each end, is held as a corridor
+  (nothing of ours is placed on it) when its ground is passable
+  (`FrontLaneMinFlat` of it flat and free). The largest T3 movement classes
+  (HBOT7, HTANK7: Korgoth, Juggernaut and the like) are 7 map squares, 3.5 cells,
+  wide. A row needs at least one lane: a place with none is refused, and a row
+  grows at an end only while a lane stays open at one end.
+
+- **A crash in the owner's game (build101, F25307).** Construction turrets were
+  dying several per frame; `CCircuitAI::DeleteTeamUnit` asks every task to forget
+  a dead unit (`ForgetUnitEverywhere`, D-108), and `IBuilderTask::ForgetUnit`
+  advanced its update iterator `unitIt` on a freed node (`BuilderTask.h:82`,
+  symbolised with build101's `.dbg`). `IUnitTask::Stop` clears the task's
+  `units`, but `IBuilderTask` kept `unitIt`, and a stopped task stays listed until
+  the update loop drops it. [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp)
+  `Stop` now resets `unitIt` (and clears `engaged` and `approaching`); it is the
+  only saved iterator into a task's unit set (build103).
+
+**Invariant.** INV-047: every spam row holds a T3 lane, and no structure stands
+on a held lane. INV-048: a standing spam lab's turret works for that lab.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp).
+
+## D-118 — The AI draws on the map: an intro, the credits, lettering from BAR's typeface
+
+**Date:** 2026-09-26. **Status:** Played (build105). The owner watched the intro and
+asked for the changes below; the `intro_test` widget counted every drawing
+received by a spectator. Strokes missing on screen are terrain in front of the
+line, not lost messages.
+
+**Owner's requests.** Draw an Armada commander large in the map's centre, with
+"Do not spec cheat!" beneath it. Keep it 10 s after it is drawn, then erase it.
+Then a contributors list, also held 10 s, then erased. Spectators must see it.
+The text must look stylised and hand-drawn in BAR's typography, not typed pings.
+Draw a little slower, like a hand, and thicker. The list goes top-left in the
+default view, "Contributors" underlined, no border, names without "@".
+
+**Found.**
+- An AI's map lines (`Drawer::AddLine`) are a player's map drawing: allies and
+  spectators see them in the sender's colour.
+- The game server drops a player's map-draw messages once more than 25 arrive
+  under 50 ms apart (`GameServer.cpp`). In play, 80 lines in one frame showed 25.
+- `EraseNear` erases only lines whose start lies within 100 elmos.
+
+**Decision.**
+- A native draw queue ([`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp)):
+  `AiQueueLine` / `AiQueuePoint` / `AiQueueErase`, sent in batches paced by
+  real time (`AiDrawPace`: at most 20 a batch, at least 55 ms apart).
+- Every start is kept, so the erase removes exactly these lines.
+- Lettering comes from Exo 2 Bold, the game's UI typeface.
+  [`tools/draw/make_glyphs.py`](../tools/draw/make_glyphs.py) flattens and
+  simplifies the outlines into
+  [`glyphs.as`](../data/script/src/manager/glyphs.as).
+- Each stroke is drawn twice side by side (bold) with a small repeatable wobble.
+- The intro runs once, from skirmish AI 0 only
+  ([`commands.as`](../data/script/src/manager/commands.as) `IntroTick`):
+  - the title "SMRTBARb", the commander and the warning at a hand's pace
+    (844 strokes in 16 s), then 10 s;
+  - an erase, then the credits at double that pace (16 a batch: 2634 strokes
+    in 11 s, all received by a spectator), then 10 s;
+  - an erase.
+
+**Invariant.** None: drawing changes no game state. The `intro_test` widget
+checks what arrives.
+
+**Files.** [`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`CircuitAI.h`](../src/circuit/CircuitAI.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`commands.as`](../data/script/src/manager/commands.as),
+[`glyphs.as`](../data/script/src/manager/glyphs.as),
+[`make_glyphs.py`](../tools/draw/make_glyphs.py), and the three
+`experimental_*/main.as`.
+
+## D-119 — Gantries get up to 50 turrets; TECH caps T2 constructors and fast assist bots at 10; spam labs are never assisted; one spread lane per spam lab
+
+**Date:** 2026-09-26. **Status:** Played. The work ran on build105 and then
+build106 (`FindProducedNear`), over many TECH-vs-TECH games of 40 to 45
+minutes on Supreme Isthmus, All That Glitters and Glacial Gap. The new
+`unit_census` widget counted live units by type every 5 minutes. The last two
+games (build106, runs `20260926-215715` and `20260926-215641`) finished without
+a crash.
+- **Gantry.** Every gantry cluster reserved the full 10 x 5 block. The gantry
+  was ordered once 10 of its 50 turrets stood; in one game it finished 38 s
+  later. All 50 turret orders were issued.
+- **Caps.** Live counts never passed 10 T2 construction bots or 10 fast assist
+  bots. The advanced labs made fast assault bots instead, up to 93 alive.
+  INV-010 (combat under the gate) did not fire once the advanced lab waited
+  under the gate.
+- **Spam labs.**
+  - INV-049 never fired, so no constructor assisted a spam lab.
+  - Rows grew to 2 and 3 labs, and INV-047 was silent.
+  - Spam production went from 37 units alive at 40 min to 652 at 45 min
+    (Supreme Isthmus) once the labs produced back to back.
+  - Turrets are tasked for their own lab. INV-048 went from dozens a game to
+    one.
+- **Lanes.** 39 to 41 lane assignments a game, 900 elmos apart, centred on the
+  moving front.
+
+**Owner's requests.**
+- The construction turret cluster for gantries holds up to 50 turrets, and they
+  are filled.
+- Late game the T2 labs make too many construction bots and fast assist bots
+  instead of fast assault bots. Cap both at 10 for TECH.
+- Factories assigned as spam never have constructors assisting. The first bot
+  lab is not spam (it is often reclaimed); the late T1 labs are placed for spam.
+- Each forward T1 spam lab correlates to a lane. Lanes have space between them,
+  spread across the active battle front, and run straight to the enemy backline.
+- There are still issues with the forward clusters that place labs.
+
+**Found.**
+- A gantry's block was 3 x 2.
+- The advanced bot lab made T2 constructors up to `T2ConstructorCap` (60, bot
+  and air together). Fast assist bots were capped by income (`5 x income/45`,
+  50 at the start).
+- Three acts put constructors on a spam lab:
+  - `fwd.t1` guarded the nearest spam lab, and repaired "anything unfinished" at
+    a cluster, which includes the units the lab is producing;
+  - `DoTurretFactory` sent any turret to any producing factory in reach;
+  - `guard.factory` and the chain's commander step guarded the primary T1 lab
+    whatever it was.
+- Every spam lab ran lane `n x LaneSpacing` sideways off its own line to the
+  focus, so lanes fanned from each lab rather than spreading across the front.
+- In play, forward clusters had three faults:
+  - **Rows never grew.** The new reason log showed each attempt refused with
+    none of our reservations on the spot. `IsSlotFree` refuses any cell a
+    structure's blocker covers. An Armada T1 bot lab's blocker
+    ([`block_map.json`](../data/config/experimental_hard/block_map.json)
+    `fac_bot`) has a 6-cell yard, 3 cells each side of the footprint. A flush
+    neighbour (`FrontRowGapCells` 0), or one 2 cells away, stood in it.
+  - **A row lost its T3 lane** (INV-047). To try the next place a row lets its
+    end lane go. When the place failed, the lane was held again only if the
+    ground still passed the passability test, and wrecks or units on it since
+    then failed it.
+  - **A front cluster's turrets were never bound to their factory.** The rule
+    `turret.spam` (D-109, D-114, D-117) never fired in any run on record.
+    - Construction turrets are the native factory manager's assistants
+      ([`FactoryManager.cpp`](../src/circuit/module/FactoryManager.cpp)
+      `assistFinishedHandler`). Their tasks come from `Tech_FactoryAiMakeTask`,
+      which fell through to native `CreateAssistTask`: help whatever is under
+      construction in reach, else wait.
+    - The builder rules only see a turret after a native builder task, such as
+      the reclaim pull, has moved it to the builder side. D-117 made spam
+      turrets `no_disrupt`, so they were never pulled and never reached the
+      rules.
+    - A builder task returned for a factory-side unit is refused by
+      `ITaskModule::AssignTask` ("refused task of another manager"), and a
+      turret has no BUILDER role, so `AssignWorkerGuard` refuses it too.
+    - INV-048 was right to fire. It also misread guards: a native guard task
+      keeps its target as an id (`CBGuardTask::vipId`), and
+      `IBuilderTask.target` is null for it.
+  - **Spam labs barely produced.** 6 labs had 37 spam units alive at 40 min,
+    and the census found no T1 lab building at any sample.
+    - D-111 put each spam lab on repeat and answered its later asks with 20 s
+      waits.
+    - Native clears a factory's whole build queue whenever a recruit task
+      finishes (`CRecruitTask::Finish` then `Cancel`). So the repeat queue
+      lasted one unit, and the lab idled until `RepeatStallSeconds` (45)
+      ordered the next.
+
+**Decision.**
+- **Gantry block.** `FrontT3TurretCols/Rows` is 10 x 5.
+  - `Plan` searches with room for the smallest block, then reserves the biggest
+    that fits: 10x5, 8x5, 8x4, 6x4, 6x3, 3x2 (`T3Blocks`).
+  - The gantry is ordered once `FrontT3TurretsFirst` (10) of its turrets stand.
+    A builder that can build it takes that order first.
+  - The turret orders go on until every slot is filled. The standing turrets
+    build the gantry meanwhile, at 200 build power each.
+- **Caps.**
+  - `T2BotConstructorCap` 10 caps the T2 construction bots: the D-103 branch
+    counts only bot constructors for a bot lab, and the unit cap is clamped each
+    economy update. T2 air constructors keep `T2ConstructorCap`, because the
+    dedicated roles need them.
+  - `FastAssistBotCap` 10 clamps the income-scaled cap, and
+    `StartCapFastAssistBots` is now 10.
+  - With both capped, the advanced bot lab falls through to the fast assault
+    rush. Under the combat gate it now waits; before, it fell to native
+    `DefaultMakeTask`, which chose combat (played: Pyros at +91, INV-010).
+- **Spam labs never assisted.**
+  - `TechFactories::IsSpamLab` names a lab as spam when it belongs to a T1
+    front cluster.
+  - `fwd.t1` no longer guards spam labs, and repairs only non-mobile unfinished
+    things at a spam cluster.
+  - `DoTurretFactory`, `GuardFactory` and `CommanderOnFirstConstructor` skip
+    spam labs.
+  - Every guard of a lab passes through `GuardHelpers::AssignWorkerGuard`, so
+    the check sits there: a guard of a spam lab by anything but its own two
+    turrets is refused and logged (INV-049).
+- **Spread lanes** ([`spam.as`](../data/script/src/manager/spam.as)
+  `SetSpreadLanes`, `BuildSpreadRoute`).
+  - The axis runs from our start to the focus, the enemy start the runs end
+    behind.
+  - Each spam lab gets its own lane parallel to the axis, `LaneSpacing` (900)
+    apart. The set is centred on the combat front and shifted to stay on the
+    map.
+  - Labs are sorted by their own sideways place, so routes never cross.
+  - Route: the lab, half way to its lane's front point, the front point, then
+    straight on to `BehindEnemyDistance` past the focus.
+  - `TickSpam` re-spreads when the count of spam labs changes, and every 30 s.
+    Every route refresh reuses the lane.
+- **Rows.**
+  - `FrontRowGapCells` is now 3 (48 elmos): side by side, clear of the
+    neighbour's blocker yard.
+  - A released end lane is put back without the passability test.
+  - A row that cannot grow says why, once a minute.
+- **Turrets bound to their factory.** `Tech_FactoryAiMakeTask` sends a
+  cluster's own turrets to `TurretFocus(u, true)`, which returns factory-side
+  tasks (`TaskS`):
+  - repair the factory while it is a frame;
+  - else repair the unit it is producing (a mobile frame within
+    `LabYardRadius`, 96). This uses the new native `FindProducedNear`
+    (build106), because `FindUnfinishedNear` sees only structures raised by
+    builder tasks;
+  - else wait 2 s.
+
+  A spam lab's turrets wait (5 s) for a lab that is not up yet. A turret on the
+  builder side still gets `turret.spam`'s builder tasks: a non-interruptible
+  guard, enqueued directly.
+- **Spam labs produce back to back.** Repeat is off, and every ask gets the
+  next unit (`Spam::FactoryMakeTask`).
+- **INV-048 reads the focus.** `TurretFocus` records the lab each turret last
+  worked for (`focusOf`) and when (`focusFrame`). A turret works for its lab
+  when its last task was for that lab within `FocusFreshSeconds` (30). A
+  factory-side turret's tasks last seconds (a unit in production, a 2 s wait),
+  so a single sample often finds it idle between two of them.
+
+**Not changed.** On Glacial Gap in a 1v1, TECH's income peaks at +165 with every
+mex upgraded. The rush chain waits for +200 for the rest of the game, which is
+the owner's S5 gate; combat and spam stay locked and the bank sits full. This
+predates D-119 and is left for the owner.
+
+**Invariant.** INV-049: a spam lab is assisted only by its own two turrets
+(checked at the one door every guard passes). INV-028 now counts only T2
+construction bots, up to `T2BotConstructorCap`.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`spam.as`](../data/script/src/manager/spam.as),
+[`guard_helpers.as`](../data/script/src/helpers/guard_helpers.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`unit_census.lua`](../tools/playtest/widgets/unit_census.lua),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

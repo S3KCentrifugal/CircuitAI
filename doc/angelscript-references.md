@@ -656,6 +656,8 @@ array<CCircuitUnit@>@ GetUnits() const;
 void Abort();
 void Done();
 bool IsDead() const;   // D-114: the task ended (a kept handle stays valid, its task may not)
+// CTerrainManager (D-116): bool IsSlotDead(int id) const -- the engine refused the
+// slot three times; it is never served again (its ground stays held)
 ```
 
 `IBuilderTask` extends `IUnitTask`:
@@ -1023,6 +1025,7 @@ CCircuitUnit@ aiBuilderMgr.FindReclaimTargetFor(CCircuitUnit@ builder);
 CCircuitUnit@ aiBuilderMgr.FindUnfinishedFor(CCircuitUnit@ builder, const CCircuitDef@ def);
 int aiBuilderMgr.GetUnfinishedCount(const CCircuitDef@ def) const;                 // our structures of def under construction
 CCircuitUnit@ aiBuilderMgr.FindUnfinishedNear(const AIFloat3& in pos, float radius, const CCircuitDef@ def);  // nearest of them within radius
+CCircuitUnit@ aiBuilderMgr.FindProducedNear(const AIFloat3& in pos, float radius);  // D-119: nearest mobile unit of ours still being built (a factory's production; FindUnfinishedNear sees only builder-task structures)
 // GetBuildPowerNear returns workertime units (commander 300, turret 200), not the engine's per-frame figure.
 float aiBuilderMgr.GetStaticBuildPowerNear(const AIFloat3& in pos, float radius) const;  // turrets only, workertime units
 // The experimental build system (D-066): with experimentalBuild on, DefaultMakeTask returns null for this

@@ -1307,6 +1307,17 @@ namespace Layout {
         }
         if (!t2.IsAvailable(ai.frame)) return null;
         if (!Builder::IsT2BotFactoryOffCooldown()) return null;
+        // D-116: the planned footprint the engine refused (a dead slot, never
+        // served again) is given up and the lab placed elsewhere (played on All
+        // That Glitters, build99: every advanced lab order was pinned to the dead
+        // slot and aborted for 15 minutes). Its ground stays held.
+        if (labSlot >= 0 && aiTerrainMgr.IsSlotDead(labSlot)) {
+            const AIFloat3 dp = aiTerrainMgr.GetReservationPos(labSlot);
+            GenericHelpers::LogUtil("[Layout] advanced lab's planned footprint at (" + int(dp.x) + ", " + int(dp.z)
+                + ") refused by the engine (a dead slot): the lab is placed elsewhere (D-116)", 1);
+            labSlot = -1;
+            aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", -1);
+        }
         // D-104 (owner's rule): an advanced lab after the first (its planned
         // front-line footprint used) stands flush against the turrets, facing the
         // front (played: the rebuilt lab 7 cells out through the ranked search)
