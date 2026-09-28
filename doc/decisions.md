@@ -6837,14 +6837,25 @@ in a row, 30 s apart
 
 **Date:** 2026-09-27. **Status:** STATUS124
 
+**Owner's report (build110).** No smiley was seen. The owner's game ran
+`SMRTBARb\stable\` (build106, `32f6f0ca`, and its older scripts). Build110
+and the current scripts had been copied to `SMRTBARb\` itself, which the engine
+does not load: an AI runs from `AI/Skirmish/<name>/<version>/`. The hook was
+still moved from the stockpile watch to the exact event.
+
 **Owner's request.** Whenever a nuclear missile is launched, the AI draws a
 smiley face on the map over the target. The intro's second screen, the
 contributors, shows only 5% of the time.
 
 **Decision.**
-- **Smiley.** [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp)
-  watches a nuke silo's stockpile (`armsilo`, `corsilo`, `legsilo`); a drop is
-  a launch. `CCircuitAI::DrawSmiley` then puts a face over the target, `SMILEY_RADIUS`
+- **Smiley.** The hook is the engine's weapon-fired event
+  ([`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp), build111). The engine
+  raises it for every shot fired on an attack command, and a nuke silo
+  (`armsilo`, `corsilo`, `legsilo`) fires only on one. The silo's
+  `CSuperTask` then draws over its aim.
+  [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp) keeps build110's
+  stockpile watch as a safety net: a drop in the silo's stockpile draws only
+  if the event has not drawn in the last 5 s, and one launch draws one face. `CCircuitAI::DrawSmiley` then puts a face over the target, `SMILEY_RADIUS`
   (400 elmos): its outline, two eyes and a smile, about 50 map lines through
   the paced draw queue of D-118. The target is the attacked unit's position, or
   the aimed ground. Logged as "NUKE: launched ...". The face stays on the map.

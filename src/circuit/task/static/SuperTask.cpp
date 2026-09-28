@@ -17,6 +17,8 @@
 #include "unit/CircuitWDef.h"
 
 #define SMILEY_RADIUS	400.f  // D-124: the face over a nuke's target
+#define SMILEY_DEDUPE	(FRAMES_PER_SEC * 5)  // D-124: the stockpile watch draws only if the event did not within this
+#define SMILEY_DEDUPE_EVENT	(FRAMES_PER_SEC * 1)  // D-124: two launch signals this close are one launch
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
@@ -83,23 +85,15 @@ void CSuperTask::Update()
 	CCircuitUnit* unit = *units.begin();
 
 	// D-124 (owner): a nuclear missile launched: a smiley face on the map over
-	// the target. A nuke silo's stockpile dropping is the launch
-	{
-		const std::string& name = unit->GetCircuitDef()->GetDef()->GetName();
-		if ((name == "armsilo") || (name == "corsilo") || (name == "legsilo")) {
-			const int stock = unit->GetUnit()->GetStockpile();
-			if ((lastStock >= 0) && (stock < lastStock)) {
-				AIFloat3 at = targetPos;
-				if (!isTargetOverride && (GetTarget() != nullptr)) {
-					at = GetTarget()->GetPos();
-				}
-				if (geom::is_valid(at)) {
-					circuit->LOG("NUKE: launched from %s(%i) at (%.0f, %.0f): a smiley on the target (D-124)", name.c_str(), unit->GetId(), at.x, at.z);
-					circuit->DrawSmiley(at, SMILEY_RADIUS);
-				}
-			}
-			lastStock = stock;
+	// the target. The weapon-fired event is the hook (CCircuitAI::WeaponFired);
+	// this stockpile watch is its safety net and draws only when the event did
+	// not in the last SMILEY_DEDUPE frames
+	if (IsNukeSilo(unit->GetCircuitDef())) {
+		const int stock = unit->GetUnit()->GetStockpile();
+		if ((lastStock >= 0) && (stock < lastStock) && (frame - lastSmileyFrame > SMILEY_DEDUPE)) {
+			OnLaunch(unit, "stockpile drop");
 		}
+		lastStock = stock;
 	}
 
 	if (unit->Blocker() != nullptr) {
@@ -725,6 +719,38 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 		value = e.cost;
 		return true;
 	});
+}
+
+bool CSuperTask::IsNukeSilo(CCircuitDef* cdef)
+{
+	const std::string name = cdef->GetDef()->GetName();
+	return (name == "armsilo") || (name == "corsilo") || (name == "legsilo");
+}
+
+AIFloat3 CSuperTask::GetAimPos() const
+{
+	if (!isTargetOverride && (GetTarget() != nullptr)) {
+		return GetTarget()->GetPos();
+	}
+	return targetPos;
+}
+
+void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	if (frame - lastSmileyFrame <= SMILEY_DEDUPE_EVENT) {
+		return;  // one smiley a launch
+	}
+	const AIFloat3 at = GetAimPos();
+	if (!geom::is_valid(at)) {
+		circuit->LOG("NUKE: launched from %s(%i) (%s) with no aim known: no smiley (D-124)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), how);
+		return;
+	}
+	lastSmileyFrame = frame;
+	circuit->LOG("NUKE: launched from %s(%i) at (%.0f, %.0f) (%s): a smiley on the target (D-124)",
+			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), at.x, at.z, how);
+	circuit->DrawSmiley(at, SMILEY_RADIUS);
 }
 
 void CSuperTask::SetTargetPos(const AIFloat3& pos)

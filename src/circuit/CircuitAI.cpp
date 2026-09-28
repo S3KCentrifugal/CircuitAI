@@ -5,6 +5,7 @@
  *      Author: rlcevg
  */
 
+#include "task/static/SuperTask.h"  // D-124
 #include "CircuitAI.h"
 #include "scheduler/Scheduler.h"
 #include "script/ScriptManager.h"
@@ -390,6 +391,19 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 		case EVENT_WEAPON_FIRED: {
 			TRACY_TOPIC("EVENT_WEAPON_FIRED", WeaponFired);
 
+			// D-124 (owner: a smiley over every nuke's target, every time): the
+			// engine raises this for each shot fired on an attack command, which
+			// is the only way a nuke silo fires
+			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
+			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
+			if ((unit != nullptr) && (unit->GetCircuitDef() != nullptr) && CSuperTask::IsNukeSilo(unit->GetCircuitDef())) {
+				CSuperTask* task = dynamic_cast<CSuperTask*>(unit->GetTask());
+				if (task != nullptr) {
+					task->OnLaunch(unit, "weapon fired");
+				} else {
+					LOG("NUKE: %s(%i) fired outside its super task: no aim known, no smiley (D-124)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
+				}
+			}
 			ret = 0;
 		} break;
 		case EVENT_PLAYER_COMMAND: {

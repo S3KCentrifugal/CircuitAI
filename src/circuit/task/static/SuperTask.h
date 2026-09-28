@@ -65,6 +65,15 @@ private:
 
 	int targetFrame;
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
+public:
+	// D-124: where the silo aims: the attacked unit, else the aimed ground
+	springai::AIFloat3 GetAimPos() const;
+	static bool IsNukeSilo(CCircuitDef* cdef);
+	// D-124: a launch seen (the weapon-fired event, or a stockpile drop): the
+	// smiley over the aim, once per launch
+	void OnLaunch(CCircuitUnit* unit, const char* how);
+	int lastSmileyFrame = -1000000;
+private:
 	springai::AIFloat3 targetPos;
 	bool isTargetOverride;
 	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty
