@@ -1,0 +1,14 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {"key":"native result","pattern":"LANE_PERF .*revision=1","scope":"any","by_minute":2},
+    {"key":"main postprocess","pattern":"LANE_POST .*revision=1","scope":"any","by_minute":2},
+    {"key":"all players requested","pattern":"LaneBenchmark.*teams=","scope":"any","by_minute":2},
+    {"key":"refresh completed","pattern":"LANE_PERF .*revision=2","scope":"any","by_minute":5.5}
+  ],
+  "forbid": [
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"AI error","pattern":": ERR\\s+:|SCRIPT CRASH|LANES: .*failed:","scope":"any"},
+    {"key":"benchmark observer","pattern":"Error in.*lane_benchmark|lane_benchmark_watch.lua.*attempt","scope":"any"}
+  ]
+}

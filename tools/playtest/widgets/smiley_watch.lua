@@ -24,6 +24,12 @@ local shots = 0
 
 local function echo(s) Spring.Echo("[Smiley] " .. s) end
 
+-- A silo only fires at an enemy the AI has seen, and a TECH 1v1 rarely scouts the
+-- enemy base ("SUPER legsilo: no target | groups=1 inRange=0"). Full map vision
+-- from LOS_FRAME gives the silo a target, so the launch hook itself is tested.
+local LOS_FRAME = 20 * 60 * 30
+local losDone = false
+
 function widget:MapDrawCmd(playerID, cmdType, x, y, z, a, b, c)
 	if cmdType ~= "line" or Spring.GetGameFrame() < MIN_FRAME then return end
 	local f = Spring.GetGameFrame()
@@ -35,6 +41,11 @@ function widget:MapDrawCmd(playerID, cmdType, x, y, z, a, b, c)
 end
 
 function widget:GameFrame(f)
+	if not losDone and f >= LOS_FRAME then
+		losDone = true
+		Spring.SendCommands("cheat 1", "globallos", "cheat 0")
+		echo("full map vision on, so the silo has a target")
+	end
 	if pendingShot and f >= pendingShot then
 		Spring.SendCommands("screenshot png")
 		pendingShot = nil

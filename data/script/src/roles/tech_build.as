@@ -321,7 +321,7 @@ namespace TechBuild {
         if (!WasIntoT2()) return true;
         const int cons = T1Cons() + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
         if (cons == 0) return true;
-        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) return false;
+        if (TechFlank::NormalLabCount() == 0) return false;
         return T1Cons() < Global::RoleSettings::Tech::LabRebuildMinT1Cons || EcoOnline();
     }
     // D-102 (owner's rule): the lab native asks for when our last factory is gone
@@ -338,7 +338,7 @@ namespace TechBuild {
             return "";
         }
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
-        if (t2 !is null && t2.IsAvailable(ai.frame) && UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) {
+        if (t2 !is null && t2.IsAvailable(ai.frame) && TechFlank::NormalLabCount() == 0) {
             GenericHelpers::LogUtil("[TECH][Build] last factory gone: the advanced lab first (D-102)", 1);
             return t2.GetName();
         }

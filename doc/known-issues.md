@@ -1740,6 +1740,22 @@ non-const parameter; 2026-09-20 script deployed ahead of the DLL that
 registers `FindReclaimTargetFor` / `FindUnfinishedFor` (the DLL in the
 install was also a 307 MB mid-build copy).
 
+2026-09-29: the owner's Supreme startup loaded current scripts/config (all
+121 script and 106 config files byte-identical to `data/`), but the installed
+`recoil_2026.07.04/AI/Skirmish/SMRTBARb/stable/SkirmishAI.dll` was the
+September 20 binary: 7,178,365 bytes, SHA256
+`69ec41f0fe970216640413e5205b5f6ab86047ece167db3e121fed1e2bbf7c5a`.
+The log reports missing `aiBattle`, `ConfigFloat`, `GetUnfinishedCount` and
+other bindings, followed by all 16 AIs being removed at frame 30; the installed
+DLL checker reports 129 findings. The verified build output is 7,561,370 bytes,
+SHA256 `36ae8cf0ee2b0f510aff94a3c2b750253267683ba54f3f436c29a2fcc026f1b7`,
+with zero findings across 231 used APIs. Remedy: owner replaces the DLL in the
+actual `SMRTBARb/stable` path from the required Recoil build output, then starts
+a fresh engine process. The copying/replacement mechanism is not established;
+no claim is made about who or what left the older file there. Installed files
+were inspected read-only; owner deployment and a live-game rerun remain pending.
+
+
 **Proposed solution.** Build a small host that links the vendored AngelScript
 from `src/lib/angelscript/`, registers the same surface as
 `src/circuit/script/InitScript.cpp` with stub implementations, and compiles a
@@ -2324,6 +2340,408 @@ a wind and an advanced converter under construction should assist the
 converter first.
 
 **Verification.** Open.
+
+### KI-420 — Legion's opening lab can exceed the dear-order frame deadline
+
+**Severity:** Medium. **Location:** `data/script/src/roles/tech_chain.as`
+(`DearOrderPendingSeconds`), native experimental builder approach/retry handling.
+
+**Problem.** Isolated Supreme Isthmus overlay run `20260928-134206`, pinned
+build114 (`c6057cbd60efaf8d`), reports INV-015 at frame 3541. The Legion
+commander repeatedly approaches/leaves the queued `leglab` at (896,10832)
+without a frame; it takes the queued order again at frame 2953 and reaches
+five failed attempts at frame 3400. This is a failure to establish the lab's
+frame, not evidence that no builder was assigned. The underlying approach
+failure is not yet established. The visualization changes no build orders or
+reservations; this gameplay issue is outside its requested scope.
+
+**Proposed solution.** Trace the assigned builder's build-range, occupied exit,
+and pinned-site feasibility through the native experimental build task before
+changing policy. Compare at normal simulation speed with the overlay disabled.
+Distinguish unassigned orders from assigned-but-frameless orders in diagnostics;
+do not relax INV-015 merely to pass the overlay test.
+
+**Verification.** Observed in the above run (1x intro, then 15x). No gameplay
+fix attempted. The subsequent four-minute run `20260928-134645` passed without
+this invariant, so reproduction is intermittent. It recurred in the four-minute
+mouse-control run `20260928-180042` (3x intro, then 15x), while all overlay
+control checks passed. A fix must start the opening lab within the existing deadline
+and pass INV-015 in repeated Legion openings.
+
+### KI-421 — Installed lane widget is ahead of the live SMRTBARb AI
+
+**Severity:** Medium. **Location:** owner installation's SMRTBARb/stable DLL
+and script tree; control widget's `setTheatres` request.
+
+**Problem.** On 2026-09-28 the installed control widget SHA256 matched the
+repository widget, but installed `commands.as` handled query/setrole/draw/layout
+only. It had no `theatres` command. The installed DLL also failed current script
+API parity with 59 findings, including lane and geothermal methods. Clicking
+show lanes therefore produced no survey. This is a deployment mismatch, not
+evidence of a mouse-hitbox failure.
+
+**Solution.** Close running games, install the matched DLL, active scripts/config
+and widget together, then start a new match. The prepared owner-run installer
+in `build-theatres/release/Install-Theatres.ps1` backs up SMRTBARb/stable and
+preserves AI identity metadata. No assistant writes to the live installation.
+The widget now reports a missing response instead of silently showing nothing.
+See D-130 in [decisions](decisions.md).
+
+**Verification.** Live mismatch verified read-only. Matched-build mouse-click
+regression is recorded in D-130. Owner deployment remains outstanding.
+
+### KI-422 — Clean native rebuild emits initialization-order and grid-size warnings
+
+**Severity:** Low. **Location:** `CFerryTask` and `CRouteTask` constructors in
+`src/circuit/task/fighter/`; `CBattleAnalysis::BuildPass` in
+`src/circuit/terrain/BattleLanes.cpp`.
+
+**Problem.** The 2026-09-28 clean MinGW GCC 13 rebuild reports `-Wreorder`
+for constructor initializers that differ from member declaration order, and
+`-Wstringop-overflow` when `BuildPass` passes the signed `gw * gh` cell count
+to `vector<char>::assign`. The latter is a compiler range diagnostic, not a
+demonstrated runtime overflow. D-131 subsequently fixed the grid-size diagnostic
+by allocating from `height.size()` with an explicit signed-index bound; its
+`BattleLanes.cpp` rebuild is warning-free. Constructor ordering remains open.
+
+**Proposed solution.** Align the constructor initializer lists with declaration
+order after checking dependencies. Do not merely suppress the diagnostic.
+
+**Verification.** Observed in
+`C:/bardev/bar-RecoilEngine/build-amd64-windows/barb-rebuild-latest.log`.
+A fix must rebuild these translation units without the diagnostics and exercise
+lane calculation on representative map sizes. No runtime failure is established
+by these warnings. The D-131 terrain changes are exercised by the tactical-guide
+map tests; this does not verify the unrelated constructor changes still proposed.
+
+### KI-423 — Unbuildable forward cluster retries the same search without exhausting attempts
+
+**Severity:** Medium. **Location:** `Layout::PlanForwardBox`, `CheckForward`
+and `ForwardGivenUp` in `data/script/src/manager/layout.as`.
+
+**Problem.** In the D-131 four-player Glacial Gap test, eastern TECH repeatedly
+found no clear ground eight cells ahead and fired INV-013 at frame 3753.
+Failed terrain searches leave `fwdReplans` unchanged; only an ally taking an
+existing cluster increments it. Thus a permanently unsuitable initial site
+repeats forever and cannot reach `ForwardGivenUp`'s exception. This is separate
+from the tactical overlay; the production layout policy was not changed here.
+
+**Proposed solution.** Track unsuccessful terrain-search attempts separately
+from ally displacement, expand/shift the candidate search under script settings,
+persist its terminal outcome, and make the invariant distinguish pending work
+from an exhausted, explicitly logged search. Do not simply suppress INV-013.
+
+**Verification.** Reproduced in
+`build-theatres/tactical/glacial-r5/runs/20260928-212935/infolog.txt`, team 2.
+A fix should rerun that fixture at the default 120-second limit and demonstrate
+either a valid cluster or a bounded, explained exhausted-search state. Follow-up
+tactical-only tests extend `InvariantForwardSeconds` in their staged data only.
+
+### KI-424 — Experimental surface/water threat multipliers can hide armed enemies
+
+**Severity:** Medium. **Location:** `data/config/experimental_*/behaviour*.json`,
+`CFactoryManager::ReadConfig`, and `SEnemyData::GetSurfDamage/GetWaterDamage`.
+
+**Problem.** D-131's observed-AA test traced zero flak threat to explicit profile
+multipliers. AA-role air/default weights are corrected, but other armed units
+(for example `corllt` and `armpw`) retain zero surface/default weights. These
+multiply away their threat before both ordinary AI avoidance and the tactical
+survey consume it. Low displayed threat therefore does not certify safe ground
+or sea; it is also affected by profile tuning, not just visibility.
+
+**Proposed solution.** Audit the armed roster against native weapon capabilities,
+restore meaningful default and domain weights under explicit profile policy,
+and retain zero weights only with a documented purpose. Review engagement and
+retreat balance as well as the map overlay: a blanket replacement changes all
+AI threat consumers. Extend the isolated observed-battery test to a ground turret
+and submerged naval battery, asserting LOS, nonzero threat and changed route
+cost or geometry. Preserve unarmed/support classifications.
+
+**Verification.** Static trace through profile loading and enemy damage gates;
+ground/naval live regression not performed. The D-131 air reroute test covers the
+AA correction only. This broader balance change is deliberately separate.
+
+### KI-425 — Weapon-cluster sonar list includes unreachable base-roster units
+
+**Severity:** Low. **Location:** `data/script/src/roles/tech_weapons.as`.
+
+**Problem.** The unit-helper checker reports `armsonar` and `corsonar` in the
+weapon-cluster policy as unreachable in the current shared BAR catalog. Their
+existence as UnitDefs does not make them buildable through the base roster.
+
+**Proposed solution.** Select sonar candidates from the actual constructor's
+build options, retaining faction and content-option checks. Confirm the
+reachable advanced/underwater alternatives against the shared unit catalog;
+do not substitute names solely to silence the checker.
+
+**Verification.** `check_unit_helpers.py` reports these two findings against BAR
+`1d267c20d1`. This pre-existing weapon-cluster policy is outside the D-131 lane/UI
+change. Verify a correction with a naval constructor and an actual sonar task.
+
+### KI-426 — Dedicated flank reconstruction after save/load is not yet played
+
+**Problem.** D-136's new factory/site and routed-unit membership are persisted
+in native layout integers, but a save/reload has not exercised their restoration
+order relative to military task assignment. The creation-event producer ID is
+deliberately unknown on reconstruction; the saved membership must take over.
+Existing general script save/load gaps are recorded in KI-209.
+
+**Proposed solution.** Save Glacial Gap with a flank lab producing and units
+halfway along its route. Reload the same build, verify the same factory is
+adopted without a duplicate order, and verify persisted members receive the
+recomputed mountain route before normal military assignment. If native layout
+restoration is later than unit callbacks, defer assignment until restoration
+completes in `TechFlank::Tick`, rather than guessing factory ownership by unit
+proximity. Also exercise a pending factory frame and a destroyed producer.
+
+**Verification.** Fresh-game factory construction and routing are tested by
+the [flank watcher](../tools/playtest/widgets/flank_watch.lua); save/load remains
+unverified. The legacy profile family has no TECH role policy and is unchanged.
+
+### KI-427 — Glacial Gap TECH regression has broader invariant failures
+
+**Problem.** D-136's focused factory, routing and production checks pass, but
+the complete Glacial Gap suite still fails ordinary TECH invariants. A control
+run using the previous D-135 DLL/scripts reproduces INV-001/008/010/011/014/017/
+019/022/029/031/035 without flank production. This establishes a pre-existing
+baseline problem, not the root cause of every individual warning. Final runs
+also contain other invariant IDs; they must not all be attributed to the
+baseline without separate evidence.
+
+**Proposed solution.** Use the preserved baseline and final logs linked in the
+[played review](reviews/2026-09-29-tech-flank-production.md). Triage the earliest
+violation per object against [the actor matrix](actor-matrix.md), especially
+turret reservations, reclaim ownership and income-scaled construction budgets.
+Reproduce each with the natural economy before changing policy or an invariant;
+the accelerated economy fixture can create abrupt bank/pull transitions. Keep
+the global invariant forbid active and fix each independently of the flank
+functional expectations.
+
+**Verification.** Complete the same natural and fixture regressions with zero
+invariant lines, while preserving all ten flank expectations. Current reports
+remain FAIL; no overall clean-game claim is made.
+
+**D-144 sample evidence.** The natural-income September 29 lane-worker samples
+also report TECH invariants: Supreme INV-001/008/019, Glacial INV-013/019/029,
+and Ascendancy INV-004/008/013/015. Their overall checks remain FAIL despite
+successful lane publication/refresh. See the [timings and exact manifests](benchmarks/lane-workers/README.md).
+The synchronous Supreme sample is clean; this small experiment does not assign
+causality or exclude worker adoption timing as a contributor.
+
+### KI-428 — Harness start roles do not force runtime roles on unregistered maps
+
+**Problem.** Ascendancy has no registered role map. The harness's
+`--roles TECH --map-file tools/playtest/fixtures/ascendancy.as` places teams at
+the fixture's TECH starts, but does not register those spots in the AI policy.
+Runtime setup still selects the default factory's FRONT/AIR role. The launch
+and report team labels say TECH because they describe the requested fixture;
+the authoritative GameDetails lines say role=0/1. Initial Ascendancy experiments
+were therefore rejected as TECH evidence.
+
+**Proposed solution.** In the playtest harness, compare every requested team's
+role with its first GameDetails snapshot and fail explicitly on mismatch.
+For intentional unregistered-map role experiments, expose a documented staged
+role override or stage a minimal registered MapConfig. Do not silently change
+the production fallback or turn the two-player fixture into a universal map
+role layout. The current experiment forces only the staged fallback to TECH.
+
+**Verification.** The corrected runs log role=2 for both AIs and build dedicated
+flank labs. The [effectiveness checks](../tools/playtest/checks/flank_effectiveness.json)
+now require actual TECH snapshots. General harness validation remains open.
+The scorecard runner now also verifies the actual role, faction and start in
+every recorded match and rejects mismatches for comparisons and ratings (D-140).
+It retains the explicit staged Ascendancy fallback override; the production
+map registry and general non-scorecard harness remain unchanged.
+
+### KI-429 — Live SMRTBARb installation predates the tested flank build
+
+**Problem.** The owner's September 29 Glacial Gap log loads policy from
+SMRTBARb/stable, which has no `tech_flank.as`. All three installed directories
+SMRTBARb, SMRTBARb_V1 and SMRTBARbzzz advertise the same stable identity, and
+the engine warns it selected the latter AIInfo.lua. Their DLL hashes all
+differ from the tested D-136 build. The script path in the log does not prove
+which duplicate native library the engine selected. The missing flank policy
+does conclusively rule out a D-136 all-terrain attack in that game.
+
+Follow-up found the current DLL (hash prefix
+`fe1b62f48707ccfc`) and flank script exist directly under `SMRTBARb/`, beside
+the version directory. The inspected `SMRTBARb/stable/` tree remained old.
+Attributing all reported failures to a copy error was an overreach; see the
+owner correction below.
+
+**Owner correction:** copying script/config from `data/` and the DLL from
+build output is valid, and the owner reports no all-terrain units with all
+correct files installed. The snapshot above must not stand in for reproducing
+that production failure. Never automatically change the main game installation;
+it is used concurrently with isolated harness simulations.
+
+**Proposed solution.** The owner installs the complete, uniquely versioned
+`SMRTBARb/flank-20260929` package from the investigation artifact and selects
+that version after restarting BAR. Check both script-load paths and native
+identity; do not replace only the DLL or deploy over ambiguously named copies.
+The assistant does not alter the live installation (AGENTS.md).
+
+**Verification.** Package contains the pinned D-136 DLL, matching symbols and
+all current data, with only AIInfo identity changed. API parity passes. Owner
+deployment and a new live-game trace remain pending. See the
+[investigation](reviews/2026-09-29-live-tech-production.md).
+
+### KI-430 — High-income TECH can remain without ordinary combat factories
+
+**Problem.** In the owner's 16-AI Glacial Gap game, TECH team 15 activated spam
+at frame 17865 (9.93 minutes), planned its first forward T1 cluster at 35368
+(19.65), and did not order that lab until frame 53032 (29.46), near the log's
+end. INV-039 repeatedly reports no forward progress; INV-047 reports an
+occupied T3 corridor. At +876 metal, its bot lab was still requesting a T2
+constructor, while its air plant had filled the configured 60-constructor cap.
+No completed combat pipeline is established by this log.
+
+**Mechanism and limits.** Income activates demand but does not guarantee a
+factory. `TechFactories::Work` waits for construction turrets and (for T1 once
+the economy is online) an ordinary advanced lab. Builder release, current jobs
+and ordered rules can defer those dependencies. Factory production prioritizes
+constructors before ordinary combat. These rules remain in current policy;
+the installed old version alone does not explain or prove a fix for all normal
+T1/T2/T3 starvation. The D-136 flank factory has an independent production hook.
+
+**Proposed solution.** Reproduce with full teams and record requested, framed,
+finished and producing states separately for every combat tier. Trace the
+first missing dependency against tech_rules.as, tech_factories.as and the
+Lifecycle actor matrix. Give unfinished combat infrastructure a bounded
+progress path without overriding the owner's constructor caps or removing
+turret/exit requirements blindly. Validate completed normal T1, T2 and T3 units
+alongside the dedicated flank stream at sustained high income. Extend the
+existing INV-039 coverage to distinguish a planned cluster from a productive
+factory; do not count a plan as delivery.
+
+**Verification.** The historical live-game stall is confirmed; a complete
+ordinary-production fix is not claimed. The current full-team control and
+its limitations are recorded in the [investigation](reviews/2026-09-29-live-tech-production.md).
+Fresh unmodified faction mirror matches produced and routed all-terrain units
+on all six faction/side combinations, each sustaining production and reaching
+the mountain. The separate 8v8 ended with west TECH defeated below the gate
+and east TECH still below +200. It does not resolve the reported high-income
+full-team failure. See the [faction validation](reviews/2026-09-29-glacial-faction-validation.md).
+The initial [scorecards](benchmarks/scorecards/README.md) separately capture
+high-income zero-combat observations on Supreme Isthmus and Glacial Gap. The
+staged TECH Ascendancy duel completed zero combat units at 45 minutes on both
+sides, but neither had a sampled income at +200; this is not evidence of failure
+to activate an already-satisfied flank gate. Its Legion chain repeatedly reports
+an advanced lab order without a frame (INV-015), and Cortex continues retrying
+its fusion step. Investigate those queued construction dependencies against the
+recorded start geometry before treating the scorecard as a flank-routing defect.
+
+**D-145 observation.** The final 35-minute Supreme fixture also shows marked
+ordinary-production asymmetry (Legion nearly no combat, Armada hundreds), even
+though both evaluate and correctly reject specialist flanks. This supports
+keeping general factory/constructor priority starvation separate from lane
+qualification; it is not a root-cause proof for that run. See the
+[connected mountain review](reviews/2026-09-29-connected-mountain-lanes.md).
+
+### KI-431 — Lane UI memory fix needs confirmation in the original session
+
+**Severity**: High
+**Location**: `tools/widgets/gui_barb_team_link.lua`, all-player DrawScreen;
+2026-09-29 installed infolog frame 44395.
+
+**Problem.** The whole LuaUI state exhausted its 1.5 GiB allocation limit after
+all-player lane viewing and a player click. The log has no widget-specific stack.
+D-141 removes measured per-segment allocation churn (about 40 MB/frame in a
+large deterministic fixture), but the original late-game session and its other
+widgets have not been replayed with the fix. Do not claim every possible source
+of that session's memory growth was ruled out.
+
+**Proposed solution.** Use the updated widget in an isolated reproduction of
+the same paused late-game survey/selection sequence, recording LuaUI memory and
+confirming the rest of the UI survives. Keep the installed game untouched unless
+the owner explicitly changes the no-deployment preference.
+
+**Verification.** The three focused Lua 5.1 tests pass. See the
+[incident review](reviews/2026-09-29-lane-ui-memory.md) for the graphical engine
+stress result and [D-141](decisions.md#d-141--batch-lane-rendering-to-avoid-exhausting-luaui-memory)
+for the implementation and allocation invariant.
+
+### KI-432 — Headless playtests load graphical widgets without shader support
+
+**Location.** Isolated `spring-headless.exe` playtests; BAR LuaUI PIP and shader widgets.
+
+**Problem.** The Arquebus regression logs a nil `Spring.CreateShader` in PIP
+initialization and shader warnings before frame zero. The headless renderer
+does not provide the graphical functionality these enabled widgets expect.
+These are not evidence of an AI script failure, but broad `Lua.*error` checks
+incorrectly treat them as one. Normal graphical play has not been assessed here.
+
+**Proposed solution.** Give headless tests an isolated minimal widget selection
+containing their observers and required dependencies, or add headless guards in
+the affected upstream widgets. Do not change the owner's live widget settings.
+The focused Arquebus check currently forbids AI and observer errors while its
+review separately discloses the unrelated graphical errors.
+
+**Verification.** Reproduced in the isolated Arquebus tests; see the
+[range review](reviews/2026-09-29-arquebus-range.md). Graphical widget loading is
+not fixed by the combat change.
+
+### KI-433 — Lane survey postprocessing still blocks the main thread
+
+**Location.** `Lanes::Finish` in `data/script/src/manager/lanes.as`, including
+validation, lessons, WaterTheatres, StrategicSites and optional overlay publication.
+
+**Problem.** Moving native lane searches to workers reduces the final Supreme
+sample's median main-thread survey work from 101.837 to 25.291 ms, but combined
+postprocessing still reaches 77.776 ms. The current timer measures that whole
+phase; it does not establish which consumer dominates. Synchronous route
+connector searches also remain outside the offloaded solver request.
+
+**Proposed solution.** Add separate timers around each Finish consumer first.
+Cache immutable topology-derived advisories by terrain/settings revision, then
+move any dominant pure calculations to owned snapshots or budget their work
+across ticks. Preserve per-team threat visibility and main-thread script/engine
+access; do not move AngelScript execution to the worker pool.
+
+**Verification.** Repeat the [map/settings benchmarks](benchmarks/lane-workers/README.md)
+with separate subphase timings, unchanged advisory outputs, completed refreshes
+and no publication invariant failures. Full-game TECH invariant failures remain
+tracked separately under KI-427.
+
+### KI-434 — TECH treats any reachable all-terrain route as a worthwhile flank
+
+**Status.** Fixed and played on Supreme, Glacial Gap and Ascendancy (D-145).
+Focused tests pass; global TECH failures and uneven faction combat efficiency
+remain disclosed in the [played review](reviews/2026-09-29-connected-mountain-lanes.md).
+
+**Location.** `TechFlank::Select` / `Work` in
+[data/script/src/roles/tech_flank.as](../data/script/src/roles/tech_flank.as),
+and route classification in [LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp).
+
+**Problem.** The September 29 live Supreme Isthmus v1.7 log confirms team 10
+selected lane 11 (later lane 10), midpoint (7392,3680), ordered an `armalab`
+at income 298, and repeatedly produced/routed `armsptk`. The flank gate tests
+ALLTERRAIN class and connectivity, but has no minimum strategic terrain
+advantage or distinct bypass requirement. Native classification intersects
+passability over every route cell: a local bot-blocking segment can make a
+route ALLTERRAIN without establishing a meaningful mountain flank. The exact
+blocking cells in this live route have not been inspected; their geometry
+must not be inferred from its class or midpoint alone.
+
+**Proposed solution.** Expose quantitative native specialist-route evidence
+(continuous exclusive crossing length, rise/drop and separation or bypass
+advantage relative to ordinary-bot routes), then gate dedicated factory and
+recruitment through one script predicate with JSON thresholds. Retain generic
+all-terrain reachability for route display/pathfinding. Test rejection of
+Supreme's observed route and retention of reachable Glacial/Ascendancy mountain
+flanks, including recalculation invalidating a previously accepted route.
+Do not substitute a map-name blacklist for terrain qualification.
+
+**Implementation (D-145).** Native candidates are now filtered by continuous
+projected traverse on one connected elevated component, with JSON span controls.
+TECH uses the native qualification and cannot resume stale production after
+a failed selection. Eight native suites and the 233-member API check pass.
+See the [played review](reviews/2026-09-29-connected-mountain-lanes.md) for final
+map results and limitations.
+
+**Verification requirement.** Regression must reach the +200 metal gate (the six-minute Supreme performance
+sample did not) and verify no dedicated specialist factory or recruitment on
+unqualified routes, while valid mountain-flank production still operates.
 
 ## Indexed elsewhere
 

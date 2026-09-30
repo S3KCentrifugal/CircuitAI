@@ -1,0 +1,18 @@
+{
+  "stop_minute": 30,
+  "expect": [
+    {"key":"west factory","pattern":"\\[FlankTest\\] PASS built team=0","scope":"any","by_minute":24},
+    {"key":"east factory","pattern":"\\[FlankTest\\] PASS built team=1","scope":"any","by_minute":24},
+    {"key":"west production","pattern":"\\[FlankTest\\] PASS continuous team=0","scope":"any","by_minute":28},
+    {"key":"east production","pattern":"\\[FlankTest\\] PASS continuous team=1","scope":"any","by_minute":28},
+    {"key":"west mountain","pattern":"\\[FlankTest\\] PASS mountain team=0","scope":"any","by_minute":29},
+    {"key":"east mountain","pattern":"\\[FlankTest\\] PASS mountain team=1","scope":"any","by_minute":29},
+    {"key":"west crossing","pattern":"\\[FlankTest\\] PASS crossed team=0","scope":"any","by_minute":30},
+    {"key":"east crossing","pattern":"\\[FlankTest\\] PASS crossed team=1","scope":"any","by_minute":30}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|: WARN\\s+:","scope":"any"},
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"crash","pattern":"Access violation|SCRIPT CRASH|Error in.*flank_watch","scope":"any"}
+  ]
+}

@@ -325,6 +325,7 @@ namespace Invariants {
                 factoriesSeen.set(keys[i], ai.frame);
                 if (!Layout::TurretsStand()) continue;
                 if (TechFactories::IsClusterLab(fac)) continue;   // D-114: at its own turret block (INV-038, INV-045)
+                if (TechFlank::Owns(fac)) continue;   // D-136: standalone reachable flank site, not an economy turret-box tenant
                 const AIFloat3 fp = fac.GetPos(ai.frame);
                 const int ff = aiTerrainMgr.GetBuildingFacing(fac);
                 int gap = aiTerrainMgr.EdgeGapToGroup(fac.circuitDef, fp, ff, Layout::nanoGroup);

@@ -46,6 +46,9 @@ public:
 	void SetThreatType(CCircuitUnit* unit);
 	float GetThreatAt(const springai::AIFloat3& position) const;
 	float GetThreatAt(CCircuitUnit* unit, const springai::AIFloat3& position) const;
+	// D-126: the default role's surface and air threat at a point, for site scoring
+	float GetSurfThreatAtPos(const springai::AIFloat3& position) const;
+	float GetAirThreatAtPos(const springai::AIFloat3& position) const;
 
 	float* GetAirThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->airThreat.data(); }
 	float* GetSurfThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->surfThreat.data(); }

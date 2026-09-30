@@ -108,7 +108,9 @@ namespace Factory {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
-		IUnitTask@ t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision
+		IUnitTask@ t = TechFlank::Produce(u);
+		if (t !is null) return t;
+		@t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision
 		if (t !is null) return t;
 
 		@t = Team::Ferry::FactoryMakeTask(u);      // AIR owes TECH a transport: build it first
@@ -195,7 +197,7 @@ namespace Factory {
 			GenericHelpers::LogUtil("[FACTORY] primaryT1BotLab set to id=" + unit.id, 2);
 		}
 
-		if (cdef !is null && UnitHelpers::IsT2BotLab(cdef.GetName()) && Factory::primaryT2BotLab is null) {
+		if (cdef !is null && UnitHelpers::IsT2BotLab(cdef.GetName()) && !TechFlank::Owns(unit) && Factory::primaryT2BotLab is null) {
 			@Factory::primaryT2BotLab = unit;
 			GenericHelpers::LogUtil("[FACTORY] primaryT2BotLab set to id=" + unit.id, 2);
 		}

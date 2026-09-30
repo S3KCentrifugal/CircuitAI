@@ -1,0 +1,10 @@
+{
+  "_doc": "Compile every profile and run the staged construction-veto probe. Count one PASS per AI separately in the log.",
+  "stop_minute": 2,
+  "expect": [{"key":"veto probe","pattern":"ArtilleryProbe.*PASS veto [23]","by_minute":1.5,"scope":"any"}],
+  "forbid": [
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"script error","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"probe failed","pattern":"ArtilleryProbe.*FAIL","scope":"any"}
+  ]
+}

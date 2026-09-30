@@ -1,0 +1,15 @@
+{
+  "stop_minute": 35,
+  "expect": [
+    {"key":"west actual TECH","pattern":"\\[GameDetails\\] skirmishAI=0 team=0 .*role=2","scope":"any","by_minute":1},
+    {"key":"east actual TECH","pattern":"\\[GameDetails\\] skirmishAI=1 team=1 .*role=2","scope":"any","by_minute":1},
+    {"key":"observer","pattern":"\\[FlankEffect\\] loaded","scope":"any","by_minute":1},
+    {"key":"west factory","pattern":"\\[FlankEffect\\] factory team=0","scope":"any","by_minute":30},
+    {"key":"east factory","pattern":"\\[FlankEffect\\] factory team=1","scope":"any","by_minute":30}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|: WARN\\s+:","scope":"any"},
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"observer error","pattern":"Removed widget: Flank effectiveness|Failed to load:.*flank_effectiveness|Error in.*flank_effectiveness|Access violation|SCRIPT CRASH","scope":"any"}
+  ]
+}

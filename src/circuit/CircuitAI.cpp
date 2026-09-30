@@ -19,6 +19,7 @@
 #include "module/MilitaryManager.h"
 #include "resource/MetalManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/path/PathFinder.h"
 #include "task/PlayerTask.h"
 #include "unit/CircuitUnit.h"
@@ -396,6 +397,12 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			// is the only way a nuke silo fires
 			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
 			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
+			if (unit != nullptr) {
+				CSuperTask* firingTask = dynamic_cast<CSuperTask*>(unit->GetTask());
+				if (firingTask != nullptr) {
+					script->SuperWeaponFired(unit, firingTask->GetAimPos());
+				}
+			}
 			if ((unit != nullptr) && (unit->GetCircuitDef() != nullptr) && CSuperTask::IsNukeSilo(unit->GetCircuitDef())) {
 				CSuperTask* task = dynamic_cast<CSuperTask*>(unit->GetTask());
 				if (task != nullptr) {
@@ -668,6 +675,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
 	modules.push_back(economyManager);  // NOTE: Uses unit's manager != nullptr, thus must be last.
 
 	terrainManager->Init();
+	battle = std::make_shared<CBattleAnalysis>(this);  // D-126
 	economyManager->InitEconomyScores();
 
 	script->RegisterMgr();
@@ -785,6 +793,7 @@ int CCircuitAI::Release(int reason)
 	economyManager = nullptr;
 	factoryManager = nullptr;
 	builderManager = nullptr;
+	battle = nullptr;
 	terrainManager = nullptr;
 	metalManager = nullptr;
 	energyManager = nullptr;
@@ -856,6 +865,10 @@ int CCircuitAI::Update(int frame)
 	}
 
 	allyTeam->Update(this);
+
+	if ((battle != nullptr) && (frame % FRAMES_PER_SEC == teamId % FRAMES_PER_SEC)) {
+		battle->Update(frame);  // D-126: heat decay, enemy composition, hostile water
+	}
 
 	scheduler->ProcessJobs(frame);
 	if (frame % TEAM_SLOWUPDATE_RATE == skirmishAIId) {
@@ -1132,6 +1145,7 @@ int CCircuitAI::Message(int playerId, const char* message)
 
 int CCircuitAI::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 {
+	unit->SetProducerId(builder != nullptr ? builder->GetId() : -1);
 	for (auto& module : modules) {
 		module->UnitCreated(unit, builder);
 	}
@@ -1238,6 +1252,9 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 {
 	unit->SetDamagedFrame(lastFrame);
 	CEnemyInfo* attacker = GetEnemyInfo(attackerId);
+	if (battle != nullptr) {
+		battle->OnOwnDamaged(unit->GetPos(lastFrame));  // D-126: combat heat
+	}
 
 	if (IsValidWeaponDefId(weaponId)) {
 		if (attacker != nullptr) {
@@ -1257,6 +1274,9 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	destroyed.insert(unit->GetId());
+	if (battle != nullptr) {
+		battle->OnOwnLost(unit->GetPos(lastFrame), unit->GetCircuitDef()->GetCostM());  // D-126
+	}
 	for (auto& module : modules) {
 		module->UnitDestroyed(unit, attacker);
 	}
@@ -1378,6 +1398,9 @@ int CCircuitAI::EnemyDamaged(CEnemyInfo* enemy)
 
 int CCircuitAI::EnemyDestroyed(CEnemyInfo* enemy)
 {
+	if (battle != nullptr) {
+		battle->OnEnemyLost(enemy->GetPos(), enemy->GetCost());  // D-126
+	}
 	allyTeam->EnemyDestroyed(enemy->GetData(), this);
 
 	militaryManager->DelPointOfInterest(enemy);

@@ -180,6 +180,7 @@
 				"power": 1.0
 			},
 			"legcluster": {
+				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
 				"limit": 3,
@@ -688,6 +689,7 @@
 				"limit": 2
 			},
 			"legsrail": {
+				"standoff": 0.90, // retain railgun range, including on specialist routes
 				"role": ["anti_heavy"]
 			},
 			"leghrk": {

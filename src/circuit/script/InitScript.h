@@ -65,6 +65,7 @@ public:
 	void LuaMessage(const char* inData);
 	void UnitFinished(CCircuitUnit* unit);
 	void UnitDestroyed(CCircuitUnit* unit);
+	void SuperWeaponFired(CCircuitUnit* unit, const springai::AIFloat3& aim);
 
 private:
 	template <class T>
@@ -110,6 +111,7 @@ private:
 	struct SScriptInfo {
 		asIScriptFunction* unitFinished = nullptr;
 		asIScriptFunction* unitDestroyed = nullptr;
+		asIScriptFunction* superWeaponFired = nullptr;
 		asIScriptFunction* update = nullptr;
 		asIScriptFunction* luaMessage = nullptr;
 		asIScriptFunction* receiveMessage = nullptr;

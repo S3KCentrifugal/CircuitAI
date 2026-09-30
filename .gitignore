@@ -21,6 +21,7 @@
 *.app
 
 CMakeFiles/
+build-theatres/
 Makefile
 cmake_install.cmake
 

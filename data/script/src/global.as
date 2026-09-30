@@ -334,6 +334,85 @@ namespace Global {
             int AirDefenceRingSize = 7;
             float AirDefenceArc = 0.35f;
             float AirDefenceShake = 320.0f;
+            /******************** LANES (D-127) ********************/
+            // manager/lanes.as, doc/roles/tech-lanes.md; data/config/lanes.json overrides each
+            bool LanesEnabled = true;                   // lanes/enabled
+            int LaneAlternatives = 3;                   // lanes/alternatives
+            float LaneMergeRadius = 450.0f;             // lanes/merge_radius
+            float LaneThreatWeight = 1.0f;              // lanes/threat_weight
+            float LaneRecalcSeconds = 180.0f;           // lanes/recalc_seconds
+            float LaneRecalcShift = 1000.0f;            // lanes/recalc_shift
+            float LaneRecalcMinSeconds = 60.0f;         // lanes/recalc_min_seconds: at most this often on a front move
+            bool LaneDraw = true;                       // lanes/draw
+            int LaneDrawSeconds = 30;                   // lanes/draw_seconds: owner: 30 s after the intro
+            int LaneDrawFallbackSeconds = 300;           // lanes/draw_fallback_seconds
+            float LaneSymbolSpacing = 1400.0f;          // lanes/symbol_spacing
+            float LaneSymbolSize = 260.0f;              // lanes/symbol_size
+            float LaneLabelSize = 240.0f;               // lanes/label_size
+
+            /******************** WEAPON CLUSTERS (D-126) ********************/
+            // TECH's weapon clusters (roles/tech_weapons.as, doc/roles/tech-weapon-clusters.md).
+            // These are the defaults; data/config/weapons.json (and a profile's own
+            // weapons.json) overrides each at game start (TechWeapons::LoadSettings),
+            // the JSON path in the comment.
+            bool WeaponClustersEnabled = true;          // weapons/enabled
+            float WeaponStartMetalIncome = 200.0f;      // weapons/start_metal_income: owner: no weapon cluster before +200 metal
+            float WeaponBudgetShare = 0.25f;            // weapons/budget/share: of metal income, into weapon clusters
+            float WeaponBudgetShareAttacked = 0.40f;    // weapons/budget/share_attacked: while the base area is being fought over
+            float WeaponBudgetWindowSeconds = 60.0f;    // weapons/budget/window_seconds: the budget saves up at most this many seconds of share
+            float WeaponAttackedHeat = 30.0f;           // weapons/budget/attacked_heat: combat heat within WeaponBaseRadius that counts as under attack
+            float WeaponBaseRadius = 2500.0f;           // weapons/budget/base_radius
+            int WeaponMaxConcurrent = 4;                // weapons/budget/max_concurrent: weapon orders out at once (the super cannon's escort apart)
+            // income gates per cluster kind (metal income, 10 s minimum)
+            float WeaponKillMinIncome = 200.0f;         // weapons/gates/kill_zone
+            float WeaponAirMinIncome = 200.0f;          // weapons/gates/air_defence
+            float WeaponCoastMinIncome = 250.0f;        // weapons/gates/coast
+            float WeaponArtyMinIncome = 300.0f;         // weapons/gates/artillery
+            float WeaponLrpcMinIncome = 350.0f;         // weapons/gates/long_range
+            float SuperMinMetalIncome = 500.0f;         // weapons/super/min_metal_income: owner: at least +500 to start a super cannon
+            float SuperIdealMetalIncome = 1000.0f;      // weapons/super/ideal_metal_income: owner: ideally over +1000 (below it, only with a high need)
+            float SuperMinNeed = 1.5f;                  // weapons/super/min_need: the need a super cannon needs between the two incomes
+            float SuperEnergySpareFactor = 1.0f;        // weapons/super/energy_spare_factor: spare energy income x the cannon's sustained draw
+            // how many of each cluster kind, and each cluster's shape
+            int WeaponMaxKill = 4;                      // weapons/max/kill_zone
+            int WeaponMaxAir = 4;                       // weapons/max/air_defence
+            int WeaponMaxCoast = 4;                     // weapons/max/coast
+            int WeaponMaxArty = 3;                      // weapons/max/artillery
+            int WeaponMaxLrpc = 3;                      // weapons/max/long_range
+            int WeaponMaxSuper = 1;                     // weapons/max/super
+            int WeaponNanoPerCluster = 4;               // weapons/cluster/nanos: owner: at least 4 construction turrets per cluster
+            float WeaponWorkRadius = 8000.0f;           // weapons/cluster/work_radius: a land constructor takes cluster work within this
+            float WeaponCriticalSpacing = 1280.0f;      // weapons/cluster/critical_spacing: nuke AoE between critical structures
+            float WeaponAirSpacing = 260.0f;            // weapons/cluster/air_spacing: AA pieces apart (1.5 x a bomb's AoE)
+            // super cannon (owner, W9)
+            int SuperStorageMin = 2;                    // weapons/super/storage_min: advanced energy storages at least
+            float SuperStorageMargin = 1.1f;            // weapons/super/storage_margin: storage holds a full shot x this
+            int SuperFlakCount = 6;                     // weapons/super/flak: dense forward flak
+            int SuperLongRangeAACount = 2;              // weapons/super/long_range_aa
+            int SuperDeflectorCount = 2;                // weapons/super/deflectors
+            int SuperAntiNukeCount = 1;                 // weapons/super/anti_nukes (2 once an enemy silo is seen)
+            int SuperNanoCount = 8;                     // weapons/super/nanos
+            int SuperRadarCount = 2;                    // weapons/super/radars
+            float SuperBandMin = 0.2f;                  // weapons/super/band_min: of the cannon's range back from the active combat zone
+            float SuperBandMax = 0.4f;                  // weapons/super/band_max
+            float SuperEscortRadius = 900.0f;           // weapons/super/escort_radius
+            int SuperEscortSeconds = 300;               // weapons/super/escort_seconds: INV-058's grace
+            // long range (LRPCs share the band, owner)
+            float WeaponLrpcBandMin = 0.2f;             // weapons/long_range/band_min
+            float WeaponLrpcBandMax = 0.4f;             // weapons/long_range/band_max
+            // analysis
+            float WeaponReplanSeconds = 60.0f;          // weapons/analysis/replan_seconds: sites re-found and re-ranked
+            float WeaponAnalyseSeconds = 600.0f;        // weapons/analysis/analyse_seconds: routes and beaches recomputed
+            int WeaponRouteAlternatives = 3;            // weapons/analysis/route_alternatives
+            float WeaponChokeHalfWidth = 480.0f;        // weapons/analysis/choke_half_width
+            float WeaponChokeMerge = 900.0f;            // weapons/analysis/choke_merge
+            float WeaponKillShareMin = 0.2f;            // weapons/analysis/kill_share_min: kill zones between these shares of a route
+            float WeaponKillShareMax = 0.6f;            // weapons/analysis/kill_share_max
+            float WeaponCombatMinHeat = 5.0f;           // weapons/analysis/combat_min_heat: an active combat zone
+            float WeaponCombatHalfLife = 180.0f;        // weapons/analysis/combat_half_life
+            float WeaponAirHalfLife = 300.0f;           // weapons/analysis/air_half_life
+            float WeaponCoastRadius = 3500.0f;          // weapons/analysis/coast_radius: beaches this close to the base
+            float WeaponEnemyCoastRadius = 2500.0f;     // weapons/analysis/enemy_coast_radius: water this close to an enemy start is hostile
             int HarbourMaxT2Shipyards = 1;
             int HarbourYardSeconds = 480;                   // INV-051: the advanced shipyard framed this soon after the harbour begins
             int HarbourHoverConstructors = 3;               // the hover plant's constructors: they float out and build the advanced shipyard

@@ -1,0 +1,35 @@
+{
+  "stop_minute": 1,
+  "expect": [
+    {
+      "key": "team 0 native publication",
+      "pattern": "LANE_PERF team=0 revision=1",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "team 1 native publication",
+      "pattern": "LANE_PERF team=1 revision=1",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "qualified mountain published",
+      "pattern": "\\[Lanes\\] qualified specialists=1",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|: WARN\\s+:|SCRIPT CRASH|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

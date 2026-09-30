@@ -65,6 +65,65 @@ mostly on native defaults and JSON configuration.
 
 ## Runtime rules
 
+### Tactical lane survey (D-131)
+
+D-136: `aiBattle.GetLaneRoute(int lane, const AIFloat3& in from, int cls)`
+returns an owned `array<AIFloat3>@` containing a connected approach and every
+lane cell, or an empty array when inaccessible. It never snaps an invalid start
+across a barrier. `CCircuitUnit.GetProducerId()` reads the creation-event builder
+ID, or -1 when unknown (including reconstruction after load).
+`CRouteTask.SetTraversal(bool preserveWaypoints, float arrivalRadius, bool fightAtEnd)`
+keeps intermediate waypoints on refresh; ordinary spam defaults remain unchanged.
+
+D-144 adds `aiBattle.RequestLanes(...)` with the same arguments as the
+synchronous call below. It returns true only when a job was admitted; false
+coalesces an already pending request. `IsLanePending()` includes queued and
+running work. `GetLaneRevision()` advances on successful main-thread publication,
+not enqueue. Existing getters keep returning the previous complete result.
+`CancelLaneRequest()` invalidates publication and signals cooperative cancellation;
+the admission slot remains occupied until that worker completes. No callbacks
+enter AngelScript from a worker. `Lanes::Poll()` in all three experimental profile
+updates finalizes teaching/theatre data and increments `Lanes::calcs` once.
+`BeginLanePostprocess()` / `EndLanePostprocess()` time that main-thread phase;
+they do not affect decisions. These methods require the D-144 DLL.
+
+`aiBattle.AnalyseLanes(alternatives, mergeRadius, threatWeight, specialistBias,
+highGroundRise, highGroundDetour, highGroundRoutes)` returns the cached lane
+count. The final four parameters default to `1`, `128`, `3`, `3` in the native
+registration. `GetLaneMask(int)` returns a bit mask using the same class order
+as `GetLaneClass`: land, bot, amphibious, hover, all-terrain, naval, air.
+The mask describes terrain passability of the full representative path, not
+  unit-specific movement or combat safety. Existing length, width, choke,
+  threat, front and point getters operate on this same AI-owned result.
+  D-132 adds `SetCliffDescentParams(int approachClass, float minDrop, float maxRun,
+  float minProgress)` before a survey: class 0/1 selects tank/bot access and other
+  values disable this tactic. `GetLaneDescent(int)` returns its staging point or
+  negative x for an ordinary lane. The mechanism joins the ordinary-class access
+  path to a verified all-terrain descent and retains the complete route in the
+  existing point getters. Script reapplies the parameters on every calculation.
+  D-133 adds `SetMountainPathParams(float gradeWeight, float peakTolerance)`:
+  quadratic grade cost controls smoothness before descent; elevation tolerance
+  selects a band below the component's highest ordinary-class-reachable point.
+  The route now includes a smooth all-terrain traverse between that approach
+  and the final cliff exit. Zero tolerance requires the highest reachable point.
+  D-134 adds `SetCliffPreference(float weight, float qualityTolerance, float
+  heightFraction)`, `GetLaneAscent(int)` (negative x without a paired crossing),
+  and `GetLaneCliffQuality(int lane, int end)` (0=home, 1=enemy, zero if absent).
+  Paired crossings keep the high passage but use steep walker-only legs at both
+  ends. The home leg is reversed to obtain the ascent in this lane's direction;
+  both quality values describe downhill terrain, not actual unit speed/safety.
+  D-135 adds `SetMountainShelfParams(float surfaceWeight, float heightWeight)`.
+  The first weights the mean engine surface slope for all-terrain transit searches,
+  including lateral movement with no route-height change. Intentional short
+  cliff endpoint legs retain the existing cliff-discount cost. The second penalizes
+  dropping below the peak tolerance band during the elevated traverse. Both
+  are nonnegative, finite-clamped policy controls; zero disables each cost.
+  The shelf fallback connects upper-band gates through the high component and
+  its immediately adjacent land cells, retaining short saddle crossings.
+  An elevated two-ended crossing can remain a terrain opportunity without
+  advertising verified steep-cliff gates when the stricter cliff test fails.
+See [lanes](roles/tech-lanes.md) for script policy, widget publication and controls.
+
 ### Compiler configuration
 
 CircuitAI configures AngelScript with these important behaviors:
@@ -154,6 +213,13 @@ declarations.
 | `Main` | `void AiMessage(const string& in data, int fromTeamId)` | Receive `AiSendMessage` traffic from an allied CircuitAI instance. |
 | `Main` | `void AiUnitFinished(CCircuitUnit@ unit)` | Observe completed friendly units. |
 | `Main` | `void AiUnitDestroyed(CCircuitUnit@ unit)` | Observe destroyed friendly units. |
+| `Main` | `void AiSuperWeaponFired(CCircuitUnit@ unit, const AIFloat3& in aim)` | Optional notification from a confirmed engine weapon-fired event for a unit assigned a native super-weapon task. Aim can be invalid; do not retain the unit handle. |
+
+`CCircuitDef.IsBuildAllowed()` reads the persistent `behaviour/<unit>/build`
+construction permission (default true). A false value overrides `maxThisUnit`
+in `IsAvailable(frame)` and rejects native construction task enqueueing;
+raising a cap cannot undo it. The active profiles veto `armguard`, `corpun`,
+and `legcluster`. This does not delete existing or captured structures.
 
 Minimal profile entry points:
 
@@ -497,6 +563,13 @@ namespace Economy {
 Keep save and load fields in exactly the same order and update both together.
 
 ## Core AI objects
+
+The read-only strategic survey bindings on `ai` include `int GetGeoSpotCount()`
+and `AIFloat3 GetGeoSpot(int)`. They expose the energy manager's existing
+geothermal feature list (filtered for its initial geo definition's terrain
+feasibility), not reservations or a fresh availability check. An invalid index
+returns `(-1,0,-1)`. Geothermal scoring, island topology and beach classification
+live in `src/manager/strategic_sites.as`; LuaUI only renders their output.
 
 ### `CCircuitAI ai`
 
@@ -1440,3 +1513,18 @@ When changing the script API:
 When changing policy rather than the API, begin with
 `data/script/README.md`. For historical BAR/Recoil compatibility issues and
 known migration risks, also read `data/script/CHANGE_RECOMMENDATIONS.md`.
+
+### Connected mountain lanes (D-145)
+
+`aiBattle.SetSpecialistSpan(float minimum, float fraction)` controls the minimum
+projected distance on a connected elevated component, as an absolute distance
+and a fraction of lane endpoint separation. Both requirements apply. Native
+sanitization clamps minimum to 0..16384 and fraction to 0..1. Defaults are 1024
+elmos and 0.45. `high_ground_rise` supplies the elevation threshold above the
+higher endpoint. A lane must exclude ordinary bots as well.
+
+`aiBattle.IsLaneSpecialist(int lane) const` returns true only for a published
+all-terrain lane that passed this qualification. Invalid indices return false.
+The worker computes the flag from its snapshot; scripts only read published
+results on the main thread. Generic `IsPassable` / connector reachability is
+unchanged. An isolated hill remains reachable without becoming a battle lane.

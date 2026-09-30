@@ -170,7 +170,12 @@ void CScheduler::ProcessJobs(int frame)
 
 void CScheduler::RunParallelJob(const std::shared_ptr<IThreadJob>& task)
 {
-	gWorkTasks.PushBack({self, task});
+    gWorkTasks.PushBefore({self, task}, [](WorkTask& queued) { return queued.background; });
+}
+
+void CScheduler::RunBackgroundJob(const std::shared_ptr<IThreadJob>& task)
+{
+    gWorkTasks.PushBack({self, task, true});
 }
 
 void CScheduler::RunPriorityJob(const std::shared_ptr<IThreadJob>& task)

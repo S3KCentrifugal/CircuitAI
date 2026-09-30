@@ -1,0 +1,12 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {"key":"west range and resume","pattern":"Arquebus.*PASS team=0","by_minute":6,"scope":"any"},
+    {"key":"east range and resume","pattern":"Arquebus.*PASS team=1","by_minute":6,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"runtime","pattern":": ERR\\s+:|SCRIPT CRASH|Error in.*arquebus_watch|arquebus_watch.lua.*(error|attempt)","scope":"any"},
+    {"key":"range failure","pattern":"Arquebus.*FAIL","scope":"any"}
+  ]
+}

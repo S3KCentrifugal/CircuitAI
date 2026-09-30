@@ -1,5 +1,21 @@
 # Playtest: launch, watch, screenshot, stop
 
+Artillery regression (D-142): stage a Supreme Isthmus test under
+`build-theatres/artillery/<name>` using the pinned DLL, then run
+`prepare_artillery_check.py --dir <dir> --mode profiles` (16 AIs / `--roles all`,
+2 minutes) or `--mode fire` (2 AIs / `--roles TECH`, 5 minutes; stage
+`--extra-widget tools/playtest/widgets/artillery_fire_watch.lua`). Then use
+`playtest.py launch` and `watch --checks artillery_profiles|artillery_fire`.
+Do not use `run` after preparation, as it stages again. The preparer installs
+test-only script probes and writes `profile-order.json`. Profile mode cycles
+all seven profiles; repeat with Legion disabled to cover conditional fragments.
+Expect one veto PASS per AI (three definitions with Legion, two without).
+Fire mode uses legacy hard to isolate shot events from TECH economy invariants,
+gifts three cannons on dry ground and energy, and forces native ground targeting
+at two minutes. Expect one `[Artillery]` line per cannon and 96 map strokes
+total through subsequent salvos. This proves shot/drawing behavior, not
+autonomous targeting or natural builds.
+
 `tools/playtest/playtest.py` runs a BAR skirmish with the freshly built BARb,
 follows its log against a checks file, takes screenshots of the AI under
 test, and stops the engine. It is the loop "change, build, play, read the
@@ -7,6 +23,8 @@ log, repeat" as a command. Skill: [`.claude/skills/playtest/SKILL.md`](../../.cl
 
 ```
 python tools/playtest/playtest.py run  --roles TECH,FRONT --speed 3            # stage + launch + watch + stop
+python tools/playtest/playtest.py run  --speed 20 --speed-plan "0:20,1.2:1,2.4:20" --shots "1.9,2.15"   # fast, 1x where it matters (D-127)
+python tools/playtest/playtest.py run  --speed 20 --shots "14,22" --slow-near-shots   # 1x from 0.3 min before each shot
 python tools/playtest/playtest.py run  --checks tech_opening                    # the full 8v8, 14 game minutes
 python tools/playtest/playtest.py stage                                         # only copy the build and write the script
 python tools/playtest/playtest.py launch                                        # only start the engine
@@ -14,6 +32,11 @@ python tools/playtest/playtest.py watch --checks tech_opening --no-stop         
 python tools/playtest/playtest.py stop                                          # kill the playtest engine
 python tools/playtest/stop_game.py                                              # the same, standalone
 ```
+
+Screenshot times schedule a camera move. Capture follows after at least three
+rendered frames and one wall-clock second so terrain can settle (D-131). At 8x,
+allow roughly eight additional game seconds before a screenshot deadline or
+the run's end; closely spaced shots should use a slower speed plan.
 
 ## What it never does
 
@@ -64,14 +87,27 @@ started from the lobby.
      `after_key` (must come after another expect), `scope` `tech` (team 0's
      AI lines) or `any`;
    - `forbid`: `pattern`, `scope`, optional `after_minute`;
-   - `pass_on`: an optional early PASS; `stop_minute`: game minutes to play.
+   - `pass_on`: sets PASS early (the game still plays to `--minutes`);
+     `stop_minute`: game minutes to play.
    The first failure stops the game (`--keep-going` to collect all); script
-   errors (`: ERR :`) always fail. Wall-clock limit `--wall-minutes`.
+   errors (`: ERR  :`, two spaces: match `: ERR\s+:`) always fail. Wall-clock
+   limit `--wall-minutes`. A crash is never named as the reason: grep the run's
+   infolog for `Access violation`. The skill `.claude/skills/playtest` has the
+   full list of traps.
 6. **report**: `<dir>/report.md` and `<dir>/runs/<timestamp>/` with the
    report, the infolog and the screenshots: verdict, each check with the
    line that met or missed it, the team-0 timeline (`[Rule]`, `[Eco]`,
    `[TECH][Build]`, `[TECH][Factory]`, `[Playtest]`), and the native lines
    (`EXP:`, `RESERVE:`, `BUILDER:`). Exit code 0 = PASS, 1 = FAIL.
+
+## Map/settings scorecards
+
+`scorecard_run.py` stages a read-only telemetry observer, captures the exact map,
+settings, factions, starts, DLL/data hashes and timestamps, runs an isolated TECH
+duel, and archives a scorecard. `scorecard.py rebuild` updates the chronological
+index and private OpenSkill ledger; `compare <a.json> <b.json>` rejects mismatched
+cohorts, including Legion on/off. Timed-out matches are censored, not draws.
+See the [design and commands](../../doc/benchmarks/scorecard-design.md).
 
 ## Zero bonus is the baseline
 
@@ -84,8 +120,8 @@ D-072). Benchmarks are always recorded at zero bonus.
 
 ```
 SPEED=8 NOTE="what changed" bash tools/playtest/bench_loop.sh t2 fusion      # one headless tech-vs-tech run per objective
-DLL=path/to/SkirmishAI.dll bash tools/playtest/bench_loop.sh afus            # a specific DLL
-python tools/playtest/benchmark.py record C:ardevarb-playtestuns\<stamp> --steps
+DLL=path/to/SkirmishAI.dll DIR=C:/bardev/barb-playtest-sim2 bash tools/playtest/bench_loop.sh afus   # a specific DLL and dir
+python tools/playtest/benchmark.py record C:\bardev\barb-playtest\runs\<stamp> --steps
 python tools/playtest/benchmark.py show
 ```
 
@@ -133,9 +169,10 @@ patterns (they are the sequence's vocabulary, `doc/roles/tech_rules.md`).
 ## Headless
 
 `--headless` runs `spring-headless.exe`: no window, no rendering, several
-times faster to load. LuaUI still runs, so the camera widget's speed, quit
-and `[Playtest]` lines work, but `screenshot` produces nothing. Use it for
-log-only checks and for the 8v8.
+times faster to load. LuaUI still runs, so the camera widget's speed, quit,
+speed plans, extra widgets and `[Playtest]` lines work, but a `screenshot`
+writes a blank 187-byte PNG (the `[Playtest] screenshot` line still appears).
+Use it for log-only checks and for the 8v8.
 
 ## Limits
 
@@ -180,11 +217,25 @@ that needs it open opens it later with `WG.barblink.SetOpen(true)`, as
 
 Stage these with `--extra-widget`; each writes tagged lines to the infolog.
 
+For the lane-renderer memory regression, install `lupa==2.8` into
+`build-theatres/widget-test-deps` and run
+`python tools/playtest/test_lane_ui_memory.py`. This uses Lua 5.1, disables
+automatic GC while measuring each frame (as Recoil does), and checks actual
+widget geometry and player selection. It does not substitute for engine rendering.
+Stage `widgets/lane_ui_memory_watch.lua` with `../widgets/gui_barb_team_link.lua`
+and use `checks/lane_ui_memory.json` for the engine check. Launch the graphical
+`spring.exe --hidden --write-dir <isolated-dir> <isolated-dir>/script.txt`:
+the observer calls the real widget DrawScreen from DrawGenesis's GL context,
+pauses the simulation, clicks player rows for 90 seconds and logs memory.
+Headless has no draw callbacks and correctly fails this check. Use a fresh
+infolog before starting the watcher; all staging stays outside the live install.
+
 | Widget | Lines | What it measures |
 | --- | --- | --- |
 | `widgets/build_area.lua` | `[BuildArea]` | The whole map's buildable ground at frame 30: a turret, a lab or an advanced fusion per 64-elmo cell, water by depth, tidal and wind. `build_area.py <infolog> --spot x,z --out map.png` draws it and measures it around a spot (D-120). |
 | `widgets/team_stats.lua` | `[TeamStats]` | Every 2 minutes, per team: metal income, damage dealt and taken, kills, combat army value, units produced; the minute team 0 first reaches each income milestone. |
 | `widgets/unit_census.lua` | `[Census]` | Live counts of watched unit types (T2 constructors, assist and assault bots, labs, turrets, spam units) and busy T1 labs (D-119). |
+| `widgets/smiley_watch.lua` | `[Smiley]` | Turns on full map vision at minute 20, so a silo has a target, then screenshots each burst of AI map lines after minute 15 (a nuke's smiley, D-124). Run with `--shots ""`. |
 | `widgets/gantry_watch.lua` | `[Gantry]` | The first TECH gantry: screenshots, build power, T3 production times. |
 | `widgets/intro_test.lua` | `[IntroTest]` | The start-of-game drawing as a spectator receives it. |
 
@@ -193,3 +244,23 @@ Stage these with `--extra-widget`; each writes tagged lines to the infolog.
 `--shots` takes `minute[@height[@x:z]]`: with `x:z` the camera centres on that
 map position instead of the start (D-103), for structures placed away from it,
 e.g. `--shots 25@1500@900:9660`.
+
+## Connected mountain regression (D-145)
+
+`prepare_mountain_regression.py --map supreme|glacial|ascendancy --dir
+<repo>/build-theatres/<run> --dll <pinned DLL> [--side legion|cortex|armada]`
+stages a 35-minute TECH duel with normal damage and an economy-only fixture.
+It supplies no factories, constructors or combat units. `--survey-only` stages
+a six-minute all-role survey (use Supreme). Legion is explicitly enabled;
+extra and player Scavenger units are disabled. Ascendancy records a staged-only
+TECH fallback override because its production role map is unregistered.
+
+Launch with `playtest.py launch`, then watch with `--keep-going --minutes 35
+--checks mountain_supreme` on Supreme or `--checks flank_effectiveness` on the
+mountain maps. Use `--minutes 6 --checks mountain_survey` for the all-role survey.
+Afterward run `verify_mountain_regression.py <directory> --run <archived run>`.
+It requires every team to refresh its survey, explicit Supreme flank rejection
+at sufficient income, or sustained recruitment and actual mountain movement
+with observed combat on the positive maps. It writes `mountain-results.json`
+and a dated map/settings scorecard. Functional success never overrides the
+global invariant/error verdict; a diagnosed unrelated failure still exits 1.

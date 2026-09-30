@@ -1,0 +1,15 @@
+{
+  "_doc": "Gifted-cannon firing test, not evidence of natural construction. Staged main script also probes the T1 veto after raising unit caps.",
+  "stop_minute": 5,
+  "expect": [
+    {"key":"veto","pattern":"ArtilleryProbe.*PASS veto 3","by_minute":2,"scope":"any"},
+    {"key":"Ragnarok","pattern":"Artillery.*armvulc .* fired: lol","by_minute":5,"scope":"any"},
+    {"key":"Calamity","pattern":"Artillery.*corbuzz .* fired: lol","by_minute":5,"scope":"any"},
+    {"key":"Starfall","pattern":"Artillery.*legstarfall .* fired: lol","by_minute":5,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"script error","pattern":": ERR\\s+:","scope":"any"},
+    {"key":"probe failed","pattern":"ArtilleryProbe.*FAIL","scope":"any"}
+  ]
+}

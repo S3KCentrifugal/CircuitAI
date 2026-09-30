@@ -1,5 +1,8 @@
 # tech_build.as - TECH's experimental build system
 
+D-136: normal advanced-lab existence checks use `TechFlank::NormalLabCount`.
+The dedicated specialist lab does not prevent replacing an ordinary lab.
+
 Script: [`data/script/src/roles/tech_build.as`](../../data/script/src/roles/tech_build.as),
 namespace `TechBuild`. Decision:
 [D-066](../decisions.md#d-066--the-experimental-build-system-a-hard-split-tech-only-one-switch).
@@ -117,4 +120,4 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: e69d5bcbf5709a70a6f0361ec1ca9c9b608ed6e6; lines: 992 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 16bb56da6d285d0de6f29a2abb99b2b45cf2c67e; lines: 992 -->

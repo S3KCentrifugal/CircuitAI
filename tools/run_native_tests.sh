@@ -16,10 +16,12 @@ if [ -z "$IMAGE" ]; then
 	echo "run_native_tests: the recoil-build-amd64-windows image is not present (run a docker build once)" >&2
 	exit 2
 fi
-tests=(layout_ranking_test base_layout_geometry_test)
+tests=(layout_ranking_test base_layout_geometry_test lane_solver_test)
 cmd=""
 for t in "${tests[@]}"; do
-	cmd="$cmd x86_64-w64-mingw32-g++ -std=c++20 -O1 -Wall -Wextra -static -I/src/src /src/tests/$t.cpp -o /out/$t.exe || exit 1;"
+    extra=""
+    if [ "$t" = lane_solver_test ]; then extra="/src/src/circuit/terrain/LaneSolver.cpp"; fi
+	cmd="$cmd x86_64-w64-mingw32-g++ -std=c++20 -O1 -Wall -Wextra -static -pthread -I/src/src -I/src/src/circuit /src/tests/$t.cpp $extra -o /out/$t.exe || exit 1;"
 done
 MSYS2_ARG_CONV_EXCL='*' docker run --rm -v "$REPO:/src:ro" -v "$(cd "$OUT" && { pwd -W 2>/dev/null || pwd; }):/out" --entrypoint sh "$IMAGE" -c "$cmd" || { echo "run_native_tests: compile failed" >&2; exit 1; }
 rc=0

@@ -444,6 +444,8 @@ void CFactoryManager::ReadConfig()
 			cdef->SetOnSlow(slowOnOff.asBool());
 		}
 		cdef->SetOn(behaviour.get("on", true).asBool());
+		cdef->SetBuildAllowed(behaviour.get("build", true).asBool());
+		cdef->SetStandoff(std::clamp(behaviour.get("standoff", 0.f).asFloat(), 0.f, 0.95f));
 
 		const Json::Value& reload = behaviour["reload"];
 		if (!reload.isNull()) {

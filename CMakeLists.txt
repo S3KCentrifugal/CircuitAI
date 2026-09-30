@@ -3,7 +3,7 @@
 
 set(CMAKE_CXX_STANDARD 20)
 
-option(CIRCUIT_BUILD_TESTS "Build CircuitAI standalone unit tests" OFF)
+option(CIRCUIT_BUILD_TESTS "Build CircuitAI standalone geometry and lane concurrency tests" OFF)
 if(CIRCUIT_BUILD_TESTS)
 	add_subdirectory(tests)
 endif()

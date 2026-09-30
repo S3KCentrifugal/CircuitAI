@@ -1,0 +1,9 @@
+{
+  "_doc": "Hidden graphical engine, real DrawScreen through DrawGenesis, paused all-player lane and row-click stress. Headless is not a rendering test.",
+  "stop_minute": 4,
+  "expect": [{"key":"render stress", "pattern":"\\[LaneUIMemory\\] PASS all-player row-click stress", "by_minute":4, "scope":"any"}],
+  "forbid": [
+    {"key":"UI memory", "pattern":"LUA_ERRMEM|Emergency garbage collection|\\[LaneUIMemory\\] FAIL|Error in.*(DrawScreen|DrawGenesis)|\\[BARb link\\] message error", "scope":"any"},
+    {"key":"invariant", "pattern":"\\[INVARIANT\\]", "scope":"any"}
+  ]
+}

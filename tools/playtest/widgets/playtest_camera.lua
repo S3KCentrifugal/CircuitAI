@@ -6,7 +6,7 @@
 --   * forcestart in the pregame and the game speed at frame 1,
 --   * finds the AI under test from the BARb roster message (role + team) or
 --     the team's start position, points the overhead camera at it and takes a
---     screenshot at each configured minute (screenshots/screenNNNNN.png),
+--     screenshot at each configured minute (screenshots/screen_<UTC time>.png),
 --   * quits the engine at end_minute.
 local CFG = __CFG__
 
@@ -127,6 +127,10 @@ local function dumpEco(n)
 		team, n / (60 * FPS), mi or 0, m or 0, ms or 0, ei or 0, e or 0, es or 0, Spring.GetTeamUnitCount(team) or 0))
 end
 
+function widget:DrawScreen()
+	if pending then pending.draws = pending.draws + 1 end
+end
+
 function widget:GameFrame(n)
 	-- owner: the BARb AI window stays closed in tests, so screenshots are clear
 	-- (the installed copy may be an older one that opens itself on a fresh config;
@@ -142,7 +146,23 @@ function widget:GameFrame(n)
 		Spring.SendCommands({ "setmaxspeed " .. CFG.speed, "setminspeed " .. CFG.speed })
 		echo("speed " .. CFG.speed)
 	end
-	if pending and n >= pending.frame then
+	-- the speed plan: fast between the moments a test watches, 1 at them
+	for _, sp in ipairs(CFG.speed_plan or {}) do
+		if not sp.done and n >= math.max(2, math.floor(sp.minute * 1800)) then
+			sp.done = true
+			-- the engine keeps max >= min: lowering sets min first, raising max first
+			local cur = Spring.GetGameSpeed()   -- the user speed factor
+			if sp.speed < (cur or 1) then
+				Spring.SendCommands({ "setminspeed " .. sp.speed, "setmaxspeed " .. sp.speed })
+			else
+				Spring.SendCommands({ "setmaxspeed " .. sp.speed, "setminspeed " .. sp.speed })
+			end
+			echo(string.format("speed %s at %.2f min", sp.speed, n / 1800))
+		end
+	end
+	-- Simulation frames are not render frames: at 8x, six frames can elapse
+	-- before terrain tessellation/textures catch up with a large camera jump.
+	if pending and pending.draws >= 3 and Spring.DiffTimers(Spring.GetTimer(), pending.started) >= 1 then
 		Spring.SendCommands("screenshot png")
 		echo(string.format("screenshot at %.1f min of team %d at (%d, %d)", pending.minute, target.team or -1, target.x or -1, target.z or -1))
 		pending = nil
@@ -152,10 +172,10 @@ function widget:GameFrame(n)
 			s.done = true
 			if s.x and s.z then
 				lookAt(s.x, s.z, s.height)   -- a map position given with the shot
-				pending = { frame = n + 6, minute = s.minute }
+				pending = { started = Spring.GetTimer(), draws = 0, minute = s.minute }
 			elseif resolveTarget() then
 				lookAt(target.x, target.z, s.height)
-				pending = { frame = n + 6, minute = s.minute }
+				pending = { started = Spring.GetTimer(), draws = 0, minute = s.minute }
 			else
 				echo(string.format("no target for the %.1f min screenshot", s.minute))
 			end

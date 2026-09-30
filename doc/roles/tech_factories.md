@@ -1,5 +1,10 @@
 # tech_factories.as - TECH's land factories move toward the front
 
+D-136: `BaseLandFactory` excludes `TechFlank::Owns` factories. Their dedicated
+flank production must survive base rezoning. `LandFactoryCount`, `AdvancedLabUp`
+and `AdvancedLabAny` exclude the dedicated lab/frame from ordinary factory
+accounting, so it cannot prevent replacement of the normal advanced lab.
+
 Script: [`data/script/src/roles/tech_factories.as`](../../data/script/src/roles/tech_factories.as),
 namespace `TechFactories`. Decision: D-114 in [`decisions.md`](../decisions.md).
 Role document: [`tech.md`](tech.md). The one-page picture:
@@ -86,4 +91,4 @@ turrets, D-119). See [`../invariants.md`](../invariants.md).
 | `FrontClusterStallSeconds` | 300 | a factory order with no frame this long gives its cluster up (ground released) |
 | `FrontClusterOpenSeconds` | 600 | INV-046 |
 
-<!-- source: data/script/src/roles/tech_factories.as; blob: 75658af1c095c5e747b1308f61ade69bec1c563a; lines: 851 -->
+<!-- source: data/script/src/roles/tech_factories.as; blob: b4159b8face160ed8a5a17f721f59c7219d91f92; lines: 851 -->

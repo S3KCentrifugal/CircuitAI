@@ -243,9 +243,28 @@ def stage(args):
             fx, _, fz = parts[2].partition(":")
             focus = ", x = %s, z = %s" % (float(fx), float(fz))
         shots.append("{ minute = %s, height = %s%s }" % (float(minute), float(height) if height else args.cam_height, focus))
+    # owner: fast-forward, and slow down near what the test watches. --speed-plan
+    # "minute:speed,...": each speed from its minute on; --slow-near-shots: speed 1
+    # from SLOW_LEAD minutes before each screenshot to just after it, --speed between
+    plan = []
+    for tok in (getattr(args, "speed_plan", None) or "").split(","):
+        tok = tok.strip()
+        if tok:
+            m, _, s = tok.partition(":")
+            plan.append((float(m), float(s)))
+    if getattr(args, "slow_near_shots", False):
+        lead = 0.3
+        for tok in (args.shots or "").split(","):
+            tok = tok.strip()
+            if tok:
+                m = float(tok.split("@")[0])
+                plan.append((max(0.0, m - lead), 1.0))
+                plan.append((m + 0.05, float(args.speed)))
+    plan.sort()
+    planLua = ", ".join("{ minute = %s, speed = %s }" % (m, s) for m, s in plan)
     cfg = ("{ role = %r, team = %d, speed = %s, end_minute = %s, forcestart = true, "
-           "log_prefix = '[Playtest]', shots = { %s } }") % (
-        args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots))
+           "log_prefix = '[Playtest]', shots = { %s }, speed_plan = { %s } }") % (
+        args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots), planLua)
     tpl = (HERE / "widgets" / "playtest_camera.lua").read_text(encoding="utf-8")
     (wdir / "playtest_camera.lua").write_text(tpl.replace("__CFG__", cfg), encoding="utf-8")
     # extra widgets under test (e.g. tools/widgets/gui_barb_team_link.lua), staged into
@@ -430,8 +449,8 @@ def running_pids(d):
     except Exception:
         return []
     # the exact write dir: "--write-dir <dir>" followed by a space, a quote or the
-    # end (a plain substring test matched C:ardevarb-playtest inside
-    # C:ardevarb-playtest-sim1, so one run's stop killed parallel runs)
+    # end (a plain substring test matched C:\bardev\barb-playtest inside
+    # C:\bardev\barb-playtest-sim1, so one run's stop killed parallel runs)
     pat = re.compile(r'--write-dir\s+"?' + re.escape(needle) + r'\\?"?(\s|$)')
     pids = []
     for line in out.splitlines():
@@ -681,6 +700,8 @@ def add_stage_args(p):
     p.add_argument("--data", help="AI data dir with config/ script/ AIOptions.lua AIInfo.lua (default: the repo's data/)")
     p.add_argument("--set", action="append", help='override a Global::RoleSettings::Tech setting in the staged script, e.g. --set RushObjective=\'"afus"\'')
     p.add_argument("--speed", default="1", help="game speed the widget sets at frame 1 (setminspeed/setmaxspeed)")
+    p.add_argument("--speed-plan", help="speed changes during the game, 'minute:speed,...' (e.g. '0:20,14:1,16:20')")
+    p.add_argument("--slow-near-shots", action="store_true", help="speed 1 from 0.3 min before each screenshot until just after it, --speed between")
     p.add_argument("--minutes", default=None, help="game minutes to play (default: the checks file's stop_minute)")
     p.add_argument("--shots", default="1,3,6,10", help="screenshot minutes, each optionally @height and @x:z (a map position to centre on), e.g. 2@1500,6,10@3000,27@1400@900:9700")
     p.add_argument("--cam-height", default="2200", help="overhead camera height for screenshots")
@@ -702,7 +723,7 @@ def add_script_args(p):
     p.add_argument("--engine", help="engine folder name under the install's engine/ (default: the one the lobby used last)")
     p.add_argument("--bonus", default=None, help="handicap percent for team 0 only (e.g. 50); benchmarks run at 0")
     p.add_argument("--extra-widget", action="append", help="an extra LuaUI widget to stage into the playtest write dir (repeatable)")
-    p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window, no widget, no screenshots; log only")
+    p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window; widgets, speed and [Playtest] lines still work; screenshots are blank 187-byte PNGs")
 
 
 def add_watch_args(p):

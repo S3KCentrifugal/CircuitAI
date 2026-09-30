@@ -37,6 +37,7 @@
 },
 
 "behaviour": {
+	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 //	"<UnitDef>": {
 		// "role": [<main>, <enemy>, <enemy>, ...]
 		// <main> is the role to make desicions of when to build it and what task to assign
@@ -147,6 +148,7 @@
 		"role": ["static"]
 	},
 	"armguard": {
+		"build": false, // never construct T1 static artillery
 		"role": ["static"],
 		"attribute": ["artillery"],
 		"threat": 0.3
@@ -204,6 +206,7 @@
 		"role": ["static"]
 	},
 	"corpun": {
+		"build": false, // never construct T1 static artillery
 		"role": ["static"],
 		"attribute": ["artillery"],
 		"threat": 0.3

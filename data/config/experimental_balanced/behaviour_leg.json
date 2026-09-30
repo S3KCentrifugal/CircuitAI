@@ -285,6 +285,7 @@
 				"power": 1.0
 			},
 			"legcluster": {
+				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
 				"limit": 3,
@@ -298,17 +299,17 @@
 			},
 			"legrl": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legrhapsis": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"leglupara": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 	// T2 Defenses -- Legion
@@ -373,12 +374,12 @@
 			},
 			"legflak": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"leglraa": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legperdition":{
@@ -419,7 +420,7 @@
 			},
 			"legfrl": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legtl": {
@@ -742,7 +743,7 @@
 			},
 			"legaabot": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 	
@@ -790,6 +791,7 @@
 				"power": 1.0
 			},
 			"legsrail": {
+				"standoff": 0.90, // retain railgun range, including on specialist routes
 				"role": ["anti_heavy"],
 				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -822,7 +824,7 @@
 			},
 			"legadvaabot": {
 				"role": ["anti_air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legamph": {
@@ -988,7 +990,7 @@
 			"legfig": {
 				"role": ["anti_air", "air"],
 				"attribute": ["rare"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legkam": {
@@ -1001,7 +1003,8 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"leglts": {
+			"leglts": {
+
 				// Ferry transport: "transport", never "support". A support
 				// main role routes it into CSupportTask, which walks it to
 				// the nearest squad - which is exactly what was seen.
@@ -1009,7 +1012,8 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
-			"legatrans": {
+			"legatrans": {
+
 				// Ferry transport: "transport", never "support". A support
 				// main role routes it into CSupportTask, which walks it to
 				// the nearest squad - which is exactly what was seen.
@@ -1027,12 +1031,12 @@
 			},
 			"legafigdef": {
 				"role": ["anti_air", "air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legvenator": {
 				"role": ["anti_air", "air"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legphoenix": {
@@ -1078,7 +1082,7 @@
 			"legnavyaaship": {
 				"role": ["anti_air", "raider"],
 				"attribute": ["rare"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legnavyscout": {
@@ -1131,7 +1135,7 @@
 			"legah": {
 				"role": ["anti_air"],
 				"attribute":["support", "rare"],
-				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"legcar": {

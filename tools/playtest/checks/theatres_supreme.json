@@ -1,0 +1,106 @@
+{
+  "_doc": "Integrated BARb panel: staged team-link only. Watcher exercises selected/all/off and AI-side strategic sites.",
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "water topology",
+      "pattern": "\\[Theatres\\] survey: 2 ponds, 2 seas; 2 shipyard candidates",
+      "by_minute": 0.5,
+      "scope": "tech"
+    },
+    {
+      "key": "overlay sent",
+      "pattern": "\\[Theatres\\] overlay published: 5 lanes; no placement changes",
+      "by_minute": 1.8,
+      "scope": "tech"
+    },
+    {
+      "key": "overlay received",
+      "pattern": "\\[TheatresUI\\] received 5 lanes for team 0",
+      "by_minute": 1.8,
+      "scope": "any"
+    },
+    {
+      "key": "screenshot",
+      "pattern": "\\[Playtest\\] screenshot",
+      "by_minute": 2,
+      "scope": "any"
+    },
+    {
+      "key": "selected player",
+      "pattern": "\\[TheatresCheck\\] PASS selected player",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "pond opportunities",
+      "pattern": "\\[TheatresCheck\\] PASS pond opportunities",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "strategic sites",
+      "pattern": "\\[TheatresCheck\\] PASS strategic sites",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "switch player",
+      "pattern": "\\[TheatresCheck\\] PASS switch player",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "all players",
+      "pattern": "\\[TheatresCheck\\] PASS all players",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "hide all",
+      "pattern": "\\[TheatresCheck\\] PASS hide all",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "visibility persists",
+      "pattern": "\\[TheatresCheck\\] PASS visibility persists",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "non-TECH survey",
+      "pattern": "\\[TheatresCheck\\] PASS non-TECH survey",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "hidden refresh stays hidden",
+      "pattern": "\\[TheatresCheck\\] PASS hidden refresh stays hidden",
+      "scope": "any",
+      "by_minute": 4
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script error",
+      "pattern": ": ERR\\s+:",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "pond navy",
+      "pattern": "\\[Theatres\\] body .* POND .*yard=true",
+      "scope": "any"
+    },
+    {
+      "key": "overlay error",
+      "pattern": "\\[TheatresUI\\] message error|Error in.*BARb theatres|\\[TheatresCheck\\] FAIL",
+      "scope": "any"
+    }
+  ]
+}

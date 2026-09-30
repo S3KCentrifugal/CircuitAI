@@ -9,6 +9,10 @@ The one-page picture: [`tech-layout-and-sequence.md`](tech-layout-and-sequence.m
 
 ## Intent
 
+`Buildable` respects `CCircuitDef.IsBuildAllowed()` before raising a unit cap.
+The D-142 construction veto therefore cannot be bypassed by forward-defense
+selection; Gauntlet, Agitator and Amputator are never enqueued.
+
 Once the air constructors carry the base (they build and assist the eco
 clusters), the land constructors go out. The owner's rules:
 
@@ -67,4 +71,4 @@ constructor drops its forward job within 60 s); D-111's INV-043 lives in
 `Global::Spam::RepeatStallSeconds` (45): a factory on repeat that produced no spam
 unit for this long gets its build again (D-111).
 
-<!-- source: data/script/src/roles/tech_forward.as; blob: 31d47339ee479f2c4a1710dc5c9b4abced912e94; lines: 410 -->
+<!-- source: data/script/src/roles/tech_forward.as; blob: 69890e324cfe28b22030879959b8b1da54ea51e2; lines: 410 -->

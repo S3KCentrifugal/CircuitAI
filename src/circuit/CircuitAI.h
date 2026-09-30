@@ -58,6 +58,7 @@ class CThreatMap;
 class CInfluenceMap;
 class CPathFinder;
 class CTerrainManager;
+class CBattleAnalysis;
 class CBuilderManager;
 class CFactoryManager;
 class CEconomyManager;
@@ -330,6 +331,7 @@ public:
 	CInfluenceMap*    GetInflMap()         const;
 	CPathFinder*      GetPathfinder()      const { return pathfinder.get(); }
 	CTerrainManager*  GetTerrainManager()  const { return terrainManager.get(); }
+	CBattleAnalysis*  GetBattle()          const { return battle.get(); }  // D-126
 	CBuilderManager*  GetBuilderManager()  const { return builderManager.get(); }
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -385,6 +387,7 @@ private:
 	std::shared_ptr<CMapManager> mapManager;
 	std::shared_ptr<CPathFinder> pathfinder;
 	std::shared_ptr<CTerrainManager> terrainManager;
+	std::shared_ptr<CBattleAnalysis> battle;  // D-126: TECH's weapon clusters
 	std::shared_ptr<CBuilderManager> builderManager;
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

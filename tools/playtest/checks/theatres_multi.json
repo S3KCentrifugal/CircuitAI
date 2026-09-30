@@ -1,0 +1,9 @@
+{
+  "_doc": "Supreme Isthmus TECH,AIR on both sides; integrated panel and multiplayer watcher.",
+  "stop_minute": 0.8,
+  "expect": [{"key":"four surveys","pattern":"\\[TheatresMulti\\] PASS four player surveys","by_minute":0.8,"scope":"any"}],
+  "forbid": [
+    {"key":"script error","pattern":": ERR\\s+:|\\[TheatresMulti\\] FAIL|Error in.*BARb|\\[BARb link\\] message error","scope":"any"},
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"}
+  ]
+}

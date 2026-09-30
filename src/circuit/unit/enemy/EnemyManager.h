@@ -50,6 +50,7 @@ public:
 	void ApplyAuthority(CCircuitAI* authority);
 
 	CEnemyUnit* GetEnemyUnit(ICoreUnit::Id unitId) const;
+	const EnemyUnits& GetEnemyUnits() const { return enemyUnits; }  // D-126
 
 	const std::set<CEnemyUnit*>& GetDyingEnemies() const { return enemyDying; }
 

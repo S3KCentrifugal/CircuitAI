@@ -37,7 +37,9 @@ namespace Military {
 			return aiMilitaryMgr.DefaultMakeTask(u);
 		}
 
-		IUnitTask@ t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
+		IUnitTask@ t = TechFlank::MilitaryTask(u);
+		if (t !is null) return t;
+		@t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
@@ -62,6 +64,7 @@ namespace Military {
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
 		Spam::OnTaskRemoved(task);
+		TechFlank::TaskRemoved(task);
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiTaskRemovedHandler !is null) {
 			cfg.MilitaryAiTaskRemovedHandler(task, done);
@@ -82,6 +85,7 @@ namespace Military {
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
 		Team::Ferry::OnUnitRemoved(unit);
+		TechFlank::UnitRemoved(unit);
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;

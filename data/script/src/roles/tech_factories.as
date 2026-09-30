@@ -44,7 +44,7 @@ namespace TechFactories {
     bool IsLandFactory(const string &in name) { return LandFactoryNames().find(name) >= 0; }
     bool IsLandFactory(const CCircuitDef@ d) { return d !is null && IsLandFactory(d.GetName()); }
     // every land factory of ours on the map, frames included
-    int LandFactoryCount() { return UnitDefHelpers::SumUnitDefCounts(LandFactoryNames()); }
+    int LandFactoryCount() { return AiMax(0, UnitDefHelpers::SumUnitDefCounts(LandFactoryNames()) - TechFlank::Count()); }
     int TierOf(const string &in name)
     {
         if (UnitHelpers::IsLandGantry(name)) return 3;
@@ -104,7 +104,7 @@ namespace TechFactories {
         for (uint i = 0; keys !is null && i < keys.length(); ++i) {
             CCircuitUnit@ f = null;
             if (!Factory::allFactories.get(keys[i], @f) || f is null || f.circuitDef is null) continue;
-            if (ai.GetTeamUnit(f.id) is null || t2.find(f.circuitDef.GetName()) < 0) continue;
+            if (ai.GetTeamUnit(f.id) is null || t2.find(f.circuitDef.GetName()) < 0 || TechFlank::Owns(f)) continue;
             if (f.GetBuildProgress() >= 1.0f && !Lifecycle::IsRetiring(f)) return true;
         }
         return false;
@@ -123,11 +123,11 @@ namespace TechFactories {
         for (uint i = 0; keys !is null && i < keys.length(); ++i) {
             CCircuitUnit@ f = null;
             if (!Factory::allFactories.get(keys[i], @f) || f is null || f.circuitDef is null) continue;
-            if (ai.GetTeamUnit(f.id) is null || t2.find(f.circuitDef.GetName()) < 0) continue;
+            if (ai.GetTeamUnit(f.id) is null || t2.find(f.circuitDef.GetName()) < 0 || TechFlank::Owns(f)) continue;
             if (!Lifecycle::IsRetiring(f)) return true;
         }
         CCircuitDef@ d = AdvancedLabDef();
-        return d !is null && aiBuilderMgr.GetUnfinishedCount(d) > 0;
+        return d !is null && aiBuilderMgr.GetUnfinishedCount(d) > TechFlank::Count(true);
     }
     bool NeedAdvancedLab()
     {
@@ -811,7 +811,7 @@ namespace TechFactories {
         for (uint i = 0; keys !is null && i < keys.length(); ++i) {
             CCircuitUnit@ f = null;
             if (!Factory::allFactories.get(keys[i], @f) || f is null || f.circuitDef is null) continue;
-            if (ai.GetTeamUnit(f.id) is null || !IsLandFactory(f.circuitDef) || IsClusterLab(f)) continue;
+            if (ai.GetTeamUnit(f.id) is null || !IsLandFactory(f.circuitDef) || IsClusterLab(f) || TechFlank::Owns(f)) continue;
             const float sq = MapHelpers::SqDist(f.GetPos(ai.frame), base);
             if (sq <= r2 && sq < bestSq) { bestSq = sq; @best = f; }
         }

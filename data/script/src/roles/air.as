@@ -1195,7 +1195,7 @@ namespace RoleAir {
             "corscreamer", "corgate", "cortron", "cortoast", "corbuzz", "cortoast", "cortoast"}},
         {"legion", array<string> = {
             "leglht", "legrl", "legflak", "leghive", "leglupara", "legflak", "legjuno", "leglraa",
-            "legabm", "legbastion", "legflak", "leglraa", "legdeflector", "legcluster", "leglrpc", "legflak",
+            "legabm", "legbastion", "legflak", "leglraa", "legdeflector", "legacluster", "leglrpc", "legflak",
             "legperdition", "leglraa", "legnanotc", "legnanotc", "leglrpc", "legdeflector", "leglrpc",
             "leglraa", "legdeflector", "legperdition", "legbastion", "legstarfall", "legbastion", "legbastion"}}
     };

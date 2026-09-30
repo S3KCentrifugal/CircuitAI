@@ -10,6 +10,9 @@ step.
 
 | Id | Invariant | Checked | Decision |
 | --- | --- | --- | --- |
+| INV-071 | Every published all-terrain lane crosses one substantial connected mountain; movement capability alone is insufficient. | `Lanes::Finish` checks native `IsLaneSpecialist`; the shared solver filters all candidate families before publication. | D-145 |
+| INV-070 | A completed lane job advances a published generation; failed or stale work never masquerades as a new survey. | `Lanes::Poll` / `Finish`; native `lane::JobGate` rejects cancelled and duplicate completion. | D-144 |
+| INV-067 | A dedicated flank combat unit retains its specialist route task. | `TechFlank::Tick`, live IDs and route ownership. | D-136 |
 | INV-001 | A retiring factory produces nothing. | `Invariants::OnUnitAdded` from the role's unit-added hooks: a mobile unit appearing within `InvariantFactoryRadius` of a factory retired less than `LifecycleMemorySeconds` ago. | [D-076](decisions.md#d-076--one-lifecycle-state-per-structure-invariants-checked-in-every-game-the-actor-matrix) |
 | INV-002 | A frame of ours under construction has build power on it within `InvariantFrameSeconds`. | `Invariants::Tick`: the nearest unfinished structure to the base with no build power within `InvariantFrameRadius` for that long. | D-076 (from KI-413) |
 | INV-003 | The chain never skips a step whose frame is under construction. | `Invariants::ChainStepSkipped` at the chain's stall-guard skip. | D-076 (from KI-413) |
@@ -60,8 +63,21 @@ step.
 | INV-051 | An island TECH's advanced shipyard stands or is framed `HarbourYardSeconds` (480) after the harbour begins. | `Invariants::Tick`, once: the advanced shipyard's count and frames. | [D-121](decisions.md#d-121--an-island-tech-builds-its-land-phase-on-cramped-ground-then-moves-its-economy-and-production-to-the-water) |
 | INV-052 | A ferry run unloads within `FerryUnloadSeconds` (15). | `Team::Ferry::Update`: how long the run's task stays in UNLOADING. | [D-122](decisions.md#d-122--a-ferried-constructor-is-given-as-soon-as-the-transport-has-set-it-down) |
 | INV-053 | No T2 air constructor waits or idles at three samples in a row, 30 s apart. | `Invariants::Tick`: every air constructor in `TechBuild::airConsSeen`, its task. | [D-123](decisions.md#d-123--an-air-constructor-with-nothing-to-build-builds-defences) |
+| INV-054 | No torpedo or depth-charge launcher of ours stands where submarines cannot come (the torpedo rule: 15 deep, a hostile submarine body, no sandbar, half its range over that body). | `TechWeapons::Checks`, every 30 s: each torpedo slot standing, `aiBattle.TorpedoSiteOK`. | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
+| INV-057 | While a super cannon is framed (after 20 s), every air constructor is on it. | `TechWeapons::Checks`: each air constructor's task (`OnSuper`). | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
+| INV-058 | A super cannon's escort (anti-nuke, deflectors, flak, long-range AA, advanced storage, construction turrets) is framed or standing `SuperEscortSeconds` (300) after the frame. | `TechWeapons::Checks`: the super cluster's slots. | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
+| INV-059 | No super cannon is framed under +500 metal income. | `TechWeapons::SuperTick`, at the frame. | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
+| INV-060 | A weapon cluster with 3 weapons standing keeps 4 construction turrets, 10 minutes after it was found. | `TechWeapons::Checks`. | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
+| INV-061 | No weapon-cluster order under +200 metal income. | `TechWeapons::Order`, at each order. | [D-126](decisions.md#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json) |
 | INV-046 | An open T2 or T3 front cluster has its factory within `FrontClusterOpenSeconds` of being planned. | `Invariants::Tick`: the cluster's `plannedFrame` against `TechFactories::LabAt`. | [D-114](decisions.md#d-114--land-factories-move-toward-the-front-in-front-factory-clusters-turrets-first) |
 | INV-004 | Metal does not float while a structure is under construction and static build power is under the income target. | `Invariants::Tick`: the bank at `InvariantFloatPercent` of storage for `InvariantFloatSeconds` with a frame standing and static build power under `PowerBuildPowerPerMetal` x metal income. | D-076 (from D-075) |
+| INV-062 | A published lane's class is present in its capability mask and can traverse its sampled path and choke anchor. | `Lanes::Compute`, after every survey. | D-131 |
+| INV-063 | A requested tactical survey has enemy destinations, including when AI options are nested in the start script. | `Lanes::Compute`, before route calculation. | D-131 |
+| INV-064 | BAR's flak definition contributes nonzero anti-air threat for tactical routing. | `Lanes::LoadSettings`, once per AI when the definition exists. | D-131 |
+| INV-065 | A cliff-descent teaching anchor is accessible to the configured approach class, on an all-terrain lane ordinary bots cannot complete, and reaches configured destination-side progress. | `Lanes::Compute`, after every survey. | D-132, D-133 |
+| INV-066 | A paired cliff route has entry and exit anchors and positive native walker-only descent quality at both ends. | `Lanes::Compute`, after every survey. | D-134 |
+
+| INV-069 | T1 static artillery definitions remain forbidden for construction even when runtime unit caps are raised. | `ArtilleryPolicy::Check`, every profile's slow update; native availability and construction enqueue enforce the JSON veto. | D-142 |
 
 ## Settings (`Global::RoleSettings::Tech`)
 

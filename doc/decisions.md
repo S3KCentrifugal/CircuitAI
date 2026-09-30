@@ -6784,7 +6784,7 @@ poll.
 
 ## D-123 — An air constructor with nothing to build builds defences
 
-**Date:** 2026-09-27. **Status:** STATUS123
+**Date:** 2026-09-27. **Status:** Built (build110), played. The fallback fires, but INV-053 still reports air constructors left in the engine's idle state after a finished task (142 spells in a Supreme Isthmus game): an open item, the idle re-ask.
 
 **Owner's report and rule.** Scaling worked well, but once 225 advanced energy
 converters were built every air constructor stopped moving. Was the layout
@@ -6835,7 +6835,7 @@ in a row, 30 s apart
 
 ## D-124 — A nuke launch draws a smiley face over its target; the credits show in 5% of games
 
-**Date:** 2026-09-27. **Status:** STATUS124
+**Date:** 2026-09-27. **Status:** Built (build111), played. With full map vision from minute 20 (so the silo has a target), a Legion TECH on Supreme Isthmus launched 6 nukes; all 6 were caught by the weapon-fired event and each drew its face (50 lines, screenshots by [`smiley_watch.lua`](../tools/playtest/widgets/smiley_watch.lua)). Without full vision, TECH 1v1 silos often fire nothing: "SUPER legsilo: no target | groups=1 inRange=0", no enemy seen.
 
 **Owner's report (build110).** No smiley was seen. The owner's game ran
 `SMRTBARb\stable\` (build106, `32f6f0ca`, and its older scripts). Build110
@@ -6870,6 +6870,1185 @@ contributors, shows only 5% of the time.
 [`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
 [`CircuitAI.h`](../src/circuit/CircuitAI.h),
 [`commands.as`](../data/script/src/manager/commands.as).
+
+## D-125 — TECH weapon clusters: designed, for the owner's review
+
+**Date:** 2026-09-27. **Status:** built as [D-126](#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json).
+
+**Owner's request.** A new cluster type, weapon clusters, like the economy and
+factory clusters, for TECH only.
+- A more advanced selection, from battlefield tactics: where flak and
+  long-range AA help, where long-range artillery and LRPCs go, counting the
+  range altitude adds.
+- A super-cannon cluster (Calamity, Starfall) that follows the enemy's
+  composition and behaviour, 20% to 40% behind the front, safe, preferring
+  altitude.
+- Front clusters keep friendly movement open, and obstruct, endanger and funnel
+  the enemy's: spam turrets and high-DPS long-range weapons, and walls round
+  whatever fires over them.
+- At least 4 construction turrets per cluster.
+- No strategically important defensive capability depends on one structure,
+  position, weapon class, radar or line.
+
+**Found (research).**
+- Height: an LRPC gains 2.5 to 4 elmos of range per elmo of height (BAR sets
+  `heightboostfactor` 6 to 8 on them), an ordinary cannon 0.4 to 0.8, a super
+  cannon little; beam turrets lose range on hills. Formulas and tables:
+  rjm.bar.docs `60-tactics/66-defensive-placement.md`.
+- LRPCs, super cannons, flak, long-range AA, silos and anti-nukes fire through
+  friendly units; smart artillery lobs over blocks. All can be walled in
+  fully. Direct-fire turrets cannot.
+- The native AI has threat and influence maps, enemy groups with role costs,
+  a path finder and bwem chokepoints, none of them bound to the script; its
+  own wall and choke code is commented out.
+
+**Decision.** The design in
+[`tech-weapon-clusters.md`](roles/tech-weapon-clusters.md):
+- a native battlefield-analysis layer: avenues of approach from path
+  density, chokes, friendly lanes, effective range with height, line of
+  fire, composition and decaying heatmaps;
+- five cluster kinds: kill zone, air defence, artillery, long-range, super
+  cannon;
+- a need score per kind from composition and behaviour;
+- site scoring per kind; walls and funnels; seven redundancy rules as
+  invariants;
+- coasts and beaches (owner's follow-up): a depth grid, water bodies,
+  beach segments and landing routes; beach classes (cliff, wading shelf,
+  ship water, deep water, hover beach); a hard torpedo rule (15 deep, in a
+  hostile submarine body, no sandbar in the line of fire; the engine
+  allows 12, a submarine needs 15); layers from the sea to the beach's
+  emergence band;
+- the super-cannon cluster (owner's rules): 20% to 40% of its range back
+  from an active combat zone; every air constructor on it the moment it is
+  framed; metal income +500 to start, ideally +1000; its escort of two
+  advanced energy storages, dense forward flak, long-range AA, two plasma
+  deflectors and anti-nuke, with a full wall ring. Found: the engine fires a
+  salvo only with its whole cost in storage, and a Starfall salvo is
+  360,000 energy, so a Starfall needs about 7 storages, not 2. Owner:
+  meet its energy requirement, whatever it is; the percentage is of the
+  cannon's range. Storage is sized from the weapon's shot cost;
+- seven phases, each its own decision.
+
+**Invariant.** None yet: nothing is built. The design proposes seven
+(section 6), each shipped with its phase.
+
+Awaiting the owner's answers on the 20% to 40% reading, the weapon budget, and
+where to start.
+
+## D-126 — TECH weapon clusters: built, found at strategic defence points, gated by income, configured in JSON
+
+**Date:** 2026-09-28. **Status:** Built (build112 to build114; md5 of build114 `d25051e1`), played in five TECH vs TECH games on Supreme Isthmus, fast-forwarded (up to 60 minutes). Clusters are found from about minute 20 (+200 metal). In the last run: 155 and 206 weapon orders, and the flat-ground range check matched every gun's listed range within 2 elmos. None of INV-054 or INV-057 to INV-061 fired once the super cluster kept its point. Open: no super cannon was framed in the runs after that fix (+500 metal and 25,000 E/s spare came late or not at all), so INV-057 and INV-058 still wait for a played frame; kill zones fill slowly (11 of 47 slots at 40 minutes) and some slots at the base find no site.
+
+**Owner's request.** Make the economic settings configurable in JSON and in the
+TECH role. Weapon cluster types are income gated, prioritised by strategic
+defence points, and discovered and re-prioritised as the game progresses.
+Build all the weapon types and the criteria for their locations, terrain
+analysis included. No weapon cluster before +200 metal. The system runs under
+the experimental settings, for TECH only, and may later serve other roles.
+
+**Decision.** Built as designed in D-125
+([`tech-weapon-clusters.md`](roles/tech-weapon-clusters.md)); what is built is
+in [`tech_weapons.md`](roles/tech_weapons.md).
+- **Native analysis** (`aiBattle`,
+  [`BattleAnalysis.cpp`](../src/circuit/terrain/BattleAnalysis.cpp)). Queries
+  only:
+  - effective range with height (the engine's formulas, the unit's
+    longest-range weapon);
+  - approach routes and chokes on the engine's own passability;
+  - decaying combat and air heat, and enemy composition by movement class;
+  - water bodies, hostile water, beach classes, and the torpedo rule.
+- **Script** ([`tech_weapons.as`](../data/script/src/roles/tech_weapons.as)):
+  - six kinds (kill zone, air defence, artillery, long range, super cannon,
+    coast), found again and re-ranked every 60 s by need x site score;
+  - slots shaped per kind: first weapon, 4 construction turrets, the rest,
+    walls last;
+  - a budget of 25% of income (40% under attack);
+  - the owner's super-cannon rules.
+- **Settings.** In `Global::RoleSettings::Tech`, overridden by
+  [`data/config/weapons.json`](../data/config/weapons.json) (a new config part
+  in every profile). The script reads the JSON through
+  `aiSetupMgr.ConfigFloat/Int/Bool`, and the config's `weapons` and `lanes`
+  sections are kept past the engine's config close.
+- **Gate.** `WeaponClustersEnabled` and `ExperimentalBuild`, from +200 metal;
+  rows `weapons.super` and `weapons.cluster` in TECH's table only.
+
+**Found in play (Supreme Isthmus, TECH vs TECH, build112 to build114).**
+- `out` is reserved in AngelScript, and the script has no `max`/`min`; a Windows
+  macro named `near` broke two C++ names.
+- The JSON was freed before the script read it (a crash in `LoadSettings`).
+- A raid on the base made the base the combat zone, and the LRPC site went
+  behind it to the map edge. Fighting within `WeaponBaseRadius` is now base
+  defence.
+- The Starfall's recorded weapon is a short auxiliary mount: its reach read 1
+  to 4. The analysis uses the longest-range weapon.
+- A framed Ragnarok's cluster went stale when the combat zone moved, and its
+  air builders left (INV-057, 238 times). A cluster with anything framed or
+  standing now keeps its point.
+
+**Invariants.** INV-054, INV-057, INV-058, INV-059, INV-060, INV-061.
+
+**Files.** [`BattleAnalysis.cpp`](../src/circuit/terrain/BattleAnalysis.cpp),
+[`BattleAnalysis.h`](../src/circuit/terrain/BattleAnalysis.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`SetupManager.cpp`](../src/circuit/setup/SetupManager.cpp),
+[`ThreatMap.cpp`](../src/circuit/map/ThreatMap.cpp),
+[`tech_weapons.as`](../data/script/src/roles/tech_weapons.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`global.as`](../data/script/src/global.as),
+[`weapons.json`](../data/config/weapons.json), the profiles' `init.as`.
+
+## D-127 — Lanes between both teams' starts, per movement class, drawn after the intro, recalculated as the front moves
+
+**Date:** 2026-09-28. **Status:** Built (build113, build114), played. Five lanes a side on Supreme Isthmus (2 land, 2 naval, 1 air), drawn after the intro, shown 30 s, erased; recalculated on the front moving. Open: the front flips between the combat heat and the fallback front as heat comes and goes, so lanes recalculate every minute (throttled by `LaneRecalcMinSeconds`); TECH's attack code does not follow lanes yet.
+
+**Owner's request.**
+- Lanes are calculated first, at game start, from both teams' start positions.
+- They are drawn with symbols that tell naval, air (edging round AA),
+  all-terrain (often edge lanes) and land lanes apart, for 30 s after the
+  first intro drawing.
+- They are cached and recalculated as the front shifts, and TECH plans attacks
+  on them.
+- They run under the experimental settings, for TECH, maybe other roles later.
+- Research the meta for how lanes are identified.
+- Separately: speed games up with the set-speed command, slowing down near what
+  a test watches.
+
+**Decision.** [`tech-lanes.md`](roles/tech-lanes.md).
+- **Classes.** Land, bot, amphibious, hover, all-terrain, naval, air, least
+  capable first. Passability is the engine's slope map against each BAR
+  movedef class's `maxslope` and depth
+  ([`BattleLanes.cpp`](../src/circuit/terrain/BattleLanes.cpp)).
+- **Paths.** Diverse paths by penalty, merged within a domain, so an
+  all-terrain lane is one only spiders take.
+- **Ends.**
+  - The start script's playing teams: an AI or a non-spectator player on the
+    team; the spectating host's team at (64, 64) was a false start, and is what
+    an earlier nuke hit.
+  - Else the enemy's start boxes, else every spot not ours.
+  - Naval ends: every sea near a start.
+- **Drawing.**
+  - A symbol per class (tank, walker, chevron over a wave, hovercraft, spider,
+    anchor, plane) and each lane's name in BAR's typeface. The glyph table
+    gained the letters and digits.
+  - Skirmish AI 0 marks the intro's end for every AI (one library).
+  - Each TECH draws 2 s after the one before, at the intro's pace: two AIs
+    drawing at once lost half their strokes to the server's rate.
+  - Shown 30 s, then erased.
+- **Recalculation.** When the front moves 1000, or every 180 s, weighing enemy
+  threat (air lanes: enemy AA).
+- **Attack plan.** `Lanes::BestLane` and `Waypoints`, logged each
+  calculation. TECH's attack code adopting them is the next step.
+- **Settings.** [`lanes.json`](../data/config/lanes.json) and
+  `Global::RoleSettings::Tech` "LANES".
+- **Playtests.**
+  - `--speed-plan "minute:speed,..."` and `--slow-near-shots`
+    (`playtest_camera.lua`).
+  - The engine keeps max speed at or above min, so a slow-down sets min first.
+
+**Invariant.** None: lanes order nothing and change no game state.
+
+**Files.** [`BattleLanes.cpp`](../src/circuit/terrain/BattleLanes.cpp),
+[`BattleAnalysis.h`](../src/circuit/terrain/BattleAnalysis.h),
+[`SetupManager.cpp`](../src/circuit/setup/SetupManager.cpp),
+[`SetupData.h`](../src/circuit/setup/SetupData.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`lanes.as`](../data/script/src/manager/lanes.as),
+[`commands.as`](../data/script/src/manager/commands.as),
+[`glyphs.as`](../data/script/src/manager/glyphs.as),
+[`make_glyphs.py`](../tools/draw/make_glyphs.py),
+[`lanes.json`](../data/config/lanes.json),
+[`playtest.py`](../tools/playtest/playtest.py),
+[`playtest_camera.lua`](../tools/playtest/widgets/playtest_camera.lua).
+
+## D-128 — Water theatres and a read-only lane overlay
+
+**Date:** 2026-09-28. **Status:** Played; final Supreme Isthmus overlay check passed. Separate-widget and automatic-display decisions superseded by D-129 below.
+
+**Request.** Identify Supreme Isthmus's two isolated ponds and two seas
+programmatically, improve lane symbols, and mark useful shipyard, tidal and
+seaplane opportunities without changing placement.
+
+**Decision.** Reuse `CBattleAnalysis::WaterBody` (conservative 64-elmo,
+8-deep connected cells, sourced from the terrain manager), then classify size
+and shore affiliation in AngelScript. Affiliation uses proximity to both sides'
+actual starts, with a neutral margin; it is an estimate, not military control.
+Only a large body reaching both sides can receive a shipyard candidate. Friendly
+isolated ponds can receive tidal/seaplane candidates. All markers pass the
+existing terrain manager's single-site `BuildableFraction` query. The
+shipyard additionally needs a same-body exit corridor. Settings stay in JSON.
+
+**Visuals.** A companion LuaUI widget consumes a versioned, acknowledged local
+message stream. It draws coloured, outlined lanes and screen-size symbols,
+including naval lines above water. One AI perspective avoids duplicate labels.
+It chains the prior UI message callback, preserves the 30-second initial view,
+and provides `/barbtheatres` for the cached survey. Without the widget, the
+existing map strokes remain. No live-install files are written.
+
+**Alternatives rejected.** Map-specific pond coordinates; classifying navy by
+water area alone; rewriting native placement or movement-area heuristics; and
+forcing colour/above-water graphics through the engine's monochrome map-draw
+messages. None is necessary for this advisory visualisation. Native flood fill,
+lane paths, factory selection, reservations and task queues remain unchanged.
+
+**Invariant.** The theatre survey is read-only: no Enqueue, Reserve, Release,
+unit-cap or placement-setting calls. The map-specific integration check forbids
+a pond shipyard and script/invariant errors. No gameplay invariant is added
+because this visualisation changes no gameplay state.
+
+**Verification.** API parity: 210 used members, zero findings against pinned
+build114 (`c6057cbd60efaf8d`). Initial live survey found two ponds and two seas
+for both TECH sides, two feasible shipyard candidates each, and tidal/seaplane
+opportunities only in each side's own pond (map tidal 21 E/s). Final isolated
+run `C:/bardev/barb-playtest-theatres-codex/runs/20260928-134645/report.md`
+passed at 4.1 game minutes: five lanes, two ponds/two seas, no pond shipyards,
+friendly pond opportunities, team-link callback coexistence, automatic expiry,
+cached toggle and refresh without reopening. No script or invariant errors.
+Overview and pond-detail screenshots were visually inspected. Invariant practice
+check passes; doc links retain eight existing missing-hover-document references
+(KI-404). An earlier run raised a frameless Legion lab order (INV-015), recorded
+as KI-420; it did not recur in the final run and no gameplay fix was attempted.
+Resolution, start-distance affiliation and bounded candidate search limits are
+detailed in the role document.
+
+**Files.** [water_theatres.as](../data/script/src/manager/water_theatres.as),
+[lanes.as](../data/script/src/manager/lanes.as),
+[lanes.json](../data/config/lanes.json),
+[gui_barb_team_link.lua](../tools/widgets/gui_barb_team_link.lua),
+[theatres_supreme.json](../tools/playtest/checks/theatres_supreme.json),
+[theatres_watch.lua](../tools/playtest/widgets/theatres_watch.lua),
+[tech-lanes.md](roles/tech-lanes.md),
+[script README](../data/script/README.md), [AGENTS.md](../AGENTS.md),
+[known issues](known-issues.md).
+
+## D-129 — Strategic surveys in the BARb control panel
+
+**Date:** 2026-09-28. **Status:** Built and Played; integrated-panel and four-player origin checks passed.
+
+**Request and decision.** Replace D-128's separate widget with one integrated
+renderer inside the existing BARb control widget. The panel offers selected
+player, all permitted local AIs, and immediate hide. A single-player view follows
+row selection. Default visibility is off, manual visibility persists, and
+recalculation cannot reopen a hidden view. Remove the old automatic lane strokes
+and the standalone theatre widget. The existing versioned channel is dispatched
+by the control widget, including returning acknowledgements through its LuaUI hook.
+
+**Invariant.** The renderer never computes strategic locations or changes construction; hidden surveys remain hidden when refreshed. The panel and multiplayer fixtures enforce this UI contract alongside the existing gameplay invariant checks.
+
+**AI ownership.** Reuse the native energy manager's filtered geothermal feature
+list through two read-only bindings. AngelScript scores enemy-facing terrain
+visibility using the actual Cerberus range, and proximity to land lanes; a
+conservative threshold distinguishes battery opportunities from power preferences.
+The line-of-fire test is straight terrain screening, not ballistic proof. This
+is a site assessment even when the inspecting faction cannot build Cerberus.
+Terrain flood fill identifies isolated land components, and joined shoreline
+edges screened for grade produce continuous defend/assault beach fronts. All
+coordinates, classifications and scores originate in CircuitAI/AngelScript.
+Lua only projects and draws, with compact geo/island diamonds, hover detail,
+stretched beach ribbons and player colours/offsets in all-player view.
+
+**Alternatives rejected.** Widget-side feature scanning or strategic heuristics;
+map-specific geo/island coordinates; treating an enemy-side geo as equally useful
+after capture; automatically changing build placement. Start-based affiliation,
+conservative visibility and isolated dry-land topology are explicitly advisory:
+they do not establish ownership, ballistic clearance, resource yield, buildable
+landing footprints or time-to-capture. No placement, reservations, construction
+orders or role policy is changed by the survey. The command also works on demand
+for non-TECH experimental roles. Lane origins use the requesting AI player's
+start; territory classification continues to use all allied starts, so selecting
+a player does not misclassify an ally's rear water as hostile.
+
+**Verification.** Native target BARb builds; stripped DLL `31153b61d5698386`
+has matching debug symbols. API check: 214 members, zero findings. Invariant
+practice check: zero findings. First four-minute panel run `20260928-155228`
+passed player selection, switch, all, off, persistence and topology checks.
+Six geos, 23 islands and eight beach fronts were calculated. The central geo
+at (5430,7188) scores 90% forward visibility from player 0 versus 42% at
+(6900,5070); player 1 reverses the advantage (28% versus 90%). Final panel run
+`C:/bardev/barb-playtest-theatres-panel/runs/20260928-160012/report.md` passed
+4.1 game minutes, including an AIR role request and refresh while hidden. Its
+single/all-player screenshots were inspected. After changing lane origins to
+the individual player, the four-AI TECH/AIR test
+`C:/bardev/barb-playtest-theatres-multi/runs/20260928-164931/report.md` passed:
+all four surveys arrived and every air lane started within one 128-elmo sample
+of its own player's start. Neither final run raised script or invariant errors.
+Doc links retain the eight pre-existing missing-hover-document links (KI-404).
+No live-install writes. The paired DLL/debug build is under ignored
+`build-theatres/`; deploy the new DLL, data and control widget together.
+
+**Files.** [native bindings](../src/circuit/script/InitScript.cpp),
+[strategic sites](../data/script/src/manager/strategic_sites.as),
+[lanes](../data/script/src/manager/lanes.as),
+[commands](../data/script/src/manager/commands.as),
+[settings](../data/config/lanes.json),
+[control widget](../tools/widgets/gui_barb_team_link.lua),
+[watcher](../tools/playtest/widgets/theatres_watch.lua),
+[checks](../tools/playtest/checks/theatres_supreme.json),
+[multiplayer watcher](../tools/playtest/widgets/theatres_multi_watch.lua),
+[multiplayer checks](../tools/playtest/checks/theatres_multi.json),
+[lane documentation](roles/tech-lanes.md),
+[script README](../data/script/README.md),
+[API reference](angelscript-references.md), [repository map](../AGENTS.md),
+[build-output ignore](../.gitignore).
+The D-128 standalone `tools/widgets/gui_barb_theatres.lua` was removed.
+
+## D-130 — Report missing lane replies and ship matching AI data
+
+**Date:** 2026-09-28. **Status:** Mouse controls Played; owner installation pending.
+
+**Finding.** The user's installed control widget matches the repository, but
+the installed SMRTBARb command handler has no `theatres` branch and the DLL is
+missing 59 current bindings. D-129's playtests used a matched build; their
+action-level tests did not exercise mouse press/release. Do not misdiagnose
+this as a button callback defect or copy only new scripts over an old DLL.
+
+**Decision.** Track lane requests with a five-second wall-clock deadline and
+show an actionable panel/event message if no survey arrives. Also explain
+when a selected AI is not hosted locally. Expose read-only button rectangles
+for the regression watcher, which now calls the actual widget MousePress and
+MouseRelease methods for player/all/off. Prepare a matched, checksummed update
+under ignored `build-theatres/release`, including an owner-run installer that
+refuses running games, backs up the existing AI and preserves its identity.
+No live game files are changed. KI-421 tracks pending owner deployment.
+
+**Invariant.** A lane request must produce a survey or visible failure feedback;
+mouse-button tests must traverse press/release rather than call SetTheatres.
+This is UI state, not a gameplay invariant; the integration fixture retains its
+existing `[INVARIANT]` forbid and `[TheatresCheck] FAIL` checks.
+
+**Verification.** Current API parity: 214 members, zero findings against
+`31153b61d5698386`. Run `20260928-180042` in
+`C:/bardev/barb-playtest-theatres-click/runs/` passed actual MousePress/MouseRelease
+checks for player/all/off, with survey received at frame 1140. It also passed
+switch, AIR survey, visibility persistence and hidden refresh checks. The overall
+run FAILED because the existing INV-015 frameless order issue (KI-420) recurred;
+no script or overlay failures. The first watcher attempt called an unavailable
+widget-handler wrapper method; it was corrected to delegate mouse events through
+WG to the real widget methods. Timeout feedback is code-reviewed, not exercised
+against the live mismatched AI. Installer parses without errors; package checksums
+cover 228 files. The installer has not been run against the owner's game.
+
+**Files.** [control widget](../tools/widgets/gui_barb_team_link.lua),
+[click watcher](../tools/playtest/widgets/theatres_watch.lua),
+[known issues](known-issues.md). Generated owner artifacts:
+`build-theatres/release/Install-Theatres.ps1`, `build-theatres/release/SHA256.json`
+and `build-theatres/barb-theatres-update.zip`.
+
+**Correction after owner feedback.** A scratch build/archive was insufficient:
+the completed build must always be published to
+`C:/bardev/bar-RecoilEngine/build-amd64-windows/install/AI/Skirmish/BARb/stable`.
+The matched stripped DLL, debug symbols and current active data have now been
+staged there; API parity checks 214 members with zero findings. The live game
+installation remains separate. This requirement is explicit in
+[AGENTS.md](../AGENTS.md) and the [playtest skill](../.claude/skills/playtest/SKILL.md).
+
+## D-131 — AI-owned tactical surveys with a controllable teaching overlay
+
+**Call.** Retain route calculation in C++, refresh/tuning/lesson anchors in
+AngelScript, and rendering/preferences in Lua. Expose route capability masks and
+survey revisions alongside existing geometry. Preserve cliff alternatives by
+capability-aware merging and search connected high ground with configurable rise,
+detour and route limits. Avoid diagonal corner cutting and measure clearance for
+the route's own movement class. Teach scouting and terrain opportunities without
+presenting candidates as orders or unobserved territory as safe.
+
+**Why.** A shortest-path-only survey missed Ascendancy's large mountain even
+though it produced a nominal all-terrain lane. Map-specific coordinates and Lua
+pathfinding were rejected: the same generic survey must remain available to AI
+attack planning. Absolute-summit routing was revised after screenshot review to
+prefer a cheaper crossing in the upper part of each high-ground region. No attack
+task is rewired by this decision. See the [UX review](reviews/2026-09-28-tactical-guide-ux.md)
+for three review rounds, failed evidence and validation boundaries.
+
+**Invariant.** INV-062 requires the representative class to be present in the
+capability mask and traverse the sampled route after every survey. The widget
+does not calculate routes or issue game commands; freezing retains the visible
+snapshot until an explicit refresh, and incoming data must not reopen a hidden view.
+INV-063 requires enemy destinations for a tactical survey. Profile testing found
+that the start parser discarded an entire AI block containing nested OPTIONS;
+it now reads direct fields while skipping child sections, retaining Team before
+or after OPTIONS. Inferring opponents from arbitrary map spots was rejected when
+the actual participating teams are present in the script.
+The last screenshot review also rejected twice-nearest-wall distance as a
+corridor width: shortest paths hug coasts. Width now measures both sides of a
+perpendicular cross-section and puts the choke anchor in its traversable centre,
+also checked by INV-062.
+Observed-AA testing then found `armflak.GetAirThreat()` was zero before route
+calculation. **Rejected after testing:** a temporary engine armor-index lookup
+returned the same indices as the existing initializer (vtol 14, subs 13), and
+flak threat remained zero. That speculative API/script change was removed.
+INV-064 checks nonzero BAR flak AA threat. The native probe confirmed correct
+weapon classification and 250 air-armor damage. The actual cause was explicit
+zero `air` and `default` threat multipliers in all three experimental profiles.
+Restore those two multipliers to 1 for their 47 AA-role definitions (141 entries
+across the six base/Legion files). Both are required: enemy damage has a default
+damage gate before its air component. Native weapon capabilities still determine
+actual AA damage; this does not invent an AA weapon for a multi-role definition.
+Keep surface/water tuning unchanged. This also changes ordinary AI AA avoidance,
+not just the overlay. Globally resetting every combat unit's tuning was rejected
+as an untested balance change; remaining surface/water zeros are KI-424.
+The screenshot harness also waits for three rendered frames and one wall-clock
+second after moving the camera. Six simulation frames were insufficient at 8x:
+the captured terrain could still be flat or incompletely textured. This affects
+test capture timing only; schedule captures early enough to finish before quit.
+
+**Status.** Built with MinGW and exercised in isolated engine playtests. Final
+map/control/dynamic-threat evidence is recorded in the linked UX review. This is
+not independent player usability testing. The default four-player Glacial run
+also found the unrelated forward-cluster failure [KI-423](known-issues.md#ki-423--unbuildable-forward-cluster-retries-the-same-search-without-exhausting-attempts).
+No live game installation was written. Cached terrain and host-local AI survey
+availability remain explicit limitations.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[start parser](../src/circuit/setup/SetupManager.cpp),
+[lane mechanism](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[lane policy](../data/script/src/manager/lanes.as),
+[commands](../data/script/src/manager/commands.as),
+[settings](../data/config/lanes.json),
+[balanced threats](../data/config/experimental_balanced/behaviour.json),
+[balanced Legion threats](../data/config/experimental_balanced/behaviour_leg.json),
+[hard threats](../data/config/experimental_hard/behaviour.json),
+[hard Legion threats](../data/config/experimental_hard/behaviour_leg.json),
+[terrible threats](../data/config/experimental_terrible/behaviour.json),
+[terrible Legion threats](../data/config/experimental_terrible/behaviour_leg.json),
+[regenerated unit report](knowledge/barb-unit-config.md),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[UI watcher](../tools/playtest/widgets/tactical_guide_watch.lua),
+[threat watcher](../tools/playtest/widgets/tactical_threat_watch.lua),
+[screenshot harness](../tools/playtest/widgets/playtest_camera.lua),
+[playtest instructions](../tools/playtest/README.md),
+[UI checks](../tools/playtest/checks/tactical_guide.json),
+[threat checks](../tools/playtest/checks/tactical_threat.json),
+[Ascendancy fixture](../tools/playtest/fixtures/ascendancy.as),
+[lane documentation](roles/tech-lanes.md), [API reference](angelscript-references.md),
+[invariants](invariants.md), [actors](actor-matrix.md), [issues](known-issues.md),
+[UX evidence](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-132 — Reach a mountain passage before committing to a crawler descent
+
+**Refined by D-133:** retain the smooth high traverse to the far-side exit.
+
+**Correction to D-131.** The owner marked Ascendancy's northern passage and
+enemy-facing cliff descent. D-131's centre-ridge candidate was passable but did
+not express that tactic; the previous northern-coordinate check was too weak.
+Keep the earlier decision and screenshots as evidence of the rejected result.
+
+**Call.** For each major high-ground component, prefer a two-stage candidate:
+reach an upper-half staging cell using the configured ordinary tank/bot class,
+then follow an all-terrain path toward its actual enemy destination. Require an
+ordinary-bot-impassable descending section and a lower bot-passable landing
+within the configured drop/run bounds. Require forward progress toward the
+destination, enforce the existing weighted detour limit, reject repeated-cell
+loops, and retain the generic crest fallback when this tactic is unavailable.
+The configured high-ground route count bounds additional descent candidates.
+Ordinary route alternatives remain; this does not declare the northern route
+universally best or send units along it.
+
+**Why.** Merely increasing uphill cost still found a central zigzag on the
+exported Ascendancy terrain. Restricting the approach to ordinary-bot terrain
+found the northern passage, followed by the cliff descent. A map-name waypoint
+override was rejected. The initial terrain check found a roughly 23,652 weighted
+cost route, within the existing 3x detour bound of roughly 25,448.
+
+The first native run exposed an additional ranking error: selecting the
+cheapest candidate before checking its joined approach/descent path meant a
+looping candidate suppressed every valid descent in that component. Check
+approach/suffix intersections before ranking. A generation-marked cell vector
+avoids allocating a map-sized visited array per candidate. Native-grid export
+also showed why Lua slope sampling is only an exploratory approximation;
+the runtime regression uses native published lanes as its authority.
+
+**Policy and display.** JSON controls approach class (`-1` disables), minimum
+drop, maximum descent run and minimum progress. AngelScript reapplies these
+parameters for each calculation, assigns the passage/descent teaching cue at
+the native staging point, and keeps the existing refresh cadence. Lua only
+orients the symbol along the published route near that anchor; using the
+route's overall middle direction was wrong for a turning cliff approach.
+
+**Invariant.** INV-065 requires a descent anchor to be accessible to the chosen
+approach class and belong to a crawler-only lane. Native construction verifies
+the approach tree, downhill cliff and lower landing. The Ascendancy runtime
+fixture now requires lesson 5, the northern passage and an enemy-side northern
+staging anchor, rather than accepting any route that grazes the mountain.
+
+**Verification.** Native build and 218-member DLL/API parity pass. Ascendancy
+run `20260928-235127` passes the stronger northern/descent assertions, controls,
+refresh and invariant checks. Its selected route reaches z=544 and stages at
+(7200, 992), following the northern passage before descending toward the enemy.
+The tactical UX review records screenshots and profile regression evidence.
+This validates survey geometry, not a completed attack by actual crawler units.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json),
+[policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[runtime check](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [lane guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-133 — Smooth high-ground traverse before the far-side descent
+
+**Endpoint selection superseded by D-134 when paired steep cliffs are available.**
+
+**Correction to D-132.** The owner's second annotated Ascendancy image shows
+that reaching the north passage is insufficient: the route drops too early on
+the east and cuts the western approach. D-132's cheap staging-cell objective
+and upper-half staging-height requirement caused that behavior. D-132 remains
+as the history of the intermediate result.
+
+**Call.** First find the highest ordinary-class-reachable elevation in each
+major component within the detour budget. Select a smooth approach within a
+configurable band below that elevation (256 elmos by default). Traverse the
+same high-ground component with all-terrain movement before descending at 0.9
+progress along the source-to-actual-destination vector. The staging point may
+be lower than the peak already reached. The approach and traverse add quadratic
+absolute-grade cost (weight 8); the intentional final cliff drop does not.
+
+**Why and alternatives.** A shortest ordinary-bot approach to a far eastern
+staging point can bypass the mountain entirely. Merely forcing a visited-height
+flag can instead create an out-and-back peak visit. Joining an explicit high
+approach and a traverse, blocking reuse of the approach, avoids both. Forcing
+the absolute maximum reached an isolated bump and caused a small hairpin in the
+terrain prototype. The elevation band balances sustained height and smoothness;
+zero tolerance remains available. This optimizes grade changes along a route,
+not temporal hysteresis between threat-driven recalculations. No map coordinates
+or map names enter production code.
+
+**Budget and controls.** The longer traverse requires a default 4x rather than
+3x detour allowance. Complete joined paths are checked against actual
+travel/uphill/threat cost, separately from the smoothness score. Reject loops
+before ranking. Both smoothness and elevation tolerance are native mechanisms
+exposed through `SetMountainPathParams` and loaded from active JSON by script.
+The existing generic crest fallback remains when no valid tactic is found.
+
+**Invariant.** INV-065 additionally checks the published exit's destination-side
+progress; INV-062 retains whole-path class/passability checks.
+
+**Verification.** Native build and 219-member script/DLL parity pass. Engine
+geometry, screenshots and profile regressions are recorded in the tactical UX
+review. Actual crawler movement/combat and terrain deformation remain outside
+this validation.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json), [policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[regression](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariant](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-134 — Prefer the steep cliff faces at both ends of the passage
+
+**Extended by D-135:** endpoint steepness alone does not prevent long lateral
+cliff-face travel on Glacial Gap. The surface and shelf costs supplement it.
+
+**Correction to D-133.** The owner accepts the northern passage but marks more
+outward, steeper western/eastern cliff faces. Ordinary-bot access on the west
+and cheapest descent on the east still optimize away the walkers' advantage.
+Keep D-133's high-passage mechanism as the centre and fallback, not the default
+endpoint objective when a paired cliff crossing is available.
+
+**Call.** Search from the high passage toward both bases with positive-cost
+all-terrain paths that discount steep bot-impassable downhill edges. Require
+an upper-half gate, early qualifying cliff drop/landing, directional progress,
+no repeated cells and the complete travel/threat budget. Rank eligible legs by
+height-drop-weighted exclusive grade, allowing a 10% quality band before cost
+breaks the tie. Reverse the home leg for the source-to-enemy lane, so its ascent
+uses the same cliff a reverse-direction attack could descend. Emit both anchors
+and quality values; Lua renders two cues and explains the terrain advantage.
+
+**Why and rejected alternatives.** Merely extending a progress threshold does
+not reward a steep face. Pure shortest cost still selected the gentler inner
+slope. Pure maximum steepness selected remote map-edge bumps for marginal
+quality; the band chooses a shorter similarly steep face. A lower cliff alone
+could win while the route gently left the upper plateau: the gate-height bound
+prevents that. Quality divides by all downhill height, so uphill/downhill
+oscillation does not gain a net-drop normalization bonus. The edge discount is
+bounded and positive; ordinary lane search defaults remain unchanged.
+
+**Policy and limits.** Active JSON/AngelScript controls the discount, quality
+band and upper-height fraction. Zero discount retains D-133. The pair search
+is bounded to 16 candidates at each end; if none forms a valid joined crossing,
+the existing fallback remains. No map coordinates appear in production search.
+The coordinate assertions are confined to the Ascendancy regression fixture.
+
+**Invariant.** INV-066 requires both gates and positive native walker-only
+quality at both ends; INV-062/065 retain capability and exit-progress checks.
+
+**Verification.** Terrain prototypes found outward gates near x=1,300 and
+x=11,100 and a joined travel cost within the existing 4x budget. The tactical UX
+review records the actual engine run, screenshots, API parity and final binary.
+This is route-survey validation, not completed walker movement/combat.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json), [policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[regression](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-135 — Cross mountain shelves instead of walking along cliff faces
+
+**Call.** Preserve steep endpoint opportunities, but charge all-terrain searches
+for mean engine surface slope as well as height change along their direction.
+A constant-height line along a cliff is expensive; a flat upper shelf is cheap.
+Between gates, additionally penalize descent below the configured peak band.
+Expose both weights through JSON, AngelScript and the native binding.
+
+**Why.** The owner's Glacial Gap correction identifies a positional objective:
+cross the top and retain places where all-terrain constructors can establish
+defenses. Longitudinal grade alone cannot distinguish a flat plateau from
+sideways movement across a vertical wall. A first runtime iteration proved that
+surface cost alone is insufficient: it selected a valley approach and climbed
+only at the far end. Endpoint legs must stay within their own configured
+progress band, and the fallback must try a two-ended elevated crossing before
+falling back to an ordinary-bot approach. The shelf fallback uses a weighted
+multi-source search between upper-band gates, rather than forcing two paths
+through one peak waypoint. Short saddles remain traversable: the component and
+adjacent land cells are searched with an elevation cost, not an absolute height
+wall. The approach cost seeds its entry candidates;
+the exit cost completes their ranking. The peak tolerance is not subtracted
+again after selecting a reference point in that band. A shelf crossing is not
+advertised as a verified steep paired descent. Blocked-region diagonals obey
+the same no-corner-cutting rule as movement masks. Physical detour allowance
+uses a separate shortest-cost search without the new preference costs.
+
+**Alternatives and scope.** A blanket map-boundary attraction can choose a
+cliff face over a usable shelf. Instead terrain determines which edge corridor
+is useful; there are no map names or coordinates in production search. Actual
+building placement still requires unit-specific footprint, terrain and obstacle
+checks. This change does not issue constructor orders. The test independently
+probes Legion radar and defense placement within Proteus's construction reach
+of the published Glacial Gap routes. This does not certify a continuous chain
+of buildings or completed unit movement. Intentional short endpoint legs retain
+the steep-cliff cost policy rather than receiving the lateral-traverse penalty.
+
+**Invariant.** Existing INV-062/065/066 retain capability and gate contracts.
+The Glacial Gap fixture measures both central mountain traverses for sustained
+elevation, surface slope and engine-tested construction positions; merely
+touching the northern/southern mountain is insufficient acceptance evidence.
+
+**Verification.** Native compilation and 223-member API parity checked. Final
+runtime geometry, screenshots and the matching binary are recorded in the
+[tactical review](reviews/2026-09-28-tactical-guide-ux.md).
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[binding](../src/circuit/script/InitScript.cpp),
+[policy](../data/script/src/manager/lanes.as),
+[settings](../data/config/lanes.json),
+[runtime fixture](../tools/playtest/widgets/tactical_guide_watch.lua),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[actors](actor-matrix.md).
+
+## D-136 — A separate factory continuously exploits an accessible mountain flank
+
+**Decision.** At +200 metal (ten-second minimum), TECH orders one additional
+advanced bot lab for a connected all-terrain specialist lane. The normal T2 lab
+remains separate for constructors and ordinary combat production. Defaults use
+the effective Recluse, Termite and Arquebus factory build edges. Production is
+continuous after establishment, including income dips; replacement construction
+still requires the gate. Air transport is explicitly deferred.
+
+**Why.** A visible lane is not proof that units from this TECH can reach it.
+The native query proves land connectivity from the start and the reserved lab
+site to the friendly lane end without a distant snap across water. Constructor
+reach and footprint/exit checks independently gate construction. The policy
+prefers sustained high ground, keeps the factory's theatre stable and owns only
+its offspring. Other factories and spam keep their existing decisions. Ordinary
+spam's direct retarget would abandon mountain waypoints; a native task option
+preserves them and fights only at the final destination. Full grid waypoints
+avoid smoothing across cliff cuts. Unit membership uses the creation-event
+producer ID, not proximity to a factory producing the same unit.
+
+**Invariant.** INV-067 checks that assigned specialist units retain their route.
+The isolated Glacial Gap regression observes factory creation by an AI builder,
+income at creation, repeated completed production, and actual high-ground travel
+from both sides. Pending build-task ownership prevents duplicate factory orders.
+Lifecycle retirement remains authoritative; dedicated labs are excluded from
+base reclaim and primary-lab assignment.
+
+**Verification.** Built and played on Glacial Gap from both sides with Armada,
+Cortex and Legion. Natural-economy orders occurred at +203/+202 metal; both
+streams repeatedly produced and reached the mountain. A separate no-damage
+test proved full traversal in both directions and disconnected southern-bank
+queries returned empty. Overall playtest reports still fail broader TECH
+invariants; see the [evidence and limitations](reviews/2026-09-29-tech-flank-production.md).
+No live game installation is modified.
+
+**Accounting and scope.** The dedicated lab is not an economy turret-box
+tenant: its independently reachable site is exempt from INV-029, as front
+clusters already are. It does not count toward ordinary T2 availability or
+base-reclaim factory totals. Otherwise an extra flank lab could suppress normal
+lab replacement and accidentally remove the production the owner asked to keep.
+The general save/load limitations remain; D-136 reconstruction is KI-426.
+
+**Files.** [policy](../data/script/src/roles/tech_flank.as),
+[rules](../data/script/src/roles/tech_rules.as), [TECH](../data/script/src/roles/tech.as),
+[reclaim](../data/script/src/roles/tech_factories.as),
+[factory hooks](../data/script/src/manager/factory.as),
+[military hooks](../data/script/src/manager/military.as),
+[normal lab accounting](../data/script/src/roles/tech_build.as),
+[economy state](../data/script/src/manager/eco_planner.as),
+[runtime invariants](../data/script/src/manager/invariants.as),
+[settings](../data/config/lanes.json),
+[lane interface](../src/circuit/terrain/BattleAnalysis.h),
+[lane query](../src/circuit/terrain/BattleLanes.cpp),
+[route interface](../src/circuit/task/fighter/RouteTask.h),
+[route commands](../src/circuit/task/fighter/RouteTask.cpp),
+[unit](../src/circuit/unit/CircuitUnit.h), [creation](../src/circuit/CircuitAI.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[runtime watcher](../tools/playtest/widgets/flank_watch.lua),
+[checks](../tools/playtest/checks/tech_flank.json),
+[traversal checks](../tools/playtest/checks/tech_flank_traversal.json),
+[economy fixture](../tools/playtest/widgets/flank_economy_fixture.lua),
+[policy guide](roles/tech_flank.md), [TECH guide](roles/tech.md),
+[rules guide](roles/tech_rules.md), [factory guide](roles/tech_factories.md), [build guide](roles/tech_build.md),
+[API](angelscript-references.md), [invariants](invariants.md), [actors](actor-matrix.md).
+
+## D-137 — Judge Ascendancy flanks by observed combat outcomes
+
+**Decision.** Test the unchanged D-136 production policy on Ascendancy with
+explicit TECH roles in isolated data. Identify dedicated combat offspring by
+engine producer IDs and their queued mountain route, then count actual kills,
+losses, nominal metal values and arrival near the enemy start. Keep normal
+damage, ordinary armies and AI visibility. Supply only economy in accelerated
+runs, and retain a separate natural-economy observation.
+
+**Why.** Following a line is insufficient evidence of a useful attack. Kills
+are credited by the engine's attacker ID, not proximity or team-wide totals.
+Metal is nominal UnitDef cost, not reclaimed value or assisted damage credit.
+BAR drops attacker arguments in widget UnitDamaged dispatch; a raw observer
+can also be replaced by UI call-in updates. Damage totals are consequently
+diagnostic only and excluded from the effectiveness conclusion. Full-map
+spectator visibility does not grant the AI extra vision.
+
+**Invariant.** Retain the global invariant forbid and require both actual
+role=2 snapshots; the harness labels alone are insufficient (KI-428). No route,
+production, unit-stat or combat policy was changed for this experiment.
+
+**Verification.** Both sides built and traversed the mountain. Legion's western
+stream killed the eastern commander in the first valid accelerated run;
+Armada's eastern stream scored kills but did not break through. See the
+[played report](reviews/2026-09-29-ascendancy-flank-effectiveness.md) for final
+counts, screenshots, fixture limits and unchanged failing overall verdicts.
+
+**Files.** [observer](../tools/playtest/widgets/flank_effectiveness.lua),
+[checks](../tools/playtest/checks/flank_effectiveness.json),
+[issues](known-issues.md), [report](reviews/2026-09-29-ascendancy-flank-effectiveness.md).
+
+## D-138 — Separate stale deployment from TECH production starvation
+
+**Decision.** Preserve the owner's live-game log, inspect the actual script
+load paths and all duplicate native installations, and run a full-team current
+build control. Provide a complete owner-installable package with the unique
+identity SMRTBARb/flank-20260929. Do not overwrite the live installation or
+claim a package update fixes all ordinary production problems.
+
+**Why.** The live game lacks the new flank script, so earlier isolated
+playtests cannot validate that installation. Separately, its high-income TECH
+shows a real forward-factory delay and constructor-first production. Reducing
+constructor caps or reordering the entire build policy based only on that old
+run would conflate two causes and undo previously deliberate owner policy.
+Unique version metadata avoids the three stable-identity collisions without
+deleting or renaming the owner's installations.
+
+**Invariant.** The update is one matching DLL/debug/data set, with explicit
+identity metadata. Income, planned clusters and construction orders are not
+accepted as evidence of completed combat production. Existing invariant
+failures remain failures.
+
+**Verification.** The packaged DLL matches D-136, 225 API members pass, and
+all 230 files have a hash manifest. Deployment remains owner work. See the
+[investigation](reviews/2026-09-29-live-tech-production.md) and KI-429/430.
+
+**Files.** [issues](known-issues.md),
+[investigation](reviews/2026-09-29-live-tech-production.md),
+[owner instructions](../build-theatres/tech-production-investigation/INSTALL.md).
+No production code changed in this diagnosis.
+
+## D-139 — Verify every faction from both Glacial Gap TECH starts without policy overrides
+
+**Decision.** Run three natural-economy faction mirror matches plus a separate
+8v8 control using the current workspace data and pinned D-136 DLL. Do not change
+production policy or extend the forward-layout invariant timeout to obtain a
+pass. Stop completed mirror matches once all six core production/traversal
+observations are met and retain their actual durations and failing raw reports.
+Keep the live game installation untouched while the owner uses it concurrently.
+
+**Why.** The owner's separate script/config and DLL copy workflow is valid.
+The D-138 filesystem observation was overextended into an explanation for all
+reported games. Direct production evidence is needed, and earlier fixture or
+timeout-relaxed runs are insufficient for this new validation. Both map sides
+matter because their build sites, economy timing and opponents differ.
+
+**Invariant.** A factory order is not completed production. Require an
+AI-built factory, at least eight completed routed units spanning five minutes,
+and two units reaching the central mountain per faction/side. Keep every global
+invariant forbid; wider failures are not relabeled as passes. In full teams,
+observe actual TECH IDs 0/9, not an allied FRONT AI at team 1.
+
+**Verification.** All six mirror cases met the core observations with no script
+errors or INV-067 violations. The 8v8 control lost its western side before the
+gate; eastern TECH remained below +200, so the high-income full-team report
+remains unresolved (KI-430). No gameplay code changed. The
+[played report](reviews/2026-09-29-glacial-faction-validation.md) records unit
+counts, first completion times, raw reports, unchanged failures and input hashes.
+
+**Files.** [report](reviews/2026-09-29-glacial-faction-validation.md),
+[corrected investigation](reviews/2026-09-29-live-tech-production.md),
+[issues](known-issues.md),
+[mirror runner](../build-theatres/faction-validation/run_mirror.py),
+[full-team runner](../build-theatres/faction-validation/run_full.py),
+[log summary](../build-theatres/faction-validation/summarize.py).
+
+## D-140 — Outcome-based OpenSkill and strict map/settings scorecards
+
+**Decision.** Record scorecards by UTC/local timestamp, map/game content checksums,
+engine binary, complete gameplay settings, actual/expected roles and starts,
+factions, scenario and tested DLL/data hashes. Keep map/settings cohorts separate,
+including Legion enabled versus disabled. The AI build is the experimental
+variable and the entrant identity, not a reason to reject matching conditions.
+Use pinned OpenSkill Plackett–Luce 6.1.2 for confirmed outcomes only; retain raw
+economy/combat/production/reliability diagnostics as separate measures.
+
+**Why.** Combining economy, damage and army size into invented skill points
+would reward high-income inactivity or damage farming. Pooling different maps,
+content versions, factions or fixtures would obscure regressions. One measured
+match is a provisional baseline, not a calibrated public BAR rating. Time limits
+are censored; no winner is inferred from leading in resources or killing units.
+The in-game calendar is pinned separately from wall-clock timestamps because
+BAR can use date options for seasonal content. Start tolerances (64 elmos from
+request, 32 between comparisons) are explicit and tested.
+
+**Invariant.** Only a valid engine GameOver callback can produce a rating update.
+Invalid/censored evidence and duplicated identical entrants cannot update skill.
+Legion on/off, different maps and altered starts cannot silently compare as equal.
+Missing/zero-denominator metrics remain null. Evidence changes cannot overwrite
+an existing run; schema reinterpretations preserve prior records and are counted
+once. Raw gameplay invariant failures stay visible and cannot be hidden by a
+successful recorder. All writes remain outside the main game installation.
+
+**Verification.** Nineteen tests pass, including actual library win/draw updates,
+censored priors, role/position/content mismatches and comparator settings. The
+three requested maps completed 45-minute observations with verified roles, starts,
+runtime content checksums and error-free telemetry. None produced a confirmed
+outcome, so all three correctly leave OpenSkill priors unchanged. The initial
+batch has not exercised a live completed-match rating update. See the
+[timestamped index](benchmarks/scorecards/README.md) and
+[design/methodology](benchmarks/scorecard-design.md). No AI policy/native code changed.
+
+**Files.** [recorder/model](../tools/playtest/scorecard.py),
+[isolated runner](../tools/playtest/scorecard_run.py),
+[observer](../tools/playtest/widgets/scorecard_metrics.lua),
+[tests](../tools/playtest/test_scorecard.py),
+[pinned dependency](../tools/playtest/requirements-scorecard.txt),
+[playtest usage](../tools/playtest/README.md),
+[methodology](benchmarks/scorecard-design.md),
+[scorecard index](benchmarks/scorecards/README.md),
+[rating ledger](benchmarks/scorecards/ratings.json), [issues](known-issues.md).
+
+## D-141 — Batch lane rendering to avoid exhausting LuaUI memory
+
+**Problem and evidence.** On 2026-09-29 the owner selected all-player lanes,
+then a player name, and lost the entire UI. The installed widget SHA256 matched
+the source. At frame 44395 the main infolog records three emergency collections
+above 1.2 GB followed by `LUA_ERRMEM` in DrawScreen and LuaUI's 1.5 GiB allocator
+limit. There is no widget-specific traceback, so this proves UI exhaustion,
+not that a particular mouse callback was the sole cause.
+
+**Decision.** Replace each route segment's closures and temporary colour/point
+tables with two GL.LINES batches per route and one shared flat projection buffer.
+The generic line primitive also uses a stable callback with arguments. Projection
+still runs every frame, so camera motion remains current; lane calculation and
+player/all/frozen controls are unchanged. Rejected raising the engine memory
+limit or forcing global LuaUI garbage collection from this widget: neither
+removes its allocation churn, and global collection affects every widget.
+
+**Invariant.** All-player rendering must have bounded per-frame allocation and
+retained state; selecting a player in all mode must preserve all-player visibility.
+Batching must preserve route endpoints, air dashes and gaps at clipped vertices,
+including a shorter or empty replacement survey. These are LuaUI invariants,
+checked by the dedicated Lua fixture and engine watcher rather than the AI's
+AngelScript Invariants module.
+
+**Verification.** Three Lua 5.1 tests pass. The same 16-player, nine-lanes-per-player,
+400-points-per-lane fixture measured roughly 40 MB of temporary allocation per
+frame before this change, versus 80.6 KiB peak after it; retained growth across
+120 draws/clicks was 0.1 KiB. This isolates rendering allocation from engine and
+other widgets. The hidden graphical engine test and remaining limits are recorded
+in the [incident review](reviews/2026-09-29-lane-ui-memory.md). The original
+incident has not been replayed; [KI-431](known-issues.md#ki-431--lane-ui-memory-fix-needs-confirmation-in-the-original-session)
+tracks that limit. No installed files were modified and no DLL rebuild is needed.
+
+**Files.** [Widget](../tools/widgets/gui_barb_team_link.lua),
+[Lua fixture](../tools/playtest/fixtures/lane_ui_mock.lua),
+[tests](../tools/playtest/test_lane_ui_memory.py),
+[engine watcher](../tools/playtest/widgets/lane_ui_memory_watch.lua),
+[engine checks](../tools/playtest/checks/lane_ui_memory.json),
+[usage](../tools/playtest/README.md), [incident review](reviews/2026-09-29-lane-ui-memory.md),
+[issue register](known-issues.md).
+
+## D-142 — Forbid T1 artillery and celebrate the first super-cannon shot
+
+**Decision.** Respect the owner's no-T1-static-artillery rule in every active
+profile and role. `behaviour/<unit>/build: false` vetoes `armguard`, `corpun`,
+and `legcluster`; runtime cap increases cannot undo it. Availability excludes
+these definitions and construction enqueue rejects them. Repair/reclaim tasks
+are outside this check: their task payload does not initialize `buildDef`.
+
+TECH's artillery slots use actual T2 artillery, gated at +300 metal by default;
+LRPC and super-cannon gates and energy affordability remain in JSON. There is
+no new mandatory build order. Correct the shared T2 helper's swapped
+artillery/pop-up classification and AIR's Legion T2 allowance. Preserve the
+legacy `art1` array index with empty definitions rather than shift role indices.
+Do not alter porcupine array indices or enemy classification.
+
+**Rationale and alternatives.** A zero unit cap alone is insufficient because
+forward policy intentionally lifts caps. `ignore` changes enemy classification
+and `on` controls activation, so neither is a construction prohibition. Keep
+named-unit policy in JSON/AngelScript, not hardcoded native priorities. Include
+the Legion veto in base fragments as well as Legion fragments: the definition
+can exist even without Legion being selected. Existing/captured buildings are
+not deleted.
+
+**Drawing.** An optional `Main::AiSuperWeaponFired` callback observes the actual
+engine event for native super-weapon tasks. Script selects Ragnarok, Calamity
+and Starfall and queues 32 lowercase `lol` strokes at the aim (or the cannon
+when no aim exists), through the nuke smiley's paced line queue. One drawing
+per unit ID per AI session prevents repeated salvos flooding the map. Destruction
+forgets the ID. JSON controls enablement and letter height. Nuclear smileys are
+unchanged. The decision to draw on first shot, not construction or an attack
+order, is deliberate; save/load starts a new script session.
+
+**Invariant.** INV-069 checks the three definition vetoes in every profile.
+The integration probe raises their caps and directly enqueues construction;
+all must remain unavailable and return null. Allowed T2/LRPC/super definitions
+must retain permission. Repair tasks must continue normally.
+
+**Status.** Built with matching stripped DLL/debug symbols; verification results
+are recorded in [the artillery review](reviews/2026-09-29-artillery-policy.md).
+No live-game installation was modified.
+
+**Files.**
+- [src/circuit/unit/CircuitDef.h](../src/circuit/unit/CircuitDef.h)
+- [src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp)
+- [src/circuit/module/FactoryManager.cpp](../src/circuit/module/FactoryManager.cpp)
+- [src/circuit/script/InitScript.h](../src/circuit/script/InitScript.h)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/CircuitAI.cpp](../src/circuit/CircuitAI.cpp)
+- [data/config/weapons.json](../data/config/weapons.json)
+- [data/script/src/manager/artillery_policy.as](../data/script/src/manager/artillery_policy.as)
+- [data/script/src/setup.as](../data/script/src/setup.as)
+- [data/script/src/helpers/unit_helpers.as](../data/script/src/helpers/unit_helpers.as)
+- [data/script/src/helpers/defense_helpers.as](../data/script/src/helpers/defense_helpers.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/tech_forward.as](../data/script/src/roles/tech_forward.as)
+- [data/script/src/roles/tech_weapons.as](../data/script/src/roles/tech_weapons.as)
+- [tools/playtest/fixtures/artillery_probe.as](../tools/playtest/fixtures/artillery_probe.as)
+- [tools/playtest/widgets/artillery_fire_watch.lua](../tools/playtest/widgets/artillery_fire_watch.lua)
+- [tools/playtest/checks/artillery_fire.json](../tools/playtest/checks/artillery_fire.json)
+- [tools/playtest/checks/artillery_profiles.json](../tools/playtest/checks/artillery_profiles.json)
+- [tools/playtest/prepare_artillery_check.py](../tools/playtest/prepare_artillery_check.py)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/knowledge/barb_report.py](../tools/knowledge/barb_report.py)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/tech_forward.md](../doc/roles/tech_forward.md)
+- [doc/roles/tech_weapons.md](../doc/roles/tech_weapons.md)
+- [data/config/behaviour.json](../data/config/behaviour.json)
+- [data/config/easy/behaviour.json](../data/config/easy/behaviour.json)
+- [data/config/easy/behaviour_leg.json](../data/config/easy/behaviour_leg.json)
+- [data/config/experimental_balanced/behaviour.json](../data/config/experimental_balanced/behaviour.json)
+- [data/config/experimental_balanced/behaviour_leg.json](../data/config/experimental_balanced/behaviour_leg.json)
+- [data/config/experimental_hard/behaviour.json](../data/config/experimental_hard/behaviour.json)
+- [data/config/experimental_hard/behaviour_leg.json](../data/config/experimental_hard/behaviour_leg.json)
+- [data/config/experimental_terrible/behaviour.json](../data/config/experimental_terrible/behaviour.json)
+- [data/config/experimental_terrible/behaviour_leg.json](../data/config/experimental_terrible/behaviour_leg.json)
+- [data/config/hard/behaviour.json](../data/config/hard/behaviour.json)
+- [data/config/hard/behaviour_leg.json](../data/config/hard/behaviour_leg.json)
+- [data/config/hard_aggressive/behaviour.json](../data/config/hard_aggressive/behaviour.json)
+- [data/config/hard_aggressive/behaviour_leg.json](../data/config/hard_aggressive/behaviour_leg.json)
+- [data/config/medium/behaviour.json](../data/config/medium/behaviour.json)
+- [data/config/medium/behaviour_leg.json](../data/config/medium/behaviour_leg.json)
+- [data/script/easy/main.as](../data/script/easy/main.as)
+- [data/script/experimental_balanced/main.as](../data/script/experimental_balanced/main.as)
+- [data/script/experimental_hard/main.as](../data/script/experimental_hard/main.as)
+- [data/script/experimental_terrible/main.as](../data/script/experimental_terrible/main.as)
+- [data/script/hard/main.as](../data/script/hard/main.as)
+- [data/script/hard_aggressive/main.as](../data/script/hard_aggressive/main.as)
+- [data/script/medium/main.as](../data/script/medium/main.as)
+
+## D-143 — Arquebus holds weapon range instead of charging along a flank
+
+**Decision.** Enable `behaviour/legsrail/standoff: 0.90` in all seven Legion
+profiles. Native unit micro maintains a firing distance based on weapon reach,
+conservatively adjusted for elevation, with a five-percent dead band. It holds
+position/fire-at-will, moves back when too close, and never appends a fight
+command that would pursue the enemy. The same mechanism intercepts ordinary
+unit attack orders. Zero is the default for other definitions and disables it.
+
+**Cause.** D-136 reused the spam route task: plain queued moves through every
+waypoint, ignoring combat until the last fight command. Thus an Arquebus could
+fire while continuing straight toward the target. Ordinary micro also had a
+sight-radius-limited firing position followed by attack/fight orders. Moving
+Arquebus to the artillery role alone would not fix the dedicated route and
+would restrict targets to structures.
+
+**Route ownership.** The route task detects observed, targetable enemies near
+weapon range and pauses its queue while using the range controller. It owns
+idle events during engagement, so Stop cannot immediately restart the charge.
+After contact loss/death it resumes the nearest preserved waypoint; route
+revisions cannot override an ongoing engagement. No known enemy means normal
+lane traversal. Membership is removed on normal unit removal. No widget logic
+or map-specific coordinates participate in production combat decisions.
+
+**Invariant.** INV-067 still checks that flank units retain their dedicated
+route task. The combat regression adds a measurable range promise: supplied
+Arquebus units in both directions must survive, kill a shorter-range defense
+without coming within 600 elmos, then resume beyond the target. Failure is
+forbidden by `checks/arquebus.json`; the watcher samples distance and health
+once per second. An inaccessible firing ring stops the unit instead of
+substituting a close attack. This is not a claim of optimal terrain line of
+fire or survival against enemies that outrange or outrun the railgun.
+
+**Verification.** Native build and DLL API parity pass. Engine comparison
+results are recorded in [the range review](reviews/2026-09-29-arquebus-range.md).
+Played on both Supreme Isthmus sides: the old DLL lost both supplied railguns;
+the new DLL destroyed both HLTs and resumed both routes, with minimum sampled
+health 2200 and distances 674/627. Natural production and cliff firing geometry
+were not exercised by this focused fixture.
+Build output contains matching DLL/debug symbols and source data; the owner's
+live game installation is not modified.
+
+**Files.**
+- [src/circuit/unit/CircuitDef.h](../src/circuit/unit/CircuitDef.h)
+- [src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h)
+- [src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp)
+- [src/circuit/module/FactoryManager.cpp](../src/circuit/module/FactoryManager.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [doc/roles/tech_flank.md](../doc/roles/tech_flank.md)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/spam-routes.md](../doc/spam-routes.md)
+- [tools/playtest/fixtures/arquebus_route.as](../tools/playtest/fixtures/arquebus_route.as)
+- [tools/playtest/widgets/arquebus_watch.lua](../tools/playtest/widgets/arquebus_watch.lua)
+- [tools/playtest/checks/arquebus.json](../tools/playtest/checks/arquebus.json)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [data/config/easy/behaviour_leg.json](../data/config/easy/behaviour_leg.json)
+- [data/config/experimental_balanced/behaviour_leg.json](../data/config/experimental_balanced/behaviour_leg.json)
+- [data/config/experimental_hard/behaviour_leg.json](../data/config/experimental_hard/behaviour_leg.json)
+- [data/config/experimental_terrible/behaviour_leg.json](../data/config/experimental_terrible/behaviour_leg.json)
+- [data/config/hard/behaviour_leg.json](../data/config/hard/behaviour_leg.json)
+- [data/config/hard_aggressive/behaviour_leg.json](../data/config/hard_aggressive/behaviour_leg.json)
+- [data/config/medium/behaviour_leg.json](../data/config/medium/behaviour_leg.json)
+
+## D-144 — Snapshot-based lane workers with measured main-thread cost
+
+**Decision.** Extract one engine-free `lane::Solver` for synchronous and worker
+execution. The main-thread adapter captures observed threats and starts, reuses
+an immutable per-AI terrain snapshot, and submits at most one background job.
+The scheduler gives later ordinary path jobs priority over queued background
+work. Script controls background mode, staggering and refresh frequency.
+
+**Why.** Strategic lane searches run many full-grid passes over stable terrain.
+They do not need to block the simulation until finished: the previous complete
+lanes remain usable. Starting one OS thread per AI, sharing mutable analysis
+objects, or invoking AngelScript on a worker were rejected. Parallelizing each
+alternative was rejected because penalty/merge ordering is dependent. The same
+solver avoids separate sync/async algorithms drifting apart.
+
+**Ownership.** Worker closures own request/scratch data and immutable terrain,
+with no raw AI pointer. The main completion is allocated before enqueue;
+worker exceptions are captured, never allowed across the thread entry. The
+scheduler's synchronized completion queue hands off the result. Only the main
+callback locks the weak owner and swaps the complete lanes. Cancellation marks
+an atomic token and invalidates a main-only generation gate without freeing the
+admission slot early. Shutdown cannot publish into a destroyed AI.
+
+**Invariant.** INV-070: script finalization observes a new successfully published
+generation; cancellation/failed work cannot impersonate one. `Lanes::Poll` and
+`Finish` log violations; the native gate additionally rejects duplicate/stale
+completion. Tests cover admission, cancellation, independent threat snapshots,
+parallel determinism, disconnected water, corner blocking and high ground.
+
+**Deliberate limits.** Terrain snapshots are shared between jobs of one AI,
+not globally interned between AIs: measured capture is below one millisecond,
+and a cross-instance terrain cache adds identity/invalidation complexity.
+Threats must never be shared between teams with different observations. Existing
+terrain-grid caching semantics are retained. Script validation, water/site
+advisories, overlay publication and `GetLaneRoute`'s connection search remain
+main-thread operations. The benchmark includes postprocessing rather than
+claiming all strategic survey work is off-thread. Worker completion timing can
+change the frame an AI adopts a new route; geometric determinism does not promise
+identical whole-match outcomes across thread schedules.
+
+**Verification.** Six standalone lane suites pass, including eight simultaneous
+solvers, alongside existing native tests. Integration build and 231-member API
+check pass. Sample games, timings, exact settings and any unrelated game failures
+are recorded in [lane-worker benchmarks](benchmarks/lane-workers/README.md).
+
+**Files.**
+- [LaneSolver.h](../src/circuit/terrain/LaneSolver.h), [LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp)
+- [BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h), [BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp), [BattleLanes.cpp](../src/circuit/terrain/BattleLanes.cpp)
+- [Scheduler.h](../src/circuit/scheduler/Scheduler.h), [Scheduler.cpp](../src/circuit/scheduler/Scheduler.cpp), [MultiQueue.h](../src/circuit/util/MultiQueue.h), [MultiQueue.hpp](../src/circuit/util/MultiQueue.hpp)
+- [InitScript.cpp](../src/circuit/script/InitScript.cpp), [lanes.as](../data/script/src/manager/lanes.as), [lanes.json](../data/config/lanes.json)
+- [balanced main](../data/script/experimental_balanced/main.as), [hard main](../data/script/experimental_hard/main.as), [terrible main](../data/script/experimental_terrible/main.as)
+- [lane tests](../tests/lane_solver_test.cpp), [test CMake](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [CMakeLists.txt](../CMakeLists.txt)
+- [benchmark tool](../tools/playtest/lane_benchmark.py), [observer](../tools/playtest/widgets/lane_benchmark_watch.lua), [checks](../tools/playtest/checks/lane_workers.json)
+- [invariants](invariants.md), [actors](actor-matrix.md), [API](angelscript-references.md), [lanes](roles/tech-lanes.md), [known issues](known-issues.md)
+
+## D-145 — Connected mountain traverses, not isolated hill detours
+
+**Decision.** Filter every native all-terrain candidate through the same
+connected-elevated-terrain test before publication. Require projected progress
+of at least 1024 elmos and 45% of lane endpoint separation on one elevated
+component, with rise above the higher endpoint controlled by the existing
+high-ground setting. Expose span controls and the resulting qualification to
+script. TECH accepts only qualified reachable routes and clears qualification
+before every refresh selection.
+
+**Why.** Supreme's small isolated hills were being treated as strategic flanks,
+triggering an extra T2 lab and perpetual all-terrain production. Class/movement
+capability does not establish tactical value. A map-name blacklist was rejected:
+it would hide the same defect on another flat map. Adding disjoint hill spans
+or measuring sideways path length was rejected because neither connects the
+opposing sides with a mountain traverse. Isolated artillery perches are not
+attack lanes; no Vanguard placement policy is introduced here.
+
+**Invariant.** INV-071: every published all-terrain lane crosses one substantial
+connected mountain. The native filter checks all generator outputs; script
+checks the published qualification. A failed selection also blocks subsequent
+flank recruitment until a successful requalification.
+
+**Verification.** Eight native suites pass, including a control that produces
+false specialist routes when span thresholds are disabled, rejection of several
+disconnected mesas in both directions, retention of a connected ridge, and
+rejection of two ridge-end visits joined through the valley.
+Build and 233-member API check pass; all three affected experimental profiles
+load and publish lanes in BAR. Runtime results are recorded in the
+[played review](reviews/2026-09-29-connected-mountain-lanes.md); do not infer
+combat effectiveness from route generation alone. KI-434 tracks the incident.
+
+**Deliberate non-change.** Fixed per-faction flank recruitment remains unchanged.
+Armada traded poorly in the played matchups; route validity is not a promise of
+favorable combat against every counter. Omniscient test kill/loss counters are
+not available to recruitment policy. See the played review for measured limits.
+
+**Files.** [solver header](../src/circuit/terrain/LaneSolver.h), [solver](../src/circuit/terrain/LaneSolver.cpp), [native API](../src/circuit/terrain/BattleAnalysis.h), [adapter](../src/circuit/terrain/BattleLanes.cpp), [bindings](../src/circuit/script/InitScript.cpp), [lanes](../data/script/src/manager/lanes.as), [flank policy](../data/script/src/roles/tech_flank.as), [config](../data/config/lanes.json), [unit tests](../tests/lane_solver_test.cpp), [preparer](../tools/playtest/prepare_mountain_regression.py), [income observer](../tools/playtest/widgets/mountain_regression_watch.lua), [archived evidence verifier](../tools/playtest/verify_mountain_regression.py), [run instructions](../tools/playtest/README.md), [Supreme check](../tools/playtest/checks/mountain_supreme.json), [survey check](../tools/playtest/checks/mountain_survey.json), [profile load check](../tools/playtest/checks/mountain_startup.json), [startup request probe](../tools/playtest/widgets/mountain_startup_watch.lua), [invariants](invariants.md), [actors](actor-matrix.md), [script API](angelscript-references.md), [lane reference](roles/tech-lanes.md), [flank reference](roles/tech_flank.md), [issues](known-issues.md).
 
 ## Process decisions
 

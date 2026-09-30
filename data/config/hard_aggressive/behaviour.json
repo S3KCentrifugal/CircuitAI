@@ -73,6 +73,7 @@
 //########################################################################################################################
 
 		"behaviour": {
+	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {
 				"role": ["builder"],
 				"attribute": ["commander"],
@@ -542,6 +543,7 @@
 				"power": 1.0
 			},
 			"armguard": {
+				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -747,6 +749,7 @@
 				"power": 1.0
 			},
 			"corpun": {
+				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
 				"limit": 3,

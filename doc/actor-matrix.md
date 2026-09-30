@@ -10,6 +10,18 @@ States: framed (a frame is under construction), active (stands), retiring
 (`Lifecycle::IsRetiring`, D-076), gone. Retiring is set once by the act that
 decides the end; everything else reads it.
 
+## Specialist flank factory (D-136)
+
+| Actor | Reads | Does |
+| --- | --- | --- |
+| `flank.factory` / `TechFlank::Work` | income, pending task, factory ID, land connectivity, effective build menu | creates or repairs one extra factory |
+| `TechFlank::Owns`, factory registration | saved ID/site, live unit | keeps dedicated lab out of primary-lab production |
+| `TechFlank::Produce` | ownership, Lifecycle retirement, combat build menu | continuously recruits specialist combat units |
+| `TechFactories::BaseLandFactory` | dedicated ownership | excludes flank lab from base reclaim |
+| `TechFlank::MilitaryTask`, `Tick`, `TaskRemoved` | producer ID, persisted membership, live task | maintains mountain waypoint ownership and INV-067 |
+| native `CRouteTask` | preserved-waypoint mode, arrival tolerance, per-definition `standoff`, observed enemies | follows the mountain; configured ranged units pause for combat and resume the same route after contact loss |
+| `CCircuitUnit::KeepWeaponRange` | JSON range fraction, weapon reach, height difference, movement area | approaches a firing distance, holds or backs away; never appends a fight-to-target order |
+
 ## The harbour (an island TECH, D-121)
 
 | Actor | Reads | Does |
@@ -19,6 +31,15 @@ decides the end; everything else reads it.
 | `harbour.sea` (`SeaTask`) | the advanced shipyard, the yards, energy low or full | the advanced shipyard (site picked by ring search), help on a yard going up, floating turrets, then converters, tidals and naval fusions; INV-051 |
 | `Tech_FactoryAiMakeTask` (`YardTask`, `HoldsLandCombat`) | the harbour runs | the hover plant makes hover constructors; the yards make construction ships and subs, then sea combat; land labs make no combat |
 | INV-010 | `TechHarbour::IsHarbourUnit` | harbour sea units are exempt from the combat gate |
+
+## Weapon clusters and lanes (TECH, D-126, D-127)
+
+| Actor | Reads | Does |
+| --- | --- | --- |
+| `weapons.cluster` (`TechWeapons::Work`) | metal income over +200 and the kind's gate, the budget, `WeaponMaxConcurrent`, the ranked clusters | the highest-priority open slot the builder can build: kill zones, air defence, artillery, long range, coast, the super cannon's escort; INV-060, INV-061, INV-054 |
+| `weapons.super` (`TechWeapons::SuperTask`) | a super-cannon cluster, +500 metal (+1000 or high need), energy for its fire | an air constructor frames the cannon, or assists the frame; `SuperTick` pulls every air constructor to it; INV-057, INV-058, INV-059 |
+| `TechWeapons::Tick` / `Replan` | `aiBattle` routes, chokes, heat, composition, water, beaches | finds the strategic defence points and re-ranks the clusters every `WeaponReplanSeconds`; a started cluster keeps its point |
+| `Lanes::Tick` | both teams' starts, the front | lanes per movement class at game start, again when the front moves or every `LaneRecalcSeconds`; drawn 30 s after the intro; `BestLane` for attack planning |
 
 ## The T1 bot lab (`Factory::primaryT1BotLab`)
 
@@ -60,7 +81,7 @@ decides the end; everything else reads it.
 | spam lanes (`TechForward::TickSpam`, `Spam::SetSpreadLanes`, D-119) | the standing spam labs, the combat front, the focus | one lane per spam lab, `LaneSpacing` apart across the front, straight on to the enemy backline; re-spread when the count changes and every 30 s |
 | advanced lab production (`Tech_FactoryAiMakeTask`, D-103, D-119) | bank share, T2 construction bot count, fast assist cap | T2 construction bots to `T2BotConstructorCap` (10), fast assist bots to `FastAssistBotCap` (10), then fast assault bots; INV-028 |
 | `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; with no site in the layout it builds defences meanwhile (D-123), else waits and says why; its structure's cap lifted while held; INV-034, INV-035, INV-036 |
-| `air.defend` (`TechBuild::AirDefence`, D-123) | an air constructor with nothing else to do | the mex clusters' long-range AA and flak, then a ring of T2 turrets and flak round the base toward the front, `AirDefenceMax` of each; INV-053 |
+| `air.defend` (`TechBuild::AirDefence`, D-123; D-126: `TechWeapons::Work` first) | an air constructor with nothing else to do | a weapon cluster's open slot first (D-126), then the mex clusters' long-range AA and flak, then a ring of T2 turrets and flak round the base toward the front, `AirDefenceMax` of each; INV-053 |
 | air role refill (`TechBuild::RefillAirRoles`, `ClaimOnBuilt`, D-108) | a dedicated builder gone; a T2 air constructor built | the role passes at once (advanced fusions first), the new holder drops its other job; the advanced aircraft plant makes one when none is free; the donation keeps dedicated units |
 | advanced-fusion ground ahead (`Layout::HoldAfusSetAhead`, D-108) | the fusion role held, no set slot left | the next set of advanced-fusion ground reserved (zones, forward, then the ring within reach), retried every 10 s; INV-037 |
 | dead slot (native `CTerrainManager`, D-108) | the engine refuses a pinned slot 3 times | the slot is never offered again, its ground stays held, the set moves on |
@@ -147,3 +168,29 @@ decides the end; everything else reads it.
 | `legacy.strategic` | `ChainInactive`, the role's rungs | nukes, anti-nuke, gantry |
 | `wait` | - | 3 s, then ask again |
 | INV-004 | metal bank share, frame, static build power | floating metal during a construction with build power short is a violation |
+
+## A tactical lane survey (D-131)
+
+| Actor | Reads | Does |
+| --- | --- | --- |
+| Native `CBattleAnalysis::RequestLanes` / `AnalyseLanes` | cached terrain, this AI's observed threats, starts and script settings | captures an owned request on main; admits one job; synchronous reference and worker use the same solver |
+| `lane::Solver` / scheduler background job | immutable terrain and owned request only | searches routes off-thread; no engine wrappers, AI state, script calls or logging; cancelled work exits cooperatively |
+| Native completion / `lane::JobGate` | weak owner, generation, complete result | publishes only a current result on main; retains old lanes during work/failure; shutdown cannot dereference a freed AI |
+| Profile threat settings and native enemy damage | weapon capabilities and JSON domain/default multipliers | weight threat for both tactical routes and ordinary AI; D-131 restores AA-role air/default weights; INV-064 checks flak and KI-424 records remaining surface/water zeros |
+| `CSetupManager::ParseScriptStarts` | participating TEAM/AI/PLAYER direct fields, ignoring nested AI options | caches actual playing starts; lane policy checks nonempty enemy destinations (INV-063) |
+| `Lanes::Compute` / `Poll` / `Finish` | job state, published revision, JSON settings | requests, then validates a completed survey; checks INV-062/070; advances attack revision once and publishes teaching metadata on main |
+| Native mountain/descent search / `Lanes::BuildLessons` (D-132/D-133) | ordinary-class smooth approach, reachable peak band, all-terrain traverse/descent, JSON bounds | preserves high-ground traverse before destination-side descent; rejects loops and excessive detours; script assigns lesson 5 and checks INV-065 |
+| Native paired cliff search / widget cues (D-134) | reachable high passage, exclusive cliff grades at both ends, profile threat, detour budget | ranks steepness before cost; verifies a non-looping joined route; publishes both gates and quality, INV-066; widget only renders |
+| Native mountain shelf search (D-135) | mean engine surface slope, reachable peak band, endpoint progress bands, script weights | penalizes lateral cliff-face traversal; tries a two-ended shelf fallback; widget only renders and the test independently checks Legion build sites |
+| `Lanes::RequestOverlay` and command handler | survey age, refresh request, minimum refresh interval | requests an eligible calculation and publishes the current survey |
+| Control widget | published geometry/metadata, local filter/focus/freeze preferences | renders, selects and hides; never calculates battle routes or issues combat orders |
+| `Lanes::BestLane`, `Waypoints` | native lane cache | exposes ranked routes and waypoints to future attack consumers; current attack code is not rewired |
+
+### Mountain qualification (D-145)
+
+| Actor | Reads | Action |
+| --- | --- | --- |
+| `lane::Solver` candidate filter | owned terrain, endpoints, script-configured rise/span | removes all-terrain candidates without progress on one connected elevated component |
+| `Lanes::Finish` | native `IsLaneSpecialist` | verifies INV-071 and reports specialist count |
+| `TechFlank::Select` / `Work` | published qualification, native land connector | admits only qualified reachable mountain routes for a dedicated lab |
+| `TechFlank::Produce` | successful current selection, survey revision | waits after failed requalification rather than resuming an old route on the next ask |

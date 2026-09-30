@@ -1,5 +1,6 @@
 // Helpers & Role Handlers
 #include "manager/commands.as"
+#include "manager/artillery_policy.as"
 #include "helpers/generic_helpers.as"
 #include "helpers/map_helpers.as"
 #include "helpers/unit_helpers.as"

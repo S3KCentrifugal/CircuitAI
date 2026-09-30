@@ -192,6 +192,7 @@ namespace Commands {
             return true;
         }
 
+        if (cmd == "theatres") { Lanes::RequestOverlay(parts.length() > 3 && parts[3] == "refresh"); return true; }
         if (cmd == "query") {
             if (Team::Roster::IsReady()) {
                 WidgetLink::Send("roster", "self|" + Team::Roster::Encode());
@@ -267,6 +268,8 @@ namespace Commands {
     int introHoldUntil = 0;
     void IntroTick()
     {
+        if (ai.skirmishAIId == 0 && (introStage >= 7 || !IntroEnabled) && AiIntroDoneFrame() < 0)
+            AiMarkIntroDone(ai.frame);   // D-127: the other AIs draw their lanes after it
         if (!IntroEnabled || ai.skirmishAIId != 0 || introStage >= 7) return;
         const bool drawn = AiDrawQueueSize() == 0 && !drawQueued, erased = AiDrawQueueSize() == 0;
         switch (introStage) {
@@ -562,6 +565,8 @@ namespace Commands {
         // Leave: the old role's layout (reservations, zones, the native flag)
         // and the native manager settings its InitHandler changed (CR-007).
         Layout::OnRoleLeave();
+        TechWeapons::OnRoleLeave();   // D-126
+        Lanes::OnRoleLeave();         // D-127
         NativeState::Restore();
         DefState::Restore();
 

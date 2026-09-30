@@ -2,19 +2,21 @@
  * RouteTask.cpp
  *
  * See RouteTask.h. Orders are plain moves (CmdMoveTo) queued with SHIFT so the
- * engine walks the waypoints in order; the task never issues fight, patrol or
- * attack, so nothing on the way interrupts the run. The unit's own weapons
- * still fire at whatever is in range (fire state), which is what spam wants.
+ * engine walks the waypoints in order. Ordinary spam fires while travelling;
+ * opt-in standoff units pause the route to hold weapon range during contact.
+ * Preserved specialist routes may issue a fight command at their endpoint.
  */
 
 #include "task/fighter/RouteTask.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
 #include "unit/CircuitUnit.h"
+#include "unit/enemy/EnemyUnit.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
+#include "Log.h"
 
 #include <algorithm>
 #include <cmath>
@@ -26,13 +28,13 @@ using namespace springai;
 
 CRouteTask::CRouteTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::ROUTE, 1.f)
-		, version(0)
-		, dirty(false)
-		, arriveRadius(SQUARE_SIZE * 32)
 		, laneCount(1)
 		, laneSpacing(0.f)
 		, laneEndSpread(0.f)
 		, laneDealt(0)
+		, version(0)
+		, dirty(false)
+		, arriveRadius(SQUARE_SIZE * 32)
 {
 }
 
@@ -62,6 +64,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
 	lanes.erase(unit);
+	engaging.erase(unit);
 }
 
 void CRouteTask::SetLanes(int count, float spacing, float endSpread)
@@ -69,6 +72,13 @@ void CRouteTask::SetLanes(int count, float spacing, float endSpread)
 	laneCount = std::max(1, count);
 	laneSpacing = std::max(0.f, spacing);
 	laneEndSpread = std::min(1.f, std::max(0.f, endSpread));
+}
+
+void CRouteTask::SetTraversal(bool preserve, float radius, bool fight)
+{
+	preserveWaypoints = preserve;
+	arriveRadius = std::isfinite(radius) ? std::clamp(radius, 16.f, 512.f) : 48.f;
+	fightAtEnd = fight;
 }
 
 int CRouteTask::LaneOf(CCircuitUnit* unit) const
@@ -107,9 +117,7 @@ void CRouteTask::Start(CCircuitUnit* unit)
 
 void CRouteTask::Update()
 {
-	if (!dirty) {
-		return;
-	}
+	const bool changed = dirty;
 	dirty = false;
 	// The route changed, which means the destination changed: send everything
 	// already in the air straight at the new one. Re-running the new lane from
@@ -117,12 +125,40 @@ void CRouteTask::Update()
 	// and a spam unit's value is pressure and vision forward, not formation.
 	// Units produced after this still get the full lane from Start().
 	for (CCircuitUnit* unit : units) {
-		IssueDirect(unit);
+		CCircuitAI* circuit = manager->GetCircuit();
+		CCircuitDef* def = unit->GetCircuitDef();
+		CEnemyInfo* nearest = nullptr;
+		float nearestSq = SQUARE(def->GetMaxRange() * 1.1f);
+		if (def->GetStandoff() > 0.f) {
+			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
+			for (const auto& kv : circuit->GetEnemyInfos()) {
+				CEnemyInfo* enemy = kv.second;
+				const CCircuitDef* edef = enemy->GetCircuitDef();
+				if (enemy->IsHidden() || !enemy->IsInRadarOrLOS() || edef == nullptr
+						|| !(edef->GetCategory() & def->GetTargetCategory())
+						|| (!def->HasSurfToWater() && enemy->GetPos().y < -SQUARE_SIZE * 5)) continue;
+				const float sq = here.SqDistance(enemy->GetPos());
+				if (sq < nearestSq) { nearestSq = sq; nearest = enemy; }
+			}
+		}
+		if (nearest != nullptr) {
+			if (engaging.insert(unit).second) { // before Stop can cause an idle callback
+				circuit->LOG("RANGE: %s(%i) pauses route at %.0f for weapon range %.0f",
+						def->GetDef()->GetName(), unit->GetId(), std::sqrt(nearestSq), def->GetMaxRange());
+			}
+			if (unit->KeepWeaponRange(nearest, circuit->GetLastFrame() + FRAMES_PER_SEC * 10)) continue;
+		}
+		const bool resume = engaging.erase(unit) != 0;
+		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
+		if (!changed && !resume) continue;
+		if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
+		else IssueDirect(unit);
 	}
 }
 
 void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 {
+	if (engaging.count(unit) != 0) return;  // Update owns contact loss and lane resumption.
 	if (route.empty() || IsAtEnd(unit)) {
 		return;  // holding at the destination; weapons keep firing on their own
 	}
@@ -200,7 +236,9 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		for (unsigned int i = fromIdx; i < route.size(); ++i) {
-			unit->CmdMoveTo(LanePoint(unit, i), (i == fromIdx) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
+			const short options = (i == fromIdx) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY;
+			if (fightAtEnd && i + 1 == route.size()) unit->CmdFightTo(LanePoint(unit, i), options, timeout);
+			else unit->CmdMoveTo(LanePoint(unit, i), options, timeout);
 		}
 	)
 }

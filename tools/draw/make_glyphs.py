@@ -37,6 +37,9 @@ TEXTS = [
     "RobotRobert03",
     "ManBearPig",
     "iOS_Client",
+    # D-127: the lane labels (manager/lanes.as): class names and numbers
+    "LAND BOT AMPHIBIOUS HOVER ALL-TERRAIN NAVAL AIR LANES",
+    "0123456789",
 ]
 CURVE_STEPS = 5          # segments per quadratic / cubic curve before simplifying
 SIMPLIFY = 32.0          # RDP tolerance in output units (cap height 1000)

@@ -24,6 +24,15 @@ The experimental runtime sequence is:
 
 ## Shared foundation
 
+The optional visual theatre survey lives in `src/manager/water_theatres.as`
+and is called by `src/manager/lanes.as`. It reuses native connected water bodies
+and terrain-manager buildability queries to label ponds, shared seas and
+advisory shipyard/tidal/seaplane sites. It creates no tasks or reservations.
+`src/manager/strategic_sites.as` calculates geo, island and beach advisories.
+The existing `tools/widgets/gui_barb_team_link.lua` renders the results locally
+with player/all/off controls; it can request surveys from any experimental role. See
+[lane and theatre documentation](../../doc/roles/tech-lanes.md).
+
 | Component | Responsibility |
 |---|---|
 | `src/common.as` | Shared initialization data such as armor definitions and categories used by every profile `init.as`. |

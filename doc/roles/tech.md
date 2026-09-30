@@ -1,5 +1,9 @@
 # TECH Role
 
+D-136: `TechFlank::Tick` maintains the separate accessible mountain-flank
+factory. Its production and routing hooks leave ordinary TECH production
+available; see [specialist flank production](tech_flank.md).
+
 Reference for the `TECH` AngelScript role: how it is loaded, which native
 callbacks reach it, which registered C++ APIs it depends on, how its decisions
 are actually gated, and where it is currently broken.
@@ -850,6 +854,19 @@ constructor under turrets from both. Now:
 | `AssistNanoEnabled` | false | `aiEconomyMgr.assistNanoEnabled`: native assist nanos off for this instance; the script owns the count |
 | `AssistNanoIncomeMod` | 1.0 | `aiEconomyMgr.assistNanoIncomeMod`: when enabled, scales the income a native assist nano must be covered by |
 
+## Lanes and weapon clusters (D-126, D-127)
+
+`Tech_EconomyUpdate` calls `Lanes::Tick` then `TechWeapons::Tick` once a
+second, before `Invariants::Tick`, and `Commands::SwitchRole` clears both on a
+role switch (`OnRoleLeave`). Both run only under the experimental build system:
+- `Lanes` computes the lanes between both teams' starts at game start, draws
+  them for 30 s after the intro, and recalculates them as the front moves
+  ([`tech-lanes.md`](tech-lanes.md));
+- `TechWeapons` places weapon clusters from +200 metal
+  ([`tech_weapons.md`](tech_weapons.md)).
+The rows `weapons.super` and `weapons.cluster` are in
+[`tech_rules.md`](tech_rules.md).
+
 ## Lifecycle and invariants (D-076)
 
 `tech.as` includes `manager/lifecycle.as` and `manager/invariants.as`.
@@ -889,4 +906,4 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 66b809f2ee39c73bebb833d20dec5e4c765ca178; lines: 2722 -->
+<!-- source: data/script/src/roles/tech.as; blob: c4e24f85cff0052c10ee5e8316996551346a8ee2; lines: 2725 -->

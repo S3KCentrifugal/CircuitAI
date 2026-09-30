@@ -53,10 +53,19 @@ public:
 	bool OpenConfig(const std::string& profile, const std::vector<std::string>& parts);
 	void CloseConfig();
 	const Json::Value& GetConfig() const { return *config; }
+	// D-126: the sections scripts read after init (the config is closed then)
+	const Json::Value* GetScriptConfig() const { return (config != nullptr) ? config : scriptConfig; }
 	const std::string& GetConfigName() const { return configName; }
 
 	const CSetupData::ModOptions& GetModOptions() const;
 	bool HasStartBoxes() const;
+	// D-127: 1 inside an enemy ally team's start box, 0 not, -1 when no boxes are known
+	int EnemyStartBoxAt(const springai::AIFloat3& pos) const;
+	// D-127: the playing teams' start positions from the start script (fixed or chosen
+	// before the game); a team counts when an AI or a non-spectator player is on it
+	int GetScriptStartCount();
+	springai::AIFloat3 GetScriptStart(int i);
+	bool IsScriptStartEnemy(int i);
 	bool CanChooseStartPos() const;
 
 	void PickStartPos(StartPosType type);
@@ -101,6 +110,10 @@ public:
 	bool IsWaterHarmful() const { return isWaterHarmful; }
 
 private:
+	void ParseScriptStarts();
+	struct SScriptStart { springai::AIFloat3 pos; int allyTeam; };
+	std::vector<SScriptStart> scriptStarts;
+	bool scriptStartsParsed = false;
 	void FindStart();
 	void CalcStartPos();
 	void CalcLanePos();
@@ -116,6 +129,7 @@ private:
 	CSetupData* setupData;
 	CSetupScript* script;
 	Json::Value* config;  // owner;
+	Json::Value* scriptConfig;  // owner; D-126: "weapons" and "lanes", kept past CloseConfig
 	std::string configName;
 
 	CCircuitUnit* commander;

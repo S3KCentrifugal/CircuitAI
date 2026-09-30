@@ -970,6 +970,13 @@ void CBuilderManager::ActivateTask(IBuilderTask* task)
 
 IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 {
+	// Only construction types (the contiguous range before REPAIR) initialize
+	// buildDef. Service tasks such as Repair/Reclaim leave that field unset.
+	// A profile's construction veto survives scripts lifting temporary caps.
+	if ((ti.type < IBuilderTask::BuildType::REPAIR)
+			&& (ti.buildDef != nullptr) && !ti.buildDef->IsBuildAllowed()) {
+		return nullptr;
+	}
 	IBuilderTask* task;
 
 	switch (ti.type) {

@@ -1,0 +1,82 @@
+{
+  "stop_minute": 45,
+  "expect": [
+    {
+      "key": "built team 0",
+      "pattern": "\\[FlankTest\\] PASS built team=0",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "continuous team 0",
+      "pattern": "\\[FlankTest\\] PASS continuous team=0",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "sustained team 0",
+      "pattern": "\\[FlankTest\\] PASS sustained team=0",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "mountain team 0",
+      "pattern": "\\[FlankTest\\] PASS mountain team=0",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "normal production team 0",
+      "pattern": "\\[FlankTest\\] PASS normal production team=0",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "built team 1",
+      "pattern": "\\[FlankTest\\] PASS built team=1",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "continuous team 1",
+      "pattern": "\\[FlankTest\\] PASS continuous team=1",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "sustained team 1",
+      "pattern": "\\[FlankTest\\] PASS sustained team=1",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "mountain team 1",
+      "pattern": "\\[FlankTest\\] PASS mountain team=1",
+      "scope": "any",
+      "by_minute": 45
+    },
+    {
+      "key": "normal production team 1",
+      "pattern": "\\[FlankTest\\] PASS normal production team=1",
+      "scope": "any",
+      "by_minute": 45
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|: WARN\\s+:",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|SCRIPT CRASH|Error in.*flank_watch",
+      "scope": "any"
+    }
+  ]
+}

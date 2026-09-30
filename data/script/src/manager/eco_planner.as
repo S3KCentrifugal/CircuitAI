@@ -195,7 +195,7 @@ namespace EcoPlanner {
         s.metalMap = ai.GetMetalSpotCount() >= Global::RoleSettings::Tech::EcoMetalMapSpots;
         s.t1Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
         s.t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
-        s.t2Lab = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) > 0;
+        s.t2Lab = TechFlank::NormalLabCount() > 0;
         {
             CCircuitDef@ t2lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
             s.t2LabQueued = (t2lab is null) ? 0 : aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), t2lab);

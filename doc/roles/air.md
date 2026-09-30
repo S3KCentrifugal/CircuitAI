@@ -27,6 +27,10 @@ line numbers when navigating.
 
 ## Intent
 
+D-142: Legion's T2 land-defense allowance uses `legacluster`, not the T1
+`legcluster`. All factions' T1 static artillery has a configuration construction
+veto, independent of this role's temporary unit caps.
+
 AIR commits to aircraft plants as the army source. It suppresses ground
 production entirely at start, opens on wind energy where the map rewards it,
 races a small number of air constructors, and funnels early build power into one
@@ -503,4 +507,4 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: e5c9e03c3c31e449d064b1a7cfe9fec5eb8253e2; lines: 1258 -->
+<!-- source: data/script/src/roles/air.as; blob: 1e7faede20d024cb0e0cc2b39d9ba090c312ea2f; lines: 1258 -->

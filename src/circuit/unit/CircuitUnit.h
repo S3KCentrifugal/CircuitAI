@@ -94,6 +94,8 @@ public:
 
 	void SetIsFinished() { isFinished = true; }
 	bool IsFinished() const { return isFinished; }
+	int GetProducerId() const { return producerId; }
+	void SetProducerId(int value) { producerId = value; }
 
 	void SetAllowedToJump(bool value) { isAllowedToJump = value; }
 	bool IsAllowedToJump() const { return isAllowedToJump; }
@@ -174,6 +176,7 @@ public:
 	void TrySetMoveState(CCircuitDef::MoveT state);  // safe CmdSetMoveState
 
 	void Attack(CEnemyInfo* enemy, bool isGround, int timeout);
+	bool KeepWeaponRange(CEnemyInfo* enemy, int timeout);
 	void Attack(const springai::AIFloat3& position, CEnemyInfo* enemy, bool isGround, bool isStatic, int timeout);
 	void Attack(const springai::AIFloat3& position, CEnemyInfo* enemy, int tile, bool isGround, bool isStatic, int timeout);
 	void Guard(CCircuitUnit* target, int timeout);
@@ -207,6 +210,7 @@ public:
 	bool IsAttrNoDisrupt() const { return attr & CCircuitDef::AttrMask::NO_DISRUPT; }
 
 private:
+	int producerId = -1; // creation event only; persistent policy membership is script-owned
 	// NOTE: taskFrame assigned on task change and OnUnitIdle to workaround idle spam.
 	//       Proper fix: do not issue any commands OnUnitIdle, delay them until next frame?
 	int taskFrame;

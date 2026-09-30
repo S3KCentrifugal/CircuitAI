@@ -80,6 +80,9 @@ public:
 	 * Run concurrent task, finalize on success at main thread
 	 */
 	void RunParallelJob(const std::shared_ptr<IThreadJob>& task);
+    // Infrequent strategic analysis yields queue priority to unit pathfinding.
+    // This does not preempt a running job; callers must bound/coalesce requests.
+    void RunBackgroundJob(const std::shared_ptr<IThreadJob>& task);
 
 	/*
 	 * Same as RunParallelTask but pushes task in front of the queue
@@ -144,10 +147,11 @@ private:
 	std::vector<std::shared_ptr<IMainJob>> removeTasks;
 
 	struct WorkTask {
-		WorkTask(const std::weak_ptr<CScheduler>& scheduler, const std::shared_ptr<IThreadJob>& task)
-			: scheduler(scheduler), task(task) {}
+		WorkTask(const std::weak_ptr<CScheduler>& scheduler, const std::shared_ptr<IThreadJob>& task, bool background = false)
+			: scheduler(scheduler), task(task), background(background) {}
 		std::weak_ptr<CScheduler> scheduler;
 		std::shared_ptr<IThreadJob> task;
+        bool background;
 	};
 	static CMultiQueue<WorkTask> gWorkTasks;
 

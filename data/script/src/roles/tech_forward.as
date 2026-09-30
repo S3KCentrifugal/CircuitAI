@@ -165,7 +165,7 @@ namespace TechForward {
     // D-108's lesson: TECH's start caps pin defences at 0; the owner asks for these
     bool Buildable(CCircuitUnit@ u, CCircuitDef@ d)
     {
-        if (d is null || !u.circuitDef.CanBuild(d)) return false;
+        if (d is null || !d.IsBuildAllowed() || !u.circuitDef.CanBuild(d)) return false;
         if (d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
         return d.IsAvailable(ai.frame);
     }

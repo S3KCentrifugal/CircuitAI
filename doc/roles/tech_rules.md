@@ -1,5 +1,9 @@
 # tech_rules.as - TECH's build rules as one ordered table
 
+D-136 adds `flank.factory` / `DoFlankFactory` after `air.dedicated`, calling
+`TechFlank::Work` for an accessible specialist lane at +200 metal. It precedes
+forward defenses and the economic chain; ongoing construction stays first.
+
 Script: [`data/script/src/roles/tech_rules.as`](../../data/script/src/roles/tech_rules.as),
 namespace `TechRules`. Decision:
 [D-067](../decisions.md#d-067--techs-build-sequence-is-one-ordered-rule-table).
@@ -67,6 +71,14 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 27 | `air.defend` | air constructors | - | D-123 (owner): nothing else to do: defences (the mex clusters' AA, then a ring round the base toward the front) |
 | `wait` | mobile | - | 3 s |
 
+### Rows added by D-126
+
+| Key | Who | When | Act |
+| --- | --- | --- | --- |
+| `weapons.super` | air constructors (the act refuses others) | - | D-126 (owner): a super cannon framed or startable: every air constructor frames it or assists the frame. Above `keep.current`. |
+| `weapons.cluster` | constructors | - | D-126: from +200 metal, within the weapon budget, the highest-priority weapon cluster's next open slot ([`tech_weapons.md`](tech_weapons.md)). Above `fwd.t2.defend`. |
+| `air.defend` | air constructors | - | now asks `TechWeapons::Work` before its defence ring |
+
 ### Rows added by D-107 to D-114
 
 In table order (the full, current order is `TechRules::Init`, and the one-page
@@ -129,4 +141,4 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 30cb29f01c72803c8f9530faa6d314659c17be67; lines: 555 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: fe7d41b431d2c93e64f1bce9ddc3010e46105fe1; lines: 568 -->

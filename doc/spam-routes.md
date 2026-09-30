@@ -141,7 +141,8 @@ where it activates and then builds nothing is - see
 
 ## Notes
 
-- Route orders are plain moves. The units still shoot: fire state is untouched.
+- Default route orders are plain moves. D-143 adds opt-in `standoff` range
+  control for specialist Arquebus units; ordinary spam has no such setting.
 - The route task keeps only units assigned through the normal task path and
   loses them through the normal removal path, so it cannot hold a freed
   pointer; the empty task idles until script aborts it.

@@ -1,0 +1,45 @@
+{
+  "stop_minute": 35,
+  "expect": [
+    {
+      "key": "zero specialists",
+      "pattern": "\\[Lanes\\] qualified specialists=0",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "income gate 0",
+      "pattern": "\\[MountainTest\\] income gate team=0",
+      "scope": "any",
+      "by_minute": 30
+    },
+    {
+      "key": "income gate 1",
+      "pattern": "\\[MountainTest\\] income gate team=1",
+      "scope": "any",
+      "by_minute": 30
+    }
+  ],
+  "forbid": [
+    {
+      "key": "specialist lane",
+      "pattern": "\\[Lanes\\] qualified specialists=[1-9]",
+      "scope": "any"
+    },
+    {
+      "key": "flank production",
+      "pattern": "\\[TECH\\]\\[Flank\\] (ordered|produce|routed)",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|: WARN\\s+:|SCRIPT CRASH|Access violation",
+      "scope": "any"
+    }
+  ]
+}

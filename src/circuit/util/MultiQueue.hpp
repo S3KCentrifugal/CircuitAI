@@ -15,6 +15,17 @@
 namespace circuit {
 
 template <typename T>
+void CMultiQueue<T>::PushBefore(const T& item, ConditionFunction before)
+{
+    std::unique_lock<spring::mutex> lock(_mutex);
+    auto it = _queue.begin();
+    while (it != _queue.end() && !before(*it)) ++it;
+    _queue.insert(it, item);
+    lock.unlock();
+    _cond.notify_one();
+}
+
+template <typename T>
 T CMultiQueue<T>::Pop()
 {
 	std::unique_lock<spring::mutex> mlock(_mutex);

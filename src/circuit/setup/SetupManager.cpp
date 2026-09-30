@@ -20,6 +20,11 @@
 #include "util/Utils.h"
 #include "json/json.h"
 
+#include <regex>
+#include <map>
+#include <set>
+#include <algorithm>
+
 #include "spring/SpringCallback.h"
 #include "spring/SpringMap.h"
 
@@ -43,6 +48,7 @@ CSetupManager::CSetupManager(CCircuitAI* circuit, CSetupData* setupData)
 		, setupData(setupData)
 		, script(new CSetupScript(circuit->GetScriptManager(), this))
 		, config(nullptr)
+		, scriptConfig(nullptr)
 		, commander(nullptr)
 		, startPos(-RgtVector)
 		, basePos(-RgtVector)
@@ -62,6 +68,7 @@ CSetupManager::CSetupManager(CCircuitAI* circuit, CSetupData* setupData)
 	if (!setupData->IsInitialized()) {
 		setupData->ParseSetupScript(circuit, circuit->GetGame()->GetSetupScript());
 	}
+	ParseScriptStarts();  // D-127: the script is readable here (later calls return nothing)
 
 	findStart = CScheduler::GameJob(&CSetupManager::FindStart, this);
 	circuit->GetScheduler()->RunJobEvery(findStart, 1);
@@ -71,6 +78,7 @@ CSetupManager::~CSetupManager()
 {
 	delete script;
 	delete config;
+	delete scriptConfig;
 }
 
 void CSetupManager::DisabledUnits()
@@ -114,6 +122,15 @@ bool CSetupManager::OpenConfig(const std::string& profile, const std::vector<std
 
 void CSetupManager::CloseConfig()
 {
+	if (config != nullptr) {  // D-126: the script-read sections outlive the config
+		delete scriptConfig;
+		scriptConfig = new Json::Value(Json::objectValue);
+		for (const char* key : {"weapons", "lanes"}) {
+			if (config->isMember(key)) {
+				(*scriptConfig)[key] = (*config)[key];
+			}
+		}
+	}
 	delete config;
 	config = nullptr;
 }
@@ -126,6 +143,131 @@ const CSetupData::ModOptions& CSetupManager::GetModOptions() const
 bool CSetupManager::HasStartBoxes() const
 {
 	return setupData->IsInitialized();
+}
+
+int CSetupManager::EnemyStartBoxAt(const AIFloat3& pos) const
+{
+	if (!setupData->IsInitialized()) {
+		return -1;
+	}
+	const int own = circuit->GetAllyTeamId();
+	for (int i = 0; i < setupData->GetAllyTeamCount(); ++i) {
+		if (i == own) {
+			continue;
+		}
+		CAllyTeam* at = setupData->GetAllyTeam(i);
+		if ((at != nullptr) && at->GetStartBox().ContainsPoint(pos)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void CSetupManager::ParseScriptStarts()
+{
+	if (scriptStartsParsed) {
+		return;
+	}
+	scriptStartsParsed = true;
+	const char* raw = circuit->GetGame()->GetSetupScript();
+	if (raw == nullptr) {
+		return;
+	}
+	const std::string script(raw);
+	// Direct fields: [team0] { startposx=...; allyteam=...; }, [ai1] { team=1; },
+	// [player0] { team=2; spectator=1; }. A plain scan: std::regex threw on this
+	// compiler ("Invalid range in '{}'") and the AI failed to start.
+	auto trim = [](std::string s) {
+		const size_t b = s.find_first_not_of(" \t\r\n");
+		const size_t e = s.find_last_not_of(" \t\r\n");
+		return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
+	};
+	std::map<int, SScriptStart> teams;
+	std::set<int> playing;
+	size_t pos = 0;
+	while ((pos = script.find('[', pos)) != std::string::npos) {
+		const size_t close = script.find(']', pos);
+		if (close == std::string::npos) {
+			break;
+		}
+		std::string name = script.substr(pos + 1, close - pos - 1);
+		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+		pos = close + 1;
+		if (name.rfind("team", 0) != 0 && name.rfind("ai", 0) != 0 && name.rfind("player", 0) != 0) continue;
+		const size_t open = script.find('{', close);
+		if (open == std::string::npos) continue;
+		// AI blocks normally contain [OPTIONS]. Keep their own Team field,
+		// skipping nested sections rather than discarding the entire AI.
+		std::string body;
+		int depth = 1;
+		bool quoted = false, childHeader = false;
+		for (size_t i = open + 1; i < script.size() && depth > 0; ++i) {
+			const char ch = script[i];
+			if (ch == '"' && script[i - 1] != '\\') quoted = !quoted;
+			if (!quoted && ch == '{') { ++depth; continue; }
+			if (!quoted && ch == '}') {
+				--depth;
+				if (depth == 1) { childHeader = false; body += ';'; }
+				continue;
+			}
+			if (!quoted && depth == 1 && ch == '[') childHeader = true;
+			if (depth == 1 && !childHeader) body += ch;
+		}
+		if (depth != 0) continue;
+		std::map<std::string, std::string> vals;
+		size_t s = 0;
+		while (s < body.size()) {
+			size_t semi = body.find(';', s);
+			if (semi == std::string::npos) {
+				semi = body.size();
+			}
+			const std::string item = body.substr(s, semi - s);
+			const size_t eq = item.find('=');
+			if (eq != std::string::npos) {
+				std::string k = trim(item.substr(0, eq));
+				std::transform(k.begin(), k.end(), k.begin(), ::tolower);
+				vals[k] = trim(item.substr(eq + 1));
+			}
+			s = semi + 1;
+		}
+		if ((name.rfind("team", 0) == 0) && vals.count("startposx") && vals.count("startposz")) {
+			const int id = std::atoi(name.c_str() + 4);
+			SScriptStart st;
+			st.pos = AIFloat3(std::atof(vals["startposx"].c_str()), 0.f, std::atof(vals["startposz"].c_str()));
+			st.allyTeam = vals.count("allyteam") ? std::atoi(vals["allyteam"].c_str()) : -1;
+			teams[id] = st;
+		} else if ((name.rfind("ai", 0) == 0) && vals.count("team")) {
+			playing.insert(std::atoi(vals["team"].c_str()));
+		} else if ((name.rfind("player", 0) == 0) && vals.count("team")
+			&& !(vals.count("spectator") && (std::atoi(vals["spectator"].c_str()) != 0)))
+		{
+			playing.insert(std::atoi(vals["team"].c_str()));
+		}
+	}
+	for (const auto& kv2 : teams) {
+		if (playing.count(kv2.first)) {
+			scriptStarts.push_back(kv2.second);
+		}
+	}
+	circuit->LOG("LANES: %i playing team start(s) in the start script", (int)scriptStarts.size());
+}
+
+int CSetupManager::GetScriptStartCount()
+{
+	ParseScriptStarts();
+	return (int)scriptStarts.size();
+}
+
+AIFloat3 CSetupManager::GetScriptStart(int i)
+{
+	ParseScriptStarts();
+	return ((i >= 0) && (i < (int)scriptStarts.size())) ? scriptStarts[i].pos : AIFloat3(-1.f, 0.f, 0.f);
+}
+
+bool CSetupManager::IsScriptStartEnemy(int i)
+{
+	ParseScriptStarts();
+	return (i >= 0) && (i < (int)scriptStarts.size()) && (scriptStarts[i].allyTeam != circuit->GetAllyTeamId());
 }
 
 bool CSetupManager::CanChooseStartPos() const

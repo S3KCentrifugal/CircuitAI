@@ -5,7 +5,9 @@
  * Script (Spam:: in data/script/src/manager/spam.as) creates one per factory
  * with TaskF::Route(), sets the route with SetRoute() and assigns every unit
  * that factory produces. Units follow the queued waypoints, hold at the end,
- * never retreat, and are re-issued the route whenever it changes.
+ * never retreat, and are re-issued the route whenever it changes. Definitions
+ * with a configured standoff fraction temporarily pause for range-controlled
+ * combat, then resume their route without changing task ownership.
  */
 
 #ifndef SRC_CIRCUIT_TASK_FIGHTER_ROUTETASK_H_
@@ -46,6 +48,7 @@ public:
 	 * backline, so this is kept small. `count` 1 disables the spread.
 	 */
 	void SetLanes(int count, float spacing, float endSpread);
+	void SetTraversal(bool preserveWaypoints, float radius, bool fightAtEnd);
 	int GetRouteVersion() const { return version; }
 	unsigned int GetRouteSize() const { return route.size(); }
 	bool IsAtEnd(CCircuitUnit* unit) const;
@@ -61,6 +64,7 @@ private:
 
 	std::vector<springai::AIFloat3> route;
 	std::map<CCircuitUnit*, int> lanes;   // unit -> signed lane index
+	std::set<CCircuitUnit*> engaging;  // temporarily paused for configured range micro
 	int laneCount;
 	float laneSpacing;
 	float laneEndSpread;
@@ -68,6 +72,8 @@ private:
 	int version;
 	bool dirty;
 	float arriveRadius;
+	bool preserveWaypoints = false;
+	bool fightAtEnd = false;
 };
 
 } // namespace circuit
