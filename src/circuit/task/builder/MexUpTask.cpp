@@ -101,7 +101,8 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 		return true;
 	}
 	if (geom::is_valid(buildPos)
-		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
 			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
@@ -183,7 +184,8 @@ void CBMexUpTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, floa
 
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	if (terrainMgr->CanReachAtSafe(builder, adjPos, builder->GetCircuitDef()->GetBuildDistance())
-		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), adjPos, facing))
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, adjPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), adjPos, facing))
 	{
 		SetBuildPos(adjPos);
 	} else {

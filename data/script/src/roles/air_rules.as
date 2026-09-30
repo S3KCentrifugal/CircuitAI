@@ -37,6 +37,10 @@ namespace AirRules {
         @t = AirBuild::Factory(u, false);
         if (t !is null) return AirBuild::Record(t, Team::Ferry::requestPending ? "transport.plant" : "opening.plant", u);
         // T2 builders, including gifts, upgrade mexes without requiring a T2 plant.
+        if (AirEconomy::BankedLab(ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side)))) {
+            @t = AirBuild::Factory(u, true);
+            if (t !is null) return AirBuild::Record(t, "production.banked", u);
+        }
         @t = AirBuild::UpgradeMex(u);
         if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
         @t = AirBuild::AssistMex(u);
@@ -71,9 +75,9 @@ namespace AirRules {
             @t = AirBuild::Utility(u, UnitHelpers::GetEnergyStorageNameForSide(side), Task::BuildType::STORE, 1);
             if (t !is null) return AirBuild::Record(t, "storage.buffer", u);
         }
-        // A funded first T2 package must not wait for the aspirational T1 energy
-        // target to catch up with distant mex income. Transition checks its own
-        // energy floor and reserves; later bays still follow ordinary growth.
+        // An income-qualified first T2 lab must not wait for the aspirational
+        // T1 energy target. Recovery remains above this row; later labs also
+        // require spare capacity unless their full cost is already banked.
         if (AirEconomy::t2 == 0) {
             @t = AirBuild::Factory(u, true);
             if (t !is null) return AirBuild::Record(t, "transition.bay", u);

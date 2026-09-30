@@ -1,5 +1,18 @@
 # Playtest: launch, watch, screenshot, stop
 
+Allied-layout/AIR-income regression (D-153): stage Cortex AIR with TECH allies,
+`--roles AIR,TECH`, the final DLL, `allied_layout_fixture.lua` and `air_watch.lua`.
+Run `prepare_air_check.py --dir <absolute-dir> --scenario natural`, then
+`prepare_allied_layout_check.py --dir <absolute-dir>`. The latter appends
+test-only probes to staged scripts. Use `allied_layout` checks for the first
+four minutes. Add `air_income_fixture.lua` for the supplied low-income/full-bank
+scenario (`air_income`, eighteen minutes), or `air_sustained_fixture.lua` for
+income-only eligibility (`air_sustained`, twelve minutes). The sustained fixture
+shares metal above 1,000 to team 1 while supplying generating assets; it must
+log `player-team=0`. These are controlled fixtures, not PvP benchmarks.
+See [design](../../doc/allied-layout-air-income-plan.md) and
+[measured results](../../doc/allied-layout-air-income-results.md).
+
 AIR commander/screen regression (D-150): stage an AIR game with both
 `--extra-widget tools/playtest/widgets/air_watch.lua` and
 `--extra-widget tools/playtest/widgets/air_opening_watch.lua`, then use

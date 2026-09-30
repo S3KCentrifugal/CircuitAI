@@ -8578,6 +8578,10 @@ one.
 
 ## D-152 — Reserve expansion before fortification; AIR mex-first access and first-mex delivery
 
+**Superseded in part by D-153.** The all-mex T2 lab gate below is historical.
+Labs now use sustained income or a full-cost metal bank; the fusion mex gate
+remains. See [D-153 validation](allied-layout-air-income-results.md).
+
 **Decision.** Implement the owner's [design](air-tech-expansion-plan.md):
 [AIR economy](../data/script/src/manager/air_economy.as),
 [AIR layout](../data/script/src/manager/air_layout.as),
@@ -8673,3 +8677,96 @@ The [results](air-tech-expansion-results.md) retain strict overall TECH invarian
 failures and unplayed lifecycle limits. The matching DLL, symbols and complete
 current data tree are published to the mandatory engine build output; no live
 BAR installation is written and the commit stays local as requested.
+
+
+## D-153 â€” Allied reservations and income-gated AIR labs
+
+**Decision.** Implement the [recorded plan](allied-layout-air-income-plan.md).
+Use one spatial rectangle index in native `CAllyTeam` for all allied slot/zone
+owners. Sharing geometry rather than copying role policy avoids a second
+reservation ledger over messages. All admissions, ordinary site searches and
+build-command retries honor foreign footprints. Full owner cluster envelopes
+exclude unrelated defenses, including holes vacated by old structures.
+Same-owner overlap is legal for nested slots and zones and releases independently.
+
+AIR and TECH recheck untouched clusters before their first order, release only
+that plan if physically blocked, and search again. A native claim/frame or
+persisted start locks the cluster. AIR retries reuse the same saved bay key;
+a failed relocation does not count as a still-held speculative bay. The Armada
+obstruction run exhausted the old 17-ring search, so AIR now exposes
+`BaySearchRings=25` (128-elmo steps). The longer search still rejects every
+foreign footprint and map-boundary violation. TECH plans
+two future clusters per tier without purchasing them or changing its spending
+sequence. Its partial economy boxes keep initial terrain holes; treating those
+holes as new obstructions was rejected after the first regression. Failed
+forward searches now advance their bounded persisted attempt count (KI-423).
+
+Replace only AIR's lab gate: minimum income over a complete fresh ten-second
+window >=50 metal/s OR current bank >= loaded lab metal cost. Full-bank orders
+precede mex upgrading and bypass existing support/capacity waits, as explicitly
+requested. One unfinished plant and the configured cap still apply. Reactors
+retain mex completion. Keep transport requests, scout/three-constructor opening,
+initial fighters and funded build-power growth ahead of optional strikes.
+T1 strikes replenish toward bounded income-scaled targets; Cortex uses Shurikens.
+A low-income T2 purchase does not shut the T1 plant off. Energy recovery still
+protects the economy; first-fusion preparation alone no longer pauses strikes.
+
+**Invariant.** INV-083 now checks income/full-bank lab admission, superseding its
+D-152 mex promise. INV-088 rejects cross-owner reservations and checks pinned
+building orders. INV-084 retains complete twenty-slot speculative AIR banks;
+INV-087 keeps speculative TECH plans out of active project accounting. The
+[actor matrix](actor-matrix.md) and [register](invariants.md) describe ownership.
+
+**Status.** Built, Checked, Played with limits. The [measured results](allied-layout-air-income-results.md)
+retain failed iterations and final runs. Native geometry/ranking, eleven shared
+index cases and 93 executable AngelScript policy cases pass. Actual games prove
+reciprocal exclusion, forced relocation, active-cluster stability, both funding
+paths, continued T1 fighters/bombers/Shurikens and constructor production.
+Mixed games retain TECH invariant failures (KI-427); the natural fusion still
+misses twenty minutes (KI-436). Shared save/load and runtime-role lifecycle
+coverage remain incomplete (KI-439). Do not infer a clean PvP benchmark.
+
+**Files.** Shared native mechanism:
+[index](../src/circuit/terrain/AlliedReservations.h),
+[ally ownership](../src/circuit/unit/ally/AllyTeam.h),
+[terrain implementation](../src/circuit/terrain/TerrainManager.cpp),
+[terrain contract](../src/circuit/terrain/TerrainManager.h),
+[bindings](../src/circuit/script/InitScript.cpp),
+[build retries](../src/circuit/task/builder/BuilderTask.cpp),
+[mex](../src/circuit/task/builder/MexTask.cpp),
+[mex upgrades](../src/circuit/task/builder/MexUpTask.cpp),
+[geo](../src/circuit/task/builder/GeoTask.cpp).
+
+Script policy:
+[settings](../data/script/src/global.as),
+[layout helpers](../data/script/src/helpers/layout_helpers.as),
+[production math](../data/script/src/helpers/production_math.as),
+[income window](../data/script/src/manager/economy.as),
+[AIR economy](../data/script/src/manager/air_economy.as),
+[AIR layout](../data/script/src/manager/air_layout.as),
+[AIR production](../data/script/src/manager/air_production.as),
+[AIR actions](../data/script/src/roles/air_build.as),
+[AIR sequence](../data/script/src/roles/air_rules.as),
+[TECH economy layout](../data/script/src/manager/layout.as),
+[TECH factory plans](../data/script/src/roles/tech_factories.as).
+
+Tests and tooling:
+[native cases](../tests/allied_reservations_test.cpp),
+[test target](../tests/CMakeLists.txt),
+[policy cases](../tests/production_math_tests.as),
+[probe](../tools/playtest/allied_layout_probe.as),
+[probe preparer](../tools/playtest/prepare_allied_layout_check.py),
+[blocker widget](../tools/playtest/widgets/allied_layout_fixture.lua),
+[bank fixture](../tools/playtest/widgets/air_income_fixture.lua),
+[income fixture](../tools/playtest/widgets/air_sustained_fixture.lua),
+[layout checks](../tools/playtest/checks/allied_layout.json),
+[bank checks](../tools/playtest/checks/air_income.json),
+[income checks](../tools/playtest/checks/air_sustained.json),
+[expansion observer](../tools/playtest/widgets/expansion_watch.lua),
+[run instructions](../tools/playtest/README.md).
+
+Reviewed references:
+[AIR](roles/air.md), [AIR actions](roles/air_build.md),
+[AIR sequence](roles/air_rules.md), [TECH factories](roles/tech_factories.md),
+[AIR management](air-management.md), [native layout](base-layout.md),
+[API](angelscript-references.md), [known issues](known-issues.md).

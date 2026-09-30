@@ -134,6 +134,16 @@ public:
 	int ReservePersistentBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
 	void ReleasePersistentBuilding(int id);
 	int GetReservationState(int id) const; // -1 absent, 0 free, 1 claimed, 2 framed, 3 complete, 4 dead
+	bool IsReservationBuildable(int id) const;
+	int GetGroupActivationState(int group) const; // -1 missing, 0 ready, 1 blocked, 2 started
+	int GetGroupZone(int group) const;
+	int GetZoneActivationState(int zone) const;
+	int ReserveClusterEnvelope(int slot, int group);
+	bool IsAllyLayoutBlocked(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+	bool CanReserveArea(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong) const;
+	bool IsAllyLayoutRectBlocked(const int2& c1, const int2& c2) const;
+	void ShareSlot(int id);
+	void ShareZone(int id);
 	// cols x rows footprints of cdef behind frontCentre (the middle of the grid's
 	// front edge), rows receding away from `facing`, `gap` cells between them.
 	// Slots the terrain refuses are skipped. Returns the group id, 0 if nothing fit.

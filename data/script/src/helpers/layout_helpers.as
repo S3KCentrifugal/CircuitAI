@@ -23,6 +23,34 @@ side vectors as Side() here, so a grid and an offset agree on left and right.
 
 ******************************************************************************/
 namespace LayoutHelpers {
+    int alliedCheckFrame = -100000;
+    void CheckAlliedPlacements()
+    {
+        if (ai.frame - alliedCheckFrame < SECOND) return;
+        alliedCheckFrame = ai.frame;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            IBuilderTask@ task = u is null ? null : cast<IBuilderTask>(u.task);
+            if (task is null || task.buildDef is null || task.GetBuildType() >= int(Task::BuildType::REPAIR)) continue;
+            const int slot = AiTaskReservationId(task);
+            if (slot < 0) continue;
+            if (aiTerrainMgr.IsAllyLayoutBlocked(task.buildDef, aiTerrainMgr.GetReservationPos(slot), aiTerrainMgr.GetReservationFacing(slot)))
+                Invariants::Violation("INV-088", "" + u.id, "building task overlaps another allied layout reservation");
+        }
+    }
+    // State is aggregated before checking buildability: one live claim locks a cluster.
+    int ActivationState(const array<int> &in slots)
+    {
+        bool blocked = slots.length() == 0;
+        for (uint i = 0; i < slots.length(); ++i) {
+            const int state = aiTerrainMgr.GetReservationState(slots[i]);
+            if (state >= 1 && state <= 3) return 2;
+            if (!aiTerrainMgr.IsReservationBuildable(slots[i])) blocked = true;
+        }
+        return blocked ? 1 : 0;
+    }
+
     AIFloat3 Offset(const AIFloat3 &in p, int f, float across, float along)
     {
         if (f == 1) return AIFloat3(p.x + along, 0.0f, p.z - across);

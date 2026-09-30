@@ -69,13 +69,19 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 81a78cfd6649cb730091ec35f69b62a7487f5c4d; lines: 376 -->
+<!-- source: data/script/src/roles/air_build.as; blob: d735ee0d8f6ef0af23d3f388b710d0c8bb448278; lines: 382 -->
 
-## D-152: mex-first plants and conversion
+## D-153: income-gated plants and mex-first reactors
 
-`RequiresMexes` covers reactors and T2 aircraft plants. `Factory` rechecks owned
-mexes for every tier-two bay; `Tick` cancels an unstarted order if a new basic
-mex invalidates it, while `Resume` declines it. `Convert` scales T1 converter
-capacity with surplus energy and admits three concurrent orders, without a
-metal-income ceiling. It runs after mex upgrade/assist and in the commander's
-local economy after the opening crew. `Record` checks INV-083.
+`RequiresMexes` covers reactors. `Factory` requires a full ten-second window
+with minimum income at least 50 metal/s or a bank covering the full plant cost.
+A fully banked plant bypasses support saturation and spare-capacity waits;
+other additional plants retain capacity checks. `AirEconomy::Transition` owns
+that shared admission rule; `Record` checks INV-083 against the fresh inputs.
+An admitted plant is not canceled because income falls or another mex arrives.
+`AirLayout::Activate` validates every unused bay member before the first order,
+relocating a blocked plan and preserving claimed or previously started bays.
+
+`Convert` scales T1 conversion with surplus energy until owned mex upgrades
+finish, permitting three concurrent orders. `Tick`, `Resume`, and `Record`
+retain the reactor mex gate (INV-077).

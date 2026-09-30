@@ -139,6 +139,7 @@ namespace AirEconomy {
     {
         if (!Active() || (sampleFrame >= 0 && ai.frame - sampleFrame < SECOND)) return;
         sampleFrame = ai.frame;
+        LayoutHelpers::CheckAlliedPlacements();
         AirLayout::PlanAhead();
         if (aiEconomyMgr.assistNanoEnabled)
             Invariants::Violation("INV-073", "AIR", "native nano planner enabled while AIR owns production support");
@@ -240,31 +241,14 @@ namespace AirEconomy {
             }
         }
     }
+    bool BankedLab(CCircuitDef@ plant)
+    {
+        return plant !is null && plant.costM > 0.0f && aiEconomyMgr.metal.current >= plant.costM;
+    }
     bool Transition(CCircuitDef@ plant)
     {
-        if (!MexesReady()) return false;
-        if (PreparingFusion() && !HasAdvancedBuilder()) {
-            CCircuitDef@ cons = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
-            // Buy access first; upgraded mex income funds the subsequent reactor.
-            return plant !is null && cons !is null && !recovery
-                && metal >= Global::RoleSettings::Air::FusionAccessMinMetal
-                && energy >= Global::RoleSettings::Air::FusionAccessMinEnergy
-                && ProductionMath::Funded(bankM, metal * 0.6f, 150.0f, AirBuild::Committed(false),
-                    plant.costM + cons.costM, Global::RoleSettings::Air::FusionAccessFundSeconds)
-                && ProductionMath::Funded(bankE, AiMax(energy - demandE * 0.5f, 0.0f), 500.0f,
-                    AirBuild::Committed(true), plant.costE + cons.costE, Global::RoleSettings::Air::FusionAccessFundSeconds);
-        }
-        if (plant is null || recovery || ai.frame < Global::RoleSettings::Air::TransitionEarliestSeconds * SECOND
-            || metal < Global::RoleSettings::Air::TransitionMinMetal || energy < Global::RoleSettings::Air::TransitionMinEnergy) return false;
-        const float seconds = Global::RoleSettings::Air::TransitionFundSeconds;
-        // Plant + constructor + two mex upgrades + two seed nanos, with replacement screen.
-        CCircuitDef@ cons = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
-        CCircuitDef@ mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
-        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
-        if (cons is null || mex is null || nano is null) return false;
-        return ProductionMath::Funded(bankM, metal * 0.35f, metal * 15.0f, AirBuild::Committed(false), plant.costM + cons.costM + 2.0f * (mex.costM + nano.costM), seconds)
-            && ProductionMath::Funded(bankE, AiMax(energy - demandE, 0.0f), demandE * 5.0f, AirBuild::Committed(true),
-                plant.costE + cons.costE + 2.0f * (mex.costE + nano.costE), seconds);
+        return plant !is null && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
+            Economy::IncomeWindowReady(), Global::RoleSettings::Air::TransitionMinMetal, aiEconomyMgr.metal.current, plant.costM);
     }
     int NanoTarget(uint bay)
     {

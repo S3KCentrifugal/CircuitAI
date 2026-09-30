@@ -114,7 +114,8 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 	}
 	CMetalManager* metalMgr = circuit->GetMetalManager();
 	CEconomyManager* economyMgr = circuit->GetEconomyManager();
-	if (circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+	if (!circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
 		if ((State::ENGAGE == state) || metalMgr->IsOpenSpot(spotId)) {  // !isFirstTry
 			state = State::ENGAGE;  // isFirstTry = false
 //			metalMgr->SetOpenSpot(index, false);

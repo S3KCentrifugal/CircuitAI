@@ -74,8 +74,8 @@ namespace AirBuild {
             Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
         if (build !is null && build.GetBuildType() == int(Task::BuildType::FACTORY)
             && build.target is null && build.buildDef !is null && UnitHelpers::IsT2AircraftPlant(build.buildDef.GetName())
-            && !AirEconomy::MexesReady())
-            Invariants::Violation("INV-083", "AIR", "T2 air lab ordered before owned mex upgrades complete");
+            && !AirEconomy::Transition(build.buildDef))
+            Invariants::Violation("INV-083", "AIR", "T2 air lab ordered below sustained income and full-bank thresholds");
         // Repair tasks also carry the target's definition, but own no building slot.
         if (build !is null && build.GetBuildType() == int(Task::BuildType::ENERGY) && build.buildDef !is null && build.buildDef.GetName()
             == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(build.buildDef.GetName()))) {
@@ -210,28 +210,34 @@ namespace AirBuild {
         const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
         if (!advanced && count > 0) return null;
         if (advanced) {
-            if (!AirEconomy::MexesReady()) return null;
+            if (!AirEconomy::Transition(d)) return null;
             if (count >= Global::RoleSettings::Air::MaxProductionBays) return null;
-            if (count == 0 && !AirEconomy::Transition(d)) return null;
-            if (count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, Global::RoleSettings::Air::MaxProductionBays,
+            if (!AirEconomy::BankedLab(d) && count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, Global::RoleSettings::Air::MaxProductionBays,
                 ai.frame - AirEconomy::stableSince, Global::RoleSettings::Air::CapacityStableSeconds * SECOND,
                 AirEconomy::bankM, d.costM * 0.6f))) return null;
             // Fill useful existing support first. Twenty is a soft comparison threshold.
-            for (uint b = 0; count > 0 && b < AirLayout::bays.length(); ++b)
+            for (uint b = 0; !AirEconomy::BankedLab(d) && count > 0 && b < AirLayout::bays.length(); ++b)
                 if (AirLayout::bays[b].factoryId >= 0 && AirLayout::bays[b].defName == name && b < AirEconomy::nanoCount.length()
                     && AirEconomy::nanoCount[b] + AirEconomy::nanoFuture[b] < AirEconomy::NanoTarget(b)) return null;
         }
         AirLayout::Bay@ bay = null;
         for (uint b = 0; b < AirLayout::bays.length(); ++b)
-            if (AirLayout::bays[b].defName == name && AirLayout::bays[b].factoryId < 0 && AirLayout::bays[b].slot >= 0
-                && aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 0) { @bay = AirLayout::bays[b]; break; }
+            if (AirLayout::bays[b].defName == name && AirLayout::bays[b].factoryId < 0
+                && (aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) <= 0 || aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 4)) { @bay = AirLayout::bays[b]; break; }
         if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame));
         if (bay is null) return null;
-        return AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
+        @bay = AirLayout::Activate(bay);
+        if (bay is null) return null;
+        if (advanced) GenericHelpers::LogUtil("[AIR][LabGate] M10=" + int(Economy::GetMinMetalIncomeLast10s())
+            + " window=" + Economy::IncomeWindowReady() + " bank=" + int(aiEconomyMgr.metal.current)
+            + " cost=" + int(d.costM) + " reason=" + (AirEconomy::BankedLab(d) ? "bank" : "income"), 1);
+        IUnitTask@ order = AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
+        if (order !is null) { bay.started = true; AirLayout::Save(bay); }
+        return order;
     }
     bool RequiresMexes(CCircuitDef@ d)
     {
-        return d !is null && (IsReactor(d) || UnitHelpers::IsT2AircraftPlant(d.GetName()));
+        return IsReactor(d);
     }
     IUnitTask@ Convert(CCircuitUnit@ u)
     {

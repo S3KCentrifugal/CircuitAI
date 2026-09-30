@@ -2,7 +2,8 @@
 
 The experimental AIR role has its own economy, layout and ordered building
 controller. TECH continues through `TechRules`, `TechBuild`, `TechChain` and
-`Layout`; none of those policy files are changed by this work.
+`Layout`. Both now share native allied reservations (D-153); their spending
+sequences and cluster geometries remain separate.
 
 ## Layout and economy
 
@@ -10,6 +11,8 @@ The T1 starter has a rear bank of up to five ordinary construction turrets.
 T2 production bays have two side banks, with up to twenty planned turrets and
 separate build pads. The campus adds one bay at a time at a nominal 560-elmo
 spacing; the configurable safety ceiling is twelve T2 plants, not a target.
+The candidate search covers 25 rings in 128-elmo steps, allowing replacement
+sites beyond the original crowded 2,048-elmo radius.
 If terrain only fits a partial bank, capacity uses those actual slots. Standing
 gifted plants are adopted in place and nearby support slots are fitted around
 them. Windmills use atomically reserved 3-by-2 groups of six touching footprints,
@@ -30,6 +33,14 @@ and bay coordinates are saved under `air.bay.*`, separate from TECH's metadata.
 The overlay selects the active role's layout. Coordinates are checked before
 native grid queries, including at map edges.
 
+AIR holds six complete future T2 bays and two T1 sites when terrain permits.
+TECH holds two future clusters per factory type. Native allied slot and zone
+rectangles exclude other allied instances; full cluster envelopes also exclude
+unreserved defense placement. Before the first order, an obstructed unused
+cluster releases its claims and searches again. A claimed or started cluster
+stays fixed. See [the shared contract](base-layout.md) and
+[D-153 design](allied-layout-air-income-plan.md).
+
 `AirEconomy` samples owned units and the ten-second low income once per second.
 Each live in-range ordinary nano belongs to its nearest production bay once;
 unfinished turrets are future capacity. Physical build speed comes from the
@@ -38,14 +49,13 @@ policy value. Production estimates use build time and metal/energy cost from
 the loaded UnitDefs. The initial mix is seven fighters to three bombers.
 
 AIR targets its first completed fusion by **20 minutes**, with every owned mex
-upgraded before any reactor starts (D-148). From eight minutes it prepares T2
-access if no capable constructor has arrived: +12 metal/+450 energy and a
-300-second forecast fund the plant and constructor first. Upgraded mex income
-then funds fusion. The ordinary production-expansion T2 gate remains eight
-minutes, +30 metal and +1,200 energy, plus funding
-for a plant, a constructor, two mex upgrades, two seed nanos and a reserve.
-That ordinary gate uses a 100-second funding projection. Further bays require sustained
-spare income for twenty seconds and useful support on existing bays. The role
+upgraded before any reactor starts (D-148). A T2 air lab needs either a complete,
+fresh ten-second window whose minimum metal income is at least +50, or the
+lab's full metal cost in the bank (D-153). Mex completion no longer gates labs.
+Further bays require sustained spare income for twenty seconds and useful
+support on existing bays, unless the entire next lab is already banked. The
+full-bank exception bypasses those expansion waits; the configured plant cap
+and one unfinished lab limit still apply. The role
 keeps growing T1 energy/storage while those conditions are unmet. Three bad
 energy samples enter recovery; ten adequately buffered samples leave it.
 Mobile construction targets scale at eight work/second per metal/second,
@@ -71,7 +81,8 @@ covering cloaked/armed/underwater variants without changing shared catalogs.
 An unreachable owned basic mex delays the goal; the clock never bypasses it.
 Queued unstarted reactors are cancelled when new mex work appears; existing
 reactor construction continues. Transports and the defensive fighter quota
-remain ahead of optional aircraft, which pause during first-fusion preparation.
+remain ahead of optional aircraft. Fusion preparation does not by itself pause
+T1 combat production. Energy recovery and immediate defense can still defer it.
 
 The turret target takes the larger of funded aircraft throughput and an
 income/float construction floor shared across live production bays. Support
@@ -102,7 +113,12 @@ transport is retried while still owed. The finite queue preserves the existing
 TECH cargo protocol and permits future requestor roles.
 
 Scouts, initial fighters and economic constructors have finite quotas. T1 strike
-aircraft are bounded. T2 fighters assigned to home interception cannot enter
+aircraft replenish toward income-scaled limits: one strike order per two extra
+fighter orders after the defensive screen, alternating support and bombers.
+Cortex support uses Shurikens (up to sixteen); bombers cap at twelve. Other
+factions retain their three-gunship support limit. A T2 purchase below +50 does
+not idle the T1 plant. Constructor growth retains its funded priority.
+T2 fighters assigned to home interception cannot enter
 the held/launched wave ledgers (INV-072). Finished units, frames and pending
 recruits are counted without a second "queued" count at birth. Existing wave
 methods, native bombing, AA-led porc, heavy aircraft and dynamic-production
@@ -122,8 +138,9 @@ targets, bounds and capacity gating. Its tests execute the actual AngelScript
 using the vendored runtime. New native observations expose owned IDs, pending
 unframed recruits, physical work/time/reach and persistent reservation states.
 The flying-builder approach lever defaults false; AIR alone enables it and
-resets it on leave. Existing native method defaults and TECH's rule order,
-geometry, resource thresholds, JSON and random calls are unchanged.
+resets it on leave. TECH's spending gates and build sequence remain intact;
+D-153 adds speculative factory sites, activation checks and shared native
+placement exclusion without routing TECH through AIR's economy controller.
 
 Shared manager changes are guarded by AIR role and/or its feature flag. Native
 completion-chain economy orders are reconciled after enqueue so they cannot

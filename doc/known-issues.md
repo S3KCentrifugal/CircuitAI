@@ -2022,7 +2022,14 @@ Sharing reservations over the roster (`barbres`, D-029 step 5) is the
 planned fix and is not built; neither is a second complex or a port
 complex (design step 7).
 
-**Status.** Open. Recorded 2026-09-20 with D-053; locations updated for D-060.
+**Status.** D-153 fixes same-library allied AI reservations through the shared
+native `CAllyTeam` rectangle index, rather than duplicating state in roster
+messages. Reciprocal AIR/TECH admission and physical-obstruction relocation are
+played on Supreme; see [results](allied-layout-air-income-results.md). Humans
+and AIs loaded from a different library cannot read this in-process index.
+Their buildings are handled as physical obstructions before first activation;
+live clusters cannot simply move. A cross-library/human overlay protocol is
+still a possible extension. Save/load and role-switch coverage remains KI-439.
 
 ### KI-406 — Closed: layout state is authoritative across save/load
 
@@ -2559,6 +2566,13 @@ from an exhausted, explicitly logged search. Do not simply suppress INV-013.
 
 **Verification.** Reproduced in
 `build-theatres/tactical/glacial-r5/runs/20260928-212935/infolog.txt`, team 2.
+
+**D-153 partial fix.** Failed `PlanForwardBox` searches now advance the persisted
+attempt count and candidate location, with the existing bounded retry cadence.
+Started forward boxes no longer move due to coarse ally-base changes. The
+Supreme obstruction tests verify first-use behavior; the original Glacial
+exhaustion fixture has not been replayed, so this issue remains open for that
+verification. See [D-153](allied-layout-air-income-results.md).
 A fix should rerun that fixture at the default 120-second limit and demonstrate
 either a valid cluster or a bounded, explained exhausted-search state. Follow-up
 tactical-only tests extend `InvariantForwardSeconds` in their staged data only.
@@ -2662,6 +2676,15 @@ and transport expectations pass, but the combined report remains FAIL.
 TECH policy is unchanged. This adds an observed instance to the category;
 it does not establish whether this occurrence has the same root cause as
 the earlier runs. See the [AIR validation](air-opening-and-screen.md).
+
+**D-153 sample evidence.** The natural 25-minute Supreme game reports TECH
+INV-004/008/010/011/019/039. The supplied-economy run also reports TECH
+INV-021/028 and other warnings listed in the [results](allied-layout-air-income-results.md).
+They remain strict report failures. Shared placement and speculative planning
+changed in D-153, so earlier baseline categories alone do not establish the
+cause of these occurrences. Triage the earliest per object against the retained
+logs and compare the same seed before attributing a regression or weakening an
+invariant.
 
 ### KI-428 — Harness start roles do not force runtime roles on unregistered maps
 
@@ -3049,6 +3072,14 @@ old/new roster messages and missing anchors handled; safe retries retain cargo;
 landing permits upgrade work on the destination island. Preserve the strict
 invariant forbid. See [D-152 results](air-tech-expansion-results.md) and
 [decision](decisions.md#d-152--reserve-expansion-before-fortification-air-mex-first-access-and-first-mex-delivery).
+
+**D-153 extension.** Shared ally rectangles are rebuilt from native saved zones
+and slots and removed on owner/reset/release. Pure index tests cover independent
+release and owner removal; fresh-game probes cover reciprocal exclusion and
+unused-cluster relocation. Actual engine save/reload, destruction/repair of
+every cluster kind and runtime AIR/TECH role switches remain unplayed. Extend
+this lifecycle fixture to assert that peers see the same restored rectangle
+set, with no stale ownership after switching or removing an AI.
 
 ## Indexed elsewhere
 

@@ -69,7 +69,8 @@ bool CBGeoTask::Execute(CCircuitUnit* unit)
 		)
 		return true;
 	}
-	if (circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+	if (!circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
 		TRY_UNIT(circuit, unit,
 			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)

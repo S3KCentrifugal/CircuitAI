@@ -82,3 +82,18 @@ void test_converter_can_fill_surplus_with_two_pending() { Check(ProductionMath::
 void test_converter_negative_aircraft_demand_rejected() { Check(ProductionMath::ConverterTarget(1000, -1, 150, 70) == 0); }
 void test_converter_negative_reserve_rejected() { Check(ProductionMath::ConverterTarget(1000, 500, -1, 70) == 0); }
 void test_converter_invalid_planned_count_rejected() { Check(!ProductionMath::ConverterMayQueue(20, -1, 0, 3)); }
+void test_lab_income_exact_fifty_passes() { Check(ProductionMath::LabIncomeReady(50, true, 50, 0, 2900)); }
+void test_lab_income_below_fifty_waits() { Check(!ProductionMath::LabIncomeReady(49.9f, true, 50, 2899, 2900)); }
+void test_lab_income_incomplete_window_waits() { Check(!ProductionMath::LabIncomeReady(500, false, 50, 0, 2900)); }
+void test_lab_bank_exact_cost_bypasses_income_window() { Check(ProductionMath::LabIncomeReady(0, false, 50, 2900, 2900)); }
+void test_lab_bank_large_surplus_passes() { Check(ProductionMath::LabIncomeReady(10, false, 50, 10000, 2900)); }
+void test_lab_negative_bank_rejected() { Check(!ProductionMath::LabIncomeReady(60, true, 50, -1, 2900)); }
+void test_lab_zero_cost_rejected() { Check(!ProductionMath::LabIncomeReady(60, true, 50, 0, 0)); }
+void test_lab_negative_minimum_rejected() { Check(!ProductionMath::LabIncomeReady(-1, true, 50, 2900, 2900)); }
+void test_lab_zero_threshold_rejected() { Check(!ProductionMath::LabIncomeReady(60, true, 0, 0, 2900)); }
+void test_strike_shuriken_income_scales() { Check(ProductionMath::StrikeTarget(40, 4, 3, 16) == 10); }
+void test_strike_bomber_income_scales() { Check(ProductionMath::StrikeTarget(40, 8, 1, 12) == 5); }
+void test_strike_support_cap() { Check(ProductionMath::StrikeTarget(1000, 4, 3, 16) == 16); }
+void test_strike_support_floor() { Check(ProductionMath::StrikeTarget(1, 4, 3, 16) == 3); }
+void test_strike_invalid_step_rejected() { Check(ProductionMath::StrikeTarget(40, 0, 3, 16) == 0); }
+void test_strike_invalid_caps_rejected() { Check(ProductionMath::StrikeTarget(40, 4, 16, 3) == 0); }

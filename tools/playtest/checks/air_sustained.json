@@ -1,0 +1,13 @@
+{
+  "stop_minute": 12,
+  "expect": [
+    {"key":"income-gate", "pattern":"\\[AIR\\]\\[LabGate\\].*reason=income", "by_minute":8},
+    {"key":"lab-built", "pattern":"\\[SustainedFixture\\] finished coraap", "scope":"any", "by_minute":12}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[LayoutProbe\\] FAIL|Error in.*(air_sustained|allied_layout)_fixture|Removed widget: AIR sustained income fixture", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

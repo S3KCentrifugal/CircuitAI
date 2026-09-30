@@ -1,0 +1,17 @@
+{
+  "stop_minute": 18,
+  "expect": [
+    {"key":"shuriken", "pattern":"\\[IncomeFixture\\] finished corbw", "scope":"any", "by_minute":12},
+    {"key":"bomber", "pattern":"\\[IncomeFixture\\] finished corshad", "scope":"any", "by_minute":12},
+    {"key":"fighter", "pattern":"\\[IncomeFixture\\] finished corveng", "scope":"any", "by_minute":6},
+    {"key":"bank-gate", "pattern":"\\[AIR\\]\\[LabGate\\].*reason=bank", "by_minute":10},
+    {"key":"lab-built", "pattern":"\\[IncomeFixture\\] finished coraap", "scope":"any", "by_minute":15},
+    {"key":"relocate", "pattern":"PASS AIR relocated unused cluster", "scope":"any", "by_minute":3}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[LayoutProbe\\] FAIL|Error in.*(air_income|allied_layout)_fixture|Removed widget: AIR income fixture", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

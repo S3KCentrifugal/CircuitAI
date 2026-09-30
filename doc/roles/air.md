@@ -29,7 +29,8 @@ screen; T2 fighters fill its income/threat quota before becoming wave escorts.
 Armada/Cortex scouts keep native scouting. Legion's first fighter/scout drone
 receives an explicit scouting route. Ferry requests run ahead of the role's factory handler.
 Role switching releases AIR projects/holds and reservations before the next
-role initializes. TECH's rules, geometry and settings are unchanged.
+role initializes. D-153 shares native reservation geometry and increases TECH's
+speculative plan count; TECH retains its own spending sequence and economy.
 
 D-151 admits the initial fighter floor immediately after the three completed
 constructors, without the ordinary 160-energy-income gate. Production remains
@@ -50,11 +51,13 @@ delay before its aircraft frame appears. See [handoff validation](../air-idle-fa
 | `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
 | `FirstFusionTargetSeconds` / `FirstFusionLeadSeconds` | 1200 / 720 | Aim for fusion at 20 minutes; prepare from minute 8; mex completion always wins |
 | `PreFusionMexLimit` | 6 | Bound own early expansion before first reactor; gifts still require upgrades |
-| `FusionAccessMinMetal` / `FusionAccessMinEnergy` / `FusionAccessFundSeconds` | 12 / 450 / 300 | Fund T2 access for the first reactor when no capable gifted constructor exists |
+| `FusionAccessMinMetal` / `FusionAccessMinEnergy` / `FusionAccessFundSeconds` | 12 / 450 / 300 | Historical settings retained; D-153 no longer uses this separate access gate |
 | `WarmFactoryGapSeconds` | 0.5 | Configured prior, separate from cold startup |
 | `ProductionIncomeShare` | 0.65 | Resource share used to size support |
-| `TransitionMinMetal` / `TransitionMinEnergy` | 30 / 1200 | Ten-second low income gates |
-| `TransitionEarliestSeconds` / `TransitionFundSeconds` | 480 / 100 | Earliest transition and funding horizon |
+| `TransitionMinMetal` | 50 | Minimum over a complete fresh ten-second window; full lab metal cost banked bypasses income |
+| `TransitionMinEnergy` / `TransitionEarliestSeconds` / `TransitionFundSeconds` | 1200 / 480 / 100 | Historical settings retained; unused by the D-153 lab gate |
+| `T1BomberMetalStep` / `T1BomberCap` | 8 / 12 | Income-scaled replenishing T1 bomber target |
+| `T1SupportMetalStep` / `T1SupportCap` | 4 / 16 | Cortex Shuriken target; other factions keep three support gunships |
 | `HomeFighterFloor` / `HomeFighterCeiling` / `HomeFightersPerMetal` | 6 / 60 / 0.5 | Income/threat target; all T1 fighters screen, T2 reserves respect this quota |
 | `OpeningAirConstructors` | 3 | Completed T1 constructors before commander release and initial fighter production |
 | `ScreenFullFighters` / `ScreenCells` | 40 / 8 | Fleet size for full advance, maximum patrol segments |
@@ -62,6 +65,7 @@ delay before its aircraft frame appears. See [handoff validation](../air-idle-fa
 | `ScreenRearAdvance` / `ScreenFrontSetback` | 400 / 600 | Rear offset and setback from the midpoint toward nearest participating enemy start |
 | `ScreenUpdateSeconds` | 10 | Refresh geometry; membership changes also refresh immediately |
 | `BaySpacing` / `CapacityStableSeconds` | 560 / 20 | Factory separation and sustained-capacity gate |
+| `BaySearchRings` | 25 | Bounded factory search in 128-elmo steps, including unused-bay relocation |
 | `TelemetrySeconds` | 10 | Economy and per-bay reporting interval |
 | `WaveAvoidHomeFocus` | true | Use an enemy start when the wave front is absent or near home |
 
@@ -581,12 +585,19 @@ own porc still owns the ground defence.
 
 AIR holds two T1 sites plus six T2 sites with complete twenty-turret banks
 before building them. Counts and production support use actual factories.
-T1 conversion follows surplus energy until every owned mex is upgraded; T2
-labs and reactors wait for that same condition. AIR continues requesting
-TECH's T2 constructor; no solo self-tech exception bypasses upgrades. See
+T1 conversion follows surplus energy until every owned mex is upgraded.
+Reactors keep that mex gate. D-153 replaces the lab gate with a ten-second
+minimum of 50 metal/s or a fully banked lab cost; AIR can now self-tech before
+all upgrades finish and continues requesting TECH's T2 constructor. See
 [design](../air-tech-expansion-plan.md).
 
 D-152 AIR settings: `PlannedT2Bays=6`, `PlannedT1Bays=2`,
 `ConverterParallel=3`, `ConverterDraw=70`, `ConverterEnergyReserve=150`.
 The existing `MaxProductionBays=12` still bounds actual production expansion;
 preplanned sites neither count as active plants nor authorize spending.
+
+D-153 publishes native reservations to allied instances, protects production
+bay interiors from ordinary defenses, and relocates unused blocked clusters.
+See the [shared layout and income design](../allied-layout-air-income-plan.md).
+T1 bombers and Cortex Shuriken support are replenished alongside the fighter
+screen; fusion preparation no longer stops them indefinitely.

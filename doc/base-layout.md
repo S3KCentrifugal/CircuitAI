@@ -263,3 +263,21 @@ Runtime behavior is not yet Played; see
 - [`roles/tech.md`](roles/tech.md#base-layout-plan)
 - [`angelscript-references.md`](angelscript-references.md#cterrainmanager-aiterrainmgr)
 - [`intent.md`](intent.md)
+
+## D-153: allied visibility
+
+All allied instances using this DLL share reservation rectangles through
+`CAllyTeam::GetLayoutReservations`. Slots and zones retain separate owner-local
+IDs; nested own claims are legal. Publication/release is synchronous and the
+spatial index is reconstructed on load. Foreign footprints are excluded by
+reservation admission and every placement search, including masked, coarse,
+ignore-blocker and experimental searches. Mex/geo execution also checks the
+shared exclusion. Ordinary searches cannot use the interior of own zones;
+explicitly reserved economy packing retains its existing contract.
+
+AIR production envelopes protect the spaces between plant and support banks.
+TECH future factory clusters protect interior gaps and exits. Script controls
+how many plans to reserve and when an untouched blocked plan relocates; native
+queries inspect complete member footprints without claiming them. Human/other
+AI builds cannot be prohibited by this registry, so activation rechecks engine
+buildability. See [design](allied-layout-air-income-plan.md).

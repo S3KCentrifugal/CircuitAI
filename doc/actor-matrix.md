@@ -266,3 +266,15 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | Weapon cluster | SortSlots, Site, Order | Walls first; exact reservation and pin respects expansion |
 | First mex | Roster ObserveMex/Encode/Decode/Update, ferry TryCarry | Latched anchor, authenticated allied team, native saved integers |
 | Cargo drop | TryCarry, _StartNext, CFerryTask | Safe drop search, threat limits, refused sites, queued/airborne ownership; bounded wait for arriving carrier |
+
+## D-153: shared allied plans and activation
+
+| Object | Actors | Authoritative state |
+| --- | --- | --- |
+| Allied reserved ground | Native reserve/zone admission, packing, normal placement, exact slot serving, mex/geo execution | CAllyTeam spatial registry, owner/kind/local ID; reconstructed after load, removed on release/reset/destruction |
+| AIR unused bay/wind cluster | PlanAhead, Reserve, Activate, WindPass, Factory | Native slot claim/frame state plus persisted started flag; all members checked before activation; envelope belongs to that bay |
+| TECH future factory cluster | PlanAhead, ReadyCluster, OpenCluster, Work | ahead/aheadKey plus native lab/group states; two future plans per tier; only authorized activation starts spending |
+| TECH forward economy cluster | CheckForward, ReserveFactorySite, Place, turret placement | Native zone activation state; persisted fwd_started locks it after any member is claimed |
+| AIR T2 plant | Transition, BankedLab, Factory, production.banked, Record | Ten-second minimum income/full window or current full-cost metal bank; cap and one unfinished plant; INV-083 |
+| AIR T1 strike mix | AirProduction::MakeTask, Recruit, native combat assignment | Queued-aware counts, persisted mix phase, fighter floor, constructor funding, faction build capability; ferry request hook remains first |
+| Placed building audit | LayoutHelpers::CheckAlliedPlacements | Exact task reservation position/facing and shared foreign footprints, INV-088 |

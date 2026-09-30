@@ -3,7 +3,6 @@
 #include "air_screen.as"
 namespace AirProduction {
     dictionary home; // mutually exclusive with AirWaves' held/launch ledgers
-    int strikeOrders = 0;
     int countLog = -100000;
     CRouteTask@ openingScout = null;
     int Projected(CCircuitDef@ d) { return d is null ? 0 : d.count + aiFactoryMgr.GetPendingRecruitCount(d); }
@@ -88,16 +87,31 @@ namespace AirProduction {
             @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
             if (t !is null) return t;
         }
-        if (basic && AirEconomy::t2 > 0) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        // A low-income T2 purchase must not switch the useful T1 force off.
+        if (basic && AirEconomy::t2 > 0 && AirEconomy::metal >= Global::RoleSettings::Air::TransitionMinMetal)
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
         @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen + scoutAway), "intercept", Task::Priority::HIGH);
         if (t !is null) return t;
         // Transports and the defensive fighter floor above remain first.
-        if (AirEconomy::PreparingFusion()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
-        if (basic && strikeOrders < Global::RoleSettings::Air::T1StrikeOpenerSize && AirEconomy::metal >= 12.0f && AirEconomy::EnemyAir() < 1000.0f) {
-            @t = Recruit(u, RoleAir::GetT1StrikeAircraftNameForSide(side), Global::RoleSettings::Air::T1StrikeOpenerSize, "strike", Task::Priority::NORMAL);
-            if (t !is null) { ++strikeOrders; return t; }
+        if (basic && AirEconomy::metal >= 12.0f && AirEconomy::EnemyAir() < 1000.0f) {
+            const string bomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
+            // One strike order per two fighters after the screen: finite targets
+            // replenish casualties without letting strike losses starve air control.
+            const int phase = aiTerrainMgr.GetLayoutInt("air.t1.mix", 0);
+            if (phase % 3 == 0) {
+                const bool supportFirst = (phase / 3) % 2 == 0;
+                for (int pass = 0; pass < 2; ++pass) {
+                    const bool support = pass == 0 ? supportFirst : !supportFirst;
+
+                    const int target = ProductionMath::StrikeTarget(AirEconomy::metal,
+                        support ? Global::RoleSettings::Air::T1SupportMetalStep : Global::RoleSettings::Air::T1BomberMetalStep,
+                        support ? 3 : 1, support ? (side == "cortex" ? Global::RoleSettings::Air::T1SupportCap : Global::RoleSettings::Air::T1StrikeOpenerSize) : Global::RoleSettings::Air::T1BomberCap);
+                    @t = Recruit(u, support ? RoleAir::GetT1StrikeAircraftNameForSide(side) : bomber, target, support ? "front.support" : "t1.bomber", Task::Priority::NORMAL);
+                    if (t !is null) { aiTerrainMgr.SetLayoutInt("air.t1.mix", phase + 1); return t; }
+                }
+            }
         }
         if (advanced && AirEconomy::metal >= 250.0f) {
             const string heavy = side == "cortex" ? "corcrwh" : side == "legion" ? "legfort" : "";
@@ -127,9 +141,10 @@ namespace AirProduction {
         }
         CCircuitDef@ fd = ai.GetCircuitDef(fighter);
         @t = Recruit(u, fighter, Projected(fd) + 1, "air.control", Task::Priority::NORMAL);
+        if (basic && t !is null) aiTerrainMgr.SetLayoutInt("air.t1.mix", aiTerrainMgr.GetLayoutInt("air.t1.mix", 0) + 1);
         return t is null ? aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND)) : t;
     }
-    void Reset() { home.deleteAll(); AirScreen::Reset(); strikeOrders = 0; countLog = -100000; }
+    void Reset() { home.deleteAll(); AirScreen::Reset(); countLog = -100000; }
     void Leave()
     {
         if (openingScout !is null && !openingScout.IsDead()) openingScout.Abort();

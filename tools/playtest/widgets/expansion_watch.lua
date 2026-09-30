@@ -21,7 +21,9 @@ function widget:UnitCreated(id,def,team,builder)
     if team==0 and builder and (n=="armaap" or n=="coraap" or n=="legaap") then
         local b,a,p=mexes(team)
         log("air-lab-frame basic="..b.." upgraded="..a.." pending="..p)
-        if b>0 or p>0 then Spring.Echo("[INVARIANT] INV-083 observer: AIR T2 plant before mex upgrades") end
+        -- D-153 gates the order on sustained income or a full metal bank.
+        -- Bank can already be spent when a frame appears; AirBuild records the
+        -- admission snapshot. Mex completion still gates reactors, not labs.
     end
 end
 function widget:UnitFinished(id,def,team)

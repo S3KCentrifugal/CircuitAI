@@ -48,12 +48,18 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: de74e54f945fcb57b33297e8c275322f055a3bcb; lines: 130 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 8c1ed5dd3c269b54b040f2c9ee31f0b5a0a9a5f7; lines: 134 -->
 
 ## D-152 sequencing
 
 `mex.phase.convert` follows mex upgrade and assist, before optional growth.
-Advanced conversion only follows completed mex upgrades. All T2 plant paths,
-including fusion access, use the same strict mex-first gate; no allied T2
-constructor means waiting for allied access. Existing recovery and opening
+Advanced conversion only follows completed mex upgrades. D-153 supersedes the T2 plant mex gate: all plant paths use the sustained
+income/full-bank test. `production.banked` runs just after the starter plant,
+before mex upgrades. Reactors still require completed mex upgrades. Existing recovery and opening
 crew/scout/fighter/transport ordering remains.
+
+D-153 recruitment removes the blanket fusion-preparation wait. After transports,
+the opening crew and the home screen, constructor growth and a bounded strike
+mix continue: one strike per two fallback fighters, with income-scaled bombers
+and Cortex Shurikens; other factions retain their small gunship opener. T1
+production remains useful below 50 metal/s even if a bank-funded T2 plant exists.

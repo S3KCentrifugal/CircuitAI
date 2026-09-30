@@ -1,0 +1,17 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {"key":"air-aware", "pattern":"PASS reciprocal exclusion team=0", "scope":"any", "by_minute":2},
+    {"key":"tech-aware", "pattern":"PASS reciprocal exclusion team=1", "scope":"any", "by_minute":2},
+    {"key":"air-replan", "pattern":"PASS AIR relocated unused cluster", "scope":"any", "by_minute":3},
+    {"key":"tech-replan", "pattern":"PASS TECH relocated unused cluster", "scope":"any", "by_minute":2},
+    {"key":"air-active", "pattern":"PASS AIR active cluster stayed fixed", "scope":"any", "by_minute":3},
+    {"key":"tech-active", "pattern":"PASS TECH claimed cluster stayed fixed", "scope":"any", "by_minute":2}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[LayoutProbe\\] FAIL|Error in.*allied_layout_fixture", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

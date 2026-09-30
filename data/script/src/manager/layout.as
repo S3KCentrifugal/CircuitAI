@@ -663,18 +663,28 @@ namespace Layout {
                 + ((group > 0) ? aiTerrainMgr.GetGroupCount(group, false) : 0) + " turret slots" + (fwdReplans > 0 ? " (re-plan " + fwdReplans + ")" : ""), 1);
             return true;
         }
-        GenericHelpers::LogUtil("[Layout] no clear ground for a forward cluster " + ahead + " cells ahead; retried in a minute", 1);
+        ++fwdReplans;
+        aiTerrainMgr.SetLayoutInt(BOX + ".fwd_replans", fwdReplans);
+        GenericHelpers::LogUtil("[Layout] no clear ground for a forward cluster " + ahead + " cells ahead; attempt "
+            + fwdReplans + "/" + Global::RoleSettings::Tech::LayoutForwardTries
+            + (ForwardGivenUp() ? "; candidate search exhausted" : "; next candidate in a minute"), 1);
         return false;
     }
 
     // The forward cluster taken by an ally: given up and planned further on.
-    void CheckForward()
+    void CheckForward(bool immediate = false)
     {
-        if (ai.frame - fwdCheckFrame < 10 * SECOND) return;
+        if (!immediate && ai.frame - fwdCheckFrame < 10 * SECOND) return;
         fwdCheckFrame = ai.frame;
         if (fwdZone == 0) { PlanForwardBox(); return; }
-        if (!aiTerrainMgr.IsZoneAlly(fwdCentre)) return;
-        GenericHelpers::LogUtil("[Layout] forward cluster at (" + int(fwdCentre.x) + ", " + int(fwdCentre.z) + ") taken by an ally: given up", 1);
+        const int state = aiTerrainMgr.GetZoneActivationState(fwdZone);
+        if (state == 2) aiTerrainMgr.SetLayoutInt(BOX + ".fwd_started", 1);
+        if (aiTerrainMgr.GetLayoutInt(BOX + ".fwd_started", 0) != 0) return;
+        // An economy box deliberately spans partly usable terrain (BoxScore).
+        // Its existing holes are not new obstructions. A structure taking the
+        // reserved cells triggers relocation; any claimed economy/nano locks it.
+        if (aiTerrainMgr.IsZoneClear(fwdZone)) return;
+        GenericHelpers::LogUtil("[Layout] forward cluster at (" + int(fwdCentre.x) + ", " + int(fwdCentre.z) + ") physically blocked before activation: recalculating", 1);
         if (fwdGroup > 0) aiTerrainMgr.ReleaseGroup(fwdGroup);
         aiTerrainMgr.ReleaseZone(fwdZone);
         fwdZone = 0; fwdGroup = 0; ++fwdReplans; fwdTryFrame = -100000;
@@ -716,6 +726,7 @@ namespace Layout {
 
     void Update(float metalIncome, bool t2LabStands, int t2ConstructorCount)
     {
+        LayoutHelpers::CheckAlliedPlacements();
         if (!planned && aiTerrainMgr.IsLayoutEnabled()) {
             Adopt(Global::AISettings::Side);
         } else if (planned) {
@@ -880,6 +891,7 @@ namespace Layout {
 
     int ReserveFactorySite(CCircuitDef@ def)
     {
+        CheckForward(true);
         if (def is null || !HasBox() || !TurretsStand()) return -1;
         // D-104: flush against the turrets (air: any facing, no exit test)
         RegisterFactoryZones();
@@ -1046,6 +1058,7 @@ namespace Layout {
             return aiBuilderMgr.Enqueue(TaskB::Common(type, priority, def, FactoryNanoCentre(),
                 float(Global::RoleSettings::Tech::LayoutFallbackShakeCells) * SQUARE_SIZE * 2, true, timeout));
         }
+        CheckForward(true);
         int id = -1;
         // D-101 (owner's rule): advanced fusions and advanced converters go in sets,
         // the first flush against a turret, the rest lined up away from it; the
@@ -1349,6 +1362,7 @@ namespace Layout {
             if (t !is null) return t;
         }
         if (!HasBox()) return null;
+        CheckForward(true);
         const bool fwdFree = (fwdGroup > 0) && aiTerrainMgr.GetGroupCount(fwdGroup, true) > 0;
         if (aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0 && !fwdFree && !GrowBox()) return null;   // D-072: more rows behind
         // D-069: the slot nearest a standing lab, whichever lab that is, so

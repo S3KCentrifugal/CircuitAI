@@ -473,6 +473,7 @@ namespace Global {
             float MexDefenceRadius = 400.0f;                // D-109: a defence within this of a cluster's centre counts for it
             float MexDefenceShake = 160.0f;                 // D-109: native picks the defence's site within this of the cluster's centre
             int ForwardOrderHoldSeconds = 120;              // D-109: an order at one place is not repeated within this
+            int PlannedFactoryClustersPerTier = 2;          // D-153: future ground only, per T1/T2/gantry
             int SpamLabGapCells = 2;                        // D-109, D-114: cells between side-by-side search positions of a front cluster (a lane each)
             float SpamClusterRadius = 600.0f;               // D-109: forward constructors assist what goes up within this of the spam cluster
             int SpamPadsMax = 2;                            // D-109: small 2x2 forward turret pads at the lab row's ends
@@ -972,7 +973,11 @@ namespace Global {
             float FusionAccessFundSeconds = 300.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
             float ProductionIncomeShare = 0.65f;
-            float TransitionMinMetal = 30.0f;
+            float TransitionMinMetal = 50.0f;
+            float T1BomberMetalStep = 8.0f;
+            int T1BomberCap = 12;
+            float T1SupportMetalStep = 4.0f;
+            int T1SupportCap = 16;
             float TransitionMinEnergy = 1200.0f;
             int TransitionEarliestSeconds = 8 * 60;
             float TransitionFundSeconds = 100.0f;
@@ -989,6 +994,7 @@ namespace Global {
             float ScreenFrontSetback = 600.0f;
             int ScreenUpdateSeconds = 10;
             float BaySpacing = 560.0f;
+            int BaySearchRings = 25; // 128-elmo steps; room to relocate after other future bays are held
             int CapacityStableSeconds = 20;
             int TelemetrySeconds = 10;
             bool WaveAvoidHomeFocus = true;

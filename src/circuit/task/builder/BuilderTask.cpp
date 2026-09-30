@@ -306,6 +306,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		return true;
 	}
 	if (geom::is_valid(buildPos)
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
 		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,

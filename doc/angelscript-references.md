@@ -1564,3 +1564,16 @@ returns the nearest sampled free, reachable, threat-qualified landing position
 or a negative x sentinel. It does not enqueue a command.
 `CFerryTask.SetCargo(id, drop, surfaceThreat = -1, airThreat = -1)` retains the
 legacy unrestricted defaults; ferry policy supplies explicit limits.
+
+### D-153 reservation coordination queries
+
+`aiTerrainMgr.IsReservationBuildable(id)` tests a free, unclaimed slot against
+the current engine footprint and allied plans. `GetGroupActivationState(group)`
+and `GetZoneActivationState(zone)` return -1 absent, 0 clear/unused, 1 blocked
+unused, 2 any claimed/framed/completed member. A started plan must not be moved.
+`GetGroupZone(group)` exposes its first slot's containing zone for compound
+rollback. `ReserveClusterEnvelope(slot, group)` reserves the gaps in the union's
+bounding rectangle. `CanReserveArea(centre, facing, halfAcross, halfAlong)` is a
+side-effect-free whole-rectangle admission test, including bounds and allied
+plans. `IsAllyLayoutBlocked(def, position, facing)` checks a snapped footprint
+against foreign reservations, without changing local marks.

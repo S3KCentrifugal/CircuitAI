@@ -91,14 +91,22 @@ turrets, D-119). See [`../invariants.md`](../invariants.md).
 | `FrontClusterStallSeconds` | 300 | a factory order with no frame this long gives its cluster up (ground released) |
 | `FrontClusterOpenSeconds` | 600 | INV-046 |
 
-<!-- source: data/script/src/roles/tech_factories.as; blob: fbbd9421f30c745de7159adef6ed1f1b2b5d0548; lines: 920 -->
+<!-- source: data/script/src/roles/tech_factories.as; blob: 33f932ea31eeb7915a98bdc9457bce021c832840; lines: 975 -->
 
 ## D-152 reserve before spending
 
-`PlanAhead` holds one future T1 bot lab, T2 bot lab and gantry with the existing
+`PlanAhead` holds two future clusters each for T1 bot labs, T2 bot labs and gantries
+(`PlannedFactoryClustersPerTier`, D-153) with the existing
 `Plan` geometry and turret blocks. Native named integers preserve these future
 plans; factory exit corridors are held too. `Cluster::ahead` excludes them
 from `CountTier`, `NeedAdvancedLab`, `OpenAbove`, `OpenWork`, and overdue-work
 invariants. Only `OpenCluster`, reached from a normal authorized build rule,
 activates one only when `planNew` and `MayPlan` both permit spending; activation starts the gantry cooldown and work
 clock. The next advance plan can then be reserved without purchasing it.
+
+`ReadyCluster` inspects the entire lab/turret plan before activation or first
+work. A blocked unused cluster releases its slots, turret zone, envelope and
+exit/lateral corridors before searching again. A claimed or previously started
+cluster stays fixed. `NewCluster` protects gaps with a native envelope; normal
+defense searches cannot fill them. Allied reservations are visible natively,
+including during every candidate check and exact task placement.

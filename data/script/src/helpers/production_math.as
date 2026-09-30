@@ -1,5 +1,16 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    bool LabIncomeReady(float minimum, bool fullWindow, float threshold, float bank, float cost)
+    {
+        if (!Valid(minimum) || !Valid(threshold) || !Valid(bank) || !Valid(cost) || cost <= 0.0f || threshold <= 0.0f) return false;
+        return bank >= cost || (fullWindow && minimum >= threshold);
+    }
+    int StrikeTarget(float income, float perUnit, int floor, int cap)
+    {
+        if (!Valid(income) || !Valid(perUnit) || perUnit <= 0.0f || floor < 0 || cap < floor) return 0;
+        const int value = int(income / perUnit);
+        return value < floor ? floor : value > cap ? cap : value;
+    }
     // Conversion capacity follows surplus, not a fixed metal-income ceiling.
     int ConverterTarget(float income, float aircraft, float reserve, float draw)
     {

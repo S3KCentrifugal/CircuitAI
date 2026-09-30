@@ -127,9 +127,11 @@ step.
 | `PowerAheadSeconds` / `PowerAheadRise` | 15 / 30 | D-075: the metal bank full this long, or risen by this over the window = metal income above spending |
 | `InvariantReclaimJoinSeconds` / `ReclaimTurretMargin` | 10 / 48 | INV-008's patience and the turret reach margin |
 
-| INV-083 | AIR orders T2 aircraft plants only after owned mex upgrades finish. | AirBuild::Record; expansion observer | D-152 |
+| INV-083 | AIR orders a T2 aircraft plant only with a full ten-second minimum income of at least 50 metal/s or the full plant metal cost banked. | AirBuild::Record checks fresh order inputs; LabGate logs evidence. Supersedes the D-152 lab mex gate. | D-153 |
 | INV-084 | A speculative T2 AIR bay reserves twenty construction turrets. | AirLayout::PlanAhead | D-152 |
 | INV-085 | TECH fortification orders stay outside friendly lanes. | TechFortifications::Work | D-152 |
 | INV-086 | Constructor delivery selects a landing point within configured surface/air threat limits. | Team::Ferry::TryCarry | D-152 |
 
 | INV-087 | Future TECH factory reservations have no active construction work. | TechFactories::PlanAhead | D-152 |
+
+| INV-088 | A reservation and a pinned construction task never overlap another allied AI's reserved layout. | Native publication checks plus LayoutHelpers::CheckAlliedPlacements, called by AIR and TECH. | D-153 |
