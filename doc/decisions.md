@@ -8050,6 +8050,55 @@ not available to recruitment policy. See the played review for measured limits.
 
 **Files.** [solver header](../src/circuit/terrain/LaneSolver.h), [solver](../src/circuit/terrain/LaneSolver.cpp), [native API](../src/circuit/terrain/BattleAnalysis.h), [adapter](../src/circuit/terrain/BattleLanes.cpp), [bindings](../src/circuit/script/InitScript.cpp), [lanes](../data/script/src/manager/lanes.as), [flank policy](../data/script/src/roles/tech_flank.as), [config](../data/config/lanes.json), [unit tests](../tests/lane_solver_test.cpp), [preparer](../tools/playtest/prepare_mountain_regression.py), [income observer](../tools/playtest/widgets/mountain_regression_watch.lua), [archived evidence verifier](../tools/playtest/verify_mountain_regression.py), [run instructions](../tools/playtest/README.md), [Supreme check](../tools/playtest/checks/mountain_supreme.json), [survey check](../tools/playtest/checks/mountain_survey.json), [profile load check](../tools/playtest/checks/mountain_startup.json), [startup request probe](../tools/playtest/widgets/mountain_startup_watch.lua), [invariants](invariants.md), [actors](actor-matrix.md), [script API](angelscript-references.md), [lane reference](roles/tech-lanes.md), [flank reference](roles/tech_flank.md), [issues](known-issues.md).
 
+## D-146 — Plan AIR production bays without changing TECH
+
+**Status.** Proposed design and source analysis only. No implementation,
+configuration, unit-test or gameplay changes. Online guidance was inspected on
+2026-09-30; no new replay sample or factory-throughput experiment was run.
+
+**Decision.** AIR will use its own T1-first economy states, ordered build rules
+and repeatable production bays over the existing native task/reservation
+mechanisms. Treat twenty ordinary nanos per T2 air plant as an initial soft
+consideration point, measure cold opening separately from warm handoff, and
+support six or more plants according to funded production demand. Separate
+late reactors from critical production. Preserve existing air scouting,
+transport, defence, strike and wave capabilities through explicit integration.
+
+**Reasoning.** Aircraft production needs continuing energy and military
+allocation; TECH's AFUS rush, dense economic sets and builder specialisation
+are not an AIR economic policy. Existing shared geometry and pinned tasks are
+reusable, but native experimental mode also disables economy/storage/start
+factory planning, and factory reservation acquisition contains TECH-specific
+names. Enabling it without a complete AIR path would remove required work.
+
+**Rejected.** Copying the TECH controller; merely raising the three-plant
+ceiling; a mandatory six-plant build order; treating all nanos in range as
+available to every plant; broad refactoring of TECH before differential
+tests. Extract parameter-only utilities where useful, keeping compatibility
+wrappers/defaults. Leave TECH's current code path in place if parity cannot
+be demonstrated.
+
+**Invariant.** For identical inputs, TECH keeps its current ordered decisions,
+task/site/facing/priority results, reservations and random draws. AIR state,
+caps, resource budgets and layout identities belong only to that AI instance
+and role. This is a proposed implementation acceptance contract; no new runtime
+invariant IDs are claimed by this documentation-only change.
+
+**Open defects.** KI-217 records per-factory nano counts that do not reconcile
+losses or cancelled orders. KI-218 records AIR's unreachable explicit mex-first
+priority on its T1 caller. Existing KI-209 save/load and KI-427 TECH baseline
+failures remain; their presence must not be hidden by the migration tests.
+
+**Files.** [Comprehensive plan](air-layout-and-priority-plan.md),
+[issues](known-issues.md), this [decision record](decisions.md), and the separate
+[game-only AIR study](../../rjm.bar.docs/knowledge/70-strategy/78-air-pvp-meta.md).
+
+**Verification.** Source trace covers all 42 functions of `air.as`, shared
+callback routing, native placement/economy gates and relevant script bindings.
+The plan specifies pure-function, lifecycle, geometry, throughput and TECH
+differential tests. Documentation validation is recorded in the plan; it does
+not verify the proposed runtime behaviour.
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

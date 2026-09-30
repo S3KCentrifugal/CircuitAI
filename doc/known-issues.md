@@ -1337,6 +1337,62 @@ killing the transport mid-ferry falls back to walking.
 
 ---
 
+### KI-217 — Per-factory nano counts do not reconcile losses or failed orders
+
+**Severity:** Medium. **Status:** Diagnosed by source trace, not fixed or played.
+
+**Location.** `factoryNanoCounts`, `_GetNanoCount`, `_SetNanoCount` and
+`EnqueueNanoForFactory` in
+[factory.as](../data/script/src/manager/factory.as).
+
+**Problem.** The per-factory count increases after a nano task is successfully
+enqueued. The entry is initialised when the factory is added and deleted when
+the factory is removed. There is no matching decrement for a cancelled/failed
+nano task or a destroyed nano, nor live reach/assignment reconciliation.
+The 5/T1 and 20/T2 limits can consequently refuse replacement assistance even
+when the corresponding live capacity is absent. A count of orders also cannot
+measure productive build power for multiple overlapping factory bays.
+
+**Proposed solution.** Reconcile pending tasks, frames and live assigned nanos
+by stable IDs with exclusive assistant ownership and a reach check. Convert
+pending to live on completion rather than count both; release on cancellation,
+death or transfer. Start with the new AIR controller's consumer so this work
+does not change TECH's existing policy. General shared-counter repair is a
+separate migration after compatibility tests. See the
+[AIR plan](air-layout-and-priority-plan.md) and D-146.
+
+**Verification.** Queue then cancel a nano, destroy one after completion, kill
+its factory, transfer a nano, and reload a game. Counts and allocated BP must
+match actual surviving assignments, replacement work must become eligible,
+and one nano must never contribute to two simultaneous factory budgets.
+
+### KI-218 — AIR's explicit mex-upgrade priority is on a T1-only path
+
+**Severity:** Medium. **Status:** Diagnosed by source trace, not fixed or played.
+
+**Location.** `Air_BuilderAiMakeTask` and `Air_T1Constructor_AiMakeTask` in
+[air.as](../data/script/src/roles/air.as), and `ShouldUpgradeMexFirst` in
+[economy_helpers.as](../data/script/src/helpers/economy_helpers.as).
+
+**Problem.** AIR calls `EnqueueMexUpgradeIfFirst` from its primary T1 air
+constructor ladder, but the predicate immediately rejects constructors below
+tier 2. The T2 AIR branch runs its floating-metal late expansion, then falls
+through to native task selection. Native may still upgrade mexes; the defect
+is that AIR does not enforce the explicit mex-first priority claimed in the
+KI-213 implementation summary. Gifted T2 land constructors also miss this
+role-specific ordering.
+
+**Proposed solution.** Route every capable constructor through an AIR
+`mex.upgrade` rule, after emergency recovery and before surplus conversion,
+using the shared mex tracker, `CanBuild`, actual ownership and upkeep budget.
+Do not change TECH or the shared helper's tier guard. This is included in the
+[AIR plan](air-layout-and-priority-plan.md), not implemented by the analysis.
+
+**Verification.** With an owned T1 mex, test a T1 air constructor (must not
+upgrade), a T2 air constructor and a gifted T2 land constructor (must choose
+the eligible upgrade ahead of discretionary conversion), an existing upgrade
+claim and an energy emergency. Use task logs and completed structures.
+
 ## Configuration and data (KI-3xx)
 
 ### KI-301 — Two Legion mobile EW units cannot be classified
