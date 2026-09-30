@@ -92,6 +92,8 @@ step.
 | INV-078 | Every new AIR wind order belongs to a reserved six-slot cluster. | `AirBuild::Record` checks planned/served slots; the independent observer checks actual 3-by-2 positions, six-slot occupancy and separation. | D-149 |
 | INV-079 | AIR's commander receives no new mex order after an air factory exists; the initial production sequence is scout then three completed constructors before fighters. | `AirBuild::Record` checks mex admission; `air_opening_watch.lua` independently observes build commands and completion order (Legion opening drone excluded from the fighter stage). | D-150 |
 | INV-080 | AIR screen patrol endpoints remain within map bounds. | `AirScreen::Tick` validates script geometry; the independent observer checks actual engine patrol commands. | D-150 |
+| INV-081 | After the opening crew, AIR never renews commander guard on a completed idle factory. | `AirBuild::Record` checks live recruitment; the observer flags actual idle-factory guarding beyond ten seconds. | D-151 |
+| INV-082 | The completed AIR opening crew is followed by the initial fighter screen without an income gate. | `AirProduction::MakeTask` checks failed admission of an available fighter; the observer requires the first fighter frame within five seconds of the third constructor, except intervening transports. | D-151 |
 
 ## TECH settings (`Global::RoleSettings::Tech`)
 

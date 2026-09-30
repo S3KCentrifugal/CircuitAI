@@ -23,20 +23,27 @@ separate rear search region. `Nano` fills actual free bank slots using live
 assistant counts and the funded throughput target; T1 constructors remain
 necessary because T2 air constructors do not build ordinary T1 nanos.
 `Utility` provides queued-aware storage, radar and flak. `Assist` repairs an
-existing project within 1,800 elmos and respects retirement. `Leave` aborts the
+nearest unfinished reachable project within 1,800 elmos and respects retirement. `Leave` aborts the
 owned tasks, releases military holds and removes AIR reservations before native
 role settings are restored.
 
 `FindAssistTarget` is shared by mobile assistance and idle production turrets.
 It supports an optional definition filter (finish a nano) and an actual-reach
-filter for immobile turrets. `Assist` wraps it in the mobile repair task. Wind
+filter for immobile turrets, plus an optional search radius. `Assist` wraps it in the mobile repair task. Wind
 placement gives commanders existing local slots, then a new entire six-slot
 cluster inside build reach with a 16-elmo snapping margin. Once a flying
-constructor exists, the commander cannot fall back to distant wind placement.
+constructor exists, normal commander work remains local. D-151 permits a
+bounded economy move when the factory is idle after the three-constructor crew.
 `NearestPlant` resolves live non-retiring factory IDs. `Commander` finishes
 the factory and guards it until three T1 constructors complete, with nearby
 energy recovery permitted during a stall. Thereafter it uses local energy,
-local project assistance or factory guard; aircraft own remote work. INV-079
+local project assistance or useful factory guard. `PlantHasWork` recognizes
+unfinished factories and live RECRUIT tasks, including their pre-frame delay.
+An idle plant releases the commander to nearby project assistance or energy
+construction, within `CommanderEconomyRadius` (900 elmos); the commander assists
+the structure rather than chasing its air constructor. If nothing useful fits,
+it waits one second instead of guarding an empty plant (INV-081). Aircraft
+retain remote work. INV-079
 forbids new commander mex orders after an air factory exists. Wind
 orders use the six-slot clusters in `AirLayout`; `Record` checks INV-078 using
 the planned position before the required pin is served, and its native slot ID
@@ -62,4 +69,4 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 7622c70e61c5120ed2c493fe353f045b1df72103; lines: 326 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 864f1e4cc66830bf08be6f2cce0d81c2ad36f347; lines: 352 -->

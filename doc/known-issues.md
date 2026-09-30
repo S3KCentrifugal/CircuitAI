@@ -2993,6 +2993,27 @@ including native completion chains and role switching. D-149's experimental
 results do not establish legacy parity. See
 [D-149](decisions.md#d-149--air-packs-six-wind-groups-and-scales-construction-from-income).
 
+### KI-438 — Playtest launch does not resolve a relative write directory
+
+**Severity:** Low tooling defect. **Location:** `tools/playtest/playtest.py`,
+`launch`: `d = Path(args.dir)` and `subprocess.Popen(..., cwd=str(eng))`.
+
+**Problem.** A relative `--dir` is validated and staged relative to the
+repository, then passed unchanged to an engine launched from its own directory.
+The engine resolves both its write directory and start script differently and
+exits without the expected infolog. D-151's first launch reproduced this; the
+same staged game launches with an absolute directory. No gameplay diagnosis
+is based on the failed launch.
+
+**Proposed solution.** Resolve the directory once at CLI argument ingestion,
+so stage, launch, watch, PID files and stop share one absolute path. Keep
+absolute `--dir` as the documented workaround for now.
+
+**Verification.** A relative-path launch must use the same command arguments
+and write directory as its absolute equivalent when engine cwd differs from
+the repository. Verify both launch and targeted stop without touching a live
+game. See [D-151 evidence](air-idle-factory.md).
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate

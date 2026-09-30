@@ -60,11 +60,26 @@ namespace AirProduction {
         if (basic && !ProductionMath::CrewReady(AirEconomy::CompletedConstructors(), firstCrew))
             return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
         const string fighter = AirEconomy::Fighter(advanced, side);
+        // The first screen follows the completed crew without an income gate.
+        // Recovery buildings use NOW priority; do not leave the plant empty
+        // waiting for wind income while it could work on an interceptor.
+        CCircuitUnit@ scoutUnit = ai.GetTeamUnit(aiTerrainMgr.GetLayoutInt("air.scout.id", -1));
+        const int scoutAway = scoutUnit !is null && scoutUnit.circuitDef.GetName() == fighter ? 1 : 0;
+        if (basic) {
+            const int initialTarget = ProductionMath::DefenceRecruitTarget(Global::RoleSettings::Air::HomeFighterFloor,
+                AirScreen::CountOther(fighter), scoutAway);
+            @t = Recruit(u, fighter, initialTarget, "opening.screen", Task::Priority::NORMAL);
+            if (t !is null) return t;
+            CCircuitDef@ initialFighter = ai.GetCircuitDef(fighter);
+            if (initialFighter !is null && initialFighter.IsAvailable(ai.frame) && u.circuitDef.CanBuild(initialFighter)
+                && Projected(initialFighter) < initialTarget)
+                Invariants::Violation("INV-082", "" + u.id, "AIR failed to enqueue available initial fighter after completed crew");
+        }
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
         if (affordable) {
             const int assignedToWaves = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
             @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2,
-                AirScreen::CountOther(fighter), assignedToWaves), "intercept", Task::Priority::HIGH);
+                AirScreen::CountOther(fighter), assignedToWaves + scoutAway), "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
@@ -76,7 +91,7 @@ namespace AirProduction {
         if (basic && AirEconomy::t2 > 0) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-        @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen), "intercept", Task::Priority::HIGH);
+        @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen + scoutAway), "intercept", Task::Priority::HIGH);
         if (t !is null) return t;
         // Transports and the defensive fighter floor above remain first.
         if (AirEconomy::PreparingFusion()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));

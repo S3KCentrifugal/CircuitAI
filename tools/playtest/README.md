@@ -259,6 +259,17 @@ infolog before starting the watcher; all staging stays outside the live install.
 map position instead of the start (D-103), for structures placed away from it,
 e.g. `--shots 25@1500@900:9660`.
 
+## AIR idle-factory regression (D-151)
+
+AIR idle-factory regression (D-151): stage an AIR duel with `air_watch.lua`
+and `air_opening_watch.lua`, then run `prepare_air_check.py --dir <absolute
+workspace run directory> --scenario idle`. This staged-only controller pauses
+team-0 recruitment from minute six through eight, without gifting resources.
+Launch using an absolute `--dir` and watch with `--checks air_idle --minutes 10
+--keep-going`. The natural `air_opening` suite now checks the first fighter
+frame within five seconds of the third constructor, except an intervening
+transport. The observer checks real factory queues and commander orders.
+
 ## Connected mountain regression (D-145)
 
 `prepare_mountain_regression.py --map supreme|glacial|ascendancy --dir

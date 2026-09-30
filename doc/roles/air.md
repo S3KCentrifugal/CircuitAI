@@ -31,9 +31,17 @@ receives an explicit scouting route. Ferry requests run ahead of the role's fact
 Role switching releases AIR projects/holds and reservations before the next
 role initializes. TECH's rules, geometry and settings are unchanged.
 
+D-151 admits the initial fighter floor immediately after the three completed
+constructors, without the ordinary 160-energy-income gate. Production remains
+one aircraft per decision, transport requests remain first, and energy recovery
+construction has higher priority. The commander leaves an idle factory for
+nearby economy construction/assistance; useful recruitment includes the brief
+delay before its aircraft frame appears. See [handoff validation](../air-idle-factory.md).
+
 | New AIR setting | Default | Meaning |
 | --- | --- | --- |
 | `ExperimentalBuild` | true | Enable this controller in experimental profiles |
+| `CommanderEconomyRadius` | 900 | Maximum nearby economy search when the crew is complete and the factory is idle; try current reach first |
 | `MaxProductionBays` | 12 | T2 ceiling, never a mandatory build count |
 | `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
 | `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 10 / 8 | Funded mobile construction ceilings; T1 remains available after T2 |

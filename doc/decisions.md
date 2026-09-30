@@ -8462,6 +8462,10 @@ config-only or script-only; a DLL-only refresh silently ships stale policy.
 
 ## D-150 — AIR uses commander factory assistance and a growing fighter screen
 
+**Partly superseded by D-151.** The fixed initial-fighter income gate and
+strictly local post-crew fallback left a commander guarding an empty factory
+in the owner's game. D-151 corrects both; the original decision/evidence remains.
+
 **Decision.** Implement the owner's scout → three completed air constructors
 → fighter opening. Once the first air factory exists, the commander finishes
 and guards it, using local energy recovery only when necessary. Flying builders
@@ -8503,6 +8507,47 @@ run (KI-435), and unfinished turret count in the final run (INV-019, KI-427).
 Neither is labelled a passing combined test. Recalibrating
 reactor timing or changing TECH's diagnostic is deliberately deferred; neither
 check was weakened. Commit remains local under the owner's explicit instruction.
+
+## D-151 — AIR leaves idle factories and immediately recruits its first screen
+
+**Decision.** The initial fighter floor follows three completed air constructors
+without the normal production income gate. Pending recruitment still prevents
+duplicate orders; other defenders count toward the floor, while Legion's
+opening scout does not. Transports retain their shared priority prehook.
+
+After the crew, a commander guards only a plant with actual work: an unfinished
+plant or a live recruit task, including its pre-frame delay. Local work remains
+preferred; an idle factory permits an economy search up to 900 elmos. Assist
+the nearest unfinished reachable structure rather than chase an air constructor.
+If neither assistance nor energy construction is possible, wait briefly.
+
+**Reasoning / rejected alternative.** The owner's log shows 130 energy income
+and over 1,150 stored energy, yet the hard 160-income gate refused fighters.
+Removing all production gates would overspend later; only the initial defensive
+floor bypasses them, at NORMAL priority below emergency energy construction.
+The D-150 local-only fallback repeatedly re-selected an empty factory. Unlimited
+commander travel is unnecessary; bounded movement retains the walking-cost
+preference while using otherwise idle build power. TECH and native code stay
+unchanged. The guard timeout expires, but builder wait preserves the previous
+engine command. D-151 therefore explicitly stops that stale guard when no
+economy task can be selected; the independent observer caught this during play.
+
+**Invariant.** INV-081 forbids renewing post-crew commander guard on an idle
+plant; the game observer checks actual commands after ten idle seconds.
+INV-082 requires initial fighter admission, with the observer checking the
+first frame within five seconds of crew completion unless a transport intervenes.
+INV-077/078/079 retain mex-before-reactor, six-wind placement and no commander
+mex orders after a plant exists.
+
+**Files and verification.** [Plan and played evidence](air-idle-factory.md)
+tracks the implementation and test results. All 67 pure policy tests pass.
+Final 12-minute natural Armada, Cortex and Legion runs pass all opening checks:
+first fighter frames arrive 1.07, 1.50 and 1.27 seconds after the third
+constructor. The forced-idle fixture passes with actual commander economy
+assistance during the pause. No script errors, crashes or invariant violations
+occur in these final runs. The initial stale-engine-guard failure is retained
+in the evidence. TECH, native code and profile JSON are unchanged; the existing
+fusion benchmark limitation is not re-measured by these opening tests.
 
 ## Maintaining this record
 

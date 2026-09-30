@@ -232,8 +232,14 @@ decides the end; everything else reads it.
 D-150 adds `AirBuild::Commander` before general economy rules once a factory
 exists. It reads live completed aircraft counts and factory retirement; the
 recruiter separately reads projected counts. `AirLayout::WindPass` prefers the
-commander's actual reach and allows remote fallback only before any constructor
-completes. `AirScreen` resolves roster TECH starts, participating enemy starts,
+commander's actual reach. D-151 permits a bounded economy move after crew
+completion when `PlantHasWork` finds no live recruitment; queued recruitment
+still counts during its cold start. `Commander` assists the nearest unfinished
+reachable structure, or builds nearby energy, instead of following aircraft or
+renewing an idle factory guard (INV-081). `AirProduction` queues the initial
+fighter floor immediately after the crew, excluding the scouting drone and
+crediting other defenders, before ordinary income gates (INV-082).
+`AirScreen` resolves roster TECH starts, participating enemy starts,
 live fighter IDs and retained route tasks; `AirProduction::HomeTask` excludes
 held/launched escorts and the opening scout. Death and role exit remove route
 ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables it.

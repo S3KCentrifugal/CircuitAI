@@ -3,6 +3,7 @@ function widget:GetInfo()
 end
 local made, commandMemo={},{}
 local factory, scout, third, firstFighter
+local thirdFrame, firstFighterFrame, transportBetween, idleSince
 local scoutId, scoutStart, scoutAway
 local commander, previous, walked, guarded= nil,nil,0,0
 local function log(s) Spring.Echo("[AirOpening] "..s) end
@@ -15,6 +16,15 @@ function widget:UnitCreated(id,def,team,builder)
     local n=UnitDefs[def].name
     if not factory and (n=="armap" or n=="corap" or n=="legap") then
         factory=id; log("factory-frame id="..id.." builder="..tostring(builder))
+    end
+    if thirdFrame and builder==factory then
+        if n=="armatlas" or n=="corvalk" or n=="legatrans" then transportBetween=true end
+        if fighter(n) and not firstFighterFrame then
+            firstFighterFrame=Spring.GetGameFrame()
+            local delay=(firstFighterFrame-thirdFrame)/30
+            log(string.format("first-fighter-frame delay=%.2f transport=%s",delay,tostring(transportBetween or false)))
+            if delay>5 and not transportBetween then Spring.Echo("[INVARIANT] INV-082 AIR observer: initial fighter frame delayed "..delay.." seconds after crew") end
+        end
     end
 end
 function widget:UnitFinished(id,def,team)
@@ -35,7 +45,7 @@ function widget:UnitFinished(id,def,team)
             if cons(d.name) and p and p>=1 then count=count+1 end
         end
         log("constructor-finished live="..count.." id="..id)
-        if count>=3 then third=true; log(string.format("crew-ready t=%.1f commanderWalk=%.1f guardSeconds=%.1f",Spring.GetGameFrame()/30,walked,guarded)) end
+        if count>=3 then third=true; thirdFrame=Spring.GetGameFrame(); log(string.format("crew-ready t=%.1f commanderWalk=%.1f guardSeconds=%.1f",Spring.GetGameFrame()/30,walked,guarded)) end
     end
     if fighter(n) and not openingDrone and made[id] and not firstFighter then
         firstFighter=true; log("first-fighter def="..n)
@@ -85,6 +95,19 @@ function widget:GameFrame(f)
             previous={x,z}
             local c=(Spring.GetUnitCommands(commander,1) or {})[1]
             if c then
+                local producing=Spring.GetUnitIsBuilding(factory)
+                for _,q in ipairs(Spring.GetFactoryCommands(factory,8) or {}) do
+                    if q.id<0 then producing=true end
+                end
+                if third and not producing then
+                    idleSince=idleSince or f
+                    if f-idleSince>300 and (c.id==CMD.GUARD or c.id==CMD.REPAIR) and c.params[1]==factory then
+                        Spring.Echo("[INVARIANT] INV-081 AIR observer: commander guards idle factory for over ten seconds")
+                    end
+                    if f%300==0 and (c.id<0 or c.id==CMD.REPAIR) and c.params[1]~=factory then
+                        log("idle-factory-economy command="..c.id.." target="..tostring(c.params[1]))
+                    end
+                else idleSince=nil end
                 if c.id==CMD.GUARD and not third then guarded=guarded+0.5 end
                 local key=c.id..":"..tostring(c.params[1])
                 if commandMemo[commander]~=key then

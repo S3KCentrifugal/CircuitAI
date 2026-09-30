@@ -65,6 +65,8 @@ namespace AirBuild {
     {
         if (t is null) return null;
         IBuilderTask@ build = cast<IBuilderTask>(t);
+        if (rule == "commander.factory.guard" && !PlantHasWork(NearestPlant(u)))
+            Invariants::Violation("INV-081", "" + u.id, "AIR commander renewed guard on idle factory after opening crew");
         if (UnitHelpers::IsCommander(u.circuitDef) && NearestPlant(u) !is null
             && build !is null && (build.GetBuildType() == int(Task::BuildType::MEX) || build.GetBuildType() == int(Task::BuildType::MEXUP)))
             Invariants::Violation("INV-079", "AIR", "commander dispatched to mex work after factory exists");
@@ -113,22 +115,26 @@ namespace AirBuild {
         }
         return null;
     }
-    CCircuitUnit@ FindAssistTarget(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false)
+    CCircuitUnit@ FindAssistTarget(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false, float radius = 1800.0f)
     {
+        CCircuitUnit@ nearest = null;
+        const float reach = inReach ? u.circuitDef.GetBuildDistance() : radius;
+        float best = reach * reach;
         for (uint i = 0; i < projects.length(); ++i) {
             IBuilderTask@ t = cast<IBuilderTask>(projects[i]);
             if (t is null || t.buildDef is null || t.target is null || Lifecycle::IsRetiring(t.target)) continue;
+            if (t.target.GetBuildProgress() >= 1.0f) continue;
             if (energyOnly && t.GetBuildType() != int(Task::BuildType::ENERGY)) continue;
             if (only !is null && t.buildDef !is only) continue;
-            const float reach = inReach ? u.circuitDef.GetBuildDistance() : 1800.0f;
-            if (MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame)) > reach * reach) continue;
-            return t.target;
+            const float distance = MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame));
+            if (distance > best || !aiTerrainMgr.CanReachAt(u, t.target.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) continue;
+            best = distance; @nearest = t.target;
         }
-        return null;
+        return nearest;
     }
-    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false)
+    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false, float radius = 1800.0f)
     {
-        CCircuitUnit@ target = FindAssistTarget(u, energyOnly, only, inReach);
+        CCircuitUnit@ target = FindAssistTarget(u, energyOnly, only, inReach, radius);
         return target is null ? null : aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 20 * SECOND));
     }
     CCircuitUnit@ NearestPlant(CCircuitUnit@ u)
@@ -146,10 +152,18 @@ namespace AirBuild {
         }
         return result;
     }
+    bool PlantHasWork(CCircuitUnit@ plant)
+    {
+        if (plant is null || Lifecycle::IsRetiring(plant)) return false;
+        if (plant.GetBuildProgress() < 1.0f) return true;
+        IBuilderTask@ job = cast<IBuilderTask>(plant.task);
+        return job !is null && !job.IsDead() && job.GetBuildType() == int(Task::BuildType::RECRUIT);
+    }
     IUnitTask@ Commander(CCircuitUnit@ u, CCircuitUnit@ plant)
     {
         const int crew = AirEconomy::CompletedConstructors();
         const bool opening = !ProductionMath::CrewReady(crew, Global::RoleSettings::Air::OpeningAirConstructors);
+        const bool useful = ProductionMath::FactoryAssistUseful(!opening, plant.GetBuildProgress() >= 1.0f, PlantHasWork(plant));
         IUnitTask@ t = null;
         // Finish the factory before branching. During the crew opening, nearby
         // energy recovery is the only exception to guarding production.
@@ -165,6 +179,18 @@ namespace AirBuild {
                 @t = Assist(u, false, null, true);
                 if (t !is null) return Record(t, "commander.local.assist", u);
             }
+        }
+        if (!useful) {
+            // Assist the structure the aircraft is building, never chase the
+            // aircraft itself. A short move beats guarding an idle factory.
+            @t = Assist(u, AirEconomy::recovery, null, false, Global::RoleSettings::Air::CommanderEconomyRadius);
+            if (t !is null) return Record(t, "commander.idle.assist", u);
+            @t = Energy(u, AirEconomy::recovery, Global::RoleSettings::Air::CommanderEconomyRadius);
+            if (t !is null) return Record(t, "commander.idle.energy", u);
+            // Builder wait deliberately preserves engine commands. End the
+            // old guard as well as its task when there is no useful target.
+            u.CmdStop();
+            return Record(aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)), "commander.idle.wait", u);
         }
         @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::HIGH, false, 5 * SECOND);
         return Record(t is null ? aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)) : t,
@@ -246,7 +272,7 @@ namespace AirBuild {
             + Global::RoleSettings::Air::FirstFusionTargetSeconds + "s", 1);
         return t;
     }
-    IUnitTask@ Energy(CCircuitUnit@ u, bool emergency)
+    IUnitTask@ Energy(CCircuitUnit@ u, bool emergency, float walkRadius = 0.0f)
     {
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null) > 0) return null;
         const string side = Global::AISettings::Side;
@@ -280,7 +306,7 @@ namespace AirBuild {
             if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY)) continue;
             if (aiBuilderMgr.GetUnfinishedCount(d) > 0) continue;
             const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
-            IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor);
+            IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor, walkRadius);
             if (task !is null) return task;
         }
         return null;

@@ -9,7 +9,7 @@ per second; existing construction stays assigned.
 | Order | Rule | Purpose |
 | --- | --- | --- |
 | 1 | current construction | Finish committed work before choosing another project |
-| 1a | `opening.commander.guard`, `commander.energy.assist`, `commander.energy.local`, `commander.local.assist`, `commander.factory.guard` | With a live air plant, commander finishes/guards production through three completed T1 constructors; local recovery may prevent a stall; subsequent work stays local |
+| 1a | `opening.commander.guard`, `commander.energy.assist`, `commander.energy.local`, `commander.local.assist`, `commander.factory.guard`, `commander.idle.assist`, `commander.idle.energy`, `commander.idle.wait` | Finish/guard production through three completed T1 constructors; local recovery may prevent a stall; after the crew, an idle plant releases the commander to nearby economy work |
 | 2 | `recovery.resume`, `recovery.assist`, `recovery.energy` | Recover an energy order, finish energy or add quickly payable supply during a sustained stall |
 | 2a | `project.resume` | Reassign an owned orphan order before adding another project |
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |

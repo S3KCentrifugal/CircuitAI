@@ -17,6 +17,10 @@ namespace ProductionMath {
     }
     // Projected counts suppress duplicate orders; only completed units release an assistant.
     bool CrewReady(int completed, int target) { return target > 0 && completed >= target; }
+    bool FactoryAssistUseful(bool crewReady, bool factoryFinished, bool recruiting)
+    {
+        return !crewReady || !factoryFinished || recruiting;
+    }
     int DefenceRecruitTarget(int target, int otherDefenders, int committedElsewhere)
     {
         if (target < 0 || otherDefenders < 0 || committedElsewhere < 0) return 0;

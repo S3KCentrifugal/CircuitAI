@@ -970,6 +970,7 @@ namespace Global {
             int HomeFighterFloor = 6;
             int HomeFighterCeiling = 60;
             int OpeningAirConstructors = 3;
+            float CommanderEconomyRadius = 900.0f;
             float HomeFightersPerMetal = 0.5f;
             int ScreenFullFighters = 40;
             int ScreenCells = 8;

@@ -11,6 +11,11 @@ void test_reach_rejects_invalid_inputs() { Check(!ProductionMath::WithinReach(-1
 void test_crew_unfinished_third_does_not_release_assistant() { Check(!ProductionMath::CrewReady(2, 3)); }
 void test_crew_three_complete_release_assistant() { Check(ProductionMath::CrewReady(3, 3)); }
 void test_crew_losses_restore_assistance() { Check(!ProductionMath::CrewReady(1, 3) && !ProductionMath::CrewReady(0, 0)); }
+void test_idle_factory_releases_commander_after_crew() { Check(!ProductionMath::FactoryAssistUseful(true, true, false)); }
+void test_factory_cold_start_keeps_commander_when_recruit_queued() { Check(ProductionMath::FactoryAssistUseful(true, true, true)); }
+void test_factory_frame_keeps_commander() { Check(ProductionMath::FactoryAssistUseful(true, false, false)); }
+void test_factory_opening_keeps_commander_until_crew_complete() { Check(ProductionMath::FactoryAssistUseful(false, true, false)); }
+void test_initial_screen_excludes_scout_drone() { Check(ProductionMath::DefenceRecruitTarget(6, 0, 1) == 7); }
 void test_defence_other_tier_already_covers_floor() { Check(ProductionMath::DefenceRecruitTarget(4, 6, 3) == 3); }
 void test_defence_wave_escorts_do_not_count_as_home() { Check(ProductionMath::DefenceRecruitTarget(4, 3, 2) == 3); }
 void test_defence_other_tier_losses_restore_recruitment() { Check(ProductionMath::DefenceRecruitTarget(6, 2, 3) == 7); }

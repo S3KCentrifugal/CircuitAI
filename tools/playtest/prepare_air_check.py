@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dir', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'screen', 'legacy'], default='natural')
+    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'screen', 'idle', 'legacy'], default='natural')
     parser.add_argument('--seed', type=int, default=930146)
     args = parser.parse_args()
     base = args.dir.resolve()
@@ -38,6 +38,19 @@ def main():
         # Isolate screen geometry at supplied fleet sizes, independent of economy.
         path = base / 'AI/Skirmish/BARbTest/test/script/src/global.as'
         path.write_text(path.read_text().replace('int HomeFighterFloor = 6;', 'int HomeFighterFloor = 60;'))
+    if args.scenario == 'idle':
+        # Force a real idle interval only in the staged test controller.
+        path = base / 'AI/Skirmish/BARbTest/test/script/src/manager/air_production.as'
+        source = path.read_text()
+        marker = 'const bool basic = UnitHelpers::IsT1AircraftPlant(name);'
+        if marker not in source:
+            parser.error('AIR production fixture insertion point not found')
+        source = source.replace(marker, marker + '''
+        if (ai.teamId == 0 && basic && ai.frame >= 10800 && ai.frame < 14400) {
+            GenericHelpers::LogUtil("[AIR][Fixture] factory idle interval", 1);
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        }''', 1)
+        path.write_text(source)
     if args.scenario in ['transport', 'screen']:
         # Real allied-message protocol; two roles request together, one duplicate.
         staged = base / 'AI/Skirmish/BARbTest/test/script'

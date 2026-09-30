@@ -45,6 +45,11 @@ locally; the owner's latest instruction is to keep commits local.
 
 ## Implementation
 
+D-151 corrects two D-150 choices: the initial fighter floor now bypasses the
+ordinary income gate, and the commander can move a bounded distance for
+economy work after the crew if its factory is idle. The original D-150 evidence
+below is retained; see [the correction and validation](air-idle-factory.md).
+
 [AIR production](../data/script/src/manager/air_production.as) latches the
 finished scout in native layout state, counts pending frames separately from
 completed constructors, and keeps bomber escorts exclusive with the screen.
