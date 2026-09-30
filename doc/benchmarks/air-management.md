@@ -14,9 +14,10 @@ All games use Supreme Isthmus v1.7, BAR `test-31450-6562fb1`, Recoil
 | build-02 | `de7332f1563747e3` | Early integration/control tests |
 | build-03 | `0a1e703afb9b2533` | Flying-builder approach and physical BP corrections |
 | build-04 | `4455871a7febabbc` | Final native binary: persistent local dimensions rotate once; dead recruit orders excluded |
+| build-05 | `6a963dd33d8a9b1d` | D-148: expose loaded metal extraction for AIR's all-owned-mex gate |
 
-Build-04 is 7,568,026 bytes, stripped, with matching `SkirmishAI.dbg`. The
-mandatory Recoil build output contains this DLL, its symbols and current
+Build-04 and build-05 are 7,568,026 bytes, stripped, with matching `SkirmishAI.dbg`. The
+mandatory Recoil build output now contains build-05, its symbols and current
 `data/`. The live BAR installation was not changed. Individual game write
 directories, reports, staged scripts and logs are under repository
 `build-theatres/air/`; build snapshots are pinned separately from that output.
@@ -151,9 +152,66 @@ equality is not claimed: the same engine seed does not fix every native worker
 or random timing source, and baseline games already violate TECH invariants.
 No TECH behavior was changed to hide those failures.
 
+## D-148: twenty-minute fusion after all mex upgrades
+
+The owner replaced the old 54-minute benchmark with a 20-minute completion
+target, subject to the stronger requirement that every owned mex upgrade
+finishes before reactor construction starts. These runs use build-05 and
+`experimental_hard`, with the same pinned engine/game/map/seed and zero bonus
+as above. They are AIR versus AIR, including the constructor-gift fixture:
+`--others none` removes allied AIs, **not** the enemy AI. No quiet-game result
+is claimed. The fixture supplies one T2 constructor at six minutes, without
+resource or economy-building gifts.
+
+| Run / archived directory | Observation and verdict |
+| --- | --- |
+| `fusion20-v1`, `fusion20-gift-v1` | Stopped after a script compile rejected a mutable definition parameter. Corrected to `const CCircuitDef@`; not gameplay evidence. |
+| `fusion20-v2/runs/20260930-135831` | Armada diagnostic FAIL: T2 13.26, first constructor 14.10, second 20.84. All six upgrades finished 21.73; reactor started 22.11 with zero pending mex frames, unfinished at 23. Full fighter quota delayed the second constructor. |
+| `fusion20-gift-v2/runs/20260930-135845` | Contested gift diagnostic FAIL: donated constructor died 6.31; two replacements also died. Five upgrades completed by 23.14; remaining mex work correctly blocked fusion. |
+| `fusion20-v3/runs/20260930-140325` | Armada diagnostic FAIL solely on fusion completion: reactor started 19.11 after all upgrades; completed 20.83 (20:50). T2 13.11, first upgrade 15.21. No script/crash/invariant failures. |
+| `fusion20-cortex-v3/runs/20260930-140353` | Cortex diagnostic FAIL solely on fusion completion: T2 13.94, first upgrade 15.86, reactor started 19.64 with zero pending mexes; completed 21.65 (21:39). No script/crash/invariant failures. |
+| `fusion20-gift-v3/runs/20260930-140526` | PASS: first upgrade 7.96; all six finished 16.47. Reactor started 17.46 and completed 19.15 (19:09). The gift died 8.02 and two replacements died 16.56/16.58; AIR recovered. No script/crash/invariant failures. This used the intermediate 600-energy access floor. |
+| `fusion20-armada-v4/runs/20260930-141331` | Final policy PASS: T2 11.95, first upgrade 13.58, all six upgrades 16.72, reactor start 17.06, completion **18:41** (frame 33643). Rejudged saved log; original live report `20260930-141116`. |
+| `fusion20-cortex-v4/runs/20260930-141335` | Final policy PASS: T2 12.13, first upgrade 13.79, all six upgrades 16.71, reactor start 16.96, completion **19:16** (frame 34679). Rejudged saved log; original live report `20260930-141144`. |
+| `fusion20-legion-v4/runs/20260930-141338` | Final policy FAIL only the exact completion deadline: T2 10.33, first upgrade 12.41, all six upgrades 17.48, reactor start 17.67, completion **20:02.5** (frame 36075). Three T2 constructors lost and replaced. Rejudged log supersedes the original false-PASS report `20260930-141152`. |
+
+All three final games recorded zero basic or unfinished mexes when the first
+reactor frame appeared, with no script/crash/invariant errors or observer gaps.
+The constructor-gift log also retains PASS when rejudged in `20260930-141341`.
+Deadlines are checked against each event's game frame: the original watcher
+could accept a late event if one buffered read crossed the deadline. Six
+regression tests cover late, exact-boundary and timely buffered arrivals,
+unbounded events, out-of-order frame records and ordering after a missed predecessor. The Legion failure
+is retained; no deadline or invariant forbid was relaxed.
+
+By 23 minutes, captured fighter damage totals were Armada 13,066, Cortex 8,054
+and Legion 4,183. These are observed damage, not kills or win-rate evidence.
+Resource samples recorded zero energy-bank stall seconds, with metal-bank
+stall seconds of 106, 161.5 and 160 respectively during investment. Final
+income samples were approximately +86/+1506, +77/+1863 and +71/+2051 metal/energy.
+The test establishes the new timing aim and strict mex priority, not guaranteed
+20-minute completion after losses or on every map. KI-436 retains timing
+variance and broader performance validation.
+
+The final policy prepares from eight minutes, buys T2 access with a 300-second
+forecast at +12 metal/+450 energy, and recruits two T2 constructors before
+filling the T2 fighter quota. The 600-energy intermediate floor held access
+until 10.52 minutes despite a full energy bank; the 450 floor retains the
+separate energy-cost forecast and recovery gate. Every reactor path shares
+the mex gate, including later fusion/AFUS and orphan-order recovery. New owned
+basic mexes cancel unstarted reactor orders; existing reactor frames continue.
+There is no deadline exception for distant or unsafe owned mexes.
+
+The executable AngelScript suite now passes 38 cases, including basic and
+advanced extractor rates, unfinished upgrades, the reclaim-to-frame queue gap,
+invalid counts and the preparation-time boundary. INV-077 checks admissions;
+the independent Lua observer records actual reactor creation with both basic
+and unfinished mex counts. Zero counts at admission are not substituted for
+actual completion timing in the verdict.
+
 ## Reproduction and limits
 
-Use `stage`, `prepare_air_check.py --scenario natural|loss|transport|switch|attack`,
+Use `stage`, `prepare_air_check.py --scenario natural|constructor|loss|transport|switch|attack`,
 `launch --headless`, then `watch --role AIR --checks <name> --keep-going`.
 Pin DLL, game/map/profile/faction, an absolute isolated directory and bounded
 game/wall times. The watcher must receive `--role AIR`; its TECH default

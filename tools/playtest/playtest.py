@@ -553,8 +553,9 @@ def watch(args):
             for line in lines:
                 line = line.rstrip("\r")
                 fm = FRAME_RE.search(line)
+                event_frame = int(fm.group(1)) if fm else frame
                 if fm:
-                    frame = max(frame, int(fm.group(1)))
+                    frame = max(frame, event_frame)
                 if "[Playtest] widget loaded" in line:
                     widget_loaded = True
                 if re.search(r": ERR\s+:", line) or "Fix compilation errors" in line:
@@ -585,11 +586,15 @@ def watch(args):
                         reason = "forbidden line"
                 for e in expects:
                     if e["seen"] is None and e["re"].search(text if am else line) and scope_ok(e.get("scope", "tech"), this_sid):
-                        e["seen"] = (frame, (text if am else line)[-200:])
+                        # Judge the event frame, not when its buffered log batch
+                        # was polled. A late match must not erase a deadline miss.
+                        if e.get("by_minute") is not None and minute(event_frame) > float(e["by_minute"]):
+                            continue
+                        e["seen"] = (event_frame, (text if am else line)[-200:])
                         if e.get("after_key"):
                             other = next((o for o in expects if o["key"] == e["after_key"]), None)
-                            if other is None or other["seen"] is None or other["seen"][0] > frame:
-                                failures.append("'%s' came before '%s' (%.1f min)" % (e["key"], e["after_key"], minute(frame)))
+                            if other is None or other["seen"] is None or other["seen"][0] is None or other["seen"][0] > event_frame:
+                                failures.append("'%s' came before '%s' (%.1f min)" % (e["key"], e["after_key"], minute(event_frame)))
                                 verdict = "FAIL"
                                 reason = "order"
                 if pass_on and pass_on["re"].search(text if am else line) and scope_ok(pass_on.get("scope", "tech"), this_sid):

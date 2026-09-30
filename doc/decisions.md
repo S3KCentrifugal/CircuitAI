@@ -8253,6 +8253,87 @@ limits and superseded diagnostic runs.
 - [tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua)
 - [tools/run_native_tests.sh](../tools/run_native_tests.sh)
 
+## D-148 — AIR targets fusion by twenty minutes after every owned mex upgrade
+
+**Date:** 2026-09-30. **Status:** Played: Armada/Cortex meet the target;
+Legion finishes 2.5 seconds late after three T2-constructor losses. All three
+finish every owned mex upgrade before starting fusion.
+
+**Decision.** The owner's target is a completed first fusion by 20 minutes,
+with all owned mexes upgraded before construction begins. The priority is
+absolute; the time is an aim, not permission to skip distant, unsafe, gifted,
+unfinished or currently reclaiming extractors. Existing reactor frames finish
+if a new basic mex arrives afterwards. This supersedes D-147's late reactor
+benchmark and the proposed partial-upgrade reactor lane in KI-436.
+
+AIR starts preparation twelve minutes before the target. A separate forecast
+buys T2 access when no advanced constructor exists; it no longer waits to fund
+the plant, constructor, mexes and support simultaneously. Initial own expansion
+is bounded at six mexes and stops during preparation. This prevents creating
+new upgrade obligations faster than they can finish. Gifted mexes still count.
+The ordinary late-production funding gate is unchanged. T1 assistants and two
+T2 builders work on upgrades; optional aircraft pause after the interception
+floor. The existing transport-first dispatch remains first.
+
+The access forecast covers 300 seconds at +12 metal/+450 energy. In intermediate
+games the 600-energy floor delayed a funded plant with a full bank; fusion
+finished 20:50 for Armada and 21:39 for Cortex. The second T2 constructor now
+precedes the full T2 fighter quota: previously it arrived at 20:50, too late to
+finish the mex obligations. Recovery and cost forecasts remain mandatory.
+
+**Mechanism.** The sole native addition exposes the existing extraction rate
+as `GetExtractsMetal`. AIR compares live owned extractor rates with loaded
+advanced definitions, avoiding a three-name list that misses cloaked/armed or
+underwater variants. Every reactor admission reads current owned units and
+pending MEX/MEXUP orders, covering the reclaim-to-frame gap. Upgrade selection
+uses actual ownership and per-spot claims without the old 3,500-elmo radius.
+AirBuild cancels invalid unstarted reactor orders and blocks their resumption.
+
+**Rejected.** A timer that forces fusion while upgrades remain, a reactor lane
+after only initial upgrades, treating queued/unfinished upgrades as complete,
+or changing TECH's economy/controller. The target cannot be guaranteed after
+combat losses, inaccessible owned mexes or insufficient income.
+
+**Invariant.** INV-077: no AIR reactor is admitted with pending owned mex work.
+The independent playtest observer also checks actual reactor-frame creation.
+Pure tests cover basic/advanced extraction, queued and unfinished work, and
+the fact that passing the target time never overrides the mex gate.
+The playtest judge must not accept events whose recorded frame exceeds their
+deadline, even when a buffered log read crosses it. Its previous batch-level
+check incorrectly accepted Legion's 20:02.5 completion; event-time checks and
+six regression tests fix that measurement error without changing gameplay.
+
+**Verification.** Native build `6a963dd33d8a9b1d` succeeded; 38 executable
+AngelScript policy tests and six Python watcher regressions passed. Final
+natural first fusions: Armada 18:41, Cortex 19:16, Legion 20:02.5. All six owned
+mexes were upgraded in each case; no script/crash/invariant errors. The
+intermediate gift test completed at 19:09. Legion retains a deadline failure,
+recorded in KI-436; the mex gate is never bypassed. Simulation evidence is in
+[AIR benchmarks](benchmarks/air-management.md). TECH policy/config remains
+unchanged. An initial host compile rejected a mutable definition argument;
+the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
+
+**Files.** [settings](../data/script/src/global.as),
+[pure policy](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[binding](../src/circuit/script/InitScript.cpp),
+[tests](../tests/production_math_tests.as),
+[transition checks](../tools/playtest/checks/air_transition.json),
+[gift checks](../tools/playtest/checks/air_fusion_gift.json),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[playtest judge](../tools/playtest/playtest.py),
+[deadline tests](../tools/playtest/test_playtest_deadlines.py),
+[AIR management](air-management.md), [AIR role](roles/air.md),
+[action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
+[API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [issues](known-issues.md),
+[benchmarks](benchmarks/air-management.md), [decision record](decisions.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

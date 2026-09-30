@@ -33,12 +33,25 @@ namespace AirRules {
         @t = AirBuild::Factory(u, false);
         if (t !is null) return AirBuild::Record(t, Team::Ferry::requestPending ? "transport.plant" : "opening.plant", u);
         // T2 builders, including gifts, upgrade mexes without requiring a T2 plant.
-        CCircuitDef@ upgrade = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(side));
-        if (AirEconomy::energy >= 350.0f && !AirEconomy::recovery && AirBuild::Can(u, upgrade)) {
-            @t = EconomyHelpers::EnqueueMexUpgradeIfFirst(u, Global::Map::StartPos, 3500.0f, 1, "AIR");
-            if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
+        @t = AirBuild::UpgradeMex(u);
+        if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
+        @t = AirBuild::AssistMex(u);
+        if (t !is null) return AirBuild::Record(t, "mex.assist", u);
+        @t = AirBuild::FirstFusion(u);
+        if (t !is null) return AirBuild::Record(t, "fusion.first", u);
+        if (AirEconomy::PreparingFusion()) {
+            if (!AirEconomy::HasAdvancedBuilder()) {
+                @t = AirBuild::Factory(u, true);
+                if (t !is null) return AirBuild::Record(t, "fusion.access", u);
+            }
+            @t = AirBuild::Assist(u);
+            if (t !is null) return AirBuild::Record(t, "fusion.prepare.assist", u);
         }
-        if (!commander && AirEconomy::metal < 80.0f && aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, 5000.0f) < 1) {
+        // Close the finite early expansion before buying T2 access. New owned
+        // mexes (including gifts anywhere on the map) still block reactor starts.
+        const bool expand = AirEconomy::HasReactor() || (!AirEconomy::PreparingFusion()
+            && AirEconomy::MexCount() < Global::RoleSettings::Air::PreFusionMexLimit);
+        if (expand && !commander && AirEconomy::metal < 80.0f && aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, 5000.0f) < 1) {
             @t = aiEconomyMgr.EnqueueMexWithin(u, u.GetPos(ai.frame), 2400.0f, 0, true);
             if (t !is null) return AirBuild::Record(t, "mex.expand", u);
         }

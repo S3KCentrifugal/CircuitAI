@@ -213,3 +213,16 @@ decides the end; everything else reads it.
 | `Lanes::Finish` | native `IsLaneSpecialist` | verifies INV-071 and reports specialist count |
 | `TechFlank::Select` / `Work` | published qualification, native land connector | admits only qualified reachable mountain routes for a dedicated lab |
 | `TechFlank::Produce` | successful current selection, survey revision | waits after failed requalification rather than resuming an old route on the next ask |
+
+## AIR first fusion and owned mexes (D-148)
+
+| Actor | Reads | Action |
+| --- | --- | --- |
+| `AirEconomy::MexesReady` | fresh owned IDs, loaded extraction rates, frame progress, queued MEX/MEXUP | Blocks reactor admission until all owned mexes are advanced and complete; includes far/gifted variants |
+| `mex.upgrade`, `mex.assist` | live mex ownership, per-spot claim, capability/reach, energy health | Upgrade distinct owned spots and assist unfinished extractors before reactor work |
+| `fusion.first` | target/preparation time, full mex completion, funding | Admit first ordinary fusion without any deadline exemption from mex priority |
+| `fusion.access`, `fusion.prepare.assist` | existing advanced constructor, funded T2 access, owned projects | Buy a constructor path when needed; lend construction power to committed work |
+| `mex.expand` | completed reactor, preparation phase, six-mex early bound | Stop creating an ever-growing pre-fusion upgrade backlog; count gifts independently |
+| `AirBuild::Energy`, `Resume`, `Tick`, `Record` | reactor identity, live mex gate, frame ownership | Apply the gate to every reactor path, cancel invalid unstarted orders, retain already framed construction, check INV-077 |
+| `AirProduction` | preparation phase, defensive quotas, transports | Reserve optional aircraft spending for the first reactor while retaining transport priority and interception |
+| AIR playtest observer | engine UnitCreated, owned mex extraction/progress | Independently reject a reactor frame before all owned mex upgrades complete |

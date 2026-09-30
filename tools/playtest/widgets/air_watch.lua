@@ -7,6 +7,24 @@ local sample, stalledM, stalledE=0,0,0
 local previousDamage, damageHook
 local function echo(s) Spring.Echo(tag..s) end
 function widget:Initialize() echo("loaded; read-only observer team=0") end
+function widget:UnitCreated(id,def,team)
+    if team~=0 then return end
+    local name=UnitDefs[def].name
+    if name~="armfus" and name~="corfus" and name~="legfus" and name~="armafus" and name~="corafus" and name~="legafus" then return end
+    local basic,unfinished=0,0
+    for _,mex in ipairs(Spring.GetTeamUnits(0)) do
+        local d=UnitDefs[Spring.GetUnitDefID(mex)]
+        if d.extractsMetal and d.extractsMetal>0 then
+            local upgraded=UnitDefNames[d.name:sub(1,3).."moho"]
+            local rate=upgraded and UnitDefs[upgraded.id].extractsMetal or math.huge
+            local _,_,_,_,progress=Spring.GetUnitHealth(mex)
+            if d.extractsMetal<rate then basic=basic+1
+            elseif progress and progress<1 then unfinished=unfinished+1 end
+        end
+    end
+    echo("reactor-start def="..name.." basicMexes="..basic.." unfinishedMexes="..unfinished)
+    if basic+unfinished>0 then Spring.Echo("[INVARIANT] INV-077 AIR observer: reactor frame before all owned mexes upgraded") end
+end
 function widget:UnitFinished(id,def,team)
     if team~=0 then return end
     local d=UnitDefs[def]; finished[d.name]=(finished[d.name] or 0)+1

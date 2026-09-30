@@ -951,6 +951,12 @@ namespace Global {
             int T1NanoLimit = 5;
             int MaxT1EconomyBuilders = 6;
             int EconomySearchRings = 24;
+            int FirstFusionTargetSeconds = 20 * 60;
+            int FirstFusionLeadSeconds = 12 * 60;
+            int PreFusionMexLimit = 6;
+            float FusionAccessMinMetal = 12.0f;
+            float FusionAccessMinEnergy = 450.0f;
+            float FusionAccessFundSeconds = 300.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
             float ProductionIncomeShare = 0.65f;
             float TransitionMinMetal = 30.0f;

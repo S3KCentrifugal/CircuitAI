@@ -1,4 +1,14 @@
 void test_rate_zero_power_returns_zero() { Check(ProductionMath::Rate(100.0f, 0.0f, 0.5f) == 0.0f); }
+void test_reactor_owned_basic_mex_blocks_even_when_deadline_passed() { Check(!ProductionMath::ReactorMayStart(1, 0, 0)); }
+void test_reactor_upgrade_frame_is_not_completed_income() { Check(!ProductionMath::ReactorMayStart(0, 1, 0)); }
+void test_reactor_reclaim_gap_and_queued_expansion_block() { Check(!ProductionMath::ReactorMayStart(0, 0, 1)); }
+void test_reactor_all_mexes_finished_allows_start() { Check(ProductionMath::ReactorMayStart(0, 0, 0)); }
+void test_reactor_negative_snapshot_is_rejected() { Check(!ProductionMath::ReactorMayStart(-1, 0, 0)); }
+void test_mex_cloaked_basic_extraction_requires_upgrade() { Check(ProductionMath::MexNeedsUpgrade(1.0f, 4.0f)); }
+void test_mex_advanced_variant_does_not_require_downgrade() { Check(!ProductionMath::MexNeedsUpgrade(8.0f, 4.0f)); }
+void test_mex_missing_upgrade_definition_blocks_reactor() { Check(ProductionMath::MexNeedsUpgrade(1.0f, 0.0f)); }
+void test_preparation_starts_at_eight_minutes_for_twenty_minute_goal() { Check(ProductionMath::PreparationDue(480, 1200, 720) && !ProductionMath::PreparationDue(479, 1200, 720)); }
+void test_preparation_late_goal_still_has_no_mex_override() { Check(ProductionMath::PreparationDue(1500, 1200, 720) && !ProductionMath::ReactorMayStart(2, 0, 0)); }
 void test_rate_invalid_work_returns_zero() { Check(ProductionMath::Rate(-1.0f, 20.0f, 0.0f) == 0.0f); }
 void test_rate_zero_work_returns_zero() { Check(ProductionMath::Rate(0.0f, 20.0f, 0.0f) == 0.0f); }
 void test_rate_no_handoff_is_linear() { Check(ProductionMath::Rate(100.0f, 20.0f, 0.0f) == 0.2f); }

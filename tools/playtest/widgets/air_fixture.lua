@@ -14,6 +14,11 @@ end
 function widget:Initialize() Spring.Echo("[AirFixture] scenario="..scenario.."; injected resources/units are not natural economy evidence") end
 function widget:GameFrame(f)
     if once("cheat",300,f) then Spring.SendCommands("cheat 1") end
+    if scenario=="constructor" and once("constructor",10800,f) then
+        local x,y,z=Spring.GetTeamStartPosition(0)
+        give("armaca",0,x+160,z,1)
+        Spring.Echo("[AirFixture] gifted one T2 constructor at 6 minutes; no economy injections")
+    end
     if (scenario=="capacity" or scenario=="loss") and once("gifts",600,f) then
         local side="arm"
         for _,id in ipairs(Spring.GetTeamUnits(0)) do

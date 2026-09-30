@@ -27,6 +27,15 @@ existing project within 1,800 elmos and respects retirement. `Leave` aborts the
 owned tasks, releases military holds and removes AIR reservations before native
 role settings are restored.
 
+`UpgradeMex` chooses the nearest live owned basic extractor the builder can
+reach, using extraction rates and per-spot upgrade claims, with no home-radius
+limit. `AssistMex` gives nearby unfinished extractors assistance before new
+capital work. `FirstFusion` uses the 20-minute goal and a funding forecast but
+requires `AirEconomy::MexesReady`. `IsReactor` identifies the role's reactor
+orders: `Energy`, `Resume` and `Tick` apply the same mex gate; `Tick` cancels
+invalid unstarted orders and `Record` checks INV-077. Already framed reactors
+continue when new mexes are acquired.
+
 Native slots own claims, frames and completed structures. `AirLayout::Pinned`
 rejects an absent, occupied or dead slot and aborts an enqueue if the exact pin
 cannot be acquired. Ordinary economy patches also use required reservations.
@@ -37,4 +46,4 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: e6616b7bcf60b1995e46cb362464790c9c1b7532; lines: 196 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 25f13f9e2c2d16ada13b8f52c36a4d7ad22bed95; lines: 261 -->

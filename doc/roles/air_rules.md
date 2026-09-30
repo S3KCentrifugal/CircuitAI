@@ -13,7 +13,9 @@ per second; existing construction stays assigned.
 | 2a | `project.resume` | Reassign an owned orphan order before adding another project |
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
-| 5 | `mex.upgrade`, `mex.expand` | Use capable gifted/owned T2 builders; expand safe reachable mexes |
+| 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes without a base-radius restriction; help existing frames |
+| 5a | `fusion.first`, `fusion.access`, `fusion.prepare.assist` | Target fusion by 20 minutes; obtain T2 access and assist projects; no reactor until all mexes finish |
+| 5b | `mex.expand` | Before first reactor, at most six self-expanded mexes and no new expansion after preparation starts; normal expansion resumes with reactor income |
 | 6 | `production.support`, `storage.buffer` | Fund actual factory BP and the first wind buffer without starvation |
 | 6a | `transition.bay` | Admit a funded first T2 package before the moving T1 energy-growth target can starve it |
 | 7 | `energy.assist`, `energy.grow` | Supply aircraft demand and T1 economy growth |
@@ -29,6 +31,9 @@ constructor recovery, scouting, an immediate fighter screen, economic builders,
 the full interception floor, a finite T1 strike, heavies and escorted waves.
 Task priority controls engine resource priority; admission gates and available
 build power also limit competing spending.
+While preparing first fusion, optional aircraft wait after the defensive floor
+and constructor quotas. Transports remain first. The 20-minute target cannot
+override any pending owned mex upgrade, including distant or gifted mexes.
 
 This sequence deliberately keeps the T1 utility plant when T2 starts. It has no
 TECH rush chain, gantry ladder, dense reactor block or automatic lab reclaim.
@@ -37,4 +42,4 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 4f00ea4e370629b17550452c6b99df96445965fd; lines: 109 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 3ced27c067546a5bd137404061bd10f0f5104f81; lines: 122 -->

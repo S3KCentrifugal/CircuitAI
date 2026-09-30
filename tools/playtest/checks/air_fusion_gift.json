@@ -1,0 +1,14 @@
+{
+  "stop_minute":23,
+  "expect":[
+    {"key":"gift","pattern":"gifted one T2 constructor at 6 minutes","by_minute":7,"scope":"any"},
+    {"key":"upgrades","pattern":"\\[Playtest\\] finished armmoho team 0","by_minute":17,"scope":"any"},
+    {"key":"reactor","pattern":"\\[Playtest\\] finished armfus team 0","by_minute":20,"scope":"any"},
+    {"key":"mex-first","pattern":"\\[AirWatch\\] reactor-start def=armfus basicMexes=0 unfinishedMexes=0","by_minute":20,"scope":"any"}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

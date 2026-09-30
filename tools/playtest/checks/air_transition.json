@@ -1,10 +1,11 @@
 {
-  "stop_minute":55,
+  "stop_minute":23,
   "expect":[
     {"key":"layout","pattern":"\\[AIR\\]\\[Layout\\] enabled","by_minute":1},
-    {"key":"t2","pattern":"\\[Playtest\\] finished armaap team 0","by_minute":40,"scope":"any"},
-    {"key":"upgrades","pattern":"\\[Playtest\\] finished armmoho team 0","by_minute":45,"scope":"any"},
-    {"key":"reactor","pattern":"\\[Playtest\\] finished arm(afus|fus) team 0","by_minute":54,"scope":"any"}
+    {"key":"t2","pattern":"\\[Playtest\\] finished (arm|cor|leg)aap team 0","by_minute":14,"scope":"any"},
+    {"key":"upgrades","pattern":"\\[Playtest\\] finished (arm|cor|leg)moho team 0","by_minute":17,"scope":"any"},
+    {"key":"reactor","pattern":"\\[Playtest\\] finished (arm|cor|leg)fus team 0","by_minute":20,"scope":"any"},
+    {"key":"mex-first","pattern":"\\[AirWatch\\] reactor-start def=(arm|cor|leg)fus basicMexes=0 unfinishedMexes=0","by_minute":20,"scope":"any"}
   ],
   "forbid":[
     {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},

@@ -2890,11 +2890,28 @@ as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
 
 ### KI-436 — AIR's natural reactor benchmark remains late
 
+**D-148 requirement update.** The owner now requires aiming for fusion by
+20 minutes, always after **all** owned mex upgrades. The historical 54-minute
+result below is retained. The proposed lane after only initial upgrades is
+superseded: AIR now checks every owned mex and pending upgrade before any
+reactor admission, with earlier T2 access and bounded initial expansion.
+Current results are in [AIR benchmarks](benchmarks/air-management.md).
+
+**D-148 verification.** Final Supreme games complete fusion at Armada 18:41,
+Cortex 19:16 and Legion 20:02.5, always after all six owned mex upgrades.
+Legion loses three T2 constructors and misses the exact target by 2.5 seconds;
+that failure remains. A constructor-gift run finishes 19:09 despite losses.
+The watcher now rejects late events by their recorded frame; its former
+buffered-poll false PASS is superseded by the rejudged report. No gameplay
+invariant, script or crash failure occurred. This leaves timing variance under
+combat and the all-map/repeated-game performance matrix open, not the original
+56-minute baseline behavior.
+
 **Severity:** Medium performance limitation. **Location:**
 [transition check](../tools/playtest/checks/air_transition.json),
 `AirEconomy::Transition` and `AirRules::MakeTask`.
 
-**Problem.** The final 60-minute natural Armada run completed T2 at 36.87 min,
+**Historical problem (D-147).** The final 60-minute natural Armada run completed T2 at 36.87 min,
 its first upgraded mex at 38.22 and ordinary fusion at 56.13. The 54-minute
 reactor benchmark remains missed by 2.13 minutes. There were no script, crash
 or invariant failures. Fusion-first fixes the initial oversized AFUS choice;
@@ -2903,12 +2920,14 @@ policy admits mex upgrades ahead of ordinary energy growth and uses a
 conservative full-package T2 funding gate; both require performance calibration
 under contested expansion and small construction crews.
 
-**Proposed solution.** Compare fixed economy/threat scenarios and repeated
-natural games, including allied TECH constructor gifts. Reserve a bounded
-reactor work lane once initial mex upgrades are funded, and measure the effect
-on fighter replacement, resource stalls and reactor completion before changing
-thresholds. Keep existing construction intact and all TECH policy unchanged;
-do not relax the recorded deadline to hide the miss.
+**Proposed solution.** Compare repeated natural games and fixed economy/threat
+scenarios, including allied TECH constructor gifts and constructor losses.
+Calibrate preparation lead, access funding and construction support while
+retaining the all-owned-mex completion gate. Measure fighter replacement,
+resource stalls and reactor completion before changing thresholds. Keep
+existing construction intact and all TECH policy unchanged; do not relax the
+recorded deadline to hide a miss. The former partial-upgrade reactor lane is
+rejected by D-148.
 
 **Verification.** Repeated final-code games meet the unchanged transition
 milestones without starving interception or showing invariant violations.

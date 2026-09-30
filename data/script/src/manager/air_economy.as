@@ -16,6 +16,65 @@ namespace AirEconomy {
     array<int> nanoFuture;
 
     bool Active() { return Global::AISettings::Role == AiRole::AIR && AirLayout::enabled; }
+    bool HasReactor()
+    {
+        const string side = Global::AISettings::Side;
+        const string fusion = UnitHelpers::GetFusionNameForSide(side);
+        const string advanced = UnitHelpers::GetAdvFusionNameForSide(side);
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(owned[i]);
+            if (u !is null && u.GetBuildProgress() >= 1.0f
+                && (u.circuitDef.GetName() == fusion || u.circuitDef.GetName() == advanced)) return true;
+        }
+        return false;
+    }
+    bool PreparingFusion()
+    {
+        return !HasReactor() && ProductionMath::PreparationDue(ai.frame / SECOND,
+            Global::RoleSettings::Air::FirstFusionTargetSeconds, Global::RoleSettings::Air::FirstFusionLeadSeconds);
+    }
+    bool NeedsMexUpgrade(const CCircuitDef@ d)
+    {
+        if (d is null || d.GetExtractsMetal() <= 0.0f) return false;
+        string side = UnitHelpers::GetSideForUnitName(d.GetName());
+        if (side.length() == 0) side = Global::AISettings::Side;
+        CCircuitDef@ advanced = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(side));
+        return ProductionMath::MexNeedsUpgrade(d.GetExtractsMetal(), advanced is null ? 0.0f : advanced.GetExtractsMetal());
+    }
+    int MexCount()
+    {
+        int count = 0;
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(owned[i]);
+            if (u !is null && u.circuitDef.GetExtractsMetal() > 0.0f) ++count;
+        }
+        return count;
+    }
+    bool MexesReady()
+    {
+        // Fresh ownership, no radius or reach exemption; frames are not upgraded income.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        int basic = 0, unfinished = 0;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef.GetExtractsMetal() <= 0.0f) continue;
+            if (NeedsMexUpgrade(u.circuitDef)) ++basic;
+            else if (u.GetBuildProgress() < 1.0f) ++unfinished;
+        }
+        const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEX), null)
+            + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), null);
+        return ProductionMath::ReactorMayStart(basic, unfinished, queued);
+    }
+    bool HasAdvancedBuilder()
+    {
+        CCircuitDef@ mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
+        if (mex is null) return false;
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(owned[i]);
+            if (u !is null && u.GetBuildProgress() >= 1.0f && u.circuitDef.CanBuild(mex)) return true;
+        }
+        return false;
+    }
     int Count(const string &in name)
     {
         CCircuitDef@ d = ai.GetCircuitDef(name);
@@ -154,6 +213,9 @@ namespace AirEconomy {
                 + " plants=" + t1 + "/" + t2 + " aircraftDemand=" + int(demandM) + "/" + int(demandE), 1);
             GenericHelpers::LogUtil("[AIR][Projects] energyQueued=" + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null)
                 + " committed=" + int(AirBuild::Committed(false)) + "/" + int(AirBuild::Committed(true)), 1);
+            GenericHelpers::LogUtil("[AIR][Fusion] target=" + Global::RoleSettings::Air::FirstFusionTargetSeconds
+                + "s mexes=" + MexCount() + " upgraded=" + (MexesReady() ? "all" : "pending")
+                + " reactor=" + (HasReactor() ? "online" : "pending"), 1);
             for (uint b = 0; b < power.length(); ++b) {
                 CCircuitDef@ nd = ai.GetCircuitDef(nanoName);
                 GenericHelpers::LogUtil("[AIR][Bay] " + b + " plant=" + AirLayout::bays[b].factoryId + " BP=" + int(power[b])
@@ -165,6 +227,17 @@ namespace AirEconomy {
     }
     bool Transition(CCircuitDef@ plant)
     {
+        if (PreparingFusion() && !HasAdvancedBuilder()) {
+            CCircuitDef@ cons = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
+            // Buy access first; upgraded mex income funds the subsequent reactor.
+            return plant !is null && cons !is null && !recovery
+                && metal >= Global::RoleSettings::Air::FusionAccessMinMetal
+                && energy >= Global::RoleSettings::Air::FusionAccessMinEnergy
+                && ProductionMath::Funded(bankM, metal * 0.6f, 150.0f, AirBuild::Committed(false),
+                    plant.costM + cons.costM, Global::RoleSettings::Air::FusionAccessFundSeconds)
+                && ProductionMath::Funded(bankE, AiMax(energy - demandE * 0.5f, 0.0f), 500.0f,
+                    AirBuild::Committed(true), plant.costE + cons.costE, Global::RoleSettings::Air::FusionAccessFundSeconds);
+        }
         if (plant is null || recovery || ai.frame < Global::RoleSettings::Air::TransitionEarliestSeconds * SECOND
             || metal < Global::RoleSettings::Air::TransitionMinMetal || energy < Global::RoleSettings::Air::TransitionMinEnergy) return false;
         const float seconds = Global::RoleSettings::Air::TransitionFundSeconds;

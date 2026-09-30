@@ -1,5 +1,18 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    bool MexNeedsUpgrade(float extraction, float advancedExtraction)
+    {
+        return Valid(extraction) && extraction > 0.0f
+            && (!Valid(advancedExtraction) || advancedExtraction <= 0.0f || extraction < advancedExtraction);
+    }
+    bool ReactorMayStart(int basicMexes, int unfinishedMexes, int queuedMexes)
+    {
+        return basicMexes == 0 && unfinishedMexes == 0 && queuedMexes == 0;
+    }
+    bool PreparationDue(int seconds, int targetSeconds, int leadSeconds)
+    {
+        return seconds >= 0 && targetSeconds > 0 && leadSeconds >= 0 && seconds >= targetSeconds - leadSeconds;
+    }
     bool Valid(float value) { return value >= 0.0f && value < 1.0e12f; }
     float Rate(float work, float power, float warmGap)
     {

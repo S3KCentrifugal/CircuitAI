@@ -16,6 +16,15 @@ namespace AirBuild {
     }
     void Tick()
     {
+        // A newly received/built mex can invalidate an unstarted reactor order.
+        array<IUnitTask@> snapshot = projects;
+        for (uint i = 0; i < snapshot.length(); ++i) {
+            IBuilderTask@ t = cast<IBuilderTask>(snapshot[i]);
+            if (t !is null && t.target is null && IsReactor(t.buildDef) && !AirEconomy::MexesReady()) {
+                GenericHelpers::LogUtil("[AIR][Fusion] cancel unstarted reactor: mex upgrades pending", 1);
+                aiBuilderMgr.AbortTask(snapshot[i]);
+            }
+        }
         // Native completion chains may enqueue economy work despite experimental
         // mode. Reconcile after Enqueue returns, so script can first claim its task.
         array<IUnitTask@> pending = pendingOwnership;
@@ -55,6 +64,9 @@ namespace AirBuild {
     IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
     {
         if (t is null) return null;
+        IBuilderTask@ build = cast<IBuilderTask>(t);
+        if (build !is null && build.target is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady())
+            Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
         if (projects.findByRef(t) < 0) projects.insertLast(t);
         const string key = "" + u.id;
         string prior = ""; trace.get(key, prior);
@@ -76,6 +88,8 @@ namespace AirBuild {
             int(Task::BuildType::NANO), int(Task::BuildType::STORE), int(Task::BuildType::CONVERT) };
         for (uint i = 0; i < (energyOnly ? 1 : kinds.length()); ++i) {
             IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, kinds[i]);
+            IBuilderTask@ build = cast<IBuilderTask>(t);
+            if (build !is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady()) continue;
             if (t !is null && projects.findByRef(t) >= 0) return t;
         }
         return null;
@@ -117,6 +131,56 @@ namespace AirBuild {
         if (bay is null) return null;
         return AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
     }
+    bool IsReactor(CCircuitDef@ d)
+    {
+        if (d is null) return false;
+        const string side = Global::AISettings::Side;
+        return d.GetName() == UnitHelpers::GetFusionNameForSide(side)
+            || d.GetName() == UnitHelpers::GetAdvFusionNameForSide(side);
+    }
+    IUnitTask@ UpgradeMex(CCircuitUnit@ u)
+    {
+        if (AirEconomy::recovery || AirEconomy::energy < 350.0f) return null;
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
+        if (!Can(u, d)) return null;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        CCircuitUnit@ nearest = null;
+        float distance = 1.0e20f;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ mex = ai.GetTeamUnit(ids[i]);
+            if (mex is null || !AirEconomy::NeedsMexUpgrade(mex.circuitDef) || mex.GetBuildProgress() < 1.0f) continue;
+            const AIFloat3 pos = mex.GetPos(ai.frame);
+            if (Economy::MexTracker::AnyUpgradeInProgressNear(pos, 48.0f)
+                || !aiTerrainMgr.CanReachAt(u, pos, u.circuitDef.GetBuildDistance())) continue;
+            const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), pos);
+            if (sq < distance) { distance = sq; @nearest = mex; }
+        }
+        if (nearest is null) return null;
+        return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, nearest.GetPos(ai.frame), -1));
+    }
+    IUnitTask@ AssistMex(CCircuitUnit@ u)
+    {
+        if (AirEconomy::recovery) return null;
+        for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
+            CCircuitUnit@ mex = ai.GetTeamUnit(AirEconomy::owned[i]);
+            if (mex is null || mex.circuitDef.GetExtractsMetal() <= 0.0f || mex.GetBuildProgress() >= 1.0f) continue;
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), mex.GetPos(ai.frame)) > 1800.0f * 1800.0f) continue;
+            return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, mex, 20 * SECOND));
+        }
+        return null;
+    }
+    IUnitTask@ FirstFusion(CCircuitUnit@ u)
+    {
+        if (!AirEconomy::PreparingFusion() || AirEconomy::recovery || !AirEconomy::MexesReady()) return null;
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
+        if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY) || AirEconomy::bankM < 500.0f) return null;
+        if (!ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 150.0f, Committed(false), d.costM, 180.0f)
+            || !ProductionMath::Funded(AirEconomy::bankE, AirEconomy::energy * 0.5f, 500.0f, Committed(true), d.costE, 180.0f)) return null;
+        IUnitTask@ t = AirLayout::Place(u, d, Task::BuildType::ENERGY, Task::Priority::HIGH, true);
+        if (t !is null) GenericHelpers::LogUtil("[AIR][Fusion] first fusion admitted: all owned mexes upgraded; target="
+            + Global::RoleSettings::Air::FirstFusionTargetSeconds + "s", 1);
+        return t;
+    }
     IUnitTask@ Energy(CCircuitUnit@ u, bool emergency)
     {
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null) > 0) return null;
@@ -135,8 +199,9 @@ namespace AirBuild {
                 reactorIncome = true; break;
             }
         }
-        if (!emergency && t2 && reactorIncome && AirEconomy::metal >= 80.0f && AirEconomy::bankM > 5000.0f) names.insertLast(advancedFusion);
-        if (!emergency && t2 && AirEconomy::metal >= 30.0f && AirEconomy::bankM > 500.0f) names.insertLast(fusion);
+        const bool mexesReady = AirEconomy::MexesReady();
+        if (!emergency && t2 && mexesReady && reactorIncome && AirEconomy::metal >= 80.0f && AirEconomy::bankM > 5000.0f) names.insertLast(advancedFusion);
+        if (!emergency && t2 && mexesReady && AirEconomy::metal >= 30.0f && AirEconomy::bankM > 500.0f) names.insertLast(fusion);
         const float wind = (ai.GetWindMin() + ai.GetWindMax()) * 0.5f;
         const string advSolar = UnitHelpers::GetAdvSolarNameForSide(side);
         if (!emergency && AirEconomy::metal >= 15.0f && AirEconomy::bankE >= 1800.0f && AirEconomy::Count(advSolar) < 6)

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dir', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['natural', 'transport', 'capacity', 'loss', 'switch', 'attack', 'legacy'], default='natural')
+    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'switch', 'attack', 'legacy'], default='natural')
     parser.add_argument('--seed', type=int, default=930146)
     args = parser.parse_args()
     base = args.dir.resolve()

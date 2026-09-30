@@ -33,9 +33,14 @@ engine's unmodified worker time, in work/second, not the JSON `build_speed`
 policy value. Production estimates use build time and metal/energy cost from
 the loaded UnitDefs. The initial mix is seven fighters to three bombers.
 
-The initial T2 gate is eight minutes, +30 metal and +1,200 energy, plus funding
+AIR targets its first completed fusion by **20 minutes**, with every owned mex
+upgraded before any reactor starts (D-148). From eight minutes it prepares T2
+access if no capable constructor has arrived: +12 metal/+450 energy and a
+300-second forecast fund the plant and constructor first. Upgraded mex income
+then funds fusion. The ordinary production-expansion T2 gate remains eight
+minutes, +30 metal and +1,200 energy, plus funding
 for a plant, a constructor, two mex upgrades, two seed nanos and a reserve.
-First T2 uses a 100-second funding projection. Further bays require sustained
+That ordinary gate uses a 100-second funding projection. Further bays require sustained
 spare income for twenty seconds and useful support on existing bays. The role
 keeps growing T1 energy/storage while those conditions are unmet. Three bad
 energy samples enter recovery; ten adequately buffered samples leave it.
@@ -47,6 +52,18 @@ The first advanced energy investment is ordinary fusion. Advanced fusion needs
 an owned completed reactor plus the metal-income and bank gates; a frame does
 not qualify. This gives AIR reactor income before its small mobile crew takes
 on the much larger project.
+
+Before the first reactor, AIR limits its own early expansion to six mexes and
+closes that expansion when preparation begins. Owned gifts anywhere on the map
+still count. Two advanced constructors can upgrade distinct spots while other
+workers assist frames; the old 3,500-elmo upgrade limit is removed. Fusion is
+blocked by any basic mex, unfinished advanced mex, or queued mex/upgrade,
+including the reclaim-to-frame gap. The check uses loaded extraction rates,
+covering cloaked/armed/underwater variants without changing shared catalogs.
+An unreachable owned basic mex delays the goal; the clock never bypasses it.
+Queued unstarted reactors are cancelled when new mex work appears; existing
+reactor construction continues. Transports and the defensive fighter quota
+remain ahead of optional aircraft, which pause during first-fusion preparation.
 
 The twenty-nano setting is the current expansion comparison point. The first
 implementation fills useful available support up to that point before another

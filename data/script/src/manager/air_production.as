@@ -36,7 +36,8 @@ namespace AirProduction {
         }
         const string side = UnitHelpers::GetSideForUnitName(name);
         const string cons = advanced ? UnitHelpers::GetT2AirConstructorNameForSide(side) : UnitHelpers::GetT1AirConstructorNameForSide(side);
-        IUnitTask@ t = Recruit(u, cons, 1, "constructor.recovery", Task::Priority::HIGH, true);
+        const int firstCrew = advanced && AirEconomy::PreparingFusion() ? 2 : 1;
+        IUnitTask@ t = Recruit(u, cons, firstCrew, "constructor.recovery", Task::Priority::HIGH, true);
         if (t !is null) return t;
         if (basic) {
             @t = Recruit(u, UnitHelpers::GetT1AirScoutForSide(side), 1, "scout", Task::Priority::HIGH);
@@ -58,6 +59,8 @@ namespace AirProduction {
             constructors = AiMax(3, AiMin(Global::RoleSettings::Air::MaxT1EconomyBuilders, 3 + int(AirEconomy::metal / 20.0f)));
         if (advanced && AirEconomy::metal >= 40.0f && AirEconomy::energy >= 1200.0f)
             constructors = AiMin(6, 2 + int(AirEconomy::metal / 150.0f));
+        if (AirEconomy::PreparingFusion() && AirEconomy::energy >= 500.0f)
+            constructors = AiMax(constructors, advanced ? 2 : 4);
         @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::NORMAL, true);
         if (t !is null) return t;
         if (basic && AirEconomy::t2 > 0) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
@@ -66,6 +69,8 @@ namespace AirProduction {
             @t = Recruit(u, fighter, AirEconomy::HomeTarget(), "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
+        // Transports and the defensive fighter floor above remain first.
+        if (AirEconomy::PreparingFusion()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (basic && strikeOrders < Global::RoleSettings::Air::T1StrikeOpenerSize && AirEconomy::metal >= 12.0f && AirEconomy::EnemyAir() < 1000.0f) {
             @t = Recruit(u, RoleAir::GetT1StrikeAircraftNameForSide(side), Global::RoleSettings::Air::T1StrikeOpenerSize, "strike", Task::Priority::NORMAL);
             if (t !is null) { ++strikeOrders; return t; }

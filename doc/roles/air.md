@@ -36,6 +36,9 @@ role initializes. TECH's rules, geometry and settings are unchanged.
 | `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
 | `MaxT1EconomyBuilders` | 6 | Funded T1 growth beyond the initial three constructors |
 | `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
+| `FirstFusionTargetSeconds` / `FirstFusionLeadSeconds` | 1200 / 720 | Aim for fusion at 20 minutes; prepare from minute 8; mex completion always wins |
+| `PreFusionMexLimit` | 6 | Bound own early expansion before first reactor; gifts still require upgrades |
+| `FusionAccessMinMetal` / `FusionAccessMinEnergy` / `FusionAccessFundSeconds` | 12 / 450 / 300 | Fund T2 access for the first reactor when no capable gifted constructor exists |
 | `WarmFactoryGapSeconds` | 0.5 | Configured prior, separate from cold startup |
 | `ProductionIncomeShare` | 0.65 | Resource share used to size support |
 | `TransitionMinMetal` / `TransitionMinEnergy` | 30 / 1200 | Ten-second low income gates |

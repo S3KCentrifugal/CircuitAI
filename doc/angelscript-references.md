@@ -11,6 +11,7 @@ policy. Existing APIs retain their behavior.
 | --- | --- |
 | `ai.GetOwnedUnitIds()` | New owned array of this AI's IDs, including frames. Resolve each borrowed unit with `GetTeamUnit` at use time; a lost/transferred ID can return null. |
 | `CCircuitDef.GetBuildTime()` | UnitDef build work. |
+| `CCircuitDef.GetExtractsMetal()` | Loaded engine extraction rate; compare with the loaded advanced extractor to classify basic/advanced variants. Read-only observation; no classification policy is changed natively (D-148). |
 | `CCircuitDef.GetBuildSpeed()` | Physical engine worker time, work/second, before JSON `build_speed` tuning. Do not multiply by `SECOND`. |
 | `CCircuitDef.GetBuildDistance()` | Engine build reach in elmos. |
 | `aiFactoryMgr.GetPendingRecruitCount(def)` | Live recruit tasks with this definition and no target frame. `def.count` already includes frames; add only this pending count. |
