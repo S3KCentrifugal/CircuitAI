@@ -12,7 +12,11 @@ separate build pads. The campus adds one bay at a time at a nominal 560-elmo
 spacing; the configurable safety ceiling is twelve T2 plants, not a target.
 If terrain only fits a partial bank, capacity uses those actual slots. Standing
 gifted plants are adopted in place and nearby support slots are fitted around
-them. Ordinary energy/storage uses spaced patches. Its search expands
+them. Windmills use atomically reserved 3-by-2 groups of six touching footprints,
+with at least 144 elmos between group bounding circles. Existing slots are
+filled and destroyed windmills replaced before new groups are opened. The
+layout keeps native slot identity and named `air.wind.*` metadata. Other
+ordinary energy/storage uses spaced patches. Its search expands
 over 24 rings of 96 elmos, with 24 samples each; failed definitions back off for
 three seconds. The earlier 12-by-12 search could exhaust its coastal candidates
 and stop energy growth despite ample resources. Late reactors search a
@@ -44,9 +48,13 @@ That ordinary gate uses a 100-second funding projection. Further bays require su
 spare income for twenty seconds and useful support on existing bays. The role
 keeps growing T1 energy/storage while those conditions are unmet. Three bad
 energy samples enter recovery; ten adequately buffered samples leave it.
-Mobile T1 economy builders grow from three to at most six when there is at
-least +30 metal, +500 energy and 500 metal bank, before T2. This lets the remote
-wind/solar field grow while factory turrets continue aircraft production.
+Mobile construction targets scale at eight work/second per metal/second,
+multiplied by 1.5 when metal floats. Loaded constructor work rates determine
+counts, with ceilings of ten T1 and eight T2 constructors. After T2, the work
+target splits 40%/60%, with three T1 and two T2 as the funded floors. Queued
+recruits and frames count once. Growth requires a bank and cost forecast and
+pauses in recovery; it follows the immediate fighter screen and precedes the
+full interception quota. Factory turrets are not credited as mobile work.
 
 The first advanced energy investment is ordinary fusion. Advanced fusion needs
 an owned completed reactor plus the metal-income and bank gates; a frame does
@@ -64,6 +72,15 @@ An unreachable owned basic mex delays the goal; the clock never bypasses it.
 Queued unstarted reactors are cancelled when new mex work appears; existing
 reactor construction continues. Transports and the defensive fighter quota
 remain ahead of optional aircraft, which pause during first-fusion preparation.
+
+The turret target takes the larger of funded aircraft throughput and an
+income/float construction floor shared across live production bays. Support
+growth precedes general fusion-preparation assistance, and unfinished turrets
+receive help before another is ordered. Idle factory turrets help owned
+construction within their physical reach through the same target selector as
+mobile builders. Once the owning plant has another unit frame, the AIR tick
+ends that economy assistance so factory production regains the turret.
+See [design and evidence](air-wind-and-build-power.md).
 
 The twenty-nano setting is the current expansion comparison point. The first
 implementation fills useful available support up to that point before another

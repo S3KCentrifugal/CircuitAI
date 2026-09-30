@@ -1,5 +1,15 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    int WorkforceTarget(float targetWork, float unitWork, int floor, int cap)
+    {
+        if (!Valid(targetWork) || !Valid(unitWork) || unitWork <= 0.0f || floor < 0 || cap < floor) return 0;
+        for (int n = floor; n < cap; ++n)
+            if (float(n) * unitWork >= targetWork) return n;
+        return cap;
+    }
+    float ClusterAcross(int slot, float width) { return float(slot % 3 - 1) * width; }
+    float ClusterAlong(int slot, float depth) { return (float(slot / 3) - 0.5f) * depth; }
+    float ClusterDiameterSquared(float width, float depth) { return 9.0f * width * width + 4.0f * depth * depth; }
     bool MexNeedsUpgrade(float extraction, float advancedExtraction)
     {
         return Valid(extraction) && extraction > 0.0f

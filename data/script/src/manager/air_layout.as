@@ -14,6 +14,13 @@ namespace AirLayout {
         array<int> nanos;
     }
     array<Bay@> bays;
+    class WindCluster {
+        string defName;
+        AIFloat3 centre;
+        int facing = 0;
+        array<int> slots;
+    }
+    array<WindCluster@> windClusters;
     bool enabled = false;
     int searchAfter = 0;
     int facing = 0;
@@ -64,6 +71,7 @@ namespace AirLayout {
         aiBuilderMgr.experimentalAirDirect = true;
         aiEconomyMgr.assistNanoEnabled = false; // one owner: native queued nanos cannot obstruct AIR slots
         bays.resize(0);
+        windClusters.resize(0);
         placeRetry.deleteAll();
         facing = LayoutHelpers::FacingToward(Global::Map::StartPos, LayoutHelpers::TerrainCentre());
         const int count = aiTerrainMgr.GetLayoutInt("air.bays", 0);
@@ -78,7 +86,18 @@ namespace AirLayout {
             for (int j = 0; j < n; ++j) b.nanos.insertLast(aiTerrainMgr.GetLayoutInt(b.key + ".nano." + j, -1));
             bays.insertLast(b);
         }
-        GenericHelpers::LogUtil("[AIR][Layout] enabled; adopted " + bays.length() + " bays", 1);
+        const int winds = aiTerrainMgr.GetLayoutInt("air.winds", 0);
+        for (int i = 0; i < winds; ++i) {
+            const string key = "air.wind." + i;
+            WindCluster c;
+            const int faction = aiTerrainMgr.GetLayoutInt(key + ".side", 0);
+            c.defName = UnitHelpers::GetWindNameForSide(faction == 1 ? "cortex" : faction == 2 ? "legion" : "armada");
+            c.facing = aiTerrainMgr.GetLayoutInt(key + ".facing", facing);
+            c.centre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(key + ".x", 0)), 0.0f, float(aiTerrainMgr.GetLayoutInt(key + ".z", 0)));
+            for (int s = 0; s < 6; ++s) c.slots.insertLast(aiTerrainMgr.GetLayoutInt(key + ".slot." + s, -1));
+            windClusters.insertLast(c);
+        }
+        GenericHelpers::LogUtil("[AIR][Layout] enabled; adopted " + bays.length() + " bays, " + windClusters.length() + " wind clusters", 1);
     }
     // A compound plan is synchronous: publish only after every reservation succeeds.
     Bay@ Reserve(CCircuitDef@ plant, const AIFloat3 &in anchor)
@@ -164,6 +183,8 @@ namespace AirLayout {
     IUnitTask@ Place(CCircuitUnit@ u, CCircuitDef@ d, Task::BuildType type, Task::Priority priority, bool reactor = false)
     {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
+        if (d.GetName() == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(d.GetName())))
+            return PlaceWind(u, d, priority);
         const string key = d.GetName() + (reactor ? ".reactor" : ".field");
         int64 retry = 0;
         if (placeRetry.get(key, retry) && ai.frame < retry) return null;
@@ -190,12 +211,95 @@ namespace AirLayout {
         GenericHelpers::LogUtil("[AIR][Layout] no economy site for " + d.GetName() + "; retry in 3s", 2);
         return null;
     }
+    void SaveWind(uint index)
+    {
+        WindCluster@ c = windClusters[index];
+        const string key = "air.wind." + index;
+        const string side = UnitHelpers::GetSideForUnitName(c.defName);
+        aiTerrainMgr.SetLayoutInt(key + ".side", side == "cortex" ? 1 : side == "legion" ? 2 : 0);
+        aiTerrainMgr.SetLayoutInt(key + ".facing", c.facing);
+        aiTerrainMgr.SetLayoutInt(key + ".x", int(c.centre.x));
+        aiTerrainMgr.SetLayoutInt(key + ".z", int(c.centre.z));
+        for (uint s = 0; s < c.slots.length(); ++s) aiTerrainMgr.SetLayoutInt(key + ".slot." + s, c.slots[s]);
+        aiTerrainMgr.SetLayoutInt("air.winds", int(windClusters.length()));
+    }
+    AIFloat3 WindPos(WindCluster@ c, CCircuitDef@ d, int s)
+    {
+        return Offset(c.centre, c.facing, ProductionMath::ClusterAcross(s, float(d.GetFootprintX()) * 16.0f),
+            ProductionMath::ClusterAlong(s, float(d.GetFootprintZ()) * 16.0f));
+    }
+    IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority)
+    {
+        // Native states own occupied, claimed and destroyed slots. Fill holes first.
+        for (uint i = 0; i < windClusters.length(); ++i) {
+            WindCluster@ c = windClusters[i];
+            if (c.defName != d.GetName()) continue;
+            for (uint s = 0; s < c.slots.length(); ++s) {
+                const AIFloat3 p = WindPos(c, d, int(s));
+                if (!Inside(p, 32.0f) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
+                int state = aiTerrainMgr.GetReservationState(c.slots[s]);
+                if (state < 0 || state == 4) {
+                    aiTerrainMgr.ReleasePersistentBuilding(c.slots[s]);
+                    c.slots[s] = aiTerrainMgr.ReservePersistentBuilding(d, p, c.facing);
+                    SaveWind(i);
+                    state = aiTerrainMgr.GetReservationState(c.slots[s]);
+                }
+                if (state != 0) continue;
+                IUnitTask@ task = Pinned(Task::BuildType::ENERGY, priority, d, c.slots[s]);
+                if (task !is null) return task;
+            }
+        }
+        const string key = d.GetName() + ".cluster";
+        int64 retry = 0;
+        if (placeRetry.get(key, retry) && ai.frame < retry) return null;
+        const float diameter = sqrt(ProductionMath::ClusterDiameterSquared(float(d.GetFootprintX()) * 16.0f, float(d.GetFootprintZ()) * 16.0f));
+        for (int ring = 1; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
+            for (int k = 0; k < 24; ++k) {
+                const float angle = 6.2831853f * float(k) / 24.0f;
+                WindCluster c; c.defName = d.GetName(); c.facing = facing;
+                c.centre = AIFloat3(Global::Map::StartPos.x + cos(angle) * float(ring) * 96.0f, 0.0f,
+                    Global::Map::StartPos.z + sin(angle) * float(ring) * 96.0f);
+                bool near = false;
+                for (uint b = 0; b < bays.length(); ++b)
+                    if (MapHelpers::SqDist(c.centre, bays[b].centre) < 250.0f * 250.0f) near = true;
+                for (uint i = 0; i < windClusters.length(); ++i) {
+                    CCircuitDef@ other = ai.GetCircuitDef(windClusters[i].defName);
+                    if (other is null) continue;
+                    const float separation = 0.5f * (diameter + sqrt(ProductionMath::ClusterDiameterSquared(float(other.GetFootprintX()) * 16.0f,
+                        float(other.GetFootprintZ()) * 16.0f))) + Global::RoleSettings::Air::WindClusterGap + 16.0f;
+                    if (MapHelpers::SqDist(c.centre, windClusters[i].centre) < separation * separation) near = true;
+                }
+                if (near || !Inside(c.centre, diameter) || aiTerrainMgr.IsZoneAlly(c.centre)) continue;
+                for (int s = 0; s < 6; ++s) {
+                    const AIFloat3 p = WindPos(c, d, s);
+                    if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) break;
+                    const int id = aiTerrainMgr.ReservePersistentBuilding(d, p, facing);
+                    if (id < 0) break;
+                    c.slots.insertLast(id);
+                    // Anchor the grid to the first snapped slot, avoiding accumulated rounding.
+                    if (s == 0) {
+                        const AIFloat3 snapped = aiTerrainMgr.GetReservationPos(id);
+                        c.centre.x += snapped.x - p.x; c.centre.z += snapped.z - p.z;
+                    }
+                }
+                if (c.slots.length() != 6) {
+                    for (uint s = 0; s < c.slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(c.slots[s]);
+                    continue;
+                }
+                windClusters.insertLast(c); SaveWind(windClusters.length() - 1);
+                GenericHelpers::LogUtil("[AIR][Wind] cluster=" + (windClusters.length() - 1) + " slots=6 at=" + int(c.centre.x) + "," + int(c.centre.z), 1);
+                return Pinned(Task::BuildType::ENERGY, priority, d, c.slots[0]);
+            }
+        }
+        placeRetry.set(key, int64(ai.frame + 3 * SECOND));
+        return null;
+    }
     void Leave()
     {
         if (!enabled) return;
         aiTerrainMgr.ResetLayout(); aiTerrainMgr.SetLayoutEnabled(false);
         aiBuilderMgr.experimentalAirDirect = false;
-        enabled = false; bays.resize(0); searchAfter = 0; overlay = false;
+        enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0; overlay = false;
         placeRetry.deleteAll();
     }
 }

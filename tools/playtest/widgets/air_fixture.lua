@@ -14,6 +14,16 @@ end
 function widget:Initialize() Spring.Echo("[AirFixture] scenario="..scenario.."; injected resources/units are not natural economy evidence") end
 function widget:GameFrame(f)
     if once("cheat",300,f) then Spring.SendCommands("cheat 1") end
+    if scenario=="windloss" and once("windloss",9000,f) then
+        for _,id in ipairs(Spring.GetTeamUnits(0)) do
+            local name=UnitDefs[Spring.GetUnitDefID(id)].name
+            if name=="armwin" or name=="corwin" or name=="legwin" then
+                Spring.SendLuaRulesMsg("$dev$:destroyunits "..id)
+                Spring.Echo("[AirFixture] requested wind destruction id="..id)
+                break
+            end
+        end
+    end
     if scenario=="constructor" and once("constructor",10800,f) then
         local x,y,z=Spring.GetTeamStartPosition(0)
         give("armaca",0,x+160,z,1)

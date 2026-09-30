@@ -2890,6 +2890,16 @@ as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
 
 ### KI-436 — AIR's natural reactor benchmark remains late
 
+**D-149 verification.** Compact wind groups and faster construction scaling
+complete Armada fusion at 18:09.7, but the Cortex wind-loss game finishes
+20:45.2 after three early constructor deaths. Final code's natural Legion run
+finishes 19:10.1; Armada finishes 21:46.5 after losing its first T2 plant and
+nine constructors. Repeated Legion games also vary (19:40.4 and 22:26.6 before
+the final production-support preemption correction).
+The all-owned-mex gate and exact deadline remain enforced. See the
+[workforce evidence](air-wind-and-build-power.md) and
+[D-149](decisions.md#d-149--air-packs-six-wind-groups-and-scales-construction-from-income).
+
 **D-148 requirement update.** The owner now requires aiming for fusion by
 20 minutes, always after **all** owned mex upgrades. The historical 54-minute
 result below is retained. The proposed lane after only initial upgrades is
@@ -2933,6 +2943,29 @@ rejected by D-148.
 milestones without starving interception or showing invariant violations.
 [D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
 and [evidence](benchmarks/air-management.md) preserve the failed scorecard.
+
+### KI-437 — Legacy AIR does not use the new wind clusters or workforce targets
+
+**Severity:** Low scope limitation. **Location:** `RoleAir::Air_TryCommanderWind`,
+the native-driven difficulty profiles and `Air.ExperimentalBuild=false`.
+
+**Problem.** D-149 corrects placement and workforce growth in experimental AIR's
+new building controller. The explicit legacy dispatcher still uses ordinary
+native wind placement and its older construction policy. Applying new packing
+there without ownership reconciliation could leave competing native and script
+orders. It is deliberately unchanged to preserve the legacy fallback and TECH.
+
+**Proposed solution.** If legacy parity is wanted, route its AIR economy through
+the same ownership-aware controller under an explicit profile setting; do not
+copy the grid algorithm into `Air_TryCommanderWind`. Keep native recruitment
+and completion chains from creating duplicate jobs, and retain feature-off
+compatibility as a separate supported path.
+
+**Verification.** Play the legacy and experimental profile matrix with the
+independent wind-position/workforce observer and explicit feature settings,
+including native completion chains and role switching. D-149's experimental
+results do not establish legacy parity. See
+[D-149](decisions.md#d-149--air-packs-six-wind-groups-and-scales-construction-from-income).
 
 ## Indexed elsewhere
 

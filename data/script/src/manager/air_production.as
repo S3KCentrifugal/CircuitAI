@@ -30,6 +30,8 @@ namespace AirProduction {
                 IBuilderTask@ job = plant is null ? null : cast<IBuilderTask>(plant.task);
                 if (job !is null && job.target !is null && !Lifecycle::IsRetiring(plant))
                     return aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::NORMAL, job.target));
+                CCircuitUnit@ frame = AirBuild::FindAssistTarget(u, false, null, true);
+                if (frame !is null) return aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, frame));
                 return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
             }
             return aiFactoryMgr.DefaultMakeTask(u);
@@ -47,28 +49,20 @@ namespace AirProduction {
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
         if (affordable) {
             const int assignedToWaves = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-            @t = Recruit(u, fighter, (advanced ? AirEconomy::HomeTarget() : 2) + assignedToWaves, "intercept", Task::Priority::HIGH);
+            @t = Recruit(u, fighter, (advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2) + assignedToWaves, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
-        int constructors = 1;
-        if (AirEconomy::metal >= 8.0f && AirEconomy::energy >= 160.0f && !advanced) constructors = 2;
-        if (AirEconomy::metal >= 18.0f && AirEconomy::energy >= 300.0f && !advanced) constructors = 3;
-        // Factory-bound nanos cannot supply remote wind/solar construction.
-        if (!advanced && AirEconomy::t2 == 0 && !AirEconomy::recovery && AirEconomy::metal >= 30.0f
-            && AirEconomy::energy >= 500.0f && AirEconomy::bankM >= 500.0f)
-            constructors = AiMax(3, AiMin(Global::RoleSettings::Air::MaxT1EconomyBuilders, 3 + int(AirEconomy::metal / 20.0f)));
-        if (advanced && AirEconomy::metal >= 40.0f && AirEconomy::energy >= 1200.0f)
-            constructors = AiMin(6, 2 + int(AirEconomy::metal / 150.0f));
-        if (AirEconomy::PreparingFusion() && AirEconomy::energy >= 500.0f)
-            constructors = AiMax(constructors, advanced ? 2 : 4);
-        @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::NORMAL, true);
-        if (t !is null) return t;
+        CCircuitDef@ builder = ai.GetCircuitDef(cons);
+        const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
+        if (AirEconomy::FundConstructor(builder)) {
+            @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
+            if (t !is null) return t;
+        }
         if (basic && AirEconomy::t2 > 0) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
-        if (basic) {
-            @t = Recruit(u, fighter, AirEconomy::HomeTarget(), "intercept", Task::Priority::HIGH);
-            if (t !is null) return t;
-        }
+        const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
+        @t = Recruit(u, fighter, AirEconomy::HomeTarget() + waveScreen, "intercept", Task::Priority::HIGH);
+        if (t !is null) return t;
         // Transports and the defensive fighter floor above remain first.
         if (AirEconomy::PreparingFusion()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (basic && strikeOrders < Global::RoleSettings::Air::T1StrikeOpenerSize && AirEconomy::metal >= 12.0f && AirEconomy::EnemyAir() < 1000.0f) {
@@ -135,6 +129,21 @@ namespace AirProduction {
     void Removed(CCircuitUnit@ u) { if (u !is null) home.delete("" + u.id); }
     void Tick()
     {
+        // Static repairs have no timeout. Return borrowed economy assistance to
+        // its production bay as soon as that plant has a unit frame again.
+        array<string>@ nanos = AirEconomy::nanoBay.getKeys();
+        for (uint i = 0; i < nanos.length(); ++i) {
+            int64 owner = -1;
+            if (!AirEconomy::nanoBay.get(nanos[i], owner) || owner < 0 || owner >= int(AirLayout::bays.length())) continue;
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(nanos[i]));
+            IBuilderTask@ help = u is null ? null : cast<IBuilderTask>(u.task);
+            if (help is null || help.GetBuildType() != int(Task::BuildType::REPAIR) || help.target is null || help.target.circuitDef.IsMobile()) continue;
+            CCircuitUnit@ plant = ai.GetTeamUnit(AirLayout::bays[int(owner)].factoryId);
+            IBuilderTask@ job = plant is null ? null : cast<IBuilderTask>(plant.task);
+            if (job is null || job.target is null || Lifecycle::IsRetiring(plant)) continue;
+            GenericHelpers::LogUtil("[AIR][Support] return to production bay=" + owner, 1);
+            aiFactoryMgr.AbortTask(u.task);
+        }
         array<string>@ ids = home.getKeys();
         for (uint i = 0; i < ids.length(); ++i) {
             if (ai.GetTeamUnit(parseInt(ids[i])) is null) home.delete(ids[i]);

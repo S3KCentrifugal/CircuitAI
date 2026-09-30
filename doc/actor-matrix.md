@@ -226,3 +226,15 @@ decides the end; everything else reads it.
 | `AirBuild::Energy`, `Resume`, `Tick`, `Record` | reactor identity, live mex gate, frame ownership | Apply the gate to every reactor path, cancel invalid unstarted orders, retain already framed construction, check INV-077 |
 | `AirProduction` | preparation phase, defensive quotas, transports | Reserve optional aircraft spending for the first reactor while retaining transport priority and interception |
 | AIR playtest observer | engine UnitCreated, owned mex extraction/progress | Independently reject a reactor frame before all owned mex upgrades complete |
+
+## AIR clustered wind and construction power (D-149)
+
+| Actor | Reads | Action |
+| --- | --- | --- |
+| `AirLayout::PlaceWind` / `SaveWind` / `Init` | loaded footprint, six native slots, map/ally/reach checks, group gap | Reserve all six or roll back; fill and replace slots; adopt named metadata |
+| `AirBuild::Record` | construction kind, planned build position or served reservation | Check INV-078 before accepting a wind construction task; repair does not own a slot |
+| `AirEconomy::ConstructionTarget`, `ConstructorTarget`, `NanoTarget` | income, floating metal, loaded work, separate mobile/static capacity | Set bounded workforce quotas and bay support targets |
+| `AirProduction::MakeTask` | pending recruits, frames, funding, immediate screen, ferry prehook | Grow funded mobile work before the full fighter quota; never count a nano as mobile work |
+| `support.assist`, `production.support` | unfinished nano and native support slot states | Finish support and grow it before general project assistance |
+| `AirBuild::FindAssistTarget` / factory nano policy | owned projects, physical reach, factory recruit target | Share one target selector; idle production nanos assist reachable construction; AIR tick ends that assistance when production resumes |
+| AIR observer | engine positions, dimensions, completions and deaths | Verify packing and replacement; measure completed mobile work and turret counts |

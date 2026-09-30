@@ -1,4 +1,12 @@
 void test_rate_zero_power_returns_zero() { Check(ProductionMath::Rate(100.0f, 0.0f, 0.5f) == 0.0f); }
+void test_workforce_rounds_up_shortage() { Check(ProductionMath::WorkforceTarget(161.0f, 60.0f, 2, 10) == 3); }
+void test_workforce_exact_target_does_not_overbuild() { Check(ProductionMath::WorkforceTarget(180.0f, 60.0f, 2, 10) == 3); }
+void test_workforce_keeps_t1_floor_after_transition() { Check(ProductionMath::WorkforceTarget(40.0f, 60.0f, 3, 10) == 3); }
+void test_workforce_income_growth_respects_cap() { Check(ProductionMath::WorkforceTarget(10000.0f, 60.0f, 2, 10) == 10); }
+void test_workforce_invalid_power_rejects() { Check(ProductionMath::WorkforceTarget(100.0f, 0.0f, 2, 10) == 0); }
+void test_wind_cluster_has_three_columns() { Check(ProductionMath::ClusterAcross(0, 32.0f) == -32.0f && ProductionMath::ClusterAcross(2, 32.0f) == 32.0f && ProductionMath::ClusterAcross(3, 32.0f) == -32.0f); }
+void test_wind_cluster_has_two_touching_rows() { Check(ProductionMath::ClusterAlong(2, 48.0f) == -24.0f && ProductionMath::ClusterAlong(3, 48.0f) == 24.0f); }
+void test_wind_cluster_bounds_include_whole_footprints() { Check(ProductionMath::ClusterDiameterSquared(32.0f, 48.0f) == 18432.0f); }
 void test_reactor_owned_basic_mex_blocks_even_when_deadline_passed() { Check(!ProductionMath::ReactorMayStart(1, 0, 0)); }
 void test_reactor_upgrade_frame_is_not_completed_income() { Check(!ProductionMath::ReactorMayStart(0, 1, 0)); }
 void test_reactor_reclaim_gap_and_queued_expansion_block() { Check(!ProductionMath::ReactorMayStart(0, 0, 1)); }

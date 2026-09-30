@@ -14,9 +14,11 @@ per second; existing construction stays assigned.
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes without a base-radius restriction; help existing frames |
-| 5a | `fusion.first`, `fusion.access`, `fusion.prepare.assist` | Target fusion by 20 minutes; obtain T2 access and assist projects; no reactor until all mexes finish |
-| 5b | `mex.expand` | Before first reactor, at most six self-expanded mexes and no new expansion after preparation starts; normal expansion resumes with reactor income |
-| 6 | `production.support`, `storage.buffer` | Fund actual factory BP and the first wind buffer without starvation |
+| 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
+| 5b | `support.assist`, `production.support` | Finish a support turret or grow funded support before general preparation assistance |
+| 5c | `fusion.access`, `fusion.prepare.assist` | Obtain T2 access and assist committed projects |
+| 5d | `mex.expand` | Before first reactor, at most six self-expanded mexes and no new expansion after preparation starts; normal expansion resumes with reactor income |
+| 6 | `storage.buffer` | Fund the first wind buffer without starvation |
 | 6a | `transition.bay` | Admit a funded first T2 package before the moving T1 energy-growth target can starve it |
 | 7 | `energy.assist`, `energy.grow` | Supply aircraft demand and T1 economy growth |
 | 8 | `intel.radar`, `defence.flak` | Radar and bounded T2 AA against observed aircraft |
@@ -27,7 +29,7 @@ per second; existing construction stays assigned.
 | 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard, or bounded retry |
 
 The factory recruiter separately prioritizes allied transport obligations, then
-constructor recovery, scouting, an immediate fighter screen, economic builders,
+constructor recovery, scouting, an immediate fighter screen, funded income-scaled economic builders,
 the full interception floor, a finite T1 strike, heavies and escorted waves.
 Task priority controls engine resource priority; admission gates and available
 build power also limit competing spending.
@@ -42,4 +44,4 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 3ced27c067546a5bd137404061bd10f0f5104f81; lines: 122 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 183d1ef78d7769e3b48f040bfddd40610aa8df72; lines: 124 -->

@@ -27,6 +27,14 @@ existing project within 1,800 elmos and respects retirement. `Leave` aborts the
 owned tasks, releases military holds and removes AIR reservations before native
 role settings are restored.
 
+`FindAssistTarget` is shared by mobile assistance and idle production turrets.
+It supports an optional definition filter (finish a nano) and an actual-reach
+filter for immobile turrets. `Assist` wraps it in the mobile repair task. Wind
+orders use the six-slot clusters in `AirLayout`; `Record` checks INV-078 using
+the planned position before the required pin is served, and its native slot ID
+after assignment. Repair tasks carry the target's definition but do not create
+wind orders or own placement slots, so this check applies to ENERGY tasks.
+
 `UpgradeMex` chooses the nearest live owned basic extractor the builder can
 reach, using extraction rates and per-spot upgrade claims, with no home-radius
 limit. `AssistMex` gives nearby unfinished extractors assistance before new
@@ -46,4 +54,4 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 25f13f9e2c2d16ada13b8f52c36a4d7ad22bed95; lines: 261 -->
+<!-- source: data/script/src/roles/air_build.as; blob: fe8fb1bf7df4dcd3556bd6f917029556817f6f45; lines: 284 -->

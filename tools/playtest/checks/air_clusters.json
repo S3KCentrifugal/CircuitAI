@@ -1,0 +1,17 @@
+{
+  "stop_minute":23,
+  "expect":[
+    {"key":"cluster","pattern":"\\[AirWatch\\] wind-cluster-start","scope":"any","by_minute":4},
+    {"key":"packed","pattern":"fullWindClusters=([2-9]|[1-9][0-9])","scope":"any","by_minute":10},
+    {"key":"mobile","pattern":"construction t1=([3-9]|10)","scope":"any","by_minute":10},
+    {"key":"static","pattern":"\\[AirWatch\\] construction .*nanos=([2-9]|[1-9][0-9])","scope":"any","by_minute":16},
+    {"key":"mex-gate","pattern":"\\[AirWatch\\] reactor-start def=(arm|cor|leg)fus basicMexes=0 unfinishedMexes=0","scope":"any","by_minute":20},
+    {"key":"fusion","pattern":"\\[Playtest\\] finished (arm|cor|leg)fus team 0","scope":"any","by_minute":20}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"},
+    {"key":"observer","pattern":"Removed widget: AIR economy and attack observer|Error in.*air_watch","scope":"any"}
+  ]
+}

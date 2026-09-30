@@ -263,7 +263,32 @@ namespace AirEconomy {
         float rate = ProductionMath::FundedRate(100.0f, cm, ce, metal * share, energy * share);
         const int space = AiMax(int(AirLayout::bays[bay].nanos.length()), nanoCount[bay]);
         const int limit = advanced ? AiMin(20, Global::RoleSettings::Air::T2NanoSoftLimit) : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
-        return ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds,
-            rate, AiMin(space, limit));
+        const int cap = AiMin(space, limit);
+        const int production = ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds, rate, cap);
+        // TECH's income/float principle, with AIR's independent bay ownership.
+        // This power can help nearby construction whenever recruitment pauses.
+        const float target = ConstructionTarget() / float(AiMax(1, t1 + t2));
+        const int construction = energy >= 250.0f ? ProductionMath::WorkforceTarget(AiMax(0.0f, target - plant.GetBuildSpeed()), nano.GetBuildSpeed(), 0, cap) : 0;
+        return AiMax(production, construction);
+    }
+    float ConstructionTarget()
+    {
+        const bool floating = bankM >= AiMax(300.0f, aiEconomyMgr.metal.storage * 0.75f);
+        return metal * Global::RoleSettings::Air::EconomyBuildPowerPerMetal
+            * (floating ? Global::RoleSettings::Air::BuildPowerFloatFactor : 1.0f);
+    }
+    int ConstructorTarget(CCircuitDef@ d, bool advanced)
+    {
+        if (d is null || recovery || energy < 160.0f || metal < 8.0f) return 1;
+        const float share = t2 == 0 ? 1.0f : advanced ? 0.6f : 0.4f;
+        const int floor = advanced ? 2 : t2 > 0 ? 3 : 2;
+        const int cap = advanced ? Global::RoleSettings::Air::MaxT2EconomyBuilders : Global::RoleSettings::Air::MaxT1EconomyBuilders;
+        return ProductionMath::WorkforceTarget(ConstructionTarget() * share, d.GetBuildSpeed(), floor, AiMax(floor, cap));
+    }
+    bool FundConstructor(CCircuitDef@ d)
+    {
+        return d !is null && !recovery && bankM >= d.costM * 0.5f
+            && ProductionMath::Funded(bankM, metal * 0.3f, 150.0f, AirBuild::Committed(false), d.costM, 30.0f)
+            && ProductionMath::Funded(bankE, energy * 0.3f, 300.0f, AirBuild::Committed(true), d.costE, 30.0f);
     }
 }

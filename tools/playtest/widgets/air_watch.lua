@@ -5,12 +5,49 @@ local tag="[AirWatch] "
 local plants, finished, losses={}, {}, {}
 local sample, stalledM, stalledE=0,0,0
 local previousDamage, damageHook
+local windGroups={}
+local nanoProjects={}
 local function echo(s) Spring.Echo(tag..s) end
+local function windCreated(id,d)
+    local x,_,z=Spring.GetUnitPosition(id)
+    for i,g in ipairs(windGroups) do
+        for s,p in ipairs(g.slots) do
+            if math.abs(p.x-x)<1 and math.abs(p.z-z)<1 then
+                if p.id and not Spring.ValidUnitID(p.id) then echo("wind-reused cluster="..i.." slot="..s) end
+                p.id=id; return
+            end
+        end
+    end
+    local w,h=d.xsize*8,d.zsize*8
+    local facing=Spring.GetUnitBuildFacing(id)
+    local function offset(a,b)
+        if facing==1 then return x+b,z-a elseif facing==2 then return x-a,z-b elseif facing==3 then return x-b,z+a end
+        return x+a,z+b
+    end
+    local cx,cz=offset(w,h/2)
+    local radius=math.sqrt((3*w)^2+(2*h)^2)/2
+    for _,g in ipairs(windGroups) do
+        if math.sqrt((cx-g.x)^2+(cz-g.z)^2)<radius+g.radius+143 then
+            Spring.Echo("[INVARIANT] INV-078 AIR observer: wind outside six-slot grid or cluster gap")
+        end
+    end
+    local g={x=cx,z=cz,radius=radius,slots={}}
+    for row=0,1 do for col=0,2 do
+        local px,pz=offset(col*w,row*h)
+        g.slots[#g.slots+1]={x=px,z=pz}
+    end end
+    g.slots[1].id=id; windGroups[#windGroups+1]=g
+    echo("wind-cluster-start cluster="..#windGroups.." x="..cx.." z="..cz.." stride="..w.."/"..h)
+end
 function widget:Initialize() echo("loaded; read-only observer team=0") end
-function widget:UnitCreated(id,def,team)
+function widget:UnitCreated(id,def,team,builder)
     if team~=0 then return end
     local name=UnitDefs[def].name
+    if name=="armwin" or name=="corwin" or name=="legwin" then windCreated(id,UnitDefs[def]); return end
     if name~="armfus" and name~="corfus" and name~="legfus" and name~="armafus" and name~="corafus" and name~="legafus" then return end
+    -- Engine-created fixture units have no builder. BAR forwards builderID;
+    -- only an actual construction frame can establish an AI admission error.
+    if not builder then echo("reactor-spawn def="..name.."; no builder"); return end
     local basic,unfinished=0,0
     for _,mex in ipairs(Spring.GetTeamUnits(0)) do
         local d=UnitDefs[Spring.GetUnitDefID(mex)]
@@ -89,6 +126,40 @@ function widget:GameFrame(f)
         end
     end
     if f%300==0 then
+        local t1,t2,nano,bp=0,0,0,0
+        for _,id in ipairs(Spring.GetTeamUnits(0)) do
+            local d=UnitDefs[Spring.GetUnitDefID(id)]
+            local _,_,_,_,progress=Spring.GetUnitHealth(id)
+            if progress and progress>=1 then
+                if d.name=="armca" or d.name=="corca" or d.name=="legca" then t1=t1+1; bp=bp+(d.buildSpeed or 0) end
+                if d.name=="armaca" or d.name=="coraca" or d.name=="legaca" then t2=t2+1; bp=bp+(d.buildSpeed or 0) end
+                if d.name=="armnanotc" or d.name=="cornanotc" or d.name=="legnanotc" then
+                    nano=nano+1
+                    local target=Spring.GetUnitIsBuilding(id)
+                    local targetDef=target and Spring.GetUnitDefID(target)
+                    if targetDef and UnitDefs[targetDef].isImmobile then
+                        local _,_,_,_,built=Spring.GetUnitHealth(target)
+                        local key=id..":"..target
+                        if built and built<1 and not nanoProjects[key] then
+                            nanoProjects[key]=true
+                            echo("nano-construction id="..id.." target="..target.." def="..UnitDefs[targetDef].name)
+                        end
+                    end
+                end
+            end
+        end
+        local full=0
+        for _,g in ipairs(windGroups) do
+            local n=0
+            for _,p in ipairs(g.slots) do
+                if p.id and Spring.ValidUnitID(p.id) then
+                    local _,_,_,_,progress=Spring.GetUnitHealth(p.id)
+                    if progress and progress>=1 then n=n+1 end
+                end
+            end
+            if n==6 then full=full+1 end
+        end
+        echo("construction t1="..t1.." t2="..t2.." mobileBP="..bp.." nanos="..nano.." fullWindClusters="..full)
         local count=0; for _ in pairs(plants) do count=count+1 end
         echo(string.format("eco t=%.1f M=%.1f/%.0f +%.1f pull=%.1f E=%.1f/%.0f +%.1f pull=%.1f stallSeconds=%.1f/%.1f plants=%d",f/30,m,ms,mi,mp,e,es,ei,ep,stalledM,stalledE,count))
     end

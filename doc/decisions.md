@@ -8334,6 +8334,98 @@ the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
 [actors](actor-matrix.md), [issues](known-issues.md),
 [benchmarks](benchmarks/air-management.md), [decision record](decisions.md).
 
+## D-149 — AIR packs six-wind groups and scales construction from income
+
+**Date:** 2026-09-30. **Status:** Played: compact groups, lost-slot replacement,
+earlier turret growth and funded mobile scaling. Exact reactor deadlines still
+fail in some contested runs; every owned mex must finish first.
+
+**Decision.** Follow the owner's six-wind request with atomically reserved
+3-by-2 groups of touching loaded footprints and a 144-elmo gap between group
+bounding circles. Fill holes before opening another group. Native slots own
+claims, frames and destruction; `air.wind.*` metadata supports adoption. Use
+existing reservation primitives and pure grid arithmetic rather than introducing
+a second native placement engine or altering TECH's turret box.
+
+TECH's useful construction principle is eight work/second per metal/second,
+with 1.5 times the target while metal floats. AIR applies it to independent
+mobile work and production-bay support. Loaded work rates determine constructor
+counts; post-T2 shares are 40% T1 and 60% T2, capped at ten/eight. T1 stays useful
+for winds and ordinary nanos. Bay support takes the larger of funded aircraft
+throughput and an income-based floor, preserving the five/twenty turret bounds.
+Funding, recovery and queue accounting still gate actual recruitment/building.
+
+Finish pending nanos and grow support before general fusion-preparation
+assistance. Reuse one target selector for mobile builders and idle production
+turrets, with actual reach for immobile units. Static repair has no timeout;
+the AIR tick aborts economy assistance when the owning plant has a unit frame,
+returning its turrets to production. This avoids capturing production support
+for an entire long construction project. The existing allied-transport prehook
+still runs before AIR recruitment. Immediate fighter coverage precedes funded
+workforce growth; the full interception quota follows it.
+
+**Rejected.** Per-wind 96-elmo scattering, one contiguous field without raid
+separation, copying TECH's layout, counting factory-bound nanos as mobile work,
+fixed constructor thresholds independent of faction work rate, or relaxing the
+all-owned-mex gate to meet the fusion clock. TECH policy/settings, JSON, native
+code and samples remain unchanged. Legacy AIR remains the explicit old path
+(KI-437), not a second copy of this controller.
+
+**Invariant.** INV-078 requires every new AIR wind construction order to belong
+to a reserved six-slot cluster. The observer independently checks actual grid
+positions and group gaps. INV-076 retains sole ownership of nano construction;
+INV-077 still blocks reactors until every owned mex upgrade is complete.
+
+**Corrections found while playing.** The first INV-078 implementation read a
+served slot before task assignment; required pins are served later, so the
+checker must inspect the planned position first. A Legion replay then showed
+repair tasks carry the wind target's definition but no placement slot: only
+ENERGY construction belongs in that invariant. Neither correction changes
+placement. The reactor observer also misclassified fixture-spawned AFUS as AI
+construction; BAR forwards the engine's builder ID, allowing provenance-aware
+checks while logging spawns separately. Natural scorecards now require an
+observed reactor frame with zero pending mexes. Turret assertions are scoped
+to the independent team-0 observer, not another AI's bay log. Failed reports
+remain in the [evidence](air-wind-and-build-power.md).
+
+**Verification.** The native ranking, geometry and lane suites and 46 executable
+AngelScript policy tests pass. API parity checks 239 used members. Natural
+Armada reaches fusion at 18:09.7 and doubles the prior turret count at ten and
+twenty minutes. Cortex rebuilds an induced wind loss in the same slot but
+finishes fusion at 20:45.2 after three early constructor losses; KI-436 retains
+that performance limitation. A supplied-income Legion game reaches ten T1,
+eight T2 constructors and twenty turrets by 11:20. It supplies economy and two
+advanced constructors and is not evidence of natural late-game income.
+Final code completes Legion fusion at 19:10.1; Armada misses at 21:46.5 after
+losing its first T2 plant and nine constructors. The final capacity replay has
+ten/eight constructors and twenty-three turrets at twelve minutes. Actual nano
+construction and return-to-production events are observed. No final run has a
+script, crash, invariant or observer error; the timing failure remains explicit.
+The [evidence](air-wind-and-build-power.md) records final replays, combat and
+stall measurements, diagnostic failures and verification limits. Complete
+save/load remains KI-209; no repeated PvP win-rate claim is made.
+
+**Files.** [settings](../data/script/src/global.as),
+[pure arithmetic](../data/script/src/helpers/production_math.as),
+[layout](../data/script/src/manager/air_layout.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[tests](../tests/production_math_tests.as),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[cluster checks](../tools/playtest/checks/air_clusters.json),
+[loss checks](../tools/playtest/checks/air_wind_loss.json),
+[workforce checks](../tools/playtest/checks/air_build_power.json),
+[plan and evidence](air-wind-and-build-power.md),
+[AIR management](air-management.md), [role settings](roles/air.md),
+[action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[issues](known-issues.md), [benchmarks](benchmarks/air-management.md),
+[decisions](decisions.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

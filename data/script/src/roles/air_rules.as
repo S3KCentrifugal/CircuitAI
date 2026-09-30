@@ -39,6 +39,10 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "mex.assist", u);
         @t = AirBuild::FirstFusion(u);
         if (t !is null) return AirBuild::Record(t, "fusion.first", u);
+        @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
+        if (t !is null) return AirBuild::Record(t, "support.assist", u);
+        @t = AirBuild::Nano(u);
+        if (t !is null) return AirBuild::Record(t, "production.support", u);
         if (AirEconomy::PreparingFusion()) {
             if (!AirEconomy::HasAdvancedBuilder()) {
                 @t = AirBuild::Factory(u, true);
@@ -57,8 +61,6 @@ namespace AirRules {
         }
         // Affordable production support and the first wind buffer must not starve
         // behind an aspirational energy target that moves upward with mex income.
-        @t = AirBuild::Nano(u);
-        if (t !is null) return AirBuild::Record(t, "production.support", u);
         if (AirEconomy::energy >= 250.0f) {
             @t = AirBuild::Utility(u, UnitHelpers::GetEnergyStorageNameForSide(side), Task::BuildType::STORE, 1);
             if (t !is null) return AirBuild::Record(t, "storage.buffer", u);

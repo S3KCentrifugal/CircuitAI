@@ -67,6 +67,22 @@ namespace AirBuild {
         IBuilderTask@ build = cast<IBuilderTask>(t);
         if (build !is null && build.target is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady())
             Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
+        // Repair tasks also carry the target's definition, but own no building slot.
+        if (build !is null && build.GetBuildType() == int(Task::BuildType::ENERGY) && build.buildDef !is null && build.buildDef.GetName()
+            == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(build.buildDef.GetName()))) {
+            const int slot = AiTaskReservationId(t);
+            bool clustered = false;
+            for (uint i = 0; i < AirLayout::windClusters.length(); ++i) {
+                if (AirLayout::windClusters[i].slots.length() != 6) continue;
+                for (uint s = 0; s < 6; ++s) {
+                    const int planned = AirLayout::windClusters[i].slots[s];
+                    // A required pin is served on assignment, after Record.
+                    if (planned >= 0 && (slot >= 0 ? slot == planned : MapHelpers::SqDist(build.GetBuildPos(),
+                        aiTerrainMgr.GetReservationPos(planned)) < 1.0f)) clustered = true;
+                }
+            }
+            if (!clustered) Invariants::Violation("INV-078", "AIR", "wind order is outside a six-slot cluster");
+        }
         if (projects.findByRef(t) < 0) projects.insertLast(t);
         const string key = "" + u.id;
         string prior = ""; trace.get(key, prior);
@@ -94,16 +110,23 @@ namespace AirBuild {
         }
         return null;
     }
-    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false)
+    CCircuitUnit@ FindAssistTarget(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false)
     {
         for (uint i = 0; i < projects.length(); ++i) {
             IBuilderTask@ t = cast<IBuilderTask>(projects[i]);
             if (t is null || t.buildDef is null || t.target is null || Lifecycle::IsRetiring(t.target)) continue;
             if (energyOnly && t.GetBuildType() != int(Task::BuildType::ENERGY)) continue;
-            if (MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame)) > 1800.0f * 1800.0f) continue;
-            return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, t.target, 20 * SECOND));
+            if (only !is null && t.buildDef !is only) continue;
+            const float reach = inReach ? u.circuitDef.GetBuildDistance() : 1800.0f;
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame)) > reach * reach) continue;
+            return t.target;
         }
         return null;
+    }
+    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null)
+    {
+        CCircuitUnit@ target = FindAssistTarget(u, energyOnly, only);
+        return target is null ? null : aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 20 * SECOND));
     }
     IUnitTask@ Factory(CCircuitUnit@ u, bool advanced)
     {

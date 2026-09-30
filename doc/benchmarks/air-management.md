@@ -211,7 +211,12 @@ actual completion timing in the verdict.
 
 ## Reproduction and limits
 
-Use `stage`, `prepare_air_check.py --scenario natural|constructor|loss|transport|switch|attack`,
+D-149's [wind packing and workforce evidence](../air-wind-and-build-power.md)
+records compact six-wind groups, static/mobile scaling, a wind-loss fixture,
+supplied-capacity runs and retained deadline/diagnostic failures. It also
+compares live workforce counts with the D-148 baseline above.
+
+Use `stage`, `prepare_air_check.py --scenario natural|constructor|capacity|loss|windloss|transport|switch|attack`,
 `launch --headless`, then `watch --role AIR --checks <name> --keep-going`.
 Pin DLL, game/map/profile/faction, an absolute isolated directory and bounded
 game/wall times. The watcher must receive `--role AIR`; its TECH default

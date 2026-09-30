@@ -949,7 +949,11 @@ namespace Global {
             int MaxProductionBays = 12;
             int T2NanoSoftLimit = 20;
             int T1NanoLimit = 5;
-            int MaxT1EconomyBuilders = 6;
+            int MaxT1EconomyBuilders = 10;
+            int MaxT2EconomyBuilders = 8;
+            float EconomyBuildPowerPerMetal = 8.0f;
+            float BuildPowerFloatFactor = 1.5f;
+            float WindClusterGap = 144.0f;
             int EconomySearchRings = 24;
             int FirstFusionTargetSeconds = 20 * 60;
             int FirstFusionLeadSeconds = 12 * 60;

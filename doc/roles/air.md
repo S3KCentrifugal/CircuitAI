@@ -34,7 +34,9 @@ role initializes. TECH's rules, geometry and settings are unchanged.
 | `ExperimentalBuild` | true | Enable this controller in experimental profiles |
 | `MaxProductionBays` | 12 | T2 ceiling, never a mandatory build count |
 | `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
-| `MaxT1EconomyBuilders` | 6 | Funded T1 growth beyond the initial three constructors |
+| `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 10 / 8 | Funded mobile construction ceilings; T1 remains available after T2 |
+| `EconomyBuildPowerPerMetal` / `BuildPowerFloatFactor` | 8 / 1.5 | Income-based work target, raised when metal storage is at least 75% full (minimum 300 metal) |
+| `WindClusterGap` | 144 | Minimum gap between wind-cluster bounding circles; six touching footprints per 3-by-2 group |
 | `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
 | `FirstFusionTargetSeconds` / `FirstFusionLeadSeconds` | 1200 / 720 | Aim for fusion at 20 minutes; prepare from minute 8; mex completion always wins |
 | `PreFusionMexLimit` | 6 | Bound own early expansion before first reactor; gifts still require upgrades |

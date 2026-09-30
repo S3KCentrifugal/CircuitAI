@@ -89,6 +89,7 @@ step.
 | INV-075 | A requestor has at most one active/queued transport obligation per AIR provider. | `Team::Ferry::Update`, distinct waiting teams and active request. | D-147 |
 | INV-076 | No unclaimed native nano order survives AIR's reconciliation. | `AirBuild::Tick`, native queued nano count vs owned orders after cancellation. | D-147 |
 | INV-077 | AIR starts no reactor while any owned basic mex, unfinished advanced mex or queued mex work remains. | `AirBuild::Record` checks admission; `Tick` cancels invalid unstarted orders; independent AIR observer checks actual reactor frames. | D-148 |
+| INV-078 | Every new AIR wind order belongs to a reserved six-slot cluster. | `AirBuild::Record` checks planned/served slots; the independent observer checks actual 3-by-2 positions, six-slot occupancy and separation. | D-149 |
 
 ## TECH settings (`Global::RoleSettings::Tech`)
 
