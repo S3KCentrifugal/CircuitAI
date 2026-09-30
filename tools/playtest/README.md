@@ -1,5 +1,19 @@
 # Playtest: launch, watch, screenshot, stop
 
+AIR commander/screen regression (D-150): stage an AIR game with both
+`--extra-widget tools/playtest/widgets/air_watch.lua` and
+`--extra-widget tools/playtest/widgets/air_opening_watch.lua`, then use
+`prepare_air_check.py --dir <dir> --scenario natural` and `watch --checks
+air_opening --minutes 25`. Judge the same completed log separately with
+`watch --checks air_transition --minutes 25 --no-stop` to preserve the strict
+20-minute fusion deadline. For screen growth/loss and real transport priority,
+stage `--roles AIR,TECH --minutes 8`, prepare `--scenario screen`, then watch
+with `--checks air_screen`. This controlled fixture supplies mixed T1/T2
+fighters, raises the T2 home quota, injects real allied ferry requests, and
+destroys fighters at six minutes. TECH's known INV-001 gift-provenance error
+(KI-435) can fail the combined report; never remove its invariant forbid.
+See [design and measured results](../../doc/air-opening-and-screen.md).
+
 Artillery regression (D-142): stage a Supreme Isthmus test under
 `build-theatres/artillery/<name>` using the pinned DLL, then run
 `prepare_artillery_check.py --dir <dir> --mode profiles` (16 AIs / `--roles all`,

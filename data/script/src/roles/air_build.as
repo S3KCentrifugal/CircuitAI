@@ -65,6 +65,9 @@ namespace AirBuild {
     {
         if (t is null) return null;
         IBuilderTask@ build = cast<IBuilderTask>(t);
+        if (UnitHelpers::IsCommander(u.circuitDef) && NearestPlant(u) !is null
+            && build !is null && (build.GetBuildType() == int(Task::BuildType::MEX) || build.GetBuildType() == int(Task::BuildType::MEXUP)))
+            Invariants::Violation("INV-079", "AIR", "commander dispatched to mex work after factory exists");
         if (build !is null && build.target is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady())
             Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
         // Repair tasks also carry the target's definition, but own no building slot.
@@ -123,10 +126,49 @@ namespace AirBuild {
         }
         return null;
     }
-    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null)
+    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false)
     {
-        CCircuitUnit@ target = FindAssistTarget(u, energyOnly, only);
+        CCircuitUnit@ target = FindAssistTarget(u, energyOnly, only, inReach);
         return target is null ? null : aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, target, 20 * SECOND));
+    }
+    CCircuitUnit@ NearestPlant(CCircuitUnit@ u)
+    {
+        CCircuitUnit@ result = null;
+        float best = 1.0e20f;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(ids[i]);
+            if (plant is null || Lifecycle::IsRetiring(plant)) continue;
+            const string name = plant.circuitDef.GetName();
+            if (!UnitHelpers::IsT1AircraftPlant(name) && !UnitHelpers::IsT2AircraftPlant(name)) continue;
+            const float distance = MapHelpers::SqDist(u.GetPos(ai.frame), plant.GetPos(ai.frame));
+            if (distance < best) { best = distance; @result = plant; }
+        }
+        return result;
+    }
+    IUnitTask@ Commander(CCircuitUnit@ u, CCircuitUnit@ plant)
+    {
+        const int crew = AirEconomy::CompletedConstructors();
+        const bool opening = !ProductionMath::CrewReady(crew, Global::RoleSettings::Air::OpeningAirConstructors);
+        IUnitTask@ t = null;
+        // Finish the factory before branching. During the crew opening, nearby
+        // energy recovery is the only exception to guarding production.
+        if (plant.GetBuildProgress() >= 1.0f && (!opening || (AirEconomy::recovery && AirEconomy::bankE < 200.0f))) {
+            const float target = AiMax(160.0f, AiMax(AirEconomy::metal * 45.0f, AirEconomy::demandE * 1.3f));
+            if (AirEconomy::energy < target || AirEconomy::recovery) {
+                @t = Assist(u, true, null, true);
+                if (t !is null) return Record(t, "commander.energy.assist", u);
+                @t = Energy(u, AirEconomy::recovery);
+                if (t !is null) return Record(t, "commander.energy.local", u);
+            }
+            if (!opening) {
+                @t = Assist(u, false, null, true);
+                if (t !is null) return Record(t, "commander.local.assist", u);
+            }
+        }
+        @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::HIGH, false, 5 * SECOND);
+        return Record(t is null ? aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)) : t,
+            opening ? "opening.commander.guard" : "commander.factory.guard", u);
     }
     IUnitTask@ Factory(CCircuitUnit@ u, bool advanced)
     {

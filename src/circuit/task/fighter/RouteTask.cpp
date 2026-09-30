@@ -1,10 +1,10 @@
 /*
  * RouteTask.cpp
  *
- * See RouteTask.h. Orders are plain moves (CmdMoveTo) queued with SHIFT so the
+ * See RouteTask.h. Orders default to moves (CmdMoveTo) queued with SHIFT so the
  * engine walks the waypoints in order. Ordinary spam fires while travelling;
  * opt-in standoff units pause the route to hold weapon range during contact.
- * Preserved specialist routes may issue a fight command at their endpoint.
+ * Specialist routes can finish with fight; patrol mode loops patrol points.
  */
 
 #include "task/fighter/RouteTask.h"
@@ -151,7 +151,8 @@ void CRouteTask::Update()
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
 		if (!changed && !resume) continue;
-		if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
+		if (patrol) IssueRoute(unit, 0);
+		else if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
 		else IssueDirect(unit);
 	}
 }
@@ -159,6 +160,10 @@ void CRouteTask::Update()
 void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 {
 	if (engaging.count(unit) != 0) return;  // Update owns contact loss and lane resumption.
+	if (patrol && !route.empty()) {
+		IssueRoute(unit, 0);
+		return;
+	}
 	if (route.empty() || IsAtEnd(unit)) {
 		return;  // holding at the destination; weapons keep firing on their own
 	}
@@ -237,7 +242,8 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		for (unsigned int i = fromIdx; i < route.size(); ++i) {
 			const short options = (i == fromIdx) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY;
-			if (fightAtEnd && i + 1 == route.size()) unit->CmdFightTo(LanePoint(unit, i), options, timeout);
+			if (patrol && i > fromIdx) unit->CmdPatrolTo(LanePoint(unit, i), options, timeout);
+			else if (fightAtEnd && i + 1 == route.size()) unit->CmdFightTo(LanePoint(unit, i), options, timeout);
 			else unit->CmdMoveTo(LanePoint(unit, i), options, timeout);
 		}
 	)

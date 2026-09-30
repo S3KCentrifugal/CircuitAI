@@ -2654,6 +2654,15 @@ successful lane publication/refresh. See the [timings and exact manifests](bench
 The synchronous Supreme sample is clean; this small experiment does not assign
 causality or exclude worker adoption timing as a contributor.
 
+**D-150 sample evidence.** The final mixed AIR/TECH Supreme fixture
+`build-theatres/air/d150-final-screen/runs/20260930-180018` reports INV-019
+from TECH team 1 at frame 8552: two unfinished turret frames, one currently
+allowed (840 build power, zero metal bank, +13 metal income). All AIR screen
+and transport expectations pass, but the combined report remains FAIL.
+TECH policy is unchanged. This adds an observed instance to the category;
+it does not establish whether this occurrence has the same root cause as
+the earlier runs. See the [AIR validation](air-opening-and-screen.md).
+
 ### KI-428 — Harness start roles do not force runtime roles on unregistered maps
 
 **Problem.** Ascendancy has no registered role map. The harness's
@@ -2880,6 +2889,10 @@ INV-001 retiring-factory radius attribution.
 TECH did not manufacture it. The generic unit-added event and spatial
 proximity cannot establish production provenance. The test's invariant forbid
 is retained, so the combined scorecard fails despite completed deliveries.
+D-150 reproduced the same case in `build-theatres/air/d150-screen/runs/20260930-174524`:
+AIR delivered `armatlas` 1408 to TECH team 1 at frame 4260; TECH's INV-001
+reported it as production at frame 4295. AIR's screen and delivery observations
+passed, but the combined report correctly remains failed.
 
 **Proposed solution.** Distinguish native creation/production from transfer in
 the lifecycle observation, or supply producer identity to the invariant.
@@ -2889,6 +2902,17 @@ from a retiring factory and require the invariant. TECH policy is not changed
 as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
 
 ### KI-436 — AIR's natural reactor benchmark remains late
+
+**D-150 verification.** The final scout/three-constructor opening and shared
+cross-tier fighter quota finish fusion at Armada 20:23.4, Cortex 20:06.7 and
+Legion 20:22.6 in 25-minute natural Supreme games. Each reactor starts only
+after all owned mexes finish upgrading; all gameplay invariants remain clean.
+The exact deadline still fails by 6.7–23.4 seconds. Earlier D-150 results and
+the corrected quota are retained in [the opening/screen evidence](air-opening-and-screen.md).
+Further tuning should measure T2 access, mobile energy construction and the
+cost/benefit of one planned commander relocation to help the T2 plant after
+the first three constructors, while preserving the new opening and avoiding
+repeated mex/wind travel. This is a proposed follow-up, not implemented policy.
 
 **D-149 verification.** Compact wind groups and faster construction scaling
 complete Armada fusion at 18:09.7, but the Cortex wind-loss game finishes
@@ -2954,6 +2978,8 @@ new building controller. The explicit legacy dispatcher still uses ordinary
 native wind placement and its older construction policy. Applying new packing
 there without ownership reconciliation could leave competing native and script
 orders. It is deliberately unchanged to preserve the legacy fallback and TECH.
+D-150's commander factory opening and growing fighter screen likewise apply
+only while `Air.ExperimentalBuild` is enabled; the legacy opening remains unchanged.
 
 **Proposed solution.** If legacy parity is wanted, route its AIR economy through
 the same ownership-aware controller under an explicit profile setting; do not

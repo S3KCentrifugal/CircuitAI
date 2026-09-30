@@ -969,6 +969,15 @@ namespace Global {
             float TransitionFundSeconds = 100.0f;
             int HomeFighterFloor = 6;
             int HomeFighterCeiling = 60;
+            int OpeningAirConstructors = 3;
+            float HomeFightersPerMetal = 0.5f;
+            int ScreenFullFighters = 40;
+            int ScreenCells = 8;
+            float ScreenRearWidth = 600.0f;
+            float ScreenFrontWidth = 6000.0f;
+            float ScreenRearAdvance = 400.0f;
+            float ScreenFrontSetback = 600.0f;
+            int ScreenUpdateSeconds = 10;
             float BaySpacing = 560.0f;
             int CapacityStableSeconds = 20;
             int TelemetrySeconds = 10;

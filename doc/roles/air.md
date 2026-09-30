@@ -24,8 +24,10 @@ initial selection and `Air_AiIsSwitchTime` returns false under this controller,
 so native switching cannot add competing plants.
 
 `Air_MilitaryAiMakeTask` assigns a home interceptor before calling the existing
-wave handler. Unit removal clears both ledgers. T1 scouts and combat still use
-native military tasks. Ferry requests run ahead of the role's factory handler.
+wave handler. Unit removal clears both ledgers. T1 fighters join the patrol
+screen; T2 fighters fill its income/threat quota before becoming wave escorts.
+Armada/Cortex scouts keep native scouting. Legion's first fighter/scout drone
+receives an explicit scouting route. Ferry requests run ahead of the role's factory handler.
 Role switching releases AIR projects/holds and reservations before the next
 role initializes. TECH's rules, geometry and settings are unchanged.
 
@@ -45,12 +47,18 @@ role initializes. TECH's rules, geometry and settings are unchanged.
 | `ProductionIncomeShare` | 0.65 | Resource share used to size support |
 | `TransitionMinMetal` / `TransitionMinEnergy` | 30 / 1200 | Ten-second low income gates |
 | `TransitionEarliestSeconds` / `TransitionFundSeconds` | 480 / 100 | Earliest transition and funding horizon |
-| `HomeFighterFloor` / `HomeFighterCeiling` | 6 / 60 | Threat-scaled home interception |
+| `HomeFighterFloor` / `HomeFighterCeiling` / `HomeFightersPerMetal` | 6 / 60 / 0.5 | Income/threat target; all T1 fighters screen, T2 reserves respect this quota |
+| `OpeningAirConstructors` | 3 | Completed T1 constructors before commander release and initial fighter production |
+| `ScreenFullFighters` / `ScreenCells` | 40 / 8 | Fleet size for full advance, maximum patrol segments |
+| `ScreenRearWidth` / `ScreenFrontWidth` | 600 / 6000 | Width grows with live screen fighters; endpoints stay inside map |
+| `ScreenRearAdvance` / `ScreenFrontSetback` | 400 / 600 | Rear offset and setback from the midpoint toward nearest participating enemy start |
+| `ScreenUpdateSeconds` | 10 | Refresh geometry; membership changes also refresh immediately |
 | `BaySpacing` / `CapacityStableSeconds` | 560 / 20 | Factory separation and sustained-capacity gate |
 | `TelemetrySeconds` | 10 | Economy and per-bay reporting interval |
 | `WaveAvoidHomeFocus` | true | Use an enemy start when the wave front is absent or near home |
 
 See [ordered rules](air_rules.md), [building actions](air_build.md),
+[commander opening and fighter screen](../air-opening-and-screen.md),
 [simulation evidence](../benchmarks/air-management.md) and
 [original feature trace](../air-layout-and-priority-plan.md).
 
@@ -559,4 +567,4 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 7c193146224bd94318c5c91e67dcf9a782d10a7d; lines: 1270 -->
+<!-- source: data/script/src/roles/air.as; blob: 7b523605c3fcd28d9df7d8a59d76bf108662f3c1; lines: 1269 -->

@@ -1,0 +1,17 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {"key":"fixture", "pattern":"\\[AirFixture\\] screen stage=3", "scope":"any", "by_minute":5},
+    {"key":"tech-anchor", "pattern":"\\[AIR\\]\\[Screen\\].*tech=[0-9]+", "by_minute":3},
+    {"key":"full-screen", "pattern":"\\[AIR\\]\\[Screen\\].*width=6000", "by_minute":5.5},
+    {"key":"actual-patrol", "pattern":"\\[AirOpening\\] screen fighters=\\d+ patrol=[1-9]", "scope":"any", "by_minute":3},
+    {"key":"loss", "pattern":"\\[AirFixture\\] screen loss requested", "scope":"any", "by_minute":7},
+    {"key":"transport", "pattern":"arrived and transferred to team", "by_minute":8}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"},
+    {"key":"observer", "pattern":"Removed widget: AIR opening|Error in.*air_opening_watch", "scope":"any"}
+  ]
+}

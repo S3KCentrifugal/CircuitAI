@@ -1,9 +1,11 @@
 #include "air_economy.as"
 #include "air_waves.as"
+#include "air_screen.as"
 namespace AirProduction {
     dictionary home; // mutually exclusive with AirWaves' held/launch ledgers
     int strikeOrders = 0;
     int countLog = -100000;
+    CRouteTask@ openingScout = null;
     int Projected(CCircuitDef@ d) { return d is null ? 0 : d.count + aiFactoryMgr.GetPendingRecruitCount(d); }
     IUnitTask@ Recruit(CCircuitUnit@ plant, const string &in name, int target, const string &in purpose, Task::Priority priority, bool utility = false)
     {
@@ -38,18 +40,31 @@ namespace AirProduction {
         }
         const string side = UnitHelpers::GetSideForUnitName(name);
         const string cons = advanced ? UnitHelpers::GetT2AirConstructorNameForSide(side) : UnitHelpers::GetT1AirConstructorNameForSide(side);
-        const int firstCrew = advanced && AirEconomy::PreparingFusion() ? 2 : 1;
-        IUnitTask@ t = Recruit(u, cons, firstCrew, "constructor.recovery", Task::Priority::HIGH, true);
-        if (t !is null) return t;
-        if (basic) {
-            @t = Recruit(u, UnitHelpers::GetT1AirScoutForSide(side), 1, "scout", Task::Priority::HIGH);
+        IUnitTask@ t = null;
+        if (basic && aiTerrainMgr.GetLayoutInt("air.scout.finished", 0) == 0) {
+            const string scout = UnitHelpers::GetT1AirScoutForSide(side);
+            array<Id>@ ids = ai.GetOwnedUnitIds();
+            for (uint i = 0; i < ids.length(); ++i) {
+                CCircuitUnit@ live = ai.GetTeamUnit(ids[i]);
+                if (live !is null && live.circuitDef.GetName() == scout && live.GetBuildProgress() >= 1.0f)
+                    aiTerrainMgr.SetLayoutInt("air.scout.finished", 1);
+            }
+            @t = Recruit(u, scout, 1, "opening.scout", Task::Priority::HIGH);
             if (t !is null) return t;
+            if (aiTerrainMgr.GetLayoutInt("air.scout.finished", 0) == 0)
+                return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
         }
+        const int firstCrew = basic ? Global::RoleSettings::Air::OpeningAirConstructors : (AirEconomy::PreparingFusion() ? 2 : 1);
+        @t = Recruit(u, cons, firstCrew, "constructor.recovery", Task::Priority::HIGH, true);
+        if (t !is null) return t;
+        if (basic && !ProductionMath::CrewReady(AirEconomy::CompletedConstructors(), firstCrew))
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
         const string fighter = AirEconomy::Fighter(advanced, side);
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
         if (affordable) {
             const int assignedToWaves = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-            @t = Recruit(u, fighter, (advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2) + assignedToWaves, "intercept", Task::Priority::HIGH);
+            @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2,
+                AirScreen::CountOther(fighter), assignedToWaves), "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
@@ -61,7 +76,7 @@ namespace AirProduction {
         if (basic && AirEconomy::t2 > 0) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-        @t = Recruit(u, fighter, AirEconomy::HomeTarget() + waveScreen, "intercept", Task::Priority::HIGH);
+        @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen), "intercept", Task::Priority::HIGH);
         if (t !is null) return t;
         // Transports and the defensive fighter floor above remain first.
         if (AirEconomy::PreparingFusion()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
@@ -80,7 +95,7 @@ namespace AirProduction {
             CCircuitDef@ fd = ai.GetCircuitDef(fighter);
             // Native counts include frames and orders immediately, including births between slow ticks.
             const int b = AiMax(0, Projected(bd) - int(AirWaves::waveBombers.getSize()));
-            const int f = AiMax(0, Projected(fd) - int(home.getSize()) - int(AirWaves::waveFighters.getSize()));
+            const int f = AiMax(0, Projected(fd) - int(home.getSize()) + AirScreen::CountOther(fighter) - int(AirWaves::waveFighters.getSize()));
             if (f < AirWaves::FightersFor(b)) {
                 @t = Recruit(u, fighter, Projected(fd) + 1, "wave.escort", Task::Priority::NORMAL);
             } else if (b < AirWaves::Required()) {
@@ -99,9 +114,11 @@ namespace AirProduction {
         @t = Recruit(u, fighter, Projected(fd) + 1, "air.control", Task::Priority::NORMAL);
         return t is null ? aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND)) : t;
     }
-    void Reset() { home.deleteAll(); strikeOrders = 0; countLog = -100000; }
+    void Reset() { home.deleteAll(); AirScreen::Reset(); strikeOrders = 0; countLog = -100000; }
     void Leave()
     {
+        if (openingScout !is null && !openingScout.IsDead()) openingScout.Abort();
+        @openingScout = null;
         array<IUnitTask@> holds;
         array<string>@ ids = home.getKeys();
         array<string>@ bombers = AirWaves::heldBombers.getKeys();
@@ -117,18 +134,47 @@ namespace AirProduction {
     }
     IUnitTask@ HomeTask(CCircuitUnit@ u)
     {
-        if (!AirEconomy::Active() || u is null || !AirWaves::IsWaveFighter(u.circuitDef)) return null;
+        // This callback observes the finished scout before it can be lost on a sortie.
+        if (AirEconomy::Active() && u !is null && u.GetBuildProgress() >= 1.0f
+            && u.circuitDef.GetName() == UnitHelpers::GetT1AirScoutForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName()))) {
+            if (aiTerrainMgr.GetLayoutInt("air.scout.id", -1) == -1) aiTerrainMgr.SetLayoutInt("air.scout.id", u.id);
+            aiTerrainMgr.SetLayoutInt("air.scout.finished", 1);
+            // Legion's Noctua is the roster's fighter/scout drone, without a
+            // native SCOUT classification. Only the opening aircraft scouts.
+            if (u.id == aiTerrainMgr.GetLayoutInt("air.scout.id", -1) && AirScreen::IsFighter(u.circuitDef)) {
+                if (openingScout !is null && !openingScout.IsDead()) return openingScout;
+                @openingScout = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+                if (openingScout !is null) {
+                    array<AIFloat3> route;
+                    array<AIFloat3> starts = Lanes::ScriptStarts(true);
+                    if (starts.length() == 0) starts.insertLast(LayoutHelpers::TerrainCentre());
+                    for (uint i = 0; i < starts.length(); ++i) route.insertLast(AirScreen::Clamp(starts[i]));
+                    openingScout.SetRoute(route);
+                    GenericHelpers::LogUtil("[AIR][Scout] opening drone=" + u.id + " enemy starts=" + route.length(), 1);
+                    return openingScout;
+                }
+            }
+        }
+        if (!AirEconomy::Active() || u is null || !AirScreen::IsFighter(u.circuitDef)) return null;
         const string key = "" + u.id;
         // Fighters already on a wave keep their assignment until it ends.
         if (AirWaves::heldFighters.exists(key) || AirWaves::waveFighters.exists(key) || AirWaves::launchQueue.exists(key)) return null;
-        if (!home.exists(key) && int(home.getSize()) >= AirEconomy::HomeTarget()) return null;
-        home.set(key, true);
-        // Distinct from both wave AA holds and native ATTACK threshold rewrites.
-        return aiMilitaryMgr.Enqueue(TaskF::Defend(Task::FightType::MELEE, Task::FightType::SCOUT, 1.0e9f));
+        if (!home.exists(key) && AirWaves::IsWaveFighter(u.circuitDef) && int(home.getSize()) >= AirEconomy::HomeTarget()) return null;
+        IUnitTask@ task = AirScreen::TaskFor(u);
+        if (task !is null) home.set(key, true);
+        return task;
     }
-    void Removed(CCircuitUnit@ u) { if (u !is null) home.delete("" + u.id); }
+    void Removed(CCircuitUnit@ u)
+    {
+        if (u is null) return;
+        home.delete("" + u.id); AirScreen::Removed(u.id);
+        if (u.id == aiTerrainMgr.GetLayoutInt("air.scout.id", -1)) {
+            aiTerrainMgr.SetLayoutInt("air.scout.id", -2); @openingScout = null;
+        }
+    }
     void Tick()
     {
+        AirScreen::Tick();
         // Static repairs have no timeout. Return borrowed economy assistance to
         // its production bay as soon as that plant has a unit frame again.
         array<string>@ nanos = AirEconomy::nanoBay.getKeys();
@@ -146,7 +192,7 @@ namespace AirProduction {
         }
         array<string>@ ids = home.getKeys();
         for (uint i = 0; i < ids.length(); ++i) {
-            if (ai.GetTeamUnit(parseInt(ids[i])) is null) home.delete(ids[i]);
+            if (ai.GetTeamUnit(parseInt(ids[i])) is null || !AirScreen::routes.exists(ids[i])) home.delete(ids[i]);
             else if (AirWaves::heldFighters.exists(ids[i]) || AirWaves::waveFighters.exists(ids[i]))
                 Invariants::Violation("INV-072", ids[i], "AIR fighter has both home and wave assignment");
         }

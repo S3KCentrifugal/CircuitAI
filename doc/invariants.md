@@ -90,6 +90,8 @@ step.
 | INV-076 | No unclaimed native nano order survives AIR's reconciliation. | `AirBuild::Tick`, native queued nano count vs owned orders after cancellation. | D-147 |
 | INV-077 | AIR starts no reactor while any owned basic mex, unfinished advanced mex or queued mex work remains. | `AirBuild::Record` checks admission; `Tick` cancels invalid unstarted orders; independent AIR observer checks actual reactor frames. | D-148 |
 | INV-078 | Every new AIR wind order belongs to a reserved six-slot cluster. | `AirBuild::Record` checks planned/served slots; the independent observer checks actual 3-by-2 positions, six-slot occupancy and separation. | D-149 |
+| INV-079 | AIR's commander receives no new mex order after an air factory exists; the initial production sequence is scout then three completed constructors before fighters. | `AirBuild::Record` checks mex admission; `air_opening_watch.lua` independently observes build commands and completion order (Legion opening drone excluded from the fighter stage). | D-150 |
+| INV-080 | AIR screen patrol endpoints remain within map bounds. | `AirScreen::Tick` validates script geometry; the independent observer checks actual engine patrol commands. | D-150 |
 
 ## TECH settings (`Global::RoleSettings::Tech`)
 

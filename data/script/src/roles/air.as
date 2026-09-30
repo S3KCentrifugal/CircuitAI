@@ -720,9 +720,8 @@ namespace RoleAir {
 
     ******************************************************************************/
     
-    // T2 bombers and T2 fighters belong to the wave system (manager/air_waves.as):
-    // held at base, released together, escorted. Every other air unit, including
-    // all T1 bombers, keeps the native default task (solo bomb runs as built).
+    // Experimental AIR: opening scout, T1/T2 home screen, then exclusive T2
+    // wave escorts/bombers. Other aircraft retain their native task selection.
     IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
     {
         IUnitTask@ homeTask = AirProduction::HomeTask(u);

@@ -80,6 +80,18 @@ namespace AirEconomy {
         CCircuitDef@ d = ai.GetCircuitDef(name);
         return d is null ? 0 : d.count;
     }
+    int CompletedConstructors()
+    {
+        int count = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.GetBuildProgress() < 1.0f) continue;
+            const string name = u.circuitDef.GetName();
+            if (name == UnitHelpers::GetT1AirConstructorNameForSide(UnitHelpers::GetSideForUnitName(name))) ++count;
+        }
+        return count;
+    }
     int Planned(CCircuitDef@ d, Task::BuildType type)
     {
         return d is null ? 0 : d.count + aiBuilderMgr.GetQueuedBuildCount(int(type), d);
@@ -103,7 +115,8 @@ namespace AirEconomy {
         CCircuitDef@ d = ai.GetCircuitDef(Fighter(t2 > 0));
         const float cost = d is null ? 150.0f : AiMax(d.costM, 1.0f);
         return AiMax(Global::RoleSettings::Air::HomeFighterFloor,
-            AiMin(Global::RoleSettings::Air::HomeFighterCeiling, int(EnemyAir() / cost * 1.1f)));
+            AiMin(Global::RoleSettings::Air::HomeFighterCeiling,
+                AiMax(int(metal * Global::RoleSettings::Air::HomeFightersPerMetal), int(EnemyAir() / cost * 1.1f))));
     }
     // Expected mixed sortie: seven fighters and three bombers. No average of rates.
     void Mix(bool advanced, float &out work, float &out costM, float &out costE)

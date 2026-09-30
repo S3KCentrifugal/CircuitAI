@@ -1,4 +1,20 @@
 void test_rate_zero_power_returns_zero() { Check(ProductionMath::Rate(100.0f, 0.0f, 0.5f) == 0.0f); }
+void test_screen_small_fleet_holds_rear() { Check(ProductionMath::Progress(4, 4, 40) == 0.0f); }
+void test_screen_half_fleet_advances_halfway() { Check(ProductionMath::Progress(22, 4, 40) == 0.5f); }
+void test_screen_loss_retracts_line() { Check(ProductionMath::Progress(10, 4, 40) < ProductionMath::Progress(30, 4, 40)); }
+void test_screen_large_fleet_cannot_cross_front() { Check(ProductionMath::Progress(80, 4, 40) == 1.0f && ProductionMath::BoundedBlend(400, 2400, 2) == 2400); }
+void test_screen_invalid_threshold_stays_at_rear() { Check(ProductionMath::Progress(40, 4, 4) == 0.0f); }
+void test_screen_width_interpolates() { Check(ProductionMath::BoundedBlend(600, 6000, 0.5f) == 3300); }
+void test_screen_invalid_value_rejects() { Check(ProductionMath::BoundedBlend(600, -1, 0.5f) == 0); }
+void test_reach_leaves_margin_for_snapping() { Check(ProductionMath::WithinReach(284*284, 300) && !ProductionMath::WithinReach(285*285, 300)); }
+void test_reach_rejects_invalid_inputs() { Check(!ProductionMath::WithinReach(-1, 300) && !ProductionMath::WithinReach(1, 8)); }
+void test_crew_unfinished_third_does_not_release_assistant() { Check(!ProductionMath::CrewReady(2, 3)); }
+void test_crew_three_complete_release_assistant() { Check(ProductionMath::CrewReady(3, 3)); }
+void test_crew_losses_restore_assistance() { Check(!ProductionMath::CrewReady(1, 3) && !ProductionMath::CrewReady(0, 0)); }
+void test_defence_other_tier_already_covers_floor() { Check(ProductionMath::DefenceRecruitTarget(4, 6, 3) == 3); }
+void test_defence_wave_escorts_do_not_count_as_home() { Check(ProductionMath::DefenceRecruitTarget(4, 3, 2) == 3); }
+void test_defence_other_tier_losses_restore_recruitment() { Check(ProductionMath::DefenceRecruitTarget(6, 2, 3) == 7); }
+void test_defence_invalid_snapshot_cannot_increase_quota() { Check(ProductionMath::DefenceRecruitTarget(4, -1, 3) == 0); }
 void test_workforce_rounds_up_shortage() { Check(ProductionMath::WorkforceTarget(161.0f, 60.0f, 2, 10) == 3); }
 void test_workforce_exact_target_does_not_overbuild() { Check(ProductionMath::WorkforceTarget(180.0f, 60.0f, 2, 10) == 3); }
 void test_workforce_keeps_t1_floor_after_transition() { Check(ProductionMath::WorkforceTarget(40.0f, 60.0f, 3, 10) == 3); }

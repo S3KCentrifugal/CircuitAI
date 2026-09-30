@@ -14,6 +14,26 @@ end
 function widget:Initialize() Spring.Echo("[AirFixture] scenario="..scenario.."; injected resources/units are not natural economy evidence") end
 function widget:GameFrame(f)
     if once("cheat",300,f) then Spring.SendCommands("cheat 1") end
+    if scenario=="screen" then
+        for i,at in ipairs({600,3600,7200}) do
+            if once("screen"..i,at,f) then
+                local x,_,z=Spring.GetTeamStartPosition(0)
+                give(i==2 and "armhawk" or "armfig",0,x,z,({4,16,20})[i])
+                Spring.Echo("[AirFixture] screen stage="..i.."; supplied fighters, defensive quota=60")
+            end
+        end
+        if once("screenloss",10800,f) then
+            local keep=0
+            for _,id in ipairs(Spring.GetTeamUnits(0)) do
+                local name=UnitDefs[Spring.GetUnitDefID(id)].name
+                if name=="armfig" or name=="armhawk" then
+                    keep=keep+1
+                    if keep>4 then Spring.SendLuaRulesMsg("$dev$:destroyunits "..id) end
+                end
+            end
+            Spring.Echo("[AirFixture] screen loss requested; keep four fighters")
+        end
+    end
     if scenario=="windloss" and once("windloss",9000,f) then
         for _,id in ipairs(Spring.GetTeamUnits(0)) do
             local name=UnitDefs[Spring.GetUnitDefID(id)].name

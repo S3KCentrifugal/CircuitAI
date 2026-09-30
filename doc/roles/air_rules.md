@@ -9,6 +9,7 @@ per second; existing construction stays assigned.
 | Order | Rule | Purpose |
 | --- | --- | --- |
 | 1 | current construction | Finish committed work before choosing another project |
+| 1a | `opening.commander.guard`, `commander.energy.assist`, `commander.energy.local`, `commander.local.assist`, `commander.factory.guard` | With a live air plant, commander finishes/guards production through three completed T1 constructors; local recovery may prevent a stall; subsequent work stays local |
 | 2 | `recovery.resume`, `recovery.assist`, `recovery.energy` | Recover an energy order, finish energy or add quickly payable supply during a sustained stall |
 | 2a | `project.resume` | Reassign an owned orphan order before adding another project |
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
@@ -29,13 +30,16 @@ per second; existing construction stays assigned.
 | 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard, or bounded retry |
 
 The factory recruiter separately prioritizes allied transport obligations, then
-constructor recovery, scouting, an immediate fighter screen, funded income-scaled economic builders,
+one initial scout, three completed constructors, an immediate fighter screen, funded income-scaled economic builders,
 the full interception floor, a finite T1 strike, heavies and escorted waves.
 Task priority controls engine resource priority; admission gates and available
 build power also limit competing spending.
 While preparing first fusion, optional aircraft wait after the defensive floor
 and constructor quotas. Transports remain first. The 20-minute target cannot
 override any pending owned mex upgrade, including distant or gifted mexes.
+The initial scout is latched on completion, so its loss cannot restart the
+opening. Legion uses its first Noctua as that scout. Completed constructor
+counts control the commander; frames and pending recruits only suppress duplicate orders.
 
 This sequence deliberately keeps the T1 utility plant when T2 starts. It has no
 TECH rush chain, gantry ladder, dense reactor block or automatic lab reclaim.
@@ -44,4 +48,4 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 183d1ef78d7769e3b48f040bfddd40610aa8df72; lines: 124 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 4cfeb8cab90918e3df2fcf4a3910b467a59dd8ff; lines: 128 -->

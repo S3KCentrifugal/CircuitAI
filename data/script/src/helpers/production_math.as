@@ -1,5 +1,27 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    float Progress(int count, int first, int full)
+    {
+        if (count <= first || first < 0 || full <= first) return 0.0f;
+        return count >= full ? 1.0f : float(count - first) / float(full - first);
+    }
+    float BoundedBlend(float first, float last, float progress)
+    {
+        if (!Valid(first) || !Valid(last) || !Valid(progress)) return 0.0f;
+        return first + (last - first) * (progress > 1.0f ? 1.0f : progress);
+    }
+    bool WithinReach(float distanceSquared, float reach, float margin = 16.0f)
+    {
+        return Valid(distanceSquared) && Valid(reach) && Valid(margin) && reach >= margin
+            && distanceSquared <= (reach - margin) * (reach - margin);
+    }
+    // Projected counts suppress duplicate orders; only completed units release an assistant.
+    bool CrewReady(int completed, int target) { return target > 0 && completed >= target; }
+    int DefenceRecruitTarget(int target, int otherDefenders, int committedElsewhere)
+    {
+        if (target < 0 || otherDefenders < 0 || committedElsewhere < 0) return 0;
+        return (target > otherDefenders ? target - otherDefenders : 0) + committedElsewhere;
+    }
     int WorkforceTarget(float targetWork, float unitWork, int floor, int cap)
     {
         if (!Valid(targetWork) || !Valid(unitWork) || unitWork <= 0.0f || floor < 0 || cap < floor) return 0;

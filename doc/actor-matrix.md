@@ -15,7 +15,7 @@ existing ownership and sequence.
 | Fallback work | `service.queued`, `project.assist`, `production.assist`, `wait` | Admit repair/defence/radar service; assist owned frames or utility plant; bounded retry. |
 | Resource model | `AirEconomy::Tick`, `Transition`, `NanoTarget`; ten-second lows, banks, committed cost, physical work/reach | Distinguish live/future BP; assign each nano once; estimate mixed sortie cost; gate transitions; INV-073/074. |
 | Aircraft orders | `AirProduction::MakeTask`, `Recruit`, native pending count plus frames | Transport prehook first; finite scout/constructor/strike/home quotas; heavy and wave production; no duplicate frame accounting. |
-| Home and attack aircraft | `AirProduction::HomeTask`, `AirWaves`, native military tasks | Keep a threat-scaled interception floor, hold/release escorted waves, release holds on role switch; INV-072. |
+| Home and attack aircraft | `AirProduction::HomeTask`, `AirScreen`, `AirWaves`, native military tasks | T1 fighters and the income/threat T2 reserve patrol cells; exclusive escorted waves; release on role switch; INV-072/080. |
 | Allied transport obligations | `Team::Ferry::HandleMessage`, `FactoryMakeTask`, `OnUnitAdded/Removed`, `Update` | Validate requestor; deduplicate/FIFO; NOW-priority recruit; retry losses; fly then transfer; start next obligation; INV-075. |
 
 
@@ -228,6 +228,15 @@ decides the end; everything else reads it.
 | AIR playtest observer | engine UnitCreated, owned mex extraction/progress | Independently reject a reactor frame before all owned mex upgrades complete |
 
 ## AIR clustered wind and construction power (D-149)
+
+D-150 adds `AirBuild::Commander` before general economy rules once a factory
+exists. It reads live completed aircraft counts and factory retirement; the
+recruiter separately reads projected counts. `AirLayout::WindPass` prefers the
+commander's actual reach and allows remote fallback only before any constructor
+completes. `AirScreen` resolves roster TECH starts, participating enemy starts,
+live fighter IDs and retained route tasks; `AirProduction::HomeTask` excludes
+held/launched escorts and the opening scout. Death and role exit remove route
+ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables it.
 
 | Actor | Reads | Action |
 | --- | --- | --- |

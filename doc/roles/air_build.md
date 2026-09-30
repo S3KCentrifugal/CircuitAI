@@ -30,6 +30,14 @@ role settings are restored.
 `FindAssistTarget` is shared by mobile assistance and idle production turrets.
 It supports an optional definition filter (finish a nano) and an actual-reach
 filter for immobile turrets. `Assist` wraps it in the mobile repair task. Wind
+placement gives commanders existing local slots, then a new entire six-slot
+cluster inside build reach with a 16-elmo snapping margin. Once a flying
+constructor exists, the commander cannot fall back to distant wind placement.
+`NearestPlant` resolves live non-retiring factory IDs. `Commander` finishes
+the factory and guards it until three T1 constructors complete, with nearby
+energy recovery permitted during a stall. Thereafter it uses local energy,
+local project assistance or factory guard; aircraft own remote work. INV-079
+forbids new commander mex orders after an air factory exists. Wind
 orders use the six-slot clusters in `AirLayout`; `Record` checks INV-078 using
 the planned position before the required pin is served, and its native slot ID
 after assignment. Repair tasks carry the target's definition but do not create
@@ -54,4 +62,4 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: fe8fb1bf7df4dcd3556bd6f917029556817f6f45; lines: 284 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 7622c70e61c5120ed2c493fe353f045b1df72103; lines: 326 -->

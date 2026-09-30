@@ -8460,6 +8460,50 @@ variable does not survive the call.
 **Deploy `config/` and `script/` with the DLL.** Several of these changes are
 config-only or script-only; a DLL-only refresh silently ships stale policy.
 
+## D-150 — AIR uses commander factory assistance and a growing fighter screen
+
+**Decision.** Implement the owner's scout → three completed air constructors
+→ fighter opening. Once the first air factory exists, the commander finishes
+and guards it, using local energy recovery only when necessary. Flying builders
+own remote mex work. Later commander work remains local or assists the factory.
+Wind placement tries local holes and a complete local six-slot group before
+walking; remote fallback is permitted only before a constructor completes.
+
+The fighter screen starts near the closest allied TECH start (own start when
+none is known), widens and advances with live strength, and retracts after
+losses. All T1 fighters screen; T2 reserves use income/threat quotas and remain
+exclusive with bomber escorts. Each fighter owns a route, distributed across
+at most eight patrol cells. Native `SetPatrol` is opt-in and defaults off, so
+existing TECH routes retain their behavior. Legion's opening Noctua receives a
+scouting route because the shared roster identifies it as the fighter/scout
+but its native classification is anti-air, not SCOUT.
+
+**Reasoning / alternative rejected.** Keeping the commander on generic economy
+rules permits distant repair and mex work despite fast flying builders. Moving
+all fighters together forms a blob instead of a screen. Sharing native patrol
+execution avoids another fighter task implementation; script retains every
+count, anchor, geometry and timing decision. Initial scout completion is
+latched; a scout loss must not continuously reset recruitment. Transport
+requests stay above this opening through the existing shared ferry prehook.
+
+**Invariant.** INV-079 forbids new commander mex orders once an air plant exists
+and observes scout/crew/fighter completion order. INV-080 keeps screen endpoints
+inside the map. INV-072 still excludes simultaneous home and wave membership;
+INV-077 still requires all owned mex upgrades before reactor construction.
+
+**Files and verification.** The [design and evidence](air-opening-and-screen.md)
+lists implementation files, checks and played results. No TECH policy, JSON
+profile, sample tree or unit classification is changed. All 62 arithmetic tests
+and native suites pass. Final 25-minute natural Armada/Cortex/Legion games pass
+the opening and screen checks with no gameplay invariant failure. Fusion is
+20:23.4 / 20:06.7 / 20:22.6, so the exact deadline still fails (KI-436).
+The controlled mixed-team fixtures prove screen growth/contraction and
+transport delivery but fail TECH invariants: gift provenance in the initial
+run (KI-435), and unfinished turret count in the final run (INV-019, KI-427).
+Neither is labelled a passing combined test. Recalibrating
+reactor timing or changing TECH's diagnostic is deliberately deferred; neither
+check was weakened. Commit remains local under the owner's explicit instruction.
+
 ## Maintaining this record
 
 Add an entry when a change involved a judgement a reader could reasonably

@@ -1,7 +1,7 @@
 /*
  * RouteTask.h
  *
- * A fighter task that owns a waypoint route and issues only move orders.
+ * A fighter task that owns a waypoint route; patrol traversal is opt-in.
  * Script (Spam:: in data/script/src/manager/spam.as) creates one per factory
  * with TaskF::Route(), sets the route with SetRoute() and assigns every unit
  * that factory produces. Units follow the queued waypoints, hold at the end,
@@ -49,6 +49,8 @@ public:
 	 */
 	void SetLanes(int count, float spacing, float endSpread);
 	void SetTraversal(bool preserveWaypoints, float radius, bool fightAtEnd);
+	// Opt-in looping engine patrol; ordinary routes retain their traversal.
+	void SetPatrol(bool enabled) { patrol = enabled; dirty = !route.empty(); }
 	int GetRouteVersion() const { return version; }
 	unsigned int GetRouteSize() const { return route.size(); }
 	bool IsAtEnd(CCircuitUnit* unit) const;
@@ -74,6 +76,7 @@ private:
 	float arriveRadius;
 	bool preserveWaypoints = false;
 	bool fightAtEnd = false;
+	bool patrol = false;
 };
 
 } // namespace circuit

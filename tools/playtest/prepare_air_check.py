@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dir', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'legacy'], default='natural')
+    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'screen', 'legacy'], default='natural')
     parser.add_argument('--seed', type=int, default=930146)
     args = parser.parse_args()
     base = args.dir.resolve()
@@ -34,7 +34,11 @@ def main():
         if not marker or 'bool ExperimentalBuild = true;' not in after:
             parser.error('staged AIR flag not found')
         path.write_text(before + marker + after.replace('bool ExperimentalBuild = true;', 'bool ExperimentalBuild = false;', 1))
-    if args.scenario == 'transport':
+    if args.scenario == 'screen':
+        # Isolate screen geometry at supplied fleet sizes, independent of economy.
+        path = base / 'AI/Skirmish/BARbTest/test/script/src/global.as'
+        path.write_text(path.read_text().replace('int HomeFighterFloor = 6;', 'int HomeFighterFloor = 60;'))
+    if args.scenario in ['transport', 'screen']:
         # Real allied-message protocol; two roles request together, one duplicate.
         staged = base / 'AI/Skirmish/BARbTest/test/script'
         for profile in ['experimental_balanced', 'experimental_hard', 'experimental_terrible']:

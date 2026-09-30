@@ -10,6 +10,10 @@ namespace AirRules {
         if (current !is null && current.GetBuildType() < int(Task::BuildType::REPAIR)) return u.task;
         const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         const bool commander = UnitHelpers::IsCommander(u.circuitDef);
+        if (commander) {
+            CCircuitUnit@ plant = AirBuild::NearestPlant(u);
+            if (plant !is null) return AirBuild::Commander(u, plant);
+        }
         IUnitTask@ t = null;
         if (AirEconomy::recovery) {
             @t = AirBuild::Resume(u, true);

@@ -3,7 +3,7 @@
   "expect": [
     {"key":"layout", "pattern":"\\[AIR\\]\\[Layout\\] enabled", "by_minute":1},
     {"key":"plant", "pattern":"\\[AIR\\]\\[Produce\\] constructor.recovery", "by_minute":6},
-    {"key":"scout", "pattern":"\\[AIR\\]\\[Produce\\] scout", "by_minute":8},
+    {"key":"scout", "pattern":"\\[AIR\\]\\[Produce\\] opening.scout", "by_minute":8},
     {"key":"fighter", "pattern":"\\[AIR\\]\\[Produce\\] intercept", "by_minute":12},
     {"key":"observer", "pattern":"\\[AirWatch\\] loaded", "scope":"any", "by_minute":1}
   ],

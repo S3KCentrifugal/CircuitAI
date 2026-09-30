@@ -185,16 +185,18 @@ namespace AirLayout {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         if (d.GetName() == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(d.GetName())))
             return PlaceWind(u, d, priority);
-        const string key = d.GetName() + (reactor ? ".reactor" : ".field");
+        const bool local = UnitHelpers::IsCommander(u.circuitDef);
+        const string key = d.GetName() + (reactor ? ".reactor" : ".field") + (local ? ".local." + u.id : "");
         int64 retry = 0;
         if (placeRetry.get(key, retry) && ai.frame < retry) return null;
-        AIFloat3 anchor = Global::Map::StartPos;
+        AIFloat3 anchor = local ? u.GetPos(ai.frame) : Global::Map::StartPos;
         if (reactor) anchor = Offset(anchor, facing, 0.0f, -900.0f);
         // Deterministic spaced patches, outside every reserved production bank.
         for (int ring = 1; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
             for (int k = 0; k < 24; ++k) {
                 const float a = 6.2831853f * float(k) / 24.0f;
                 AIFloat3 p(anchor.x + cos(a) * float(ring) * 96.0f, 0.0f, anchor.z + sin(a) * float(ring) * 96.0f);
+                if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(anchor, p), u.circuitDef.GetBuildDistance())) continue;
                 bool near = false;
                 for (uint b = 0; b < bays.length(); ++b)
                     if (MapHelpers::SqDist(p, bays[b].centre) < (reactor ? 700.0f * 700.0f : 250.0f * 250.0f)) near = true;
@@ -230,12 +232,22 @@ namespace AirLayout {
     }
     IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority)
     {
+        if (UnitHelpers::IsCommander(u.circuitDef)) {
+            IUnitTask@ t = WindPass(u, d, priority, true);
+            if (t !is null || AirEconomy::CompletedConstructors() > 0) return t;
+        }
+        return WindPass(u, d, priority, false);
+    }
+    IUnitTask@ WindPass(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority, bool local)
+    {
+        const AIFloat3 origin = u.GetPos(ai.frame);
         // Native states own occupied, claimed and destroyed slots. Fill holes first.
         for (uint i = 0; i < windClusters.length(); ++i) {
             WindCluster@ c = windClusters[i];
             if (c.defName != d.GetName()) continue;
             for (uint s = 0; s < c.slots.length(); ++s) {
                 const AIFloat3 p = WindPos(c, d, int(s));
+                if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), u.circuitDef.GetBuildDistance())) continue;
                 if (!Inside(p, 32.0f) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
                 int state = aiTerrainMgr.GetReservationState(c.slots[s]);
                 if (state < 0 || state == 4) {
@@ -249,16 +261,19 @@ namespace AirLayout {
                 if (task !is null) return task;
             }
         }
-        const string key = d.GetName() + ".cluster";
+        const string key = d.GetName() + ".cluster" + (local ? ".local." + u.id : "");
         int64 retry = 0;
         if (placeRetry.get(key, retry) && ai.frame < retry) return null;
         const float diameter = sqrt(ProductionMath::ClusterDiameterSquared(float(d.GetFootprintX()) * 16.0f, float(d.GetFootprintZ()) * 16.0f));
-        for (int ring = 1; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
+        const AIFloat3 anchor = local ? origin : Global::Map::StartPos;
+        const int rings = local ? int(u.circuitDef.GetBuildDistance() / 32.0f) : Global::RoleSettings::Air::EconomySearchRings;
+        const float step = local ? 32.0f : 96.0f;
+        for (int ring = 1; ring <= rings; ++ring) {
             for (int k = 0; k < 24; ++k) {
                 const float angle = 6.2831853f * float(k) / 24.0f;
                 WindCluster c; c.defName = d.GetName(); c.facing = facing;
-                c.centre = AIFloat3(Global::Map::StartPos.x + cos(angle) * float(ring) * 96.0f, 0.0f,
-                    Global::Map::StartPos.z + sin(angle) * float(ring) * 96.0f);
+                c.centre = AIFloat3(anchor.x + cos(angle) * float(ring) * step, 0.0f,
+                    anchor.z + sin(angle) * float(ring) * step);
                 bool near = false;
                 for (uint b = 0; b < bays.length(); ++b)
                     if (MapHelpers::SqDist(c.centre, bays[b].centre) < 250.0f * 250.0f) near = true;
@@ -272,6 +287,7 @@ namespace AirLayout {
                 if (near || !Inside(c.centre, diameter) || aiTerrainMgr.IsZoneAlly(c.centre)) continue;
                 for (int s = 0; s < 6; ++s) {
                     const AIFloat3 p = WindPos(c, d, s);
+                    if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), u.circuitDef.GetBuildDistance())) break;
                     if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) break;
                     const int id = aiTerrainMgr.ReservePersistentBuilding(d, p, facing);
                     if (id < 0) break;
@@ -287,7 +303,8 @@ namespace AirLayout {
                     continue;
                 }
                 windClusters.insertLast(c); SaveWind(windClusters.length() - 1);
-                GenericHelpers::LogUtil("[AIR][Wind] cluster=" + (windClusters.length() - 1) + " slots=6 at=" + int(c.centre.x) + "," + int(c.centre.z), 1);
+                GenericHelpers::LogUtil("[AIR][Wind] cluster=" + (windClusters.length() - 1) + " slots=6 at=" + int(c.centre.x) + "," + int(c.centre.z)
+                    + " local=" + local + " builder=" + u.id, 1);
                 return Pinned(Task::BuildType::ENERGY, priority, d, c.slots[0]);
             }
         }

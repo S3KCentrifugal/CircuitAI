@@ -97,6 +97,9 @@ across a barrier. `CCircuitUnit.GetProducerId()` reads the creation-event builde
 ID, or -1 when unknown (including reconstruction after load).
 `CRouteTask.SetTraversal(bool preserveWaypoints, float arrivalRadius, bool fightAtEnd)`
 keeps intermediate waypoints on refresh; ordinary spam defaults remain unchanged.
+`CRouteTask.SetPatrol(bool enabled)` opts into looping engine patrol orders
+(D-150). It defaults to false. Patrol routes start with a move to the first
+point and queue patrol points after it; script owns geometry and refresh timing.
 
 D-144 adds `aiBattle.RequestLanes(...)` with the same arguments as the
 synchronous call below. It returns true only when a job was admitted; false
@@ -779,11 +782,13 @@ void SetTargetPos(const AIFloat3& in pos);
 ```
 
 `CRouteTask` extends `IFighterTask` (created by `TaskF::Route()`; a
-script-owned waypoint route that issues move orders only, see
+script-owned waypoint route with optional traversal/patrol modes, see
 `doc/spam-routes.md`):
 
 ```angelscript
 void SetRoute(const array<AIFloat3>@ waypoints);
+void SetTraversal(bool preserveWaypoints, float arrivalRadius, bool fightAtEnd);
+void SetPatrol(bool enabled);
 int GetRouteVersion() const;
 uint GetRouteSize() const;
 bool IsAtEnd(CCircuitUnit@ unit) const;
