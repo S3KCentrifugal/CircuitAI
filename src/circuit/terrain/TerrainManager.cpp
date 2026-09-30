@@ -1742,6 +1742,43 @@ void CTerrainManager::FinishReservation(int id, int unitId)
 	it->second.unitId = unitId;  // a zone slot remembers its structure (restore or forget when it goes)
 }
 
+int CTerrainManager::ReservePersistentBuilding(CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	if (!CanReserveBuilding(cdef, pos, facing)) return -1;
+	const AIFloat3 snapped = Pos2BuildPos(cdef, pos, facing);
+	auto* def = cdef->GetDef();
+	// ReserveZone rotates local across/along dimensions itself.
+	const float halfAcross = float(def->GetXSize() / 2) * SQUARE_SIZE;
+	const float halfAlong = float(def->GetZSize() / 2) * SQUARE_SIZE;
+	const int zone = ReserveZone(snapped, facing, halfAcross, halfAlong, false);
+	if (zone <= 0) return -1;
+	const int id = ReserveBuildingEx(cdef, snapped, facing, 0, 0, true, false, false, zone, true);
+	if (id < 0) ReleaseZone(zone);
+	return id;
+}
+
+void CTerrainManager::ReleasePersistentBuilding(int id)
+{
+	const auto it = reservations.find(id);
+	if (it == reservations.end()) return;
+	const int zone = it->second.zone;
+	ReleaseReservation(id);
+	if (zone > 0) ReleaseZone(zone);
+}
+
+int CTerrainManager::GetReservationState(int id) const
+{
+	const auto it = reservations.find(id);
+	if (it == reservations.end()) return -1;
+	const SReservation& slot = it->second;
+	if (slot.unitId != 0) {
+		const CCircuitUnit* unit = circuit->GetTeamUnit(slot.unitId);
+		if (unit != nullptr) return unit->GetUnit()->IsBeingBuilt() ? 2 : 3;
+	}
+	if (slot.serveFails >= kDeadSlotFails) return 4;
+	return slot.consumed ? 2 : slot.claimed ? 1 : 0;
+}
+
 bool CTerrainManager::ClaimReservation(int id)
 {
 	auto it = reservations.find(id);

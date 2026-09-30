@@ -1,0 +1,16 @@
+{
+  "stop_minute": 30,
+  "expect": [
+    {"key":"layout", "pattern":"\\[AIR\\]\\[Layout\\] enabled", "by_minute":1},
+    {"key":"plant", "pattern":"\\[AIR\\]\\[Produce\\] constructor.recovery", "by_minute":6},
+    {"key":"scout", "pattern":"\\[AIR\\]\\[Produce\\] scout", "by_minute":8},
+    {"key":"fighter", "pattern":"\\[AIR\\]\\[Produce\\] intercept", "by_minute":12},
+    {"key":"observer", "pattern":"\\[AirWatch\\] loaded", "scope":"any", "by_minute":1}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"},
+    {"key":"observer", "pattern":"Removed widget: AIR economy and attack observer|Error in.*air_watch", "scope":"any"}
+  ]
+}

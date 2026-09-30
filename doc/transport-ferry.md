@@ -60,12 +60,22 @@ the lab, well before any builder touches it, so the transport arrived far too
 early. Now any role may call `RequestTransport()`, and TECH does so itself
 once its sliding-minimum metal income clears `RequestMinMetalIncome` (20)
 while it owns no transport. The cooldown covers the two ways that stays true:
-the transport died, or AIR was already serving someone and dropped the request.
+the transport died, or the request/delivery has not completed yet.
 
-AIR serves one request at a time and **drops** any that arrive while it is
-busy — it does not queue them. The requester's cooldown re-sends, by which
-time the current delivery is done. Dropping is simpler than a queue and loses
-nothing but a few minutes.
+From D-147, AIR serves distinct allied requestors FIFO. Self and duplicate
+outstanding requests are ignored (INV-075). Any allied role can request;
+TECH is still the only automatic requestor. The request position is validated
+and the roster's start position is preferred. A successful hand-over starts
+the next obligation. AIR's factory prehook runs before optional spam/combat,
+with NOW priority; an existing unit in production is allowed to finish first.
+
+The order latch is set only after successful enqueue. Retry checks pending
+unframed recruits and owned transport frames, preventing the old timeout from
+ordering duplicates while construction is slow. Destruction leaves the active
+obligation owed. The native cargo-flight protocol is unchanged. See
+[AIR evidence](benchmarks/air-management.md) for simultaneous TECH/SUPPORT
+requests and repeated-message verification. Provider arbitration when several
+AIR teammates receive the same broadcast remains a separate limitation.
 
 ## The protocol
 

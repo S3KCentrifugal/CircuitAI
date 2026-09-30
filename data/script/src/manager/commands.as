@@ -212,6 +212,7 @@ namespace Commands {
         }
         // barb|layout|<team>|on|off : push the planned base to the widget's overlay (D-053)
         if (cmd == "layout" && parts.length() >= 4) {
+            if (AirEconomy::Active()) { AirLayout::SetOverlay(parts[3] == "on"); return true; }
             Layout::SetOverlay(parts[3] == "on");
             if (!Layout::planned) WidgetLink::Send("layout", "0|0|none");
             return true;
@@ -564,6 +565,7 @@ namespace Commands {
         GenericHelpers::LogUtil("[Commands] Role switch " + current + " -> " + roleName + " requested by widget", 1);
         // Leave: the old role's layout (reservations, zones, the native flag)
         // and the native manager settings its InitHandler changed (CR-007).
+        if (Global::AISettings::Role == AiRole::AIR) AirBuild::Leave();
         Layout::OnRoleLeave();
         TechWeapons::OnRoleLeave();   // D-126
         Lanes::OnRoleLeave();         // D-127

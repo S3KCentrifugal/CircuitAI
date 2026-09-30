@@ -4,8 +4,9 @@
 
 CircuitAI normally places structures with the existing nearest-free search.
 The experimental profiles additionally permit a native reservation mechanism,
-but only TECH opts its AI instance into it. This keeps every other role and
-every legacy profile on the ordinary placement path.
+used by TECH and, from D-147, the independent [AIR controller](air-management.md).
+Other roles and legacy profiles retain ordinary placement. The TECH history
+and geometry below are unchanged; AIR uses repeatable production bays instead.
 
 The current TECH design is decision
 [D-060](decisions.md#d-060--tech-layout-uses-native-canonical-clusters-and-an-ordered-economy-module)
@@ -23,9 +24,9 @@ Two conditions are required:
 
 1. the loaded experimental `behaviour.json` fragment contains
    `"layout": {"enabled": true}`; and
-2. `Tech_Init` calls `aiTerrainMgr.SetLayoutEnabled(true)`.
+2. the role enables it: TECH's existing initialization or AIR's `AirLayout::Init`.
 
-JSON only permits the mechanism. It does not activate it. No other role calls
+JSON only permits the mechanism. It does not activate it. Roles other than AIR/TECH do not call
 the opt-in API. If either condition is false, reservation matching is skipped
 and factory/building placement is unchanged.
 

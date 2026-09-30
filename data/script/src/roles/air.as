@@ -10,6 +10,8 @@
 #include "../manager/factory_production.as"
 // T2 bomber waves
 #include "../manager/air_waves.as"
+#include "air_rules.as"
+#include "../manager/air_production.as"
 
 namespace RoleAir {
     IUnitTask@ g_airStrategicFocusTask = null;
@@ -396,6 +398,7 @@ namespace RoleAir {
     ******************************************************************************/
 
     void Air_MainUpdate() {
+        if (AirEconomy::Active()) { AirBuild::Tick(); AirEconomy::Tick(); AirProduction::Tick(); AirLayout::Draw(); }
         // Periodically update dynamic military quotas once the configured delay has passed
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();
@@ -468,6 +471,7 @@ namespace RoleAir {
     }
 
     IUnitTask@ Air_FactoryAiMakeTask(CCircuitUnit@ u) {
+        if (AirEconomy::Active()) return AirProduction::MakeTask(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
             return aiFactoryMgr.DefaultMakeTask(u);
@@ -681,6 +685,7 @@ namespace RoleAir {
     }
 
     string Air_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
+        if (AirEconomy::Active() && isReset) return "none";
         if(isStart) {
             if(Global::Map::NearestMapStartPosition !is null) {
                 return FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
@@ -695,6 +700,7 @@ namespace RoleAir {
 
     // Local default implementations (ready to customize per-role)
     bool Air_AiIsSwitchTime(int lastSwitchFrame) {
+        if (AirEconomy::Active()) return false;
         int interval = (30 * SECOND);
         return (lastSwitchFrame + interval) <= ai.frame;
     }
@@ -719,6 +725,8 @@ namespace RoleAir {
     // all T1 bombers, keeps the native default task (solo bomb runs as built).
     IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
     {
+        IUnitTask@ homeTask = AirProduction::HomeTask(u);
+        if (homeTask !is null) return homeTask;
         IUnitTask@ waveTask = AirWaves::MakeTask(u);
         if (waveTask !is null) return waveTask;
         return aiMilitaryMgr.DefaultMakeTask(u);
@@ -726,6 +734,7 @@ namespace RoleAir {
 
     void Air_MilitaryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        AirProduction::Removed(unit);
         AirWaves::OnUnitRemoved(unit);
     }
 
@@ -741,6 +750,7 @@ namespace RoleAir {
     ******************************************************************************/ 
 
     IUnitTask@ Air_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        if (AirEconomy::Active()) return AirRules::MakeTask(builder);
         GenericHelpers::LogUtil("[Air_BuilderAiMakeTask] called for builder", 3);
         if (builder is null) return null;
 
@@ -863,6 +873,7 @@ namespace RoleAir {
     }
 
     void Air_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
+        AirBuild::Removed(task);
         if (task !is null && task is g_airCommanderWindTask) {
             @g_airCommanderWindTask = null;
         }
@@ -1252,6 +1263,7 @@ namespace RoleAir {
         @cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_MilitaryAiTaskRemoved);
 
         @cfg.PorcChainHandler = cast<PorcChainDelegate@>(@Air_PorcChain);
+        @cfg.LayoutPlanHandler = cast<LayoutPlanDelegate@>(@AirLayout::Init);
 
         RoleConfigs::Register(cfg);
     }

@@ -944,6 +944,25 @@ namespace Global {
         }
 
         namespace Air {
+            // AIR owns these settings and all air.* reservations. TECH never reads them.
+            bool ExperimentalBuild = true;
+            int MaxProductionBays = 12;
+            int T2NanoSoftLimit = 20;
+            int T1NanoLimit = 5;
+            int MaxT1EconomyBuilders = 6;
+            int EconomySearchRings = 24;
+            float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
+            float ProductionIncomeShare = 0.65f;
+            float TransitionMinMetal = 30.0f;
+            float TransitionMinEnergy = 1200.0f;
+            int TransitionEarliestSeconds = 8 * 60;
+            float TransitionFundSeconds = 100.0f;
+            int HomeFighterFloor = 6;
+            int HomeFighterCeiling = 60;
+            float BaySpacing = 560.0f;
+            int CapacityStableSeconds = 20;
+            int TelemetrySeconds = 10;
+            bool WaveAvoidHomeFocus = true;
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;

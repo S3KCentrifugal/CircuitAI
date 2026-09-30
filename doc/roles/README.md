@@ -39,7 +39,9 @@ One `.as` file per role in `data/script/src/roles/`, one namespace each.
 | Role | File | Lines | Namespace | Documented |
 | --- | --- | --- | --- | --- |
 | `FRONT` | `front.as` | 1028 | `RoleFront` | [front.md](front.md) |
-| `AIR` | `air.as` | 1042 | `RoleAir` | [air.md](air.md) |
+| `AIR` | `air.as` | 1270 | `RoleAir` | [air.md](air.md) |
+| `AIR` | `air_build.as` | see source marker | `AirBuild` | [air_build.md](air_build.md) |
+| `AIR` | `air_rules.as` | see source marker | `AirRules` | [air_rules.md](air_rules.md) |
 | `TECH` | `tech.as` | 1923 | `RoleTech` | [tech.md](tech.md) |
 | `TECH` | `tech_build.as` | 310 | `TechBuild` | [tech_build.md](tech_build.md) |
 | `TECH` | `tech_rules.as` | 341 | `TechRules` | [tech_rules.md](tech_rules.md) |
@@ -162,10 +164,10 @@ row to see how consistently a slot is used.
 | `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
 | `AiMakeDefenceHandler` | no | no | yes | no | no | no |
 | `PorcChainHandler` | no | yes | no | no | yes | no |
-| `LayoutPlanHandler` | no | no | yes | no | no | no |
+| `LayoutPlanHandler` | no | yes | yes | no | no | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `FactoryAiTaskRemovedHandler` | no | no | no | no | no | no |
-| **Slots filled** | **17** | **18** | **19** | **14** | **16** | **14** |
+| **Slots filled** | **17** | **19** | **19** | **14** | **16** | **14** |
 
 Thirteen slots are filled by every role. That common set is the de-facto role
 interface; everything below it in the table is an exception worth understanding

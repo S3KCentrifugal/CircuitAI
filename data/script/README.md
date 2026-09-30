@@ -24,6 +24,14 @@ The experimental runtime sequence is:
 
 ## Shared foundation
 
+Experimental AIR uses `roles/air_rules.as` and `roles/air_build.as` over
+`manager/air_layout.as`, `air_economy.as` and `air_production.as`. Its T1-first
+economy, production bays and transport-first factory decisions are independent
+of TECH's controller. `helpers/production_math.as` supplies pure, unit-tested
+throughput, funding and support calculations. Native persistent reservations
+share task/claim/frame machinery without sharing role policy. See
+[AIR management](../../doc/air-management.md) and its simulation evidence.
+
 The optional visual theatre survey lives in `src/manager/water_theatres.as`
 and is called by `src/manager/lanes.as`. It reuses native connected water bodies
 and terrain-manager buildability queries to label ponds, shared seas and

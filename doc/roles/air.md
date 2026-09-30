@@ -4,7 +4,52 @@ Reference for the `AIR` AngelScript role: aircraft plants, air constructors and
 the wind-economy opening. How it is registered, what it installs at init, how its
 build-focus system works, and where it is currently wrong.
 
-Source: `data/script/src/roles/air.as` (1042 lines), namespace `RoleAir`.
+## Current building controller (D-147)
+
+`Global::RoleSettings::Air::ExperimentalBuild = true` selects the independent
+[AIR management controller](../air-management.md). `LayoutPlanHandler` delegates
+to `AirLayout::Init`; `Air_BuilderAiMakeTask` and `Air_FactoryAiMakeTask`
+dispatch to `AirRules::MakeTask` and `AirProduction::MakeTask`. Those total
+dispatchers own building/production decisions while enabled. The build-focus,
+commander wind and legacy factory flows described below remain the fallback
+when the feature is disabled; they are not a second concurrent planner.
+
+`Air_MainUpdate` reconciles task ownership, samples the economy, maintains
+military assignments and draws the layout before the existing quota and wave
+updates. The shared builder hook calls `AirBuild::Added` only for experimental
+AIR; the registered `Air_BuilderAiTaskAdded` remains a legacy log hook.
+`Air_BuilderAiTaskRemoved`
+removes project handles. `Air_SelectFactoryHandler` returns `none` after its
+initial selection and `Air_AiIsSwitchTime` returns false under this controller,
+so native switching cannot add competing plants.
+
+`Air_MilitaryAiMakeTask` assigns a home interceptor before calling the existing
+wave handler. Unit removal clears both ledgers. T1 scouts and combat still use
+native military tasks. Ferry requests run ahead of the role's factory handler.
+Role switching releases AIR projects/holds and reservations before the next
+role initializes. TECH's rules, geometry and settings are unchanged.
+
+| New AIR setting | Default | Meaning |
+| --- | --- | --- |
+| `ExperimentalBuild` | true | Enable this controller in experimental profiles |
+| `MaxProductionBays` | 12 | T2 ceiling, never a mandatory build count |
+| `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
+| `MaxT1EconomyBuilders` | 6 | Funded T1 growth beyond the initial three constructors |
+| `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
+| `WarmFactoryGapSeconds` | 0.5 | Configured prior, separate from cold startup |
+| `ProductionIncomeShare` | 0.65 | Resource share used to size support |
+| `TransitionMinMetal` / `TransitionMinEnergy` | 30 / 1200 | Ten-second low income gates |
+| `TransitionEarliestSeconds` / `TransitionFundSeconds` | 480 / 100 | Earliest transition and funding horizon |
+| `HomeFighterFloor` / `HomeFighterCeiling` | 6 / 60 | Threat-scaled home interception |
+| `BaySpacing` / `CapacityStableSeconds` | 560 / 20 | Factory separation and sustained-capacity gate |
+| `TelemetrySeconds` | 10 | Economy and per-bay reporting interval |
+| `WaveAvoidHomeFocus` | true | Use an enemy start when the wave front is absent or near home |
+
+See [ordered rules](air_rules.md), [building actions](air_build.md),
+[simulation evidence](../benchmarks/air-management.md) and
+[original feature trace](../air-layout-and-priority-plan.md).
+
+Source: `data/script/src/roles/air.as` (1270 lines), namespace `RoleAir`.
 Line references are as of branch `smrt`, 2026-09-17. Prefer function names over
 line numbers when navigating.
 
@@ -41,9 +86,8 @@ T1 land defences - AIR does not intend to fight on the ground.
 
 ## Registration
 
-`RoleAir::Register()` fills **17 of 24** slots - the common thirteen plus
-`FactoryAiMakeTaskHandler` and the three military hooks that drive the bomber
-waves.
+`RoleAir::Register()` fills **19 of 26** slots: the common thirteen, factory
+production, three military hooks, the porc chain and the layout hook.
 
 | Slot | Handler |
 | --- | --- |
@@ -64,6 +108,8 @@ waves.
 | `MilitaryAiMakeTaskHandler` | `Air_MilitaryAiMakeTask` |
 | `MilitaryAiUnitRemoved` | `Air_MilitaryAiUnitRemoved` |
 | `MilitaryAiTaskRemovedHandler` | `Air_MilitaryAiTaskRemoved` |
+| `PorcChainHandler` | `Air_PorcChain` |
+| `LayoutPlanHandler` | `AirLayout::Init` |
 
 Not filled: both factory task hooks, both factory unit hooks,
 `MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`, `AiMakeDefenceHandler`.
@@ -194,7 +240,7 @@ Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
 
 ## Decision flows
 
-### Builder
+### Legacy builder (ExperimentalBuild disabled)
 
 `Air_BuilderAiMakeTask(builder)`:
 
@@ -218,7 +264,7 @@ The T1 air constructor set is matched by **hardcoded name string comparison**
 (`uname == "armca" || uname == "corca" || uname == "legca"`), not by a
 `UnitHelpers` accessor.
 
-### Factory
+### Legacy factory (ExperimentalBuild disabled)
 
 `Air_FactoryAiMakeTask(u)` bails to `aiFactoryMgr.DefaultMakeTask(u)` unless the
 factory is a T1 or T2 aircraft plant. For a T1 plant it uses the sliding-window
@@ -245,8 +291,9 @@ next wave's target - and only then dynamic production or the native default.
 
 ### Economy
 
-`Air_EconomyUpdate()` is **empty**. All AIR economy shaping happens through
-start limits and the factory handler's income gates.
+`Air_EconomyUpdate()` is **empty**. Enabled AIR samples `AirEconomy` from the
+main update and task entry points. Legacy economy shaping uses start limits
+and the factory handler's income gates.
 
 ### Dynamic quotas
 
@@ -297,8 +344,8 @@ ATTACK-promoting defend tasks every 5 s. Held ids live in `heldBombers` and
 
 **Launch** (`AirWaves::Update`, from `Air_MainUpdate`): when the hold has
 `Required()` bombers and `FightersFor(Required())` fighters, or when
-`BomberWaveFirstSize` bombers have been held for `BomberWaveMaxHoldSeconds`
-(escort requirement waived). `Required()` is the survival-grown
+the full `Required()` bomber target has been held for `BomberWaveMaxHoldSeconds`
+(escort requirement waived, bomber target still required). `Required()` is the survival-grown
 `nextWaveSize` raised to the **income floor**: `BomberWaveSizePerIncomeStep`
 (50) bombers per `BomberWaveIncomeStep` (100) of sliding-minimum metal income
 - 50 at +100, 100 at +200 - see
@@ -507,4 +554,4 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 1e7faede20d024cb0e0cc2b39d9ba090c312ea2f; lines: 1258 -->
+<!-- source: data/script/src/roles/air.as; blob: 7c193146224bd94318c5c91e67dcf9a782d10a7d; lines: 1270 -->

@@ -2177,6 +2177,7 @@ namespace Builder {
 
 	void AiTaskAdded(IUnitTask@ task)
 	{
+		if (Global::AISettings::Role == AiRole::AIR && Global::RoleSettings::Air::ExperimentalBuild) AirBuild::Added(task);
 		GenericHelpers::LogUtil("[BUILDER] AiTaskAdded called", 4);
 		// Mex ownership and upgrade state are role-independent: every role needs
 		// them to rank an upgrade against the energy ladder, so the bookkeeping

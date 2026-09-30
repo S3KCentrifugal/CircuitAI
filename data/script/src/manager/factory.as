@@ -108,6 +108,11 @@ namespace Factory {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+		// Only AIR changes ordering: transport obligations precede optional spam and combat.
+		if (Global::AISettings::Role == AiRole::AIR) {
+			IUnitTask@ ferry = Team::Ferry::FactoryMakeTask(u);
+			if (ferry !is null) return ferry;
+		}
 		IUnitTask@ t = TechFlank::Produce(u);
 		if (t !is null) return t;
 		@t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision

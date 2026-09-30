@@ -130,6 +130,10 @@ public:
 	static constexpr int kDeadSlotFails = 3;  // D-108: a slot the engine refuses this often is never served again; its ground stays held
 	// One footprint. Refuses (-1, logged) off-map, unbuildable, or overlapping ground.
 	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
+	// A single reusable slot. Its private zone preserves frame/unit identity after completion.
+	int ReservePersistentBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	void ReleasePersistentBuilding(int id);
+	int GetReservationState(int id) const; // -1 absent, 0 free, 1 claimed, 2 framed, 3 complete, 4 dead
 	// cols x rows footprints of cdef behind frontCentre (the middle of the grid's
 	// front edge), rows receding away from `facing`, `gap` cells between them.
 	// Slots the terrain refuses are skipped. Returns the group id, 0 if nothing fit.

@@ -1,0 +1,196 @@
+#include "../manager/air_economy.as"
+#include "../helpers/economy_helpers.as"
+namespace AirBuild {
+    array<IUnitTask@> projects;
+    array<IUnitTask@> pendingOwnership;
+    dictionary trace;
+    dictionary nanoTrace;
+    void Added(IUnitTask@ task)
+    {
+        IBuilderTask@ t = cast<IBuilderTask>(task);
+        if (t is null) return;
+        const int kind = t.GetBuildType();
+        if (kind == int(Task::BuildType::NANO) || kind == int(Task::BuildType::FACTORY)
+            || kind == int(Task::BuildType::ENERGY) || kind == int(Task::BuildType::CONVERT) || kind == int(Task::BuildType::STORE))
+            pendingOwnership.insertLast(task);
+    }
+    void Tick()
+    {
+        // Native completion chains may enqueue economy work despite experimental
+        // mode. Reconcile after Enqueue returns, so script can first claim its task.
+        array<IUnitTask@> pending = pendingOwnership;
+        pendingOwnership.resize(0);
+        for (uint i = 0; i < pending.length(); ++i) {
+            if (projects.findByRef(pending[i]) >= 0) continue;
+            IBuilderTask@ t = cast<IBuilderTask>(pending[i]);
+            if (t !is null && t.target is null) {
+                GenericHelpers::LogUtil("[AIR][Claim] cancel unowned native order " + (t.buildDef is null ? "?" : t.buildDef.GetName()), 1);
+                aiBuilderMgr.AbortTask(pending[i]);
+            }
+        }
+        int queuedNanos = 0;
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ t = cast<IBuilderTask>(projects[i]);
+            if (t !is null && t.GetBuildType() == int(Task::BuildType::NANO) && t.target is null) ++queuedNanos;
+        }
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO), null) > queuedNanos)
+            Invariants::Violation("INV-076", "AIR", "unclaimed native nano order remains after AIR reconciliation");
+    }
+    float Committed(bool energy)
+    {
+        float cost = 0.0f;
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ job = cast<IBuilderTask>(projects[i]);
+            if (job is null || job.buildDef is null || job.GetBuildType() >= int(Task::BuildType::REPAIR)) continue;
+            const float left = job.target is null ? 1.0f : 1.0f - job.target.GetBuildProgress();
+            cost += (energy ? job.buildDef.costE : job.buildDef.costM) * AiMax(left, 0.0f);
+        }
+        return cost;
+    }
+    bool Can(CCircuitUnit@ u, CCircuitDef@ d) { return d !is null && d.IsAvailable(ai.frame) && u.circuitDef.CanBuild(d); }
+    bool Busy(CCircuitDef@ d, Task::BuildType type)
+    {
+        return d !is null && (aiBuilderMgr.GetUnfinishedCount(d) > 0 || aiBuilderMgr.GetQueuedBuildCount(int(type), d) > 0);
+    }
+    IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
+    {
+        if (t is null) return null;
+        if (projects.findByRef(t) < 0) projects.insertLast(t);
+        const string key = "" + u.id;
+        string prior = ""; trace.get(key, prior);
+        if (prior != rule) { trace.set(key, rule); GenericHelpers::LogUtil("[AIR][Rule] " + rule + " builder=" + u.id, 1); }
+        return t;
+    }
+    void Removed(IUnitTask@ t)
+    {
+        const int i = projects.findByRef(t);
+        if (i >= 0) projects.removeAt(i);
+        const int p = pendingOwnership.findByRef(t);
+        if (p >= 0) pendingOwnership.removeAt(p);
+    }
+    IUnitTask@ Resume(CCircuitUnit@ u, bool energyOnly = false)
+    {
+        // A killed/reassigned builder can leave a pinned order with no frame.
+        // Busy/committed accounting must not strand that order forever.
+        array<int> kinds = { int(Task::BuildType::ENERGY), int(Task::BuildType::FACTORY),
+            int(Task::BuildType::NANO), int(Task::BuildType::STORE), int(Task::BuildType::CONVERT) };
+        for (uint i = 0; i < (energyOnly ? 1 : kinds.length()); ++i) {
+            IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, kinds[i]);
+            if (t !is null && projects.findByRef(t) >= 0) return t;
+        }
+        return null;
+    }
+    IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false)
+    {
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ t = cast<IBuilderTask>(projects[i]);
+            if (t is null || t.buildDef is null || t.target is null || Lifecycle::IsRetiring(t.target)) continue;
+            if (energyOnly && t.GetBuildType() != int(Task::BuildType::ENERGY)) continue;
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame)) > 1800.0f * 1800.0f) continue;
+            return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, t.target, 20 * SECOND));
+        }
+        return null;
+    }
+    IUnitTask@ Factory(CCircuitUnit@ u, bool advanced)
+    {
+        const string name = advanced ? UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side) : UnitHelpers::GetT1AirPlantForSide(Global::AISettings::Side);
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        if (!Can(u, d) || Busy(d, Task::BuildType::FACTORY)) return null;
+        const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
+        if (!advanced && count > 0) return null;
+        if (advanced) {
+            if (count >= Global::RoleSettings::Air::MaxProductionBays) return null;
+            if (count == 0 && !AirEconomy::Transition(d)) return null;
+            if (count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, Global::RoleSettings::Air::MaxProductionBays,
+                ai.frame - AirEconomy::stableSince, Global::RoleSettings::Air::CapacityStableSeconds * SECOND,
+                AirEconomy::bankM, d.costM * 0.6f))) return null;
+            // Fill useful existing support first. Twenty is a soft comparison threshold.
+            for (uint b = 0; count > 0 && b < AirLayout::bays.length(); ++b)
+                if (AirLayout::bays[b].defName == name && b < AirEconomy::nanoCount.length()
+                    && AirEconomy::nanoCount[b] + AirEconomy::nanoFuture[b] < AirEconomy::NanoTarget(b)) return null;
+        }
+        AirLayout::Bay@ bay = null;
+        for (uint b = 0; b < AirLayout::bays.length(); ++b)
+            if (AirLayout::bays[b].defName == name && AirLayout::bays[b].factoryId < 0 && AirLayout::bays[b].slot >= 0
+                && aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 0) { @bay = AirLayout::bays[b]; break; }
+        if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame));
+        if (bay is null) return null;
+        return AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
+    }
+    IUnitTask@ Energy(CCircuitUnit@ u, bool emergency)
+    {
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null) > 0) return null;
+        const string side = Global::AISettings::Side;
+        const bool t2 = UnitHelpers::GetConstructorTier(u.circuitDef) >= 2;
+        array<string> names;
+        const string fusion = UnitHelpers::GetFusionNameForSide(side);
+        const string advancedFusion = UnitHelpers::GetAdvFusionNameForSide(side);
+        // A floating metal bank does not supply the work or energy for an AFUS.
+        // Establish ordinary reactor income before committing the small AIR crew.
+        bool reactorIncome = false;
+        for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
+            CCircuitUnit@ reactor = ai.GetTeamUnit(AirEconomy::owned[i]);
+            if (reactor !is null && reactor.GetBuildProgress() >= 1.0f
+                && (reactor.circuitDef.GetName() == fusion || reactor.circuitDef.GetName() == advancedFusion)) {
+                reactorIncome = true; break;
+            }
+        }
+        if (!emergency && t2 && reactorIncome && AirEconomy::metal >= 80.0f && AirEconomy::bankM > 5000.0f) names.insertLast(advancedFusion);
+        if (!emergency && t2 && AirEconomy::metal >= 30.0f && AirEconomy::bankM > 500.0f) names.insertLast(fusion);
+        const float wind = (ai.GetWindMin() + ai.GetWindMax()) * 0.5f;
+        const string advSolar = UnitHelpers::GetAdvSolarNameForSide(side);
+        if (!emergency && AirEconomy::metal >= 15.0f && AirEconomy::bankE >= 1800.0f && AirEconomy::Count(advSolar) < 6)
+            names.insertLast(advSolar);
+        if (wind > Global::RoleSettings::Air::GoodWindMinimumEnergy && (!emergency || ai.GetWindMin() > 4.0f)) names.insertLast(UnitHelpers::GetWindNameForSide(side));
+        if (!emergency && AirEconomy::metal > 15.0f && AirEconomy::bankE > 1500.0f) names.insertLast(UnitHelpers::GetAdvSolarNameForSide(side));
+        names.insertLast(UnitHelpers::GetSolarNameForSide(side));
+        names.insertLast(UnitHelpers::GetTidalNameForSide(side));
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY)) continue;
+            if (aiBuilderMgr.GetUnfinishedCount(d) > 0) continue;
+            const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
+            IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor);
+            if (task !is null) return task;
+        }
+        return null;
+    }
+    IUnitTask@ Nano(CCircuitUnit@ u)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        const string key = "" + u.id;
+        int64 logged = -100000;
+        if (nanoTrace.exists(key)) nanoTrace.get(key, logged);
+        if (ai.frame - logged >= 30 * SECOND && AirEconomy::metal >= 30.0f && d !is null) {
+            nanoTrace.set(key, int64(ai.frame));
+            GenericHelpers::LogUtil("[AIR][NanoGate] " + u.circuitDef.GetName() + " " + u.id + " can=" + (Can(u, d) ? "yes" : "no")
+                + " busy=" + (Busy(d, Task::BuildType::NANO) ? "yes" : "no") + " count=" + d.count, 1);
+        }
+        if (!Can(u, d) || Busy(d, Task::BuildType::NANO) || AirEconomy::bankM < 150.0f || AirEconomy::energy < 250.0f) return null;
+        for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
+            if (AirLayout::bays[b].factoryId < 0 || AirEconomy::nanoCount[b] + AirEconomy::nanoFuture[b] >= AirEconomy::NanoTarget(b)) continue;
+            for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {
+                const int slot = AirLayout::bays[b].nanos[s];
+                if (aiTerrainMgr.GetReservationState(slot) != 0) continue;
+                IUnitTask@ t = AirLayout::Pinned(Task::BuildType::NANO, Task::Priority::NORMAL, d, slot);
+                if (t !is null) return t;
+            }
+        }
+        return null;
+    }
+    IUnitTask@ Utility(CCircuitUnit@ u, const string &in name, Task::BuildType type, int cap)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(name);
+        if (!Can(u, d) || AirEconomy::Planned(d, type) >= cap) return null;
+        return AirLayout::Place(u, d, type, Task::Priority::NORMAL);
+    }
+    void Leave()
+    {
+        AirProduction::Leave();
+        array<IUnitTask@> tasks = projects;
+        projects.resize(0);
+        pendingOwnership.resize(0);
+        for (uint i = 0; i < tasks.length(); ++i) aiBuilderMgr.AbortTask(tasks[i]);
+        trace.deleteAll(); nanoTrace.deleteAll(); AirLayout::Leave();
+    }
+}

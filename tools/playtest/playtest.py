@@ -486,7 +486,7 @@ def stop(args, quiet=False):
 FRAME_RE = re.compile(r"\[f=(-?\d+)\]")
 AI_RE = re.compile(r":::AI LOG:S:(\d+):T:(\d+):F:(-?\d+):L::(.*)$")
 DETAILS_RE = re.compile(r"\[GameDetails\] skirmishAI=(\d+) team=(\d+) .*? role=(\d+)")
-TIMELINE_RE = re.compile(r"\[Rule\] |\[Eco\] next|\[TECH\]\[Build\]|\[TECH\]\[Opening\]|\[TECH\]\[Factory\]|\[TECH\]\[Labs\]|\[Layout\]|\[Team\]\[Roster\]|\[Playtest\]")
+TIMELINE_RE = re.compile(r"\[Rule\] |\[Eco\] next|\[TECH\]\[Build\]|\[TECH\]\[Opening\]|\[TECH\]\[Factory\]|\[TECH\]\[Labs\]|\[Layout\]|\[Team\]\[Roster\]|\[Playtest\]|\[AIR\]|\[AirWave\]|\[Ferry\]")
 NATIVE_RE = re.compile(r"Skirmish AI <[^>]*>: (EXP: |RESERVE: |BUILDER: |CBFactoryTask: )")
 
 

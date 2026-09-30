@@ -1,5 +1,24 @@
 # Actor matrix
 
+## AIR production and economy (D-147)
+
+These actors are local to AIR. The TECH objects and rows below retain their
+existing ownership and sequence.
+
+| Object | Actors and reads | Actions |
+| --- | --- | --- |
+| Bay and support slots | `AirLayout::Reserve`, `AdoptSupport`, native reservation states, unit ownership/reach | Reserve factory and usable rear/side support banks atomically; restore persistent slots after loss; roll back unused candidates; `AirLayout::Leave` resets on role switch. |
+| Builder projects | `AirBuild::Added`, `Record`, `Removed`, `Tick`, `Resume`; task identity/frame/assignee | Claim successful script enqueues; cancel unowned native completion-chain orders; resume owned orphans; release on removal; INV-076. |
+| Opening/recovery | `recovery.resume`, `recovery.assist`, `recovery.energy`, `project.resume`, `opening.mex`, `opening.energy`, `transport.plant`, `opening.plant` | Retain current construction, stabilize energy, restore workers to orders, open/recover T1 transport capability. |
+| Metal and supply | `mex.upgrade`, `mex.expand`, `production.support`, `storage.buffer`, `energy.assist`, `energy.grow` | Safe mexes and capable upgrades; useful live support before aspirational energy growth; first wind buffer. |
+| Capacity and services | `transition.bay`, `intel.radar`, `defence.flak`, `storage.metal`, `production.bay`, `storage.energy`, `surplus.convert` | Fund first T2 independently of moving energy targets, then expand on sustained income; explicit radar/flak/storage/conversion. |
+| Fallback work | `service.queued`, `project.assist`, `production.assist`, `wait` | Admit repair/defence/radar service; assist owned frames or utility plant; bounded retry. |
+| Resource model | `AirEconomy::Tick`, `Transition`, `NanoTarget`; ten-second lows, banks, committed cost, physical work/reach | Distinguish live/future BP; assign each nano once; estimate mixed sortie cost; gate transitions; INV-073/074. |
+| Aircraft orders | `AirProduction::MakeTask`, `Recruit`, native pending count plus frames | Transport prehook first; finite scout/constructor/strike/home quotas; heavy and wave production; no duplicate frame accounting. |
+| Home and attack aircraft | `AirProduction::HomeTask`, `AirWaves`, native military tasks | Keep a threat-scaled interception floor, hold/release escorted waves, release holds on role switch; INV-072. |
+| Allied transport obligations | `Team::Ferry::HandleMessage`, `FactoryMakeTask`, `OnUnitAdded/Removed`, `Update` | Validate requestor; deduplicate/FIFO; NOW-priority recruit; retry losses; fly then transfer; start next obligation; INV-075. |
+
+
 Who acts on what, for the TECH role. One row per actor, grouped by the object
 it reads or orders on, with the state it reads. A change to how an object is
 handled updates this table; `tools/knowledge/check_invariants.py` requires

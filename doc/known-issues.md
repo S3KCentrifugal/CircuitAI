@@ -603,6 +603,23 @@ between them; and no drop in the number of structures placed per minute
 
 ---
 
+### KI-112 — IsZoneAlly requires caller-side map bounds validation
+
+**Severity:** High for callers supplying unchecked coordinates.
+**Location:** `CTerrainManager::IsZoneAlly` and native blocking-grid indexing.
+
+**Problem.** An AIR rear-region search could pass a negative candidate to
+`IsZoneAlly` before checking map bounds. The 2026-09-30 natural Armada test
+crashed at frame 20066; matching symbols located the grid access. D-147 fixes
+the AIR caller and tests negative/off-map bounds, but the public native method
+still assumes a valid coordinate. Other future callers can repeat the error.
+
+**Proposed solution.** Add a finite/bounds guard in the native query with a
+documented conservative result, and audit existing callers before changing
+that shared contract. This migration deliberately preserves TECH's path.
+**Verification.** Native negative, far-edge and non-finite cases, then AIR and
+TECH edge-start games. Current AIR simulations verify its guarded caller only.
+
 ## AngelScript policy (KI-2xx)
 
 ### KI-201 — The dynamic factory production system is entirely inert
@@ -1339,7 +1356,14 @@ killing the transport mid-ferry falls back to walking.
 
 ### KI-217 — Per-factory nano counts do not reconcile losses or failed orders
 
-**Severity:** Medium. **Status:** Diagnosed by source trace, not fixed or played.
+**D-147 scope update.** Experimental AIR no longer consumes this historical
+order counter. It reconciles live/future nanos by owned ID, reach and exclusive
+bay assignment. A supplied-economy loss test destroyed four nanos and observed
+replacement support. The shared legacy counter is unchanged; full save/load,
+transfer and non-AIR migration remain separate verification work.
+
+**Severity:** Medium. **Status:** Enabled AIR replacement played; the shared
+legacy counter remains unfixed.
 
 **Location.** `factoryNanoCounts`, `_GetNanoCount`, `_SetNanoCount` and
 `EnqueueNanoForFactory` in
@@ -1368,7 +1392,15 @@ and one nano must never contribute to two simultaneous factory budgets.
 
 ### KI-218 — AIR's explicit mex-upgrade priority is on a T1-only path
 
-**Severity:** Medium. **Status:** Diagnosed by source trace, not fixed or played.
+**D-147 scope update.** Enabled AIR now routes every capable builder through
+`AirRules` and checks `CanBuild` before the shared upgrade helper. Its economy
+snapshot marks observed completed T2 mexes upgraded, including direct native
+MEX builds; without this, a gifted constructor could make the tracker repeatedly
+try upgrading an already advanced extractor. The legacy disabled path and
+other roles' direct-T2-MEX bookkeeping are unchanged.
+
+**Severity:** Medium. **Status:** Enabled AIR replacement played; legacy AIR
+and other roles' direct-T2-MEX bookkeeping remain unchanged.
 
 **Location.** `Air_BuilderAiMakeTask` and `Air_T1Constructor_AiMakeTask` in
 [air.as](../data/script/src/roles/air.as), and `ShouldUpgradeMexFirst` in
@@ -1392,6 +1424,44 @@ Do not change TECH or the shared helper's tier guard. This is included in the
 upgrade), a T2 air constructor and a gifted T2 land constructor (must choose
 the eligible upgrade ahead of discretionary conversion), an existing upgrade
 claim and an energy emergency. Use task logs and completed structures.
+
+### KI-219 — Multiple AIR providers can each fulfill one broadcast request
+
+**Severity:** Medium. **Location:** `Team::Ferry::HandleMessage`.
+**Problem.** Request deduplication/FIFO is per AIR AI. With two allied AIR
+providers, both can accept the same broadcast; there is no elected provider or
+request ID in the legacy protocol. Single-provider multi-requestor tests do
+not establish a team-wide exactly-once delivery guarantee.
+**Proposed solution.** Add request IDs and deterministic provider selection
+from the allied roster, with acknowledgement expiry and replacement on loss.
+Keep old messages interoperable and TECH's cargo handling unchanged.
+**Verification.** Two AIR providers, simultaneous distinct requestors, repeated
+messages and provider destruction; exactly one live obligation per request.
+
+### KI-220 — AIR's factory handoff prior needs effective-throughput calibration
+
+**Severity:** Medium. **Location:** `Air::WarmFactoryGapSeconds`,
+`AirEconomy::Mix` / `NanoTarget`, and `ProductionMath::Rate`.
+
+**Problem.** The first capacity model uses a 0.5-second warm gap. Independent
+observation in `natural-v10` found a median 2.0-second gap with sampled banks
+above 500 metal/1,000 energy; the supplied Legion run had a 4.5-second median.
+These include policy/scheduler waits and cannot directly identify engine
+animation latency, but treating the prior as measured effective throughput
+would overstate capacity and misprice support. The twenty-nano bound and
+actual income gates limit expenditure; they do not calibrate the model.
+
+**Proposed solution.** Run fixed continuous queues by faction and product mix
+at controlled 0/5/10/15/20/25/30/40 support, tracking assignment/queue time,
+frame creation, completion and income pressure separately. Fit effective
+handoff only from continuously demanded, funded samples; compare marginal
+nano investment with a new plant instead of blindly replacing the prior with
+a gap polluted by policy waits. Keep all parameters AIR-only.
+
+**Verification.** Repeated fixed-queue measurements predict held-out observed
+throughput and identify the appropriate support/new-bay crossover. See
+[D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
+and [measurement limits](benchmarks/air-management.md).
 
 ## Configuration and data (KI-3xx)
 
@@ -2798,6 +2868,52 @@ map results and limitations.
 **Verification requirement.** Regression must reach the +200 metal gate (the six-minute Supreme performance
 sample did not) and verify no dedicated specialist factory or recruitment on
 unqualified routes, while valid mountain-flank production still operates.
+
+### KI-435 — TECH lifecycle invariant can mistake a gifted transport for production
+
+**Severity:** Low diagnostic error. **Location:** `Invariants::OnUnitAdded`,
+INV-001 retiring-factory radius attribution.
+
+**Problem.** In the 2026-09-30 mixed AIR/TECH/SUPPORT transport fixture, a
+`armatlas` (unit 18053, AIR team 4 to TECH team 3) transferred near a retired factory produced an INV-001
+"produced" report. AIR's log proves it built and transferred the transport;
+TECH did not manufacture it. The generic unit-added event and spatial
+proximity cannot establish production provenance. The test's invariant forbid
+is retained, so the combined scorecard fails despite completed deliveries.
+
+**Proposed solution.** Distinguish native creation/production from transfer in
+the lifecycle observation, or supply producer identity to the invariant.
+Avoid excluding arbitrary nearby combat units, which would hide real defects.
+**Verification.** Reproduce the gift without INV-001, then deliberately recruit
+from a retiring factory and require the invariant. TECH policy is not changed
+as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
+
+### KI-436 — AIR's natural reactor benchmark remains late
+
+**Severity:** Medium performance limitation. **Location:**
+[transition check](../tools/playtest/checks/air_transition.json),
+`AirEconomy::Transition` and `AirRules::MakeTask`.
+
+**Problem.** The final 60-minute natural Armada run completed T2 at 36.87 min,
+its first upgraded mex at 38.22 and ordinary fusion at 56.13. The 54-minute
+reactor benchmark remains missed by 2.13 minutes. There were no script, crash
+or invariant failures. Fusion-first fixes the initial oversized AFUS choice;
+it does not establish competitive transition timing. The current ordered
+policy admits mex upgrades ahead of ordinary energy growth and uses a
+conservative full-package T2 funding gate; both require performance calibration
+under contested expansion and small construction crews.
+
+**Proposed solution.** Compare fixed economy/threat scenarios and repeated
+natural games, including allied TECH constructor gifts. Reserve a bounded
+reactor work lane once initial mex upgrades are funded, and measure the effect
+on fighter replacement, resource stalls and reactor completion before changing
+thresholds. Keep existing construction intact and all TECH policy unchanged;
+do not relax the recorded deadline to hide the miss.
+
+**Verification.** Repeated final-code games meet the unchanged transition
+milestones without starving interception or showing invariant violations.
+[D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
+and [evidence](benchmarks/air-management.md) preserve the failed scorecard.
 
 ## Indexed elsewhere
 

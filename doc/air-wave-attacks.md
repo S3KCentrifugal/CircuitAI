@@ -1,5 +1,13 @@
 # Air wave attacks
 
+**D-147 update.** Enabled AIR reserves a separate home-fighter cohort before
+wave holds. `WaveAvoidHomeFocus` selects the nearest participating enemy start
+when no ground opposition is observed or the combat focus is absent/near home.
+An explicit STRIKE/DEEP target still overrides that fallback. This avoids
+carpeting the home runway in an AIR duel without changing TECH or the six wave
+methods. The [controlled sortie](benchmarks/air-management.md) launched 24
+bombers and independently observed their damage to enemy targets.
+
 How an AIR-role T2 bomber wave is sized, how it forms up, and the six
 methods it attacks with. The hold-and-release machinery that gathers a wave
 is in [`roles/air.md`](roles/air.md#t2-bomber-waves); target ranking for the

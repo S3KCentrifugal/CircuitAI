@@ -604,6 +604,12 @@ int IBuilderTask::CmdTimeout(int frame) const
 
 bool IBuilderTask::Approach(CCircuitUnit* unit)
 {
+	// Flying builders can stop outside a ground approach disc because altitude
+	// contributes to engine build range. Opt-in lets the engine's build command
+	// choose their final position; existing ground/TECH approach stays unchanged.
+	const auto* builderMgr = dynamic_cast<const CBuilderManager*>(manager);
+	if ((builderMgr != nullptr) && builderMgr->IsExperimentalAirDirect()
+		&& unit->GetCircuitDef()->IsAbleToFly()) return false;
 	CCircuitAI* circuit = manager->GetCircuit();
 	if (!geom::is_valid(GetPosition())) {
 		return false;

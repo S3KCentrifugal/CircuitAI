@@ -269,6 +269,22 @@ namespace AirWaves {
     AIFloat3 _FrontAim()
     {
         AIFloat3 p = aiMilitaryMgr.GetCombatFocusPos();
+        // With no ground front, an AIR duel can focus on interceptors over our
+        // own runway. A bomber sortie should instead survey an actual enemy
+        // start; this uses participating starts, not every unused map slot.
+        if (Global::RoleSettings::Air::ExperimentalBuild && Global::RoleSettings::Air::WaveAvoidHomeFocus
+            && (Military::GetEnemySurfaceCostPerPlayer() <= 0.0f || p.x < 0.0f || p.z < 0.0f || MapHelpers::SqDist(p, Global::Map::StartPos)
+                < Global::RoleSettings::Air::AllyRange * Global::RoleSettings::Air::AllyRange)) {
+            array<AIFloat3> starts = Lanes::ScriptStarts(true);
+            float best = 1.0e12f;
+            for (uint i = 0; i < starts.length(); ++i) {
+                const float dist = MapHelpers::SqDist(starts[i], Global::Map::StartPos);
+                if (dist < best && dist > Global::RoleSettings::Air::AllyRange * Global::RoleSettings::Air::AllyRange) {
+                    p = starts[i]; best = dist;
+                }
+            }
+            if (best < 1.0e12f) GenericHelpers::LogUtil("[AIR][Waves] home focus replaced by enemy start " + int(p.x) + "," + int(p.z), 1);
+        }
         if (p.x < 0.0f || p.z < 0.0f) {
             p = AIFloat3(float(AiTerrainWidth()) * 0.5f, 0.0f, float(AiTerrainHeight()) * 0.5f);
         }

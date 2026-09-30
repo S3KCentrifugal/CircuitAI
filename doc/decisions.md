@@ -8099,6 +8099,160 @@ The plan specifies pure-function, lifecycle, geometry, throughput and TECH
 differential tests. Documentation validation is recorded in the plan; it does
 not verify the proposed runtime behaviour.
 
+## D-147 — AIR owns T1 economy, production bays and transport-first recruitment
+
+**Status.** Built and played on 2026-09-30. The final native DLL is
+`4455871a7febabbc` with matching symbols and current data in the mandatory
+Recoil build output. The live game installation is unchanged. Full results,
+including failed checks and data revisions, are in the
+[AIR evidence report](benchmarks/air-management.md).
+
+**Decision.** Enable an independent AIR controller in experimental profiles:
+`AirRules` selects ordered actions, `AirBuild` owns tasks, `AirEconomy` observes
+income/commitments/owned units, `AirLayout` reserves repeatable production bays,
+and `AirProduction` controls finite utility/home quotas and military output.
+T1 energy and combat continue until a complete T2 package is funded. T1 mobile
+builders grow to six when funded, because factory-bound nanos cannot build a
+remote wind field. Keep the T1 plant for transports after T2 arrives.
+
+A starter has up to five rear nanos. Each T2 bay has up to twenty side-bank
+slots, with partial banks accepted on cramped terrain and capacity calculated
+from actual space. Further plants need sustained spare resources, available
+support and funding; twelve is a configurable ceiling. Late reactors search
+away from factories. Native persistent single sites share existing claims,
+required pins, completion/destruction and serialization; AIR metadata is named
+separately. Pure production, funding and geometry arithmetic is reusable and
+executes under the real AngelScript runtime in unit tests.
+
+Transport obligations precede optional AIR recruitment and spam. Accept any
+allied requestor role, deduplicate active/queued teams, service FIFO, and latch
+an order only after enqueue succeeds. Pending recruits, frames and owned units
+are counted separately. TECH's requester trigger and cargo protocol stay as
+before. Home fighters never enter wave ledgers. With no observed ground front
+or a home-area combat focus, new AIR wave planning falls back to an actual
+participating enemy start; explicit strike targeting still takes precedence.
+
+**Why these implementation choices.** Reusing TECH's AFUS chain, turret box
+or thresholds would change the role's economy and risk TECH behavior. Shared
+native mechanisms and small pure helpers remove duplication without migrating
+TECH. Script `GetBuildSpeed` exposes physical worker time, not JSON's policy
+speed; applying a frame multiplier produced wrong capacity estimates and was
+removed. Native completion chains can create unassigned economy orders despite
+experimental mode, so AIR reconciles ownership after enqueue and resumes its
+own orphan orders. Otherwise a phantom nano or energy job can block all future
+work. Flying builders can orbit a ground approach disc; an AIR-only native
+lever delegates their final approach to the engine's build command. Negative
+rear candidates are rejected before native grid queries. Completed T2 mexes
+are reconciled from owned units, including direct native MEX builds. The original
+12-ring/12-sample coastal energy search exhausted its candidates while banks
+floated; AIR now expands across 24 rings with 24 samples and backs off failed
+definitions for three seconds. A transition check requires actual T2, mex
+upgrade and reactor completion instead of only a valid opening.
+The 55-minute natural run missed its reactor deadline while building its first
+AFUS. A large metal bank had admitted that project without established reactor
+income. AIR now chooses ordinary fusion first and requires an observed completed
+reactor before selecting AFUS. This keeps the initial energy investment within
+the smaller AIR construction crew; unfinished reactor frames do not qualify.
+
+**Rejected or deferred.** No general TECH extraction, no sample/profile edits,
+no mandatory six-factory order and no unbounded constructor/scout/transport
+queue. The first capacity policy fills useful funded support up to twenty
+before another bay; a calibrated marginal-capital optimizer, every product's
+0–40-nano experiment, floating campus templates and full script save/load are
+not claimed. The warm-gap value is a prior, not a measurement of cold startup.
+The initial observer incorrectly included factory construction in cold idle;
+the final observer starts at completion. Damage collection hooks the complete
+LuaUI event and forwards it unchanged, reinstating after dispatcher resets.
+
+**Invariant.** INV-072 separates home/wave fighters; INV-073 keeps one nano
+planner; INV-074 bounds published bays; INV-075 prevents duplicate obligations
+per provider; INV-076 rejects unowned queued nano work. Existing TECH invariants
+and all playtest forbids remain intact. For identical valid inputs TECH keeps
+its policy sequence, sites, caps, defaults and random calls. Protected TECH
+scripts/configuration are byte-for-byte unchanged; this does not assert equal
+emergent matches when AIR changes allied resources or threats.
+
+**Verification.** Native compilation succeeded, registration parity passed
+239 used members, 28 executable AS math tests passed, as did 76 ranking checks,
+base geometry and eight lane suites. Natural AIR reached T2 while continuing
+combat; supplied Cortex/Legion economies exceeded six factories and replaced
+real nano losses; role switches passed. A controlled sortie produced observed
+bomber damage after the outbound fallback. TECH and mixed-team reports retain
+baseline invariant failures. Source checks pass apart from documented existing
+hover links and TECH sonar findings. Exact repeated-game equality, full
+save/load and competitive win-rate improvement remain unverified.
+The final natural run completed ordinary fusion at 56.13 minutes, 2.13 minutes
+after the unchanged benchmark; it completed 14 T2 mexes and maintained combat
+without script/crash/invariant errors. This functional result does not turn
+the deadline scorecard into a pass.
+
+**Open issues.** KI-112 records the native grid query's unchecked caller
+contract (AIR is guarded); KI-217/218 retain legacy bookkeeping limitations;
+KI-209 covers script persistence; KI-219 covers several AIR providers accepting
+one broadcast; KI-220 records warm-gap calibration from observed effective
+factory delays; KI-435 covers a gifted transport misattributed by TECH's
+retiring-factory invariant; KI-436 retains the natural reactor timing miss.
+KI-427 baseline TECH failures are not hidden.
+
+**Files.** The implementation, references, fixtures and tests touched by this
+change are linked below; the evidence report distinguishes completed work from
+limits and superseded diagnostic runs.
+
+- [data/script/README.md](../data/script/README.md)
+- [data/script/src/global.as](../data/script/src/global.as)
+- [data/script/src/helpers/production_math.as](../data/script/src/helpers/production_math.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as)
+- [data/script/src/manager/builder.as](../data/script/src/manager/builder.as)
+- [data/script/src/manager/commands.as](../data/script/src/manager/commands.as)
+- [data/script/src/manager/factory.as](../data/script/src/manager/factory.as)
+- [data/script/src/manager/ferry.as](../data/script/src/manager/ferry.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [doc/actor-matrix.md](actor-matrix.md)
+- [doc/air-layout-and-priority-plan.md](air-layout-and-priority-plan.md)
+- [doc/air-management.md](air-management.md)
+- [doc/air-wave-attacks.md](air-wave-attacks.md)
+- [doc/angelscript-references.md](angelscript-references.md)
+- [doc/base-layout.md](base-layout.md)
+- [doc/benchmarks/air-management.md](benchmarks/air-management.md)
+- [doc/decisions.md](decisions.md)
+- [doc/invariants.md](invariants.md)
+- [doc/known-issues.md](known-issues.md)
+- [doc/roles/README.md](roles/README.md)
+- [doc/roles/air.md](roles/air.md)
+- [doc/roles/air_build.md](roles/air_build.md)
+- [doc/roles/air_rules.md](roles/air_rules.md)
+- [doc/transport-ferry.md](transport-ferry.md)
+- [src/circuit/module/BuilderManager.h](../src/circuit/module/BuilderManager.h)
+- [src/circuit/script/BuilderScript.cpp](../src/circuit/script/BuilderScript.cpp)
+- [src/circuit/script/FactoryScript.cpp](../src/circuit/script/FactoryScript.cpp)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/builder/BuilderTask.cpp](../src/circuit/task/builder/BuilderTask.cpp)
+- [src/circuit/terrain/TerrainManager.cpp](../src/circuit/terrain/TerrainManager.cpp)
+- [src/circuit/terrain/TerrainManager.h](../src/circuit/terrain/TerrainManager.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/production_math_test.cpp](../tests/production_math_test.cpp)
+- [tests/production_math_tests.as](../tests/production_math_tests.as)
+- [tools/playtest/checks/air_attack.json](../tools/playtest/checks/air_attack.json)
+- [tools/playtest/checks/air_legacy.json](../tools/playtest/checks/air_legacy.json)
+- [tools/playtest/checks/air_capacity.json](../tools/playtest/checks/air_capacity.json)
+- [tools/playtest/checks/air_compile.json](../tools/playtest/checks/air_compile.json)
+- [tools/playtest/checks/air_economy.json](../tools/playtest/checks/air_economy.json)
+- [tools/playtest/checks/air_switch.json](../tools/playtest/checks/air_switch.json)
+- [tools/playtest/checks/air_transport.json](../tools/playtest/checks/air_transport.json)
+- [tools/playtest/checks/air_transition.json](../tools/playtest/checks/air_transition.json)
+- [tools/playtest/checks/tech_control.json](../tools/playtest/checks/tech_control.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py)
+- [tools/playtest/summarize_air.py](../tools/playtest/summarize_air.py)
+- [tools/playtest/widgets/air_fixture.lua](../tools/playtest/widgets/air_fixture.lua)
+- [tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.

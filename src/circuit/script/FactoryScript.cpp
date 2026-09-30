@@ -17,6 +17,17 @@ namespace circuit {
 
 using namespace springai;
 
+// count already contains frames; count only orders without a frame here.
+static int CFactoryManager_GetPendingRecruitCount(const CFactoryManager* manager, const CCircuitDef* def)
+{
+	if (def == nullptr) return 0;
+	int count = 0;
+	for (const CRecruitTask* task : manager->GetTasks()) {
+		if (!task->IsDead() && (task->GetBuildDef() == def) && (task->GetTarget() == nullptr)) ++count;
+	}
+	return count;
+}
+
 CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 		: ITaskModuleScript(scr, mgr)
 {
@@ -52,6 +63,7 @@ CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 //	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CFactoryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "CCircuitDef@ GetRoleDef(const CCircuitDef@, Type) const", asMETHOD(CFactoryManager, GetRoleDef), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "int GetFactoryCount() const", asMETHOD(CFactoryManager, GetFactoryCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFactoryManager", "int GetPendingRecruitCount(const CCircuitDef@) const", asFUNCTION(CFactoryManager_GetPendingRecruitCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "bool isAssistRequired", asOFFSET(CFactoryManager, isAssistRequired)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "float buildpowerRatio", asOFFSET(CFactoryManager, bpRatio)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "float responseWeight", asOFFSET(CFactoryManager, reWeight)); ASSERT(r >= 0);

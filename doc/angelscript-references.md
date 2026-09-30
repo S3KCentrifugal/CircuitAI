@@ -2,6 +2,28 @@
 
 ## Purpose
 
+### AIR management additions (D-147)
+
+These additions are mechanisms; role thresholds and build order remain script
+policy. Existing APIs retain their behavior.
+
+| API | Contract |
+| --- | --- |
+| `ai.GetOwnedUnitIds()` | New owned array of this AI's IDs, including frames. Resolve each borrowed unit with `GetTeamUnit` at use time; a lost/transferred ID can return null. |
+| `CCircuitDef.GetBuildTime()` | UnitDef build work. |
+| `CCircuitDef.GetBuildSpeed()` | Physical engine worker time, work/second, before JSON `build_speed` tuning. Do not multiply by `SECOND`. |
+| `CCircuitDef.GetBuildDistance()` | Engine build reach in elmos. |
+| `aiFactoryMgr.GetPendingRecruitCount(def)` | Live recruit tasks with this definition and no target frame. `def.count` already includes frames; add only this pending count. |
+| `aiTerrainMgr.ReservePersistentBuilding(def, pos, facing)` | Layout-enabled snapped footprint and private zone, retained after completion; negative on failure. Local footprint dimensions are rotated once. |
+| `aiTerrainMgr.ReleasePersistentBuilding(id)` | Release an unused reservation and its private zone, used for rollback. |
+| `aiTerrainMgr.GetReservationState(id)` | -1 absent, 0 free, 1 claimed, 2 frame/consumed, 3 completed owned structure, 4 exhausted/dead slot. |
+| `aiBuilderMgr.experimentalAirDirect` | False by default. When enabled, flying construction uses the engine's final build approach instead of the experimental ground disc. AIR enables/resets it; TECH never opts in. |
+
+Persistent sites use the existing pin, task claim, frame, destruction and native
+serialization machinery. A saved named layout does not imply complete script
+state persistence (KI-209). Check positions against map bounds before grid
+queries such as `IsZoneAlly`; see [AIR management](air-management.md).
+
 This document is the practical reference for writing and maintaining CircuitAI
 AngelScript. It covers:
 

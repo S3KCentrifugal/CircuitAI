@@ -79,7 +79,17 @@ step.
 
 | INV-069 | T1 static artillery definitions remain forbidden for construction even when runtime unit caps are raised. | `ArtilleryPolicy::Check`, every profile's slow update; native availability and construction enqueue enforce the JSON veto. | D-142 |
 
-## Settings (`Global::RoleSettings::Tech`)
+## AIR management (D-147)
+
+| ID | Promise | In-game check | Decision |
+| --- | --- | --- | --- |
+| INV-072 | A T2 fighter belongs to home interception or a bomber wave, never both. | `AirProduction::Tick`, home vs held/launched IDs. | D-147 |
+| INV-073 | AIR alone owns production support while its controller is enabled. | `AirEconomy::Tick`, native `assistNanoEnabled` remains false. | D-147 |
+| INV-074 | Every published AIR factory bay lies within map bounds. | `AirEconomy::Tick`, pure coordinate check. | D-147 |
+| INV-075 | A requestor has at most one active/queued transport obligation per AIR provider. | `Team::Ferry::Update`, distinct waiting teams and active request. | D-147 |
+| INV-076 | No unclaimed native nano order survives AIR's reconciliation. | `AirBuild::Tick`, native queued nano count vs owned orders after cancellation. | D-147 |
+
+## TECH settings (`Global::RoleSettings::Tech`)
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
