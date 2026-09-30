@@ -3081,6 +3081,23 @@ every cluster kind and runtime AIR/TECH role switches remain unplayed. Extend
 this lifecycle fixture to assert that peers see the same restored rectangle
 set, with no stale ownership after switching or removing an AI.
 
+### KI-440 - Smoke opening check misses TECH's rush-chain mexes
+
+**Problem.** `tools/playtest/checks/smoke.json` requires `[Rule] opening.mex`
+by one minute. The 2026-09-30 intro-disabled startup run builds three team-0
+mexes at frames 526, 1006 and 1471, while TECH logs `chain.next`. Thus the
+smoke report fails despite a working opening. Retained evidence:
+`build-theatres/intro-disabled/runs/20260930-204542`; no script/invariant error.
+
+**Proposed solution.** Make the smoke check observe actual mex construction
+for the tested TECH team, or explicitly accept the supported rush-chain route.
+Do not remove the opening expectation or accept an unrelated ally's AIR log.
+Keep script-error and invariant forbids. Test both rush-chain and ordinary
+opening configurations before updating the generic check.
+
+**Verification.** Pending; the intro default-off change does not modify this
+check or TECH policy. The current report is retained as FAIL.
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate

@@ -28,9 +28,8 @@ host-side console, never a network protocol. Lines are "barb|<command>|...":
     barb|draw|<teamId>|credits      draw the credits (the contributors) across the map centre
     barb|draw|<teamId>|clear        erase every line this instance drew
 
-At game start one instance (skirmish AI 0) plays the intro on its own: the
-commander with "Do not spec cheat!" beneath it for IntroHoldSeconds, erased, then
-the credits for IntroHoldSeconds, erased (IntroEnabled).
+The automatic match-start intro is disabled by default (IntroEnabled). Its
+title, commander, warning and credits remain available through the draw commands.
 
 Every command names the team it is meant for and is ignored by any other
 instance: the engine already routes Spring.SendSkirmishAIMessage(teamId, ...)
@@ -261,7 +260,7 @@ namespace Commands {
     // erased. One instance draws it (skirmish AI 0), or every AI would. Map marks
     // made by a spectating host are seen by spectators; by a playing host, by its
     // allies and by spectators.
-    bool IntroEnabled = true;
+    bool IntroEnabled = false; // Keep the artwork and manual commands; skip the match-start intro.
     const int IntroStartFrame = 3 * SECOND;
     const int IntroHoldSeconds = 10;
     const int IntroCreditsPercent = 5;   // owner: the credits in 5% of games, rolled once a game

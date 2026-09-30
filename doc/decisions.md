@@ -6366,6 +6366,23 @@ asked for the changes below; the `intro_test` widget counted every drawing
 received by a spectator. Strokes missing on screen are terrain in front of the
 line, not lost messages.
 
+**Current default (2026-09-30).** At the owner's request, automatic match-start
+artwork is disabled with `Commands::IntroEnabled = false` in
+[`commands.as`](../data/script/src/manager/commands.as). The title, Armada
+commander, warning, contributors, glyphs and manual draw commands are retained.
+The existing disabled path still marks the intro complete for lane scheduling.
+This supersedes automatic playback below; it does not remove the drawing system.
+
+**Default-off verification.** Played all three experimental profiles in the
+same isolated Supreme match, one minute, DLL `fcc2c7ea532f9ef3`, run
+`build-theatres/intro-disabled/runs/20260930-204542`. All four AI instances
+initialize; no intro drawing/credits commands, script errors or invariant lines
+occur. The generic smoke report remains FAIL only on its opening-rule log
+expectation despite three completed team-0 mexes (KI-440). Invariant practice,
+diff checks and published script/DLL API parity pass. The existing eight missing
+hover-document links remain KI-404. Matching DLL/symbols/current data are
+published to the required build output; no live game folder is changed.
+
 **Owner's requests.** Draw an Armada commander large in the map's centre, with
 "Do not spec cheat!" beneath it. Keep it 10 s after it is drawn, then erase it.
 Then a contributors list, also held 10 s, then erased. Spectators must see it.
