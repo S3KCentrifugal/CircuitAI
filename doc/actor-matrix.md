@@ -100,7 +100,7 @@ decides the end; everything else reads it.
 | spam lanes (`TechForward::TickSpam`, `Spam::SetSpreadLanes`, D-119) | the standing spam labs, the combat front, the focus | one lane per spam lab, `LaneSpacing` apart across the front, straight on to the enemy backline; re-spread when the count changes and every 30 s |
 | advanced lab production (`Tech_FactoryAiMakeTask`, D-103, D-119) | bank share, T2 construction bot count, fast assist cap | T2 construction bots to `T2BotConstructorCap` (10), fast assist bots to `FastAssistBotCap` (10), then fast assault bots; INV-028 |
 | `air.dedicated` (D-107, D-108) | the first two T2 air constructors | one always builds advanced converters, the other always advanced fusions; with no site in the layout it builds defences meanwhile (D-123), else waits and says why; its structure's cap lifted while held; INV-034, INV-035, INV-036 |
-| `air.defend` (`TechBuild::AirDefence`, D-123; D-126: `TechWeapons::Work` first) | an air constructor with nothing else to do | a weapon cluster's open slot first (D-126), then the mex clusters' long-range AA and flak, then a ring of T2 turrets and flak round the base toward the front, `AirDefenceMax` of each; INV-053 |
+| `air.defend` (`TechBuild::AirDefence`, D-123; D-126: `TechWeapons::Work` first) | an air constructor with nothing else to do | reserved resource/lane fortification first, then funded weapon-cluster slots (D-152); no expanding turret spiral; INV-053 |
 | air role refill (`TechBuild::RefillAirRoles`, `ClaimOnBuilt`, D-108) | a dedicated builder gone; a T2 air constructor built | the role passes at once (advanced fusions first), the new holder drops its other job; the advanced aircraft plant makes one when none is free; the donation keeps dedicated units |
 | advanced-fusion ground ahead (`Layout::HoldAfusSetAhead`, D-108) | the fusion role held, no set slot left | the next set of advanced-fusion ground reserved (zones, forward, then the ring within reach), retried every 10 s; INV-037 |
 | dead slot (native `CTerrainManager`, D-108) | the engine refuses a pinned slot 3 times | the slot is never offered again, its ground stays held, the set moves on |
@@ -253,3 +253,16 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | `support.assist`, `production.support` | unfinished nano and native support slot states | Finish support and grow it before general project assistance |
 | `AirBuild::FindAssistTarget` / factory nano policy | owned projects, physical reach, factory recruit target | Share one target selector; idle production nanos assist reachable construction; AIR tick ends that assistance when production resumes |
 | AIR observer | engine positions, dimensions, completions and deaths | Verify packing and replacement; measure completed mobile work and turret counts |
+
+## D-152 expansion, fortification and mex anchors
+
+| Object | Actors | Shared state |
+| --- | --- | --- |
+| AIR T2 plant | Factory, Transition, Tick, Resume, Record | Fresh MexesReady; unstarted orders cancelled, frames completed |
+| AIR converter | Convert, Commander, AirRules | Completed/framed/queued capacity and surplus energy |
+| AIR future bays | PlanAhead, Reserve, Factory, Nano | Persistent bay slots; only factoryId >= 0 contributes demand |
+| TECH future cluster | PlanAhead, OpenCluster, Work, OpenWork, CountTier, SpamClusters, invariants | ahead flag, native factory/turret/exit claims; activation alone grants spending |
+| TECH fortification | `defence.fortify`, `defence.base`, Tick, Work | Site/Piece persistent claims, budget, outstanding tasks, owned asset |
+| Weapon cluster | SortSlots, Site, Order | Walls first; exact reservation and pin respects expansion |
+| First mex | Roster ObserveMex/Encode/Decode/Update, ferry TryCarry | Latched anchor, authenticated allied team, native saved integers |
+| Cargo drop | TryCarry, _StartNext, CFerryTask | Safe drop search, threat limits, refused sites, queued/airborne ownership; bounded wait for arriving carrier |

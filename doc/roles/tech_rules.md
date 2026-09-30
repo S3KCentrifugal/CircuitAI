@@ -64,7 +64,7 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 20 | `energy.float` | mobile | `MetalFloating`, `EnergyAhead`, `EnergyIdle` | best-payback energy anyway |
 | 21 | ~~`lab.t1.spam`~~ | - | - | removed by D-109: spam labs are built forward by the released T1 land constructors (`fwd.t1`) |
 | 22 | `legacy.strategic` | mobile | `ChainInactive` | the role's strategic rungs as they stand (nukes, anti-nuke, gantry, water factories, T2 constructor policy) |
-| 23 | `defence.base` | constructors | `FirstTurretStands` | one light laser and one light AA near the factories |
+| 23 | `defence.base` | constructors | `FirstTurretStands` | D-152 shared fortification fallback |
 | 24 | `order.repair` | constructors | - | native's queued repairs of our own unfinished structures within `ExpOrderRadius` |
 | 25 | `assist.any` | mobile | - | the nearest structure under construction within the builder's assist radius (commander: home radius) |
 | 26 | `guard.factory` | constructors | - | guard the primary T1 lab |
@@ -141,4 +141,11 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: fe7d41b431d2c93e64f1bce9ddc3010e46105fe1; lines: 568 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: 5bd64d2d115a6268cc603d36418336a3e83b8a59; lines: 570 -->
+
+## D-152 fortification rule
+
+`defence.fortify` asks the shared `DoDefence` action after opening/recovery
+ownership rules and before weapon clusters. It allows T2 resource protection immediately; T1 lane work requires base build
+power. It has a separate five-percent income budget and two concurrent orders.
+The existing `defence.base` fallback uses the same controller.

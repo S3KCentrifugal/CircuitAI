@@ -1,5 +1,19 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    // Conversion capacity follows surplus, not a fixed metal-income ceiling.
+    int ConverterTarget(float income, float aircraft, float reserve, float draw)
+    {
+        if (!Valid(income) || !Valid(aircraft) || !Valid(reserve) || !Valid(draw)
+            || draw <= 0.0f || income <= aircraft + reserve) return 0;
+        const float value = (income - aircraft - reserve) / draw;
+        const int whole = int(value);
+        return whole + (value > float(whole) ? 1 : 0);
+    }
+    bool ConverterMayQueue(int target, int planned, int queued, int parallel)
+    {
+        return planned >= 0 && target > planned && queued >= 0 && queued < parallel;
+    }
+
     float Progress(int count, int first, int full)
     {
         if (count <= first || first < 0 || full <= first) return 0.0f;

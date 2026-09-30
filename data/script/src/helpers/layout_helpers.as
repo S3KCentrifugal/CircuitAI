@@ -23,6 +23,14 @@ side vectors as Side() here, so a grid and an offset agree on left and right.
 
 ******************************************************************************/
 namespace LayoutHelpers {
+    AIFloat3 Offset(const AIFloat3 &in p, int f, float across, float along)
+    {
+        if (f == 1) return AIFloat3(p.x + along, 0.0f, p.z - across);
+        if (f == 2) return AIFloat3(p.x - across, 0.0f, p.z - along);
+        if (f == 3) return AIFloat3(p.x - along, 0.0f, p.z + across);
+        return AIFloat3(p.x + across, 0.0f, p.z + along);
+    }
+
 
     const int FACING_SOUTH = 0;
     const int FACING_EAST = 1;

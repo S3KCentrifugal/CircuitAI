@@ -74,13 +74,13 @@ using namespace springai;
 CFerryTask::CFerryTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::FERRY, 1.f)
 		, state_(EState::IDLE)
-		, unloadRetries(0)
-		, landPos(-RgtVector)
 		, cargoId(-1)
 		, dropPos(-RgtVector)
 		, holdPos(-RgtVector)
 		, stateFrame(0)
 		, loadRetries(0)
+		, unloadRetries(0)
+		, landPos(-RgtVector)
 {
 }
 
@@ -203,11 +203,12 @@ AIFloat3 CFerryTask::FindLandingSpot(CCircuitUnit* cargo, const AIFloat3& around
 	// retry (played: `dump retry 9 ... at (11488, 4720)`). Our search: the
 	// cargo's move type reaches it, no structure covers it, and never a spot
 	// the engine already refused.
-	const AIFloat3 spot = circuit->GetTerrainManager()->FindDropSpot(cargo, around, radius, refusedDrops, SQUARE_SIZE * 8);
+	const AIFloat3 spot = circuit->GetTerrainManager()->FindDropSpot(cargo, around, radius, refusedDrops, SQUARE_SIZE * 8, maxSurfaceThreat, maxAirThreat);
 	if (geom::is_valid(spot)) {
 		return spot;
 	}
 	circuit->LOG("FERRY: no standing room for cargo %i within %.0f of (%.0f, %.0f)", cargoId, radius, around.x, around.z);
+	if (maxSurfaceThreat >= 0.f || maxAirThreat >= 0.f) return -RgtVector;
 	return around;
 }
 
@@ -265,6 +266,8 @@ void CFerryTask::Fail(const char* why)
 	// flying it around.
 	if ((state_ != EState::DUMPING) && (transport != nullptr) && (cargo != nullptr) && IsAboard(cargo, transport, frame)) {
 		landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * 3);
+		if (!geom::is_valid(landPos)) landPos = FindLandingSpot(cargo, holdPos, FERRY_LAND_SEARCH * 3);
+		if (!geom::is_valid(landPos)) { Enter(EState::DUMPING); GoTo(transport, holdPos); return; }
 		circuit->LOG("FERRY: run failed (%s) | cargo=%i state=%i; setting it down at (%.0f, %.0f)",
 				why, cargoId, int(state_), landPos.x, landPos.z);
 		TRY_UNIT(circuit, transport,
@@ -300,7 +303,7 @@ void CFerryTask::SetHoldPos(const AIFloat3& pos)
 	}
 }
 
-bool CFerryTask::SetCargo(int id, const AIFloat3& pos)
+bool CFerryTask::SetCargo(int id, const AIFloat3& pos, float surfaceThreat, float airThreat)
 {
 	if ((state_ != EState::IDLE) && (state_ != EState::DONE) && (state_ != EState::FAILED)) {
 		return false;  // a run is already in flight
@@ -310,6 +313,8 @@ bool CFerryTask::SetCargo(int id, const AIFloat3& pos)
 		return false;
 	}
 	cargoId = id;
+	maxSurfaceThreat = surfaceThreat;
+	maxAirThreat = airThreat;
 	dropPos = pos;
 	landPos = -RgtVector;
 	baseLift = -1.f;  // D-112: measured when the load is issued
@@ -399,7 +404,7 @@ void CFerryTask::Update()
 				if (len < 1.f) { dx = 0.f; dz = 1.f; } else { dx /= len; dz /= len; }
 				const AIFloat3 away(cPos.x + dx * 160.f, cPos.y, cPos.z + dz * 160.f);
 				const AIFloat3 out = circuit->GetTerrainManager()->FindDropSpot(cargo, away, 240.f, {}, 0.f);
-				if (geom::is_valid(out)) {
+				if (geom::is_valid(out) && circuit->GetTerrainManager()->CanMoveToPos(cargo->GetArea(), out)) {
 					TRY_UNIT(circuit, cargo,
 						cargo->CmdMoveTo(out, 0, frame + FRAMES_PER_SEC * 20);
 					)
@@ -497,6 +502,7 @@ void CFerryTask::Update()
 				CCircuitUnit* cargo = GetCargo();
 				if (!geom::is_valid(landPos)) {
 					landPos = FindLandingSpot(cargo, dropPos, FERRY_LAND_SEARCH);
+					if (!geom::is_valid(landPos)) { Fail("no safe landing ground"); return; }
 					if (landPos.SqDistance2D(dropPos) > SQUARE(SQUARE_SIZE * 2)) {
 						circuit->LOG("FERRY: drop (%.0f, %.0f) is occupied; landing cargo %i at (%.0f, %.0f)",
 								dropPos.x, dropPos.z, cargoId, landPos.x, landPos.z);
@@ -555,6 +561,7 @@ void CFerryTask::Update()
 					// engine disagreed). Widen the search from where we hover.
 					refusedDrops.push_back(landPos);  // D-091: never this spot again
 					landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * (unloadRetries + 1));
+					if (!geom::is_valid(landPos)) { Fail("no safe retry ground"); return; }
 					dropPos = landPos;
 					circuit->LOG("FERRY: unload retry %i for cargo %i at (%.0f, %.0f)", unloadRetries, cargoId, landPos.x, landPos.z);
 					Enter(EState::TO_DROP);
@@ -581,6 +588,7 @@ void CFerryTask::Update()
 				++unloadRetries;
 				refusedDrops.push_back(landPos);  // D-091
 				landPos = FindLandingSpot(cargo, transport->GetPos(frame), FERRY_LAND_SEARCH * (unloadRetries + 1));
+				if (!geom::is_valid(landPos)) { GoTo(transport, holdPos); Enter(EState::DUMPING); return; }
 				circuit->LOG("FERRY: dump retry %i for cargo %i at (%.0f, %.0f); still lifted, not given", unloadRetries, cargoId, landPos.x, landPos.z);
 				TRY_UNIT(circuit, transport,
 					transport->CmdUnloadUnitsInArea(landPos, FERRY_UNLOAD_RADIUS, 0, frame + FERRY_UNLOAD_TIMEOUT * 2);  // D-110

@@ -8574,3 +8574,102 @@ one.
 - [`known-issues.md`](known-issues.md) — open problems.
 - [`intent.md`](intent.md) — the long-term goals these decisions serve.
 - [`../AGENTS.md`](../AGENTS.md) — the repository map and working rules.
+
+
+## D-152 � Reserve expansion before fortification; AIR mex-first access and first-mex delivery
+
+**Decision.** Implement the owner's [design](air-tech-expansion-plan.md):
+[AIR economy](../data/script/src/manager/air_economy.as),
+[AIR layout](../data/script/src/manager/air_layout.as),
+[AIR build](../data/script/src/roles/air_build.as) and
+[dispatch](../data/script/src/roles/air_rules.as) gate all T2 plants on actual
+mex completion and scale T1 conversion without an income ceiling. Hold six
+complete T2 turret banks plus two T1 sites; count only real factories as
+production capacity. Strict upgrading implies reliance on allied T2 access;
+a solo self-tech exception was rejected because it contradicts the request.
+
+Reuse [TECH's factory planner](../data/script/src/roles/tech_factories.as),
+with a distinct future state, ahead of
+[fortification](../data/script/src/roles/tech_fortifications.as). Existing
+spending rules activate future clusters. `defence.fortify` and early defense
+share the new action; [weapon clusters](../data/script/src/roles/tech_weapons.as)
+order walls first and pin their sites. Reserve exits too; closed asset rings
+were rejected because they trap builders and obstruct upgrades.
+
+[Allied roster](../data/script/src/manager/roster.as) appends the first completed
+mex anchor compatibly. [Ferry policy](../data/script/src/manager/ferry.as)
+uses [native free-ground search](../src/circuit/terrain/TerrainManager.cpp)
+with script-selected threat limits; [ferry task](../src/circuit/task/fighter/FerryTask.cpp)
+revalidates at landing. A no-safe-site result retains ownership for retry.
+The anchor stays latched through mex loss and upgrades. This applies to
+controlled AI peers; the protocol cannot report human construction.
+
+**Invariant.** INV-083 forbids premature AIR T2 plant orders; INV-084 requires
+complete twenty-turret speculative banks; INV-085 forbids fortification in
+friendly lanes; INV-086 forbids a ferry destination over its threat limits.
+The [actor matrix](actor-matrix.md) names every new actor.
+
+**Status.** Built, Checked, Played with limits. [Measured results](air-tech-expansion-results.md)
+retain every failed and successful scenario. 78 executable pure policy tests,
+native geometry/ranking checks, API parity, role docs and invariant-practice
+checks pass. Mixed TECH reports still fail global invariants (KI-427); fusion
+misses twenty minutes in the measured natural sample (KI-436). Lifecycle and
+contested-landing coverage is incomplete (KI-439).
+
+D-152 additional invariant: INV-087 distinguishes a future reservation from an active construction project. Role re-entry discards invalid future IDs and resets fortification caches before adopting native saved claims.
+
+**Further decisions.** A future reservation requires both the caller's
+`planNew` authorization and `MayPlan`; treating it as an already-funded project
+was rejected. Idle TECH air builders share the finite fortification/weapon
+plans instead of keeping the old scattering fallback. Resource protection can
+start with T2 access even before a base turret stands. Empty geo perimeters
+retry at wider radii rather than being marked protected forever. A ferry landing
+checks the cargo movement class at the destination, not connectivity from the
+origin; walking off its factory pad retains a separate same-area check.
+The engine's 256-elmo area unload remains (D-110); nearest sampled safe ground
+is not an exact-coordinate landing guarantee.
+
+**Supporting files.** Configuration and shared arithmetic:
+[settings](../data/script/src/global.as), [weapons profile](../data/config/weapons.json),
+[layout offsets](../data/script/src/helpers/layout_helpers.as),
+[production math](../data/script/src/helpers/production_math.as),
+[unit cases](../tests/production_math_tests.as).
+TECH wiring: [role](../data/script/src/roles/tech.as),
+[actions](../data/script/src/roles/tech_build.as), [rules](../data/script/src/roles/tech_rules.as),
+[forward filters](../data/script/src/roles/tech_forward.as),
+[invariant actor](../data/script/src/manager/invariants.as), [promises](invariants.md).
+Native contract: [terrain header](../src/circuit/terrain/TerrainManager.h),
+[ferry header](../src/circuit/task/fighter/FerryTask.h),
+[registration](../src/circuit/script/InitScript.cpp), [API reference](angelscript-references.md),
+[protocol](transport-ferry.md).
+Regression tooling: [expansion checks](../tools/playtest/checks/expansion.json),
+[wall checks](../tools/playtest/checks/fortification.json),
+[observer](../tools/playtest/widgets/expansion_watch.lua),
+[controlled assets](../tools/playtest/widgets/fortification_fixture.lua).
+Reviewed role references: [AIR](roles/air.md), [actions](roles/air_build.md),
+[sequence](roles/air_rules.md), [TECH](roles/tech.md), [build](roles/tech_build.md),
+[factories](roles/tech_factories.md), [forward](roles/tech_forward.md),
+[fortification](roles/tech_fortifications.md), [rules](roles/tech_rules.md),
+[weapons](roles/tech_weapons.md). [Generated roster/config report](knowledge/barb-unit-config.md)
+and [known issues](known-issues.md) updated.
+
+D-152 delivery-race correction: the final natural regression exposed a gift
+created before TECH's +20-income transport request. `TryCarry` formerly
+returned false, giving it at base 2,219 elmos from AIR's first mex. With an
+allied AIR provider, it now requests and queues the constructor until the
+carrier/task exists. Existing `ferry.cargo` owns that wait; `AwaitTransportSeconds`
+(120) bounds failure to obtain a carrier. No-provider and expired-arrival cases
+retain walking fallback. The expansion observer explicitly expects team 0's
+handover within 999 elmos in this Supreme scenario; INV-086 still checks the
+chosen safe point. Actual queued and delivered positions are recorded in the
+final evidence, rather than accepting a log of the chosen target alone.
+
+Final verification: the 45-minute supplied-economy capacity game passes with
+eight completed T2 plants, full twenty-nano support banks and a bomber wave.
+The final natural game physically delivers both queued gifts near their first
+mexes (182/216 elmos) and starts its T2 air plant only after all six upgrades.
+Its fusion is still pending at 25 minutes; no 20-minute success is claimed.
+The [results](air-tech-expansion-results.md) retain strict overall TECH invariant
+failures and unplayed lifecycle limits. The matching DLL, symbols and complete
+current data tree are published to the mandatory engine build output; no live
+BAR installation is written and the commit stays local as requested.

@@ -1,0 +1,15 @@
+{
+  "stop_minute": 15,
+  "expect": [
+    {"key":"future-gantry","pattern":"\\[TECH\\]\\[Expansion\\] held armshltx.*turrets=50","by_minute":5,"scope":"any"},
+    {"key":"geo-plan","pattern":"\\[TECH\\]\\[Fortify\\] protect armgeo.*pieces=[1-9]","by_minute":5,"scope":"any"},
+    {"key":"geo-wall","pattern":"\\[FortFixture\\] finished wall near armgeo","by_minute":15,"scope":"any"},
+    {"key":"mex-wall","pattern":"\\[FortFixture\\] finished wall near armmoho","by_minute":15,"scope":"any"},
+    {"key":"t2-line","pattern":"\\[TECH\\]\\[Fortify\\] planned fort.lane.t2","by_minute":5,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

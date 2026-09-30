@@ -2903,6 +2903,14 @@ as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
 
 ### KI-436 â€” AIR's natural reactor benchmark remains late
 
+**D-152 evidence.** A natural AIR/TECH game completes the first Armada fusion
+at 21:04.6, after all six mex upgrades; the T2 air plant starts at 21:18.6.
+The strict new mex-before-air-lab rule relies on allied advanced constructor
+access. The final delivery-corrected sample upgrades all six mexes by 16:00
+and starts its T2 plant at 23:14, but fusion is still pending at 25:00. These
+games do not meet the 20-minute aim. See
+[D-152 results](air-tech-expansion-results.md).
+
 **D-150 verification.** The final scout/three-constructor opening and shared
 cross-tier fighter quota finish fusion at Armada 20:23.4, Cortex 20:06.7 and
 Legion 20:22.6 in 25-minute natural Supreme games. Each reactor starts only
@@ -3013,6 +3021,34 @@ absolute `--dir` as the documented workaround for now.
 and write directory as its absolute equivalent when engine cwd differs from
 the repository. Verify both launch and targeted stop without touching a live
 game. See [D-151 evidence](air-idle-factory.md).
+
+### KI-439 — D-152 lifecycle and contested landing verification gaps
+
+**Severity:** Medium verification gap. **Location:** `AirLayout::PlanAhead`,
+`TechFactories::PlanAhead`, `TechFortifications`, `Team::Roster` and native
+`FindDropSpot` / `CFerryTask`.
+
+**Problem.** Natural and supplied-economy Supreme games exercise the new plans,
+first-mex delivery and resource walls. Native saved keys exist, but D-152 has
+not played save/reload of all future claims and first-mex anchors, all runtime
+role switches, cramped maps, disconnected-island deliveries, or the no-safe-site
+and contested emergency-unload paths. The cross-island movement check is fixed
+and built; its island behavior is not yet played. Terrain can leave partial
+perimeters, especially when friendly lanes cross an asset.
+
+**Proposed solution.** Add isolated save/reload and role-switch fixtures that
+compare reservation IDs, counts and activation before/after. On an island map,
+fly a land constructor across disconnected areas, then force observed air and
+surface threat at the target and verify queue/landing retries preserve the cargo.
+Observe actual unload positions, since Recoil may select a point within its
+256-elmo area. Sample tight maps and log skipped perimeter segments; do not fill
+traffic gaps or discard factory reservations merely to close walls.
+
+**Verification.** No duplicate claims or speculative construction after reload;
+old/new roster messages and missing anchors handled; safe retries retain cargo;
+landing permits upgrade work on the destination island. Preserve the strict
+invariant forbid. See [D-152 results](air-tech-expansion-results.md) and
+[decision](decisions.md#d-152--reserve-expansion-before-fortification-air-mex-first-access-and-first-mex-delivery).
 
 ## Indexed elsewhere
 

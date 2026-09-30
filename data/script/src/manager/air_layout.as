@@ -45,10 +45,7 @@ namespace AirLayout {
 
     AIFloat3 Offset(const AIFloat3 &in p, int f, float across, float along)
     {
-        if (f == 1) return AIFloat3(p.x + along, 0.0f, p.z - across);
-        if (f == 2) return AIFloat3(p.x - across, 0.0f, p.z - along);
-        if (f == 3) return AIFloat3(p.x - along, 0.0f, p.z + across);
-        return AIFloat3(p.x + across, 0.0f, p.z + along);
+        return LayoutHelpers::Offset(p, f, across, along);
     }
     string Key(int i) { return "air.bay." + i; }
     void Save(Bay@ b)
@@ -100,7 +97,7 @@ namespace AirLayout {
         GenericHelpers::LogUtil("[AIR][Layout] enabled; adopted " + bays.length() + " bays, " + windClusters.length() + " wind clusters", 1);
     }
     // A compound plan is synchronous: publish only after every reservation succeeds.
-    Bay@ Reserve(CCircuitDef@ plant, const AIFloat3 &in anchor)
+    Bay@ Reserve(CCircuitDef@ plant, const AIFloat3 &in anchor, bool complete = false)
     {
         if (!enabled || plant is null || ai.frame < searchAfter) return null;
         CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
@@ -134,7 +131,7 @@ namespace AirLayout {
                 }
                 // A cramped site can start with a partial bank. The capacity
                 // calculation uses the slots actually published, never phantom BP.
-                if (int(slots.length()) < AiMin(2, wanted)) {
+                if (int(slots.length()) < (complete ? wanted : AiMin(2, wanted))) {
                     for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
                     aiTerrainMgr.ReleasePersistentBuilding(id);
                     continue;
@@ -149,6 +146,24 @@ namespace AirLayout {
         }
         searchAfter = ai.frame + 10 * SECOND;
         return null;
+    }
+    int aheadFrame = -100000;
+    void PlanAhead()
+    {
+        if (!enabled || bays.length() == 0 || ai.frame - aheadFrame < SECOND) return;
+        aheadFrame = ai.frame;
+        const string side = Global::AISettings::Side;
+        const array<string> names = {UnitHelpers::GetT2AirPlantForSide(side), UnitHelpers::GetT1AirPlantForSide(side)};
+        const array<int> wants = {AiMin(Global::RoleSettings::Air::PlannedT2Bays, Global::RoleSettings::Air::MaxProductionBays), Global::RoleSettings::Air::PlannedT1Bays};
+        for (uint t = 0; t < names.length(); ++t) {
+            int have = 0;
+            for (uint i = 0; i < bays.length(); ++i) if (bays[i].defName == names[t]) ++have;
+            if (have >= wants[t]) continue;
+            Bay@ b = Reserve(ai.GetCircuitDef(names[t]), Global::Map::StartPos, true);
+            if (b !is null && t == 0 && b.nanos.length() != 20)
+                Invariants::Violation("INV-084", b.key, "speculative T2 air bay lacks twenty turret slots");
+            return; // one compound search per second
+        }
     }
     void AdoptSupport(Bay@ bay)
     {

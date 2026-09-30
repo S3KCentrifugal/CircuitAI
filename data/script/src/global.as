@@ -102,6 +102,10 @@ namespace Global {
     // lab; TECH uses it to fly donated T2 constructors to their recipients.
     namespace Ferry {
         float DropPullback = 300.0f;
+        float SafeDropRadius = 900.0f;
+        float DropSurfaceThreat = 1.0f;
+        float DropAirThreat = 1.0f;
+        int AwaitTransportSeconds = 120;
         float ParkDistance = 450.0f;      // D-112: gifts wait this far behind our start (away from the map centre)
         float ParkSpacing = 80.0f;        // D-112: gifts park this far apart
         int ParkWaitSeconds = 900;        // D-112: a gift's park (renewed at every ask)
@@ -947,6 +951,11 @@ namespace Global {
             // AIR owns these settings and all air.* reservations. TECH never reads them.
             bool ExperimentalBuild = true;
             int MaxProductionBays = 12;
+            int PlannedT2Bays = 6;
+            int PlannedT1Bays = 2;
+            int ConverterParallel = 3;
+            float ConverterDraw = 70.0f;
+            float ConverterEnergyReserve = 150.0f;
             int T2NanoSoftLimit = 20;
             int T1NanoLimit = 5;
             int MaxT1EconomyBuilders = 10;

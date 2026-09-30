@@ -576,3 +576,17 @@ own porc still owns the ground defence.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
 <!-- source: data/script/src/roles/air.as; blob: 7b523605c3fcd28d9df7d8a59d76bf108662f3c1; lines: 1269 -->
+
+## D-152 expansion and access
+
+AIR holds two T1 sites plus six T2 sites with complete twenty-turret banks
+before building them. Counts and production support use actual factories.
+T1 conversion follows surplus energy until every owned mex is upgraded; T2
+labs and reactors wait for that same condition. AIR continues requesting
+TECH's T2 constructor; no solo self-tech exception bypasses upgrades. See
+[design](../air-tech-expansion-plan.md).
+
+D-152 AIR settings: `PlannedT2Bays=6`, `PlannedT1Bays=2`,
+`ConverterParallel=3`, `ConverterDraw=70`, `ConverterEnergyReserve=150`.
+The existing `MaxProductionBays=12` still bounds actual production expansion;
+preplanned sites neither count as active plants nor authorize spending.

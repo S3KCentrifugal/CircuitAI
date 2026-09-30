@@ -478,7 +478,7 @@ namespace Invariants {
         // FrontClusterOpenSeconds of being planned
         for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
             TechFactories::Cluster@ s = TechFactories::clusters[i];
-            if (s.tier < 2 || s.labRes < 0 || s.plannedFrame < 0 || TechFactories::LabAt(s) !is null) continue;
+            if (s.ahead || s.tier < 2 || s.labRes < 0 || s.plannedFrame < 0 || TechFactories::LabAt(s) !is null) continue;
             if (ai.frame - s.plannedFrame >= Global::RoleSettings::Tech::FrontClusterOpenSeconds * SECOND && ai.frame - s.invOpenLog >= 120 * SECOND) {
                 s.invOpenLog = ai.frame;
                 Violation("INV-046", "front", "front cluster " + (i + 1) + " (" + s.defName + ") planned " + int((ai.frame - s.plannedFrame) / SECOND)

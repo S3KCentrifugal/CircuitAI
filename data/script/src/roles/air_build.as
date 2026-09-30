@@ -20,8 +20,8 @@ namespace AirBuild {
         array<IUnitTask@> snapshot = projects;
         for (uint i = 0; i < snapshot.length(); ++i) {
             IBuilderTask@ t = cast<IBuilderTask>(snapshot[i]);
-            if (t !is null && t.target is null && IsReactor(t.buildDef) && !AirEconomy::MexesReady()) {
-                GenericHelpers::LogUtil("[AIR][Fusion] cancel unstarted reactor: mex upgrades pending", 1);
+            if (t !is null && t.target is null && RequiresMexes(t.buildDef) && !AirEconomy::MexesReady()) {
+                GenericHelpers::LogUtil("[AIR][Fusion] cancel unstarted advanced building: mex upgrades pending", 1);
                 aiBuilderMgr.AbortTask(snapshot[i]);
             }
         }
@@ -72,6 +72,10 @@ namespace AirBuild {
             Invariants::Violation("INV-079", "AIR", "commander dispatched to mex work after factory exists");
         if (build !is null && build.target is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady())
             Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
+        if (build !is null && build.GetBuildType() == int(Task::BuildType::FACTORY)
+            && build.target is null && build.buildDef !is null && UnitHelpers::IsT2AircraftPlant(build.buildDef.GetName())
+            && !AirEconomy::MexesReady())
+            Invariants::Violation("INV-083", "AIR", "T2 air lab ordered before owned mex upgrades complete");
         // Repair tasks also carry the target's definition, but own no building slot.
         if (build !is null && build.GetBuildType() == int(Task::BuildType::ENERGY) && build.buildDef !is null && build.buildDef.GetName()
             == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(build.buildDef.GetName()))) {
@@ -110,7 +114,7 @@ namespace AirBuild {
         for (uint i = 0; i < (energyOnly ? 1 : kinds.length()); ++i) {
             IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, kinds[i]);
             IBuilderTask@ build = cast<IBuilderTask>(t);
-            if (build !is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady()) continue;
+            if (build !is null && build.target is null && RequiresMexes(build.buildDef) && !AirEconomy::MexesReady()) continue;
             if (t !is null && projects.findByRef(t) >= 0) return t;
         }
         return null;
@@ -176,6 +180,8 @@ namespace AirBuild {
                 if (t !is null) return Record(t, "commander.energy.local", u);
             }
             if (!opening) {
+                @t = Convert(u);
+                if (t !is null) return Record(t, "commander.convert", u);
                 @t = Assist(u, false, null, true);
                 if (t !is null) return Record(t, "commander.local.assist", u);
             }
@@ -204,6 +210,7 @@ namespace AirBuild {
         const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
         if (!advanced && count > 0) return null;
         if (advanced) {
+            if (!AirEconomy::MexesReady()) return null;
             if (count >= Global::RoleSettings::Air::MaxProductionBays) return null;
             if (count == 0 && !AirEconomy::Transition(d)) return null;
             if (count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, Global::RoleSettings::Air::MaxProductionBays,
@@ -211,7 +218,7 @@ namespace AirBuild {
                 AirEconomy::bankM, d.costM * 0.6f))) return null;
             // Fill useful existing support first. Twenty is a soft comparison threshold.
             for (uint b = 0; count > 0 && b < AirLayout::bays.length(); ++b)
-                if (AirLayout::bays[b].defName == name && b < AirEconomy::nanoCount.length()
+                if (AirLayout::bays[b].factoryId >= 0 && AirLayout::bays[b].defName == name && b < AirEconomy::nanoCount.length()
                     && AirEconomy::nanoCount[b] + AirEconomy::nanoFuture[b] < AirEconomy::NanoTarget(b)) return null;
         }
         AirLayout::Bay@ bay = null;
@@ -221,6 +228,23 @@ namespace AirBuild {
         if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame));
         if (bay is null) return null;
         return AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
+    }
+    bool RequiresMexes(CCircuitDef@ d)
+    {
+        return d !is null && (IsReactor(d) || UnitHelpers::IsT2AircraftPlant(d.GetName()));
+    }
+    IUnitTask@ Convert(CCircuitUnit@ u)
+    {
+        if (AirEconomy::recovery || AirEconomy::MexesReady()
+            || AirEconomy::bankE < aiEconomyMgr.energy.storage * 0.75f) return null;
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
+        if (!Can(u, d)) return null;
+        const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), d);
+        const int target = ProductionMath::ConverterTarget(AirEconomy::energy, AirEconomy::demandE,
+            Global::RoleSettings::Air::ConverterEnergyReserve, Global::RoleSettings::Air::ConverterDraw);
+        if (!ProductionMath::ConverterMayQueue(target, d.count + queued, queued,
+                Global::RoleSettings::Air::ConverterParallel)) return null;
+        return AirLayout::Place(u, d, Task::BuildType::CONVERT, Task::Priority::NORMAL);
     }
     bool IsReactor(CCircuitDef@ d)
     {

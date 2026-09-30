@@ -490,60 +490,13 @@ namespace TechBuild {
         return Wait(3 * SECOND);
     }
 
-    // D-123 (owner: if air constructors get stuck or have nothing to do, never let
-    // them do nothing; always fall back, at the lowest priority, to defences). The
-    // mex clusters' long-range AA and flak first (D-109's work), then a ring of
-    // defences round the base toward the front, T2 anti-ground turrets and flak in
-    // turn (T1 air constructors: light lasers and AA), AirDefenceMax of each at most.
-    // TECH's start caps hold land defences at 0: Buildable lifts one at a time.
-    int airDefenceRing = 0;
-    int airDefenceLog = -100000;
+    // D-152: idle air builders share the reserved wall/weapon plans. The old
+    // expanding spiral consumed future economy and factory ground.
     IUnitTask@ AirDefence(CCircuitUnit@ u)
     {
         if (u is null || u.circuitDef is null || !UnitHelpers::IsAirConstructor(u.circuitDef)) return null;
-        IUnitTask@ t = TechForward::DefendMexes(u);
-        if (t !is null) return t;
-        const string side = Global::AISettings::Side;
-        // played: at +1000 metal twelve of each of four kinds were built in minutes
-        // and the constructors waited again: six kinds, AirDefenceMax (60) of each
-        array<CCircuitDef@> defs = {
-            ai.GetCircuitDef(UnitHelpers::GetStaticT2MediumTurretNameForSide(side)),
-            ai.GetCircuitDef(UnitHelpers::GetStaticT2AAFlakNameForSide(side)),
-            ai.GetCircuitDef(UnitHelpers::GetStaticT2AARangeNameForSide(side)),
-            ai.GetCircuitDef(UnitHelpers::GetStaticT2ArtilleryNameForSide(side)),
-            ai.GetCircuitDef(UnitHelpers::GetStaticLLTNameForSide(side)),
-            ai.GetCircuitDef(UnitHelpers::GetStaticAAHeavyNameForSide(side))
-        };
-        const AIFloat3 base = Layout::BaseCentre();
-        const AIFloat3 front = Layout::FrontTarget();
-        float dx = front.x - base.x, dz = front.z - base.z;
-        float len = sqrt(dx * dx + dz * dz);
-        if (len < 1.0f) { dx = 1.0f; dz = 0.0f; len = 1.0f; }
-        dx /= len; dz /= len;
-        for (int k = 0; k < 24; ++k) {
-            const int slot = airDefenceRing + k;
-            CCircuitDef@ d = defs[slot % defs.length()];
-            if (d is null || d.count >= Global::RoleSettings::Tech::AirDefenceMax) continue;
-            if (!TechForward::Buildable(u, d)) continue;
-            // round the base, fanned about the front: 0, +1, -1, +2, -2 ... steps of
-            // AirDefenceArc radians, further out every AirDefenceRingSize places
-            const int place = slot / int(defs.length());
-            const int side2 = ((place % Global::RoleSettings::Tech::AirDefenceRingSize) + 1) / 2 * (((place % 2) == 1) ? 1 : -1);
-            const float ang = float(side2) * Global::RoleSettings::Tech::AirDefenceArc;
-            const float r = Global::RoleSettings::Tech::AirDefenceRadius + Global::RoleSettings::Tech::AirDefenceRingStep * float(place / Global::RoleSettings::Tech::AirDefenceRingSize);
-            const float ca = cos(ang), sa = sin(ang);
-            const AIFloat3 p(base.x + (dx * ca - dz * sa) * r, 0.0f, base.z + (dx * sa + dz * ca) * r);
-            if (p.x < 64.0f || p.z < 64.0f || p.x > float(AiTerrainWidth()) - 64.0f || p.z > float(AiTerrainHeight()) - 64.0f) continue;
-            IUnitTask@ dt = TechForward::OrderDefence(u, d, p, Global::RoleSettings::Tech::AirDefenceShake, "nothing else to do: the base's defence ring (D-123)");
-            if (dt is null) continue;
-            airDefenceRing = slot + 1;
-            return dt;
-        }
-        if (ai.frame - airDefenceLog > 60 * SECOND) {
-            airDefenceLog = ai.frame;
-            GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + ": no defence left to build (D-123)", 1);
-        }
-        return null;
+        IUnitTask@ t = TechFortifications::Work(u);
+        return t !is null ? t : TechWeapons::Work(u);
     }
     // the rest of the T2 air constructors: converters while energy overflows; the
     // advanced fusion going up the moment the converters cannot stay on
@@ -817,26 +770,9 @@ namespace TechBuild {
     // factories, packed by native nearest that anchor outside the planned
     // zones. Nothing more: TECH is a back-line role and the rest is the
     // team's.
-    array<int> defenceOrders = { 0, 0 };   // D-075: orders per def; native refusing the site ExpDefenceMaxOrders times ends the rung
     IUnitTask@ Defence(CCircuitUnit@ u)
     {
-        if (aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius) <= 0.0f)
-            return null;   // the first turret first
-        const string side = Global::AISettings::Side;
-        array<string> names = { UnitHelpers::GetStaticLLTNameForSide(side), UnitHelpers::GetStaticAALightNameForSide(side) };
-        array<int> wanted = { Global::RoleSettings::Tech::ExpDefenceLLT, Global::RoleSettings::Tech::ExpDefenceAA };
-        for (uint i = 0; i < names.length(); ++i) {
-            CCircuitDef@ def = ai.GetCircuitDef(names[i]);
-            if (def is null || !def.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(def)) continue;
-            if (def.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), def) >= wanted[i]) continue;
-            if (defenceOrders[i] >= Global::RoleSettings::Tech::ExpDefenceMaxOrders) continue;
-            AIFloat3 anchor = Layout::factoryCentre;
-            if (anchor.x < 0.0f) anchor = Global::Map::StartPos;
-            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::NORMAL, def, anchor, Global::RoleSettings::Tech::ExpDefenceRadius, true, 120 * SECOND));
-            if (t !is null) { defenceOrders[i]++; GenericHelpers::LogUtil("[TECH][Build] base defence: " + names[i] + " near the factories (order " + defenceOrders[i] + " of " + Global::RoleSettings::Tech::ExpDefenceMaxOrders + ")", 1); }
-            return t;
-        }
-        return null;
+        return TechFortifications::Work(u);
     }
 
     // D-077 (owner's rule): winds and solars are reclaimed once a fusion

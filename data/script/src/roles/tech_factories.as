@@ -70,6 +70,7 @@ namespace TechFactories {
         int labRes = -1;             // the factory's reservation (forgotten by native once built)
         AIFloat3 pos;                // the factory's site
         int facing = 0;
+        int exitZone = 0;
         int nanoGroup = 0;           // its turret block
         array<AIFloat3> turretPos;   // the turret slots ordered so far (script's record: built slots are forgotten)
         int slots = 0;               // the block's size
@@ -81,6 +82,7 @@ namespace TechFactories {
         bool labSeen = false;        // its factory (a frame or finished) seen (INV-045)
         int turretFrame = -1;        // the last turret order or frame seen
         int plannedFrame = -1;       // INV-046
+        bool ahead = false;          // reserved ground only, no spending authority
         bool built = false;          // its factory stood once: native forgot labRes, a rebuild re-reserves
         IUnitTask@ labTask;          // the factory's order while it lives (builders join it)
         Row@ row;                    // D-117: a T1 spam lab's row
@@ -133,7 +135,7 @@ namespace TechFactories {
     {
         if (!Active() || AdvancedLabAny() || AdvancedLabDef() is null) return false;
         for (uint i = 0; i < clusters.length(); ++i)
-            if (clusters[i].tier == 2 && clusters[i].labRes >= 0 && LabAt(clusters[i]) is null) return false;   // one open already: OpenAbove carries it
+            if (!clusters[i].ahead && clusters[i].tier == 2 && clusters[i].labRes >= 0 && LabAt(clusters[i]) is null) return false;   // one open already: OpenAbove carries it
         return true;
     }
 
@@ -220,7 +222,7 @@ namespace TechFactories {
     int CountTier(int tier)
     {
         int n = 0;
-        for (uint i = 0; i < clusters.length(); ++i) if (clusters[i].tier == tier) ++n;
+        for (uint i = 0; i < clusters.length(); ++i) if (!clusters[i].ahead && clusters[i].tier == tier) ++n;
         return n;
     }
 
@@ -423,7 +425,7 @@ namespace TechFactories {
     // nearer than the furthest cluster), where the cluster fits: along the line
     // from the home centre to the front, FrontShareStep at a time, and across it
     // at each step; roomy spots first (away from other buildings), then any
-    Cluster@ Plan(CCircuitDef@ lab)
+    Cluster@ Plan(CCircuitDef@ lab, bool ahead = false)
     {
         CCircuitDef@ nano = Nano();
         if (lab is null || nano is null) return null;
@@ -432,7 +434,7 @@ namespace TechFactories {
         const int tier = TierOf(lab.GetName());
         int cols, rows;
         TurretBlock(tier, cols, rows);
-        if (tier == 1) {   // D-117: side by side in a row first
+        if (tier == 1 && !ahead) {   // D-117: side by side in a row first
             Cluster@ joined = ExtendRow(lab, nano);
             if (joined !is null) return joined;
         }
@@ -489,7 +491,7 @@ namespace TechFactories {
                         }
                     }
                     Cluster@ c = NewCluster(lab, tier, id, lp, facing, g, cols * rows, s);
-                    if (tier >= 3) Builder::MarkGantryEnqueued();
+                    if (tier >= 3 && !ahead) Builder::MarkGantryEnqueued();
                     if (tier == 1) {
                         Row@ r = Row();
                         r.origin = lp;
@@ -502,7 +504,7 @@ namespace TechFactories {
                         GenericHelpers::LogUtil("[TECH][Factories] spam row " + spamRows.length() + " begins; T3 lanes: "
                             + ((laneL > 0) ? "left" : "") + ((laneL > 0 && laneR > 0) ? " and " : "") + ((laneR > 0) ? "right" : "") + " (D-117)", 1);
                     }
-                    if (s > reachShare) reachShare = s;
+                    if (!ahead && s > reachShare) reachShare = s;
                     GenericHelpers::LogUtil("[TECH][Factories] T" + tier + " cluster " + clusters.length() + " for " + lab.GetName() + " at (" + int(lp.x) + ", " + int(lp.z)
                         + "), " + int(s * 100.0f) + "% toward the front, " + (cols * rows) + " turrets behind it" + (roomy ? "" : " (close to other buildings: no roomier spot)") + " (D-114)", 1);
                     return c;
@@ -541,7 +543,19 @@ namespace TechFactories {
     {
         for (uint i = 0; i < clusters.length(); ++i) {
             Cluster@ c = clusters[i];
-            if (c.defName == def.GetName() && LabAt(c) is null && c.labRes >= 0) return c;
+            if (c.defName == def.GetName() && LabAt(c) is null && c.labRes >= 0) {
+                if (c.ahead) {
+                    if (!planNew || !MayPlan(def)) continue;
+                    c.ahead = false;
+                    c.plannedFrame = ai.frame;
+                    if (c.share > reachShare) reachShare = c.share;
+                    if (c.tier >= 3) Builder::MarkGantryEnqueued();
+                    aiTerrainMgr.SetLayoutInt("tech.ahead." + c.defName + ".slot", -1);
+                    aiTerrainMgr.SetLayoutInt("tech.ahead." + c.defName + ".exit", 0);
+                    GenericHelpers::LogUtil("[TECH][Expansion] activated " + c.defName + " slot=" + c.labRes, 1);
+                }
+                return c;
+            }
         }
         return planNew ? Plan(def) : null;
     }
@@ -646,7 +660,7 @@ namespace TechFactories {
     {
         if (tier <= 2 && NeedAdvancedLab()) return true;
         for (uint i = 0; i < clusters.length(); ++i)
-            if (clusters[i].tier >= tier && clusters[i].labRes >= 0 && LabAt(clusters[i]) is null) return true;
+            if (!clusters[i].ahead && clusters[i].tier >= tier && clusters[i].labRes >= 0 && LabAt(clusters[i]) is null) return true;
         return false;
     }
     // A standing factory's lost turret is rebuilt (played: INV-038, a cluster 56%
@@ -685,7 +699,7 @@ namespace TechFactories {
         }
         for (uint i = 0; i < clusters.length(); ++i) {
             Cluster@ c = clusters[i];
-            if (c.tier < 2 || c.labRes < 0 || LabAt(c) !is null) continue;
+            if (c.ahead || c.tier < 2 || c.labRes < 0 || LabAt(c) !is null) continue;
             IUnitTask@ t = Work(ai.GetCircuitDef(c.defName), u, false);
             if (t !is null) return t;
         }
@@ -794,6 +808,61 @@ namespace TechFactories {
     }
     const int FocusFreshSeconds = 30;
 
+    int aheadTry = -100000;
+    void PlanAhead()
+    {
+        if (!Global::RoleSettings::Tech::ExperimentalBuild || !aiTerrainMgr.IsLayoutEnabled()
+            || ai.frame - aheadTry < 5 * SECOND) return;
+        aheadTry = ai.frame;
+        const string side = Global::AISettings::Side;
+        array<string> names = {UnitHelpers::GetT1BotLabForSide(side), UnitHelpers::GetT2BotLabForSide(side), UnitHelpers::GetLandGantryForSide(side)};
+        for (uint n = 0; n < names.length(); ++n) {
+            bool held = false;
+            for (uint i = 0; i < clusters.length(); ++i)
+                if (clusters[i].ahead && clusters[i].defName == names[n] && clusters[i].labRes >= 0) {
+                    if (aiTerrainMgr.GetReservationState(clusters[i].labRes) >= 0) held = true;
+                    else clusters[i].labRes = -1; // role switch reset the native registry
+                    if (clusters[i].labTask !is null || clusters[i].turretFrame >= 0)
+                        Invariants::Violation("INV-087", names[n], "future factory reservation acquired active construction work");
+                }
+            if (held) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(names[n]);
+            if (d is null) continue;
+            const string key = "tech.ahead." + names[n];
+            const int saved = aiTerrainMgr.GetLayoutInt(key + ".slot", -1);
+            Cluster@ c = null;
+            if (saved >= 0 && aiTerrainMgr.GetReservationState(saved) >= 0) {
+                @c = NewCluster(d, TierOf(names[n]), saved, aiTerrainMgr.GetReservationPos(saved),
+                    aiTerrainMgr.GetReservationFacing(saved), aiTerrainMgr.GetLayoutInt(key + ".group", 0),
+                    aiTerrainMgr.GetLayoutInt(key + ".count", 0), float(aiTerrainMgr.GetLayoutInt(key + ".share", 0)) / 1000.0f);
+                if (c.tier == 1) {
+                    Row r; r.origin = c.pos; r.facing = c.facing;
+                    r.laneL = aiTerrainMgr.GetLayoutInt(key + ".left", 0); r.laneR = aiTerrainMgr.GetLayoutInt(key + ".right", 0);
+                    r.labs.insertLast(c); @c.row = r; spamRows.insertLast(r);
+                }
+            } else @c = Plan(d, true);
+            if (c is null) continue;
+            c.ahead = true;
+            c.exitZone = aiTerrainMgr.GetLayoutInt(key + ".exit", 0);
+            if (c.exitZone <= 0) {
+                const float depth = float(Layout::Along(d, c.facing)) * SQUARE_SIZE;
+                const AIFloat3 centre = c.pos + Layout::Fwd(c.facing) * (depth + 176.0f);
+                c.exitZone = aiTerrainMgr.ReserveZone(centre, c.facing,
+                    float(Layout::Across(d, c.facing)) * SQUARE_SIZE + 32.0f, 160.0f, true);
+                aiTerrainMgr.SetLayoutInt(key + ".exit", c.exitZone);
+            }
+            aiTerrainMgr.SetLayoutInt(key + ".slot", c.labRes);
+            aiTerrainMgr.SetLayoutInt(key + ".group", c.nanoGroup);
+            aiTerrainMgr.SetLayoutInt(key + ".count", c.slots);
+            aiTerrainMgr.SetLayoutInt(key + ".share", int(c.share * 1000.0f));
+            if (c.row !is null) {
+                aiTerrainMgr.SetLayoutInt(key + ".left", c.row.laneL);
+                aiTerrainMgr.SetLayoutInt(key + ".right", c.row.laneR);
+            }
+            GenericHelpers::LogUtil("[TECH][Expansion] held " + names[n] + " slot=" + c.labRes + " turrets=" + c.slots, 1);
+            return;
+        }
+    }
     // ---------------------------------------------------------------- the base's land factories
 
     // Owner's rule: with FrontReclaimAtCount land factories on the map, the land

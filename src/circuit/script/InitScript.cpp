@@ -241,6 +241,12 @@ static int CTerrainManager_ReservePersistentBuilding(CTerrainManager* terrainMgr
 	return terrainMgr->ReservePersistentBuilding(const_cast<CCircuitDef*>(cdef), pos, facing);
 }
 
+static AIFloat3 CTerrainManager_FindSafeDropSpot(CTerrainManager* mgr, CCircuitUnit* cargo,
+        const AIFloat3& at, float radius, float surface, float air)
+{
+    return mgr->FindDropSpot(cargo, at, radius, {}, 0.f, surface, air);
+}
+
 // Owned IDs only: scripts resolve each ID at use time, never retain borrowed units.
 static CScriptArray* CCircuitAI_GetOwnedUnitIds(CCircuitAI* circuit)
 {
@@ -1072,6 +1078,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "float GetLandPercent() const", asMETHOD(CTerrainManager, GetLandPercent), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float SetAllyZoneRange(float)", asMETHOD(CTerrainManager, SetAllyZoneRange), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainWidth() const", asFUNCTION(CTerrainManager_GetTerrainWidth), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 FindSafeDropSpot(CCircuitUnit@, const AIFloat3& in, float radius, float surfaceThreat, float airThreat)", asFUNCTION(CTerrainManager_FindSafeDropSpot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	// Reservations: doc/base-layout.md
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveBuilding(const CCircuitDef@, const AIFloat3& in, int facing, int ttlFrames = 0)", asFUNCTION(CTerrainManager_ReserveBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReservePersistentBuilding(const CCircuitDef@, const AIFloat3& in, int facing)", asFUNCTION(CTerrainManager_ReservePersistentBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
@@ -1410,7 +1417,7 @@ void CInitScript::RegisterCFerryTask(asIScriptEngine* engine)
 	// across frames (the donation it is waiting on may outlive any handle it
 	// captured) and CFerryTask resolves them through CCircuitAI::GetTeamUnit.
 	int r = engine->RegisterObjectMethod("CFerryTask", "void SetHoldPos(const AIFloat3& in)", asMETHOD(CFerryTask, SetHoldPos), asCALL_THISCALL); ASSERT(r >= 0);
-	r = engine->RegisterObjectMethod("CFerryTask", "bool SetCargo(int, const AIFloat3& in)", asMETHOD(CFerryTask, SetCargo), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFerryTask", "bool SetCargo(int, const AIFloat3& in, float surfaceThreat = -1, float airThreat = -1)", asMETHOD(CFerryTask, SetCargo), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFerryTask", "int GetState() const", asMETHOD(CFerryTask, GetState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFerryTask", "int GetCargoId() const", asMETHOD(CFerryTask, GetCargoId), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFerryTask", "void Reset()", asMETHOD(CFerryTask, Reset), asCALL_THISCALL); ASSERT(r >= 0);

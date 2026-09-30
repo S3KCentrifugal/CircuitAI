@@ -198,6 +198,7 @@ namespace RoleTech
 	******************************************************************************/
 	void Tech_Init()
 	{
+        TechFortifications::Reset();
 
 		// Apply TECH role settings
 		aiTerrainMgr.SetAllyZoneRange(Global::RoleSettings::Tech::AllyRange);
@@ -593,6 +594,8 @@ namespace RoleTech
 		TechChain::Tick();
 		Lanes::Tick();         // D-127: lanes between both teams' starts, drawn after the intro
 		TechFlank::Tick();     // D-136: dedicated accessible-flank production
+		TechFactories::PlanAhead();
+		TechFortifications::Tick();
 		TechWeapons::Tick();   // D-126: weapon clusters: analysis, discovery, budget, the super cannon
 		Invariants::Tick();   // D-076: the role's promises, checked once a second
 		Tech_IncomeBuilderLimits(metalIncome);

@@ -2668,13 +2668,14 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 }
 
 AIFloat3 CTerrainManager::FindDropSpot(CCircuitUnit* cargo, const AIFloat3& around, float maxRadius,
-		const std::vector<AIFloat3>& avoid, float avoidRadius)
+		const std::vector<AIFloat3>& avoid, float avoidRadius, float maxSurfaceThreat, float maxAirThreat)
 {
 	if (cargo == nullptr) {
 		return -RgtVector;
 	}
 	const SBlockingMap::SM solid = static_cast<SBlockingMap::SM>(SBlockingMap::StructMask::ALL);
 	CMap* map = circuit->GetMap();
+	SMobileType* cargoMove = GetMobileTypeById(cargo->GetCircuitDef()->GetMobileId());
 	std::vector<layout_rank::Pt> refused;  // D-091 via D-094
 	for (const AIFloat3& q : avoid) {
 		refused.push_back(ToPt(q));
@@ -2685,6 +2686,10 @@ AIFloat3 CTerrainManager::FindDropSpot(CCircuitUnit* cargo, const AIFloat3& arou
 			AIFloat3 p(rp.x, 0.f, rp.z);
 			CorrectPosition(p);
 			p.y = map->GetElevationAt(p.x, p.z);
+			if ((maxSurfaceThreat >= 0.f && circuit->GetThreatMap()->GetSurfThreatAtPos(p) > maxSurfaceThreat)
+					|| (maxAirThreat >= 0.f && circuit->GetThreatMap()->GetAirThreatAtPos(p) > maxAirThreat)) {
+				continue;
+			}
 			if (!layout_rank::ClearOf(ToPt(p), refused, avoidRadius)) {
 				continue;
 			}
@@ -2702,8 +2707,11 @@ AIFloat3 CTerrainManager::FindDropSpot(CCircuitUnit* cargo, const AIFloat3& arou
 			if (blocked) {
 				continue;
 			}
-			// the cargo's own move type: water, cliffs and unreachable pockets refused
-			if (!CanMoveToPos(cargo->GetArea(), p)) {
+			// A ferry can cross disconnected land areas. Test standing room for
+			// the cargo's move type, not reachability from its pre-flight area.
+			const int sector = GetSectorIndex(p);
+			if (!terrainData->IsSectorValid(sector)
+					|| (cargoMove != nullptr && cargoMove->sector[sector].area == nullptr)) {
 				continue;
 			}
 			if (!cargo->GetCircuitDef()->IsAbleToSwim() && !cargo->GetCircuitDef()->IsAmphibious() && (p.y < 0.f)) {

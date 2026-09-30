@@ -139,6 +139,7 @@ namespace AirEconomy {
     {
         if (!Active() || (sampleFrame >= 0 && ai.frame - sampleFrame < SECOND)) return;
         sampleFrame = ai.frame;
+        AirLayout::PlanAhead();
         if (aiEconomyMgr.assistNanoEnabled)
             Invariants::Violation("INV-073", "AIR", "native nano planner enabled while AIR owns production support");
         metal = Economy::GetMinMetalIncomeLast10s(); energy = Economy::GetMinEnergyIncomeLast10s();
@@ -174,6 +175,7 @@ namespace AirEconomy {
             int best = -1;
             float dist = 96.0f * 96.0f;
             for (uint b = 0; b < AirLayout::bays.length(); ++b) {
+                if (AirLayout::bays[b].defName != name) continue;
                 const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), AirLayout::bays[b].centre);
                 if (sq < dist) { best = int(b); dist = sq; }
             }
@@ -240,6 +242,7 @@ namespace AirEconomy {
     }
     bool Transition(CCircuitDef@ plant)
     {
+        if (!MexesReady()) return false;
         if (PreparingFusion() && !HasAdvancedBuilder()) {
             CCircuitDef@ cons = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
             // Buy access first; upgraded mex income funds the subsequent reactor.

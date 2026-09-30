@@ -718,7 +718,7 @@ namespace TechWeapons {
     }
 
     // the order of work in a cluster: its first weapon, its construction turrets
-    // (they build the rest), the other weapons and sensors, walls last
+    // (they build the rest), the other weapons and sensors; D-152 builds the walls first
     void SortSlots(WCluster@ c)
     {
         array<Slot@> a, b, d, w;
@@ -730,10 +730,10 @@ namespace TechWeapons {
             else d.insertLast(s);
         }
         c.slots.resize(0);
+        for (uint i = 0; i < w.length(); ++i) c.slots.insertLast(w[i]);
         for (uint i = 0; i < a.length(); ++i) c.slots.insertLast(a[i]);
         for (uint i = 0; i < b.length(); ++i) c.slots.insertLast(b[i]);
         for (uint i = 0; i < d.length(); ++i) c.slots.insertLast(d[i]);
-        for (uint i = 0; i < w.length(); ++i) c.slots.insertLast(w[i]);
     }
 
     // a started cluster short of construction turrets gets new slots on another
@@ -906,7 +906,7 @@ namespace TechWeapons {
         }
         // construction turrets only need build range of the cluster: search further
         // (played: a long-range cluster stood with 0 of its 4, their slots dead)
-        const int rings = (s.role == "nano") ? 5 : 3;
+        const int rings = IsWall(s.role) ? 1 : (s.role == "nano") ? 5 : 3;
         for (int ring = 0; ring < rings; ++ring) {
             for (int k = 0; k < (ring == 0 ? 1 : 8); ++k) {
                 const float a = 0.7854f * k;
@@ -927,9 +927,15 @@ namespace TechWeapons {
     IUnitTask@ Order(CCircuitUnit@ u, WCluster@ c, Slot@ s, CCircuitDef@ d, const AIFloat3& in at)
     {
         if (!TechForward::Buildable(u, d)) return null;
+        const int slot = aiTerrainMgr.ReserveBuilding(d, at, 0);
+        if (slot < 0) return null;
+        if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot))) {
+            aiTerrainMgr.ReleaseReservation(slot); return null;
+        }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(TypeOf(s.role), (c.kind == SUPER) ? Task::Priority::HIGH : Task::Priority::NORMAL,
-            d, at, SQUARE_SIZE * 2, true, 120 * SECOND));
-        if (t is null) return null;
+            d, aiTerrainMgr.GetReservationPos(slot), 0.0f, true, 120 * SECOND));
+        if (t is null) { aiTerrainMgr.ReleaseReservation(slot); return null; }
+        if (!AiPinReservation(t, slot)) { aiBuilderMgr.AbortTask(t); aiTerrainMgr.ReleaseReservation(slot); return null; }
         s.orderedFrame = ai.frame;
         if (MetalIncome() < Global::RoleSettings::Tech::WeaponStartMetalIncome)
             Invariants::Violation("INV-061", "" + c.id, "weapon cluster #" + c.id + " ordered " + d.GetName() + " at +" + int(MetalIncome()) + " metal, under +" + int(Global::RoleSettings::Tech::WeaponStartMetalIncome));

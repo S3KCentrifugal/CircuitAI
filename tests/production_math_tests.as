@@ -70,3 +70,15 @@ void test_capacity_six_and_eight_supported() { Check(ProductionMath::CapacityRea
 void test_capacity_twelve_is_ceiling() { Check(!ProductionMath::CapacityReady(12, 12, 600, 600, 2000, 2000)); }
 void test_capacity_bank_windfall_cannot_skip_sustained_income() { Check(!ProductionMath::CapacityReady(1, 12, 0, 600, 1000000, 2000)); }
 void test_capacity_stable_but_unfunded_rejected() { Check(!ProductionMath::CapacityReady(1, 12, 600, 600, 1000, 2000)); }
+
+void test_converter_no_surplus_no_capacity() { Check(ProductionMath::ConverterTarget(250, 160, 150, 70) == 0); }
+void test_converter_reserves_aircraft_and_economy() { Check(ProductionMath::ConverterTarget(1000, 500, 150, 70) == 5); }
+void test_converter_small_surplus_rounds_up() { Check(ProductionMath::ConverterTarget(1001, 500, 150, 70) == 6); }
+void test_converter_scales_without_metal_income_ceiling() { Check(ProductionMath::ConverterTarget(10000, 500, 150, 70) == 134); }
+void test_converter_rejects_zero_draw() { Check(ProductionMath::ConverterTarget(1000, 500, 150, 0) == 0); }
+void test_converter_counts_existing_and_queue() { Check(!ProductionMath::ConverterMayQueue(5, 5, 1, 3)); }
+void test_converter_parallel_limit() { Check(!ProductionMath::ConverterMayQueue(20, 5, 3, 3)); }
+void test_converter_can_fill_surplus_with_two_pending() { Check(ProductionMath::ConverterMayQueue(20, 5, 2, 3)); }
+void test_converter_negative_aircraft_demand_rejected() { Check(ProductionMath::ConverterTarget(1000, -1, 150, 70) == 0); }
+void test_converter_negative_reserve_rejected() { Check(ProductionMath::ConverterTarget(1000, 500, -1, 70) == 0); }
+void test_converter_invalid_planned_count_rejected() { Check(!ProductionMath::ConverterMayQueue(20, -1, 0, 3)); }

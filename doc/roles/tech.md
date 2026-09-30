@@ -906,4 +906,13 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: c4e24f85cff0052c10ee5e8316996551346a8ee2; lines: 2725 -->
+<!-- source: data/script/src/roles/tech.as; blob: 3adb5c3e8057e528b2fcbf031cb9d188d4196745; lines: 2728 -->
+
+## D-152 protected expansion
+
+`Tech_AiUpdate` calls `TechFactories::PlanAhead` before
+`TechFortifications::Tick` and weapon planning. Future factory/turret/exit
+claims do not authorize spending. The fortification controller reserves
+lane-side teeth and, after advanced construction access, a second wall line
+and owned geo/advanced-mex perimeters with access gaps. See
+[design](../air-tech-expansion-plan.md).

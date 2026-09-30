@@ -408,8 +408,11 @@ namespace Ferry {
     }
 
     // The transport is free: start the oldest queued run.
+    int safeRetryFrame = -1;
+    int awaitTransportSince = -1;
     void _StartNext()
     {
+        if (ai.frame < safeRetryFrame) return;
         while (queuedCargo.length() > 0) {
             const int id = queuedCargo[0];
             const int to = queuedRecipient[0];
@@ -452,9 +455,18 @@ namespace Ferry {
         if (!IsEnabled()) return _Refuse("ferry disabled");
         if (cargo is null || recipient < 0) return _Refuse("no cargo or no recipient");
         CCircuitUnit@ t = Transport();
-        if (t is null) return _Refuse("no transport owned (transportId=" + transportId + ")");
         CFerryTask@ task = TaskOf(t);
-        if (task is null) return _Refuse("transport " + t.id + " has no CFerryTask yet");
+        if (task is null) {
+            if (t is null && Team::Roster::WithRole(AiRole::AIR).length() == 0)
+                return _Refuse("no allied AIR transport provider");
+            if (queuedCargo.find(cargo.id) < 0) {
+                queuedCargo.insertLast(cargo.id); queuedRecipient.insertLast(recipient);
+            }
+            if (awaitTransportSince < 0) awaitTransportSince = ai.frame;
+            RequestTransport("constructor awaiting first-mex delivery");
+            GenericHelpers::LogUtil("[Ferry] TECH: queued " + cargo.id + " until its transport arrives", 1);
+            return true; // ferry.cargo owns the gift while AIR fulfills the request
+        }
         if (cargoId >= 0) {
             // A run is in flight: queue behind it rather than walk. "If an air
             // transport is available always deliver it" - it is, just busy.
@@ -472,21 +484,35 @@ namespace Ferry {
         }
         // D-110 (played: no unload ever took at a teammate's start, their busiest
         // ground): the drop is FerryDropPullback short of it, toward our base
-        AIFloat3 drop = dropPos;
-        {
+        Team::Roster::Entry@ ally = Team::Roster::Get(recipient);
+        const bool mexAnchor = ally !is null && ally.firstMex.x >= 0.0f;
+        AIFloat3 drop = mexAnchor ? ally.firstMex : dropPos;
+        if (!mexAnchor) {
             const float dx = Global::Map::StartPos.x - dropPos.x, dz = Global::Map::StartPos.z - dropPos.z;
             const float len = sqrt(dx * dx + dz * dz);
             const float pull = Global::Ferry::DropPullback;
             if (len > 2.0f * pull) drop = AIFloat3(dropPos.x + dx / len * pull, dropPos.y, dropPos.z + dz / len * pull);
         }
-        if (!task.SetCargo(cargo.id, drop)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
+        const AIFloat3 safe = aiTerrainMgr.FindSafeDropSpot(cargo, drop, Global::Ferry::SafeDropRadius,
+            Global::Ferry::DropSurfaceThreat, Global::Ferry::DropAirThreat);
+        if (safe.x < 0.0f) {
+            safeRetryFrame = ai.frame + 10 * SECOND;
+            GenericHelpers::LogUtil("[Ferry] waiting for safe ground near recipient " + recipient + " first mex/start", 1);
+            if (queuedCargo.find(cargo.id) < 0) { queuedCargo.insertLast(cargo.id); queuedRecipient.insertLast(recipient); }
+            return true; // retain cargo for a later safe delivery
+        }
+        drop = safe;
+        if (aiBattle.SurfThreat(drop) > Global::Ferry::DropSurfaceThreat || aiBattle.AirThreat(drop) > Global::Ferry::DropAirThreat)
+            Invariants::Violation("INV-086", "" + cargo.id, "ferry selected an unsafe landing point");
+        if (!task.SetCargo(cargo.id, drop, Global::Ferry::DropSurfaceThreat, Global::Ferry::DropAirThreat)) return _Refuse("CFerryTask refused SetCargo (state " + task.GetState() + ")");
         cargoId = cargo.id;
         cargoRecipient = recipient;
         runStart = ai.frame;
         runDrop = drop;
         { int64 n = 0; runAttempts.get("" + cargo.id, n); runAttempts.set("" + cargo.id, n + 1); }   // int64: the dictionary's integer type
         GenericHelpers::LogUtil("[Ferry] TECH: carrying " + cargo.id + " to team " + recipient
-            + " at (" + int(dropPos.x) + "," + int(dropPos.z) + ")", 1);
+            + " at (" + int(drop.x) + "," + int(drop.z) + ") anchor=" + (mexAnchor ? "first-mex" : "start")
+            + " distance=" + int(sqrt(MapHelpers::SqDist(drop, mexAnchor ? ally.firstMex : dropPos))), 1);
         WidgetLink::Send("ferry", "carry|" + cargo.id + "|" + recipient);
         return true;
     }
@@ -592,6 +618,19 @@ namespace Ferry {
             }
         }
 
+        // A new gift may precede the income-triggered transport request. Keep it
+        // for the arriving carrier, with a bounded fallback if AIR cannot help.
+        if (cargoId < 0 && queuedCargo.length() > 0) {
+            if (TaskOf(Transport()) !is null) {
+                awaitTransportSince = -1;
+                _StartNext();
+            } else {
+                if (awaitTransportSince < 0) awaitTransportSince = ai.frame;
+                if (ai.frame - awaitTransportSince >= Global::Ferry::AwaitTransportSeconds * SECOND) {
+                    _WalkQueue("transport arrival time-out"); awaitTransportSince = -1;
+                } else RequestTransport("queued constructor delivery");
+            }
+        } else if (queuedCargo.length() == 0) awaitTransportSince = -1;
         // TECH: poll the run.
         if (cargoId >= 0) {
             CFerryTask@ task = TaskOf(Transport());

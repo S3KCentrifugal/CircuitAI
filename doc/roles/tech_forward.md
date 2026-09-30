@@ -71,4 +71,9 @@ constructor drops its forward job within 60 s); D-111's INV-043 lives in
 `Global::Spam::RepeatStallSeconds` (45): a factory on repeat that produced no spam
 unit for this long gets its build again (D-111).
 
-<!-- source: data/script/src/roles/tech_forward.as; blob: 69890e324cfe28b22030879959b8b1da54ea51e2; lines: 410 -->
+<!-- source: data/script/src/roles/tech_forward.as; blob: e2e9c8ee7c34c8dccc941e95d6ecdc6395666e38; lines: 410 -->
+
+## D-152 future clusters
+
+`SpamClusters` excludes `Cluster::ahead`: reserving a future lab does not
+count as a spam-production commitment or start its construction.

@@ -41,6 +41,8 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
         @t = AirBuild::AssistMex(u);
         if (t !is null) return AirBuild::Record(t, "mex.assist", u);
+        @t = AirBuild::Convert(u);
+        if (t !is null) return AirBuild::Record(t, "mex.phase.convert", u);
         @t = AirBuild::FirstFusion(u);
         if (t !is null) return AirBuild::Record(t, "fusion.first", u);
         @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
@@ -100,7 +102,7 @@ namespace AirRules {
             @t = AirBuild::Utility(u, UnitHelpers::GetEnergyStorageNameForSide(side), Task::BuildType::STORE, AiMin(8, 1 + int(AirEconomy::energy / 2000.0f)));
             if (t !is null) return AirBuild::Record(t, "storage.energy", u);
         }
-        if (!AirEconomy::recovery && AirEconomy::bankE > aiEconomyMgr.energy.storage * 0.85f && AirEconomy::bankM < aiEconomyMgr.metal.storage * 0.8f
+        if (AirEconomy::MexesReady() && !AirEconomy::recovery && AirEconomy::bankE > aiEconomyMgr.energy.storage * 0.85f && AirEconomy::bankM < aiEconomyMgr.metal.storage * 0.8f
             && AirEconomy::energy > AirEconomy::demandE * 1.25f + 150.0f) {
             CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(side));
             if (!AirBuild::Can(u, d)) @d = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(side));

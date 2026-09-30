@@ -126,3 +126,10 @@ step.
 | `ChainEnergyFloatSeconds` / `ChainEnergyFloatMax` / `InvariantFloatOrderSeconds` | 15 / 300 / 90 | D-079: the energy bank at `EcoConvertEnergyPercent` of storage this long, or at it now with income over the pull by this = energy floats; INV-009 after the longer wait, so the order was made while floating |
 | `PowerAheadSeconds` / `PowerAheadRise` | 15 / 30 | D-075: the metal bank full this long, or risen by this over the window = metal income above spending |
 | `InvariantReclaimJoinSeconds` / `ReclaimTurretMargin` | 10 / 48 | INV-008's patience and the turret reach margin |
+
+| INV-083 | AIR orders T2 aircraft plants only after owned mex upgrades finish. | AirBuild::Record; expansion observer | D-152 |
+| INV-084 | A speculative T2 AIR bay reserves twenty construction turrets. | AirLayout::PlanAhead | D-152 |
+| INV-085 | TECH fortification orders stay outside friendly lanes. | TechFortifications::Work | D-152 |
+| INV-086 | Constructor delivery selects a landing point within configured surface/air threat limits. | Team::Ferry::TryCarry | D-152 |
+
+| INV-087 | Future TECH factory reservations have no active construction work. | TechFactories::PlanAhead | D-152 |

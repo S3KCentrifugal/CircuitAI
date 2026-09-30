@@ -172,4 +172,11 @@ start caps one at a time) and logs `[TECH][Weapons] <kind> #<id>: ... orders`.
 - `budget: ...`
 - `super cannon framed ...`
 
-<!-- source: data/script/src/roles/tech_weapons.as; blob: 6d03f1461879c384b39b73b39506756417b0fd58; lines: 1102 -->
+<!-- source: data/script/src/roles/tech_weapons.as; blob: 6d8dfdc39e2384e4fc44b0950e668af041398d41; lines: 1108 -->
+
+## D-152 protected weapon placement
+
+`SortSlots` puts walls first. `Site` keeps wall coordinates exact; `Order`
+reserves and pins the chosen site, aborting if the claim fails. Every candidate
+therefore respects future factory/turret/corridor reservations. The existing
+weapon budget, income gates and unit choices remain.

@@ -256,7 +256,7 @@ namespace TechForward {
     {
         array<TechFactories::Cluster@> res;
         for (uint i = 0; i < TechFactories::clusters.length(); ++i)
-            if (TechFactories::clusters[i].tier == 1) res.insertLast(TechFactories::clusters[i]);
+            if (!TechFactories::clusters[i].ahead && TechFactories::clusters[i].tier == 1) res.insertLast(TechFactories::clusters[i]);
         return res;
     }
     array<int> padGroups;

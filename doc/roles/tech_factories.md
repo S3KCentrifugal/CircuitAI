@@ -91,4 +91,14 @@ turrets, D-119). See [`../invariants.md`](../invariants.md).
 | `FrontClusterStallSeconds` | 300 | a factory order with no frame this long gives its cluster up (ground released) |
 | `FrontClusterOpenSeconds` | 600 | INV-046 |
 
-<!-- source: data/script/src/roles/tech_factories.as; blob: b4159b8face160ed8a5a17f721f59c7219d91f92; lines: 851 -->
+<!-- source: data/script/src/roles/tech_factories.as; blob: fbbd9421f30c745de7159adef6ed1f1b2b5d0548; lines: 920 -->
+
+## D-152 reserve before spending
+
+`PlanAhead` holds one future T1 bot lab, T2 bot lab and gantry with the existing
+`Plan` geometry and turret blocks. Native named integers preserve these future
+plans; factory exit corridors are held too. `Cluster::ahead` excludes them
+from `CountTier`, `NeedAdvancedLab`, `OpenAbove`, `OpenWork`, and overdue-work
+invariants. Only `OpenCluster`, reached from a normal authorized build rule,
+activates one only when `planNew` and `MayPlan` both permit spending; activation starts the gantry cooldown and work
+clock. The next advance plan can then be reserved without purchasing it.

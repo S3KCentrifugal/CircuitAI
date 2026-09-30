@@ -28,8 +28,8 @@ three seconds and is asked again.
 through: its own structure through the layout, else assist a frame of its kind,
 else, with no site in the layout, defences meanwhile (`AirDefence`, D-123), else
 wait 3 s and log why. `AirDefence` (row `air.defend`, the lowest before `wait`) is
-every air constructor's last resort: the mex clusters' AA, then a defence ring
-round the base toward the front. `LiftCapForRole` keeps a held role's structure one past
+every air constructor's last resort: reserved resource/lane fortifications, then
+funded weapon clusters (D-152). It no longer scatters a spiral of turrets. `LiftCapForRole` keeps a held role's structure one past
 its count (TECH's start caps and the chain's step targets pinned the advanced fusion
 at 1). `RefillAirRoles` hands a vacant role to another T2 air constructor at once
 (advanced fusions first) and `DropOtherJob` makes it drop a job of another kind
@@ -59,7 +59,7 @@ computes one.
 | `ExpandMex` | `mex.expand` | the nearest open spot the builder can reach within `EcoMexExpandRadius` (every spot inside it considered, nearest first), allied ground excluded; logs `expands to a mex at (x, z)` and, once a minute, `no open mex spot within R` |
 | `EcoPlanner::Pick*` / `Enqueue`, `Layout::T2LabTask` (D-073: the advanced lab where the most turret slots reach it, front first) | `energy.*`, `lab.t2`, `mex.upgrade`, `energy.convert`, `turret.build`, `storage.*` | the planner's pieces, called one at a time by the rows that own them: energy, converters, the advanced lab, mex upgrades, turrets, storages, all packed into the turret box |
 | `Tech_Commander_AiMakeTask` / `Strategic` | `legacy.strategic` | the role's strategic rungs as they stand (recycle, nukes, anti-nuke, gantry, water factories, T2 constructor policy) with a null default; the planner they used to call answers nothing in this mode |
-| `Defence` | `defence.base` | once the first turret stands: `ExpDefenceLLT` (1) light laser and `ExpDefenceAA` (1) light AA turrets near the factories (packed by native within `ExpDefenceRadius` of the factory centre, outside the planned zones), at most `ExpDefenceMaxOrders` orders per def (D-075: native refused the site fifteen times in a row); nothing else, and native's porc chain is not asked (`Tech_AiMakeDefence` returns at once) |
+| `Defence` | `defence.fortify`, `defence.base` | D-152: shared resource perimeters and lane walls/guns, exactly pinned; five-percent income budget, two orders; T1 waits for base build power, T2 protection starts with construction access |
 | `QueuedOrder` | `order.repair` | native's queued repair orders for our own unfinished structures, nearest first (`aiBuilderMgr.FindQueuedTask`), within `ExpOrderRadius` of the base centre; native's defence, radar and sonar orders are left alone |
 | `AssistAny` | `assist.any` | the nearest structure of ours under construction within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) |
 | `GuardFactory` | `guard.factory` | never a retiring lab (D-076), never a spam lab (D-119); guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
@@ -120,4 +120,11 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: 16bb56da6d285d0de6f29a2abb99b2b45cf2c67e; lines: 992 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 7458fe4b8a9ca92aec8166cec0674d9d8e42d964; lines: 928 -->
+
+## D-152 defense ownership
+
+`Defence` delegates to `TechFortifications::Work`. Early guns now occupy pinned
+sites behind lane-side wall lines. The previous unpinned placement radius is
+removed. `AirDefence` shares this controller, then `TechWeapons::Work`; the old
+expanding defense spiral is removed. Expansion reservations precede defense reservations.

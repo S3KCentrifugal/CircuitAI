@@ -1556,3 +1556,11 @@ all-terrain lane that passed this qualification. Invalid indices return false.
 The worker computes the flag from its snapshot; scripts only read published
 results on the main thread. Generic `IsPassable` / connector reachability is
 unchanged. An isolated hill remains reachable without becoming a battle lane.
+
+### D-152 landing search
+
+`aiTerrainMgr.FindSafeDropSpot(cargo, around, radius, surfaceThreat, airThreat)`
+returns the nearest sampled free, reachable, threat-qualified landing position
+or a negative x sentinel. It does not enqueue a command.
+`CFerryTask.SetCargo(id, drop, surfaceThreat = -1, airThreat = -1)` retains the
+legacy unrestricted defaults; ferry policy supplies explicit limits.

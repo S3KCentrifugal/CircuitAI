@@ -298,7 +298,7 @@ public:
 	// footprint covers it, and it is at least `avoidRadius` from every point in
 	// `avoid` (spots the engine already refused). -RgtVector when none.
 	springai::AIFloat3 FindDropSpot(CCircuitUnit* cargo, const springai::AIFloat3& around, float maxRadius,
-			const std::vector<springai::AIFloat3>& avoid, float avoidRadius);
+			const std::vector<springai::AIFloat3>& avoid, float avoidRadius, float maxSurfaceThreat = -1.f, float maxAirThreat = -1.f);
 	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
 	// task may take a held slot; NextSlot serves the armed ones only).
 	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;

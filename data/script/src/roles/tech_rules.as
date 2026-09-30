@@ -16,6 +16,7 @@
 #include "tech_factories.as"
 #include "tech_harbour.as"
 #include "tech_weapons.as"
+#include "tech_fortifications.as"
 #include "tech_flank.as"
 #include "../manager/lanes.as"
 
@@ -454,6 +455,7 @@ namespace TechRules {
         table.insertLast(Rule("air.dedicated",     CON_T2,       W0(), @DoAirDedicated, "D-107: the first two T2 air constructors: one only advanced energy converters, the other only advanced fusions, always"));
         table.insertLast(Rule("flank.factory",     CONSTRUCTORS, W0(), @DoFlankFactory, "D-136: from +200 metal a separate T2 lab feeds an accessible specialist land flank"));
         table.insertLast(Rule("air.flex",          CON_T2,       W0(), @DoAirFlexible,  "D-107: the other T2 air constructors: advanced converters while energy overflows, the advanced fusion going up when the converters cannot stay on"));
+        table.insertLast(Rule("defence.fortify", CONSTRUCTORS, W0(), @DoDefence, "D-152: lane walls after base build power, or T2 resource protection, within the fortification budget"));
         table.insertLast(Rule("weapons.cluster",   CONSTRUCTORS, W0(), @DoWeaponsCluster, "D-126: from +200 metal, within the weapon budget: the highest-priority weapon cluster's next slot (kill zone, air defence, artillery, long range, coast, the super cannon's escort)"));
         table.insertLast(Rule("fwd.t2.defend",     CON_T2,       W2(@LandCon, @T2LandReleased), @DoDefendMexes, "D-109: the T2 air constructors are up: T2 land constructors defend the mex clusters, long-range AA then flak"));
         table.insertLast(Rule("fwd.t1",            CON_T1,       W2(@LandCon, @T1LandReleased), @DoForwardT1,   "D-109: more than 5 T1 air constructors: T1 land constructors build the spam cluster forward (labs, their turrets, AA, pads)"));

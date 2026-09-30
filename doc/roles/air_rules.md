@@ -48,4 +48,12 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 4cfeb8cab90918e3df2fcf4a3910b467a59dd8ff; lines: 128 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: de74e54f945fcb57b33297e8c275322f055a3bcb; lines: 130 -->
+
+## D-152 sequencing
+
+`mex.phase.convert` follows mex upgrade and assist, before optional growth.
+Advanced conversion only follows completed mex upgrades. All T2 plant paths,
+including fusion access, use the same strict mex-first gate; no allied T2
+constructor means waiting for allied access. Existing recovery and opening
+crew/scout/fighter/transport ordering remains.

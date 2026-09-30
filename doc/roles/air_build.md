@@ -69,4 +69,13 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 864f1e4cc66830bf08be6f2cce0d81c2ad36f347; lines: 352 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 81a78cfd6649cb730091ec35f69b62a7487f5c4d; lines: 376 -->
+
+## D-152: mex-first plants and conversion
+
+`RequiresMexes` covers reactors and T2 aircraft plants. `Factory` rechecks owned
+mexes for every tier-two bay; `Tick` cancels an unstarted order if a new basic
+mex invalidates it, while `Resume` declines it. `Convert` scales T1 converter
+capacity with surplus energy and admits three concurrent orders, without a
+metal-income ceiling. It runs after mex upgrade/assist and in the commander's
+local economy after the opening crew. `Record` checks INV-083.

@@ -60,7 +60,7 @@ public:
 	void SetHoldPos(const springai::AIFloat3& pos);
 	// Begin a run. Fails (returns false, state unchanged) when a run is
 	// already in flight or the cargo id is not one of our units.
-	bool SetCargo(int cargoId, const springai::AIFloat3& dropPos);
+	bool SetCargo(int cargoId, const springai::AIFloat3& dropPos, float surfaceThreat = -1.f, float airThreat = -1.f);
 	int GetState() const { return int(state_); }
 	int GetCargoId() const { return cargoId; }
 	// Back to IDLE and home. Safe to call in any state; the cargo is released.
@@ -86,6 +86,8 @@ private:
 
 	EState state_;
 	int cargoId;
+    float maxSurfaceThreat = -1.f;
+    float maxAirThreat = -1.f;
 	springai::AIFloat3 dropPos;
 	springai::AIFloat3 holdPos;
 	int stateFrame;    // frame the current state was entered

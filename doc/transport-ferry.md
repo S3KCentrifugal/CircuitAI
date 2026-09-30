@@ -411,3 +411,34 @@ will come up again and the answer is "constructors, not combat units".
 - [`roles/air.md`](roles/air.md) - AIR's production, which the request preempts.
 - [`intent.md`](intent.md#the-architectural-rule) - why the sequencing is
   native and the coordination is script.
+
+## D-152 first-mex destination
+
+Every experimental role's roster appends optional first-mex x/z fields to
+version 1 and announces immediately on first completed ownership. Older
+12-field peers remain compatible. Sender identity and coordinate bounds are
+validated. `ObserveMex` latches/persists the anchor across upgrades; role
+changes retain it. The AI-only channel cannot announce human-built mexes.
+
+`TryCarry` prefers the recipient's first mex, retaining the start/pullback
+fallback for an absent anchor. `FindSafeDropSpot` reuses nearest-first native
+free-space/movement filtering and adds script-selected threat limits. Unsafe
+destinations retain queued cargo for retry. `CFerryTask::SetCargo` accepts
+optional threat limits and rechecks landing/retry sites; no safe local landing
+returns the transport toward home with the cargo still aboard.
+
+D-152 landing search checks the cargo movement type at the destination, not
+connectivity to its pre-flight area. Walking off a factory yard still checks
+same-area reachability. The engine's area unload retains its 256-elmo radius
+(D-110); the chosen safe point is the nearest sampled acceptable destination,
+not a promise of the constructor's exact final coordinates. Threat safety is
+relative to currently observed threats. Cross-island and contested emergency
+unload verification remain tracked by KI-439.
+
+If a constructor is ready before TECH owns a carrier, `TryCarry` queues it
+and requests transport immediately when an allied AIR provider is known.
+`ferry.cargo` retains ownership while the transport arrives and its task is
+initialized. `AwaitTransportSeconds` (120) bounds this wait; missing providers
+and arrival timeouts retain the existing walking fallback. This closes the
+observed donation-before-request race without making AIR transport service
+TECH-specific.
