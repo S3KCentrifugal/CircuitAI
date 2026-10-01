@@ -3238,6 +3238,30 @@ deadline while another silo can fire. Check pending Juno cancellation, fired
 claim expiry, destroyed unit IDs and multiple remembered impact locations.
 Not implemented in D-157; uninterrupted-match targeting is tested separately.
 
+### KI-445 - Generated amphibious unit notes imply underwater firing without checking weapons
+
+**Problem.** The shared generated pages for `legamph` and `armmar` say they can
+hit shorelines from below the surface. Mobility alone does not establish that.
+Telchine's `legamph.bos` rejects both AimPrimary and AimSecondary in water form;
+its depthcharge also explicitly sets `firesubmersed=false`. Marauder has no
+underwater-capable weapon: Recoil rejects firing when the weapon aim origin is
+submerged. The generated note therefore misleads gameplay and AI policy research.
+Confirmed against BAR `1d267c20d1` and Recoil `92efda5e60` on 2026-10-01.
+
+**Proposed solution.** Correct `../rjm.bar.docs/tools/knowledge/gen_units.py`:
+describe amphibious travel separately from underwater firing, examine loaded
+weapon `waterweapon`/`fireSubmersed` semantics and target masks, and annotate
+script-controlled exceptions such as Telchine. Regenerate unit pages; never
+hand-edit the generated files. Treat Marauder's raw unit-level water-depth
+field separately from the authoritative HABOT5 movement class when generating
+travel notes. Do not infer combat capability from the amphibious domain alone.
+
+**Verification.** Check Telchine (coastal anti-sub, cannot shoot in water form),
+Marauder (no submerged firing), and Duck (underwater torpedoes) as contrasting
+cases. Match generated explanations to engine/script rules and a controlled
+shore-to-deep-water firing test. Documentation-generator fix remains pending;
+the user's mechanics explanation uses primary source rather than that note.
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate
