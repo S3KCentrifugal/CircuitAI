@@ -3300,6 +3300,32 @@ include submerged units, shore-fired depth charges, paralysis and radar loss.
 compare native threat values and actual unit paths before/after the profile
 change. The D-158 guarded fixture covers only its new query, not that rollout.
 
+### KI-448 - One rendered Tundra repeat did not enroll AIR Marauders
+
+**Problem.** D-158's first rendered Tundra run passed all four wave audits, but
+`build-theatres/d158-tundra-closeups/runs/20261001-114046/infolog.txt` did not.
+All four AIR `armmar` units were spawned and remained alive near the starting
+island with empty command queues at frame 9000. Their maximum displacement was
+383 elmos; none entered water by 9.5 minutes. No AIR Marauder `AMPH` assembly
+was logged, while TECH Marauders and both Telchine waves advanced and fought.
+There were no script errors or invariant violations. This is an intermittent
+registration/task-ownership observation, not proof of a route-planner failure;
+the precise cause remains unverified. The failed archive is retained.
+
+**Proposed solution.** Trace the four stable unit IDs (5312, 15449, 15988,
+4485) through native `UnitCreated`, `UnitFinished`, military handler selection,
+idle assignment and script `AmphibiousOps::MilitaryTask`. Compare with a passing
+spawn under identical profile/settings. Repeat with camera selection disabled
+to separate UI/test interference from AI lifecycle behavior. Repair the owner
+that drops the task transition; do not issue move orders from the fixture or
+silently force units into a wave. Extend INV-096 to detect eligible unassigned
+units only after accounting for player control and legitimate other ownership.
+
+**Verification.** Repeated rendered and headless Tundra runs must observe all
+20 distinct units crossing and landing, all four wave groups securing ground,
+and both types dealing actual combat damage. Retain every failing seed/log.
+The passing run and screenshots do not resolve this repeatability issue.
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate

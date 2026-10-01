@@ -1,5 +1,23 @@
 # Playtest: launch, watch, screenshot, stop
 
+Simulation updates must include actual in-game screenshots and analysis while
+the match is running (owner instruction, 2026-10-01). Headless runs remain useful
+for automated checks, but cannot provide visual evidence. Preserve screenshots
+with the report and distinguish observations from log-derived conclusions.
+
+Amphibious visual check (D-158): run `prepare_amphibious_check.py --map tundra
+--dir build-theatres/<name> --dll <pinned-dll> --guarded --windowed --minutes 17`.
+Then `playtest.py launch --dir <same-dir> --engine recoil_2026.07.04` without
+`--headless`. The visual observer follows actual crossings and landfalls,
+selects nearby wave members, and records labelled screenshots. Each capture
+briefly slows game speed to 0.25 and then
+restores it, allowing terrain and effects to render. The observer issues no unit
+orders. Default rendered
+speed is 3; override with `--speed`. Watch with `--checks amphibious`, then run
+`audit_amphibious_check.py <same-dir> --log <retained-infolog>`. Units are supplied
+and construction is frozen: this is a combat capability check, not an economy
+or competitive benchmark. See [plan and results](../../doc/amphibious-operations-plan.md).
+
 Strategic targeting (D-157): stage `--roles AIR,SUPPORT` for `juno` or `--roles AIR`
 for `nuclear`, then run `prepare_strategic_check.py --dir <dir> --scenario <name>`.
 The fixture pauses builders and its mobile probe only in the staged scripts,

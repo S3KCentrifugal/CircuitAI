@@ -573,6 +573,7 @@ symbolising `SkirmishAI.dll` stack offsets.
 Use the cheapest focused validation available in this repository, then broaden according to risk.
 
 - Run diagnostics for edited C++ or AngelScript files.
+- During simulations, provide ongoing in-game behaviour updates and analysis with actual screenshots. Use rendered runs for visual evidence; headless log checks alone do not satisfy this requirement. Show screenshots while the match is running and preserve them with the report.
 - For configuration changes, parse the changed JSON and check referenced UnitDef names/build edges against the effective BAR data pipeline.
 - Use `git diff --check` before finishing.
 - **Always publish completed builds to `C:\bardev\bar-RecoilEngine\build-amd64-windows\install\AI\Skirmish\BARb\stable`.** This is the required build output, not the live game installation. Stage the stripped `SkirmishAI.dll`, its matching `SkirmishAI.dbg`, and the current `data/` contents together. A scratch build, pinned playtest DLL or update archive does not replace this step. Verify script/DLL API parity there before reporting completion.

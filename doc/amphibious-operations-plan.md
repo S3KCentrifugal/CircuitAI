@@ -216,3 +216,48 @@ The final stripped DLL, matching `.dbg`, and all 243 current data files were
 published together and hash-verified in
 `C:/bardev/bar-RecoilEngine/build-amd64-windows/install/AI/Skirmish/BARb/stable`.
 API parity passed against that output. The live BAR installation was not written.
+
+
+### Rendered Tundra evidence (2026-10-01)
+
+Per the owner's instruction, screenshots and behavior analysis were shown during
+rendered simulations. All runs use the same pinned DLL above, supplied waves,
+frozen construction, full vision and the guarded water route. The standing
+reporting preference is now recorded in `AGENTS.md` and the playtest guide.
+
+| Run | Minutes | Distinct landed | Secured groups | Telchine / Marauder kills | Torpedo clearance | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `d158-tundra-visual` | 9.4 | 20/20 | 4/4 | 4 / 12 | 1,067 | PASS |
+| `d158-tundra-closeups` | 9.5 | 16/20 | 3/4 | 4 / 11 | 1,064 | FAIL: AIR Marauders never enrolled |
+| `d158-tundra-evidence` | 9.5 | 20/20 | 4/4 | 4 / 13 | 1,065 | PASS |
+
+Clearance is minimum observed underwater distance to the live 890-range tower.
+All three have zero script errors and invariant violations. FRONT controls
+remained outside the experimental controller. Watcher and independent audit
+agree on both passing runs and the failed replay. The repeatability issue is
+[KI-448](known-issues.md#ki-448---one-rendered-tundra-repeat-did-not-enroll-air-marauders);
+a subsequent pass does not resolve it. Natural production and competitive
+performance remain outside these controlled tests.
+
+Archives under `build-theatres/`:
+
+- `d158-tundra-visual/runs/20261001-113740/`
+- `d158-tundra-closeups/runs/20261001-114046/`
+- `d158-tundra-evidence/runs/20261001-114525/`
+
+The first and final archives show water entry, actual island landfalls and
+Marauders reaching the enemy starting island. All retain PNGs, infolog,
+`report.md` and `amphibious-audit.json`. A local gallery at
+`build-theatres/d158-tundra-gallery.md` joins selected screenshots with their
+observations and the limitations above.
+
+The reusable camera observer lives only in playtest staging. It selects nearby
+wave members and changes the camera and game speed; it issues no unit orders.
+The final run verified 0.25-speed captures and restoration. The rejected 0.1
+speed was below Recoil's accepted maximum-speed floor. A prototype hit trigger
+was inconsistent and was removed after the final run; the retained observer
+uses the position-triggered capture path exercised by that run. Screenshots
+show positions; attributed kills and secured phases come from the log audit.
+Python syntax, script/DLL API parity, invariant checks and `git diff --check`
+passed. Documentation links retain only the eight pre-existing missing-hover
+findings (KI-404). No production scripts or native binary changed here.

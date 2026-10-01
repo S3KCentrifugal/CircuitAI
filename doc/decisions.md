@@ -9153,3 +9153,36 @@ Files:
 - [tools/playtest/prepare_amphibious_check.py](../tools/playtest/prepare_amphibious_check.py)
 - [tools/playtest/widgets/amphibious_fixture.lua](../tools/playtest/widgets/amphibious_fixture.lua)
 - [Known issues](known-issues.md).
+
+
+### D-158 follow-up - Rendered evidence and simulation reporting (2026-10-01)
+
+**Decision.** Honor the owner's standing request for screenshots with ongoing
+in-game analysis. Add an opt-in rendered amphibious observer and retain the
+headless fixture for automated checks. Capture actual unit positions and landfalls; select nearby units for visibility
+but issue no orders. A weapon-hit-trigger prototype missed events in repeats,
+so it was removed; combat conclusions use the independent fixture telemetry.
+Briefly slow rendering captures to 0.25 game speed and restore the previous
+speed. Recoil rejects `setmaxspeed` at or below 0.2, so the initial 0.1 attempt
+was ineffective and was corrected. Do not substitute illustrations or route
+announcements for gameplay evidence.
+
+**Alternative rejected.** Headless-only success reports and screenshots only
+after the run cannot meet the owner's request to inspect behavior as it unfolds.
+A new policy change is not justified by screenshot instrumentation alone.
+
+**Verification.** The first rendered Tundra run passed the watcher and independent
+audit at 9.4 game minutes: 20/20 distinct landfalls, four secured groups, four
+Telchine and twelve Marauder kills, 1,067-elmo minimum underwater clearance from
+a live 890-range torpedo tower. Screenshots were shown during the run. One
+close-up replay left AIR Marauders unenrolled; retain its failed report and
+[KI-448](known-issues.md#ki-448---one-rendered-tundra-repeat-did-not-enroll-air-marauders).
+Final camera verification and archive details are in the
+[results](amphibious-operations-plan.md). No production behavior changed here.
+
+**Files.** [AGENTS.md](../AGENTS.md),
+[playtest guide](../tools/playtest/README.md),
+[preparer](../tools/playtest/prepare_amphibious_check.py),
+[fixture](../tools/playtest/widgets/amphibious_fixture.lua),
+[visual observer](../tools/playtest/widgets/amphibious_visual.lua),
+[results](amphibious-operations-plan.md), [known issues](known-issues.md).

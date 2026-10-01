@@ -18,9 +18,12 @@ p.add_argument('--dll',required=True)
 p.add_argument('--profile',default='experimental_balanced')
 p.add_argument('--minutes',default='22')
 p.add_argument('--guarded',action='store_true')
+p.add_argument('--windowed',action='store_true',help='Render the game and capture unit-following screenshots')
+p.add_argument('--speed',type=float,help='Simulation speed (default: 3 when windowed, 25 when headless)')
 p.add_argument('--marauder-delay-seconds',type=int,default=0,help='Give slower Telchines a head start for independent combat observation')
 a=p.parse_args()
 if not 0<=a.marauder_delay_seconds<=300: p.error('Marauder delay must be between 0 and 300 seconds')
+if a.speed is not None and not 0<a.speed<=100: p.error('Speed must be greater than 0 and at most 100')
 base=a.dir.resolve()
 if not base.is_relative_to(ROOT/'build-theatres'): p.error('Use repository build-theatres')
 base.mkdir(parents=True,exist_ok=True)
@@ -29,11 +32,14 @@ fixture=base/'starts.as'
 fixture.write_text('\n'.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::{role}, false),' for (x,z),role in [(tech,'TECH'),(air,'AIR'),(enemy,'FRONT'),((enemy[0]+300,enemy[1]),'FRONT')]))
 subprocess.run([sys.executable,str(ROOT/'tools/playtest/playtest.py'),'stage','--dir',str(base),'--dll',a.dll,
     '--map',name,'--map-file',str(fixture),'--game','Beyond All Reason test-31450-6562fb1',
-    '--engine','recoil_2026.07.04','--role','TECH','--roles','TECH,AIR','--side','legion','--headless',
-    '--shots','','--speed','25','--minutes',a.minutes,'--ai-option','profile='+a.profile,
+    '--engine','recoil_2026.07.04','--role','TECH','--roles','TECH,AIR','--side','legion',
+    *([] if a.windowed else ['--headless']),
+    '--shots','','--speed',str(a.speed if a.speed is not None else (3 if a.windowed else 25)),
+    '--minutes',a.minutes,'--ai-option','profile='+a.profile,
     '--set','PlanCombatGate=0','--set','PlanT3RushCombatGate=0',
     '--modoption','experimentallegionfaction=1','--modoption','experimentalextraunits=0','--modoption','deathmode=neverend',
-    '--extra-widget',str(ROOT/'tools/playtest/widgets/amphibious_fixture.lua')],check=True)
+    '--extra-widget',str(ROOT/'tools/playtest/widgets/amphibious_fixture.lua'),
+    *(['--extra-widget',str(ROOT/'tools/playtest/widgets/amphibious_visual.lua')] if a.windowed else [])],check=True)
 scripts=base/'AI/Skirmish/BARbTest/test/script/src'
 setup=scripts/'setup.as'
 text=setup.read_text()
@@ -51,5 +57,5 @@ text=military.read_text(); needle='@t = TechFlank::MilitaryTask(u);'; assert tex
 military.write_text(text.replace(needle,'if (ai.teamId >= 2) return null; // after amphibious scope check; opposing fixture stays stationary\n        '+needle))
 (base/'LuaUI/Config').mkdir(parents=True,exist_ok=True)
 (base/'LuaUI/Config/amphibious_fixture.lua').write_text('return {guarded='+str(a.guarded).lower()+', marauderDelay='+str(a.marauder_delay_seconds)+'}\n')
-(base/'amphibious-fixture.json').write_text(json.dumps({'map':name,'profile':a.profile,'role_override':'0 TECH, 1 AIR, enemy FRONT','autonomous_builders':False,'global_los':True,'guarded':a.guarded,'require_front_controls':True,'deathmode':'neverend','marauder_delay_seconds':a.marauder_delay_seconds},indent=2))
+(base/'amphibious-fixture.json').write_text(json.dumps({'map':name,'profile':a.profile,'role_override':'0 TECH, 1 AIR, enemy FRONT','autonomous_builders':False,'global_los':True,'guarded':a.guarded,'require_front_controls':True,'deathmode':'neverend','marauder_delay_seconds':a.marauder_delay_seconds,'visual_observer':a.windowed,'speed':a.speed if a.speed is not None else (3 if a.windowed else 25)},indent=2))
 print(base)
