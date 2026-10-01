@@ -1,0 +1,16 @@
+{
+  "stop_minute": 60,
+  "expect": [
+    {"key":"observer","pattern":"TelMatch.*loaded natural=1 no_gifts=1 no_orders=1","by_minute":1,"scope":"any"},
+    {"key":"natural-production","pattern":"TelMatch.*finished team=","by_minute":60,"scope":"any"},
+    {"key":"landfall","pattern":"TelMatch.*landfall","by_minute":60,"scope":"any"},
+    {"key":"secured","pattern":"\\[AMPH\\].*secured","by_minute":60,"scope":"any"},
+    {"key":"completed-match","pattern":"TelMatch.*gameover winners=[0-9]","by_minute":60,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception|Error in.*[Tt]elchine","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"pursuit-review","pattern":"TelMatch.*CHASE_CANDIDATE","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

@@ -9186,3 +9186,60 @@ Final camera verification and archive details are in the
 [fixture](../tools/playtest/widgets/amphibious_fixture.lua),
 [visual observer](../tools/playtest/widgets/amphibious_visual.lua),
 [results](amphibious-operations-plan.md), [known issues](known-issues.md).
+
+
+### D-159 - Measure natural Telchine timing separately from naval pursuit restraint (2026-10-01)
+
+**Decision.** Run the requested full sixteen-AI Tundra match with ordinary
+production/economies, the pinned D-158 DLL and current scripts. Preserve the
+existing asymmetric map roster, record it explicitly, and place Legion on both
+TECH positions. A read-only observer supplies screenshots and behavioral
+updates during the simulation. End competitive metrics at GameOver, not when
+the engine later stops: the first persistent coastal hold was post-victory.
+
+**Reasoning.** Landfalls alone do not establish useful combat or strategic
+garrison behavior. The natural match completed at 38:37 with seven Telchines,
+six distinct landers, two secured stops and zero damage/kills. The +200 metal
+gate delayed their first completion until 32:58. Naval-pursuit restraint was
+therefore unexercised. Use an explicitly labelled separate controlled encounter:
+gift six Telchines, freeze economy/production, leave their orders to the AI,
+then retreat an enemy battleship after a verified hit. Spectator godmode grants
+only order permission; the fixture orders enemy team 2 and retains read access
+to the Telchine queues. No production policy changes are justified solely by
+fixing camera/fixture instrumentation; record candidate recruitment and garrison
+work as KI-449/KI-450 for scoped implementation and further natural tests.
+
+**Alternatives rejected.** Counting after-victory guards as match impact,
+declaring no chase from zero naval encounters, or using supplied units as
+natural-production evidence would overstate the result. A nearby cruiser died
+before escape, so the final target is tougher and starts at least 520 elmos
+from every Telchine. The strict result requires a surviving target beyond
+range. Onshore engine-generated ATTACK commands are automatic firing, not
+proof of pursuit; the audit checks actual ground height and hold-position state.
+
+**Invariant.** Preserve INV-096's dry regrouping/security requirement and the
+global invariant forbid in both new checks. The shore probe additionally
+requires 360 dry, hold-position samples, zero submerged naval attack orders
+and a live target over 1,000 elmos away. Match audit excludes post-GameOver
+frames. No new production invariant is introduced by observer-only tooling.
+
+**Verification.** Natural match archive
+`build-theatres/d159-tundra-full/runs/20261001-121509` is FAIL on existing and
+newly reproduced TECH invariant categories (65 pre-victory, 121 total), with
+no script errors or INV-096. This does not establish every warning's root cause.
+Final shore archive `build-theatres/d159-tundra-retreat/runs/20261001-123039`
+is PASS: 1,401.1 naval damage, ship alive 1,481 elmos away, 360/360 dry
+hold-position samples and no pursuit. Three preliminary probe failures remain
+archived and explained. Screenshots were inspected and shown during the runs.
+API parity (259 members), Python compilation and invariant-practice checks
+pass; eight pre-existing missing-hover-document links remain KI-404.
+
+**Files.** [Analysis and screenshots](tundra-8v8-telchine-analysis.md),
+[known issues](known-issues.md),
+[playtest guide](../tools/playtest/README.md),
+[natural observer](../tools/playtest/widgets/telchine_match_watch.lua),
+[GameOver-aware audit](../tools/playtest/audit_telchine_match.py),
+[shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[shore fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[match checks](../tools/playtest/checks/telchine_match.json),
+[shore checks](../tools/playtest/checks/telchine_shore.json).

@@ -372,3 +372,45 @@ also requires actual underwater positions to remain outside its weapon radius.
 On Serene use `--marauder-delay-seconds 120` to give Telchines independent combat
 time before faster Marauders clear their shared landing targets. The manifest
 records this fixture-only stagger; it does not alter production policy.
+
+## Natural Telchine match and naval-retreat probe (D-159)
+
+For an ordinary 16-AI Tundra game, stage `--map "Tundra Continents v2.3.1"
+--roles all --role TECH --side legion --speed 8 --minutes 60 --shots ""`
+with `--modoption experimentallegionfaction=1 --modoption deathmode=com
+--modoption nowasting=disabled --modoption dynamiccheats=0` and
+`--extra-widget tools/playtest/widgets/telchine_match_watch.lua`.
+Add `team_stats.lua` and `unit_census.lua` for economy/army context. Use a pinned
+DLL and game, verify script API parity, then launch. The observer gives no units,
+income or orders. Check the roster: Tundra's existing role distribution is
+asymmetric, so it is not a mirrored balance benchmark.
+
+The observer captures actual landfalls and first combat, and logs production,
+positions, naval hits and pursuit candidates. During a run, write a line
+`unique-key X Z HEIGHT Caption` to `LuaUI/Config/telchine_camera.txt` for another
+camera capture; `telchine_speed.txt` sets the requested speed after captures.
+Both files belong in that isolated write directory. Show screenshots with
+behavioral analysis during the run, as the owner requests.
+
+Judge with `--checks telchine_match --keep-going`. After `TelMatch gameover`,
+archive/stop promptly with `playtest.py watch` using the reached game minute.
+Run `audit_telchine_match.py <archived infolog.txt> --output <summary.json>`;
+it excludes every post-GameOver event from match results. A clean pursuit
+counter without a naval encounter is inconclusive. Invariant failures remain
+failures even when all landing checks pass.
+
+`prepare_telchine_shore_check.py --dir build-theatres/<run> --dll <pinned DLL>`
+stages a separate rendered twelve-minute Tundra capability probe. It injects
+six TECH Telchines and freezes builders/production. After autonomous landings
+and a dry hold at the final island, an enemy battleship retreats after a real
+weapon hit. The fixture orders only enemy team 2. Recoil's `godmode 3` grants
+spectator order permission, not invulnerability; spectator access is retained
+to read all Telchine command queues. The screen explicitly labels the test as
+controlled. Launch and judge with `--checks telchine_shore --keep-going`.
+Passing requires a live ship over 1,000 elmos from the firing anchor, one minute
+of dry Telchine samples in hold-position state and no submerged naval attack
+orders. Onshore automatic firing is allowed. A killed/stationary
+target or failed fixture must not be counted as a passing retreat test.
+
+See [the Tundra results](../../doc/tundra-8v8-telchine-analysis.md) for timing,
+strict failures, screenshots and production/garrison limitations.

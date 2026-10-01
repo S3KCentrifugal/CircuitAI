@@ -2738,6 +2738,15 @@ this a placement fixture, not a natural-economy regression. In particular,
 INV-047 requires tracing the exact blocking structure against the T3 row
 reservation before attributing the obstruction to the wall change.
 
+**D-159 natural Tundra evidence.** Before GameOver the 8v8 emitted 65 TECH
+invariant lines: INV-008/013/015/017/018/022/029/039/041. The complete archive
+also includes post-victory frames and totals 121 reports. This is a natural
+reproduction of the categories, not a diagnosis of each root cause or proof
+that ferry INV-041 has the same origin as prior layout warnings. Trace the
+cargo's task ownership separately from packing/exit obstruction. See the
+[report and exact counts](tundra-8v8-telchine-analysis.md). The global forbid
+remains active and the run verdict is FAIL.
+
 ### KI-428 — Harness start roles do not force runtime roles on unregistered maps
 
 **Problem.** Ascendancy has no registered role map. The harness's
@@ -3262,7 +3271,7 @@ cases. Match generated explanations to engine/script rules and a controlled
 shore-to-deep-water firing test. Documentation-generator fix remains pending;
 the user's mechanics explanation uses primary source rather than that note.
 
-### KI-446 - Amphibious production and saved-game recovery are not yet played
+### KI-446 - Amphibious AIR recruitment and saved-game recovery remain unplayed
 
 **Problem.** D-158's real-terrain fixtures inject complete Telchine/Marauder
 waves and freeze builders/factories. They verify routing, landfalls and combat,
@@ -3282,6 +3291,13 @@ each recruitment, and assert continued AIR fighter/constructor/transport work.
 For reload, audit all stable unit IDs and INV-096 before and after. Current
 pure-rule/API checks and injected-unit simulations are not this evidence.
 See [plan/results](amphibious-operations-plan.md).
+
+**D-159 natural-production evidence.** The full Tundra 8v8 produced seven
+TECH Telchines before GameOver; six crossed and landed autonomously. This
+establishes natural TECH recruitment on that map, but their arrival was too
+late for combat (KI-449). AIR natural recruitment, funded pending-queue stress
+and save/load reconstruction remain unplayed. See the
+[cutoff-aware results](tundra-8v8-telchine-analysis.md).
 
 ### KI-447 - Zero torpedo threat weights remain outside the new route query
 
@@ -3325,6 +3341,57 @@ units only after accounting for player control and legitimate other ownership.
 20 distinct units crossing and landing, all four wave groups securing ground,
 and both types dealing actual combat damage. Retain every failing seed/log.
 The passing run and screenshots do not resolve this repeatability issue.
+
+### KI-449 - Tundra natural Telchine recruitment arrives after decisive naval fighting
+
+**Problem.** In D-159's natural 8v8, southern TECH first completes `legamph`
+at 32:58, departs with three at 34:29 and lands at 35:06. Northern TECH is
+already effectively defeated. Seven Telchines finish before victory at 38:37,
+but none deal damage. `AmphibiousOps::Produce` requires the greater of its
++200 metal gate and TECH's combat gate, a funded bank and factory access;
+constructor work precedes it. This is one asymmetric map-role match, not
+proof of a universally optimal lower threshold.
+
+**Proposed solution.** Give experimental TECH/AIR amphibious recruitment a
+separate coastal-demand budget in `amphibious_ops.as`/`lanes.json` and its
+`tech.as`/`air_production.as` call sites (their caller gate also clamps the
+JSON minimum). Test +80
+to +120 candidate gates with energy availability, builder demand and bank
+reserves; do not lower the ordinary TECH rush/army gate. Retain bounded pending
+recruits and verify that transport/constructor work remains serviced. Compare
+first useful shore contact and total economic opportunity cost across mirrored
+rosters and seeds, rather than optimizing a single first-unit timestamp.
+
+**Verification.** Preserve the natural archive at
+`build-theatres/d159-tundra-full/runs/20261001-121509/`. Require pre-victory
+shore combat and protected economic assets with no new invariants. See the
+[measured analysis](tundra-8v8-telchine-analysis.md). No policy fix made in D-159.
+
+### KI-450 - Telchine island security does not retain strategic beachhead guards
+
+**Problem.** `AmphibiousOps::Tick` declares a cleared, regrouped Telchine
+foothold secure after eighteen seconds and sends the whole wave onward.
+`Hold("coastal guard")` is a fallback when no useful onward goal/route exists;
+it does not reserve defenders according to friendly mexes, geothermal assets
+or channel coverage. D-159's first two unopposed landings near five/six mexes
+were secured and vacated; no coastal-guard phase occurred before GameOver.
+The first later guard was at a defeated enemy start, after victory.
+
+**Proposed solution.** Add explicit, bounded beachhead assignments to the
+experimental amphibious objective policy. Rank dry firing positions by nearby
+allied economy, naval approach coverage and observed threats. Keep a minimum
+guard while an independently assembled assault wave advances; release or move
+guards when strategic value changes. Share objective ownership with the lane
+system rather than creating competing movement tasks. Preserve hold-position
+and dry-component repositioning; ships must never become underwater pursuit
+destinations. Keep other roles and ordinary TECH build sequencing unchanged.
+
+**Verification.** In a natural Tundra match, show a guarded economic beach
+remaining covered while another wave advances. Then prove the garrison fires
+from dry terrain at a ship that retreats beyond range without following it
+underwater. The separate controlled shore probe tests movement restraint only,
+not this missing strategic assignment. See the
+[analysis](tundra-8v8-telchine-analysis.md); no garrison-policy fix made in D-159.
 
 ## Indexed elsewhere
 
