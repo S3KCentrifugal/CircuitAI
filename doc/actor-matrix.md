@@ -302,3 +302,15 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | overflow.support / overflow.support.assist | Live floating bank, energy health, support target | Fund up to three support projects before converter growth, then assist |
 | AirEconomy::ConstructionTarget / FundConstructor | Income, bank drawdown, energy, constructor cost | Grow funded mobile work during overflow without counting factory BP as economy construction |
 | AIR observer | Engine UnitCreated and independent owned-unit range/completion scan | Audit twenty completed turrets per prior T2 lab at every new lab frame |
+
+
+## D-156: local AIR economy and interception
+
+| Object | Actors | Authoritative state |
+| --- | --- | --- |
+| AIR economic worker | ConstructorTarget, FundConstructor, Recruit, AirRules | Completed/projected crews, stable income, bank forecast, per-factory consecutive constructor count |
+| Local economic project | Energy, AssignedPower, Assist, FindAssistTarget, Resume, Record, Tick | Native frame and live task targets; at most six energy commitments, useful remaining work, home geometry |
+| New mex / distant owned mex | `mex.expand`, UpgradeMex, AssistMex, MexesReady | Fixed home expansion center; one remote owned upgrade task; all owned mexes still gate reactors |
+| AIR static defense | Air_AiMakeDefence, AirDefence::MakeTask/Place, Planned, Added, Record, Tick | AIR-owned project, cross-faction count caps, native reservations, bounded base radius, actual coverage; no shared remote defense queue |
+| AIR fighter | HomeTask, AirScreen::Tick/Intercept, AirWaves | Exclusive home/wave ledgers, fresh native observed aircraft, script territorial classification and cost allocation |
+| Wind frame | WindPass, Record, native FinishReservation, observer | Native slot-to-unit identity after framing; independent observer disambiguates six possible grid origins |

@@ -176,6 +176,33 @@ float CBattleAnalysis::MainRange(const CCircuitDef* cdef) const
 	return (w == nullptr) ? 0.f : w->GetRange();
 }
 
+float CBattleAnalysis::InterceptorCoverage(const CCircuitDef* cdef) const
+{
+	if (cdef == nullptr || cdef->GetDef() == nullptr) return 0.f;
+	float coverage = 0.f;
+	// Generated wrapper children are caller-owned; the UnitDef is borrowed.
+	for (WeaponMount* raw : cdef->GetDef()->GetWeaponMounts()) {
+		const std::unique_ptr<WeaponMount> mount(raw);
+		const std::unique_ptr<WeaponDef> weapon(mount->GetWeaponDef());
+		if (weapon != nullptr && weapon->GetInterceptor() != 0) {
+			const float range = weapon->GetCoverageRange();
+			if (std::isfinite(range)) coverage = std::max(coverage, range);
+		}
+	}
+	return coverage;
+}
+
+AIFloat3 CBattleAnalysis::GetAirContactPos(int index) const
+{
+	return index >= 0 && static_cast<size_t>(index) < airContacts.size()
+		? airContacts[index].pos : AIFloat3(-1.f, 0.f, -1.f);
+}
+
+float CBattleAnalysis::GetAirContactCost(int index) const
+{
+	return index >= 0 && static_cast<size_t>(index) < airContacts.size() ? airContacts[index].cost : 0.f;
+}
+
 float CBattleAnalysis::EffectiveRange(const CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& to) const
 {
 	CWeaponDef* main = MainWeapon(cdef);
@@ -495,6 +522,7 @@ void CBattleAnalysis::OnEnemyLost(const AIFloat3& pos, float c)
 void CBattleAnalysis::Update(int frame)
 {
 	EnsureGrid();
+	airContacts.clear();
 	const float dt = float(frame - lastDecay) / FRAMES_PER_SEC;
 	if (dt > 0.f) {
 		Decay(combat, std::pow(0.5f, dt / combatHalfLife));
@@ -515,6 +543,12 @@ void CBattleAnalysis::Update(int frame)
 		auto add = [this, m](Kind k) { cost[k] += m; ++count[k]; };
 		if (d->IsAbleToFly()) {
 			add(AIR);
+			const AIFloat3& pos = e->GetPos();
+			if (!e->IsHidden() && e->IsInRadarOrLOS() && std::isfinite(pos.x) && std::isfinite(pos.z)
+				&& pos.x >= 0.f && pos.z >= 0.f && pos.x < circuit->GetTerrainManager()->GetTerrainWidth()
+				&& pos.z < circuit->GetTerrainManager()->GetTerrainHeight()) {
+				airContacts.push_back({pos, m});
+			}
 			if (!e->IsHidden()) {
 				AddHeat(air, e->GetPos(), 1.f);
 			}

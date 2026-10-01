@@ -55,6 +55,7 @@ python tools/playtest/playtest.py run  --speed 20 --shots "14,22" --slow-near-sh
 python tools/playtest/playtest.py run  --checks tech_opening                    # the full 8v8, 14 game minutes
 python tools/playtest/playtest.py stage                                         # only copy the build and write the script
 python tools/playtest/playtest.py launch                                        # only start the engine
+python tools/playtest/playtest.py launch --headless                             # explicitly launch the staged match without rendering
 python tools/playtest/playtest.py watch --checks tech_opening --no-stop         # only follow a running game's log
 python tools/playtest/playtest.py stop                                          # kill the playtest engine
 python tools/playtest/stop_game.py                                              # the same, standalone

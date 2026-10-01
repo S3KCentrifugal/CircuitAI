@@ -328,7 +328,7 @@ namespace RoleAir {
         Global::Porc::LateGameMetalIncome = Global::RoleSettings::Air::PorcLateGameMetalIncome;
         Global::Porc::LateGameEnergyIncome = Global::RoleSettings::Air::PorcLateGameEnergyIncome;
         Global::Porc::LateBudgetMod = Global::RoleSettings::Air::PorcLateBudgetMod;
-        aiMilitaryMgr.porcAllyAA = Global::RoleSettings::Air::PorcAlliedClustersAA ? 1 : 0;
+        aiMilitaryMgr.porcAllyAA = !Global::RoleSettings::Air::ExperimentalBuild && Global::RoleSettings::Air::PorcAlliedClustersAA ? 1 : 0;
         // Change scout cap (unit count)
         aiMilitaryMgr.quota.scout = Global::RoleSettings::Air::MilitaryScoutCap;
 
@@ -1233,6 +1233,12 @@ namespace RoleAir {
         GenericHelpers::LogUtil("[Porc] AIR: " + side + " air-denial chain set (" + land.length() + " entries)", 1);
     }
 
+    void Air_AiMakeDefence(int cluster, const AIFloat3& in pos)
+    {
+        if (!Global::RoleSettings::Air::ExperimentalBuild && (ai.frame > 10 * MINUTE
+            || aiEconomyMgr.metal.income > 10.0f || aiEnemyMgr.mobileThreat > 0.0f)) Military::Porc::MakeDefence(cluster, pos);
+    }
+
     void Register() {
         if (RoleConfigs::Get(AiRole::AIR) !is null) return;
         RoleConfig@ cfg = RoleConfig(AiRole::AIR, cast<MainUpdateDelegate@>(@Air_MainUpdate));
@@ -1262,6 +1268,7 @@ namespace RoleAir {
         @cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_MilitaryAiTaskRemoved);
 
         @cfg.PorcChainHandler = cast<PorcChainDelegate@>(@Air_PorcChain);
+        @cfg.AiMakeDefenceHandler = cast<AiMakeDefence@>(@Air_AiMakeDefence);
         @cfg.LayoutPlanHandler = cast<LayoutPlanDelegate@>(@AirLayout::Init);
 
         RoleConfigs::Register(cfg);

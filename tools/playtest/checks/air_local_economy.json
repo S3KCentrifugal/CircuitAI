@@ -1,0 +1,16 @@
+{
+  "stop_minute":25,
+  "expect":[
+    {"key":"layout","pattern":"\\[AIR\\]\\[Layout\\] enabled","by_minute":1},
+    {"key":"workforce","pattern":"\\[AirWatch\\] construction t1=([2-9][0-9]|1[1-9]) ","by_minute":20,"scope":"any"},
+    {"key":"upgrades","pattern":"\\[Playtest\\] finished (arm|cor|leg)moho team 0","by_minute":17,"scope":"any"},
+    {"key":"reactor","pattern":"\\[Playtest\\] finished (arm|cor|leg)fus team 0","by_minute":20,"scope":"any"},
+    {"key":"mex-first","pattern":"\\[AirWatch\\] reactor-start def=(arm|cor|leg)fus basicMexes=0 unfinishedMexes=0","by_minute":20,"scope":"any"}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"remote-workforce","pattern":"\\[AirWatch\\] construction .*remote=([2-9]|[1-9][0-9])","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

@@ -6,41 +6,44 @@ otherwise the next action is tried. Every construction action rechecks current
 capability, queue and reservation state. Economy observations are cached once
 per second; existing construction stays assigned.
 
-D-154: `service.queued` uses shared `WallHelpers::AdmitQueued` to reject wall
-jobs inside allied start circles (1,200 elmos by default), aborting unstarted
-orders. AIR has no independent wall-ring planner. Its existing flak and radar
-services retain their normal rules. See [wall base exclusion](../wall-base-exclusion.md).
+D-156 removes `service.queued`: shared defense/radar jobs must not take AIR
+constructors to allied resource clusters. `AirDefence` admits bounded own-base
+flak, long-range AA and an anti-nuke; AIR has no wall planner. Other roles keep
+the [wall base exclusion](../wall-base-exclusion.md).
 
 | Order | Rule | Purpose |
 | --- | --- | --- |
 | 1 | current construction | Finish committed work before choosing another project |
 | 1a | `opening.commander.guard`, `commander.energy.assist`, `commander.energy.local`, `commander.local.assist`, `commander.factory.guard`, `commander.idle.assist`, `commander.idle.energy`, `commander.idle.wait` | Finish/guard production through three completed T1 constructors; local recovery may prevent a stall; after the crew, an idle plant releases the commander to nearby economy work |
-| 2 | `recovery.resume`, `recovery.assist`, `recovery.energy` | Recover an energy order, finish energy or add quickly payable supply during a sustained stall |
+| 2 | `recovery.resume`, `recovery.energy`, `recovery.assist` | Recover an energy order, add quickly payable local supply, then assist useful energy work during a sustained stall |
 | 2a | `project.resume` | Reassign an owned orphan order before adding another project |
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
-| 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes without a base-radius restriction; help existing frames |
+| 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes, at most one remote upgrade at a time; additional helpers stay local |
 | 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
 | 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
 | 5b | `support.assist`, `production.support` | Finish a support turret or grow funded support before general preparation assistance |
-| 5c | `fusion.access`, `fusion.prepare.assist` | Obtain T2 access and assist committed projects |
-| 5d | `mex.expand` | Before first reactor, at most six self-expanded mexes and no new expansion after preparation starts; normal expansion resumes with reactor income |
+| 5c | `defence.base`, `fusion.access` | Bounded own-base protection and T2 access |
+| 5d | `mex.expand` | Expand only within 1,400 elmos of start; before first reactor, at most six mexes and no expansion after preparation starts |
 | 6 | `storage.buffer` | Fund the first wind buffer without starvation |
 | 6a | `transition.bay` | Admit a funded first T2 package before the moving T1 energy-growth target can starve it |
-| 7 | `energy.assist`, `energy.grow` | Supply aircraft demand and T1 economy growth |
-| 8 | `intel.radar`, `defence.flak` | Radar and bounded T2 AA against observed aircraft |
+| 7 | `energy.grow`, `energy.assist` | Open funded parallel energy work, then help frames that need more power |
+| 8 | `intel.radar` | One local radar |
 | 9 | `storage.metal` | Save income needed for a funded T2 package |
 | 10 | `production.bay` | Fund first T2 or one additional independent bay |
 | 11 | `storage.energy`, `surplus.convert` | Buffer fluctuations; convert only surplus with metal capacity |
-| 12 | `service.queued` | Explicit native repair, defence and radar service |
 | 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard, or bounded retry |
 
 The factory recruiter separately prioritizes allied transport obligations, then
-one initial scout, three completed constructors, an immediate fighter screen, funded income-scaled economic builders,
-the full interception floor, a finite T1 strike, heavies and escorted waves.
+one initial scout, three completed constructors, an immediate fighter screen,
+urgent incursion defense, and funded income-scaled economic builders (at most
+two consecutive constructor orders before a fighter). Then come the full
+interception floor, finite T1 strikes, land-threat-gated gunships and escorted
+waves. T1 land support remains available after T2; a live incursion suspends
+optional T2 strike/heavy recruitment.
 Task priority controls engine resource priority; admission gates and available
 build power also limit competing spending.
-While preparing first fusion, optional aircraft wait after the defensive floor
+First-fusion preparation retains funded aircraft after the defensive floor
 and constructor quotas. Transports remain first. The 20-minute target cannot
 override any pending owned mex upgrade, including distant or gifted mexes.
 The initial scout is latched on completion, so its loss cannot restart the
@@ -54,7 +57,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 15826a0d338e06afbce2091ba07c56e0cb57b185; lines: 140 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: f666e54818f95e8adf1cbcc76e37bf7bb3088e93; lines: 133 -->
 
 ## D-152 sequencing
 
@@ -74,3 +77,9 @@ the opening crew and the home screen, constructor growth and a bounded strike
 mix continue: one strike per two fallback fighters, with income-scaled bombers
 and Cortex Shurikens; other factions retain their small gunship opener. T1
 production remains useful below 50 metal/s even if a bank-funded T2 plant exists.
+
+D-156 keeps finite T1 support available above that income too. Optional strikes
+require available completed fighters worth at least 1.25 times known enemy air
+and no friendly-territory incursion. This replaces the fixed enemy-air cutoff
+that suppressed Shurikens even with a superior friendly force. Funded economic
+constructors are interleaved with fighters before optional strike spending.

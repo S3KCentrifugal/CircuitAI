@@ -12,8 +12,53 @@ local function give(name,team,x,z,count)
     queue[#queue+1]="give "..(count and (count.." ") or "")..name.." "..team.." @"..x..","..Spring.GetGroundHeight(x,z)..","..z
 end
 function widget:Initialize() Spring.Echo("[AirFixture] scenario="..scenario.."; injected resources/units are not natural economy evidence") end
+function widget:UnitCreated(id,def,team)
+    local frame=Spring.GetGameFrame()
+    if scenario=="defence" and UnitDefs[def].name=="armthund" and not Spring.AreTeamsAllied(0,team)
+        and ((frame>=12000 and frame<12300) or (frame>=30000 and frame<30300)) then
+        WG.AirFixtureRaids=WG.AirFixtureRaids or {}
+        WG.AirFixtureRaids[id]=true
+    end
+end
 function widget:GameFrame(f)
     if once("cheat",300,f) then Spring.SendCommands("cheat 1") end
+    if scenario=="defence" then
+        local x,_,z=Spring.GetTeamStartPosition(0)
+        if once("defence-economy",600,f) then
+            local rear=z>Game.mapSizeZ/2 and -1 or 1
+            local side="arm"
+            for _,id in ipairs(Spring.GetTeamUnits(0)) do
+                local name=UnitDefs[Spring.GetUnitDefID(id)].name
+                if name:sub(1,3)=="cor" then side="cor" elseif name:sub(1,3)=="leg" then side="leg" end
+            end
+            give(side.."aca",0,x+200,z,2)
+            give(side.."afus",0,x+1400,z+rear*1400,6)
+            give(side=="leg" and "legadveconv" or side.."mmkr",0,x+1400,z+rear*900,12)
+            give(side.."estor",0,x+650,z+rear*200,4)
+            give(side.."mstor",0,x+550,z+rear*200,4)
+            give(side=="cor" and "corveng" or side.."fig",0,x,z,40)
+            Spring.Echo("[AirFixture] supplied defense economy and fighter reserve; not a natural benchmark")
+        end
+        for i,frame in ipairs({12000,30000}) do
+            if once("raid"..i,frame,f) then
+                local ally,enemy
+                for _,team in ipairs(Spring.GetTeamList()) do
+                    if team~=0 and team~=Spring.GetGaiaTeamID() then
+                        local units=Spring.GetTeamUnits(team)
+                        if #units>0 then
+                            if Spring.AreTeamsAllied(0,team) then ally=ally or team else enemy=enemy or team end
+                        end
+                    end
+                end
+                if ally and enemy then
+                    local ax,_,az=Spring.GetTeamStartPosition(ally)
+                    give("armrad",ally,ax,az,1)
+                    give("armthund",enemy,ax+250,az+250,6)
+                    Spring.Echo("[AirFixture] friendly-territory raid="..i.." neighbour="..ally.." enemy="..enemy.." at="..ax..","..az)
+                else Spring.Echo("[AirFixture] missing neighbor or enemy; defense fixture invalid") end
+            end
+        end
+    end
     if scenario=="screen" then
         for i,at in ipairs({600,3600,7200}) do
             if once("screen"..i,at,f) then

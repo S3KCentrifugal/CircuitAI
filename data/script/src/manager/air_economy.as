@@ -320,19 +320,14 @@ namespace AirEconomy {
     bool MetalFloating() { return ProductionMath::MetalFloating(aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage); }
     int ConstructorTarget(CCircuitDef@ d, bool advanced)
     {
-        if (d is null || recovery || energy < 160.0f || metal < 8.0f) return 1;
-        const float share = t2 == 0 ? 1.0f : advanced ? 0.6f : 0.4f;
+        if (d is null || energy < 160.0f || metal < 8.0f) return 1;
+        const float share = t2 == 0 ? 1.0f : advanced ? 0.55f : 0.45f;
         const int floor = advanced ? 2 : t2 > 0 ? 3 : 2;
         const int cap = advanced ? Global::RoleSettings::Air::MaxT2EconomyBuilders : Global::RoleSettings::Air::MaxT1EconomyBuilders;
         return ProductionMath::WorkforceTarget(ConstructionTarget() * share, d.GetBuildSpeed(), floor, AiMax(floor, cap));
     }
     bool FundConstructor(CCircuitDef@ d)
     {
-        if (d is null || recovery || bankM < d.costM * 0.5f) return false;
-        // Overflow funds useful work now; an entire unfinished lab/fusion must
-        // not consume the short recruitment forecast for its whole build time.
-        const bool floating = MetalFloating() && bankM >= d.costM + 150.0f;
-        return ProductionMath::Funded(bankM, metal * 0.3f, 150.0f, floating ? 0.0f : AirBuild::Committed(false), d.costM, 30.0f)
-            && ProductionMath::Funded(bankE, energy * 0.3f, 300.0f, floating ? 0.0f : AirBuild::Committed(true), d.costE, 30.0f);
+        return d !is null && ProductionMath::ConstructorFunded(bankM, bankE, metal, energy, d.costM, d.costE);
     }
 }

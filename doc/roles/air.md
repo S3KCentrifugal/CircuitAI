@@ -46,8 +46,8 @@ delay before its aircraft frame appears. See [handoff validation](../air-idle-fa
 | `MaxProductionBays` | 12 | T2 ceiling, never a mandatory build count |
 | `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
 | `T2ExpansionSupport` / `NanoParallel` | 20 / 3 | Completed turrets required on every existing T2 lab before expansion; funded simultaneous turret projects while metal floats |
-| `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 10 / 8 | Funded mobile construction ceilings; T1 remains available after T2 |
-| `EconomyBuildPowerPerMetal` / `BuildPowerFloatFactor` | 8 / 1.5 | Income-based work target, raised when metal storage is at least 75% full (minimum 300 metal) |
+| `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 40 / 24 | Funded mobile construction ceilings; T1 remains available after T2 |
+| `EconomyBuildPowerPerMetal` / `BuildPowerFloatFactor` | 24 / 1.5 | Income-based work target, raised when metal storage is at least 75% full (minimum 300 metal) |
 | `BuildPowerBankDrainSeconds` | 60 | Construction target includes drawing floating metal down toward half storage over this horizon |
 | `WindClusterGap` | 144 | Minimum gap between wind-cluster bounding circles; six touching footprints per 3-by-2 group |
 | `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
@@ -113,8 +113,8 @@ T1 land defences - AIR does not intend to fight on the ground.
 
 ## Registration
 
-`RoleAir::Register()` fills **19 of 26** slots: the common thirteen, factory
-production, three military hooks, the porc chain and the layout hook.
+`RoleAir::Register()` fills **20 of 26** slots: the common thirteen, factory
+production, three military hooks, the porc chain, the layout hook and defense placement.
 
 | Slot | Handler |
 | --- | --- |
@@ -137,9 +137,10 @@ production, three military hooks, the porc chain and the layout hook.
 | `MilitaryAiTaskRemovedHandler` | `Air_MilitaryAiTaskRemoved` |
 | `PorcChainHandler` | `Air_PorcChain` |
 | `LayoutPlanHandler` | `AirLayout::Init` |
+| `AiMakeDefenceHandler` | `Air_AiMakeDefence` |
 
 Not filled: both factory task hooks, both factory unit hooks,
-`MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`, `AiMakeDefenceHandler`.
+`MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`.
 
 ## Settings
 
@@ -581,7 +582,7 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 7b523605c3fcd28d9df7d8a59d76bf108662f3c1; lines: 1269 -->
+<!-- source: data/script/src/roles/air.as; blob: 0a0b8d773f30f5b19140e27728f4c86afc566cbd; lines: 1276 -->
 
 ## D-152 expansion and access
 

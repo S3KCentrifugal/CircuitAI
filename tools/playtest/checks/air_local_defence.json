@@ -1,0 +1,21 @@
+{
+  "stop_minute": 20,
+  "expect": [
+    {"key":"layout","pattern":"\\[AIR\\]\\[Layout\\] enabled","by_minute":1},
+    {"key":"transport-priority","pattern":"\\[Ferry\\] AIR: ordered one","by_minute":7},
+    {"key":"raid","pattern":"\\[AirFixture\\] friendly-territory raid=1","by_minute":7,"scope":"any"},
+    {"key":"response","pattern":"\\[AIR\\]\\[Intercept\\] fighters=","by_minute":8},
+    {"key":"engagement","pattern":"\\[AirWatch\\] raid-hit def=(arm(fig|hawk)|cor(veng|vamp)|legfig) ","by_minute":9,"scope":"any"},
+    {"key":"return","pattern":"\\[AIR\\]\\[Intercept\\] clear; return to screen","by_minute":10},
+    {"key":"transport-delivery","pattern":"arrived and transferred to team","by_minute":7},
+    {"key":"anti-placement","pattern":"\\[AIR\\]\\[AntiNuke\\].*ownCore=yes.*neighbourCore=true","by_minute":19},
+    {"key":"anti-geometry","pattern":"\\[AirWatch\\] anti-nuke-coverage loaded=2000.*own=true neighbor=true","by_minute":19,"scope":"any"},
+    {"key":"anti-ready","pattern":"\\[AirWatch\\] anti-nuke-ready","by_minute":20,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"fixture","pattern":"missing neighbor or enemy","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

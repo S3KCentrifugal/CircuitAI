@@ -1188,6 +1188,10 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float HeightAbove(const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, HeightAbove), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float EffectiveRange(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asMETHOD(CBattleAnalysis, EffectiveRange), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float MainRange(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, MainRange), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float InterceptorCoverage(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, InterceptorCoverage), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetAirContactCount() const", asMETHOD(CBattleAnalysis, GetAirContactCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetAirContactPos(int) const", asMETHOD(CBattleAnalysis, GetAirContactPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetAirContactCost(int) const", asMETHOD(CBattleAnalysis, GetAirContactCost), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotEnergy(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotEnergy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotReload(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotReload), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "bool LineOfFire(const AIFloat3& in, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, LineOfFire), asCALL_THISCALL); ASSERT(r >= 0);

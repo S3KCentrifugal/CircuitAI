@@ -1,5 +1,15 @@
 // Pure placement geometry, shared by policy and the standalone AS tests.
 namespace PlacementMath {
+    bool FriendlyTerritory(float allyDistanceSquared, float enemyDistanceSquared)
+    {
+        return allyDistanceSquared >= 0.0f && enemyDistanceSquared >= 0.0f
+            && allyDistanceSquared < enemyDistanceSquared;
+    }
+    bool CoversCore(float coverage, float distanceSquared, float coreRadius)
+    {
+        return coverage > 0.0f && coreRadius >= 0.0f && coverage >= coreRadius
+            && distanceSquared >= 0.0f && distanceSquared <= (coverage - coreRadius) * (coverage - coreRadius);
+    }
     bool FootprintIntersectsCircle(float x, float z, float halfX, float halfZ,
         float centreX, float centreZ, float radius)
     {

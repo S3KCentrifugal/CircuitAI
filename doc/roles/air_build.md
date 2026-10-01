@@ -22,12 +22,24 @@ and bank gates. An unfinished frame supplies no reactor income. Expensive reacto
 separate rear search region. `Nano` fills actual free bank slots using live
 assistant counts and the funded throughput target; T1 constructors remain
 necessary because T2 air constructors do not build ordinary T1 nanos.
-`Utility` provides queued-aware storage, radar and flak. `Assist` repairs an
-nearest unfinished reachable project within 1,800 elmos and respects retirement. `Leave` aborts the
+`Utility` provides queued-aware storage and radar. `AirDefence` owns flak, long-range AA and anti-nukes.
+`Assist` repairs the nearest unfinished reachable local project within 1,800 elmos and respects retirement. `Leave` aborts the
 owned tasks, releases military holds and removes AIR reservations before native
 role settings are restored.
 
 `FindAssistTarget` is shared by mobile assistance and idle production turrets.
+`AssignedPower` sums completed workers whose current builder/repair task targets
+that frame, excluding the asking worker. Small projects stop admitting helpers
+when assigned work can finish the remaining frame in twelve seconds; reactors
+use 120 seconds. `Energy` may open six funded energy projects instead of one
+frame per definition. Recovery starts small local energy work before helping
+an existing frame. An owned remote mex can still be upgraded, with one remote
+upgrade order at a time; `AssistMex` keeps the rest of the crew home.
+
+`Added`/`Tick` also reconcile defense and radar orders. Experimental AIR never
+accepts native distributed defense/radar service queues. `Record` checks the
+home-defense radius, local new-mex radius and loaded anti-nuke core coverage
+(INV-091/092/094). See [D-156 design and evidence](../air-local-economy-plan.md).
 It supports an optional definition filter (finish a nano) and an actual-reach
 filter for immobile turrets, plus an optional search radius. `Assist` wraps it in the mobile repair task. Wind
 placement gives commanders existing local slots, then a new entire six-slot
@@ -69,7 +81,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: e091a1eae1664a0e322b3da564fd42d20f9b73e1; lines: 406 -->
+<!-- source: data/script/src/roles/air_build.as; blob: b14b14004201ff567c47681a33fdb0db325ed647; lines: 449 -->
 
 ## D-153: income-gated plants and mex-first reactors
 

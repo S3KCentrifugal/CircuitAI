@@ -11,7 +11,8 @@ namespace AirBuild {
         if (t is null) return;
         const int kind = t.GetBuildType();
         if (kind == int(Task::BuildType::NANO) || kind == int(Task::BuildType::FACTORY)
-            || kind == int(Task::BuildType::ENERGY) || kind == int(Task::BuildType::CONVERT) || kind == int(Task::BuildType::STORE))
+            || kind == int(Task::BuildType::ENERGY) || kind == int(Task::BuildType::CONVERT) || kind == int(Task::BuildType::STORE)
+            || kind == int(Task::BuildType::DEFENCE) || kind == int(Task::BuildType::RADAR))
             pendingOwnership.insertLast(task);
     }
     void Tick()
@@ -70,6 +71,17 @@ namespace AirBuild {
     {
         if (t is null) return null;
         IBuilderTask@ build = cast<IBuilderTask>(t);
+        if (build !is null && build.buildDef !is null && build.target is null
+            && build.GetBuildType() == int(Task::BuildType::DEFENCE)
+            && !AirHome::Within(build.GetBuildPos(), Global::RoleSettings::Air::HomeDefenceRadius))
+            Invariants::Violation("INV-091", "AIR", "static defence ordered outside own base");
+        if (rule == "mex.expand" && build !is null && !AirHome::Within(build.GetBuildPos(), Global::RoleSettings::Air::HomeMexRadius))
+            Invariants::Violation("INV-092", "AIR", "new mex expansion ordered outside home area");
+        if (build !is null && build.buildDef !is null && build.target is null
+            && build.GetBuildType() == int(Task::BuildType::DEFENCE)
+            && build.buildDef.GetName() == UnitHelpers::GetAntiNukeNameForSide(UnitHelpers::GetSideForUnitName(build.buildDef.GetName()))
+            && !PlacementMath::CoversCore(aiBattle.InterceptorCoverage(build.buildDef), MapHelpers::SqDist(build.GetBuildPos(), Global::Map::StartPos), Global::RoleSettings::Air::AntiNukeCoreRadius))
+            Invariants::Violation("INV-094", "AIR", "anti-nuke placement does not cover own economic core");
         if (rule == "commander.factory.guard" && !PlantHasWork(NearestPlant(u)))
             Invariants::Violation("INV-081", "" + u.id, "AIR commander renewed guard on idle factory after opening crew");
         if (UnitHelpers::IsCommander(u.circuitDef) && NearestPlant(u) !is null
@@ -94,7 +106,8 @@ namespace AirBuild {
                 for (uint s = 0; s < 6; ++s) {
                     const int planned = AirLayout::windClusters[i].slots[s];
                     // A required pin is served on assignment, after Record.
-                    if (planned >= 0 && (slot >= 0 ? slot == planned : MapHelpers::SqDist(build.GetBuildPos(),
+                    if (planned >= 0 && (build.target !is null ? aiTerrainMgr.GetReservationUnit(planned) is build.target
+                        : slot >= 0 ? slot == planned : MapHelpers::SqDist(build.GetBuildPos(),
                         aiTerrainMgr.GetReservationPos(planned)) < 1.0f)) clustered = true;
                 }
             }
@@ -118,7 +131,8 @@ namespace AirBuild {
         // A killed/reassigned builder can leave a pinned order with no frame.
         // Busy/committed accounting must not strand that order forever.
         array<int> kinds = { int(Task::BuildType::ENERGY), int(Task::BuildType::FACTORY),
-            int(Task::BuildType::NANO), int(Task::BuildType::STORE), int(Task::BuildType::CONVERT) };
+            int(Task::BuildType::NANO), int(Task::BuildType::STORE), int(Task::BuildType::CONVERT),
+            int(Task::BuildType::DEFENCE), int(Task::BuildType::RADAR) };
         for (uint i = 0; i < (energyOnly ? 1 : kinds.length()); ++i) {
             IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, kinds[i]);
             IBuilderTask@ build = cast<IBuilderTask>(t);
@@ -140,11 +154,25 @@ namespace AirBuild {
             if (t.target.GetBuildProgress() >= 1.0f) continue;
             if (energyOnly && t.GetBuildType() != int(Task::BuildType::ENERGY)) continue;
             if (only !is null && t.buildDef !is only) continue;
+            if (!AirHome::EconomySite(t.target.GetPos(ai.frame))) continue;
             const float distance = MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame));
             if (distance > best || !aiTerrainMgr.CanReachAt(u, t.target.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) continue;
+            if (!ProductionMath::AssistUseful(AssignedPower(t.target, u), t.buildDef.GetBuildTime(), t.target.GetBuildProgress(),
+                IsReactor(t.buildDef) ? Global::RoleSettings::Air::ReactorProjectSeconds : Global::RoleSettings::Air::SmallProjectSeconds)) continue;
             best = distance; @nearest = t.target;
         }
         return nearest;
+    }
+    float AssignedPower(CCircuitUnit@ target, CCircuitUnit@ except)
+    {
+        float power = 0.0f;
+        for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
+            CCircuitUnit@ worker = ai.GetTeamUnit(AirEconomy::owned[i]);
+            if (worker is null || worker is except || worker.GetBuildProgress() < 1.0f) continue;
+            IBuilderTask@ task = cast<IBuilderTask>(worker.task);
+            if (task !is null && task.target is target) power += worker.circuitDef.GetBuildSpeed();
+        }
+        return power;
     }
     IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false, float radius = 1800.0f)
     {
@@ -274,10 +302,17 @@ namespace AirBuild {
         array<Id>@ ids = ai.GetOwnedUnitIds();
         CCircuitUnit@ nearest = null;
         float distance = 1.0e20f;
+        bool remoteBusy = false;
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ job = cast<IBuilderTask>(projects[i]);
+            if (job !is null && !job.IsDead() && job.GetBuildType() == int(Task::BuildType::MEXUP)
+                && !AirHome::Within(job.GetBuildPos(), Global::RoleSettings::Air::HomeMexRadius)) remoteBusy = true;
+        }
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ mex = ai.GetTeamUnit(ids[i]);
             if (mex is null || !AirEconomy::NeedsMexUpgrade(mex.circuitDef) || mex.GetBuildProgress() < 1.0f) continue;
             const AIFloat3 pos = mex.GetPos(ai.frame);
+            if (remoteBusy && !AirHome::Within(pos, Global::RoleSettings::Air::HomeMexRadius)) continue;
             if (Economy::MexTracker::AnyUpgradeInProgressNear(pos, 48.0f)
                 || !aiTerrainMgr.CanReachAt(u, pos, u.circuitDef.GetBuildDistance())) continue;
             const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), pos);
@@ -292,6 +327,8 @@ namespace AirBuild {
         for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
             CCircuitUnit@ mex = ai.GetTeamUnit(AirEconomy::owned[i]);
             if (mex is null || mex.circuitDef.GetExtractsMetal() <= 0.0f || mex.GetBuildProgress() >= 1.0f) continue;
+            if (!AirHome::Within(mex.GetPos(ai.frame), Global::RoleSettings::Air::HomeMexRadius)) continue;
+            if (!ProductionMath::AssistUseful(AssignedPower(mex, u), mex.circuitDef.GetBuildTime(), mex.GetBuildProgress(), 20.0f)) continue;
             if (MapHelpers::SqDist(u.GetPos(ai.frame), mex.GetPos(ai.frame)) > 1800.0f * 1800.0f) continue;
             return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, mex, 20 * SECOND));
         }
@@ -311,7 +348,12 @@ namespace AirBuild {
     }
     IUnitTask@ Energy(CCircuitUnit@ u, bool emergency, float walkRadius = 0.0f)
     {
-        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null) > 0) return null;
+        int pending = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null);
+        for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
+            CCircuitUnit@ frame = ai.GetTeamUnit(AirEconomy::owned[i]);
+            if (frame !is null && frame.GetBuildProgress() < 1.0f && aiEconomyMgr.GetEnergyMake(frame.circuitDef) > 0.0f) ++pending;
+        }
+        if (pending >= Global::RoleSettings::Air::EnergyParallel) return null;
         const string side = Global::AISettings::Side;
         const bool t2 = UnitHelpers::GetConstructorTier(u.circuitDef) >= 2;
         array<string> names;
@@ -340,9 +382,10 @@ namespace AirBuild {
         names.insertLast(UnitHelpers::GetTidalNameForSide(side));
         for (uint i = 0; i < names.length(); ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(names[i]);
-            if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY)) continue;
-            if (aiBuilderMgr.GetUnfinishedCount(d) > 0) continue;
+            if (!Can(u, d)) continue;
             const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
+            if (reactor && (Busy(ai.GetCircuitDef(fusion), Task::BuildType::ENERGY) || Busy(ai.GetCircuitDef(advancedFusion), Task::BuildType::ENERGY))) continue;
+            if (!reactor && !ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 50.0f, float(pending) * d.costM, d.costM, 20.0f)) continue;
             IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor, walkRadius);
             if (task !is null) return task;
         }

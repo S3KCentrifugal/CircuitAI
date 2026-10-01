@@ -1,5 +1,26 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    bool StrikeReady(float homeValue, float enemyAirValue, bool intrusion, float ratio)
+    {
+        return !intrusion && Valid(homeValue) && homeValue > 0.0f && Valid(enemyAirValue)
+            && Valid(ratio) && ratio > 0.0f && homeValue >= enemyAirValue * ratio;
+    }
+    bool ConstructorTurn(int consecutive, int maximum)
+    {
+        return consecutive >= 0 && maximum > 0 && consecutive < maximum;
+    }
+    bool ConstructorFunded(float bankM, float bankE, float incomeM, float incomeE, float costM, float costE)
+    {
+        return Valid(costM) && costM > 0.0f && bankM >= costM * 0.5f
+            && Funded(bankM, incomeM * 0.35f, 100.0f, 0.0f, costM, 30.0f)
+            && Funded(bankE, incomeE * 0.3f, 200.0f, 0.0f, costE, 30.0f);
+    }
+    bool AssistUseful(float assigned, float work, float progress, float seconds)
+    {
+        if (!Valid(assigned) || !Valid(work) || !Valid(progress) || progress >= 1.0f
+            || !Valid(seconds) || seconds <= 0.0f) return false;
+        return assigned < work * (1.0f - progress) / seconds;
+    }
     bool ExpansionSupportReady(int factories, int finishedFactories, int leastSupport, int required)
     {
         if (factories < 0 || finishedFactories < 0 || leastSupport < 0 || required <= 0) return false;

@@ -1577,3 +1577,18 @@ bounding rectangle. `CanReserveArea(centre, facing, halfAcross, halfAlong)` is a
 side-effect-free whole-rectangle admission test, including bounds and allied
 plans. `IsAllyLayoutBlocked(def, position, facing)` checks a snapped footprint
 against foreign reservations, without changing local marks.
+
+### D-156 current air contacts and interceptor coverage
+
+`aiBattle.GetAirContactCount()`, `GetAirContactPos(index)` and
+`GetAirContactCost(index)` expose value snapshots refreshed once per second
+from non-hidden known aircraft currently in allied radar or LOS. Unknown radar
+blips without a known aircraft definition are excluded. Invalid indexes return
+a negative position or zero cost. This does not expose unseen opponents and
+does not reuse decaying air heat as a live-contact signal. AIR owns grouping,
+friendly-territory classification and response orders in script.
+
+`aiBattle.InterceptorCoverage(def)` returns the largest finite positive
+coverage of the definition's interceptor weapons, or zero. The generated
+weapon mounts/definitions are temporary owned wrappers; no wrapper is retained
+across frames. Missile travel range is not interception coverage.

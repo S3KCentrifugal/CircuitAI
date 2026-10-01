@@ -3,6 +3,8 @@
 #include "lifecycle.as"
 
 // AIR sites use native reservation/claim/frame ownership. No TECH controller calls.
+#include "../helpers/air_home.as"
+
 namespace AirLayout {
     class Bay {
         string key;
@@ -259,7 +261,7 @@ namespace AirLayout {
                 for (uint b = 0; b < bays.length(); ++b)
                     if ((bays[b].slot >= 0 || bays[b].factoryId >= 0)
                         && MapHelpers::SqDist(p, bays[b].centre) < (reactor ? 700.0f * 700.0f : 250.0f * 250.0f)) near = true;
-                if (near || !Inside(p, 96.0f) || aiTerrainMgr.IsZoneAlly(p) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())
+                if (near || !Inside(p, 96.0f) || !AirHome::EconomySite(p) || aiTerrainMgr.IsZoneAlly(p) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())
                     || !aiTerrainMgr.CanReserveBuilding(d, p, facing)) continue;
                 const int slot = aiTerrainMgr.ReserveBuilding(d, p, facing);
                 if (slot < 0) continue;
@@ -320,7 +322,7 @@ namespace AirLayout {
                 const AIFloat3 p = WindPos(c, d, int(s));
                 if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), u.circuitDef.GetBuildDistance())) continue;
                 if (walkRadius > 0.0f && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), walkRadius)) continue;
-                if (!Inside(p, 32.0f) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
+                if (!Inside(p, 32.0f) || !AirHome::EconomySite(p) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
                 int state = aiTerrainMgr.GetReservationState(c.slots[s]);
                 if (state < 0 || state == 4) {
                     aiTerrainMgr.ReleasePersistentBuilding(c.slots[s]);
@@ -356,9 +358,10 @@ namespace AirLayout {
                         float(other.GetFootprintZ()) * 16.0f))) + Global::RoleSettings::Air::WindClusterGap + 16.0f;
                     if (MapHelpers::SqDist(c.centre, windClusters[i].centre) < separation * separation) near = true;
                 }
-                if (near || !Inside(c.centre, diameter) || aiTerrainMgr.IsZoneAlly(c.centre)) continue;
+                if (near || !Inside(c.centre, diameter) || !AirHome::EconomySite(c.centre) || aiTerrainMgr.IsZoneAlly(c.centre)) continue;
                 for (int s = 0; s < 6; ++s) {
                     const AIFloat3 p = WindPos(c, d, s);
+                    if (!AirHome::EconomySite(p)) break;
                     if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), u.circuitDef.GetBuildDistance())) break;
                     if (walkRadius > 0.0f && !ProductionMath::WithinReach(MapHelpers::SqDist(origin, p), walkRadius)) break;
                     if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) break;

@@ -7,6 +7,7 @@ local sample, stalledM, stalledE=0,0,0
 local previousDamage, damageHook
 local windGroups={}
 local nanoProjects={}
+local stockReady={}
 local function echo(s) Spring.Echo(tag..s) end
 local function airPlant(name)
     return name=="armap" or name=="corap" or name=="legap" or name=="armaap" or name=="coraap" or name=="legaap"
@@ -53,39 +54,100 @@ local function checkExpansion(newID)
 end
 local function windCreated(id,d)
     local x,_,z=Spring.GetUnitPosition(id)
-    for i,g in ipairs(windGroups) do
-        for s,p in ipairs(g.slots) do
-            if math.abs(p.x-x)<1 and math.abs(p.z-z)<1 then
-                if p.id and not Spring.ValidUnitID(p.id) then echo("wind-reused cluster="..i.." slot="..s) end
-                p.id=id; return
+    local w,h=d.xsize*8,d.zsize*8
+    local facing=Spring.GetUnitBuildFacing(id)
+    local function vector(a,b)
+        if facing==1 then return b,-a elseif facing==2 then return -a,-b elseif facing==3 then return -b,a end
+        return a,b
+    end
+    local function contains(c,px,pz)
+        for _,p in ipairs(c.slots) do if math.abs(p.x-px)<1 and math.abs(p.z-pz)<1 then return true end end
+        return false
+    end
+    local function resolve(g)
+        g.slots=g.candidates[1].slots
+        for _,p in ipairs(g.slots) do
+            for _,member in ipairs(g.members) do
+                if math.abs(p.x-member.x)<1 and math.abs(p.z-member.z)<1 then p.id=member.id end
+            end
+        end
+        if #g.candidates==1 and not g.resolved then
+            local c=g.candidates[1]
+            g.x,g.z,g.resolved=c.x,c.z,true
+            for _,other in ipairs(windGroups) do
+                if other~=g and other.resolved and math.sqrt((g.x-other.x)^2+(g.z-other.z)^2)<g.radius+other.radius+143 then
+                    Spring.Echo("[INVARIANT] INV-078 AIR observer: independently resolved wind clusters overlap their gap")
+                end
             end
         end
     end
-    local w,h=d.xsize*8,d.zsize*8
-    local facing=Spring.GetUnitBuildFacing(id)
-    local function offset(a,b)
-        if facing==1 then return x+b,z-a elseif facing==2 then return x-a,z-b elseif facing==3 then return x-b,z+a end
-        return x+a,z+b
-    end
-    local cx,cz=offset(w,h/2)
-    local radius=math.sqrt((3*w)^2+(2*h)^2)/2
-    for _,g in ipairs(windGroups) do
-        if math.sqrt((cx-g.x)^2+(cz-g.z)^2)<radius+g.radius+143 then
-            Spring.Echo("[INVARIANT] INV-078 AIR observer: wind outside six-slot grid or cluster gap")
+    for i,g in ipairs(windGroups) do
+        for s,p in ipairs(g.members) do
+            if math.abs(p.x-x)<1 and math.abs(p.z-z)<1 then
+                if p.id and not Spring.ValidUnitID(p.id) then echo("wind-reused cluster="..i.." slot="..s) end
+                p.id=id; resolve(g); return
+            end
+        end
+        local candidates={}
+        for _,c in ipairs(g.candidates) do if contains(c,x,z) then candidates[#candidates+1]=c end end
+        if #candidates>0 then
+            g.candidates=candidates
+            g.members[#g.members+1]={x=x,z=z,id=id}
+            resolve(g); return
         end
     end
-    local g={x=cx,z=cz,radius=radius,slots={}}
-    for row=0,1 do for col=0,2 do
-        local px,pz=offset(col*w,row*h)
-        g.slots[#g.slots+1]={x=px,z=pz}
+    local radius=math.sqrt((3*w)^2+(2*h)^2)/2
+    local g={radius=radius,candidates={},members={{x=x,z=z,id=id}}}
+    -- Parallel builders can create any of the six slots first. Keep all six
+    -- possible origins until subsequent engine frames disambiguate the grid.
+    for firstRow=0,1 do for firstCol=0,2 do
+        local dx,dz=vector(firstCol*w,firstRow*h)
+        local ox,oz=x-dx,z-dz
+        local cx,cz=vector(w,h/2)
+        local c={x=ox+cx,z=oz+cz,slots={}}
+        for row=0,1 do for col=0,2 do
+            local px,pz=vector(col*w,row*h)
+            c.slots[#c.slots+1]={x=ox+px,z=oz+pz}
+        end end
+        g.candidates[#g.candidates+1]=c
     end end
-    g.slots[1].id=id; windGroups[#windGroups+1]=g
-    echo("wind-cluster-start cluster="..#windGroups.." x="..cx.." z="..cz.." stride="..w.."/"..h)
+    windGroups[#windGroups+1]=g; resolve(g)
+    echo("wind-cluster-start cluster="..#windGroups.." first="..x..","..z.." stride="..w.."/"..h)
 end
 function widget:Initialize() echo("loaded; read-only observer team=0") end
 function widget:UnitCreated(id,def,team,builder)
     if team~=0 then return end
     local name=UnitDefs[def].name
+    if builder and (name=="armamd" or name=="corfmd" or name=="legabm") then
+        local x,_,z=Spring.GetUnitPosition(id)
+        local hx,_,hz=Spring.GetTeamStartPosition(0)
+        local coverage=0
+        for _,weapon in ipairs(UnitDefs[def].weapons) do
+            coverage=math.max(coverage,WeaponDefs[weapon.weaponDef].coverageRange or 0)
+        end
+        local own=math.sqrt((x-hx)^2+(z-hz)^2)+800<=coverage
+        local neighborDistance=math.huge
+        local neighborCovered=false
+        for _,teamID in ipairs(Spring.GetTeamList()) do
+            if teamID~=0 and Spring.AreTeamsAllied(0,teamID) and #Spring.GetTeamUnits(teamID)>0 then
+                local ax,_,az=Spring.GetTeamStartPosition(teamID)
+                local sq=(ax-hx)^2+(az-hz)^2
+                if sq<neighborDistance then
+                    neighborDistance=sq
+                    neighborCovered=math.sqrt((x-ax)^2+(z-az)^2)+800<=coverage
+                end
+            end
+        end
+        echo("anti-nuke-coverage loaded="..coverage.." own="..tostring(own).." neighbor="..tostring(neighborCovered))
+        if not own then Spring.Echo("[INVARIANT] INV-094 AIR observer: anti-nuke leaves own core uncovered") end
+    end
+    if builder and UnitDefs[def].isImmobile and #UnitDefs[def].weapons>0 then
+        local x,_,z=Spring.GetUnitPosition(id)
+        local hx,_,hz=Spring.GetTeamStartPosition(0)
+        local distance=math.sqrt((x-hx)^2+(z-hz)^2)
+        echo("static-defence def="..name.." homeDistance="..math.floor(distance))
+        if distance>1500 then Spring.Echo("[INVARIANT] INV-091 AIR observer: static weapon outside home defense radius") end
+    end
     if advancedPlant(name) and builder then checkExpansion(id) end
     if name=="armwin" or name=="corwin" or name=="legwin" then windCreated(id,UnitDefs[def]); return end
     if name~="armfus" and name~="corfus" and name~="legfus" and name~="armafus" and name~="corafus" and name~="legafus" then return end
@@ -119,7 +181,12 @@ end
 local function damageEvent(id,def,team,damage,paralyzer,weapon,projectile,attacker,attackerDef,attackerTeam)
     if attackerTeam~=0 or not attackerDef or not UnitDefs[attackerDef].canFly or paralyzer then return end
     if Spring.AreTeamsAllied(team,attackerTeam) then return end
-    if damage>=20 then echo("damage attacker="..attacker.." def="..UnitDefs[attackerDef].name.." victim="..id.." amount="..math.floor(damage)) end
+    if damage>=20 then
+        echo("damage attacker="..attacker.." def="..UnitDefs[attackerDef].name.." victim="..id.." amount="..math.floor(damage))
+        if WG.AirFixtureRaids and WG.AirFixtureRaids[id] then
+            echo("raid-hit def="..UnitDefs[attackerDef].name.." victim="..id.." amount="..math.floor(damage))
+        end
+    end
 end
 function widget:Shutdown()
     local env=getfenv(0)
@@ -170,13 +237,26 @@ function widget:GameFrame(f)
         end
     end
     if f%300==0 then
-        local t1,t2,nano,bp=0,0,0,0
+        local t1,t2,nano,bp,remote,working=0,0,0,0,0,0
+        local hx,_,hz=Spring.GetTeamStartPosition(0)
         for _,id in ipairs(Spring.GetTeamUnits(0)) do
             local d=UnitDefs[Spring.GetUnitDefID(id)]
             local _,_,_,_,progress=Spring.GetUnitHealth(id)
             if progress and progress>=1 then
                 if d.name=="armca" or d.name=="corca" or d.name=="legca" then t1=t1+1; bp=bp+(d.buildSpeed or 0) end
                 if d.name=="armaca" or d.name=="coraca" or d.name=="legaca" then t2=t2+1; bp=bp+(d.buildSpeed or 0) end
+                if d.canFly and d.isBuilder and not d.isFactory then
+                    local x,_,z=Spring.GetUnitPosition(id)
+                    if (x-hx)^2+(z-hz)^2>2400^2 then remote=remote+1 end
+                    if Spring.GetUnitIsBuilding(id) then working=working+1 end
+                end
+                if d.name=="armamd" or d.name=="corfmd" or d.name=="legabm" then
+                    local stock=Spring.GetUnitStockpile(id)
+                    if stock and stock>0 and not stockReady[id] then
+                        stockReady[id]=true
+                        echo("anti-nuke-ready def="..d.name.." stock="..stock)
+                    end
+                end
                 if d.name=="armnanotc" or d.name=="cornanotc" or d.name=="legnanotc" then
                     nano=nano+1
                     local target=Spring.GetUnitIsBuilding(id)
@@ -203,7 +283,7 @@ function widget:GameFrame(f)
             end
             if n==6 then full=full+1 end
         end
-        echo("construction t1="..t1.." t2="..t2.." mobileBP="..bp.." nanos="..nano.." fullWindClusters="..full)
+        echo("construction t1="..t1.." t2="..t2.." mobileBP="..bp.." nanos="..nano.." fullWindClusters="..full.." remote="..remote.." working="..working)
         local count=0; for _ in pairs(plants) do count=count+1 end
         echo(string.format("eco t=%.1f M=%.1f/%.0f +%.1f pull=%.1f E=%.1f/%.0f +%.1f pull=%.1f stallSeconds=%.1f/%.1f plants=%d",f/30,m,ms,mi,mp,e,es,ei,ep,stalledM,stalledE,count))
     end

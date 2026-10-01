@@ -6,13 +6,27 @@ namespace AirProduction {
     int countLog = -100000;
     CRouteTask@ openingScout = null;
     int Projected(CCircuitDef@ d) { return d is null ? 0 : d.count + aiFactoryMgr.GetPendingRecruitCount(d); }
+    float AvailableFighterValue()
+    {
+        float value = AirScreen::HomeValue();
+        array<string>@ ids = AirWaves::heldFighters.getKeys();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (u !is null && u.GetBuildProgress() >= 1.0f && !home.exists(ids[i])) value += u.circuitDef.costM;
+        }
+        return value;
+    }
     IUnitTask@ Recruit(CCircuitUnit@ plant, const string &in name, int target, const string &in purpose, Task::Priority priority, bool utility = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(name);
         if (d is null || !plant.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || Projected(d) >= target) return null;
         IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(utility ? Task::RecruitType::BUILDPOWER : Task::RecruitType::FIREPOWER,
             priority, d, plant.GetPos(ai.frame), 64.0f));
-        if (t !is null) GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target, 1);
+        if (t !is null) {
+            const string key = "air.crew.streak." + plant.id;
+            aiTerrainMgr.SetLayoutInt(key, utility ? aiTerrainMgr.GetLayoutInt(key, 0) + 1 : 0);
+            GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target, 1);
+        }
         return t;
     }
     IUnitTask@ MakeTask(CCircuitUnit@ u)
@@ -75,27 +89,30 @@ namespace AirProduction {
                 Invariants::Violation("INV-082", "" + u.id, "AIR failed to enqueue available initial fighter after completed crew");
         }
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
+        const float intrusion = AirScreen::IntrusionCost();
         if (affordable) {
             const int assignedToWaves = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-            @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2,
+            const int urgent = intrusion > 0.0f ? AirEconomy::HomeTarget() : advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2;
+            @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(urgent,
                 AirScreen::CountOther(fighter), assignedToWaves + scoutAway), "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
-        if (AirEconomy::FundConstructor(builder)) {
-            @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
+        if (AirEconomy::FundConstructor(builder) && Projected(builder) < constructors) {
+            if (ProductionMath::ConstructorTurn(aiTerrainMgr.GetLayoutInt("air.crew.streak." + u.id, 0), Global::RoleSettings::Air::ConstructorsPerFighter))
+                @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
+            else
+                @t = Recruit(u, fighter, Projected(ai.GetCircuitDef(fighter)) + 1, "constructor.screen", Task::Priority::NORMAL);
             if (t !is null) return t;
         }
-        // A low-income T2 purchase must not switch the useful T1 force off.
-        if (basic && AirEconomy::t2 > 0 && AirEconomy::metal >= Global::RoleSettings::Air::TransitionMinMetal)
-            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
         @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen + scoutAway), "intercept", Task::Priority::HIGH);
         if (t !is null) return t;
         // Transports and the defensive fighter floor above remain first.
-        if (basic && AirEconomy::metal >= 12.0f && AirEconomy::EnemyAir() < 1000.0f) {
+        const bool strike = ProductionMath::StrikeReady(AvailableFighterValue(), AirEconomy::EnemyAir(), intrusion > 0.0f, Global::RoleSettings::Air::StrikeControlRatio);
+        if (basic && strike && AirEconomy::metal >= 12.0f) {
             const string bomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
             // One strike order per two fighters after the screen: finite targets
             // replenish casualties without letting strike losses starve air control.
@@ -104,6 +121,7 @@ namespace AirProduction {
                 const bool supportFirst = (phase / 3) % 2 == 0;
                 for (int pass = 0; pass < 2; ++pass) {
                     const bool support = pass == 0 ? supportFirst : !supportFirst;
+                    if (support && aiBattle.EnemyCost(0) + aiBattle.EnemyCost(4) + aiBattle.EnemyCost(5) < 300.0f) continue;
 
                     const int target = ProductionMath::StrikeTarget(AirEconomy::metal,
                         support ? Global::RoleSettings::Air::T1SupportMetalStep : Global::RoleSettings::Air::T1BomberMetalStep,
@@ -113,12 +131,12 @@ namespace AirProduction {
                 }
             }
         }
-        if (advanced && AirEconomy::metal >= 250.0f) {
+        if (advanced && strike && AirEconomy::metal >= 250.0f && aiBattle.EnemyCost(0) >= 1000.0f) {
             const string heavy = side == "cortex" ? "corcrwh" : side == "legion" ? "legfort" : "";
             @t = Recruit(u, heavy, 6, "heavy", Task::Priority::NORMAL);
             if (t !is null) return t;
         }
-        if (advanced && AirEconomy::metal >= Global::RoleSettings::Air::BomberWaveProductionMetalIncome) {
+        if (advanced && strike && AirEconomy::metal >= Global::RoleSettings::Air::BomberWaveProductionMetalIncome) {
             const string bomber = UnitHelpers::GetT2WaveBomberForSide(side);
             CCircuitDef@ bd = ai.GetCircuitDef(bomber);
             CCircuitDef@ fd = ai.GetCircuitDef(fighter);
@@ -135,6 +153,12 @@ namespace AirProduction {
         // A sustainable production share leaves resources for growth. Emergency floor above bypasses this.
         if (AirEconomy::bankM < 80.0f && aiEconomyMgr.metal.pull > AirEconomy::metal * 1.2f)
             return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        // Keep the old lab available for economic crews and finite land support;
+        // sustained advanced fighter production belongs to the advanced bays.
+        if (basic && AirEconomy::t2 > 0 && AirEconomy::metal >= Global::RoleSettings::Air::TransitionMinMetal) {
+            aiTerrainMgr.SetLayoutInt("air.t1.mix", aiTerrainMgr.GetLayoutInt("air.t1.mix", 0) + 1);
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        }
         if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
             @t = FactoryProduction::MakeTask(u);
             if (t !is null) return t;

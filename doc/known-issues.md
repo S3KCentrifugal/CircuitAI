@@ -2678,6 +2678,15 @@ functional expectations.
 invariant lines, while preserving all ten flank expectations. Current reports
 remain FAIL; no overall clean-game claim is made.
 
+**D-156 mixed fixture evidence.** Supreme's final Cortex defense run
+`build-theatres/d156-defence04/runs/20260930-225000/` meets all AIR expectations
+but retains 36 TECH invariant lines: INV-001/004/008/009/010/011/014/015/022/039.
+Two INV-010 lines are caused by the fixture creating enemy bombers on TECH's
+team. The remaining findings need natural reproduction and per-object triage;
+this run does not establish their cause or prove they all predate D-156.
+No AIR or independent observer invariant lines occur. See the
+[AIR evidence](air-local-economy-plan.md) for scope and timings.
+
 **D-144 sample evidence.** The natural-income September 29 lane-worker samples
 also report TECH invariants: Supreme INV-001/008/019, Glacial INV-013/019/029,
 and Ascendancy INV-004/008/013/015. Their overall checks remain FAIL despite
@@ -3164,6 +3173,39 @@ cases. Report storage fraction, actual waste/shared income, completed energy,
 mobile/static work, fighter replacement and stalls over time. Require a lower
 overflow duration without worsening energy starvation or violating invariants.
 Current evidence and exact runs: [D-155 results](air-support-before-expansion.md).
+
+**D-156 update.** The donated-constructor case improves with bounded local
+work, higher funded mobile targets and parallel energy projects; the matched
+25-minute run passes with zero invariants and no remote constructors. See
+[measured results](air-local-economy-plan.md). This is not a universal overflow
+fix: the wealthy six-AFUS defense fixture still fills its metal bank, and fewer
+new remote mexes lower income relative to D-155. Constructor loss and a broad
+late-economy matrix remain to be checked before closing this issue.
+
+### KI-443 - Some AIR constructors can remain on a distant local frame without making progress
+
+**Problem.** In D-156's final Armada gift run
+`build-theatres/d156-gift03/runs/20260930-223321`, constructors 7006 and 14636
+repeatedly report native `EXP: idle` on existing wind frames hundreds of elmos
+away, despite being inside the AIR home campus. Unit 14636 reaches 572 failed
+idle attempts near frame 45,300. Local admission and higher constructor counts
+do not repair this movement/task-execution failure. Other workers continue
+building, the first fusion completes at 14:50.4, and the role's invariants pass.
+
+**Proposed solution.** Reproduce with the retained six-minute constructor-gift
+fixture, log the engine command/goal and path-query state for the two stalled
+workers, and trace `IBuilderTask` experimental approach/re-evaluation and its
+goal-region completion. Add a bounded progress watchdog that reissues travel
+for the same owned frame, then releases only the stalled worker if retry fails.
+Expose the timeout/retry policy to script, preserve other assignees and the
+frame reservation, and avoid a global abort that strands otherwise active work.
+Keep TECH on its current defaults unless an independent regression verifies
+the shared mechanism change.
+
+**Verification.** Require actual distance/progress recovery after injected
+interruption, not a new task label. Compare active economic build power, worker
+positions and stall duration across Armada/Cortex/Legion, while retaining the
+constructor-gift economy and wind-reservation checks. Unfixed in D-156.
 
 ## Indexed elsewhere
 

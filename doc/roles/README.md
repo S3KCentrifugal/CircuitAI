@@ -162,7 +162,7 @@ row to see how consistently a slot is used.
 | `MilitaryAiUnitRemoved` | no | yes | no | no | no | no |
 | `MilitaryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
-| `AiMakeDefenceHandler` | no | no | yes | no | no | no |
+| `AiMakeDefenceHandler` | no | yes | yes | no | no | no |
 | `PorcChainHandler` | no | yes | no | no | yes | no |
 | `LayoutPlanHandler` | no | yes | yes | no | no | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |

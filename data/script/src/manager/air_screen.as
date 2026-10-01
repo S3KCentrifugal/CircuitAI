@@ -7,6 +7,9 @@ namespace AirScreen {
     dictionary routes; // unit id -> retained native task; units are resolved by id
     dictionary cellByUnit;
     int updated = -100000;
+    int screenLog = -100000;
+    int interceptLog = -100000;
+    bool responding = false;
     bool changed = true;
     bool IsFighter(const CCircuitDef@ d)
     {
@@ -29,6 +32,76 @@ namespace AirScreen {
         return AIFloat3(AiMax(128.0f, AiMin(float(AiTerrainWidth()) - 128.0f, p.x)), 0.0f,
             AiMax(128.0f, AiMin(float(AiTerrainHeight()) - 128.0f, p.z)));
     }
+    float IntrusionCost()
+    {
+        float cost = 0.0f;
+        for (int i = 0; i < aiBattle.GetAirContactCount(); ++i)
+            if (AirHome::Friendly(aiBattle.GetAirContactPos(i))) cost += aiBattle.GetAirContactCost(i);
+        return cost;
+    }
+    float HomeValue()
+    {
+        float value = 0.0f;
+        array<string>@ ids = routes.getKeys();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (u !is null && u.GetBuildProgress() >= 1.0f) value += u.circuitDef.costM;
+        }
+        return value;
+    }
+    void Intercept(array<string>@ ids)
+    {
+        array<AIFloat3> raids;
+        array<float> costs;
+        for (int i = 0; i < aiBattle.GetAirContactCount(); ++i) {
+            const AIFloat3 p = aiBattle.GetAirContactPos(i);
+            if (!AirHome::Friendly(p)) continue;
+            int group = -1;
+            for (uint j = 0; j < raids.length(); ++j)
+                if (MapHelpers::SqDist(p, raids[j]) < 600.0f * 600.0f) { group = int(j); break; }
+            if (group < 0) { raids.insertLast(p); costs.insertLast(0.0f); group = int(raids.length()) - 1; }
+            costs[group] += aiBattle.GetAirContactCost(i);
+        }
+        dictionary assigned;
+        int groups = 0;
+        for (uint pass = 0; pass < raids.length(); ++pass) {
+            int raid = -1;
+            for (uint j = 0; j < raids.length(); ++j) if (costs[j] > 0.0f && (raid < 0 || costs[j] > costs[raid])) raid = int(j);
+            if (raid < 0) break;
+            float required = costs[raid] * Global::RoleSettings::Air::InterceptCostRatio;
+            costs[raid] = 0.0f;
+            int defenders = 0;
+            while (required > 0.0f) {
+                int best = -1;
+                float distance = 1.0e20f;
+                for (uint i = 0; i < ids.length(); ++i) {
+                    if (assigned.exists(ids[i])) continue;
+                    CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+                    if (u is null) continue;
+                    const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), raids[raid]);
+                    if (sq < distance) { best = int(i); distance = sq; }
+                }
+                if (best < 0) break;
+                assigned.set(ids[best], true);
+                CCircuitUnit@ unit = ai.GetTeamUnit(parseInt(ids[best]));
+                CRouteTask@ task = null;
+                if (unit is null || !routes.get(ids[best], @task) || task is null) continue;
+                if (!AirHome::Friendly(raids[raid])) Invariants::Violation("INV-093", ids[best], "AIR interception assigned outside friendly territory");
+                array<AIFloat3> points = { Clamp(raids[raid]), Clamp(AIFloat3(raids[raid].x + 96.0f, 0.0f, raids[raid].z)) };
+                task.SetRoute(points);
+                required -= AiMax(1.0f, unit.circuitDef.costM);
+                ++defenders;
+            }
+            if (defenders > 0) {
+                ++groups;
+                if (ai.frame - interceptLog >= 10 * SECOND || !responding)
+                    GenericHelpers::LogUtil("[AIR][Intercept] fighters=" + defenders + " at=" + int(raids[raid].x) + "," + int(raids[raid].z), 1);
+            }
+        }
+        if (groups == 0 && responding) GenericHelpers::LogUtil("[AIR][Intercept] clear; return to screen", 1);
+        if (ai.frame - interceptLog >= 10 * SECOND) interceptLog = ai.frame;
+        responding = groups > 0;
+    }
     void Tick()
     {
         array<string>@ ids = routes.getKeys();
@@ -39,7 +112,9 @@ namespace AirScreen {
                 routes.delete(ids[i]); cellByUnit.delete(ids[i]); changed = true;
             }
         }
-        if (!changed && ai.frame - updated < Global::RoleSettings::Air::ScreenUpdateSeconds * SECOND) return;
+        const int interval = responding || aiBattle.GetAirContactCount() > 0
+            ? Global::RoleSettings::Air::InterceptUpdateSeconds : Global::RoleSettings::Air::ScreenUpdateSeconds;
+        if (!changed && ai.frame - updated < interval * SECOND) return;
         updated = ai.frame; changed = false;
         @ids = routes.getKeys();
         if (ids.length() == 0) return;
@@ -101,8 +176,12 @@ namespace AirScreen {
                 Invariants::Violation("INV-080", ids[i], "AIR screen endpoint is outside map");
             task.SetRoute(points);
         }
-        GenericHelpers::LogUtil("[AIR][Screen] fighters=" + ids.length() + " cells=" + cells + " tech=" + tech
-            + " centre=" + int(centre.x) + "," + int(centre.z) + " width=" + int(width) + " advance=" + int(advance), 1);
+        Intercept(ids);
+        if (ai.frame - screenLog >= Global::RoleSettings::Air::ScreenUpdateSeconds * SECOND) {
+            screenLog = ai.frame;
+            GenericHelpers::LogUtil("[AIR][Screen] fighters=" + ids.length() + " cells=" + cells + " tech=" + tech
+                + " centre=" + int(centre.x) + "," + int(centre.z) + " width=" + int(width) + " advance=" + int(advance), 1);
+        }
     }
     IUnitTask@ TaskFor(CCircuitUnit@ u)
     {
@@ -117,5 +196,5 @@ namespace AirScreen {
         return task;
     }
     void Removed(int id) { routes.delete("" + id); cellByUnit.delete("" + id); changed = true; }
-    void Reset() { routes.deleteAll(); cellByUnit.deleteAll(); updated = -100000; changed = true; }
+    void Reset() { routes.deleteAll(); cellByUnit.deleteAll(); updated = -100000; screenLog = -100000; interceptLog = -100000; responding = false; changed = true; }
 }

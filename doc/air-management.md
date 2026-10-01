@@ -5,6 +5,48 @@ controller. TECH continues through `TechRules`, `TechBuild`, `TechChain` and
 `Layout`. Both now share native allied reservations (D-153); their spending
 sequences and cluster geometries remain separate.
 
+## Local economic growth and air defense (D-156)
+
+The [design and measured results](air-local-economy-plan.md) define the current
+AIR-only policy. New mex expansion stays within 1,400 elmos of its start;
+ordinary economy sites stay within 2,400 and on the friendly side of known
+starts. Previously owned remote mexes still get one upgrade worker at a time.
+Constructor targets use 24 build power per stable metal income, bank drawdown,
+and caps of 40 T1/24 T2 constructors. These are ceilings, not an opening queue.
+Recruitment interleaves a fighter after two consecutive economic constructors.
+The thirty-second resource forecast does not subtract the entire remaining
+price of an unrelated reactor. Energy recovery can still recruit funded help.
+
+Up to six funded energy frames can progress concurrently. Additional helpers
+join a frame only while its assigned power cannot finish the remainder in the
+configured twelve seconds (small structures) or 120 seconds (reactors). Factory
+turrets remain production capacity and cannot replace the mobile economy crew.
+
+`Air_AiMakeDefence` disables shared porcupine planning while experimental AIR
+is active. The legacy disabled-feature behavior retains its old gates.
+`AirDefence` places at most four flak, one long-range AA and one anti-nuke in the
+own-base defense radius (1,500). AA also needs observed enemy air investment.
+Anti-nuke admission starts at fifteen minutes, +40 metal/+1,200 energy and a
+fundable cost forecast. Placement uses loaded interceptor coverage, retains
+the 800-elmo own core and favors the closest participating allied start.
+Native stockpile handling supplies missiles after completion. All structures
+still use native reservations and cannot occupy another role's planned area.
+
+`AirScreen` groups currently observed enemy aircraft in friendly territory and
+assigns nearby home fighters every two seconds. Its threat budget uses 1.5
+times observed metal cost; it restores the screen after contact disappears.
+This is a start-based territorial approximation, not a claim to model shifting
+ground control. Enemy-AA heat and stale unseen aircraft do not create live raids.
+Bombers keep existing targeting/wave behavior. Optional strikes require no live
+incursion and available completed fighters worth at least 1.25 times known
+enemy air investment; waiting escorts count, already launched waves do not.
+This replaces the fixed 1,000-metal enemy-air veto, which could suppress
+Shurikens despite a much larger friendly fighter force. Gunships require known
+land presence, and T1 support remains available after T2. Defense count limits
+are shared across faction variants so a gifted foreign constructor cannot add
+a second anti-nuke or long-range AA. Transport requests remain
+ahead of all ordinary recruitment.
+
 ## Layout and economy
 
 The T1 starter has a rear bank of up to five ordinary construction turrets.

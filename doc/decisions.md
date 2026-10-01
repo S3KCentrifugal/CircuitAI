@@ -8922,3 +8922,91 @@ Files: [settings](../data/script/src/global.as),
 [rule reference](roles/air_rules.md), [management reference](air-management.md),
 [actor matrix](actor-matrix.md), [invariants](invariants.md),
 [known issues](known-issues.md), and [plan/results](air-support-before-expansion.md).
+
+
+## D-156 - AIR keeps its economy local and defends allied airspace with fighters
+
+**Decision.** Apply the pre-written [design](air-local-economy-plan.md) to the
+experimental AIR controller. Constructor targets use 24 work/metal, caps 40/24,
+and a short recruitment forecast rather than charging a whole unfinished
+reactor to the next constructor. Interleave a fighter after two constructor
+orders. Permit six funded energy projects and cap incremental assistance by
+remaining work. Keep factory support separate, including the strict twenty
+completed turrets per existing T2 lab. Constrain new mex expansion to the start
+area; keep one worker available for previously owned distant mex upgrades.
+
+The owner explicitly replaces distributed static AA with fighter response.
+AIR opts out of shared porc/queued defense and owns bounded base flak, long-range
+AA and anti-nuke orders. The anti-nuke keeps its own core covered and chooses the
+closest feasible position toward the nearest allied start, using actual loaded
+interceptor coverage. Fresh known radar/LOS aircraft snapshots are native
+mechanism; territory, threat grouping and dispatch remain script policy.
+TECH files and spending behavior are deliberately unchanged. Existing TECH
+invariant failures observed in the mixed fixture remain strict whole-game
+failures, recorded under KI-427 rather than hidden by an AIR-only verdict.
+
+Optional strikes compare completed available fighter value against known enemy
+air (1.25 times), counting home fighters and waiting wave escorts, not escorts
+already committed to an attack. The fixed enemy-air cutoff rejected a Cortex
+strike despite a superior fighter reserve. Base-defense caps sum all faction
+variants: a donated foreign constructor must not bypass the single anti-nuke
+limit. Both cases were exposed and corrected in the mixed defense fixtures.
+
+**Alternatives rejected.** Raising constructor caps alone leaves serialized
+construction and distributed defense jobs intact. Counting factory turrets as
+idle economic work double-counts production capacity. A fixed bomber/gunship
+clock ignores air control and resources. Decaying air heat is not a live raid.
+Missile travel range is not anti-nuke coverage. Expanding around the current
+worker continually moves the home boundary. We keep the all-owned-mex reactor
+gate while limiting remote upgrade concurrency; dropping distant owned mexes
+from that gate would violate the owner's standing instruction.
+
+**Invariant.** INV-091 bounds AIR static-defense orders to its base; INV-092
+bounds new mex expansion to home; INV-093 confines defensive interception targets
+to friendly territory; INV-094 retains anti-nuke own-core coverage. INV-077/078/
+090 still guard reactor mex completion, six-wind placement and twenty-turret
+expansion. The wind audit now resolves framed units through native reservation
+identity: Legion's model-midpoint offset made an exact position comparison
+incorrect when resuming a damaged wind frame. The independent observer supports
+all six possible first-built slots, so parallel building does not invent a
+misaligned cluster.
+
+**Verification.** Native build and unit suite pass (76 ranking checks, geometry,
+eight lane suites, 128 production and twenty placement cases). The matched
+Armada constructor-gift run passes 25 minutes with zero script/invariant lines,
+fusion before twenty minutes and all sampled constructors local. The mixed
+Armada fixture demonstrates fighter dispatch/damage/return and anti-nuke
+completion plus stockpile; its strict report fails TECH invariants and the
+since-corrected Legion framed-wind audit. Exact final runs, timings, quantitative
+limits and subsequent Cortex checks are in [the results](air-local-economy-plan.md).
+Persistent native constructor movement stalls are recorded as KI-443; broad
+late overflow remains KI-442. Save/load and a full map matrix are not verified.
+
+Files: [settings](../data/script/src/global.as),
+[home geometry](../data/script/src/helpers/air_home.as),
+[placement math](../data/script/src/helpers/placement_math.as),
+[production math](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[layout](../data/script/src/manager/air_layout.as),
+[recruitment](../data/script/src/manager/air_production.as),
+[fighter screen](../data/script/src/manager/air_screen.as),
+[base defense](../data/script/src/manager/air_defence.as),
+[role hooks](../data/script/src/roles/air.as),
+[building actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[native observations](../src/circuit/terrain/BattleAnalysis.cpp),
+[native interface](../src/circuit/terrain/BattleAnalysis.h),
+[bindings](../src/circuit/script/InitScript.cpp),
+[production tests](../tests/production_math_tests.as),
+[geometry tests](../tests/placement_math_tests.as),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[economy checks](../tools/playtest/checks/air_local_economy.json),
+[defense checks](../tools/playtest/checks/air_local_defence.json),
+[playtest guide](../tools/playtest/README.md),
+[AIR reference](roles/air.md), [actions reference](roles/air_build.md),
+[rules reference](roles/air_rules.md), [role index](roles/README.md),
+[management](air-management.md), [API reference](angelscript-references.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), [plan/results](air-local-economy-plan.md).

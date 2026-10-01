@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <string>
 #include <chrono>
+#include <memory>
 
 namespace circuit {
 
@@ -61,6 +62,7 @@ public:
 	float Depth(const springai::AIFloat3& pos) const { return -Height(pos); }
 	float EffectiveRange(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to) const;
 	float MainRange(const CCircuitDef* cdef) const;   // the longest-range weapon's range
+	float InterceptorCoverage(const CCircuitDef* cdef) const;
 	float ShotEnergy(const CCircuitDef* cdef) const;   // energy one shot (salvo) takes from storage
 	float ShotReload(const CCircuitDef* cdef) const;
 	bool LineOfFire(const springai::AIFloat3& from, const springai::AIFloat3& to, float muzzle) const;
@@ -92,6 +94,9 @@ public:
 	int EnemyCount(int kind) const;
 	float SurfThreat(const springai::AIFloat3& pos) const;
 	float AirThreat(const springai::AIFloat3& pos) const;
+	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
+	springai::AIFloat3 GetAirContactPos(int index) const;
+	float GetAirContactCost(int index) const;
 
 	// --- water
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
@@ -142,6 +147,12 @@ public:
 	std::vector<springai::AIFloat3> GetLaneRoute(int lane, const springai::AIFloat3& from, int cls) const;
 
 private:
+	// Value snapshots, refreshed each second from current ally-visible contacts.
+	struct AirContact {
+		springai::AIFloat3 pos;
+		float cost;
+	};
+	std::vector<AirContact> airContacts;
 	struct SChoke {
 		springai::AIFloat3 pos, dir;
 		float width, heat, share;
