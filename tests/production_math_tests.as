@@ -1,3 +1,19 @@
+void test_first_lab_needs_no_existing_support() { Check(ProductionMath::ExpansionSupportReady(0, 0, 0, 20)); }
+void test_second_lab_rejects_nineteen_completed() { Check(!ProductionMath::ExpansionSupportReady(1, 1, 19, 20)); }
+void test_second_lab_accepts_twenty_completed() { Check(ProductionMath::ExpansionSupportReady(1, 1, 20, 20)); }
+void test_expansion_requires_every_lab_not_total_turrets() { Check(!ProductionMath::ExpansionSupportReady(2, 2, 19, 20)); }
+void test_expansion_rejects_unfinished_existing_lab() { Check(!ProductionMath::ExpansionSupportReady(2, 1, 20, 20)); }
+void test_expansion_support_loss_closes_gate() { Check(ProductionMath::ExpansionSupportReady(3, 3, 20, 20) && !ProductionMath::ExpansionSupportReady(3, 3, 19, 20)); }
+void test_expansion_invalid_snapshot_fails_closed() { Check(!ProductionMath::ExpansionSupportReady(-1, 0, 20, 20) && !ProductionMath::ExpansionSupportReady(1, 1, 20, 0)); }
+void test_float_target_includes_bank_drawdown() { Check(ProductionMath::ConstructionPower(50, 5000, 6000, 8, 1.5f, 60) > 600); }
+void test_nonfloating_construction_target_keeps_income_only() { Check(ProductionMath::ConstructionPower(20, 200, 1000, 8, 1.5f, 60) == 160); }
+void test_float_target_rejects_zero_horizon() { Check(ProductionMath::ConstructionPower(50, 5000, 6000, 8, 1.5f, 0) == 0); }
+void test_float_target_small_bank_does_not_trigger() { Check(!ProductionMath::MetalFloating(299, 300) && ProductionMath::MetalFloating(750, 1000)); }
+void test_parallel_support_fits_resource_budget() { Check(ProductionMath::SupportQueueReady(2, 3, 2000, 12000, 50, 1000, 210, 3200)); }
+void test_parallel_support_cannot_exceed_cap() { Check(!ProductionMath::SupportQueueReady(3, 3, 2000, 12000, 50, 1000, 210, 3200)); }
+void test_parallel_support_rejects_energy_shortage() { Check(!ProductionMath::SupportQueueReady(2, 3, 2000, 200, 50, 300, 210, 3200)); }
+void test_parallel_support_without_overflow_stays_serial() { Check(!ProductionMath::SupportQueueReady(1, 1, 2000, 12000, 50, 1000, 210, 3200)); }
+void test_overflow_short_recruitment_forecast_can_pay_for_worker() { Check(ProductionMath::Funded(5000, 15, 150, 0, 120, 30) && ProductionMath::Funded(4000, 210, 300, 0, 5000, 30) && !ProductionMath::Funded(4000, 210, 300, 20000, 5000, 30)); }
 void test_rate_zero_power_returns_zero() { Check(ProductionMath::Rate(100.0f, 0.0f, 0.5f) == 0.0f); }
 void test_screen_small_fleet_holds_rear() { Check(ProductionMath::Progress(4, 4, 40) == 0.0f); }
 void test_screen_half_fleet_advances_halfway() { Check(ProductionMath::Progress(22, 4, 40) == 0.5f); }

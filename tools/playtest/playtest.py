@@ -409,7 +409,9 @@ def pid_file(d):
 
 
 def launch(args):
-    d = Path(args.dir)
+    # The engine starts in its own directory; keep all writable output in the
+    # explicitly selected test directory even when the caller used a relative path.
+    d = Path(args.dir).resolve()
     if not (d / "script.txt").exists() or not (d / "AI" / "Skirmish" / AI_SHORT / AI_VERSION / "SkirmishAI.dll").exists():
         die("nothing staged in %s: run 'stage' first" % d)
     if running_pids(d):
@@ -441,7 +443,7 @@ def launch(args):
 
 def running_pids(d):
     """Engine processes started on this write dir, and no other spring.exe."""
-    needle = str(d).replace("/", "\\").lower()
+    needle = str(Path(d).resolve()).replace("/", "\\").lower()
     ps = ("Get-CimInstance Win32_Process -Filter \"Name='spring.exe' or Name='spring-headless.exe'\" | "
           "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }")
     try:

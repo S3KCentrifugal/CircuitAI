@@ -45,6 +45,12 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
         @t = AirBuild::AssistMex(u);
         if (t !is null) return AirBuild::Record(t, "mex.assist", u);
+        if (AirEconomy::MetalFloating()) {
+            @t = AirBuild::Nano(u);
+            if (t !is null) return AirBuild::Record(t, "overflow.support", u);
+            @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
+            if (t !is null) return AirBuild::Record(t, "overflow.support.assist", u);
+        }
         @t = AirBuild::Convert(u);
         if (t !is null) return AirBuild::Record(t, "mex.phase.convert", u);
         @t = AirBuild::FirstFusion(u);

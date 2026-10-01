@@ -20,6 +20,7 @@ services retain their normal rules. See [wall base exclusion](../wall-base-exclu
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes without a base-radius restriction; help existing frames |
+| 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
 | 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
 | 5b | `support.assist`, `production.support` | Finish a support turret or grow funded support before general preparation assistance |
 | 5c | `fusion.access`, `fusion.prepare.assist` | Obtain T2 access and assist committed projects |
@@ -53,7 +54,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 47f85ad1e335aa3555d1485c11424becd37bb51b; lines: 134 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 15826a0d338e06afbce2091ba07c56e0cb57b185; lines: 140 -->
 
 ## D-152 sequencing
 
@@ -62,6 +63,11 @@ Advanced conversion only follows completed mex upgrades. D-153 supersedes the T2
 income/full-bank test. `production.banked` runs just after the starter plant,
 before mex upgrades. Reactors still require completed mex upgrades. Existing recovery and opening
 crew/scout/fighter/transport ordering remains.
+
+D-155 applies the completed twenty-turret requirement to every expansion path,
+including `production.banked`. The first T2 lab retains its income/full-bank
+test. Overflow support follows mex work and precedes converters and fusion;
+energy recovery stays first. See [plan and evidence](../air-support-before-expansion.md).
 
 D-153 recruitment removes the blanket fusion-preparation wait. After transports,
 the opening crew and the home screen, constructor growth and a bounded strike

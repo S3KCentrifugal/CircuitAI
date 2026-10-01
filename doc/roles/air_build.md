@@ -69,14 +69,15 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: d735ee0d8f6ef0af23d3f388b710d0c8bb448278; lines: 382 -->
+<!-- source: data/script/src/roles/air_build.as; blob: e091a1eae1664a0e322b3da564fd42d20f9b73e1; lines: 406 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
 `RequiresMexes` covers reactors. `Factory` requires a full ten-second window
 with minimum income at least 50 metal/s or a bank covering the full plant cost.
-A fully banked plant bypasses support saturation and spare-capacity waits;
-other additional plants retain capacity checks. `AirEconomy::Transition` owns
+A fully banked plant bypasses spare-capacity waits. D-155 requires twenty
+completed, uniquely assigned turrets on every existing T2 lab before any
+additional T2 lab, including bank-funded expansion. `AirEconomy::Transition` owns
 that shared admission rule; `Record` checks INV-083 against the fresh inputs.
 An admitted plant is not canceled because income falls or another mex arrives.
 `AirLayout::Activate` validates every unused bay member before the first order,
@@ -85,3 +86,15 @@ relocating a blocked plan and preserving claimed or previously started bays.
 `Convert` scales T1 conversion with surplus energy until owned mex upgrades
 finish, permitting three concurrent orders. `Tick`, `Resume`, and `Record`
 retain the reactor mex gate (INV-077).
+
+## D-155: completed support before expansion
+
+`Factory`, `Resume`, and `Tick` use `AirEconomy::ExistingT2SupportReady` to
+recheck gifts, deaths and completion; invalid unstarted orders are cancelled,
+while already framed labs finish. `Record` checks INV-090. New T2 reservations
+require the complete twenty-slot support bank.
+
+`SupportCommitted` counts completed turrets, frames and unstarted owned orders
+once per bay. `Nano` permits up to `NanoParallel` (three) funded projects during
+metal overflow, otherwise one, with native reach checks and high task priority.
+Only completed turrets satisfy expansion. See [plan and evidence](../air-support-before-expansion.md).

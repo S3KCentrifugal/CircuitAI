@@ -284,6 +284,20 @@ Launch using an absolute `--dir` and watch with `--checks air_idle --minutes 10
 frame within five seconds of the third constructor, except an intervening
 transport. The observer checks real factory queues and commander orders.
 
+## AIR completed-support regression (D-155)
+
+Stage an Armada AIR duel with `widgets/air_watch.lua`, then prepare with
+`prepare_air_check.py --dir <run> --scenario capacity`. Run 45 minutes with
+`--checks air_support --wall-minutes 20 --keep-going`. The observer independently counts completed
+turrets within reach, uniquely assigned to existing factories, at every new
+T2 lab frame (INV-090); the check requires supported expansion through the
+sixth lab. The fixture supplies an economy, so its timings are capacity evidence.
+Use `--scenario constructor` with `--checks air_transition --minutes 25` for
+the unboosted economy with a T2 constructor donated at six minutes.
+
+The launcher and process lookup now resolve relative run directories before
+starting or locating the engine; its working directory is the engine directory.
+
 ## Connected mountain regression (D-145)
 
 `prepare_mountain_regression.py --map supreme|glacial|ascendancy --dir

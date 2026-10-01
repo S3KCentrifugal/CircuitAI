@@ -8790,6 +8790,10 @@ Reviewed references:
 
 ## D-154 - AIR and TECH walls leave allied start areas open
 
+**Later requirement:** D-155 supersedes the bank-funded bypass of expansion
+support; the first-lab income/full-bank rule remains. See
+[support admission](air-support-before-expansion.md).
+
 **Decision.** Use one shared script wall policy, with a configurable 1,200-elmo
 base exclusion around the union of known allied starts. Test full footprints,
 not just centres, at candidate selection and after native snapping. Advance
@@ -8848,3 +8852,73 @@ Files: [shared settings](../data/script/src/global.as),
 [actor matrix](actor-matrix.md), [invariants](invariants.md),
 [known issues](known-issues.md), and regenerated
 [unit configuration report](knowledge/barb-unit-config.md).
+
+## D-155 - AIR completes twenty support turrets per T2 lab before expansion
+
+**Decision.** Additional T2 air labs require every existing T2 lab to be
+finished and supported by twenty completed, owned, in-range turrets. A turret
+belongs to one nearest live bay. Queued/framed turrets are future capacity,
+not admission credit. Recheck gifts, losses and completion on new/resumed
+orders and cancel invalid unstarted orders; retain actual frames. New T2
+reservations require all twenty slots. The first lab retains D-153's
+income/full-bank test; the bank exception no longer bypasses expansion support.
+
+Floating metal raises construction demand by a sixty-second drawdown toward
+half storage. Factory production speed cannot offset economy construction
+power. When expansion is affordable, existing T2 banks target twenty. Up to
+three funded turret projects precede converters during overflow, followed by
+assistance; energy recovery and mex upgrades still lead. Funded constructor
+growth during overflow does not subtract the full remaining cost of every
+large project from a short recruitment forecast. TECH policy is unchanged.
+
+**Why.** The owner explicitly requires twenty completed turrets before the
+next T2 lab. The control run built four labs with just two turrets on the first
+and none on the others. Full-bank admission bypassed support, unfinished
+support counted toward a low dynamic target, and construction growth could
+be blocked by whole-project cost accounting. Rejected: crediting queued
+support, averaging turrets across labs, bypassing support with stored metal,
+unbounded construction concurrency, or increasing TECH's spending targets.
+The exact twenty threshold is owner policy; the game meta supports assisting
+factories before duplicating them, not a universal twenty-turret optimum.
+
+The test launcher also resolves relative write directories before launching
+and matching processes: its engine working directory differs from the caller.
+An initial relative-path invocation could not start the intended test; the
+corrected launch uses the explicit workspace directory. This resolves KI-438,
+verified by launch/targeted-stop boundary probes and live engine lookup. No game-install
+configuration is changed.
+
+**Invariant.** INV-090: an additional AIR T2 lab is ordered only after every
+existing T2 lab is finished and has twenty completed uniquely assigned support
+turrets. Record audits admission; an independent engine observer checks actual
+new frames. Both capacity and support checks forbid all invariant violations.
+
+**Verification.** The native suite passes: 76 ranking checks, geometry tests,
+eight lane suites, 109 production-policy cases and ten placement-policy cases.
+The host compiler caught a const-handle mismatch; corrected before the final
+runs. The donated-constructor game finishes fusion at 18:33.7, its second lab
+starts with twenty completed turrets, and no script/invariant errors occur.
+The strict 14-minute first-lab deadline still fails (KI-436). The capacity
+game reaches ten labs and launches a wave, with every observed expansion
+properly supported. Its strict run times out at 44.5 of 45 game minutes; all
+gameplay expectations and support event checks are met with no script or
+invariant errors. Exact manifests and limits are recorded in the
+[plan and evidence](air-support-before-expansion.md).
+Metal still overflows in the later unboosted economy (KI-442); increased build
+power is verified, elimination of overflow is not. Save/load and a full
+cross-faction/map matrix were not played for this change.
+
+Files: [settings](../data/script/src/global.as),
+[pure policy](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[building actions](../data/script/src/roles/air_build.as),
+[ordered rules](../data/script/src/roles/air_rules.as),
+[unit tests](../tests/production_math_tests.as),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[support check](../tools/playtest/checks/air_support.json),
+[launcher](../tools/playtest/playtest.py),
+[playtest guide](../tools/playtest/README.md),
+[AIR role](roles/air.md), [building reference](roles/air_build.md),
+[rule reference](roles/air_rules.md), [management reference](air-management.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), and [plan/results](air-support-before-expansion.md).

@@ -1,5 +1,29 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    bool ExpansionSupportReady(int factories, int finishedFactories, int leastSupport, int required)
+    {
+        if (factories < 0 || finishedFactories < 0 || leastSupport < 0 || required <= 0) return false;
+        return factories == finishedFactories && (factories == 0 || leastSupport >= required);
+    }
+    bool MetalFloating(float bank, float storage)
+    {
+        return Valid(bank) && Valid(storage) && storage > 0.0f
+            && bank >= (storage * 0.75f > 300.0f ? storage * 0.75f : 300.0f);
+    }
+    float ConstructionPower(float income, float bank, float storage, float perMetal, float floatFactor, float drainSeconds)
+    {
+        if (!Valid(income) || !Valid(bank) || !Valid(storage) || !Valid(perMetal)
+            || !Valid(floatFactor) || !Valid(drainSeconds) || drainSeconds <= 0.0f) return 0.0f;
+        const bool floating = MetalFloating(bank, storage);
+        const float draw = floating && bank > storage * 0.5f ? (bank - storage * 0.5f) / drainSeconds : 0.0f;
+        return (income + draw) * perMetal * (floating ? floatFactor : 1.0f);
+    }
+    bool SupportQueueReady(int pending, int parallel, float bankM, float bankE, float incomeM, float incomeE, float costM, float costE)
+    {
+        if (pending < 0 || parallel <= 0 || pending >= parallel || !Valid(costM) || !Valid(costE)) return false;
+        return Funded(bankM, incomeM * 0.5f, 150.0f, float(pending) * costM, costM, 20.0f)
+            && Funded(bankE, incomeE * 0.25f, 300.0f, float(pending) * costE, costE, 20.0f);
+    }
     bool LabIncomeReady(float minimum, bool fullWindow, float threshold, float bank, float cost)
     {
         if (!Valid(minimum) || !Valid(threshold) || !Valid(bank) || !Valid(cost) || cost <= 0.0f || threshold <= 0.0f) return false;

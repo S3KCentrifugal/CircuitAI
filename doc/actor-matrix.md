@@ -290,3 +290,15 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | TechWeapons::Site / Order | Weapon-cluster wall slots and snapped positions | Same wall admission; other weapon roles keep existing rules |
 | AirRules::MakeTask | Queued native defense services | AdmitQueued rejects walls in a base before accepting service |
 | LayoutHelpers::CheckAlliedPlacements | Assigned AIR/TECH construction tasks | INV-089 audits wall footprints once per second |
+
+## AIR support before expansion (D-155)
+
+| Actor | Reads or changes | Guard |
+| --- | --- | --- |
+| AirEconomy::SupportBay / RefreshSupport | Fresh owned factory/turret IDs, retirement, completion, range | Each completed turret belongs to one nearest live bay; frames are separate future capacity |
+| AirEconomy::ExistingT2SupportReady | All existing T2 plants, completed plants, minimum completed support | Every plant must finish and own twenty support turrets; newly gifted unadopted plants block expansion |
+| AirBuild::Factory / Resume / Tick / Record | Fresh support gate on new/resumed/unstarted lab tasks | Banked metal cannot bypass INV-090; already framed work finishes |
+| AirBuild::SupportCommitted / Nano | Native frames, unstarted owned tasks, exact slots, cost forecast | Count each support commitment once; bounded concurrency and reach |
+| overflow.support / overflow.support.assist | Live floating bank, energy health, support target | Fund up to three support projects before converter growth, then assist |
+| AirEconomy::ConstructionTarget / FundConstructor | Income, bank drawdown, energy, constructor cost | Grow funded mobile work during overflow without counting factory BP as economy construction |
+| AIR observer | Engine UnitCreated and independent owned-unit range/completion scan | Audit twenty completed turrets per prior T2 lab at every new lab frame |

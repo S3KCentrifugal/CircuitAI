@@ -2958,6 +2958,12 @@ as part of the AIR migration; baseline INV-008/015/019 findings remain KI-427.
 
 ### KI-436 — AIR's natural reactor benchmark remains late
 
+**D-155 evidence.** The donated-constructor Armada sample now completes fusion
+at 18:33.7 versus the unchanged control's 21:10.2. The strict first-T2-lab
+benchmark still misses 14:00: completion is 15:48.6, improved from 16:28.7.
+This single gifted-access scenario does not close the natural map/faction
+matrix. See [support admission results](air-support-before-expansion.md).
+
 **D-152 evidence.** A natural AIR/TECH game completes the first Armada fusion
 at 21:04.6, after all six mex upgrades; the T2 air plant starts at 21:18.6.
 The strict new mex-before-air-lab rule relies on allied advanced constructor
@@ -3056,27 +3062,6 @@ including native completion chains and role switching. D-149's experimental
 results do not establish legacy parity. See
 [D-149](decisions.md#d-149--air-packs-six-wind-groups-and-scales-construction-from-income).
 
-### KI-438 — Playtest launch does not resolve a relative write directory
-
-**Severity:** Low tooling defect. **Location:** `tools/playtest/playtest.py`,
-`launch`: `d = Path(args.dir)` and `subprocess.Popen(..., cwd=str(eng))`.
-
-**Problem.** A relative `--dir` is validated and staged relative to the
-repository, then passed unchanged to an engine launched from its own directory.
-The engine resolves both its write directory and start script differently and
-exits without the expected infolog. D-151's first launch reproduced this; the
-same staged game launches with an absolute directory. No gameplay diagnosis
-is based on the failed launch.
-
-**Proposed solution.** Resolve the directory once at CLI argument ingestion,
-so stage, launch, watch, PID files and stop share one absolute path. Keep
-absolute `--dir` as the documented workaround for now.
-
-**Verification.** A relative-path launch must use the same command arguments
-and write directory as its absolute equivalent when engine cwd differs from
-the repository. Verify both launch and targeted stop without touching a live
-game. See [D-151 evidence](air-idle-factory.md).
-
 ### KI-439 � D-152 lifecycle and contested landing verification gaps
 
 **Severity:** Medium verification gap. **Location:** `AirLayout::PlanAhead`,
@@ -3149,6 +3134,36 @@ DLL fcc2c7ea532f9ef3, reached 25.1 minutes. `armsilo` finished at frame 32847;
 no script errors, but benchmark timing and existing invariant checks failed.
 A fix must repeat the natural run and show the silo by 16:30, then separately
 verify stockpiling and firing. See [wall/nuke validation](wall-base-exclusion.md).
+
+### KI-442 - AIR can still overflow metal after construction capacity grows
+
+**Problem.** D-155 enforces twenty completed turrets per existing T2 lab and
+increases funded construction growth, but it does not eliminate floating metal.
+In the final unboosted Armada game with a T2 constructor donated at six minutes,
+AIR reaches ten T1/eight T2 constructors (the configured ceilings) and 35
+completed turrets by 25 minutes, yet holds 8,094/8,100 metal. The first T2 bank
+has twenty and the second ten. Instantaneous production spending is bursty;
+reported aircraft energy demand (4,155) exceeds low-window supply (~1,964).
+Increasing nominal build power alone does not guarantee that funded work and
+energy supply absorb income. The 6-20 minute ten-second samples above 75%
+storage total 400 seconds versus 300 for the control, despite earlier fusion
+and much more completed construction power. This is an unresolved allocation
+and performance limit, not a violation of the new expansion gate.
+
+**Proposed solution.** In `AirEconomy`, `AirBuild` and `AirProduction`, measure
+assigned versus idle mobile work, committed support build positions and
+resource pull through the bank-filling intervals. Compare a sustained
+bank-drawdown policy with bounded energy-project staffing and reachable
+construction assistance. Adjust constructor ceilings only when additional
+workers can fund and reach useful work. Preserve mex-before-reactor,
+transport-first recruitment, existing construction and twenty completed
+support per lab; do not reopen the bank bypass to mask overflow.
+
+**Verification.** Repeat matched donated-constructor games and constructor-loss
+cases. Report storage fraction, actual waste/shared income, completed energy,
+mobile/static work, fighter replacement and stalls over time. Require a lower
+overflow duration without worsening energy starvation or violating invariants.
+Current evidence and exact runs: [D-155 results](air-support-before-expansion.md).
 
 ## Indexed elsewhere
 

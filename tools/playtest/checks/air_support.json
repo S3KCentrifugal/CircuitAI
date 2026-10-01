@@ -1,0 +1,14 @@
+{
+  "stop_minute": 45,
+  "expect": [
+    {"key": "layout", "pattern": "\\[AIR\\]\\[Layout\\] enabled", "by_minute": 1},
+    {"key": "second-lab-supported", "pattern": "\\[AirWatch\\] t2-lab-start existing=1 minimum=20 unfinished=0", "by_minute": 44},
+    {"key": "third-lab-supported", "pattern": "\\[AirWatch\\] t2-lab-start existing=2 minimum=20 unfinished=0", "by_minute": 44},
+    {"key": "sixth-lab-supported", "pattern": "\\[AirWatch\\] t2-lab-start existing=5 minimum=20 unfinished=0", "by_minute": 44}
+  ],
+  "forbid": [
+    {"key": "script", "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope": "any"},
+    {"key": "invariant", "pattern": "INVARIANT", "scope": "any"},
+    {"key": "crash", "pattern": "Access violation|has crashed|Fatal:", "scope": "any"}
+  ]
+}

@@ -13,9 +13,10 @@ separate build pads. The campus adds one bay at a time at a nominal 560-elmo
 spacing; the configurable safety ceiling is twelve T2 plants, not a target.
 The candidate search covers 25 rings in 128-elmo steps, allowing replacement
 sites beyond the original crowded 2,048-elmo radius.
-If terrain only fits a partial bank, capacity uses those actual slots. Standing
+New T2 plans require all twenty support slots. Standing
 gifted plants are adopted in place and nearby support slots are fitted around
-them. Windmills use atomically reserved 3-by-2 groups of six touching footprints,
+them; a partial gifted bank cannot authorize further labs until it has twenty
+completed support turrets in reach. Windmills use atomically reserved 3-by-2 groups of six touching footprints,
 with at least 144 elmos between group bounding circles. Existing slots are
 filled and destroyed windmills replaced before new groups are opened. The
 layout keeps native slot identity and named `air.wind.*` metadata. Other
@@ -52,18 +53,22 @@ AIR targets its first completed fusion by **20 minutes**, with every owned mex
 upgraded before any reactor starts (D-148). A T2 air lab needs either a complete,
 fresh ten-second window whose minimum metal income is at least +50, or the
 lab's full metal cost in the bank (D-153). Mex completion no longer gates labs.
-Further bays require sustained spare income for twenty seconds and useful
-support on existing bays, unless the entire next lab is already banked. The
-full-bank exception bypasses those expansion waits; the configured plant cap
-and one unfinished lab limit still apply. The role
+Further bays require twenty completed, uniquely assigned support turrets on
+**every** existing T2 lab (D-155). Frames and queued turrets do not qualify.
+Sustained spare income for twenty seconds is also required unless the entire
+next lab is banked. Banked metal bypasses that capacity wait but never the
+support gate; the configured plant cap and one unfinished lab limit still apply. The role
 keeps growing T1 energy/storage while those conditions are unmet. Three bad
 energy samples enter recovery; ten adequately buffered samples leave it.
 Mobile construction targets scale at eight work/second per metal/second,
-multiplied by 1.5 when metal floats. Loaded constructor work rates determine
+multiplied by 1.5 when metal floats. Floating bank above half storage adds a
+sixty-second drawdown term to the income input. Loaded constructor work rates determine
 counts, with ceilings of ten T1 and eight T2 constructors. After T2, the work
 target splits 40%/60%, with three T1 and two T2 as the funded floors. Queued
 recruits and frames count once. Growth requires a bank and cost forecast and
-pauses in recovery; it follows the immediate fighter screen and precedes the
+pauses in recovery; during overflow the forecast does not charge every large
+project's full remaining cost against one constructor's short funding window.
+It follows the immediate fighter screen and precedes the
 full interception quota. Factory turrets are not credited as mobile work.
 
 The first advanced energy investment is ordinary fusion. Advanced fusion needs
@@ -85,17 +90,20 @@ remain ahead of optional aircraft. Fusion preparation does not by itself pause
 T1 combat production. Energy recovery and immediate defense can still defer it.
 
 The turret target takes the larger of funded aircraft throughput and an
-income/float construction floor shared across live production bays. Support
-growth precedes general fusion-preparation assistance, and unfinished turrets
-receive help before another is ordered. Idle factory turrets help owned
+income/float construction floor shared across live production bays. Factory
+production power is not deducted from the construction floor. Affordable T2
+expansion raises existing T2 targets to twenty. During overflow, up to three
+funded turrets can be started before assistance; otherwise unfinished turrets
+receive help before another is ordered. This follows mex work and precedes
+converters and optional capital work. Idle factory turrets help owned
 construction within their physical reach through the same target selector as
 mobile builders. Once the owning plant has another unit frame, the AIR tick
 ends that economy assistance so factory production regains the turret.
 See [design and evidence](air-wind-and-build-power.md).
 
-The twenty-nano setting is the current expansion comparison point. The first
-implementation fills useful available support up to that point before another
-plant; it does not claim a calibrated global capital-cost optimizer. A
+The twenty-nano setting is a completed-support expansion requirement. It does
+not claim a calibrated global capital-cost optimizer. See
+[support admission and verification](air-support-before-expansion.md). A
 configured warm handoff estimate is separate from cold startup; playtest
 observations distinguish idle gaps from the previous unit's build time. No
 runtime adaptation is inferred from contaminated resource-stalled samples.

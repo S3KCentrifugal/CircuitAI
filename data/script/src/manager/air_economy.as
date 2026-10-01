@@ -135,6 +135,59 @@ namespace AirEconomy {
             costE = (costE * 7.0f + b.costE * 3.0f) / 10.0f;
         }
     }
+    int SupportBay(const CCircuitDef@ d, const AIFloat3 &in pos)
+    {
+        if (d is null) return -1;
+        int best = -1;
+        float dist = d.GetBuildDistance() * d.GetBuildDistance();
+        for (uint b = 0; b < AirLayout::bays.length(); ++b) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(AirLayout::bays[b].factoryId);
+            if (plant is null || Lifecycle::IsRetiring(plant)) continue;
+            const float sq = MapHelpers::SqDist(pos, plant.GetPos(ai.frame));
+            if (sq < dist) { best = int(b); dist = sq; }
+        }
+        return best;
+    }
+    void RefreshSupport()
+    {
+        owned = ai.GetOwnedUnitIds();
+        nanoBay.deleteAll();
+        power.resize(AirLayout::bays.length()); nanoCount.resize(power.length()); nanoFuture.resize(power.length());
+        for (uint b = 0; b < power.length(); ++b) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(AirLayout::bays[b].factoryId);
+            power[b] = plant !is null && !Lifecycle::IsRetiring(plant) && plant.GetBuildProgress() >= 1.0f ? plant.circuitDef.GetBuildSpeed() : 0.0f;
+            nanoCount[b] = 0; nanoFuture[b] = 0;
+        }
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ n = ai.GetTeamUnit(owned[i]);
+            if (n is null || Lifecycle::IsRetiring(n)) continue;
+            const string name = n.circuitDef.GetName();
+            if (name != UnitHelpers::GetT1NanoNameForSide(UnitHelpers::GetSideForUnitName(name))) continue;
+            const int best = SupportBay(n.circuitDef, n.GetPos(ai.frame));
+            if (best < 0) continue;
+            nanoBay.set("" + n.id, int64(best));
+            if (n.GetBuildProgress() < 1.0f) { ++nanoFuture[best]; continue; }
+            ++nanoCount[best];
+            power[best] += n.circuitDef.GetBuildSpeed();
+        }
+    }
+    bool ExistingT2SupportReady()
+    {
+        // Re-read gifts, deaths and completion immediately before an order.
+        RefreshSupport();
+        int factories = 0, finished = 0, least = Global::RoleSettings::Air::T2ExpansionSupport;
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(owned[i]);
+            if (plant is null || !UnitHelpers::IsT2AircraftPlant(plant.circuitDef.GetName()) || Lifecycle::IsRetiring(plant)) continue;
+            ++factories;
+            if (plant.GetBuildProgress() >= 1.0f) ++finished;
+            int count = 0;
+            for (uint b = 0; b < AirLayout::bays.length(); ++b)
+                if (AirLayout::bays[b].factoryId == plant.id) { count = nanoCount[b]; break; }
+            least = AiMin(least, count);
+        }
+        return ProductionMath::ExpansionSupportReady(factories, finished, least, Global::RoleSettings::Air::T2ExpansionSupport);
+    }
     void Tick()
     {
         if (!Active() || (sampleFrame >= 0 && ai.frame - sampleFrame < SECOND)) return;
@@ -192,22 +245,7 @@ namespace AirEconomy {
             if (u.GetBuildProgress() >= 1.0f) power[best] = u.circuitDef.GetBuildSpeed();
         }
         const string nanoName = UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side);
-        for (uint i = 0; i < owned.length(); ++i) {
-            CCircuitUnit@ n = ai.GetTeamUnit(owned[i]);
-            if (n is null || n.circuitDef.GetName() != nanoName || Lifecycle::IsRetiring(n)) continue;
-            int best = -1;
-            float dist = n.circuitDef.GetBuildDistance() * n.circuitDef.GetBuildDistance();
-            for (uint b = 0; b < AirLayout::bays.length(); ++b) {
-                if (AirLayout::bays[b].factoryId < 0) continue;
-                const float sq = MapHelpers::SqDist(n.GetPos(ai.frame), AirLayout::bays[b].centre);
-                if (sq < dist) { best = int(b); dist = sq; }
-            }
-            if (best < 0) continue;
-            nanoBay.set("" + n.id, int64(best));
-            if (n.GetBuildProgress() < 1.0f) { ++nanoFuture[best]; continue; }
-            ++nanoCount[best];
-            power[best] += n.circuitDef.GetBuildSpeed();
-        }
+        RefreshSupport();
         demandM = 0.0f; demandE = 0.0f;
         for (uint b = 0; b < power.length(); ++b) {
             float work = 0.0f, cm = 0.0f, ce = 0.0f;
@@ -262,21 +300,24 @@ namespace AirEconomy {
         const float share = Global::RoleSettings::Air::ProductionIncomeShare / float(count);
         float rate = ProductionMath::FundedRate(100.0f, cm, ce, metal * share, energy * share);
         const int space = AiMax(int(AirLayout::bays[bay].nanos.length()), nanoCount[bay]);
-        const int limit = advanced ? AiMin(20, Global::RoleSettings::Air::T2NanoSoftLimit) : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
+        const int limit = advanced ? AiMin(20, AiMax(Global::RoleSettings::Air::T2NanoSoftLimit, Global::RoleSettings::Air::T2ExpansionSupport)) : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
         const int cap = AiMin(space, limit);
         const int production = ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds, rate, cap);
         // TECH's income/float principle, with AIR's independent bay ownership.
         // This power can help nearby construction whenever recruitment pauses.
         const float target = ConstructionTarget() / float(AiMax(1, t1 + t2));
-        const int construction = energy >= 250.0f ? ProductionMath::WorkforceTarget(AiMax(0.0f, target - plant.GetBuildSpeed()), nano.GetBuildSpeed(), 0, cap) : 0;
-        return AiMax(production, construction);
+        // Factory build speed produces units; it cannot build our wind/solar economy.
+        const int construction = energy >= 250.0f ? ProductionMath::WorkforceTarget(target, nano.GetBuildSpeed(), 0, cap) : 0;
+        const int expansion = advanced && Transition(plant) ? AiMin(cap, Global::RoleSettings::Air::T2ExpansionSupport) : 0;
+        return AiMax(expansion, AiMax(production, construction));
     }
     float ConstructionTarget()
     {
-        const bool floating = bankM >= AiMax(300.0f, aiEconomyMgr.metal.storage * 0.75f);
-        return metal * Global::RoleSettings::Air::EconomyBuildPowerPerMetal
-            * (floating ? Global::RoleSettings::Air::BuildPowerFloatFactor : 1.0f);
+        return ProductionMath::ConstructionPower(metal, aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage,
+            Global::RoleSettings::Air::EconomyBuildPowerPerMetal, Global::RoleSettings::Air::BuildPowerFloatFactor,
+            Global::RoleSettings::Air::BuildPowerBankDrainSeconds);
     }
+    bool MetalFloating() { return ProductionMath::MetalFloating(aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage); }
     int ConstructorTarget(CCircuitDef@ d, bool advanced)
     {
         if (d is null || recovery || energy < 160.0f || metal < 8.0f) return 1;
@@ -287,8 +328,11 @@ namespace AirEconomy {
     }
     bool FundConstructor(CCircuitDef@ d)
     {
-        return d !is null && !recovery && bankM >= d.costM * 0.5f
-            && ProductionMath::Funded(bankM, metal * 0.3f, 150.0f, AirBuild::Committed(false), d.costM, 30.0f)
-            && ProductionMath::Funded(bankE, energy * 0.3f, 300.0f, AirBuild::Committed(true), d.costE, 30.0f);
+        if (d is null || recovery || bankM < d.costM * 0.5f) return false;
+        // Overflow funds useful work now; an entire unfinished lab/fusion must
+        // not consume the short recruitment forecast for its whole build time.
+        const bool floating = MetalFloating() && bankM >= d.costM + 150.0f;
+        return ProductionMath::Funded(bankM, metal * 0.3f, 150.0f, floating ? 0.0f : AirBuild::Committed(false), d.costM, 30.0f)
+            && ProductionMath::Funded(bankE, energy * 0.3f, 300.0f, floating ? 0.0f : AirBuild::Committed(true), d.costE, 30.0f);
     }
 }

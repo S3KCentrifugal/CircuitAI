@@ -8,6 +8,49 @@ local previousDamage, damageHook
 local windGroups={}
 local nanoProjects={}
 local function echo(s) Spring.Echo(tag..s) end
+local function airPlant(name)
+    return name=="armap" or name=="corap" or name=="legap" or name=="armaap" or name=="coraap" or name=="legaap"
+end
+local function advancedPlant(name)
+    return name=="armaap" or name=="coraap" or name=="legaap"
+end
+local function checkExpansion(newID)
+    local bays={}
+    for _,id in ipairs(Spring.GetTeamUnits(0)) do
+        local d=UnitDefs[Spring.GetUnitDefID(id)]
+        if id~=newID and airPlant(d.name) then
+            local x,_,z=Spring.GetUnitPosition(id)
+            local _,_,_,_,progress=Spring.GetUnitHealth(id)
+            bays[#bays+1]={id=id,x=x,z=z,advanced=advancedPlant(d.name),finished=progress and progress>=1,count=0}
+        end
+    end
+    for _,id in ipairs(Spring.GetTeamUnits(0)) do
+        local d=UnitDefs[Spring.GetUnitDefID(id)]
+        if d.name=="armnanotc" or d.name=="cornanotc" or d.name=="legnanotc" then
+            local _,_,_,_,progress=Spring.GetUnitHealth(id)
+            if progress and progress>=1 then
+                local x,_,z=Spring.GetUnitPosition(id)
+                local best,dist=nil,d.buildDistance*d.buildDistance
+                for _,b in ipairs(bays) do
+                    local sq=(x-b.x)^2+(z-b.z)^2
+                    if sq<dist then best,dist=b,sq end
+                end
+                if best then best.count=best.count+1 end
+            end
+        end
+    end
+    local count,unfinished,minimum=0,0,20
+    for _,b in ipairs(bays) do
+        if b.advanced then
+            count=count+1; minimum=math.min(minimum,b.count)
+            if not b.finished then unfinished=unfinished+1 end
+        end
+    end
+    echo("t2-lab-start existing="..count.." minimum="..minimum.." unfinished="..unfinished)
+    if count>0 and (unfinished>0 or minimum<20) then
+        Spring.Echo("[INVARIANT] INV-090 AIR observer: expansion before twenty completed turrets per existing T2 lab")
+    end
+end
 local function windCreated(id,d)
     local x,_,z=Spring.GetUnitPosition(id)
     for i,g in ipairs(windGroups) do
@@ -43,6 +86,7 @@ function widget:Initialize() echo("loaded; read-only observer team=0") end
 function widget:UnitCreated(id,def,team,builder)
     if team~=0 then return end
     local name=UnitDefs[def].name
+    if advancedPlant(name) and builder then checkExpansion(id) end
     if name=="armwin" or name=="corwin" or name=="legwin" then windCreated(id,UnitDefs[def]); return end
     if name~="armfus" and name~="corfus" and name~="legfus" and name~="armafus" and name~="corafus" and name~="legafus" then return end
     -- Engine-created fixture units have no builder. BAR forwards builderID;

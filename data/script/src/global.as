@@ -961,11 +961,14 @@ namespace Global {
             float ConverterDraw = 70.0f;
             float ConverterEnergyReserve = 150.0f;
             int T2NanoSoftLimit = 20;
+            int T2ExpansionSupport = 20; // completed turrets per existing T2 air lab; banked metal cannot bypass
+            int NanoParallel = 3; // funded support frames while metal floats
             int T1NanoLimit = 5;
             int MaxT1EconomyBuilders = 10;
             int MaxT2EconomyBuilders = 8;
             float EconomyBuildPowerPerMetal = 8.0f;
             float BuildPowerFloatFactor = 1.5f;
+            float BuildPowerBankDrainSeconds = 60.0f;
             float WindClusterGap = 144.0f;
             int EconomySearchRings = 24;
             int FirstFusionTargetSeconds = 20 * 60;
