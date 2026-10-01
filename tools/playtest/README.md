@@ -168,6 +168,7 @@ each minute; the tracker reads those lines. Two objectives per call fit the
 | `checks/smoke.json` | 4 min | the AI and the widget load, the opening starts, a screenshot lands, no script error |
 | `checks/tech_opening.json` | 14 min | D-066..D-068: opening mexes, first lab after them, energy, turret, advanced lab by 14; no mobile def packed, no combat production, no T1 lab re-ordered after 9 min, no native default tasks |
 | `checks/rush_<objective>.json` | target + 1 | D-070: the chain announces the objective, the milestone finishes by the target; no script error, no combat production |
+| `checks/wall_exclusion.json` + `widgets/wall_exclusion_fixture.lua` | 14.2 min | D-154: mixed AIR/TECH, rear own/allied-base assets remain unwalled while forward resource walls complete; global invariant forbid remains active |
 
 Add a file per behaviour under test; keep the `[Rule] <key>` names as the
 patterns (they are the sequence's vocabulary, `doc/roles/tech_rules.md`).

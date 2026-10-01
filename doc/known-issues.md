@@ -2398,6 +2398,23 @@ marks as the eco base) exposed to the script as a one-shot target; a
 distance behind the front and unobstructed range, bound for the `lrpc`
 step. Both are decisions of their own.
 
+**D-154 current evidence (2026-09-30).** The explicit `RushObjective="nuke"`
+run `build-theatres/d154-nuke/runs/20260930-205611` completed team 0's silo at
+frame 32847 (18:15). At frames 41569, 43369 and 45169, `CSuperTask` logged
+`no target`; that diagnostic requires a positive stockpile. No `NUKE: launched`
+event appeared by 25.1 minutes. `manager/military.as::AiMakeTask` returns the
+native task for every super static before calling the TECH role, so the
+first-strike override in `roles/tech.as` is unreachable on this path.
+
+The focused repair is to retain the shared native super task and apply TECH's
+optional first-shot policy to that task through a separate hook; do not restore
+the old cross-manager wait task or gate all super statics on TECH income.
+Keep the first-shot target until an actual launch, rather than expiring a
+30-second override while the first missile is still stockpiling. Verify natural
+stockpile completion and a real launch, then normal targeting after the shot.
+This investigation does not change targeting policy. The silo timing miss is
+tracked separately as KI-441.
+
 **Verification.** Open.
 
 ---
@@ -2685,6 +2702,21 @@ changed in D-153, so earlier baseline categories alone do not establish the
 cause of these occurrences. Triage the earliest per object against the retained
 logs and compare the same seed before attributing a regression or weakening an
 invariant.
+
+**D-154 sample evidence.** The unchanged nuke-control game
+`build-theatres/d154-nuke/runs/20260930-205611` reports INV-008/011/022.
+The wall fixture `build-theatres/d154-walls/runs/20260930-210130` reports
+INV-004/010/015/037, with no INV-089 and all wall expectations met.
+The strict reports remain FAIL. These are observations, not proof that all
+occurrences share a baseline cause; isolate the first event per object and
+compare the same seed before changing unrelated economy behavior.
+
+Final D-154 fortification regression `build-theatres/d154-fortification-final/runs/20260930-210640`
+reports INV-010/011/015/019/022/029/047/052. All five forward-wall/expansion
+expectations pass and INV-089 is clean. The resource/build-power gifts make
+this a placement fixture, not a natural-economy regression. In particular,
+INV-047 requires tracing the exact blocking structure against the T3 row
+reservation before attributing the obstruction to the wall change.
 
 ### KI-428 — Harness start roles do not force runtime roles on unregistered maps
 
@@ -3097,6 +3129,26 @@ opening configurations before updating the generic check.
 
 **Verification.** Pending; the intro default-off change does not modify this
 check or TECH policy. The current report is retained as FAIL.
+
+### KI-441 - Explicit TECH nuke rush misses the existing silo benchmark
+
+**Problem.** On Supreme Isthmus with Armada, experimental_hard and no income
+bonus, the current explicit nuke chain finishes the silo at 18:15, after the
+16:30 deadline in `tools/playtest/checks/rush_nuke.json`. The chain is active
+and completes; this is a timing failure, separate from KI-418's launch target.
+
+**Proposed solution.** Compare the retained step and builder-assignment timeline
+against the older rush benchmark with a fixed seed. Measure time spent on the
+T2 lab, mex upgrades, fusion and silo, and effective assigned build power versus
+resource pull at each. Adjust `TechChain` admission/support only after locating
+the critical delay; retain mex-first ownership and factory reservations. Do not
+raise the benchmark deadline just to make this sample pass.
+
+**Verification.** Control run `build-theatres/d154-nuke/runs/20260930-205611`,
+DLL fcc2c7ea532f9ef3, reached 25.1 minutes. `armsilo` finished at frame 32847;
+no script errors, but benchmark timing and existing invariant checks failed.
+A fix must repeat the natural run and show the silo by 16:30, then separately
+verify stockpiling and firing. See [wall/nuke validation](wall-base-exclusion.md).
 
 ## Indexed elsewhere
 

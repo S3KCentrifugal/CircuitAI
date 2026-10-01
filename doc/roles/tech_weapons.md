@@ -172,7 +172,7 @@ start caps one at a time) and logs `[TECH][Weapons] <kind> #<id>: ... orders`.
 - `budget: ...`
 - `super cannon framed ...`
 
-<!-- source: data/script/src/roles/tech_weapons.as; blob: 6d8dfdc39e2384e4fc44b0950e668af041398d41; lines: 1108 -->
+<!-- source: data/script/src/roles/tech_weapons.as; blob: ecf5cc47ea01842876a810d6ec17d629dbf4d1a0; lines: 1108 -->
 
 ## D-152 protected weapon placement
 
@@ -180,3 +180,8 @@ start caps one at a time) and logs `[TECH][Weapons] <kind> #<id>: ... orders`.
 reserves and pins the chosen site, aborting if the claim fails. Every candidate
 therefore respects future factory/turret/corridor reservations. The existing
 weapon budget, income gates and unit choices remain.
+
+D-154: `Site` and `Order` also apply shared `WallHelpers::Allowed` to wall
+footprints before and after snapping. Walls inside the 1,200-elmo default
+allied-start exclusion are omitted; other weapons keep their existing placement
+rules. See [wall base exclusion](../wall-base-exclusion.md).

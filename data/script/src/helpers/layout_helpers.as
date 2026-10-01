@@ -22,6 +22,8 @@ A factory's exit is on its facing side. Native's ReserveGrid uses the same
 side vectors as Side() here, so a grid and an offset agree on left and right.
 
 ******************************************************************************/
+#include "wall_helpers.as"
+
 namespace LayoutHelpers {
     int alliedCheckFrame = -100000;
     void CheckAlliedPlacements()
@@ -33,6 +35,8 @@ namespace LayoutHelpers {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             IBuilderTask@ task = u is null ? null : cast<IBuilderTask>(u.task);
             if (task is null || task.buildDef is null || task.GetBuildType() >= int(Task::BuildType::REPAIR)) continue;
+            if (!WallHelpers::Allowed(task.buildDef, task.GetBuildPos()))
+                Invariants::Violation("INV-089", "" + u.id, "wall construction overlaps an allied start base area");
             const int slot = AiTaskReservationId(task);
             if (slot < 0) continue;
             if (aiTerrainMgr.IsAllyLayoutBlocked(task.buildDef, aiTerrainMgr.GetReservationPos(slot), aiTerrainMgr.GetReservationFacing(slot)))

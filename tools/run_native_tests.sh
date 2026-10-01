@@ -33,4 +33,5 @@ for t in "${tests[@]}"; do
 	fi
 done
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/production_math.as" "$REPO/tests/production_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/placement_math.as" "$REPO/tests/placement_math_tests.as" || rc=1
 exit $rc

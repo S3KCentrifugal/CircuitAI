@@ -911,7 +911,7 @@ namespace TechWeapons {
             for (int k = 0; k < (ring == 0 ? 1 : 8); ++k) {
                 const float a = 0.7854f * k;
                 AIFloat3 p(s.pos.x + cos(a) * 48.0f * ring, 0.0f, s.pos.z + sin(a) * 48.0f * ring);
-                if (!OnMap(p) || aiBattle.IsFriendlyLane(p)) continue;
+                if (!OnMap(p) || aiBattle.IsFriendlyLane(p) || !WallHelpers::Allowed(d, p)) continue;
                 if (IsTorp(s.role) && ring > 0) {
                     const float r = d.GetMaxRange(RANGE_WATER) > 0.0f ? d.GetMaxRange(RANGE_WATER) : 500.0f;
                     if (!aiBattle.TorpedoSiteOK(d, p, r, s.role == "dcharge")) continue;
@@ -926,10 +926,10 @@ namespace TechWeapons {
 
     IUnitTask@ Order(CCircuitUnit@ u, WCluster@ c, Slot@ s, CCircuitDef@ d, const AIFloat3& in at)
     {
-        if (!TechForward::Buildable(u, d)) return null;
+        if (!TechForward::Buildable(u, d) || !WallHelpers::Allowed(d, at)) return null;
         const int slot = aiTerrainMgr.ReserveBuilding(d, at, 0);
         if (slot < 0) return null;
-        if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot))) {
+        if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot)) || !WallHelpers::Allowed(d, aiTerrainMgr.GetReservationPos(slot))) {
             aiTerrainMgr.ReleaseReservation(slot); return null;
         }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(TypeOf(s.role), (c.kind == SUPER) ? Task::Priority::HIGH : Task::Priority::NORMAL,

@@ -278,3 +278,15 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | AIR T2 plant | Transition, BankedLab, Factory, production.banked, Record | Ten-second minimum income/full window or current full-cost metal bank; cap and one unfinished plant; INV-083 |
 | AIR T1 strike mix | AirProduction::MakeTask, Recruit, native combat assignment | Queued-aware counts, persisted mix phase, fighter floor, constructor funding, faction build capability; ferry request hook remains first |
 | Placed building audit | LayoutHelpers::CheckAlliedPlacements | Exact task reservation position/facing and shared foreign footprints, INV-088 |
+
+## Allied start areas and walls (D-154)
+
+| Actor | Reads or changes | Guard |
+| --- | --- | --- |
+| WallHelpers | Own start, allied roster and playing-team start-script coordinates; shared configured radius | Cached union of known allied bases; footprint/circle geometry |
+| TechFortifications::Add / Work | Persistent wall positions and actual snapped footprint | Shared wall admission before reservation and construction |
+| TechFortifications::Lane / Protect | Forward direction, base circles, asset position | Forward lane lines; no rear-base asset rings |
+| TechFortifications::Tick | Late start announcements, reservation state and task target | Release invalid unstarted wall claims; preserve existing frames |
+| TechWeapons::Site / Order | Weapon-cluster wall slots and snapped positions | Same wall admission; other weapon roles keep existing rules |
+| AirRules::MakeTask | Queued native defense services | AdmitQueued rejects walls in a base before accepting service |
+| LayoutHelpers::CheckAlliedPlacements | Assigned AIR/TECH construction tasks | INV-089 audits wall footprints once per second |

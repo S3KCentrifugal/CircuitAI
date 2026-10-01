@@ -8787,3 +8787,64 @@ Reviewed references:
 [AIR sequence](roles/air_rules.md), [TECH factories](roles/tech_factories.md),
 [AIR management](air-management.md), [native layout](base-layout.md),
 [API](angelscript-references.md), [known issues](known-issues.md).
+
+## D-154 - AIR and TECH walls leave allied start areas open
+
+**Decision.** Use one shared script wall policy, with a configurable 1,200-elmo
+base exclusion around the union of known allied starts. Test full footprints,
+not just centres, at candidate selection and after native snapping. Advance
+TECH lane walls beyond the exclusion, keep forward resource perimeters, and
+omit wall rings around rear-base assets. AIR's queued-defense admission uses
+the same helper. Late start announcements release invalid unstarted TECH wall
+claims; existing frames are preserved. No native change or role build-order
+change is needed.
+
+**Why.** The owner wants walls nearer the front, keeping the slow commander's
+base and economic/factory expansion open. The old 752/800-elmo lane anchors
+were inside the base area. This explicitly supersedes D-152's requirement to
+wall every geo and advanced mex. The radius matches the existing front-factory
+base-radius default but is independently configurable. Rejected: disabling all
+walls (loses forward protection), checking only this AI's start (still clutters
+allies), centre-only tests (allow footprint intrusion), and hardcoded native
+role policy. Ordinary guns and AA keep their existing placement rules.
+
+**Invariant.** INV-089: AIR and TECH wall construction footprints stay outside
+every known allied start's base exclusion. The shared placement audit checks
+assigned building tasks once per second, and both controlled checks retain the
+global invariant forbid. The new fixture also audits actual wall creation.
+
+**Verification.** Ten geometry cases and the full required native/AS suite
+pass. Four-AI games compiled the scripts and verified rear-base exclusion plus
+forward geo/mex walls; see the exact run manifests and limitations in the
+[design and results](wall-base-exclusion.md). Those games remain strict FAIL
+because other TECH invariants fired; no INV-089 or script error occurred.
+Save/reload migration and unknown human starts are not claimed verified.
+
+The requested nuke investigation used an unchanged control with
+`RushObjective="nuke"`: silo at 18:15, positive stockpile but no target or launch
+by 25.1 minutes. `auto` still selects `afus`. Do not silently enable a nuke rush
+or change targeting while answering this question: the shared-super dispatch
+bypass is documented in KI-418, and the 16:30 timing miss in KI-441.
+
+Files: [shared settings](../data/script/src/global.as),
+[JSON radius](../data/config/weapons.json),
+[geometry](../data/script/src/helpers/placement_math.as),
+[wall policy](../data/script/src/helpers/wall_helpers.as),
+[placement audit](../data/script/src/helpers/layout_helpers.as),
+[AIR services](../data/script/src/roles/air_rules.as),
+[fortifications](../data/script/src/roles/tech_fortifications.as),
+[weapon clusters](../data/script/src/roles/tech_weapons.as),
+[unit cases](../tests/placement_math_tests.as),
+[CTest registration](../tests/CMakeLists.txt),
+[test runner](../tools/run_native_tests.sh),
+[wall fixture](../tools/playtest/widgets/wall_exclusion_fixture.lua),
+[wall checks](../tools/playtest/checks/wall_exclusion.json),
+[forward fixture](../tools/playtest/widgets/fortification_fixture.lua),
+[forward checks](../tools/playtest/checks/fortification.json),
+[playtest reference](../tools/playtest/README.md),
+[AIR rule reference](roles/air_rules.md),
+[fortification reference](roles/tech_fortifications.md),
+[weapon reference](roles/tech_weapons.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), and regenerated
+[unit configuration report](knowledge/barb-unit-config.md).

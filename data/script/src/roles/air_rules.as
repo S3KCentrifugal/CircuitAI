@@ -119,7 +119,7 @@ namespace AirRules {
         array<int> services = { int(Task::BuildType::REPAIR), int(Task::BuildType::DEFENCE), int(Task::BuildType::RADAR) };
         for (uint i = 0; i < services.length(); ++i) {
             @t = aiBuilderMgr.FindQueuedTask(u, services[i]);
-            if (t !is null) return AirBuild::Record(t, "service.queued", u);
+            if (t !is null && WallHelpers::AdmitQueued(t)) return AirBuild::Record(t, "service.queued", u);
         }
         @t = AirBuild::Assist(u);
         if (t !is null) return AirBuild::Record(t, "project.assist", u);

@@ -18,6 +18,8 @@ if(BUILD_TESTING)
     target_compile_definitions(circuit_production_math_test PRIVATE ANGELSCRIPT_EXPORT AS_MAX_PORTABILITY)
     add_test(NAME circuit_production_math_test COMMAND circuit_production_math_test
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/production_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/production_math_tests.as")
+    add_test(NAME circuit_placement_math_test COMMAND circuit_production_math_test
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/placement_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/placement_math_tests.as")
     find_package(Threads REQUIRED)
     target_link_libraries(circuit_production_math_test PRIVATE Threads::Threads)
     add_executable(circuit_lane_solver_test lane_solver_test.cpp ../src/circuit/terrain/LaneSolver.cpp)

@@ -6,6 +6,11 @@ otherwise the next action is tried. Every construction action rechecks current
 capability, queue and reservation state. Economy observations are cached once
 per second; existing construction stays assigned.
 
+D-154: `service.queued` uses shared `WallHelpers::AdmitQueued` to reject wall
+jobs inside allied start circles (1,200 elmos by default), aborting unstarted
+orders. AIR has no independent wall-ring planner. Its existing flak and radar
+services retain their normal rules. See [wall base exclusion](../wall-base-exclusion.md).
+
 | Order | Rule | Purpose |
 | --- | --- | --- |
 | 1 | current construction | Finish committed work before choosing another project |
@@ -48,7 +53,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 8c1ed5dd3c269b54b040f2c9ee31f0b5a0a9a5f7; lines: 134 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 47f85ad1e335aa3555d1485c11424becd37bb51b; lines: 134 -->
 
 ## D-152 sequencing
 

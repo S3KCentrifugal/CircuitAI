@@ -11,12 +11,20 @@ function widget:GameFrame(f)
         local x,_,z=Spring.GetTeamStartPosition(1)
         local gx,gz=x,z
         local found=false
-        for r=900,1900,200 do
+        for r=1800,3600,200 do
             if found then break end
             for k=0,15 do
                 local a=k*math.pi/8
                 local px,pz=x+math.cos(a)*r,z+math.sin(a)*r
                 local good=px>220 and pz>220 and px<Game.mapSizeX-220 and pz<Game.mapSizeZ-220
+                    and (px-x)*(Game.mapSizeX/2-x)+(pz-z)*(Game.mapSizeZ/2-z)>0
+                -- D-154: only forward assets are supposed to acquire walls.
+                for _,t in ipairs(Spring.GetTeamList()) do
+                    if t~=Spring.GetGaiaTeamID() and Spring.AreTeamsAllied(1,t) then
+                        local sx,_,sz=Spring.GetTeamStartPosition(t)
+                        if sx and sx>=0 and sz>=0 and (px-sx)^2+(pz-sz)^2<1840^2 then good=false end
+                    end
+                end
                 for j=0,7 do
                     local b=j*math.pi/4
                     if Spring.GetGroundHeight(px+math.cos(b)*200,pz+math.sin(b)*200)<5 then good=false end
@@ -24,6 +32,7 @@ function widget:GameFrame(f)
                 if good then gx,gz=px,pz;found=true;break end
             end
         end
+        if not found then Spring.Echo("[FortFixture] FAIL no forward site"); return end
         give("armgeo",1,gx,gz)
         give("armmoho",1,gx+320,gz)
         give("armack",1,gx-120,gz,2)

@@ -1,0 +1,16 @@
+{
+  "stop_minute": 14.2,
+  "expect": [
+    {"key":"rear-assets","pattern":"\\[WallFixture\\] rear assets supplied","by_minute":1,"scope":"any"},
+    {"key":"ally-base-asset","pattern":"\\[WallFixture\\] allied-base asset supplied","by_minute":1,"scope":"any"},
+    {"key":"forward-assets","pattern":"\\[WallFixture\\] forward assets supplied","by_minute":1,"scope":"any"},
+    {"key":"forward-wall","pattern":"\\[WallFixture\\] finished forward resource wall","by_minute":14,"scope":"any"},
+    {"key":"audit","pattern":"\\[WallFixture\\] PASS rear bases open and forward walls completed","by_minute":14.2,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"wall","pattern":"\\[WallFixture\\] FAIL","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

@@ -53,7 +53,7 @@ namespace TechFortifications {
     {
         if (!TechWeapons::OnMap(p) || aiBattle.IsFriendlyLane(p)) return;
         CCircuitDef@ d = TechWeapons::Def(role);
-        if (d is null) return;
+        if (d is null || !WallHelpers::Allowed(d, p)) return;
         Piece v; v.role = role; v.pos = p;
         const string key = s.key + "." + role + "." + int(p.x) + "." + int(p.z);
         v.slot = aiTerrainMgr.GetLayoutInt(key, -1);
@@ -64,6 +64,10 @@ namespace TechFortifications {
             aiTerrainMgr.SetLayoutInt(key, v.slot);
         }
         v.pos = aiTerrainMgr.GetReservationPos(v.slot);
+        if (!WallHelpers::Allowed(d, v.pos)) {
+            aiTerrainMgr.ReleasePersistentBuilding(v.slot);
+            return;
+        }
         s.pieces.insertLast(v);
     }
     Site@ Find(const string &in key)
@@ -76,18 +80,30 @@ namespace TechFortifications {
         const string key = advanced ? "fort.lane.t2" : "fort.lane.t1";
         if (Find(key) !is null) return;
         Site s; s.key = key; s.advanced = advanced;
-        const AIFloat3 base = Layout::BaseCentre();
+        const AIFloat3 base = Global::Map::StartPos;
         const AIFloat3 front = Layout::FrontTarget();
         const int facing = LayoutHelpers::FacingToward(base, front);
         const AIFloat3 dir = Layout::Fwd(facing);
+        WallHelpers::Refresh();
+        // Move toward the front, but never beyond it or the worker's search radius.
+        const float frontDistance = (front.x - base.x) * dir.x + (front.z - base.z) * dir.z;
+        const float limit = AiMin(radius, frontDistance - 128.0f);
+        float along = AiMax(752.0f, WallHelpers::baseRadius + 96.0f) + (advanced ? 48.0f : 0.0f);
+        for (; along <= limit; along += 32.0f) {
+            const AIFloat3 centre = TechWeapons::Along(base, dir, along, 0.0f);
+            const float halfX = dir.x == 0.0f ? 496.0f : 16.0f;
+            const float halfZ = dir.z == 0.0f ? 496.0f : 16.0f;
+            if (!WallHelpers::InBase(centre, halfX, halfZ)) break;
+        }
+        if (along > limit) return;
         // A broad central gap keeps the actual lane and factory traffic open.
         for (int k = -15; k <= 15; ++k) {
             if (k > -5 && k < 5) continue;
-            Add(s, advanced ? "fort" : "teeth", TechWeapons::Along(base, dir, advanced ? 800.0f : 752.0f, float(k) * 32.0f));
+            Add(s, advanced ? "fort" : "teeth", TechWeapons::Along(base, dir, along, float(k) * 32.0f));
         }
         if (!advanced) {
-            Add(s, "llt", TechWeapons::Along(base, dir, 640.0f, -256.0f));
-            Add(s, "aal", TechWeapons::Along(base, dir, 640.0f, 256.0f));
+            Add(s, "llt", TechWeapons::Along(base, dir, along - 112.0f, -256.0f));
+            Add(s, "aal", TechWeapons::Along(base, dir, along - 112.0f, 256.0f));
         }
         if (s.pieces.length() > 0) {
             sites.insertLast(s);
@@ -97,6 +113,7 @@ namespace TechFortifications {
     void Protect(CCircuitUnit@ u)
     {
         const AIFloat3 p = u.GetPos(ai.frame);
+        if (WallHelpers::InBase(p)) return;
         const string key = "fort.asset." + u.id;
         if (Find(key) !is null) return;
         int64 due = -1;
@@ -151,6 +168,17 @@ namespace TechFortifications {
         if (advancedAccess) Lane(true);
         for (int i = int(sites.length()) - 1; i >= 0; --i) {
             Site@ s = sites[i];
+            // A late ally announcement can invalidate a planned, unstarted wall.
+            for (int j = int(s.pieces.length()) - 1; j >= 0; --j) {
+                Piece@ p = s.pieces[j];
+                if (WallHelpers::Allowed(TechWeapons::Def(p.role), p.pos)) continue;
+                IBuilderTask@ task = cast<IBuilderTask>(p.task);
+                if (aiTerrainMgr.GetReservationState(p.slot) > 1 || (task !is null && task.target !is null)) continue;
+                if (p.task !is null && !p.task.IsDead()) aiBuilderMgr.AbortTask(p.task);
+                aiTerrainMgr.ReleasePersistentBuilding(p.slot);
+                s.pieces.removeAt(j);
+            }
+            if (s.pieces.length() == 0) { sites.removeAt(i); continue; }
             if (s.asset < 0 || ai.GetTeamUnit(s.asset) !is null) continue;
             for (uint j = 0; j < s.pieces.length(); ++j) {
                 if (s.pieces[j].task !is null && !s.pieces[j].task.IsDead()) aiBuilderMgr.AbortTask(s.pieces[j].task);
@@ -182,7 +210,7 @@ namespace TechFortifications {
                 Piece@ p = s.pieces[j];
                 if (aiTerrainMgr.GetReservationState(p.slot) != 0) continue;
                 CCircuitDef@ d = TechWeapons::Def(p.role);
-                if (d is null || budget < d.costM || !TechForward::Buildable(u, d)) continue;
+                if (d is null || budget < d.costM || !TechForward::Buildable(u, d) || !WallHelpers::Allowed(d, p.pos)) continue;
                 if (MapHelpers::SqDist(u.GetPos(ai.frame), p.pos) > radius * radius
                     || !aiTerrainMgr.CanReachAt(u, p.pos, u.circuitDef.GetBuildDistance()) || aiBattle.SurfThreat(p.pos) > 1.0f) continue;
                 if (aiBattle.IsFriendlyLane(p.pos)) continue;

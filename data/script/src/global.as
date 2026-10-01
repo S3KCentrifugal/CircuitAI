@@ -270,6 +270,9 @@ namespace Global {
         // Independent from primary/secondary caps. Default 0 disables tactical guarding.
         int BuilderMaxGuardsPerTacticalLeader = 0;
 
+        // Shared AIR/TECH wall exclusion, measured from every allied start.
+        float WallBaseExclusionRadius = 1200.0f;
+
         namespace Tech {
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 400;
