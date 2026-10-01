@@ -1,0 +1,15 @@
+{
+  "stop_minute": 11,
+  "expect": [
+    {"key":"mobile-only","pattern":"StrategicFixture.*mobile-only","by_minute":1,"scope":"any"},
+    {"key":"building","pattern":"StrategicFixture.*building target supplied","by_minute":4,"scope":"any"},
+    {"key":"launch","pattern":"NUKE: launched from.*at \\(.*weapon fired","by_minute":6,"scope":"any"},
+    {"key":"stock","pattern":"StrategicFixture.*stock-drop","by_minute":6,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"fixture","pattern":"StrategicFixture.*INVALID","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

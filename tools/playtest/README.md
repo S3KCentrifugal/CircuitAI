@@ -1,5 +1,14 @@
 # Playtest: launch, watch, screenshot, stop
 
+Strategic targeting (D-157): stage `--roles AIR,SUPPORT` for `juno` or `--roles AIR`
+for `nuclear`, then run `prepare_strategic_check.py --dir <dir> --scenario <name>`.
+The fixture pauses builders and its mobile probe only in the staged scripts,
+injects stock, and preserves commanders. Launch headless and watch with
+`strategic_juno` (9 minutes) or `strategic_nuclear` (11 minutes), then run
+`audit_strategic_check.py <retained-infolog> --scenario <name>`. The independent
+audit requires two launchers, respects actual launch times and checks five-minute
+same-silo exclusion. These are controlled capability checks, not economy benchmarks.
+
 Allied-layout/AIR-income regression (D-153): stage Cortex AIR with TECH allies,
 `--roles AIR,TECH`, the final DLL, `allied_layout_fixture.lua` and `air_watch.lua`.
 Run `prepare_air_check.py --dir <absolute-dir> --scenario natural`, then

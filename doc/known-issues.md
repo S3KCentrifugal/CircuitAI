@@ -84,6 +84,11 @@ consistent, or keep a separate `bestScore`.
 LRPC and confirm from the `SUPER ...` log lines that consecutive targets are not
 clustered on one bearing when a more expensive group exists elsewhere in range.
 
+**D-157 update.** Strategic silos now use an immobile-structure area scan
+and no longer enter this bearing-weight branch. The generic cannon issue
+remains open; this does not claim it was repaired. See
+[strategic targeting](strategic-targeting-plan.md).
+
 ### KI-102 — Mobile pulse weapons never reach the pulse policy
 
 **Severity**: Medium
@@ -437,8 +442,8 @@ the shot cost to `min_fraction` over `patience_seconds` and collapses at
 `full_fire_count` stocked (`CSuperTask::StockedShotFloor`, the `stockpile`
 block in `behaviour.json`). Item 2 is built for the tactical launchers only
 ([D-036](decisions.md#d-036--tactical-launchers-aim-by-unit-scan-and-super-statics-bypass-role-policy):
-aim points valued by metal inside the AoE); the nuke and Juno still value a
-k-means cell. Item 3 is not addressed. Not Played. See
+aim points valued by metal inside the AoE). D-157 also moves strategic nukes
+to a structure-only area scan; Junos use their sensor-class area scan. Item 3 is not addressed. Not Played. See
 [`launcher-targets.md`](launcher-targets.md#the-floor).
 
 **Severity**: High — **fixed, not yet played**
@@ -1568,6 +1573,12 @@ first-priority shot, and is certainly not worth it when a scout swarm is in
 range and would actually die.
 
 Nothing currently reads the option, so the AI plays the same way in both modes.
+
+**D-157 owner policy.** The owner now explicitly requires the tower priority
+order for all roles. Keep that order under `junorework` too; the alternative
+ranking proposed below is historical and must not silently override the new
+requirement. Detection and accurate effect modelling remain useful, and the
+separate EMP arithmetic issue remains unresolved.
 
 **Proposed solution.** Read the option once and switch the ranking:
 
@@ -3206,6 +3217,26 @@ the shared mechanism change.
 interruption, not a new task label. Compare active economic build power, worker
 positions and stall duration across Armada/Cortex/Legion, while retaining the
 constructor-gift economy and wind-reservation checks. Unfixed in D-156.
+
+### KI-444 - Strategic shot histories do not survive a save/load restart
+
+**Problem.** D-157 stores Juno claims and the five-minute per-silo nuclear
+history in `CAllyTeam`. Task recreation and allied transfers retain that shared
+state, but `CCircuitAI::Save`/`Load` do not serialize it. A restored game starts
+with empty histories and can repeat a pre-save shot before its original expiry.
+
+**Proposed solution.** Serialize the ledgers once per ally team with a versioned
+record containing owner ID, ground position, radius, expiry frame and pending
+state. Restore after friendly-unit identity is available, discard expired or
+invalid records, and reconcile pending claims with restored attack commands.
+Avoid duplicate restoration when several allied AI instances load the same
+shared team state. Preserve fired Juno claims even if the launcher has died.
+
+**Verification.** Save after a confirmed launch, restore with several allied
+roles, and prove that the same silo cannot repeat until the original five-minute
+deadline while another silo can fire. Check pending Juno cancellation, fired
+claim expiry, destroyed unit IDs and multiple remembered impact locations.
+Not implemented in D-157; uninterrupted-match targeting is tested separately.
 
 ## Indexed elsewhere
 

@@ -142,3 +142,4 @@ step.
 | INV-092 | New AIR mex expansion stays within the configured radius of the original start. | AirRules anchors EnqueueMexWithin to start; AirBuild::Record audits the result. Existing owned upgrades are separate. | D-156 |
 | INV-093 | Defensive AIR interception targets are in friendly territory. | AirScreen::Intercept checks fresh observed contacts against participating starts. | D-156 |
 | INV-094 | An AIR anti-nuke covers its own economic core using loaded interceptor coverage. | AirDefence checks snapped placement, AirBuild::Record checks admission, AirWatch checks the actual frame. | D-156 |
+| INV-095 | A confirmed strategic launch respects allied Juno area claims or that silo's nuclear location cooldown. | Native CSuperTask::OnLaunch; independent launch-log fixture audit. | D-157 |

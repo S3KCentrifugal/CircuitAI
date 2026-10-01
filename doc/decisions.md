@@ -9010,3 +9010,63 @@ Files: [settings](../data/script/src/global.as),
 [management](air-management.md), [API reference](angelscript-references.md),
 [actor matrix](actor-matrix.md), [invariants](invariants.md),
 [known issues](known-issues.md), [plan/results](air-local-economy-plan.md).
+
+
+## D-157 - Shared sensor priorities, coordinated Junos and per-silo nuclear cooldowns
+
+**Decision.** Follow the owner's explicit order: advanced jammer, jammer,
+advanced radar, radar, then other eligible sensors. Read both known-enemy
+snapshot pools; non-combat towers were missing from the previous scan. Use
+loaded sensor vulnerability/properties plus compatible role extensions and
+JSON priorities for every profile. Empty known-target and radar-hole passes
+fall back to enemy-facing fog boundaries, without querying hidden enemies.
+
+Ally-team Juno claims cover pending orders and recent confirmed launches.
+Observe allied ground commands too, including humans, without controlling
+those units. Strategic silos count only immobile structures and keep a
+300-second blast-sized location history per physical silo. Different silos
+may strike the same place. Histories survive task recreation and allied
+transfers; destruction clears nuclear history, while an airborne Juno claim
+outlives its launcher. Stop persistent attack orders after a confirmed shot.
+Both weapon-fired and stockpile-drop paths share deduplication and accounting.
+JSON remains the policy lever. Tactical launchers/EMP keep their selectors.
+
+**Alternatives rejected.** Merely increasing jammer weights cannot recover
+targets absent from the candidate pool. An allied/global nuke lock would
+violate the explicit per-silo requirement. Recording selection time would
+cool down unfired orders; allowing a persistent attack command would bypass
+the new history. Blind random map points do not follow the observed fog edge.
+The rework option changes Juno effects, but does not supersede the owner's
+explicit tower order with scout priority.
+
+**Invariant.** INV-095 checks a confirmed strategic launch against active
+Juno claims or that silo's nuclear history. The controlled fixture also audits
+mobile-only nuclear withholding, actual launch spacing and separate silo IDs.
+
+**Verification.** See [design and measured results](strategic-targeting-plan.md).
+Six focused pure-rule suites cover priorities, mobile rejection, claim release,
+overlap, independent silos, multiple remembered areas and the exact expiry
+boundary. Save/load persistence and manually changed human orders are not
+claimed verified by those tests.
+
+Files: [super task](../src/circuit/task/static/SuperTask.cpp),
+[super interface](../src/circuit/task/static/SuperTask.h),
+[pure rules](../src/circuit/task/static/StrategicTargeting.h),
+[event dispatch](../src/circuit/CircuitAI.cpp),
+[policy loading](../src/circuit/module/MilitaryManager.cpp),
+[policy settings](../src/circuit/module/MilitaryManager.h),
+[ally state](../src/circuit/unit/ally/AllyTeam.h),
+[ally lifecycle](../src/circuit/unit/ally/AllyTeam.cpp),
+[active profiles](../data/config/),
+[unit tests](../tests/strategic_targeting_test.cpp),
+[test runner](../tools/run_native_tests.sh),
+[fixture preparation](../tools/playtest/prepare_strategic_check.py),
+[launch audit](../tools/playtest/audit_strategic_check.py),
+[playtest instructions](../tools/playtest/README.md),
+[fixture](../tools/playtest/widgets/strategic_fixture.lua),
+[Juno checks](../tools/playtest/checks/strategic_juno.json),
+[nuclear checks](../tools/playtest/checks/strategic_nuclear.json),
+[invariant checker](../tools/knowledge/check_invariants.py),
+[Juno reference](juno-targets.md), [actor matrix](actor-matrix.md),
+[invariants](invariants.md), [known issues](known-issues.md),
+[plan/results](strategic-targeting-plan.md).

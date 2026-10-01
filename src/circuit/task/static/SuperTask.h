@@ -49,7 +49,12 @@ private:
 	// rejected (damaging weapons: Perdition, Catalyst). EMP and Juno do no damage.
 	bool SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
-			float minValue = 0.f, bool avoidFriendly = false);
+			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
+			bool pulseClaims = false, bool nuclearHistory = false);
+	bool IsPulse(CCircuitDef* cdef) const;
+	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	bool SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	bool CanAimStrategic(CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	// Tactical launchers (Perdition, Catalyst): the richest blast in range.
 	bool SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, float minValue);
 	// The metal a target must be worth for a stockpiled shot; decays while the
@@ -77,6 +82,7 @@ private:
 	springai::AIFloat3 targetPos;
 	bool isTargetOverride;
 	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty
+	int lastStrategicLaunch = -1000000;
 };
 
 } // namespace circuit

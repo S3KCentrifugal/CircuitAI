@@ -12,6 +12,7 @@
 #include "util/math/QuadField.h"
 #include "util/math/Region.h"
 #include "terrain/AlliedReservations.h"
+#include "task/static/StrategicTargeting.h"
 
 #include <memory>
 #include <map>
@@ -128,7 +129,10 @@ public:
 	void UnmarkReclaim(ICoreUnit::Id unitId);
 	bool IsReclaimMarked(ICoreUnit::Id unitId) const { return reclaimMarks.find(unitId) != reclaimMarks.end(); }
 	allied_layout::Reservations& GetLayoutReservations() { return layoutReservations; }
+	strategic::Ledger& GetPulseClaims() { return pulseClaims; }
+	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
 private:
+	strategic::Ledger pulseClaims, nuclearHistory;
 	allied_layout::Reservations layoutReservations;
 	void DelegateAuthority();
 	void ApplyAuthority(CCircuitAI* newOwner);

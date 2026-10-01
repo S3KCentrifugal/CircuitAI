@@ -400,13 +400,15 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			if (unit != nullptr) {
 				CSuperTask* firingTask = dynamic_cast<CSuperTask*>(unit->GetTask());
 				if (firingTask != nullptr) {
-					script->SuperWeaponFired(unit, firingTask->GetAimPos());
+					const AIFloat3 aim = firingTask->GetAimPos();
+					firingTask->OnLaunch(unit, "weapon fired");
+					script->SuperWeaponFired(unit, aim);
 				}
 			}
 			if ((unit != nullptr) && (unit->GetCircuitDef() != nullptr) && CSuperTask::IsNukeSilo(unit->GetCircuitDef())) {
 				CSuperTask* task = dynamic_cast<CSuperTask*>(unit->GetTask());
 				if (task != nullptr) {
-					task->OnLaunch(unit, "weapon fired");
+					// Handled above for both Junos and strategic silos.
 				} else {
 					LOG("NUKE: %s(%i) fired outside its super task: no aim known, no smiley (D-124)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
 				}
@@ -1274,6 +1276,9 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	destroyed.insert(unit->GetId());
+	const int lostId = unit->GetId();
+	allyTeam->GetNuclearHistory().Prune(lastFrame, [lostId](int owner) { return owner != lostId; });
+	allyTeam->GetPulseClaims().ReleasePending(lostId);
 	if (battle != nullptr) {
 		battle->OnOwnLost(unit->GetPos(lastFrame), unit->GetCircuitDef()->GetCostM());  // D-126
 	}

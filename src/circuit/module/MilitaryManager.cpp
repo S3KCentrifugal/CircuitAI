@@ -388,7 +388,7 @@ void CMilitaryManager::ReadConfig()
 	const Json::Value& pulse = root["pulse"];
 	pulseInfo.rank.fill(-1);
 	pulseInfo.isEnabled = false;
-	if (!pulse.isNull() && pulse.get("enabled", true).asBool()) {
+	if (pulse.get("enabled", true).asBool()) {
 		auto findRole = [&roleNames, &cfgName, this](const std::string& name, CCircuitDef::RoleM& out) {
 			auto it = roleNames.find(name);
 			if (it == roleNames.end()) {
@@ -399,6 +399,7 @@ void CMilitaryManager::ReadConfig()
 			return true;
 		};
 		static const std::map<std::string, PulseClass> classNames = {
+			{"jammer_advanced", PulseClass::JAMMER_ADVANCED}, {"radar_advanced", PulseClass::RADAR_ADVANCED},
 			{"jammer_static", PulseClass::JAMMER_STATIC}, {"radar_static", PulseClass::RADAR_STATIC},
 			{"jammer_mobile", PulseClass::JAMMER_MOBILE}, {"radar_mobile", PulseClass::RADAR_MOBILE},
 		};
@@ -416,11 +417,8 @@ void CMilitaryManager::ReadConfig()
 			pulseInfo.rank[static_cast<PulseC>(it->second)] = rank++;
 		}
 		if (rank == 0) {  // no list given: the documented default order
-			pulseInfo.rank[static_cast<PulseC>(PulseClass::JAMMER_STATIC)] = 0;
-			pulseInfo.rank[static_cast<PulseC>(PulseClass::RADAR_STATIC)] = 1;
-			pulseInfo.rank[static_cast<PulseC>(PulseClass::JAMMER_MOBILE)] = 2;
-			pulseInfo.rank[static_cast<PulseC>(PulseClass::RADAR_MOBILE)] = 3;
-			rank = 4;
+			for (int i = 0; i < static_cast<PulseC>(PulseClass::_SIZE_); ++i) pulseInfo.rank[i] = i;
+			rank = static_cast<PulseC>(PulseClass::_SIZE_);
 		}
 		pulseInfo.mobileMaxAge = pulse.get("mobile_max_age", 60).asInt() * FRAMES_PER_SEC;
 		pulseInfo.minTargets = std::max(1, pulse.get("min_targets", 1).asInt());
@@ -429,6 +427,27 @@ void CMilitaryManager::ReadConfig()
 		pulseInfo.holeRadius = pulse.get("hole_radius", 500.f).asFloat();
 		pulseInfo.holeMinEnemyInfl = pulse.get("hole_min_enemy_infl", 0.05f).asFloat();
 		pulseInfo.holeProbes = std::max(1, pulse.get("hole_probes", 8).asInt());
+		pulseInfo.pendingFrames = std::max(1, pulse.get("pending_seconds", 45).asInt()) * FRAMES_PER_SEC;
+		pulseInfo.coverageFrames = std::max(1, pulse.get("coverage_seconds", 90).asInt()) * FRAMES_PER_SEC;
+		pulseInfo.scatter = pulse.get("scatter", true).asBool();
+		pulseInfo.scatterStep = std::max(128.f, pulse.get("scatter_step", 384.f).asFloat());
+		pulseInfo.scatterDepth = std::max(0.f, pulse.get("scatter_depth", 192.f).asFloat());
+		pulseInfo.targetClasses.clear();
+		pulseInfo.unitDefs.clear();
+		Json::Value names = pulse["units"];
+		if (names.isNull()) for (const char* name : {"armjuno", "corjuno", "legjuno"}) names.append(name);
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			for (const auto& name : names) if (name.asString() == d.GetDef()->GetName()) pulseInfo.unitDefs.insert(d.GetId());
+			const auto& cp = d.GetDef()->GetCustomParams();
+			const auto kill = cp.find("juno_kill");
+			const bool vulnerable = kill != cp.end() && (kill->second == "1" || kill->second == "true");
+			const bool jammer = d.IsRespRoleAny(pulseInfo.jammerRole) || (vulnerable && d.GetDef()->GetJammerRadius() > 0);
+			const bool radar = d.IsRespRoleAny(pulseInfo.radarRole) || (vulnerable && d.GetDef()->GetRadarRadius() > 0);
+			const auto level = cp.find("techlevel");
+			const bool advanced = level != cp.end() && std::atoi(level->second.c_str()) >= 2;
+			const int cls = strategic::SensorClass(jammer, radar, d.IsMobile(), advanced);
+			if (cls >= 0) pulseInfo.targetClasses[d.GetId()] = cls;
+		}
 		pulseInfo.isEnabled = isRoles;
 		circuit->LOG("CONFIG %s: pulse %s | classes=%i mobileMaxAge=%is minTargets=%i",
 				cfgName.c_str(), pulseInfo.isEnabled ? "enabled" : "disabled",
@@ -499,6 +518,10 @@ void CMilitaryManager::ReadConfig()
 			bomberInfo.areaRadius, int(bomberInfo.groupMixedDefs));
 
 	const Json::Value& stockCfg = root["stockpile"];
+	const Json::Value& nuclear = root["nuclear"];
+	nuclearInfo.structuresOnly = nuclear.get("structures_only", true).asBool();
+	nuclearInfo.repeatFrames = std::max(0, nuclear.get("repeat_seconds", 300).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.repeatRadius = std::max(0.f, nuclear.get("repeat_radius", 0.f).asFloat());
 	if (!stockCfg.isNull()) {
 		stockInfo.patienceSeconds = std::max(0.f, stockCfg.get("patience_seconds", 240.f).asFloat());
 		stockInfo.minFraction = std::min(1.f, std::max(0.f, stockCfg.get("min_fraction", 0.25f).asFloat()));

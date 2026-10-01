@@ -121,7 +121,7 @@ public:
 	 * Instead it picks the highest-priority sensor/EW target it can reach.
 	 * Configured under "pulse" in behaviour.json; see doc/juno-targets.md.
 	 */
-	enum class PulseClass: int {JAMMER_STATIC = 0, RADAR_STATIC, JAMMER_MOBILE, RADAR_MOBILE, _SIZE_};
+	enum class PulseClass: int {JAMMER_ADVANCED = 0, JAMMER_STATIC, RADAR_ADVANCED, RADAR_STATIC, JAMMER_MOBILE, RADAR_MOBILE, _SIZE_};
 	using PulseC = std::underlying_type<PulseClass>::type;
 	struct SPulseInfo {
 		bool isEnabled = false;  // false when the config names no usable role
@@ -129,7 +129,14 @@ public:
 		CCircuitDef::RoleM jammerRole = 0;
 		CCircuitDef::RoleM radarRole = 0;
 		// rank[class] = priority, lower fires first; -1 excludes the class
-		std::array<int, static_cast<PulseC>(PulseClass::_SIZE_)> rank = {-1, -1, -1, -1};
+		std::array<int, static_cast<PulseC>(PulseClass::_SIZE_)> rank = {-1, -1, -1, -1, -1, -1};
+		std::map<int, int> targetClasses; // loaded vulnerable sensor properties, cached once
+		std::set<int> unitDefs;
+		int pendingFrames = 45 * FRAMES_PER_SEC;
+		int coverageFrames = 90 * FRAMES_PER_SEC;
+		bool scatter = true;
+		float scatterStep = 384.f;
+		float scatterDepth = 192.f;
 		int mobileMaxAge = 0;  // frames a mobile target's last known position stays usable
 		int minTargets = 1;    // do not spend a shot on fewer than this many targets
 		/*
@@ -232,6 +239,12 @@ public:
 		bool launcherStructuresFirst = false; // rank any structure above any mobile
 	};
 	const SStockInfo& GetStockInfo() const { return stockInfo; }
+	struct SNuclearInfo {
+		bool structuresOnly = true;
+		int repeatFrames = 300 * FRAMES_PER_SEC;
+		float repeatRadius = 0.f; // zero uses the loaded blast radius
+	};
+	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 
 	/*
 	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
@@ -453,6 +466,7 @@ private:
 	SEmpInfo empInfo;
 	SBomberInfo bomberInfo;
 	SStockInfo stockInfo;
+	SNuclearInfo nuclearInfo;
 	SSensorInfo sensorInfo;
 
 	unsigned int preventCount = 0;

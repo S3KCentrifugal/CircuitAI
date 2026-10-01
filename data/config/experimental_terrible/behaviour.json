@@ -1,5 +1,6 @@
     // Mono-space font required
 	{
+"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0},
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
 		"layout": {
@@ -53,21 +54,26 @@
 		// by what it can actually delete, never by enemy metal cost. "role" marks
 		// the def that carries a pulse weapon; "jammer" and "radar" mark its
 		// worthwhile targets (append those roles to the sensor defs below);
-		// "priority" orders the four target classes and omitting a class means
+		// "priority" orders the six target classes and omitting a class means
 		// never target it. See doc/juno-targets.md.
 		"pulse": {
 			"enabled": true,
 			"role": "juno",
 			"jammer": "jammer",
 			"radar": "radar",
-			"priority": ["jammer_static", "radar_static", "jammer_mobile", "radar_mobile"],
+			"priority": ["jammer_advanced", "jammer_static", "radar_advanced", "radar_static", "jammer_mobile", "radar_mobile"],
 			"mobile_max_age": 60,  // seconds a mobile target's last known position stays usable
 			"min_targets": 1,      // raise to require a cluster before spending 200 M + 12000 E
 			"suspect_jammer": true,      // fall back to inferring a jammer from a radar hole
 			"hole_probe_radius": 760,    // widest BAR jam radius; probe this far off a known contact
 			"hole_radius": 500,          // a probe with no contact inside this is a hole
 			"hole_min_enemy_infl": 0.05, // only where we believe the enemy operates
-			"hole_probes": 8
+			"hole_probes": 8,
+            "pending_seconds": 45,
+            "coverage_seconds": 90,
+            "scatter": true,
+            "scatter_step": 384,
+            "scatter_depth": 192
 		},
 
 		// EMP weapons (Paralyzer). A paralyzer deals no health damage, so a shot

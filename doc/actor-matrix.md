@@ -314,3 +314,12 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | AIR static defense | Air_AiMakeDefence, AirDefence::MakeTask/Place, Planned, Added, Record, Tick | AIR-owned project, cross-faction count caps, native reservations, bounded base radius, actual coverage; no shared remote defense queue |
 | AIR fighter | HomeTask, AirScreen::Tick/Intercept, AirWaves | Exclusive home/wave ledgers, fresh native observed aircraft, script territorial classification and cost allocation |
 | Wind frame | WindPass, Record, native FinishReservation, observer | Native slot-to-unit identity after framing; independent observer disambiguates six possible grid origins |
+
+## D-157: strategic targets
+
+| Object | Actors | Authoritative state |
+| --- | --- | --- |
+| Juno target | SelectPulseTarget, SelectSuspectedJammer, SelectFogTarget, ExecuteAttack | Both known-enemy snapshots, configured sensor classes, current LOS, shared ally-team pending/recent-shot ledger |
+| Nuclear target | SelectNuclearTarget, ExecuteAttack, script ground overrides | Known immobile structures; per-silo location history; friendly blast exclusion |
+| Launch | WeaponFired, stockpile-drop fallback, OnLaunch | Confirmed launch frame and aim; deduplicated events; persistent attack command stopped after launch |
+| Launcher lifecycle | RemoveAssignee, UnitDestroyed, allied friendly-unit refresh | Pending claims cancelled; fired Juno areas retained through flight; nuclear history retained across task recreation and cleared on destruction |

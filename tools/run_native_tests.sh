@@ -16,7 +16,7 @@ if [ -z "$IMAGE" ]; then
 	echo "run_native_tests: the recoil-build-amd64-windows image is not present (run a docker build once)" >&2
 	exit 2
 fi
-tests=(layout_ranking_test base_layout_geometry_test lane_solver_test)
+tests=(layout_ranking_test base_layout_geometry_test lane_solver_test strategic_targeting_test)
 cmd=""
 for t in "${tests[@]}"; do
     extra=""

@@ -3,8 +3,8 @@
 
 Checks, all static:
 
-1. Every invariant id the scripts can log ("[INVARIANT] INV-nnn") has a row in
-   doc/invariants.md, and every row there is logged by some script.
+1. Every invariant id the scripts or native code can log ("[INVARIANT] INV-nnn")
+   has a row in doc/invariants.md, and every row there is logged by code.
 2. Every playtest check file (tools/playtest/checks/*.json) forbids the
    "[INVARIANT]" line, so a broken invariant fails every benchmark run.
 3. Every rule row of the TECH table (Rule("key", ...) in tech_rules.as) appears
@@ -34,18 +34,21 @@ def read(path):
 def main():
     findings = []
 
-    # 1. ids in scripts vs the register
+    # 1. ids in scripts/native code vs the register
     script_ids = set()
     for path in glob.glob(os.path.join(ROOT, "data", "script", "src", "**", "*.as"), recursive=True):
         script_ids.update(re.findall(r'"(INV-\d{3})"', read(path)))
+    # Native targeting owns launch events unavailable to the script observer.
+    for path in glob.glob(os.path.join(ROOT, "src", "circuit", "**", "*.cpp"), recursive=True):
+        script_ids.update(re.findall(r'\[INVARIANT\] (INV-\d{3})', read(path)))
     reg_path = os.path.join(ROOT, "doc", "invariants.md")
     reg_ids = set(re.findall(r"^\| (INV-\d{3}) \|", read(reg_path), re.M)) if os.path.exists(reg_path) else set()
     if not os.path.exists(reg_path):
         findings.append("doc/invariants.md is missing")
     for i in sorted(script_ids - reg_ids):
-        findings.append("%s is logged by a script but has no row in doc/invariants.md" % i)
+        findings.append("%s is logged by code but has no row in doc/invariants.md" % i)
     for i in sorted(reg_ids - script_ids):
-        findings.append("%s has a row in doc/invariants.md but no script logs it" % i)
+        findings.append("%s has a row in doc/invariants.md but no code logs it" % i)
 
     # 2. every check file forbids a broken invariant
     for path in sorted(glob.glob(os.path.join(ROOT, "tools", "playtest", "checks", "*.json"))):
