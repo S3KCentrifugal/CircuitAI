@@ -4,6 +4,7 @@
 #include "porc_policy.as"
 #include "spam.as"
 #include "ferry.as"
+#include "amphibious_ops.as"
 
 namespace Military {
 
@@ -37,7 +38,9 @@ namespace Military {
 			return aiMilitaryMgr.DefaultMakeTask(u);
 		}
 
-		IUnitTask@ t = TechFlank::MilitaryTask(u);
+		IUnitTask@ t = AmphibiousOps::MilitaryTask(u);
+        if (t !is null) return t;
+        @t = TechFlank::MilitaryTask(u);
 		if (t !is null) return t;
 		@t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
@@ -65,6 +68,7 @@ namespace Military {
 	{
 		Spam::OnTaskRemoved(task);
 		TechFlank::TaskRemoved(task);
+        AmphibiousOps::TaskRemoved(task);
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiTaskRemovedHandler !is null) {
 			cfg.MilitaryAiTaskRemovedHandler(task, done);
@@ -86,6 +90,7 @@ namespace Military {
 	{
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);
+        AmphibiousOps::UnitRemoved(unit);
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
@@ -96,6 +101,8 @@ namespace Military {
 
 	void AiLoad(IStream& istream)
 	{
+        AmphibiousOps::Reset(); // ephemeral routes are rebuilt through Military::AiMakeTask
+        AmphibiousOps::lastTick = -100000; // a loaded frame may precede the last live update
 	}
 
 	void AiSave(OStream& ostream)

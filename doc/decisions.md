@@ -9070,3 +9070,86 @@ Files: [super task](../src/circuit/task/static/SuperTask.cpp),
 [Juno reference](juno-targets.md), [actor matrix](actor-matrix.md),
 [invariants](invariants.md), [known issues](known-issues.md),
 [plan/results](strategic-targeting-plan.md).
+
+
+## D-158 - Experimental TECH/AIR amphibious waves and secured landfalls
+
+**Decision.** Give owned Telchines and Marauders one shared AngelScript wave
+controller, enabled only for experimental TECH/AIR with lanes enabled. Telchines
+assemble, cross, regroup on usable dry land and clear local opposition before
+advancing. Marauders exploit known economy on the reached landmass first.
+Both prefer quiet water approaches and hold/replan if no acceptable route exists.
+A timed-out crossing cannot declare a foothold secure. TECH retains these two
+unit types instead of splitting their opening wave through combat donation.
+
+Native code supplies reusable point-to-point terrain routes, observed contacts,
+underwater weapon coverage and an opt-in hold-position route command. Script
+and lanes.json own wave sizes, income gates, target scoring, quorum, dwell time
+and allowed threat. The new coverage query gives observed torpedo weapons a
+nonzero floor despite zero profile weights; existing threat maps are unchanged.
+AIR's aircraft queues and constructor/transport priorities keep their order.
+Only already-owned compatible ground factories can supply these waves, behind
+economic prerequisites; AIR does not receive a new ground-factory build order.
+
+**Alternatives rejected.** Generic attack groups skip intermediate security;
+direct attack orders can chase targets into water. A timeout-only landing admits
+stranded units. Tiny dry shoreline samples cannot hold a whole wave, so approach
+selection samples a dry square and checks actual surviving-member positions.
+Global role or torpedo-profile changes would exceed the requested TECH/AIR scope.
+
+**Invariant.** INV-096 requires a dry, regrouped foothold before onward travel.
+The controller's secured latch prevents a stalled crossing from bypassing that
+check. Factory production, donations and task lifecycle share the wave ownership
+and owned/pending count instead of issuing competing commands. The independent
+fixture audit checks actual water entry, distinct unit landfalls, onward progress,
+secured waves, combat attribution, guarded approach clearance and role isolation.
+
+**Verification.** See the [plan and measured results](amphibious-operations-plan.md).
+The initial plan preceded implementation. Tests cover the pure route and wave
+rules; real-engine capability fixtures cover Tundra Continents, Supreme Isthmus
+and Serene Caldera, with all three experimental profiles. These are controlled
+movement/combat tests with injected units, not competitive win-rate or natural
+production benchmarks. Save/load reconstruction and unmodified economic
+production remain unplayed; see KI-446. Zero torpedo weights for other native
+threat-map users remain separate (KI-447).
+
+Files:
+
+- [data/config/lanes.json](../data/config/lanes.json)
+- [data/script/experimental_balanced/main.as](../data/script/experimental_balanced/main.as)
+- [data/script/experimental_hard/main.as](../data/script/experimental_hard/main.as)
+- [data/script/experimental_terrible/main.as](../data/script/experimental_terrible/main.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/lanes.as](../data/script/src/manager/lanes.as)
+- [data/script/src/manager/military.as](../data/script/src/manager/military.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/tech.as](../data/script/src/roles/tech.as)
+- [data/script/src/roles/tech_flank.as](../data/script/src/roles/tech_flank.as)
+- [doc/actor-matrix.md](actor-matrix.md)
+- [doc/angelscript-references.md](angelscript-references.md)
+- [doc/invariants.md](invariants.md)
+- [doc/roles/air.md](roles/air.md)
+- [doc/roles/tech.md](roles/tech.md)
+- [doc/roles/tech_flank.md](roles/tech_flank.md)
+- [src/circuit/map/ThreatMap.cpp](../src/circuit/map/ThreatMap.cpp)
+- [src/circuit/map/ThreatMap.h](../src/circuit/map/ThreatMap.h)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp)
+- [src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h)
+- [src/circuit/terrain/BattleLanes.cpp](../src/circuit/terrain/BattleLanes.cpp)
+- [src/circuit/terrain/LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp)
+- [src/circuit/terrain/LaneSolver.h](../src/circuit/terrain/LaneSolver.h)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+- [data/script/src/helpers/amphibious_math.as](../data/script/src/helpers/amphibious_math.as)
+- [data/script/src/manager/amphibious_ops.as](../data/script/src/manager/amphibious_ops.as)
+- [doc/amphibious-operations-plan.md](amphibious-operations-plan.md)
+- [tests/amphibious_math_tests.as](../tests/amphibious_math_tests.as)
+- [tests/terrain_route_test.cpp](../tests/terrain_route_test.cpp)
+- [tools/playtest/audit_amphibious_check.py](../tools/playtest/audit_amphibious_check.py)
+- [tools/playtest/checks/amphibious.json](../tools/playtest/checks/amphibious.json)
+- [tools/playtest/prepare_amphibious_check.py](../tools/playtest/prepare_amphibious_check.py)
+- [tools/playtest/widgets/amphibious_fixture.lua](../tools/playtest/widgets/amphibious_fixture.lua)
+- [Known issues](known-issues.md).

@@ -523,6 +523,8 @@ void CBattleAnalysis::Update(int frame)
 {
 	EnsureGrid();
 	airContacts.clear();
+    groundContacts.clear();
+    observedWaterWeapons.assign(height.size(), 0.f);
 	const float dt = float(frame - lastDecay) / FRAMES_PER_SEC;
 	if (dt > 0.f) {
 		Decay(combat, std::pow(0.5f, dt / combatHalfLife));
@@ -540,6 +542,39 @@ void CBattleAnalysis::Update(int frame)
 			continue;
 		}
 		const float m = d->GetCostM();
+        // Role-level target preferences (e.g. TECH ignoring T1 combat) must not
+        // label an occupied foothold empty. Still respect hidden/dead/neutral
+        // contacts and the game's explicit ignoredByAI exclusion.
+        const bool observed = e->IsInRadarOrLOS()
+            && !(e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL
+                | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))
+            && (!e->IsIgnore() || (d->IsIgnore() && e->GetUnit()->GetRulesParamFloat("ignoredByAI", 0.f) <= 0.f));
+        // Current ally-visible contacts only. No hidden mobile or destroyed-memory targets.
+        if (!d->IsAbleToFly() && observed && Height(e->GetPos()) >= 0.f) {
+            const bool economy = !d->IsMobile() && (d->IsMex() || d->IsBuilder() || d->IsWind()
+                || d->GetMaxRange() <= 0.f);
+            groundContacts.push_back({e->GetPos(), m, economy});
+        }
+        // Some profiles intentionally zero torpedo-tower combat weights. The new
+        // route query must still see an observed underwater weapon's coverage.
+        // This does not alter the legacy threat maps or their callers.
+        if (observed) {
+            const AIFloat3& p = e->GetPos();
+            const bool submerged = e->GetCircuitDef()->IsInWater(Height(p), p.y);
+            if (submerged ? d->HasSubToWater() : d->HasSurfToWater()) {
+                // Include cell discretisation and the moving unit's footprint.
+                const float reach = d->GetMaxRange(CCircuitDef::RangeType::WATER) + 2.f * cellSize;
+                const int x0 = std::max(0, int((p.x - reach) / cellSize));
+                const int z0 = std::max(0, int((p.z - reach) / cellSize));
+                const int x1 = std::min(gw - 1, int((p.x + reach) / cellSize));
+                const int z1 = std::min(gh - 1, int((p.z + reach) / cellSize));
+                for (int z = z0; z <= z1; ++z) for (int x = x0; x <= x1; ++x) {
+                    const int cell = z * gw + x;
+                    if (height[cell] < 0.f && CellPos(cell).SqDistance2D(p) <= reach * reach)
+                        observedWaterWeapons[cell] = 1.f;
+                }
+            }
+        }
 		auto add = [this, m](Kind k) { cost[k] += m; ++count[k]; };
 		if (d->IsAbleToFly()) {
 			add(AIR);
@@ -587,6 +622,19 @@ void CBattleAnalysis::Update(int frame)
 	}
 }
 
+float CBattleAnalysis::AmphThreat(const AIFloat3& pos) const {
+    const float coverage = observedWaterWeapons.empty() ? 0.f : observedWaterWeapons[Cell(pos)];
+    return std::max(coverage, circuit->GetThreatMap()->GetAmphThreatAtPos(pos));
+}
+AIFloat3 CBattleAnalysis::GetGroundContactPos(int i) const {
+    return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].pos : AIFloat3(-1.f, 0.f, -1.f);
+}
+float CBattleAnalysis::GetGroundContactCost(int i) const {
+    return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].cost : 0.f;
+}
+bool CBattleAnalysis::IsGroundContactEconomy(int i) const {
+    return i >= 0 && i < int(groundContacts.size()) && groundContacts[i].economy;
+}
 float CBattleAnalysis::CombatHeat(const AIFloat3& pos, float radius) const { return SumHeat(combat, pos, radius); }
 float CBattleAnalysis::AirHeat(const AIFloat3& pos, float radius) const { return SumHeat(air, pos, radius); }
 

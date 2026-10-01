@@ -65,6 +65,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	IFighterTask::RemoveAssignee(unit);
 	lanes.erase(unit);
 	engaging.erase(unit);
+    if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
 }
 
 void CRouteTask::SetLanes(int count, float spacing, float endSpread)
@@ -112,6 +113,7 @@ AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 
 void CRouteTask::Start(CCircuitUnit* unit)
 {
+    if (holdPosition) unit->TrySetMoveState(CCircuitDef::MoveType::HOLD_POS);
 	IssueRoute(unit, 0);
 }
 

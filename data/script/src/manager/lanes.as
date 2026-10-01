@@ -99,8 +99,9 @@ namespace Lanes {
 
     bool Enabled()
     {
-        return Global::RoleSettings::Tech::LanesEnabled && Global::RoleSettings::Tech::ExperimentalBuild
-            && Global::AISettings::Role == AiRole::TECH;
+        return Global::RoleSettings::Tech::LanesEnabled
+            && ((Global::RoleSettings::Tech::ExperimentalBuild && Global::AISettings::Role == AiRole::TECH)
+            || (Global::RoleSettings::Air::ExperimentalBuild && Global::AISettings::Role == AiRole::AIR));
     }
 
     // ---------------------------------------------------------------- the calculation (cached)

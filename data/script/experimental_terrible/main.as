@@ -92,6 +92,7 @@ namespace Main {
 	{
 		ArtilleryPolicy::Check();
         Lanes::Poll(); // complete async surveys for every role before consumers run
+        AmphibiousOps::Tick();
 		Commands::DrawTick();   // the widget's map drawing, paced under the server's flood guard
 		// Refresh the cached enemy threat/cost layers the role quotas read.
 		Military::UpdateEnemyThreatCache();

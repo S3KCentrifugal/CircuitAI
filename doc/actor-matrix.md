@@ -323,3 +323,12 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | Nuclear target | SelectNuclearTarget, ExecuteAttack, script ground overrides | Known immobile structures; per-silo location history; friendly blast exclusion |
 | Launch | WeaponFired, stockpile-drop fallback, OnLaunch | Confirmed launch frame and aim; deduplicated events; persistent attack command stopped after launch |
 | Launcher lifecycle | RemoveAssignee, UnitDestroyed, allied friendly-unit refresh | Pending claims cancelled; fired Juno areas retained through flight; nuclear history retained across task recreation and cleared on destruction |
+
+## D-158: amphibious operations
+
+| Object | Actors | Authoritative state |
+| --- | --- | --- |
+| Telchine / Marauder wave | Military::AiMakeTask, AmphibiousOps::MilitaryTask/Tick/TaskRemoved/UnitRemoved/Reset | Stable owned IDs, exclusive route handle, surviving-member quorum, phase and quiet timer; load restarts assembly |
+| Water crossing | AmphibiousOps::Plan/CheckCrossing, CBattleAnalysis::GetTerrainRoute, lane::Solver::PointRoute | Immutable terrain grid plus this AI's observed amphibious threat and weapon coverage; usable dry landings end a leg |
+| Dry foothold | StrategicSites::LandAt, Objective, Staging, Tick | Connected dry component, current observed contacts, arrival quorum and uninterrupted secure interval |
+| Compatible factory | Tech_FactoryAiMakeTask, AirProduction::MakeTask, AmphibiousOps::Produce | Existing constructor priorities, income gate, metal bank, actual build edge, owned plus pending bounded force |

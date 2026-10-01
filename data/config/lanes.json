@@ -5,6 +5,27 @@
 // folder may carry its own lanes.json.
 {
 "lanes": {
+    "amph_enabled": true,
+    "amph_max_waves": 6,
+    "amph_telchine_wave": 6,
+    "amph_marauder_wave": 4,
+    "amph_min_wave": 3,
+    "amph_assemble_seconds": 90,
+    "amph_secure_seconds": 18,
+    "amph_raid_seconds": 5,
+    "amph_retry_seconds": 20,
+    "amph_stall_seconds": 180,
+    "amph_quorum": 0.8,
+    "amph_gather_radius": 240,
+    "amph_secure_radius": 1000,
+    "amph_land_cost": 2.5,
+    "amph_water_cost": 1.0,
+    "amph_threat_weight": 8.0,
+    "amph_max_water_threat": 0.0,
+    "amph_min_metal": 200,
+    "amph_landing_inland": 128,
+    "amph_landing_half_width": 160,
+    "amph_staging_detour": 1.35,
     "background": true,              // native worker; false retains synchronous profiling mode
     "stagger_seconds": 2,            // spread initial/panel requests by team, no polling flood
 	"flank_enabled": true,

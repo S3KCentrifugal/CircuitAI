@@ -16,11 +16,11 @@ if [ -z "$IMAGE" ]; then
 	echo "run_native_tests: the recoil-build-amd64-windows image is not present (run a docker build once)" >&2
 	exit 2
 fi
-tests=(layout_ranking_test base_layout_geometry_test lane_solver_test strategic_targeting_test)
+tests=(layout_ranking_test base_layout_geometry_test lane_solver_test strategic_targeting_test terrain_route_test)
 cmd=""
 for t in "${tests[@]}"; do
     extra=""
-    if [ "$t" = lane_solver_test ]; then extra="/src/src/circuit/terrain/LaneSolver.cpp"; fi
+    if [ "$t" = lane_solver_test ] || [ "$t" = terrain_route_test ]; then extra="/src/src/circuit/terrain/LaneSolver.cpp"; fi
 	cmd="$cmd x86_64-w64-mingw32-g++ -std=c++20 -O1 -Wall -Wextra -static -pthread -I/src/src -I/src/src/circuit /src/tests/$t.cpp $extra -o /out/$t.exe || exit 1;"
 done
 cmd="$cmd x86_64-w64-mingw32-g++ -std=c++20 -O1 -static -DAS_MAX_PORTABILITY -DANGELSCRIPT_EXPORT -I/src/src/lib/angelscript/include /src/tests/production_math_test.cpp /src/src/lib/angelscript/source/*.cpp -o /out/production_math_test.exe || exit 1;"
@@ -34,4 +34,5 @@ for t in "${tests[@]}"; do
 done
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/production_math.as" "$REPO/tests/production_math_tests.as" || rc=1
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/placement_math.as" "$REPO/tests/placement_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/amphibious_math.as" "$REPO/tests/amphibious_math_tests.as" || rc=1
 exit $rc

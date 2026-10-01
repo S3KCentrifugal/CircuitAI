@@ -49,6 +49,7 @@ public:
 	 */
 	void SetLanes(int count, float spacing, float endSpread);
 	void SetTraversal(bool preserveWaypoints, float radius, bool fightAtEnd);
+    void SetHoldPosition(bool enabled) { holdPosition = enabled; }
 	// Opt-in looping engine patrol; ordinary routes retain their traversal.
 	void SetPatrol(bool enabled) { patrol = enabled; dirty = !route.empty(); }
 	int GetRouteVersion() const { return version; }
@@ -77,6 +78,7 @@ private:
 	bool preserveWaypoints = false;
 	bool fightAtEnd = false;
 	bool patrol = false;
+    bool holdPosition = false;
 };
 
 } // namespace circuit

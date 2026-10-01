@@ -314,6 +314,25 @@ AIFloat3 CBattleAnalysis::GetLanePoint(int i, float share) const
 	return r;
 }
 
+std::vector<AIFloat3> CBattleAnalysis::GetTerrainRoute(const AIFloat3& from, const AIFloat3& to,
+        int cls, float landCost, float waterCost, float threatWeight, float maxWaterThreat)
+{
+    EnsureGrid();
+    if (!laneTerrain) CaptureLaneRequest(1, 0.f, 0.f, 1.f, 0.f, 1.f, 0);
+    Grid threat(height.size());
+    for (size_t c = 0; c < threat.size(); ++c) {
+        const auto p = CellPos(c);
+        threat[c] = cls == L_AIR ? AirThreat(p) : (cls == L_AMPH ? AmphThreat(p) : SurfThreat(p));
+    }
+    const auto cells = lane::Solver(*laneTerrain, laneSettings).PointRoute(
+        {from.x, from.y, from.z}, {to.x, to.y, to.z}, cls, threat,
+        landCost, waterCost, threatWeight, maxWaterThreat);
+    std::vector<AIFloat3> result;
+    result.reserve(cells.size());
+    for (int c : cells) { auto p = CellPos(c); p.y = Height(p); result.push_back(p); }
+    return result;
+}
+
 std::vector<AIFloat3> CBattleAnalysis::GetLaneRoute(int lane, const AIFloat3& from, int cls) const
 {
 	std::vector<AIFloat3> result;

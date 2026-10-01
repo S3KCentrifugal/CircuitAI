@@ -30,7 +30,7 @@ namespace TechFlank {
         site = AIFloat3(float(aiTerrainMgr.GetLayoutInt("tech.flank.x", -1)), 0.0f,
             float(aiTerrainMgr.GetLayoutInt("tech.flank.z", -1)));
     }
-    bool Enabled() { Load(); return enabled && Lanes::Enabled(); }
+    bool Enabled() { Load(); return enabled && Global::AISettings::Role == AiRole::TECH && Lanes::Enabled(); }
     CCircuitDef@ Lab() { return ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side)); }
     bool Owns(CCircuitUnit@ u)
     {

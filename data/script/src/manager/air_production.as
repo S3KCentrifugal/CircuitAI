@@ -38,6 +38,8 @@ namespace AirProduction {
         const bool advanced = UnitHelpers::IsT2AircraftPlant(name);
         const bool basic = UnitHelpers::IsT1AircraftPlant(name);
         if (!advanced && !basic) {
+            IUnitTask@ amphib = AmphibiousOps::Produce(u, 200.0f);
+            if (amphib !is null) return amphib;
             // A nano serves one bay even where reach discs overlap. Reacquire all IDs.
             int64 owner = -1;
             if (AirEconomy::nanoBay.get("" + u.id, owner) && owner >= 0 && owner < int(AirLayout::bays.length())) {

@@ -1,5 +1,28 @@
 # CircuitAI AngelScript Reference
 
+## Amphibious operation queries (D-158)
+
+`aiBattle.GetTerrainRoute(from, to, movementClass, landCost, waterCost,
+threatWeight, maxWaterThreat)` returns a fresh `array<AIFloat3>` of grid waypoints,
+or an empty array when either endpoint is invalid or no allowed route exists.
+It never snaps endpoints. The amphibious class uses the observed amphibious
+threat layer; `aiBattle.AmphThreat(pos)` exposes that layer with a floor of one
+inside currently observed underwater-weapon coverage, even when a profile zeros
+that weapon's combat weight. The coverage includes two grid cells of clearance.
+The existing threat maps are unchanged. Queries run on
+the AI thread and should be throttled, not called per unit per frame.
+
+`GetGroundContactCount`, `GetGroundContactPos`, `GetGroundContactCost` and
+`IsGroundContactEconomy` expose per-second value snapshots of current known
+ground contacts. These snapshots include observed units suppressed only by a
+role's target preference, such as TECH's T1-combat ignore flag, while respecting
+hidden/dead/neutral contacts and the game's `ignoredByAI` exclusion.
+Indexes last only until the next update; no enemy pointers
+escape. `CRouteTask.SetHoldPosition(true)` opts into hold-position movement
+during the task so automatic pursuit cannot drag coastal guards underwater;
+removal restores the UnitDef movement policy. Existing route users retain
+their previous behavior.
+
 ## Purpose
 
 ### AIR management additions (D-147)

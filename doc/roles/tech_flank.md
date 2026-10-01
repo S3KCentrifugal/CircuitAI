@@ -55,7 +55,7 @@ factions. Natural-economy orders occurred at +203/+202 metal; both streams
 reached the mountain and sustained production. See the [played review](../reviews/2026-09-29-tech-flank-production.md)
 for fixtures, screenshots and the broader invariant failures.
 
-<!-- source: data/script/src/roles/tech_flank.as; blob: 561fbe61c2d3ccaa13c814a61e1d5d6902b8ca4a; lines: 191 -->
+<!-- source: data/script/src/roles/tech_flank.as; blob: 3834e9ae0e162ee86e107b7ae158d1c46bb8f606; lines: 191 -->
 
 ## D-145: strategic mountain qualification
 
@@ -64,3 +64,6 @@ first clears `laneQualified`; only successful reachable selection sets it.
 `Produce` checks this flag after revision revalidation, preventing a failed
 refresh from allowing the next ask to reuse an old route. Ordinary factory
 composition remains separate from dedicated mountain-flank production.
+
+D-158 lets experimental AIR survey shared lanes. `Enabled` therefore checks
+TECH explicitly so AIR cannot acquire this dedicated ground-factory policy.

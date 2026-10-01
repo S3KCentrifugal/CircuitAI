@@ -327,3 +327,30 @@ at sufficient income, or sustained recruitment and actual mountain movement
 with observed combat on the positive maps. It writes `mountain-results.json`
 and a dated map/settings scorecard. Functional success never overrides the
 global invariant/error verdict; a diagnosed unrelated failure still exits 1.
+
+## Amphibious capability fixtures (D-158)
+
+`prepare_amphibious_check.py --map tundra|supreme|serene --dir build-theatres/<run>
+--dll <pinned DLL> [--profile experimental_balanced]` stages two allied TECH/AIR
+controllers with both Telchine and Marauder waves. Launch with `playtest.py
+launch`; judge with `playtest.py watch --checks amphibious`.
+
+The fixture uses real map terrain and checks full unit footprints before giving
+troops. It gives landing/backline economic targets and T1 defenders, enables
+global LOS, keeps the target team alive with `deathmode=neverend`, freezes
+autonomous builder/factory work, overrides only the staged role assignments and
+TECH combat-income guard for injected troops, and observes real positions and
+damage attribution. This is a movement/combat capability test, not an economic
+opening or competitive win-rate benchmark. Original engine logs and each failed
+attempt remain in the isolated directory's `runs/` archive.
+
+Run `audit_amphibious_check.py <directory> --log <archived infolog.txt>` after
+the watcher. Both checks must pass: the audit requires every injected member
+to cross and land, substantial forward movement and a secured foothold for
+each role/type, and attributed kills by both unit types. FRONT control units
+must be present and must never enter the new controller. Add `--guarded` when
+preparing Tundra to place a known torpedo tower across the approach; the audit
+also requires actual underwater positions to remain outside its weapon radius.
+On Serene use `--marauder-delay-seconds 120` to give Telchines independent combat
+time before faster Marauders clear their shared landing targets. The manifest
+records this fixture-only stagger; it does not alter production policy.

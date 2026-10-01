@@ -398,7 +398,7 @@ namespace RoleAir {
     ******************************************************************************/
 
     void Air_MainUpdate() {
-        if (AirEconomy::Active()) { AirBuild::Tick(); AirEconomy::Tick(); AirProduction::Tick(); AirLayout::Draw(); }
+        if (AirEconomy::Active()) { AirBuild::Tick(); AirEconomy::Tick(); AirProduction::Tick(); AirLayout::Draw(); Lanes::Tick(); }
         // Periodically update dynamic military quotas once the configured delay has passed
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();

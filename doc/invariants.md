@@ -143,3 +143,4 @@ step.
 | INV-093 | Defensive AIR interception targets are in friendly territory. | AirScreen::Intercept checks fresh observed contacts against participating starts. | D-156 |
 | INV-094 | An AIR anti-nuke covers its own economic core using loaded interceptor coverage. | AirDefence checks snapped placement, AirBuild::Record checks admission, AirWatch checks the actual frame. | D-156 |
 | INV-095 | A confirmed strategic launch respects allied Juno area claims or that silo's nuclear location cooldown. | Native CSuperTask::OnLaunch; independent launch-log fixture audit. | D-157 |
+| INV-096 | An amphibious wave declares a foothold secure only on dry ground with its surviving-member quorum present and no current local target. | AmphibiousOps::Tick; independent amphibious fixture records actual water and land transitions. | D-158 |

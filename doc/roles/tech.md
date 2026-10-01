@@ -906,7 +906,7 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 3adb5c3e8057e528b2fcbf031cb9d188d4196745; lines: 2728 -->
+<!-- source: data/script/src/roles/tech.as; blob: 8a5a751cf717e3196c7826466ca98172c36dccbd; lines: 2737 -->
 
 ## D-152 protected expansion
 
@@ -916,3 +916,18 @@ claims do not authorize spending. The fortification controller reserves
 lane-side teeth and, after advanced construction access, a second wall line
 and owned geo/advanced-mex perimeters with access gaps. See
 [design](../air-tech-expansion-plan.md).
+
+## D-158 amphibious units
+
+`Tech_FactoryAiMakeTask` offers a bounded `AmphibiousOps::Produce` wave from an
+existing compatible lab after constructor upkeep and before island ground-army
+suppression; compatible gantries offer Marauders before their signature batch.
+Both use the existing combat gate plus the amphibious income/bank gate.
+`Military::AiMakeTask` routes owned Telchines and Marauders through the shared
+controller before generic army routing. Telchines regroup and secure dry
+footholds; Marauders exploit known economy on the reached landmass. All policy
+is experimental TECH/AIR only. See the [design](../amphibious-operations-plan.md).
+
+`Tech_MilitaryAiUnitAdded` retains these two unit types for their wave instead
+of splitting Telchines through the opening combat donation. T2 constructor
+donations and other combat-unit donations retain their previous policy.

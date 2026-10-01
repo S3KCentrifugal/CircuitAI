@@ -3262,6 +3262,44 @@ cases. Match generated explanations to engine/script rules and a controlled
 shore-to-deep-water firing test. Documentation-generator fix remains pending;
 the user's mechanics explanation uses primary source rather than that note.
 
+### KI-446 - Amphibious production and saved-game recovery are not yet played
+
+**Problem.** D-158's real-terrain fixtures inject complete Telchine/Marauder
+waves and freeze builders/factories. They verify routing, landfalls and combat,
+but do not establish natural recruitment under unmodified income gates or
+reconstruction after a save/load during a crossing. Other roles and legacy
+profiles deliberately retain their existing amphibious army behavior.
+
+**Proposed solution.** Add a funded compatible-factory fixture that preserves
+`Tech_FactoryAiMakeTask` and `AirProduction::MakeTask`, exercises constructor
+and transport demand, and audits actual completed recruits and bounded pending
+queues. Save and reload during submerged advance and contested security, then
+verify each owned unit gets exactly one task and cannot skip dry regrouping.
+Keep role/profile enablement explicit; do not expand it as part of those tests.
+
+**Verification.** Run with ordinary production gates, log income and bank at
+each recruitment, and assert continued AIR fighter/constructor/transport work.
+For reload, audit all stable unit IDs and INV-096 before and after. Current
+pure-rule/API checks and injected-unit simulations are not this evidence.
+See [plan/results](amphibious-operations-plan.md).
+
+### KI-447 - Zero torpedo threat weights remain outside the new route query
+
+**Problem.** Experimental behavior profiles assign `coratl` zero default and
+water threat. Ordinary native threat-map callers can therefore treat a known
+advanced torpedo launcher as harmless. D-158's observed underwater weapon
+coverage fixes the new TECH/AIR amphibious query only, preserving the requested
+scope. The existing threat maps and other roles are unchanged.
+
+**Proposed solution.** Audit torpedo weapon weights across profiles against the
+loaded weapon masks and damages. Test appropriate nonzero water weights with
+SEA and other native amphibious controllers before changing shared behavior;
+include submerged units, shore-fired depth charges, paralysis and radar loss.
+
+**Verification.** Place an observed torpedo tower across a naval route and
+compare native threat values and actual unit paths before/after the profile
+change. The D-158 guarded fixture covers only its new query, not that rollout.
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate

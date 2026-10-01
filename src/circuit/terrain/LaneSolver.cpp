@@ -102,6 +102,42 @@ int Solver::Snap(const Point& pos, int cls) const
 	return -1;
 }
 
+std::vector<int> Solver::PointRoute(const Point& from, const Point& to, int cls, const Grid& threat,
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat) const
+{
+    auto inside = [this](const Point& p) {
+        return std::isfinite(p.x) && std::isfinite(p.z) && p.x >= 0 && p.z >= 0
+            && p.x < gw * cellSize && p.z < gh * cellSize;
+    };
+    if (!inside(from) || !inside(to) || cls < 0 || cls >= _LANE_CLASSES_
+        || threat.size() != height.size() || !std::isfinite(landCost) || landCost <= 0
+        || !std::isfinite(waterCost) || waterCost <= 0 || !std::isfinite(threatWeight) || threatWeight < 0
+        || !std::isfinite(maxWaterThreat) || maxWaterThreat < 0) return {};
+    const int origin = Cell(from), goal = Cell(to);
+    if (!pass[cls][origin] || !pass[cls][goal]) return {};
+    Grid penalty(height.size()), distance;
+    std::vector<char> blocked(height.size());
+    for (size_t c = 0; c < height.size(); ++c) {
+        const float value = std::isfinite(threat[c]) ? std::max(0.f, threat[c]) : 1e9f;
+        blocked[c] = height[c] < 0 && value > maxWaterThreat;
+        penalty[c] = std::min(1e8f, (height[c] < 0 ? waterCost : landCost) + value * threatWeight);
+    }
+    // Allow escape from a newly threatened starting cell, but not entry into a threatened goal.
+    blocked[origin] = false;
+    if (blocked[goal]) return {};
+    std::vector<int> previous, result;
+    DijkstraMulti({goal}, penalty, cls, nullptr, distance, previous, true, 0.f, &blocked);
+    if (distance[origin] == std::numeric_limits<float>::max()) return {};
+    int at = origin;
+    for (size_t step = 0; step < height.size(); ++step) {
+        result.push_back(at);
+        if (at == goal) return result;
+        at = previous[at];
+        if (at < 0) break;
+    }
+    return {};
+}
+
 void Solver::DijkstraMulti(const std::vector<int>& starts, const Grid& penalty, int cls, const Grid* extra,
 		Grid& dist, std::vector<int>& prev, bool reverse, float gradeWeight, const std::vector<char>* blocked, float cliffWeight, bool preferShelf,
 		const Grid* initialCost) const

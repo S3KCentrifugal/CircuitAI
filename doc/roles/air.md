@@ -582,7 +582,7 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 0a0b8d773f30f5b19140e27728f4c86afc566cbd; lines: 1276 -->
+<!-- source: data/script/src/roles/air.as; blob: 9dce14f6546d07996178fdc940760ee8db61cc47; lines: 1276 -->
 
 ## D-152 expansion and access
 
@@ -604,3 +604,14 @@ bay interiors from ordinary defenses, and relocates unused blocked clusters.
 See the [shared layout and income design](../allied-layout-air-income-plan.md).
 T1 bombers and Cortex Shuriken support are replenished alongside the fighter
 screen; fusion preparation no longer stops them indefinitely.
+
+## D-158 amphibious units
+
+Experimental AIR calls `Lanes::Tick` for shared terrain and island surveys.
+The shared military hook gives owned Telchines and Marauders to
+`AmphibiousOps::MilitaryTask` before ordinary army routing. `AmphibiousOps::Tick`
+runs in each experimental profile and releases operations on role loss.
+Existing compatible ground factories may produce bounded waves through
+`AirProduction::MakeTask`; AIR does not build a new ground factory for them.
+Aircraft production, requested transports and economic constructors keep their
+existing priority. See the [operation design](../amphibious-operations-plan.md).

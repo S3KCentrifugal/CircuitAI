@@ -97,6 +97,14 @@ public:
 	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
 	springai::AIFloat3 GetAirContactPos(int index) const;
 	float GetAirContactCost(int index) const;
+    float AmphThreat(const springai::AIFloat3& pos) const;
+    int GetGroundContactCount() const { return static_cast<int>(groundContacts.size()); }
+    springai::AIFloat3 GetGroundContactPos(int index) const;
+    float GetGroundContactCost(int index) const;
+    bool IsGroundContactEconomy(int index) const;
+    std::vector<springai::AIFloat3> GetTerrainRoute(const springai::AIFloat3& from,
+        const springai::AIFloat3& to, int cls, float landCost, float waterCost,
+        float threatWeight, float maxWaterThreat);
 
 	// --- water
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
@@ -153,6 +161,8 @@ private:
 		float cost;
 	};
 	std::vector<AirContact> airContacts;
+    struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; };
+    std::vector<GroundContact> groundContacts;
 	struct SChoke {
 		springai::AIFloat3 pos, dir;
 		float width, heat, share;
@@ -164,6 +174,7 @@ private:
 		float heat;
 	};
 	using Grid = std::vector<float>;
+    Grid observedWaterWeapons; // current weapon coverage, independent of profile threat multipliers
     lane::Settings laneSettings;
     std::shared_ptr<const lane::Terrain> laneTerrain;
     lane::JobGate laneJobs;

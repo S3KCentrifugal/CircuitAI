@@ -61,6 +61,10 @@ class Solver final : private Settings {
 public:
     explicit Solver(const Terrain& terrain, Settings settings = {}, const std::atomic<bool>* cancel = nullptr);
     std::vector<Route> Run(const Request& request);
+    // Point-to-point terrain route, with policy-supplied travel costs and threat ceiling.
+    // Empty means unreachable; never snap either end across an impassable cell.
+    std::vector<int> PointRoute(const Point& from, const Point& to, int cls, const Grid& threat,
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat) const;
     // Pure qualification, also exercised by synthetic route regressions.
     bool HasMountainTraverse(const Route& route, float rise) const;
     // Shared by the legacy choke analyser and lane planner; no second BFS.

@@ -541,7 +541,9 @@ namespace RoleTech
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		Invariants::OnUnitAdded(unit);   // D-076: INV-001
-		Team::Donation::OnCombatBotBuilt(unit);
+        // D-158: keep the amphibious wave together; constructor donations are separate.
+        if (!AmphibiousOps::Active() || unit is null || AmphibiousOps::Kind(unit.circuitDef)<0)
+            Team::Donation::OnCombatBotBuilt(unit);
 	}
 
 	void Tech_MilitaryAiTaskRemoved(IUnitTask @task, bool done)
@@ -975,6 +977,8 @@ namespace RoleTech
 		if (UnitHelpers::IsGantryLab(facDef.GetName()))
 		{
 			GenericHelpers::LogUtil("[TECH][Factory] Gantry detected ('" + facDef.GetName() + "')", 3);
+            IUnitTask@ amphib = AmphibiousOps::Produce(u, botLabGate);
+            if (amphib !is null) return amphib;
 			// If economy is very strong, queue a batch of signature experimentals
 			if (metalIncome > 200.0f)
 			{
@@ -1209,7 +1213,9 @@ namespace RoleTech
 				}
 			}
 		}
-		// D-121: an island TECH's land labs make no combat units once the harbour
+        IUnitTask@ amphib = AmphibiousOps::Produce(u, botLabGate);
+        if (amphib !is null) return amphib;
+        // D-121: an island TECH's land labs make no combat units once the harbour
 		// runs (they cannot leave the island); constructors above still come
 		if (TechHarbour::HoldsLandCombat(facDef.GetName()))
 			return aiFactoryMgr.Enqueue(TaskS::Wait(false, 10 * SECOND));
@@ -1270,6 +1276,9 @@ namespace RoleTech
 				}
 
 				GenericHelpers::LogUtil("[TECH][Factory] Eco>=gate: enqueue 10 '" + unitName + "' from T2 bot lab (gate=" + botLabGate + ")", 3);
+                // The shared wave producer above owns its bounded queue; do not add a legacy ten-unit batch.
+                if (AmphibiousOps::Active() && AmphibiousOps::Kind(ai.GetCircuitDef(unitName))>=0)
+                    return aiFactoryMgr.Enqueue(TaskS::Wait(false, 5 * SECOND));
 				IUnitTask @last2 = Tech_EnqueueUnitBatch(unitName, 10, pos);
 				if (last2 !is null)
 					return last2;
