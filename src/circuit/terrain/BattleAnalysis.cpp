@@ -15,6 +15,8 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "spring/SpringMap.h"
+#include "spring/SpringCallback.h"
+#include "unit/ally/AllyUnit.h"
 
 #include "UnitDef.h"
 #include "WeaponDef.h"
@@ -524,6 +526,7 @@ void CBattleAnalysis::Update(int frame)
 	EnsureGrid();
 	airContacts.clear();
     groundContacts.clear();
+    navalContacts.clear();
     observedWaterWeapons.assign(height.size(), 0.f);
 	const float dt = float(frame - lastDecay) / FRAMES_PER_SEC;
 	if (dt > 0.f) {
@@ -554,6 +557,10 @@ void CBattleAnalysis::Update(int frame)
             const bool economy = !d->IsMobile() && (d->IsMex() || d->IsBuilder() || d->IsWind()
                 || d->GetMaxRange() <= 0.f);
             groundContacts.push_back({e->GetPos(), m, economy});
+        }
+        if (observed && !d->IsAbleToFly() && d->IsMobile()
+            && (d->IsFloater() || d->IsSubmarine()) && Height(e->GetPos()) < 0.f) {
+            navalContacts.push_back(e->GetPos());
         }
         // Some profiles intentionally zero torpedo-tower combat weights. The new
         // route query must still see an observed underwater weapon's coverage.
@@ -634,6 +641,32 @@ float CBattleAnalysis::GetGroundContactCost(int i) const {
 }
 bool CBattleAnalysis::IsGroundContactEconomy(int i) const {
     return i >= 0 && i < int(groundContacts.size()) && groundContacts[i].economy;
+}
+AIFloat3 CBattleAnalysis::GetNavalContactPos(int i) const {
+    return i >= 0 && i < int(navalContacts.size()) ? navalContacts[i] : AIFloat3(-1.f, 0.f, -1.f);
+}
+int CBattleAnalysis::GetAllyAssetCount() {
+    const int frame = circuit->GetLastFrame();
+    if (frame >= allyAssetFrame + 5 * FRAMES_PER_SEC) {
+        allyAssetFrame = frame;
+        allyAssets.clear();
+        circuit->UpdateFriendlyUnits();
+        for (const auto& kv : circuit->GetFriendlyUnits()) {
+            // AllyUnit's definition may belong to another AI that has resigned.
+            // Resolve through this AI's definition table, using only the stable ID.
+            const CCircuitDef* d = circuit->GetCircuitDefSafe(circuit->GetCallback()->Unit_GetDefId(kv.first));
+            if (d == nullptr || d->IsMobile() || !(d->IsMex() || d->IsBuilder() || d->GetDef()->IsNeedGeo())
+                || kv.second->GetUnit()->IsBeingBuilt()) continue;
+            allyAssets.push_back({kv.second->GetPos(frame), d->GetCostM()});
+        }
+    }
+    return static_cast<int>(allyAssets.size());
+}
+AIFloat3 CBattleAnalysis::GetAllyAssetPos(int i) const {
+    return i >= 0 && i < int(allyAssets.size()) ? allyAssets[i].pos : AIFloat3(-1.f, 0.f, -1.f);
+}
+float CBattleAnalysis::GetAllyAssetCost(int i) const {
+    return i >= 0 && i < int(allyAssets.size()) ? allyAssets[i].cost : 0.f;
 }
 float CBattleAnalysis::CombatHeat(const AIFloat3& pos, float radius) const { return SumHeat(combat, pos, radius); }
 float CBattleAnalysis::AirHeat(const AIFloat3& pos, float radius) const { return SumHeat(air, pos, radius); }

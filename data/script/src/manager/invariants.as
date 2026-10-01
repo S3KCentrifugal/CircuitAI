@@ -45,7 +45,11 @@ namespace Invariants {
             || u.circuitDef.IsRoleAny(Unit::Role::TRANS.mask)   // D-093: the ferry's transport is logistics (played: armatlas and corvalk flagged)
             || TechHarbour::IsHarbourUnit(u.circuitDef);   // D-121 (owner): the harbour's sea units are built whatever the income
         const float mi = Economy::GetMinMetalIncomeLast10s();
-        if (!builder && mi < TechPlan::CombatGate())
+        // D-160: Telchines use the separate coastal budget, admitted at enqueue
+        // time. Completion may occur after income falls; ordinary combat keeps
+        // its existing gate and Marauders are not exempted.
+        const bool coastal = AmphibiousOps::Active() && AmphibiousOps::Kind(u.circuitDef)==0;
+        if (!builder && !coastal && mi < TechPlan::CombatGate())
             Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
 
@@ -204,7 +208,8 @@ namespace Invariants {
                 // INV-018 (D-096): the advanced lab faces the front and nothing of ours
                 // stands in its exit lane, so what it makes walks out toward the enemy
                 const int labF = aiTerrainMgr.GetBuildingFacing(t2);
-                // D-098: the facing it was ordered with (the front then); never away from the front now
+                // D-160: compare with the front when ordered. A completed lab
+                // cannot rotate when the observed enemy front changes.
                 const int planned = Layout::LabPlannedFacing();
                 const int frontF = (planned >= 0) ? planned : Layout::LabFacing();
                 const int inExit = aiTerrainMgr.CountStructuresInExit(t2);
@@ -214,7 +219,7 @@ namespace Invariants {
                         + inExit + " structures in its exit lane", 1);
                 }
                 if (ai.frame - t2LabSince >= int(Global::RoleSettings::Tech::InvariantLabReachSeconds) * SECOND
-                    && (labF != frontF || labF == (Layout::LabFacing() + 2) % 4 || inExit > 0))
+                    && (labF != frontF || inExit > 0))
                     Violation("INV-018", "" + t2.id, "the advanced lab faces " + labF + " (the front " + frontF + ") with " + inExit + " structures in its exit lane");
             }
         }

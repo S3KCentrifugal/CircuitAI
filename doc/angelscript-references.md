@@ -1615,3 +1615,26 @@ friendly-territory classification and response orders in script.
 coverage of the definition's interceptor weapons, or zero. The generated
 weapon mounts/definitions are temporary owned wrappers; no wrapper is retained
 across frames. Missile travel range is not interception coverage.
+
+### D-160 beachhead observation and task transfer
+
+`aiBattle.GetNavalContactCount() const` and
+`AIFloat3 GetNavalContactPos(int) const` expose current observed mobile
+floater/submarine positions over water. The existing once-per-second observed
+contact refresh excludes hidden/unseen contacts; this is not omniscient navy
+tracking. Invalid indexes return a negative-x position.
+
+`int aiBattle.GetAllyAssetCount()` refreshes a value snapshot at most every
+five seconds, from completed immobile allied mexes, production/build-option
+structures and geothermal structures. Call Count before indexing.
+`AIFloat3 GetAllyAssetPos(int) const` and `float GetAllyAssetCost(int) const`
+return copied positions/metal costs, or negative-x/zero for invalid indexes.
+No UnitDef/AllyUnit handle is exported or retained in the snapshot; definitions
+are resolved in the querying AI to survive another AI resigning.
+
+`bool aiMilitaryMgr.TransferUnit(CCircuitUnit@, IUnitTask@)` reassigns an owned
+unit between live tasks of the same military manager. The destination must be
+a fighter task; null, foreign, dead and cross-manager requests return false.
+It delegates removal/start to native AssignTask and does not choose priorities
+or destinations. Arguments remain borrowed; the call returns no new handle.
+Script retains stable member IDs and updates its wave membership on success.

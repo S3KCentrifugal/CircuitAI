@@ -1,13 +1,15 @@
 #include "lanes.as"
 #include "../helpers/amphibious_math.as"
+#include "amphibious_beaches.as"
 
 // D-158: role-scoped waves. Native code supplies geometry and commands only.
 namespace AmphibiousOps {
-    enum Phase { ASSEMBLE, ADVANCE, SECURE, HOLD }
+    enum Phase { ASSEMBLE, ADVANCE, SECURE, HOLD, GUARD }
     class Wave {
         int serial = 0, kind = 0, phase = ASSEMBLE, born = 0, changed = 0, quiet = 0, retry = 0;
         int launched = 0, region = -1, checked = 0;
         bool secured = false;
+        AIFloat3 beachGoal(-1,0,-1);
         array<Id> members;
         CRouteTask@ task;
         AIFloat3 anchor, goal, destination;
@@ -20,6 +22,8 @@ namespace AmphibiousOps {
     float quorum = 0.8f, radius = 240.0f, secureRadius = 1000.0f, landCost = 2.5f, waterCost = 1.0f;
     float threatWeight = 8.0f, maxWaterThreat = 0.0f, minMetal = 200.0f;
     float landingInland = 128.0f, landingWidth = 160.0f, stagingDetour = 1.35f;
+    float telMinMetal = 80.0f, telReserve = 300.0f, telMetalShare = 0.15f, telEnergyShare = 0.2f;
+    int guardSize = 3, guardGroups = 2, telLimit = 18, telNext = 0;
 
     void Load() {
         if (loaded) return;
@@ -45,6 +49,13 @@ namespace AmphibiousOps {
         landingInland = AiMax(64.0f, aiSetupMgr.ConfigFloat("lanes/amph_landing_inland", 128.0f));
         landingWidth = AiMax(64.0f, aiSetupMgr.ConfigFloat("lanes/amph_landing_half_width", 160.0f));
         stagingDetour = AiMax(1.0f, aiSetupMgr.ConfigFloat("lanes/amph_staging_detour", 1.35f));
+        telMinMetal = AiMax(0.0f,aiSetupMgr.ConfigFloat("lanes/amph_telchine_min_metal",80.0f));
+        telReserve = AiMax(0.0f,aiSetupMgr.ConfigFloat("lanes/amph_telchine_reserve_metal",300.0f));
+        telMetalShare = AiMax(0.01f,AiMin(1.0f,aiSetupMgr.ConfigFloat("lanes/amph_telchine_metal_share",0.15f)));
+        telEnergyShare = AiMax(0.01f,AiMin(1.0f,aiSetupMgr.ConfigFloat("lanes/amph_telchine_energy_share",0.2f)));
+        guardSize = AiMax(1,aiSetupMgr.ConfigInt("lanes/amph_guard_size",3));
+        guardGroups = AiMax(0,AiMin(4,aiSetupMgr.ConfigInt("lanes/amph_guard_groups",2)));
+        telLimit = AiMax(telSize,aiSetupMgr.ConfigInt("lanes/amph_telchine_limit",18));
     }
     bool Active() {
         Load();
@@ -57,6 +68,21 @@ namespace AmphibiousOps {
         return d.GetName() == "legamph" ? 0 : (d.GetName() == "armmar" ? 1 : -1);
     }
     int Size(int kind) { return kind == 0 ? telSize : marSize; }
+    int Guards() {
+        int count=0;
+        for (uint i=0;i<waves.length();++i) if (waves[i].phase==GUARD && waves[i].task !is null && !waves[i].task.IsDead()) ++count;
+        return count;
+    }
+    CRouteTask@ NewRoute() {
+        IUnitTask@ task=aiMilitaryMgr.Enqueue(TaskF::Route());
+        CRouteTask@ route=cast<CRouteTask>(cast<IFighterTask>(task));
+        if (route !is null) {
+            route.SetTraversal(true,48.0f,false);
+            route.SetHoldPosition(true);
+            route.SetLanes(1,0,0);
+        }
+        return route;
+    }
     void Say(Wave@ w, const string &in event) {
         GenericHelpers::LogUtil("[AMPH] wave=" + w.serial + " kind=" + w.kind + " " + event
             + " alive=" + w.members.length() + " at=(" + int(w.destination.x) + "," + int(w.destination.z) + ")", 1);
@@ -74,7 +100,12 @@ namespace AmphibiousOps {
             CCircuitUnit@ u = ai.GetTeamUnit(w.members[i]);
             if (u !is null) {
                 const AIFloat3 p = u.GetPos(ai.frame);
-                if (aiBattle.Height(p) >= 0.0f && p.distance2D(w.destination) <= radius) ++count;
+                // Once landed, allow modest dry dispersal from allied traffic.
+                // Requiring the original tight circle forever stranded waves
+                // pushed aside by another landing or a retained guard (D-160).
+                const float reach=w.phase==SECURE ? radius*1.5f : radius;
+                if (aiBattle.Height(p) >= 0.0f && p.distance2D(w.destination) <= reach
+                    && (w.phase!=SECURE || StrategicSites::LandAt(p)==w.region)) ++count;
             }
         }
         return count;
@@ -227,6 +258,12 @@ namespace AmphibiousOps {
     }
     bool Onward(Wave@ w) {
         if (!AmphibiousMath::MayAdvance(w.phase==ASSEMBLE,w.secured)) return false;
+        if (w.kind==0 && w.phase==ASSEMBLE && AmphibiousMath::GuardAllocation(int(w.members.length()),guardSize,minimum,Guards(),guardGroups)>0)
+            w.beachGoal=AmphibiousBeaches::Best(w.destination);
+        if (w.beachGoal.x>=0) {
+            if (w.destination.distance2D(w.beachGoal)>radius && Plan(w,w.beachGoal)) return true;
+            w.beachGoal=AIFloat3(-1,0,-1);
+        }
         const AIFloat3 goal=Goal(w), stage=Staging(w,goal);
         // A blocked island must not veto a reachable safe final approach.
         return Plan(w,stage) || (stage.distance2D(goal)>64.0f && Plan(w,goal));
@@ -256,6 +293,73 @@ namespace AmphibiousOps {
         w.phase = HOLD; w.retry = ai.frame + retrySeconds * SECOND;
         Say(w, "hold " + reason);
     }
+    array<AIFloat3>@ GuardRoute(Wave@ w, const AIFloat3& in target) {
+        if (target.x<0 || !DryRoom(target) || StrategicSites::LandAt(target)!=w.region) return null;
+        array<AIFloat3>@ route=aiBattle.GetTerrainRoute(Leader(w),target,Lanes::BOT,1,1,threatWeight,0);
+        if (route is null || route.length()==0) return null;
+        for (uint i=0;i<route.length();++i)
+            if (aiBattle.Height(route[i])<0 || StrategicSites::LandAt(route[i])!=w.region) return null;
+        return route;
+    }
+    void RetainGuard(Wave@ w) {
+        if (w.kind!=0 || !w.secured || int(waves.length())>=maxWaves) return;
+        const int desired=AmphibiousMath::GuardAllocation(int(w.members.length()),guardSize,minimum,Guards(),guardGroups);
+        if (desired==0) return;
+        const AIFloat3 target=AmphibiousBeaches::Best(w.destination,w.region);
+        array<AIFloat3>@ route=GuardRoute(w,target);
+        if (route is null) return;
+        // Transfer only dry, assembled members. A quorum may leave one straggler.
+        array<Id> chosen;
+        for (uint i=0;i<w.members.length() && int(chosen.length())<desired;++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(w.members[i]);
+            if (u !is null && aiBattle.Height(u.GetPos(ai.frame))>=0
+                && StrategicSites::LandAt(u.GetPos(ai.frame))==w.region
+                && u.GetPos(ai.frame).distance2D(w.destination)<=radius*1.5f)
+                chosen.insertLast(u.id);
+        }
+        if (int(chosen.length())!=desired) return;
+        Wave@ g=Wave(); g.serial=++nextSerial; g.kind=0; g.phase=GUARD; g.region=w.region;
+        g.anchor=target; g.destination=target; g.born=ai.frame; g.quiet=ai.frame; g.secured=true;
+        @g.task=NewRoute(); if (g.task is null) return;
+        Order(g,route); waves.insertLast(g);
+        for (uint i=0;i<chosen.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(chosen[i]);
+            if (u is null || !aiMilitaryMgr.TransferUnit(u,g.task)) continue;
+            w.members.removeAt(w.members.find(chosen[i])); g.members.insertLast(chosen[i]);
+        }
+        if (g.members.length()==0) { g.task.Abort(); return; }
+        if (int(w.members.length())<minimum) Invariants::Violation("INV-097","amph","guard split consumed assault minimum");
+        w.beachGoal=AIFloat3(-1,0,-1);
+        AmphibiousBeaches::Publish(g.serial,g.anchor);
+        Say(g,"guard retained assets="+int(AmphibiousBeaches::Assets(target,g.region))+" assault="+w.members.length());
+    }
+    void GuardTick(Wave@ w) {
+        for (uint p=0;p<w.leg.length();++p) if (aiBattle.Height(w.leg[p])<0)
+            Invariants::Violation("INV-097","amph","guard route enters water");
+        for (uint i=0;i<w.members.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(w.members[i]);
+            if (u !is null && aiBattle.Height(u.GetPos(ai.frame))<0)
+                Invariants::Violation("INV-097","amph","retained guard submerged id="+u.id);
+        }
+        if (ai.frame<w.checked+retrySeconds*SECOND) return;
+        w.checked=ai.frame;
+        const bool assets=AmphibiousBeaches::Assets(w.anchor,w.region)>0;
+        if (assets) w.quiet=ai.frame;
+        if (AmphibiousMath::GuardRelease(assets,ai.frame-w.quiet,60*SECOND,AmphibiousBeaches::Claimed(w.anchor,w.serial,true))) {
+            AmphibiousBeaches::Publish(w.serial,w.anchor,true);
+            w.phase=ASSEMBLE; w.born=ai.frame; w.beachGoal=AIFloat3(-1,0,-1); Say(w,"guard released"); return;
+        }
+        AmphibiousBeaches::Publish(w.serial,w.anchor);
+        const AIFloat3 target=AmphibiousBeaches::Best(w.anchor,w.region,w.serial);
+        // Retain the economic beachhead, rather than following a ship around an
+        // island. Reposition locally only if a current naval approach is closer.
+        if (target.x>=0 && target.distance2D(w.anchor)<=800.0f && target.distance2D(w.destination)>128.0f
+            && AmphibiousBeaches::NavalDistance(target)+128.0f<AmphibiousBeaches::NavalDistance(w.destination)) {
+            array<AIFloat3>@ route=GuardRoute(w,target);
+            if (route !is null) { Order(w,route); Say(w,"guard dry reposition"); }
+        }
+        Say(w,"guard maintained assets="+int(AmphibiousBeaches::Assets(w.anchor,w.region)));
+    }
     IUnitTask@ MilitaryTask(CCircuitUnit@ u) {
         if (!Active() || u is null || Kind(u.circuitDef) < 0) return null;
         const int kind = Kind(u.circuitDef);
@@ -273,12 +377,8 @@ namespace AmphibiousOps {
             wave.anchor=DryTarget(u.GetPos(ai.frame));
             if (wave.anchor.x<0) wave.anchor=u.GetPos(ai.frame);
             wave.destination=wave.anchor;
-            IUnitTask@ task=aiMilitaryMgr.Enqueue(TaskF::Route());
-            @wave.task=cast<CRouteTask>(cast<IFighterTask>(task));
+            @wave.task=NewRoute();
             if (wave.task is null) return null;
-            wave.task.SetTraversal(true, 48.0f, false);
-            wave.task.SetHoldPosition(true); // do not chase a submarine off the dry firing platform
-            wave.task.SetLanes(1,0,0);
             array<AIFloat3> hold={wave.anchor};
             Order(wave, hold);
             waves.insertLast(wave);
@@ -288,7 +388,10 @@ namespace AmphibiousOps {
         return wave.task;
     }
     void TaskRemoved(IUnitTask@ task) {
-        for (uint i=0; i<waves.length(); ++i) if (waves[i].task is task) @waves[i].task=null;
+        for (uint i=0; i<waves.length(); ++i) if (waves[i].task is task) {
+            if (waves[i].phase==GUARD) AmphibiousBeaches::Publish(waves[i].serial,waves[i].anchor,true);
+            @waves[i].task=null;
+        }
     }
     void UnitRemoved(CCircuitUnit@ unit) {
         if (unit is null) return;
@@ -299,7 +402,10 @@ namespace AmphibiousOps {
     }
     void Reset() {
         array<Wave@> old=waves; waves.resize(0);
-        for (uint i=0; i<old.length(); ++i) if (old[i].task !is null && !old[i].task.IsDead()) old[i].task.Abort();
+        for (uint i=0; i<old.length(); ++i) {
+            if (old[i].phase==GUARD) AmphibiousBeaches::Publish(old[i].serial,old[i].anchor,true);
+            if (old[i].task !is null && !old[i].task.IsDead()) old[i].task.Abort();
+        }
     }
     void Tick() {
         if (ai.frame < lastTick + SECOND) return;
@@ -313,11 +419,13 @@ namespace AmphibiousOps {
                 if (u is null || u.task !is w.task) w.members.removeAt(j);
             }
             if (w.members.length()==0 || w.task is null || w.task.IsDead()) {
+                if (w.phase==GUARD) AmphibiousBeaches::Publish(w.serial,w.anchor,true);
                 CRouteTask@ task=w.task; waves.removeAt(i);
                 if (task !is null && !task.IsDead()) task.Abort();
                 continue;
             }
             const int alive=int(w.members.length()), arrived=Arrived(w);
+            if (w.phase==GUARD) { GuardTick(w); continue; }
             if (w.phase==ASSEMBLE) {
                 if (ai.frame>=w.retry && (aiBattle.Height(w.destination)<0 || !aiBattle.IsPassable(Leader(w),Lanes::AMPH))) {
                     w.retry=ai.frame+retrySeconds*SECOND;
@@ -357,6 +465,7 @@ namespace AmphibiousOps {
                 if (aiBattle.Height(w.destination)<0 || !AmphibiousMath::Gathered(alive,Arrived(w),quorum))
                     Invariants::Violation("INV-096","amph","departure without dry regrouped foothold");
                 if (alive < AiMin(minimum,w.launched)) { Hold(w,"losses"); continue; }
+                RetainGuard(w);
                 const AIFloat3 target=Goal(w);
                 w.anchor=w.destination;
                 if (target.x<0 || target.distance2D(w.destination)<radius || !Onward(w)) Hold(w,"coastal guard");
@@ -369,18 +478,48 @@ namespace AmphibiousOps {
             }
         }
     }
+    IUnitTask@ DefaultFactoryTask(CCircuitUnit@ f) {
+        if (!Active()) return aiFactoryMgr.DefaultMakeTask(f);
+        // The ordinary chooser may still build other units and constructors,
+        // but cannot bypass the shared amphibious budget with its own batch.
+        array<string> names={"legamph","armmar"};
+        array<CCircuitDef@> defs; array<int> limits;
+        for (uint i=0;i<names.length();++i) {
+            CCircuitDef@ d=ai.GetCircuitDef(names[i]);
+            if (d is null) continue;
+            defs.insertLast(d); limits.insertLast(d.maxThisUnit); d.maxThisUnit=0;
+        }
+        IUnitTask@ task=aiFactoryMgr.DefaultMakeTask(f);
+        for (uint i=0;i<defs.length();++i) defs[i].maxThisUnit=limits[i];
+        return task;
+    }
     IUnitTask@ Produce(CCircuitUnit@ f, float roleGate) {
-        if (!Active() || f is null || f.circuitDef is null || aiEconomyMgr.metal.income<AiMax(roleGate,minMetal)
+        if (!Active() || f is null || f.circuitDef is null
             || int(waves.length())>=maxWaves) return null;
         array<string> names={"legamph","armmar"};
         for (uint k=0;k<names.length();++k) {
             CCircuitDef@ d=ai.GetCircuitDef(names[k]);
-            if (d is null || !f.circuitDef.CanBuild(d) || d.count+aiFactoryMgr.GetPendingRecruitCount(d)>=Size(k)*2
+            const int limit=k==0 ? telLimit : Size(k)*2;
+            if (d is null || !f.circuitDef.CanBuild(d) || d.count+aiFactoryMgr.GetPendingRecruitCount(d)>=limit
                 || aiEconomyMgr.metal.current<d.costM) continue;
+            float seconds=0;
+            if (k==0) {
+                const float buffer=AiMin(d.costE*0.2f,aiEconomyMgr.energy.storage*0.5f);
+                if (ai.frame<telNext || !AmphibiousMath::RecruitReady(Economy::GetMinMetalIncomeLast10s(),telMinMetal,Economy::IncomeWindowReady()?10*SECOND:0,10*SECOND,
+                    aiEconomyMgr.metal.current,d.costM,telReserve,aiEconomyMgr.energy.current,buffer,aiEconomyMgr.isEnergyStalling)) continue;
+                seconds=AmphibiousMath::RecruitSeconds(d.costM,d.costE,Economy::GetMinMetalIncomeLast10s(),Economy::GetMinEnergyIncomeLast10s(),telMetalShare,telEnergyShare);
+                if (seconds<0) continue;
+            } else if (aiEconomyMgr.metal.income<AiMax(roleGate,minMetal)) continue;
             // Bounded standing force, not a new factory build order or an override of economy prerequisites.
-            if (d.maxThisUnit<Size(k)*2) d.maxThisUnit=Size(k)*2;
-            if (d.IsAvailable(ai.frame)) return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER,
+            if (d.maxThisUnit<limit) d.maxThisUnit=limit;
+            if (!d.IsAvailable(ai.frame)) continue;
+            IUnitTask@ task=aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER,
                 Task::Priority::NORMAL,d,f.GetPos(ai.frame),64.0f));
+            if (task !is null && k==0) {
+                telNext=ai.frame+int(seconds*SECOND)+1;
+                GenericHelpers::LogUtil("[AMPH] recruit legamph income="+aiEconomyMgr.metal.income+" bank="+aiEconomyMgr.metal.current+" interval="+seconds,1);
+            }
+            return task;
         }
         return null;
     }

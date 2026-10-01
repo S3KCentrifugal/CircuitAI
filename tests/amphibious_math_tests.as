@@ -9,3 +9,39 @@ void test_secure_timer_and_quorum_required() { Check(!AmphibiousMath::Secured(6,
 void test_underwater_is_not_landing() { Check(!AmphibiousMath::Landing(true,-10)); Check(AmphibiousMath::Landing(true,1)); Check(!AmphibiousMath::Landing(false,1)); }
 void test_stalled_crossing_cannot_skip_security() { Check(!AmphibiousMath::MayAdvance(false,false)); Check(AmphibiousMath::MayAdvance(true,false)); Check(AmphibiousMath::MayAdvance(false,true)); }
 void test_marauder_economy_priority() { Check(AmphibiousMath::TargetScore(true,true,100,800,0)>AmphibiousMath::TargetScore(true,false,200,800,0)); Check(AmphibiousMath::TargetScore(false,true,100,800,0)<AmphibiousMath::TargetScore(false,false,200,800,0)); }
+void test_recruit_reserves_economy_bank() {
+    Check(AmphibiousMath::RecruitReady(80,80,300,300,900,600,300,2000,1500,false));
+    Check(!AmphibiousMath::RecruitReady(80,80,300,300,899,600,300,2000,1500,false));
+    Check(!AmphibiousMath::RecruitReady(80,80,300,300,900,600,300,1499,1500,false));
+    Check(!AmphibiousMath::RecruitReady(80,80,300,300,900,600,300,2000,1500,true));
+}
+void test_brief_income_spike_cannot_recruit() {
+    Check(!AmphibiousMath::RecruitReady(80,80,299,300,2000,600,300,2000,1500,false));
+    Check(!AmphibiousMath::RecruitReady(79,80,300,300,2000,600,300,2000,1500,false));
+}
+void test_energy_limits_recruitment_even_with_metal_float() {
+    Check(AmphibiousMath::RecruitSeconds(600,13200,80,1000,0.15f,0.2f)>65.9f);
+    Check(AmphibiousMath::RecruitSeconds(600,13200,80,2000,0.15f,0.2f)<50.1f);
+    Check(AmphibiousMath::RecruitSeconds(600,13200,80,0,0.15f,0.2f)<0);
+}
+void test_guard_split_preserves_assault_and_group_bound() {
+    Check(AmphibiousMath::GuardAllocation(6,3,3,0,2)==3);
+    Check(AmphibiousMath::GuardAllocation(5,3,3,0,2)==0);
+    Check(AmphibiousMath::GuardAllocation(6,3,3,2,2)==0);
+}
+void test_empty_beach_is_never_valuable() {
+    Check(AmphibiousMath::BeachScore(0,10,10,0)==0);
+    Check(AmphibiousMath::BeachScore(100,500,100,0)>AmphibiousMath::BeachScore(100,2000,100,0));
+}
+void test_guard_survives_brief_observation_gap_but_releases_lost_claim() {
+    Check(!AmphibiousMath::GuardRelease(false,59,60,false));
+    Check(AmphibiousMath::GuardRelease(false,60,60,false));
+    Check(!AmphibiousMath::GuardRelease(true,600,60,false));
+    Check(AmphibiousMath::GuardRelease(true,0,60,true));
+}
+void test_simultaneous_claims_have_one_stable_winner() {
+    Check(AmphibiousMath::ClaimPrecedes(1,9,2,1));
+    Check(!AmphibiousMath::ClaimPrecedes(2,1,1,9));
+    Check(AmphibiousMath::ClaimPrecedes(1,1,1,2));
+    Check(!AmphibiousMath::ClaimPrecedes(1,2,1,2));
+}

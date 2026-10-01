@@ -51,7 +51,7 @@ namespace AirProduction {
                 if (frame !is null) return aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, frame));
                 return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
             }
-            return aiFactoryMgr.DefaultMakeTask(u);
+            return AmphibiousOps::DefaultFactoryTask(u);
         }
         const string side = UnitHelpers::GetSideForUnitName(name);
         const string cons = advanced ? UnitHelpers::GetT2AirConstructorNameForSide(side) : UnitHelpers::GetT1AirConstructorNameForSide(side);

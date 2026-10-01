@@ -615,3 +615,9 @@ Existing compatible ground factories may produce bounded waves through
 `AirProduction::MakeTask`; AIR does not build a new ground factory for them.
 Aircraft production, requested transports and economic constructors keep their
 existing priority. See the [operation design](../amphibious-operations-plan.md).
+
+D-160 uses the same Telchine budget and beachhead claims as TECH, including
+a native-fallback exclusion so an auxiliary lab cannot bypass recruitment
+cadence. No aircraft queue or ground-factory construction priority changes.
+Guard repositioning remains on the secured dry land component.
+See [implementation and tests](../telchine-beachhead-results.md).

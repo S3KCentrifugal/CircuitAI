@@ -8,6 +8,8 @@
 #include "script/MilitaryScript.h"
 #include "script/ScriptManager.h"
 #include "module/MilitaryManager.h"
+#include "CircuitAI.h"
+#include "unit/CircuitUnit.h"
 #include "util/ExtAS.h"
 #include "angelscript/include/angelscript.h"
 #include "angelscript/add_on/scriptarray/scriptarray.h"
@@ -56,6 +58,17 @@ static bool CMilitaryManager_SetPorcChain(CMilitaryManager* militaryMgr,
 	return militaryMgr->SetPorcChain(sideName, isWater, names);
 }
 
+// Explicit regrouping between this manager's live fighter tasks. Refuse the
+// cross-manager ownership error guarded by ITaskModule::AssignTask(unit).
+static bool CMilitaryManager_TransferUnit(CMilitaryManager* mgr, CCircuitUnit* unit, IUnitTask* task)
+{
+    if (unit == nullptr || task == nullptr || mgr->GetCircuit()->GetTeamUnit(unit->GetId()) != unit
+        || task->IsDead() || task->GetManager() != mgr || unit->GetTask() == nullptr
+        || unit->GetTask()->GetManager() != mgr || dynamic_cast<IFighterTask*>(task) == nullptr) return false;
+    if (unit->GetTask() != task) mgr->AssignTask(unit, task);
+    return true;
+}
+
 
 CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 		: ITaskModuleScript(scr, mgr)
@@ -77,6 +90,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CMilitaryManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CMilitaryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool TransferUnit(CCircuitUnit@, IUnitTask@)", asFUNCTION(CMilitaryManager_TransferUnit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void DefaultMakeDefence(int, const AIFloat3& in)", asMETHOD(CMilitaryManager, DefaultMakeDefence), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetCombatFocusPos() const", asMETHOD(CMilitaryManager, GetCombatFocusPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "array<string>@ GetPorcChain(const string& in, bool) const", asFUNCTION(CMilitaryManager_GetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

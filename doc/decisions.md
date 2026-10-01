@@ -5000,6 +5000,13 @@ INV-019 (turret frames within the slots), as amended above.
 [`invariants.as`](../data/script/src/manager/invariants.as),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
 
+**D-160 correction (2026-10-01).** The extra INV-018 requirement that a
+completed lab never face away from a later changing front was invalid: a
+standing factory cannot rotate. Compare its saved order facing and retain
+the physical exit-obstruction check. This supersedes only that moving-front
+assertion, not D-098's original placement, reclaim or build-power policy.
+See [D-160 results](telchine-beachhead-results.md).
+
 ## D-099 — Structures fill the ground within reach of a cluster's turrets, then the next cluster; no reservation in a factory's exit
 
 **Date:** 2026-09-23. **Status:** Built (native, script; build56); unit-tested; played on build54 and build55 (small box).
@@ -9243,3 +9250,116 @@ pass; eight pre-existing missing-hover-document links remain KI-404.
 [shore fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
 [match checks](../tools/playtest/checks/telchine_match.json),
 [shore checks](../tools/playtest/checks/telchine_shore.json).
+
+### D-160 - Budget Telchines separately and retain shared dry beachheads (2026-10-01)
+
+**Decision.** Add a Telchine admission budget and retained beachhead phase to
+the experimental TECH/AIR amphibious controller. Keep ordinary TECH lab
+reclaim/rebuild predicates and relative sequencing exact. The owner explicitly
+chose the existing cycle over an earlier +80 coastal lab recovery exception,
+accepting later units. No ground lab is built for AIR. Marauders keep their
+existing gate and raid behavior. Plan written before implementation:
+[telchine-beachhead-implementation-plan](telchine-beachhead-implementation-plan.md).
+
+**Reasoning.** The [official unit reference](https://www.beyondallreason.info/unit/legamph)
+and local weapon script require dry firing. A secured island is useful as a
+staging stop, but moving the entire wave onward leaves valuable allied economy
+uncovered. Rank actual completed allied mex/geo/factory assets with observed
+naval approaches; keep three dry guards while at least three attackers advance.
+Bound groups to two per AI and share sixty-second claims with twenty-second
+refresh. Resolve simultaneous claims by team/serial ordering. Loss of asset
+value for sixty seconds or a winning allied claim releases the group.
+
+Telchine production uses the existing ten-second income minima, +80 metal,
+unit cost plus 300 metal banked, an energy buffer and no stall. Cadence budgets
+15% of metal income and 20% of energy income. Values live in lanes.json/script,
+not native build orders. Native fallback selection temporarily excludes the
+two managed amphibious definitions and restores their caps afterward, so it
+can still choose ordinary units without bypassing the shared budget. These
+initial shares are not a proven optimal PvP build order. Constructor and ferry
+obligations remain ahead of optional combat.
+
+**Alternatives rejected.** Lowering the general TECH +200 gate or rebuilding
+its lab early violates the owner's decision. Permanent hold of every wave
+would remove assault pressure. Sending guards toward naval unit positions
+would submerge units unable to fire. A second movement owner would fight the
+route controller: native instead supplies one checked same-manager task
+transfer, while script owns member IDs, assignments and priorities. Do not
+infer natural combat usefulness from injected encounters or after-victory
+landings.
+
+**Corrections from simulation.** Concurrent allied waves could push a landed
+wave outside its tight arrival circle and strand it indefinitely in SECURE.
+Initial landing still requires the configured quorum within 240 elmos;
+subsequent security allows dry dispersal to 360 on the same connected land.
+The full eighteen-second dwell and dry landing requirement remain. The final
+combined probe waits until all twenty-one attackers clear the three-unit guard
+before introducing a naval target. Earlier fixture failures are retained.
+
+The donation consumer accepted naval subs although its producer orders bot
+constructors. It now matches the producer's bot roster, preserves dedicated
+air constructor claims and gives ferry ownership priority over discretionary
+harbour construction. INV-018 now compares a lab with its saved construction
+facing rather than requiring it to rotate when the front moves. Real exit
+obstructions still fail. Cramped fallback geometry and harbour-specific
+support checks are left to KI-451/452, not hidden by relaxed expectations.
+
+**Invariant.** INV-097 requires every retained guard route/unit to remain dry
+and every split to leave the minimum assault group. INV-096 retains dry
+regroup/security before onward crossing. INV-010 exempts only experimental
+Telchines admitted by the separate budget, not ordinary combat or Marauders.
+INV-041 still rejects building orders on ferry gifts; INV-018 still checks
+saved facing and actual obstruction. Every new check forbids all invariants.
+
+**Verification.** Native/DLL build pin `082783d682ef926e` with matching debug
+symbols. Standalone native suites and eighteen amphibious policy tests pass;
+API parity checks 265 members. TECH/balanced and AIR/hard independent probes
+pass. The final combined terrible-profile probe passes sixteen minutes with
+three retained guards, twenty-one onward attackers, two surviving factories,
+180 dry hold-position samples and a surviving ship 1,421 elmos away. Its
+archive is `build-theatres/d160-allied-beachhead-terrible-03/runs/20261001-134844/`.
+The complete run ledger, screenshots, final profile repeats and publication
+record are in [results](telchine-beachhead-results.md).
+
+Two natural sixteen-AI runs complete, but strict reports remain FAIL on TECH
+invariants. They demonstrate no Telchine damage or kills. The spectator's
+extra commander also survives longer than the harness expects, delaying
+GameOver after the opposing AI side is eliminated (KI-453). The audit now
+records the first all-dead competitive-side census as an upper bound and
+warns against treating GameOver as the competitive endpoint. These are
+behavior traces, not clean PvP balance evidence. Preserve KI-449/450's natural
+verification limits, AIR natural recruitment/save-load KI-446, and all failed
+archives. Commit locally; the owner declined pushing.
+
+**Files.** Policy: [amphibious operations](../data/script/src/manager/amphibious_ops.as),
+[beach sites/claims](../data/script/src/manager/amphibious_beaches.as),
+[pure policy](../data/script/src/helpers/amphibious_math.as),
+[settings](../data/config/lanes.json),
+[AIR production](../data/script/src/manager/air_production.as),
+[TECH](../data/script/src/roles/tech.as),
+[donation](../data/script/src/manager/donation.as),
+[TECH rules](../data/script/src/roles/tech_rules.as),
+[team dispatch](../data/script/src/manager/team.as),
+[runtime assertions](../data/script/src/manager/invariants.as).
+Mechanisms: [observation source](../src/circuit/terrain/BattleAnalysis.cpp),
+[observation declarations](../src/circuit/terrain/BattleAnalysis.h),
+[query bindings](../src/circuit/script/InitScript.cpp),
+[task transfer](../src/circuit/script/MilitaryScript.cpp).
+Tests: [pure cases](../tests/amphibious_math_tests.as),
+[shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[paired match preparer](../tools/playtest/prepare_telchine_match.py),
+[fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[guard checks](../tools/playtest/checks/telchine_beachhead.json),
+[allied checks](../tools/playtest/checks/telchine_allied_beachhead.json),
+[match audit](../tools/playtest/audit_telchine_match.py),
+[guide](../tools/playtest/README.md),
+[seed 1601 audit](telchine-natural-1601.json),
+[seed 1602 audit](telchine-natural-1602.json).
+Contracts: [API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [issues](known-issues.md),
+[TECH role](roles/tech.md), [AIR role](roles/air.md), [rules reference](roles/tech_rules.md).
+Screenshots: [TECH guard](images/d160/tech-guards-after-retreat.png),
+[AIR guard](images/d160/air-guards-after-retreat.png),
+[natural landing](images/d160/natural-1601-landfall.png),
+[allied guard](images/d160/allied-guard-after-retreat.png),
+[allied assault](images/d160/allied-assault-final-landfall.png).

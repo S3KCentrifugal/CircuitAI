@@ -141,7 +141,7 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 5bd64d2d115a6268cc603d36418336a3e83b8a59; lines: 570 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: c447469bf26283440be4946bbe2b07fd7b0e7878; lines: 570 -->
 
 ## D-152 fortification rule
 
@@ -149,3 +149,8 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 ownership rules and before weapon clusters. It allows T2 resource protection immediately; T1 lane work requires base build
 power. It has a separate five-percent income budget and two concurrent orders.
 The existing `defence.base` fallback uses the same controller.
+
+D-160 moves `ferry.cargo` ahead of `harbour.sea`, `harbour.yard` and
+`harbour.float`: valid donated bot constructors belong to the ferry before
+discretionary construction. Naval subs no longer consume bot-donation requests.
+The lab reclaim, recovery and rush-chain predicates and relative ordering are unchanged.

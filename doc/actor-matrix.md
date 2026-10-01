@@ -332,3 +332,20 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | Water crossing | AmphibiousOps::Plan/CheckCrossing, CBattleAnalysis::GetTerrainRoute, lane::Solver::PointRoute | Immutable terrain grid plus this AI's observed amphibious threat and weapon coverage; usable dry landings end a leg |
 | Dry foothold | StrategicSites::LandAt, Objective, Staging, Tick | Connected dry component, current observed contacts, arrival quorum and uninterrupted secure interval |
 | Compatible factory | Tech_FactoryAiMakeTask, AirProduction::MakeTask, AmphibiousOps::Produce | Existing constructor priorities, income gate, metal bank, actual build edge, owned plus pending bounded force |
+
+## D-160 amphibious beachheads
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Telchine recruit | TECH factory, AIR auxiliary factory, AmphibiousOps::Produce | Existing constructor priority precedes admission. Economy sliding minima, bank reserve, energy buffer, pending count and team cooldown bound the optional budget. Marauders retain the caller gate. |
+| Assault wave | MilitaryTask, Tick, native route task | Stable member IDs and one owning task; secure/regroup before crossing again. RetainGuard transfers only dry members and preserves the assault minimum. |
+| Retained guard | RetainGuard, GuardTick, TaskRemoved, Reset | One GUARD route task, same dry component, hold-position. No amphibious route fallback. Lost assets or a winning allied claim release the group. |
+| Beachhead claim | AmphibiousBeaches, Team::HandleMessage | Actual completed allied economy, advisory shared-sea geometry, expiring team/serial claims; no second movement owner. |
+
+D-160 donation ownership: `Donation::OnConstructorBuilt` first preserves
+dedicated air-constructor claims, then accepts only the same T2 bot roster
+as `FactoryMakeTask`. Sea constructors cannot consume bot requests.
+`ferry.cargo` precedes harbour work; INV-041 still checks every queued gift.
+Native factory fallbacks in TECH/AIR temporarily exclude the two managed
+amphibious definitions through `AmphibiousOps::DefaultFactoryTask`; the shared
+producer alone admits them, and original caps are restored after the call.

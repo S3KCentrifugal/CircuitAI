@@ -921,7 +921,7 @@ namespace RoleTech
 		const CCircuitDef @facDef = (u is null ? null : u.circuitDef);
 		if (facDef is null)
 		{
-			return aiFactoryMgr.DefaultMakeTask(u);
+			return AmphibiousOps::DefaultFactoryTask(u);
 		}
 
 		// D-119: construction turrets are the native factory manager's assistants,
@@ -987,7 +987,7 @@ namespace RoleTech
 					return tSig;
 			}
 			// Fallback: Let default choose heavy/super units to build
-			return aiFactoryMgr.DefaultMakeTask(u);
+			return AmphibiousOps::DefaultFactoryTask(u);
 		}
 
 		// Check T1 constructor threshold
@@ -1317,7 +1317,7 @@ namespace RoleTech
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()) && metalIncome < botLabGate)
 			return aiFactoryMgr.Enqueue(TaskS::Wait(false, 5 * SECOND));
 		GenericHelpers::LogUtil("[TECH][Factory] No custom tasks applicable; using DefaultMakeTask for factory '" + facDef.GetName() + "'", 4);
-		return aiFactoryMgr.DefaultMakeTask(u);
+		return AmphibiousOps::DefaultFactoryTask(u);
 	}
 
 	/**************************************************************************

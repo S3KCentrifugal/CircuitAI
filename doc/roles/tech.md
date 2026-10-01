@@ -906,7 +906,7 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 8a5a751cf717e3196c7826466ca98172c36dccbd; lines: 2737 -->
+<!-- source: data/script/src/roles/tech.as; blob: f7a4a79da60ee93aacfafc2db9ea81637ef481ee; lines: 2737 -->
 
 ## D-152 protected expansion
 
@@ -922,7 +922,12 @@ and owned geo/advanced-mex perimeters with access gaps. See
 `Tech_FactoryAiMakeTask` offers a bounded `AmphibiousOps::Produce` wave from an
 existing compatible lab after constructor upkeep and before island ground-army
 suppression; compatible gantries offer Marauders before their signature batch.
-Both use the existing combat gate plus the amphibious income/bank gate.
+Marauders use the existing combat gate plus the amphibious income/bank gate.
+D-160 Telchines instead require a ten-second minimum of +80 metal, their
+600-metal cost plus 300 reserve banked, available energy and an income-scaled
+cadence (15% metal / 20% energy). TECH lab reclaim/rebuild rules remain exact;
+there is no early lab recovery exception. Native factory fallbacks use
+`AmphibiousOps::DefaultFactoryTask` to prevent an unbudgeted amphibious batch.
 `Military::AiMakeTask` routes owned Telchines and Marauders through the shared
 controller before generic army routing. Telchines regroup and secure dry
 footholds; Marauders exploit known economy on the reached landmass. All policy
@@ -931,3 +936,8 @@ is experimental TECH/AIR only. See the [design](../amphibious-operations-plan.md
 `Tech_MilitaryAiUnitAdded` retains these two unit types for their wave instead
 of splitting Telchines through the opening combat donation. T2 constructor
 donations and other combat-unit donations retain their previous policy.
+
+D-160 retained guards protect completed allied economic assets from a dry
+shore position while the remainder advances. Three guards leave at least
+three attackers; at most two guard groups exist per AI. Allied claims avoid
+duplicate coverage. See [implementation and tests](../telchine-beachhead-results.md).

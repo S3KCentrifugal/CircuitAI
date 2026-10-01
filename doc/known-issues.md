@@ -3367,6 +3367,13 @@ rosters and seeds, rather than optimizing a single first-unit timestamp.
 shore combat and protected economic assets with no new invariants. See the
 [measured analysis](tundra-8v8-telchine-analysis.md). No policy fix made in D-159.
 
+**D-160 update to KI-449.** A separate +80 Telchine unit budget is implemented,
+but the owner explicitly retained TECH's exact lab reclaim/rebuild rules. No
++80 lab recovery exception is allowed. Seed 1601 first completed at 36:40,
+landed at 38:50 and dealt no damage before victory at 40:33. Arrival remains
+a limitation, not a proven recruitment fix; independent seeds and natural
+combat evidence are recorded in [D-160 results](telchine-beachhead-results.md).
+
 ### KI-450 - Telchine island security does not retain strategic beachhead guards
 
 **Problem.** `AmphibiousOps::Tick` declares a cleared, regrouped Telchine
@@ -3392,6 +3399,84 @@ from dry terrain at a ship that retreats beyond range without following it
 underwater. The separate controlled shore probe tests movement restraint only,
 not this missing strategic assignment. See the
 [analysis](tundra-8v8-telchine-analysis.md); no garrison-policy fix made in D-159.
+
+**D-160 update to KI-450.** Explicit asset-scored dry guards and allied claims
+are implemented. Separate TECH/balanced and AIR/hard twelve-minute fixtures
+pass with three guards protecting two allied factories while nine attackers
+advance, including a surviving retreating ship and zero wet pursuit. Natural
+pre-victory strategic guard effectiveness is still unproven. The combined
+allied fixture exposed dry regroup crowding; its correction and repeated
+evidence are retained in [D-160 results](telchine-beachhead-results.md).
+
+The corrected combined terrible-profile test passes sixteen minutes with
+three guards, twenty-one onward attackers and 180 dry naval-retreat samples.
+Final balanced and hard repeats also pass with the final production code.
+This resolves controlled guard assignment/coordination and the reproduced
+dry regroup deadlock; natural competitive effectiveness remains unverified.
+
+### KI-451 - Cramped island labs lack the complete exit and turret reservation contract
+
+**Problem.** D-160 seed 1601 reproduces INV-016/018 on Tundra's northern
+TECH island. `Layout::fallback` reserves a cramped T2 footprint after the
+full pair fails, but `TechBuild::Tick` only reserves completed lab exit cones
+when `Layout::HasComplex()` is true. The fallback has no planned nano group.
+Nearby ordinary placements can therefore crowd the exit, and the lab lacks
+the turret slot promised by INV-016. A separate false INV-018 comparison
+against a later moving front was corrected; real obstructions remain.
+
+**Proposed solution.** Give cramped lab reservations the same compound
+footprint/exit lifecycle as planned labs, before surrounding economy occupies
+it. Reuse native exit geometry rather than duplicating footprint arithmetic.
+Reserve a reachable turret slot where terrain allows, or define an explicit
+mobile-assist fallback contract. Release the compound reservation on reclaim
+and replacement; do not change the owner's exact lab reclaim/rebuild rules.
+
+**Verification.** Repeat the unboosted northern Tundra opening and lab rebuild
+with zero blocked exits, actual constructor/unit egress and adequate in-reach
+build power. See [D-160 evidence](telchine-beachhead-results.md). Still open.
+
+### KI-452 - Land turret adjacency check includes offshore harbour factories
+
+**Problem.** INV-029 compares `TechHarbour` shipyards and hover yards with
+TECH's land nano group even though harbour placement is deliberately offshore.
+It already excludes `TechFactories` and `TechFlank` owners, but has no harbour
+ownership branch. Seed 1601 records seven such warnings before GameOver.
+This diagnosis does not prove every factory in those categories has adequate
+build power; suppressing the check alone would hide that question.
+
+**Proposed solution.** Expose/consume explicit harbour factory ownership and
+validate its floating-turret support and clear exits against the harbour's
+own layout. Keep ordinary factory-to-land-box checks exact. Test both missing
+naval support and a correctly supported offshore yard.
+
+**Verification.** Natural Tundra runs must show working T1/T2 harbour queues,
+clear exits and the appropriate support invariant without false land-group
+adjacency failures. See [D-160 evidence](telchine-beachhead-results.md).
+
+### KI-453 - Spectator commander can prolong natural test GameOver
+
+**Problem.** `playtest.py` creates a separate spectator team to avoid an
+older loading-time elimination of allied AI teams. Its comment expects BAR
+to remove that team's commander immediately. D-160 natural Tundra did not:
+seed 1602's eight northern AI teams were all dead by the 26-minute census,
+but the spectator commander survived, recorded minor combat and delayed
+engine GameOver until 45:46. Seed 1601's northern side was dead by 38 minutes,
+before the first Telchine landing and GameOver at 40:33. The audit now exposes the
+first all-dead competitive-side census (an upper bound), separate from engine
+GameOver; this diagnoses but does not fix the extra spectator combatant. A GameOver-only
+audit can therefore mistake after-competition movement for match impact.
+
+**Proposed solution.** Reproduce startup on the pinned BAR/engine and provide
+a spectator without a combatant commander, while preserving the inactive-host
+startup workaround. Add observer assertions for spectator unit absence and
+per-allyteam competitive elimination timestamps independent of GameOver.
+Do not silently destroy a participating team or count the extra commander as
+one of the sixteen AIs. Re-run natural comparisons after this correction.
+
+**Verification.** Every intended AI survives initialization; the observer
+team owns no units; engine GameOver and the last competitive ally's loss
+agree. Until then these are natural-economy behavior traces, not clean PvP
+benchmarks. See [D-160 results](telchine-beachhead-results.md).
 
 ## Indexed elsewhere
 

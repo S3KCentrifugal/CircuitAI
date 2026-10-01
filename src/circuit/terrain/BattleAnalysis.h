@@ -102,6 +102,13 @@ public:
     springai::AIFloat3 GetGroundContactPos(int index) const;
     float GetGroundContactCost(int index) const;
     bool IsGroundContactEconomy(int index) const;
+    int GetNavalContactCount() const { return static_cast<int>(navalContacts.size()); }
+    springai::AIFloat3 GetNavalContactPos(int index) const;
+    // Completed allied extractors, geothermal plants and factories. Lazy value
+    // snapshot: no borrowed unit/definition escapes and no enemy omniscience.
+    int GetAllyAssetCount();
+    springai::AIFloat3 GetAllyAssetPos(int index) const;
+    float GetAllyAssetCost(int index) const;
     std::vector<springai::AIFloat3> GetTerrainRoute(const springai::AIFloat3& from,
         const springai::AIFloat3& to, int cls, float landCost, float waterCost,
         float threatWeight, float maxWaterThreat);
@@ -163,6 +170,9 @@ private:
 	std::vector<AirContact> airContacts;
     struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; };
     std::vector<GroundContact> groundContacts;
+    std::vector<springai::AIFloat3> navalContacts;
+    std::vector<AirContact> allyAssets;
+    int allyAssetFrame = -100000;
 	struct SChoke {
 		springai::AIFloat3 pos, dir;
 		float width, heat, share;

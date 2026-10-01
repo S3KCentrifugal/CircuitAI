@@ -414,3 +414,35 @@ target or failed fixture must not be counted as a passing retreat test.
 
 See [the Tundra results](../../doc/tundra-8v8-telchine-analysis.md) for timing,
 strict failures, screenshots and production/garrison limitations.
+
+## Retained beachheads and paired natural rosters (D-160)
+
+`prepare_telchine_shore_check.py --beachhead --dir build-theatres/<run>
+--dll <pin> [--owner-role AIR] [--profile experimental_hard]` injects twelve
+Telchines and two allied island factories. Economy and production remain
+frozen, every Telchine order remains autonomous, and only the enemy ship is
+ordered to retreat. Judge with `--checks telchine_beachhead --keep-going`.
+The test requires a three-unit retained guard, at least three advancing
+attackers, surviving assets/ship and dry hold-position samples after escape.
+
+Add `--allied-guards` with TECH ownership to inject twelve additional AIR
+Telchines competing for the same island. Judge using
+`--checks telchine_allied_beachhead`; use `--minutes 16`; exactly three units must remain on
+that island after all twenty-one attackers advance, before the naval probe begins. This tests
+inter-AI claims without providing any Telchine movement orders.
+
+`prepare_telchine_match.py --dir build-theatres/<run> --dll <pin> --seed 1601`
+stages all sixteen normal AIs with paired role/faction rosters and explicit
+engine/AI seeds. Each allyteam gets one TECH, one AIR, two TACTICAL and four
+SEA roles. Real start coordinates remain; Tundra terrain is not symmetric.
+There are no unit gifts, resource boosts or production overrides. Launch,
+watch with `telchine_match`, stop at GameOver and run the GameOver-aware audit.
+Compare [the D-160 results](../../doc/telchine-beachhead-results.md), including
+strict failures and the owner's decision to preserve TECH's lab cycle.
+
+D-160 found that the spectator commander can survive on the extra team and
+delay engine GameOver (KI-453). The audit now reports the first all-dead
+competitive-side census separately, when `teams.json` and `team_stats` are
+available. This is an upper bound, not the exact elimination timestamp.
+Do not use later landfalls as competitive impact or these runs as clean
+PvP benchmarks until the spectator-team startup issue is corrected.
