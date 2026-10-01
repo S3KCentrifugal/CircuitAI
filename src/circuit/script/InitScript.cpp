@@ -144,6 +144,17 @@ static CScriptArray* CBattleAnalysis_GetTerrainRoute(CBattleAnalysis* battle, co
     return array;
 }
 
+static CScriptArray* CBattleAnalysis_GetUnitTerrainRoute(CBattleAnalysis* battle, const CCircuitDef* def,
+        const AIFloat3& from, const AIFloat3& to, bool dry, float landCost, float waterCost,
+        float threatWeight, float maxWaterThreat)
+{
+    auto* cache=static_cast<CScriptManager::STypeInfoCache*>(asGetActiveContext()->GetEngine()->GetUserData());
+    const auto points=battle->GetUnitTerrainRoute(def,from,to,dry,landCost,waterCost,threatWeight,maxWaterThreat);
+    auto* array=CScriptArray::Create(cache->vec3Array,static_cast<asUINT>(points.size()));
+    for (asUINT i=0;i<array->GetSize();++i) *static_cast<AIFloat3*>(array->At(i))=points[i];
+    return array;
+}
+
 static CScriptArray* CPolygon_GetVerts(geom::CPolygon* poly)
 {
 	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
@@ -1211,6 +1222,7 @@ void CInitScript::RegisterMgr()
     r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetAllyAssetCost(int) const", asMETHOD(CBattleAnalysis, GetAllyAssetCost), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "float AmphThreat(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, AmphThreat), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "array<AIFloat3>@ GetTerrainRoute(const AIFloat3& in, const AIFloat3& in, int, float, float, float, float)", asFUNCTION(CBattleAnalysis_GetTerrainRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "array<AIFloat3>@ GetUnitTerrainRoute(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in, bool, float, float, float, float)", asFUNCTION(CBattleAnalysis_GetUnitTerrainRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetAirContactPos(int) const", asMETHOD(CBattleAnalysis, GetAirContactPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetAirContactCost(int) const", asMETHOD(CBattleAnalysis, GetAirContactCost), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotEnergy(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotEnergy), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1428,11 +1440,21 @@ static void CRouteTask_SetRoute(CRouteTask* task, const CScriptArray* array)
 	task->SetRoute(std::move(route));
 }
 
+static bool CRouteTask_SetUnitRoute(CRouteTask* task, CCircuitUnit* unit, const CScriptArray* array, float radius)
+{
+    if (array==nullptr) return false;
+    std::vector<AIFloat3> route;
+    route.reserve(array->GetSize());
+    for (asUINT i=0;i<array->GetSize();++i) route.push_back(*static_cast<const AIFloat3*>(array->At(i)));
+    return task->SetUnitRoute(unit,std::move(route),radius);
+}
+
 void CInitScript::RegisterCRouteTask(asIScriptEngine* engine)
 {
 	RegisterIFighterTask<CRouteTask>(engine, "CRouteTask");
 	RegisterCast<IFighterTask, CRouteTask>(engine, "IFighterTask", "CRouteTask");
 	int r = engine->RegisterObjectMethod("CRouteTask", "void SetRoute(const array<AIFloat3>@+)", asFUNCTION(CRouteTask_SetRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CRouteTask", "bool SetUnitRoute(CCircuitUnit@, const array<AIFloat3>@+, float)", asFUNCTION(CRouteTask_SetUnitRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "int GetRouteVersion() const", asMETHOD(CRouteTask, GetRouteVersion), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "uint GetRouteSize() const", asMETHOD(CRouteTask, GetRouteSize), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "bool IsAtEnd(CCircuitUnit@) const", asMETHOD(CRouteTask, IsAtEnd), asCALL_THISCALL); ASSERT(r >= 0);

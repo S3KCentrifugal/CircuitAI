@@ -19,13 +19,13 @@ std::uint64_t Fingerprint(const std::vector<Route>& routes) {
 static constexpr int NB[8][2] = {{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
 Solver::Solver(const Terrain& t, Settings settings, const std::atomic<bool>* cancel)
     : Settings(settings), gw(t.gw), gh(t.gh), cellSize(t.cellSize), height(t.height),
-      surfaceSlope(t.surfaceSlope), pass(t.pass), body8(t.body8), cancel(cancel)
+      surfaceSlope(t.surfaceSlope), edges(t.edges), pass(t.pass), body8(t.body8), cancel(cancel)
 {
     if (gw <= 0 || gh <= 0 || cellSize <= 0 || gw > std::numeric_limits<int>::max()/gh
         || gw > std::numeric_limits<int>::max()/cellSize || gh > std::numeric_limits<int>::max()/cellSize)
         throw std::invalid_argument("lane terrain dimensions");
     const auto n = static_cast<std::size_t>(gw)*gh;
-    if (height.size()!=n || surfaceSlope.size()!=n || body8.size()!=n)
+    if (height.size()!=n || surfaceSlope.size()!=n || body8.size()!=n || (!edges.empty() && edges.size()!=n))
         throw std::invalid_argument("lane terrain snapshot size");
     for (const auto& p : pass) if (p.size()!=n) throw std::invalid_argument("lane passability snapshot size");
 }
@@ -103,14 +103,15 @@ int Solver::Snap(const Point& pos, int cls) const
 }
 
 std::vector<int> Solver::PointRoute(const Point& from, const Point& to, int cls, const Grid& threat,
-        float landCost, float waterCost, float threatWeight, float maxWaterThreat) const
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat, const std::vector<char>* obstacles) const
 {
     auto inside = [this](const Point& p) {
         return std::isfinite(p.x) && std::isfinite(p.z) && p.x >= 0 && p.z >= 0
             && p.x < gw * cellSize && p.z < gh * cellSize;
     };
     if (!inside(from) || !inside(to) || cls < 0 || cls >= _LANE_CLASSES_
-        || threat.size() != height.size() || !std::isfinite(landCost) || landCost <= 0
+        || threat.size() != height.size() || (obstacles != nullptr && obstacles->size()!=height.size())
+        || !std::isfinite(landCost) || landCost <= 0
         || !std::isfinite(waterCost) || waterCost <= 0 || !std::isfinite(threatWeight) || threatWeight < 0
         || !std::isfinite(maxWaterThreat) || maxWaterThreat < 0) return {};
     const int origin = Cell(from), goal = Cell(to);
@@ -119,7 +120,7 @@ std::vector<int> Solver::PointRoute(const Point& from, const Point& to, int cls,
     std::vector<char> blocked(height.size());
     for (size_t c = 0; c < height.size(); ++c) {
         const float value = std::isfinite(threat[c]) ? std::max(0.f, threat[c]) : 1e9f;
-        blocked[c] = height[c] < 0 && value > maxWaterThreat;
+        blocked[c] = (height[c] < 0 && value > maxWaterThreat) || (obstacles != nullptr && (*obstacles)[c]);
         penalty[c] = std::min(1e8f, (height[c] < 0 ? waterCost : landCost) + value * threatWeight);
     }
     // Allow escape from a newly threatened starting cell, but not entry into a threatened goal.
@@ -172,6 +173,9 @@ void Solver::DijkstraMulti(const std::vector<int>& starts, const Grid& penalty, 
 			if (!p[n] || (blocked != nullptr && (*blocked)[n])) {
 				continue;
 			}
+            const int direction = int(&d - NB);
+            const int opposite = direction < 4 ? (direction ^ 1) : (7 - direction + 4);
+            if (!edges.empty() && !(edges[reverse ? n : c] & (1u << (reverse ? opposite : direction)))) continue;
 			// A coarse diagonal must not slip through two blocked corners.
 			if (d[0] != 0 && d[1] != 0 && (!p[cz * gw + nx] || !p[nz * gw + cx]
 				|| (blocked != nullptr && ((*blocked)[cz * gw + nx] || (*blocked)[nz * gw + cx])))) {

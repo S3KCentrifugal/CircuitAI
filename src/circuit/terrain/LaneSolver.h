@@ -27,6 +27,8 @@ struct Terrain {
     Grid height, surfaceSlope;
     std::array<std::vector<char>, _LANE_CLASSES_> pass;
     std::vector<int> body8;
+    // Optional per-cell outgoing edge bits, NB order. Empty preserves legacy lanes.
+    std::vector<unsigned char> edges;
 };
 struct Settings {
     float specialistMinSpan = 1024.f, specialistSpanFraction = 0.45f;
@@ -64,7 +66,8 @@ public:
     // Point-to-point terrain route, with policy-supplied travel costs and threat ceiling.
     // Empty means unreachable; never snap either end across an impassable cell.
     std::vector<int> PointRoute(const Point& from, const Point& to, int cls, const Grid& threat,
-        float landCost, float waterCost, float threatWeight, float maxWaterThreat) const;
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat,
+        const std::vector<char>* obstacles = nullptr) const;
     // Pure qualification, also exercised by synthetic route regressions.
     bool HasMountainTraverse(const Route& route, float rise) const;
     // Shared by the legacy choke analyser and lane planner; no second BFS.
@@ -88,6 +91,7 @@ private:
     const int gw, gh, cellSize;
     const Grid& height;
     const Grid& surfaceSlope;
+    const std::vector<unsigned char>& edges;
     const std::array<std::vector<char>, _LANE_CLASSES_>& pass;
     const std::vector<int>& body8;
     const std::atomic<bool>* cancel;

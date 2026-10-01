@@ -941,3 +941,7 @@ D-160 retained guards protect completed allied economic assets from a dry
 shore position while the remainder advances. Three guards leave at least
 three attackers; at most two guard groups exist per AI. Allied claims avoid
 duplicate coverage. See [implementation and tests](../telchine-beachhead-results.md).
+
+D-161 gives Telchines land-first, footprint-checked routes and distinct dry
+shore perimeter or land assault slots. Marauder travel and TECH's exact lab
+cycle stay unchanged. See the [formation plan](../telchine-perimeter-plan.md).

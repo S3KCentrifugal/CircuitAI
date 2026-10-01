@@ -1,5 +1,9 @@
 // Pure wave policy, shared by the runtime controller and standalone tests.
 namespace AmphibiousMath {
+    int FormationLane(int index) {
+        if (index<=0) return 0;
+        return index%2==1 ? (index+1)/2 : -index/2;
+    }
     bool Scope(bool tech, bool air, bool experimental) { return experimental && (tech || air); }
     bool Gathered(int alive, int arrived, float fraction) {
         return alive > 0 && arrived > 0 && float(arrived) >= float(alive) * fraction;

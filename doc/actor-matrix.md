@@ -341,6 +341,7 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 | Assault wave | MilitaryTask, Tick, native route task | Stable member IDs and one owning task; secure/regroup before crossing again. RetainGuard transfers only dry members and preserves the assault minimum. |
 | Retained guard | RetainGuard, GuardTick, TaskRemoved, Reset | One GUARD route task, same dry component, hold-position. No amphibious route fallback. Lost assets or a winning allied claim release the group. |
 | Beachhead claim | AmphibiousBeaches, Team::HandleMessage | Actual completed allied economy, advisory shared-sea geometry, expiring team/serial claims; no second movement owner. |
+| Telchine firing slot | AmphibiousFormation::Form/Maintain, AmphibiousOps::Order/Arrived, CRouteTask | Stable member ID, validated dry connector and distinct endpoint. New group orders clear overrides; losses remove slots; arrival uses each assigned slot. Native code issues commands but chooses no formation. |
 
 D-160 donation ownership: `Donation::OnConstructorBuilt` first preserves
 dedicated air-constructor claims, then accepts only the same T2 bot roster

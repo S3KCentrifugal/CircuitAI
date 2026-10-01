@@ -446,3 +446,30 @@ competitive-side census separately, when `teams.json` and `team_stats` are
 available. This is an upper bound, not the exact elimination timestamp.
 Do not use later landfalls as competitive impact or these runs as clean
 PvP benchmarks until the spectator-team startup issue is corrected.
+
+## Telchine terrain and formations (D-161)
+
+Prepare `prepare_telchine_shore_check.py --beachhead --minutes 16 --dir
+build-theatres/<run> --dll <pin>` and watch with `--checks telchine_perimeter
+--minutes 16 --keep-going`. For AIR add `--owner-role AIR` when preparing
+and **`--role AIR` when watching**. The watcher otherwise cannot identify the
+team under test. The stricter observer waits for exactly three retained guards
+and nine onward attackers before presenting the ship. It measures actual dry
+positions, at least 100 elmos minimum separation, at least 280 elmos perimeter
+span, ten stable samples, and terrain-only `Spring.TestMoveOrder` legality.
+All invariants and illegal movement targets remain forbidden.
+
+`--land-attack --minutes 8` adds six land targets to the six-unit TECH fixture.
+Watch with `--checks telchine_land_formation --minutes 8 --keep-going`.
+This requires dry travel, fitted formation slots, attributed Telchine weapon
+fire from dry ground, nearby dry formation spread and a destroyed target.
+The fixture injects targets but never orders friendly Telchines. These are
+controlled capability tests, not evidence of natural recruitment or PvP wins.
+See [D-161 results](../../doc/telchine-perimeter-results.md).
+
+For inland coverage, prepare `--land-attack --map supreme --minutes 8` and
+watch with `--checks telchine_inland_formation --minutes 8 --keep-going`.
+Land-combat samples are taken after minute one; the check requires formation
+deployment before attributed fire and actual dry spread. This excludes firing
+from the initial spawn cluster. Frozen fixture energy can limit heat-ray fire,
+so the resulting casualty totals are not a combat-efficiency benchmark.

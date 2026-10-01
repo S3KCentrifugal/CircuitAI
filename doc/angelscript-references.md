@@ -2,6 +2,26 @@
 
 ## Amphibious operation queries (D-158)
 
+D-161 adds `aiBattle.GetUnitTerrainRoute(const CCircuitDef@, from, to,
+bool dryOnly, float landCost, float waterCost, float threatWeight,
+float maxWaterThreat)`, returning a new owned waypoint array. It supports
+ground MoveData classes, validates the loaded movement footprint and dry
+slope on land and seabed against fine terrain samples along edges, and forbids any wet footprint
+sample in dry mode. Invalid/unreachable endpoints return an empty array;
+endpoint-to-grid connectors are checked too. Terrain masks refresh every
+sixty seconds; observed threats are current per query. This conservative
+terrain query excludes allied structure footprints per query; the engine still
+resolves mobile traffic and enemy structures.
+Existing class-based lane queries retain their behavior.
+
+`CRouteTask.SetUnitRoute(CCircuitUnit@, const array<AIFloat3>@+, float arrivalRadius)` returns false
+for non-members, null/empty arrays or non-finite coordinates/radius. The
+script-selected member arrival radius is clamped to 16–512 elmos. It copies the
+route and issues it only to that task's assignee. `SetRoute` clears all member
+overrides; removing an assignee erases its override. Arrival, idle and resume
+use the member route. Script owns formation policy and retains stable IDs,
+not borrowed unit pointers. Specialist callers validate terrain before use.
+
 `aiBattle.GetTerrainRoute(from, to, movementClass, landCost, waterCost,
 threatWeight, maxWaterThreat)` returns a fresh `array<AIFloat3>` of grid waypoints,
 or an empty array when either endpoint is invalid or no allowed route exists.

@@ -8,6 +8,9 @@ local config=VFS.FileExists("LuaUI/Config/telchine_shore.lua",VFS.RAW_FIRST)
 local beachhead=config.beachhead==true
 local guards, assets, advanced, guardStart, shot = {}, {}, {}, nil, nil
 local coordinationReported=false
+local perimeterSamples, perimeterReported=0,false
+local terrainTargets, badTargets=0,0
+local landTargets,landHit,landKills={},false,0
 local function echo(s) Spring.Echo("[ShoreProbe] "..s) end
 local function valid(id) return id and Spring.ValidUnitID(id) and not Spring.GetUnitIsDead(id) end
 local function give(name,team,x,z)
@@ -40,14 +43,34 @@ function widget:UnitFinished(id,def,team)
     if (team==0 or (config.alliedGuards and team==1)) and def==UnitDefNames.legamph.id then tracked[id]={wet=false,landed=false,still=0} end
     if team==2 and def==UnitDefNames.corbats.id then ship=id end
     if beachhead and team==1 and (def==UnitDefNames.leglab.id or def==UnitDefNames.legalab.id) then assets[id]=true end
+    if config.landAttack and team==2 and (def==UnitDefNames.armsolar.id or def==UnitDefNames.armwar.id) then landTargets[id]=true end
 end
 function widget:UnitDamaged(id,def,team,damage)
+    if landTargets[id] then
+        local attacker=Spring.GetUnitLastAttacker(id)
+        -- Exclude incidental fire immediately after gift/spawn; measure a deployed group.
+        if tracked[attacker] and not landHit and Spring.GetGameFrame() >= 60*30 then
+            landHit=true;local x,y,z=Spring.GetUnitPosition(attacker)
+            echo(string.format("land_hit frame=%d telchine=%d ground=%.1f damage=%.1f",Spring.GetGameFrame(),attacker,Spring.GetGroundHeight(x,z),damage))
+            local nearby,span=0,0
+            for id in pairs(tracked) do if valid(id) then
+                local px,py,pz=Spring.GetUnitPosition(id)
+                local distance=math.sqrt((px-x)^2+(pz-z)^2)
+                if distance<650 and Spring.GetGroundHeight(px,pz)>=0 then nearby=nearby+1;span=math.max(span,distance) end
+            end end
+            echo(string.format("land_formation dry_nearby=%d span=%.0f",nearby,span))
+            shot={x=x,z=z,label="Telchines attack land targets from a dry formation"}
+        end
+    end
     if id~=ship then return end
     local attacker=Spring.GetUnitLastAttacker(id)
     if tracked[attacker] and not hitFrame then
         hitFrame=Spring.GetGameFrame()
         echo("naval_hit frame="..hitFrame.." telchine="..attacker.." damage="..damage)
     end
+end
+function widget:UnitDestroyed(id)
+    if landTargets[id] then landKills=landKills+1;landTargets[id]=nil;echo("land_target_destroyed count="..landKills) end
 end
 function widget:GameFrame(f)
     if f==300 then Spring.SendCommands({"cheat 1","globallos"}) end
@@ -65,6 +88,12 @@ function widget:GameFrame(f)
     if f==900 then
         local sx,_,sz=Spring.GetTeamStartPosition(0)
         local fx,fz=dry(sx-240,sz+160);give("leglab",0,fx,fz)
+        if config.landAttack then
+            for i=1,3 do
+                local tx,tz=dry(sx+650+i*96,sz+450);give("armsolar",2,tx,tz)
+                local bx,bz=dry(sx+650+i*96,sz+600);give("armwar",2,bx,bz)
+            end
+        end
         if beachhead then
             -- Two completed allied production assets make a useful central
             -- beachhead. Production is frozen; the AI owns every Telchine order.
@@ -87,12 +116,33 @@ function widget:GameFrame(f)
     end
     if f%30==0 then
         local beachCount,advancedCount=0,0
+        local perimeter={}
         for id in pairs(tracked) do if valid(id) then
             local x,y,z=Spring.GetUnitPosition(id)
             if z>3500 and z<5200 then beachCount=beachCount+1 end
+            if z>3500 and z<5200 and Spring.GetGroundHeight(x,z)>=0
+                and not (Spring.GetUnitCommands(id,1) or {})[1] then
+                perimeter[#perimeter+1]={id=id,x=x,z=z}
+            end
             if z>8000 then advancedCount=advancedCount+1 end
         end end
-        local guardOnly=not config.alliedGuards or (beachCount==3 and advancedCount==21)
+        local guardOnly=not beachhead or (beachCount==3 and advancedCount==(config.alliedGuards and 21 or 9))
+        if #perimeter==3 and advancedCount>0 then
+            local nearest,span,blocked=math.huge,0,0
+            for i,a in ipairs(perimeter) do
+                if not Spring.TestMoveOrder(UnitDefNames.legamph.id,a.x,Spring.GetGroundHeight(a.x,a.z),a.z,0,0,0,true,false,false) then blocked=blocked+1 end
+                for j=i+1,#perimeter do
+                    local b=perimeter[j];local d=math.sqrt((a.x-b.x)^2+(a.z-b.z)^2)
+                    nearest=math.min(nearest,d);span=math.max(span,d)
+                end
+            end
+            if nearest>=100 and span>=280 and blocked==0 then perimeterSamples=perimeterSamples+1 else perimeterSamples=0 end
+            if perimeterSamples>=10 and not perimeterReported then
+                perimeterReported=true
+                echo(string.format("perimeter actual_guards=3 min_spacing=%.0f span=%.0f dry=3 terrain_blocked=%d stable_samples=%d",nearest,span,blocked,perimeterSamples))
+                shot={x=perimeter[1].x,z=perimeter[1].z,label="Three Telchines form a dry shoreline perimeter"}
+            end
+        end
         if config.alliedGuards and guardOnly and not coordinationReported then
             coordinationReported=true
             echo("ally_coordination held="..beachCount.." advancing="..advancedCount)
@@ -102,6 +152,15 @@ function widget:GameFrame(f)
             if h<-30 then u.wet=true end
             if u.wet and h>=0 then u.landed=true end
             local cmd=(Spring.GetUnitCommands(id,1) or {})[1]
+            if cmd and cmd.id==CMD.MOVE and #cmd.params>=3 then
+                local tx,tz=cmd.params[1],cmd.params[3]
+                local ty=Spring.GetGroundHeight(tx,tz)
+                terrainTargets=terrainTargets+1
+                if not Spring.TestMoveOrder(UnitDefNames.legamph.id,tx,ty,tz,0,0,0,true,false,false) then
+                    badTargets=badTargets+1
+                    if badTargets<=6 then echo(string.format("terrain_bad_target frame=%d id=%d target=%.0f,%.0f",f,id,tx,tz)) end
+                end
+            end
             local states=Spring.GetUnitStates(id) or {}
             local guardedSite=beachhead and z>3500 and z<5200 or (not beachhead and z>10400)
             if u.landed and guardedSite and h>=0 and not cmd then u.still=u.still+30 else u.still=0 end
@@ -113,7 +172,7 @@ function widget:GameFrame(f)
                     if beachhead then
                         for other in pairs(tracked) do if valid(other) then
                             local gx,gy,gz=Spring.GetUnitPosition(other)
-                            if (gx-x)^2+(gz-z)^2<400^2 and Spring.GetGroundHeight(gx,gz)>=0 then guards[other]=true end
+                            if gz>3500 and gz<5200 and Spring.GetGroundHeight(gx,gz)>=0 then guards[other]=true end
                         end end
                         guardStart=f
                     end
@@ -137,6 +196,7 @@ function widget:GameFrame(f)
             local x,y,z=Spring.GetUnitPosition(ship)
             local distance=x and math.sqrt((x-anchor.x)^2+(z-anchor.z)^2) or -1
             echo(string.format("result samples=%d wet=%d wet_ship_attack_orders=%d non_hold=%d ship_alive=%s ship_distance=%.0f",samples,wet,pursuit,nonHold,tostring(valid(ship)),distance))
+            echo(string.format("terrain targets=%d rejected=%d",terrainTargets,badTargets))
             if beachhead then
                 local g,a,v=0,0,0
                 for id in pairs(guards) do if valid(id) then g=g+1 end end

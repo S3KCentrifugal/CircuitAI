@@ -1,6 +1,7 @@
 #include "lanes.as"
 #include "../helpers/amphibious_math.as"
 #include "amphibious_beaches.as"
+#include "amphibious_formation.as"
 
 // D-158: role-scoped waves. Native code supplies geometry and commands only.
 namespace AmphibiousOps {
@@ -14,6 +15,9 @@ namespace AmphibiousOps {
         CRouteTask@ task;
         AIFloat3 anchor, goal, destination;
         array<AIFloat3> leg;
+        array<Id> slotIds;
+        array<AIFloat3> slots;
+        int formationAt = -100000;
     }
     array<Wave@> waves;
     bool loaded = false, enabled = true;
@@ -24,6 +28,7 @@ namespace AmphibiousOps {
     float landingInland = 128.0f, landingWidth = 160.0f, stagingDetour = 1.35f;
     float telMinMetal = 80.0f, telReserve = 300.0f, telMetalShare = 0.15f, telEnergyShare = 0.2f;
     int guardSize = 3, guardGroups = 2, telLimit = 18, telNext = 0;
+    float telWaterCost = 6.0f, shoreSpacing = 192.0f, attackSpacing = 96.0f;
 
     void Load() {
         if (loaded) return;
@@ -56,6 +61,9 @@ namespace AmphibiousOps {
         guardSize = AiMax(1,aiSetupMgr.ConfigInt("lanes/amph_guard_size",3));
         guardGroups = AiMax(0,AiMin(4,aiSetupMgr.ConfigInt("lanes/amph_guard_groups",2)));
         telLimit = AiMax(telSize,aiSetupMgr.ConfigInt("lanes/amph_telchine_limit",18));
+        telWaterCost=AiMax(1.0f,aiSetupMgr.ConfigFloat("lanes/amph_telchine_water_cost",6.0f));
+        shoreSpacing=AiMax(96.0f,AiMin(256.0f,aiSetupMgr.ConfigFloat("lanes/amph_shore_spacing",192.0f)));
+        attackSpacing=AiMax(64.0f,AiMin(160.0f,aiSetupMgr.ConfigFloat("lanes/amph_attack_spacing",96.0f)));
     }
     bool Active() {
         Load();
@@ -88,6 +96,7 @@ namespace AmphibiousOps {
             + " alive=" + w.members.length() + " at=(" + int(w.destination.x) + "," + int(w.destination.z) + ")", 1);
     }
     void Order(Wave@ w, const array<AIFloat3>& in points) {
+        w.slotIds.resize(0); w.slots.resize(0); w.formationAt=-100000;
         w.leg = points;
         if (points.length() == 0 || w.task is null) return;
         w.destination = points[points.length()-1];
@@ -103,8 +112,10 @@ namespace AmphibiousOps {
                 // Once landed, allow modest dry dispersal from allied traffic.
                 // Requiring the original tight circle forever stranded waves
                 // pushed aside by another landing or a retained guard (D-160).
-                const float reach=w.phase==SECURE ? radius*1.5f : radius;
-                if (aiBattle.Height(p) >= 0.0f && p.distance2D(w.destination) <= reach
+                const int slot=w.slotIds.find(w.members[i]);
+                const float reach=slot>=0 ? 128.0f : (w.phase==SECURE ? radius*1.5f : radius);
+                const AIFloat3 destination=slot>=0 ? w.slots[slot] : w.destination;
+                if (aiBattle.Height(p) >= 0.0f && p.distance2D(destination) <= reach
                     && (w.phase!=SECURE || StrategicSites::LandAt(p)==w.region)) ++count;
             }
         }
@@ -164,11 +175,11 @@ namespace AmphibiousOps {
         }
         if (point.x<0) return false;
         // Only the small local engine escape is direct; the strategic route never snaps.
-        if (best<=192.0f) {
+        if (best<=192.0f && w.kind!=0) {
             array<AIFloat3> points={point}; Order(w,points); w.anchor=point;
             return true;
         }
-        array<AIFloat3>@ path=aiBattle.GetTerrainRoute(from,point,Lanes::AMPH,1,1,threatWeight,maxWaterThreat);
+        array<AIFloat3>@ path=Travel(w,from,point,false);
         if (path is null || path.length()<2) return false;
         Order(w,path); w.anchor=point;
         Say(w,"recover dry assembly");
@@ -176,6 +187,7 @@ namespace AmphibiousOps {
     }
     AIFloat3 Staging(Wave@ w, const AIFloat3& in goal) {
         if (goal.x<0 || !StrategicSites::mapped) return goal;
+        if (w.kind==0 && StrategicSites::LandAt(goal)==StrategicSites::LandAt(w.destination)) return goal;
         const float direct=w.destination.distance2D(goal);
         AIFloat3 chosen=goal;
         float best=1.0e30f;
@@ -208,9 +220,40 @@ namespace AmphibiousOps {
         }
         return best;
     }
+    array<AIFloat3>@ Travel(Wave@ w, const AIFloat3& in from, const AIFloat3& in to, bool dry, float threatLimit=-1.0f) {
+        const float ceiling=threatLimit<0 ? maxWaterThreat : threatLimit;
+        if (w.kind!=0) return aiBattle.GetTerrainRoute(from,to,dry?Lanes::BOT:Lanes::AMPH,dry?1.0f:landCost,waterCost,threatWeight,ceiling);
+        CCircuitDef@ def=ai.GetCircuitDef("legamph");
+        array<AIFloat3>@ route=aiBattle.GetUnitTerrainRoute(def,from,to,true,1,telWaterCost,threatWeight,ceiling);
+        if (dry || (route !is null && route.length()>0)) return route;
+        return aiBattle.GetUnitTerrainRoute(def,from,to,false,1,telWaterCost,threatWeight,ceiling);
+    }
+    array<AIFloat3>@ ApproachRoute(Wave@ w, const AIFloat3& in from, const AIFloat3& in target, bool dry) {
+        array<AIFloat3>@ route=Travel(w,from,target,dry);
+        if (w.kind!=0 || (route !is null && route.length()>0)) return route;
+        // A strategic asset/coast point can be occupied. Keep the objective,
+        // but find a reachable approach on the same dry component.
+        const int region=StrategicSites::LandAt(target);
+        for (int ring=64;ring<=256;ring+=64) {
+            for (int x=-1;x<=1;++x) for (int z=-1;z<=1;++z) {
+                if (x==0 && z==0) continue;
+                const AIFloat3 p=target+AIFloat3(float(x*ring),0,float(z*ring));
+                if (!DryRoom(p) || StrategicSites::LandAt(p)!=region) continue;
+                @route=Travel(w,from,p,dry);
+                if (route !is null && route.length()>0) return route;
+            }
+        }
+        return null;
+    }
     bool Plan(Wave@ w, const AIFloat3& in target, bool landOnly = false, bool regroup = false) {
         if (target.x < 0) return false;
-        const AIFloat3 approach=DryTarget(target);
+        AIFloat3 aim=target;
+        if (w.kind==0 && landOnly) {
+            const AIFloat3 from=Leader(w);
+            const float distance=from.distance2D(target);
+            if (distance>1.0f) aim=target+(from-target)*(AiMin(280.0f,distance)/distance);
+        }
+        const AIFloat3 approach=DryTarget(aim);
         if (approach.x<0) return false;
         AIFloat3 from = Leader(w);
         if (regroup) {
@@ -223,8 +266,7 @@ namespace AmphibiousOps {
                 if (distance>far) {far=distance;from=p;}
             }
         }
-        array<AIFloat3>@ path = aiBattle.GetTerrainRoute(from, approach, landOnly ? Lanes::BOT : Lanes::AMPH,
-            landOnly ? 1.0f : landCost, waterCost, threatWeight, maxWaterThreat);
+        array<AIFloat3>@ path = ApproachRoute(w,from,approach,landOnly);
         if (path is null || path.length() < 2) {
             Say(w,"route rejected from="+int(from.x)+","+int(from.z)+" pass="+aiBattle.IsPassable(from,Lanes::AMPH)
                 +" target="+int(target.x)+","+int(target.z)+" pass="+aiBattle.IsPassable(target,Lanes::AMPH));
@@ -253,6 +295,15 @@ namespace AmphibiousOps {
         w.phase = ADVANCE;
         w.secured = false;
         w.quiet = ai.frame;
+        if (w.kind==0) {
+            float wet=0, dry=0;
+            for (uint p=1;p<leg.length();++p) {
+                const float distance=leg[p].distance2D(leg[p-1]);
+                if (leg[p].y<0 || leg[p-1].y<0) wet+=distance; else dry+=distance;
+            }
+            Say(w,"travel dry="+int(dry)+" water="+int(wet));
+            if (wet==0) AmphibiousFormation::Form(w);
+        }
         Say(w, landOnly ? "exploit/clear" : "depart waypoints=" + leg.length());
         return true;
     }
@@ -284,7 +335,7 @@ namespace AmphibiousOps {
         // Threat appeared after departure: escape onto reachable dry ground instead of stopping submerged.
         AIFloat3 escape=w.anchor;
         if (here.distance2D(w.destination)<here.distance2D(escape)) escape=w.destination;
-        array<AIFloat3>@ route=aiBattle.GetTerrainRoute(here,escape,Lanes::AMPH,1,1,threatWeight,1.0e9f);
+        array<AIFloat3>@ route=Travel(w,here,escape,false,1.0e9f);
         if (route !is null && route.length()>0 && route[route.length()-1].y>=0) {
             Order(w,route); Say(w,"emergency landfall: threat discovered");
         }
@@ -295,7 +346,7 @@ namespace AmphibiousOps {
     }
     array<AIFloat3>@ GuardRoute(Wave@ w, const AIFloat3& in target) {
         if (target.x<0 || !DryRoom(target) || StrategicSites::LandAt(target)!=w.region) return null;
-        array<AIFloat3>@ route=aiBattle.GetTerrainRoute(Leader(w),target,Lanes::BOT,1,1,threatWeight,0);
+        array<AIFloat3>@ route=ApproachRoute(w,Leader(w),target,true);
         if (route is null || route.length()==0) return null;
         for (uint i=0;i<route.length();++i)
             if (aiBattle.Height(route[i])<0 || StrategicSites::LandAt(route[i])!=w.region) return null;
@@ -332,8 +383,10 @@ namespace AmphibiousOps {
         w.beachGoal=AIFloat3(-1,0,-1);
         AmphibiousBeaches::Publish(g.serial,g.anchor);
         Say(g,"guard retained assets="+int(AmphibiousBeaches::Assets(target,g.region))+" assault="+w.members.length());
+        AmphibiousFormation::Form(g);
     }
     void GuardTick(Wave@ w) {
+        AmphibiousFormation::Maintain(w);
         for (uint p=0;p<w.leg.length();++p) if (aiBattle.Height(w.leg[p])<0)
             Invariants::Violation("INV-097","amph","guard route enters water");
         for (uint i=0;i<w.members.length();++i) {
@@ -424,7 +477,8 @@ namespace AmphibiousOps {
                 if (task !is null && !task.IsDead()) task.Abort();
                 continue;
             }
-            const int alive=int(w.members.length()), arrived=Arrived(w);
+            const int alive=int(w.members.length());
+            int arrived=Arrived(w);
             if (w.phase==GUARD) { GuardTick(w); continue; }
             if (w.phase==ASSEMBLE) {
                 if (ai.frame>=w.retry && (aiBattle.Height(w.destination)<0 || !aiBattle.IsPassable(Leader(w),Lanes::AMPH))) {
@@ -441,11 +495,15 @@ namespace AmphibiousOps {
                 if (AmphibiousMath::Gathered(alive,Arrived(w),quorum)) {
                     w.phase=SECURE; w.region=StrategicSites::LandAt(w.destination); w.quiet=ai.frame;
                     Say(w,"landed/regroup");
+                    AmphibiousFormation::Form(w);
                 } else if (ai.frame-w.changed>stallSeconds*SECOND) {
                     // Re-query from the straggler; never declare a timed-out landing secure.
                     if (!Plan(w,w.destination,false,true)) Hold(w,"stalled");
                 }
             } else if (w.phase==SECURE) {
+                AmphibiousFormation::Maintain(w);
+                arrived=Arrived(w);
+                if (ai.frame% (60*SECOND)==0) Say(w,"regroup arrived="+arrived+" slots="+w.slots.length());
                 AIFloat3 contact=Objective(w,w.kind==0);
                 if (contact.x<0 && w.kind==1) contact=Objective(w,true);
                 if (contact.x>=0 && ai.frame>=w.retry && ai.frame-w.changed>retrySeconds*SECOND) {
@@ -470,6 +528,7 @@ namespace AmphibiousOps {
                 w.anchor=w.destination;
                 if (target.x<0 || target.distance2D(w.destination)<radius || !Onward(w)) Hold(w,"coastal guard");
             } else if (ai.frame>=w.retry && alive>=AiMin(minimum,w.launched)) {
+                AmphibiousFormation::Maintain(w);
                 w.retry=ai.frame+retrySeconds*SECOND;
                 if (!w.secured) { Plan(w,w.destination,false,true); continue; }
                 const AIFloat3 goal=Goal(w), contact=Objective(w,true);

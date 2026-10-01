@@ -145,3 +145,4 @@ step.
 | INV-095 | A confirmed strategic launch respects allied Juno area claims or that silo's nuclear location cooldown. | Native CSuperTask::OnLaunch; independent launch-log fixture audit. | D-157 |
 | INV-096 | An amphibious wave declares a foothold secure only on dry ground with its surviving-member quorum present and no current local target. | AmphibiousOps::Tick; independent amphibious fixture records actual water and land transitions. | D-158 |
 | INV-097 | A retained Telchine guard has a dry route on its secured land component and leaves at least the minimum assault group when split. | AmphibiousOps::RetainGuard/GuardTick; independent shore guard fixture checks actual positions, movement state and onward assault. | D-160 |
+| INV-098 | Telchine formation connectors and distinct firing slots stay dry. | AmphibiousFormation::Form/Maintain; independent shore observer measures actual spacing and dry positions. | D-161 |

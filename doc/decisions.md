@@ -9363,3 +9363,90 @@ Screenshots: [TECH guard](images/d160/tech-guards-after-retreat.png),
 [natural landing](images/d160/natural-1601-landfall.png),
 [allied guard](images/d160/allied-guard-after-retreat.png),
 [allied assault](images/d160/allied-assault-final-landfall.png).
+
+
+### D-161 - Telchine land-first travel and terrain-fitted firing formations
+
+**Decision.** Experimental TECH/AIR Telchines try a strictly dry route first,
+then minimize exposed water travel with script-configured cost 6 versus land 1.
+Keep Marauder travel, recruitment and TECH's exact lab cycle unchanged. Use
+separate dry firing slots: nominal shore spacing 192, land spacing 96, with
+terrain-fitted alternatives. The plan was written before implementation in
+[telchine-perimeter-plan](telchine-perimeter-plan.md).
+
+**Reasoning.** Telchines cannot fire submerged. A shared guard endpoint caused
+clumping, and a majority-passable coarse cell did not establish a usable shore
+transition. Reuse the lane solver with optional edge masks, fine loaded
+MoveData footprint/slope checks and current allied structure exclusions.
+The engine checks ground slope on the seabed too. Script selects formations,
+travel costs and objectives; native code supplies routes and per-member
+command overrides. Guard claims and island security remain shared owners.
+
+**Alternatives rejected.** Blind lane offsets can place wings in water or on
+cliffs. Banning all water prevents island assaults. Changing the general lane
+passability rules would affect other roles; the strict query is opt-in.
+Changing TECH's lab cycle contradicts the owner's explicit choice. Do not
+call controlled encounters PvP win-rate evidence.
+
+**Corrections from testing.** Refresh arrival after assigning late slots;
+exclude allied factories from approach routes and search nearby dry ground
+when the strategic anchor is occupied. Individual formation arrival is 128
+elmos in script and native, accounting for observed idle centres 97-106 elmos
+from requested positions. Initial landing quorum and dry-component security
+remain exact. Exact-route idle retries are deferred and rate-limited rather
+than synchronous or silently discarded. Preserve all failed runs.
+
+**Invariant.** INV-098 requires distinct, dry firing positions and dry
+formation connectors. INV-096 still requires a regrouped, secure dry foothold
+before onward travel; INV-097 still requires actual retained guards to stay
+dry. Independent observers check actual spread, Recoil terrain legality and
+naval retreat without pursuit. All check files forbid every invariant.
+
+**Verification.** Played: balanced TECH and hard AIR each passed the strict
+16-minute Tundra perimeter/retreat check; terrible TECH passed eight minutes of
+Tundra land combat. A strengthened eight-minute Supreme test observed inland
+combat after formation deployment. No invariant, illegal terrain target, script
+or crash markers in these final runs. Native/pure suites passed, including 18
+terrain and 19 amphibious scenarios; 266-member API/DLL parity, role docs and
+invariant checks passed. Published matching DLL/debug/data to the required
+engine build output. Full archives, failures, hashes and inspected screenshots
+are in [the results](telchine-perimeter-results.md).
+
+**Limits and deliberate non-changes.** These are controlled behavior fixtures,
+not natural 8v8 recruitment or PvP win-rate benchmarks. Frozen energy limits
+combat-value conclusions; inland casualties are reported rather than used to
+tune production policy. A unit without a safe individual slot keeps the parent
+dry anchor. One initial memory failure remains KI-454; generated shared notes
+need correction under KI-455. Fixture evidence limits are KI-456. The accurate game mechanic is recorded in
+`../rjm.bar.docs/knowledge/60-tactics/68-telchine-shoreline-tactics.md`
+(local knowledge commit `e2e748a`). Existing KI-449/450/453 remain unchanged.
+
+**Files.** [Plan](telchine-perimeter-plan.md),
+[controller](../data/script/src/manager/amphibious_ops.as),
+[formations](../data/script/src/manager/amphibious_formation.as),
+[pure helper](../data/script/src/helpers/amphibious_math.as),
+[settings](../data/config/lanes.json),
+[route task declarations](../src/circuit/task/fighter/RouteTask.h),
+[route task commands](../src/circuit/task/fighter/RouteTask.cpp),
+[terrain declarations](../src/circuit/terrain/BattleAnalysis.h),
+[terrain queries](../src/circuit/terrain/BattleLanes.cpp),
+[fine corridor](../src/circuit/terrain/TerrainCorridor.h),
+[solver declarations](../src/circuit/terrain/LaneSolver.h),
+[solver](../src/circuit/terrain/LaneSolver.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[terrain tests](../tests/terrain_route_test.cpp),
+[policy tests](../tests/amphibious_math_tests.as),
+[preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[observer](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[perimeter checks](../tools/playtest/checks/telchine_perimeter.json),
+[combat checks](../tools/playtest/checks/telchine_land_formation.json),
+[inland checks](../tools/playtest/checks/telchine_inland_formation.json),
+[playtest guide](../tools/playtest/README.md),
+[results](telchine-perimeter-results.md),
+[TECH perimeter](images/d161/tech-shore-perimeter.png),
+[AIR landfall](images/d161/air-accessible-landfall.png),
+[AIR formation](images/d161/air-next-island-formation.png),
+[land combat](images/d161/tundra-land-combat.png),
+[API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [TECH](roles/tech.md), [AIR](roles/air.md),
+[issues](known-issues.md).

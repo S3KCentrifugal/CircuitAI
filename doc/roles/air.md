@@ -621,3 +621,7 @@ a native-fallback exclusion so an auxiliary lab cannot bypass recruitment
 cadence. No aircraft queue or ground-factory construction priority changes.
 Guard repositioning remains on the secured dry land component.
 See [implementation and tests](../telchine-beachhead-results.md).
+
+D-161 gives Telchines land-first, footprint-checked routes and distinct dry
+shore perimeter or land assault slots. Marauder travel and AIR economy stay
+unchanged. See the [formation plan](../telchine-perimeter-plan.md).

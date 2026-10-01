@@ -3478,6 +3478,68 @@ team owns no units; engine GameOver and the last competitive ally's loss
 agree. Until then these are natural-economy behavior traces, not clean PvP
 benchmarks. See [D-160 results](telchine-beachhead-results.md).
 
+### KI-454 - One D-161 rendered run ended in Lua memory exhaustion
+
+**Problem.** The first formation run ended at frame 4666 with engine
+`content_error: not enough memory` and Lua shutdown `LUA_ERRMEM`.
+Archive: `build-theatres/d161-tundra-01/runs/20261001-194121/`.
+No native access violation or stack trace identifies the allocating owner.
+Subsequent full sixteen-minute runs did not reproduce it. Route command
+re-entry was guarded and exact-route idle retries deferred, but that does
+not prove the cause of the engine memory failure.
+
+**Proposed solution.** If it recurs, retain the exact DLL/debug symbols,
+replay, process private-memory samples and Lua allocator statistics. Compare
+observer-enabled and observer-disabled runs with the same seed; instrument
+command/event counts before assigning the cause to routing or the observer.
+Do not increase memory limits or disable strict checks to claim a pass.
+
+**Verification.** Track stability across the D-161 repeats and subsequent
+natural matches. This remains an unresolved single occurrence; current
+terrain/formation correctness is assessed separately.
+
+### KI-455 - Generated amphibious notes assume submerged firing
+
+**Problem.** The shared knowledge generator
+`../rjm.bar.docs/tools/knowledge/gen_units.py` adds a blanket claim that
+amphibious units can fire at shorelines from below the surface. The generated
+Telchine page inherits it, contradicting the official unit reference: neither
+Telchine weapon fires submerged. Movement class is not weapon capability.
+
+**Proposed solution.** Replace that generic firing claim with a movement-only
+note and derive weapon-specific underwater restrictions separately. Regenerate
+all affected pages from the pinned cache, reviewing the diff for unrelated
+statistic changes. Do not hand-edit generated unit pages. The accurate current
+mechanic and tactical inference are recorded in the shared handwritten guide
+`knowledge/60-tactics/68-telchine-shoreline-tactics.md` and the
+[D-161 plan](telchine-perimeter-plan.md).
+
+**Verification.** Generator regression must show no submerged-fire claim for
+`legamph` or other amphibians solely because of their domain; run the shared
+knowledge checker after regeneration. Generator correction remains outstanding.
+
+### KI-456 - Land-combat fixture limits casualty and screenshot evidence
+
+**Problem.** D-161's controlled Supreme fixture freezes builders/production
+and supplies only commander energy. At minute one its energy bank was empty;
+three of six Telchines were lost while clearing six targets. The fixture proves
+movement and attributed fire but cannot establish resource-sufficient combat
+trading. In the stricter repeat, automatic screenshots framed empty ground
+despite correct unit coordinates in the observer log. Do not label those images
+as visual proof. Tundra screenshots were inspected and do show the tested units.
+
+**Proposed solution.** Before using this fixture to optimize combat efficiency,
+provide explicitly declared, equal resource support and log weapon-energy
+availability. Keep movement-only probes separately labelled. Instrument
+`telchine_match_watch.lua` camera target/state before and after the delayed
+screenshot, investigate competing camera widgets, and require observed units
+inside the rendered view before accepting a capture. Retain strict checks and
+AI ownership of all friendly unit commands.
+
+**Verification.** Repeat Supreme with sustained weapon energy and inspected
+screenshots of actual post-deployment firing. Compare casualty results only
+under documented equal resource conditions. See [D-161 results](telchine-perimeter-results.md).
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate

@@ -112,6 +112,9 @@ public:
     std::vector<springai::AIFloat3> GetTerrainRoute(const springai::AIFloat3& from,
         const springai::AIFloat3& to, int cls, float landCost, float waterCost,
         float threatWeight, float maxWaterThreat);
+    std::vector<springai::AIFloat3> GetUnitTerrainRoute(const CCircuitDef* def,
+        const springai::AIFloat3& from, const springai::AIFloat3& to, bool dry,
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat);
 
 	// --- water
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
@@ -218,6 +221,8 @@ private:
 	int gw, gh;
 	Grid height, maxHeight;   // per cell: mean and highest point
 	Grid surfaceSlope;   // mean engine slope: catches sideways travel along a cliff
+    struct UnitTerrain { lane::Terrain grid; Grid slope; int frame = -100000; };
+    std::unordered_map<int, UnitTerrain> unitTerrain;
 	std::vector<springai::AIFloat3> sources;
 	Grid routeHeat, routeShare;
 	std::vector<char> lane;

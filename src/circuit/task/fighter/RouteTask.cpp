@@ -64,6 +64,11 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
 	lanes.erase(unit);
+	unitRoutes.erase(unit);
+    unitArrival.erase(unit);
+	issuing.erase(unit);
+	lastIssue.erase(unit);
+	retryUnits.erase(unit);
 	engaging.erase(unit);
     if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
 }
@@ -90,6 +95,8 @@ int CRouteTask::LaneOf(CCircuitUnit* unit) const
 
 AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 {
+	const auto& route = RouteFor(unit);
+	if (unitRoutes.count(unit)) return route[idx];
 	const AIFloat3& p = route[idx];
 	const int lane = LaneOf(unit);
 	if ((lane == 0) || (laneSpacing <= 0.f) || (route.size() < 2)) {
@@ -152,7 +159,10 @@ void CRouteTask::Update()
 		}
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
-		if (!changed && !resume) continue;
+        const bool retry=retryUnits.count(unit) && circuit->GetLastFrame()-lastIssue[unit]>=FRAMES_PER_SEC;
+        if (!changed && !resume && !retry) continue;
+        retryUnits.erase(unit);
+        if (!changed && !resume && IsAtEnd(unit)) continue;
 		if (patrol) IssueRoute(unit, 0);
 		else if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
 		else IssueDirect(unit);
@@ -161,6 +171,9 @@ void CRouteTask::Update()
 
 void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 {
+	if (issuing.count(unit) != 0) return;
+    // A rejected/zero-length waypoint can synchronously idle again. Bound
+    // opt-in exact routes instead of filling the engine's command/event queues.
 	if (engaging.count(unit) != 0) return;  // Update owns contact loss and lane resumption.
 	if (patrol && !route.empty()) {
 		IssueRoute(unit, 0);
@@ -169,6 +182,7 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 	if (route.empty() || IsAtEnd(unit)) {
 		return;  // holding at the destination; weapons keep firing on their own
 	}
+    if (preserveWaypoints) { retryUnits.insert(unit); return; }
 	// Stuck or the queue was cleared: continue from the nearest waypoint ahead
 	IssueRoute(unit, NearestAheadIndex(unit));
 }
@@ -180,6 +194,8 @@ void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 void CRouteTask::SetRoute(std::vector<AIFloat3>&& waypoints)
 {
+	unitRoutes.clear();
+    unitArrival.clear();
 	route = std::move(waypoints);
 	++version;
 	dirty = !route.empty();
@@ -190,15 +206,19 @@ void CRouteTask::SetRoute(std::vector<AIFloat3>&& waypoints)
 
 bool CRouteTask::IsAtEnd(CCircuitUnit* unit) const
 {
+	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return true;
 	}
 	const int frame = manager->GetCircuit()->GetLastFrame();
-	return unit->GetPos(frame).SqDistance2D(route.back()) < SQUARE(arriveRadius);
+	const auto it=unitArrival.find(unit);
+    const float radius=it==unitArrival.end() ? arriveRadius : it->second;
+    return unit->GetPos(frame).SqDistance2D(route.back()) < SQUARE(radius);
 }
 
 unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
 {
+	const auto& route = RouteFor(unit);
 	// Nearest waypoint, then the one after it unless it is the last: a unit
 	// standing on waypoint k should head for k+1.
 	if (route.empty()) {
@@ -223,6 +243,7 @@ unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
 
 void CRouteTask::IssueDirect(CCircuitUnit* unit)
 {
+	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
 	}
@@ -235,10 +256,13 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 
 void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 {
+	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
 	}
 	CCircuitAI* circuit = manager->GetCircuit();
+	if (!issuing.insert(unit).second) return;
+	lastIssue[unit]=circuit->GetLastFrame();
 	const int timeout = circuit->GetLastFrame() + FRAMES_PER_SEC * 600;
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
@@ -249,6 +273,23 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 			else unit->CmdMoveTo(LanePoint(unit, i), options, timeout);
 		}
 	)
+	issuing.erase(unit);
+}
+
+const std::vector<AIFloat3>& CRouteTask::RouteFor(CCircuitUnit* unit) const
+{
+    const auto it=unitRoutes.find(unit);
+    return it==unitRoutes.end() ? route : it->second;
+}
+
+bool CRouteTask::SetUnitRoute(CCircuitUnit* unit, std::vector<AIFloat3>&& points, float radius)
+{
+    if (unit==nullptr || units.count(unit)==0 || points.empty() || !std::isfinite(radius)) return false;
+    for (const auto& p:points) if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
+    unitRoutes[unit]=std::move(points);
+    unitArrival[unit]=std::clamp(radius,16.f,512.f);
+    IssueRoute(unit,0);
+    return true;
 }
 
 } // namespace circuit

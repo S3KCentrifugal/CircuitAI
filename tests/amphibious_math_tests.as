@@ -1,4 +1,11 @@
 void test_role_scope() { Check(AmphibiousMath::Scope(true,false,true)); Check(AmphibiousMath::Scope(false,true,true)); Check(!AmphibiousMath::Scope(false,false,true)); Check(!AmphibiousMath::Scope(true,false,false)); }
+void test_formation_spreads_centre_out_without_duplicate_slots() {
+    Check(AmphibiousMath::FormationLane(0)==0);
+    Check(AmphibiousMath::FormationLane(1)==1);
+    Check(AmphibiousMath::FormationLane(2)==-1);
+    Check(AmphibiousMath::FormationLane(5)==3);
+    Check(AmphibiousMath::FormationLane(-1)==0);
+}
 void test_empty_wave_never_arrives() { Check(!AmphibiousMath::Gathered(0,0,0.8f)); }
 void test_quorum_rounds_up() { Check(!AmphibiousMath::Gathered(6,4,0.8f)); Check(AmphibiousMath::Gathered(6,5,0.8f)); }
 void test_no_single_unit_trickle() { Check(!AmphibiousMath::Release(1,1,6,3,9000,2700,0.8f)); }

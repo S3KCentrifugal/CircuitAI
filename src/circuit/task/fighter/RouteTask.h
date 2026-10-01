@@ -37,6 +37,7 @@ public:
 
 	// Script hooks
 	void SetRoute(std::vector<springai::AIFloat3>&& waypoints);
+    bool SetUnitRoute(CCircuitUnit* unit, std::vector<springai::AIFloat3>&& waypoints, float radius);
 	/*
 	 * Per-unit lane spread. The route is one line; each unit assigned to the
 	 * task is dealt a lane - 0, +1, -1, +2, -2 ... - and follows the line
@@ -66,6 +67,12 @@ private:
 	int LaneOf(CCircuitUnit* unit) const;
 
 	std::vector<springai::AIFloat3> route;
+    std::map<CCircuitUnit*, std::vector<springai::AIFloat3>> unitRoutes;
+    std::map<CCircuitUnit*, float> unitArrival;
+    std::set<CCircuitUnit*> issuing;
+    std::set<CCircuitUnit*> retryUnits;
+    std::map<CCircuitUnit*, int> lastIssue;
+    const std::vector<springai::AIFloat3>& RouteFor(CCircuitUnit* unit) const;
 	std::map<CCircuitUnit*, int> lanes;   // unit -> signed lane index
 	std::set<CCircuitUnit*> engaging;  // temporarily paused for configured range micro
 	int laneCount;

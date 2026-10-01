@@ -22,6 +22,13 @@
 
 #include "terrain/BattleAnalysis.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/TerrainData.h"
+#include "terrain/TerrainCorridor.h"
+#include "unit/CircuitDef.h"
+#include "unit/ally/AllyUnit.h"
+#include "spring/SpringCallback.h"
+#include "UnitDef.h"
+#include "MoveData.h"
 #include "map/ThreatMap.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
@@ -330,6 +337,85 @@ std::vector<AIFloat3> CBattleAnalysis::GetTerrainRoute(const AIFloat3& from, con
     std::vector<AIFloat3> result;
     result.reserve(cells.size());
     for (int c : cells) { auto p = CellPos(c); p.y = Height(p); result.push_back(p); }
+    return result;
+}
+
+std::vector<AIFloat3> CBattleAnalysis::GetUnitTerrainRoute(const CCircuitDef* def,
+        const AIFloat3& from, const AIFloat3& to, bool dry, float landCost,
+        float waterCost, float threatWeight, float maxWaterThreat)
+{
+    EnsureGrid();
+    auto inside = [this](const AIFloat3& p) {
+        return std::isfinite(p.x) && std::isfinite(p.z) && p.x>=0 && p.z>=0
+            && p.x<gw*cellSize && p.z<gh*cellSize;
+    };
+    if (def == nullptr || !inside(from) || !inside(to)) return {};
+    std::unique_ptr<MoveData> move(def->GetDef()->GetMoveData());
+    if (!move || move->GetSpeedModClass()>1) return {}; // ground mechanisms only
+    auto& cache = unitTerrain[def->GetId()*2 + int(dry)];
+    const auto* area = circuit->GetTerrainManager()->GetAreaData();
+    const int sw = CTerrainManager::GetTerrainWidth()/16;
+    const float halfWidth = std::max(move->GetXSize(),move->GetZSize())*SQUARE_SIZE*0.5f;
+    const float slopeLimit = move->GetMaxSlope(), depth = move->GetDepth();
+    auto elevation = [&](float x, float z) {
+        return inside({x,0,z}) ? area->GetElevationAt(x,z) : std::numeric_limits<float>::quiet_NaN();
+    };
+    auto slopeAt = [&](float x, float z) {
+        if (!inside({x,0,z})) return std::numeric_limits<float>::quiet_NaN();
+        const size_t i=int(z/16)*sw+int(x/16);
+        return i<cache.slope.size() ? cache.slope[i] : std::numeric_limits<float>::quiet_NaN();
+    };
+    auto corridor = [&](const AIFloat3& a, const AIFloat3& b) {
+        return lane::TerrainCorridor(a.x,a.z,b.x,b.z,halfWidth,slopeLimit,depth,dry,elevation,slopeAt);
+    };
+    auto& t=cache.grid;
+    const int frame=circuit->GetLastFrame();
+    if (t.height.empty() || frame-cache.frame>=60*FRAMES_PER_SEC) {
+        cache.frame=frame;
+        circuit->GetMap()->GetSlopeMap(cache.slope);
+        t.gw=gw; t.gh=gh; t.cellSize=cellSize;
+        t.height.resize(height.size()); t.surfaceSlope=surfaceSlope; t.body8.assign(height.size(),0);
+        t.edges.assign(height.size(),0);
+        for (auto& p:t.pass) p.assign(height.size(),0);
+        for (int c=0;c<gw*gh;++c) {
+            const auto p=CellPos(c);
+            t.height[c]=elevation(p.x,p.z);
+            t.pass[L_AMPH][c]=corridor(p,p);
+        }
+        for (int c=0;c<gw*gh;++c) if (t.pass[L_AMPH][c]) {
+            for (int d=0;d<8;++d) {
+                const int x=c%gw+NB[d][0],z=c/gw+NB[d][1];
+                if (x<0 || z<0 || x>=gw || z>=gh) continue;
+                const int n=z*gw+x;
+                if (t.pass[L_AMPH][n] && corridor(CellPos(c),CellPos(n))) t.edges[c]|=1u<<d;
+            }
+        }
+        circuit->LOG("UNIT_TERRAIN def=%s dry=%i cells=%i",def->GetDef()->GetName(),int(dry),gw*gh);
+    }
+    // Endpoints must connect to their grid centres; never snap over a cliff.
+    if (!corridor(from,CellPos(Cell(from))) || !corridor(CellPos(Cell(to)),to)) return {};
+    Grid threat(height.size());
+    for (size_t c=0;c<threat.size();++c) threat[c]=dry ? SurfThreat(CellPos(c)) : AmphThreat(CellPos(c));
+    // Exclude allied structures; the engine still resolves mobile traffic.
+    std::vector<char> obstacles(height.size(),0);
+    circuit->UpdateFriendlyUnits();
+    for (const auto& kv:circuit->GetFriendlyUnits()) {
+        const auto* building=circuit->GetCircuitDefSafe(circuit->GetCallback()->Unit_GetDefId(kv.first));
+        if (building==nullptr || building->IsMobile()) continue;
+        const auto p=kv.second->GetPos(frame);
+        const float r=std::max(building->GetDef()->GetXSize(),building->GetDef()->GetZSize())*SQUARE_SIZE*0.5f+halfWidth+cellSize*0.5f;
+        for (int z=std::max(0,int((p.z-r)/cellSize));z<=std::min(gh-1,int((p.z+r)/cellSize));++z)
+            for (int x=std::max(0,int((p.x-r)/cellSize));x<=std::min(gw-1,int((p.x+r)/cellSize));++x)
+                obstacles[z*gw+x]=1;
+    }
+    const auto cells=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
+        L_AMPH,threat,landCost,waterCost,threatWeight,maxWaterThreat,&obstacles);
+    if (cells.empty()) return {};
+    std::vector<AIFloat3> result;
+    result.reserve(cells.size()+2);
+    result.emplace_back(from.x,elevation(from.x,from.z),from.z);
+    for (int c:cells) { auto p=CellPos(c);p.y=t.height[c];result.push_back(p); }
+    result.emplace_back(to.x,elevation(to.x,to.z),to.z);
     return result;
 }
 
