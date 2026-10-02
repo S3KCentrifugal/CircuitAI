@@ -1,0 +1,8 @@
+{
+  "name": "torpedo",
+  "description": "Torpedo raids on exposed forward naval targets; home fighters retain their territory policy",
+  "aircraft": [{"unit":"$torpedo","count":18,"team":0},{"unit":"$fighter1","count":6,"team":1}],
+  "targets": [{"unit":"armroy","count":2,"position":[5600,6500],"water":true},{"unit":"armuwfus","count":1,"position":[4800,6000],"water":true}],
+  "defenses": [{"unit":"armfrt","count":1,"position":[4900,6200],"water":true}],
+  "refill_seconds": 60
+}

@@ -3609,6 +3609,24 @@ as open combat calibration work, measured against target value and actual
 interception/loss locations rather than only successful payload release. See
 [D-163 evidence](air-campus-strike-results.md).
 
+**D-165 update.** Combat-only arenas now isolate this issue from economic
+build-up. The final radar baseline raised resistance from 1 to 3 and later
+35-bomber waves destroyed fusions, but one lost all aircraft and another
+returned only three. In the layered-AA samples, Armada and Legion did no
+attributed bomber health damage; Cortex destroyed a lab at an unfavorable cost.
+T1 raids also sacrificed more value than they destroyed. The existing T1 raid
+controller does not use the T2 resistance feedback. Do not interpret a passing
+fixture-integrity check as effective combat or increasing size as safe routing.
+
+Use the repeatable cases to compare target-value budgets, interception/egress
+loss estimates and escort/AA-suppression packages in `air_raids.as`,
+`air_waves.as` and native `AirWaveTask`. Keep TECH unchanged. Require multiple
+seeds and actual target kills/returns; distinguish radar tests, supplied sonar,
+global LOS and exposed forward naval targets. The new harness supports loaded
+UnitDefs, but utility-aircraft missions and specialist coordinated payloads are
+still not validated merely by spawning them. See [D-165 results](air-combat-arena-results.md)
+and [decision D-165](decisions.md#d-165---replenishing-air-combat-arenas-with-measured-outcomes).
+
 ### KI-458 - Concurrent rendered tests can warn during graphics initialization
 
 **Problem.** D-162 gift02 and earlier strike fixtures emitted load-thread

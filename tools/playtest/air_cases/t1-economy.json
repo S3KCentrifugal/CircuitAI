@@ -1,0 +1,8 @@
+{
+  "name": "t1-economy",
+  "description": "T1 mex/wind raids against light AA and T1 fighters; Legion uses its early gunship",
+  "aircraft": [{"unit":"$t1","count":18,"team":0},{"unit":"$fighter1","count":8,"team":1}],
+  "targets": [{"unit":"armwin","count":6,"position":[8000,4500]},{"unit":"armmex","count":3,"position":[10300,3100]}],
+  "defenses": [{"unit":"armrl","count":1,"position":[8700,3600]}],
+  "refill_seconds": 45
+}

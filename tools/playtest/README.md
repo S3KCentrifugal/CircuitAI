@@ -559,3 +559,60 @@ For the larger capacity fixture use `--scenario capacity --seed 1002165` and
 no orders, units or resources. `audit_air_economy.py <infolog> --output <json>`
 summarizes worker tasks, reactor/factory completions, aircraft production and
 sampled bank occupancy. See [results](../../doc/air-economy-zone-results.md).
+
+## Supplied AIR combat arena (D-165)
+
+`air_arena.py` runs two experimental AIR opponents without economic build-up.
+Missing attackers, fighters, targets and AA are replenished; surviving aircraft
+keep their real AI tasks. Radars cover both teams' standard start positions.
+The default uses normal radar/LOS plus supplied scouts. All overrides and source
+hashes are recorded in `arena-manifest.json`; the live installation is untouched.
+
+```powershell
+python tools/playtest/air_arena.py list
+python tools/playtest/air_arena.py run --dir build-theatres/air-baseline --case t2-intercept --side armada --defender cortex --minutes 18 --speed 12
+python tools/playtest/air_arena.py matrix --dir build-theatres/air-matrix --cases t1-economy,t2-intercept,t2-flak,gunship,torpedo --sides armada,cortex,legion --seeds 1651,1652 --minutes 18 --speed 12
+python tools/playtest/air_arena.py summarize --dir build-theatres/air-matrix
+python tools/playtest/air_arena.py run --dir build-theatres/air-continuous --case t2-flak --endless
+python tools/playtest/playtest.py stop --dir build-theatres/air-continuous
+```
+
+Endless mode disables fixture autoquit and game victory termination. It keeps
+running until explicitly stopped. Bounded runs use the same replenishment rules
+and archive their exact log, manifest, screenshots, strict report and
+`arena-results.json`/`.md` together. Matrix runs are serial and return failure
+if any case fails. Use a fresh directory for each comparison. A live/stale PID
+must be cleared through the scoped stop command before restaging.
+
+Cases are JSON under `air_cases/`. Change aircraft, counts, targets, AA, positions
+and refill period there; a custom JSON path works with `--case`. `--unit armlance`
+replaces the primary attacker, `--fighters 0` isolates static AA, and
+`--visibility global` is an explicitly labeled omniscient diagnostic. Built-in
+coordinates require Supreme Isthmus v1.7; other maps need a custom case. Case
+counts are replenished pool ceilings, not forced AI wave sizes.
+
+The optional `sensors` list can supply extra detection, such as sonar for
+submerged targets. `torpedo` tests exposed forward naval targets;
+`torpedo-covered` moves them closer to the defender and supplies attacker sonar.
+The fighter AI still respects its normal friendly-territory boundary.
+
+Ordinary T1/T2 bomber results identify actual launch cohorts, target damage,
+target destruction, losses, survivors, home returns and detection-to-fighter-hit
+latency. Completed and unfinished sorties are separate. Aircraft-class totals
+also cover native gunships, paralysis and torpedo attacks without inventing
+bomber waves for them. Radar detection and the home-screen response flag can
+concern different contacts, so use attributed fighter fire for interception.
+An AI policy hold is an outcome; the fixture never orders a raid to force a pass.
+Bounded audits cut off at the configured game frame, excluding extra simulation
+time while the watcher stops the process. Endless observations use the watcher's
+reported cutoff. `summarize` compares one final archive per case without counting
+its root convenience copy again.
+
+Energy storage/production and stockpile ammunition are supplied. Economic and
+escort launch gates are waived for the default bomber-only drill. These are
+controlled combat measurements, not PvP balance or economy scores. The loaded
+aircraft catalog includes support/optional units and is not behavior coverage:
+transport delivery, construction, radar-plane missions and specialist payload
+coordination need their own acceptance criteria. Legion's T1 preset uses its
+gunship, not a fictitious level bomber. See the [plan](../../doc/air-combat-arena-plan.md)
+and [measured results](../../doc/air-combat-arena-results.md).

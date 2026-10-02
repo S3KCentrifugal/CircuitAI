@@ -9810,3 +9810,78 @@ tracked in [known issues](known-issues.md).
   [doc/roles/air.md](roles/air.md),
   [doc/roles/air_build.md](roles/air_build.md),
   [doc/roles/air_rules.md](roles/air_rules.md).
+
+## D-165 - Replenishing AIR combat arenas with measured outcomes
+
+**Date.** 2026-10-02.
+
+**Decision.** Add combat-only AIR fixtures under playtest tooling, using the
+published native build and staged copies of policy. Supply units, radar, energy
+and ammunition; freeze economic construction and waive the documented economic
+and escort gates. Keep real target selection, routes, formations, returns,
+resistance feedback and home fighter interception. JSON cases, UnitDef overrides,
+serial matrices, per-case comparison and an explicit endless/stop lifecycle
+provide one reusable harness instead of separate hard-coded unit tests.
+
+**Reasoning and rejected alternatives.** Waiting for a full economy obscures
+combat regressions and costs far more time. Issuing widget attack orders would
+test the widget rather than AIR. Removing survivors between rounds would hide
+return behavior. Global LOS cannot prove radar reaction, and a completed sortie
+cannot be inferred from an arbitrary wave timer. The observer retains each
+actual task and waits for evaluation before recording its resistance outcome.
+BAR regenerates the LuaUI damage dispatcher, so the final observer wraps the
+handler method and checks ownership instead of wrapping only the global callin.
+Completed cohorts are released, preventing an endless accumulation of retained
+wave tables. Bounded audits exclude shutdown overrun and unfinished sorties
+remain censored.
+
+Deliberately leave production doctrine unchanged. These samples establish a
+measurement baseline and working loss feedback, not an efficient solution to
+layered AA. Tuning a scalar until one supplied-force matchup wins would not
+establish stronger PvP play. KI-457 remains open. The forward naval fixture
+also does not exercise home interception at those targets; a separate covered
+naval case changes geography and supplies sonar without changing fighter policy.
+
+**Invariant.** A fixture never commands, teleports or heals a living combat
+unit to force an outcome. Only actual launched members contribute to a bomber
+cohort; EMP is separate from health damage; completed cohorts do not accumulate
+later losses. Fixture checks reject missing units/sites, broken callbacks,
+script/crash errors and every existing production invariant. This changes no
+production actor or rule, so it adds no production INV identifier.
+
+**Verification.** Fourteen measurement/input tests pass. Seventeen final rendered
+observations pass strict checks: the 18-minute T2 radar baseline, twelve
+10-minute faction cases, three 8-minute covered naval cases, and an endless
+observation beyond its nominal one-minute cutoff to frame 11097. All were
+stopped explicitly or by their bounded watcher. The initial failed observer
+and its provisional successor remain archived and excluded from final scores.
+The final radar baseline shows resistance 1 -> 1.5 -> 2.25 -> 3 and later fusion
+kills, with poor exchanges; the layered-AA baseline retains zero-damage failures.
+See the evidence and limits in the results. Production data, TECH and the DLL
+are unchanged; the mandatory output remains matched to the source data.
+
+**Files.**
+
+- Harness: [runner](../tools/playtest/air_arena.py),
+  [read-only probe](../tools/playtest/air_arena_probe.as),
+  [widget](../tools/playtest/widgets/air_arena.lua),
+  [auditor](../tools/playtest/audit_air_arena.py),
+  [tests](../tools/playtest/test_air_arena.py),
+  [strict checks](../tools/playtest/checks/air_arena.json),
+  [run instructions](../tools/playtest/README.md).
+- Cases: [T1 economy](../tools/playtest/air_cases/t1-economy.json),
+  [T2 interception](../tools/playtest/air_cases/t2-intercept.json),
+  [layered AA](../tools/playtest/air_cases/t2-flak.json),
+  [gunships](../tools/playtest/air_cases/gunship.json),
+  [forward naval](../tools/playtest/air_cases/torpedo.json),
+  [covered naval](../tools/playtest/air_cases/torpedo-covered.json).
+- Documentation: [plan](air-combat-arena-plan.md),
+  [results](air-combat-arena-results.md),
+  [measurements](benchmarks/air-d165-arena.json),
+  [known issues](known-issues.md), [decision record](decisions.md).
+- Original screenshots: [interception](images/d165/t2-intercept.png),
+  [fusion strike](images/d165/t2-fusion-strike.png),
+  [mex strike](images/d165/t1-mex-strike.png),
+  [layered AA](images/d165/layered-aa-strike.png),
+  [torpedo strike](images/d165/torpedo-strike.png),
+  [Shurikens](images/d165/shuriken-strike.png).
