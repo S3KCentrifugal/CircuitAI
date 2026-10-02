@@ -14,12 +14,26 @@ task, checking native assignment and reachability before creating more work.
 chain orders after script enqueue has returned. This prevents a native nano
 order outside the layout from blocking the role's pinned support job (INV-076).
 
+`EconomyAircraft` identifies economic workers by aircraft constructor
+type and tier. `ReturnEconomyWorkers`, called by `Tick`, removes an advanced
+aircraft constructor from a builder GUARD using individual `AssignTask` and a
+one-second wait. Other assignees, player tasks and ferry tasks retain their
+owners. `Record` audits new fallback production guards for these workers
+(INV-106). Genuine unfinished construction assistance remains useful work.
+See [the economic district design](../air-economy-zone-plan.md).
+
+`ReactorPending` reads only owned ENERGY projects with a reactor definition and
+no target or an unfinished target. `AirGrowth` uses it for serialization so a
+leftover T1 wind/solar order cannot block all advanced economy. `AirLayout::Place`
+checks the same predicate before admitting any reactor; `Record` audits INV-108.
+
 `Factory` reserves one funded site, reuses a free surviving factory slot after
 loss, and keeps the T1 transport plant. `Energy` chooses affordable wind, solar,
 advanced solar, tidal or capable-builder fusion/AFUS. The first reactor is
 ordinary fusion; AFUS needs an observed completed reactor as well as its income
 and bank gates. An unfinished frame supplies no reactor income. Expensive reactors use a
-separate rear search region. `Nano` fills actual free bank slots using live
+separate rear search region for ordinary fusion; AFUS and advanced converters
+use the persistent `AirEcoLayout` modules reserved during the opening. `Nano` fills actual free bank slots using live
 assistant counts and the funded throughput target; T1 constructors remain
 necessary because T2 air constructors do not build ordinary T1 nanos.
 `Utility` provides queued-aware storage and radar. `AirDefence` owns flak, long-range AA and anti-nukes.
@@ -81,7 +95,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 0e4eae7be795f669bf3518352e31a17f4aececaa; lines: 471 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 2b997099ccbb31c74d049b963e8197c5f730ea9c; lines: 510 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -122,6 +136,7 @@ must not indefinitely block a funded first reactor. See [the review](../air-enha
 
 `Nano` repairs dead support pins within the started lab's reach. `PlantHasWork`
 requires an unfinished aircraft frame after the opening crew; a queued recruit
-task alone cannot keep the commander on an idle lab. Mobile fallback guards
+task alone cannot keep the commander on an idle lab. T1 mobile fallback guards
 start an explicit five-second expiry and `Tick` checks their task-identity leases
-(INV-104), preventing idle production assistance from trapping the workforce.
+(INV-104). D-164 excludes advanced aircraft from this fallback entirely;
+expiration alone did not prevent them repeatedly renewing the same activity.

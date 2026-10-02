@@ -1,0 +1,19 @@
+{
+  "stop_minute": 20,
+  "expect": [
+    {"key":"opening", "pattern":"\\[AirEconomyProbe\\] PASS opening reserves", "by_minute":5},
+    {"key":"physical", "pattern":"\\[LayoutProbe\\] physical wall exists team=0", "scope":"any", "by_minute":2},
+    {"key":"relocation", "pattern":"\\[AirEconomyProbe\\] PASS unused economic module relocated", "by_minute":20},
+    {"key":"inject", "pattern":"\\[AirEconomyProbe\\] confirmed injected legacy production guard", "by_minute":8},
+    {"key":"release", "pattern":"\\[AirEconomyProbe\\] PASS T2 constructor left injected guard", "by_minute":8},
+    {"key":"work", "pattern":"\\[AirEconomyProbe\\] PASS recovered T2 aircraft working advanced economy", "by_minute":20},
+    {"key":"afus", "pattern":"\\[AIR\\]\\[EcoLayout\\] place .*afus", "by_minute":20},
+    {"key":"converters", "pattern":"\\[AIR\\]\\[EcoLayout\\] place .*mmkr", "by_minute":20}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[AirEconomyProbe\\] FAIL", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

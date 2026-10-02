@@ -3210,6 +3210,18 @@ included in the reported mean +160.41 income, so bank occupancy does not by
 itself measure wasted production capacity. The spending/calibration issue
 remains open; see [D-163 measurements](benchmarks/air-d163.json).
 
+**D-164 update.** Removing advanced-aircraft factory guards and reserving a
+separate economic district restores continued reactor growth. The final
+controlled growth run completed five self-built AFUS, while the natural
+42-minute AIR/TECH run completed two and started a third. Nevertheless,
+63/103 ten-second samples from minute 25 onward still had at least 95% metal
+storage. Zero T2 factory guards were observed in 252 samples, so this remaining
+funding/throughput issue must not be treated as the old guard bug. Preserve the
+new reactor-commitment gate and inspect funded project staffing, converter
+surplus gates and actual aircraft pull before changing constructor limits.
+See [D-164 results](air-economy-zone-results.md) and
+[decision D-164](decisions.md#d-164---air-economy-workers-and-separately-reserved-advanced-economy).
+
 ### KI-443 - Some AIR constructors can remain on a distant local frame without making progress
 
 **Problem.** In D-156's final Armada gift run
@@ -3717,3 +3729,13 @@ ferry arrivals and workforce command/position traces. See
 [AIR rules](../data/script/src/roles/air_rules.as),
 [growth](../data/script/src/manager/air_growth.as) and
 [production](../data/script/src/manager/air_production.as).
+
+**D-164 update.** The final natural Cortex AIR/TECH run completed first fusion
+at 27.89 minutes and AFUS at 32.89/37.54. Correcting a generic T1 energy-queue
+blocker restored advanced growth but did not meet the twenty-minute first
+fusion goal. Four economy modules and seven factory bays were reserved at
+12 seconds, so this run's delay cannot be explained by the earlier missing
+opening reservations. Keep this issue open and measure the transition capital
+and first-reactor critical path with the now-correct ownership/queue rules.
+See [D-164 results](air-economy-zone-results.md) and
+[decision D-164](decisions.md#d-164---air-economy-workers-and-separately-reserved-advanced-economy).

@@ -957,6 +957,11 @@ namespace Global {
             int MaxProductionBays = 0; // zero: no AIR policy cap; terrain/income/support still gate
             int PlannedT2Bays = 6;
             int PlannedT1Bays = 1;
+            int PlannedEcoModules = 4; // one AFUS and eight converter pins each; reservation, not a build order
+            float EcoFactorySeparation = 384.0f; // districts may abut; native envelopes still exclude overlap
+            float EcoReactorSpacing = 512.0f;
+            float EcoConverterClearance = 128.0f;
+            float OverflowGrowthSeconds = 180.0f;
             int ConverterParallel = 3;
             float ConverterDraw = 70.0f;
             float ConverterEnergyReserve = 150.0f;

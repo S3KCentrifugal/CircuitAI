@@ -4,6 +4,7 @@
 
 // AIR sites use native reservation/claim/frame ownership. No TECH controller calls.
 #include "../helpers/air_home.as"
+#include "air_eco_layout.as"
 
 namespace AirLayout {
     class Bay {
@@ -92,6 +93,7 @@ namespace AirLayout {
         windClusters.resize(0);
         placeRetry.deleteAll();
         facing = LayoutHelpers::FacingToward(Global::Map::StartPos, LayoutHelpers::TerrainCentre());
+        AirEcoLayout::Init();
         const int count = aiTerrainMgr.GetLayoutInt("air.bays", 0);
         for (int i = 0; i < count; ++i) {
             Bay b;
@@ -139,45 +141,52 @@ namespace AirLayout {
         const float pitchX = AirMath::BayPitch(across + 16.0f, Global::RoleSettings::Air::BaySpacing);
         const float pitchZ = AirMath::BayPitch(along, Global::RoleSettings::Air::BaySpacing);
         const AIFloat3 origin = bays.length() > 0 ? bays[0].centre : anchor;
-        for (int ring = 0; ring < Global::RoleSettings::Air::BaySearchRings; ++ring) {
-            for (int cell = 0; cell < (2 * ring + 1) * (2 * ring + 1); ++cell) {
-                const int gx = cell % (2 * ring + 1) - ring;
-                const int gz = cell / (2 * ring + 1) - ring;
-                if (ring > 0 && gx > -ring && gx < ring && gz > -ring && gz < ring) continue;
-                AIFloat3 at = Offset(origin, facing, float(gx) * pitchX, float(gz) * pitchZ);
-                if (!Inside(at, AiMax(across + 16.0f, along)) || !AirHome::EconomySite(at)
-                    || aiTerrainMgr.IsZoneAlly(at) || !aiTerrainMgr.CanReserveBuilding(plant, at, facing)) continue;
-                if (!aiTerrainMgr.CanReserveArea(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along)) continue;
-                const int id = aiTerrainMgr.ReservePersistentBuilding(plant, at, facing);
-                if (id < 0) continue;
-                at = aiTerrainMgr.GetReservationPos(id);
-                array<int> slots;
-                for (int s = 0; s < wanted; ++s) {
-                    // T1 grows a rear row; T2 has independent side banks.
-                    const float x = t2 ? ProductionMath::BayAcross(s, half, nw, 32.0f) : float(s - 2) * nw;
-                    const float z = t2 ? ProductionMath::BayAlong(s, nw) : -half - nw;
-                    const AIFloat3 p = Offset(at, facing, x, z);
-                    if (MapHelpers::SqDist(p, at) > nano.GetBuildDistance() * nano.GetBuildDistance()) break;
-                    const int ns = aiTerrainMgr.ReservePersistentBuilding(nano, p, facing);
-                    if (ns < 0) break;
-                    slots.insertLast(ns);
+        // Keep the dense lattice first. A half-pitch fallback fits terrain and
+        // allied reservations without assuming an empty rectangular base.
+        for (int pass = 0; pass < 2; ++pass) {
+            const float scale = pass == 0 ? 1.0f : 0.5f;
+            const int rings = Global::RoleSettings::Air::BaySearchRings * (pass == 0 ? 1 : 2);
+            for (int ring = 0; ring < rings; ++ring) {
+                for (int cell = 0; cell < (2 * ring + 1) * (2 * ring + 1); ++cell) {
+                    const int gx = cell % (2 * ring + 1) - ring;
+                    const int gz = cell / (2 * ring + 1) - ring;
+                    if (ring > 0 && gx > -ring && gx < ring && gz > -ring && gz < ring) continue;
+                    AIFloat3 at = Offset(origin, facing, float(gx) * pitchX * scale, float(gz) * pitchZ * scale);
+                    if (AirEcoLayout::NearReactor(at, Global::RoleSettings::Air::EcoFactorySeparation)) continue;
+                    if (!Inside(at, AiMax(across + 16.0f, along)) || !AirHome::EconomySite(at)
+                        || aiTerrainMgr.IsZoneAlly(at) || !aiTerrainMgr.CanReserveBuilding(plant, at, facing)) continue;
+                    if (!aiTerrainMgr.CanReserveArea(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along)) continue;
+                    const int id = aiTerrainMgr.ReservePersistentBuilding(plant, at, facing);
+                    if (id < 0) continue;
+                    at = aiTerrainMgr.GetReservationPos(id);
+                    array<int> slots;
+                    for (int s = 0; s < wanted; ++s) {
+                        // T1 grows a rear row; T2 has independent side banks.
+                        const float x = t2 ? ProductionMath::BayAcross(s, half, nw, 32.0f) : float(s - 2) * nw;
+                        const float z = t2 ? ProductionMath::BayAlong(s, nw) : -half - nw;
+                        const AIFloat3 p = Offset(at, facing, x, z);
+                        if (MapHelpers::SqDist(p, at) > nano.GetBuildDistance() * nano.GetBuildDistance()) break;
+                        const int ns = aiTerrainMgr.ReservePersistentBuilding(nano, p, facing);
+                        if (ns < 0) break;
+                        slots.insertLast(ns);
+                    }
+                    // A cramped site can start with a partial bank. The capacity
+                    // calculation uses the slots actually published, never phantom BP.
+                    if (int(slots.length()) < (complete ? wanted : AiMin(2, wanted))) {
+                        for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
+                        aiTerrainMgr.ReleasePersistentBuilding(id);
+                        continue;
+                    }
+                    Bay@ b = reuse is null ? Bay() : reuse;
+                    if (reuse is null) b.key = Key(int(bays.length()));
+                    b.defName = plant.GetName(); b.slot = id;
+                    b.centre = at; b.facing = facing; b.nanos = slots;
+                    b.envelope = aiTerrainMgr.ReserveZone(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along, false);
+                    if (reuse is null) bays.insertLast(b);
+                    Save(b);
+                    GenericHelpers::LogUtil("[AIR][Layout] reserved " + b.key + " " + b.defName + " at " + int(at.x) + "," + int(at.z) + " support=" + slots.length(), 1);
+                    return b;
                 }
-                // A cramped site can start with a partial bank. The capacity
-                // calculation uses the slots actually published, never phantom BP.
-                if (int(slots.length()) < (complete ? wanted : AiMin(2, wanted))) {
-                    for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
-                    aiTerrainMgr.ReleasePersistentBuilding(id);
-                    continue;
-                }
-                Bay@ b = reuse is null ? Bay() : reuse;
-                if (reuse is null) b.key = Key(int(bays.length()));
-                b.defName = plant.GetName(); b.slot = id;
-                b.centre = at; b.facing = facing; b.nanos = slots;
-                b.envelope = aiTerrainMgr.ReserveZone(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along, false);
-                if (reuse is null) bays.insertLast(b);
-                Save(b);
-                GenericHelpers::LogUtil("[AIR][Layout] reserved " + b.key + " " + b.defName + " at " + int(at.x) + "," + int(at.z) + " support=" + slots.length(), 1);
-                return b;
             }
         }
         searchAfter = ai.frame + 10 * SECOND;
@@ -203,9 +212,15 @@ namespace AirLayout {
     int aheadFrame = -100000;
     void PlanAhead()
     {
-        if (!enabled || bays.length() == 0 || ai.frame - aheadFrame < SECOND) return;
+        if (!enabled || ai.frame - aheadFrame < SECOND) return;
         aheadFrame = ai.frame;
         const string side = Global::AISettings::Side;
+        // Reserve the starter and campus during the opening, before wind and
+        // allied expansion use the land. Reservation spends no resources and
+        // does not advance the actual mex/energy/factory build sequence.
+        if (bays.length() == 0) Reserve(ai.GetCircuitDef(UnitHelpers::GetT1AirPlantForSide(side)), Global::Map::StartPos);
+        AirEcoLayout::PlanAhead();
+        if (bays.length() == 0) return;
         const array<string> names = {UnitHelpers::GetT2AirPlantForSide(side), UnitHelpers::GetT1AirPlantForSide(side)};
         const int minimum = AiMax(6, Global::RoleSettings::Air::PlannedT2Bays);
         const array<int> wants = {AirMath::PlannedBays(AirEconomy::t2, minimum), AiMax(1, Global::RoleSettings::Air::PlannedT1Bays)};
@@ -297,6 +312,8 @@ namespace AirLayout {
     IUnitTask@ Place(CCircuitUnit@ u, CCircuitDef@ d, Task::BuildType type, Task::Priority priority, bool reactor = false, float walkRadius = 0.0f)
     {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
+        if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
+        if (AirEcoLayout::Managed(d)) return AirEcoLayout::Place(u, d, type, priority);
         if (d.GetName() == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(d.GetName())))
             return PlaceWind(u, d, priority, walkRadius);
         const bool commander = UnitHelpers::IsCommander(u.circuitDef);
@@ -460,6 +477,7 @@ namespace AirLayout {
         aiTerrainMgr.ResetLayout(); aiTerrainMgr.SetLayoutEnabled(false);
         aiBuilderMgr.experimentalAirDirect = false;
         enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0; overlay = false;
+        AirEcoLayout::Leave();
         placeRetry.deleteAll();
     }
 }

@@ -27,7 +27,10 @@ namespace AirGrowth {
         }
         s.energyGoal = AiMax(EcoPlanner::TargetEnergy(s.mIncome), AirEconomy::demandE * 1.3f);
         if (!AirEconomy::MassBombers()) s.energyGoal = AiMax(s.energyGoal, s.eIncome + 1.0f);
-        s.energyBuilding = s.energyBuilding || reactor !is null;
+        // AIR can retain small, local T1 energy orders while its flying crew
+        // scales reactors elsewhere. Generic ENERGY queues must not lock out
+        // this district; only real owned reactor commitments serialize it.
+        s.energyBuilding = AirBuild::ReactorPending() || reactor !is null;
         s.energyAssistable = reactor !is null;
         s.turretSlot = false;
         for (uint b = 0; b < AirLayout::bays.length(); ++b)
@@ -53,6 +56,19 @@ namespace AirGrowth {
                 @task = AirLayout::Place(u, d, kind, big ? Task::Priority::HIGH : Task::Priority::NORMAL, big);
         }
         if (task is null && reactor !is null) @task = AssistReactor(u);
+        // A shared chooser answer may be temporarily unexecutable (for example
+        // support already claimed by another worker). A full bank after the
+        // bomber milestone must still permit funded, serial economic growth.
+        if (task is null && s.builderIsT2 && AirEconomy::MassBombers() && AirEconomy::MexesReady()) {
+            CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+            if (AirBuild::Can(u, d) && AirMath::OverflowGrowth(AirEconomy::MetalFloating(), AirEconomy::recovery,
+                s.energyBuilding || AirBuild::Busy(d, Task::BuildType::ENERGY), s.mCur, s.eCur, s.mIncome, s.eIncome,
+                AirBuild::Committed(false), AirBuild::Committed(true), d.costM, d.costE,
+                Global::RoleSettings::Air::ProductionIncomeShare, Global::RoleSettings::Air::OverflowGrowthSeconds)) {
+                @task = AirLayout::Place(u, d, Task::BuildType::ENERGY, Task::Priority::NORMAL, true);
+                if (task !is null) { key = "afus"; why = "funded surplus after production share and existing commitments"; }
+            }
+        }
         if (task !is null) {
             if (ai.frame - lastLog >= 10 * SECOND) {
                 lastLog = ai.frame;

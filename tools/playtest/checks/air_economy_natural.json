@@ -1,0 +1,15 @@
+{
+  "stop_minute": 42,
+  "expect": [
+    {"key":"opening", "pattern":"\\[AirEconomyProbe\\] PASS opening reserves", "by_minute":5},
+    {"key":"afus", "pattern":"\\[AIR\\]\\[EcoLayout\\] place .*afus", "by_minute":40},
+    {"key":"economy-workers", "pattern":"\\[AirEconomyProbe\\] workers=[0-9]+ guard=0 advancedEco=[1-9]", "by_minute":40}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"guard", "pattern":"\\[AirEconomyProbe\\] workers=[0-9]+ guard=[1-9]", "scope":"any"},
+    {"key":"probe", "pattern":"\\[AirEconomyProbe\\] FAIL", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

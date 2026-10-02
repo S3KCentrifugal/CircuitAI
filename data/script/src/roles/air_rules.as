@@ -128,9 +128,10 @@ namespace AirRules {
         // to allied resource clusters and must not recruit these constructors.
         @t = AirBuild::Assist(u);
         if (t !is null) return AirBuild::Record(t, "project.assist", u);
-        // Short guard renewals keep the commander useful without starving economy rechecks.
+        // Advanced aircraft remain available for economy; a renewable guard
+        // would absorb their mobile build power indefinitely at a completed lab.
         CCircuitUnit@ plant = Factory::primaryT1AirPlant;
-        if (plant !is null && !Lifecycle::IsRetiring(plant)) {
+        if (!AirBuild::EconomyAircraft(u) && plant !is null && !Lifecycle::IsRetiring(plant)) {
             // Non-interruptible guards explicitly start the native timeout;
             // interruptible guards deactivate their timer while assigned.
             @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::NORMAL, false, 5 * SECOND);

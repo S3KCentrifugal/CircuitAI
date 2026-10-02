@@ -7,6 +7,40 @@ namespace AirBuild {
     dictionary nanoTrace;
     dictionary guardLeases;
     dictionary guardLeaseFrames;
+    bool ReactorPending()
+    {
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ task = cast<IBuilderTask>(projects[i]);
+            if (task is null) continue;
+            if (AirMath::PendingReactor(IsReactor(task.buildDef), task.GetBuildType() == int(Task::BuildType::ENERGY),
+                task.target !is null, task.target is null ? 0.0f : task.target.GetBuildProgress())) return true;
+        }
+        return false;
+    }
+    bool EconomyAircraft(CCircuitUnit@ u)
+    {
+        return u !is null && UnitHelpers::IsAirConstructor(u.circuitDef)
+            && UnitHelpers::GetConstructorTier(u.circuitDef) >= 2;
+    }
+    void ReturnEconomyWorkers()
+    {
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (!EconomyAircraft(u) || u.GetBuildProgress() < 1.0f) continue;
+            IBuilderTask@ task = cast<IBuilderTask>(u.task);
+            if (task is null || task.GetBuildType() != int(Task::BuildType::GUARD)) continue;
+            // Do not abort a guard shared with another worker. PLAYER/ferry tasks
+            // are separate types and remain under their existing owner.
+            IUnitTask@ wait = aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+            if (wait is null) continue;
+            aiBuilderMgr.AssignTask(u, wait);
+            GenericHelpers::LogUtil("[AIR][Economy] released advanced aircraft " + ids[i] + " from production guard", 1);
+            @u = ai.GetTeamUnit(ids[i]);
+            if (u !is null && u.task is task)
+                Invariants::Violation("INV-106", "" + ids[i], "advanced AIR economy constructor retained its production guard");
+        }
+    }
     void Added(IUnitTask@ task)
     {
         IBuilderTask@ t = cast<IBuilderTask>(task);
@@ -19,6 +53,7 @@ namespace AirBuild {
     }
     void Tick()
     {
+        ReturnEconomyWorkers();
         array<string>@ guards = guardLeases.getKeys();
         for (uint g = 0; g < guards.length(); ++g) {
             IUnitTask@ lease;
@@ -86,10 +121,14 @@ namespace AirBuild {
     {
         if (t is null) return null;
         if (rule == "production.assist") {
+            if (EconomyAircraft(u)) Invariants::Violation("INV-106", "" + u.id, "advanced AIR economy constructor assigned production guard");
             guardLeases.set("" + u.id, @t);
             guardLeaseFrames.set("" + u.id, int64(ai.frame));
         }
         IBuilderTask@ build = cast<IBuilderTask>(t);
+        if (build !is null && build.target is null && build.GetBuildType() == int(Task::BuildType::ENERGY)
+            && IsReactor(build.buildDef) && projects.findByRef(t) < 0 && ReactorPending())
+            Invariants::Violation("INV-108", "AIR", "new reactor order while another owned reactor project is unfinished");
         if (build !is null && build.buildDef !is null && build.target is null
             && build.GetBuildType() == int(Task::BuildType::DEFENCE)
             && !AirHome::Within(build.GetBuildPos(), Global::RoleSettings::Air::HomeDefenceRadius))
@@ -310,7 +349,7 @@ namespace AirBuild {
     bool IsReactor(CCircuitDef@ d)
     {
         if (d is null) return false;
-        const string side = Global::AISettings::Side;
+        const string side = UnitHelpers::GetSideForUnitName(d.GetName());
         return d.GetName() == UnitHelpers::GetFusionNameForSide(side)
             || d.GetName() == UnitHelpers::GetAdvFusionNameForSide(side);
     }

@@ -538,3 +538,24 @@ Land-combat samples are taken after minute one; the check requires formation
 deployment before attributed fire and actual dry spread. This excludes firing
 from the initial spawn cluster. Frozen fixture energy can limit heat-ray fire,
 so the resulting casualty totals are not a combat-efficiency benchmark.
+
+## AIR economic districts and constructor ownership (D-164)
+
+After staging a rendered AIR game under `build-theatres`, prepare
+`prepare_air_check.py --scenario growth --seed 1002164 --dir <run>` followed by
+`prepare_air_economy_zone_check.py --dir <run>`. Watch with `--role AIR --checks
+air_economy_zone --minutes 25 --keep-going`. Ordinary reactor income and two
+T2 constructors are supplied at six minutes; no AFUS is supplied. A physical
+wall blocks a planned unused reactor pin, and the probe requires relocation
+before advanced economy placement. A confirmed three-minute factory guard
+assigned to an advanced aircraft must release it within five seconds; its T1
+peer must keep that same task. Module reinitialization checks saved slot/zone
+adoption. This is controlled capability evidence, not a natural economy score.
+
+For the larger capacity fixture use `--scenario capacity --seed 1002165` and
+`--checks air_economy_capacity --minutes 20`. For natural AIR/TECH games use
+`--scenario natural`, prepare the probe with `--observe-only`, and watch with
+`--checks air_economy_natural --minutes 42`. Observation-only preparation adds
+no orders, units or resources. `audit_air_economy.py <infolog> --output <json>`
+summarizes worker tasks, reactor/factory completions, aircraft production and
+sampled bank occupancy. See [results](../../doc/air-economy-zone-results.md).

@@ -667,3 +667,11 @@ unchanged. See the [formation plan](../telchine-perimeter-plan.md).
 ## D-163 dense campus and strategic bomber phase
 
 Experimental AIR reserves at least six T2 aircraft bays and one T1 bay, tiled by actual footprints with dense independent twenty-turret banks. Growth continues without a default factory cap. Shared TECH economy decisions begin at a sustained +50 metal minimum; AIR keeps all placements and tasks. Two completed advanced fusions enable mass bomber production. The opening wave draws once from `FirstBomberWaveMin`/`FirstBomberWaveMax` (10-20); later sorties use target and route budgets, with a separate funded replacement pool. T1 reusable bombers select mexes/wind. See [design](../air-campus-strike-design.md).
+
+D-164 reserves a separate advanced-economy district at the opening: four modules
+of one AFUS/eight advanced-converter slots, expanding one unused module ahead.
+The native reservations exclude other local and allied building placement;
+unused blocked modules move at first use. T2 aircraft constructors no longer
+renew production guards, and existing guards release only those workers.
+Overflow may fund serial reactor growth alongside continued factory production.
+See [design and verification plan](../air-economy-zone-plan.md).

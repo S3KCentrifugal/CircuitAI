@@ -6,6 +6,14 @@ otherwise the next action is tried. Every construction action rechecks current
 capability, queue and reservation state. Economy observations are cached once
 per second; existing construction stays assigned.
 
+D-164 excludes T2 aircraft constructors from the final `production.assist`
+fallback. They finish/assist real construction or wait three seconds for the
+next economic decision. Existing factory guards are individually removed by
+`AirBuild::ReturnEconomyWorkers`. After the bomber milestone, `AirGrowth` may
+invest overflowing metal in one AFUS after deducting commitments and leaving
+the configured production share of projected income available. TECH's chooser
+and ordered rules are unchanged. See [design](../air-economy-zone-plan.md).
+
 D-156 removes `service.queued`: shared defense/radar jobs must not take AIR
 constructors to allied resource clusters. `AirDefence` admits bounded own-base
 flak, long-range AA and an anti-nuke; AIR has no wall planner. Other roles keep
@@ -34,7 +42,7 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 9 | `storage.metal` | Save income needed for a funded T2 package |
 | 10 | `production.bay` | Fund first T2 or one additional independent bay |
 | 11 | `storage.energy`, `surplus.convert` | Buffer fluctuations; convert only surplus with metal capacity |
-| 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard, or bounded retry |
+| 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard for eligible T1 workers, or bounded retry; advanced aircraft keep their economy role |
 
 The factory recruiter separately prioritizes allied transport obligations, then
 one initial scout, three completed constructors, an immediate fighter screen,
@@ -59,7 +67,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: ffaad029928f7dc4bfb5c9a59e975af655dad387; lines: 141 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: be0fe3fe84f8cbfa0373ed54d81a5053fa1ba202; lines: 142 -->
 
 ## D-152 sequencing
 

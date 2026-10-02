@@ -9594,6 +9594,8 @@ policy, twenty-turret expansion condition or transport-request priority changed.
 
 ## D-163 - Dense AIR campus, shared growth objective and target-funded raids
 
+**Refined by D-164.** Five-second guards still allowed repeated production assistance by T2 aircraft. Those workers now retain an economic role, and opening economic/campus reservations prevent the newly diagnosed spatial starvation. TECH policy is unchanged.
+
 2026-10-02. Owner requested six-plus dense T2 production blocks, a sustained
 50-metal transition into TECH-style growth, two completed AFUS before mass
 bombers, a saved random 10-20 opening, and target/route/resistance-sized raids.
@@ -9724,3 +9726,87 @@ built its two AFUS at 27.62/33.01 and launched its saved eleven.
 Legion selected four later missions outside active failed regions;
 [natural audit](benchmarks/air-d163-natural-feedback.json) passed its
 narrow contract. Heavy combat losses remain KI-457, not a solved outcome.
+
+
+## D-164 - AIR economy workers and separately reserved advanced economy
+
+**Decision.** Exclude advanced aircraft constructors from fallback production
+guards and individually reassign an existing builder guard to a one-second
+recheck. Leave shared guards alive for their other workers. Keep real unfinished
+construction/repair assistance. Use the shared economic chooser unchanged, with
+an AIR-only funded surplus-reactor fallback after the two-AFUS milestone.
+
+Reserve four AFUS/eight-converter modules, the starter and at least six future
+T2 factory/turret modules during the opening. Native slots and zones enforce
+local/allied exclusion; named native state reconstructs module ownership.
+Revalidate unused modules before first use and relocate atomically around
+physical blockage. Claimed modules remain fixed. A 128-elmo economic search
+and half-pitch factory fallback fit terrain while retaining native geometry.
+
+**Reasoning and rejected alternatives.** A short guard timeout alone does not
+prevent indefinite renewals. Aborting the whole guard would affect innocent
+workers, so use individual assignment. Reservation must precede construction:
+waiting until the first lab order let wind and allied expansion consume space.
+Two modules and 700-elmo reactor/factory exclusion passed an isolated fixture
+but failed the crowded natural team test. Four initial modules, 384-elmo
+reactor/factory spacing and 512-elmo reactor spacing preserve more useful room.
+Neither spacing is explosion-proof; the owner allows the districts to connect.
+Do not weaken TECH reservations, extend AIR's home radius, bypass twenty
+completed turrets per existing T2 lab, or change TECH's exact reclaim sequence.
+
+**Invariant.** INV-106 forbids advanced AIR aircraft production guards and
+checks individual release. INV-107 requires new AFUS/advanced-converter tasks
+to use a complete persistent economic module. INV-108 serializes owned reactor projects without letting unrelated T1 energy
+orders block advanced growth. Existing shared placement, reactor-mex, support
+and bounded-guard invariants remain active.
+
+An additional natural-run diagnosis showed generic ENERGY queues preventing
+AFUS starts with no reactor underway. AIR now reads its own queued/unfinished
+reactor projects for this gate; completed targets, small energy and repair
+tasks cannot block it. The shared TECH context is deliberately unchanged.
+
+**Verification.** Engine-free AIR policy: 61 tests pass. Rendered controlled
+runs confirm actual injected task ownership, release within 30 frames, T1 peer
+retention, saved-name module adoption, physical first-use relocation, new
+reactors and continued combat-aircraft production. The latest natural opening
+reserved all four economic modules and all seven factory bays by twelve game
+seconds. Complete evidence and limits, including the intermediate failures,
+are in [the results](air-economy-zone-results.md). This is not a claim of optimal
+PvP balance or a complete engine save/load round trip. KI-442 and KI-461 remain
+tracked in [known issues](known-issues.md).
+
+**Files.**
+
+- Active policy: [data/script/src/global.as](../data/script/src/global.as),
+  [data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+  [data/script/src/manager/air_eco_layout.as](../data/script/src/manager/air_eco_layout.as),
+  [data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as),
+  [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as),
+  [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as),
+  [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as).
+- Tests: [tests/air_math_tests.as](../tests/air_math_tests.as).
+- Simulation tooling: [tools/playtest/README.md](../tools/playtest/README.md),
+  [tools/playtest/air_economy_probe.as](../tools/playtest/air_economy_probe.as),
+  [tools/playtest/audit_air_economy.py](../tools/playtest/audit_air_economy.py),
+  [tools/playtest/checks/air_economy_capacity.json](../tools/playtest/checks/air_economy_capacity.json),
+  [tools/playtest/checks/air_economy_natural.json](../tools/playtest/checks/air_economy_natural.json),
+  [tools/playtest/checks/air_economy_zone.json](../tools/playtest/checks/air_economy_zone.json),
+  [tools/playtest/prepare_air_economy_zone_check.py](../tools/playtest/prepare_air_economy_zone_check.py).
+- Documentation and evidence: [doc/actor-matrix.md](actor-matrix.md),
+  [doc/air-economy-zone-plan.md](air-economy-zone-plan.md),
+  [doc/air-economy-zone-results.md](air-economy-zone-results.md),
+  [doc/benchmarks/air-d164-capacity.json](benchmarks/air-d164-capacity.json),
+  [doc/benchmarks/air-d164-final-natural.json](benchmarks/air-d164-final-natural.json),
+  [doc/benchmarks/air-d164-final-regression.json](benchmarks/air-d164-final-regression.json),
+  [doc/benchmarks/air-d164-queue-blocker.json](benchmarks/air-d164-queue-blocker.json),
+  [doc/benchmarks/air-d164-regression.json](benchmarks/air-d164-regression.json),
+  [doc/decisions.md](decisions.md),
+  [doc/images/d164/capacity-19min.png](images/d164/capacity-19min.png),
+  [doc/images/d164/final-growth-24min.png](images/d164/final-growth-24min.png),
+  [doc/images/d164/growth-24min.png](images/d164/growth-24min.png),
+  [doc/images/d164/natural-40min.png](images/d164/natural-40min.png),
+  [doc/invariants.md](invariants.md),
+  [doc/known-issues.md](known-issues.md),
+  [doc/roles/air.md](roles/air.md),
+  [doc/roles/air_build.md](roles/air_build.md),
+  [doc/roles/air_rules.md](roles/air_rules.md).

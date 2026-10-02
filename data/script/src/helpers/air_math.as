@@ -1,5 +1,23 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    bool PendingReactor(bool reactor, bool construction, bool hasTarget, float progress)
+    {
+        return reactor && construction && (!hasTarget || (Valid(progress) && progress < 1.0f));
+    }
+    // Conservative admission for a single additional reactor after the bomber
+    // milestone: leave the configured share of future income to production.
+    bool OverflowGrowth(bool floatingMetal, bool recovering, bool pendingReactor, float bankM, float bankE,
+        float incomeM, float incomeE, float committedM, float committedE, float costM, float costE,
+        float productionShare, float seconds)
+    {
+        if (!floatingMetal || recovering || pendingReactor || !Valid(bankM) || !Valid(bankE)
+            || !Valid(incomeM) || !Valid(incomeE) || !Valid(committedM) || !Valid(committedE)
+            || !Valid(costM) || costM <= 0.0f || !Valid(costE) || costE <= 0.0f
+            || !Valid(productionShare) || productionShare > 1.0f || !Valid(seconds)) return false;
+        const float share = 1.0f - productionShare;
+        return bankM + incomeM * share * seconds >= committedM + costM + 150.0f
+            && bankE + incomeE * share * seconds >= committedE + costE + 500.0f;
+    }
     bool BayAllowed(int count, int ceiling) { return count >= 0 && (ceiling <= 0 || count < ceiling); }
     int PlannedBays(int completed, int minimum) {
         if (completed < 0) completed = 0;

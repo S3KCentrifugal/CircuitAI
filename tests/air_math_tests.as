@@ -46,3 +46,16 @@ void test_air_good_survival_relaxes_learned_resistance() { Check(AirMath::RaidRe
 void test_air_success_cannot_erase_base_unknown_reserve() { Check(AirMath::RaidResistance(1,1,.3f,.8f,1.5f,.5f,3)==1); }
 void test_air_neutral_survival_keeps_resistance() { Check(AirMath::RaidResistance(2,.5f,.3f,.8f,1.5f,.9f,3)==2); }
 void test_air_invalid_resistance_is_safe() { Check(AirMath::RaidResistance(-1,0,.3f,.8f,1.5f,.9f,3)==1); }
+void test_air_overflow_funds_serial_growth() { Check(AirMath::OverflowGrowth(true,false,false,5000,40000,100,5000,0,0,9700,69000,.65f,180)); }
+void test_air_growth_leaves_production_share() { Check(!AirMath::OverflowGrowth(true,false,false,1000,40000,100,5000,0,0,9700,69000,.65f,180)); }
+void test_air_growth_deducts_existing_commitments() { Check(!AirMath::OverflowGrowth(true,false,false,5000,40000,100,5000,2000,0,9700,69000,.65f,180)); }
+void test_air_growth_needs_energy_funding() { Check(!AirMath::OverflowGrowth(true,false,false,20000,1000,100,100,0,0,9700,69000,.65f,180)); }
+void test_air_growth_never_overrides_recovery() { Check(!AirMath::OverflowGrowth(true,true,false,20000,100000,100,5000,0,0,9700,69000,.65f,180)); }
+void test_air_growth_never_starts_parallel_reactors() { Check(!AirMath::OverflowGrowth(true,false,true,20000,100000,100,5000,0,0,9700,69000,.65f,180)); }
+void test_air_growth_does_not_spend_nonfloating_bank() { Check(!AirMath::OverflowGrowth(false,false,false,20000,100000,100,5000,0,0,9700,69000,.65f,180)); }
+void test_air_growth_invalid_share_fails_closed() { Check(!AirMath::OverflowGrowth(true,false,false,20000,100000,100,5000,0,0,9700,69000,2,180)); }
+void test_air_queued_reactor_blocks_parallel_growth() { Check(AirMath::PendingReactor(true,true,false,0)); }
+void test_air_unfinished_reactor_blocks_parallel_growth() { Check(AirMath::PendingReactor(true,true,true,.8f)); }
+void test_air_completed_reactor_does_not_block_growth() { Check(!AirMath::PendingReactor(true,true,true,1)); }
+void test_air_small_energy_does_not_block_reactors() { Check(!AirMath::PendingReactor(false,true,false,0)); }
+void test_air_reactor_repair_is_not_new_construction() { Check(!AirMath::PendingReactor(true,false,true,.8f)); }
