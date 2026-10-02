@@ -1497,6 +1497,8 @@ void CInitScript::RegisterCAirWaveTask(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetStrikePolicy(CCircuitDef@, int, float, float, float, float)", asMETHOD(CAirWaveTask, SetStrikePolicy), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "int GetRequiredBombers() const", asMETHOD(CAirWaveTask, GetRequiredBombers), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void ConsiderStrikeAircraft(CCircuitDef@)", asMETHOD(CAirWaveTask, ConsiderStrikeAircraft), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetMissionPolicy(float, float, float, float, float, float, bool)", asMETHOD(CAirWaveTask, SetMissionPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void ExcludeStrikeRegion(const AIFloat3& in, float)", asMETHOD(CAirWaveTask, ExcludeStrikeRegion), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAssemblyPolicy(float, float, int)", asMETHOD(CAirWaveTask, SetAssemblyPolicy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "bool PickStrikeTarget(const AIFloat3& in from, int preference, float minStaticCost, bool includeHeavy)", asMETHOD(CAirWaveTask, PickStrikeTarget), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "int GetState() const", asMETHOD(CAirWaveTask, GetState), asCALL_THISCALL); ASSERT(r >= 0);

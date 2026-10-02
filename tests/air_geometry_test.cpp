@@ -27,5 +27,16 @@ int main()
     assert(TransitSeconds(6000, 0) == 0);
     assert(TransitSeconds(std::numeric_limits<float>::infinity(), 150) == 0);
     assert(TransitSeconds(std::numeric_limits<float>::max(), .001f) == 300);
+    assert(RequiredForce(3000, 300, 1.2f, 0, .25f, 0) == 15);
+    assert(RequiredForce(1000, 100, 1, 0, 0, 0) == 10);
+    assert(RequiredForce(1000, 100, 1, .5f, .25f, .15f) == 19);
+    assert(RequiredForce(1000, 0, 1, 0, 0, 0) == 0);
+    assert(RequiredForce(std::numeric_limits<float>::infinity(), 100, 1, 0, 0, 0) == 0);
+    assert(RequiredForce(1e30f, 1, 1, 0, 0, 0) == 1000000);
+    assert(AttackDelay(20, 1500, 150) == 10);
+    assert(AttackDelay(20, 4500, 150) == 0);
+    assert(AttritionReserve(2460, 230, .5f) == 6);
+    assert(AttritionReserve(820, 230, .5f) == 2);
+    assert(AttritionReserve(820, 0, .5f) == 0);
     std::cout << "air geometry: 300 unique bounded slots and loss thresholds passed\n";
 }

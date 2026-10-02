@@ -954,9 +954,9 @@ namespace Global {
         namespace Air {
             // AIR owns these settings and all air.* reservations. TECH never reads them.
             bool ExperimentalBuild = true;
-            int MaxProductionBays = 12;
+            int MaxProductionBays = 0; // zero: no AIR policy cap; terrain/income/support still gate
             int PlannedT2Bays = 6;
-            int PlannedT1Bays = 2;
+            int PlannedT1Bays = 1;
             int ConverterParallel = 3;
             float ConverterDraw = 70.0f;
             float ConverterEnergyReserve = 150.0f;
@@ -1009,7 +1009,27 @@ namespace Global {
             float HomeAirValueRatio = 1.2f;
             int BomberOrdersClear = 6; // discretionary orders per ten, not resource percentages
             int BomberOrdersParity = 3;
-            int StrikeFirstSize = 8;
+            int StrikeFirstSize = 8; // legacy compatibility; experimental opening uses the range below
+            int FirstBomberWaveMin = 10;
+            int FirstBomberWaveMax = 20;
+            float TechEconomyMinMetal = 50.0f;
+            int MassBomberAfusCount = 2;
+            int MassBomberOrdersClear = 8;
+            int MassBomberOrdersParity = 5;
+            float StrikeReserveSeconds = 120.0f;
+            float StrikeUnknownReserve = 0.25f;
+            float StrikeRiskScale = 0.002f;
+            float StrikeArmyReserve = 0.15f;
+            float StrikeLocalAaReserve = 0.5f;
+            float StrikeLossGrowth = 1.5f;
+            float StrikeRiskRecovery = 0.9f;
+            float StrikeLearnedRiskMax = 3.0f;
+            float StrikeFailedSurvival = 0.25f;
+            int StrikeFailedRetrySeconds = 300;
+            float StrikeFailedRegionRadius = 640.0f;
+            float StrikeCorridorPadding = 320.0f;
+            float StrikeEdgeInset = 480.0f;
+            bool StrikeSynchronize = true;
             int T1RaidMinimum = 3;
             int StrikeWaveIncrement = 4;
             int StrikeWaveCap = 80;
@@ -1035,7 +1055,8 @@ namespace Global {
             float ScreenRearAdvance = 400.0f;
             float ScreenFrontSetback = 600.0f;
             int ScreenUpdateSeconds = 10;
-            float BaySpacing = 560.0f;
+            float BaySpacing = 16.0f; // extra clearance between footprint-derived campus blocks
+            float BayExitClearance = 64.0f;
             int BaySearchRings = 25; // 128-elmo steps; room to relocate after other future bays are held
             int CapacityStableSeconds = 20;
             int TelemetrySeconds = 10;

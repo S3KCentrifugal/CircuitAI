@@ -363,3 +363,15 @@ as `FactoryMakeTask`. Sea constructors cannot consume bot requests.
 Native factory fallbacks in TECH/AIR temporarily exclude the two managed
 amphibious definitions through `AmphibiousOps::DefaultFactoryTask`; the shared
 producer alone admits them, and original caps are restored after the call.
+
+## D-163 AIR growth and missions
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Production campus | AirLayout::Reserve/Activate/PlanAhead, AirBuild::Factory/Nano, AirEconomy::RefreshSupport | Persistent atomic factory/support slots; footprint lattice; one speculative bay beyond completed demand, at least six T2 and one T1; first-use blockage relocates. No TECH placement calls. |
+| Economic growth phase | AirEconomy::UpdateMilestones, AirGrowth::MakeTask, EcoPlanner::Read/Decide | Saved ten-second 50M milestone; AIR-owned context and task execution. Default context remains TECH. Conversion admission is communicated to the chooser so rejected converters cannot starve reactors. |
+| Bomber milestone and stock | AirEconomy::CompletedAfus/UpdateMilestones, AirProduction::Recruit/MakeTask, AirWaves::ProductionTarget | Two completed AFUS latch mass production. Transport/crew/emergency precede discretionary aircraft. Funded replacement stock is distinct from sortie size. INV-102. |
+| Strike package | AirWaves::OpeningSize/_PlanWave/_Launch, AirRaids::Update, CAirWaveTask | Saved first draw; known target health, observed army and padded route risk with unknown reserve; no launch below selected requirement. Direct/edge commands, nominal synchronized static impact and latched return waypoints. INV-103. |
+| Mobile fallback guards | AirRules::MakeTask, AirBuild::Record/Tick, native CBGuardTask | AIR uses non-interruptible five-second guards, which explicitly start the native expiry timer. Track actual task identity; a thirty-second lease violation logs INV-104. TECH guard policy is unchanged. |
+| Failed support pin / factory cap | AirLayout::RepairSupport/UnlockCampus/Leave, AirEconomy::SupportBay | Replace dead support pins within actual reach and unique bay assignment; retain quarantine on failed ground. Lift only experimental AIR factory definition caps and restore original caps when leaving the role. |
+| Failed raid / learned resistance | AirWaves::_EvaluateLastWave/_PlanWave, CAirWaveTask::ExcludeStrikeRegion | Immutable cohort evaluated after sortie termination; saved bounded resistance; up to eight script-owned temporary regions filtered by native targeting and independently checked by INV-105. Region memory resets on role reinitialization; learned resistance persists. |

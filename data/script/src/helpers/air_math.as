@@ -1,6 +1,40 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    bool BayAllowed(int count, int ceiling) { return count >= 0 && (ceiling <= 0 || count < ceiling); }
+    int PlannedBays(int completed, int minimum) {
+        if (completed < 0) completed = 0;
+        if (completed >= 2147483646) return 2147483647;
+        return completed + 1 > minimum ? completed + 1 : minimum;
+    }
+    float BayPitch(float halfEnvelope, float gap) {
+        return 2.0f * halfEnvelope + (gap > 0.0f ? gap : 0.0f);
+    }
+    bool GrowthPhase(bool windowReady, float minimumIncome, float threshold) {
+        return windowReady && Valid(minimumIncome) && threshold > 0.0f && minimumIncome >= threshold;
+    }
+    bool MassBombersReady(int completedAfus, int required) { return required <= 0 || completedAfus >= required; }
+    bool EnergyEraAllows(bool basicEnergy, bool advancedSolar, bool fusionUp, bool afusStarted) {
+        if (basicEnergy) return !fusionUp && !afusStarted;
+        if (advancedSolar) return !afusStarted;
+        return true;
+    }
+    int OpeningWave(int low, int high, int roll) {
+        if (low < 1) low = 1;
+        if (high < low) high = low;
+        if (high > 300) high = 300;
+        if (low > high) low = high;
+        return roll < low ? low : roll > high ? high : roll;
+    }
+
     bool Valid(float value) { return value == value && value >= 0.0f && value < 1.0e12f; }
+    float RaidResistance(float previous, float survival, float low, float high, float growth, float recovery, float ceiling)
+    {
+        if (!Valid(previous) || !Valid(survival) || !Valid(ceiling) || ceiling < 1.0f) return 1.0f;
+        float factor = Clamp(previous, 1.0f, ceiling);
+        if (survival < low && Valid(growth) && growth > 1.0f) factor *= growth;
+        else if (survival > high && Valid(recovery)) factor *= Clamp(recovery, 0.0f, 1.0f);
+        return Clamp(factor, 1.0f, ceiling);
+    }
     float Clamp(float value, float lo, float hi) { return value < lo ? lo : value > hi ? hi : value; }
     int Missing(float required, float available, float unitCost)
     {

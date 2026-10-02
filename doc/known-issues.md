@@ -3202,6 +3202,14 @@ fix: the wealthy six-AFUS defense fixture still fills its metal bank, and fewer
 new remote mexes lower income relative to D-155. Constructor loss and a broad
 late-economy matrix remain to be checked before closing this issue.
 
+D-163 adds a natural forty-minute Cortex/TECH sample: after minute 25,
+750 of 910 sampled seconds had metal at least 95% full, despite four additional
+T2 labs, eighty turrets and twenty flying constructors completing in that
+window. No energy-stall seconds were recorded there. Allied donations are not
+included in the reported mean +160.41 income, so bank occupancy does not by
+itself measure wasted production capacity. The spending/calibration issue
+remains open; see [D-163 measurements](benchmarks/air-d163.json).
+
 ### KI-443 - Some AIR constructors can remain on a distant local frame without making progress
 
 **Problem.** In D-156's final Armada gift run
@@ -3578,6 +3586,17 @@ seeds and maps before tuning constants. Require kill value and surviving force,
 not only damage or launch logs. See [the review](air-enhancement-review.md) and
 [the plan](air-enhancement-plan.md). Do not close from compilation or one win.
 
+D-163 build 6 adds target/route budgets, padded edge routes, local-AA reserve,
+nominal synchronized static passes, latched returns and loss feedback. The
+controlled combat repeat passes, including two AFUS destroyed and seventeen of
+forty-eight aircraft returning. Natural Cortex AIR lost its opening eleven;
+Legion's later raids also took heavy losses despite alternate targets and a
+resistance multiplier reaching three. Temporary exclusions prevent immediate
+repeats but do not establish favorable exchanges or safe egress. Preserve this
+as open combat calibration work, measured against target value and actual
+interception/loss locations rather than only successful payload release. See
+[D-163 evidence](air-campus-strike-results.md).
+
 ### KI-458 - Concurrent rendered tests can warn during graphics initialization
 
 **Problem.** D-162 gift02 and earlier strike fixtures emitted load-thread
@@ -3664,3 +3683,37 @@ INV-101 stale completed-construction reports occurred. See the
 [results](air-enhancement-results.md),
 [observer](../tools/playtest/widgets/air_watch.lua), and
 [home policy](../data/script/src/helpers/air_home.as).
+
+
+### KI-461 - Natural AIR transition and first-fusion timing remain inconsistent
+
+**Problem.** D-163's natural AIR-versus-AIR run reached fifty minutes without T2
+access or fusion: ongoing T1 production/energy spending never reserved the
+capital for self-funded access. In a natural AIR/TECH repeat, real T2 delivery
+and mex upgrades succeeded. The earlier repeat finished its first fusion at
+21.21 minutes and still had its first AFUS under construction at thirty-five.
+After full-home flying reactor assistance, the next natural run completed its
+first fusion at 18.47 and both AFUS at 23.90/26.73 minutes. That meets the observed
+donated-constructor timing once, but the final build-6 repeat again took 21.48
+minutes. The independent self-funded T2 capital gap and timing consistency
+remain open. Bootstrap fixtures cannot be
+substituted for natural timings.
+
+**Proposed solution.** Add a script-controlled transition capital budget when
+no reliable T2 donation is pending, retaining emergency fighter/transport
+production. Measure reactor critical-path work and actual arriving build power
+against remaining metal/energy funding; start the first-reactor preparation
+early enough to cover its build time after owned mex upgrades. Avoid relaxing
+the mex prerequisite, changing TECH's reclaim sequence or expanding AIR's home
+boundary. D-163 already fixes indefinite mobile factory guards, sparse reactor
+search and flying reactor-assist distance; the last correction now has a
+natural timing repeat meeting twenty minutes with a real TECH donation.
+
+**Verification.** Repeat natural donated-constructor and self-funded AIR games
+with fixed engine/AI seeds and strict `air_transition` checks through forty
+minutes. Record actual fusion/AFUS finishes, bank occupancy, energy stalls,
+ferry arrivals and workforce command/position traces. See
+[D-163 results](air-campus-strike-results.md),
+[AIR rules](../data/script/src/roles/air_rules.as),
+[growth](../data/script/src/manager/air_growth.as) and
+[production](../data/script/src/manager/air_production.as).

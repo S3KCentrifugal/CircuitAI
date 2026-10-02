@@ -22,6 +22,20 @@ function widget:UnitCreated(id,def,team)
 end
 function widget:GameFrame(f)
     if once("cheat",300,f) then Spring.SendCommands("cheat 1") end
+    if scenario=="growth" and once("growth",10800,f) then
+        local x,_,z=Spring.GetTeamStartPosition(0)
+        local side="arm"
+        for _,id in ipairs(Spring.GetTeamUnits(0)) do
+            local name=UnitDefs[Spring.GetUnitDefID(id)].name
+            if name:sub(1,3)=="cor" then side="cor" elseif name:sub(1,3)=="leg" then side="leg" end
+        end
+        give(side.."aca",0,x+180,z,2)
+        give(side.."fus",0,x+1300,z-1300,8)
+        give(side=="leg" and "legadveconv" or side.."mmkr",0,x+1300,z-900,8)
+        give(side.."estor",0,x+800,z-300,4)
+        give(side.."mstor",0,x+700,z-300,4)
+        Spring.Echo("[AirFixture] supplied bootstrap income and T2 constructors; ZERO AFUS supplied")
+    end
     if scenario=="defence" then
         local x,_,z=Spring.GetTeamStartPosition(0)
         if once("defence-economy",600,f) then

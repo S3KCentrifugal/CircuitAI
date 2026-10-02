@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dir', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['natural', 'constructor', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'screen', 'idle', 'legacy', 'defence'], default='natural')
+    parser.add_argument('--scenario', choices=['natural', 'constructor', 'growth', 'transport', 'capacity', 'loss', 'windloss', 'switch', 'attack', 'screen', 'idle', 'legacy', 'defence'], default='natural')
     parser.add_argument('--seed', type=int, default=930146)
     args = parser.parse_args()
     base = args.dir.resolve()
@@ -56,7 +56,7 @@ def main():
     if args.scenario == 'defence':
         # Bound fixture load; six-plus-bay capacity has its own full stress test.
         path = base / 'AI/Skirmish/BARbTest/test/script/src/global.as'
-        path.write_text(path.read_text().replace('int MaxProductionBays = 12;', 'int MaxProductionBays = 3;'))
+        path.write_text(path.read_text().replace('int MaxProductionBays = 0;', 'int MaxProductionBays = 3;'))
     if args.scenario == 'idle':
         # Force a real idle interval only in the staged test controller.
         path = base / 'AI/Skirmish/BARbTest/test/script/src/manager/air_production.as'

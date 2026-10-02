@@ -32,6 +32,19 @@ namespace AirLayout {
     bool overlay = false;
     int overlayFrame = -1;
     dictionary placeRetry;
+    dictionary originalFactoryCaps;
+
+    void UnlockCampus()
+    {
+        const array<string> names = UnitHelpers::GetAllT2AircraftPlants();
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (d is null) continue;
+            if (!originalFactoryCaps.exists(names[i])) originalFactoryCaps.set(names[i], int(d.maxThisUnit));
+            d.maxThisUnit = Global::RoleSettings::Air::MaxProductionBays > 0
+                ? Global::RoleSettings::Air::MaxProductionBays : 2147483647;
+        }
+    }
 
     void SetOverlay(bool on) { overlay = on; overlayFrame = -1; Draw(); }
     void Draw()
@@ -70,6 +83,7 @@ namespace AirLayout {
     {
         enabled = Global::RoleSettings::Air::ExperimentalBuild && aiTerrainMgr.SetLayoutEnabled(true);
         if (!enabled) return;
+        UnlockCampus();
         AirEconomy::Reset(); AirProduction::Reset();
         aiBuilderMgr.experimentalBuild = true;
         aiBuilderMgr.experimentalAirDirect = true;
@@ -120,18 +134,19 @@ namespace AirLayout {
         const float across = t2 ? half + 32.0f + 2.0f * nw : AiMax(half, 2.5f * nw);
         const float back = t2 ? AiMax(depth, 2.5f * nw) : half + 1.5f * nw;
         const float front = t2 ? back : depth;
-        const float along = (front + back) * 0.5f + 16.0f;
+        const float along = (front + back) * 0.5f + 16.0f + Global::RoleSettings::Air::BayExitClearance * 0.5f;
         const float shift = (front - back) * 0.5f;
+        const float pitchX = AirMath::BayPitch(across + 16.0f, Global::RoleSettings::Air::BaySpacing);
+        const float pitchZ = AirMath::BayPitch(along, Global::RoleSettings::Air::BaySpacing);
+        const AIFloat3 origin = bays.length() > 0 ? bays[0].centre : anchor;
         for (int ring = 0; ring < Global::RoleSettings::Air::BaySearchRings; ++ring) {
-            const int points = ring == 0 ? 1 : 16;
-            for (int k = 0; k < points; ++k) {
-                const float angle = 6.2831853f * float(k) / float(points);
-                AIFloat3 at(anchor.x + cos(angle) * float(ring) * 128.0f, 0.0f, anchor.z + sin(angle) * float(ring) * 128.0f);
-                bool near = false;
-                for (uint j = 0; j < bays.length(); ++j)
-                    if (bays[j] !is reuse && (bays[j].slot >= 0 || bays[j].factoryId >= 0)
-                        && MapHelpers::SqDist(at, bays[j].centre) < Global::RoleSettings::Air::BaySpacing * Global::RoleSettings::Air::BaySpacing) near = true;
-                if (near || !Inside(at, 240.0f) || aiTerrainMgr.IsZoneAlly(at) || !aiTerrainMgr.CanReserveBuilding(plant, at, facing)) continue;
+            for (int cell = 0; cell < (2 * ring + 1) * (2 * ring + 1); ++cell) {
+                const int gx = cell % (2 * ring + 1) - ring;
+                const int gz = cell / (2 * ring + 1) - ring;
+                if (ring > 0 && gx > -ring && gx < ring && gz > -ring && gz < ring) continue;
+                AIFloat3 at = Offset(origin, facing, float(gx) * pitchX, float(gz) * pitchZ);
+                if (!Inside(at, AiMax(across + 16.0f, along)) || !AirHome::EconomySite(at)
+                    || aiTerrainMgr.IsZoneAlly(at) || !aiTerrainMgr.CanReserveBuilding(plant, at, facing)) continue;
                 if (!aiTerrainMgr.CanReserveArea(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along)) continue;
                 const int id = aiTerrainMgr.ReservePersistentBuilding(plant, at, facing);
                 if (id < 0) continue;
@@ -192,7 +207,8 @@ namespace AirLayout {
         aheadFrame = ai.frame;
         const string side = Global::AISettings::Side;
         const array<string> names = {UnitHelpers::GetT2AirPlantForSide(side), UnitHelpers::GetT1AirPlantForSide(side)};
-        const array<int> wants = {AiMin(Global::RoleSettings::Air::PlannedT2Bays, Global::RoleSettings::Air::MaxProductionBays), Global::RoleSettings::Air::PlannedT1Bays};
+        const int minimum = AiMax(6, Global::RoleSettings::Air::PlannedT2Bays);
+        const array<int> wants = {AirMath::PlannedBays(AirEconomy::t2, minimum), AiMax(1, Global::RoleSettings::Air::PlannedT1Bays)};
         for (uint t = 0; t < names.length(); ++t) {
             int have = 0;
             Bay@ retry = null;
@@ -226,6 +242,46 @@ namespace AirLayout {
         }
         Save(bay);
     }
+    // A started lab cannot relocate as a whole. Keep dead pins quarantined and
+    // replace only missing support capacity, within the same lab's real reach.
+    bool RepairSupport(uint index, CCircuitDef@ nano)
+    {
+        if (index >= bays.length() || nano is null || bays[index].factoryId < 0) return false;
+        Bay@ bay = bays[index];
+        const int wanted = UnitHelpers::IsT2AircraftPlant(bay.defName) ? 20 : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
+        int usable = 0;
+        for (uint s = 0; s < bay.nanos.length(); ++s) {
+            const int state = aiTerrainMgr.GetReservationState(bay.nanos[s]);
+            if (state >= 0 && state != 4) ++usable;
+        }
+        if (usable >= wanted) return false;
+        const string key = bay.key + ".supportRepair";
+        if (ai.frame < aiTerrainMgr.GetLayoutInt(key, 0)) return false;
+        aiTerrainMgr.SetLayoutInt(key, ai.frame + 10 * SECOND);
+        const float reach = nano.GetBuildDistance();
+        const float stride = float(nano.GetFootprintX()) * 8.0f;
+        for (int ring = 1; float(ring) * stride < reach; ++ring) {
+            for (int k = 0; k < 24; ++k) {
+                const float angle = 6.2831853f * float(k) / 24.0f;
+                AIFloat3 p = Offset(bay.centre, bay.facing, cos(angle) * float(ring) * stride, sin(angle) * float(ring) * stride);
+                if (!Inside(p, stride) || !AirHome::EconomySite(p) || aiTerrainMgr.IsZoneAlly(p)
+                    || AirEconomy::SupportBay(nano, p) != int(index)
+                    || !aiTerrainMgr.CanReserveBuilding(nano, p, bay.facing)) continue;
+                const int slot = aiTerrainMgr.ReservePersistentBuilding(nano, p, bay.facing);
+                if (slot < 0) continue;
+                p = aiTerrainMgr.GetReservationPos(slot);
+                if (AirEconomy::SupportBay(nano, p) != int(index)) {
+                    aiTerrainMgr.ReleasePersistentBuilding(slot); continue;
+                }
+                bay.nanos.insertLast(slot); Save(bay);
+                GenericHelpers::LogUtil("[AIR][Layout] repaired support " + bay.key + " viable=" + (usable + 1) + "/" + wanted
+                    + " slot=" + slot + " at=" + int(p.x) + "," + int(p.z), 1);
+                return true;
+            }
+        }
+        GenericHelpers::LogUtil("[AIR][Layout] support repair has no reachable site " + bay.key, 2);
+        return false;
+    }
     // Required pins already have the complete native claim/retry/serialization contract.
     IUnitTask@ Pinned(Task::BuildType type, Task::Priority priority, CCircuitDef@ d, int slot)
     {
@@ -251,9 +307,16 @@ namespace AirLayout {
         AIFloat3 anchor = commander ? u.GetPos(ai.frame) : Global::Map::StartPos;
         if (reactor) anchor = Offset(anchor, facing, 0.0f, -900.0f);
         // Deterministic spaced patches, outside every reserved production bank.
-        for (int ring = 1; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
-            for (int k = 0; k < 24; ++k) {
-                const float a = 6.2831853f * float(k) / 24.0f;
+        // The rear-biased anchor may lie beyond the map edge. Search far enough
+        // to cover the opposite edge of our home disc too; fixed 24 rays left
+        // large untested gaps exactly where a dense campus needed its reactors.
+        const int rings = reactor ? AiMax(Global::RoleSettings::Air::EconomySearchRings,
+            1 + int((Global::RoleSettings::Air::HomeEconomyRadius + 900.0f) / 96.0f))
+            : Global::RoleSettings::Air::EconomySearchRings;
+        for (int ring = 1; ring <= rings; ++ring) {
+            const int samples = reactor ? AiMax(24, ring * 6) : 24;
+            for (int k = 0; k < samples; ++k) {
+                const float a = 6.2831853f * float(k) / float(samples);
                 AIFloat3 p(anchor.x + cos(a) * float(ring) * 96.0f, 0.0f, anchor.z + sin(a) * float(ring) * 96.0f);
                 if (local && !ProductionMath::WithinReach(MapHelpers::SqDist(anchor, p), u.circuitDef.GetBuildDistance())) continue;
                 if (walkRadius > 0.0f && !ProductionMath::WithinReach(MapHelpers::SqDist(u.GetPos(ai.frame), p), walkRadius)) continue;
@@ -392,6 +455,8 @@ namespace AirLayout {
     void Leave()
     {
         if (!enabled) return;
+        UnitHelpers::ApplyUnitLimits(originalFactoryCaps);
+        originalFactoryCaps.deleteAll();
         aiTerrainMgr.ResetLayout(); aiTerrainMgr.SetLayoutEnabled(false);
         aiBuilderMgr.experimentalAirDirect = false;
         enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0; overlay = false;

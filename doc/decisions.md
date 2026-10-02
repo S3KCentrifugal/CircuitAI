@@ -9590,3 +9590,137 @@ retains unimplemented specialist/navigation work and loss/crowding calibration.
 All evidence, seeds, artifact hash and limitations are in the
 [results](air-enhancement-results.md). No TECH rule sequence, static firing
 policy, twenty-turret expansion condition or transport-request priority changed.
+
+
+## D-163 - Dense AIR campus, shared growth objective and target-funded raids
+
+2026-10-02. Owner requested six-plus dense T2 production blocks, a sustained
+50-metal transition into TECH-style growth, two completed AFUS before mass
+bombers, a saved random 10-20 opening, and target/route/resistance-sized raids.
+[Design](air-campus-strike-design.md) was written before implementation.
+
+**Call.** Share EcoPlanner's economic choices through an explicit AIR context;
+default TECH state/ordering remains unchanged. AIR owns placement, lab admission,
+mex prerequisites, support and aircraft budgets. Keep a zero-by-default policy
+factory cap, lift AIR profile definition caps only during experimental AIR,
+reserve six speculative T2 blocks and expand incrementally. Preserve the twenty
+completed uniquely assigned turrets per existing T2 lab before expansion. Failed
+support pins remain quarantined and get replacement ground within the same lab's
+reach. Flying workers may cross their home disc to assist reactors. Reactor
+placement searches that whole disc despite a rear anchor, and maintains campus
+separation. Ground gifts keep their travel bound.
+
+Save the first random bomber draw and two-AFUS milestone. Keep replacement stock
+separate from each sortie's target budget. Native opt-in mission primitives read
+loaded payload/health and known threats; script sets corridor padding, unknown,
+army and local-AA reserves and target class. Execute the selected direct/edge
+route, nominally synchronize one owner's static attack, then follow latched
+return waypoints. T1 reusable bombers select known mexes/wind. Do not claim
+multi-owner synchronization or optimal casualty predictions.
+
+**Why and rejected alternatives.** Fixed factory caps contradict the requested
+income-scaled campus; infinite up-front reservations steal allied/eco space.
+Invoking TECH's chain/executor would alter its exact lab lifecycle or make AIR
+build bot labs. Using generic native fallback production would spend on bombers
+before the economic milestone. Linear wave growth ignores mission resistance;
+forcing the opening draw onto an unaffordable target wastes the force. A timeout
+does not waive target funding. Simultaneous return proximity was rejected after
+healthy aircraft orbited past one another until timeout. Local AA reserve was
+added after an eight-bomber flak package failed. Mission coefficients remain
+calibration knobs, not a promise of PvP dominance. Two natural waves were
+wiped out at the same defended solar target: the experimental target budget
+had discarded survival feedback. Evaluate only completed sorties, persist a
+bounded resistance multiplier, and exclude up to eight failed target regions
+for a script-configured interval. Native filtering takes script-supplied areas;
+it contains no hardcoded target cooldown. Keeping the same budget after a
+complete loss was rejected. Temporary areas reset on role initialization;
+the learned multiplier persists. The independent log audit checks actual later
+target coordinates against active exclusions.
+
+The natural run also diagnosed AIR's interruptible fallback guards: their native
+timer is deactivated while assigned. Use non-interruptible five-second guards
+(as already used by the commander) so mobile workers reconsider the economy.
+After the opening crew, the commander needs a real unfinished aircraft frame,
+not merely a recruit-task label. These are AIR policy changes, not native guard
+or TECH behavior changes.
+
+**Invariant.** INV-084/088 preserve complete speculative support and reciprocal
+allied exclusion; INV-090 preserves completed support before lab expansion.
+INV-102 requires the completed AFUS milestone before ordinary bomber orders;
+INV-103 funds every actual release and keeps the first at its saved draw.
+INV-104 audits fallback guard leases; INV-081 retains the independent commander
+idle check. INV-105 independently audits native failed-raid region exclusion. No existing playtest forbid was removed.
+
+**Verification.** Native and AngelScript helper suites passed. The twenty-minute
+Armada three-stage combat test passed, including T1 economic attacks, a ten-unit
+opening, target-sized edge attacks, destroyed flak/AFUS and actual returns home.
+The Cortex bootstrap built both AFUS and six supported labs; its idle-commander
+failure remains recorded. The later natural team run finishes its first
+fusion at 18.47 minutes and both AFUS at 23.90/26.73. TECH's existing invariant
+failures and the T2-lab deadline remain failures. Paired TECH games reached
+twelve minutes with the same T1-then-T2 sequence, not identical timing; historical
+smoke expectations make both reports FAIL. Full details and final obstruction
+test results are in [the evidence report](air-campus-strike-results.md).
+Unresolved natural timing is KI-461; combat calibration remains KI-457. Keep
+the changes local, without pushing, per the owner's explicit instruction.
+
+**Files.**
+[data/script/src/global.as](../data/script/src/global.as),
+[data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+[data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as),
+[data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as),
+[data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as),
+[data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as),
+[data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as),
+[data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as),
+[data/script/src/manager/eco_planner.as](../data/script/src/manager/eco_planner.as),
+[data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as),
+[data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as),
+[doc/actor-matrix.md](actor-matrix.md),
+[doc/air-campus-strike-design.md](air-campus-strike-design.md),
+[doc/air-campus-strike-results.md](air-campus-strike-results.md),
+[doc/air-enhancement-plan.md](air-enhancement-plan.md),
+[doc/air-wave-attacks.md](air-wave-attacks.md),
+[doc/angelscript-references.md](angelscript-references.md),
+[doc/invariants.md](invariants.md),
+[doc/known-issues.md](known-issues.md),
+[doc/roles/air.md](roles/air.md),
+[doc/roles/air_build.md](roles/air_build.md),
+[doc/roles/air_rules.md](roles/air_rules.md),
+[src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp),
+[src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h),
+[src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp),
+[src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h),
+[tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp),
+[tests/air_math_tests.as](../tests/air_math_tests.as),
+[tools/playtest/air_support_probe.as](../tools/playtest/air_support_probe.as),
+[tools/playtest/checks/air_growth.json](../tools/playtest/checks/air_growth.json),
+[tools/playtest/checks/air_support_repair.json](../tools/playtest/checks/air_support_repair.json),
+[tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py),
+[tools/playtest/prepare_air_support_check.py](../tools/playtest/prepare_air_support_check.py),
+[tools/playtest/widgets/air_fixture.lua](../tools/playtest/widgets/air_fixture.lua),
+[tools/playtest/widgets/air_strike_fixture.lua](../tools/playtest/widgets/air_strike_fixture.lua).
+
+Additional verification files: [playtest guide](../tools/playtest/README.md),
+[raid feedback audit](../tools/playtest/audit_air_raid_feedback.py),
+[campus screenshot](images/d163/cortex-campus-30min.png),
+[edge ingress](images/d163/edge-ingress.png),
+[static strike](images/d163/synchronized-flak-attack.png).
+
+Final feedback verification: build 6 Armada combat repeat `d163-strike-feedback/runs/20261002-022342` passed twenty-minute checks.
+The independent audit observed three alternate missions during an active
+failed-region exclusion and increased then relaxed resistance. The forty-two
+minute natural repeat again missed the fusion deadline (21.48 minutes);
+the earlier 18.47 result is not a consistency claim. KI-442 metal overflow
+remains open. [Feedback audit](benchmarks/air-d163-feedback.json),
+[measurements](benchmarks/air-d163.json),
+[natural base](images/d163/natural-base-20min.png),
+[repaired campus](images/d163/support-repaired-campus.png).
+
+Natural feedback evidence: `d163-team-feedback/runs/20261002-022726`
+completed forty-two minutes; both AIR teams logged no role invariants,
+while existing TECH/ferry failures kept the full report FAIL. Cortex
+built its two AFUS at 27.62/33.01 and launched its saved eleven.
+Legion selected four later missions outside active failed regions;
+[natural audit](benchmarks/air-d163-natural-feedback.json) passed its
+narrow contract. Heavy combat losses remain KI-457, not a solved outcome.

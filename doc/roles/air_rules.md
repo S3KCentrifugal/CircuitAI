@@ -19,8 +19,10 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 2a | `project.resume` | Reassign an owned orphan order before adding another project |
 | 3 | `opening.mex`, `opening.energy` | Three nearby mexes and initial energy before the starter |
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
+| 4a | `production.banked` | Bank-funded T2 admission; between the growth milestone and two AFUS, allow the first T2 lab only; existing support gate always applies |
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes, at most one remote upgrade at a time; additional helpers stay local |
 | 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
+| 5.2 | `mex.phase.convert`, `economy.shared.*` | Pending-upgrade T1 conversion, then shared TECH economy choices with AIR state, placement and reactor assistance after sustained +50 metal |
 | 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
 | 5b | `support.assist`, `production.support` | Finish a support turret or grow funded support before general preparation assistance |
 | 5c | `defence.base`, `fusion.access` | Bounded own-base protection and T2 access |
@@ -57,7 +59,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: f666e54818f95e8adf1cbcc76e37bf7bb3088e93; lines: 133 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: ffaad029928f7dc4bfb5c9a59e975af655dad387; lines: 141 -->
 
 ## D-152 sequencing
 
@@ -83,3 +85,7 @@ require available completed fighters worth at least 1.25 times known enemy air
 and no friendly-territory incursion. This replaces the fixed enemy-air cutoff
 that suppressed Shurikens even with a superior friendly force. Funded economic
 constructors are interleaved with fighters before optional strike spending.
+
+## D-163 shared growth phase
+
+`economy.shared.*` calls `AirGrowth::MakeTask` after mex work and T1 conversion, before the first-fusion and general support rows. Sustained ten-second minimum income of 50 metal activates the shared TECH economy chooser, with AIR placement and state. Additional T2 labs wait for two completed AFUS during this phase; the first lab and twenty-turret support remain eligible. `energy.grow` is the pre-transition fallback. TECH rule ordering is unchanged. See [design](../air-campus-strike-design.md).

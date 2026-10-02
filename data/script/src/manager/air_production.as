@@ -25,6 +25,8 @@ namespace AirProduction {
         IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(utility ? Task::RecruitType::BUILDPOWER : Task::RecruitType::FIREPOWER,
             priority, d, plant.GetPos(ai.frame), 64.0f));
         if (t !is null) {
+            if (purpose == "wave.bomber" && !AirEconomy::MassBombers())
+                Invariants::Violation("INV-102", name, "T2 bomber production before completed AFUS milestone");
             const string key = "air.crew.streak." + plant.id;
             aiTerrainMgr.SetLayoutInt(key, utility ? aiTerrainMgr.GetLayoutInt(key, 0) + 1 : 0);
             if (!utility) aiTerrainMgr.SetLayoutInt("air.mix." + plant.id, (aiTerrainMgr.GetLayoutInt("air.mix." + plant.id, 0) + 1) % 10);
@@ -131,7 +133,8 @@ namespace AirProduction {
             if (t !is null) { aiTerrainMgr.SetLayoutInt("air.scout.next", ai.frame + Global::RoleSettings::Air::ScoutReplaceSeconds * SECOND); return t; }
         }
         const int strikeOrders = emergency ? 0 : AirMath::BomberOrders(AvailableFighterValue(), AirEconomy::EnemyAir(),
-            Global::RoleSettings::Air::BomberOrdersClear, Global::RoleSettings::Air::BomberOrdersParity);
+            AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersClear : Global::RoleSettings::Air::BomberOrdersClear,
+            AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersParity : Global::RoleSettings::Air::BomberOrdersParity);
         const bool strike = strikeOrders > 0 && AirMath::BomberTurn(aiTerrainMgr.GetLayoutInt("air.mix." + u.id, 0), strikeOrders);
         if (basic && strike && AirEconomy::metal >= 12.0f) {
             const string bomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
@@ -141,7 +144,7 @@ namespace AirProduction {
                 const bool supportFirst = phase % 2 == 0;
                 for (int pass = 0; pass < 2; ++pass) {
                     const bool support = pass == 0 ? supportFirst : !supportFirst;
-                    if (!support && AirEconomy::t2 > 0 && side != "legion") continue;
+                    if (!support && AirEconomy::MassBombers() && side != "legion") continue;
                     if (support && aiBattle.EnemyCost(0) + aiBattle.EnemyCost(4) + aiBattle.EnemyCost(5) < 300.0f) continue;
 
                     const int target = ProductionMath::StrikeTarget(AirEconomy::metal,
@@ -153,12 +156,12 @@ namespace AirProduction {
                 }
             }
         }
-        if (advanced && strike && AirEconomy::metal >= 250.0f && aiBattle.EnemyCost(0) >= 1000.0f) {
+        if (advanced && strike && AirEconomy::MassBombers() && AirEconomy::metal >= 250.0f && aiBattle.EnemyCost(0) >= 1000.0f) {
             const string heavy = side == "cortex" ? "corcrwh" : side == "legion" ? "legfort" : "";
             @t = Recruit(u, heavy, 6, "heavy", Task::Priority::NORMAL);
             if (t !is null) return t;
         }
-        if (advanced && strike && AirEconomy::metal >= Global::RoleSettings::Air::BomberWaveProductionMetalIncome) {
+        if (advanced && strike && AirEconomy::MassBombers() && AirEconomy::metal >= Global::RoleSettings::Air::BomberWaveProductionMetalIncome) {
             const string bomber = UnitHelpers::GetT2WaveBomberForSide(side);
             CCircuitDef@ bd = ai.GetCircuitDef(bomber);
             CCircuitDef@ fd = ai.GetCircuitDef(fighter);
@@ -167,7 +170,7 @@ namespace AirProduction {
             const int f = AiMax(0, Projected(fd) - int(home.getSize()) + AirScreen::CountOther(fighter) - int(AirWaves::waveFighters.getSize()));
             if (f < AirWaves::FightersFor(b)) {
                 @t = Recruit(u, fighter, Projected(fd) + 1, "wave.escort", Task::Priority::NORMAL);
-            } else if (b < AirWaves::Required()) {
+            } else if (b < AirWaves::ProductionTarget()) {
                 @t = Recruit(u, bomber, Projected(bd) + 1, "wave.bomber", Task::Priority::NORMAL);
             }
             if (t !is null) return t;
@@ -180,7 +183,10 @@ namespace AirProduction {
         if (basic && AirEconomy::t2 > 0 && AirEconomy::metal >= Global::RoleSettings::Air::TransitionMinMetal) {
             return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         }
-        if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
+        if (advanced && AirEconomy::TechGrowth() && !AirEconomy::MassBombers()
+            && homeValue + futureValue >= AirEconomy::HomeValueTarget())
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        if (Global::RoleSettings::Air::UseDynamicFactoryProduction && (!advanced || AirEconomy::MassBombers())) {
             @t = FactoryProduction::MakeTask(u);
             if (t !is null) return t;
         }

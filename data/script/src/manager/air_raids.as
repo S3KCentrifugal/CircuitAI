@@ -46,7 +46,11 @@ namespace AirRaids {
         @wave = cast<CAirWaveTask>(aiMilitaryMgr.Enqueue(TaskF::Wave()));
         if (wave is null) return;
         AirWaves::ConfigureStrike(wave, ai.GetCircuitDef(first.circuitDef.GetName()), held);
-        if (!wave.PickStrikeTarget(Global::Map::StartPos, 0, 30.0f, false)) {
+        wave.SetMissionPolicy(Global::RoleSettings::Air::StrikeCorridorPadding,
+            Global::RoleSettings::Air::StrikeEdgeInset, Global::RoleSettings::Air::StrikeUnknownReserve,
+            Global::RoleSettings::Air::StrikeRiskScale, Global::RoleSettings::Air::StrikeArmyReserve,
+            Global::RoleSettings::Air::StrikeLocalAaReserve, false);
+        if (!wave.PickStrikeTarget(Global::Map::StartPos, 2, 30.0f, false)) {
             wave.Abort(); @wave = null; return;
         }
         wave.SetPlan(Task::WaveMode::STRIKE, wave.GetAim(), Global::RoleSettings::Air::WaveFormDistance,

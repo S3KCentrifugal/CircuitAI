@@ -6,6 +6,12 @@ build-focus system works, and where it is currently wrong.
 
 ## Current air combat controller (D-162)
 
+D-163 supersedes the historical fixed-size description below: the saved first
+T2 wave is configurable 10-20; later missions use target/route budgets after
+two AFUS. Completed sorties update a saved resistance multiplier. Heavy losses
+temporarily exclude the failed target region; returned aircraft remain in the
+immutable survival cohort. See [current design](../air-campus-strike-design.md).
+
 `Air_MilitaryAiMakeTask` calls the home screen, `AirRaids::MakeTask`, then
 `AirWaves::MakeTask`. Experimental AIR stages ordinary bombers at home, uses
 three-aircraft T1 raids and an eight-aircraft T2 minimum, and selects known
@@ -57,21 +63,32 @@ D-151 admits the initial fighter floor immediately after the three completed
 constructors, without the ordinary 160-energy-income gate. Production remains
 one aircraft per decision, transport requests remain first, and energy recovery
 construction has higher priority. The commander leaves an idle factory for
-nearby economy construction/assistance; useful recruitment includes the brief
-delay before its aircraft frame appears. See [handoff validation](../air-idle-factory.md).
+nearby economy construction/assistance. After the opening crew, D-163 requires
+an actual unfinished aircraft frame for useful recruitment assistance.
+See [handoff validation](../air-idle-factory.md).
 
 | New AIR setting | Default | Meaning |
 | --- | --- | --- |
 | `ExperimentalBuild` | true | Enable this controller in experimental profiles |
 | `CommanderEconomyRadius` | 900 | Maximum nearby economy search when the crew is complete and the factory is idle; try current reach first |
-| `MaxProductionBays` | 12 | T2 ceiling, never a mandatory build count |
+| `MaxProductionBays` | 0 | No default numerical T2 ceiling; positive values explicitly cap construction |
+| `PlannedT2Bays` / `PlannedT1Bays` | 6 / 1 | Minimum speculative footprint/support blocks; extend beyond completed demand |
+| `BaySpacing` / `BayExitClearance` | 16 / 64 | Additional footprint-lattice clearance and protected exit space |
+| `TechEconomyMinMetal` / `MassBomberAfusCount` | 50 / 2 | Sustained ten-second income switches the shared chooser on; completed AFUS unlock mass bombers |
+| `FirstBomberWaveMin` / `FirstBomberWaveMax` | 10 / 20 | Inclusive saved opening T2 draw |
+| `MassBomberOrdersClear` / `MassBomberOrdersParity` | 8 / 5 | Post-milestone bomber orders per ten discretionary combat orders |
+| `StrikeReserveSeconds` / `StrikeUnknownReserve` | 120 / 0.25 | Funded replacement stock horizon and base uncertainty allowance |
+| `StrikeRiskScale` / `StrikeArmyReserve` / `StrikeLocalAaReserve` | 0.002 / 0.15 / 0.5 | Route proxy, observed army and local AA resistance coefficients |
+| `StrikeCorridorPadding` / `StrikeEdgeInset` / `StrikeSynchronize` | 320 / 480 / true | Padded route samples, edge candidates and nominal cohort static synchronization |
+| `StrikeLossGrowth` / `StrikeRiskRecovery` / `StrikeLearnedRiskMax` | 1.5 / 0.9 / 3 | Learned resistance increases after heavy losses and decays after strong survival |
+| `StrikeFailedSurvival` / `StrikeFailedRetrySeconds` / `StrikeFailedRegionRadius` | 0.25 / 300 / 640 | Failed-region admission, lifetime and target-exclusion radius |
 | `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
 | `T2ExpansionSupport` / `NanoParallel` | 20 / 3 | Completed turrets required on every existing T2 lab before expansion; funded simultaneous turret projects while metal floats |
 | `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 40 / 24 | Funded mobile construction ceilings; T1 remains available after T2 |
 | `EconomyBuildPowerPerMetal` / `BuildPowerFloatFactor` | 24 / 1.5 | Income-based work target, raised when metal storage is at least 75% full (minimum 300 metal) |
 | `BuildPowerBankDrainSeconds` | 60 | Construction target includes drawing floating metal down toward half storage over this horizon |
 | `WindClusterGap` | 144 | Minimum gap between wind-cluster bounding circles; six touching footprints per 3-by-2 group |
-| `EconomySearchRings` | 24 | Expanding 96-elmo energy/storage search rings, 24 samples each |
+| `EconomySearchRings` | 24 | Ordinary 96-elmo search rings; reactor search additionally covers the whole home disc with increasing angular samples |
 | `FirstFusionTargetSeconds` / `FirstFusionLeadSeconds` | 1200 / 720 | Aim for fusion at 20 minutes; prepare from minute 8; mex completion always wins |
 | `PreFusionMexLimit` | 6 | Bound own early expansion before first reactor; gifts still require upgrades |
 | `FusionAccessMinMetal` / `FusionAccessMinEnergy` / `FusionAccessFundSeconds` | 12 / 450 / 300 | Historical settings retained; D-153 no longer uses this separate access gate |
@@ -617,7 +634,7 @@ all upgrades finish and continues requesting TECH's T2 constructor. See
 
 D-152 AIR settings: `PlannedT2Bays=6`, `PlannedT1Bays=2`,
 `ConverterParallel=3`, `ConverterDraw=70`, `ConverterEnergyReserve=150`.
-The existing `MaxProductionBays=12` still bounds actual production expansion;
+At D-152, `MaxProductionBays=12` bounded actual production expansion;
 preplanned sites neither count as active plants nor authorize spending.
 
 D-153 publishes native reservations to allied instances, protects production
@@ -646,3 +663,7 @@ See [implementation and tests](../telchine-beachhead-results.md).
 D-161 gives Telchines land-first, footprint-checked routes and distinct dry
 shore perimeter or land assault slots. Marauder travel and AIR economy stay
 unchanged. See the [formation plan](../telchine-perimeter-plan.md).
+
+## D-163 dense campus and strategic bomber phase
+
+Experimental AIR reserves at least six T2 aircraft bays and one T1 bay, tiled by actual footprints with dense independent twenty-turret banks. Growth continues without a default factory cap. Shared TECH economy decisions begin at a sustained +50 metal minimum; AIR keeps all placements and tasks. Two completed advanced fusions enable mass bomber production. The opening wave draws once from `FirstBomberWaveMin`/`FirstBomberWaveMax` (10-20); later sorties use target and route budgets, with a separate funded replacement pool. T1 reusable bombers select mexes/wind. See [design](../air-campus-strike-design.md).

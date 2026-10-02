@@ -1678,3 +1678,11 @@ a fighter task; null, foreign, dead and cross-manager requests return false.
 It delegates removal/start to native AssignTask and does not choose priorities
 or destinations. Arguments remain borrowed; the call returns no new handle.
 Script retains stable member IDs and updates its wave membership on success.
+
+## D-163 AIR mission mechanism
+
+`CAirWaveTask::SetMissionPolicy(float padding, float edgeInset, float unknownReserve, float riskScale, float armyReserve, float localAAReserve, bool synchronize)` opts a wave into padded direct/edge corridor planning and execution. Call after `SetStrikePolicy`, before `PickStrikeTarget`. Preferences: 2 requires mex/wind, 3 ranks static attackers near the current plan aim (ground-front objective), 4 requires peaceful static economy, 0 admits other qualifying statics. `GetRequiredBombers` returns the selected target budget or the smallest evaluated requirement when none fits. Aircraft damage, target health and known threat snapshots are native mechanisms; AIR supplies all coefficients and chooses which preference to try. The script subsequently calls `SetPlan` with the selected aim. No other role opts into this mechanism.
+
+D-163: `CAirWaveTask::ExcludeStrikeRegion(const AIFloat3& in, float)` adds
+one target-selection exclusion to that task (up to eight finite regions).
+Radius and expiry are AIR script policy; no exclusion applies by default.

@@ -2,7 +2,16 @@
 
 **D-162 experimental AIR override.** The legacy description below applies to
 `ExperimentalBuild=false`. Enabled AIR uses home staging routes, ordinary
-lethal bomber pools, an eight-bomber T2 minimum and 240-second funded cadence.
+lethal bomber pools and the [D-163 campus/mission policy](air-campus-strike-design.md).
+The first T2 wave draws once from a configurable 10-20 range after two completed
+AFUS. Later sorties use target health and padded corridor risk; the eight-aircraft
+minimum never waives that requirement. A separate income/energy/build-power
+funded reserve keeps production ahead of sorties.
+After sortie completion, heavy losses increase a saved resistance multiplier
+(bounded at 3 by default); good survival relaxes it. A below-25% survival raid
+excludes its 640-elmo target region for five minutes, with up to eight regions.
+These are AIR settings, not fixed native priorities. Temporary region memory
+resets on role initialization; the learned multiplier is saved.
 Three reusable T1 bombers can form an independent raid. Requested transports,
 required crews and emergency defense precede discretionary strikes.
 

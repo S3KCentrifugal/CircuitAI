@@ -5,6 +5,8 @@ namespace AirBuild {
     array<IUnitTask@> pendingOwnership;
     dictionary trace;
     dictionary nanoTrace;
+    dictionary guardLeases;
+    dictionary guardLeaseFrames;
     void Added(IUnitTask@ task)
     {
         IBuilderTask@ t = cast<IBuilderTask>(task);
@@ -17,6 +19,19 @@ namespace AirBuild {
     }
     void Tick()
     {
+        array<string>@ guards = guardLeases.getKeys();
+        for (uint g = 0; g < guards.length(); ++g) {
+            IUnitTask@ lease;
+            int64 started = 0;
+            guardLeases.get(guards[g], @lease);
+            guardLeaseFrames.get(guards[g], started);
+            CCircuitUnit@ worker = ai.GetTeamUnit(parseInt(guards[g]));
+            if (worker is null || worker.task !is lease) {
+                guardLeases.delete(guards[g]); guardLeaseFrames.delete(guards[g]);
+            } else if (ai.frame - started > 30 * SECOND) {
+                Invariants::Violation("INV-104", guards[g], "AIR fallback factory guard outlived its economic recheck lease");
+            }
+        }
         // A newly received/built mex can invalidate an unstarted reactor order.
         array<IUnitTask@> snapshot = projects;
         for (uint i = 0; i < snapshot.length(); ++i) {
@@ -70,6 +85,10 @@ namespace AirBuild {
     IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
     {
         if (t is null) return null;
+        if (rule == "production.assist") {
+            guardLeases.set("" + u.id, @t);
+            guardLeaseFrames.set("" + u.id, int64(ai.frame));
+        }
         IBuilderTask@ build = cast<IBuilderTask>(t);
         if (build !is null && build.buildDef !is null && build.target is null
             && build.GetBuildType() == int(Task::BuildType::DEFENCE)
@@ -199,7 +218,8 @@ namespace AirBuild {
         if (plant is null || Lifecycle::IsRetiring(plant)) return false;
         if (plant.GetBuildProgress() < 1.0f) return true;
         IBuilderTask@ job = cast<IBuilderTask>(plant.task);
-        return job !is null && !job.IsDead() && job.GetBuildType() == int(Task::BuildType::RECRUIT);
+        return job !is null && !job.IsDead() && job.GetBuildType() == int(Task::BuildType::RECRUIT)
+            && job.target !is null && job.target.GetBuildProgress() < 1.0f;
     }
     IUnitTask@ Commander(CCircuitUnit@ u, CCircuitUnit@ plant)
     {
@@ -250,8 +270,8 @@ namespace AirBuild {
         if (advanced) {
             if (!AirEconomy::Transition(d)) return null;
             if (!AirEconomy::ExistingT2SupportReady()) return null;
-            if (count >= Global::RoleSettings::Air::MaxProductionBays) return null;
-            if (!AirEconomy::BankedLab(d) && count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, Global::RoleSettings::Air::MaxProductionBays,
+            if (!AirMath::BayAllowed(count, Global::RoleSettings::Air::MaxProductionBays)) return null;
+            if (!AirEconomy::BankedLab(d) && count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, (Global::RoleSettings::Air::MaxProductionBays <= 0 ? count + 1 : Global::RoleSettings::Air::MaxProductionBays),
                 ai.frame - AirEconomy::stableSince, Global::RoleSettings::Air::CapacityStableSeconds * SECOND,
                 AirEconomy::bankM, d.costM * 0.6f))) return null;
         }
@@ -356,6 +376,7 @@ namespace AirBuild {
         if (pending >= Global::RoleSettings::Air::EnergyParallel) return null;
         const string side = Global::AISettings::Side;
         const bool t2 = UnitHelpers::GetConstructorTier(u.circuitDef) >= 2;
+        if (!emergency && AirEconomy::TechGrowth() && AirEconomy::HasReactor() && !t2) return null;
         array<string> names;
         const string fusion = UnitHelpers::GetFusionNameForSide(side);
         const string advancedFusion = UnitHelpers::GetAdvFusionNameForSide(side);
@@ -421,6 +442,7 @@ namespace AirBuild {
         AirEconomy::RefreshSupport();
         for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
             if (AirLayout::bays[b].factoryId < 0 || SupportCommitted(b) >= AirEconomy::NanoTarget(b)) continue;
+            AirLayout::RepairSupport(b, d);
             for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {
                 const int slot = AirLayout::bays[b].nanos[s];
                 if (aiTerrainMgr.GetReservationState(slot) != 0) continue;
@@ -444,6 +466,6 @@ namespace AirBuild {
         projects.resize(0);
         pendingOwnership.resize(0);
         for (uint i = 0; i < tasks.length(); ++i) aiBuilderMgr.AbortTask(tasks[i]);
-        trace.deleteAll(); nanoTrace.deleteAll(); AirLayout::Leave();
+        trace.deleteAll(); nanoTrace.deleteAll(); guardLeases.deleteAll(); guardLeaseFrames.deleteAll(); AirLayout::Leave();
     }
 }

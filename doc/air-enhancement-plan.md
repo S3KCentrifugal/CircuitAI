@@ -1,5 +1,8 @@
 # AIR enhancement plan: production, strike packages, targeting, navigation and ISR
 
+The [D-163 campus and strike design](air-campus-strike-design.md) supersedes the
+fixed campus cap, linear wave growth and pre-two-AFUS T2 bomber policy below.
+
 Date: 2026-10-01. **Status: reviewed; core production and strike controller implemented and played.** The
 [evidence audit and implementation contract](air-enhancement-review.md) corrects
 and supersedes the initial proposal below, including all numerical examples.

@@ -102,6 +102,12 @@ namespace AirWaves {
     dictionary evaluationCohort; // immutable launch IDs; returning does not mean dying
     int lastNoTargetLog = -100000;
     int targetMinimum = 0;
+    int plannedCount = 0;
+    int lastPlanFrame = -100000;
+    float learnedResistance = 1.0f;
+    AIFloat3 lastRaidAim;
+    array<AIFloat3> failedRaidAims;
+    array<int> failedRaidUntil;
     dictionary waveBombTasks;    // bomber def name -> IUnitTask@, release window only
     IUnitTask@ waveTask = null;  // the launched wave's CAirWaveTask, until it aborts itself
     dictionary mopUp;            // id string -> true: a native bomb task is still owed after the run
@@ -136,6 +142,12 @@ namespace AirWaves {
         waveFighters.deleteAll();
         evaluationCohort.deleteAll();
         targetMinimum = 0;
+        plannedCount = 0;
+        lastPlanFrame = -100000;
+        learnedResistance = AirMath::Clamp(float(aiTerrainMgr.GetLayoutInt("air.raidRiskMilli", 1000)) / 1000.0f,
+            1.0f, AiMax(1.0f, Global::RoleSettings::Air::StrikeLearnedRiskMax));
+        failedRaidAims.resize(0);
+        failedRaidUntil.resize(0);
         waveBombTasks.deleteAll();
         @waveTask = null;
         mopUp.deleteAll();
@@ -244,26 +256,51 @@ namespace AirWaves {
     }
 
     // What the next wave must hold: the survival-grown target or the income floor.
+    bool OpeningDone() { return aiTerrainMgr.GetLayoutInt("air.openingBombDone", 0) != 0; }
+    int OpeningSize()
+    {
+        int size = aiTerrainMgr.GetLayoutInt("air.firstBomberSize", 0);
+        if (size <= 0) {
+            const int lo = AirMath::OpeningWave(Global::RoleSettings::Air::FirstBomberWaveMin,
+                Global::RoleSettings::Air::FirstBomberWaveMax, 0);
+            const int hi = AirMath::OpeningWave(Global::RoleSettings::Air::FirstBomberWaveMin,
+                Global::RoleSettings::Air::FirstBomberWaveMax, 300);
+            size = AiRandom(lo, hi);
+            aiTerrainMgr.SetLayoutInt("air.firstBomberSize", size);
+            GenericHelpers::LogUtil("[AIR][Waves] opening size drawn=" + size, 1);
+        }
+        return size;
+    }
     int Required()
     {
         if (Global::RoleSettings::Air::ExperimentalBuild) {
-            CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side));
-            if (d is null) return Global::RoleSettings::Air::StrikeFirstSize;
-            float rate = 0.0f;
-            for (uint i = 0; i < AirEconomy::power.length(); ++i)
-                if (UnitHelpers::IsT2AircraftPlant(AirLayout::bays[i].defName))
-                    rate += ProductionMath::Rate(d.GetBuildTime(), AirEconomy::power[i], Global::RoleSettings::Air::WarmFactoryGapSeconds);
-            const int scheduled = AirMath::WaveTarget(waveIndex, Global::RoleSettings::Air::StrikeFirstSize,
-                Global::RoleSettings::Air::StrikeWaveIncrement, Global::RoleSettings::Air::StrikeWaveCap,
-                int(heldBombers.getSize()), float(Global::RoleSettings::Air::StrikeCadenceSeconds), rate,
-                AirEconomy::metal * Global::RoleSettings::Air::StrikeBudgetShare,
-                AirEconomy::energy * Global::RoleSettings::Air::StrikeBudgetShare, d.costM, d.costE);
-            return AiMin(Global::RoleSettings::Air::StrikeWaveCap, AiMax(scheduled, targetMinimum));
+            if (!OpeningDone()) return OpeningSize();
+            return AiMin(Global::RoleSettings::Air::StrikeWaveCap,
+                AiMax(Global::RoleSettings::Air::StrikeFirstSize, targetMinimum));
         }
         const int floor = IncomeFloor();
         int req = (nextWaveSize > floor) ? nextWaveSize : floor;
         const int hi = Global::RoleSettings::Air::BomberWaveMaxSize;
         return (req > hi) ? hi : req;
+    }
+
+    // Maintain a funded replacement pool independently of the next sortie's
+    // target-specific size. Extra factories must not stop after eight bombers.
+    int ProductionTarget()
+    {
+        if (!Global::RoleSettings::Air::ExperimentalBuild) return Required();
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side));
+        if (d is null) return Required();
+        float rate = 0.0f;
+        for (uint b = 0; b < AirEconomy::power.length(); ++b)
+            if (UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName))
+                rate += ProductionMath::Rate(d.GetBuildTime(), AirEconomy::power[b], Global::RoleSettings::Air::WarmFactoryGapSeconds);
+        const int reserve = AirMath::WaveTarget(1, Global::RoleSettings::Air::StrikeFirstSize,
+            Global::RoleSettings::Air::StrikeWaveCap, Global::RoleSettings::Air::StrikeWaveCap, 0,
+            Global::RoleSettings::Air::StrikeReserveSeconds, rate,
+            AirEconomy::metal * Global::RoleSettings::Air::StrikeBudgetShare,
+            AirEconomy::energy * Global::RoleSettings::Air::StrikeBudgetShare, d.costM, d.costE);
+        return AiMax(Required(), reserve);
     }
 
     /**************************************************************************
@@ -355,7 +392,25 @@ namespace AirWaves {
         }
         if (Global::RoleSettings::Air::ExperimentalBuild) {
             ConfigureStrike(wt, ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side)), heldBombers, bombers);
-            if (!wt.PickStrikeTarget(Global::Map::StartPos, 0, Global::RoleSettings::Air::StrikeMinTargetMetal, false)) {
+            wt.SetMissionPolicy(Global::RoleSettings::Air::StrikeCorridorPadding,
+                Global::RoleSettings::Air::StrikeEdgeInset, Global::RoleSettings::Air::StrikeUnknownReserve + learnedResistance - 1.0f,
+                Global::RoleSettings::Air::StrikeRiskScale * learnedResistance, Global::RoleSettings::Air::StrikeArmyReserve * learnedResistance,
+                Global::RoleSettings::Air::StrikeLocalAaReserve * learnedResistance,
+                Global::RoleSettings::Air::StrikeSynchronize);
+            for (int i = int(failedRaidUntil.length()) - 1; i >= 0; --i) {
+                if (ai.frame >= failedRaidUntil[i]) {
+                    failedRaidUntil.removeAt(i); failedRaidAims.removeAt(i);
+                } else wt.ExcludeStrikeRegion(failedRaidAims[i], Global::RoleSettings::Air::StrikeFailedRegionRadius);
+            }
+            // Alternate economy raids with a coordinated static assault. A failed
+            // preference may use another feasible known static target.
+            const int preference = waveIndex % 3 == 2 ? 3 : 4;
+            // Supply the ground-front objective before selecting the actual target.
+            wt.SetPlan(Task::WaveMode::STRIKE, _FrontAim(), Global::RoleSettings::Air::WaveFormDistance,
+                Global::RoleSettings::Air::StrikeLaneSpacing, Global::RoleSettings::Air::WaveOverrun,
+                Global::RoleSettings::Air::WaveFormTimeoutSeconds * SECOND, 0, Task::WAVE_SMART_BEARING, 1);
+            if (!wt.PickStrikeTarget(Global::Map::StartPos, preference, Global::RoleSettings::Air::StrikeMinTargetMetal, false)
+                && !wt.PickStrikeTarget(Global::Map::StartPos, 0, Global::RoleSettings::Air::StrikeMinTargetMetal, false)) {
                 targetMinimum = wt.GetRequiredBombers();
                 raw.Abort();
                 if (ai.frame - lastNoTargetLog >= 30 * SECOND) {
@@ -364,13 +419,23 @@ namespace AirWaves {
                 }
                 return null;
             }
-            targetMinimum = 0;
+            targetMinimum = wt.GetRequiredBombers();
+            for (uint i = 0; i < failedRaidAims.length(); ++i)
+                if (MapHelpers::SqDist(wt.GetAim(), failedRaidAims[i]) <= Global::RoleSettings::Air::StrikeFailedRegionRadius
+                    * Global::RoleSettings::Air::StrikeFailedRegionRadius)
+                    Invariants::Violation("INV-105", "failed.raid", "AIR selected a target in an unexpired failed raid region");
+            plannedCount = OpeningDone() ? AiMax(Global::RoleSettings::Air::StrikeFirstSize, targetMinimum) : OpeningSize();
+            if (plannedCount > bombers || FightersFor(plannedCount) > int(heldFighters.getSize())) {
+                raw.Abort(); return null;
+            }
+            ConfigureStrike(wt, ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side)), heldBombers, plannedCount);
             wt.SetPlan(Task::WaveMode::STRIKE, wt.GetAim(), Global::RoleSettings::Air::WaveFormDistance,
                 Global::RoleSettings::Air::StrikeLaneSpacing, Global::RoleSettings::Air::WaveOverrun, Global::RoleSettings::Air::WaveFormTimeoutSeconds * SECOND,
                 0, Task::WAVE_SMART_BEARING, 1);
             lastMethod = Task::WaveMode::STRIKE;
+            lastRaidAim = wt.GetAim();
             GenericHelpers::LogUtil("[AIR][Waves] planned strike target=" + wt.GetStrikeTargetId()
-                + " bombers=" + bombers + " aim=" + int(wt.GetAim().x) + "," + int(wt.GetAim().z), 1);
+                + " bombers=" + plannedCount + " required=" + targetMinimum + " aim=" + int(wt.GetAim().x) + "," + int(wt.GetAim().z), 1);
             return raw;
         }
         const float fd = Global::RoleSettings::Air::WaveFormDistance;
@@ -502,6 +567,7 @@ namespace AirWaves {
         const int frame = ai.frame;
         if (releaseUntilFrame >= 0 && frame > releaseUntilFrame) _EndRelease();
         if (!lastWaveEvaluated && lastLaunchFrame >= 0
+            && (!Global::RoleSettings::Air::ExperimentalBuild || waveTask is null || waveTask.IsDead())
             && frame >= lastLaunchFrame + Global::RoleSettings::Air::BomberWaveEvaluateSeconds * SECOND) {
             _EvaluateLastWave();
         }
@@ -516,11 +582,14 @@ namespace AirWaves {
         if (holdSinceFrame < 0) holdSinceFrame = frame;
         if (Global::RoleSettings::Air::ExperimentalBuild) {
             const bool busy = (waveTask !is null && !waveTask.IsDead()) || !lastWaveEvaluated;
-            const int size = AirMath::SortieSize(bombers, Required(), Global::RoleSettings::Air::StrikeFirstSize,
-                fighters, EscortRatio());
-            if (AirMath::LaunchDue(bombers, Required(), Global::RoleSettings::Air::StrikeFirstSize,
-                frame - holdSinceFrame, Global::RoleSettings::Air::StrikeCadenceSeconds * SECOND,
-                size > 0 && fighters >= FightersFor(size), busy)) _Launch(frame, "funded cadence", size);
+            if (!AirEconomy::MassBombers() || busy || frame - lastPlanFrame < 10 * SECOND) return;
+            const int floor = OpeningDone() ? Global::RoleSettings::Air::StrikeFirstSize : OpeningSize();
+            if (bombers < floor || fighters < FightersFor(floor)) return;
+            lastPlanFrame = frame;
+            // Re-probe even below an old target minimum: reconnaissance may
+            // expose a cheaper objective. Never waive the new target's budget.
+            _Launch(frame, "target and route budget", OpeningDone()
+                ? AiMin(bombers, Global::RoleSettings::Air::StrikeWaveCap) : OpeningSize());
             return;
         }
 
@@ -544,6 +613,7 @@ namespace AirWaves {
         if (Global::RoleSettings::Air::ExperimentalBuild) {
             @planned = _PlanWave(limit < 0 ? int(heldBombers.getSize()) : limit);
             if (planned is null) return;
+            limit = plannedCount;
         }
         waveBombers.deleteAll();
         waveFighters.deleteAll();
@@ -558,8 +628,13 @@ namespace AirWaves {
         _ReleaseHeld(@heldFighters, null, @aborted, limit < 0 ? -1 : FightersFor(limit));
         const int launchedBombers = int(waveBombers.getSize());
         const int launchedFighters = int(launchQueue.getSize()) - launchedBombers;
+        if (Global::RoleSettings::Air::ExperimentalBuild
+            && ((!OpeningDone() && launchedBombers != OpeningSize()) || launchedBombers < targetMinimum))
+            Invariants::Violation("INV-103", "" + waveIndex, "bomber release differs from opening draw or cannot fund selected mission");
 
         ++waveIndex;
+        if (Global::RoleSettings::Air::ExperimentalBuild && launchedBombers > 0)
+            aiTerrainMgr.SetLayoutInt("air.openingBombDone", 1);
         @waveTask = Global::RoleSettings::Air::ExperimentalBuild ? planned : _PlanWave(launchedBombers);
         evaluationCohort.deleteAll();
         {
@@ -642,6 +717,23 @@ namespace AirWaves {
         for (uint i = 0; i < cohort.length(); ++i) if (ai.GetTeamUnit(parseInt(cohort[i])) !is null) ++survivors;
         if (survivors > lastWaveSize) Invariants::Violation("INV-099", "cohort", "AIR survivor count exceeds immutable launch size");
         const float survival = (lastWaveSize > 0) ? float(survivors) / float(lastWaveSize) : 1.0f;
+        if (Global::RoleSettings::Air::ExperimentalBuild) {
+            learnedResistance = AirMath::RaidResistance(learnedResistance, survival,
+                Global::RoleSettings::Air::BomberWaveLowSurvival, Global::RoleSettings::Air::BomberWaveHighSurvival,
+                Global::RoleSettings::Air::StrikeLossGrowth, Global::RoleSettings::Air::StrikeRiskRecovery,
+                Global::RoleSettings::Air::StrikeLearnedRiskMax);
+            aiTerrainMgr.SetLayoutInt("air.raidRiskMilli", int(learnedResistance * 1000.0f));
+            if (survival < Global::RoleSettings::Air::StrikeFailedSurvival
+                && Global::RoleSettings::Air::StrikeFailedRetrySeconds > 0
+                && Global::RoleSettings::Air::StrikeFailedRegionRadius > 0.0f) {
+                if (failedRaidAims.length() >= 8) { failedRaidAims.removeAt(0); failedRaidUntil.removeAt(0); }
+                failedRaidAims.insertLast(lastRaidAim);
+                failedRaidUntil.insertLast(ai.frame + AiMin(3600, Global::RoleSettings::Air::StrikeFailedRetrySeconds) * SECOND);
+                GenericHelpers::LogUtil("[AIR][Waves] failed raid excluded aim=" + int(lastRaidAim.x) + "," + int(lastRaidAim.z)
+                    + " radius=" + int(Global::RoleSettings::Air::StrikeFailedRegionRadius) + " until=" + failedRaidUntil[failedRaidUntil.length() - 1], 1);
+            }
+            GenericHelpers::LogUtil("[AIR][Waves] learned resistance=" + learnedResistance + " survival=" + survival, 1);
+        }
         const float enemyAAMetal = Military::GetCachedRoleCost("anti_air");
         const float bomberCost = _WaveBomberCost();
         const int previous = nextWaveSize;

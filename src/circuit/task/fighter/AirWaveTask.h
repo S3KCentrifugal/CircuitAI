@@ -70,6 +70,8 @@ public:
     void SetStrikePolicy(CCircuitDef* bomber, int count, float passFraction, float margin, float threatWeight, float maxThreat);
     void ConsiderStrikeAircraft(CCircuitDef* bomber);
     void SetAssemblyPolicy(float radius, float fraction, int joinFrames);
+    void SetMissionPolicy(float padding, float inset, float unknown, float riskScale, float armyReserve, float localAAReserve, bool synchronize);
+    void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     int GetRequiredBombers() const { return requiredBombers; }
 	int GetState() const { return int(state_); }
 	int GetMode() const { return int(mode); }
@@ -91,7 +93,10 @@ private:
 	bool IsPastAim(CCircuitUnit* unit, int frame) const;
     float RouteExposure(const springai::AIFloat3& from, const springai::AIFloat3& to) const;
     void ReturnHome(const char* reason);
+    bool AdvanceReturn(CCircuitUnit* unit, int frame, bool force = false);
     float StrikeAlpha(CCircuitDef* bomber);
+    std::vector<springai::AIFloat3> PlanIngress(const springai::AIFloat3& from, const springai::AIFloat3& target, float& risk) const;
+    float RouteLength(const springai::AIFloat3& from, const springai::AIFloat3& target) const;
 	CEnemyInfo* GetStrikeTarget() const;
 
 	EMode mode;
@@ -136,6 +141,24 @@ private:
     std::set<CCircuitUnit*> outbound;
     std::set<CCircuitUnit*> assembled;
     std::map<int, float> strikeAlpha;
+    bool missionPolicy = false;
+    bool synchronize = false;
+    bool staticAssault = false;
+    float corridorPadding = 0.f;
+    float edgeInset = 480.f;
+    float unknownReserve = 0.f;
+    float riskScale = 0.f;
+    float armyReserve = 0.f;
+    float localAAReserve = 0.f;
+    float bomberMetal = 1.f;
+    std::vector<std::pair<springai::AIFloat3, float>> excludedStrikeRegions;
+    std::vector<springai::AIFloat3> ingress;
+    std::set<CCircuitUnit*> routed;
+    std::map<CCircuitUnit*, int> attackAt;
+    std::set<CCircuitUnit*> attackIssued;
+    std::map<CCircuitUnit*, std::vector<springai::AIFloat3>> returnRoutes;
+    std::map<CCircuitUnit*, size_t> returnSteps;
+    int returnFrames = 0;
 };
 
 } // namespace circuit

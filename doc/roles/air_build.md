@@ -81,7 +81,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 780c20961af0f7dfac7bd4a714c8d4a6409718e7; lines: 449 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 0e4eae7be795f669bf3518352e31a17f4aececaa; lines: 471 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -115,3 +115,13 @@ D-162 removes `FirstFusion`'s additional 500-metal bank veto. Completed owned
 mex upgrades, recovery state and conservative 180-second metal/energy funding
 including committed projects still gate admission. Continuous factory spending
 must not indefinitely block a funded first reactor. See [the review](../air-enhancement-review.md).
+
+## D-163 campus and reactor-era updates
+
+`Factory` has no default policy ceiling (`MaxProductionBays=0`); an explicitly positive setting remains a cap. Every expansion still requires twenty completed support turrets per existing T2 plant. Before the shared growth phase, `Energy` retains the original reactor ladder. After sustained +50 metal, `AirGrowth` selects reactors through the shared chooser, so a funded advanced fusion may be the first reactor. T1 workers stop ordinary small-energy fallback once reactor income exists; emergency recovery stays available. See [design](../air-campus-strike-design.md).
+
+`Nano` repairs dead support pins within the started lab's reach. `PlantHasWork`
+requires an unfinished aircraft frame after the opening crew; a queued recruit
+task alone cannot keep the commander on an idle lab. Mobile fallback guards
+start an explicit five-second expiry and `Tick` checks their task-identity leases
+(INV-104), preventing idle production assistance from trapping the workforce.

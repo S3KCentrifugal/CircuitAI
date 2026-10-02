@@ -5,6 +5,24 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+D-163 AIR campus obstruction: stage experimental AIR with `air_watch.lua` and
+`air_opening_watch.lua`, then run `prepare_air_check.py --scenario capacity`
+and `prepare_air_support_check.py` against that write directory. Launch rendered
+and watch `--role AIR --checks air_support_repair --minutes 20 --keep-going`.
+The fixture supplies late economy, places a real wall on a free support pin
+after the first T2 lab starts, and requires twenty completed support turrets
+with the original lab retained, then six or more labs. Native may remove a
+ground-taken pin or retain it dead; the observer accepts either only with a
+replacement pin, completed support and the original site still blocked.
+For self-built AFUS milestones use `--scenario growth` / `--checks air_growth`:
+ordinary reactors, converters and T2 constructors arrive at six minutes, with
+zero advanced fusions supplied. These are capability fixtures, not natural
+economic timings. See [D-163 results](../../doc/air-campus-strike-results.md).
+For natural raid learning, run `audit_air_raid_feedback.py <retained-infolog>`.
+It requires an observed resistance increase and a later mission while a failed
+region is still excluded, then checks every later target against that region.
+Its focused verdict does not replace the full match's invariant/deadline report.
+
 Amphibious visual check (D-158): run `prepare_amphibious_check.py --map tundra
 --dir build-theatres/<name> --dll <pinned-dll> --guarded --windowed --minutes 17`.
 Then `playtest.py launch --dir <same-dir> --engine recoil_2026.07.04` without

@@ -1,5 +1,6 @@
 #include "air_build.as"
 #include "../manager/air_defence.as"
+#include "../manager/air_growth.as"
 
 // Ordered, total dispatcher. Each action rechecks mutable claims before enqueue.
 namespace AirRules {
@@ -38,7 +39,8 @@ namespace AirRules {
         @t = AirBuild::Factory(u, false);
         if (t !is null) return AirBuild::Record(t, Team::Ferry::requestPending ? "transport.plant" : "opening.plant", u);
         // T2 builders, including gifts, upgrade mexes without requiring a T2 plant.
-        if (AirEconomy::BankedLab(ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side)))) {
+        if ((!AirEconomy::TechGrowth() || AirEconomy::MassBombers() || AirEconomy::t2 == 0)
+            && AirEconomy::BankedLab(ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side)))) {
             @t = AirBuild::Factory(u, true);
             if (t !is null) return AirBuild::Record(t, "production.banked", u);
         }
@@ -54,6 +56,8 @@ namespace AirRules {
         }
         @t = AirBuild::Convert(u);
         if (t !is null) return AirBuild::Record(t, "mex.phase.convert", u);
+        @t = AirGrowth::MakeTask(u);
+        if (t !is null) return t;
         @t = AirBuild::FirstFusion(u);
         if (t !is null) return AirBuild::Record(t, "fusion.first", u);
         @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
@@ -91,7 +95,7 @@ namespace AirRules {
         }
         // Production demand is a floor, plus energy for the next stage of T1 growth.
         const float targetE = AiMax(160.0f, AiMax(AirEconomy::metal * 45.0f, AirEconomy::demandE * 1.3f));
-        if (AirEconomy::energy < targetE || AirEconomy::recovery) {
+        if (!AirEconomy::TechGrowth() && (AirEconomy::energy < targetE || AirEconomy::recovery)) {
             @t = AirBuild::Energy(u, AirEconomy::recovery);
             if (t !is null) return AirBuild::Record(t, "energy.grow", u);
             @t = AirBuild::Assist(u, true);
@@ -103,8 +107,10 @@ namespace AirRules {
             @t = AirBuild::Utility(u, UnitHelpers::GetMetalStorageNameForSide(side), Task::BuildType::STORE, 4);
             if (t !is null) return AirBuild::Record(t, "storage.metal", u);
         }
-        @t = AirBuild::Factory(u, true);
-        if (t !is null) return AirBuild::Record(t, "production.bay", u);
+        if (!AirEconomy::TechGrowth() || AirEconomy::MassBombers()) {
+            @t = AirBuild::Factory(u, true);
+            if (t !is null) return AirBuild::Record(t, "production.bay", u);
+        }
         if (AirEconomy::energy > 250.0f && aiEconomyMgr.energy.storage < AirEconomy::energy * 10.0f) {
             @t = AirBuild::Utility(u, UnitHelpers::GetEnergyStorageNameForSide(side), Task::BuildType::STORE, AiMin(8, 1 + int(AirEconomy::energy / 2000.0f)));
             if (t !is null) return AirBuild::Record(t, "storage.energy", u);
@@ -125,7 +131,9 @@ namespace AirRules {
         // Short guard renewals keep the commander useful without starving economy rechecks.
         CCircuitUnit@ plant = Factory::primaryT1AirPlant;
         if (plant !is null && !Lifecycle::IsRetiring(plant)) {
-            @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::NORMAL, true, 5 * SECOND);
+            // Non-interruptible guards explicitly start the native timeout;
+            // interruptible guards deactivate their timer while assigned.
+            @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::NORMAL, false, 5 * SECOND);
             if (t !is null) return AirBuild::Record(t, "production.assist", u);
         }
         return AirBuild::Record(aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND)), "wait", u);

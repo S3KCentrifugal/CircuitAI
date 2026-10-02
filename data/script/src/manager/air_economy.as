@@ -17,6 +17,29 @@ namespace AirEconomy {
     array<int> nanoFuture;
 
     bool Active() { return Global::AISettings::Role == AiRole::AIR && AirLayout::enabled; }
+    bool TechGrowth() { return aiTerrainMgr.GetLayoutInt("air.techGrowth", 0) != 0; }
+    bool MassBombers() { return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0; }
+    int CompletedAfus() {
+        int count = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ unit = ai.GetTeamUnit(ids[i]);
+            if (unit !is null && unit.GetBuildProgress() >= 1.0f && unit.circuitDef.GetName()
+                == UnitHelpers::GetAdvFusionNameForSide(UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName()))) ++count;
+        }
+        return count;
+    }
+    void UpdateMilestones() {
+        if (!TechGrowth() && AirMath::GrowthPhase(Economy::IncomeWindowReady(), Economy::GetMinMetalIncomeLast10s(),
+            Global::RoleSettings::Air::TechEconomyMinMetal)) {
+            aiTerrainMgr.SetLayoutInt("air.techGrowth", 1);
+            GenericHelpers::LogUtil("[AIR][Growth] shared TECH economy enabled at M10=" + Economy::GetMinMetalIncomeLast10s(), 1);
+        }
+        if (!MassBombers() && AirMath::MassBombersReady(CompletedAfus(), Global::RoleSettings::Air::MassBomberAfusCount)) {
+            aiTerrainMgr.SetLayoutInt("air.massBombers", 1);
+            GenericHelpers::LogUtil("[AIR][Growth] mass bombers enabled; completed AFUS=" + CompletedAfus(), 1);
+        }
+    }
     bool HasReactor()
     {
         const string side = Global::AISettings::Side;
@@ -140,10 +163,11 @@ namespace AirEconomy {
         work = 0.0f; costM = 0.0f; costE = 0.0f;
         if (f is null) return;
         work = f.GetBuildTime(); costM = f.costM; costE = f.costE;
-        if (b !is null) {
+        if (b !is null && (!advanced || MassBombers())) {
             // Forecast the current order mix, not the old fixed seven/three.
             const float strikes = float(AirMath::BomberOrders(AirProduction::AvailableFighterValue(), EnemyAir(),
-                Global::RoleSettings::Air::BomberOrdersClear, Global::RoleSettings::Air::BomberOrdersParity));
+                MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersClear : Global::RoleSettings::Air::BomberOrdersClear,
+                MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersParity : Global::RoleSettings::Air::BomberOrdersParity));
             const float fighters = 10.0f - strikes;
             work = (work * fighters + b.GetBuildTime() * strikes) / 10.0f;
             costM = (costM * fighters + b.costM * strikes) / 10.0f;
@@ -212,6 +236,7 @@ namespace AirEconomy {
     {
         if (!Active() || (sampleFrame >= 0 && ai.frame - sampleFrame < SECOND)) return;
         sampleFrame = ai.frame;
+        UpdateMilestones();
         LayoutHelpers::CheckAlliedPlacements();
         AirLayout::PlanAhead();
         if (aiEconomyMgr.assistNanoEnabled)

@@ -57,13 +57,14 @@ function widget:GameFrame(f)
         stage=1
         give(prefix=="cor" and "corveng" or prefix.."fig",0,2400,11200,20)
         give(prefix=="leg" and "legmos" or prefix=="cor" and "corshad" or "armthund",0,2600,11200,6)
-        give("armsolar",1,3300,8200,8);give("armwin",1,3500,8300,12)
+        give("armsolar",1,3300,8200,8);give("armwin",1,3500,8300,12);give("armmex",1,3200,8000,3)
         give("corshad",1,2700,10800,2);give("corveng",1,3000,10700,2)
         echo("stage=1 early raid")
     end
     if f==7200 then
         stage=2
-        give(bombers[prefix],0,2600,11200,16);give(fighters[prefix],0,2400,11200,30)
+        give(prefix.."afus",0,2000,12500,2) -- explicit economic milestone; still a supplied combat fixture
+        give(bombers[prefix],0,2600,11200,24);give(fighters[prefix],0,2400,11200,30)
         give("armfus",1,3700,7000,1);give("armflak",1,3900,7000,1)
         give("corhurc",1,2800,10800,2);give("corvamp",1,3000,10700,3)
         echo("stage=2 mid strike with flak")
