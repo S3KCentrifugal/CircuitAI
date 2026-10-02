@@ -1,7 +1,22 @@
 # Metal maps: change proposal
 
 Date: 2026-10-02. **Status: proposed. No code, configuration or decision record has
-been changed.**
+been changed by the original proposal.**
+
+**Review status (2026-10-02): revise before implementation.** The
+[source verification](reviews/2026-10-02-metal-maps-proposal-review.md) confirms
+the central diagnosis but identifies required corrections to shared mode
+initialization, income units, AIR opening termination, task persistence, economy
+math and normal-map regression coverage. Its findings qualify the claims below;
+this document remains the original research proposal. The review adds D-168 and
+KI-469–471; it changes no gameplay code or configuration.
+
+**Researched solutions (2026-10-02):** the
+[revised design](metal-maps-revised-design.md) answers all nine review findings
+and supersedes the corresponding recommendations below. It uses marginal mex
+economics, actual production costs and map-specific space constraints, and
+separates verified mechanics from unvalidated player timing claims. No gameplay
+implementation has been applied.
 
 This proposal comes from a read-only review of the engine (Recoil `92efda5e60`), the
 game (BAR `1d267c20d1`), the Skirmish AI C++ and the AngelScript. The AI was reviewed

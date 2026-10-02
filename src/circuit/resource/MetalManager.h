@@ -66,7 +66,7 @@ public:
 public:
 	void SetOpenSpot(int index, bool value);
 	void SetOpenSpot(const springai::AIFloat3& pos, bool value);
-	bool IsOpenSpot(int index) const { return metalInfos[index].isOpen; }
+	bool IsOpenSpot(int index) const { return index >= 0 && std::size_t(index) < metalInfos.size() && metalInfos[index].isOpen; }
 	bool IsOpenSpot(const springai::AIFloat3& pos) const;
 	void MarkAllyMexes();
 	void MarkAllyMexes(const std::vector<CAllyUnit*>& mexes);

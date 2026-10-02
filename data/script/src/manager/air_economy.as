@@ -17,8 +17,15 @@ namespace AirEconomy {
     array<int> nanoFuture;
 
     bool Active() { return Global::AISettings::Role == AiRole::AIR && AirLayout::enabled; }
-    bool TechGrowth() { return aiTerrainMgr.GetLayoutInt("air.techGrowth", 0) != 0; }
-    bool MassBombers() { return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0; }
+    bool TechGrowth() { return !MetalEconomy::Active() && aiTerrainMgr.GetLayoutInt("air.techGrowth", 0) != 0; }
+    bool MassBombers() {
+        if (MetalEconomy::Active()) {
+            CCircuitDef@ bomber = ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side));
+            return t2 > 0 && bomber !is null && bomber.costM > 0
+                && MetalMath::Sustainable(metal, energy, 30, bomber.costE / bomber.costM) >= 30;
+        }
+        return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0;
+    }
     int CompletedAfus() {
         int count = 0;
         array<Id>@ ids = ai.GetOwnedUnitIds();
@@ -30,6 +37,7 @@ namespace AirEconomy {
         return count;
     }
     void UpdateMilestones() {
+        if (MetalEconomy::Active()) return;
         if (!TechGrowth() && AirMath::GrowthPhase(Economy::IncomeWindowReady(), Economy::GetMinMetalIncomeLast10s(),
             Global::RoleSettings::Air::TechEconomyMinMetal)) {
             aiTerrainMgr.SetLayoutInt("air.techGrowth", 1);
@@ -330,6 +338,8 @@ namespace AirEconomy {
     }
     bool Transition(CCircuitDef@ plant)
     {
+        if (MetalEconomy::Active()) return t2 == 0 ? MetalEconomy::AirScreenReady()
+            : MetalEconomy::Funded(plant) && MetalMath::Sustainable(metal, energy, 30, 40) >= 15;
         return plant !is null && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
             Economy::IncomeWindowReady(), Global::RoleSettings::Air::TransitionMinMetal, aiEconomyMgr.metal.current, plant.costM);
     }
@@ -358,6 +368,11 @@ namespace AirEconomy {
     }
     float ConstructionTarget()
     {
+        if (MetalEconomy::Active()) return ProductionMath::ConstructionPower(
+            AiMax(8.0f, MetalMath::Sustainable(metal, energy, 30, 10)),
+            AiMin(aiEconomyMgr.metal.current, metal * 20), aiEconomyMgr.metal.storage,
+            Global::RoleSettings::Air::EconomyBuildPowerPerMetal, Global::RoleSettings::Air::BuildPowerFloatFactor,
+            Global::RoleSettings::Air::BuildPowerBankDrainSeconds);
         return ProductionMath::ConstructionPower(metal, aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage,
             Global::RoleSettings::Air::EconomyBuildPowerPerMetal, Global::RoleSettings::Air::BuildPowerFloatFactor,
             Global::RoleSettings::Air::BuildPowerBankDrainSeconds);

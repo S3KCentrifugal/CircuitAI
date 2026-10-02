@@ -1691,3 +1691,27 @@ Radius and expiry are AIR script policy; no exclusion applies by default.
 ## D-167: compact AIR factory compounds
 
 `aiTerrainMgr.PlanAirFactoryCluster(name, firstFactory, repeatedFactory, nanoDef, origin, facing, count, columns, firstNanos)` atomically plans up to six flying-output factories. It uses actual UnitDef footprints and the shared half-cell/reservation engine. Existing exit lanes, allied reservations, every footprint and support reach are preflighted. Internal ground exit lanes are omitted only in this transaction. Named layout integers `name + ".bay.N.slot"`, `.nano.N`, `.n`, plus `name + ".count"` and `.envelope` expose ordinary persistent reservation IDs to policy. Each building has its own zone, so releasing a pin cannot erase sibling slots. Failed commits release all created pins; successful state uses existing native serialization. The call does not set TECH factory-front/line state. Callers must release an unused prior compound before retrying the same name.
+
+
+## D-170 metal-field economy API
+
+The following methods are registered on `aiEconomyMgr` in EconomyScript.cpp:
+`bool IsMetalMap() const`, `int GetEffectiveUnitLimit() const`,
+`int GetFieldMexCount(const AIFloat3& in, float) const`,
+`float GetFieldYield(const CCircuitDef@, const AIFloat3& in)`, and
+`IUnitTask@+ EnqueueFieldUpgrade(CCircuitUnit@, const AIFloat3& in, float)`.
+The existing `EnqueueMexWithin` dispatches to bounded field search when enabled.
+GetFieldYield returns isolated M/s, zero outside metal mode and -1 when its cell
+budget cannot complete. GetFieldMexCount counts owned units/frames and untargeted
+queued mex orders in the radius. EffectiveUnitLimit returns zero when no owned
+unit can expose the engine limit. Returned task ownership follows the existing
+manager-owned AddRef convention. See [implementation](metal-maps-implementation.md).
+
+
+`aiTerrainMgr.PlanMexCluster(name, mexDef, origin, facing, columns, rows)` is
+metal-mode only. It atomically reserves a snapped dense extraction module,
+using the shared native slot geometry, allied reservation checks and persistent
+layout state. Membership is 1..8 in each dimension. Policy reads `name + ".n"`,
+`.slot.N`, `.zone`, and `.started`; failed commits roll back their slots.
+MetalLayout chooses eight-mex modules, replans blocked unused modules and
+preplans at least forty sites. Extra demand may add further modules.

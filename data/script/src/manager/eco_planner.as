@@ -429,6 +429,12 @@ namespace EcoPlanner {
         if (s.t2Lab || s.t2LabQueued > 0 || s.builderDef is null) return "";
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         if (lab is null || !lab.IsAvailable(ai.frame) || !s.builderDef.CanBuild(lab)) return "";
+        if (MetalEconomy::Active()) {
+            MetalEconomy::Read();
+            if (MetalEconomy::workers[2] < 0) return "";
+            why = "metal field: third constructor initiates T2";
+            return "t2lab";
+        }
         if (s.mIncome < Global::RoleSettings::Tech::MinimumMetalIncomeForT2Lab
             || s.eIncome < Global::RoleSettings::Tech::MinimumEnergyIncomeForT2Lab) {
             if (ai.frame - lastT2GateLog > 60 * SECOND) {
@@ -617,8 +623,10 @@ namespace EcoPlanner {
     // caller continues its ladder and never spirals for it (D-063).
     IUnitTask@ Enqueue(const string &in key, CCircuitUnit@ u)
     {
+        if (MetalEconomy::Active() && (key == "t1conv" || key == "advconv")) return null;
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
         if (key == "mexup") {
+            if (MetalEconomy::Active()) return aiEconomyMgr.EnqueueFieldUpgrade(u, Global::Map::StartPos, MetalEconomy::HomeRadius);
             CCircuitDef@ t2mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
             AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
                 Global::RoleSettings::MexUpgradeRadius);
@@ -657,6 +665,7 @@ namespace EcoPlanner {
     // reactor under construction instead" rule, then Execute.
     string Next(CCircuitUnit@ u, float metalIncome, float energyIncome)
     {
+        if (MetalEconomy::Active()) return ""; // one field controller owns economy selection
         // With the experimental system on, the rule table (roles/tech_rules.as)
         // calls the Pick* pieces itself and this entry answers nothing, so the
         // legacy rungs it still reuses cannot run the planner a second time.

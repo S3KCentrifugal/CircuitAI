@@ -621,6 +621,10 @@ def watch(args):
             reason = reason or "reached %.0f min" % stop_minute
             break
         if not alive and frame > 0:
+            # The engine can flush its final seconds while running_pids polls.
+            # Consume that tail before deciding an accelerated run ended early.
+            if info.exists() and info.stat().st_size > pos:
+                continue
             verdict = verdict or ("FAIL" if frame < stop_frame else "PASS")
             reason = reason or "engine exited at %.1f min" % minute(frame)
             break

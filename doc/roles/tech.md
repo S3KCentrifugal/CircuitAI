@@ -1,5 +1,13 @@
 # TECH Role
 
+D-170 gives metal-field TECH a first T1 constructor assigned to forty dense
+mexes, a second assigned to power, and a third initiating T2. Dedicated workers
+skip discretionary defense/frontline rows; ferry ownership, current construction
+and the existing lab reclaim rules keep precedence. Other economic work uses
+`MetalEconomy::EconomyTask` at mex.expand. Metal mode keeps useful wind and excludes
+conversion/rush-chain economy. Normal TECH retains its prior decision path. See
+[implementation and validation](../metal-maps-implementation.md).
+
 D-136: `TechFlank::Tick` maintains the separate accessible mountain-flank
 factory. Its production and routing hooks leave ordinary TECH production
 available; see [specialist flank production](tech_flank.md).
@@ -906,7 +914,7 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: f7a4a79da60ee93aacfafc2db9ea81637ef481ee; lines: 2737 -->
+<!-- source: data/script/src/roles/tech.as; blob: 59eaa0797a24d3397ebac903709804da59d1af0d; lines: 2740 -->
 
 ## D-152 protected expansion
 

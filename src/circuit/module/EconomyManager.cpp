@@ -135,6 +135,7 @@ void CEconomyManager::InitHandlers()
 		UnitRemoved(unit, UseAs::GEO);
 	};
 	auto mexFinishedHandler = [this](CCircuitUnit* unit) {
+		if (metalMap) { UnitAdded(unit, UseAs::MEX); return; } // measured income owns field accounting
 //		const float income = unit->GetUnit()->GetRulesParamFloat("mexIncome", 0.f);
 		CMetalManager* metalMgr = this->circuit->GetMetalManager();
 		int index = metalMgr->FindNearestSpot(unit->GetPos(this->circuit->GetLastFrame()));
@@ -261,6 +262,15 @@ void CEconomyManager::InitHandlers()
 
 	for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
 		const std::map<std::string, std::string>& customParams = cdef.GetDef()->GetCustomParams();
+		if (metalMap) {
+			const auto capacity = customParams.find("energyconv_capacity");
+			const auto efficiency = customParams.find("energyconv_efficiency");
+			if (capacity != customParams.end() && efficiency != customParams.end()
+				&& utils::string_to_float(capacity->second) > 0 && utils::string_to_float(efficiency->second) > 0) {
+				fieldConverters.insert(cdef.GetId());
+				cdef.SetBuildAllowed(false);
+			}
+		}
 
 		if (!cdef.IsMobile()) {
 			// FIXME: Either assign score to different types of structure category,
@@ -412,6 +422,7 @@ void CEconomyManager::ReadConfig(float& outMinEInc)
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
 	const Json::Value& econ = root["economy"];
+	InitMetalField();
 	ecoStep = econ.get("eps_step", 0.25f).asFloat();
 	ecoFactor = (circuit->GetAllyTeam()->GetSize() - 1.0f) * ecoStep + 1.0f;
 	metalMod = (1.f - econ.get("excess", -1.f).asFloat());
@@ -990,6 +1001,8 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos) const
 IBuilderTask* CEconomyManager::EnqueueMexWithin(
 		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
 {
+	if (metalMap) return (maxSpots > 0 && GetFieldMexCount(center, radius) >= maxSpots)
+		? nullptr : EnqueueFieldMex(builder, center, radius);
 	if ((builder == nullptr) || (builder->GetCircuitDef() == nullptr)) {
 		return nullptr;
 	}
@@ -1280,11 +1293,13 @@ bool CEconomyManager::IsAllyOpenMexSpot(int spotId) const
 
 bool CEconomyManager::IsOpenMexSpot(int spotId) const
 {
+	if (spotId < 0 || std::size_t(spotId) >= mexSpots.size()) return false;
 	return mexSpots[spotId].isOpen && ((isAllyMexMax ? circuit->GetMetalManager()->GetMexCount() : mexCount) < mexMax);
 }
 
 void CEconomyManager::SetOpenMexSpot(int spotId, bool value)
 {
+	if (spotId < 0 || std::size_t(spotId) >= mexSpots.size()) return;
 	if (mexSpots[spotId].isOpen == value) {
 		return;
 	}
@@ -1391,6 +1406,19 @@ IBuilderTask* CEconomyManager::UpdateMetalTasks(const AIFloat3& position, CCircu
 {
 	assert(unit != nullptr);
 	ZoneScoped;
+	if (metalMap) {
+		const float ratio = fieldLegacyEnergyRatio;
+		if (IsEnergyStalling() || GetAvgEnergyIncome() < std::max(100.f, GetAvgMetalIncome() * ratio)) {
+			IBuilderTask* energyTask = UpdateEnergyTasks(position, unit);
+			if (energyTask != nullptr) return energyTask;
+		}
+		if (IsMetalFull()) return nullptr;
+		const auto& home = circuit->GetSetupManager()->GetStartPos();
+		const float radius = fieldHomeRadius;
+		IBuilderTask* mex = EnqueueFieldMex(unit, home, radius);
+		if (mex != nullptr) return mex;
+		return IsMetalEmpty() ? EnqueueFieldUpgrade(unit, home, radius) : nullptr;
+	}
 
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	if (!builderMgr->CanEnqueueTask(16)) {
@@ -2565,6 +2593,7 @@ int CEconomyManager::GetEnergyLimit(CCircuitDef* cdef) const
 
 void CEconomyManager::ReclaimOldEnergy(const SEnergyExt* energyExt)
 {
+	if (metalMap) return; // density retirement belongs to the metal-map script policy
 	float energyIncome = GetAvgEnergyIncome();
 	if (circuit->IsLoadSave() || (reclEnergyEff <= 0.f) || (energyIncome < energyExt->cond.energyIncome)) {
 		return;

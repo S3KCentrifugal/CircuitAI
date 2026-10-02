@@ -36,7 +36,7 @@ namespace Invariants {
     void OnUnitAdded(CCircuitUnit@ u)
     {
         if (u is null || u.circuitDef is null || !u.circuitDef.IsMobile()) return;
-        if (Lifecycle::RetiringNear(u.GetPos(ai.frame), Global::RoleSettings::Tech::InvariantFactoryRadius))
+        if (u.GetProducerId() >= 0 && Lifecycle::IsRetiringId(u.GetProducerId()))
             Violation("INV-001", "" + u.id, "a retiring factory produced " + u.circuitDef.GetName() + " " + u.id);
         // INV-010: no mobile combat unit under the plan's income gate (D-080)
         const string name = u.circuitDef.GetName();
@@ -134,7 +134,7 @@ namespace Invariants {
         // after an advanced fusion does (the owner's rule, D-077).
         const string side = Global::AISettings::Side;
         CCircuitDef@ afus = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
-        if (afus !is null && afus.count - aiBuilderMgr.GetUnfinishedCount(afus) > 0) {
+        if (!MetalEconomy::Active() && afus !is null && afus.count - aiBuilderMgr.GetUnfinishedCount(afus) > 0) {
             if (afusSince < 0) afusSince = ai.frame;
             else if (ai.frame - afusSince >= int(Global::RoleSettings::Tech::InvariantReclaimSeconds) * SECOND) {
                 int left = 0;
@@ -149,7 +149,7 @@ namespace Invariants {
         // INV-009: no energy structure is ordered while energy floats (the
         // owner's rule, D-079): a new energy frame appearing while it floats.
         {
-            const bool floats = TechChain::EnergyFullSeconds() >= Global::RoleSettings::Tech::InvariantFloatOrderSeconds;   // long enough that the order was made while floating
+            const bool floats = !MetalEconomy::Active() && TechChain::EnergyFullSeconds() >= Global::RoleSettings::Tech::InvariantFloatOrderSeconds;   // metal fields fund production directly; no converter rung
             array<string> energy = { UnitHelpers::GetWindNameForSide(side), UnitHelpers::GetSolarNameForSide(side), UnitHelpers::GetAdvSolarNameForSide(side),
                                      UnitHelpers::GetFusionNameForSide(side), UnitHelpers::GetAdvFusionNameForSide(side) };
             for (uint i = 0; i < energy.length(); ++i) {
@@ -247,7 +247,7 @@ namespace Invariants {
             CCircuitDef@ fd = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
             const int frames = (fd is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(fd);
             // not while the metal floats (the fusion then goes ahead on purpose, D-100)
-            if (frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
+            if (!aiEconomyMgr.IsMetalMap() && frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
                 const AIFloat3 t1 = Economy::MexTracker::GetNearestNonUpgradedMexInRange(Global::Map::StartPos, Global::Map::StartPos,
                     Global::RoleSettings::Tech::ChainMohoRadius);
                 if (t1.x >= 0.0f)

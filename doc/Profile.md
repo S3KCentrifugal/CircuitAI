@@ -28,3 +28,10 @@ Root contains fallback AI config parts. Folders contain configs for each `<profi
 As with script fastest way to create initial config parts for `customlol` is to copy `dev` folder and rename it to `customlol`.
 
 After those steps new `My custom profile` should appear in the list of available profiles for BARbarIAn in the lobby.
+
+
+D-170 adds the shared `metal_map` fragment immediately after `economy` in every
+active profile init. Its native admission settings apply to experimental and
+legacy profiles; its expensive work runs only after explicit field detection.
+Experimental role economic decisions remain in `MetalEconomy`. See
+[metal-map implementation](metal-maps-implementation.md).

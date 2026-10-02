@@ -1,5 +1,9 @@
 # tech_chain.as - the rush chain: one objective, one computed build order
 
+D-170 returns from `TechChain::Init` on detected metal fields. The separate
+MetalEconomy controller owns extraction and energy; normal-map rush objectives
+and the ordered lab reclaim/rebuild rules retain their existing behavior.
+
 Script: [`data/script/src/roles/tech_chain.as`](../../data/script/src/roles/tech_chain.as),
 namespace `TechChain`. Decision:
 [D-070](../decisions.md#d-070--the-tech-rush-chain-one-objective-one-computed-build-order-then-the-economy).
@@ -169,4 +173,4 @@ happen by construction, and the check says so if it does. See
 - [`tech_build.md`](tech_build.md) - the acts.
 - [`../eco-planner.md`](../eco-planner.md) - the economy that continues after the chain.
 
-<!-- source: data/script/src/roles/tech_chain.as; blob: 0bb707c677fa977a3253dbae79135c8eda36ab81; lines: 689 -->
+<!-- source: data/script/src/roles/tech_chain.as; blob: 22cb6e425f04a45f54899c1fa489f6acf7f0f83b; lines: 690 -->

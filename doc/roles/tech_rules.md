@@ -1,5 +1,12 @@
 # tech_rules.as - TECH's build rules as one ordered table
 
+D-170 leaves the normal table unchanged. On metal fields, `OpeningWorker`
+protects the first mex worker, second power worker and initial third-constructor
+T2 transition from discretionary front/defense work. Ferry and existing lab
+reclaim rules retain precedence; `DedicatedTask` runs at `power.t1`, and the
+general `EconomyTask` at `mex.expand`. Converter/rush-chain rows are skipped.
+INV-113 checks selected discretionary rules against those worker identities.
+
 D-136 adds `flank.factory` / `DoFlankFactory` after `air.dedicated`, calling
 `TechFlank::Work` for an accessible specialist lane at +200 metal. It precedes
 forward defenses and the economic chain; ongoing construction stays first.
@@ -141,7 +148,7 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: c447469bf26283440be4946bbe2b07fd7b0e7878; lines: 570 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: aac069f2063d4c9688c70d996f5c66db845cad82; lines: 599 -->
 
 ## D-152 fortification rule
 

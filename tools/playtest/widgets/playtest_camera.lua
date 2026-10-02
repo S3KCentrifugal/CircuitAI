@@ -91,8 +91,10 @@ end
 local function lookAt(x, z, height)
 	local y = Spring.GetGroundHeight(x, z) or 0
 	Spring.SendCommands("viewta")
-	Spring.SetCameraTarget(x, y, z, 0)
-	Spring.SetCameraState({ height = height, dist = height }, 0)
+	-- A partial state can restore the previous controller position after a
+	-- target jump. Set the TA controller and target coordinates atomically.
+	Spring.SetCameraState({mode=1, px=x, py=y, pz=z, height=height, angle=0.15, flipped=-1}, 0)
+	echo(string.format("camera requested (%d,%d) height=%d", x, z, height))
 end
 
 local function dumpTeams(n)
@@ -140,7 +142,13 @@ function widget:GameFrame(n)
 		echo("BARb AI window closed for the screenshots")
 	end
 	if n % 1800 == 0 then dumpEco(n) end
-	if n == 1 then Spring.SendCommands("luaui disablewidget Autoquit") end
+	if n == 1 then
+		Spring.SendCommands("luaui disablewidget Autoquit")
+		-- The spectator TV can replace the requested camera during its render
+		-- settling interval. Disable it only in this isolated test UI.
+		Spring.SendCommands("luaui disablewidget Player-TV")
+		if widgetHandler and widgetHandler.DisableWidget then widgetHandler:DisableWidget("Player-TV") end
+	end
 	if n == 1 or n == 90 then dumpTeams(n) end
 	if n == 1 and CFG.speed and CFG.speed > 1 then
 		Spring.SendCommands({ "setmaxspeed " .. CFG.speed, "setminspeed " .. CFG.speed })

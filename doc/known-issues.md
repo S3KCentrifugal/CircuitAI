@@ -3686,6 +3686,7 @@ their detail here; add the pointer and keep the one-line summary accurate.
 | KI-463 - Transient AIR routes survive aircraft loss | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Home/staging/scout route tasks can remain scheduled empty after losses. Add opt-in transient lifetime or safe owner cleanup; preserve persistent Spam/amphibious routes. Verify bounded task/memory counts over repeated deaths and transfers. |
 | KI-464 - Repeated AIR economy, target and layout computation | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Per-project ownership scans, per-target enemy scans, square-per-ring enumeration and per-candidate exit-list rebuilding repeat work. Use revision-aware aggregates/indexes and budgeted exact searches; preserve admission/visibility/placement rules and benchmark p99 cost. |
 | KI-465 - Script slow updates exclude AI IDs 30 and above | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | CircuitAI::Update compares frame modulo 30 with raw skirmishAIId. Reduce the ID modulo the interval, retaining phases 0-29; verify IDs 29/30/31 and recreation. Source-checked, unimplemented and unplayed. |
+| KI-469-471 - Metal-map support and source corrections | [Metal-map proposal review](reviews/2026-10-02-metal-maps-proposal-review.md) | D-170 implements field support and dense openings; [implementation](metal-maps-implementation.md). Remaining validation and TECH findings: KI-472. KI-471 documentation corrected. |
 
 ## Maintaining this register
 
@@ -3861,3 +3862,136 @@ live-install settings changes or changes to AI unit orders.
 directory and inspect that labs/nanos/eco are in view at each timestamp. See
 [playtest camera](../tools/playtest/widgets/playtest_camera.lua) and
 [D-167 results](air-cluster-reclaim-results.md). Unfixed test tooling issue.
+
+
+### KI-469 - Mex task index safety and cancellation ownership
+
+**Severity.** High. **Location.** Native MexTask/MexUpTask and economy/metal
+spot accessors; see F1 and F4 in the
+[metal-map review](reviews/2026-10-02-metal-maps-proposal-review.md).
+
+**Problem.** Positional MEXUP tasks can use -1 with unguarded indexed accessors.
+MexTask::Reevaluate assigns valid spot zero before aborting, so Cancel may reopen
+an unrelated allied spot. Changing zero to -1 changes a defined normal-map path,
+not just undefined behavior. Positional upgrades also fail the current Load
+spot-validation check. This extends KI-210's objective-placement diagnosis.
+
+**Proposed solution.** Repair bounds and cancellation ownership separately from
+metal-map policy. Give positional upgrades their own reservation/target identity
+and restore contract rather than treating a bounds-check no-op as an upgrade lock.
+Keep the legacy indexed path intact apart from explicitly verified repairs. See the
+[tagged lifecycle design](metal-maps-revised-design.md#5-tasks-pins-and-saveload).
+
+**Verification.** Source-confirmed, unfixed. Test invalid indices, cancellation
+with spot zero occupied by an ally, duplicate upgrades and save/load before/after
+frame creation; then repeat ordinary-map games against the corrected baseline.
+
+### KI-470 - Continuous metal fields still use sparse spots and normal economy
+
+**Severity.** High. **Location.** ParseMetalSpots, UpdateMetalTasks and role
+policy; indexed by the [proposal](metal-maps-proposal.md) and its
+[review](reviews/2026-10-02-metal-maps-proposal-review.md).
+
+**Problem.** Native fallback subsampling and finite-spot assumptions restrict
+metal-field expansion, while converter and upgrade priorities consume resources
+as if metal were scarce. Existing headless runs demonstrate the symptoms but
+fail smoke checks and do not validate current TECH or D-167 AIR layouts.
+
+**Proposed solution.** Incorporate review F2-F9 before implementation: early
+unambiguous mode selection, typed yield accounting, positional task lifecycles,
+bounded AIR opening, noncircular economy math, owned layout pins and separate
+legacy-profile support. Preserve false-mode data, random calls and policy. The
+[revised design](metal-maps-revised-design.md) now specifies the field service,
+workload economy, metal-only policy recommendations and staged acceptance gates.
+These are proposed solutions, not an implemented fix.
+
+**Verification.** Current behavior source-verified and observed in the proposal's
+older baseline runs; no fix implemented. Follow the review's normal/metal map,
+profile, save/load and performance matrix with correctly logged actual roles.
+
+### KI-471 - Shared metal-map knowledge confuses footprint and extraction area
+
+**Severity.** Medium. **Location.** Shared knowledge page
+[27-metal-maps-and-spots.md](../../rjm.bar.docs/knowledge/20-game-mechanics/27-metal-maps-and-spots.md).
+
+**Problem.** The page describes yield as a sum over the rectangular building
+footprint, citing CMetalMap's rectangle helper. Recoil ExtractorBuilding actually
+iterates metal-cell centers inside extractionRange, using a strict circle test.
+Using the page's model would produce wrong field yield and overlap calculations.
+
+**Proposed solution.** Correct the shared game-mechanics page with the verified
+engine source and distinguish placement footprint, extraction radius, deposit
+potential and marginal yield. Keep AI-specific admission policy in CircuitAI.
+
+**Verification.** Source-confirmed at Recoil 92efda5e60; not corrected in this
+review. Appendix B's circle counts were independently recounted. See the
+[review's evidence section](reviews/2026-10-02-metal-maps-proposal-review.md#evidence-and-factual-corrections).
+
+
+**Resolution (2026-10-02).** The shared page now describes strict extraction
+circles, overlap contributions, the separation from construction footprints,
+and the raw-byte mean returned by the engine average-income callback. Verified
+against the pinned engine source and linked to the new metal-map gameplay
+research. This resolves the documentation error only; KI-469/470 and runtime
+metal-map behavior remain unfixed. Original diagnosis retained for provenance.
+
+
+### D-170 follow-up to KI-469, KI-470 and KI-468 (2026-10-02)
+
+KI-469: implemented bounds checks, the invalid cancellation sentinel, owned
+field task/upgrade identities and appended tagged save payloads. Unit tests
+cover claim overlap, cancellation ownership and restored key allocation.
+Rendered games cover construction/upgrade paths. The controlled cancellation
+fixture verifies that a served unframed mex returns its layout pin. Engine
+save/load remains a validation gap; this is not a complete save/load closure.
+
+KI-470: implemented continuous-field detection/search, converter admission veto,
+legacy adapter and experimental AIR/TECH dense mex modules and dedicated workers.
+All four players reached forty mexes on Nine Metal Islands. Repeated metal games
+and normal-map controls are recorded in [results](metal-maps-results.md).
+The full invariant suite is not clean; see KI-472. Earlier diagnosis retained.
+
+KI-468 camera follow-up: an atomic overhead camera state alone did not defeat
+Player-TV's later camera changes. Isolated playtests now disable that spectator
+widget. Full Metal Plate, Nine Metal Islands and Glacial captures subsequently
+show the requested bases. No live install or user camera settings were edited.
+
+### KI-472 - Full invariant and performance validation remains incomplete after metal-map support
+
+**Problem.** Focused D-170 field checks pass while full games still report TECH
+production, retirement, build-power and geometry invariant failures. SpeedMetal
+logs retiring-factory production (INV-001), insufficient local build power
+(INV-004), missing flush support (INV-017) and early production (INV-010).
+Nine Metal Islands records INV-013/025/029/017/010. Ordinary Supreme/Glacial
+controls also report invariant failures, some shared with their before-change
+baselines. A different occurrence count in unseeded combat games does not prove
+or disprove a regression. AIR and legacy profiles can still bank considerable
+metal or stall energy despite much higher extraction; no optimal-PvP claim.
+
+**Proposed solution.** Preserve the owner's exact TECH lab reclaim/rebuild
+sequence while investigating actual producer/retirement state (KI-416), explicit
+factory ownership/support (KI-451/452) and affordable spending (KI-442). Use
+seeded before/after games and targeted fixtures. Complete actual engine
+save/load, full profile/faction/terrain matrix and measured 8v8 callback/APM
+p95/p99 profiling; candidate/cell budgets alone are not an FPS guarantee.
+
+**Verification.** Native unit/policy suites and focused rendered observations
+passed; full reports remain FAIL wherever any invariant is logged. See the
+[retained measurements and limits](metal-maps-results.md). Do not hide those
+findings by accepting the focused audit as the overall game verdict.
+
+### KI-473 - Unit-helper validation still reports unreachable static sonars
+
+**Problem.** The unit-helper checker reports armsonar/corsonar references in
+tech_weapons.as as unreachable.
+This file is unchanged by D-170. The checker also reports the informational
+Abductor air-combat-list gap; that is not evidence to classify a transport as
+combat without a separate roster review.
+
+**Proposed solution.** Reconcile the cached build graph, current BAR menus and
+TECH's actual sensor choices, then repair the references or availability logic
+with a focused sensor-placement test. Do not change the unit roster as part of
+the metal-economy patch.
+
+**Verification.** Reproduced with check_unit_helpers.py against BAR 1d267c20d1.
+The separate eight broken hover.md links are already recorded as KI-404.

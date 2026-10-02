@@ -1,6 +1,8 @@
 // AIR's persistent advanced-economy modules, independent of the aircraft campus.
 // Slots/claims and allied exclusion remain owned by the native layout service.
 namespace AirEcoLayout {
+    string Prefix() { return aiEconomyMgr.IsMetalMap() ? "air.fieldEco." : "air.eco."; }
+    int ConverterSlots() { return aiEconomyMgr.IsMetalMap() ? 0 : 8; }
     class Module {
         string key;
         string side;
@@ -15,7 +17,7 @@ namespace AirEcoLayout {
 
     void Save(Module@ m)
     {
-        aiTerrainMgr.SetLayoutInt("air.eco.count", int(modules.length()));
+        aiTerrainMgr.SetLayoutInt(Prefix() + "count", int(modules.length()));
         aiTerrainMgr.SetLayoutInt(m.key + ".zone", m.zone);
         aiTerrainMgr.SetLayoutInt(m.key + ".facing", m.facing);
         aiTerrainMgr.SetLayoutInt(m.key + ".started", m.started ? 1 : 0);
@@ -26,10 +28,10 @@ namespace AirEcoLayout {
     void Init()
     {
         modules.resize(0); retryAfter = 0; planFrame = -100000;
-        const int count = aiTerrainMgr.GetLayoutInt("air.eco.count", 0);
+        const int count = aiTerrainMgr.GetLayoutInt(Prefix() + "count", 0);
         for (int i = 0; i < count; ++i) {
             Module m;
-            m.key = "air.eco." + i;
+            m.key = Prefix() + i;
             m.zone = aiTerrainMgr.GetLayoutInt(m.key + ".zone", 0);
             m.facing = aiTerrainMgr.GetLayoutInt(m.key + ".facing", AirLayout::facing);
             m.started = aiTerrainMgr.GetLayoutInt(m.key + ".started", 0) != 0;
@@ -67,9 +69,9 @@ namespace AirEcoLayout {
         const float cw = float(converter.GetFootprintX()) * SQUARE_SIZE;
         const float cd = float(converter.GetFootprintZ()) * SQUARE_SIZE;
         const float pitch = 2.0f * cw + 16.0f;
-        const float across = AiMax(rw, 1.5f * pitch + cw) + 16.0f;
+        const float across = (ConverterSlots() == 0 ? rw : AiMax(rw, 1.5f * pitch + cw)) + 16.0f;
         const float bankZ = rd + Global::RoleSettings::Air::EcoConverterClearance + cd;
-        const float front = bankZ + 3.0f * cd + 16.0f;
+        const float front = ConverterSlots() == 0 ? rd : bankZ + 3.0f * cd + 16.0f;
         const float along = (front + rd) * 0.5f + 16.0f;
         const float shift = (front - rd) * 0.5f;
         // Fine candidate spacing can move an unused module around one blocker
@@ -104,14 +106,14 @@ namespace AirEcoLayout {
                 if (first < 0) continue;
                 slots.insertLast(first);
                 at = aiTerrainMgr.GetReservationPos(first);
-                for (int s = 0; s < 8; ++s) {
+                for (int s = 0; s < ConverterSlots(); ++s) {
                     const AIFloat3 p = AirLayout::Offset(at, f, (float(s % 4) - 1.5f) * pitch,
                         bankZ + float(s / 4) * (2.0f * cd + 16.0f));
                     const int id = aiTerrainMgr.ReservePersistentBuilding(converter, p, f);
                     if (id < 0) break;
                     slots.insertLast(id);
                 }
-                if (slots.length() != 9) {
+                if (slots.length() != uint(1 + ConverterSlots())) {
                     for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
                     continue;
                 }
@@ -121,13 +123,13 @@ namespace AirEcoLayout {
                     continue;
                 }
                 Module@ m = reuse is null ? Module() : reuse;
-                if (reuse is null) m.key = "air.eco." + modules.length();
+                if (reuse is null) m.key = Prefix() + modules.length();
                 m.side = side; m.facing = f; m.slots = slots;
                 m.zone = envelope;
                 if (reuse is null) modules.insertLast(m);
                 Save(m);
                 GenericHelpers::LogUtil("[AIR][EcoLayout] reserved " + m.key + " reactor=" + int(at.x) + "," + int(at.z)
-                    + " converters=8 zone=" + m.zone, 1);
+                    + " converters=" + ConverterSlots() + " zone=" + m.zone, 1);
                 return m;
             }
         }
@@ -148,6 +150,7 @@ namespace AirEcoLayout {
     void PlanAhead()
     {
         if (!AirLayout::enabled || ai.frame - planFrame < SECOND) return;
+        if (MetalEconomy::Active() && AirLayout::bays.length() == 0) return;
         planFrame = ai.frame;
         int active = 0, planned = 0;
         Module@ retry = null;
@@ -186,7 +189,7 @@ namespace AirEcoLayout {
                 IUnitTask@ task = AirLayout::Pinned(type, priority, d, slot);
                 if (task is null) continue;
                 m.started = true; Save(m);
-                if (m.zone <= 0 || m.slots.length() != 9)
+                if (m.zone <= 0 || m.slots.length() != uint(1 + ConverterSlots()))
                     Invariants::Violation("INV-107", m.key, "AIR advanced economy order lacks its complete reserved module");
                 GenericHelpers::LogUtil("[AIR][EcoLayout] place " + d.GetName() + " in " + m.key + " slot=" + slot, 1);
                 return task;

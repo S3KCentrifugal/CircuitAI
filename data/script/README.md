@@ -192,3 +192,13 @@ code.
 4. Validate every configured UnitDef against the target BAR version and each factory's actual build options.
 5. Load every profile at least once with Armada, Cortex, and Legion/optional-unit modes relevant to that profile.
 6. Treat AngelScript warnings as failures because the host application compiles with warnings-as-errors.
+
+
+### Metal-field adapter (D-170)
+
+`src/manager/metal_economy.as` is included by setup and dispatches only when
+`aiEconomyMgr.IsMetalMap()` is true. AIR replaces its normal economic task ladder;
+TECH evaluates the adapter at mex.expand while preserving prior lab lifecycle
+rows. Other experimental mobile constructors share the economic chooser. The
+native legacy-profile adapter uses the separate `metal_map` JSON fragment loaded
+by each active profile. See [implementation](../../doc/metal-maps-implementation.md).

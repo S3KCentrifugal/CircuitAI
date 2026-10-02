@@ -10,6 +10,7 @@ namespace AirRules {
         AirEconomy::Tick();
         IBuilderTask@ current = cast<IBuilderTask>(u.task);
         if (current !is null && current.GetBuildType() < int(Task::BuildType::REPAIR)) return u.task;
+        if (MetalEconomy::Active()) return AirBuild::Record(MetalEconomy::AirTask(u), "metal.economy", u);
         const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         const bool commander = UnitHelpers::IsCommander(u.circuitDef);
         if (commander) {

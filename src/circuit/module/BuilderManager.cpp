@@ -234,6 +234,7 @@ void CBuilderManager::InitHandlers()
 		CCircuitDef* mexDef = unit->GetCircuitDef();
 		const int facing = unit->GetUnit()->GetBuildingFacing();
 		this->circuit->GetTerrainManager()->DelBlocker(mexDef, pos, facing, true);
+		if (this->circuit->GetEconomyManager()->IsMetalMap()) return;
 		int index = this->circuit->GetMetalManager()->FindNearestSpot(pos);
 		if ((index < 0) || (reclaimUnits.find(unit) != reclaimUnits.end())) {
 			return;
@@ -987,11 +988,21 @@ void CBuilderManager::ActivateTask(IBuilderTask* task)
 
 IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 {
+	// Positional requests from older role helpers still enter the field claim
+	// lifecycle. They may never fall back to nearest synthetic spot ownership.
+	if (circuit->GetEconomyManager()->IsMetalMap()
+		&& (ti.type == IBuilderTask::BuildType::MEX || ti.type == IBuilderTask::BuildType::MEXUP)
+		&& ti.i.spotId != metal_field::SiteTagV1) {
+		auto field = ti;
+		field.i.spotId = metal_field::SiteTagV1;
+		return Enqueue(field);
+	}
 	// Only construction types (the contiguous range before REPAIR) initialize
 	// buildDef. Service tasks such as Repair/Reclaim leave that field unset.
 	// A profile's construction veto survives scripts lifting temporary caps.
 	if ((ti.type < IBuilderTask::BuildType::REPAIR)
-			&& (ti.buildDef != nullptr) && !ti.buildDef->IsBuildAllowed()) {
+			&& (ti.buildDef != nullptr) && (!ti.buildDef->IsBuildAllowed()
+				|| circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef))) {
 		return nullptr;
 	}
 	IBuilderTask* task;
@@ -1109,6 +1120,11 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 	}
 	lastEnqueued = task;
 	TaskAdded(task);
+	if ((ti.type == IBuilderTask::BuildType::MEX && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexTask*>(task)->HasFieldClaim())
+		|| (ti.type == IBuilderTask::BuildType::MEXUP && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexUpTask*>(task)->HasFieldClaim())) {
+		AbortTask(task);
+		return nullptr;
+	}
 	return task;
 }
 
@@ -2251,7 +2267,9 @@ void CBuilderManager::Load(std::istream& is)
 				default: break;
 			}
 			if (task != nullptr) {
-				const bool isValid = is >> *task;
+				bool isValid = is >> *task;
+				if (circuit->GetEconomyManager()->IsMetalConverter(task->GetBuildDef())
+					&& task->GetBuildType() < IBuilderTask::BuildType::REPAIR) isValid = false;
 				buildTasks[i].insert(task);
 				buildTasksCount++;
 				updateTasks.push_back(task);

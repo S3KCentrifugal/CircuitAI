@@ -1,5 +1,9 @@
 # AIR ordered building rules
 
+D-170 dispatches explicitly detected metal maps to `MetalEconomy::AirTask`
+before the ordinary AIR table. This preserves the ordinary-map sequence while
+providing dedicated mex/power workers and fighter-screen-triggered first T2.
+
 `AirRules::MakeTask` is a total dispatcher for a valid owned builder while
 `Air.ExperimentalBuild` is enabled. A successful action ends evaluation;
 otherwise the next action is tried. Every construction action rechecks current
@@ -68,7 +72,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 5db3adc2cae674f0a28ff92b2ce2ea3e9ee8f661; lines: 144 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 298a072d682b197e4bf18d622f63434f3814cba7; lines: 145 -->
 
 ## D-152 sequencing
 

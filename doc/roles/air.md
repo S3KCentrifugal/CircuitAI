@@ -1,5 +1,14 @@
 # AIR Role
 
+D-170 adds an explicitly detected metal-field economy through
+`MetalEconomy::AirTask`. It replaces converter/finite-mex priorities only in
+metal mode. The first T1 constructor builds toward forty dense mexes, the second
+meets power demand, and the first T2 lab follows the completed initial fighter
+screen. Later investments consider power and support capacity. It reserves
+reactor modules without converters. Crowded metal platforms may use
+smaller atomic factory compounds after the six-site search deadline. Normal
+AIR retains the rules below. See [implementation and validation](../metal-maps-implementation.md).
+
 D-167 changes factory planning to compact native compounds of six labs total:
 one T1 plus five T2 in the first, then six T2 per additional compound, without a
 default overall cap. Each T2 site has twenty dedicated construction-turret pins.

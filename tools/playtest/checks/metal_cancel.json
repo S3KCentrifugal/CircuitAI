@@ -1,0 +1,14 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {"key":"released pin","pattern":"\\[MetalCancelFixture\\] cancelled pin=\\d+ taskPin=-1 state=0","scope":"any","by_minute":7},
+    {"key":"deferred audit","pattern":"\\[METAL\\]\\[Cancel\\] served mex pin released","scope":"any","by_minute":7},
+    {"key":"completed mex","pattern":"\\[MetalWatch\\] mex-finished.*team=0","scope":"any","by_minute":7}
+  ],
+  "forbid": [
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH","scope":"any"},
+    {"key":"converter","pattern":"\\[MetalWatch\\] converter-created","scope":"any"},
+    {"key":"native","pattern":"Exception:|Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

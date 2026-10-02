@@ -148,6 +148,7 @@ public:
 	// front edge), rows receding away from `facing`, `gap` cells between them.
 	// Slots the terrain refuses are skipped. Returns the group id, 0 if nothing fit.
 	int ReserveGrid(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap, int ttlFrames = 0);
+	bool PlanMexCluster(const std::string& name, CCircuitDef* def, const springai::AIFloat3& origin, int facing, int cols, int rows);
 	// A nano block tight against the back of a factory footprint (built or reserved).
 	int ReserveNanoBlockAt(CCircuitDef* nanoDef, CCircuitDef* facDef, const springai::AIFloat3& facPos, int facing, int cols, int rows, int gap);
 	// The same behind a standing factory: position and facing read from the unit.

@@ -156,6 +156,14 @@ namespace AirLayout {
         }
         const int cluster = reuse !is null && reuse.cluster >= 0 ? reuse.cluster : aiTerrainMgr.GetLayoutInt("air.clusters", 0);
         const string key = "air.cluster." + cluster;
+        const int variant = MetalEconomy::Active() ? int(ai.frame / (10 * SECOND)) : 0;
+        const int planFacing = MetalEconomy::Active() ? (facing + variant / 3) % 4 : facing;
+        // A cramped metal platform may not hold two allies' full campuses.
+        // Keep atomic support reservations, but allow a smaller cluster after
+        // a complete six-site search cycle. Future demand plans another cluster.
+        const int count = members.length() > 0 ? int(members.length())
+            : MetalEconomy::Active() && ai.frame >= MetalEconomy::CompactCampusAfterSeconds * SECOND
+                ? (variant % 3 == 0 ? 6 : variant % 3 == 1 ? 3 : 1) : 6;
         // Perimeter-only bounded search, one atomic native transaction per site.
         for (int ring = 0; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
             const int length = AiMax(1, 8 * ring);
@@ -165,24 +173,28 @@ namespace AirLayout {
                 const int x = ring == 0 ? 0 : edge == 0 ? along : edge == 1 ? ring : edge == 2 ? -along : -ring;
                 const int z = ring == 0 ? 0 : edge == 0 ? -ring : edge == 1 ? along : edge == 2 ? ring : -along;
                 const AIFloat3 at = Offset(anchor, facing, float(x) * 96.0f - 168.0f, float(z) * 96.0f - 120.0f);
-                if (!Inside(at, 0.0f) || !AirHome::EconomySite(at) || aiTerrainMgr.IsZoneAlly(at)) continue;
+                if (!Inside(at, 0.0f) || !AirHome::EconomySite(at)
+                    || (!MetalEconomy::Active() && aiTerrainMgr.IsZoneAlly(at))) continue;
                 const int firstNanos = UnitHelpers::IsT2AircraftPlant(plant.GetName()) ? 20 : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
-                if (!aiTerrainMgr.PlanAirFactoryCluster(key, plant, advanced, nano, at, facing, 6, 3, firstNanos)) continue;
+                // Narrow metal lanes need a longer compound with fewer columns.
+                // Keep the same six sites and support pins, using the shared geometry.
+                const int columns = AiMin(count, MetalEconomy::Active() ? 3 - variant % 3 : 3);
+                if (!aiTerrainMgr.PlanAirFactoryCluster(key, plant, advanced, nano, at, planFacing, count, columns, firstNanos)) continue;
                 bool allowed = true;
-                for (int b = 0; b < 6; ++b) {
+                for (int b = 0; b < count; ++b) {
                     const AIFloat3 p = aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(key + ".bay." + b + ".slot", -1));
                     if (!AirHome::EconomySite(p) || AirEcoLayout::NearReactor(p, Global::RoleSettings::Air::EcoFactorySeparation)) allowed = false;
                 }
-                if (!allowed) { DiscardClusterPlan(key, 6); continue; }
+                if (!allowed) { DiscardClusterPlan(key, count); continue; }
                 const int envelope = aiTerrainMgr.GetLayoutInt(key + ".envelope", 0);
-                for (int b = 0; b < 6; ++b) {
+                for (int b = 0; b < count; ++b) {
                     Bay@ bay;
                     if (b < int(members.length())) @bay = members[b];
                     else { @bay = Bay(); bay.key = Key(int(bays.length())); bays.insertLast(bay); members.insertLast(bay); }
                     const string source = key + ".bay." + b;
                     bay.cluster = cluster; bay.slot = aiTerrainMgr.GetLayoutInt(source + ".slot", -1);
                     bay.defName = b == 0 ? plant.GetName() : advanced.GetName();
-                    bay.centre = aiTerrainMgr.GetReservationPos(bay.slot); bay.facing = facing;
+                    bay.centre = aiTerrainMgr.GetReservationPos(bay.slot); bay.facing = planFacing;
                     bay.envelope = envelope; bay.nanos.resize(0);
                     for (int n = 0; n < aiTerrainMgr.GetLayoutInt(source + ".n", 0); ++n)
                         bay.nanos.insertLast(aiTerrainMgr.GetLayoutInt(source + ".nano." + n, -1));
@@ -191,9 +203,9 @@ namespace AirLayout {
                         Invariants::Violation("INV-084", bay.key, "cluster T2 bay lacks twenty support slots");
                 }
                 aiTerrainMgr.SetLayoutInt("air.clusters", AiMax(cluster + 1, aiTerrainMgr.GetLayoutInt("air.clusters", 0)));
-                if (members.length() != 6)
+                if (members.length() != uint(count))
                     Invariants::Violation("INV-109", key, "AIR compound must contain exactly six reserved lab sites");
-                GenericHelpers::LogUtil("[AIR][Layout] cluster=" + cluster + " labs=6 at=" + int(at.x) + "," + int(at.z), 1);
+                GenericHelpers::LogUtil("[AIR][Layout] cluster=" + cluster + " labs=" + count + " at=" + int(at.x) + "," + int(at.z), 1);
                 return members[0];
             }
         }
@@ -309,15 +321,31 @@ namespace AirLayout {
         return false;
     }
     // Required pins already have the complete native claim/retry/serialization contract.
+    int pinReportAfter = 0;
     IUnitTask@ Pinned(Task::BuildType type, Task::Priority priority, CCircuitDef@ d, int slot)
     {
-        if (slot < 0 || d is null || aiTerrainMgr.GetReservationState(slot) != 0) return null;
+        if (slot < 0 || d is null || aiTerrainMgr.GetReservationState(slot) != 0) {
+            if (MetalEconomy::Active() && d !is null && ai.frame >= pinReportAfter) {
+                pinReportAfter = ai.frame + 10 * SECOND;
+                GenericHelpers::LogUtil("[METAL][Pin] " + d.GetName() + " slot=" + slot
+                    + " state=" + aiTerrainMgr.GetReservationState(slot), 1);
+            }
+            return null;
+        }
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(slot);
         IUnitTask@ t = type == Task::BuildType::FACTORY
             ? aiBuilderMgr.Enqueue(TaskB::Factory(priority, d, pos, null, 0.0f, false, true, 300 * SECOND))
             : aiBuilderMgr.Enqueue(TaskB::Common(type, priority, d, pos, 0.0f, true, 180 * SECOND));
-        if (t is null) return null;
-        if (!AiPinReservation(t, slot)) { aiBuilderMgr.AbortTask(t); return null; }
+        const bool pinned = t !is null && AiPinReservation(t, slot);
+        if (!pinned) {
+            if (MetalEconomy::Active() && ai.frame >= pinReportAfter) {
+                pinReportAfter = ai.frame + 10 * SECOND;
+                GenericHelpers::LogUtil("[METAL][Pin] " + d.GetName() + " slot=" + slot
+                    + " failed=" + (t is null ? "enqueue" : "claim"), 1);
+            }
+            if (t !is null) aiBuilderMgr.AbortTask(t);
+            return null;
+        }
         return t;
     }
     IUnitTask@ Place(CCircuitUnit@ u, CCircuitDef@ d, Task::BuildType type, Task::Priority priority, bool reactor = false, float walkRadius = 0.0f)
@@ -325,7 +353,7 @@ namespace AirLayout {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
         // Every AIR caller, including shared growth, must respect retirement.
-        if (AirEconomy::CompletedAfus() > 0 && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
+        if (!MetalEconomy::Active() && AirEconomy::CompletedAfus() > 0 && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
             || d.GetName() == UnitHelpers::GetSolarNameForSide(side)
             || d.GetName() == UnitHelpers::GetAdvSolarNameForSide(side))) return null;
         if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
@@ -391,7 +419,7 @@ namespace AirLayout {
     }
     IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority, float walkRadius = 0.0f)
     {
-        if (AirEconomy::CompletedAfus() > 0 || AirReclaim::Allowed()) return null;
+        if (!MetalEconomy::Active() && (AirEconomy::CompletedAfus() > 0 || AirReclaim::Allowed())) return null;
         if (UnitHelpers::IsCommander(u.circuitDef)) {
             IUnitTask@ t = WindPass(u, d, priority, true);
             if (t !is null || (AirEconomy::CompletedConstructors() > 0 && walkRadius <= 0.0f)) return t;

@@ -9,6 +9,7 @@
 #define SRC_CIRCUIT_TASK_BUILDER_MEXUPTASK_H_
 
 #include "task/builder/BuilderTask.h"
+#include "resource/MetalField.h"
 
 namespace circuit {
 
@@ -19,6 +20,8 @@ public:
 				SResource cost, int timeout);
 	CBMexUpTask(ITaskModule* mgr);  // Load
 	virtual ~CBMexUpTask();
+	bool HasFieldClaim() const { return fieldKey != 0; }
+	virtual void Stop(bool done) override;
 
 protected:
 	virtual void Finish() override;
@@ -36,6 +39,8 @@ private:
 	virtual void Save(std::ostream& os) const override;
 
 	int spotId;
+	metal_field::Key fieldKey = 0;
+	int fieldTargetId = -1;
 	CCircuitUnit* reclaimMex;  // NOTE: never use it as unit, it's a mark (void*)
 };
 

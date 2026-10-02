@@ -369,6 +369,7 @@ void CTerrainManager::Init()
 	}
 	int notIgnoreMask = ~STRUCT_BIT(MEX);  // all except mex
 	for (auto& spot : mspots) {
+		if (circuit->GetEconomyManager()->IsMetalMap()) break;
 		const AIFloat3 pos = Pos2BuildPos(cdef, spot.position, UNIT_FACING_SOUTH);
 		const int x1 = int(pos.x / (SQUARE_SIZE << 1)) - (xsize >> 1), x2 = x1 + xsize;
 		const int z1 = int(pos.z / (SQUARE_SIZE << 1)) - (zsize >> 1), z2 = z1 + zsize;
@@ -1715,6 +1716,57 @@ bool CTerrainManager::PlanFactoryPair(const std::string& name, CCircuitDef* firs
 	return true;
 }
 
+bool CTerrainManager::PlanMexCluster(const std::string& name, CCircuitDef* def,
+        const AIFloat3& origin, int facing, int cols, int rows)
+{
+    auto* economy = circuit->GetEconomyManager();
+    if (!layoutEnabled || !economy->IsMetalMap() || name.empty() || def == nullptr
+        || def->GetExtractsM() <= 0 || !geom::is_valid(origin)
+        || !base_layout::IsFacingValid(facing) || cols < 1 || rows < 1 || cols > 8 || rows > 8) return false;
+    const base_layout::Footprint fp{def->GetDef()->GetXSize() / 2, def->GetDef()->GetZSize() / 2};
+    // Dense without overlapping extraction circles; rounding follows the same
+    // build lattice as factories and economy modules. Policy chooses membership.
+    const int pitch = int(std::ceil(def->GetExtrRangeM() * 2.f / BUILD_SQUARE_SIZE));
+    const int gap = std::max(0, pitch - std::min(fp.x, fp.z));
+    base_layout::Point anchor{int(std::lround(origin.x / 8.f)), int(std::lround(origin.z / 8.f))};
+    anchor.x2 -= anchor.x2 & 1; anchor.z2 -= anchor.z2 & 1;
+    auto slots = base_layout::GridBehind(anchor,
+        facing, fp, cols, rows, gap, false, 0);
+    for (auto& slot : slots) {
+        const auto snapped = Pos2BuildPos(def, AIFloat3(slot.centre.x2 * 8.f, 0.f, slot.centre.z2 * 8.f), facing);
+        slot.centre = {int(std::lround(snapped.x / 8.f)), int(std::lround(snapped.z / 8.f))};
+    }
+    const auto bounds = base_layout::BoundsOf(slots);
+    if (slots.size() != std::size_t(cols * rows) || !IsRectFree(bounds)
+        || layout_rank::OverlapsAny({bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ}, FactoryExitLanes())) return false;
+    const auto position = [](const base_layout::Slot& s) {
+        return AIFloat3(s.centre.x2 * 8.f, 0.f, s.centre.z2 * 8.f);
+    };
+    for (const auto& slot : slots) {
+        const auto pos = position(slot);
+        if (!economy->IsOwnSpot(pos) || !CanBeBuiltAt(def, pos)
+            || !IsEngineBuildable(def, pos, facing) || economy->GetFieldYield(def, pos) <= .001f) return false;
+    }
+    std::vector<int> ids;
+    for (const auto& slot : slots) {
+        const int id = ReservePersistentBuilding(def, position(slot), facing);
+        if (id < 0) {
+            for (int old : ids) ReleasePersistentBuilding(old);
+            return false;
+        }
+        ids.push_back(id);
+    }
+    const auto centre = base_layout::CentreOf(bounds);
+    const int envelope = ReserveZone(AIFloat3(centre.x2 * 8.f, 0.f, centre.z2 * 8.f), 0,
+        bounds.Width() * 8.f, bounds.Depth() * 8.f, false);
+    for (std::size_t i = 0; i < ids.size(); ++i) layoutInts[name + ".slot." + std::to_string(i)] = ids[i];
+    layoutInts[name + ".n"] = int(ids.size());
+    layoutInts[name + ".zone"] = envelope;
+    layoutInts[name + ".started"] = 0;
+    circuit->LOG("METAL_CLUSTER: team=%i name=%s slots=%i pitch=%i", circuit->GetTeamId(), name.c_str(), int(ids.size()), (std::min(fp.x, fp.z) + gap) * BUILD_SQUARE_SIZE);
+    return true;
+}
+
 bool CTerrainManager::PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory,
 		CCircuitDef* repeatedFactory, CCircuitDef* nanoDef, const AIFloat3& origin,
 		int facing, int count, int columns, int firstNanos)
@@ -1909,7 +1961,7 @@ void CTerrainManager::RestoreReservation(int id)
 		return;
 	}
 	SReservation& r = it->second;
-	if (!r.consumed) {
+	if (!r.consumed && !(circuit->GetEconomyManager()->IsMetalMap() && r.def->GetExtractsM() > 0)) {
 		return;
 	}
 	int2 c1, c2;

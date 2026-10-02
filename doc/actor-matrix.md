@@ -396,3 +396,24 @@ producer alone admits them, and original caps are restored after the call.
 | Advanced economy module | AirEcoLayout::Init/Save/Reserve/Activate/PlanAhead/Place/Leave, AirLayout::Reserve/Place/PlanAhead, native terrain layout | One persistent nine-slot module with enclosing zone and saved first-use state. Before first claim, a physical blocker relocates the entire module. Activated modules stay fixed; blocked pins are skipped. Shared native reservations exclude allied/local factories and defenses. INV-107. |
 | Late surplus investment | AirGrowth::MakeTask, AirMath::OverflowGrowth, AirBuild::Committed, AirProduction | Shared chooser first, useful reactor assistance next, then a funded additional AFUS while metal floats after the bomber milestone. Deduct existing project costs, reserve the production income share and admit only one reactor. TECH policy unchanged. |
 | Reactor commitment | AirBuild::ReactorPending/Record, AirMath::PendingReactor, AirGrowth::MakeTask, AirLayout::Place | Queued and unfinished owned reactor ENERGY tasks block new reactor starts. T1 energy, repairs and completed targets do not. AIR overrides the generic chooser context without changing TECH; INV-108. |
+
+
+## D-170 continuous metal fields
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Map mode | EconomyManager::ReadConfig/InitMetalField, profile init fragments, TerrainManager::Init | BAR publication plus raw-field validation; normal mode takes the original path. |
+| Extraction cells | MetalField::Grid/Claims, AllyTeam, GameAttribute, SyncFieldUnits | Game-owned raw grid; ally-owned maximum-depth occupancy from frames, units and owner-tagged tasks. |
+| Field mex order | EnqueueFieldMex, BuilderManager::Enqueue, CBMexTask execute/cancel/finish/load | Exact build position, bounded admission, shared claim identity, no synthetic spot closure, frame promotion before claim release. |
+| Field upgrade | EnqueueFieldUpgrade, CBMexUpTask, BAR replacement gadget | Actual owned target ID, exclusive upgrade lock, incremental depth, no nearest-neighbour reclaim after completion. |
+| Converter order | Native enqueue/load, role cap updates, MetalEconomy::Read, metal_watch | Admission veto survives cap changes. Existing gifted units are preserved. INV-111. |
+| Experimental field economy | MetalEconomy, AirRules, TechRules at mex.expand, shared Builder policy | Cached workload snapshot and funded resource decisions; exact TECH lab rows precede the economic adapter. |
+| AIR constrained cluster | AirLayout::Reserve/Activate/PlanAhead, native layout engine | Full six-site search first, then atomic smaller metal-only clusters; actual allied reservations stay authoritative. |
+| Legacy field economy | EconomyManager::UpdateMetalTasks, JSON metal_map settings | Separate configured native adapter; cached settings remain valid after SetupManager releases parsed JSON. |
+
+
+| D-170 revised object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Dense mex module | MetalLayout::Plan/Build/Release, TerrainManager::PlanMexCluster, BuilderTask::PinReservation, MexTask::Execute | Eight snapped slots plus envelope; atomic rollback; task blocker-to-slot handoff; first-use relocation; INV-112. |
+| Opening workforce | MetalEconomy::Read/DedicatedTask/OpeningWorker, AirTask, TechRules at power.t1 and Trace | Saved first three T1 constructor IDs, death replacement, forty-mex and power assignments, initial third-constructor TECH transition after lab reclaim precedence; INV-113 prevents discretionary front/defense diversion. |
+| AIR initial screen | MetalEconomy::AirScreenReady, AirEconomy::Transition, AirProduction | Completed fighter count reaches configured HomeFighterFloor; saved latch permits first T2 immediately. Existing twenty-nano gate remains for later labs. |

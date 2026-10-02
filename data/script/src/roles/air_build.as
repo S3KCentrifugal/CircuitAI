@@ -153,7 +153,7 @@ namespace AirBuild {
         if (UnitHelpers::IsCommander(u.circuitDef) && NearestPlant(u) !is null
             && build !is null && (build.GetBuildType() == int(Task::BuildType::MEX) || build.GetBuildType() == int(Task::BuildType::MEXUP)))
             Invariants::Violation("INV-079", "AIR", "commander dispatched to mex work after factory exists");
-        if (build !is null && build.target is null && IsReactor(build.buildDef) && !AirEconomy::MexesReady())
+        if (build !is null && build.target is null && RequiresMexes(build.buildDef) && !AirEconomy::MexesReady())
             Invariants::Violation("INV-077", "AIR", "reactor ordered while owned mex upgrades remain");
         if (build !is null && build.GetBuildType() == int(Task::BuildType::FACTORY)
             && build.target is null && build.buildDef !is null && UnitHelpers::IsT2AircraftPlant(build.buildDef.GetName())
@@ -339,7 +339,7 @@ namespace AirBuild {
     }
     bool RequiresMexes(CCircuitDef@ d)
     {
-        return IsReactor(d);
+        return !MetalEconomy::Active() && IsReactor(d);
     }
     IUnitTask@ Convert(CCircuitUnit@ u)
     {

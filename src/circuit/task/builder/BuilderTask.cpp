@@ -945,6 +945,16 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 bool IBuilderTask::PinReservation(int id)
 {
 	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
+	// Positional mex construction marks its footprint in the constructor. A
+	// field module transfers that footprint back to its persistent slot before
+	// claiming it; otherwise FindReservedSite drops our own slot as ground taken.
+	if (buildType == BuildType::MEX && target == nullptr
+		&& manager->GetCircuit()->GetEconomyManager()->IsMetalMap()
+		&& terrainMgr->GetReservationState(id) == 0 && geom::is_valid(buildPos)
+		&& buildPos.SqDistance2D(terrainMgr->GetReservationPos(id)) < 1.f) {
+		SetBuildPos(-RgtVector);
+		terrainMgr->RestoreReservation(id);
+	}
 	pinRequired = true;
 	layoutOwned = true;
 	pinnedReservation = id;

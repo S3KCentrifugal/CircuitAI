@@ -528,8 +528,33 @@ namespace TechRules {
                 if (dt !is null) { lastIdleAsks.set(ik, int64(0)); Trace(c, airDefendRule); return dt; }
             }
         }
+        bool openingWorker = MetalEconomy::Active() && MetalEconomy::OpeningWorker(u);
         for (uint i = 0; i < table.length(); ++i) {
             Rule@ r = table[i];
+            if (MetalEconomy::Active()) {
+                // Keep lab reclaim/rebuild precedence, then protect the two
+                // dedicated opening workers before discretionary investment.
+                if (r.key == "power.t1") {
+                    openingWorker = false;
+                    IUnitTask@ dedicated = MetalEconomy::DedicatedTask(u);
+                    if (dedicated !is null) return dedicated;
+                    if (u.id == MetalEconomy::workers[2] && aiTerrainMgr.GetLayoutInt("metal.techTransition", 0) == 0
+                        && !c.eco.t2Lab && c.eco.t2LabQueued == 0) {
+                        IUnitTask@ transition = DoT2Lab(c);
+                        if (transition !is null) {
+                            aiTerrainMgr.SetLayoutInt("metal.techTransition", 1);
+                            return transition;
+                        }
+                    }
+                }
+                if (openingWorker && r.key != "ferry.cargo" && r.key != "keep.current"
+                    && r.key != "lab.t1.reclaim" && r.key != "lab.t2.reclaim" && r.key != "lab.base.reclaim") continue;
+                if (r.key == "mex.expand" && c.openingDone && (c.who & MOBILE) != 0) {
+                    IUnitTask@ field = MetalEconomy::EconomyTask(u);
+                    if (field !is null) return field;
+                }
+                if (MetalEconomy::SkipTechRule(r.key)) continue;
+            }
             if ((r.who & c.who) == 0) continue;
             bool ok = true;
             for (uint k = 0; k < r.when.length() && ok; ++k) ok = r.when[k](c);
@@ -558,6 +583,10 @@ namespace TechRules {
 
     void Trace(Ctx@ c, const Rule@ r)
     {
+        if (MetalEconomy::Active() && MetalEconomy::OpeningWorker(c.u)
+            && (r.key == "weapons.cluster" || r.key == "weapons.super" || r.key == "defence.fortify"
+                || r.key == "flank.factory" || r.key == "fwd.t1" || r.key == "lab.front"))
+            Invariants::Violation("INV-113", "" + c.u.id, "dedicated metal opening worker diverted to " + r.key);
         const string id = "" + c.u.id;
         string last;
         lastKeyByUnit.get(id, last);

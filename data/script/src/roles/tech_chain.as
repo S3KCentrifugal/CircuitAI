@@ -242,6 +242,7 @@ namespace TechChain
     {
         steps.resize(0);
         active = false; done = false;
+        if (MetalEconomy::Active()) return; // field growth has no finite mex/converter recipe
         stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
         objective = Global::RoleSettings::Tech::RushObjective;
         if (objective == "auto") objective = Choose();

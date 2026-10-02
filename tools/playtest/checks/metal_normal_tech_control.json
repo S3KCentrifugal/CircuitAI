@@ -1,0 +1,46 @@
+{
+  "stop_minute": 20,
+  "expect": [
+    {
+      "key": "observer",
+      "pattern": "\\[MetalWatch\\] sample",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "TECH",
+      "pattern": "Setup complete role=2",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "ordinary spots",
+      "pattern": "classification mex_count=[1-9]",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "field branch",
+      "pattern": "METAL_FIELD:.*mode=1|\\[METAL\\]",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "native",
+      "pattern": "Exception:|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ],
+  "note": "Glacial has no AIR starts in its existing map config; TECH-only control preserves that config."
+}

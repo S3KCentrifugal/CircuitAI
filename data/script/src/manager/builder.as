@@ -2154,7 +2154,9 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		if (cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
+		if (MetalEconomy::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
+			&& !UnitHelpers::IsCommander(u.circuitDef) && u.circuitDef.IsMobile()) @t = MetalEconomy::EconomyTask(u);
+		if (t is null && cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
 			@t = cfg.BuilderAiMakeTaskHandler(u);
 		}
 		// If no role-specific task or handler returned null, fallback to default
@@ -2340,6 +2342,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		MetalEconomy::Removed(task, done);
 		{
 			IBuilderTask@ mexTask = cast<IBuilderTask>(task);
 			if (mexTask !is null) {

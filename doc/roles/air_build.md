@@ -1,5 +1,10 @@
 # AIR building actions
 
+D-170 permits a metal-mode T2 order after the initial fighter screen without
+the normal income/bank gate. Existing per-lab support requirements still govern
+additional labs. `Pinned` logs failed metal-only placement attempts at a
+bounded frequency for the field-economy simulations.
+
 `AirBuild` is the action layer for [AIR's ordered rules](air_rules.md), enabled
 by `Air.ExperimentalBuild`. It does not call TECH's building controller.
 
@@ -103,7 +108,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 902c7c51676f7de88130ce22b18485a06a09e9f7; lines: 520 -->
+<!-- source: data/script/src/roles/air_build.as; blob: f4808b77ddd452b1c535aed3882588d1c4737f18; lines: 520 -->
 
 ## D-153: income-gated plants and mex-first reactors
 

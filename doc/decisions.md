@@ -9975,3 +9975,244 @@ labs by 38.18. First bomber wave 29.72; twenty bombers with zero escorts, then
 zero survivors. Retain the failed timing/efficacy verdict and KI-457/461 rather
 than accepting production counts as effective combat. The final all-caller
 low-tier energy admission guard was loaded in this natural run.
+
+
+## D-168 - Metal-map support requires explicit isolation before implementation
+
+**Date.** 2026-10-02.
+
+**Decision.** Retain the metal-map proposal as research with a linked source
+review. Do not implement its current contracts verbatim. Require early coherent
+mode selection, unchanged false-mode paths, corrected yield units and complete
+positional task ownership/persistence before enabling metal-specific policy.
+Treat the existing spot-zero cancellation repair separately from the claim that
+normal-map behavior is identical.
+
+**Reasoning.** Shared initialization happens before script map setup; the proposed
+T1 M/s skeleton income is multiplied by extraction rate again; AIR's candidate
+cap is not an opening total; positional upgrades reject -1 on load. These are
+concrete code conflicts, not tuning preferences. Economy arithmetic and layout
+ownership also need the corrections listed in the review.
+
+**Alternatives rejected.** Implementing the proposal as written would introduce
+avoidable startup, production and restore regressions. Rewriting the entire
+proposal would obscure which evidence and recommendations were originally
+supplied. This review does not approve owner-rule exceptions or change native,
+AngelScript, profile or map behavior.
+
+**Invariant.** Preserve existing normal-map rule order, factory/reclaim behavior,
+layout pins and converter policies, including existing INV-107/109/110 promises.
+Future metal variants need separate applicable checks, not unconditional skips.
+No new runtime invariant is introduced by this documentation-only review.
+
+**Verification.** Source review at aacbfc8a against Recoil 92efda5e60 and BAR
+1d267c20d1; independent extraction-cell and economy arithmetic checks; audited
+three retained headless logs/reports. All retained smoke verdicts remain FAIL.
+No new games, binary builds or runtime behavior changes; performance unmeasured.
+
+**Files.** [Proposal](metal-maps-proposal.md),
+[source review](reviews/2026-10-02-metal-maps-proposal-review.md),
+[known issues KI-469-471](known-issues.md).
+
+
+## D-169 - Base metal-map recommendations on marginal value and funded workloads
+
+**Date.** 2026-10-02.
+
+**Decision.** Recommend an explicitly enabled metal-field economy whose desired
+production, sustainable resource funding and local build capacity are separate.
+Keep legacy spot data and normal-mode policy intact; add per-AI mode context and
+separate field claims with typed yield and task identity. Resolve F1-F9 through
+the revised design before implementation. Treat metal-only exceptions to AIR's
+raw-income, upgrade, wind-reclaim and two-AFUS gates as proposed settings, not
+owner decisions already made. Preserve TECH's exact lab reclaim/rebuild rules.
+
+**Reasoning.** Actual aircraft costs exceed the proposed generic energy ratio.
+On safe free ground, three new T1 mexes are a much cheaper source of the same
+additional income as upgrading an existing one. Constant high wind can remain
+efficient after AFUS access; space, slots, risk and affordable throughput decide
+when compression pays. Rich strips, flat plates and void platforms have different
+opportunities. Workload arithmetic and source mechanics justify these decisions;
+limited player recordings do not establish optimal timings or winning strategy.
+Correct the shared extraction-circle and average-income documentation rather
+than propagating those errors into the design.
+
+**Alternatives rejected.** Raw +50 metal as proof that production is funded;
+upgrading an unbounded field before power growth; unconditional wind retirement;
+one roster-wide energy ratio; overwriting the shared legacy spot catalog with
+M/s field nodes; reusing optional instant-build quick-start timings as an ordinary
+PvP opening benchmark. Retain the original proposal/review with follow-up links
+so the superseded claims and failed tests remain visible.
+
+**Invariant.** Reuse D-168's normal-map, TECH sequence, pin and converter-policy
+boundary. Proposed field promises cover lifecycle identity, non-duplicated income,
+bounded opening/search work and ammunition-ready defense. No new runtime check
+or behavior is claimed by this research change, and existing checks are not
+disabled. Arithmetic fixtures do not replace game validation.
+
+**Verification.** Pinned BAR 1d267c20d1 and Recoil 92efda5e60 source inspection;
+scalar unit costs cross-checked against the shared cache; reproducible strict
+circle, mex-upgrade, energy and bomber/fighter workload arithmetic. Official
+map/economy/air pages checked; three player-video identities inspected, transcripts
+unavailable, one private Cloud9 game's description and early scene sampled.
+No representative competitive replay cohort, new simulation, native build or
+runtime performance measurement. Implementation and PvP efficacy remain unverified.
+
+**Files.** [Revised design](metal-maps-revised-design.md),
+[original proposal](metal-maps-proposal.md),
+[review disposition](reviews/2026-10-02-metal-maps-proposal-review.md),
+[arithmetic tool](../tools/knowledge/metal_map_economics.py),
+[arithmetic results](benchmarks/metal-map-economics.json),
+[known issues](known-issues.md),
+[shared gameplay research](../../rjm.bar.docs/knowledge/70-strategy/79-metal-map-pvp.md),
+[corrected extraction mechanics](../../rjm.bar.docs/knowledge/20-game-mechanics/27-metal-maps-and-spots.md).
+
+
+## D-170 - Continuous metal fields, dense AIR/TECH extraction and dedicated opening workers
+
+**Date.** 2026-10-02.
+
+**Decision.** Implement D-168/169 with the owner's subsequent forty-mex amendment.
+Native C++ owns detection, extraction-circle arithmetic, shared claims, exact
+positional task identities and atomic layout geometry. Script/JSON own budgets,
+workload economics, worker assignments, module membership and progression.
+All seven active profiles load a separate metal_map fragment. The field branch
+requires the published metal-map sentinel plus positive broad/recognized ground;
+missing metadata and ordinary finite spot maps keep the existing path.
+
+AIR/TECH preplan five dense eight-mex modules using the same native reservation
+engine as labs and economy. Forty is a minimum, not a cap. The first T1 worker
+keeps constructing/resuming extraction commitments despite full metal storage;
+the second meets power demand. TECH's third starts its initial T2 lab. AIR's
+first T2 follows its completed configured fighter screen. Dedicated workers skip
+discretionary defense/frontline assignments while ferry ownership, current
+construction and TECH's existing lab reclaim rules keep precedence. Later AIR
+labs still require twenty completed support turrets per existing T2 lab.
+
+**Reasoning.** Unlimited deposit area changes priorities but does not remove
+energy/build-power constraints. Exact extraction circles and maximum-depth claims
+prevent synthetic spot accounting and ownership errors. Separate dense modules
+reserve usable ground before production/defense expansion. Natural tests exposed
+own-blocker rejection, cancellation bypassing shared pin cleanup, a coarse ally
+exclusion covering the owner's start, and defense rules stealing the mex worker.
+Fix their mechanisms instead of accepting sparse expansion. The forty-mex target
+and first-T2 triggers are explicit owner policy, not universal researched timings.
+
+**Alternatives rejected.** Replacing the normal spot catalog; a blanket raw-metal
+income gate; continuing to pause initial extraction at a full bank; allowing
+converters through profile cap changes; mandatory useful-wind retirement on metal
+fields; overlapping allied reservations; forcing six-lab shapes where constrained
+platforms cannot fit them; reordering TECH's lab reclaim/rebuild table; hiding
+invariant failures behind the focused economic audit. A six-site AIR search may
+fall back to atomic three-/one-site metal compounds after 120 seconds, preserving
+full support membership. Normal AIR shapes are unchanged.
+
+**Invariant.** INV-111 forbids queued converters, independently checked by actual
+Lua unit creation. INV-112 keeps framed mexes at their served module positions.
+INV-113 protects dedicated opening workers from discretionary front/defense rows.
+INV-114 checks that cancelled unframed mex tasks release served pins after native
+cleanup. Every test keeps the full invariant forbid. INV-006/009/021 are explicitly
+ordinary-economy promises; metal mode uses its separate energy policy. The normal
+branch gains only bounds/spot-zero cancellation repairs and an actual-producer
+invariant diagnostic, aside from early false-mode guards.
+
+**Verification.** Built and played. Final DLL 9d1c668474924f01 with matching symbols;
+all native/AngelScript policy unit suites pass and 275 used API members match.
+Final Nine Metal Islands reaches forty completed mexes on all four AIR/TECH
+players at 12:00-15:30, with zero converters. Plate and repeated SpeedMetal games
+verify dense expansion under combat, with incomplete forty-mex outcomes after
+base losses explicitly retained. Native hard profile passes twenty minutes with
+111-147 peak mexes per player and zero converters. Controlled cancellation passes:
+pin 247 is released, served again, and followed by eleven more mex completions.
+Twenty-minute ordinary Supreme and Glacial comparisons preserve finite spots,
+ordinary upgrades/converters and no field-policy entry. Their full invariant
+reports, and several metal reports, still fail. No claim of optimal PvP play,
+seeded deterministic equivalence, runtime save/load completion, full profile
+matrix coverage or measured 8v8 p95/p99/APM performance. See
+[results](metal-maps-results.md) and KI-472/473; original failed runs remain.
+
+**Files.** The complete repository change set for the research and implementation
+is linked below. Generated binaries and local playtest artifacts are described
+in the results, not committed. Shared gameplay-only research remains in the
+sibling knowledge repository.
+
+- [data/config/metal_map.json](../data/config/metal_map.json)
+- [data/script/README.md](../data/script/README.md)
+- [data/script/easy/init.as](../data/script/easy/init.as)
+- [data/script/experimental_balanced/init.as](../data/script/experimental_balanced/init.as)
+- [data/script/experimental_hard/init.as](../data/script/experimental_hard/init.as)
+- [data/script/experimental_terrible/init.as](../data/script/experimental_terrible/init.as)
+- [data/script/hard/init.as](../data/script/hard/init.as)
+- [data/script/hard_aggressive/init.as](../data/script/hard_aggressive/init.as)
+- [data/script/medium/init.as](../data/script/medium/init.as)
+- [data/script/src/helpers/metal_math.as](../data/script/src/helpers/metal_math.as)
+- [data/script/src/manager/air_eco_layout.as](../data/script/src/manager/air_eco_layout.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_reclaim.as](../data/script/src/manager/air_reclaim.as)
+- [data/script/src/manager/builder.as](../data/script/src/manager/builder.as)
+- [data/script/src/manager/eco_planner.as](../data/script/src/manager/eco_planner.as)
+- [data/script/src/manager/invariants.as](../data/script/src/manager/invariants.as)
+- [data/script/src/manager/metal_economy.as](../data/script/src/manager/metal_economy.as)
+- [data/script/src/manager/metal_layout.as](../data/script/src/manager/metal_layout.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [data/script/src/roles/tech.as](../data/script/src/roles/tech.as)
+- [data/script/src/roles/tech_chain.as](../data/script/src/roles/tech_chain.as)
+- [data/script/src/roles/tech_rules.as](../data/script/src/roles/tech_rules.as)
+- [data/script/src/setup.as](../data/script/src/setup.as)
+- [doc/Profile.md](../doc/Profile.md)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/base-layout.md](../doc/base-layout.md)
+- [doc/benchmarks/metal-map-economics.json](../doc/benchmarks/metal-map-economics.json)
+- [doc/benchmarks/metal-map-simulations.json](../doc/benchmarks/metal-map-simulations.json)
+- [doc/decisions.md](../doc/decisions.md)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/metal-maps-implementation.md](../doc/metal-maps-implementation.md)
+- [doc/metal-maps-proposal.md](../doc/metal-maps-proposal.md)
+- [doc/metal-maps-results.md](../doc/metal-maps-results.md)
+- [doc/metal-maps-revised-design.md](../doc/metal-maps-revised-design.md)
+- [doc/reviews/2026-10-02-metal-maps-proposal-review.md](../doc/reviews/2026-10-02-metal-maps-proposal-review.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/air_build.md](../doc/roles/air_build.md)
+- [doc/roles/air_rules.md](../doc/roles/air_rules.md)
+- [doc/roles/tech.md](../doc/roles/tech.md)
+- [doc/roles/tech_chain.md](../doc/roles/tech_chain.md)
+- [doc/roles/tech_rules.md](../doc/roles/tech_rules.md)
+- [src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp)
+- [src/circuit/module/EconomyManager.cpp](../src/circuit/module/EconomyManager.cpp)
+- [src/circuit/module/EconomyManager.h](../src/circuit/module/EconomyManager.h)
+- [src/circuit/module/MetalFieldEconomy.cpp](../src/circuit/module/MetalFieldEconomy.cpp)
+- [src/circuit/resource/MetalField.h](../src/circuit/resource/MetalField.h)
+- [src/circuit/resource/MetalManager.cpp](../src/circuit/resource/MetalManager.cpp)
+- [src/circuit/resource/MetalManager.h](../src/circuit/resource/MetalManager.h)
+- [src/circuit/script/EconomyScript.cpp](../src/circuit/script/EconomyScript.cpp)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/builder/BuilderTask.cpp](../src/circuit/task/builder/BuilderTask.cpp)
+- [src/circuit/task/builder/MexTask.cpp](../src/circuit/task/builder/MexTask.cpp)
+- [src/circuit/task/builder/MexTask.h](../src/circuit/task/builder/MexTask.h)
+- [src/circuit/task/builder/MexUpTask.cpp](../src/circuit/task/builder/MexUpTask.cpp)
+- [src/circuit/task/builder/MexUpTask.h](../src/circuit/task/builder/MexUpTask.h)
+- [src/circuit/terrain/TerrainManager.cpp](../src/circuit/terrain/TerrainManager.cpp)
+- [src/circuit/terrain/TerrainManager.h](../src/circuit/terrain/TerrainManager.h)
+- [src/circuit/unit/ally/AllyTeam.h](../src/circuit/unit/ally/AllyTeam.h)
+- [src/circuit/util/GameAttribute.h](../src/circuit/util/GameAttribute.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/metal_field_test.cpp](../tests/metal_field_test.cpp)
+- [tests/metal_math_tests.as](../tests/metal_math_tests.as)
+- [tools/knowledge/metal_map_economics.py](../tools/knowledge/metal_map_economics.py)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/playtest/audit_metal_check.py](../tools/playtest/audit_metal_check.py)
+- [tools/playtest/checks/metal_cancel.json](../tools/playtest/checks/metal_cancel.json)
+- [tools/playtest/checks/metal_field.json](../tools/playtest/checks/metal_field.json)
+- [tools/playtest/checks/metal_legacy.json](../tools/playtest/checks/metal_legacy.json)
+- [tools/playtest/checks/metal_normal_control.json](../tools/playtest/checks/metal_normal_control.json)
+- [tools/playtest/checks/metal_normal_tech_control.json](../tools/playtest/checks/metal_normal_tech_control.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_metal_check.py](../tools/playtest/prepare_metal_check.py)
+- [tools/playtest/widgets/metal_watch.lua](../tools/playtest/widgets/metal_watch.lua)
+- [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)

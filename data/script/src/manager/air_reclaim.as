@@ -19,6 +19,12 @@ namespace AirReclaim {
     }
     bool Allowed(bool advanced = false)
     {
+        if (MetalEconomy::Active()) {
+            MetalEconomy::Read();
+            return MetalEconomy::dense && AirEconomy::HasReactor() && !aiEconomyMgr.isEnergyStalling
+                && MetalMath::RetirePower(AirEconomy::energy, float(jobs.length() + 1) * 75.0f,
+                    aiEconomyMgr.energy.pull, MetalEconomy::goal, .1f);
+        }
         if (!AirEconomy::HasReactor() || AirEconomy::recovery || aiEconomyMgr.isEnergyStalling) return false;
         const string side = Global::AISettings::Side;
         const float wind = AiMax(0.0f, AiMin(25.0f, (ai.GetWindMin() + ai.GetWindMax()) * 0.5f));

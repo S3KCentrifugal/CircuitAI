@@ -79,6 +79,7 @@ namespace RoleTech
 
 		int MexCap()
 		{
+			if (MetalEconomy::Active()) return MetalEconomy::OpeningCap();
 			return (Global::Map::Config.TechOpeningMexCap > 0)
 				? Global::Map::Config.TechOpeningMexCap
 				: Global::RoleSettings::Tech::OpeningMexCap;   // 0 = every spot inside the radius
@@ -131,7 +132,8 @@ namespace RoleTech
 		void Tick()
 		{
 			if (complete || !Global::RoleSettings::Tech::ExperimentalBuild) return;
-			if (ai.frame - startFrame > Global::RoleSettings::Tech::OpeningMaxSeconds * SECOND)
+			const int deadline = MetalEconomy::Active() ? MetalEconomy::OpeningDeadlineSeconds : Global::RoleSettings::Tech::OpeningMaxSeconds;
+			if (ai.frame - startFrame > deadline * SECOND)
 			{
 				Finish("deadline");
 				return;
@@ -186,6 +188,7 @@ namespace RoleTech
 			// is still pending (one may be assigned to another builder).
 			if (aiEconomyMgr.GetMexTaskCountWithin(Global::Map::StartPos, MexRadius()) > 0)
 				return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+			if (MetalEconomy::Active()) return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
 			Finish("every reachable spot inside the radius is taken and no mex order is pending");
 			return null;
 		}

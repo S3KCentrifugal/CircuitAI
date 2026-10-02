@@ -286,3 +286,13 @@ how many plans to reserve and when an untouched blocked plan relocates; native
 queries inspect complete member footprints without claiming them. Human/other
 AI builds cannot be prohibited by this registry, so activation rechecks engine
 buildability. See [design](allied-layout-air-income-plan.md).
+
+
+## Metal-field placement (D-170)
+
+Metal mode omits synthetic finite-spot blockers. Field extraction admission still
+checks precise allied reservations and factory exits. AIR uses the same atomic
+native compound geometry, tries rotated/narrower variants and can use smaller
+compounds after a bounded six-site search. Its metal-mode reactor district omits
+converter slots. TECH geometry and normal-map layouts remain unchanged. See
+[implementation and validation](metal-maps-implementation.md).

@@ -5,6 +5,21 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+D-170 metal maps: `prepare_metal_check.py --map "Full Metal Plate 1.7"
+--output build-theatres/metal-map.as` supplies explicit start/role fixtures.
+Stage with that `--map-file`, `--roles AIR,TECH`, `--minutes 30`, and
+`--extra-widget tools/playtest/widgets/metal_watch.lua`; run the preparer again
+with `--dir <staged-dir>` to register the fixture only in the isolated copy.
+Also supported: SpeedMetal BAR V2 and Nine_Metal_Islands_V1. No resource gifts.
+Watch with `metal_field`, then run `audit_metal_check.py <infolog> --metal
+--output <audit.json>`. The audit reports the first forty-mex census, dense
+neighbours, worker assignments, screen completion and factory events. Its focused
+growth/converter verdict does not replace the full invariant verdict or guarantee
+forty surviving mexes under combat. Use `metal_legacy` for `--ai-option profile=hard`.
+Normal controls use `metal_normal_control` on Supreme and
+`metal_normal_tech_control` on Glacial Gap, whose existing map has TECH starts.
+See [implementation and validation](../../doc/metal-maps-implementation.md).
+
 D-167 compact factory compounds: stage the `prepare_air_economy_check.py`
 capacity fixture, then `prepare_air_cluster_check.py --dir <same-dir>`. Move the
 capacity fixture's asset gift to six minutes to observe early wind before AFUS.
