@@ -1,5 +1,6 @@
 #include "../manager/air_economy.as"
 #include "../helpers/economy_helpers.as"
+#include "../manager/air_reclaim.as"
 namespace AirBuild {
     array<IUnitTask@> projects;
     array<IUnitTask@> pendingOwnership;
@@ -11,7 +12,7 @@ namespace AirBuild {
     {
         for (uint i = 0; i < projects.length(); ++i) {
             IBuilderTask@ task = cast<IBuilderTask>(projects[i]);
-            if (task is null) continue;
+            if (task is null || task.IsDead()) continue;
             if (AirMath::PendingReactor(IsReactor(task.buildDef), task.GetBuildType() == int(Task::BuildType::ENERGY),
                 task.target !is null, task.target is null ? 0.0f : task.target.GetBuildProgress())) return true;
         }
@@ -53,6 +54,13 @@ namespace AirBuild {
     }
     void Tick()
     {
+        AirReclaim::Tick();
+        for (int i = int(projects.length()) - 1; i >= 0; --i) {
+            if (projects[i] is null || projects[i].IsDead()) {
+                GenericHelpers::LogUtil("[AIR][Claim] forget dead project", 1);
+                projects.removeAt(i);
+            }
+        }
         ReturnEconomyWorkers();
         array<string>@ guards = guardLeases.getKeys();
         for (uint g = 0; g < guards.length(); ++g) {
@@ -317,7 +325,7 @@ namespace AirBuild {
         AirLayout::Bay@ bay = null;
         for (uint b = 0; b < AirLayout::bays.length(); ++b)
             if (AirLayout::bays[b].defName == name && AirLayout::bays[b].factoryId < 0
-                && (aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) <= 0 || aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 4)) { @bay = AirLayout::bays[b]; break; }
+                && (aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 0 || !AirLayout::bays[b].started)) { @bay = AirLayout::bays[b]; break; }
         if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame), advanced);
         if (bay is null) return null;
         @bay = AirLayout::Activate(bay);
@@ -444,6 +452,7 @@ namespace AirBuild {
             CCircuitDef@ d = ai.GetCircuitDef(names[i]);
             if (!Can(u, d)) continue;
             const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
+            if (!reactor && AirEconomy::CompletedAfus() > 0) continue;
             if (reactor && (Busy(ai.GetCircuitDef(fusion), Task::BuildType::ENERGY) || Busy(ai.GetCircuitDef(advancedFusion), Task::BuildType::ENERGY))) continue;
             if (!reactor && !ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 50.0f, float(pending) * d.costM, d.costM, 20.0f)) continue;
             IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor, walkRadius);
@@ -505,6 +514,7 @@ namespace AirBuild {
         projects.resize(0);
         pendingOwnership.resize(0);
         for (uint i = 0; i < tasks.length(); ++i) aiBuilderMgr.AbortTask(tasks[i]);
+        AirReclaim::jobs.resize(0);
         trace.deleteAll(); nanoTrace.deleteAll(); guardLeases.deleteAll(); guardLeaseFrames.deleteAll(); AirLayout::Leave();
     }
 }

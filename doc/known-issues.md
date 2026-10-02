@@ -3627,6 +3627,16 @@ UnitDefs, but utility-aircraft missions and specialist coordinated payloads are
 still not validated merely by spawning them. See [D-165 results](air-combat-arena-results.md)
 and [decision D-165](decisions.md#d-165---replenishing-air-combat-arenas-with-measured-outcomes).
 
+**D-167 natural update.** The final forty-minute run launched its first T2
+wave at 29.72 minutes: twenty bombers, zero escorts, then zero survivors at
+31.78 minutes. Waves two/four/five also returned zero, while wave three retained
+six of sixteen. Production capacity and reaction learning do not establish
+strike effectiveness. Trace escort availability versus home-screen ownership
+at launch and add target-damage/destruction evidence to the existing payload
+and route-risk audit before relaxing admission. Do not globally steal fighters
+from an active friendly-territory incursion. See
+[D-167 results](air-cluster-reclaim-results.md).
+
 ### KI-458 - Concurrent rendered tests can warn during graphics initialization
 
 **Problem.** D-162 gift02 and earlier strike fixtures emitted load-thread
@@ -3761,3 +3771,93 @@ opening reservations. Keep this issue open and measure the transition capital
 and first-reactor critical path with the now-correct ownership/queue rules.
 See [D-164 results](air-economy-zone-results.md) and
 [decision D-164](decisions.md#d-164---air-economy-workers-and-separately-reserved-advanced-economy).
+
+
+**D-167 update.** Compact AIR compounds and wind retirement passed two supplied
+capacity games, but natural twenty-minute bomber readiness did not. The first
+natural run's AFUS frame was reclaimed and an owned reactor project continued
+blocking growth without a live reactor target. Dead-task pruning was added;
+no diagnostic repeat proved that a dead handle caused this incident. Trace
+`AirBuild::projects`, `Removed`, `ReactorPending`, native frame cleanup and pin
+ownership together before claiming it resolved. The next run reached AFUS at
+29.29/31.63 minutes and launched seventeen bombers at 34.53. Native legacy
+low-tier energy reclaim is now disabled while AIR owns its TECH-style policy;
+this is not a demonstrated explanation for the reclaimed AFUS. The unchanged
+two-AFUS gate remains incompatible with these observed twenty-minute timings.
+See [D-167 results](air-cluster-reclaim-results.md).
+
+
+**D-167 final natural evidence (KI-461/467).** Final scripts reached first T2
+lab 14.65, first fusion 17.48, AFUS 21.95/26.65, and the first T2 wave 29.72
+minutes. All wind was reclaimed by 28.6 and stayed absent to forty minutes;
+seven T2 labs completed. No new compound/reclaim invariant fired. The strict
+report remains FAIL: the lab and bomber deadlines were missed and idle-guard
+plus TECH invariant failures persist. This repeat improves on earlier timings
+but does not prove consistent PvP readiness or the remaining lifecycle edges.
+See [final audit](benchmarks/d167-natural-final.json).
+
+
+### KI-466 - AIR commander can retain an idle factory guard beyond ten seconds
+
+**Problem.** The D-167 natural repeat emitted 24 INV-081 observer failures
+starting at frame 47415 (26.34 minutes). The final natural run reproduced the
+failure around 24.84 minutes. Admission checks a working plant, but this does
+not ensure prompt release if production becomes idle after admission. This
+change does not claim to fix existing commander guard lifetime.
+
+**Proposed solution.** Track commander guard ownership and the plant's actual
+production target through the existing AIR reconciliation tick. Reassign only
+the eligible commander after a brief idle grace, preserving player/ferry tasks
+and genuinely unfinished factory production. Inspect both CommanderTask and
+fallback production.assist paths; do not abort a shared guard for all workers
+or globally change native guard semantics. Instrument target IDs and times to
+distinguish lease renewal from a brief engine command transition.
+
+**Verification.** Reproduce a controlled post-opener idle plant with
+[the AIR opening observer](../tools/playtest/widgets/air_opening_watch.lua),
+then repeat natural games and require INV-081 absent while production resumes
+and commander economy work continues. See
+[AIR actions](../data/script/src/roles/air_build.as) and
+[D-167 results](air-cluster-reclaim-results.md). Diagnosed; unfixed.
+
+### KI-467 - New AIR compound/reclaim lifecycle edge cases need runtime coverage
+
+**Problem.** D-167's first use, physical-blocker relocation, support and wind
+retirement were Played. Save/load of a partly occupied compound, role-exit
+restoration of native reclaim settings, and renewed low-tier energy after
+reactor loss have not been Played. Named native state and guards implement
+these paths, but ordinary games do not validate them. Six-site three-column
+compounds also have no smaller-shape fallback for narrow terrain.
+
+**Proposed solution.** Add isolated scenarios which save/load with live pinned
+orders, switch AIR away and back after setting a non-default native reclaim
+value, and destroy completed reactors while preserving economic workers.
+Verify stable IDs/no duplicate claims, exact setting restoration, and energy
+recovery without rebuilding wind while AFUS survives. Exercise rough/narrow
+maps; if full compounds cannot fit, retain the six-site maximum but select a
+script-controlled alternate aspect ratio or smaller compound, with atomic
+native validation. Preserve TECH and occupied legacy bay geometry.
+
+**Verification.** Existing native/scalar suites and Supreme games pass the
+covered paths only. See [D-167 results](air-cluster-reclaim-results.md),
+[AIR layout](../data/script/src/manager/air_layout.as), and
+[AIR reclaim](../data/script/src/manager/air_reclaim.as).
+
+### KI-468 - Later D-167 playtest captures point outside the intended base
+
+**Problem.** Natural repeat and final capacity screenshots show an off-map
+corner despite configured base coordinates. Earlier captures correctly show
+the base. Explicit staged SetCameraState coordinates/angle did not correct the
+last repeat. The camera-controller or competing-widget cause is not proven;
+these images are excluded from visual evidence.
+
+**Proposed solution.** Log the requested and actual camera state/target before
+and after the capture delay in the isolated playtest camera widget. Identify
+camera-follow/edge-scroll/widget overrides, disable only those in test staging,
+and reassert/verify the intended target immediately before capture. Avoid any
+live-install settings changes or changes to AI unit orders.
+
+**Verification.** Run rendered repeated captures with a fresh isolated write
+directory and inspect that labs/nanos/eco are in view at each timestamp. See
+[playtest camera](../tools/playtest/widgets/playtest_camera.lua) and
+[D-167 results](air-cluster-reclaim-results.md). Unfixed test tooling issue.

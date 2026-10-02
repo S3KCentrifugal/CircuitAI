@@ -66,7 +66,7 @@ void TestFactoryClusters()
 {
 	const Footprint nano{3, 3};
 	for (int facing = 0; facing < 4; ++facing) {
-		for (const auto [factory, tier, expected] : {
+		for (const auto& [factory, tier, expected] : {
 				std::tuple{Footprint{6, 6}, FactoryTier::T1, 2},
 				std::tuple{Footprint{9, 9}, FactoryTier::T2, 6}}) {
 			const Point centre{100 + Across(factory, facing) % 2, 120 + Along(factory, facing) % 2};
@@ -114,6 +114,36 @@ void TestFactoryPairSymmetry()
 	}
 }
 
+void TestAirClustersPackSixWithoutOverlap()
+{
+	for (int facing = 0; facing < 4; ++facing) {
+		for (Footprint first : {Footprint{9, 6}, Footprint{6, 6}, Footprint{9, 9}}) {
+			const auto plan = MakeAirFactoryCluster({301, 303}, facing, first, {9, 9}, {3, 3}, 6, 3, 5, 20);
+			Check(plan.valid && plan.factories.size() == 6, "six air labs planned atomically");
+			std::vector<Slot> slots = plan.factories;
+			for (std::size_t b = 0; b < plan.nanos.size(); ++b) {
+				Check(plan.nanos[b].size() == (b == 0 ? 5u : 20u), "distinct support per bay");
+				for (const auto& nano : plan.nanos[b]) {
+					const int dx = (nano.centre.x2 - plan.factories[b].centre.x2) * HALF_CELL_ELMOS;
+					const int dz = (nano.centre.z2 - plan.factories[b].centre.z2) * HALF_CELL_ELMOS;
+					Check(dx * dx + dz * dz <= 400 * 400, "all air support reaches its assigned lab");
+					slots.push_back(nano);
+				}
+			}
+			Check(plan.bounds.Width() * plan.bounds.Depth() <= 63 * 30, "dense cluster fits 1008 by 480 elmos");
+			for (std::size_t i = 0; i < slots.size(); ++i) {
+				const auto rect = RectFromCentre(slots[i].centre, slots[i].footprint, facing);
+				Check(IsAligned(slots[i].centre, slots[i].footprint, facing), "air slot aligned after rotation");
+				Check(Contains(plan.bounds, rect), "air slot inside compound");
+				for (std::size_t j = 0; j < i; ++j)
+					Check(!Intersects(rect, RectFromCentre(slots[j].centre, slots[j].footprint, facing)), "air slots never overlap");
+			}
+		}
+	}
+	Check(!MakeAirFactoryCluster({}, 0, {9, 6}, {9, 9}, {3, 3}, 7, 3, 5, 20).valid, "seventh lab needs another cluster");
+	Check(!MakeAirFactoryCluster({}, 4, {9, 6}, {9, 9}, {3, 3}, 6, 3, 5, 20).valid, "invalid air facing rejected");
+}
+
 void TestBoundsAndIntersection()
 {
 	const Rect a{0, 0, 4, 4};
@@ -136,6 +166,7 @@ int main()
 	TestFactoryClusters();
 	TestFactoryPairSymmetry();
 	TestBoundsAndIntersection();
+	TestAirClustersPackSixWithoutOverlap();
 	if (failures != 0) {
 		std::cerr << failures << " base-layout geometry check(s) failed\n";
 		return EXIT_FAILURE;

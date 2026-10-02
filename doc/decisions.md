@@ -9928,3 +9928,50 @@ KI-465 remain open; existing KI-419/KI-433/KI-457/KI-461 are not claimed fixed.
 
 **Files.** [Full review](reviews/2026-10-02-air-performance-review.md),
 [known issues](known-issues.md), and this [decision record](decisions.md).
+
+
+## D-167 - Compact AIR lab compounds and shared early-energy retirement
+
+**Decision.** Reserve six total labs per compound: one T1 plus five T2 first, then six T2 per expansion, with no default total cap. Use shared native half-cell geometry and persistent pins, atomic preflight and allied exclusion; keep AIR policy independent. Extract TECH's exact scalar reclaim comparison for AIR and retire early energy behind completed reactors. Preserve the two-AFUS bomber gate pending the user's conflict resolution.
+
+**Reasoning.** Individually searched bays spread production across the base. Flying constructors and factory output allow touching support banks without an internal ground exit lane. The complete first compound must exist before spending; a blocked unused compound relocates together. Existing and gifted occupied legacy bays remain anchored. Finished AFUS permits retirement, while frames cannot substitute for working energy.
+
+**Alternatives rejected.** Calling TECH's controller would alter its lab sequence. Global changes to factory exit semantics could affect ground factories. Six T2 plus a T1 inside one compound would exceed the requested six-lab cluster size. Claiming a twenty-minute bomber deadline from a resource-supplied test would confuse capacity with natural economy.
+
+**Invariant.** INV-109: each new AIR compound publishes exactly six reserved lab sites. INV-110: early energy reclaim requires a completed reactor and the shared TECH permission outside energy stalls. Existing INV-084/090 retain twenty support pins/completed turrets respectively; TECH's actors and sequence remain unchanged.
+
+**Verification.** Built and Checked: native integration, full engine-free suites, API parity, invariant and role checks. Played: two controlled capacity games passed first-use relocation, wind retirement and expansion to eleven T2 labs; all experimental profiles loaded. Natural games missed the twenty-minute T2 wave target and retain full failure verdicts. Runtime lifecycle edges and camera faults remain KI-467/468; natural economy remains KI-461 and commander idle guards KI-466. See [measured results](air-cluster-reclaim-results.md) for exact artifacts and limitations.
+
+**Files.** [Plan](air-cluster-reclaim-plan.md), [geometry](../src/circuit/terrain/BaseLayoutGeometry.h), [terrain declaration](../src/circuit/terrain/TerrainManager.h), [terrain implementation](../src/circuit/terrain/TerrainManager.cpp), [binding](../src/circuit/script/InitScript.cpp), [API](angelscript-references.md), [AIR layout](../data/script/src/manager/air_layout.as), [reclaim](../data/script/src/manager/air_reclaim.as), [AIR build](../data/script/src/roles/air_build.as), [AIR rules](../data/script/src/roles/air_rules.as), [shared math](../data/script/src/helpers/production_math.as), [TECH execution](../data/script/src/roles/tech_build.as), [geometry tests](../tests/base_layout_geometry_test.cpp), [math tests](../tests/production_math_tests.as), [probe](../tools/playtest/air_cluster_probe.as), [fixture setup](../tools/playtest/prepare_air_cluster_check.py), [checks](../tools/playtest/checks/air_factory_clusters.json), [invariants](invariants.md), [actors](actor-matrix.md), [AIR reference](roles/air.md), [TECH reference](roles/tech_build.md).
+
+
+**D-167 implementation refinement.** AIR now owns low-tier energy retirement
+exclusively while active, retaining/restoring the prior native setting rather
+than allowing two different reclaim policies. Dead owned project handles no
+longer hold its reactor serialization gate. All AIR placement callers reject
+wind/basic/advanced solar while AFUS stands, preventing a build/reclaim cycle.
+Neither defensive change is claimed to explain the first natural run's
+reclaimed AFUS. The two-AFUS bomber gate remains deliberately unchanged.
+
+**Additional files.** [Results](air-cluster-reclaim-results.md),
+[known issues](known-issues.md), [base layout](base-layout.md),
+[AIR action reference](roles/air_build.md), [AIR rule reference](roles/air_rules.md),
+[playtest guide](../tools/playtest/README.md),
+[economy probe](../tools/playtest/air_economy_probe.as),
+[growth check](../tools/playtest/checks/air_growth.json),
+[expansion check](../tools/playtest/checks/expansion.json),
+[natural audit 1](benchmarks/d167-natural-1.json),
+[natural audit 2](benchmarks/d167-natural-2.json),
+[capacity audit 1](benchmarks/d167-clusters-1.json),
+[capacity audit final](benchmarks/d167-final-clusters.json),
+[capacity capture 15](images/d167/capacity-15.png),
+[capacity capture 24](images/d167/capacity-24.png),
+[natural capture 20](images/d167/natural-20.png).
+
+
+**D-167 final natural repeat.** [Final audit](benchmarks/d167-natural-final.json):
+first fusion 17.48 minutes, AFUS 21.95/26.65, all wind gone at 28.6 and seven T2
+labs by 38.18. First bomber wave 29.72; twenty bombers with zero escorts, then
+zero survivors. Retain the failed timing/efficacy verdict and KI-457/461 rather
+than accepting production counts as effective combat. The final all-caller
+low-tier energy admission guard was loaded in this natural run.

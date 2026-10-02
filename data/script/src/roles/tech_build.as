@@ -818,8 +818,8 @@ namespace TechBuild {
         const float t1Make = s.winds * wind + s.solars * 20.0f;
         const float advMake = s.advSolars * 75.0f;
         const float pull = s.ePull;
-        const bool t1Ok = afusUp || (s.eIncome - t1Make >= pull * Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
-        const bool advOk = afusUp || (s.eIncome - t1Make - advMake >= pull * Global::RoleSettings::Tech::ReclaimAdvSolarMargin);
+        const bool t1Ok = ProductionMath::LowTierEnergyReclaim(afusUp, s.eIncome, t1Make, pull, Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
+        const bool advOk = ProductionMath::LowTierEnergyReclaim(afusUp, s.eIncome - t1Make, advMake, pull, Global::RoleSettings::Tech::ReclaimAdvSolarMargin);
         if (ReclaimsInFlight() >= Global::RoleSettings::Tech::ReclaimEnergyConcurrent) return null;
         const string side = Global::AISettings::Side;
         array<string> names;

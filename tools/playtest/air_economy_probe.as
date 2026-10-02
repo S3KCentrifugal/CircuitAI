@@ -16,7 +16,7 @@ namespace AirEconomyProbe {
         }
         if (!planned && int(AirEcoLayout::modules.length()) >= Global::RoleSettings::Air::PlannedEcoModules && t2 >= 6 && t1 >= 1) {
             planned = true;
-            GenericHelpers::LogUtil("[AirEconomyProbe] PASS opening reserves " + AirEcoLayout::modules.length() + " economy modules and seven factory bays", 1);
+            GenericHelpers::LogUtil("[AirEconomyProbe] PASS opening reserves " + AirEcoLayout::modules.length() + " economy modules and " + (t1 + t2) + " factory bays", 1);
         }
         if (controlled && !adopted && ai.frame >= 300 && AirEcoLayout::modules.length() >= 2) {
             adopted = true;

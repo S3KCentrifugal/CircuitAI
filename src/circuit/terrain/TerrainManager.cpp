@@ -901,7 +901,7 @@ int CTerrainManager::ReserveBuilding(CCircuitDef* cdef, const AIFloat3& position
 }
 
 int CTerrainManager::ReserveBuildingEx(CCircuitDef* cdef, const AIFloat3& position, int facing, int ttlFrames, int group,
-		bool armed, bool anyReach, bool tenant, int zone, bool quiet)
+		bool armed, bool anyReach, bool tenant, int zone, bool quiet, bool exitsPreflighted)
 {
 	SSlowCall slow("ReserveBuildingEx", circuit);
 	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) {
@@ -978,7 +978,7 @@ int CTerrainManager::ReserveBuildingEx(CCircuitDef* cdef, const AIFloat3& positi
 	// D-099 (played: the first lab reserved at the commander stood in the
 	// advanced lab's planned exit): no reservation of the layout in a planned or
 	// standing factory's exit lane, whoever asks
-	if (layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes())) {
+	if (!exitsPreflighted && layout_rank::OverlapsAny(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, FactoryExitLanes())) {
 		if (!quiet) {
 			circuit->LOG("RESERVE: refused %s at (%.0f, %.0f): in a factory's exit lane", cdef->GetDef()->GetName(), pos.x, pos.z);
 		}
@@ -1713,6 +1713,73 @@ bool CTerrainManager::PlanFactoryPair(const std::string& name, CCircuitDef* firs
 	layoutInts[name + ".t2_slot"] = secondId;
 	circuit->LOG("RESERVE: factory pair '%s' committed atomically facing %i", name.c_str(), facing);
 	return true;
+}
+
+bool CTerrainManager::PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory,
+		CCircuitDef* repeatedFactory, CCircuitDef* nanoDef, const AIFloat3& origin,
+		int facing, int count, int columns, int firstNanos)
+{
+	if (!layoutEnabled || name.empty() || !MakesAircraft(circuit, firstFactory)
+			|| !MakesAircraft(circuit, repeatedFactory) || nanoDef == nullptr || nanoDef->GetDef() == nullptr) return false;
+	const auto footprint = [](CCircuitDef* d) {
+		return base_layout::Footprint{d->GetDef()->GetXSize() / 2, d->GetDef()->GetZSize() / 2};
+	};
+	const auto plan = base_layout::MakeAirFactoryCluster(
+			{int(std::lround(origin.x / 8.f)), int(std::lround(origin.z / 8.f))}, facing,
+			footprint(firstFactory), footprint(repeatedFactory), footprint(nanoDef), count, columns, firstNanos, 20);
+	if (!plan.valid || !IsRectFree(plan.bounds)) return false;
+	// Existing corridors are checked once; flying output needs no internal
+	// ground lanes. Every other reservation caller retains its original policy.
+	if (layout_rank::OverlapsAny({plan.bounds.minX, plan.bounds.minZ, plan.bounds.maxX, plan.bounds.maxZ}, FactoryExitLanes())) return false;
+	const auto position = [](const base_layout::Slot& s) {
+		return AIFloat3(s.centre.x2 * base_layout::HALF_CELL_ELMOS, 0.f, s.centre.z2 * base_layout::HALF_CELL_ELMOS);
+	};
+	const auto canBuild = [this, &position](CCircuitDef* d, const base_layout::Slot& s) {
+		const auto p = position(s);
+		return CanBeBuiltAt(d, p) && IsEngineBuildable(d, p, s.facing);
+	};
+	for (int b = 0; b < count; ++b) {
+		if (!canBuild(b == 0 ? firstFactory : repeatedFactory, plan.factories[b])) return false;
+		for (const auto& slot : plan.nanos[b]) {
+			if (!canBuild(nanoDef, slot)
+					|| position(slot).SqDistance2D(position(plan.factories[b])) > SQUARE(nanoDef->GetBuildDistance())) return false;
+		}
+	}
+	std::vector<int> ids;
+	std::vector<std::pair<std::string, int>> values;
+	const auto reserve = [this, &position, &ids](CCircuitDef* d, const base_layout::Slot& s) {
+		const auto p = position(s);
+		const int zone = ReserveZone(p, s.facing, s.footprint.x * 8.f, s.footprint.z * 8.f, false);
+		if (zone <= 0) return -1;
+		const int id = ReserveBuildingEx(d, p, s.facing, 0, 0, true, false, false, zone, true, true);
+		if (id < 0) ReleaseZone(zone);
+		else ids.push_back(id);
+		return id;
+	};
+	bool success = true;
+	for (int b = 0; b < count && success; ++b) {
+		const std::string key = name + ".bay." + std::to_string(b);
+		const int id = reserve(b == 0 ? firstFactory : repeatedFactory, plan.factories[b]);
+		values.emplace_back(key + ".slot", id);
+		success = id >= 0;
+		for (std::size_t n = 0; n < plan.nanos[b].size() && success; ++n) {
+			const int nano = reserve(nanoDef, plan.nanos[b][n]);
+			values.emplace_back(key + ".nano." + std::to_string(n), nano);
+			success = nano >= 0;
+		}
+		values.emplace_back(key + ".n", int(plan.nanos[b].size()));
+	}
+	if (success) {
+		const auto centre = base_layout::CentreOf(plan.bounds);
+		const int envelope = ReserveZone(AIFloat3(centre.x2 * 8.f, 0.f, centre.z2 * 8.f), 0,
+				plan.bounds.Width() * 8.f, plan.bounds.Depth() * 8.f, false);
+		values.emplace_back(name + ".envelope", envelope);
+		values.emplace_back(name + ".count", count);
+		for (const auto& value : values) layoutInts[value.first] = value.second;
+		return true;
+	}
+	for (int id : ids) ReleasePersistentBuilding(id);
+	return false;
 }
 
 int CTerrainManager::AcquireFactoryReservation(CCircuitDef* factoryDef)

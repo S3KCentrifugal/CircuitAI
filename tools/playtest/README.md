@@ -5,6 +5,18 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+D-167 compact factory compounds: stage the `prepare_air_economy_check.py`
+capacity fixture, then `prepare_air_cluster_check.py --dir <same-dir>`. Move the
+capacity fixture's asset gift to six minutes to observe early wind before AFUS.
+Watch with `--checks air_factory_clusters --minutes 25 --keep-going`: it
+physically blocks an unused compound, verifies relocation, and observes wind
+retirement plus expansion beyond the first six lab sites. The older
+`air_clusters` checks still test six-wind clustering and natural fusion timing.
+For natural runs, stage AIR/TECH and use the cluster preparer's `--observe-only`
+option; retain strict `air_transition` checks. See
+[design](../../doc/air-cluster-reclaim-plan.md) and
+[results](../../doc/air-cluster-reclaim-results.md).
+
 D-163 AIR campus obstruction: stage experimental AIR with `air_watch.lua` and
 `air_opening_watch.lua`, then run `prepare_air_check.py --scenario capacity`
 and `prepare_air_support_check.py` against that write directory. Launch rendered

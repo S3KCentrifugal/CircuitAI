@@ -1,5 +1,9 @@
 # tech_build.as - TECH's experimental build system
 
+D-167 extracts the scalar reclaim comparison into
+`ProductionMath::LowTierEnergyReclaim` for AIR reuse. TECH's expression order,
+thresholds, reactor prerequisite, rule order and reclaim execution are unchanged.
+
 D-136: normal advanced-lab existence checks use `TechFlank::NormalLabCount`.
 The dedicated specialist lab does not prevent replacing an ordinary lab.
 
@@ -120,7 +124,7 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: 7458fe4b8a9ca92aec8166cec0674d9d8e42d964; lines: 928 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: e35140bb4f8bb7689fc06a82ba671a63fb73c0c4; lines: 928 -->
 
 ## D-152 defense ownership
 

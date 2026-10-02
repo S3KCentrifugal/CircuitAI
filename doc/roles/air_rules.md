@@ -29,6 +29,7 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
 | 4a | `production.banked` | Bank-funded T2 admission; between the growth milestone and two AFUS, allow the first T2 lab only; existing support gate always applies |
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes, at most one remote upgrade at a time; additional helpers stay local |
+| 5.0 | `energy.reclaim` | Retire wind, then basic and advanced solar using TECH's shared margin and completed-reactor guard; completed AFUS admits retirement outside recovery |
 | 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
 | 5.2 | `mex.phase.convert`, `economy.shared.*` | Pending-upgrade T1 conversion, then shared TECH economy choices with AIR state, placement and reactor assistance after sustained +50 metal |
 | 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
@@ -67,7 +68,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: be0fe3fe84f8cbfa0373ed54d81a5053fa1ba202; lines: 142 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 5db3adc2cae674f0a28ff92b2ce2ea3e9ee8f661; lines: 144 -->
 
 ## D-152 sequencing
 

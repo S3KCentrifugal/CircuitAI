@@ -247,6 +247,8 @@ public:
 	bool PlanFactoryPair(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
 			CCircuitDef* nanoDef, const springai::AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells);
 	int AcquireFactoryReservation(CCircuitDef* factoryDef);
+	bool PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* repeatedFactory,
+			CCircuitDef* nanoDef, const springai::AIFloat3& origin, int facing, int count, int columns, int firstNanos);
 	bool PinLayoutTask(IBuilderTask* task, const std::string& groupName, CCircuitUnit* builder);
 	bool PinFactoryNanoTask(IBuilderTask* task, CCircuitUnit* builder);
 	int GetFactoryNanoAvailable() const;
@@ -467,7 +469,7 @@ private:
 	void RemarkZoneCells(int2 c1, int2 c2);
 	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,
-			bool armed, bool anyReach, bool tenant, int zone, bool quiet);
+			bool armed, bool anyReach, bool tenant, int zone, bool quiet, bool exitsPreflighted = false);
 	int ReserveGridEx(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap,
 			int ttlFrames, bool armed, bool anyReach, bool tenant, int zone, int group);
 	bool FindReservedSite(CCircuitDef* cdef, const springai::AIFloat3& pos, TerrainPredicate& predicate,

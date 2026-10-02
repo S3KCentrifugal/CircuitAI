@@ -9,6 +9,7 @@
 namespace AirLayout {
     class Bay {
         string key;
+        int cluster = -1;
         string defName;
         int slot = -1;
         int envelope = 0;
@@ -69,6 +70,7 @@ namespace AirLayout {
     string Key(int i) { return "air.bay." + i; }
     void Save(Bay@ b)
     {
+        aiTerrainMgr.SetLayoutInt(b.key + ".cluster", b.cluster);
         aiTerrainMgr.SetLayoutInt(b.key + ".slot", b.slot);
         aiTerrainMgr.SetLayoutInt(b.key + ".envelope", b.envelope);
         aiTerrainMgr.SetLayoutInt(b.key + ".started", b.started ? 1 : 0);
@@ -88,6 +90,12 @@ namespace AirLayout {
         AirEconomy::Reset(); AirProduction::Reset();
         aiBuilderMgr.experimentalBuild = true;
         aiBuilderMgr.experimentalAirDirect = true;
+        if (aiTerrainMgr.GetLayoutInt("air.reclaimCaptured", 0) == 0) {
+            aiTerrainMgr.SetLayoutInt("air.reclaimPrior", int(fpToIEEE(aiEconomyMgr.reclEnergyEff)));
+            aiTerrainMgr.SetLayoutInt("air.nanoPrior", aiEconomyMgr.assistNanoEnabled ? 1 : 0);
+            aiTerrainMgr.SetLayoutInt("air.reclaimCaptured", 1);
+        }
+        aiEconomyMgr.reclEnergyEff = 0.0f; // AIR's shared TECH threshold is the sole early-energy reclaim policy
         aiEconomyMgr.assistNanoEnabled = false; // one owner: native queued nanos cannot obstruct AIR slots
         bays.resize(0);
         windClusters.resize(0);
@@ -98,6 +106,7 @@ namespace AirLayout {
         for (int i = 0; i < count; ++i) {
             Bay b;
             b.key = Key(i);
+            b.cluster = aiTerrainMgr.GetLayoutInt(b.key + ".cluster", -1);
             b.slot = aiTerrainMgr.GetLayoutInt(b.key + ".slot", -1);
             b.envelope = aiTerrainMgr.GetLayoutInt(b.key + ".envelope", 0);
             b.started = aiTerrainMgr.GetLayoutInt(b.key + ".started", 0) != 0;
@@ -122,71 +131,70 @@ namespace AirLayout {
         }
         GenericHelpers::LogUtil("[AIR][Layout] enabled; adopted " + bays.length() + " bays, " + windClusters.length() + " wind clusters", 1);
     }
-    // A compound plan is synchronous: publish only after every reservation succeeds.
-    Bay@ Reserve(CCircuitDef@ plant, const AIFloat3 &in anchor, bool complete = false, Bay@ reuse = null)
+    void DiscardClusterPlan(const string &in key, int count)
     {
-        if (!enabled || plant is null || ai.frame < searchAfter) return null;
-        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
-        if (nano is null) return null;
-        const bool t2 = UnitHelpers::IsT2AircraftPlant(plant.GetName());
-        const int wanted = t2 ? 20 : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
-        const float nw = float(nano.GetFootprintX()) * SQUARE_SIZE * 2.0f;
-        const float half = float(plant.GetFootprintX()) * SQUARE_SIZE; // local across; Offset applies facing
-        const float depth = float(plant.GetFootprintZ()) * SQUARE_SIZE;
-        const float across = t2 ? half + 32.0f + 2.0f * nw : AiMax(half, 2.5f * nw);
-        const float back = t2 ? AiMax(depth, 2.5f * nw) : half + 1.5f * nw;
-        const float front = t2 ? back : depth;
-        const float along = (front + back) * 0.5f + 16.0f + Global::RoleSettings::Air::BayExitClearance * 0.5f;
-        const float shift = (front - back) * 0.5f;
-        const float pitchX = AirMath::BayPitch(across + 16.0f, Global::RoleSettings::Air::BaySpacing);
-        const float pitchZ = AirMath::BayPitch(along, Global::RoleSettings::Air::BaySpacing);
-        const AIFloat3 origin = bays.length() > 0 ? bays[0].centre : anchor;
-        // Keep the dense lattice first. A half-pitch fallback fits terrain and
-        // allied reservations without assuming an empty rectangular base.
-        for (int pass = 0; pass < 2; ++pass) {
-            const float scale = pass == 0 ? 1.0f : 0.5f;
-            const int rings = Global::RoleSettings::Air::BaySearchRings * (pass == 0 ? 1 : 2);
-            for (int ring = 0; ring < rings; ++ring) {
-                for (int cell = 0; cell < (2 * ring + 1) * (2 * ring + 1); ++cell) {
-                    const int gx = cell % (2 * ring + 1) - ring;
-                    const int gz = cell / (2 * ring + 1) - ring;
-                    if (ring > 0 && gx > -ring && gx < ring && gz > -ring && gz < ring) continue;
-                    AIFloat3 at = Offset(origin, facing, float(gx) * pitchX * scale, float(gz) * pitchZ * scale);
-                    if (AirEcoLayout::NearReactor(at, Global::RoleSettings::Air::EcoFactorySeparation)) continue;
-                    if (!Inside(at, AiMax(across + 16.0f, along)) || !AirHome::EconomySite(at)
-                        || aiTerrainMgr.IsZoneAlly(at) || !aiTerrainMgr.CanReserveBuilding(plant, at, facing)) continue;
-                    if (!aiTerrainMgr.CanReserveArea(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along)) continue;
-                    const int id = aiTerrainMgr.ReservePersistentBuilding(plant, at, facing);
-                    if (id < 0) continue;
-                    at = aiTerrainMgr.GetReservationPos(id);
-                    array<int> slots;
-                    for (int s = 0; s < wanted; ++s) {
-                        // T1 grows a rear row; T2 has independent side banks.
-                        const float x = t2 ? ProductionMath::BayAcross(s, half, nw, 32.0f) : float(s - 2) * nw;
-                        const float z = t2 ? ProductionMath::BayAlong(s, nw) : -half - nw;
-                        const AIFloat3 p = Offset(at, facing, x, z);
-                        if (MapHelpers::SqDist(p, at) > nano.GetBuildDistance() * nano.GetBuildDistance()) break;
-                        const int ns = aiTerrainMgr.ReservePersistentBuilding(nano, p, facing);
-                        if (ns < 0) break;
-                        slots.insertLast(ns);
-                    }
-                    // A cramped site can start with a partial bank. The capacity
-                    // calculation uses the slots actually published, never phantom BP.
-                    if (int(slots.length()) < (complete ? wanted : AiMin(2, wanted))) {
-                        for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
-                        aiTerrainMgr.ReleasePersistentBuilding(id);
-                        continue;
-                    }
-                    Bay@ b = reuse is null ? Bay() : reuse;
-                    if (reuse is null) b.key = Key(int(bays.length()));
-                    b.defName = plant.GetName(); b.slot = id;
-                    b.centre = at; b.facing = facing; b.nanos = slots;
-                    b.envelope = aiTerrainMgr.ReserveZone(Offset(at, facing, 0.0f, shift), facing, across + 16.0f, along, false);
-                    if (reuse is null) bays.insertLast(b);
-                    Save(b);
-                    GenericHelpers::LogUtil("[AIR][Layout] reserved " + b.key + " " + b.defName + " at " + int(at.x) + "," + int(at.z) + " support=" + slots.length(), 1);
-                    return b;
+        for (int b = 0; b < count; ++b) {
+            const string member = key + ".bay." + b;
+            for (int n = 0; n < aiTerrainMgr.GetLayoutInt(member + ".n", 0); ++n)
+                aiTerrainMgr.ReleasePersistentBuilding(aiTerrainMgr.GetLayoutInt(member + ".nano." + n, -1));
+            aiTerrainMgr.ReleasePersistentBuilding(aiTerrainMgr.GetLayoutInt(member + ".slot", -1));
+        }
+        aiTerrainMgr.ReleaseZone(aiTerrainMgr.GetLayoutInt(key + ".envelope", 0));
+    }
+    Bay@ Reserve(CCircuitDef@ plant, const AIFloat3 &in anchor, bool force = false, Bay@ reuse = null)
+    {
+        if (!enabled || plant is null || (!force && ai.frame < searchAfter)) return null;
+        const string side = Global::AISettings::Side;
+        CCircuitDef@ advanced = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(side));
+        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(side));
+        if (advanced is null || nano is null) return null;
+        array<Bay@> members;
+        if (reuse !is null) {
+            for (uint i = 0; i < bays.length(); ++i)
+                if (bays[i] is reuse || (reuse.cluster >= 0 && bays[i].cluster == reuse.cluster)) members.insertLast(bays[i]);
+            @plant = ai.GetCircuitDef(members[0].defName);
+        }
+        const int cluster = reuse !is null && reuse.cluster >= 0 ? reuse.cluster : aiTerrainMgr.GetLayoutInt("air.clusters", 0);
+        const string key = "air.cluster." + cluster;
+        // Perimeter-only bounded search, one atomic native transaction per site.
+        for (int ring = 0; ring <= Global::RoleSettings::Air::EconomySearchRings; ++ring) {
+            const int length = AiMax(1, 8 * ring);
+            for (int k = 0; k < length; ++k) {
+                const int edge = ring == 0 ? 0 : k / (2 * ring);
+                const int along = ring == 0 ? 0 : k % (2 * ring) - ring;
+                const int x = ring == 0 ? 0 : edge == 0 ? along : edge == 1 ? ring : edge == 2 ? -along : -ring;
+                const int z = ring == 0 ? 0 : edge == 0 ? -ring : edge == 1 ? along : edge == 2 ? ring : -along;
+                const AIFloat3 at = Offset(anchor, facing, float(x) * 96.0f - 168.0f, float(z) * 96.0f - 120.0f);
+                if (!Inside(at, 0.0f) || !AirHome::EconomySite(at) || aiTerrainMgr.IsZoneAlly(at)) continue;
+                const int firstNanos = UnitHelpers::IsT2AircraftPlant(plant.GetName()) ? 20 : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
+                if (!aiTerrainMgr.PlanAirFactoryCluster(key, plant, advanced, nano, at, facing, 6, 3, firstNanos)) continue;
+                bool allowed = true;
+                for (int b = 0; b < 6; ++b) {
+                    const AIFloat3 p = aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(key + ".bay." + b + ".slot", -1));
+                    if (!AirHome::EconomySite(p) || AirEcoLayout::NearReactor(p, Global::RoleSettings::Air::EcoFactorySeparation)) allowed = false;
                 }
+                if (!allowed) { DiscardClusterPlan(key, 6); continue; }
+                const int envelope = aiTerrainMgr.GetLayoutInt(key + ".envelope", 0);
+                for (int b = 0; b < 6; ++b) {
+                    Bay@ bay;
+                    if (b < int(members.length())) @bay = members[b];
+                    else { @bay = Bay(); bay.key = Key(int(bays.length())); bays.insertLast(bay); members.insertLast(bay); }
+                    const string source = key + ".bay." + b;
+                    bay.cluster = cluster; bay.slot = aiTerrainMgr.GetLayoutInt(source + ".slot", -1);
+                    bay.defName = b == 0 ? plant.GetName() : advanced.GetName();
+                    bay.centre = aiTerrainMgr.GetReservationPos(bay.slot); bay.facing = facing;
+                    bay.envelope = envelope; bay.nanos.resize(0);
+                    for (int n = 0; n < aiTerrainMgr.GetLayoutInt(source + ".n", 0); ++n)
+                        bay.nanos.insertLast(aiTerrainMgr.GetLayoutInt(source + ".nano." + n, -1));
+                    Save(bay);
+                    if (UnitHelpers::IsT2AircraftPlant(bay.defName) && bay.nanos.length() != 20)
+                        Invariants::Violation("INV-084", bay.key, "cluster T2 bay lacks twenty support slots");
+                }
+                aiTerrainMgr.SetLayoutInt("air.clusters", AiMax(cluster + 1, aiTerrainMgr.GetLayoutInt("air.clusters", 0)));
+                if (members.length() != 6)
+                    Invariants::Violation("INV-109", key, "AIR compound must contain exactly six reserved lab sites");
+                GenericHelpers::LogUtil("[AIR][Layout] cluster=" + cluster + " labs=6 at=" + int(at.x) + "," + int(at.z), 1);
+                return members[0];
             }
         }
         searchAfter = ai.frame + 10 * SECOND;
@@ -195,19 +203,22 @@ namespace AirLayout {
     Bay@ Activate(Bay@ bay)
     {
         if (bay is null || bay.started) return bay;
-        array<int> slots = bay.nanos; slots.insertLast(bay.slot);
+        array<Bay@> members;
+        array<int> slots;
+        for (uint i = 0; i < bays.length(); ++i) {
+            if (bays[i] !is bay && (bay.cluster < 0 || bays[i].cluster != bay.cluster)) continue;
+            members.insertLast(bays[i]); slots.insertLast(bays[i].slot);
+            for (uint n = 0; n < bays[i].nanos.length(); ++n) slots.insertLast(bays[i].nanos[n]);
+        }
         const int state = LayoutHelpers::ActivationState(slots);
-        if (state == 2) { bay.started = true; Save(bay); return bay; }
+        if (state == 2) { for (uint i = 0; i < members.length(); ++i) { members[i].started = true; Save(members[i]); } return bay; }
         if (state == 0) return bay;
-        GenericHelpers::LogUtil("[AIR][Layout] relocate blocked unused " + bay.key, 1);
-        // Releasing this cluster changes the search space; an unrelated failed
-        // speculative search must not delay its first replacement attempt.
-        if (bay.slot >= 0) searchAfter = 0;
-        for (uint i = 0; i < bay.nanos.length(); ++i) aiTerrainMgr.ReleasePersistentBuilding(bay.nanos[i]);
-        aiTerrainMgr.ReleasePersistentBuilding(bay.slot);
-        if (bay.envelope > 0) aiTerrainMgr.ReleaseZone(bay.envelope);
-        bay.slot = -1; bay.envelope = 0; bay.nanos.resize(0); Save(bay);
-        return Reserve(ai.GetCircuitDef(bay.defName), Global::Map::StartPos, true, bay);
+        GenericHelpers::LogUtil("[AIR][Layout] relocate blocked unused cluster=" + bay.cluster, 1);
+        for (uint i = 0; i < slots.length(); ++i) aiTerrainMgr.ReleasePersistentBuilding(slots[i]);
+        aiTerrainMgr.ReleaseZone(bay.envelope);
+        for (uint i = 0; i < members.length(); ++i) { members[i].slot = -1; members[i].envelope = 0; members[i].nanos.resize(0); Save(members[i]); }
+        Bay@ replacement = Reserve(ai.GetCircuitDef(members[0].defName), Global::Map::StartPos, true, members[0]);
+        return replacement is null ? null : bay;
     }
     int aheadFrame = -100000;
     void PlanAhead()
@@ -220,7 +231,7 @@ namespace AirLayout {
         // does not advance the actual mex/energy/factory build sequence.
         if (bays.length() == 0) Reserve(ai.GetCircuitDef(UnitHelpers::GetT1AirPlantForSide(side)), Global::Map::StartPos);
         AirEcoLayout::PlanAhead();
-        if (bays.length() == 0) return;
+        if (bays.length() == 0 || ai.frame < searchAfter) return;
         const array<string> names = {UnitHelpers::GetT2AirPlantForSide(side), UnitHelpers::GetT1AirPlantForSide(side)};
         const int minimum = AiMax(6, Global::RoleSettings::Air::PlannedT2Bays);
         const array<int> wants = {AirMath::PlannedBays(AirEconomy::t2, minimum), AiMax(1, Global::RoleSettings::Air::PlannedT1Bays)};
@@ -312,6 +323,11 @@ namespace AirLayout {
     IUnitTask@ Place(CCircuitUnit@ u, CCircuitDef@ d, Task::BuildType type, Task::Priority priority, bool reactor = false, float walkRadius = 0.0f)
     {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
+        const string side = UnitHelpers::GetSideForUnitName(d.GetName());
+        // Every AIR caller, including shared growth, must respect retirement.
+        if (AirEconomy::CompletedAfus() > 0 && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
+            || d.GetName() == UnitHelpers::GetSolarNameForSide(side)
+            || d.GetName() == UnitHelpers::GetAdvSolarNameForSide(side))) return null;
         if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
         if (AirEcoLayout::Managed(d)) return AirEcoLayout::Place(u, d, type, priority);
         if (d.GetName() == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(d.GetName())))
@@ -375,6 +391,7 @@ namespace AirLayout {
     }
     IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority, float walkRadius = 0.0f)
     {
+        if (AirEconomy::CompletedAfus() > 0 || AirReclaim::Allowed()) return null;
         if (UnitHelpers::IsCommander(u.circuitDef)) {
             IUnitTask@ t = WindPass(u, d, priority, true);
             if (t !is null || (AirEconomy::CompletedConstructors() > 0 && walkRadius <= 0.0f)) return t;
@@ -474,6 +491,8 @@ namespace AirLayout {
         if (!enabled) return;
         UnitHelpers::ApplyUnitLimits(originalFactoryCaps);
         originalFactoryCaps.deleteAll();
+        aiEconomyMgr.reclEnergyEff = fpFromIEEE(uint(aiTerrainMgr.GetLayoutInt("air.reclaimPrior", int(fpToIEEE(20.0f)))));
+        aiEconomyMgr.assistNanoEnabled = aiTerrainMgr.GetLayoutInt("air.nanoPrior", 1) != 0;
         aiTerrainMgr.ResetLayout(); aiTerrainMgr.SetLayoutEnabled(false);
         aiBuilderMgr.experimentalAirDirect = false;
         enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0; overlay = false;

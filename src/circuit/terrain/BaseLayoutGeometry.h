@@ -192,6 +192,57 @@ struct FactoryPair {
 	return bounds;
 }
 
+// Flying output needs no internal ground exit corridor. Geometry only: callers
+// own tier/count policy, terrain preflight, reservations and funding.
+struct AirFactoryCluster {
+	std::vector<Slot> factories;
+	std::vector<std::vector<Slot>> nanos;
+	Rect bounds;
+	bool valid = false;
+};
+
+[[nodiscard]] inline AirFactoryCluster MakeAirFactoryCluster(Point origin, int facing,
+		Footprint first, Footprint repeated, Footprint nano, int count, int columns,
+		int firstNanos, int repeatedNanos)
+{
+	AirFactoryCluster result;
+	if (!IsFacingValid(facing) || count < 1 || count > 6 || columns < 1 || columns > count
+			|| first.x <= 0 || first.z <= 0 || repeated.x <= 0 || repeated.z <= 0
+			|| nano.x <= 0 || nano.z <= 0 || firstNanos < 0 || firstNanos > 20
+			|| repeatedNanos < 0 || repeatedNanos > 20) return result;
+	origin.x2 -= origin.x2 & 1;
+	origin.z2 -= origin.z2 & 1;
+	const int width = std::max(first.x, repeated.x);
+	const int depth = std::max(std::max(first.z, repeated.z), 5 * nano.z);
+	const int pitch = width + 4 * nano.x;
+	std::vector<Slot> all;
+	for (int b = 0; b < count; ++b) {
+		const Footprint fp = b == 0 ? first : repeated;
+		const Point corner = Offset(origin, facing, 2 * (b / columns) * depth, 2 * (b % columns) * pitch);
+		const int centreX2 = 4 * nano.x + AlignParity(width, fp.x);
+		const int centreZ2 = AlignParity(depth, fp.z);
+		const Slot factory{Offset(corner, facing, centreZ2, centreX2), fp, facing, b};
+		result.factories.push_back(factory);
+		all.push_back(factory);
+		std::vector<Slot> support;
+		const int n = b == 0 ? firstNanos : repeatedNanos;
+		for (int i = 0; i < n; ++i) {
+			const int bank = i / 10;
+			const int col = (i % 10) / 5;
+			const int row = i % 5;
+			const int x2 = bank == 0 ? (2 * col + 1) * nano.x
+				: 4 * nano.x + 2 * width + (2 * col + 1) * nano.x;
+			const Slot slot{Offset(corner, facing, (2 * row + 1) * nano.z, x2), nano, facing, i};
+			support.push_back(slot);
+			all.push_back(slot);
+		}
+		result.nanos.push_back(std::move(support));
+	}
+	result.bounds = BoundsOf(all);
+	result.valid = true;
+	return result;
+}
+
 [[nodiscard]] constexpr Rect OrientedRect(
 		const Point& origin, int facing, int front2, int back2, int left2, int right2)
 {

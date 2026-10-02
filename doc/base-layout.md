@@ -1,5 +1,10 @@
 # Base layout
 
+D-167: AIR uses the same native half-cell geometry and persistent reservation
+mechanism through `PlanAirFactoryCluster`, with its own six-lab compound policy.
+TECH's factory-pair/packing entry points and build sequence are unchanged. See
+[AIR's cluster plan](air-cluster-reclaim-plan.md).
+
 > **Current picture:** [`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md) explains the layout and the build sequence as they play today (D-108). This file records how the design got there; where the two disagree (for example, the box no longer grows: D-099), that page is current.
 
 CircuitAI normally places structures with the existing nearest-free search.

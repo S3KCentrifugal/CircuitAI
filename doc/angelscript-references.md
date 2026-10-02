@@ -1686,3 +1686,8 @@ Script retains stable member IDs and updates its wave membership on success.
 D-163: `CAirWaveTask::ExcludeStrikeRegion(const AIFloat3& in, float)` adds
 one target-selection exclusion to that task (up to eight finite regions).
 Radius and expiry are AIR script policy; no exclusion applies by default.
+
+
+## D-167: compact AIR factory compounds
+
+`aiTerrainMgr.PlanAirFactoryCluster(name, firstFactory, repeatedFactory, nanoDef, origin, facing, count, columns, firstNanos)` atomically plans up to six flying-output factories. It uses actual UnitDef footprints and the shared half-cell/reservation engine. Existing exit lanes, allied reservations, every footprint and support reach are preflighted. Internal ground exit lanes are omitted only in this transaction. Named layout integers `name + ".bay.N.slot"`, `.nano.N`, `.n`, plus `name + ".count"` and `.envelope` expose ordinary persistent reservation IDs to policy. Each building has its own zone, so releasing a pin cannot erase sibling slots. Failed commits release all created pins; successful state uses existing native serialization. The call does not set TECH factory-front/line state. Callers must release an unused prior compound before retrying the same name.

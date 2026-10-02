@@ -1,5 +1,10 @@
 // Pure, role-neutral arithmetic. No engine calls, settings or mutable state.
 namespace ProductionMath {
+    // Shared TECH/AIR threshold; callers require a completed reactor and no stall.
+    bool LowTierEnergyReclaim(bool completedAfus, float income, float retiringOutput, float pull, float margin)
+    {
+        return completedAfus || income - retiringOutput >= pull * margin;
+    }
     bool StrikeReady(float homeValue, float enemyAirValue, bool intrusion, float ratio)
     {
         return !intrusion && Valid(homeValue) && homeValue > 0.0f && Valid(enemyAirValue)

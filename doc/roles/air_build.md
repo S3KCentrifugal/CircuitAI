@@ -23,9 +23,17 @@ owners. `Record` audits new fallback production guards for these workers
 See [the economic district design](../air-economy-zone-plan.md).
 
 `ReactorPending` reads only owned ENERGY projects with a reactor definition and
-no target or an unfinished target. `AirGrowth` uses it for serialization so a
+no target or an unfinished target, excluding dead tasks. `Tick` prunes dead
+project handles. `AirGrowth` uses it for serialization so a
 leftover T1 wind/solar order cannot block all advanced economy. `AirLayout::Place`
 checks the same predicate before admitting any reactor; `Record` audits INV-108.
+
+D-167 delegates low-tier energy retirement to `AirReclaim`, using TECH's shared
+income-minus-retiring-output comparison. It requires a completed reactor,
+reclaims wind first with bounded concurrency, and releases retired wind pins.
+`Tick` reconciles these jobs; `Leave` drops their handles. Once AFUS stands,
+all AIR placement callers reject new wind, basic solar and advanced solar.
+See [cluster and reclaim results](../air-cluster-reclaim-results.md).
 
 `Factory` reserves one funded site, reuses a free surviving factory slot after
 loss, and keeps the T1 transport plant. `Energy` chooses affordable wind, solar,
@@ -95,7 +103,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 2b997099ccbb31c74d049b963e8197c5f730ea9c; lines: 510 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 902c7c51676f7de88130ce22b18485a06a09e9f7; lines: 520 -->
 
 ## D-153: income-gated plants and mex-first reactors
 

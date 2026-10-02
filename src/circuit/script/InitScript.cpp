@@ -383,6 +383,15 @@ static bool CTerrainManager_PlanFactoryPair(CTerrainManager* terrainMgr, const s
 			base, facing, sideOffsetCells, forwardOffsetCells);
 }
 
+static bool CTerrainManager_PlanAirFactoryCluster(CTerrainManager* terrainMgr, const std::string& name,
+		const CCircuitDef* firstFactory, const CCircuitDef* repeatedFactory, const CCircuitDef* nanoDef,
+		const AIFloat3& origin, int facing, int count, int columns, int firstNanos)
+{
+	return terrainMgr->PlanAirFactoryCluster(name, const_cast<CCircuitDef*>(firstFactory),
+			const_cast<CCircuitDef*>(repeatedFactory), const_cast<CCircuitDef*>(nanoDef),
+			origin, facing, count, columns, firstNanos);
+}
+
 static bool IBuilderTask_PinReservation(IUnitTask* task, int id)
 {
 	IBuilderTask* bt = dynamic_cast<IBuilderTask*>(task);
@@ -1128,6 +1137,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutEnabled() const", asMETHOD(CTerrainManager, IsLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutConfigured() const", asMETHOD(CTerrainManager, IsLayoutConfigured), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanFactoryPair(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int facing, int sideOffsetCells, int forwardOffsetCells)", asFUNCTION(CTerrainManager_PlanFactoryPair), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanAirFactoryCluster(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int, int, int, int)", asFUNCTION(CTerrainManager_PlanAirFactoryCluster), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetFactoryNanoAvailable() const", asMETHOD(CTerrainManager, GetFactoryNanoAvailable), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetFactoryNanoActive() const", asMETHOD(CTerrainManager, GetFactoryNanoActive), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool HasLayoutGroup(const string& in) const", asMETHOD(CTerrainManager, HasLayoutGroup), asCALL_THISCALL); ASSERT(r >= 0);

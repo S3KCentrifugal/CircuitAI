@@ -1,5 +1,13 @@
 # AIR Role
 
+D-167 changes factory planning to compact native compounds of six labs total:
+one T1 plus five T2 in the first, then six T2 per additional compound, without a
+default overall cap. Each T2 site has twenty dedicated construction-turret pins.
+AIR now reclaims early energy using TECH's threshold calculation and prevents
+wind/solar reconstruction while a completed AFUS stands. See the
+[cluster and reclaim plan](../air-cluster-reclaim-plan.md) and
+[measured results](../air-cluster-reclaim-results.md).
+
 Reference for the `AIR` AngelScript role: aircraft plants, air constructors and
 the wind-economy opening. How it is registered, what it installs at init, how its
 build-focus system works, and where it is currently wrong.

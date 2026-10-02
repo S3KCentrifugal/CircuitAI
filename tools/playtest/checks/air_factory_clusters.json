@@ -1,0 +1,18 @@
+{
+  "stop_minute": 25,
+  "expect": [
+    {"key":"cluster", "pattern":"cluster=0 labs=6", "by_minute":2},
+    {"key":"expansion-plan", "pattern":"cluster=1 labs=6", "by_minute":3},
+    {"key":"relocation", "pattern":"PASS whole unused cluster relocated", "by_minute":3},
+    {"key":"retirement", "pattern":"\\[AIR\\]\\[Reclaim\\].*win", "by_minute":12},
+    {"key":"wind-gone", "pattern":"afus=[1-9][0-9]* wind=0", "by_minute":16},
+    {"key":"capacity", "pattern":"economy t1=1 t2=[6-9]", "by_minute":25}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": (ERR|WARN)\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[AirClusterProbe\\] FAIL", "scope":"any"},
+    {"key":"observer", "pattern":"Removed widget: AIR economy and attack observer|Error in.*air_watch", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

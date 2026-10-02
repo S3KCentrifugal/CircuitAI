@@ -133,3 +133,8 @@ void test_strike_understrength_screen_waits() { Check(!ProductionMath::StrikeRea
 void test_strike_live_incursion_preempts_optional_aircraft() { Check(!ProductionMath::StrikeReady(10000, 100, true, 1.25f)); }
 void test_strike_absent_home_fighters_waits() { Check(!ProductionMath::StrikeReady(0, 0, false, 1.25f)); }
 void test_strike_invalid_ratio_rejected() { Check(!ProductionMath::StrikeReady(10000, 100, false, 0)); }
+void test_reclaim_t1_exact_tech_boundary() { Check(ProductionMath::LowTierEnergyReclaim(false, 1450, 200, 1000, 1.25f)); }
+void test_reclaim_t1_below_tech_boundary() { Check(!ProductionMath::LowTierEnergyReclaim(false, 1449, 200, 1000, 1.25f)); }
+void test_reclaim_advanced_exact_tech_boundary() { Check(ProductionMath::LowTierEnergyReclaim(false, 1950, 450, 1000, 1.5f)); }
+void test_reclaim_afus_completed_override() { Check(ProductionMath::LowTierEnergyReclaim(true, 2000, 200, 3000, 1.25f)); }
+void test_reclaim_afus_frame_has_no_override() { Check(!ProductionMath::LowTierEnergyReclaim(false, 2000, 200, 3000, 1.25f)); }

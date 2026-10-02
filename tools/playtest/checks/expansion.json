@@ -2,7 +2,7 @@
   "stop_minute": 25,
   "expect": [
     {"key":"first-mex", "pattern":"\\[Team\\]\\[Roster\\] first mex", "scope":"any", "by_minute":5},
-    {"key":"air-bank", "pattern":"\\[AIR\\]\\[Layout\\] reserved air.bay.6 .* support=20", "by_minute":6},
+    {"key":"air-bank", "pattern":"\\[AIR\\]\\[Layout\\] cluster=1 labs=6", "by_minute":6},
     {"key":"converters", "pattern":"t1-converters=[1-9]", "scope":"any", "by_minute":15},
     {"key":"tech-future", "pattern":"\\[TECH\\]\\[Expansion\\] held .*gantry|\\[TECH\\]\\[Expansion\\] held (armshltx|corgant|leggant)", "scope":"any", "by_minute":5},
     {"key":"wall", "pattern":"\\[ExpansionWatch\\] wall-finished", "scope":"any", "by_minute":15},

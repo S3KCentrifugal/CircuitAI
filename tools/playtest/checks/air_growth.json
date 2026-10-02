@@ -6,7 +6,7 @@
     {"key":"self-built-afus","pattern":"\\[Playtest\\] finished (arm|cor|leg)afus team 0","scope":"any","by_minute":25},
     {"key":"two-completed","pattern":"mass bombers enabled; completed AFUS=2","by_minute":30},
     {"key":"mass-production","pattern":"\\[AIR\\]\\[Produce\\] wave.bomber","by_minute":32},
-    {"key":"six-planned","pattern":"reserved air.bay.6.*support=20","by_minute":4}
+    {"key":"six-planned","pattern":"\\[AIR\\]\\[Layout\\] cluster=1 labs=6","by_minute":4}
   ],
   "forbid": [
     {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},

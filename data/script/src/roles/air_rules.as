@@ -48,6 +48,8 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
         @t = AirBuild::AssistMex(u);
         if (t !is null) return AirBuild::Record(t, "mex.assist", u);
+        @t = AirReclaim::MakeTask(u);
+        if (t !is null) return AirBuild::Record(t, "energy.reclaim", u);
         if (AirEconomy::MetalFloating()) {
             @t = AirBuild::Nano(u);
             if (t !is null) return AirBuild::Record(t, "overflow.support", u);

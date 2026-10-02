@@ -1,5 +1,17 @@
 # Actor matrix
 
+## AIR compact lab clusters and early energy retirement (D-167)
+
+| Object | Actor | State read or changed |
+| --- | --- | --- |
+| Six-lab compound | AirLayout::Reserve / native PlanAirFactoryCluster | Atomic footprint preflight; persistent per-building slots and shared envelope; named cluster ID links six bays. |
+| Unused compound | AirLayout::Activate | All member slots checked before first use; any started slot anchors all members; otherwise physical blockage releases and relocates all six. |
+| Factory/nano frame | AirBuild::Factory / Nano / AirEconomy::RefreshSupport | Existing required pins and exclusive nearest-bay turret assignment; twenty completed supports before another T2 lab. |
+| Wind/basic/advanced solar | AirReclaim::Allowed / MakeTask / Tick | Completed reactor and shared TECH thresholds, fresh target ID, task ownership, bounded concurrency; Lifecycle retirement and release of gone wind pins. |
+| Reclaim policy ownership | AirLayout::Init / Leave | Save native legacy reclaim setting in persistent named state, disable while AIR owns reclaim, restore on role exit; no concurrent native early-energy selector. |
+| Replacement low-tier energy | AirLayout::Place / PlaceWind / AirBuild::Energy | All callers refuse wind/basic/advanced solar while AFUS stands; wind also stops while the shared retirement threshold is satisfied. Reactor loss restores recovery eligibility. |
+| TECH early energy | TechBuild::ReclaimEnergy | Same ordered rule, arithmetic and thresholds; only the scalar predicate is shared with AIR. |
+
 ## AIR production and economy (D-147)
 
 These actors are local to AIR. The TECH objects and rows below retain their
