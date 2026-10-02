@@ -3672,6 +3672,10 @@ their detail here; add the pointer and keep the one-line summary accurate.
 | Role-layer findings | [`roles/README.md`](roles/README.md) | Cross-role findings, enforced against the scripts by `tools/knowledge/check_role_docs.py`. KI-203 to KI-208 are the ones with a proposed solution. |
 | Juno policy limits | [`juno-targets.md`](juno-targets.md) | Per-feature limits of the pulse policy; KI-102 and KI-301 to KI-304 are the register entries. |
 | EMP policy limits | [`emp-targets.md`](emp-targets.md) | Per-feature limits of the EMP policy; KI-104, KI-303 and KI-304 are the register entries. |
+| KI-462 - AIR screen order churn and assignment scaling | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Every refresh dirties unchanged fighter routes; greedy assignment and birth-triggered full refreshes multiply work. Final-route deduplication and exact snapshot-based assignment are proposed; source-checked, runtime performance unmeasured. |
+| KI-463 - Transient AIR routes survive aircraft loss | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Home/staging/scout route tasks can remain scheduled empty after losses. Add opt-in transient lifetime or safe owner cleanup; preserve persistent Spam/amphibious routes. Verify bounded task/memory counts over repeated deaths and transfers. |
+| KI-464 - Repeated AIR economy, target and layout computation | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Per-project ownership scans, per-target enemy scans, square-per-ring enumeration and per-candidate exit-list rebuilding repeat work. Use revision-aware aggregates/indexes and budgeted exact searches; preserve admission/visibility/placement rules and benchmark p99 cost. |
+| KI-465 - Script slow updates exclude AI IDs 30 and above | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | CircuitAI::Update compares frame modulo 30 with raw skirmishAIId. Reduce the ID modulo the interval, retaining phases 0-29; verify IDs 29/30/31 and recreation. Source-checked, unimplemented and unplayed. |
 
 ## Maintaining this register
 

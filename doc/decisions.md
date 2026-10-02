@@ -9885,3 +9885,46 @@ are unchanged; the mandatory output remains matched to the source data.
   [layered AA](images/d165/layered-aa-strike.png),
   [torpedo strike](images/d165/torpedo-strike.png),
   [Shurikens](images/d165/shuriken-strike.png).
+
+
+## D-166 - AIR performance review before optimization
+
+**Date.** 2026-10-02 05:04:39 -03:00.
+
+**Decision.** Complete the requested runtime/APM review against AI revision
+`2c391ab6` and the trusted Recoil source before changing gameplay. Prioritize
+transient AIR task retirement, unchanged-route command suppression, exact
+revision-aware economy aggregates, and indexed/budgeted placement and target
+queries. Preserve emergency interception, transport requests, bomber mission
+budgets, constructor economy work and TECH's existing sequence. Leave the
+production implementation unchanged in this review.
+
+**Reasoning.** Source tracing confirms synchronous AI callbacks in the engine
+simulation path and networked unit orders. Repeated whole-screen routes create
+avoidable orders; empty transient routes can survive losses; several nested
+queries multiply with late-game armies and layouts. These justify focused
+optimizations, but source operation counts are not measured FPS gains. Existing
+D-165 arena outcomes do not measure AI CPU cost, network bursts or relay delay.
+The review specifies instrumentation and exact-output/runtime acceptance tests.
+
+**Alternatives rejected.** A blanket slower AIR tick or global APM cap could
+delay defense, ferry handoffs and volleys. Changing generic RouteTask lifetime
+or SetRoute semantics globally could break persistent Spam and TECH amphibious
+routes. Moving live engine/script objects to workers is unsafe. Arbitrary target
+shortlists, six-lab caps or stale economy caches could change efficacy. Begin
+with exact, opt-in mechanisms and measure before considering those tradeoffs.
+
+**Invariant.** This documentation-only change leaves production code, settings,
+TECH actors and all existing invariant contracts unchanged. A future optimization
+must retain timely threat reaction, fresh order admission, allied reservation
+exclusion, exact TECH lab sequencing and current mission/transport ownership.
+No new production invariant ID is introduced before an implementation exists.
+
+**Verification.** Checked the active AIR script graph, recent native air tasks,
+shared query/scheduler mechanisms and the pinned engine dispatch/network path.
+Independently calculated command-volume and candidate-enumeration examples.
+No new game was run and no optimization was Built or Played. KI-462 through
+KI-465 remain open; existing KI-419/KI-433/KI-457/KI-461 are not claimed fixed.
+
+**Files.** [Full review](reviews/2026-10-02-air-performance-review.md),
+[known issues](known-issues.md), and this [decision record](decisions.md).
