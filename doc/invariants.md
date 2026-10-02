@@ -146,3 +146,6 @@ step.
 | INV-096 | An amphibious wave declares a foothold secure only on dry ground with its surviving-member quorum present and no current local target. | AmphibiousOps::Tick; independent amphibious fixture records actual water and land transitions. | D-158 |
 | INV-097 | A retained Telchine guard has a dry route on its secured land component and leaves at least the minimum assault group when split. | AmphibiousOps::RetainGuard/GuardTick; independent shore guard fixture checks actual positions, movement state and onward assault. | D-160 |
 | INV-098 | Telchine formation connectors and distinct firing slots stay dry. | AmphibiousFormation::Form/Maintain; independent shore observer measures actual spacing and dry positions. | D-161 |
+| INV-099 | Bomber survival is counted from the immutable launch cohort, never exceeding its original size; return to staging is not a loss. | AirWaves::_EvaluateLastWave; retained combat-fixture cohort and loss logs. | D-162 |
+| INV-100 | An experimental AIR bomber in the held pool cannot belong to autonomous DEFEND/BOMB combat. | AirProduction::Tick; staged units use owned fixed routes until release. | D-162 |
+| INV-101 | Completed AIR construction does not retain workers through a stale construction task. | AirProduction::Tick checks target progress; AIR's native completion handler retires duplicate owners. | D-162 |

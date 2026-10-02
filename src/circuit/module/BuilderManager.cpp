@@ -578,9 +578,26 @@ int CBuilderManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 
 int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 {
+	// Experimental AIR can have a second construction task adopt the same
+	// standing frame. Only one is in unfinishedUnits; the other must not keep
+	// recruiting workers to repair an already completed structure. Snapshot
+	// before dequeuing, and finish the registered owner exactly once below.
+	std::vector<IBuilderTask*> staleOwners;
+	if (IsExperimentalAirDirect()) {
+		for (const auto& byType : buildTasks) for (IBuilderTask* task : byType) {
+			if (!task->IsDead() && task->GetBuildType() <= IBuilderTask::BuildType::MEXUP
+				&& task->GetTarget() == unit) staleOwners.push_back(task);
+		}
+	}
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
 		DoneTask(iter->second);
+	}
+	for (IBuilderTask* task : staleOwners) {
+		if (!task->IsDead()) {
+			circuit->LOG("EXP: retire duplicate construction owner for completed frame %i", unit->GetId());
+			AbortTask(task);
+		}
 	}
 	// D-108 crash: the entry goes with the frame even when its task was already
 	// dequeued (DequeueTask erases by the task's current target only)

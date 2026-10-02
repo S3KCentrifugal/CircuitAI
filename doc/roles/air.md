@@ -4,6 +4,27 @@ Reference for the `AIR` AngelScript role: aircraft plants, air constructors and
 the wind-economy opening. How it is registered, what it installs at init, how its
 build-focus system works, and where it is currently wrong.
 
+## Current air combat controller (D-162)
+
+`Air_MilitaryAiMakeTask` calls the home screen, `AirRaids::MakeTask`, then
+`AirWaves::MakeTask`. Experimental AIR stages ordinary bombers at home, uses
+three-aircraft T1 raids and an eight-aircraft T2 minimum, and selects known
+static targets from both armed and economic snapshots. A funded 240-second
+cadence replaces the income floor. An immutable cohort includes returned
+survivors when measuring losses. Flight policy bounds formation ranks,
+samples route exposure, observes weapon release and returns survivors.
+Phoenix script-emitted beams also confirm release through attributed damage.
+Legion's T1 Mosquito explicitly uses native RAID; it is not a reusable bomber.
+
+Home demand is `clamp(6,60,ceil(1.2*armedAirValue/fighterCost))`; the old income
+coefficient is unused. `BomberOrdersClear=6` and `BomberOrdersParity=3` allocate
+strike turns per ten combat orders, after utility and emergency work.
+`StrikeFirstSize=8`, `StrikeWaveIncrement=4`, `StrikeWaveCap=80` set the funded
+schedule. `StrikeAssemblyRadius=600`, `StrikeAssemblyFraction=0.8`, and
+`StrikeJoinSeconds=20` control assembly. Specialists (EMP/Liche), coordinated
+multi-target packages and radar-plane missions remain future work. See the
+[review](../air-enhancement-review.md) and [wave reference](../air-wave-attacks.md).
+
 ## Current building controller (D-147)
 
 `Global::RoleSettings::Air::ExperimentalBuild = true` selects the independent
@@ -25,7 +46,7 @@ so native switching cannot add competing plants.
 
 `Air_MilitaryAiMakeTask` assigns a home interceptor before calling the existing
 wave handler. Unit removal clears both ledgers. T1 fighters join the patrol
-screen; T2 fighters fill its income/threat quota before becoming wave escorts.
+screen; T2 fighters fill its armed-threat quota before becoming wave escorts.
 Armada/Cortex scouts keep native scouting. Legion's first fighter/scout drone
 receives an explicit scouting route. Ferry requests run ahead of the role's factory handler.
 Role switching releases AIR projects/holds and reservations before the next
@@ -60,7 +81,7 @@ delay before its aircraft frame appears. See [handoff validation](../air-idle-fa
 | `TransitionMinEnergy` / `TransitionEarliestSeconds` / `TransitionFundSeconds` | 1200 / 480 / 100 | Historical settings retained; unused by the D-153 lab gate |
 | `T1BomberMetalStep` / `T1BomberCap` | 8 / 12 | Income-scaled replenishing T1 bomber target |
 | `T1SupportMetalStep` / `T1SupportCap` | 4 / 16 | Cortex Shuriken target; other factions keep three support gunships |
-| `HomeFighterFloor` / `HomeFighterCeiling` / `HomeFightersPerMetal` | 6 / 60 / 0.5 | Income/threat target; all T1 fighters screen, T2 reserves respect this quota |
+| `HomeFighterFloor` / `HomeFighterCeiling` / `HomeFightersPerMetal` | 6 / 60 / 0.5 | Armed-threat target; income coefficient retained but unused |
 | `OpeningAirConstructors` | 3 | Completed T1 constructors before commander release and initial fighter production |
 | `ScreenFullFighters` / `ScreenCells` | 40 / 8 | Fleet size for full advance, maximum patrol segments |
 | `ScreenRearWidth` / `ScreenFrontWidth` | 600 / 6000 | Width grows with live screen fighters; endpoints stay inside map |
@@ -582,7 +603,7 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: 9dce14f6546d07996178fdc940760ee8db61cc47; lines: 1276 -->
+<!-- source: data/script/src/roles/air.as; blob: b0d9704b93ea4d477c482eb5f2aa910c131bd484; lines: 1278 -->
 
 ## D-152 expansion and access
 

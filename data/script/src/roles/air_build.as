@@ -338,7 +338,7 @@ namespace AirBuild {
     {
         if (!AirEconomy::PreparingFusion() || AirEconomy::recovery || !AirEconomy::MexesReady()) return null;
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
-        if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY) || AirEconomy::bankM < 500.0f) return null;
+        if (!Can(u, d) || Busy(d, Task::BuildType::ENERGY)) return null;
         if (!ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 150.0f, Committed(false), d.costM, 180.0f)
             || !ProductionMath::Funded(AirEconomy::bankE, AirEconomy::energy * 0.5f, 500.0f, Committed(true), d.costE, 180.0f)) return null;
         IUnitTask@ t = AirLayout::Place(u, d, Task::BuildType::ENERGY, Task::Priority::HIGH, true);

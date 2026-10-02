@@ -548,6 +548,12 @@ bool CCircuitUnit::KeepWeaponRange(CEnemyInfo* enemy, int timeout)
 	return true;
 }
 
+void CCircuitUnit::TrySetIdleMode(int mode)
+{
+    if (!circuitDef->IsAbleToFly() || (mode != 0 && mode != 1) || manager == nullptr) return;
+    TRY_UNIT(manager->GetCircuit(), this, unit->SetIdleMode(mode);)
+}
+
 void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
 {
 	if (KeepWeaponRange(enemy, timeout)) return;

@@ -97,6 +97,8 @@ public:
 	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
 	springai::AIFloat3 GetAirContactPos(int index) const;
 	float GetAirContactCost(int index) const;
+    bool IsAirContactArmed(int index) const;
+    float GetArmedAirCost() const;
     float AmphThreat(const springai::AIFloat3& pos) const;
     int GetGroundContactCount() const { return static_cast<int>(groundContacts.size()); }
     springai::AIFloat3 GetGroundContactPos(int index) const;
@@ -169,6 +171,7 @@ private:
 	struct AirContact {
 		springai::AIFloat3 pos;
 		float cost;
+		bool armed = false;
 	};
 	std::vector<AirContact> airContacts;
     struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; };

@@ -18,13 +18,14 @@
 #include <vector>
 
 namespace circuit {
+class CCircuitDef;
 
 class CAirWaveTask final: public IFighterTask {
 public:
 	// Numbers are the script's contract (Task::WaveMode in task.as).
 	enum class EMode: char {CARPET = 0, FLANK, PINCER, STRIKE, DEEP, FEINT};
 	// PLANNED until SetPlan; DONE is terminal and the task aborts itself.
-	enum class EState: char {PLANNED = 0, FORMING, HOLDING, ATTACKING, DONE};
+	enum class EState: char {PLANNED = 0, FORMING, HOLDING, ATTACKING, DONE, RETURNING};
 	// bearingDeg value meaning "sample the threat map and take the quietest".
 	static constexpr float SMART_BEARING = 999.f;
 
@@ -40,6 +41,8 @@ public:
 
 	virtual void OnUnitIdle(CCircuitUnit* unit) override;
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+    void OnWeaponFired(CCircuitUnit* unit, int weaponDefId);
+    void OnDamageDealt(CCircuitUnit* unit, int weaponDefId);
 
 	// Script hooks
 	/*
@@ -63,6 +66,11 @@ public:
 	 * False when nothing qualifies; the plan is untouched.
 	 */
 	bool PickStrikeTarget(const springai::AIFloat3& from, int preference, float minStaticCost, bool includeHeavy);
+    void SetFlightPolicy(float width, float rankSpacing, float lossAbort, const springai::AIFloat3& home);
+    void SetStrikePolicy(CCircuitDef* bomber, int count, float passFraction, float margin, float threatWeight, float maxThreat);
+    void ConsiderStrikeAircraft(CCircuitDef* bomber);
+    void SetAssemblyPolicy(float radius, float fraction, int joinFrames);
+    int GetRequiredBombers() const { return requiredBombers; }
 	int GetState() const { return int(state_); }
 	int GetMode() const { return int(mode); }
 	const springai::AIFloat3& GetAim() const { return aim; }
@@ -81,6 +89,9 @@ private:
 	void IssueForm(CCircuitUnit* unit);
 	void IssueAttack(CCircuitUnit* unit);
 	bool IsPastAim(CCircuitUnit* unit, int frame) const;
+    float RouteExposure(const springai::AIFloat3& from, const springai::AIFloat3& to) const;
+    void ReturnHome(const char* reason);
+    float StrikeAlpha(CCircuitDef* bomber);
 	CEnemyInfo* GetStrikeTarget() const;
 
 	EMode mode;
@@ -102,6 +113,29 @@ private:
 	int strikeTargetId;
 	int formedCount;
 	bool linesReady;
+    bool safeFlight = false;
+    float maxWidth = 1320.f;
+    float rankSpacing = 240.f;
+    float abortFraction = .35f;
+    float damageBudget = 0.f;
+    float passDamage = 0.f;
+    int requiredBombers = 0;
+    float damageMargin = 1.f;
+    float threatWeight = 0.f;
+    float maxThreat = 0.f;
+    int launchCount = 0;
+    int expectedCount = 0;
+    int joinFrames = 0;
+    int assemblyTravelFrames = 0;
+    float assemblyRadius = WAVE_DEFAULT_ASSEMBLY_RADIUS;
+    float assemblyFraction = .8f;
+    float passFraction = 0.f;
+    static constexpr float WAVE_DEFAULT_ASSEMBLY_RADIUS = 400.f;
+    springai::AIFloat3 returnPos;
+    std::map<CCircuitUnit*, int> releasedAt;
+    std::set<CCircuitUnit*> outbound;
+    std::set<CCircuitUnit*> assembled;
+    std::map<int, float> strikeAlpha;
 };
 
 } // namespace circuit

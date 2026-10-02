@@ -1072,6 +1072,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void TglAttribute(Type)", asMETHOD(CCircuitUnit, TglAttribute), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "bool IsAttrAny(Mask) const", asMETHOD(CCircuitUnit, IsAttrAny), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetFireState(int)", asMETHOD(CCircuitUnit, TrySetFireState), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetIdleMode(int)", asMETHOD(CCircuitUnit, TrySetIdleMode), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetMoveState(int)", asMETHOD(CCircuitUnit, TrySetMoveState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SelfDestruct(bool)", asMETHOD(CCircuitUnit, CmdSelfD), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdStop()", asFUNCTION(CCircuitUnit_CmdStop), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
@@ -1225,6 +1226,8 @@ void CInitScript::RegisterMgr()
     r = engine->RegisterObjectMethod("CBattleAnalysis", "array<AIFloat3>@ GetUnitTerrainRoute(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in, bool, float, float, float, float)", asFUNCTION(CBattleAnalysis_GetUnitTerrainRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetAirContactPos(int) const", asMETHOD(CBattleAnalysis, GetAirContactPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetAirContactCost(int) const", asMETHOD(CBattleAnalysis, GetAirContactCost), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "bool IsAirContactArmed(int) const", asMETHOD(CBattleAnalysis, IsAirContactArmed), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetArmedAirCost() const", asMETHOD(CBattleAnalysis, GetArmedAirCost), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotEnergy(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotEnergy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotReload(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotReload), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "bool LineOfFire(const AIFloat3& in, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, LineOfFire), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1490,6 +1493,11 @@ void CInitScript::RegisterCAirWaveTask(asIScriptEngine* engine)
 	// doc/air-wave-attacks.md. Modes are Task::WaveMode; 999 as the bearing
 	// means "sample the threat map".
 	int r = engine->RegisterObjectMethod("CAirWaveTask", "void SetPlan(int mode, const AIFloat3& in aim, float formDistance, float spacing, float overrun, int formTimeout, int holdFrames, float bearingDeg, int groups)", asMETHOD(CAirWaveTask, SetPlan), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetFlightPolicy(float, float, float, const AIFloat3& in)", asMETHOD(CAirWaveTask, SetFlightPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetStrikePolicy(CCircuitDef@, int, float, float, float, float)", asMETHOD(CAirWaveTask, SetStrikePolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "int GetRequiredBombers() const", asMETHOD(CAirWaveTask, GetRequiredBombers), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void ConsiderStrikeAircraft(CCircuitDef@)", asMETHOD(CAirWaveTask, ConsiderStrikeAircraft), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAssemblyPolicy(float, float, int)", asMETHOD(CAirWaveTask, SetAssemblyPolicy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "bool PickStrikeTarget(const AIFloat3& in from, int preference, float minStaticCost, bool includeHeavy)", asMETHOD(CAirWaveTask, PickStrikeTarget), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "int GetState() const", asMETHOD(CAirWaveTask, GetState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "int GetMode() const", asMETHOD(CAirWaveTask, GetMode), asCALL_THISCALL); ASSERT(r >= 0);

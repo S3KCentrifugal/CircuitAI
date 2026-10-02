@@ -21,8 +21,23 @@ def main():
     text = text.replace('[GAME]\n{', '[GAME]\n{\n\tFixedRNGSeed=' + str(args.seed) + ';', 1)
     if 'FixedRNGSeed=' not in text:
         text = re.sub(r'(\[GAME\]\s*\{)', r'\1\n FixedRNGSeed=' + str(args.seed) + ';', text, count=1, flags=re.I)
+    if args.seed <= 0:
+        parser.error('Use a positive seed')
+    # Engine RNG and CircuitAI RNG are separate. Pin both for reproducible
+    # fixtures; the first AI initializes the process-shared game attribute.
+    text = re.sub(r'\brandom_seed\s*=\s*\d+;', '', text, flags=re.I)
+    def pin_ai(match):
+        block = match[0]
+        option = re.search(r'\[OPTIONS\]\s*\{', block, re.I)
+        setting = '\n random_seed=' + str(args.seed) + ';'
+        if option:
+            return block[:option.end()] + setting + block[option.end():]
+        return block[:-1] + '\n [OPTIONS]\n {' + setting + '\n }\n }'
+    text, count = re.subn(r'\[AI\d+\]\s*\{.*?\}', pin_ai, text, flags=re.I | re.S)
+    if count == 0:
+        parser.error('No AI sections to seed')
     script.write_text(text)
-    config = {'scenario': args.scenario, 'seed': args.seed}
+    config = {'scenario': args.scenario, 'seed': args.seed, 'engine_seed': args.seed, 'ai_seed': args.seed}
     (base / 'air-fixture.json').write_text(json.dumps(config, indent=2))
     widgets = base / 'LuaUI/Widgets'
     if args.scenario not in ['natural', 'legacy']:

@@ -81,7 +81,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: b14b14004201ff567c47681a33fdb0db325ed647; lines: 449 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 780c20961af0f7dfac7bd4a714c8d4a6409718e7; lines: 449 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -110,3 +110,8 @@ require the complete twenty-slot support bank.
 once per bay. `Nano` permits up to `NanoParallel` (three) funded projects during
 metal overflow, otherwise one, with native reach checks and high task priority.
 Only completed turrets satisfy expansion. See [plan and evidence](../air-support-before-expansion.md).
+
+D-162 removes `FirstFusion`'s additional 500-metal bank veto. Completed owned
+mex upgrades, recovery state and conservative 180-second metal/energy funding
+including committed projects still gate admission. Continuous factory spending
+must not indefinitely block a funded first reactor. See [the review](../air-enhancement-review.md).

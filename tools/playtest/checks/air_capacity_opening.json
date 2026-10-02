@@ -1,0 +1,15 @@
+{
+  "_doc": "Focused six-minute regression: gifted T2 builders can frame the first lab while the commander finishes an already-issued opening mex. Does not replace the 45-minute capacity test.",
+  "stop_minute": 6,
+  "expect": [
+    {"key":"layout","pattern":"\\[AIR\\]\\[Layout\\] enabled","by_minute":1},
+    {"key":"factory-frame","pattern":"\\[AirOpening\\] factory-frame","scope":"any","by_minute":2},
+    {"key":"crew","pattern":"\\[AirOpening\\] crew-ready","scope":"any","by_minute":5},
+    {"key":"fighter","pattern":"\\[AirOpening\\] first-fighter-frame","scope":"any","by_minute":5}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

@@ -1,5 +1,30 @@
 # Air wave attacks
 
+**D-162 experimental AIR override.** The legacy description below applies to
+`ExperimentalBuild=false`. Enabled AIR uses home staging routes, ordinary
+lethal bomber pools, an eight-bomber T2 minimum and 240-second funded cadence.
+Three reusable T1 bombers can form an independent raid. Requested transports,
+required crews and emergency defense precede discretionary strikes.
+
+Native flight-policy opt-in bounds fronts to 1,320 elmos, with 180-elmo lanes
+and 240-elmo ranks. Slots are assigned nearby after the joining window. Arrival
+is latched within 600 elmos and cleared outside 1,200 to accommodate fixed-wing
+orbits; 80% must be ready. The timeout allows distance/speed transit plus the
+script's settling time. Incomplete assembly returns home. Target selection includes economic enemy
+data, estimates health feasibility and samples the entire route. Actual
+lethal weapon release (or an attributed lethal hit for scripted beams), target disappearance, pass completion and a 35% loss
+threshold control return to staging. Returned survivors remain in the
+immutable evaluation cohort. This does not change static AA behavior.
+
+Phoenix budgeting inspects its lethal heat-ray mount rather than its zero-damage
+targeting/sound mounts. Its nominal sweep upper bound still uses the configured
+pass fraction; release observations never assume that every sweep tick hits.
+See [measured results](air-enhancement-results.md) for faction-specific evidence.
+
+EMP timing, Liche pairs, coordinated target reservations, fighter sweeps and
+radar-plane missions remain in the [reviewed plan](air-enhancement-review.md).
+
+
 **D-147 update.** Enabled AIR reserves a separate home-fighter cohort before
 wave holds. `WaveAvoidHomeFocus` selects the nearest participating enemy start
 when no ground opposition is observed or the combat focus is absent/near home.

@@ -312,6 +312,53 @@ Launch using an absolute `--dir` and watch with `--checks air_idle --minutes 10
 frame within five seconds of the third constructor, except an intervening
 transport. The observer checks real factory queues and commander orders.
 
+## AIR production and strike review (D-162)
+
+`prepare_air_strike_check.py --dir build-theatres/<run> --dll <pin> --side
+cortex --profile experimental_hard` stages a rendered thirteen-minute test.
+Launch it with `playtest.py launch`, then watch with `--role AIR --checks
+<run>/checks.json --minutes 13 --keep-going`. Repeat for Armada/balanced and
+Legion/terrible. The fixture supplies early, mid and late fleets and targets,
+freezes construction, and enables global LOS. It checks attributed ground
+damage, air interception and return, with all invariants forbidden. Its
+screenshots show interception, outbound aircraft, targets and impacts. It is
+a capability test, not an economy benchmark or a human-PvP win-rate estimate.
+
+The strike preparer pins both engine and AI RNGs with `--seed` (default 1621).
+Use `--assembly-radius` only for a recorded staged calibration; production's
+final radius is 600. Earlier D-162 natural runs and combat cases 01-13 omitted
+the separate AI seed and are not reproducible paired experiments.
+
+`prepare_air_economy_check.py --dir build-theatres/<run> --dll <pin> --scenario
+constructor` supplies one T2 constructor at six minutes and freezes the enemy's
+construction. Watch twenty-five minutes with `air_transition` to retain the
+strict T2 deadline, and report `air_fusion_gift` separately for its intended
+mex-before-fusion promise. `--scenario capacity` supplies a large economy;
+watch forty-five minutes with `air_capacity` to exercise six T2 bays and their
+twenty-turret prerequisites. Never count supplied assets as natural growth.
+
+`air_capacity_opening` is a separate six-minute regression of the first lab,
+three-constructor crew and immediate fighter order under the same gifts. It
+does not replace the full capacity test. The opening observer records commands
+before the first factory so an old mex order is not mistaken for a new one.
+`air_watch.lua` logs remote constructor coordinates and commands on locality
+failures; keep those failures visible rather than increasing the accepted radius.
+
+For a natural comparison, stage the ordinary roster with `air_watch.lua`,
+`air_opening_watch.lua`, `team_stats.lua` and `unit_census.lua`, then use
+`prepare_air_check.py --scenario natural --seed <same seed>`. Pin the game,
+map, engine, roster and DLL/data for each run. `compare_air_runs.py <logs...>
+--output <report.json>` reports the 0–10, 10–25 and 25–50 minute windows without
+altering verdicts. Damage, nominal kill value and aircraft loss are separate
+metrics; missing kill instrumentation in old runs is not evidence of zero kills.
+
+`prepare_air_check.py` now pins both RNGs too. A sandbox that cannot enumerate
+the engine process can make `watch` report a false early exit while the engine
+continues. Preserve that report and re-run observation with process access;
+report the full captured game duration, not the second watcher's wall time.
+Measured outcomes and limitations are in [the D-162 report](../../doc/air-enhancement-results.md).
+
+
 ## AIR completed-support regression (D-155)
 
 Stage an Armada AIR duel with `widgets/air_watch.lua`, then prepare with

@@ -1733,8 +1733,8 @@
 				"power": 1.0
 			},
 			"armthund": {
-				"role": ["bomber", "static", "assault", "anti_air"],
-				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
+				"role": ["bomber", "air"],
+				"threat": {"air": 0.0, "surf": 1.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
 			"armhvytrans": {

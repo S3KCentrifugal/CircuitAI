@@ -5,6 +5,7 @@ local tag="[AirWatch] "
 local plants, finished, losses={}, {}, {}
 local sample, stalledM, stalledE=0,0,0
 local previousDamage, damageHook
+local previousDestroyed, destroyedHook
 local windGroups={}
 local nanoProjects={}
 local stockReady={}
@@ -181,6 +182,7 @@ end
 local function damageEvent(id,def,team,damage,paralyzer,weapon,projectile,attacker,attackerDef,attackerTeam)
     if attackerTeam~=0 or not attackerDef or not UnitDefs[attackerDef].canFly or paralyzer then return end
     if Spring.AreTeamsAllied(team,attackerTeam) then return end
+    if WG.AirStrikeDamage then WG.AirStrikeDamage(id,damage,attacker,attackerDef) end
     if damage>=20 then
         echo("damage attacker="..attacker.." def="..UnitDefs[attackerDef].name.." victim="..id.." amount="..math.floor(damage))
         if WG.AirFixtureRaids and WG.AirFixtureRaids[id] then
@@ -192,6 +194,9 @@ function widget:Shutdown()
     local env=getfenv(0)
     if damageHook and rawget(env,"UnitDamaged")==damageHook then
         rawset(env,"UnitDamaged",previousDamage); Script.UpdateCallIn("UnitDamaged")
+    end
+    if destroyedHook and rawget(env,"UnitDestroyed")==destroyedHook then
+        rawset(env,"UnitDestroyed",previousDestroyed); Script.UpdateCallIn("UnitDestroyed")
     end
 end
 function widget:GameFrame(f)
@@ -208,6 +213,22 @@ function widget:GameFrame(f)
         damageHook=function(...) damageEvent(...); if prior then return prior(...) end end
         rawset(env,"UnitDamaged",damageHook); Script.UpdateCallIn("UnitDamaged")
         echo("damage observer installed")
+    end
+    if destroyedHook and rawget(getfenv(0),"UnitDestroyed")~=destroyedHook then destroyedHook=nil end
+    if f>=150 and not destroyedHook then
+        local env=getfenv(0)
+        previousDestroyed=rawget(env,"UnitDestroyed")
+        local prior=previousDestroyed
+        destroyedHook=function(id,def,team,attacker,attackerDef,attackerTeam,...)
+            if attackerTeam==0 and attackerDef and def and UnitDefs[attackerDef].canFly
+                and not Spring.AreTeamsAllied(team,attackerTeam) then
+                echo("kill attacker="..attacker.." def="..UnitDefs[attackerDef].name.." victim="..id
+                    .." victimDef="..UnitDefs[def].name.." nominalMetal="..UnitDefs[def].metalCost)
+            end
+            if prior then return prior(id,def,team,attacker,attackerDef,attackerTeam,...) end
+        end
+        rawset(env,"UnitDestroyed",destroyedHook); Script.UpdateCallIn("UnitDestroyed")
+        echo("kill observer installed; nominal unit metal, not actual investment")
     end
     if f%15~=0 then return end
     local m,ms,mp,mi=Spring.GetTeamResources(0,"metal")
@@ -247,7 +268,13 @@ function widget:GameFrame(f)
                 if d.name=="armaca" or d.name=="coraca" or d.name=="legaca" then t2=t2+1; bp=bp+(d.buildSpeed or 0) end
                 if d.canFly and d.isBuilder and not d.isFactory then
                     local x,_,z=Spring.GetUnitPosition(id)
-                    if (x-hx)^2+(z-hz)^2>2400^2 then remote=remote+1 end
+                    if (x-hx)^2+(z-hz)^2>2400^2 then
+                        remote=remote+1
+                        local c=(Spring.GetUnitCommands(id,1) or {})[1]
+                        echo(string.format("remote-builder id=%d def=%s pos=%.0f,%.0f distance=%.0f command=%s params=%s",
+                            id,d.name,x,z,math.sqrt((x-hx)^2+(z-hz)^2),
+                            c and tostring(c.id) or "none",c and table.concat(c.params,",") or ""))
+                    end
                     if Spring.GetUnitIsBuilding(id) then working=working+1 end
                 end
                 if d.name=="armamd" or d.name=="corfmd" or d.name=="legabm" then

@@ -1043,6 +1043,26 @@ int GetEnergyLimit(const CCircuitDef@ def) const;
 
 ### `CAirWaveTask`
 
+D-162 adds opt-in ordinary-aircraft strike controls. Default native tasks
+retain their original behavior. Register signatures:
+
+```angelscript
+void SetFlightPolicy(float width, float rankSpacing, float lossAbort, const AIFloat3& in home);
+void SetAssemblyPolicy(float radius, float assembledFraction, int joinFrames);
+void SetStrikePolicy(CCircuitDef@ bomber, int count, float passFraction, float damageMargin, float threatWeight, float maxThreat);
+void ConsiderStrikeAircraft(CCircuitDef@ bomber); // conservative mixed ordinary payloads
+int GetRequiredBombers() const; // smallest eligible target health requirement
+```
+
+`GetState()` adds 5=RETURNING, preserving previous enum values.
+`CCircuitUnit.SetIdleMode(int)` accepts 0 (fly) or 1 (land), for aircraft only.
+`aiBattle.IsAirContactArmed(index)` and `GetArmedAirCost()` expose unique observed
+armed air; unarmed death explosions do not count as weapons. Flight policy
+includes peaceful economic snapshots, feasible health budgets, formation,
+weapon-release tracking, loss abort and return. See
+[the wave reference](air-wave-attacks.md).
+
+
 A script-planned bomber wave (`doc/air-wave-attacks.md`): made with
 `aiMilitaryMgr.Enqueue(TaskF::Wave())` and reached with
 `cast<CAirWaveTask>(cast<IFighterTask>(t))`.

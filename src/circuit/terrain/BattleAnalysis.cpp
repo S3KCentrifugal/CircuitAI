@@ -205,6 +205,18 @@ float CBattleAnalysis::GetAirContactCost(int index) const
 	return index >= 0 && static_cast<size_t>(index) < airContacts.size() ? airContacts[index].cost : 0.f;
 }
 
+bool CBattleAnalysis::IsAirContactArmed(int index) const
+{
+    return index >= 0 && static_cast<size_t>(index) < airContacts.size() && airContacts[index].armed;
+}
+
+float CBattleAnalysis::GetArmedAirCost() const
+{
+    float value = 0.f;
+    for (const auto& contact : airContacts) if (contact.armed) value += contact.cost;
+    return value;
+}
+
 float CBattleAnalysis::EffectiveRange(const CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& to) const
 {
 	CWeaponDef* main = MainWeapon(cdef);
@@ -586,10 +598,12 @@ void CBattleAnalysis::Update(int frame)
 		if (d->IsAbleToFly()) {
 			add(AIR);
 			const AIFloat3& pos = e->GetPos();
-			if (!e->IsHidden() && e->IsInRadarOrLOS() && std::isfinite(pos.x) && std::isfinite(pos.z)
+			if (observed && std::isfinite(pos.x) && std::isfinite(pos.z)
 				&& pos.x >= 0.f && pos.z >= 0.f && pos.x < circuit->GetTerrainManager()->GetTerrainWidth()
 				&& pos.z < circuit->GetTerrainManager()->GetTerrainHeight()) {
-				airContacts.push_back({pos, m});
+				// One entry per enemy ID. Do not discard armed scout/fighter hybrids,
+                // or inflate the sum with overlapping role labels.
+				airContacts.push_back({pos, m, d->HasSurfToAir() || d->HasSurfToLand() || d->HasSurfToWater()});
 			}
 			if (!e->IsHidden()) {
 				AddHeat(air, e->GetPos(), 1.f);

@@ -3227,6 +3227,15 @@ interruption, not a new task label. Compare active economic build power, worker
 positions and stall duration across Armada/Cortex/Legion, while retaining the
 constructor-gift economy and wind-reservation checks. Unfixed in D-156.
 
+**D-162 diagnosis correction.** In the natural build-06 repeat, targets 5583
+and 165 had completed at frames 29014 and 30398 but still attracted construction
+workers thousands of frames later. The engine correctly drops repair orders on
+healthy completed structures. A worker-release workaround only repeated the
+selection and was removed. AIR's completion handler now retires duplicate
+construction owners, with INV-101 auditing live completed targets. This corrects
+the observed stale-task case; cross-faction interruption/path recovery remains
+unverified. See the [AIR review](air-enhancement-review.md).
+
 ### KI-444 - Strategic shot histories do not survive a save/load restart
 
 **Problem.** D-157 stores Juno claims and the five-minute per-silo nuclear
@@ -3540,6 +3549,68 @@ AI ownership of all friendly unit commands.
 screenshots of actual post-deployment firing. Compare casualty results only
 under documented equal resource conditions. See [D-161 results](telchine-perimeter-results.md).
 
+### KI-457 - AIR strike efficacy still needs calibrated payload and route-loss models
+
+**Problem.** D-162 replaces launch starvation and uncontrolled holds, but its
+ordinary-bomber controller still estimates a pass from loaded alpha times a
+script fraction. It attacks one known structure per sortie. Sampled bearing
+selection is not an obstacle/threat corridor solver; hidden AA and escort
+pursuit remain risks. Candidate natural waves suffered heavy post-release
+losses, motivating explicit egress. EMP/Liche coordinated packages, radar-plane
+missions and cooperative damage reservations remain proposal work. AIR cohort
+history is not a durable saved-game mission record. A T1 remainder below the
+three-bomber raid minimum can remain held after T2 production ends further T1
+bomber orders. Home staging hashes aircraft into 49 points, so very large
+reserves can share destinations; unique strike slots do not fix home crowding. None of these limitations
+supports an unbeatable or globally optimal PvP claim.
+
+**Proposed solution.** Retain the staged controller and compare measured release,
+impact, target death and return for each loaded bomber type. Introduce typed
+payload budgets and allied target reservations before multi-target packages.
+Compare a bounded waypoint search against current integrated-bearing routes
+using identical observed contacts, and re-plan on meaningful new AA evidence.
+Add save/load reconstruction of cohort ownership before persisting missions.
+Keep specialist payloads separate and preserve TECH and static AA defaults.
+
+**Verification.** Rendered faction fixtures with early/mid/late air threats,
+known AA and economic targets; matched natural economy/combat windows; multiple
+seeds and maps before tuning constants. Require kill value and surviving force,
+not only damage or launch logs. See [the review](air-enhancement-review.md) and
+[the plan](air-enhancement-plan.md). Do not close from compilation or one win.
+
+### KI-458 - Concurrent rendered tests can warn during graphics initialization
+
+**Problem.** D-162 gift02 and earlier strike fixtures emitted load-thread
+watchdog/graphics-driver stack warnings before frame zero while other rendered
+simulations were running. They subsequently initialized and advanced. This is
+not evidence of an AI crash or an identified driver defect; concurrency is a
+possible contributor, not a proven cause.
+
+**Proposed solution.** Keep rendered test concurrency low, preserve the full
+startup log, and repeat serially if loading fails to progress. Separate startup
+latency from simulated performance. Do not modify graphics drivers or weaken
+crash/invariant checks to obtain a passing result.
+
+**Verification.** Compare serial and concurrent launch logs on the same engine
+and settings before attributing the warning. D-162 records continued gameplay
+and final verdicts in [results](air-enhancement-results.md).
+
+### KI-459 - Legion wind-cluster invariant in the retained AIR baseline
+
+**Problem.** D-162's pre-change natural baseline logged INV-078 once for Legion
+AIR team 6 at frame 69087. A wind construction order lacked a recognized
+six-slot reservation. The revised build-08 natural run did not reproduce it,
+but that is not a fix or proof of correct adoption for every blocked cluster.
+
+**Proposed solution.** Reproduce the retained baseline reservation/task sequence,
+join the offending worker and frame to AirLayout wind cluster slot ownership,
+and distinguish a missing reservation from late adoption. Repair the ownership
+transition, not the invariant. Keep allied reservation exclusion intact.
+
+**Verification.** Repeat the same Legion seed with reservation and actor traces
+through the failed frame, plus a controlled blocked-cluster/adoption case.
+See [D-162 results](air-enhancement-results.md).
+
 ## Indexed elsewhere
 
 These are open, documented, and owned by their own document. Do not duplicate
@@ -3573,3 +3644,23 @@ their detail here; add the pointer and keep the one-line summary accurate.
 6. **Verification is part of the entry.** State how the fix will be proven, and
    distinguish static checks from in-game verification. Compiling is not
    verifying.
+
+### KI-460 - AIR constructor locality observer failed briefly in D-162 natural run
+
+**Problem.** The full fifty-minute Supreme run d162-air-fusion-final /
+20261002-001148 reported 2-4 completed flying constructors beyond 2,400 elmos
+from the start in five ten-second samples at 18:30-19:10. Economy placement
+checks home sites, but this does not establish that every flight stays home.
+The old observer did not log remote coordinates, commands or targets; the
+cause is unproven. The strict air_local_economy verdict remains FAIL.
+
+**Proposed solution.** Use the added remote-builder position, distance and
+command diagnostics to distinguish overshoot/avoidance from remote assignments;
+constrain the responsible AIR task if it dispatches outside the home economy.
+Do not expand the acceptance radius simply to make the test pass.
+
+**Verification.** Observed in a real fifty-minute run; not fixed. No AIR
+INV-101 stale completed-construction reports occurred. See the
+[results](air-enhancement-results.md),
+[observer](../tools/playtest/widgets/air_watch.lua), and
+[home policy](../data/script/src/helpers/air_home.as).

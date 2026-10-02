@@ -172,6 +172,7 @@ public:
 	void CmdResurrectInArea(const springai::AIFloat3& pos, float radius, short options = 0, int timeout = INT_MAX);
 	void CmdSetFireState(CCircuitDef::FireT state);
 	void TrySetFireState(CCircuitDef::FireT state);  // safe CmdSetFireState
+    void TrySetIdleMode(int mode); // 0 fly, 1 land; aircraft only
 	void CmdSetMoveState(CCircuitDef::MoveT state);
 	void TrySetMoveState(CCircuitDef::MoveT state);  // safe CmdSetMoveState
 

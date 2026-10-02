@@ -293,6 +293,19 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 
 ## AIR support before expansion (D-155)
 
+### AIR strike ownership and allocation (D-162)
+
+| Object | Actors | Authoritative state |
+| --- | --- | --- |
+| Observed armed aircraft | BattleAnalysis, AirEconomy, AirScreen | Unique visible enemy IDs and weapon domains; exponentially fading observed-value memory, separate from generic role costs |
+| Factory discretionary order | AirProduction, Ferry | Persisted per-plant interleave, pending/frame counts, actual defender value and emergency deficit; ferry hook retains first access |
+| T2 bomber | AirWaves, AirProduction, native AirWaveTask | Exclusive held/release/active membership; separate immutable evaluation cohort; fixed staging routes; native flight/return state |
+| T1 reusable bomber / light gunship | AirRaids, AirWaves::StagingTask, native AirWaveTask / RaidTask | Independent bomber held/joining/cohort sets; Legion Mosquitos explicitly use the existing threat-aware native RAID task |
+| Strike target | AirWaveTask | Known hostile plus peaceful structure snapshots, loaded lethal pass estimate, health margin, sampled route exposure; no omniscient enemy reads |
+| Aircraft state | AirScreen, staging routes, AirWaveTask, role leave | Explicit idle/fire settings owned by AIR, restored on departure; no static-weapon state writes |
+| Completed construction | AIR native UnitFinished, AirProduction::Tick | Finish registered owner once; abort duplicate construction owners; preserve the completed structure and avoid repeating its build chain (INV-101) |
+
+
 | Actor | Reads or changes | Guard |
 | --- | --- | --- |
 | AirEconomy::SupportBay / RefreshSupport | Fresh owned factory/turret IDs, retirement, completion, range | Each completed turret belongs to one nearest live bay; frames are separate future capacity |

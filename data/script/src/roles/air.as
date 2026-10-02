@@ -726,6 +726,8 @@ namespace RoleAir {
     {
         IUnitTask@ homeTask = AirProduction::HomeTask(u);
         if (homeTask !is null) return homeTask;
+        IUnitTask@ raidTask = AirRaids::MakeTask(u);
+        if (raidTask !is null) return raidTask;
         IUnitTask@ waveTask = AirWaves::MakeTask(u);
         if (waveTask !is null) return waveTask;
         return aiMilitaryMgr.DefaultMakeTask(u);

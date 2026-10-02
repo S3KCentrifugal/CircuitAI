@@ -36,7 +36,7 @@ namespace AirScreen {
     {
         float cost = 0.0f;
         for (int i = 0; i < aiBattle.GetAirContactCount(); ++i)
-            if (AirHome::Friendly(aiBattle.GetAirContactPos(i))) cost += aiBattle.GetAirContactCost(i);
+            if (aiBattle.IsAirContactArmed(i) && AirHome::Friendly(aiBattle.GetAirContactPos(i))) cost += aiBattle.GetAirContactCost(i);
         return cost;
     }
     float HomeValue()
@@ -190,6 +190,8 @@ namespace AirScreen {
         if (routes.get(key, @task) && task !is null && !task.IsDead()) return task;
         @task = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
         if (task is null) return null;
+        u.SetIdleMode(0);
+        u.SetFireState(2);
         task.SetPatrol(true);
         routes.set(key, @task); changed = true;
         Tick();

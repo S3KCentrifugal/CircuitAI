@@ -1,5 +1,6 @@
 #include "air_layout.as"
 #include "economy.as"
+#include "../helpers/air_math.as"
 
 namespace AirEconomy {
     float metal = 0.0f, energy = 0.0f, bankM = 0.0f, bankE = 0.0f;
@@ -100,6 +101,7 @@ namespace AirEconomy {
     {
         sampleFrame = -1; stableSince = -1; lastLog = -100000;
         recovery = false; badSamples = 0; goodSamples = 0;
+        armedAirMemory = 0.0f; armedAirFrame = -1;
         t1 = 0; t2 = 0; state = "BOOTSTRAP";
         owned.resize(0); nanoBay.deleteAll(); power.resize(0); nanoCount.resize(0); nanoFuture.resize(0);
     }
@@ -109,16 +111,25 @@ namespace AirEconomy {
         if (advanced) return UnitHelpers::GetT2FighterForSide(side);
         return side == "cortex" ? "corveng" : side == "legion" ? "legfig" : "armfig";
     }
-    float EnemyAir() { return Military::GetCachedRoleCost("air") + Military::GetCachedRoleCost("bomber"); }
+    float armedAirMemory = 0.0f;
+    int armedAirFrame = -1;
+    float EnemyAir()
+    {
+        if (armedAirFrame != ai.frame) {
+            const float dt = armedAirFrame < 0 ? 0.0f : float(ai.frame - armedAirFrame) / float(SECOND);
+            armedAirMemory = AiMax(aiBattle.GetArmedAirCost(), armedAirMemory * AiMax(0.0f, 1.0f - dt / 300.0f));
+            armedAirFrame = ai.frame;
+        }
+        return armedAirMemory;
+    }
     int HomeTarget()
     {
         CCircuitDef@ d = ai.GetCircuitDef(Fighter(t2 > 0));
         const float cost = d is null ? 150.0f : AiMax(d.costM, 1.0f);
         return AiMax(Global::RoleSettings::Air::HomeFighterFloor,
             AiMin(Global::RoleSettings::Air::HomeFighterCeiling,
-                AiMax(int(metal * Global::RoleSettings::Air::HomeFightersPerMetal), int(EnemyAir() / cost * 1.1f))));
+                int(EnemyAir() / cost * Global::RoleSettings::Air::HomeAirValueRatio + 0.999f)));
     }
-    // Expected mixed sortie: seven fighters and three bombers. No average of rates.
     void Mix(bool advanced, float &out work, float &out costM, float &out costE)
     {
         CCircuitDef@ f = ai.GetCircuitDef(Fighter(advanced));
@@ -130,9 +141,13 @@ namespace AirEconomy {
         if (f is null) return;
         work = f.GetBuildTime(); costM = f.costM; costE = f.costE;
         if (b !is null) {
-            work = (work * 7.0f + b.GetBuildTime() * 3.0f) / 10.0f;
-            costM = (costM * 7.0f + b.costM * 3.0f) / 10.0f;
-            costE = (costE * 7.0f + b.costE * 3.0f) / 10.0f;
+            // Forecast the current order mix, not the old fixed seven/three.
+            const float strikes = float(AirMath::BomberOrders(AirProduction::AvailableFighterValue(), EnemyAir(),
+                Global::RoleSettings::Air::BomberOrdersClear, Global::RoleSettings::Air::BomberOrdersParity));
+            const float fighters = 10.0f - strikes;
+            work = (work * fighters + b.GetBuildTime() * strikes) / 10.0f;
+            costM = (costM * fighters + b.costM * strikes) / 10.0f;
+            costE = (costE * fighters + b.costE * strikes) / 10.0f;
         }
     }
     int SupportBay(const CCircuitDef@ d, const AIFloat3 &in pos)
@@ -147,6 +162,11 @@ namespace AirEconomy {
             if (sq < dist) { best = int(b); dist = sq; }
         }
         return best;
+    }
+    float HomeValueTarget()
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(Fighter(t2 > 0));
+        return float(HomeTarget()) * (d is null ? 150.0f : AiMax(d.costM, 1.0f));
     }
     void RefreshSupport()
     {

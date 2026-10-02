@@ -88,6 +88,13 @@ function widget:GameFrame(f)
             end
         end
     end
+    -- Observe the existing order before the first factory too. A gifted T2
+    -- builder can frame a factory while the commander is already finishing
+    -- an opening mex; first seeing that old order is not a new mex command.
+    if commander and not factory then
+        local c=(Spring.GetUnitCommands(commander,1) or {})[1]
+        if c then commandMemo[commander]=c.id..":"..tostring(c.params[1]) end
+    end
     if factory and commander then
         local x,_,z=Spring.GetUnitPosition(commander)
         if x then

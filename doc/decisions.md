@@ -9450,3 +9450,143 @@ need correction under KI-455. Fixture evidence limits are KI-456. The accurate g
 [API](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [TECH](roles/tech.md), [AIR](roles/air.md),
 [issues](known-issues.md).
+
+
+## D-162 - AIR allocates funded strikes and retains explicit sortie ownership
+
+**Date:** 2026-10-01. **State:** Built; simulation verification in progress.
+
+**Decision.** Correct the reviewed AIR plan before implementation. Count unique
+observed armed aircraft instead of overlapping role costs; admit bounded strike
+orders after transports, initial crew and emergency defense. Forecast the same
+order mix in the economy. Keep TECH's sequence, mex-before-reactor and twenty
+completed turrets per existing T2 lab. Reject the proposed bank bypass, arbitrary
+25-fighter cap, guaranteed bomber share during emergencies, and return-fire-only
+static AA. These conflict with protected behavior or lack PvP evidence.
+
+Ordinary T1 raids and T2 waves stage on owned routes. Fund a linear capped
+schedule; cadence waives only the schedule, never target feasibility or minimum
+escorts. Release a supported subset rather than demanding escorts for the entire
+reserve. Preserve an immutable cohort for survival measurement. Specialists
+(EMP/Liche) retain native behavior until their payload/timing is modeled.
+
+Native flight policy is opt-in. It scans armed AND peaceful enemy snapshots,
+checks loaded damage/health margin, integrates route exposure, bounds ranks and
+assigns nearby slots after asynchronous release. Fixed-wing readiness remembers
+arrival within an inner radius while requiring continued presence inside twice
+that radius; missing assembly returns home. Actual lethal release triggers
+straight egress before turning home. Loss abort and return keep task ownership;
+there is no autonomous experimental mop-up. This is not speed matching, a full
+route solver, multi-target allocation, or proof against hidden AA.
+
+The natural candidate also reproduced KI-443. Releasing exhausted idle workers
+was tried and rejected: the same completed wind frames were repeatedly chosen.
+Observer IDs proved those structures were complete, with duplicate construction
+owners left behind. Under AIR's existing direct-flight opt-in, UnitFinished
+finishes the registered owner once and aborts remaining construction owners of
+that structure. It preserves the building and avoids duplicate build chains.
+TECH keeps its previous path. INV-101 audits completed targets retaining workers.
+Assembly also adds distance/speed transit before its script settling allowance;
+the earlier fixed deadline could expire before a distant flank was reached.
+
+**Alternatives rejected.** Bigger fixed home quotas and mass factories mask
+allocation/energy limits. Income-only waves strand funded bombers. Unbounded
+lines, point-hover assembly and immediate U-turns expose aircraft unnecessarily.
+A whole-reserve escort requirement reproduces the original launch deadlock.
+Changing shared static defaults or TECH rules expands the risk beyond AIR.
+
+**Invariant.** INV-099 counts survivors from immutable launch IDs; INV-100
+forbids autonomous DEFEND/BOMB ownership of held experimental bombers. Existing
+INV-077/078/083/088/090/091/092/093 preserve reactor, income, layout, support and home
+bounds. All simulation checks retain the global invariant forbid. Controlled
+fixtures cannot establish natural economy milestones or unbeatable PvP strength.
+
+**Verification.** See the [review](air-enhancement-review.md), corrected
+[plan](air-enhancement-plan.md), and [measured results](air-enhancement-results.md). Failed and
+interrupted runs remain under build-theatres/d162-*. Pure geometry tests cover
+300 distinct slots, extreme finite inputs and loss thresholds. Twenty-eight
+AngelScript air-math tests cover funding, defense, interleave, cadence and
+escort-limited reserve release, overflow bounds and constant-time sizing. Final run IDs, screenshots and limitations are recorded in the results.
+
+**Files.**
+[data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+[data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as),
+[data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as),
+[data/script/src/manager/air_screen.as](../data/script/src/manager/air_screen.as),
+[data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as),
+[data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as),
+[data/script/src/roles/air.as](../data/script/src/roles/air.as),
+[data/script/src/global.as](../data/script/src/global.as),
+[data/config/experimental_balanced/behaviour.json](../data/config/experimental_balanced/behaviour.json),
+[data/config/experimental_hard/behaviour.json](../data/config/experimental_hard/behaviour.json),
+[data/config/experimental_terrible/behaviour.json](../data/config/experimental_terrible/behaviour.json),
+[src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h),
+[src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp),
+[src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h),
+[src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp),
+[src/circuit/CircuitAI.cpp](../src/circuit/CircuitAI.cpp),
+[src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp),
+[src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h),
+[src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h),
+[src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp),
+[src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp),
+[tests/air_math_tests.as](../tests/air_math_tests.as),
+[tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp),
+[tools/run_native_tests.sh](../tools/run_native_tests.sh),
+[tools/playtest/prepare_air_strike_check.py](../tools/playtest/prepare_air_strike_check.py),
+[tools/playtest/widgets/air_strike_fixture.lua](../tools/playtest/widgets/air_strike_fixture.lua),
+[tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua),
+[tools/playtest/checks/air_strike_stages.json](../tools/playtest/checks/air_strike_stages.json),
+[tools/playtest/compare_air_runs.py](../tools/playtest/compare_air_runs.py),
+[tools/playtest/prepare_air_economy_check.py](../tools/playtest/prepare_air_economy_check.py),
+[tools/playtest/README.md](../tools/playtest/README.md),
+[doc/air-enhancement-plan.md](air-enhancement-plan.md),
+[doc/air-enhancement-review.md](air-enhancement-review.md),
+[doc/air-wave-attacks.md](air-wave-attacks.md),
+[doc/roles/air.md](roles/air.md),
+[doc/angelscript-references.md](angelscript-references.md),
+[doc/invariants.md](invariants.md),
+[doc/actor-matrix.md](actor-matrix.md),
+[doc/known-issues.md](known-issues.md),
+[doc/knowledge/barb-unit-config.md](knowledge/barb-unit-config.md).
+
+D-162 follow-up decisions: Phoenix mount inspection remains local to the opt-in
+wave task. Script-emitted heat rays use attributed positive non-paralyzing enemy
+damage as a fallback release observation, preserving the first fired timestamp
+for ordinary bombers. Legion Mosquitos reuse native RAID rather than DEFEND.
+The first-fusion rule drops its additional 500-metal bank veto but retains
+owned-mex completion, recovery and 180-second M/E funding with commitments; the
+repeat natural game completed Armada fusion at 19:03 after all owned upgrades.
+See [results](air-enhancement-results.md), [AIR builder](roles/air_build.md),
+[builder policy](../data/script/src/roles/air_build.as) and
+[measurement data](benchmarks/air-d162-intermediate.json). The latest sizing
+helpers also bound before integer conversion and avoid reserve-length loops;
+four adversarial tests cover oversized configuration and fractional escorts.
+
+D-162 final calibration: adopt a script-controlled 600-elmo assembly arrival
+radius after Armada's 400-elmo run failed late formation, and the unchanged
+600-elmo three-stage test passed unseeded and with engine/AI seed 1621. Keep
+80% readiness and deadlines; changing the deadline or ignoring missing aircraft
+was rejected. The observer now tracks commander commands before first factory
+creation, avoiding a false new-mex allegation when a gifted builder starts the
+lab. A focused seeded opening repeat passed. RNG helpers pin both independent
+seeds; prior natural measurements remain non-paired. Process-inspection failures
+are retained alongside full-log re-observation reports, never silently replaced.
+Additional touched files:
+[seed preparer](../tools/playtest/prepare_air_check.py),
+[opening observer](../tools/playtest/widgets/air_opening_watch.lua),
+[opening checks](../tools/playtest/checks/air_capacity_opening.json),
+[final data](benchmarks/air-d162-final.json),
+[results and screenshot evidence](air-enhancement-results.md).
+
+**Final state: Built, Checked, Played (bounded acceptance).** Final seeded
+Armada/balanced, Cortex/hard and Legion/terrible three-stage combat fixtures
+passed, as did the donated-constructor fusion case and focused gifted-opening
+regression. Natural runs completed fifty minutes but remain FAIL for TECH
+invariants and the last run's constructor-locality excursion (KI-460). The
+supplied capacity case reached six supported T2 labs but exited at 33.6 of
+45 intended minutes with an observer failure; it is not a full PASS. KI-457
+retains unimplemented specialist/navigation work and loss/crowding calibration.
+All evidence, seeds, artifact hash and limitations are in the
+[results](air-enhancement-results.md). No TECH rule sequence, static firing
+policy, twenty-turret expansion condition or transport-request priority changed.

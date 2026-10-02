@@ -1,6 +1,8 @@
 #include "air_economy.as"
 #include "air_waves.as"
 #include "air_screen.as"
+#include "air_raids.as"
+#include "../helpers/air_math.as"
 namespace AirProduction {
     dictionary home; // mutually exclusive with AirWaves' held/launch ledgers
     int countLog = -100000;
@@ -25,6 +27,7 @@ namespace AirProduction {
         if (t !is null) {
             const string key = "air.crew.streak." + plant.id;
             aiTerrainMgr.SetLayoutInt(key, utility ? aiTerrainMgr.GetLayoutInt(key, 0) + 1 : 0);
+            if (!utility) aiTerrainMgr.SetLayoutInt("air.mix." + plant.id, (aiTerrainMgr.GetLayoutInt("air.mix." + plant.id, 0) + 1) % 10);
             GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target, 1);
         }
         return t;
@@ -92,11 +95,24 @@ namespace AirProduction {
         }
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
         const float intrusion = AirScreen::IntrusionCost();
+        CCircuitDef@ fighterDef = ai.GetCircuitDef(fighter);
+        float futureValue = 0.0f;
+        if (fighterDef !is null) {
+            futureValue = aiFactoryMgr.GetPendingRecruitCount(fighterDef) * fighterDef.costM;
+            array<Id>@ owned = ai.GetOwnedUnitIds();
+            for (uint i = 0; i < owned.length(); ++i) {
+                CCircuitUnit@ unit = ai.GetTeamUnit(owned[i]);
+                if (unit !is null && unit.circuitDef.GetName() == fighter && unit.GetBuildProgress() < 1.0f) futureValue += fighterDef.costM;
+            }
+        }
+        const float homeValue = AirScreen::HomeValue();
+        const bool emergency = AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
         if (affordable) {
-            const int assignedToWaves = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-            const int urgent = intrusion > 0.0f ? AirEconomy::HomeTarget() : advanced ? AiMin(4, AirEconomy::HomeTarget()) : 2;
-            @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(urgent,
-                AirScreen::CountOther(fighter), assignedToWaves + scoutAway), "intercept", Task::Priority::HIGH);
+            const float cost = fighterDef is null ? 150.0f : fighterDef.costM;
+            const float urgent = AiMax(float(Global::RoleSettings::Air::HomeFighterFloor) * cost,
+                intrusion * Global::RoleSettings::Air::InterceptCostRatio);
+            const int missing = AirMath::Missing(urgent, homeValue + futureValue, cost);
+            @t = Recruit(u, fighter, Projected(fighterDef) + missing, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
@@ -109,26 +125,30 @@ namespace AirProduction {
             if (t !is null) return t;
         }
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
-        const int waveScreen = advanced ? int(AirWaves::heldFighters.getSize() + AirWaves::waveFighters.getSize()) : 0;
-        @t = Recruit(u, fighter, ProductionMath::DefenceRecruitTarget(AirEconomy::HomeTarget(), AirScreen::CountOther(fighter), waveScreen + scoutAway), "intercept", Task::Priority::HIGH);
-        if (t !is null) return t;
-        // Transports and the defensive fighter floor above remain first.
-        const bool strike = ProductionMath::StrikeReady(AvailableFighterValue(), AirEconomy::EnemyAir(), intrusion > 0.0f, Global::RoleSettings::Air::StrikeControlRatio);
+        // A lost scout gets another route. Utility never consumes a strike slot.
+        if (basic && side != "legion" && ai.frame >= aiTerrainMgr.GetLayoutInt("air.scout.next", 0)) {
+            @t = Recruit(u, UnitHelpers::GetT1AirScoutForSide(side), 1, "recon.replace", Task::Priority::NORMAL, true);
+            if (t !is null) { aiTerrainMgr.SetLayoutInt("air.scout.next", ai.frame + Global::RoleSettings::Air::ScoutReplaceSeconds * SECOND); return t; }
+        }
+        const int strikeOrders = emergency ? 0 : AirMath::BomberOrders(AvailableFighterValue(), AirEconomy::EnemyAir(),
+            Global::RoleSettings::Air::BomberOrdersClear, Global::RoleSettings::Air::BomberOrdersParity);
+        const bool strike = strikeOrders > 0 && AirMath::BomberTurn(aiTerrainMgr.GetLayoutInt("air.mix." + u.id, 0), strikeOrders);
         if (basic && strike && AirEconomy::metal >= 12.0f) {
             const string bomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
-            // One strike order per two fighters after the screen: finite targets
-            // replenish casualties without letting strike losses starve air control.
+            // Alternate finite land support and reusable T1 bomber groups.
             const int phase = aiTerrainMgr.GetLayoutInt("air.t1.mix", 0);
-            if (phase % 3 == 0) {
-                const bool supportFirst = (phase / 3) % 2 == 0;
+            {
+                const bool supportFirst = phase % 2 == 0;
                 for (int pass = 0; pass < 2; ++pass) {
                     const bool support = pass == 0 ? supportFirst : !supportFirst;
+                    if (!support && AirEconomy::t2 > 0 && side != "legion") continue;
                     if (support && aiBattle.EnemyCost(0) + aiBattle.EnemyCost(4) + aiBattle.EnemyCost(5) < 300.0f) continue;
 
                     const int target = ProductionMath::StrikeTarget(AirEconomy::metal,
                         support ? Global::RoleSettings::Air::T1SupportMetalStep : Global::RoleSettings::Air::T1BomberMetalStep,
-                        support ? 3 : 1, support ? (side == "cortex" ? Global::RoleSettings::Air::T1SupportCap : Global::RoleSettings::Air::T1StrikeOpenerSize) : Global::RoleSettings::Air::T1BomberCap);
-                    @t = Recruit(u, support ? RoleAir::GetT1StrikeAircraftNameForSide(side) : bomber, target, support ? "front.support" : "t1.bomber", Task::Priority::NORMAL);
+                        support ? 3 : Global::RoleSettings::Air::T1RaidMinimum, support ? (side == "cortex" ? Global::RoleSettings::Air::T1SupportCap : Global::RoleSettings::Air::T1StrikeOpenerSize) : Global::RoleSettings::Air::T1BomberCap);
+                    @t = Recruit(u, support ? RoleAir::GetT1StrikeAircraftNameForSide(side) : bomber, target,
+                        support || side == "legion" ? "front.support" : "t1.bomber", Task::Priority::NORMAL);
                     if (t !is null) { aiTerrainMgr.SetLayoutInt("air.t1.mix", phase + 1); return t; }
                 }
             }
@@ -158,7 +178,6 @@ namespace AirProduction {
         // Keep the old lab available for economic crews and finite land support;
         // sustained advanced fighter production belongs to the advanced bays.
         if (basic && AirEconomy::t2 > 0 && AirEconomy::metal >= Global::RoleSettings::Air::TransitionMinMetal) {
-            aiTerrainMgr.SetLayoutInt("air.t1.mix", aiTerrainMgr.GetLayoutInt("air.t1.mix", 0) + 1);
             return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         }
         if (Global::RoleSettings::Air::UseDynamicFactoryProduction) {
@@ -167,22 +186,27 @@ namespace AirProduction {
         }
         CCircuitDef@ fd = ai.GetCircuitDef(fighter);
         @t = Recruit(u, fighter, Projected(fd) + 1, "air.control", Task::Priority::NORMAL);
-        if (basic && t !is null) aiTerrainMgr.SetLayoutInt("air.t1.mix", aiTerrainMgr.GetLayoutInt("air.t1.mix", 0) + 1);
         return t is null ? aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND)) : t;
     }
     void Reset() { home.deleteAll(); AirScreen::Reset(); countLog = -100000; }
     void Leave()
     {
+        AirRaids::Reset();
         if (openingScout !is null && !openingScout.IsDead()) openingScout.Abort();
         @openingScout = null;
         array<IUnitTask@> holds;
         array<string>@ ids = home.getKeys();
         array<string>@ bombers = AirWaves::heldBombers.getKeys();
         array<string>@ escorts = AirWaves::heldFighters.getKeys();
+        array<string>@ activeBombers = AirWaves::waveBombers.getKeys();
+        array<string>@ activeFighters = AirWaves::waveFighters.getKeys();
+        for (uint i = 0; i < activeBombers.length(); ++i) ids.insertLast(activeBombers[i]);
+        for (uint i = 0; i < activeFighters.length(); ++i) ids.insertLast(activeFighters[i]);
         for (uint i = 0; i < bombers.length(); ++i) ids.insertLast(bombers[i]);
         for (uint i = 0; i < escorts.length(); ++i) ids.insertLast(escorts[i]);
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (u !is null) { u.SetFireState(u.circuitDef.GetFireState()); u.SetIdleMode(1); }
             if (u !is null && u.task !is null && holds.findByRef(u.task) < 0) holds.insertLast(u.task);
         }
         for (uint i = 0; i < holds.length(); ++i) holds[i].Abort();
@@ -215,7 +239,8 @@ namespace AirProduction {
         const string key = "" + u.id;
         // Fighters already on a wave keep their assignment until it ends.
         if (AirWaves::heldFighters.exists(key) || AirWaves::waveFighters.exists(key) || AirWaves::launchQueue.exists(key)) return null;
-        if (!home.exists(key) && AirWaves::IsWaveFighter(u.circuitDef) && int(home.getSize()) >= AirEconomy::HomeTarget()) return null;
+        if (!home.exists(key) && AirWaves::IsWaveFighter(u.circuitDef)
+            && AirScreen::HomeValue() >= AirEconomy::HomeValueTarget()) return null;
         IUnitTask@ task = AirScreen::TaskFor(u);
         if (task !is null) home.set(key, true);
         return task;
@@ -223,6 +248,7 @@ namespace AirProduction {
     void Removed(CCircuitUnit@ u)
     {
         if (u is null) return;
+        AirRaids::Removed(u.id);
         home.delete("" + u.id); AirScreen::Removed(u.id);
         if (u.id == aiTerrainMgr.GetLayoutInt("air.scout.id", -1)) {
             aiTerrainMgr.SetLayoutInt("air.scout.id", -2); @openingScout = null;
@@ -230,7 +256,42 @@ namespace AirProduction {
     }
     void Tick()
     {
+        AirRaids::Update();
         AirScreen::Tick();
+        array<Id>@ workers = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < workers.length(); ++i) {
+            CCircuitUnit@ worker = ai.GetTeamUnit(workers[i]);
+            IBuilderTask@ construction = worker is null ? null : cast<IBuilderTask>(worker.task);
+            if (construction !is null && construction.GetBuildType() <= int(Task::BuildType::MEXUP)
+                && construction.buildDef !is null && construction.target !is null
+                && construction.target.GetBuildProgress() >= 1.0f)
+                Invariants::Violation("INV-101", "" + construction.target.id, "AIR completed construction still owns workers");
+        }
+        // Noctua doubles as fighter and scout. Its global count cannot tell us
+        // whether recon exists; lend one home aircraft after the replacement delay.
+        if (Global::AISettings::Side == "legion" && aiTerrainMgr.GetLayoutInt("air.scout.id", -1) < 0
+            && home.getSize() > uint(Global::RoleSettings::Air::HomeFighterFloor)
+            && ai.frame >= aiTerrainMgr.GetLayoutInt("air.scout.next", 0)) {
+            array<string>@ defenders = home.getKeys();
+            for (uint i = 0; i < defenders.length(); ++i) {
+                CCircuitUnit@ scout = ai.GetTeamUnit(parseInt(defenders[i]));
+                if (scout is null || scout.circuitDef.GetName() != UnitHelpers::GetT1AirScoutForSide("legion")) continue;
+                aiTerrainMgr.SetLayoutInt("air.scout.id", scout.id);
+                aiTerrainMgr.SetLayoutInt("air.scout.next", ai.frame + Global::RoleSettings::Air::ScoutReplaceSeconds * SECOND);
+                home.delete(defenders[i]); AirScreen::Removed(scout.id);
+                if (scout.task !is null) scout.task.Abort();
+                GenericHelpers::LogUtil("[AIR][Scout] replacement drone=" + scout.id, 1);
+                break;
+            }
+        }
+        array<string>@ staged = AirWaves::heldBombers.getKeys();
+        for (uint i = 0; i < staged.length(); ++i) {
+            CCircuitUnit@ unit = ai.GetTeamUnit(parseInt(staged[i]));
+            IFighterTask@ task = unit is null ? null : cast<IFighterTask>(unit.task);
+            if (task !is null && (task.GetFightType() == int(Task::FightType::DEFEND)
+                || task.GetFightType() == int(Task::FightType::BOMB)))
+                Invariants::Violation("INV-100", staged[i], "AIR held bomber belongs to an autonomous attack task");
+        }
         // Static repairs have no timeout. Return borrowed economy assistance to
         // its production bay as soon as that plant has a unit frame again.
         array<string>@ nanos = AirEconomy::nanoBay.getKeys();

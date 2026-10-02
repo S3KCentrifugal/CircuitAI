@@ -1,0 +1,22 @@
+{
+  "stop_minute": 13,
+  "expect": [
+    {"key":"observer", "pattern":"\\[AirStrike\\] loaded", "scope":"any", "by_minute":1},
+    {"key":"mid", "pattern":"\\[AirStrike\\] stage=2", "scope":"any", "by_minute":5},
+    {"key":"late", "pattern":"\\[AirStrike\\] stage=3", "scope":"any", "by_minute":9},
+    {"key":"strike", "pattern":"\\[AIR\\]\\[Waves\\] Wave [0-9]+ launched", "by_minute":6},
+    {"key":"release", "pattern":"WAVE: released unit=", "scope":"any", "by_minute":7},
+    {"key":"damage", "pattern":"\\[AirWatch\\] damage attacker=.*def=(armpnix|corhurc|legphoenix)", "scope":"any", "by_minute":7},
+    {"key":"late-damage", "pattern":"\\[AirStrike\\] stage-damage stage=3", "scope":"any", "by_minute":13},
+    {"key":"return", "pattern":"WAVE: returned alive=", "scope":"any", "by_minute":9}
+    ,{"key":"early-intercept", "pattern":"\\[AirStrike\\] air-damage stage=1", "scope":"any", "by_minute":4}
+    ,{"key":"mid-intercept", "pattern":"\\[AirStrike\\] air-damage stage=2", "scope":"any", "by_minute":8}
+    ,{"key":"late-intercept", "pattern":"\\[AirStrike\\] air-damage stage=3", "scope":"any", "by_minute":13}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"},
+    {"key":"observer", "pattern":"Error in.*air_strike_fixture|Removed widget: AIR strike stages", "scope":"any"}
+  ]
+}

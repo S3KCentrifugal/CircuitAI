@@ -6,6 +6,7 @@
  */
 
 #include "task/static/SuperTask.h"  // D-124
+#include "task/fighter/AirWaveTask.h"
 #include "CircuitAI.h"
 #include "scheduler/Scheduler.h"
 #include "script/ScriptManager.h"
@@ -374,6 +375,13 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			TRACY_TOPIC("EVENT_ENEMY_DAMAGED", EnemyDamaged);
 
 			struct SEnemyDamagedEvent* evt = (struct SEnemyDamagedEvent*)data;
+			// Script-emitted beams can deal damage without WEAPON_FIRED.
+			// Only an attributed lethal hit from our active wave proves release.
+			if (evt->damage > 0.f && !evt->paralyzer) {
+				CCircuitUnit* attacker = GetTeamUnit(evt->attacker);
+				CAirWaveTask* wave = attacker == nullptr ? nullptr : dynamic_cast<CAirWaveTask*>(attacker->GetTask());
+				if (wave != nullptr) wave->OnDamageDealt(attacker, evt->weaponDefId);
+			}
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			ret = (enemy != nullptr) ? this->EnemyDamaged(enemy) : ERROR_ENEMY_DAMAGED;
 		} break;
@@ -398,6 +406,8 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
 			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
 			if (unit != nullptr) {
+				CAirWaveTask* wave = dynamic_cast<CAirWaveTask*>(unit->GetTask());
+                if (wave != nullptr) wave->OnWeaponFired(unit, evt->weaponDefId);
 				CSuperTask* firingTask = dynamic_cast<CSuperTask*>(unit->GetTask());
 				if (firingTask != nullptr) {
 					const AIFloat3 aim = firingTask->GetAimPos();
