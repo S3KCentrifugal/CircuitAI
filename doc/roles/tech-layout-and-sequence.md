@@ -266,7 +266,7 @@ A full bank is wasted metal. The sinks, in order: build power (turrets),
 production (T2 constructors, spam labs, turrets assisting factories), and,
 in a team game, the teammates: over 95% full, TECH refreshes every
 teammate's economy and gives up to 20% of its storage to the lowest-filled
-ones (`TechBuild::ShareOverflow`). No converters are built while the metal
+ones (`TeamEconomy::ShareOverflow`). No converters are built while the metal
 bank is full (they turn energy into metal nobody can store).
 
 ## Part 3: who decides what
@@ -290,7 +290,7 @@ bank is full (they turn energy into metal nobody can store).
 | The rush chain | `TechChain` recipes | `RushObjective` |
 | Parallel turrets | `Layout::TurretSlots` | `PowerTurretBatchSeconds`, `PowerTurretsMax` |
 | T2 constructors | `Tech_FactoryAiMakeTask` | `T2ConstructorBankShare`, `T2BotConstructorCap` (bots), `T2ConstructorCap` (air) |
-| Donation | `TechBuild::ShareOverflow` | `TeamShare*` |
+| Donation | `TeamEconomy::ShareOverflow` | `TeamShare*` |
 | Dedicated air roles | `TechBuild::AirDedicated`, `RefillAirRoles`, `LiftCapForRole` | `ConverterStarveEnergyShare` |
 
 ## The checks that guard it

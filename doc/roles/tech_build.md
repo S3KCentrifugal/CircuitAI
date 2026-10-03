@@ -124,7 +124,7 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: e35140bb4f8bb7689fc06a82ba671a63fb73c0c4; lines: 928 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 36642ff337ebd203c35fbd988c745eca7a9ecf00; lines: 855 -->
 
 ## D-152 defense ownership
 
@@ -132,3 +132,12 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 sites behind lane-side wall lines. The previous unpinned placement radius is
 removed. `AirDefence` shares this controller, then `TechWeapons::Work`; the old
 expanding defense spiral is removed. Expansion reservations precede defense reservations.
+
+
+## Shared metal donations (D-175)
+
+`TechBuild::Tick` retains dedicated-air-constructor maintenance. Overflow
+sharing now runs once from the shared economy callback as
+`TeamEconomy::ShareOverflow`, with the original TECH opening gate, threshold,
+budget and cooldown. All six roles use the same settings. See
+[shared metal donations](../team-metal-sharing.md).

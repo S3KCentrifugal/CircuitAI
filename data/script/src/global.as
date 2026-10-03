@@ -481,6 +481,7 @@ namespace Global {
             float SpamClusterRadius = 600.0f;               // D-109: forward constructors assist what goes up within this of the spam cluster
             int SpamPadsMax = 2;                            // D-109: small 2x2 forward turret pads at the lab row's ends
             float ConverterStarveEnergyShare = 0.5f;        // D-107: the energy bank under this share of storage (or stalling) means the converters cannot stay on (BAR's conversion level is 75% by default)
+            // D-175: shared by ALL roles; keep the Tech namespace for existing overrides.
             float TeamShareMetalAbove = 0.95f;              // D-106: our metal bank over this share of storage triggers the team economy check and a donation
             float TeamShareMetalBudget = 0.20f;             // D-106: at most this share of our metal storage is given per donation, the lowest-filled teammate first
             float TeamShareCheckSeconds = 5.0f;             // D-106: a donation at most this often (the engine's share command settles each slow update)

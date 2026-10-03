@@ -37,4 +37,5 @@ done
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/amphibious_math.as" "$REPO/tests/amphibious_math_tests.as" || rc=1
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/air_math.as" "$REPO/tests/air_math_tests.as" || rc=1
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/metal_math.as" "$REPO/tests/metal_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/team_share_math.as" "$REPO/tests/team_share_math_tests.as" || rc=1
 exit $rc

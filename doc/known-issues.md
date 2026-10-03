@@ -4237,3 +4237,50 @@ specifies normal-vision cliff factory/jammer fixtures for all three factions,
 human-allied bases, multi-AIR accounting, AA/air raids, ownership regressions,
 economy comparisons and screenshot/latency/APM evidence. See
 [D-174](decisions.md#d-174---proposed-air-defense-of-allied-bases-against-ground-infiltration).
+
+
+### KI-483 - Legacy profiles do not run the experimental metal-sharing policy
+
+**Problem.** D-175 gives all six experimental roles TECH's D-106 explicit
+overflow donation. The native-driven easy/medium/hard/hard_aggressive profiles
+do not use these roles or the shared economy callback and retain engine/native
+sharing. Their thresholds have not been made equivalent by this change.
+
+**Proposed solution.** If parity is wanted for legacy profiles, add an explicit
+native sharing mechanism controlled by shared JSON thresholds, using the existing
+team resource snapshots and send binding, without enabling both native and
+script sends for an experimental instance. Preserve opening protection and the
+engine's unusual send-command return contract. Avoid importing the entire role
+framework just for sharing.
+
+**Verification.** Source-reviewed scope boundary; legacy behavior unchanged and
+not played for donation parity. See [D-175](decisions.md#d-175---one-metal-overflow-donation-policy-for-all-six-roles).
+
+### KI-484 - Nearly full allied economies can circulate shared metal
+
+**Problem.** The D-106 policy fills the lowest-filled live allies up to their
+free storage, even if those recipients are already near 95%. With every role
+now donating in D-175, a supplied-full-team test shows multiple roles reaching
+the trigger again after receiving other donations and passing metal onward at
+the five-second interval. The threshold, percentage and recipient ordering are
+intentionally preserved for the requested parity; this is not evidence of
+improved spending or natural-game efficiency.
+
+**Proposed solution.** Evaluate recipient hysteresis or an absorption estimate
+using existing usage/pull/free-storage snapshots in TeamEconomy::ShareOverflow.
+Test a saturated whole team and a genuinely metal-starved frontline together,
+keeping 95%/20% as donor settings. Avoid suppressing urgently useful aid. This
+would change TECH's recipient policy and is separate from matching it.
+
+**Verification.** Observed in the supplied 16-AI balanced sharing fixture:
+teams 0-7 repeatedly send after the first full-bank injection. No engine failure
+or INV-033 violation; no natural-game frequency/loss claim. See
+[sharing validation](team-metal-sharing.md) and
+[D-175](decisions.md#d-175---one-metal-overflow-donation-policy-for-all-six-roles).
+
+
+**D-175 follow-up to KI-427.** Rendered sharing fixtures with supplied banks
+report TECH INV-008 at frames 7621 (hard) and 7741 (terrible): two turrets in
+range do not join the T1 lab reclaim. Their strict reports remain FAIL even
+though all donation checks pass. This is a recurrence of the recorded category,
+not a same-seed diagnosis of its cause. See [exact evidence](team-metal-sharing.md).

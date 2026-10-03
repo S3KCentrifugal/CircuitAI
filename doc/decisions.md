@@ -10516,3 +10516,68 @@ The missing behavior remains [KI-482](known-issues.md).
 
 **Files.** [Proposed response plan](air-allied-base-response-plan.md),
 [known issue register](known-issues.md), and this decision record.
+
+
+## D-175 - One metal overflow donation policy for all six roles
+
+**Date:** 2026-10-03. **Status:** Checked; rendered runtime results recorded in
+[the validation report](team-metal-sharing.md).
+
+**Decision.** Move D-106's TECH donation implementation and its one cooldown
+into TeamEconomy, invoked once after the shared economy callback's role
+adjustment. TECH, AIR, FRONT, SEA, TACTICAL and SUPPORT share at an inclusive
+95% storage threshold, budgeting at most 20% of storage every five seconds,
+with 25-metal minimum gifts and the same lowest-filled live-ally ordering.
+This includes human teammates. Preserve the Tech::TeamShare* setting names as
+the sole configuration so existing overrides continue to work for all roles;
+reject six copied policies/settings that could drift.
+
+**Opening and ownership.** TECH keeps its original completed T1 bot lab or
+WasIntoT2 recovery gate. Other roles latch eligibility on a completed native
+factory of any terrain/tier; frames and constructor-only starts cannot donate
+their opening bank. The latch survives role changes and factory reclaim/loss
+within an instance. TECH's unrelated air-constructor refill/cap/layout upkeep
+stays in TechBuild::Tick. The prior lack of script save-state persistence is
+unchanged (KI-209); a restored instance reconstructs eligibility from extant
+factories/T2 state rather than a serialized historic latch. Save/load during
+a factory-free recovery is not established by these tests.
+
+**Invariant.** INV-033 now runs from the shared economy callback for every
+role after opening eligibility: the bank does not remain at/above the threshold
+for 60 seconds while a live teammate has a quarter of our capacity free. Pure
+allocation tests cover exact threshold, opening protection, storage-based budget,
+overdraw, recipient capacity, minimum gift and one budget across recipients.
+
+**Scope.** No C++ or UnitDef/profile-classification changes. Legacy profiles
+remain on their prior behavior (KI-483). Near-full-team recirculation is a
+separate recipient-policy follow-up (KI-484), not silently changed as part of
+matching TECH. The test fixture supplies banks and occasional missing factories;
+it does not measure natural economy strength. The native/AngelScript suite,
+three profile compilations and script/DLL parity pass; see the report for
+individual rendered runs and transfer audits.
+
+**Files.** [team economy](../data/script/src/manager/team_economy.as),
+[shared callback](../data/script/src/manager/economy.as),
+[TECH upkeep](../data/script/src/roles/tech_build.as),
+[settings](../data/script/src/global.as),
+[invariant checker](../data/script/src/manager/invariants.as),
+[allocation arithmetic](../data/script/src/helpers/team_share_math.as),
+[allocation tests](../tests/team_share_math_tests.as),
+[test runner](../tools/run_native_tests.sh),
+[fixture preparer](../tools/playtest/prepare_team_share_check.py),
+[fixture widget](../tools/playtest/widgets/team_share_fixture.lua),
+[runtime checks](../tools/playtest/checks/team_share.json),
+[transfer audit](../tools/playtest/audit_team_share.py),
+[script guide](../data/script/README.md),
+[TECH build reference](roles/tech_build.md),
+[layout/sequence reference](roles/tech-layout-and-sequence.md),
+[invariant register](invariants.md), [actor matrix](actor-matrix.md),
+[known issues](known-issues.md), [plan and results](team-metal-sharing.md).
+
+**D-175 evidence artifacts.** [Audit manifest](benchmarks/d175-team-sharing.json),
+[hard screenshot](images/d175/sharing-hard.png),
+[terrible screenshot](images/d175/sharing-terrible.png). All six roles sent in
+all three rendered profiles; balanced strict PASS, hard/terrible strict FAIL
+on KI-427 INV-008. The 196 hard/terrible donation decisions pass their focused
+audit. This makes the donation change Played, without claiming the full-match
+failures resolved.
