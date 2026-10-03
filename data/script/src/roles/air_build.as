@@ -10,6 +10,7 @@ namespace AirBuild {
     dictionary guardLeases;
     dictionary guardLeaseFrames;
     dictionary commanderFactoryGuards;
+    int firstLabAttemptFrame = -1, firstLabAttemptBuilder = -1;
     bool ReactorPending()
     {
         for (uint i = 0; i < projects.length(); ++i) {
@@ -22,8 +23,7 @@ namespace AirBuild {
     }
     bool EconomyAircraft(CCircuitUnit@ u)
     {
-        return u !is null && UnitHelpers::IsAirConstructor(u.circuitDef)
-            && UnitHelpers::GetConstructorTier(u.circuitDef) >= 2;
+        return u !is null && UnitHelpers::IsAirConstructor(u.circuitDef);
     }
     void ReturnEconomyWorkers()
     {
@@ -39,10 +39,10 @@ namespace AirBuild {
             if (wait is null) continue;
             aiBuilderMgr.AssignTask(u, wait);
             u.CmdStop(); // Wait preserves the old engine guard unless explicitly cleared.
-            GenericHelpers::LogUtil("[AIR][Economy] released advanced aircraft " + ids[i] + " from production guard", 1);
+            GenericHelpers::LogUtil("[AIR][Economy] released economy aircraft " + ids[i] + " from guard", 1);
             @u = ai.GetTeamUnit(ids[i]);
             if (u !is null && u.task is task)
-                Invariants::Violation("INV-106", "" + ids[i], "advanced AIR economy constructor retained its production guard");
+                Invariants::Violation("INV-106", "" + ids[i], "AIR economy constructor retained its guard");
         }
     }
     void Added(IUnitTask@ task)
@@ -141,6 +141,9 @@ namespace AirBuild {
     IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
     {
         if (t is null) return null;
+        IBuilderTask@ previous = cast<IBuilderTask>(u.task);
+        if (EconomyAircraft(u) && previous !is null && previous.GetBuildType() == int(Task::BuildType::GUARD))
+            u.CmdStop(); // Construction may wait for a path; clear the engine guard once.
         if (UnitHelpers::IsCommander(u.circuitDef)) {
             const string key = "" + u.id;
             if (rule == "opening.commander.guard" || rule == "commander.factory.guard") {
@@ -155,7 +158,7 @@ namespace AirBuild {
             }
         }
         if (rule == "production.assist") {
-            if (EconomyAircraft(u)) Invariants::Violation("INV-106", "" + u.id, "advanced AIR economy constructor assigned production guard");
+            if (EconomyAircraft(u)) Invariants::Violation("INV-106", "" + u.id, "AIR economy constructor assigned production guard");
             guardLeases.set("" + u.id, @t);
             guardLeaseFrames.set("" + u.id, int64(ai.frame));
         }
@@ -308,6 +311,12 @@ namespace AirBuild {
         const bool opening = !ProductionMath::CrewReady(crew, Global::RoleSettings::Air::OpeningAirConstructors);
         const bool useful = ProductionMath::FactoryAssistUseful(!opening, plant.GetBuildProgress() >= 1.0f, PlantHasWork(plant));
         IUnitTask@ t = null;
+        if (!opening && AirEconomy::SavingForFirstLab()) {
+            @t = Assist(u, false, null, true);
+            if (t !is null) return Record(t, "transition.finish", u);
+            u.CmdStop();
+            return Record(aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND)), "transition.save", u);
+        }
         // Finish the factory before branching. During the crew opening, nearby
         // energy recovery is the only exception to guarding production.
         if (plant.GetBuildProgress() >= 1.0f && (!opening || (AirEconomy::recovery && AirEconomy::bankE < 200.0f))) {
@@ -420,6 +429,7 @@ namespace AirBuild {
             if (!AirEconomy::BankedLab(d) && count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, (Global::RoleSettings::Air::MaxProductionBays <= 0 ? count + 1 : Global::RoleSettings::Air::MaxProductionBays),
                 ai.frame - AirEconomy::stableSince, Global::RoleSettings::Air::CapacityStableSeconds * SECOND,
                 AirEconomy::bankM, d.costM * 0.6f))) return null;
+            if (count == 0) { firstLabAttemptFrame = ai.frame; firstLabAttemptBuilder = u.id; }
         }
         AirLayout::Bay@ bay = null;
         for (uint b = 0; b < AirLayout::bays.length(); ++b)

@@ -706,3 +706,15 @@ unused blocked modules move at first use. T2 aircraft constructors no longer
 renew production guards, and existing guards release only those workers.
 Overflow may fund serial reactor growth alongside continued factory production.
 See [design and verification plan](../air-economy-zone-plan.md).
+
+D-172 extends `AirBuild::EconomyAircraft` to T1 as well as T2 aircraft:
+mobile workers assist unfinished economy structures and do not renew factory
+or constructor guards. `ReturnEconomyWorkers` releases any inherited builder
+guard individually and clears its engine order. Once the initial fighter
+screen exists, `AirMath::WorkforceTurn` gives funded missing constructors a
+production turn; `CombatOrdersPerEconomyConstructor` defaults to two during
+an incursion. This allocates factory output without delaying combat commands.
+The first eligible T2 lab precedes shared reactor growth; `SavingForFirstLab`
+reserves capital after the existing preparation time and energy threshold
+while preserving recovery, mex upgrades, transport and immediate defense.
+See [repair plan](../air-workforce-repair-plan.md).

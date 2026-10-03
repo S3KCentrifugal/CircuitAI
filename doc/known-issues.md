@@ -4151,3 +4151,48 @@ an isolated recon test. Require twenty AI-controlled planes before dispatch and
 no commands to the player-owned aircraft. See
 [the recon controller](../data/script/src/manager/air_recon.as) and
 [D-171 evidence](air-committed-operations-results.md).
+
+
+### KI-480 - Late Glacial fighter patrol observer reports out-of-map coordinates
+
+**Problem.** D-172's rendered 35-minute natural Glacial repeat logged 62
+INV-080 observer reports, starting at frame 54540 (30:18). Constructor guard
+and AIR policy checks were clean. The script clamps wall endpoints and native
+RouteTask::LanePoint also corrects positions; the offending unit/command and
+whether it is an engine-added patrol anchor were not recorded. Do not infer
+an economy regression or dismiss the observer without those coordinates.
+
+**Proposed solution.** Extend the observer to record unit ID, full command queue,
+coordinates and actual map dimensions, then correlate the native issued route
+with engine-added patrol commands after combat near a boundary. Correct the
+owning layer without repeating orders for an unchanged group.
+
+**Verification.** Repeat the late Glacial case beyond 35 minutes and observe
+real patrol queues around both map edges. The final 30-minute run did not
+reproduce it, which is not sufficient to close it. See
+[results and evidence](air-workforce-repair-results.md).
+
+### KI-481 - Concurrent map additions reference unknown floating hover factory IDs
+
+**Problem.** During D-172, the whole-workspace unit checker reported 165
+unknown armhs/corhs/leghs identifiers in concurrent map additions/edits,
+plus the existing two sonar findings (KI-473). These map changes were not
+part of the AIR repair commit. A tracked-source-only check at that point
+reported only the two existing sonar findings.
+
+**Proposed solution.** Validate those TACTICAL factory weights against the
+loaded roster and factory_mapping helper; use the appropriate reachable
+floating hover factory IDs (existing map tables use armfhp/corfhp/legfhp).
+Keep unknown map registration changes out of pinned regression snapshots.
+
+**Verification.** Run check_unit_helpers.py on the completed map work and
+compile/launch the affected map registrations. Not changed by D-172.
+
+**D-172 follow-up to KI-461/466/472/477.** Both AIR constructor tiers now
+release native guards in one second in the forced two-tier test. First-lab
+priority and capital budgeting were added; final Glacial and Caldera reached
+T2 at 12:56/15:31 and fusion at 13:26/19:18. This does not guarantee the
+20-minute targets under attack or across all maps. Mixed TECH invariants and
+aggregate APM above 3000 remain; final Glacial peaked at 2396 aircraft / 3833
+all-unit APM. Exact cases and limitations are in
+[the D-172 results](air-workforce-repair-results.md).

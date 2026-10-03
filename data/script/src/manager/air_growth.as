@@ -14,6 +14,14 @@ namespace AirGrowth {
     IUnitTask@ MakeTask(CCircuitUnit@ u)
     {
         if (!AirEconomy::TechGrowth()) return null;
+        CCircuitDef@ firstLab = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+        // Completed counts can change between the once-per-second snapshots.
+        if (AirEconomy::t2 == 0 && AirEconomy::Planned(firstLab, Task::BuildType::FACTORY) == 0
+            && AirBuild::Can(u, firstLab) && !AirBuild::Busy(firstLab, Task::BuildType::FACTORY)
+            && AirEconomy::Transition(firstLab)) {
+            if (AirBuild::firstLabAttemptFrame != ai.frame || AirBuild::firstLabAttemptBuilder != u.id)
+                Invariants::Violation("INV-120", "AIR", "shared growth considered before eligible first-lab placement");
+        }
         EcoPlanner::State@ s = EcoPlanner::Read(u, AirEconomy::metal, AirEconomy::energy, true);
         // The next reactor is an objective, even at a temporarily full bank.
         // Keep one reactor frame and focus mobile build power on it.

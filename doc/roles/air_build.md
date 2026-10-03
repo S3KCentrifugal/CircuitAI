@@ -31,8 +31,8 @@ task, checking native assignment and reachability before creating more work.
 chain orders after script enqueue has returned. This prevents a native nano
 order outside the layout from blocking the role's pinned support job (INV-076).
 
-`EconomyAircraft` identifies economic workers by aircraft constructor
-type and tier. `ReturnEconomyWorkers`, called by `Tick`, removes an advanced
+`EconomyAircraft` identifies economic workers of both aircraft constructor
+tiers. `ReturnEconomyWorkers`, called by `Tick`, removes any such
 aircraft constructor from a builder GUARD using individual `AssignTask` and a
 one-second wait. Other assignees, player tasks and ferry tasks retain their
 owners. `Record` audits new fallback production guards for these workers
@@ -120,7 +120,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 2811e9d0b427baab5d146e3dbce105381b8d0b47; lines: 619 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 895dc051c7eedcff0710663420df00cc39aeaae3; lines: 629 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -161,14 +161,14 @@ must not indefinitely block a funded first reactor. See [the review](../air-enha
 
 `Nano` repairs dead support pins within the started lab's reach. `PlantHasWork`
 requires an unfinished aircraft frame after the opening crew; a queued recruit
-task alone cannot keep the commander on an idle lab. T1 mobile fallback guards
-start an explicit five-second expiry and `Tick` checks their task-identity leases
-(INV-104). D-164 excludes advanced aircraft from this fallback entirely;
-expiration alone did not prevent them repeatedly renewing the same activity.
+task alone cannot keep the commander on an idle lab. D-172 excludes both aircraft tiers from fallback guards. Eligible ground
+workers can still briefly assist an actively producing factory; `Tick` checks
+their task-identity leases (INV-104). Expiration alone did not prevent mobile
+workers repeatedly renewing the same activity.
 
 D-171 records commander factory-guard intent in `commanderFactoryGuards`.
 `Record` clears that engine command once before a different AIR action waits
-for a path. `ReturnEconomyWorkers` also stops the released T2 constructor's old
+for a path. `ReturnEconomyWorkers` also stops the released constructor's old
 guard. Native task expiry alone leaves these engine queues intact. The Legion
 45-minute repeat passed INV-081 after this handoff change.
 

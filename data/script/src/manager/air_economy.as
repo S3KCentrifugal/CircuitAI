@@ -330,6 +330,11 @@ namespace AirEconomy {
                 + " plants=" + t1 + "/" + t2 + " aircraftDemand=" + int(demandM) + "/" + int(demandE), 1);
             GenericHelpers::LogUtil("[AIR][Projects] energyQueued=" + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), null)
                 + " committed=" + int(AirBuild::Committed(false)) + "/" + int(AirBuild::Committed(true)), 1);
+            CCircuitDef@ crew1 = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(Global::AISettings::Side));
+            CCircuitDef@ crew2 = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(Global::AISettings::Side));
+            GenericHelpers::LogUtil("[AIR][Workforce] t1=" + (crew1 is null ? 0 : crew1.count) + "/" + ConstructorTarget(crew1, false)
+                + " t2=" + (crew2 is null ? 0 : crew2.count) + "/" + ConstructorTarget(crew2, true)
+                + " targetBP=" + int(ConstructionTarget()) + " floating=" + MetalFloating() + " savingLab=" + SavingForFirstLab(), 1);
             GenericHelpers::LogUtil("[AIR][Fusion] target=" + Global::RoleSettings::Air::FirstFusionTargetSeconds
                 + "s mexes=" + MexCount() + " upgraded=" + (MexesReady() ? "all" : "pending")
                 + " reactor=" + (HasReactor() ? "online" : "pending"), 1);
@@ -353,6 +358,17 @@ namespace AirEconomy {
         return plant !is null && (BankedLab(plant) || Economy::GetMinEnergyIncomeLast10s() >= Global::RoleSettings::Air::TransitionMinEnergy)
             && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
             Economy::IncomeWindowReady(), Global::RoleSettings::Air::TransitionMinMetal, aiEconomyMgr.metal.current, plant.costM);
+    }
+    bool SavingForFirstLab()
+    {
+        if (MetalEconomy::Active()) return false;
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+        return lab !is null && !Transition(lab) && AirMath::SaveForLab(t2 > 0,
+            Planned(lab, Task::BuildType::FACTORY) > 0, recovery,
+            aiTerrainMgr.GetLayoutInt("air.screen.established", 0) != 0,
+            ai.frame / SECOND, Global::RoleSettings::Air::TransitionEarliestSeconds,
+            metal, energy, Global::RoleSettings::Air::FusionAccessMinMetal,
+            Global::RoleSettings::Air::FusionAccessMinEnergy, bankM, lab.costM);
     }
     int NanoTarget(uint bay)
     {

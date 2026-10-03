@@ -983,6 +983,7 @@ namespace Global {
             float SmallProjectSeconds = 12.0f;
             float ReactorProjectSeconds = 120.0f;
             int ConstructorsPerFighter = 2;
+            int CombatOrdersPerEconomyConstructor = 2; // after opening screen, even during sustained incursions
             int InterceptUpdateSeconds = 2;
             float InterceptCostRatio = 1.5f;
             float StrikeControlRatio = 1.25f;

@@ -435,3 +435,11 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Normal opening mex count | AirRules::MakeTask, AirEconomy::MexCount, AirBuild::Record | Three owned extractors end the opening mex stage. Native maxSpots only bounds candidate search. Metal maps keep their separate forty-mex sequence. INV-117. |
 | Legion replacement scout | AirProduction::Tick/HomeTask, AirScreen, MilitaryManager::TransferUnit | Transfer one drone to the scout route without aborting its shared wall cell. Other group members retain their tasks. |
 | AIR engine-command handoff | AirBuild::Record/ReturnEconomyWorkers/CancelUnstarted/Tick, native task removal, opening/eco observers | Clear the old command once when relinquishing a factory guard or cancelling an unstarted building. Stop only actual assignees; retain PLAYER and reassigned workers, framed projects and TECH semantics. INV-077/081/106. |
+
+## D-172 AIR workforce and first-lab access
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Mobile economy aircraft | AirRules fallback, AirBuild::EconomyAircraft/ReturnEconomyWorkers/Record, air_workforce_watch | Both tiers stay on concrete economy projects; release native guards individually and stop their engine command once. Preserve player/ferry ownership. INV-106. |
+| Workforce recruitment | AirProduction::Recruit/MakeTask, AirEconomy::ConstructorTarget/FundConstructor, AirMath::WorkforceTurn | Projected constructor counts and bank-aware target; per-plant combat streak permits a funded missing constructor after two combat orders during an incursion. Initial screen and transports retain precedence. INV-119. |
+| First advanced lab | AirRules::transition.bay/transition.save, AirEconomy::SavingForFirstLab/Transition, AirGrowth | First placement attempted before discretionary growth; low-income, energy-ready economies save capital after preparation time. Full loaded lab bank or sustained income still gates admission. Additional plants retain support/capacity rules. INV-120. |

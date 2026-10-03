@@ -1,5 +1,17 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    bool WorkforceTurn(bool missing, bool funded, bool emergency, int combatOrders, int maximum)
+    {
+        return missing && funded && maximum > 0 && (!emergency || combatOrders >= maximum);
+    }
+    bool SaveForLab(bool advanced, bool pending, bool recovering, bool screenReady,
+        int seconds, int earliest, float metal, float energy, float minimumMetal,
+        float minimumEnergy, float bank, float cost)
+    {
+        return !advanced && !pending && !recovering && screenReady && seconds >= earliest
+            && Valid(metal) && Valid(energy) && Valid(bank) && Valid(cost) && cost > 0
+            && metal >= minimumMetal && energy >= minimumEnergy && bank < cost;
+    }
     bool TransitionStorage(bool advancedPlant, float bank, float capacity, float labCost)
     {
         return !advancedPlant && Valid(bank) && Valid(capacity) && Valid(labCost)

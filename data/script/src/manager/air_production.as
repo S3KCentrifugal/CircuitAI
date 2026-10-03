@@ -30,6 +30,10 @@ namespace AirProduction {
                 Invariants::Violation("INV-102", name, "T2 bomber production below sustainable income gate");
             const string key = "air.crew.streak." + plant.id;
             aiTerrainMgr.SetLayoutInt(key, utility ? aiTerrainMgr.GetLayoutInt(key, 0) + 1 : 0);
+            const string combatKey = "air.combat.streak." + plant.id;
+            aiTerrainMgr.SetLayoutInt(combatKey, utility ? 0 : AiMin(
+                Global::RoleSettings::Air::CombatOrdersPerEconomyConstructor,
+                aiTerrainMgr.GetLayoutInt(combatKey, 0) + 1));
             if (!utility) aiTerrainMgr.SetLayoutInt("air.mix." + plant.id, (aiTerrainMgr.GetLayoutInt("air.mix." + plant.id, 0) + 1) % 10);
             GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target, 1);
         }
@@ -86,7 +90,7 @@ namespace AirProduction {
         // waiting for wind income while it could work on an interceptor.
         CCircuitUnit@ scoutUnit = ai.GetTeamUnit(aiTerrainMgr.GetLayoutInt("air.scout.id", -1));
         const int scoutAway = scoutUnit !is null && scoutUnit.circuitDef.GetName() == fighter ? 1 : 0;
-        if (basic) {
+        if (basic && aiTerrainMgr.GetLayoutInt("air.screen.established", 0) == 0) {
             const int initialTarget = ProductionMath::DefenceRecruitTarget(Global::RoleSettings::Air::HomeFighterFloor,
                 AirScreen::CountOther(fighter), scoutAway);
             @t = Recruit(u, fighter, initialTarget, "opening.screen", Task::Priority::NORMAL);
@@ -95,6 +99,8 @@ namespace AirProduction {
             if (initialFighter !is null && initialFighter.IsAvailable(ai.frame) && u.circuitDef.CanBuild(initialFighter)
                 && Projected(initialFighter) < initialTarget)
                 Invariants::Violation("INV-082", "" + u.id, "AIR failed to enqueue available initial fighter after completed crew");
+            if (initialFighter !is null && Projected(initialFighter) >= initialTarget)
+                aiTerrainMgr.SetLayoutInt("air.screen.established", 1);
         }
         const bool affordable = AirEconomy::energy >= 160.0f && (AirEconomy::bankE > 200.0f || !AirEconomy::recovery);
         const float intrusion = AirScreen::IntrusionCost();
@@ -110,6 +116,23 @@ namespace AirProduction {
         }
         const float homeValue = AirScreen::HomeValue();
         const bool emergency = AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
+        CCircuitDef@ builder = ai.GetCircuitDef(cons);
+        const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
+        const bool saving = AirEconomy::SavingForFirstLab();
+        const bool workforceTurn = !saving && AirMath::WorkforceTurn(Projected(builder) < constructors,
+            AirEconomy::FundConstructor(builder), emergency,
+            aiTerrainMgr.GetLayoutInt("air.combat.streak." + u.id, 0),
+            Global::RoleSettings::Air::CombatOrdersPerEconomyConstructor);
+        if (workforceTurn) {
+            if (ProductionMath::ConstructorTurn(aiTerrainMgr.GetLayoutInt("air.crew.streak." + u.id, 0), Global::RoleSettings::Air::ConstructorsPerFighter)) {
+                @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
+                if (t is null && builder !is null && builder.IsAvailable(ai.frame) && u.circuitDef.CanBuild(builder))
+                    Invariants::Violation("INV-119", "" + u.id, "funded AIR workforce turn failed to recruit an available constructor");
+            } else {
+                @t = Recruit(u, fighter, Projected(fighterDef) + 1, "constructor.screen", Task::Priority::NORMAL);
+            }
+            if (t !is null) return t;
+        }
         if (affordable) {
             const float cost = fighterDef is null ? 150.0f : fighterDef.costM;
             const float urgent = AiMax(float(Global::RoleSettings::Air::HomeFighterFloor) * cost,
@@ -118,17 +141,9 @@ namespace AirProduction {
             @t = Recruit(u, fighter, Projected(fighterDef) + missing, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
-        CCircuitDef@ builder = ai.GetCircuitDef(cons);
-        const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
-        if (AirEconomy::FundConstructor(builder) && Projected(builder) < constructors) {
-            if (ProductionMath::ConstructorTurn(aiTerrainMgr.GetLayoutInt("air.crew.streak." + u.id, 0), Global::RoleSettings::Air::ConstructorsPerFighter))
-                @t = Recruit(u, cons, constructors, "constructor.expand", Task::Priority::HIGH, true);
-            else
-                @t = Recruit(u, fighter, Projected(ai.GetCircuitDef(fighter)) + 1, "constructor.screen", Task::Priority::NORMAL);
-            if (t !is null) return t;
-        }
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (basic && AirBuild::StarterReadyToRetire(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
+        if (saving) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         // A lost scout gets another route. Utility never consumes a strike slot.
         if (basic && side != "legion" && ai.frame >= aiTerrainMgr.GetLayoutInt("air.scout.next", 0)) {
             @t = Recruit(u, UnitHelpers::GetT1AirScoutForSide(side), 1, "recon.replace", Task::Priority::NORMAL, true);

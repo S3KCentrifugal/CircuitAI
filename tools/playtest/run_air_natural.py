@@ -18,7 +18,8 @@ def run(args, entry):
     key, name, side, _, _ = entry
     base = args.dir.resolve()/key
     base.mkdir(parents=True, exist_ok=True)
-    spots = playtest.map_spots(name)
+    map_source = args.data/"script/src/maps"/playtest.map_file_for(name).name if args.data else None
+    spots = playtest.map_spots(name, map_source)
     selected = []
     ally_count = 0
     override = False
@@ -47,8 +48,13 @@ def run(args, entry):
         "--ai-option", "random_seed=1711002", "--extra-widget", str(playtest.HERE/"widgets/air_command_watch.lua"),
         "--extra-widget", str(playtest.HERE/"widgets/air_watch.lua"),
         "--extra-widget", str(playtest.HERE/"widgets/air_opening_watch.lua")]
+    stage += ["--extra-widget", str(playtest.HERE/"widgets/air_workforce_watch.lua")]
+    for widget in args.extra_widget:
+        stage += ["--extra-widget", str(widget)]
     if args.headless:
         stage.append("--headless")
+    if args.data:
+        stage += ["--data", str(args.data)]
     subprocess.run(stage, check=True)
     source = base/"AI/Skirmish/BARbTest/test/script/src/setup.as"
     if override:
@@ -58,7 +64,8 @@ def run(args, entry):
         teams = json.loads((base/"teams.json").read_text())["teams"]
         condition = " || ".join("ai.teamId == "+str(team["team"]) for team in teams if team["role"] == "AIR")
         source.write_text(text.replace(needle, "derivedRole = ("+condition+") ? AiRole::AIR : AiRole::TECH;\n"+needle))
-    (base/"natural-fixture.json").write_text(json.dumps({"map": name, "supplied_assets": False,
+    (base/"natural-fixture.json").write_text(json.dumps({"map": name, "supplied_assets": bool(args.extra_widget),
+        "extra_widgets": [str(w) for w in args.extra_widget],
         "production_overrides": False, "role_override": override, "selected_starts": selected,
         "minutes_requested": args.minutes, "rendered": not args.headless,
         "dll_sha256": hashlib.sha256(args.dll.read_bytes()).hexdigest(),
@@ -77,6 +84,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", type=Path, required=True)
     parser.add_argument("--dll", type=Path, required=True)
+    parser.add_argument("--data", type=Path, help="Pinned data snapshot for a reproducible fixture")
+    parser.add_argument("--extra-widget", type=Path, action="append", default=[])
     parser.add_argument("--maps", default=",".join(m[0] for m in MAPS))
     parser.add_argument("--minutes", type=float, default=45)
     parser.add_argument("--speed", type=float, default=20)

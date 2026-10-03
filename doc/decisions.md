@@ -10364,3 +10364,59 @@ feedback without replacing real initialization and gameplay.
 - [tools/playtest/widgets/air_opening_watch.lua](../tools/playtest/widgets/air_opening_watch.lua)
 - [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
 - [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
+
+## D-172 - AIR workforce ownership and first advanced-lab capital
+
+**Decision.** Both aircraft constructor tiers are mobile economy workers;
+release inherited native guards individually and clear their engine order.
+After the initial screen, give funded missing workers a recruitment turn,
+including after two combat orders during an incursion. Attempt the first
+eligible advanced lab before optional shared reactor growth. Save its full
+loaded cost after the existing eight-minute, +12 metal/+450 energy access
+conditions; retain recovery, mex work, transports and immediate defense.
+The normal +50 metal/+1200 energy admission or full-bank waiver is unchanged.
+
+**Reasoning.** T1 fallback guards checked neither active production nor engine
+order lifetime. Repeated fighter-floor/interception orders preceded workforce
+recruitment indefinitely. Shared growth preceded first income-qualified lab
+placement; below that income, optional spending never explicitly budgeted lab
+capital. BAR's low-build-power aircraft need multiple workers and local turret
+support. Increasing only constructor caps would not repair order ownership or
+recruitment starvation. Global guard changes and command throttles were rejected;
+TECH's exact rules and native semantics are unchanged.
+
+**Invariant.** INV-106 now covers both aircraft tiers. INV-119 requires a
+funded workforce turn to recruit an available missing constructor. INV-120
+requires an eligible first-lab placement attempt before shared reactor growth,
+using fresh counts to avoid a just-completed-lab snapshot race.
+
+**Verification.** 98 AIR and 133 shared math tests; three compiled experimental
+profiles; 276 API members checked. Final natural Glacial completed T2 at 12:56,
+fusion 13:26, bomber 16:24; final natural Caldera T2 15:31, fusion 19:18,
+bomber 20:15. Both aircraft tiers left injected non-interruptible guards in
+one second, and allied receipts were confirmed. AIR checks were clean in the
+final games; Caldera passed all enabled checks. Mixed TECH reports remain FAIL.
+An earlier patrol-boundary report is KI-480. See the results for exact run
+paths, hashes, limitations, initial diagnostic failures and screenshots.
+No save/load or universal FPS/APM claim. Build output was published with the
+matched DLL/debug/data; the live game install was not modified.
+
+**Files.**
+- [AIR actions](../data/script/src/roles/air_build.as)
+- [AIR rules](../data/script/src/roles/air_rules.as)
+- [Economy](../data/script/src/manager/air_economy.as)
+- [Growth](../data/script/src/manager/air_growth.as)
+- [Recruitment](../data/script/src/manager/air_production.as)
+- [AIR arithmetic](../data/script/src/helpers/air_math.as)
+- [Settings](../data/script/src/global.as)
+- [Math tests](../tests/air_math_tests.as)
+- [Role reference](roles/air.md), [actions reference](roles/air_build.md), [rules reference](roles/air_rules.md)
+- [Invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
+- [Plan](air-workforce-repair-plan.md), [results](air-workforce-repair-results.md)
+- [Evidence](benchmarks/d172-air-workforce.json)
+- [Baseline image](images/d172/glacial-baseline-5.png), [natural image](images/d172/glacial-natural-20.png), [donation image](images/d172/glacial-donation-20.png)
+- [Natural runner](../tools/playtest/run_air_natural.py)
+- [Guard fixture preparer](../tools/playtest/prepare_air_workforce.py)
+- [Workforce observer](../tools/playtest/widgets/air_workforce_watch.lua)
+- [Donation fixture](../tools/playtest/widgets/air_donation_fixture.lua)

@@ -24,7 +24,7 @@ otherwise the next action is tried. Every construction action rechecks current
 capability, queue and reservation state. Economy observations are cached once
 per second; existing construction stays assigned.
 
-D-164 excludes T2 aircraft constructors from the final `production.assist`
+D-172 excludes both T1 and T2 aircraft constructors from the final `production.assist`
 fallback. They finish/assist real construction or wait three seconds for the
 next economic decision. Existing factory guards are individually removed by
 `AirBuild::ReturnEconomyWorkers`. After the bomber milestone, `AirGrowth` may
@@ -49,6 +49,7 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes, at most one remote upgrade at a time; additional helpers stay local |
 | 5a | `transition.storage` | One queued/unfinished metal store at a time when a nearly full pre-T2 bank cannot hold the advanced lab cost |
 | 5.0 | `energy.reclaim` | Retire wind, then basic and advanced solar using TECH's shared margin and completed-reactor guard; completed AFUS admits retirement outside recovery |
+| 5.05 | `transition.bay`, `transition.finish`, `transition.save` | Attempt first eligible T2 access before discretionary growth; finish existing work while saving its capital on an energy-ready economy |
 | 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
 | 5.2 | `mex.phase.convert`, `economy.shared.*` | Pending-upgrade T1 conversion, then shared TECH economy choices with AIR state, placement and reactor assistance after sustained +50 metal |
 | 5a | `fusion.first` | Target fusion by 20 minutes; no reactor until all mexes finish |
@@ -56,19 +57,19 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 5c | `defence.base`, `fusion.access` | Bounded own-base protection and T2 access |
 | 5d | `mex.expand` | Expand only within 1,400 elmos of start; before first reactor, at most six mexes and no expansion after preparation starts |
 | 6 | `storage.buffer` | Fund the first wind buffer without starvation |
-| 6a | `transition.bay` | Admit a funded first T2 package before the moving T1 energy-growth target can starve it |
 | 7 | `energy.grow`, `energy.assist` | Open funded parallel energy work, then help frames that need more power |
 | 8 | `intel.radar` | One local radar |
 | 9 | `storage.metal` | Save income needed for a funded T2 package |
 | 10 | `production.bay` | Fund first T2 or one additional independent bay |
 | 11 | `storage.energy`, `surplus.convert` | Buffer fluctuations; convert only surplus with metal capacity |
-| 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short factory guard for eligible T1 workers, or bounded retry; advanced aircraft keep their economy role |
+| 13 | `project.assist`, `production.assist`, `wait` | Useful nearby work, short working-factory guard for eligible ground workers, or bounded retry; both aircraft tiers keep their economy role |
 
 The factory recruiter separately prioritizes allied transport obligations, then
 one initial scout, three completed constructors, an immediate fighter screen,
-urgent incursion defense, and funded income-scaled economic builders (at most
-two consecutive constructor orders before a fighter). Then come the full
-interception floor, finite T1 strikes, land-threat-gated gunships and escorted
+funded income/bank-scaled economic builders (at most two consecutive
+constructor orders before a fighter). During an incursion, two combat orders
+may precede a funded missing worker; this prevents indefinite starvation.
+Then come the interception floor, finite T1 strikes, land-threat-gated gunships and escorted
 waves. T1 land support remains available after T2; a live incursion suspends
 optional T2 strike/heavy recruitment.
 Task priority controls engine resource priority; admission gates and available
@@ -88,7 +89,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: c5310dc9220b0375e609c3e507eb3cc53334a749; lines: 160 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: c63ec2c7c847bbd86fa84ca833a73dbec01371ad; lines: 164 -->
 
 ## D-152 sequencing
 

@@ -66,6 +66,17 @@ namespace AirRules {
         }
         @t = AirReclaim::MakeTask(u);
         if (t !is null) return AirBuild::Record(t, "energy.reclaim", u);
+        // First access precedes discretionary shared economy/its assists.
+        // Later factories retain the twenty-turret gate and capacity policy.
+        if (AirEconomy::t2 == 0) {
+            @t = AirBuild::Factory(u, true);
+            if (t !is null) return AirBuild::Record(t, "transition.bay", u);
+            if (AirEconomy::SavingForFirstLab()) {
+                @t = AirBuild::Assist(u);
+                if (t !is null) return AirBuild::Record(t, "transition.finish", u);
+                return AirBuild::Record(aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND)), "transition.save", u);
+            }
+        }
         if (AirEconomy::MetalFloating()) {
             @t = AirBuild::Nano(u);
             if (t !is null) return AirBuild::Record(t, "overflow.support", u);
@@ -104,13 +115,6 @@ namespace AirRules {
             @t = AirBuild::Utility(u, UnitHelpers::GetEnergyStorageNameForSide(side), Task::BuildType::STORE, 1);
             if (t !is null) return AirBuild::Record(t, "storage.buffer", u);
         }
-        // An income-qualified first T2 lab must not wait for the aspirational
-        // T1 energy target. Recovery remains above this row; later labs also
-        // require spare capacity unless their full cost is already banked.
-        if (AirEconomy::t2 == 0) {
-            @t = AirBuild::Factory(u, true);
-            if (t !is null) return AirBuild::Record(t, "transition.bay", u);
-        }
         // Production demand is a floor, plus energy for the next stage of T1 growth.
         const float targetE = AiMax(160.0f, AiMax(AirEconomy::metal * 45.0f, AirEconomy::demandE * 1.3f));
         if (!AirEconomy::TechGrowth() && (AirEconomy::energy < targetE || AirEconomy::recovery)) {
@@ -146,10 +150,10 @@ namespace AirRules {
         // to allied resource clusters and must not recruit these constructors.
         @t = AirBuild::Assist(u);
         if (t !is null) return AirBuild::Record(t, "project.assist", u);
-        // Advanced aircraft remain available for economy; a renewable guard
+        // All aircraft remain available for economy; a renewable guard
         // would absorb their mobile build power indefinitely at a completed lab.
         CCircuitUnit@ plant = Factory::primaryT1AirPlant;
-        if (!AirBuild::EconomyAircraft(u) && plant !is null && !Lifecycle::IsRetiring(plant)) {
+        if (!AirBuild::EconomyAircraft(u) && AirBuild::PlantHasWork(plant)) {
             // Non-interruptible guards explicitly start the native timeout;
             // interruptible guards deactivate their timer while assigned.
             @t = GuardHelpers::AssignWorkerGuard(u, plant, Task::Priority::NORMAL, false, 5 * SECOND);
