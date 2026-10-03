@@ -10847,3 +10847,34 @@ guarantee. [Plan, settings, times and retained evidence](air-opening-recon-plan.
 [API reference](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [verification gaps](known-issues.md),
 [benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).
+
+
+## D-180 - Review AIR build-power allocation before replacing its scaling policy
+
+**Decision.** Record the requested review and recommend a shared spending-gap
+signal with role-specific capacity allocation. Make no gameplay changes in this
+review. Preserve TECH's exact sequence, thresholds and reclaim rules; do not call
+its mutable role state from AIR.
+
+**Reasoning.** AIR shares the chooser but not TECH's bank-trend response or
+calculated support batches. Independent targets, broad static counts, budget
+holds and assistance horizons can hide useful capacity shortages. The legacy
+three-constructor fallback is bypassed. Native recruit priority is a separate
+risk requiring an observed reproduction. Raising caps or using income minus
+requested pull would leave the interactions unresolved. Usage and transfer
+observations already have script bindings; no new resource API is needed.
+
+**Invariant.** Preserve existing ownership, opening, allied reservation,
+twenty-support-per-lab and TECH build/reclaim promises. Proposed checks will
+ensure a funded reachable shortage is not masked by unavailable support or BP
+credited to two concurrent workloads. No new runtime invariant is added before
+its behavioral implementation exists.
+
+**Verification.** Source trace and retained D-179 Glacial team-0 telemetry;
+133 production and 113 AIR tests pass. Five temporary probes confirm the current
+arithmetic, not corrected behavior. No new game ran. Six unresolved findings
+are KI-486 through KI-491. Official BAR economy/air guidance informs the plan;
+the proposed controller is distinguished from published advice.
+
+**Files.** [Review and correction plan](reviews/2026-10-03-air-build-power-review.md),
+[unresolved findings](known-issues.md), and this decision record.

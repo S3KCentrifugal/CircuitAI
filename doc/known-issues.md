@@ -4310,3 +4310,93 @@ make hidden enemies targetable or silently change the random draw.
 mex/wind, separately from recruitment; retain the nine/two-bomber Supreme
 dispatch evidence. Glacial's full verdict remains FAIL for TECH invariants
 (KI-472). See [D-179 run details](air-opening-recon-plan.md).
+
+
+### KI-486 - AIR build-power targets lack sustained spending-gap feedback
+
+**Problem.** Gross-income ratios and an instantaneous 75%-bank boost replace
+TECH's rising/full-bank response. Constructor and support targets are independent;
+constructor ceilings have no sustained-overflow exception.
+
+**Proposed solution.** Share pure pressure/spending-gap arithmetic, preserving
+TECH's outcomes. Allocate funded reachable capacity once, including queued BP
+and lab reserves. Existing usage/transfer bindings suffice; do not count receipts
+twice. This refines the unresolved overflow symptom in KI-442.
+
+**Verification.** Current helper probes confirm threshold behavior. Matched
+natural/donation games must measure actual spending, trend and idle BP. See
+[review R1 and design](reviews/2026-10-03-air-build-power-review.md#r1--high-air-has-targets-but-no-sustained-spending-gap-response-ki-486). Not fixed.
+
+### KI-487 - AIR opening and lab budgets can suppress funded workforce growth
+
+**Problem.** Workforce recruitment requires no opening-support, opening-bomber
+or first-lab saving hold. OpeningSupportBudget does not check Nano affordability:
+a funded constructor can lose to an unfunded turret.
+
+**Proposed solution.** Reserve concrete funded support/lab costs; let a proven
+workforce shortage compete without starving the milestone. Preserve transports,
+three opening constructors, fighter screen and raid prerequisites.
+
+**Verification.** Helpers reproduce the funding mismatch. Retained Glacial has
+three workers versus target seven at 6.10 minutes, expanding at 7.05. Add per-gate
+reasons before attributing every delayed second. See
+[review R2](reviews/2026-10-03-air-build-power-review.md#r2--high-opening-and-lab-savings-override-funded-constructor-demand-ki-487). Not fixed.
+
+### KI-488 - AIR factory turrets can mask missing economic support
+
+**Problem.** The eco snapshot credits all static assist BP within 2,400 elmos,
+including occupied factory support outside reactor reach. AIR's reactor/converter
+modules lack their own turret bank; Nano only fills factory bays.
+
+**Proposed solution.** Add economy-local support reservations and separate
+production/economy ownership. Credit reachable available power once, preserving
+factory twenty-turret accounting and allied layout exclusions.
+
+**Verification.** Reservation/snapshot/assignment paths are source-confirmed.
+Play separated-district fixtures demonstrating reactor assistance while factory
+support produces aircraft. See
+[review R3](reviews/2026-10-03-air-build-power-review.md#r3--high-factory-power-is-treated-as-economic-capacity-across-districts-ki-488). Not fixed.
+
+### KI-489 - AIR support parallelism and shared chooser use conflicting budgets
+
+**Problem.** AIR permits one support project, or three while floating, regardless
+of greater funded capacity. Shared growth can choose reactor assistance using
+TECH's broad lower static target before AIR's support target is serviced.
+
+**Proposed solution.** Derive one funded request and capacity-based batch before
+choosing work; allocate by district. Preserve existing-project funding and twenty
+completed support turrets per existing T2 lab.
+
+**Verification.** A helper probe confirms the fixed ceiling; ordering is
+source-confirmed. Compare queue/completion rates and stalls in one- and six-lab
+fixtures. See
+[review R4](reviews/2026-10-03-air-build-power-review.md#r4--medium-airs-support-batch-rule-and-chooser-disagree-ki-489). Not fixed.
+
+### KI-490 - AIR assistance admission ignores surplus and arriving work
+
+**Problem.** Fixed 120-second reactor/12-second small-project horizons reject
+extra assistants irrespective of metal accumulation. Assigned nominal BP includes
+workers travelling to the task, potentially hiding a local shortage.
+
+**Proposed solution.** Size assistance from affordable spend and remaining work;
+measure progress and arriving capacity. Preserve travel bounds and diagnose
+no-progress workers through KI-443 rather than only adding aircraft.
+
+**Verification.** A helper probe rejects extra BP for the review's 80%-complete
+AFUS example. Test partial reactors with high/low banks, energy stalls and delayed
+workers. See
+[review R5](reviews/2026-10-03-air-build-power-review.md#r5--medium-fixed-assistance-horizons-cap-usable-economic-power-ki-490). Not fixed.
+
+### KI-491 - Native recruit priority can override funded AIR workforce priority
+
+**Problem.** CRecruitTask lowers engine/BAR resource priority when metal pull is
+at least twice average income, without a bank or BUILDPOWER exception. It includes
+script HIGH constructors. Resulting starvation in reported games is not proven.
+
+**Proposed solution.** Reproduce a funded recruit beside a high-pull frame. If
+confirmed, expose a script opt-in for funded workforce priority; preserve native
+defaults for TECH and other roles.
+
+**Verification.** Observe resource priority and actual progress under matched
+low/high-pull conditions, then run TECH/static-task regressions. See
+[review R6](reviews/2026-10-03-air-build-power-review.md#r6--medium-native-recruitment-can-lower-a-funded-constructors-priority-ki-491). Not fixed.
