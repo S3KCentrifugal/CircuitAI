@@ -3995,3 +3995,159 @@ the metal-economy patch.
 
 **Verification.** Reproduced with check_unit_helpers.py against BAR 1d267c20d1.
 The separate eight broken hover.md links are already recorded as KI-404.
+
+
+### KI-474 - Strike planning retains nested candidate/AA scans
+
+**Severity.** Medium (scaling/verification).
+
+**Location.** CAirWaveTask::PickStrikeTarget and PlanIngress in
+[AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp).
+
+**Problem.** The existing strategic picker evaluates routes and local AA for
+each eligible enemy target; T1 economy clustering also scans nearby peaceful
+units per candidate. This is not O(n) in total known enemy population. D-171
+reduces command and per-unit controller work but does not prove an FPS bound
+for this less frequent planning pass in a large 8v8 game.
+
+**Proposed solution.** Profile planner p95/p99 separately from per-frame flight
+updates, then reuse a spatial AA/economy index or cell summaries for the current
+enemy snapshot. Avoid silently discarding a valid weak route through a fixed
+top-target cap. Keep candidate priorities and policy weights script-controlled.
+
+**Verification.** Compare target choices, route safety, planning CPU and command
+counts with many bases/AA and 8v8 natural games. The five-map supplied fixtures
+measure behavior and commands, not host-independent FPS.
+
+### KI-475 - Escort lead is geometric rather than an exact speed lock
+
+**Severity.** Medium (formation limitation).
+
+**Location.** CAirWaveTask::IssueOperationLeg and CCircuitUnit::CmdWantedSpeed.
+
+**Problem.** The engine adapter's wanted-speed command is a no-op. D-171 places
+fighters ahead on each cohort leg and waits for actual assembly arrivals, but
+fixed-wing aircraft circle around their destinations. This cannot guarantee
+that every fighter stays ahead on every simulation frame, nor force enemy AA
+to target fighters instead of bombers.
+
+**Proposed solution.** Measure escort/bomber positions and interception under
+turning/reload behavior, then evaluate engine-supported speed/formation commands
+or event-based lead corrections without per-frame per-aircraft order spam.
+Keep committed ownership regardless of later friendly-territory raids.
+
+**Verification.** Track actual lead distribution and AA hits across aircraft
+types, long edge routes, large waves and fixed-wing turns alongside APM. Do not
+claim exact shield behavior from formation destinations alone.
+
+
+### KI-476 - UnitDef numeric lookup has an off-by-one validity boundary
+
+**Problem.** `CCircuitAI::IsValidUnitDefId` accepts zero and rejects the final
+one-based UnitDef ID, while the checked lookup indexes `defsById[id-1]`.
+D-171's loaded gantry-roster enumeration starts at one and skips a null result;
+it cannot recover the final definition. Existing string lookups are separate.
+Source-verified in [CircuitAI.h](../src/circuit/CircuitAI.h); native code not changed.
+
+**Proposed solution.** Validate `id >= 1 && unsigned(id) <= defsById.size()`
+at the shared numeric boundary; test negative, zero, first, last and last+1
+with an actual registry and the AngelScript wrapper. Review callers before
+changing the shared mechanism; never map zero to the first definition.
+
+**Verification.** Add a boundary regression and run all profiles' initialization
+and loaded-roster tests. D-171 confirms Shiva admission and Telchine exclusion
+in game, but does not claim to fix this pre-existing shared API issue.
+
+### KI-477 - AIR total command traffic and 8v8 FPS remain unbounded
+
+**Problem.** D-171's final supplied-combat cases peak at 1186-1265 aircraft
+orders per minute. A final natural Legion repeat stays at 2857 aircraft but
+reaches 3136 total orders including builders. Older natural runs exceed 3000
+aircraft orders. A fixed-bin APM measure is not network bandwidth, rolling
+peak or host FPS. Group-order calls are not an engine batch-send mechanism.
+
+**Proposed solution.** Profile real 8v8 callback and command p95/p99 with
+per-command/per-UnitDef attribution. Suppress unchanged builder/static state
+commands and retain live attack/path queues; cache planning aggregates with
+explicit revisions (KI-464/474). Preserve immediate new-threat response and
+do not introduce a global action cap. Compare matched seeds and populations.
+
+**Verification.** Use the independent
+[command observer](../tools/playtest/widgets/air_command_watch.lua) and the
+[D-171 results](air-committed-operations-results.md). Final combat and a clean
+Legion natural game verify functional reductions, not a universal sub-3000
+or no-FPS-impact guarantee.
+
+### KI-478 - Cancelled AIR reactor engine order could outlive its task
+
+**Problem.** The D-171 Supreme natural repeat selected a fusion while mexes
+were complete, cancelled it at frame 52980 after an upgrade became pending,
+then still framed the reactor at 53079 (INV-077). Native task cancellation
+does not itself clear the travelling constructor's engine queue.
+
+**Applied solution.** `AirBuild::CancelUnstarted` stops only the task's current
+assignees before aborting. AIR uses it for invalid reactors, unsupported new
+labs and unclaimed native building orders. Completed/framed work and units
+owned by another task are untouched; TECH semantics stay unchanged.
+
+**Verification.** All script graphs compile and the original log establishes
+the stale-command cause. The final natural Supreme repeat is recorded in
+[D-171 results](air-committed-operations-results.md). A natural run with no
+repeat is not a deterministic injected mex-arrival/cancellation regression;
+that lifecycle race and save/load coverage remain to be completed.
+
+**D-171 follow-up to KI-466.** The natural Legion trace shows a factory guard
+remaining in the engine while `commander.idle.energy` waits on path preparation.
+AIR now clears that command once at `Record`'s action handoff, and explicitly
+stops guards when returning advanced economy aircraft. The 45-minute final
+Legion Caldera repeat passes all enabled checks with no idle-guard violations.
+Broader lifecycle/save-load coverage remains open; no native/TECH guard rewrite.
+
+**D-171 follow-up to KI-461/467/472.** Income admission, nearby opening labs,
+three-mex ownership and constrained-campus fallback were implemented. Glacial
+now completes T2 lab at 15.18 and first T2 bomber at 18.44 minutes. Natural
+self-funded access and pre-twenty-minute raid consistency remain weak, and
+TECH invariants continue failing in mixed-role games. See the full
+[five-map results](air-committed-operations-results.md); preserve these failures.
+
+
+**D-171 final measured follow-up.** Stable cell target ownership still reaches
+3482 aircraft orders/minute in a 45-minute natural Tundra game (KI-477).
+About 186 fighters can accompany a three-bomber T1 raid under the owner's
+explicit all-fighter commitment policy; cohort movement still emits per-unit
+engine orders. Do not silently reduce escorts or cap urgent actions. The next
+optimization needs actual packet/CPU profiling and preservation of live queues.
+
+KI-461's Tundra transition also had a concrete capacity deadlock: the +21 metal
+income storage target was below the current 1350 bank, which could never hold
+the 2900-metal advanced lab. The pre-T2 storage exception now allows capacity
+for that loaded cost, with one pending store at a time and INV-118 admission.
+Its first natural repeat completes the advanced lab at 15.00 minutes, the first
+bomber at 20.59, fusion at 21.85 and AFUS at 34.83; team zero still launches no
+offensive wave before losing air control. The opposing AIR launches eight
+advanced waves and two radar sweeps. Timing and combat consistency stay open;
+the full result remains FAIL for TECH/ferry invariants (KI-472).
+
+The D-171 camera repair follows the actual factory, forces a complete controller
+state while rendering settles, and logs captured coordinates/height (KI-468).
+Only inspected base images are used as evidence. The idle-factory observer now
+counts continuous guard/repair of a completed idle lab, excluding unfinished
+factory construction and intervals spent doing other work. Original reports
+retain their raw failures rather than being retroactively declared passes.
+
+### KI-479 - Player-controlled radar planes can occupy the next recon cohort budget
+
+**Problem.** AIR's production target includes all owned radar planes, while its
+waiting cohort correctly excludes PLAYER tasks. Taking over one waiting plane
+can leave nineteen eligible planes and a total of twenty, suppressing the last
+replacement recruit. Source review only; not reproduced in the autonomous tests.
+
+**Proposed solution.** Account separately for eligible waiting aircraft, active
+sweeps, player ownership and pending factory orders, preserving the existing
+manual-control exclusion. Clear stale sweep accounting when its task ends.
+
+**Verification.** Inject human takeover/release and lost/returned sweep tasks in
+an isolated recon test. Require twenty AI-controlled planes before dispatch and
+no commands to the player-owned aircraft. See
+[the recon controller](../data/script/src/manager/air_recon.as) and
+[D-171 evidence](air-committed-operations-results.md).

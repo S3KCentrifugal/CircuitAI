@@ -10,6 +10,13 @@ local function log(s) Spring.Echo("[AirOpening] "..s) end
 local function invariant(s) Spring.Echo("[INVARIANT] INV-079 AIR observer: "..s) end
 local function cons(n) return n=="armca" or n=="corca" or n=="legca" end
 local function fighter(n) return n=="armfig" or n=="corveng" or n=="legfig" or n=="armhawk" or n=="corvamp" or n=="legvenator" end
+function widget:UnitDestroyed(id)
+    made[id]=nil; commandMemo[id]=nil
+    -- Recovery after the last plant dies is a new opening, not a commander
+    -- abandoning an existing factory. Keep first-opening timing separately.
+    if id==factory then factory=nil; idleSince=nil end
+    if id==commander then commander=nil; previous=nil end
+end
 function widget:UnitCreated(id,def,team,builder)
     if team~=0 then return end
     made[id]=builder
@@ -64,6 +71,8 @@ function widget:GameFrame(f)
     local spreadX,spreadZ,farX,farZ=math.huge,math.huge,0,0
     for _,id in ipairs(Spring.GetTeamUnits(0)) do
         local d=UnitDefs[Spring.GetUnitDefID(id)]
+        if not factory and (d.name=="armap" or d.name=="corap" or d.name=="legap"
+            or d.name=="armaap" or d.name=="coraap" or d.name=="legaap") then factory=id end
         if d.customParams and d.customParams.iscommander then commander=id end
         if fighter(d.name) then
             local _,_,_,_,p=Spring.GetUnitHealth(id)
@@ -103,18 +112,22 @@ function widget:GameFrame(f)
             local c=(Spring.GetUnitCommands(commander,1) or {})[1]
             if c then
                 local producing=Spring.GetUnitIsBuilding(factory)
+                local _,_,_,_,factoryProgress=Spring.GetUnitHealth(factory)
                 for _,q in ipairs(Spring.GetFactoryCommands(factory,8) or {}) do
                     if q.id<0 then producing=true end
                 end
-                if third and not producing then
+                -- Finishing the replacement factory itself is useful work;
+                -- it cannot yet have an aircraft production target or queue.
+                local guarding=(c.id==CMD.GUARD or c.id==CMD.REPAIR) and c.params[1]==factory
+                if third and factoryProgress and factoryProgress>=1 and not producing and guarding then
                     idleSince=idleSince or f
-                    if f-idleSince>300 and (c.id==CMD.GUARD or c.id==CMD.REPAIR) and c.params[1]==factory then
+                    if f-idleSince>300 then
                         Spring.Echo("[INVARIANT] INV-081 AIR observer: commander guards idle factory for over ten seconds")
                     end
-                    if f%300==0 and (c.id<0 or c.id==CMD.REPAIR) and c.params[1]~=factory then
-                        log("idle-factory-economy command="..c.id.." target="..tostring(c.params[1]))
-                    end
                 else idleSince=nil end
+                if third and not producing and f%300==0 and (c.id<0 or c.id==CMD.REPAIR) and c.params[1]~=factory then
+                    log("idle-factory-economy command="..c.id.." target="..tostring(c.params[1]))
+                end
                 if c.id==CMD.GUARD and not third then guarded=guarded+0.5 end
                 local key=c.id..":"..tostring(c.params[1])
                 if commandMemo[commander]~=key then
@@ -128,7 +141,7 @@ function widget:GameFrame(f)
                         if px and pz then log(string.format("commander-wind-distance=%.1f reach=%.1f",math.sqrt((px-x)^2+(pz-z)^2),cd.buildDistance or 0)) end
                     end
                 end
-            end
+            else idleSince=nil end
         end
     end
     if f%300==0 and fighters>0 then

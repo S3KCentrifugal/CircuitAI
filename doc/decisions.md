@@ -10216,3 +10216,151 @@ sibling knowledge repository.
 - [tools/playtest/widgets/metal_watch.lua](../tools/playtest/widgets/metal_watch.lua)
 - [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
 - [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
+
+## D-171 - Committed AIR operations, stable control groups and income admission
+
+**Call.** Experimental AIR uses opt-in native cohort/route mechanisms controlled
+by AngelScript. Offensive bombers remain airborne and attack until exhausted;
+all available fighters accompany a sortie and do not peel for a home incursion.
+The owner's explicit answer selects this over intercepting with committed
+escorts. Newly produced/uncommitted fighters remain home defenders. Defensive
+T3 sorties can return and repair. TECH's executor and lab rules are unchanged.
+
+**Reasoning.** Stable route versions, shared wall cells and persistent target
+orders remove needless per-aircraft refreshes. Recoil's GiveGroupOrder is a
+no-op, so logical groups are not a network-packet reduction by themselves.
+An early natural run exposed 3,254 AIR commands in one minute: TrySetIdleMode
+and TrySetFireState each emit a command even when unchanged. D-171 sets these
+states once on operation entry, not again on every movement leg or target.
+No general command rate limiter or delayed emergency decision is added.
+
+Sustained M/E affordability replaces the named two-AFUS bomber gate while the
+two-AFUS growth objective remains. A nearby temporary T1 lab avoids forcing
+the sole commander to a speculative campus. It is retired when idle, supported
+and affordable T2 access has a planned site; transport requests preempt this.
+Later T1 recovery uses a planned campus bay. The fighter/radar factory identity
+persists while that factory is valid, including when a new lab has a lower ID.
+
+**Alternatives rejected.** A global APM cap would suppress urgent responses.
+Moving every unit each tick defeats multiplayer efficiency. Holding excess
+T2 fighters at the factory wastes the home wall. Counting intentional losses
+as failed return missions suppresses the requested attrition doctrine. Forcing
+a large frontline assault into the 10-20 opening raid size can deadlock the
+first attack; the random size now applies to the first economy raid, while
+frontline and defensive missions have separate payload budgets.
+
+**Invariant.** INV-115 keeps committed escorts with their live operation;
+INV-116 forbids offensive RETURNING. INV-093 preserves friendly-territory
+interception; INV-102 checks sustained production income; INV-103 checks the
+opening economy draw and every mission's payload budget. Existing construction,
+transport, twenty-turret expansion, shared reservations and TECH invariants stay
+enabled. See the updated actor matrix and invariant register.
+
+Further full-game evidence found paired ATTACK/FIGHT orders. AIR's opt-in
+controllers now request only the persistent target; all other callers retain
+the native fallback. Legion replacement scouts transfer individually, avoiding
+whole-cell aborts. A three-owned-mex gate fixes the opening search-cap mistake;
+rotated smaller campuses fit constrained terrain while retaining complete
+support and aggregate six-lab planning. Large six-lab compounds stay preferred.
+
+Natural handoff failures also showed that cancelling an AI task does not clear
+its engine queue. AIR clears a commander factory guard once before another
+action waits for a path, stops a released T2 economy aircraft, and stops current
+assignees before cancelling an unstarted building. Changing all native guard
+semantics or TECH's builder ownership was rejected as unnecessary scope.
+
+Fighter cells now retain eligible contact IDs before assigning free cells; switching merely because contact indexes or positions move was rejected. The full natural repeat still reaches 3482 aircraft orders/minute, so this is not a universal APM bound. The storage transition fix reserves one pending metal store at a time when a nearly full pre-T2 bank cannot contain the loaded lab cost; lowering the income gate was rejected. INV-118 audits that narrow exception. The first natural Tundra repeat reaches T2 lab at 15.00 minutes after admitting its full bank at M10=16. The camera holds an explicit controller through render settling; the idle observer measures continuous guarding of a completed factory, avoiding false positives while finishing replacement labs.
+
+**Verification.** All three experimental script graphs compile; actual engine
+initialization succeeds. Native suites, 83 real AngelScript AIR policy tests,
+14 arena-validation tests and five independent audit tests pass. The final
+native build passes all five supplied-combat maps plus strict escort-incursion,
+defensive-return and blocked-backline cases. Forty-five-minute natural games
+were run on the same five non-metal maps; their full failures and repeats are
+retained in [the results](air-committed-operations-results.md). A final Legion
+natural repeat passes all enabled checks after the guard handoff fix. Normal
+economic timing and mixed-role TECH checks are not uniformly clean. Earlier
+invalid fixtures, an underfunded defensive case and a wall-time-limited run
+are not counted as successful acceptance tests. Save/load and 8v8 FPS remain
+unverified.
+
+**References.** [Design and PvP sources](air-committed-operations-plan.md),
+[results and screenshots](air-committed-operations-results.md),
+[machine-readable evidence](benchmarks/d171-air-operations.json).
+Escort lead is not an engine speed lock (KI-475); strike scans retain nested
+cost (KI-474), and total command/FPS bounds remain unproven (KI-477). The
+optional CIRCUIT_AS_INTERFACE dump and compile-only checker accelerate type/API
+feedback without replacing real initialization and gameplay.
+
+**Files touched.**
+- [data/script/src/global.as](../data/script/src/global.as)
+- [data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_operations.as](../data/script/src/manager/air_operations.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as)
+- [data/script/src/manager/air_recon.as](../data/script/src/manager/air_recon.as)
+- [data/script/src/manager/air_screen.as](../data/script/src/manager/air_screen.as)
+- [data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/air-committed-operations-plan.md](../doc/air-committed-operations-plan.md)
+- [doc/air-committed-operations-results.md](../doc/air-committed-operations-results.md)
+- [doc/air-wave-attacks.md](../doc/air-wave-attacks.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/benchmarks/d171-air-operations.json](../doc/benchmarks/d171-air-operations.json)
+- [doc/decisions.md](../doc/decisions.md)
+- [doc/images/d171/defensive-return.png](../doc/images/d171/defensive-return.png)
+- [doc/images/d171/frontline-strike.png](../doc/images/d171/frontline-strike.png)
+- [doc/images/d171/glitters-legion-strike.png](../doc/images/d171/glitters-legion-strike.png)
+- [doc/images/d171/tundra-island-strike.png](../doc/images/d171/tundra-island-strike.png)
+- [doc/images/d171/tundra-natural-opening.png](../doc/images/d171/tundra-natural-opening.png)
+- [doc/images/d171/tundra-natural-t2.png](../doc/images/d171/tundra-natural-t2.png)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/air_build.md](../doc/roles/air_build.md)
+- [doc/roles/air_rules.md](../doc/roles/air_rules.md)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/script/ScriptManager.cpp](../src/circuit/script/ScriptManager.cpp)
+- [src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h)
+- [src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp)
+- [src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp)
+- [src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h)
+- [src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp)
+- [src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp)
+- [tests/air_math_tests.as](../tests/air_math_tests.as)
+- [tests/production_math_test.cpp](../tests/production_math_test.cpp)
+- [tools/compile_script.cpp](../tools/compile_script.cpp)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/playtest/air_arena.py](../tools/playtest/air_arena.py)
+- [tools/playtest/air_arena_probe.as](../tools/playtest/air_arena_probe.as)
+- [tools/playtest/air_cases/blocked-backline.json](../tools/playtest/air_cases/blocked-backline.json)
+- [tools/playtest/air_cases/committed-home-incursion.json](../tools/playtest/air_cases/committed-home-incursion.json)
+- [tools/playtest/air_cases/defensive-t3.json](../tools/playtest/air_cases/defensive-t3.json)
+- [tools/playtest/analyze_air_natural.py](../tools/playtest/analyze_air_natural.py)
+- [tools/playtest/analyze_air_operations.py](../tools/playtest/analyze_air_operations.py)
+- [tools/playtest/checks/air_arena.json](../tools/playtest/checks/air_arena.json)
+- [tools/playtest/checks/air_committed_incursion.json](../tools/playtest/checks/air_committed_incursion.json)
+- [tools/playtest/checks/air_compile.json](../tools/playtest/checks/air_compile.json)
+- [tools/playtest/checks/air_defensive.json](../tools/playtest/checks/air_defensive.json)
+- [tools/playtest/checks/air_frontline.json](../tools/playtest/checks/air_frontline.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_air_operations_cases.py](../tools/playtest/prepare_air_operations_cases.py)
+- [tools/playtest/run_air_natural.py](../tools/playtest/run_air_natural.py)
+- [tools/playtest/test_air_operations.py](../tools/playtest/test_air_operations.py)
+- [tools/playtest/widgets/air_arena.lua](../tools/playtest/widgets/air_arena.lua)
+- [tools/playtest/widgets/air_command_watch.lua](../tools/playtest/widgets/air_command_watch.lua)
+- [tools/playtest/widgets/air_opening_watch.lua](../tools/playtest/widgets/air_opening_watch.lua)
+- [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)

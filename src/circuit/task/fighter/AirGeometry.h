@@ -4,6 +4,19 @@
 #include <cmath>
 namespace circuit::air_geometry {
 struct Slot { float lateral; float behind; };
+inline bool PreferDistrictTarget(bool committed, bool local, bool bestLocal, float score, float bestScore)
+{
+    if (committed && local != bestLocal) return local;
+    return score > bestScore;
+}
+// Short cohort legs bound how far faster escorts can run ahead. A leg is
+// longer than the arrival disc, so successive arrivals require real progress.
+inline int CohortLegCount(float distance, float arrivalRadius)
+{
+    if (!std::isfinite(distance) || !std::isfinite(arrivalRadius) || distance <= 0.f) return 1;
+    const float length = std::max(1024.f, std::max(0.f, arrivalRadius) * 2.f);
+    return std::clamp(int(std::min(256.f, std::ceil(distance / length))), 1, 256);
+}
 // Travel is separate from the script's settling allowance. Clamp before any
 // float-to-frame conversion; malformed inputs must not create infinite waits.
 inline float TransitSeconds(float distance, float speed)

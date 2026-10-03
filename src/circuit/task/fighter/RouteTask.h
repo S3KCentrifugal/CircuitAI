@@ -37,6 +37,9 @@ public:
 
 	// Script hooks
 	void SetRoute(std::vector<springai::AIFloat3>&& waypoints);
+    // AIR opts into exact final-route deduplication and transient ownership.
+    void SetAirControl(bool enabled) { airControl = enabled; }
+    void SetAirTarget(int id) { if (airControl && airTarget != id) { airTarget = id; ++version; dirty = true; } }
     bool SetUnitRoute(CCircuitUnit* unit, std::vector<springai::AIFloat3>&& waypoints, float radius);
 	/*
 	 * Per-unit lane spread. The route is one line; each unit assigned to the
@@ -86,6 +89,10 @@ private:
 	bool fightAtEnd = false;
 	bool patrol = false;
     bool holdPosition = false;
+    bool airControl = false;
+    bool hadAssignee = false;
+    int airTarget = -1;
+    std::map<CCircuitUnit*, int> issuedVersion;
 };
 
 } // namespace circuit

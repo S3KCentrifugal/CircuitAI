@@ -26,7 +26,7 @@ namespace AirGrowth {
             if (reactor !is null) break;
         }
         s.energyGoal = AiMax(EcoPlanner::TargetEnergy(s.mIncome), AirEconomy::demandE * 1.3f);
-        if (!AirEconomy::MassBombers()) s.energyGoal = AiMax(s.energyGoal, s.eIncome + 1.0f);
+        if (!AirEconomy::GrowthComplete()) s.energyGoal = AiMax(s.energyGoal, s.eIncome + 1.0f);
         // AIR can retain small, local T1 energy orders while its flying crew
         // scales reactors elsewhere. Generic ENERGY queues must not lock out
         // this district; only real owned reactor commitments serialize it.
@@ -40,7 +40,7 @@ namespace AirGrowth {
         string key = EcoPlanner::Decide(s, why);
         // The growth goal outranks a full bank's ordinary 'no more energy' answer,
         // after surplus conversion/build power have had their shared decisions.
-        if (key.length() == 0 && s.builderIsT2 && !AirEconomy::MassBombers() && !s.energyBuilding)
+        if (key.length() == 0 && s.builderIsT2 && !AirEconomy::GrowthComplete() && !s.energyBuilding)
             key = EcoPlanner::PickEnergy(s, why, "two-AFUS objective");
         IUnitTask@ task = null;
         if (key == "nano") @task = AirBuild::Nano(u);
@@ -59,7 +59,7 @@ namespace AirGrowth {
         // A shared chooser answer may be temporarily unexecutable (for example
         // support already claimed by another worker). A full bank after the
         // bomber milestone must still permit funded, serial economic growth.
-        if (task is null && s.builderIsT2 && AirEconomy::MassBombers() && AirEconomy::MexesReady()) {
+        if (task is null && s.builderIsT2 && AirEconomy::GrowthComplete() && AirEconomy::MexesReady()) {
             CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
             if (AirBuild::Can(u, d) && AirMath::OverflowGrowth(AirEconomy::MetalFloating(), AirEconomy::recovery,
                 s.energyBuilding || AirBuild::Busy(d, Task::BuildType::ENERGY), s.mCur, s.eCur, s.mIncome, s.eIncome,

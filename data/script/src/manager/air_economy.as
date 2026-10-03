@@ -18,13 +18,13 @@ namespace AirEconomy {
 
     bool Active() { return Global::AISettings::Role == AiRole::AIR && AirLayout::enabled; }
     bool TechGrowth() { return !MetalEconomy::Active() && aiTerrainMgr.GetLayoutInt("air.techGrowth", 0) != 0; }
+    bool GrowthComplete() { return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0; }
     bool MassBombers() {
-        if (MetalEconomy::Active()) {
-            CCircuitDef@ bomber = ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side));
-            return t2 > 0 && bomber !is null && bomber.costM > 0
-                && MetalMath::Sustainable(metal, energy, 30, bomber.costE / bomber.costM) >= 30;
-        }
-        return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0;
+        CCircuitDef@ bomber = ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side));
+        const float floor = Global::RoleSettings::Air::BomberSustainableMetal;
+        return t2 > 0 && bomber !is null && bomber.costM > 0
+            && AirMath::SustainedProduction(Economy::IncomeWindowReady(), Economy::GetMinMetalIncomeLast10s(),
+                Economy::GetMinEnergyIncomeLast10s(), floor, bomber.costE / bomber.costM, 30);
     }
     int CompletedAfus() {
         int count = 0;
@@ -43,9 +43,9 @@ namespace AirEconomy {
             aiTerrainMgr.SetLayoutInt("air.techGrowth", 1);
             GenericHelpers::LogUtil("[AIR][Growth] shared TECH economy enabled at M10=" + Economy::GetMinMetalIncomeLast10s(), 1);
         }
-        if (!MassBombers() && AirMath::MassBombersReady(CompletedAfus(), Global::RoleSettings::Air::MassBomberAfusCount)) {
+        if (!GrowthComplete() && AirMath::MassBombersReady(CompletedAfus(), Global::RoleSettings::Air::MassBomberAfusCount)) {
             aiTerrainMgr.SetLayoutInt("air.massBombers", 1);
-            GenericHelpers::LogUtil("[AIR][Growth] mass bombers enabled; completed AFUS=" + CompletedAfus(), 1);
+            GenericHelpers::LogUtil("[AIR][Growth] growth objective reached; completed AFUS=" + CompletedAfus(), 1);
         }
     }
     bool HasReactor()
@@ -111,6 +111,16 @@ namespace AirEconomy {
     {
         CCircuitDef@ d = ai.GetCircuitDef(name);
         return d is null ? 0 : d.count;
+    }
+    bool HasMobileConstructor()
+    {
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u !is null && u.GetBuildProgress() >= 1.0f && u.circuitDef.IsMobile()
+                && u.circuitDef.GetBuildSpeed() > 0.0f && !UnitHelpers::IsCommander(u.circuitDef)) return true;
+        }
+        return false;
     }
     int CompletedConstructors()
     {
@@ -340,7 +350,8 @@ namespace AirEconomy {
     {
         if (MetalEconomy::Active()) return t2 == 0 ? MetalEconomy::AirScreenReady()
             : MetalEconomy::Funded(plant) && MetalMath::Sustainable(metal, energy, 30, 40) >= 15;
-        return plant !is null && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
+        return plant !is null && (BankedLab(plant) || Economy::GetMinEnergyIncomeLast10s() >= Global::RoleSettings::Air::TransitionMinEnergy)
+            && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
             Economy::IncomeWindowReady(), Global::RoleSettings::Air::TransitionMinMetal, aiEconomyMgr.metal.current, plant.costM);
     }
     int NanoTarget(uint bay)

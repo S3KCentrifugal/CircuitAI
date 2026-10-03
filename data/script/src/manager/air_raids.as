@@ -35,7 +35,7 @@ namespace AirRaids {
             int survivors = 0;
             array<string>@ ids = cohort.getKeys();
             for (uint i = 0; i < ids.length(); ++i) if (ai.GetTeamUnit(parseInt(ids[i])) !is null) ++survivors;
-            GenericHelpers::LogUtil("[AIR][Raid] returned cohort=" + cohort.getSize() + " survivors=" + survivors, 1);
+            GenericHelpers::LogUtil("[AIR][Raid] exhausted cohort=" + cohort.getSize() + " survivors=" + survivors, 1);
             cohort.deleteAll(); joining.deleteAll(); @wave = null;
         }
         if (int(held.getSize()) < Global::RoleSettings::Air::T1RaidMinimum
@@ -50,6 +50,7 @@ namespace AirRaids {
             Global::RoleSettings::Air::StrikeEdgeInset, Global::RoleSettings::Air::StrikeUnknownReserve,
             Global::RoleSettings::Air::StrikeRiskScale, Global::RoleSettings::Air::StrikeArmyReserve,
             Global::RoleSettings::Air::StrikeLocalAaReserve, false);
+        AirOperations::Configure(wave, true, 2);
         if (!wave.PickStrikeTarget(Global::Map::StartPos, 2, 30.0f, false)) {
             wave.Abort(); @wave = null; return;
         }
@@ -60,12 +61,11 @@ namespace AirRaids {
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
             if (u is null) continue;
-            joining.set(ids[i], true); cohort.set(ids[i], true);
-            if (u.task !is null && tasks.findByRef(u.task) < 0) tasks.insertLast(u.task);
+            if (aiMilitaryMgr.TransferUnit(u, wave)) cohort.set(ids[i], true);
         }
         held.deleteAll();
-        for (uint i = 0; i < tasks.length(); ++i) tasks[i].Abort();
-        GenericHelpers::LogUtil("[AIR][Raid] launched bombers=" + joining.getSize() + " target=" + wave.GetStrikeTargetId(), 1);
+        const int escorts = AirOperations::AttachFighters(wave);
+        GenericHelpers::LogUtil("[AIR][Raid] launched bombers=" + cohort.getSize() + " escorts=" + escorts + " target=" + wave.GetStrikeTargetId(), 1);
     }
     void Removed(int id) { held.delete("" + id); joining.delete("" + id); }
     void Reset()

@@ -1,3 +1,8 @@
+Experimental AIR now uses [D-171 committed operations](air-committed-operations-plan.md):
+offensive sorties keep attacking, all available fighters escort them, and
+income gates bomber production. The historical modes and return behavior
+below remain available to legacy callers.
+
 # Air wave attacks
 
 **D-162 experimental AIR override.** The legacy description below applies to

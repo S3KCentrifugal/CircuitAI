@@ -5,6 +5,26 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+D-171 committed AIR tests: `prepare_air_operations_cases.py --output
+build-theatres/air-cases` generates supplied combat fixtures for five non-metal
+maps. Run each with `air_arena.py run --case <json> --map <name> --side <faction>
+--defender <faction> --dll <pinned-dll>`. `committed-home-incursion` verifies escort
+ownership while an enemy raid appears at home; `defensive-t3` supplies one near
+home heavy-unit incursion with real sight coverage. The arena's `once` and
+`after_seconds` group fields support transient incursions without infinite
+target replacement. `analyze_air_operations.py` separates actual bomber damage
+and last-hit kills from the AI target cache's disappearance counters.
+
+`run_air_natural.py --dir build-theatres/air-natural --dll <pinned-dll> --headless`
+runs 45-minute ordinary-resource games on the same five maps. Glacial and the
+north of Tundra need explicit test role assignments; Caldera uses an AIR duel
+because its table has no TECH land start. `natural-fixture.json` records this.
+Use `analyze_air_natural.py <write-dir>` for milestones and AIR command counts.
+Counts are fixed sixty-game-second bins, not a rolling-window or FPS guarantee.
+Headless staging disables automatic thread pinning only in that write directory:
+multiple Recoil copies otherwise pin every main thread to the same preferred
+CPU. Record host contention and affinity changes when comparing wall times.
+
 D-170 metal maps: `prepare_metal_check.py --map "Full Metal Plate 1.7"
 --output build-theatres/metal-map.as` supplies explicit start/role fixtures.
 Stage with that `--map-file`, `--roles AIR,TECH`, `--minutes 30`, and
@@ -643,3 +663,11 @@ transport delivery, construction, radar-plane missions and specialist payload
 coordination need their own acceptance criteria. Legion's T1 preset uses its
 gunship, not a fictitious level bomber. See the [plan](../../doc/air-combat-arena-plan.md)
 and [measured results](../../doc/air-combat-arena-results.md).
+
+For committed AIR operations, `committed-home-incursion` checks that all living
+escorts stay assigned during a home raid. `defensive-t3` supplies enough payload
+for a Shiva and requires an actual hit and completed home return.
+`blocked-backline` supplies heavy economic AA and requires a frontline plan and
+actual artillery damage. These cases select their own strict checks. The
+five-map generator and natural-game runner are documented with their evidence
+in [D-171 results](../../doc/air-committed-operations-results.md).

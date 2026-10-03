@@ -417,3 +417,21 @@ producer alone admits them, and original caps are restored after the call.
 | Dense mex module | MetalLayout::Plan/Build/Release, TerrainManager::PlanMexCluster, BuilderTask::PinReservation, MexTask::Execute | Eight snapped slots plus envelope; atomic rollback; task blocker-to-slot handoff; first-use relocation; INV-112. |
 | Opening workforce | MetalEconomy::Read/DedicatedTask/OpeningWorker, AirTask, TechRules at power.t1 and Trace | Saved first three T1 constructor IDs, death replacement, forty-mex and power assignments, initial third-constructor TECH transition after lab reclaim precedence; INV-113 prevents discretionary front/defense diversion. |
 | AIR initial screen | MetalEconomy::AirScreenReady, AirEconomy::Transition, AirProduction | Completed fighter count reaches configured HomeFighterFloor; saved latch permits first T2 immediately. Existing twenty-nano gate remains for later labs. |
+
+## D-171 AIR committed operations
+
+`AirRules::transition.storage` lets a full pre-T2 metal bank expand to the
+loaded lab cost, after mex upgrades and before optional spending. It changes
+storage capacity only; factory income/banked-cost admission remains authoritative.
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Fighter group | AirScreen, AirOperations, AirProduction, CRouteTask | One live shared wall task or one committed wave per fighter; direct member transfers, persistent final commands; INV-115. |
+| Bomber operation | AirRaids, AirWaves, AirOperations, CAirWaveTask | Immutable bomber membership, cohort formation and travel, prioritized targets, no offensive return; INV-116. Defensive T3 whitelist comes from loaded gantry build edges. |
+| Radar cohort | AirRecon, AirProduction, CRouteTask | One designated completed T2 factory, friendly wall until twenty aircraft, synchronized persistent enemy sweep, next production cycle ten minutes after dispatch. |
+| Opening lab | AirBuild::NearbyStarter/RetireStarter/Factory, AirLayout::PlanAhead, AirProduction, Lifecycle | Starter claimed near the lone commander before speculative campuses; shared retirement state stops production; planned T1 rebuild follows completed advanced construction capability. TECH rows unchanged. |
+| Production readiness | AirEconomy, AirMath::SustainedProduction, AirGrowth | Ten-second metal/energy minima gate bomber production; completed AFUS count remains a separate economic objective. INV-102 updated. |
+| AIR campus search | AirLayout::Reserve/Activate/PlanAhead, AirBuild::Factory, AirMath::CampusSize | Six-site plans first; rotated one/three-site terrain fallbacks retain twenty turret pins per T2 bay and aggregate future capacity. Builder requests respect the failed-search cooldown. INV-084/109. |
+| Normal opening mex count | AirRules::MakeTask, AirEconomy::MexCount, AirBuild::Record | Three owned extractors end the opening mex stage. Native maxSpots only bounds candidate search. Metal maps keep their separate forty-mex sequence. INV-117. |
+| Legion replacement scout | AirProduction::Tick/HomeTask, AirScreen, MilitaryManager::TransferUnit | Transfer one drone to the scout route without aborting its shared wall cell. Other group members retain their tasks. |
+| AIR engine-command handoff | AirBuild::Record/ReturnEconomyWorkers/CancelUnstarted/Tick, native task removal, opening/eco observers | Clear the old command once when relinquishing a factory guard or cancelling an unstarted building. Stop only actual assignees; retain PLAYER and reassigned workers, framed projects and TECH semantics. INV-077/081/106. |

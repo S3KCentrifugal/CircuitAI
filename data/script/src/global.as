@@ -990,6 +990,7 @@ namespace Global {
             float BuildPowerBankDrainSeconds = 60.0f;
             float WindClusterGap = 144.0f;
             int EconomySearchRings = 24;
+            int CompactCampusAfterSeconds = 180; // rough land: rotate/narrow/split failed six-lab plans
             int FirstFusionTargetSeconds = 20 * 60;
             int FirstFusionLeadSeconds = 12 * 60;
             int PreFusionMexLimit = 6;
@@ -1018,7 +1019,13 @@ namespace Global {
             int FirstBomberWaveMin = 10;
             int FirstBomberWaveMax = 20;
             float TechEconomyMinMetal = 50.0f;
-            int MassBomberAfusCount = 2;
+            int MassBomberAfusCount = 2; // economic growth goal, not a production gate
+            float BomberSustainableMetal = 30.0f;
+            float StrikeEscortLead = 480.0f;
+            float StrikeBacklineRiskLimit = 500.0f;
+            float StrikeDistrictRadius = 1800.0f;
+            int RadarWaveSize = 20;
+            int RadarWaveIntervalSeconds = 600;
             int MassBomberOrdersClear = 8;
             int MassBomberOrdersParity = 5;
             float StrikeReserveSeconds = 120.0f;

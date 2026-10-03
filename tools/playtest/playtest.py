@@ -208,6 +208,16 @@ def stage(args):
         "WindowPosY": "0",
         "LogFlush": "1",
     }
+    if getattr(args, "lean_render", False):
+        # Local test output only. Never alter the player's installation settings.
+        overrides.update({"CompressTextures":"0", "MSAALevel":"0", "Shadows":"-1",
+                          "Water":"0", "GrassDetail":"0", "GroundDetail":"60",
+                          "CubeTexSizeReflection":"128", "CubeTexGenerateMipMaps":"0",
+                          "VSync":"0", "VSyncGame":"0", "IdleFpsDivider":"0", "ThreadPinPolicy":"0"})
+    if args.headless:
+        # Concurrent headless engines otherwise choose the same preferred main
+        # core. Let the OS schedule these isolated test threads independently.
+        overrides["ThreadPinPolicy"] = "0"
     out = []
     seen = set()
     for line in lines:
@@ -734,6 +744,7 @@ def add_script_args(p):
     p.add_argument("--engine", help="engine folder name under the install's engine/ (default: the one the lobby used last)")
     p.add_argument("--bonus", default=None, help="handicap percent for team 0 only (e.g. 50); benchmarks run at 0")
     p.add_argument("--extra-widget", action="append", help="an extra LuaUI widget to stage into the playtest write dir (repeatable)")
+    p.add_argument("--lean-render", action="store_true", help="reduce graphics memory in this isolated write directory")
     p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window; widgets, speed and [Playtest] lines still work; screenshots are blank 187-byte PNGs")
 
 

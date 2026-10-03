@@ -27,6 +27,8 @@
 #include "angelscript/add_on/scriptdictionary/scriptdictionary.h"
 #include "angelscript/add_on/scriptmath/scriptmath.h"
 #include "angelscript/add_on/scriptbuilder/scriptbuilder.h"
+#include "angelscript/add_on/scripthelper/scripthelper.h"
+#include <cstdlib>
 #include "angelscript/add_on/aatc/aatc.hpp"
 
 #ifdef _WIN32
@@ -226,6 +228,12 @@ void CScriptManager::Release()
 
 bool CScriptManager::Load(const char* modname, const std::string& subdir, const std::string& filename)
 {
+    // Explicit local-tooling opt-in. Export declarations and compiler settings,
+    // never game state, so policy can be type-checked without reloading assets.
+    if (const char* output = std::getenv("CIRCUIT_AS_INTERFACE")) {
+        const std::string path = std::string(output) + "." + modname + ".cfg";
+        WriteConfigToFile(engine, path.c_str());
+    }
 	// The CScriptBuilder helper is an add-on that loads the file,
 	// performs a pre-processing pass if necessary, and then tells
 	// the engine to build a script module.

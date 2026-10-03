@@ -1,5 +1,40 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    bool TransitionStorage(bool advancedPlant, float bank, float capacity, float labCost)
+    {
+        return !advancedPlant && Valid(bank) && Valid(capacity) && Valid(labCost)
+            && capacity>0 && labCost>capacity && bank>capacity*0.85f;
+    }
+    // Snapshot indexes can change while the same enemy is still alive.
+    int RetainedContact(int current, const array<int> &in ids, const array<float> &in remaining)
+    {
+        if (current < 0 || ids.length() != remaining.length()) return -1;
+        for (uint i=0;i<ids.length();++i)
+            if (ids[i]==current && Valid(remaining[i]) && remaining[i]>0) return int(i);
+        return -1;
+    }
+    int CampusSize(bool compact, int variant)
+    {
+        if (!compact || variant < 0) return 6;
+        return variant % 3 == 0 ? 6 : variant % 3 == 1 ? 3 : 1;
+    }
+    int OperationSize(int available, int required, bool openingDone, int opening,
+        bool front, bool defensive, int laterMinimum)
+    {
+        if (available <= 0 || required < 0 || opening <= 0 || laterMinimum <= 0) return 0;
+        int count = opening;
+        if (defensive) count = required > 3 ? required : 3;
+        else if (front) count = available;
+        else if (openingDone) count = required > laterMinimum ? required : laterMinimum;
+        return count >= required && count <= available ? count : 0;
+    }
+    bool SustainedProduction(bool ready, float minimumMetal, float minimumEnergy,
+        float requiredMetal, float energyPerMetal, float reserveEnergy)
+    {
+        return ready && Valid(minimumMetal) && Valid(minimumEnergy) && Valid(requiredMetal)
+            && requiredMetal > 0 && Valid(energyPerMetal) && energyPerMetal > 0 && Valid(reserveEnergy)
+            && minimumMetal >= requiredMetal && minimumEnergy >= requiredMetal*energyPerMetal+reserveEnergy;
+    }
     bool PendingReactor(bool reactor, bool construction, bool hasTarget, float progress)
     {
         return reactor && construction && (!hasTarget || (Valid(progress) && progress < 1.0f));

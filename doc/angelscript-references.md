@@ -1715,3 +1715,11 @@ layout state. Membership is 1..8 in each dimension. Policy reads `name + ".n"`,
 `.slot.N`, `.zone`, and `.started`; failed commits roll back their slots.
 MetalLayout chooses eight-mex modules, replans blocked unused modules and
 preplans at least forty sites. Extra demand may add further modules.
+
+## D-171 AIR operation and compile tooling API
+
+`CRouteTask.SetAirControl(bool)` opts into equal-route suppression, target identity tracking and empty-group cleanup. `SetAirTarget(int)` replaces repeated intercept-coordinate orders with a persistent enemy ID; -1 resumes the shared route. `aiBattle.GetAirContactId(int)` resolves a current observed contact. Defaults preserve legacy route behavior.
+
+`CAirWaveTask.SetOperationPolicy(bool offensive, int preference, const AIFloat3& assembly, float escortLead, float routeCeiling, float districtRadius)` enables the separate operation state machine. `AllowStrikeDef(CCircuitDef@, float)` supplies script priorities and allowed T3 defense definitions. `AddSearchPoint` supplies enemy-base search anchors. Bomber definitions come from `SetStrikePolicy`/`ConsiderStrikeAircraft`; escorts use the same task but are not counted as bombers. `GetBomberCount` exposes that distinction. `GetDamageDealt` currently reports observed target-health loss, including other attackers, and `GetTargetsDestroyed` counts disappeared target identities; neither is authoritative kill attribution. Use the arena damage observer for that.
+
+For offline type checking, set `CIRCUIT_AS_INTERFACE` to an explicit local output prefix for one engine launch. ScriptManager writes `<prefix>.init.cfg` and `<prefix>.main.cfg` containing declarations/compiler settings, without game state. `tools/compile_script.cpp` compiles a profile against this snapshot without executing policy or global initializers. Regenerate the snapshot after native API changes; an engine run remains necessary to validate initialization and behavior.

@@ -90,11 +90,16 @@ end
 
 local function lookAt(x, z, height)
 	local y = Spring.GetGroundHeight(x, z) or 0
-	Spring.SendCommands("viewta")
-	-- A partial state can restore the previous controller position after a
-	-- target jump. Set the TA controller and target coordinates atomically.
-	Spring.SetCameraState({mode=1, px=x, py=y, pz=z, height=height, angle=0.15, flipped=-1}, 0)
+	Spring.SetCameraState({mode=1, px=x, py=math.max(0,y), pz=z, height=height, angle=0.8}, 0)
 	echo(string.format("camera requested (%d,%d) height=%d", x, z, height))
+end
+
+local function prepareShot(x,z,height,minute)
+	-- Keep camera/render settling independent of fast-forward simulation.
+	local speed=Spring.GetGameSpeed()
+	Spring.SendCommands({"setminspeed 0.25", "setmaxspeed 0.25"})
+	lookAt(x,z,height)
+	pending={started=Spring.GetTimer(),draws=0,minute=minute,x=x,z=z,height=height,speed=speed}
 end
 
 local function dumpTeams(n)
@@ -133,6 +138,23 @@ function widget:DrawScreen()
 	if pending then pending.draws = pending.draws + 1 end
 end
 
+function widget:Update()
+	if not pending then return end
+	-- Other spectator camera widgets can restore their own state after a jump.
+	-- Hold this explicit test camera only during the screenshot settling window.
+	Spring.SetCameraState({mode=1,px=pending.x,py=math.max(0,Spring.GetGroundHeight(pending.x,pending.z)),
+		pz=pending.z,height=pending.height,angle=0.8},0)
+	if pending.draws>=3 and Spring.DiffTimers(Spring.GetTimer(),pending.started)>=1 then
+		local state=Spring.GetCameraState()
+		echo(string.format("camera captured name=%s position=(%.0f,%.0f) height=%.0f",
+			tostring(state.name),state.px or -1,state.pz or -1,state.height or -1))
+		Spring.SendCommands("screenshot png")
+		echo(string.format("screenshot at %.1f min of team %d at (%d, %d)",pending.minute,target.team or -1,pending.x,pending.z))
+		Spring.SendCommands({"setmaxspeed "..pending.speed,"setminspeed "..pending.speed})
+		pending=nil
+	end
+end
+
 function widget:GameFrame(n)
 	-- owner: the BARb AI window stays closed in tests, so screenshots are clear
 	-- (the installed copy may be an older one that opens itself on a fresh config;
@@ -168,22 +190,29 @@ function widget:GameFrame(n)
 			echo(string.format("speed %s at %.2f min", sp.speed, n / 1800))
 		end
 	end
-	-- Simulation frames are not render frames: at 8x, six frames can elapse
-	-- before terrain tessellation/textures catch up with a large camera jump.
-	if pending and pending.draws >= 3 and Spring.DiffTimers(Spring.GetTimer(), pending.started) >= 1 then
-		Spring.SendCommands("screenshot png")
-		echo(string.format("screenshot at %.1f min of team %d at (%d, %d)", pending.minute, target.team or -1, target.x or -1, target.z or -1))
-		pending = nil
-	end
 	for _, s in ipairs(shots) do
 		if not s.done and n >= s.frame then
 			s.done = true
 			if s.x and s.z then
-				lookAt(s.x, s.z, s.height)   -- a map position given with the shot
-				pending = { started = Spring.GetTimer(), draws = 0, minute = s.minute }
+				prepareShot(s.x,s.z,s.height,s.minute)
 			elseif resolveTarget() then
-				lookAt(target.x, target.z, s.height)
-				pending = { started = Spring.GetTimer(), draws = 0, minute = s.minute }
+				local x,z=target.x,target.z
+				-- A terrain-constrained AIR opening can establish its factory away
+				-- from the nominal start (including a water start). Follow the
+				-- actual base for automatic AIR shots; explicit shot coordinates
+				-- and every other role keep their original meaning.
+				if CFG.role=="AIR" then
+					local nearest=math.huge
+					for _,id in ipairs(Spring.GetTeamUnits(target.team or 0)) do
+						local def=UnitDefs[Spring.GetUnitDefID(id)]
+						if def and def.isFactory then
+							local px,_,pz=Spring.GetUnitPosition(id)
+							local distance=px and (px-target.x)^2+(pz-target.z)^2 or math.huge
+							if distance<nearest then x,z,nearest=px,pz,distance end
+						end
+					end
+				end
+				prepareShot(x,z,s.height,s.minute)
 			else
 				echo(string.format("no target for the %.1f min screenshot", s.minute))
 			end

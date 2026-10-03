@@ -1,6 +1,9 @@
 void test_air_parity_still_builds_bombers() { Check(AirMath::BomberOrders(1000,1000,6,3)==3); }
 void test_air_badly_losing_preserves_fighter_priority() { Check(AirMath::BomberOrders(100,500,6,3)==0); }
 void test_air_clear_sky_allocation_is_bounded() { Check(AirMath::BomberOrders(1000,0,6,3)==6); }
+void test_air_campus_attempts_full_size_before_compacting() { Check(AirMath::CampusSize(false,5)==6); }
+void test_air_compact_search_retries_large_then_medium_then_single() { Check(AirMath::CampusSize(true,3)==6 && AirMath::CampusSize(true,4)==3 && AirMath::CampusSize(true,5)==1); }
+void test_air_invalid_campus_variant_preserves_full_plan() { Check(AirMath::CampusSize(true,-1)==6); }
 void test_air_interleave_is_exact_per_cycle() { int n=0; for(int i=0;i<20;++i) if(AirMath::BomberTurn(i,3)) ++n; Check(n==6); }
 void test_air_invalid_sequence_cannot_recruit_strike() { Check(!AirMath::BomberTurn(-1,6)); }
 void test_air_unarmed_contact_does_not_stop_strike() { Check(!AirMath::Emergency(0,100,1.5f)); }
@@ -31,8 +34,19 @@ void test_air_explicit_factory_limit_is_respected() { Check(!AirMath::BayAllowed
 void test_air_campus_reserves_minimum_before_growth() { Check(AirMath::PlannedBays(0,6)==6 && AirMath::PlannedBays(5,6)==6); }
 void test_air_income_spike_does_not_start_growth() { Check(!AirMath::GrowthPhase(false,100,50) && !AirMath::GrowthPhase(true,49.9f,50)); }
 void test_air_sustained_fifty_starts_growth() { Check(AirMath::GrowthPhase(true,50,50)); }
-void test_air_one_afus_does_not_start_mass_bombers() { Check(!AirMath::MassBombersReady(1,2) && AirMath::MassBombersReady(2,2)); }
+void test_air_two_afus_completes_growth_objective() { Check(!AirMath::MassBombersReady(1,2) && AirMath::MassBombersReady(2,2)); }
+void test_air_bomber_admission_requires_both_incomes() { Check(AirMath::SustainedProduction(true,50,1830,30,60,30)); }
+void test_air_high_metal_cannot_mask_energy_shortfall() { Check(!AirMath::SustainedProduction(true,500,1829,30,60,30)); }
+void test_air_high_energy_cannot_mask_metal_shortfall() { Check(!AirMath::SustainedProduction(true,29,50000,30,60,30)); }
+void test_air_bomber_admission_waits_for_complete_window() { Check(!AirMath::SustainedProduction(false,500,50000,30,60,30)); }
+void test_air_invalid_payload_ratio_fails_closed() { Check(!AirMath::SustainedProduction(true,500,50000,30,0,30)); }
 void test_air_opening_random_bounds_are_inclusive() { Check(AirMath::OpeningWave(10,20,10)==10 && AirMath::OpeningWave(10,20,20)==20); }
+void test_air_economy_opening_preserves_draw() { Check(AirMath::OperationSize(64,8,false,17,false,false,8)==17); }
+void test_air_opening_does_not_waive_payload() { Check(AirMath::OperationSize(64,18,false,17,false,false,8)==0); }
+void test_air_front_assault_uses_available_force_before_opening() { Check(AirMath::OperationSize(64,35,false,17,true,false,8)==64); }
+void test_air_defence_does_not_wait_for_offensive_opening() { Check(AirMath::OperationSize(7,6,false,17,false,true,8)==6); }
+void test_air_later_raid_funds_target() { Check(AirMath::OperationSize(64,28,true,17,false,false,8)==28); }
+void test_air_insufficient_cohort_is_not_released() { Check(AirMath::OperationSize(5,6,true,17,false,true,8)==0); }
 void test_air_bad_opening_settings_are_bounded() { Check(AirMath::OpeningWave(20,10,1)==20 && AirMath::OpeningWave(1000,2000,1000)==300); }
 void test_air_shared_economy_retires_small_energy() { Check(!AirMath::EnergyEraAllows(true,false,true,false) && !AirMath::EnergyEraAllows(true,false,false,true)); }
 void test_air_shared_economy_keeps_reactors_and_converters() { Check(AirMath::EnergyEraAllows(false,false,true,true)); }
@@ -59,3 +73,11 @@ void test_air_unfinished_reactor_blocks_parallel_growth() { Check(AirMath::Pendi
 void test_air_completed_reactor_does_not_block_growth() { Check(!AirMath::PendingReactor(true,true,true,1)); }
 void test_air_small_energy_does_not_block_reactors() { Check(!AirMath::PendingReactor(false,true,false,0)); }
 void test_air_reactor_repair_is_not_new_construction() { Check(!AirMath::PendingReactor(true,false,true,.8f)); }
+void test_air_retained_intercept_survives_snapshot_reorder() { array<int> ids={12,5}; array<float> needs={100,100}; Check(AirMath::RetainedContact(5,ids,needs)==1); }
+void test_air_disappeared_intercept_frees_group_immediately() { array<int> ids={12}; array<float> needs={100}; Check(AirMath::RetainedContact(5,ids,needs)==-1); }
+void test_air_fully_funded_contact_does_not_keep_extra_group() { array<int> ids={5}; array<float> needs={-50}; Check(AirMath::RetainedContact(5,ids,needs)==-1); }
+void test_air_invalid_contact_snapshot_releases_group() { array<int> ids={5}; array<float> needs; Check(AirMath::RetainedContact(5,ids,needs)==-1); }
+void test_air_low_income_full_store_can_fund_transition_capacity() { Check(AirMath::TransitionStorage(false,1340,1350,2900)); }
+void test_air_transition_storage_stops_at_lab_capacity() { Check(!AirMath::TransitionStorage(false,2900,2900,2900)); }
+void test_air_transition_storage_does_not_spend_an_empty_bank() { Check(!AirMath::TransitionStorage(false,200,1350,2900)); }
+void test_air_transition_storage_does_not_expand_after_t2() { Check(!AirMath::TransitionStorage(true,1340,1350,2900)); }

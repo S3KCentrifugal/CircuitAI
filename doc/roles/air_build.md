@@ -1,5 +1,17 @@
 # AIR building actions
 
+`Record` audits the pre-T2 `transition.storage` exception with INV-118: the
+nearly full bank must still lack capacity for the loaded advanced lab cost.
+
+D-171 adds `NearbyStarter` for a commander with no lab and no other completed
+mobile constructor. It pins a physically valid nearby lab before speculative
+campus planning. `StarterReadyToRetire` requires the opening crew, fighter wall,
+advanced-lab affordability and a reserved advanced site; ferry requests take
+precedence. `RetireStarter` retires one idle starter and owns its reclaim task.
+`Factory` later rebuilds T1 on a planned campus bay after T2 access is secured.
+Adopted starter/gifted bays never substitute for future campus reservations.
+TECH's lab lifecycle is unchanged. See [D-171](../air-committed-operations-plan.md).
+
 D-170 permits a metal-mode T2 order after the initial fighter screen without
 the normal income/bank gate. Existing per-lab support requirements still govern
 additional labs. `Pinned` logs failed metal-only placement attempts at a
@@ -108,7 +120,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: f4808b77ddd452b1c535aed3882588d1c4737f18; lines: 520 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 2811e9d0b427baab5d146e3dbce105381b8d0b47; lines: 619 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -153,3 +165,14 @@ task alone cannot keep the commander on an idle lab. T1 mobile fallback guards
 start an explicit five-second expiry and `Tick` checks their task-identity leases
 (INV-104). D-164 excludes advanced aircraft from this fallback entirely;
 expiration alone did not prevent them repeatedly renewing the same activity.
+
+D-171 records commander factory-guard intent in `commanderFactoryGuards`.
+`Record` clears that engine command once before a different AIR action waits
+for a path. `ReturnEconomyWorkers` also stops the released T2 constructor's old
+guard. Native task expiry alone leaves these engine queues intact. The Legion
+45-minute repeat passed INV-081 after this handoff change.
+
+`CancelUnstarted` stops only a cancelled task's current assignees before
+aborting it. `Tick` uses it for a newly invalid reactor/mex prerequisite,
+insufficient support for another T2 lab and unclaimed native building orders.
+It preserves already framed buildings and workers now owned by another task.

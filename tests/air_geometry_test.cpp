@@ -7,6 +7,15 @@
 int main()
 {
     using namespace circuit::air_geometry;
+    assert(PreferDistrictTarget(true, true, false, 10, 10000));
+    assert(!PreferDistrictTarget(true, false, true, 10000, 10));
+    assert(PreferDistrictTarget(false, false, true, 10000, 10));
+    assert(!PreferDistrictTarget(true, true, true, 10, 11));
+    assert(CohortLegCount(6000, 600) == 5);
+    assert(CohortLegCount(0, 600) == 1);
+    assert(CohortLegCount(1000, -10) == 1);
+    assert(CohortLegCount(1e30f, 400) == 256);
+    assert(CohortLegCount(std::numeric_limits<float>::infinity(), 600) == 1);
     std::set<std::pair<float,float>> positions;
     for (int i = 0; i < 300; ++i) {
         auto s = FormationSlot(i, 1320.f, 180.f, 240.f);

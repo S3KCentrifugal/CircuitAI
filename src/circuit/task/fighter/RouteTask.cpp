@@ -13,6 +13,7 @@
 #include "unit/CircuitUnit.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "CircuitAI.h"
+#include "spring/SpringCallback.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
@@ -50,6 +51,7 @@ bool CRouteTask::CanAssignTo(CCircuitUnit* unit) const
 void CRouteTask::AssignTo(CCircuitUnit* unit)
 {
 	IFighterTask::AssignTo(unit);
+    hadAssignee = true;
 	// Deal lanes from the centre outwards: 0, +1, -1, +2, -2 ... so a small
 	// stream still straddles the line rather than drifting to one side.
 	const unsigned int k = laneDealt++ % std::max(1, laneCount);
@@ -70,7 +72,9 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	lastIssue.erase(unit);
 	retryUnits.erase(unit);
 	engaging.erase(unit);
+    issuedVersion.erase(unit);
     if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
+    if (airControl && hadAssignee && units.empty()) manager->AbortTask(this);
 }
 
 void CRouteTask::SetLanes(int count, float spacing, float endSpread)
@@ -159,10 +163,17 @@ void CRouteTask::Update()
 		}
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
-        const bool retry=retryUnits.count(unit) && circuit->GetLastFrame()-lastIssue[unit]>=FRAMES_PER_SEC;
+        bool retry=retryUnits.count(unit) && circuit->GetLastFrame()-lastIssue[unit]>=FRAMES_PER_SEC;
+        if (airControl && retry && circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
+            // Idle events can describe an order just replaced by another
+            // callback. Preserve that live queue; only repair an empty one.
+            retryUnits.erase(unit);
+            retry = false;
+        }
         if (!changed && !resume && !retry) continue;
+        if (airControl && !resume && !retry && issuedVersion.count(unit) && issuedVersion[unit] == version) continue;
         retryUnits.erase(unit);
-        if (!changed && !resume && IsAtEnd(unit)) continue;
+        if (!changed && !resume && !airControl && IsAtEnd(unit)) continue;
 		if (patrol) IssueRoute(unit, 0);
 		else if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
 		else IssueDirect(unit);
@@ -176,6 +187,7 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
     // opt-in exact routes instead of filling the engine's command/event queues.
 	if (engaging.count(unit) != 0) return;  // Update owns contact loss and lane resumption.
 	if (patrol && !route.empty()) {
+		if (airControl) { retryUnits.insert(unit); return; }
 		IssueRoute(unit, 0);
 		return;
 	}
@@ -194,6 +206,10 @@ void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 void CRouteTask::SetRoute(std::vector<AIFloat3>&& waypoints)
 {
+    if (airControl && unitRoutes.empty() && waypoints.size() == route.size()
+        && std::equal(route.begin(), route.end(), waypoints.begin(), [](const AIFloat3& a, const AIFloat3& b) {
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+        })) return;
 	unitRoutes.clear();
     unitArrival.clear();
 	route = std::move(waypoints);
@@ -256,6 +272,16 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 
 void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 {
+    if (airControl && airTarget >= 0) {
+        auto* circuit = manager->GetCircuit();
+        auto* enemy = circuit->GetEnemyInfo(airTarget);
+        if (enemy != nullptr && !enemy->IsHidden() && enemy->IsInRadarOrLOS()) {
+            if (!issuing.insert(unit).second) return;
+            TRY_UNIT(circuit, unit, unit->Attack(enemy, false, circuit->GetLastFrame() + FRAMES_PER_SEC * 3600, false);)
+            issuing.erase(unit); issuedVersion[unit] = version; lastIssue[unit] = circuit->GetLastFrame();
+            return;
+        }
+    }
 	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
@@ -274,6 +300,7 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 		}
 	)
 	issuing.erase(unit);
+    if (airControl) issuedVersion[unit] = version;
 }
 
 const std::vector<AIFloat3>& CRouteTask::RouteFor(CCircuitUnit* unit) const

@@ -1,11 +1,20 @@
 // Read-only combat observer, appended only to staged experimental main.as.
 namespace AirArenaProbe {
     int serial = 0;
+    int lastCommitment = -100000;
+    bool rosterReported = false;
     bool active = false, t1 = false, responding = false;
     CAirWaveTask@ observed = null;
     void Tick()
     {
         if (ai.teamId > 1 || Global::AISettings::Role != AiRole::AIR) return;
+        if (ai.teamId == 0 && !rosterReported && AirOperations::rosterReady) {
+            rosterReported = true;
+            GenericHelpers::LogUtil("[AirArenaProbe] T3 roster=" + AirOperations::groundHeavyDefs.length()
+                + " shiva=" + AirOperations::groundHeavyDefs.find("corshiva")
+                + " telchine=" + AirOperations::groundHeavyDefs.find("legamph")
+                + " home=" + int(Global::Map::StartPos.x) + "," + int(Global::Map::StartPos.z), 1);
+        }
         if (ai.teamId == 1) {
             if (AirScreen::responding != responding) {
                 responding = AirScreen::responding;
@@ -38,6 +47,20 @@ namespace AirArenaProbe {
             @observed = wave;
             WidgetLink::Send("arena", "launch|" + serial + "|" + ai.frame + "|" + wave.GetStrikeTargetId()
                 + "|" + AirWaves::learnedResistance + "|" + members);
+        }
+        if (active && observed !is null && !observed.IsDead() && ai.frame-lastCommitment >= 10*SECOND) {
+            lastCommitment = ai.frame;
+            int live = 0, owned = 0;
+            array<string>@ escorts = AirOperations::escorts.getKeys();
+            for (uint i = 0; i < escorts.length(); ++i) {
+                IUnitTask@ owner;
+                CCircuitUnit@ unit = ai.GetTeamUnit(parseInt(escorts[i]));
+                if (unit is null || !AirOperations::escorts.get(escorts[i], @owner) || owner !is observed) continue;
+                ++live;
+                if (unit.task is owner) ++owned;
+            }
+            WidgetLink::Send("arena", "commitment|" + serial + "|" + live + "|" + owned
+                + "|" + AirScreen::IntrusionCost() + "|" + observed.GetState());
         }
     }
 }

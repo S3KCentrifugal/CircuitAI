@@ -603,7 +603,7 @@ void CBattleAnalysis::Update(int frame)
 				&& pos.z < circuit->GetTerrainManager()->GetTerrainHeight()) {
 				// One entry per enemy ID. Do not discard armed scout/fighter hybrids,
                 // or inflate the sum with overlapping role labels.
-				airContacts.push_back({pos, m, d->HasSurfToAir() || d->HasSurfToLand() || d->HasSurfToWater()});
+				airContacts.push_back({pos, m, d->HasSurfToAir() || d->HasSurfToLand() || d->HasSurfToWater(), e->GetId()});
 			}
 			if (!e->IsHidden()) {
 				AddHeat(air, e->GetPos(), 1.f);

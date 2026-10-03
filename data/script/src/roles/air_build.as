@@ -2,12 +2,14 @@
 #include "../helpers/economy_helpers.as"
 #include "../manager/air_reclaim.as"
 namespace AirBuild {
+    IUnitTask@ starterReclaimTask;
     array<IUnitTask@> projects;
     array<IUnitTask@> pendingOwnership;
     dictionary trace;
     dictionary nanoTrace;
     dictionary guardLeases;
     dictionary guardLeaseFrames;
+    dictionary commanderFactoryGuards;
     bool ReactorPending()
     {
         for (uint i = 0; i < projects.length(); ++i) {
@@ -36,6 +38,7 @@ namespace AirBuild {
             IUnitTask@ wait = aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
             if (wait is null) continue;
             aiBuilderMgr.AssignTask(u, wait);
+            u.CmdStop(); // Wait preserves the old engine guard unless explicitly cleared.
             GenericHelpers::LogUtil("[AIR][Economy] released advanced aircraft " + ids[i] + " from production guard", 1);
             @u = ai.GetTeamUnit(ids[i]);
             if (u !is null && u.task is task)
@@ -51,6 +54,16 @@ namespace AirBuild {
             || kind == int(Task::BuildType::ENERGY) || kind == int(Task::BuildType::CONVERT) || kind == int(Task::BuildType::STORE)
             || kind == int(Task::BuildType::DEFENCE) || kind == int(Task::BuildType::RADAR))
             pendingOwnership.insertLast(task);
+    }
+    void CancelUnstarted(IBuilderTask@ task)
+    {
+        if (task is null || task.IsDead() || task.target !is null) return;
+        // Aborting an AI task does not clear its engine queue. In particular,
+        // a travelling constructor can otherwise frame a cancelled reactor.
+        array<CCircuitUnit@>@ workers = task.GetUnits();
+        for (uint i = 0; i < workers.length(); ++i)
+            if (workers[i] !is null && workers[i].task is task) workers[i].CmdStop();
+        aiBuilderMgr.AbortTask(task);
     }
     void Tick()
     {
@@ -81,12 +94,12 @@ namespace AirBuild {
             IBuilderTask@ t = cast<IBuilderTask>(snapshot[i]);
             if (t !is null && t.target is null && RequiresMexes(t.buildDef) && !AirEconomy::MexesReady()) {
                 GenericHelpers::LogUtil("[AIR][Fusion] cancel unstarted advanced building: mex upgrades pending", 1);
-                aiBuilderMgr.AbortTask(snapshot[i]);
+                CancelUnstarted(t);
             }
             if (t !is null && t.target is null && t.buildDef !is null && t.GetBuildType() == int(Task::BuildType::FACTORY)
                 && UnitHelpers::IsT2AircraftPlant(t.buildDef.GetName()) && !AirEconomy::ExistingT2SupportReady()) {
                 GenericHelpers::LogUtil("[AIR][Support] cancel unstarted T2 lab: existing bays need completed turrets", 1);
-                aiBuilderMgr.AbortTask(snapshot[i]);
+                CancelUnstarted(t);
             }
         }
         // Native completion chains may enqueue economy work despite experimental
@@ -98,7 +111,7 @@ namespace AirBuild {
             IBuilderTask@ t = cast<IBuilderTask>(pending[i]);
             if (t !is null && t.target is null) {
                 GenericHelpers::LogUtil("[AIR][Claim] cancel unowned native order " + (t.buildDef is null ? "?" : t.buildDef.GetName()), 1);
-                aiBuilderMgr.AbortTask(pending[i]);
+                CancelUnstarted(t);
             }
         }
         int queuedNanos = 0;
@@ -128,6 +141,19 @@ namespace AirBuild {
     IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
     {
         if (t is null) return null;
+        if (UnitHelpers::IsCommander(u.circuitDef)) {
+            const string key = "" + u.id;
+            if (rule == "opening.commander.guard" || rule == "commander.factory.guard") {
+                commanderFactoryGuards.set(key, true);
+            } else if (commanderFactoryGuards.exists(key)) {
+                // A new construction task can wait on its path before issuing
+                // any engine order. End the old guard at the ownership handoff,
+                // not repeatedly on each idle tick or by aborting a shared task.
+                u.CmdStop();
+                commanderFactoryGuards.delete(key);
+                GenericHelpers::LogUtil("[AIR][Commander] cleared factory guard for " + rule, 1);
+            }
+        }
         if (rule == "production.assist") {
             if (EconomyAircraft(u)) Invariants::Violation("INV-106", "" + u.id, "advanced AIR economy constructor assigned production guard");
             guardLeases.set("" + u.id, @t);
@@ -141,6 +167,14 @@ namespace AirBuild {
             && build.GetBuildType() == int(Task::BuildType::DEFENCE)
             && !AirHome::Within(build.GetBuildPos(), Global::RoleSettings::Air::HomeDefenceRadius))
             Invariants::Violation("INV-091", "AIR", "static defence ordered outside own base");
+        if (rule == "opening.mex" && AirEconomy::MexCount() >= 3)
+            Invariants::Violation("INV-117", "AIR", "opening mex order exceeds three owned extractors");
+        if (rule == "transition.storage") {
+            CCircuitDef@ lab=ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+            if (lab is null || !AirMath::TransitionStorage(AirEconomy::t2>0,
+                AirEconomy::bankM,aiEconomyMgr.metal.storage,lab.costM))
+                Invariants::Violation("INV-118","AIR","transition storage admitted without a full undersized pre-T2 bank");
+        }
         if (rule == "mex.expand" && build !is null && !AirHome::Within(build.GetBuildPos(), Global::RoleSettings::Air::HomeMexRadius))
             Invariants::Violation("INV-092", "AIR", "new mex expansion ordered outside home area");
         if (build !is null && build.buildDef !is null && build.target is null
@@ -307,6 +341,64 @@ namespace AirBuild {
         return Record(t is null ? aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)) : t,
             opening ? "opening.commander.guard" : "commander.factory.guard", u);
     }
+    bool StarterReadyToRetire(CCircuitUnit@ plant)
+    {
+        if (plant is null || !UnitHelpers::IsT1AircraftPlant(plant.circuitDef.GetName())
+            || Team::Ferry::requestPending || aiTerrainMgr.GetLayoutInt("air.starter.retired", 0) != 0
+            || AirEconomy::CompletedConstructors() < Global::RoleSettings::Air::OpeningAirConstructors
+            || AirScreen::HomeValue() < Global::RoleSettings::Air::HomeFighterFloor * 70.0f) return false;
+        CCircuitDef@ advanced = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+        if (!AirEconomy::Transition(advanced)) return false;
+        for (uint b = 0; b < AirLayout::bays.length(); ++b)
+            if (AirLayout::bays[b].defName == advanced.GetName() && AirLayout::bays[b].slot >= 0) return true;
+        return false;
+    }
+    IUnitTask@ RetireStarter(CCircuitUnit@ worker)
+    {
+        if (worker is null || !worker.circuitDef.IsMobile()) return null;
+        CCircuitUnit@ retiring = ai.GetTeamUnit(aiTerrainMgr.GetLayoutInt("air.starter.retiringId", -1));
+        if (retiring !is null) {
+            if (starterReclaimTask !is null && !starterReclaimTask.IsDead()) return null;
+            @starterReclaimTask = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, retiring, 120*SECOND));
+            return starterReclaimTask;
+        }
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(ids[i]);
+            if (!StarterReadyToRetire(plant) || plant.GetBuildProgress() < 1.0f || PlantHasWork(plant)) continue;
+            if (!aiTerrainMgr.CanReachAt(worker, plant.GetPos(ai.frame), worker.circuitDef.GetBuildDistance())) continue;
+            IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, plant, 120*SECOND));
+            if (task is null) return null;
+            @starterReclaimTask = task;
+            Lifecycle::Retire(plant, "AIR starter funds advanced production; rebuild in planned campus later");
+            aiTerrainMgr.SetLayoutInt("air.starter.retired", 1);
+            aiTerrainMgr.SetLayoutInt("air.starter.retiringId", plant.id);
+            return task;
+        }
+        return null;
+    }
+    IUnitTask@ NearbyStarter(CCircuitUnit@ u, CCircuitDef@ lab)
+    {
+        const AIFloat3 at = u.GetPos(ai.frame);
+        const float clear = float(AiMax(lab.GetFootprintX(),lab.GetFootprintZ()))*8.0f + 48.0f;
+        for (int ring = int(clear/32)+1; ring <= 20; ++ring) {
+            for (int k = 0; k < ring*8; ++k) {
+                const float angle = 6.2831853f*float(k)/float(ring*8);
+                AIFloat3 point(at.x+cos(angle)*ring*32,0,at.z+sin(angle)*ring*32);
+                for (int facing = 0; facing < 4; ++facing) {
+                    if (!aiTerrainMgr.CanReserveBuilding(lab,point,facing)) continue;
+                    const int slot = aiTerrainMgr.ReserveBuilding(lab,point,facing);
+                    if (slot < 0) continue;
+                    IUnitTask@ task = AirLayout::Pinned(Task::BuildType::FACTORY,Task::Priority::NOW,lab,slot);
+                    if (task is null) { aiTerrainMgr.ReleaseReservation(slot); return null; }
+                    aiTerrainMgr.SetLayoutInt("air.starter.ordered",1);
+                    GenericHelpers::LogUtil("[AIR][Starter] nearby distance="+int(sqrt(MapHelpers::SqDist(at,point))),1);
+                    return task;
+                }
+            }
+        }
+        return null;
+    }
     IUnitTask@ Factory(CCircuitUnit@ u, bool advanced)
     {
         const string name = advanced ? UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side) : UnitHelpers::GetT1AirPlantForSide(Global::AISettings::Side);
@@ -314,6 +406,13 @@ namespace AirBuild {
         if (!Can(u, d) || Busy(d, Task::BuildType::FACTORY)) return null;
         const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
         if (!advanced && count > 0) return null;
+        if (!advanced && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) != 0 && !Team::Ferry::requestPending
+            && (AirEconomy::t2 == 0 || !AirEconomy::HasAdvancedBuilder() || AirEconomy::bankM < d.costM)) return null;
+        if (!advanced && UnitHelpers::IsCommander(u.circuitDef) && AirEconomy::t1+AirEconomy::t2 == 0
+            && !AirEconomy::HasMobileConstructor()) {
+            IUnitTask@ nearby = NearbyStarter(u,d);
+            if (nearby !is null) return nearby;
+        }
         if (advanced) {
             if (!AirEconomy::Transition(d)) return null;
             if (!AirEconomy::ExistingT2SupportReady()) return null;
@@ -324,9 +423,9 @@ namespace AirBuild {
         }
         AirLayout::Bay@ bay = null;
         for (uint b = 0; b < AirLayout::bays.length(); ++b)
-            if (AirLayout::bays[b].defName == name && AirLayout::bays[b].factoryId < 0
+            if (AirLayout::bays[b].defName == name && AirLayout::bays[b].cluster >= 0 && AirLayout::bays[b].factoryId < 0
                 && (aiTerrainMgr.GetReservationState(AirLayout::bays[b].slot) == 0 || !AirLayout::bays[b].started)) { @bay = AirLayout::bays[b]; break; }
-        if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame), advanced);
+        if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame));
         if (bay is null) return null;
         @bay = AirLayout::Activate(bay);
         if (bay is null) return null;

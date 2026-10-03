@@ -554,7 +554,7 @@ void CCircuitUnit::TrySetIdleMode(int mode)
     TRY_UNIT(manager->GetCircuit(), this, unit->SetIdleMode(mode);)
 }
 
-void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
+void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool queueFight)
 {
 	if (KeepWeaponRange(enemy, timeout)) return;
 	target = enemy;
@@ -583,7 +583,9 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
 				unit->Attack(enemy->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			}
 		}
-		CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);  // los-cheat related
+		// Route/operation owners can handle contact loss themselves. Avoid a
+		// redundant follow-up order when they request a persistent target only.
+		if (queueFight) CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
 		CmdWantedSpeed(NO_SPEED_LIMIT);
 		CmdSetTarget(target);
 	)

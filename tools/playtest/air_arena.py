@@ -54,6 +54,11 @@ def resolve_case(path, side, defender, seed, visibility=None):
         raise ValueError('refill_seconds must be an integer in 1..600')
     for field in ('aircraft', 'targets', 'defenses', 'sensors'):
         for group in case.get(field, []):
+            delay = group.get('after_seconds', 0)
+            if type(delay) is not int or not 0 <= delay <= 3600:
+                raise ValueError('after_seconds must be an integer in 0..3600')
+            if type(group.get('once', False)) is not bool:
+                raise ValueError('once must be a boolean')
             name = group['unit']
             team = group.get('team', 0 if field == 'aircraft' else 1)
             if name.startswith('$'):
@@ -153,6 +158,9 @@ def prepare(args):
     if not case_path.exists():
         case_path = HERE / 'air_cases' / (args.case + '.json')
     case = resolve_case(case_path, args.side, args.defender, args.seed, args.visibility)
+    args.checks = args.checks or case.get('checks', 'air_arena')
+    if not re.fullmatch('[a-z0-9_]+', args.checks) or not (HERE/'checks'/f'{args.checks}.json').is_file():
+        raise ValueError('Unknown arena checks: ' + args.checks)
     if args.map != 'Supreme Isthmus v1.7' and case_path.parent.resolve() == (HERE/'air_cases').resolve():
         raise ValueError('Built-in target coordinates require Supreme Isthmus v1.7; supply a custom JSON case for another map')
     if args.unit:
@@ -182,11 +190,12 @@ def prepare(args):
     cmd = [sys.executable, str(HERE / 'playtest.py'), 'stage', '--dir', str(base), '--dll', str(args.dll),
            '--map', args.map, '--map-file', str(starts), '--game', args.game, '--engine', args.engine,
            '--role', 'AIR', '--roles', 'all', '--side', args.side, '--ally-spots', '1', '--bonus', '0',
-           '--speed', str(args.speed), '--minutes', str(args.minutes), '--shots', '', '--width', '1280', '--height', '720',
+           '--speed', str(args.speed), '--minutes', str(args.minutes), '--shots', '', '--width', '1280', '--height', '720', '--lean-render',
            '--ai-option', 'profile=experimental_hard', '--ai-option', 'random_seed=' + str(args.seed),
            '--modoption', 'deathmode=neverend', '--modoption', 'startenergy=1000000000',
            '--modoption', 'startenergystorage=1000000000', '--modoption', 'multiplier_energyproduction=1000',
-           '--extra-widget', str(HERE / 'widgets/air_arena.lua')]
+           '--extra-widget', str(HERE / 'widgets/air_arena.lua'),
+           '--extra-widget', str(HERE / 'widgets/air_command_watch.lua')]
     subprocess.run(cmd, check=True)
     script = base / 'script.txt'
     text = script.read_text()
@@ -197,7 +206,7 @@ def prepare(args):
     teams['teams'][1]['side'] = args.defender
     (base / 'teams.json').write_text(json.dumps(teams, indent=2))
     staged = base / 'AI/Skirmish/BARbTest/test/script'
-    overrides = ['builder/factory tasks frozen', 'AIR role on both teams', 'two-AFUS combat gate waived',
+    overrides = ['builder/factory tasks frozen', 'AIR role on both teams', 'sustainable-income combat gate waived',
                  'defensive fighters remain in home screen', 'supplied energy storage and 1000x passive energy',
                  'stockpile ammunition replenished']
     checked_replace(staged / 'src/setup.as', 'Global::AISettings::Role = derivedRole;',
@@ -209,9 +218,8 @@ def prepare(args):
         at = source.index('{', source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
         p.write_text(source[:at+1] + '\n if (ai.frame >= 0) return ' + manager + '.Enqueue(' + wait + '); // arena only\n' + source[at+1:])
     checked_replace(staged / 'src/manager/air_economy.as',
-                    'bool MassBombers() { return aiTerrainMgr.GetLayoutInt("air.massBombers", 0) != 0; }',
-                    'bool MassBombers() { return true; } // supplied combat arena only')
-    checked_replace(staged / 'src/global.as', 'int HomeFighterFloor = 6;', 'int HomeFighterFloor = 10000; // arena only')
+                    'bool MassBombers() {',
+                    'bool MassBombers() { if (ai.frame >= 0) return true; // supplied combat arena only')
     if case.get('bomber_only', True):
         checked_replace(staged / 'src/global.as', 'float BomberWaveFighterRatio = 1.0f;', 'float BomberWaveFighterRatio = 0.0f;')
         checked_replace(staged / 'src/manager/air_raids.as', 'AirScreen::HomeValue() < AirEconomy::EnemyAir()', 'false /* bomber-only arena */')
@@ -236,7 +244,7 @@ def prepare(args):
                 'dll_sha256': hashlib.sha256(Path(args.dll).read_bytes()).hexdigest(), 'overrides': overrides,
                 'harness_sha256': {str(p.relative_to(HERE)): hashlib.sha256(p.read_bytes()).hexdigest()
                                    for p in (Path(__file__).resolve(), HERE/'air_arena_probe.as',
-                                             HERE/'widgets/air_arena.lua', HERE/'checks/air_arena.json')},
+                                             HERE/'widgets/air_arena.lua', HERE/'checks'/f'{args.checks}.json')},
                 'config_sha256': {str(p.relative_to(staged.parent)): hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in (staged.parent/'config').rglob('*.json')},
                 'staged_script_sha256': {str(p.relative_to(staged)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -251,6 +259,7 @@ def main():
     p.add_argument('command', choices=['list', 'prepare', 'run', 'matrix', 'summarize'])
     p.add_argument('--dir', type=Path, default=ROOT / 'build-theatres/air-arena')
     p.add_argument('--case', default='t2-intercept')
+    p.add_argument('--checks', help='Behavior-specific checks; defaults to the case or air_arena')
     p.add_argument('--side', choices=ROSTERS, default='armada')
     p.add_argument('--defender', choices=ROSTERS, default='cortex')
     p.add_argument('--seed', type=int, default=1651)
@@ -291,7 +300,7 @@ def main():
                                '--case', case, '--side', side, '--defender', a.defender, '--seed', seed,
                                '--dll', str(a.dll), '--map', a.map, '--game', a.game, '--engine', a.engine,
                                '--minutes', str(a.minutes), '--speed', str(a.speed), '--wall-minutes', str(a.wall_minutes)]
-                    for key in ('visibility', 'map_file', 'unit', 'fighters'):
+                    for key in ('visibility', 'map_file', 'unit', 'fighters', 'checks'):
                         value = getattr(a, key)
                         if value is not None:
                             command += ['--'+key.replace('_','-'), str(value)]
@@ -309,7 +318,7 @@ def main():
         print('Continuous arena running. Stop with: python tools/playtest/playtest.py stop --dir', base)
         return
     run = subprocess.run([sys.executable, str(HERE/'playtest.py'), 'watch', '--dir', str(base), '--role', 'AIR',
-                          '--checks', 'air_arena', '--minutes', str(a.minutes), '--wall-minutes', str(a.wall_minutes), '--keep-going'])
+                          '--checks', a.checks, '--minutes', str(a.minutes), '--wall-minutes', str(a.wall_minutes), '--keep-going'])
     result = archive_results(base)
     sys.exit(run.returncode or bool(result['fixture_errors']))
 

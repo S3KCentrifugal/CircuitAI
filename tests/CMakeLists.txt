@@ -12,14 +12,22 @@ if(BUILD_TESTING)
     target_include_directories(circuit_allied_reservations_test PRIVATE ../src)
     add_test(NAME circuit_allied_reservations_test COMMAND circuit_allied_reservations_test)
     file(GLOB ANGELSCRIPT_SOURCES "../src/lib/angelscript/source/*.cpp")
-    add_executable(circuit_production_math_test production_math_test.cpp ${ANGELSCRIPT_SOURCES})
+    add_executable(circuit_production_math_test production_math_test.cpp ${ANGELSCRIPT_SOURCES}
+        ../src/lib/angelscript/add_on/scriptarray/scriptarray.cpp)
     target_compile_features(circuit_production_math_test PRIVATE cxx_std_20)
-    target_include_directories(circuit_production_math_test PRIVATE ../src/lib/angelscript/include)
+    target_include_directories(circuit_production_math_test PRIVATE ../src/lib/angelscript/include
+        ../src/lib/angelscript/add_on/scriptarray)
     target_compile_definitions(circuit_production_math_test PRIVATE ANGELSCRIPT_EXPORT AS_MAX_PORTABILITY)
     add_test(NAME circuit_production_math_test COMMAND circuit_production_math_test
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/production_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/production_math_tests.as")
     add_test(NAME circuit_placement_math_test COMMAND circuit_production_math_test
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/placement_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/placement_math_tests.as")
+    add_test(NAME circuit_air_math_test COMMAND circuit_production_math_test
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/air_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/air_math_tests.as")
+    add_executable(circuit_air_geometry_test air_geometry_test.cpp)
+    target_compile_features(circuit_air_geometry_test PRIVATE cxx_std_20)
+    target_include_directories(circuit_air_geometry_test PRIVATE ../src ../src/circuit)
+    add_test(NAME circuit_air_geometry_test COMMAND circuit_air_geometry_test)
     find_package(Threads REQUIRED)
     target_link_libraries(circuit_production_math_test PRIVATE Threads::Threads)
     add_executable(circuit_lane_solver_test lane_solver_test.cpp ../src/circuit/terrain/LaneSolver.cpp)

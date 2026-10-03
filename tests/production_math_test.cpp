@@ -1,4 +1,5 @@
 #include <angelscript.h>
+#include "scriptarray.h"
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -22,6 +23,7 @@ int main(int argc, char** argv) {
     if (argc != 3) return 2;
     asIScriptEngine* engine = asCreateScriptEngine();
     engine->SetMessageCallback(asFUNCTION(Message), nullptr, asCALL_CDECL);
+    RegisterScriptArray(engine, true);
     engine->RegisterGlobalFunction("void Check(bool)", asFUNCTION(Check), asCALL_GENERIC);
     asIScriptModule* mod = engine->GetModule("tests", asGM_ALWAYS_CREATE);
     const auto policy = Read(argv[1]);

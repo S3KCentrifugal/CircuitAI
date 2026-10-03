@@ -10,6 +10,8 @@ namespace AirRules {
         AirEconomy::Tick();
         IBuilderTask@ current = cast<IBuilderTask>(u.task);
         if (current !is null && current.GetBuildType() < int(Task::BuildType::REPAIR)) return u.task;
+        IUnitTask@ retirement = AirBuild::RetireStarter(u);
+        if (retirement !is null) return AirBuild::Record(retirement, "starter.reclaim", u);
         if (MetalEconomy::Active()) return AirBuild::Record(MetalEconomy::AirTask(u), "metal.economy", u);
         const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         const bool commander = UnitHelpers::IsCommander(u.circuitDef);
@@ -29,9 +31,14 @@ namespace AirRules {
         @t = AirBuild::Resume(u);
         if (t !is null) return AirBuild::Record(t, "project.resume", u);
         // Home spots precede the starter. Recovery never repeats a paid opening.
-        if (AirEconomy::t1 + AirEconomy::t2 == 0) {
-            @t = aiEconomyMgr.EnqueueMexWithin(u, Global::Map::StartPos, 700.0f, 3, true);
-            if (t !is null) return AirBuild::Record(t, "opening.mex", u);
+        if (AirEconomy::t1 + AirEconomy::t2 == 0 && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) == 0) {
+            // maxSpots limits native search candidates, not owned extractors.
+            // Without an ownership check the commander keeps taking fourth,
+            // fifth, ... spots and may never reach its nearby starter lab.
+            if (AirEconomy::MexCount() < 3) {
+                @t = aiEconomyMgr.EnqueueMexWithin(u, Global::Map::StartPos, 700.0f, 3, true);
+                if (t !is null) return AirBuild::Record(t, "opening.mex", u);
+            }
             if (AirEconomy::energy < 80.0f) {
                 @t = AirBuild::Energy(u, false);
                 if (t !is null) return AirBuild::Record(t, "opening.energy", u);
@@ -49,6 +56,14 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "mex.upgrade", u);
         @t = AirBuild::AssistMex(u);
         if (t !is null) return AirBuild::Record(t, "mex.assist", u);
+        CCircuitDef@ nextLab=ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+        CCircuitDef@ transitionStore=ai.GetCircuitDef(UnitHelpers::GetMetalStorageNameForSide(side));
+        if (nextLab !is null && AirMath::TransitionStorage(AirEconomy::t2>0,
+            AirEconomy::bankM,aiEconomyMgr.metal.storage,nextLab.costM)
+            && !AirBuild::Busy(transitionStore,Task::BuildType::STORE)) {
+            @t=AirBuild::Utility(u,UnitHelpers::GetMetalStorageNameForSide(side),Task::BuildType::STORE,4);
+            if (t !is null) return AirBuild::Record(t,"transition.storage",u);
+        }
         @t = AirReclaim::MakeTask(u);
         if (t !is null) return AirBuild::Record(t, "energy.reclaim", u);
         if (AirEconomy::MetalFloating()) {

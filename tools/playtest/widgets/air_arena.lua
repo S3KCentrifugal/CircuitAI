@@ -32,7 +32,10 @@ local function position(g,index)
     local def=UnitDefNames[g.unit]
     if not def then return end
     if UnitDefs[def.id].canFly then
-        if x<128 or z<128 or x>Game.mapSizeX-128 or z>Game.mapSizeZ-128 then return end
+        -- Start boxes may touch the map edge. Formation/recon offsets are
+        -- fixture-generated; keep aircraft inside the map on every refill.
+        x=math.max(128,math.min(Game.mapSizeX-128,x))
+        z=math.max(128,math.min(Game.mapSizeZ-128,z))
         return x,math.max(0,Spring.GetGroundHeight(x,z))+160,z
     end
     for r=0,960,64 do
@@ -52,7 +55,7 @@ local function position(g,index)
 end
 local function addGroup(g,kind)
     g.kind=kind;g.team=g.team or (kind=="aircraft" and 0 or 1)
-    g.key=kind.."-"..(#groups+1);g.slots={};g.waiting={}
+    g.key=kind.."-"..(#groups+1);g.slots={};g.waiting={};g.spawned={}
     if not UnitDefNames[g.unit] then event("error",{reason="missing_unit",unit=g.unit});return end
     if kind=="aircraft" and not UnitDefs[UnitDefNames[g.unit].id].canFly then
         event("error",{reason="not_aircraft",unit=g.unit});return
@@ -62,8 +65,8 @@ end
 local function refill(f)
     local count=0
     for _,g in ipairs(groups) do
-        if (g.team~=0 or g.kind~="aircraft" or f>=1350) then
-            for i=1,g.count do if not valid(g.slots[i]) and not g.waiting[i] then
+        if f>=(g.after_seconds or 0)*30 and (g.team~=0 or g.kind~="aircraft" or f>=1350) then
+            for i=1,g.count do if not valid(g.slots[i]) and not g.waiting[i] and not (g.once and g.spawned[i]) then
                 local x,y,z=position(g,i)
                 if x then
                     queue[#queue+1]={g=g,slot=i,x=x,y=y,z=z};g.waiting[i]=true;count=count+1
@@ -105,6 +108,8 @@ local function receive(team,text)
         if current and current.id==id then current=nil end
     elseif args[1]=="response" then
         event("response",{team=team,active=args[3],wave=current and current.id or 0})
+    elseif args[1]=="commitment" then
+        event("commitment",{wave=args[2],escorts=args[3],owned=args[4],homeIntruders=args[5],state=args[6]})
     end
 end
 local function onDamage(id,def,team,damage,paralyzer,weapon,projectile,attacker,attackerDef,attackerTeam)
@@ -139,7 +144,12 @@ function widget:Initialize()
     for _,g in ipairs(cfg.targets) do addGroup(g,"target") end
     for _,g in ipairs(cfg.defenses) do addGroup(g,"defense") end
     for _,g in ipairs(cfg.sensors or {}) do addGroup(g,"sensor") end
-    for team=0,1 do addGroup({unit="armrad",team=team,count=#cfg.sites[team+1]},"radar") end
+    for team=0,1 do
+        for _,site in ipairs(cfg.sites[team+1]) do
+            local wet=Spring.GetGroundHeight(site[1],site[2]) < -40
+            addGroup({unit=wet and "armfrad" or "armrad",team=team,count=1,position=site,water=wet},"radar")
+        end
+    end
     for _,g in ipairs(cfg.aircraft) do addGroup(g,"aircraft") end
     -- Real scouts at the target region establish identification once; their
     -- subsequent commands, losses and rediscovery remain normal AI behavior.
@@ -169,8 +179,8 @@ function widget:UnitCreated(id,def,team)
     for i,p in ipairs(pending) do
         if team==p.g.team and UnitDefs[def].name==p.g.unit then
             units[id]={team=team,def=def,kind=p.g.kind,group=p.g.key,wave=0}
-            p.g.slots[p.slot]=id;p.g.waiting[p.slot]=nil;table.remove(pending,i)
-            event("spawn",{id=id,team=team,unit=p.g.unit,kind=p.g.kind,group=p.g.key,cost=UnitDefs[def].metalCost})
+            p.g.slots[p.slot]=id;p.g.waiting[p.slot]=nil;p.g.spawned[p.slot]=true;table.remove(pending,i)
+            event("spawn",{id=id,team=team,unit=p.g.unit,kind=p.g.kind,group=p.g.key,cost=UnitDefs[def].metalCost,x=math.floor(p.x),z=math.floor(p.z)})
             return
         end
     end

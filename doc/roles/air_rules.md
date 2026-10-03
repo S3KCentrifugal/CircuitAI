@@ -1,5 +1,19 @@
 # AIR ordered building rules
 
+`transition.storage` expands a nearly full pre-T2 metal store when it cannot
+hold the loaded advanced lab cost. Mex upgrades/recovery retain priority; the
+existing factory income or fully banked-cost admission is unchanged. The
+metal-map branch remains separate.
+
+D-171 checks `starter.reclaim` immediately after preserving current
+construction. A retired opener does not repeat the initial mex/energy sequence.
+T1 reconstruction waits for T2 access and its bank, except transport recovery.
+Bomber admission now reads sustained income; the two-AFUS growth objective
+remains separate. See [D-171](../air-committed-operations-plan.md).
+The normal opening checks three owned mexes explicitly: native `maxSpots=3`
+limits search candidates, not the total opening. This prevents extra commander
+walks before the first lab; metal-mode forty-mex policy remains separate.
+
 D-170 dispatches explicitly detected metal maps to `MetalEconomy::AirTask`
 before the ordinary AIR table. This preserves the ordinary-map sequence while
 providing dedicated mex/power workers and fighter-screen-triggered first T2.
@@ -33,6 +47,7 @@ the [wall base exclusion](../wall-base-exclusion.md).
 | 4 | `transport.plant`, `opening.plant` | Recover or build the T1 air plant, retaining transport capability |
 | 4a | `production.banked` | Bank-funded T2 admission; between the growth milestone and two AFUS, allow the first T2 lab only; existing support gate always applies |
 | 5 | `mex.upgrade`, `mex.assist` | Upgrade all owned basic mexes, at most one remote upgrade at a time; additional helpers stay local |
+| 5a | `transition.storage` | One queued/unfinished metal store at a time when a nearly full pre-T2 bank cannot hold the advanced lab cost |
 | 5.0 | `energy.reclaim` | Retire wind, then basic and advanced solar using TECH's shared margin and completed-reactor guard; completed AFUS admits retirement outside recovery |
 | 5.1 | `overflow.support`, `overflow.support.assist` | While metal floats, open up to three funded turret projects, then help finish them before converters or optional capital work |
 | 5.2 | `mex.phase.convert`, `economy.shared.*` | Pending-upgrade T1 conversion, then shared TECH economy choices with AIR state, placement and reactor assistance after sustained +50 metal |
@@ -65,14 +80,15 @@ The initial scout is latched on completion, so its loss cannot restart the
 opening. Legion uses its first Noctua as that scout. Completed constructor
 counts control the commander; frames and pending recruits only suppress duplicate orders.
 
-This sequence deliberately keeps the T1 utility plant when T2 starts. It has no
-TECH rush chain, gantry ladder, dense reactor block or automatic lab reclaim.
+The D-171 sequence retires the temporary T1 lab for funded T2 access and later
+rebuilds utility production in the planned campus. It uses AIR's separate
+reactor district and shares economy decisions without a TECH rush chain.
 Turning the feature off returns AIR to its existing legacy dispatcher.
 
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 298a072d682b197e4bf18d622f63434f3814cba7; lines: 145 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: c5310dc9220b0375e609c3e507eb3cc53334a749; lines: 160 -->
 
 ## D-152 sequencing
 
@@ -101,4 +117,4 @@ constructors are interleaved with fighters before optional strike spending.
 
 ## D-163 shared growth phase
 
-`economy.shared.*` calls `AirGrowth::MakeTask` after mex work and T1 conversion, before the first-fusion and general support rows. Sustained ten-second minimum income of 50 metal activates the shared TECH economy chooser, with AIR placement and state. Additional T2 labs wait for two completed AFUS during this phase; the first lab and twenty-turret support remain eligible. `energy.grow` is the pre-transition fallback. TECH rule ordering is unchanged. See [design](../air-campus-strike-design.md).
+`economy.shared.*` calls `AirGrowth::MakeTask` after mex work and T1 conversion, before the first-fusion and general support rows. Sustained ten-second minimum income of 50 metal activates the shared TECH economy chooser, with AIR placement and state. D-171 replaces the former two-AFUS readiness test for additional labs with sustained bomber-workload income readiness (`MassBombers`); the first lab and twenty-turret support remain eligible. Two AFUS are still a growth objective, not the production prerequisite. `energy.grow` is the pre-transition fallback. TECH rule ordering is unchanged. See [design](../air-campus-strike-design.md) and [D-171](../air-committed-operations-plan.md).

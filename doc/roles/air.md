@@ -1,5 +1,7 @@
 # AIR Role
 
+D-171 adds [committed air operations](../air-committed-operations-plan.md): shared fighter wall groups, all available fighters committed to each bomber sortie, persistent offensive attacks, strategic district targeting, a fighter/radar production owner, and income-based bomber readiness. The nearby startup lab is retired and later rebuilt in the campus. Native changes are opt-in; TECH retains its existing policy. Validation is recorded with the plan.
+
 D-170 adds an explicitly detected metal-field economy through
 `MetalEconomy::AirTask`. It replaces converter/finite-mex priorities only in
 metal mode. The first T1 constructor builds toward forty dense mexes, the second
@@ -21,31 +23,43 @@ Reference for the `AIR` AngelScript role: aircraft plants, air constructors and
 the wind-economy opening. How it is registered, what it installs at init, how its
 build-focus system works, and where it is currently wrong.
 
-## Current air combat controller (D-162)
+## Current air combat controller (D-171)
 
-D-163 supersedes the historical fixed-size description below: the saved first
-T2 wave is configurable 10-20; later missions use target/route budgets after
-two AFUS. Completed sorties update a saved resistance multiplier. Heavy losses
-temporarily exclude the failed target region; returned aircraft remain in the
-immutable survival cohort. See [current design](../air-campus-strike-design.md).
+`Air_MilitaryAiMakeTask` offers radar missions, the shared fighter wall,
+`AirRaids::MakeTask`, then `AirWaves::MakeTask`. All uncommitted fighters join
+wall cells, including surplus Legion interceptors. Contact identity changes
+replace a group's mission; identical routes leave existing commands intact.
 
-`Air_MilitaryAiMakeTask` calls the home screen, `AirRaids::MakeTask`, then
-`AirWaves::MakeTask`. Experimental AIR stages ordinary bombers at home, uses
-three-aircraft T1 raids and an eight-aircraft T2 minimum, and selects known
-static targets from both armed and economic snapshots. A funded 240-second
-cadence replaces the income floor. An immutable cohort includes returned
-survivors when measuring losses. Flight policy bounds formation ranks,
-samples route exposure, observes weapon release and returns survivors.
-Phoenix script-emitted beams also confirm release through attributed damage.
-Legion's T1 Mosquito explicitly uses native RAID; it is not a reusable bomber.
+T1 bombers raid mex/wind targets. T2 bombers select AFUS, advanced converters
+and factories, clearing valuable local targets before moving to another base.
+All available fighters transfer to each bomber operation and remain committed
+until that offensive wave has no bombers. New fighters defend home. Offensive
+operations never return; nearby T3 defensive sorties may return and repair.
+Bomber HOLD_FIRE plus explicit target orders avoids deliberate T1 ground-unit
+attacks. Collateral splash is still possible. Legion's T1 Mosquito uses native
+RAID because it is a gunship, not an ordinary bomber.
+
+The first T2 economy raid keeps its configurable saved 10-20 draw. Defensive
+sorties and frontline assaults use separate payload budgets; an inaccessible
+backline can therefore produce a larger frontline wave before the opening
+economy raid. Subsequent raids use target health, route exposure, local AA,
+enemy army and unknown-threat allowances. Intended total attrition no longer
+penalizes future offensive missions as a failed return.
+
+Two completed advanced factories designate one live factory for fighters and
+20-plane radar cohorts every ten minutes. Radar aircraft patrol friendly
+territory while collecting, then sweep enemy starts without returning. Economy
+and emergency constructor/transport recovery can preempt normal production.
+Sustained metal and energy admit bombers independently of the two-AFUS growth
+objective. See [design and validation](../air-committed-operations-plan.md).
 
 Home demand is `clamp(6,60,ceil(1.2*armedAirValue/fighterCost))`; the old income
 coefficient is unused. `BomberOrdersClear=6` and `BomberOrdersParity=3` allocate
 strike turns per ten combat orders, after utility and emergency work.
-`StrikeFirstSize=8`, `StrikeWaveIncrement=4`, `StrikeWaveCap=80` set the funded
-schedule. `StrikeAssemblyRadius=600`, `StrikeAssemblyFraction=0.8`, and
-`StrikeJoinSeconds=20` control assembly. Specialists (EMP/Liche), coordinated
-multi-target packages and radar-plane missions remain future work. See the
+`StrikeFirstSize=8` is the later raid minimum and `StrikeWaveCap=80` bounds one
+dispatch. `StrikeAssemblyRadius=600`, `StrikeAssemblyFraction=0.8`, and
+`StrikeJoinSeconds=20` control assembly. Specialists (EMP/Liche) retain their
+existing tasks. Escort lead is positional, not an engine speed lock. See the
 [review](../air-enhancement-review.md) and [wave reference](../air-wave-attacks.md).
 
 ## Current building controller (D-147)
@@ -69,7 +83,7 @@ so native switching cannot add competing plants.
 
 `Air_MilitaryAiMakeTask` assigns a home interceptor before calling the existing
 wave handler. Unit removal clears both ledgers. T1 fighters join the patrol
-screen; T2 fighters fill its armed-threat quota before becoming wave escorts.
+screen; T2 fighters also stay on the wall until committed to an operation.
 Armada/Cortex scouts keep native scouting. Legion's first fighter/scout drone
 receives an explicit scouting route. Ferry requests run ahead of the role's factory handler.
 Role switching releases AIR projects/holds and reservations before the next
@@ -637,7 +651,7 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: b0d9704b93ea4d477c482eb5f2aa910c131bd484; lines: 1278 -->
+<!-- source: data/script/src/roles/air.as; blob: bbd3141a3c6f9d9b5f93e5eda14780e582293010; lines: 1280 -->
 
 ## D-152 expansion and access
 
@@ -683,7 +697,7 @@ unchanged. See the [formation plan](../telchine-perimeter-plan.md).
 
 ## D-163 dense campus and strategic bomber phase
 
-Experimental AIR reserves at least six T2 aircraft bays and one T1 bay, tiled by actual footprints with dense independent twenty-turret banks. Growth continues without a default factory cap. Shared TECH economy decisions begin at a sustained +50 metal minimum; AIR keeps all placements and tasks. Two completed advanced fusions enable mass bomber production. The opening wave draws once from `FirstBomberWaveMin`/`FirstBomberWaveMax` (10-20); later sorties use target and route budgets, with a separate funded replacement pool. T1 reusable bombers select mexes/wind. See [design](../air-campus-strike-design.md).
+Experimental AIR reserves at least six T2 aircraft bays and one T1 bay, tiled by actual footprints with dense independent twenty-turret banks. Growth continues without a default factory cap. Shared TECH economy decisions begin at a sustained +50 metal minimum; AIR keeps all placements and tasks. D-171 replaces the original two-AFUS bomber gate with sustained metal/energy admission; two AFUS remain an economy growth objective. The opening economy raid draws once from `FirstBomberWaveMin`/`FirstBomberWaveMax` (10-20); defensive and frontline sorties use their own payload budgets. Later raids use target and route budgets, with a separate funded replacement pool. T1 reusable bombers select mexes/wind. See [original design](../air-campus-strike-design.md) and [current operations](../air-committed-operations-plan.md).
 
 D-164 reserves a separate advanced-economy district at the opening: four modules
 of one AFUS/eight advanced-converter slots, expanding one unused module ahead.
