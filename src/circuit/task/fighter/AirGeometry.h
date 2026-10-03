@@ -4,6 +4,26 @@
 #include <cmath>
 namespace circuit::air_geometry {
 struct Slot { float lateral; float behind; };
+// Target classes are mechanism; script supplies their order. Unidentified,
+// hidden and submerged contacts are rejected by the caller before this filter.
+inline bool OperationTargetClass(int preference, bool mobile, bool flying,
+        bool attacker, bool earlyEconomy, bool allowed, int primaryPreference = -1)
+{
+    if (flying) return false;
+    // Falling back must not retry a primary target with weaker admission gates.
+    if (primaryPreference >= 0 && preference != primaryPreference
+        && OperationTargetClass(primaryPreference, mobile, flying, attacker, earlyEconomy, allowed)) return false;
+    switch (preference) {
+        case 0: return !mobile;
+        case 2: return !mobile && earlyEconomy;
+        case 3: return !mobile && attacker;
+        case 4: return !mobile && !attacker;
+        case 5: return !mobile && allowed;
+        case 6: case 7: return mobile && allowed;
+        case 8: return mobile;
+        default: return false;
+    }
+}
 inline bool PreferDistrictTarget(bool committed, bool local, bool bestLocal, float score, float bestScore)
 {
     if (committed && local != bestLocal) return local;

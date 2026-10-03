@@ -1,0 +1,10 @@
+{
+  "name":"glitters-cleanup-only",
+  "map":"All That Glitters v2.2.3",
+  "checks":"air_cleanup_only",
+  "description":"No strategic targets or factories remain; launch directly against lower-priority structures under radar visibility",
+  "visibility":"radar", "bomber_only":true,
+  "aircraft":[{"unit":"$t2","count":20,"team":0,"once":true}],
+  "targets":[{"unit":"armestor","count":3,"position":[3200,8700],"once":true}],
+  "defenses":[], "refill_seconds":60
+}

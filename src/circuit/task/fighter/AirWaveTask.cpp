@@ -471,9 +471,16 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
 		}
 		const bool isStatic = !e.cdef->IsMobile();
         if (operationPolicy && completedTargets.count(e.id)) continue;
-        if (operationPolicy && preference == 5 && (!isStatic || !allowedStrikeDefs.count(e.cdef->GetId()))) continue;
-        if (operationPolicy && preference == 6 && (isStatic || !allowedStrikeDefs.count(e.cdef->GetId()) || e.cdef->IsAbleToFly()
-            || e.pos.SqDistance2D(returnPos) > SQUARE(localRadius))) continue;
+        if (operationPolicy) {
+            if (!air_geometry::OperationTargetClass(preference, !isStatic, e.cdef->IsAbleToFly(),
+                e.cdef->IsAttacker(), e.cdef->GetExtractsM() > 0.f || e.cdef->IsWind(),
+                allowedStrikeDefs.count(e.cdef->GetId()) != 0, operationPreference) || e.pos.y < -SQUARE_SIZE * 5) continue;
+            // Remembered contacts can guide reconnaissance, but cannot hold a
+            // committed wave in an attack/search cycle against a hidden unit.
+            CEnemyInfo* known = circuit->GetEnemyInfo(e.id);
+            if (known == nullptr || known->IsHidden()) continue;
+            if (preference == 6 && e.pos.SqDistance2D(returnPos) > SQUARE(localRadius)) continue;
+        }
         if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&e](const auto& region) {
             return e.pos.SqDistance2D(region.first) <= region.second * region.second;
         })) continue;
@@ -481,7 +488,7 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
 			if (e.cost < minStaticCost) {
 				continue;
 			}
-		} else if (!includeHeavy || (!(operationPolicy && preference == 6) && !e.cdef->IsRoleHeavy()) || e.cdef->IsAbleToFly()) {
+		} else if (!includeHeavy || (!(operationPolicy && preference >= 6) && !e.cdef->IsRoleHeavy()) || e.cdef->IsAbleToFly()) {
 			continue;
 		}
 		float score;
@@ -905,11 +912,34 @@ void CAirWaveTask::SetOperationPolicy(bool attack, int preference, const AIFloat
     operationPolicy = true;
     offensive = attack;
     operationPreference = preference;
+    targetFallbacks.clear();
     assemblyPos = assembly;
     CTerrainManager::CorrectPosition(assemblyPos);
     escortLead = std::clamp(lead, 128.f, 1200.f);
     routeCeiling = std::max(0.f, ceiling);
     localRadius = std::clamp(radius, 256.f, 10000.f);
+}
+
+void CAirWaveTask::AddTargetFallback(int preference)
+{
+    if (!operationPolicy || !offensive || preference == operationPreference
+        || (preference != 0 && preference != 2 && preference != 3 && preference != 4
+            && preference != 5 && preference != 7 && preference != 8)) return;
+    if (std::find(targetFallbacks.begin(), targetFallbacks.end(), preference) == targetFallbacks.end())
+        targetFallbacks.push_back(preference);
+}
+
+bool CAirWaveTask::PickOperationTarget(const AIFloat3& from, float minStaticCost, bool includePrimary)
+{
+    if (!operationPolicy) return false;
+    if (includePrimary && PickStrikeTarget(from, operationPreference, minStaticCost, operationPreference >= 6)) return true;
+    int minimum = includePrimary ? requiredBombers : 0;
+    for (int preference : targetFallbacks) {
+        if (PickStrikeTarget(from, preference, minStaticCost, preference >= 6)) return true;
+        if (requiredBombers > 0 && (minimum == 0 || requiredBombers < minimum)) minimum = requiredBombers;
+    }
+    requiredBombers = minimum;
+    return false;
 }
 
 void CAirWaveTask::AllowStrikeDef(CCircuitDef* def, float priority)
@@ -997,11 +1027,7 @@ bool CAirWaveTask::NextOperationTarget()
     const AIFloat3 centre = OperationCentre();
     expectedCount = std::max(1, GetBomberCount());
     damageBudget = passDamage * expectedCount;
-    bool selected = PickStrikeTarget(centre, operationPreference, 0.f, !offensive);
-    // Once airborne, survivors keep seeking strategic value rather than retreating.
-    if (!selected && offensive && operationPreference == 5)
-        selected = PickStrikeTarget(centre, 3, 0.f, false);
-    if (!selected) return false;
+    if (!PickOperationTarget(centre, 0.f)) return false;
     PrepareOperationRoute();
     operationLeg = 0;
     operationPhase = 1;

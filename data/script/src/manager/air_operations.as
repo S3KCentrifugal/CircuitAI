@@ -40,6 +40,15 @@ namespace AirOperations {
         wave.SetOperationPolicy(offensive, preference, Global::Map::StartPos,
             Global::RoleSettings::Air::StrikeEscortLead, Global::RoleSettings::Air::StrikeBacklineRiskLimit,
             Global::RoleSettings::Air::StrikeDistrictRadius);
+        if (offensive) {
+            // A committed wave exhausts each class before descending. This also
+            // lets new waves finish a defeated base after its named targets die.
+            wave.AddTargetFallback(3); // preserve the existing frontline assault fallback
+            wave.AddTargetFallback(4); // other economy and support structures
+            wave.AddTargetFallback(7); // approved heavy ground units
+            wave.AddTargetFallback(0); // remaining structures
+            if (Global::RoleSettings::Air::StrikeCleanupMobile) wave.AddTargetFallback(8);
+        }
         if (!rosterReady) {
             rosterReady = true;
             const array<string> gantries = UnitHelpers::GetAllGantries();

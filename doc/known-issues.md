@@ -4196,3 +4196,15 @@ T2 at 12:56/15:31 and fusion at 13:26/19:18. This does not guarantee the
 aggregate APM above 3000 remain; final Glacial peaked at 2396 aircraft / 3833
 all-unit APM. Exact cases and limitations are in
 [the D-172 results](air-workforce-repair-results.md).
+
+
+**D-173 follow-up to KI-457/KI-474.** Experimental AIR's strategic-target
+exhaustion is fixed and played: three Glitters factions explicitly retarget
+surviving stores; cleanup-only admission, defensive return and blocked-backline
+assault pass. No active-wave landing was observed in either baseline or final
+tests, so this does not establish the cause of the reported original-match
+landing. The arena now records actual aircraftState/autoland and captures a
+landing violation for future reproduction. Payload calibration, nested scans,
+save/load and natural-game efficacy remain outside this repair. See
+[D-173 results and limitations](air-bomber-cleanup-results.md) and
+[decision D-173](decisions.md#d-173---committed-air-cleanup-after-strategic-target-exhaustion).

@@ -984,6 +984,7 @@ namespace Global {
             float ReactorProjectSeconds = 120.0f;
             int ConstructorsPerFighter = 2;
             int CombatOrdersPerEconomyConstructor = 2; // after opening screen, even during sustained incursions
+            bool StrikeCleanupMobile = false; // preserve T1 exclusion unless explicitly enabled
             int InterceptUpdateSeconds = 2;
             float InterceptCostRatio = 1.5f;
             float StrikeControlRatio = 1.25f;

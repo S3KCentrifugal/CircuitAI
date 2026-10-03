@@ -7,6 +7,23 @@
 int main()
 {
     using namespace circuit::air_geometry;
+    // Cleanup admits support buildings but never confuses them with strategic
+    // targets; mobile low-tier cleanup remains an explicit script opt-in.
+    assert(OperationTargetClass(4, false, false, false, false, false));
+    assert(!OperationTargetClass(5, false, false, false, false, false));
+    assert(OperationTargetClass(5, false, false, false, false, true));
+    assert(OperationTargetClass(3, false, false, true, false, false));
+    assert(!OperationTargetClass(4, false, false, true, false, false));
+    assert(OperationTargetClass(7, true, false, true, false, true));
+    assert(!OperationTargetClass(7, true, false, true, false, false));
+    assert(!OperationTargetClass(0, true, false, true, false, false));
+    assert(OperationTargetClass(8, true, false, true, false, false));
+    assert(!OperationTargetClass(8, true, true, true, false, false));
+    assert(!OperationTargetClass(99, false, false, false, false, true));
+    assert(!OperationTargetClass(4, false, false, false, false, true, 5));
+    assert(!OperationTargetClass(0, false, false, false, false, true, 5));
+    assert(!OperationTargetClass(4, false, false, false, true, false, 2));
+    assert(OperationTargetClass(4, false, false, false, false, false, 5));
     assert(PreferDistrictTarget(true, true, false, 10, 10000));
     assert(!PreferDistrictTarget(true, false, true, 10000, 10));
     assert(PreferDistrictTarget(false, false, true, 10000, 10));

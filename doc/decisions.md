@@ -10420,3 +10420,57 @@ matched DLL/debug/data; the live game install was not modified.
 - [Guard fixture preparer](../tools/playtest/prepare_air_workforce.py)
 - [Workforce observer](../tools/playtest/widgets/air_workforce_watch.lua)
 - [Donation fixture](../tools/playtest/widgets/air_donation_fixture.lua)
+
+
+## D-173 - Committed AIR cleanup after strategic target exhaustion
+
+**Decision.** Let script supply a bounded fallback list shared by launch and
+retargeting. Retain strategic targets and the existing armed-static fallback,
+then admit other economy/support, approved heavy ground units and other static
+targets. All-mobile cleanup is opt-in; preserve the owner's T1-ground exclusion
+until explicitly changed. Keep committed offensive survivors airborne and active;
+defensive operations retain their return lifecycle. Hold an unlaunched response
+whose known nearby T3 payload exceeds the available bombers.
+
+**Reasoning.** The old advanced operation searched only named strategic and armed
+structures, then surveyed starts despite known surviving utility buildings. The
+Glitters baseline killed the converter but ignored all three stores. Falling back
+through broad unarmed/static classes must exclude primary targets; otherwise a
+rejected strategic route or opening-force budget could be bypassed. Hidden contacts
+are excluded from attack admission, matching the attack-state visibility contract.
+The defensive accumulation guard prevents a cheap cleanup commitment from consuming
+an incomplete response. Already committed waves are never recalled.
+
+**Alternatives.** Repeatedly resending idle-mode commands was rejected: baseline
+and fixed launched cohorts already report fly mode and no active landing in these
+tests. The exact reported late-game landing remains unproven. Putting utility
+targets ahead of the existing armed-static fallback was rejected on final review
+to preserve frontline assault when backline AA blocks ingress. No TECH, legacy
+task or economy policy was changed. No global rate limit was introduced.
+
+**Invariant.** INV-116 now includes independently observed engine flight state
+for launched cohorts; defensive return is exempt. The cleanup checks require an
+explicit lower-priority selection after primary destruction plus actual damage
+and death, allowing incidental earlier splash damage.
+
+**Verification.** Built, Checked, Played. Native and policy suites pass; all three
+experimental profiles compile/load; 19 arena/attribution tests pass. Final DLL
+Glitters tests pass for Phoenix, Armada and Cortex. Radar-only cleanup admission,
+defensive return and blocked-backline artillery cases pass. Failed early fixtures
+and the overly strict splash-order check are retained. The final script reorder
+is separately exercised by blocked-route and cleanup-only games; the other cases
+contain no armed structures. Exact source/build hashes, logs, screenshots and
+limits are recorded below. Existing strike-calibration and nested-scan concerns
+remain KI-457/KI-474. Matched DLL/debug/data published to the required Recoil build
+output; live game installation untouched; concurrent map edits excluded.
+
+**Files.**
+- [Wave task](../src/circuit/task/fighter/AirWaveTask.cpp), [API](../src/circuit/task/fighter/AirWaveTask.h), [target filter](../src/circuit/task/fighter/AirGeometry.h), [bindings](../src/circuit/script/InitScript.cpp)
+- [Operation policy](../data/script/src/manager/air_operations.as), [advanced waves](../data/script/src/manager/air_waves.as), [T1 raids](../data/script/src/manager/air_raids.as), [settings](../data/script/src/global.as)
+- [Native filter tests](../tests/air_geometry_test.cpp)
+- [Arena runner](../tools/playtest/air_arena.py), [engine observer/camera](../tools/playtest/widgets/air_arena.lua)
+- [Glitters case](../tools/playtest/air_cases/cleanup-glitters.json), [cleanup-only case](../tools/playtest/air_cases/cleanup-only-glitters.json), [defensive case](../tools/playtest/air_cases/defensive-t3.json)
+- [Cleanup checks](../tools/playtest/checks/air_cleanup.json), [cleanup-only checks](../tools/playtest/checks/air_cleanup_only.json), [defensive checks](../tools/playtest/checks/air_defensive.json)
+- [AIR reference](roles/air.md), [script API](angelscript-references.md), [invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
+- [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](benchmarks/d173-bomber-cleanup.json)
+- [Phoenix screenshot](images/d173/phoenix-cleanup.png), [Cortex screenshot](images/d173/cortex-cleanup.png)

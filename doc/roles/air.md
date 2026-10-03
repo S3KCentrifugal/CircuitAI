@@ -32,6 +32,14 @@ replace a group's mission; identical routes leave existing commands intact.
 
 T1 bombers raid mex/wind targets. T2 bombers select AFUS, advanced converters
 and factories, clearing valuable local targets before moving to another base.
+D-173 extends the existing armed-structure fallback with other economy/support
+buildings, approved heavy ground units, then remaining structures.
+Both launch admission and surviving waves use this fallback. Setting
+`StrikeCleanupMobile=true` adds all remaining surface mobile units as the last
+tier; it defaults to false to retain the earlier T1 exclusion. See the
+[cleanup repair plan](../air-bomber-cleanup-plan.md). A known nearby T3 whose
+minimum payload exceeds the available bombers holds an unlaunched wave until
+it has a viable defensive force; already committed offense is unaffected.
 All available fighters transfer to each bomber operation and remain committed
 until that offensive wave has no bombers. New fighters defend home. Offensive
 operations never return; nearby T3 defensive sorties may return and repair.

@@ -73,6 +73,8 @@ public:
     void SetMissionPolicy(float padding, float inset, float unknown, float riskScale, float armyReserve, float localAAReserve, bool synchronize);
     void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
+    void AddTargetFallback(int preference);
+    bool PickOperationTarget(const springai::AIFloat3& from, float minStaticCost, bool includePrimary = true);
     void AllowStrikeDef(CCircuitDef* def, float priority);
     void AddSearchPoint(const springai::AIFloat3& point);
     int GetBomberCount() const;
@@ -174,6 +176,7 @@ private:
     bool offensive = false;
     bool committed = false;
     int operationPreference = 5;
+    std::vector<int> targetFallbacks;
     int operationPhase = 0;
     int operationLeg = 0;
     int operationIssuedFrame = -1;

@@ -19,8 +19,9 @@ local function photograph(key,x,z,height)
     if camera or shots[key] then return end
     shots[key]=true
     Spring.SendCommands({"setmaxspeed 0.25","setminspeed 0.25","setmaxspeed 0.25"})
-    Spring.SetCameraState({name="ta",px=x,py=math.max(0,Spring.GetGroundHeight(x,z)),pz=z,height=height or 2400,angle=0.8},0)
-    camera={key=key,at=Spring.GetTimer(),draws=0}
+    local state={mode=1,px=x,py=math.max(0,Spring.GetGroundHeight(x,z)),pz=z,height=height or 2400,angle=0.8}
+    Spring.SetCameraState(state,0)
+    camera={key=key,at=Spring.GetTimer(),draws=0,state=state}
     event("camera",{key=key,x=math.floor(x),z=math.floor(z)})
 end
 local function position(g,index)
@@ -83,7 +84,7 @@ local function receive(team,text)
     if args[1]=="launch" then
         local id=tonumber(args[2]);local ids={}
         for s in args[6]:gmatch("%d+") do ids[#ids+1]=tonumber(s) end
-        local w={id=id,target=tonumber(args[4]),members=ids,seen=false,damage=false,firstHit=false}
+        local w={id=id,target=tonumber(args[4]),members=ids,seen=false,damage=false,firstHit=false,launched=Spring.GetGameFrame(),landed={}}
         waves[id]=w;current=w
         event("launch",{wave=id,target=w.target,risk=args[5],ids=args[6],count=#ids})
         for _,u in ipairs(ids) do if units[u] then units[u].wave=id end end
@@ -109,6 +110,8 @@ local function receive(team,text)
     elseif args[1]=="response" then
         event("response",{team=team,active=args[3],wave=current and current.id or 0})
     elseif args[1]=="commitment" then
+        local w=waves[tonumber(args[2])]
+        if w then w.returning=tonumber(args[6])==5 end
         event("commitment",{wave=args[2],escorts=args[3],owned=args[4],homeIntruders=args[5],state=args[6]})
     end
 end
@@ -131,6 +134,10 @@ local function onDamage(id,def,team,damage,paralyzer,weapon,projectile,attacker,
         w.damage=true;local x,_,z=Spring.GetUnitPosition(id)
         event("target_hit",{wave=wave,target=id,emp=paralyzer and 1 or 0})
         if x and wave<=8 then photograph("wave"..wave.."-target",x,z,2200) end
+    end
+    if w and a and a.team==0 and id~=w.target and not w.cleanupShot and not camera then
+        local x,_,z=Spring.GetUnitPosition(id)
+        if x then w.cleanupShot=true;photograph("wave"..wave.."-cleanup",x,z,2200) end
     end
     if not w and not camera and a and a.team==0 and a.kind=="aircraft" and not genericAttackShot then
         local x,_,z=Spring.GetUnitPosition(id)
@@ -239,12 +246,36 @@ function widget:GameFrame(f)
         event("sample",{attackers=n0,fighters=n1,wave=current and current.id or 0,targets=targets,seenTargets=seen})
         if f==1800 then photograph("arena-overview",Game.mapSizeX/2,Game.mapSizeZ/2,15000) end
     end
+    if f%150==0 then
+        for _,w in pairs(waves) do
+            local alive,landed,autoLand=0,0,0
+            for _,id in ipairs(w.members) do if valid(id) then
+                alive=alive+1
+                local movement=Spring.GetUnitMoveTypeData(id) or {}
+                local state=Spring.GetUnitStates(id) or {}
+                if state.autoland then autoLand=autoLand+1 end
+                if movement.aircraftState=="landed" or movement.aircraftState=="landing" then
+                    landed=landed+1
+                    if not w.returning and f>w.launched+150 and not w.landed[id] then
+                        w.landed[id]=true
+                        event("flight_landing",{wave=w.id,id=id,state=movement.aircraftState,autoland=state.autoland})
+                        Spring.Echo("[INVARIANT] INV-116 AIR arena: active bomber landed outside defensive return id="..id)
+                        local x,_,z=Spring.GetUnitPosition(id)
+                        if x then photograph("wave"..w.id.."-landing",x,z,2200) end
+                    end
+                end
+            end end
+            event("flight",{wave=w.id,alive=alive,landed=landed,autoland=autoLand})
+        end
+    end
 end
 function widget:DrawScreen()
     if camera then
+        Spring.SetCameraState(camera.state,0)
         camera.draws=camera.draws+1
         if camera.draws>=5 and Spring.DiffTimers(Spring.GetTimer(),camera.at)>=1 then
-            Spring.SendCommands("screenshot png");event("screenshot",{key=camera.key})
+            local state=Spring.GetCameraState()
+            Spring.SendCommands("screenshot png");event("screenshot",{key=camera.key,x=math.floor(state.px or 0),z=math.floor(state.pz or 0)})
             Spring.SendCommands({"setmaxspeed "..cfg.speed,"setminspeed "..cfg.speed,"setmaxspeed "..cfg.speed});camera=nil
         end
     end

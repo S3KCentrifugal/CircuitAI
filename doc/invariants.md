@@ -166,7 +166,7 @@ step.
 | INV-114 | A cancelled field mex task without a frame relinquishes its served layout pin. | Builder removal callback retains the dead task until MetalEconomy::Read checks the completed native cancellation; the handle is then released. | D-170 |
 
 | INV-115 | A committed fighter stays assigned to its live bomber operation unless a human takes control. | AirOperations::Tick checks actual task identity; ending the operation releases surviving escorts. | D-171 |
-| INV-116 | An offensive bomber operation never enters RETURNING. | AirOperations::Tick checks each live offensive native wave state. Defensive operations may return and repair. | D-171 |
+| INV-116 | An offensive bomber operation never returns or lands in combat. | AirOperations::Tick checks RETURNING; the arena reads engine aircraftState/autoland for launched bombers outside defensive return. Defensive operations may return and repair. | D-171, D-173 |
 | INV-117 | AIR's normal-map three-mex opening does not enqueue another opening extractor after owning three. | AirRules checks ownership separately from the native search-candidate cap; AirBuild::Record audits admission. Metal-map opening remains separate. | D-171 |
 | INV-118 | AIR's transition storage exception spends only a nearly full pre-T2 bank whose capacity is below the loaded lab cost. | AirBuild::Record checks transition.storage against current economy observations. | D-171 |
 | INV-119 | A funded AIR workforce production turn recruits an available missing constructor. | AirProduction audits admission after the opening screen, with bounded combat-order precedence during incursions. | D-172 |

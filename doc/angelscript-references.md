@@ -1723,3 +1723,20 @@ preplans at least forty sites. Extra demand may add further modules.
 `CAirWaveTask.SetOperationPolicy(bool offensive, int preference, const AIFloat3& assembly, float escortLead, float routeCeiling, float districtRadius)` enables the separate operation state machine. `AllowStrikeDef(CCircuitDef@, float)` supplies script priorities and allowed T3 defense definitions. `AddSearchPoint` supplies enemy-base search anchors. Bomber definitions come from `SetStrikePolicy`/`ConsiderStrikeAircraft`; escorts use the same task but are not counted as bombers. `GetBomberCount` exposes that distinction. `GetDamageDealt` currently reports observed target-health loss, including other attackers, and `GetTargetsDestroyed` counts disappeared target identities; neither is authoritative kill attribution. Use the arena damage observer for that.
 
 For offline type checking, set `CIRCUIT_AS_INTERFACE` to an explicit local output prefix for one engine launch. ScriptManager writes `<prefix>.init.cfg` and `<prefix>.main.cfg` containing declarations/compiler settings, without game state. `tools/compile_script.cpp` compiles a profile against this snapshot without executing policy or global initializers. Regenerate the snapshot after native API changes; an engine run remains necessary to validate initialization and behavior.
+
+
+### AIR cleanup target policy (D-173)
+
+`CAirWaveTask.AddTargetFallback(int preference)` appends a unique fallback
+class to an offensive operation. `SetOperationPolicy` clears this list.
+Classes: 4 other economy/support statics, 3 armed statics, 7 script-allowed
+mobile ground heavies, 0 all remaining statics, 8 remaining surface mobiles.
+No aircraft, hidden contacts or deeply submerged contacts qualify.
+`PickOperationTarget(const AIFloat3& in, float minStaticCost, bool includePrimary = true)`
+tries the primary then each fallback in order and preserves the lowest unmet
+force requirement on failure. `includePrimary=false` lets first-wave planning
+retain its strategic opening-size budget while testing cleanup separately.
+Committed retargeting uses the same operation policy with no minimum cost.
+Defensive operations have no fallback list; existing PickStrikeTarget callers
+retain their original non-operation behavior. No new state is serialized: wave
+objects remain transient under the existing save/load design.

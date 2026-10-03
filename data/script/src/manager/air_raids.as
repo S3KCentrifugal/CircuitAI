@@ -51,7 +51,7 @@ namespace AirRaids {
             Global::RoleSettings::Air::StrikeRiskScale, Global::RoleSettings::Air::StrikeArmyReserve,
             Global::RoleSettings::Air::StrikeLocalAaReserve, false);
         AirOperations::Configure(wave, true, 2);
-        if (!wave.PickStrikeTarget(Global::Map::StartPos, 2, 30.0f, false)) {
+        if (!wave.PickOperationTarget(Global::Map::StartPos, 0.0f)) {
             wave.Abort(); @wave = null; return;
         }
         wave.SetPlan(Task::WaveMode::STRIKE, wave.GetAim(), Global::RoleSettings::Air::WaveFormDistance,

@@ -410,6 +410,13 @@ namespace AirWaves {
             AirOperations::Configure(wt, false, 6);
             plannedDefensive = wt.PickStrikeTarget(Global::Map::StartPos, 6, 0.0f, true);
             const int defensiveMinimum = wt.GetRequiredBombers();
+            // Accumulate a viable response before committing to cheap cleanup.
+            // This only governs launch; an existing offensive wave stays committed.
+            if (!plannedDefensive && defensiveMinimum > bombers) {
+                targetMinimum = defensiveMinimum;
+                raw.Abort();
+                return null;
+            }
             if (!plannedDefensive) {
                 AirOperations::Configure(wt, true, 5);
                 // The opening draw sizes an economy raid. A blocked backline
@@ -427,7 +434,7 @@ namespace AirWaves {
                 Global::RoleSettings::Air::StrikeMinTargetMetal, false);
             if (plannedFront) ConfigureStrike(wt,
                 ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side)), heldBombers, bombers);
-            if (plannedFront && !wt.PickStrikeTarget(Global::Map::StartPos, 3, Global::RoleSettings::Air::StrikeMinTargetMetal, false)) {
+            if (plannedFront && !wt.PickOperationTarget(Global::Map::StartPos, 0.0f, false)) {
                 targetMinimum = wt.GetRequiredBombers();
                 raw.Abort();
                 if (ai.frame - lastNoTargetLog >= 30 * SECOND) {

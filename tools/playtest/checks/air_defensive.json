@@ -3,7 +3,7 @@
   "expect":[
     {"key":"loaded","pattern":"\\[AirArena\\] event=loaded","scope":"any","by_minute":1},
     {"key":"defensive-launch","pattern":"WAVE: committed attack .*offensive=0","scope":"any","by_minute":6},
-    {"key":"bomber-hits-t3","pattern":"\\[AirArena\\] event=damage .*adef=armpnix .*vdef=corshiva","scope":"any","by_minute":6},
+    {"key":"bomber-hits-t3","pattern":"\\[AirArena\\] event=damage .*adef=(armpnix|corhurc|legphoenix) .*vdef=corshiva","scope":"any","by_minute":6},
     {"key":"defensive-return","pattern":"WAVE: defensive return complete","scope":"any","by_minute":8},
     {"key":"screenshot","pattern":"\\[AirArena\\] event=screenshot","scope":"any","by_minute":5}
   ],

@@ -161,8 +161,8 @@ def prepare(args):
     args.checks = args.checks or case.get('checks', 'air_arena')
     if not re.fullmatch('[a-z0-9_]+', args.checks) or not (HERE/'checks'/f'{args.checks}.json').is_file():
         raise ValueError('Unknown arena checks: ' + args.checks)
-    if args.map != 'Supreme Isthmus v1.7' and case_path.parent.resolve() == (HERE/'air_cases').resolve():
-        raise ValueError('Built-in target coordinates require Supreme Isthmus v1.7; supply a custom JSON case for another map')
+    if args.map != case.get('map', 'Supreme Isthmus v1.7') and case_path.parent.resolve() == (HERE/'air_cases').resolve():
+        raise ValueError('Built-in target coordinates require their declared map; supply a custom JSON case for another map')
     if args.unit:
         if not re.fullmatch('[a-z][a-z0-9_]*', args.unit):
             raise ValueError('Invalid aircraft UnitDef name')
@@ -191,11 +191,13 @@ def prepare(args):
            '--map', args.map, '--map-file', str(starts), '--game', args.game, '--engine', args.engine,
            '--role', 'AIR', '--roles', 'all', '--side', args.side, '--ally-spots', '1', '--bonus', '0',
            '--speed', str(args.speed), '--minutes', str(args.minutes), '--shots', '', '--width', '1280', '--height', '720', '--lean-render',
-           '--ai-option', 'profile=experimental_hard', '--ai-option', 'random_seed=' + str(args.seed),
+           '--ai-option', 'profile=' + args.profile, '--ai-option', 'random_seed=' + str(args.seed),
            '--modoption', 'deathmode=neverend', '--modoption', 'startenergy=1000000000',
            '--modoption', 'startenergystorage=1000000000', '--modoption', 'multiplier_energyproduction=1000',
            '--extra-widget', str(HERE / 'widgets/air_arena.lua'),
            '--extra-widget', str(HERE / 'widgets/air_command_watch.lua')]
+    if args.data:
+        cmd += ['--data', str(args.data)]
     subprocess.run(cmd, check=True)
     script = base / 'script.txt'
     text = script.read_text()
@@ -239,7 +241,7 @@ def prepare(args):
     (base / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     (base / 'LuaUI/Config/air_arena.lua').write_text('return ' + lua(case) + '\n')
     git = ['git', '-c', 'safe.directory=' + ROOT.as_posix(), 'rev-parse', 'HEAD']
-    manifest = {'case': case, 'game': args.game, 'engine': args.engine, 'map': args.map,
+    manifest = {'case': case, 'game': args.game, 'engine': args.engine, 'map': args.map, 'profile': args.profile,
                 'source_commit': subprocess.check_output(git, cwd=ROOT, text=True).strip(),
                 'dll_sha256': hashlib.sha256(Path(args.dll).read_bytes()).hexdigest(), 'overrides': overrides,
                 'harness_sha256': {str(p.relative_to(HERE)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -270,6 +272,8 @@ def main():
     p.add_argument('--sides', default='armada,cortex,legion')
     p.add_argument('--seeds', default='1651')
     p.add_argument('--dll', type=Path, default=DLL)
+    p.add_argument('--data', type=Path, help='Pinned AI data for isolated regression games')
+    p.add_argument('--profile', choices=['experimental_balanced', 'experimental_hard', 'experimental_terrible'], default='experimental_hard')
     p.add_argument('--map', default='Supreme Isthmus v1.7')
     p.add_argument('--map-file')
     p.add_argument('--game', default=GAME)
@@ -300,7 +304,7 @@ def main():
                                '--case', case, '--side', side, '--defender', a.defender, '--seed', seed,
                                '--dll', str(a.dll), '--map', a.map, '--game', a.game, '--engine', a.engine,
                                '--minutes', str(a.minutes), '--speed', str(a.speed), '--wall-minutes', str(a.wall_minutes)]
-                    for key in ('visibility', 'map_file', 'unit', 'fighters', 'checks'):
+                    for key in ('visibility', 'map_file', 'unit', 'fighters', 'checks', 'data', 'profile'):
                         value = getattr(a, key)
                         if value is not None:
                             command += ['--'+key.replace('_','-'), str(value)]
