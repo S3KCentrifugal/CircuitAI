@@ -11107,3 +11107,40 @@ and no Hoplites for Legion. Both focused audits pass. Whole games remain FAIL
 for known TECH invariant categories (KI-472), with zero script errors/INV-127.
 No new AIR/Marauder or waves-disabled fallback game was run. See the report
 for immutable evidence, screenshots and all verification limits.
+
+
+## D-183 - Investigate first bomber wave starvation without waiving launch budgets
+
+**Date:** 2026-10-03. **Status:** Investigated; existing game evidence and pure
+policy checks, no gameplay changes or new simulation.
+
+**Decision.** Record the actual first-wave admission gates and the observed
+18/20 Phoenix delay. Recommend bounded funded quota completion and explicit
+blocked-state/reconnaissance handling. Preserve current gameplay in this
+investigation, which asks why the wave waits and what triggers launch.
+
+**Reasoning.** The matching Supreme game drew 20 and held 18 for roughly
+nineteen game minutes before launching. Current production can postpone the
+last orders indefinitely. The logs do not name all launch vetoes, so neither
+missing escorts nor lack of vision is established as the sole cause. The
+owner has not yet confirmed this is the reported match.
+
+**Alternatives rejected.** Merely disabling landing leaves the same wait in
+the air. Changing the legacy eight-minute timeout does not affect the
+experimental branch. Blind timed release can waive required damage or send
+an unfunded raid through known AA; lowering the configured opening quota
+conceals its incomplete production rather than coordinating the two owners.
+
+**Invariant.** No new runtime invariant: no behavior fix is shipped. Existing
+operation payload/route and committed-escort policies remain unchanged. A
+follow-up fix must check bounded readiness progress and exercise physical
+assembly, ingress and weapon damage, not just a launch log.
+
+**Files.** [Investigation and evidence](reviews/2026-10-03-air-first-wave-stall.md),
+[known issues KI-493 and KI-494](known-issues.md), and this decision record.
+
+**Verification.** 113 existing AIR math tests and six scratch policy probes
+pass. The local log records the quota, held pool, resumed bomber production
+and 38:48 launch. Current installed policy files match the repository after
+newline normalization; the historical match build is not pinned. See the
+report for exact evidence, uncertainty and proposed regression cases.

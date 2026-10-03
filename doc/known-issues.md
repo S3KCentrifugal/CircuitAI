@@ -3687,6 +3687,7 @@ their detail here; add the pointer and keep the one-line summary accurate.
 | KI-464 - Repeated AIR economy, target and layout computation | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | Per-project ownership scans, per-target enemy scans, square-per-ring enumeration and per-candidate exit-list rebuilding repeat work. Use revision-aware aggregates/indexes and budgeted exact searches; preserve admission/visibility/placement rules and benchmark p99 cost. |
 | KI-465 - Script slow updates exclude AI IDs 30 and above | [AIR performance review](reviews/2026-10-02-air-performance-review.md) | CircuitAI::Update compares frame modulo 30 with raw skirmishAIId. Reduce the ID modulo the interval, retaining phases 0-29; verify IDs 29/30/31 and recreation. Source-checked, unimplemented and unplayed. |
 | KI-469-471 - Metal-map support and source corrections | [Metal-map proposal review](reviews/2026-10-02-metal-maps-proposal-review.md) | D-170 implements field support and dense openings; [implementation](metal-maps-implementation.md). Remaining validation and TECH findings: KI-472. KI-471 documentation corrected. |
+| KI-493-494 - First AIR bomber wave held at base | [First-wave investigation](reviews/2026-10-03-air-first-wave-stall.md) | Opening quota completion can be starved; several launch vetoes are silent and the no-target reconnaissance request is only a log message. |
 
 ## Maintaining this register
 
@@ -4468,3 +4469,42 @@ includes the correction. Not fixed at review time; D-181 status follows.
 **D-181 implementation update (2026-10-03).** D-181 corrects all numeric boundaries/ranges in the active check and adds physical completion/working assertions. Python tests accept whole large counts and reject counts below the scenario floor. Archived checks/results are untouched; separate workforce audits observe spending and lifecycle events. Fixed test-definition defect; see [results](air-workforce-results.md).
 
 **D-182 storage audit note.** The immutable migration snapshot still hashes the pre-D-181 active air_build_power definition. Its mismatch is expected after the documented KI-492 fix; all 130 historical benchmark/image files match. Keep the original evidence hashes rather than rewriting them to hide an active-definition change.
+
+
+### KI-493 - AIR can starve the last bombers needed for its opening raid
+
+**Problem.** A Supreme Legion AIR log holds 18 Phoenixes against an opening
+quota of 20 for about nineteen game minutes, then launches at 38:48. Production
+can prioritize fighters/workforce/recon without an allocation to finish that
+quota. Experimental launch has no elapsed-time recovery and several silent
+vetoes; the log cannot attribute every failed attempt to one predicate.
+
+**Proposed solution.** Share readiness/blocked-reason state between
+`AirProduction` and `AirWaves`, add a bounded funded quota-completion share
+while preserving immediate defense, and trigger replanning/scouting on an
+excessive wait. Preserve payload/AA budgets and the dedicated fighter plant.
+See the [investigation](reviews/2026-10-03-air-first-wave-stall.md) and
+[D-183](decisions.md#d-183---investigate-first-bomber-wave-starvation-without-waiving-launch-budgets).
+
+**Verification.** Existing 113 helper tests and six focused current-policy
+probes pass; observed game delay is retained in the report. Match identity
+awaits owner confirmation; no fix or new simulation. Test 18/20 completion,
+escort shortfall, air intrusion, hidden targets and physical launch/damage,
+then a natural Supreme game. Do not count recruit events as completed aircraft.
+
+### KI-494 - AIR no-target message does not request reconnaissance
+
+**Problem.** `_PlanWave` says `request fresh reconnaissance` but only logs it.
+A held wave needs a qualifying known target; search of remembered positions
+is an already-launched operation behavior. Periodic scouting is independent.
+This source-confirmed gap is not proven causal in the eighteen-Phoenix game.
+
+**Proposed solution.** Send a deduplicated target-discovery request from
+`AirWaves` to the existing reconnaissance controller, preserving economic
+admission and distinguishing lack of vision from a genuinely denied AA route.
+See the [investigation](reviews/2026-10-03-air-first-wave-stall.md) and D-183.
+
+**Verification.** Source traced; unimplemented and unplayed. A controlled
+hidden-economy fixture must produce a real reconnaissance dispatch, discover
+a target and physically launch the funded wave without repeated orders or
+bypassing its damage/AA/escort checks.
