@@ -1,0 +1,15 @@
+{
+  "name": "workforce-energy-starved",
+  "runner": "run_air_workforce.py",
+  "scenario": "energy-starved",
+  "description": "Same metal gifts without supplied energy production; observe energy recovery.",
+  "kind": "supplied",
+  "map": "Supreme Isthmus v1.7",
+  "minutes": 16,
+  "seed": 1810001,
+  "checks": "air_workforce_budget",
+  "focused_assertions": [
+    "completed-workers",
+    "donor-stop"
+  ]
+}

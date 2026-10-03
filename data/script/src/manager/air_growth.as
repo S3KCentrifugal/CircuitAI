@@ -23,6 +23,9 @@ namespace AirGrowth {
                 Invariants::Violation("INV-120", "AIR", "shared growth considered before eligible first-lab placement");
         }
         EcoPlanner::State@ s = EcoPlanner::Read(u, AirEconomy::metal, AirEconomy::energy, true);
+        // AIR admitted its funded support request before this chooser. It must
+        // not ask TECH's independent 8-BP/M rule to make a second decision.
+        s.buildPowerNear = 0.0f;
         // The next reactor is an objective, even at a temporarily full bank.
         // Keep one reactor frame and focus mobile build power on it.
         CCircuitUnit@ reactor = null;
@@ -41,9 +44,6 @@ namespace AirGrowth {
         s.energyBuilding = AirBuild::ReactorPending() || reactor !is null;
         s.energyAssistable = reactor !is null;
         s.turretSlot = false;
-        for (uint b = 0; b < AirLayout::bays.length(); ++b)
-            if (AirLayout::bays[b].factoryId >= 0 && AirBuild::SupportCommitted(b) < AirEconomy::NanoTarget(b))
-                s.turretSlot = true;
         string why;
         string key = EcoPlanner::Decide(s, why);
         // The growth goal outranks a full bank's ordinary 'no more energy' answer,

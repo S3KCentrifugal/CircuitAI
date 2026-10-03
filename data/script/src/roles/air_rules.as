@@ -78,12 +78,14 @@ namespace AirRules {
             @t = AirBuild::Factory(u, true);
             if (t !is null) return AirBuild::Record(t, "transition.bay", u);
             if (AirEconomy::SavingForFirstLab()) {
+                @t = AirBuild::Nano(u);
+                if (t !is null) return AirBuild::Record(t, "transition.support", u);
                 @t = AirBuild::Assist(u);
                 if (t !is null) return AirBuild::Record(t, "transition.finish", u);
                 return AirBuild::Record(aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND)), "transition.save", u);
             }
         }
-        if (AirEconomy::MetalFloating()) {
+        { // One funded support decision, before shared growth/assistance.
             @t = AirBuild::Nano(u);
             if (t !is null) return AirBuild::Record(t, "overflow.support", u);
             @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));

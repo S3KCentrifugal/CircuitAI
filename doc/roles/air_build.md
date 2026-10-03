@@ -1,9 +1,10 @@
 # AIR building actions
 
-D-179: `OpeningSupportBudget` reserves spending for the first two supported
-turrets on normal maps once the screen exists. It first repairs missing slots;
-fully blocked support cannot freeze recruitment. `Nano(u, openingOnly)` keeps
-the early 160-energy exception confined to the configured opening support.
+D-181: the opening support goal no longer reserves all factory recruitment.
+The unused `OpeningSupportBudget` veto is removed. Constructors and `Nano`
+use the same two-resource investment budget.
+`Nano(u, openingOnly)` restricts that pass to the configured opening support;
+the common budget checks its capital and incremental energy demand.
 `Commander` may build a turret only if capable, otherwise assists a nearby
 frame. See [design and evidence](../air-opening-recon-plan.md).
 
@@ -37,6 +38,10 @@ task, checking native assignment and reachability before creating more work.
 `Added` observes construction orders; `Tick` cancels unclaimed native completion
 chain orders after script enqueue has returned. This prevents a native nano
 order outside the layout from blocking the role's pinned support job (INV-076).
+`AdoptExisting` observes builders' current tasks on role entry, preserving
+framed construction and registering unframed orders for reconciliation. `Tick`
+also drains orders exposed by cancelling a native chain head before auditing
+ownership; a bounded chain loop retains the invariant on malformed chains.
 
 `EconomyAircraft` identifies economic workers of both aircraft constructor
 tiers. `ReturnEconomyWorkers`, called by `Tick`, removes any such
@@ -74,10 +79,11 @@ owned tasks, releases military holds and removes AIR reservations before native
 role settings are restored.
 
 `FindAssistTarget` is shared by mobile assistance and idle production turrets.
-`AssignedPower` sums completed workers whose current builder/repair task targets
-that frame, excluding the asking worker. Small projects stop admitting helpers
-when assigned work can finish the remaining frame in twelve seconds; reactors
-use 120 seconds. `Energy` may open six funded energy projects instead of one
+`AssignedPower` reads AirWorkforce's per-target ledger, excluding the asking
+worker. The twelve-second small-project and 120-second reactor horizons remain
+baseline goals; funded surplus may shorten them to the configurable six-second
+minimum. Arriving workers count once and stalled assignments do not justify
+buying more workers. `Energy` may open six funded energy projects instead of one
 frame per definition. Recovery starts small local energy work before helping
 an existing frame. An owned remote mex can still be upgraded, with one remote
 upgrade order at a time; `AssistMex` keeps the rest of the crew home.
@@ -127,7 +133,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 8fbe4ebcb56d7be9eb08c49032547b13e7b32aa8; lines: 658 -->
+<!-- source: data/script/src/roles/air_build.as; blob: f11a75d6f92854890aa37cecc00ad1a1437cda0a; lines: 688 -->
 
 ## D-153: income-gated plants and mex-first reactors
 
@@ -153,9 +159,12 @@ while already framed labs finish. `Record` checks INV-090. New T2 reservations
 require the complete twenty-slot support bank.
 
 `SupportCommitted` counts completed turrets, frames and unstarted owned orders
-once per bay. `Nano` permits up to `NanoParallel` (three) funded projects during
-metal overflow, otherwise one, with native reach checks and high task priority.
-Only completed turrets satisfy expansion. See [plan and evidence](../air-support-before-expansion.md).
+once per bay. D-181 replaces the former one/three-project rule with a funded
+batch based on construction power and completion time, bounded by
+`WorkforceSupportBatchMax` (eight). Native reach checks still apply.
+Only completed production turrets satisfy lab expansion. Economy support
+cannot reduce that requirement or be credited twice within an admission sample.
+See [current policy and evidence](../air-workforce-results.md).
 
 D-162 removes `FirstFusion`'s additional 500-metal bank veto. Completed owned
 mex upgrades, recovery state and conservative 180-second metal/energy funding
@@ -183,3 +192,9 @@ guard. Native task expiry alone leaves these engine queues intact. The Legion
 aborting it. `Tick` uses it for a newly invalid reactor/mex prerequisite,
 insufficient support for another T2 lab and unclaimed native building orders.
 It preserves already framed buildings and workers now owned by another task.
+
+D-181 `AdoptExisting` also checks the previous role's unassigned native nano
+queue before the layout-only filter is enabled. It cancels reachable unframed
+orders through one representative per mobile-builder definition, retaining
+framed work. This bounded entry-only cleanup does not assign or redirect the
+representative builder. The final lifecycle test passes INV-076 after handoff.

@@ -26,6 +26,7 @@ namespace AirProduction {
         IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(utility ? Task::RecruitType::BUILDPOWER : Task::RecruitType::FIREPOWER,
             priority, d, plant.GetPos(ai.frame), 64.0f));
         if (t !is null) {
+            if (UnitHelpers::IsAirConstructor(d)) AirWorkforce::Admit(d, purpose == "constructor.expand");
             if (purpose == "opening.raid" && !AirMath::T1OpeningReady(AirEconomy::CompletedConstructors(),
                 Global::RoleSettings::Air::OpeningAirConstructors, AirEconomy::OpeningNanoCompleted(), AirEconomy::OpeningNanoTarget(), AirEconomy::recovery))
                 Invariants::Violation("INV-122", name, "T1 opening ordered before crew/support readiness");
@@ -51,6 +52,13 @@ namespace AirProduction {
         const bool advanced = UnitHelpers::IsT2AircraftPlant(name);
         const bool basic = UnitHelpers::IsT1AircraftPlant(name);
         if (!advanced && !basic) {
+            if (AirEcoLayout::Owns(u.GetPos(ai.frame))) {
+                CCircuitUnit@ frame = AirBuild::FindAssistTarget(u, false, null, true);
+                IUnitTask@ task = frame is null ? aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND))
+                    : aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, frame));
+                AirWorkforce::Assign(u, task);
+                return task;
+            }
             IUnitTask@ amphib = AmphibiousOps::Produce(u, 200.0f);
             if (amphib !is null) return amphib;
             // A nano serves one bay even where reach discs overlap. Reacquire all IDs.
@@ -122,14 +130,14 @@ namespace AirProduction {
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
         const bool saving = AirEconomy::SavingForFirstLab();
-        const bool supportBudget = basic && !emergency && AirBuild::OpeningSupportBudget();
         const bool openingReady = basic && AirRaids::OpeningPending() && AirMath::T1OpeningReady(AirEconomy::CompletedConstructors(),
             Global::RoleSettings::Air::OpeningAirConstructors, AirEconomy::OpeningNanoCompleted(), AirEconomy::OpeningNanoTarget(), AirEconomy::recovery);
         const string openingBomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
-        const bool openingTurn = openingReady && (side == "legion" ? aiTerrainMgr.GetLayoutInt("air.t1.openingOrders", 0)
-            : Projected(ai.GetCircuitDef(openingBomber))) < AirRaids::OpeningSize();
-        const bool workforceTurn = !saving && !supportBudget && !openingTurn && AirMath::WorkforceTurn(Projected(builder) < constructors,
-            AirEconomy::FundConstructor(builder), emergency,
+        float producerPower = u.circuitDef.GetBuildSpeed();
+        for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::power.length(); ++b)
+            if (AirLayout::bays[b].factoryId == u.id) producerPower = AiMax(producerPower, AirEconomy::power[b]);
+        const bool workforceTurn = AirMath::WorkforceTurn(Projected(builder) < constructors,
+            AirEconomy::FundConstructor(builder, producerPower), emergency,
             aiTerrainMgr.GetLayoutInt("air.combat.streak." + u.id, 0),
             Global::RoleSettings::Air::CombatOrdersPerEconomyConstructor);
         if (workforceTurn) {
@@ -150,7 +158,7 @@ namespace AirProduction {
             @t = Recruit(u, fighter, Projected(fighterDef) + missing, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
-        if (!affordable || AirEconomy::recovery || supportBudget) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         if (openingReady) {
             const int goal = AirRaids::OpeningSize();
             aiTerrainMgr.SetLayoutInt("air.t1.openingReady", 1);

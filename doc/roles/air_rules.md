@@ -1,5 +1,12 @@
 # AIR ordered building rules
 
+D-181 replaces the metal-floating-only support row with a funded `Nano` request
+before shared growth. The first-lab savings branch also permits that request
+above its protected lab reserve. `AirWorkforce` owns the budget; failure falls
+through to existing assistance/energy behavior. Metal maps already call the
+same `Nano`/`Assist` actions from `MetalEconomy::EconomyTask`, while dedicated
+mex and energy workers retain precedence. TECH's table is unchanged.
+
 D-179 inserts `opening.support` / `opening.support.assist` after starter/transport
 factory recovery and before discretionary expansion. They require three
 completed air constructors, funded resources, and no energy recovery. The
@@ -96,7 +103,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: 89dad1a8ebb3e1e1af3fb79c7601283498e590c0; lines: 170 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 3b507b060bbe9180f74d4dc2bb70048e94560677; lines: 172 -->
 
 ## D-152 sequencing
 

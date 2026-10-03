@@ -25,6 +25,41 @@ namespace AirBuild {
     {
         return u !is null && UnitHelpers::IsAirConstructor(u.circuitDef);
     }
+    void AdoptExisting()
+    {
+        // A role handoff keeps native tasks alive. Observe their current owners
+        // once on entry so old unframed support orders cannot bypass the layout.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            IBuilderTask@ t = u is null ? null : cast<IBuilderTask>(u.task);
+            if (t is null || t.IsDead() || t.GetBuildType() >= int(Task::BuildType::REPAIR)) continue;
+            Added(t);
+            if (t.target !is null && projects.findByRef(t) < 0) projects.insertLast(t);
+        }
+        // The previous role can leave orders with no assignee, so a unit-task
+        // walk alone is incomplete. On entry, discard reachable unframed nano
+        // orders before enabling the native layout-only queue filter. Framed
+        // work remains owned and must finish. This never assigns the probe unit.
+        const bool prior = aiBuilderMgr.experimentalBuild;
+        aiBuilderMgr.experimentalBuild = false;
+        dictionary checked;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !u.circuitDef.IsMobile() || u.circuitDef.GetBuildSpeed() <= 0) continue;
+            const string key = u.circuitDef.GetName();
+            if (checked.exists(key)) continue;
+            checked.set(key, true);
+            for (int n = 0; n < 64; ++n) {
+                IBuilderTask@ t = cast<IBuilderTask>(aiBuilderMgr.FindQueuedTask(u, int(Task::BuildType::NANO)));
+                if (t is null || t.IsDead() || projects.findByRef(t) >= 0) break;
+                if (t.target !is null) { projects.insertLast(t); break; }
+                GenericHelpers::LogUtil("[AIR][Claim] cancel unassigned inherited nano", 1);
+                CancelUnstarted(t);
+            }
+        }
+        aiBuilderMgr.experimentalBuild = prior;
+    }
     void ReturnEconomyWorkers()
     {
         array<Id>@ ids = ai.GetOwnedUnitIds();
@@ -104,14 +139,19 @@ namespace AirBuild {
         }
         // Native completion chains may enqueue economy work despite experimental
         // mode. Reconcile after Enqueue returns, so script can first claim its task.
-        array<IUnitTask@> pending = pendingOwnership;
-        pendingOwnership.resize(0);
-        for (uint i = 0; i < pending.length(); ++i) {
-            if (projects.findByRef(pending[i]) >= 0) continue;
-            IBuilderTask@ t = cast<IBuilderTask>(pending[i]);
-            if (t !is null && t.target is null) {
-                GenericHelpers::LogUtil("[AIR][Claim] cancel unowned native order " + (t.buildDef is null ? "?" : t.buildDef.GetName()), 1);
-                CancelUnstarted(t);
+        // Cancelling a native chain head can expose its next order immediately.
+        // Drain those callbacks before auditing ownership, bounded against a
+        // malformed self-replicating chain (which still trips INV-076 below).
+        for (int round = 0; round < 16 && pendingOwnership.length() > 0; ++round) {
+            array<IUnitTask@> pending = pendingOwnership;
+            pendingOwnership.resize(0);
+            for (uint i = 0; i < pending.length(); ++i) {
+                if (projects.findByRef(pending[i]) >= 0) continue;
+                IBuilderTask@ t = cast<IBuilderTask>(pending[i]);
+                if (t !is null && t.target is null) {
+                    GenericHelpers::LogUtil("[AIR][Claim] cancel unowned native order " + (t.buildDef is null ? "?" : t.buildDef.GetName()), 1);
+                    CancelUnstarted(t);
+                }
             }
         }
         int queuedNanos = 0;
@@ -141,6 +181,7 @@ namespace AirBuild {
     IUnitTask@ Record(IUnitTask@ t, const string &in rule, CCircuitUnit@ u)
     {
         if (t is null) return null;
+        AirWorkforce::Assign(u, t);
         IBuilderTask@ previous = cast<IBuilderTask>(u.task);
         if (EconomyAircraft(u) && previous !is null && previous.GetBuildType() == int(Task::BuildType::GUARD))
             u.CmdStop(); // Construction may wait for a path; clear the engine guard once.
@@ -260,22 +301,14 @@ namespace AirBuild {
             if (!AirHome::EconomySite(t.target.GetPos(ai.frame))) continue;
             const float distance = MapHelpers::SqDist(u.GetPos(ai.frame), t.target.GetPos(ai.frame));
             if (distance > best || !aiTerrainMgr.CanReachAt(u, t.target.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) continue;
-            if (!ProductionMath::AssistUseful(AssignedPower(t.target, u), t.buildDef.GetBuildTime(), t.target.GetBuildProgress(),
-                IsReactor(t.buildDef) ? Global::RoleSettings::Air::ReactorProjectSeconds : Global::RoleSettings::Air::SmallProjectSeconds)) continue;
+            if (!AirWorkforce::Useful(t.target, u)) continue;
             best = distance; @nearest = t.target;
         }
         return nearest;
     }
     float AssignedPower(CCircuitUnit@ target, CCircuitUnit@ except)
     {
-        float power = 0.0f;
-        for (uint i = 0; i < AirEconomy::owned.length(); ++i) {
-            CCircuitUnit@ worker = ai.GetTeamUnit(AirEconomy::owned[i]);
-            if (worker is null || worker is except || worker.GetBuildProgress() < 1.0f) continue;
-            IBuilderTask@ task = cast<IBuilderTask>(worker.task);
-            if (task !is null && task.target is target) power += worker.circuitDef.GetBuildSpeed();
-        }
-        return power;
+        return AirWorkforce::Assigned(target, except);
     }
     IUnitTask@ Assist(CCircuitUnit@ u, bool energyOnly = false, CCircuitDef@ only = null, bool inReach = false, float radius = 1800.0f)
     {
@@ -318,6 +351,8 @@ namespace AirBuild {
             if (t !is null) return Record(t, "opening.support.assist", u);
         }
         if (!opening && AirEconomy::SavingForFirstLab()) {
+            @t = Nano(u);
+            if (t !is null) return Record(t, "transition.support", u);
             @t = Assist(u, false, null, true);
             if (t !is null) return Record(t, "transition.finish", u);
             u.CmdStop();
@@ -334,6 +369,8 @@ namespace AirBuild {
                 if (t !is null) return Record(t, "commander.energy.local", u);
             }
             if (!opening) {
+                @t = Nano(u);
+                if (t !is null) return Record(t, "commander.support", u);
                 @t = Convert(u);
                 if (t !is null) return Record(t, "commander.convert", u);
                 @t = Assist(u, false, null, true);
@@ -469,7 +506,7 @@ namespace AirBuild {
                 Global::RoleSettings::Air::ConverterParallel)) return null;
         return AirLayout::Place(u, d, Task::BuildType::CONVERT, Task::Priority::NORMAL);
     }
-    bool IsReactor(CCircuitDef@ d)
+    bool IsReactor(const CCircuitDef@ d)
     {
         if (d is null) return false;
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
@@ -586,24 +623,6 @@ namespace AirBuild {
         }
         return count;
     }
-    bool OpeningSupportBudget()
-    {
-        if (MetalEconomy::Active() || AirEconomy::recovery || !AirEconomy::OpeningSupportNeeded()
-            || AirEconomy::energy < Global::RoleSettings::Air::OpeningNanoMinEnergy) return false;
-        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
-        if (nano is null) return false;
-        for (uint b = 0; b < AirLayout::bays.length(); ++b) {
-            AirLayout::Bay@ bay = AirLayout::bays[b];
-            CCircuitUnit@ plant = ai.GetTeamUnit(bay.factoryId);
-            if (plant is null || Lifecycle::IsRetiring(plant) || !UnitHelpers::IsT1AircraftPlant(bay.defName)) continue;
-            AirLayout::RepairSupport(b, nano);
-            for (uint n = 0; n < bay.nanos.length(); ++n) {
-                const int state = aiTerrainMgr.GetReservationState(bay.nanos[n]);
-                if (state >= 0 && state <= 2) return true;
-            }
-        }
-        return false; // blocked support must not freeze aircraft production
-    }
     IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
@@ -617,24 +636,34 @@ namespace AirBuild {
         }
         const bool openingSupport = AirEconomy::OpeningSupportNeeded();
         if (openingOnly && !openingSupport) return null;
-        const float minimumEnergy = openingSupport ? Global::RoleSettings::Air::OpeningNanoMinEnergy : 250.0f;
-        if (!Can(u, d) || AirEconomy::recovery || AirEconomy::bankM < 150.0f || AirEconomy::energy < minimumEnergy) return null;
-        const int pending = aiBuilderMgr.GetUnfinishedCount(d) + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO), d);
-        const int parallel = AirEconomy::MetalFloating() ? Global::RoleSettings::Air::NanoParallel : 1;
-        if (!ProductionMath::SupportQueueReady(pending, parallel, aiEconomyMgr.metal.current, aiEconomyMgr.energy.current,
-            AirEconomy::metal, AirEconomy::energy, d.costM, d.costE)) return null;
+        if (!Can(u, d) || AirEconomy::recovery) return null;
+        if (BuildPowerMath::Batch(AirWorkforce::constructionPower, d.GetBuildTime(),
+            Global::RoleSettings::Air::WorkforceSupportSeconds, AirWorkforce::pendingSupport,
+            Global::RoleSettings::Air::WorkforceSupportBatchMax) <= 0) return null;
+        if (!openingOnly) {
+            IUnitTask@ local = AirEcoLayout::Nano(u, d);
+            if (local !is null) { AirWorkforce::Admit(d, true, true); return local; }
+        }
         AirEconomy::RefreshSupport();
         for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
             if ((openingOnly || AirEconomy::energy < 250.0f) && (!UnitHelpers::IsT1AircraftPlant(AirLayout::bays[b].defName)
                 || SupportCommitted(b) >= AirEconomy::OpeningNanoTarget())) continue;
             if (AirLayout::bays[b].factoryId < 0 || SupportCommitted(b) >= AirEconomy::NanoTarget(b)) continue;
+            float work = 0, cm = 0, ce = 0;
+            AirEconomy::Mix(UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName), work, cm, ce);
+            // Only incremental throughput is new demand; cold-start time remains
+            // part of the existing factory model and pending turrets count once.
+            const float power = AirEconomy::power[b] + float(AiMax(0, SupportCommitted(b) - AirEconomy::nanoCount[b])) * d.GetBuildSpeed();
+            const float delta = AiMax(0.0f, ProductionMath::Rate(work, power + d.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds)
+                - ProductionMath::Rate(work, power, Global::RoleSettings::Air::WarmFactoryGapSeconds));
+            if (!AirWorkforce::Fund(d, u.circuitDef.GetBuildSpeed(), delta * cm, delta * ce)) continue;
             AirLayout::RepairSupport(b, d);
             for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {
                 const int slot = AirLayout::bays[b].nanos[s];
                 if (aiTerrainMgr.GetReservationState(slot) != 0) continue;
                 if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(slot), u.circuitDef.GetBuildDistance())) continue;
                 IUnitTask@ t = AirLayout::Pinned(Task::BuildType::NANO, Task::Priority::HIGH, d, slot);
-                if (t !is null) return t;
+                if (t !is null) { AirWorkforce::Admit(d, true); return t; }
             }
         }
         return null;
@@ -647,6 +676,7 @@ namespace AirBuild {
     }
     void Leave()
     {
+        AirWorkforce::Reset();
         AirProduction::Leave();
         array<IUnitTask@> tasks = projects;
         projects.resize(0);

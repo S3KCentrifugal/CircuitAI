@@ -1,5 +1,7 @@
 # AIR build-power scaling review
 
+Implementation: D-181; see [changes, measurements and outstanding validation](../air-workforce-results.md). The proposal below is retained as the acceptance contract.
+
 Reviewed 2026-10-03 against D-179 at commit `2eb25a0f`. This is a
 review and proposed correction plan; no gameplay, settings or native code
 changed. TECH's exact build/reclaim sequence remains the regression baseline.
@@ -455,7 +457,7 @@ decision is needed to implement R1-R5; R6's branch is an engineering evidence
 gate. The current review commits contain no gameplay implementation or new
 simulation result.
 
-## Evidence and validation
+## Evidence and validation at the review stage
 
 Executed the current pure AngelScript helpers in the existing standalone
 interpreter: **133 production tests and 113 AIR tests passed**, plus five
@@ -500,3 +502,26 @@ constructor/turret completion, T2/fusion/bomber timing and command count. Includ
 supplied-metal/energy-isolated fixtures and natural games; provide screenshots
 of allocation while those games run. Preserve failed results and benchmark
 cohorts under the existing [storage conventions](../test-storage.md).
+
+## D-181 implementation and acceptance disposition
+
+The policy changes R1-R5 are implemented. The conditional native recruit change
+is deliberately omitted: every observed low-priority recruit in the final
+six-lab fixture completed, and causal starvation has not been established.
+Read the [results report](../air-workforce-results.md) for measurements, immutable
+evidence and the distinction between focused checks and whole-game verdicts.
+
+| Acceptance | Implemented/executed | Remaining limit |
+| --- | --- | --- |
+| V1 | Nineteen pure funding/capacity tests; own-resource sampling, queued commitments and immediate admission debits; supplied gifts and donor stop | Observations are point samples, not complete transfer/overflow totals. |
+| V2 | Seven protected TECH/controller/chooser/sharing sources unchanged; baseline and revised TECH opening/rush runs | Baseline checks passed; revised repeats failed existing TECH invariants. Runtime acceptance is incomplete. |
+| V3 | Three experimental profiles compile/run against the pinned DLL; cancellation, loss, gifts, old-state adoption and role handoff; guard recovery for both constructor tiers | Named-state adoption is not an engine save/load round trip. Final PLAYER availability correction has a dedicated lifecycle probe. |
+| V4 | Armada donations, Cortex six working labs and Legion energy-starved fixtures; physical completion and actual usage measured | Exact next-callback latency is not independently timed; supplied capability does not prove natural optimality. |
+| V5 | Separate economic support banks, unique workload ownership, blocked unstarted relocation, old nine-slot adoption and shared reservations | An occupied old module may retain mobile support if an added bank cannot fit; full engine save/load remains untested. |
+| V6 | Fifteen paired five-map/faction games, five final 45-minute repeats and three metal controls | Results are mixed; only two final maps meet first fusion by twenty minutes. No effective T2 raid by twenty minutes is established. Whole-game TECH failures and some sub-forty-mex totals remain visible. |
+| V7 | Indexed assignment ledger and one census per simulated second; serial 8v8 one/multiple AIR games and command telemetry; fixed idle-population scaling experiment | Aggregate AI timer cannot isolate an AIR census or active-project cost. Elimination changes the measured population. Natural late Supreme exceeds 3,000 APM. No FPS guarantee or global rate limiter. |
+| V8 | Actual native priority and recruit progress/completion recorded; native code unchanged | No matched causal low/high-pull experiment; KI-491 stays open. |
+
+Implementation completion does not mean every gameplay acceptance target passed.
+The report records unresolved natural timing, TECH invariants and performance
+attribution instead of converting those gaps into successful checks.

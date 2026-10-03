@@ -1,5 +1,11 @@
 # AIR Role
 
+D-181 replaces independent constructor income ratios with `AirWorkforce`'s
+once-per-second own-resource and workload snapshot. A full/refilling bank may
+fund growth despite an own-income deficit; future donations are never assumed.
+Factory and economy turret ownership are disjoint. See the
+[workforce review and implementation map](../reviews/2026-10-03-air-build-power-review.md).
+
 D-179 adds [earlier opening support, compact factory rows and wide recon](../air-opening-recon-plan.md).
 `OpeningNanoCount=2` and `OpeningNanoMinEnergy=160` fund early support after the
 three-constructor opening and initial fighter screen. A missing reservation no

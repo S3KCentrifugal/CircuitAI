@@ -1,5 +1,16 @@
 # Base layout
 
+D-181 adds an independent support array to AIR economy modules (schema 2),
+leaving the original reactor-first nine slots unchanged. Twelve densely packed
+turrets are reserved atomically within reach of the reactor; failed batches
+release every new pin. The native footprint binding returns **half-cells**:
+adjacent nano centers need `2 * footprint * SQUARE_SIZE`. Module envelopes
+include the support gap before advanced converters. Metal-map modules retain
+only their reactor plus the separate support bank. Old nine-slot state loads
+with zero support; an occupied district stays anchored and can use mobile
+workers if no valid supplemental bank fits. An unused module relocates when
+its reactor, converter or support reservations are physically blocked.
+
 D-179 compacts AIR's native compound into touching factory rows with dense
 rear support banks. Six T2 labs using loaded 9x9/3x3 footprints occupy a
 27x60-cell envelope, versus 63x30 previously. All twenty turrets per lab stay

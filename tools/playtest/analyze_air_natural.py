@@ -8,12 +8,13 @@ from collections import Counter
 import json
 from pathlib import Path
 import re
+from workforce_metrics import parse_sample, summarize
 
 
 def analyze(log, teams, end_frame=None):
     air = {str(t['team']): {'side': t['side'], 'first': {}, 'finished': Counter(),
            'waves': [], 'raids': [], 'recon': [], 'orders': [], 'starter_distance': [],
-           'retirements': [], 'invariants': Counter(), 'first_rule': {}}
+           'retirements': [], 'invariants': Counter(), 'first_rule': {}, 'workforce_samples': [], 'removed_frame': None}
            for t in teams if t['role'] == 'AIR'}
     violations, observer_violations, errors, last_frame = Counter(), Counter(), [], 0
     milestones = {'armap':'t1_lab', 'corap':'t1_lab', 'legap':'t1_lab',
@@ -32,6 +33,12 @@ def analyze(log, teams, end_frame=None):
                 continue
             last_frame = max(last_frame, frame)
             minute = round(frame/1800, 3)
+            removed = re.search(r'local skirmish AI .* being removed from team (\d+)', line)
+            if removed and removed[1] in air and air[removed[1]]['removed_frame'] is None:
+                air[removed[1]]['removed_frame'] = frame
+            sample = parse_sample(line)
+            if sample is not None and '0' in air and air['0']['removed_frame'] is None:
+                air['0']['workforce_samples'].append(sample)
             inv = re.search(r'\[INVARIANT\] (INV-\d+)', line)
             if inv:
                 violations[inv[1]] += 1
@@ -71,6 +78,8 @@ def analyze(log, teams, end_frame=None):
             if rule:
                 row['first_rule'].setdefault(rule[1], minute)
     for row in air.values():
+        row['observed_minutes'] = round(min(last_frame, row['removed_frame'] if row['removed_frame'] is not None else last_frame)/1800, 3)
+        row['workforce'] = summarize(row.pop('workforce_samples'))
         row['peak_air_apm'] = max((v['air'] for v in row['orders']), default=0)
         row['peak_all_apm'] = max((v['all'] for v in row['orders']), default=0)
     return {'log': str(Path(log).resolve()), 'minutes': round(last_frame/1800, 3),

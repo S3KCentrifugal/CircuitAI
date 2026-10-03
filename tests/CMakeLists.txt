@@ -24,6 +24,8 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/placement_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/placement_math_tests.as")
     add_test(NAME circuit_air_math_test COMMAND circuit_production_math_test
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/air_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/air_math_tests.as")
+    add_test(NAME circuit_build_power_math_test COMMAND circuit_production_math_test
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/build_power_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/build_power_math_tests.as")
     add_executable(circuit_air_geometry_test air_geometry_test.cpp)
     target_compile_features(circuit_air_geometry_test PRIVATE cxx_std_20)
     target_include_directories(circuit_air_geometry_test PRIVATE ../src ../src/circuit)

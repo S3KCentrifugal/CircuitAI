@@ -1,6 +1,7 @@
 #include "air_layout.as"
 #include "economy.as"
 #include "../helpers/air_math.as"
+#include "air_workforce.as"
 
 namespace AirEconomy {
     float metal = 0.0f, energy = 0.0f, bankM = 0.0f, bankE = 0.0f;
@@ -142,6 +143,7 @@ namespace AirEconomy {
     }
     void Reset()
     {
+        AirWorkforce::Reset();
         sampleFrame = -1; stableSince = -1; lastLog = -100000;
         recovery = false; badSamples = 0; goodSamples = 0;
         armedAirMemory = 0.0f; armedAirFrame = -1;
@@ -197,7 +199,7 @@ namespace AirEconomy {
     }
     int SupportBay(const CCircuitDef@ d, const AIFloat3 &in pos)
     {
-        if (d is null) return -1;
+        if (d is null || AirEcoLayout::Owns(pos)) return -1;
         const int revision = aiTerrainMgr.GetLayoutInt("air.supportRevision", 0);
         if (supportRevision != revision) {
             supportOwner.deleteAll(); supportRevision = revision;
@@ -248,6 +250,8 @@ namespace AirEconomy {
             const string name = n.circuitDef.GetName();
             if (name != UnitHelpers::GetT1NanoNameForSide(UnitHelpers::GetSideForUnitName(name))) continue;
             const int best = SupportBay(n.circuitDef, n.GetPos(ai.frame));
+            if (best >= 0 && AirEcoLayout::Owns(n.GetPos(ai.frame)))
+                Invariants::Violation("INV-125", "" + n.id, "economy support credited to an aircraft production bay");
             if (best < 0) continue;
             nanoBay.set("" + n.id, int64(best));
             if (n.GetBuildProgress() < 1.0f) { ++nanoFuture[best]; continue; }
@@ -338,6 +342,7 @@ namespace AirEconomy {
             const float rate = ProductionMath::Rate(work, power[b], Global::RoleSettings::Air::WarmFactoryGapSeconds);
             demandM += rate * cm; demandE += rate * ce;
         }
+        AirWorkforce::Tick();
         const bool spare = !recovery && metal * Global::RoleSettings::Air::ProductionIncomeShare > demandM * 1.15f
             && energy * 0.8f > demandE * 1.15f && bankM > 500.0f;
         if (!spare) stableSince = -1; else if (stableSince < 0) stableSince = ai.frame;
@@ -409,15 +414,10 @@ namespace AirEconomy {
         // RepairSupport to allocate its first turret.
         const int cap = limit;
         const int production = ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds, rate, cap);
-        // TECH's income/float principle, with AIR's independent bay ownership.
-        // This power can help nearby construction whenever recruitment pauses.
-        const float target = ConstructionTarget() / float(AiMax(1, t1 + t2));
-        // Factory build speed produces units; it cannot build our wind/solar economy.
-        const int construction = energy >= 250.0f ? ProductionMath::WorkforceTarget(target, nano.GetBuildSpeed(), 0, cap) : 0;
         const int expansion = advanced && Transition(plant) ? AiMin(cap, Global::RoleSettings::Air::T2ExpansionSupport) : 0;
         const int opening = !advanced && CompletedConstructors() >= Global::RoleSettings::Air::OpeningAirConstructors
             ? AiMin(cap, OpeningNanoTarget()) : 0;
-        return AiMax(opening, AiMax(expansion, AiMax(production, construction)));
+        return AiMax(opening, AiMax(expansion, production));
     }
     int OpeningNanoTarget() { return AiMax(0, AiMin(5, AiMin(Global::RoleSettings::Air::T1NanoLimit, Global::RoleSettings::Air::OpeningNanoCount))); }
     int OpeningNanoCompleted()
@@ -434,26 +434,17 @@ namespace AirEconomy {
     }
     float ConstructionTarget()
     {
-        if (MetalEconomy::Active()) return ProductionMath::ConstructionPower(
-            AiMax(8.0f, MetalMath::Sustainable(metal, energy, 30, 10)),
-            AiMin(aiEconomyMgr.metal.current, metal * 20), aiEconomyMgr.metal.storage,
-            Global::RoleSettings::Air::EconomyBuildPowerPerMetal, Global::RoleSettings::Air::BuildPowerFloatFactor,
-            Global::RoleSettings::Air::BuildPowerBankDrainSeconds);
-        return ProductionMath::ConstructionPower(metal, aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage,
-            Global::RoleSettings::Air::EconomyBuildPowerPerMetal, Global::RoleSettings::Air::BuildPowerFloatFactor,
-            Global::RoleSettings::Air::BuildPowerBankDrainSeconds);
+        return AirWorkforce::mobile + AirWorkforce::arriving + AirWorkforce::shortage;
     }
     bool MetalFloating() { return ProductionMath::MetalFloating(aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage); }
     int ConstructorTarget(CCircuitDef@ d, bool advanced)
     {
-        if (d is null || energy < 160.0f || metal < 8.0f) return 1;
-        const float share = t2 == 0 ? 1.0f : advanced ? 0.55f : 0.45f;
-        const int floor = advanced ? 2 : t2 > 0 ? 3 : 2;
-        const int cap = advanced ? Global::RoleSettings::Air::MaxT2EconomyBuilders : Global::RoleSettings::Air::MaxT1EconomyBuilders;
-        return ProductionMath::WorkforceTarget(ConstructionTarget() * share, d.GetBuildSpeed(), floor, AiMax(floor, cap));
+        return AirWorkforce::ConstructorTarget(d, advanced);
     }
-    bool FundConstructor(CCircuitDef@ d)
+    bool FundConstructor(CCircuitDef@ d, float producerPower = 0)
     {
-        return d !is null && ProductionMath::ConstructorFunded(bankM, bankE, metal, energy, d.costM, d.costE);
+        if (producerPower <= 0) for (uint i = 0; i < power.length(); ++i) producerPower = AiMax(producerPower, power[i]);
+        return d !is null && AirWorkforce::Fund(d, producerPower,
+            d.GetBuildSpeed() * AirWorkforce::jobMetalPerPower, d.GetBuildSpeed() * AirWorkforce::jobEnergyPerPower);
     }
 }

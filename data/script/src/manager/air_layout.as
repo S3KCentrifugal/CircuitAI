@@ -89,6 +89,7 @@ namespace AirLayout {
         if (!enabled) return;
         UnlockCampus();
         AirEconomy::Reset(); AirProduction::Reset();
+        AirBuild::AdoptExisting();
         aiBuilderMgr.experimentalBuild = true;
         aiBuilderMgr.experimentalAirDirect = true;
         if (aiTerrainMgr.GetLayoutInt("air.reclaimCaptured", 0) == 0) {

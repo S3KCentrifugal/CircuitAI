@@ -704,3 +704,47 @@ for a Shiva and requires an actual hit and completed home return.
 actual artillery damage. These cases select their own strict checks. The
 five-map generator and natural-game runner are documented with their evidence
 in [D-171 results](../../doc/air-committed-operations-results.md).
+
+
+## Funded AIR workforce (D-181)
+
+`run_air_workforce.py --dll <pinned-dll> --scenario donations --side armada`
+allocates a fresh supplied game, checks script/DLL parity, stages the workforce
+probe and independent observer, and runs sixteen simulated minutes. Scenarios
+`donations`, `six-labs`, `energy-starved` and `lifecycle` have definitions under
+`cases/air/economy/workforce-*.json`. Donor gifts use real allied transfers and
+stop at ten minutes. Other teams are frozen; these are capability fixtures.
+`audit_air_workforce.py <write-dir>` applies the case's physical observations
+without suppressing the original whole-game invariant verdict.
+
+`run_air_workforce_cohort.py --dll <dll> --baseline <data-snapshot>` pins both
+data trees and runs five maps at thirty minutes for three seed/faction pairs.
+Its default two concurrent games are correctness/economy measurements, not
+wall-time performance measurements. `run_air_natural.py` also accepts explicit
+`--seed` and `--side`; both engine and AI seeds are pinned. The analysis reports
+actual usage, full-bank point samples and workforce observations. Missing or
+nonmatching metadata invalidates comparison; samples cannot be integrated into
+invented total donations or overflow.
+`analyze_air_workforce_cohort.py <cohort>` compares common live AIR windows;
+`--final <five-map-repeat>` compares a later Armada repeat with its original
+matched baseline. AI elimination censors the window, even if the spectator
+clock keeps advancing. Published initial analyses remain immutable; record a
+new derived cohort analysis when correcting interpretation.
+
+`run_workforce_regressions.py --dll <dll> [--subset metal|tech]` exercises three
+metal maps plus the unchanged TECH opening/rush. `run_workforce_performance.py
+--dll <dll> --baseline <data> --revised <data>` runs serial 8v8 controls with
+one AIR per team and then multiple AIR roles. Run it while other simulations
+are stopped. Its engine AI timer aggregates all AI callbacks; it is **not**
+a per-role or per-census profiler. The command observer remains authoritative
+for synchronized APM. See [results](../../doc/air-workforce-results.md).
+`analyze_workforce_performance.py build-theatres/workforce-performance.json`
+reports cumulative engine-wide p50/p95/max, minute speed observations and
+AIR-role order counts. It never treats absent timing as zero cost or relabels
+engine-wide timing as individual AIR CPU time.
+Windows after an AI is eliminated are labeled as changed-population comparisons.
+`run_workforce_scaling.py --dll <dll> --baseline <data> [--revised <data>]`
+holds factory/builder production and supplies 100, 500 and 1,000 idle air
+constructors. This isolates fixed-population observation overhead, not active
+project or combat throughput. Compare full minute windows after each spawn
+settles; spawn frames are not steady-state measurements.

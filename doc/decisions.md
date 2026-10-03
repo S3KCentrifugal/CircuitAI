@@ -10913,3 +10913,144 @@ The invariant promises in D-180 remain unchanged.
 **Files.** [Expanded plan](reviews/2026-10-03-air-build-power-review.md),
 [test-check finding](known-issues.md#ki-492---air-build-power-checks-match-count-prefixes-and-narrow-historical-ranges),
 and this decision record.
+
+
+## D-181 - Fund AIR workforce from useful work and stored capital
+
+**Decision.** Implement the D-180 policy in AIR-owned sampled state and shared
+pure arithmetic. Own production and actual usage are distinct from receipts;
+future gifts are not forecast. A sustained full/refilling bank can pay for
+useful build power while own income is negative, subject to both resource
+reserves and outstanding investments. Debit accepted costs and incremental
+spending before another callback can spend the same budget. Constructor floors
+and ordinary/safety ceilings remain guards; available and arriving workers
+reduce the next request. Record real target progress and suppress expansion
+behind stalled assignments instead of treating nominal assignment as work.
+
+Remove the opening-bomber/support and first-lab blanket workforce vetoes.
+Protect concrete lab capital and opening/transport prerequisites. Place economic
+support in twelve separate, atomically reserved pins per AFUS module; preserve
+the original nine-slot array and named-state adoption. Exclude those turrets
+from factory support and dispatch them to reachable economic frames. AIR asks
+for support before shared growth, without changing TECH's chooser or sequence.
+Metal-mode AIR already calls these actions; its dedicated opening workers retain
+priority. Observe existing construction on AIR role entry so a previous role's
+unframed native orders cannot bypass ownership reconciliation.
+
+**Alternatives rejected.** Raising every fixed constructor cap blindly would
+buy idle workers without checking energy or useful demand. Requiring positive
+own-income balance rejects usable donated capital. Adding receipts to the
+native receipt-inclusive average double-counts transfers. Crediting factory
+nanos to distant reactors misstates capacity. Appending support to the reactor/
+converter slot array breaks its loader and placement indices. Rewriting native
+recruit priority globally would affect TECH; observed priority-zero constructors
+made progress and finished, so the conditional exception is not implemented.
+A matched causal priority experiment remains an explicit verification gap.
+
+**Invariant.** INV-124 requires same-frame two-resource funding for discretionary
+workforce admissions, with opening/recovery exceptions explicit. INV-125 keeps
+factory and economy support disjoint. INV-126 audits assignment ownership.
+Existing INV-076, INV-090, INV-106 and INV-107 continue to protect task ownership,
+twenty-per-lab support, guard release and complete economic reservations.
+
+**Verification.** Built and played through the supplied, natural, metal and TECH
+matrix. Nineteen pure funding/capacity tests pass; all existing standalone native and
+AngelScript suites passed. All three experimental profiles compiled and ran
+against the pinned DLL. Physical support, donor cessation, blocked support,
+old-state adoption and role handoff have played evidence. Failed initial runs
+are retained. See [results and limitations](air-workforce-results.md) for the
+final verification extent; no claim of globally optimal or universally
+pre-twenty-minute economy is made.
+
+**Files.** Policy:
+[workforce](../data/script/src/manager/air_workforce.as),
+[arithmetic](../data/script/src/helpers/build_power_math.as),
+[settings](../data/script/src/global.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[growth](../data/script/src/manager/air_growth.as),
+[economy layout](../data/script/src/manager/air_eco_layout.as),
+[layout entry](../data/script/src/manager/air_layout.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as).
+Tests and evidence:
+[math tests](../tests/build_power_math_tests.as),
+[CMake](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh),
+[fixture runner](../tools/playtest/run_air_workforce.py),
+[probe](../tools/playtest/air_workforce_probe.as),
+[fixture widget](../tools/playtest/widgets/air_workforce_fixture.lua),
+[independent observer](../tools/playtest/widgets/air_workforce_watch.lua),
+[budget checks](../tools/playtest/checks/air/economy/air_workforce_budget.json),
+[count/progress checks](../tools/playtest/checks/air/economy/air_build_power.json),
+[focused audit](../tools/playtest/audit_air_workforce.py),
+[metrics](../tools/playtest/workforce_metrics.py),
+[metrics tests](../tools/playtest/test_air_workforce.py),
+[paired cohort](../tools/playtest/run_air_workforce_cohort.py),
+[natural runner](../tools/playtest/run_air_natural.py),
+[natural analysis](../tools/playtest/analyze_air_natural.py),
+[matched comparison](../tools/playtest/analyze_air_workforce_cohort.py),
+[metal/TECH controls](../tools/playtest/run_workforce_regressions.py),
+[8v8 controls](../tools/playtest/run_workforce_performance.py),
+[performance observer](../tools/playtest/widgets/workforce_perf_watch.lua),
+[performance analysis](../tools/playtest/analyze_workforce_performance.py),
+[timer contract test](../tools/playtest/test_workforce_perf_watch.py),
+[performance checks](../tools/playtest/checks/air/performance/air_workforce_performance.json),
+[donation case](../tools/playtest/cases/air/economy/workforce-donations.json),
+[six-lab case](../tools/playtest/cases/air/economy/workforce-six-labs.json),
+[energy case](../tools/playtest/cases/air/economy/workforce-energy-starved.json),
+[lifecycle case](../tools/playtest/cases/air/economy/workforce-lifecycle.json).
+Documentation:
+[results](air-workforce-results.md), [review](reviews/2026-10-03-air-build-power-review.md),
+[AIR](roles/air.md), [actions reference](roles/air_build.md),
+[rules reference](roles/air_rules.md), [layout](base-layout.md),
+[invariants](invariants.md), [actors](actor-matrix.md), [issues](known-issues.md),
+[playtest guide](../tools/playtest/README.md), and this record.
+
+
+**Final accounting review.** Existing assignments, including travellers and
+energy-limited workers, consume newly fundable project demand before another
+investment. Delivered progress plus affordable extra spending defines desired
+power; current assignments and queued support are subtracted once. Production
+turret admissions do not reduce the separate economic shortage, even inside one
+snapshot. Tests cover both corrections. Assistance uses delivered power rather
+than adding affordable extra capacity repeatedly to the assignment total.
+
+**Evidence handling.** Natural comparisons stop at the earlier AIR removal
+frame; an advancing spectator clock after defeat is not live economic evidence.
+Initial per-run analyses remain immutable. The version-2 cohort measurements
+in the results document supersede their uncensored comparisons. Engine AI timer
+measurements cover all AI callbacks, not isolated AIR census CPU time.
+
+**Ownership review.** PLAYER/RETREAT tasks do not cast to builder tasks, but that
+does not make their workers available. The final census admits idle task kinds
+explicitly; it never releases protected ownership. The lifecycle probe uses
+the existing UnitControl API to hold and return a constructor.
+
+Additional verification files: [fixed-population runner](../tools/playtest/run_workforce_scaling.py),
+[population widget](../tools/playtest/widgets/workforce_scaling.lua),
+[scaling analysis](../tools/playtest/analyze_workforce_scaling.py),
+[scaling checks](../tools/playtest/checks/air/performance/air_workforce_scaling.json),
+[timer contract test](../tools/playtest/test_workforce_perf_watch.py),
+[performance checks](../tools/playtest/checks/air/performance/air_workforce_performance.json),
+[initial portable cohort](benchmarks/air-workforce-cohort-2026-10-03.json),
+[final portable cohort](benchmarks/air-workforce-final-2026-10-03.json),
+and the generated [evidence catalog](benchmarks/catalog.json).
+
+**Final handoff correction.** The strengthened lifecycle run passed PLAYER
+ownership but exposed an unassigned native nano left by SUPPORT. A walk of
+current unit tasks cannot see it. AIR entry now searches reachable unassigned
+nanos through the existing native API before enabling its layout-only filter,
+cancels unframed orders and retains frames. The follow-up sixteen-minute
+lifecycle game passed every assertion with no invariant or script failure.
+The lookup is bounded and entry-only; it does not assign its probe builder.
+
+**Final measurements.** Nineteen policy and 81 tooling tests pass. The final
+strengthened lifecycle and both supplied-factory population controls pass.
+Natural and TECH whole-game results remain mixed. Serial 8v8 measurements
+retain elimination/population caveats; idle-population p99 shows measurable
+additional observation cost, so no zero-overhead or FPS guarantee is claimed.
+[8v8 evidence](benchmarks/air-workforce-performance-2026-10-03.json),
+[final scaling](benchmarks/air-workforce-scaling-2026-10-03.json),
+[initial scaling failures](benchmarks/air-workforce-scaling-initial-2026-10-03.json),
+and [intermediate control failures](benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
+retain all interpretations separately from the immutable raw publications.

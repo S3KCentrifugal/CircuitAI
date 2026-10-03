@@ -17,6 +17,7 @@ from prepare_air_operations_cases import MAPS
 
 def run(args, entry):
     key, name, side, _, _ = entry
+    side = args.side or side
     base = args.dir.resolve()/key
     base.mkdir(parents=True, exist_ok=True)
     # This runner nests maps below --dir; carry an allocated cohort's category
@@ -52,7 +53,7 @@ def run(args, entry):
         "--role", "AIR", "--roles", "all", "--ally-spots", ",".join(str(i+1) for i in range(ally_count)), "--side", side, "--bonus", "0",
         "--speed", str(args.speed), "--minutes", str(args.minutes), "--shots", "" if args.headless else "5,15,20,30,40",
         "--width", "1280", "--height", "720", "--lean-render", "--ai-option", "profile=experimental_hard",
-        "--ai-option", "random_seed=1711002", "--extra-widget", str(playtest.HERE/"widgets/air_command_watch.lua"),
+        "--ai-option", f"random_seed={args.seed}", "--extra-widget", str(playtest.HERE/"widgets/air_command_watch.lua"),
         "--extra-widget", str(playtest.HERE/"widgets/air_watch.lua"),
         "--extra-widget", str(playtest.HERE/"widgets/air_opening_watch.lua")]
     stage += ["--extra-widget", str(playtest.HERE/"widgets/air_workforce_watch.lua")]
@@ -63,6 +64,8 @@ def run(args, entry):
     if args.data:
         stage += ["--data", str(args.data)]
     subprocess.run(stage, check=True)
+    subprocess.run([sys.executable, str(playtest.HERE/"prepare_air_check.py"),
+        "--dir", str(base), "--scenario", "natural", "--seed", str(args.seed)], check=True)
     source = base/"AI/Skirmish/BARbTest/test/script/src/setup.as"
     if override:
         text = source.read_text()
@@ -74,6 +77,7 @@ def run(args, entry):
     (base/"natural-fixture.json").write_text(json.dumps({"map": name, "supplied_assets": bool(args.extra_widget),
         "extra_widgets": [str(w) for w in args.extra_widget],
         "production_overrides": False, "role_override": override, "selected_starts": selected,
+        "seed": args.seed, "side": side,
         "minutes_requested": args.minutes, "rendered": not args.headless,
         "dll_sha256": hashlib.sha256(args.dll.read_bytes()).hexdigest(),
         "staged_script_sha256": {str(p.relative_to(source.parents[1])): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -94,6 +98,8 @@ def main():
     parser.add_argument("--data", type=Path, help="Pinned data snapshot for a reproducible fixture")
     parser.add_argument("--extra-widget", type=Path, action="append", default=[])
     parser.add_argument("--maps", default=",".join(m[0] for m in MAPS))
+    parser.add_argument("--seed", type=int, default=1711002)
+    parser.add_argument("--side", choices=("armada", "cortex", "legion"))
     parser.add_argument("--minutes", type=float, default=45)
     parser.add_argument("--speed", type=float, default=20)
     parser.add_argument("--wall-minutes", type=float, default=25)

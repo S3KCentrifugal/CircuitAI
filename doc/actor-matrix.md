@@ -450,7 +450,17 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 
 | Object | Actors | Shared state and contract |
 | --- | --- | --- |
-| Early support | AirRules::opening.support/opening.support.assist, AirBuild::Commander/OpeningSupportBudget/Nano, AirEconomy::NanoTarget | Completed crew, viable reserved pins, funded two-turret goal; blocked/missing geometry is repaired without erasing demand. Metal opening and TECH rows retain their owners. |
+| Early support | AirRules::opening.support/opening.support.assist, AirBuild::Commander/Nano, AirEconomy::NanoTarget | Completed crew, viable reserved pins, funded two-turret goal; blocked/missing geometry is repaired without erasing demand. Metal opening and TECH rows retain their owners. |
 | Support ownership | AirLayout::Save/RepairSupport, AirEconomy::SupportBay/RefreshSupport | Layout revision invalidates the position-to-bay cache; explicit reserved owner precedes proximity when compact rear banks overlap another factory's reach. |
 | T1 opening | AirProduction::Recruit/MakeTask, AirRaids::OpeningSize/Update | Persistent random draw and ready/done flags; projected orders include frames; pre-launch bomber losses may be replaced. Legion counts accepted gunship orders. INV-122. |
 | Radar cohort | AirRecon::ProductionTarget/MakeTask/Tick/ScoutBases/Reset, CRouteTask | Separate waiting slot, visited, sweep destination and survey ledgers; PLAYER tasks stay excluded. Twenty visited, nearby members transfer to straight MOVE routes, then local patrols. Extra donations wait for the next cohort. INV-123. |
+
+## D-181 AIR funded workforce
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Funding snapshot | AirEconomy::Tick/Reset, AirWorkforce::Tick/Room/Fund/Admit, TeamEconomy own-resource readers, BuildPowerMath | One sample per engine second; minimum observed own income, actual usage, fresh current banks, no forecast gifts; outstanding capital and newly accepted costs are counted once. Both resources must fund expansion. INV-124. |
+| Mobile capacity | AirProduction::MakeTask/Recruit, AirEconomy::ConstructorTarget/FundConstructor, AirWorkforce::ConstructorTarget | Three T1 opening workers, bounded funded growth after the screen, projected queues/frames and idle capacity reduce demand. Persistent bank pressure may exceed ordinary 40/24 counts up to the safety ceiling. Transports retain precedence. |
+| Economic support | AirEcoLayout::ReserveSupport/Save/Init/Nano/Activate/ReleaseUnused, AirBuild::Nano, AirProduction turret dispatch, AirEconomy::SupportBay/RefreshSupport | Separate schema-2 bank; actual unfinished reactor, reachability and funding required before construction; no factory-support credit. INV-125. |
+| Project assistance | AirBuild::Record/FindAssistTarget/AssignedPower, AirWorkforce::Assign/Useful/Tick | Worker-to-target ID index; arrivals and stalled progress distinguished from working power; bounded minimum job horizon. INV-126. |
+| Role handoff | AirLayout::Init/Leave, AirBuild::AdoptExisting/Added/Tick/Leave, AirWorkforce::Reset | Adopt framed native construction once; cancel unframed foreign orders and their newly exposed chain children before ownership audit; clear assignments and reservations on exit. PLAYER/ferry tasks retain their separate owners. INV-076. |

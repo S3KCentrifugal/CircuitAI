@@ -3798,6 +3798,9 @@ but does not prove consistent PvP readiness or the remaining lifecycle edges.
 See [final audit](benchmarks/d167-natural-final.json).
 
 
+
+**D-181 follow-up (2026-10-03).** The fifteen matched workforce pairs had mixed timing; an Armada candidate Caldera failed to reach T2 by thirty minutes while its storage stayed at 1,300. Later source repeats reached T2 on all five maps, and the final accounting pass reached first fusion at 19:48 on Supreme and 19:34 on Glacial. These repeats do not establish the earlier storage stall's cause or a universal twenty-minute reactor/effective-bomber target. Final live-window timings and source hashes are in [workforce results](air-workforce-results.md). This issue remains open.
+
 ### KI-466 - AIR commander can retain an idle factory guard beyond ten seconds
 
 **Problem.** The D-167 natural repeat emitted 24 INV-081 observer failures
@@ -3980,6 +3983,9 @@ passed; full reports remain FAIL wherever any invariant is logged. See the
 [retained measurements and limits](metal-maps-results.md). Do not hide those
 findings by accepting the focused audit as the overall game verdict.
 
+
+**D-181 follow-up (2026-10-03).** All three metal controls observed zero converters, but not every player reached forty mexes and all whole-game checks failed existing TECH invariants. Seven protected TECH/controller/chooser/sharing sources remain unchanged. Baseline TECH-only opening/rush passed; later TECH-only repeats completed their opening/rush but reported INV-028/015/004. Runtime regression acceptance therefore remains incomplete; seeded inputs and source isolation are not a clean-game guarantee. See the retained reports in [workforce results](air-workforce-results.md).
+
 ### KI-473 - Unit-helper validation still reports unreachable static sonars
 
 **Problem.** The unit-helper checker reports armsonar/corsonar references in
@@ -4077,6 +4083,11 @@ do not introduce a global action cap. Compare matched seeds and populations.
 [D-171 results](air-committed-operations-results.md). Final combat and a clean
 Legion natural game verify functional reductions, not a universal sub-3000
 or no-FPS-impact guarantee.
+
+
+**D-181 follow-up (2026-10-03).** Final natural Supreme peaked at 6,323 all-unit orders/minute (4,508 aircraft) at minute 41: 3,068 fighter orders, 1,570 turret orders and 862 bomber orders dominate that bin. Minute 43 also had heavy constructor traffic. The new workforce census removes project-by-unit rescans, but this does not establish sub-3,000 APM. Retained command attribution and engine-wide serial 8v8 timing are documented in [workforce results](air-workforce-results.md). Per-AIR/census timing remains a separate profiling gap; no global rate limiter or combat rewrite was added.
+
+**D-181 timing follow-up (2026-10-03).** Serial full-roster twenty-minute 8v8 checkpoints changed aggregate AI p95 by +0.46% with two AIR players and +0.68% with six. A thirty-minute comparison was confounded by eight baseline AI eliminations. Final fixed idle-population controls both pass; at 1,000 constructors the revised mean rises from 0.440 to 0.520 ms/frame and p99 from 10.405 to 12.854 ms. This is measurable observation overhead, not an isolated active-census profile. Instrument per-AIR/census scopes and increasing active-project counts before claiming no FPS impact or choosing further cache work. See [results](air-workforce-results.md).
 
 ### KI-478 - Cancelled AIR reactor engine order could outlive its task
 
@@ -4330,7 +4341,11 @@ receipts while full.
 
 **Verification.** Current helper probes confirm threshold behavior. Matched
 natural/donation games must measure actual spending, trend and idle BP. See
-[review R1 and design](reviews/2026-10-03-air-build-power-review.md#r1--high-air-has-targets-but-no-sustained-spending-gap-response-ki-486). Not fixed.
+[review R1 and design](reviews/2026-10-03-air-build-power-review.md#r1--high-air-has-targets-but-no-sustained-spending-gap-response-ki-486). Not fixed at review time; D-181 status follows.
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 implements sampled own-resource funding, sustained/refilling-bank pressure, immediate admission debits and projected/idle capacity. Supplied negative-own-balance and donor-stop games build and use new power. Natural timing remains mixed and is tracked separately by KI-461; see [results](air-workforce-results.md).
 
 ### KI-487 - AIR opening and lab budgets can suppress funded workforce growth
 
@@ -4345,7 +4360,11 @@ three opening constructors, fighter screen and raid prerequisites.
 **Verification.** Helpers reproduce the funding mismatch. Retained Glacial has
 three workers versus target seven at 6.10 minutes, expanding at 7.05. Add per-gate
 reasons before attributing every delayed second. See
-[review R2](reviews/2026-10-03-air-build-power-review.md#r2--high-opening-and-lab-savings-override-funded-constructor-demand-ki-487). Not fixed.
+[review R2](reviews/2026-10-03-air-build-power-review.md#r2--high-opening-and-lab-savings-override-funded-constructor-demand-ki-487). Not fixed at review time; D-181 status follows.
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 removes the opening support/bomber and first-lab blanket workforce vetoes. A concrete lab reserve and the common two-resource decision now control expansion. Opening scouts/crew/screen and transport precedence remain. Built and played in supplied/natural games; see [results](air-workforce-results.md).
 
 ### KI-488 - AIR factory turrets can mask missing economic support
 
@@ -4360,7 +4379,11 @@ factory twenty-turret accounting and allied layout exclusions.
 **Verification.** Reservation/snapshot/assignment paths are source-confirmed.
 Play separated-district fixtures demonstrating reactor assistance while factory
 support produces aircraft. See
-[review R3](reviews/2026-10-03-air-build-power-review.md#r3--high-factory-power-is-treated-as-economic-capacity-across-districts-ki-488). Not fixed.
+[review R3](reviews/2026-10-03-air-build-power-review.md#r3--high-factory-power-is-treated-as-economic-capacity-across-districts-ki-488). Not fixed at review time; D-181 status follows.
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 adds twelve separate economic support pins per AFUS module, exclusive ownership and economic dispatch. Physical donated-economy and six-lab games exercise the banks while factories produce. Named-state and blocked-module tests pass; see [results](air-workforce-results.md).
 
 ### KI-489 - AIR support parallelism and shared chooser use conflicting budgets
 
@@ -4375,7 +4398,11 @@ completed support turrets per existing T2 lab.
 **Verification.** A helper probe confirms the fixed ceiling; ordering is
 source-confirmed. Compare queue/completion rates and stalls in one- and six-lab
 fixtures. See
-[review R4](reviews/2026-10-03-air-build-power-review.md#r4--medium-airs-support-batch-rule-and-chooser-disagree-ki-489). Not fixed.
+[review R4](reviews/2026-10-03-air-build-power-review.md#r4--medium-airs-support-batch-rule-and-chooser-disagree-ki-489). Not fixed at review time; D-181 status follows.
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 derives support batches from construction capacity and funding, bounded by a configurable safety batch of eight. AIR services this request before its own shared-chooser snapshot, disabling the duplicate TECH-style turret decision only for AIR. Six-lab physical production/support verified; see [results](air-workforce-results.md).
 
 ### KI-490 - AIR assistance admission ignores surplus and arriving work
 
@@ -4390,7 +4417,11 @@ no-progress workers through KI-443 rather than only adding aircraft.
 **Verification.** A helper probe rejects extra BP for the review's 80%-complete
 AFUS example. Test partial reactors with high/low banks, energy stalls and delayed
 workers. See
-[review R5](reviews/2026-10-03-air-build-power-review.md#r5--medium-fixed-assistance-horizons-cap-usable-economic-power-ki-490). Not fixed.
+[review R5](reviews/2026-10-03-air-build-power-review.md#r5--medium-fixed-assistance-horizons-cap-usable-economic-power-ki-490). Not fixed at review time; D-181 status follows.
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 admits funded assistance beyond the former fixed horizons and indexes assignments by worker/target ID. Travellers, queued support, idle workers and stalled progress reduce expansion demand. Supplied assistance and both-tier guard-release fixtures passed; natural timing consistency remains KI-461. See [results](air-workforce-results.md).
 
 ### KI-491 - Native recruit priority can override funded AIR workforce priority
 
@@ -4404,8 +4435,12 @@ defaults for TECH and other roles.
 
 **Verification.** Observe resource priority and actual progress under matched
 low/high-pull conditions, then run TECH/static-task regressions. See
-[review R6](reviews/2026-10-03-air-build-power-review.md#r6--medium-native-recruitment-can-lower-a-funded-constructors-priority-ki-491). Not fixed.
+[review R6](reviews/2026-10-03-air-build-power-review.md#r6--medium-native-recruitment-can-lower-a-funded-constructors-priority-ki-491). Not fixed at review time; D-181 status follows.
 
+
+
+
+**D-181 implementation update (2026-10-03).** D-181 leaves native priority unchanged. Observed priority-zero recruits advanced and completed in the donation/six-lab fixtures (all nine observed targets completed in the final Cortex case). This is not a matched causal low/high-pull test and does not disprove all starvation; the conditional native change remains unproven and this issue stays open. See [results](air-workforce-results.md).
 
 ### KI-492 - AIR build-power checks match count prefixes and narrow historical ranges
 
@@ -4425,4 +4460,7 @@ invariant/crash forbids.
 above: false, true, false, true respectively. No gameplay failure is inferred
 from these synthetic strings. The
 [implementation and acceptance map](reviews/2026-10-03-air-build-power-review.md#implementation-map-and-acceptance-contract-2026-10-03)
-includes the correction. Not fixed.
+includes the correction. Not fixed at review time; D-181 status follows.
+
+
+**D-181 implementation update (2026-10-03).** D-181 corrects all numeric boundaries/ranges in the active check and adds physical completion/working assertions. Python tests accept whole large counts and reject counts below the scenario floor. Archived checks/results are untouched; separate workforce audits observe spending and lifecycle events. Fixed test-definition defect; see [results](air-workforce-results.md).
