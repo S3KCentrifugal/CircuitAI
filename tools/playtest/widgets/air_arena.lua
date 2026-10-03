@@ -188,6 +188,37 @@ local function observePriorityContact(f)
         end
     end end
 end
+-- A route log is only a plan. Record the live cohort crossing the guarded
+-- corridor, with a configurable open band on either side (fixture only).
+local function observeRoute(f)
+    local probe=cfg.route_probe
+    if not probe then return end
+    for _,w in pairs(waves) do if w.state==3 and not w.returning then
+        local cx,cz,alive=0,0,0
+        for _,id in ipairs(w.members) do if valid(id) then
+            local x,_,z=Spring.GetUnitPosition(id)
+            if x then cx=cx+x;cz=cz+z;alive=alive+1 end
+        end end
+        if alive>0 then
+            cx=cx/alive;cz=cz/alive
+            local along=probe.axis=="x" and cx or cz
+            local across=probe.axis=="x" and cz or cx
+            if not w.routeCrossed then
+                event("route_position",{wave=w.id,alive=alive,x=math.floor(cx),z=math.floor(cz)})
+                if w.routePrevious and (w.routePrevious-probe.crossing)*(along-probe.crossing)<=0 then
+                    w.routeCrossed=true
+                    local safe=across<=probe.safe_below or across>=probe.safe_above
+                    event("route_crossing",{wave=w.id,alive=alive,x=math.floor(cx),z=math.floor(cz),flank=safe and 1 or 0})
+                    photograph("wave"..w.id.."-flank-crossing",cx,cz,probe.height or 6500)
+                    if not safe and probe.require_flank~=false then
+                        event("error",{reason="direct_corridor_crossed",wave=w.id})
+                    end
+                end
+            end
+            w.routePrevious=along
+        end
+    end end
+end
 function widget:Initialize()
     for _,g in ipairs(cfg.targets) do addGroup(g,"target") end
     for _,g in ipairs(cfg.defenses) do addGroup(g,"defense") end
@@ -250,6 +281,7 @@ function widget:GameFrame(f)
     if f>=150 and widgetHandler.UnitDamaged~=damageHook then event("error",{reason="damage_handler_replaced"}) end
     if not enabled then return end
     if f%5==0 then observePriorityContact(f) end
+    if f%60==0 then observeRoute(f) end
     if f==300 or f%((cfg.refill_seconds or 45)*30)==0 then refill(f) end
     if #queue>0 and f%3==0 then
         local p=table.remove(queue,1);p.sent=f;pending[#pending+1]=p

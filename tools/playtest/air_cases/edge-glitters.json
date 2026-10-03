@@ -1,0 +1,21 @@
+{
+  "name":"edge-glitters",
+  "map":"All That Glitters v2.2.3",
+  "checks":"air_edge",
+  "description":"Central flak blocks the direct path to a backline converter and AFUS; verify the actual flank under normal LOS",
+  "visibility":"radar", "bomber_only":false,
+  "route_probe":{"axis":"z","crossing":5100,"safe_below":1800,"safe_above":4700,"height":6000},
+  "priority_targets":{"armafus":true}, "priority_radius":1800,
+  "aircraft":[{"unit":"$fighter2","count":40,"team":0,"once":true},{"unit":"$t2","count":48,"team":0,"once":true}],
+  "targets":[
+    {"unit":"armmmkr","count":1,"position":[4000,8700],"once":true},
+    {"unit":"armafus","count":1,"position":[4000,9400],"once":true}
+  ],
+  "defenses":[{"unit":"armflak","count":12,"position":[3000,4900],"once":true}],
+  "sensors":[
+    {"unit":"armeyes","team":0,"count":1,"position":[2900,4900],"once":true},
+    {"unit":"armeyes","team":0,"count":1,"position":[3400,5200],"once":true},
+    {"unit":"armeyes","team":0,"count":1,"position":[3900,8900],"once":true}
+  ],
+  "refill_seconds":30
+}

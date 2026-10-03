@@ -10655,3 +10655,55 @@ recorded in the report rather than inferred from screenshots alone.
 
 **Evidence.** [Pinned build and run manifest](benchmarks/d176-afus-handoff.json).
 All four fixed strict reports PASS; the old-DLL baseline fails INV-121 as expected.
+
+## D-177 - Verify edge routes through actual flight without retuning AIR
+
+**Date:** 2026-10-03. **Status:** Checked and Played against the published
+D-176 DLL; no production source, script policy or binary change.
+
+**Decision.** Preserve the existing direct/four-edge planner, intermediate
+formation legs and local AFUS handoff. Add opt-in fixture observation of the
+live bomber cohort crossing a defended corridor, with screenshots and target
+damage/destruction. Experimental STRIKE missions can use an edge ingress;
+the historical randomized FLANK/PINCER labels are not evidence that this path
+is disabled. Do not change gameplay to satisfy a verification-only request.
+
+**Why and alternatives.** A selected `route=edge` log cannot prove the units
+flew it. Actual positions on two maps show they did: Supreme west with Armada,
+Glitters east with Cortex under normal visibility. Both reached and destroyed
+the AFUS after the crossing; local AFUS ATTACK handoff took 0.33 seconds.
+Reject retuning threat weights or assuming flak removal alone makes a clear
+control. Two initial controls still had an enemy commander near the targets'
+exit corridor and failed the direct-crossing expectation. Keep those failures
+in the evidence. A corrected control separates the targets from the commander
+and the unchanged AI selects and flies direct. This is not a per-candidate
+threat-cost attribution or an economy/performance benchmark.
+
+**Invariant.** Existing INV-115 escort ownership, INV-116 offensive commitment
+and INV-121 attack handoff remain enforced. The test-only route observer
+raises `event=error` if a required flank crosses the configured central band;
+strict checks forbid that event and all runtime invariants. It measures cohort
+centre every 60 frames, not each aircraft's individual AA clearance. No new
+production invariant or actor state is needed because no behaviour changed.
+
+**Verification.** Both defended cases and the corrected clear control pass
+rendered 8-10 minute runs. Both discarded control designs remain strict FAIL
+for their missing direct crossing. No runtime invariant, script, fixture or
+crash failures in any of the five games. Two factions and two experimental
+profiles were played, not all maps or legacy randomized attack modes. Existing
+KI-474 performance and KI-475 exact escort-speed limitations remain outside
+this verification.
+
+**Files.** [Plan, results and reproduction](air-edge-flank-verification.md),
+[measurement manifest](benchmarks/d177-air-routes.json),
+[read-only route observer](../tools/playtest/widgets/air_arena.lua),
+[Supreme fixture](../tools/playtest/air_cases/edge-supreme.json),
+[Glitters fixture](../tools/playtest/air_cases/edge-glitters.json),
+[clear control](../tools/playtest/air_cases/direct-glitters.json),
+[edge checks](../tools/playtest/checks/air_edge.json),
+[direct checks](../tools/playtest/checks/air_direct.json),
+[Supreme edge](images/d177/supreme-edge.png),
+[Supreme strike](images/d177/supreme-afus.png),
+[Glitters edge](images/d177/glitters-edge.png),
+[Glitters strike](images/d177/glitters-afus.png),
+[direct control](images/d177/glitters-direct.png).
