@@ -130,7 +130,9 @@ void TestAirClustersPackSixWithoutOverlap()
 					slots.push_back(nano);
 				}
 			}
-			Check(plan.bounds.Width() * plan.bounds.Depth() <= 63 * 30, "dense cluster fits 1008 by 480 elmos");
+			Check(plan.bounds.Width() * plan.bounds.Depth() <= 27 * 60, "rear support removes unused side-bank space");
+			Check(TouchesEdge(RectFromCentre(plan.factories[1].centre, plan.factories[1].footprint, facing),
+				RectFromCentre(plan.factories[2].centre, plan.factories[2].footprint, facing)), "air factories share an edge without an unused aisle");
 			for (std::size_t i = 0; i < slots.size(); ++i) {
 				const auto rect = RectFromCentre(slots[i].centre, slots[i].footprint, facing);
 				Check(IsAligned(slots[i].centre, slots[i].footprint, facing), "air slot aligned after rotation");

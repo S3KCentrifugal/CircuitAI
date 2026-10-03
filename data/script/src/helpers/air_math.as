@@ -1,5 +1,26 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    bool T1OpeningReady(int crew, int requiredCrew, int nanos, int requiredNanos, bool recovering)
+    {
+        return !recovering && requiredCrew > 0 && requiredNanos >= 0
+            && crew >= requiredCrew && nanos >= requiredNanos;
+    }
+    float RadarSpacing(float radius, float overlap)
+    {
+        if (!Valid(radius) || radius <= 0 || !Valid(overlap) || overlap >= 1) return 0;
+        return 2.0f * radius * (1.0f - overlap);
+    }
+    bool RadarReady(bool visited, float distanceSq, float radius)
+    {
+        return visited && Valid(distanceSq) && Valid(radius) && radius > 0 && distanceSq <= 4.0f*radius*radius;
+    }
+    int RadarColumns(int count, float span, float spacing)
+    {
+        if (count <= 0 || !Valid(span) || !Valid(spacing) || spacing <= 0) return 0;
+        if (span / spacing >= float(count - 1)) return count;
+        const int fit = 1 + int(span / spacing);
+        return fit < count ? fit : count;
+    }
     bool WorkforceTurn(bool missing, bool funded, bool emergency, int combatOrders, int maximum)
     {
         return missing && funded && maximum > 0 && (!emergency || combatOrders >= maximum);

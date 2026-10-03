@@ -29,6 +29,15 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+D-179 radar/compact-factory fixture: allocate an AIR/combat supplied directory,
+then `prepare_air_recon_check.py --dir <dir> --dll <pinned-dll> --map glacial`
+(or `supreme --clusters`). Launch rendered and watch with
+`--role AIR --checks air_recon --minutes 8`. It supplies twenty radar planes,
+freezes building/production and keeps commanders passive. The cluster option
+supplies six T2 labs and 120 turrets on native reservation positions. It checks
+formation, MOVE ingress and base scouting, independently of economy or enemy-AA
+penetration. See [settings and results](../../doc/air-opening-recon-plan.md).
+
 D-171 committed AIR tests: `prepare_air_operations_cases.py --output
 build-theatres/air-cases` generates supplied combat fixtures for five non-metal
 maps. Run each with `air_arena.py run --case <json> --map <name> --side <faction>

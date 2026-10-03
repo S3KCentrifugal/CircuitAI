@@ -311,6 +311,12 @@ namespace AirBuild {
         const bool opening = !ProductionMath::CrewReady(crew, Global::RoleSettings::Air::OpeningAirConstructors);
         const bool useful = ProductionMath::FactoryAssistUseful(!opening, plant.GetBuildProgress() >= 1.0f, PlantHasWork(plant));
         IUnitTask@ t = null;
+        if (!opening && !AirEconomy::recovery && AirEconomy::OpeningSupportNeeded()) {
+            @t = Nano(u, true);
+            if (t !is null) return Record(t, "opening.support", u);
+            @t = Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)), true);
+            if (t !is null) return Record(t, "opening.support.assist", u);
+        }
         if (!opening && AirEconomy::SavingForFirstLab()) {
             @t = Assist(u, false, null, true);
             if (t !is null) return Record(t, "transition.finish", u);
@@ -580,7 +586,25 @@ namespace AirBuild {
         }
         return count;
     }
-    IUnitTask@ Nano(CCircuitUnit@ u)
+    bool OpeningSupportBudget()
+    {
+        if (MetalEconomy::Active() || AirEconomy::recovery || !AirEconomy::OpeningSupportNeeded()
+            || AirEconomy::energy < Global::RoleSettings::Air::OpeningNanoMinEnergy) return false;
+        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        if (nano is null) return false;
+        for (uint b = 0; b < AirLayout::bays.length(); ++b) {
+            AirLayout::Bay@ bay = AirLayout::bays[b];
+            CCircuitUnit@ plant = ai.GetTeamUnit(bay.factoryId);
+            if (plant is null || Lifecycle::IsRetiring(plant) || !UnitHelpers::IsT1AircraftPlant(bay.defName)) continue;
+            AirLayout::RepairSupport(b, nano);
+            for (uint n = 0; n < bay.nanos.length(); ++n) {
+                const int state = aiTerrainMgr.GetReservationState(bay.nanos[n]);
+                if (state >= 0 && state <= 2) return true;
+            }
+        }
+        return false; // blocked support must not freeze aircraft production
+    }
+    IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
         const string key = "" + u.id;
@@ -591,13 +615,18 @@ namespace AirBuild {
             GenericHelpers::LogUtil("[AIR][NanoGate] " + u.circuitDef.GetName() + " " + u.id + " can=" + (Can(u, d) ? "yes" : "no")
                 + " busy=" + (Busy(d, Task::BuildType::NANO) ? "yes" : "no") + " count=" + d.count, 1);
         }
-        if (!Can(u, d) || AirEconomy::recovery || AirEconomy::bankM < 150.0f || AirEconomy::energy < 250.0f) return null;
+        const bool openingSupport = AirEconomy::OpeningSupportNeeded();
+        if (openingOnly && !openingSupport) return null;
+        const float minimumEnergy = openingSupport ? Global::RoleSettings::Air::OpeningNanoMinEnergy : 250.0f;
+        if (!Can(u, d) || AirEconomy::recovery || AirEconomy::bankM < 150.0f || AirEconomy::energy < minimumEnergy) return null;
         const int pending = aiBuilderMgr.GetUnfinishedCount(d) + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO), d);
         const int parallel = AirEconomy::MetalFloating() ? Global::RoleSettings::Air::NanoParallel : 1;
         if (!ProductionMath::SupportQueueReady(pending, parallel, aiEconomyMgr.metal.current, aiEconomyMgr.energy.current,
             AirEconomy::metal, AirEconomy::energy, d.costM, d.costE)) return null;
         AirEconomy::RefreshSupport();
         for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
+            if ((openingOnly || AirEconomy::energy < 250.0f) && (!UnitHelpers::IsT1AircraftPlant(AirLayout::bays[b].defName)
+                || SupportCommitted(b) >= AirEconomy::OpeningNanoTarget())) continue;
             if (AirLayout::bays[b].factoryId < 0 || SupportCommitted(b) >= AirEconomy::NanoTarget(b)) continue;
             AirLayout::RepairSupport(b, d);
             for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {

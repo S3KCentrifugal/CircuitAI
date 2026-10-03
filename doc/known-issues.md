@@ -4137,6 +4137,12 @@ retain their raw failures rather than being retroactively declared passes.
 
 ### KI-479 - Player-controlled radar planes can occupy the next recon cohort budget
 
+**D-179 update (2026-10-03).** Production now adds PLAYER aircraft and active
+sweeps to the eligible quota. Stale sweep handles are removed and extra
+donations retain waiting ownership. Two-map dispatch/survey and loss cleanup
+were played; explicit human takeover/release remains unverified, so this
+verification item stays open. See [D-179 evidence](air-opening-recon-plan.md).
+
 **Problem.** AIR's production target includes all owned radar planes, while its
 waiting cohort correctly excludes PLAYER tasks. Taking over one waiting plane
 can leave nineteen eligible planes and a total of twenty, suppressing the last
@@ -4284,3 +4290,23 @@ report TECH INV-008 at frames 7621 (hard) and 7741 (terrible): two turrets in
 range do not join the T1 lab reclaim. Their strict reports remain FAIL even
 though all donation checks pass. This is a recurrence of the recorded category,
 not a same-seed diagnosis of its cause. See [exact evidence](team-metal-sharing.md).
+
+
+### KI-485 - Single-bomber Glacial opening was recruited but no dispatch was observed
+
+**Problem.** The D-179 natural Armada Glacial game completed its two starter
+support turrets at 6.51/6.82 minutes and recruited the saved one-bomber opening
+at 6.87. No `[AIR][Raid] launched` event occurred before the 18-minute stop.
+T2 completed at 13.90. This does not establish a production stall or targeting
+defect: the planner requires visible viable targets, and initial scout sight
+can be lost before bombers are ready. The exact blocker was not instrumented.
+
+**Proposed solution.** Add bounded held-pool/visibility/payload diagnostics and
+repeat with natural scouting, then a controlled visible-mex case. If visibility
+is responsible, coordinate replacement scouts with a ready T1 raid; do not
+make hidden enemies targetable or silently change the random draw.
+
+**Verification.** Require an actual one-bomber dispatch and damage to a known
+mex/wind, separately from recruitment; retain the nine/two-bomber Supreme
+dispatch evidence. Glacial's full verdict remains FAIL for TECH invariants
+(KI-472). See [D-179 run details](air-opening-recon-plan.md).

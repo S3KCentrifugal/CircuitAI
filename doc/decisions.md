@@ -10782,3 +10782,68 @@ Historical documentation paths were updated in [AFUS results](air-afus-attack-ha
 [opening/screen reference](air-opening-and-screen.md), [issue register](known-issues.md),
 [flank review](reviews/2026-09-29-ascendancy-flank-effectiveness.md),
 [lanes reference](roles/tech-lanes.md), and earlier entries in this decision record.
+
+
+## D-179 - AIR opening support, compact factories and LOS-spaced recon (2026-10-03)
+
+**Decision.** Fund two early support turrets after the first three constructors
+and initial fighter screen, ahead of extra peacetime aircraft. Preserve demand
+when initial support pins are missing so repair can run. Add a saved configurable
+1-10 T1 raid (Legion uses Mosquito gunships). Pack AIR lab rows together with
+rear support banks and explicit cached bay ownership. Recon uses loaded sight,
+a map-centred friendly formation, per-member arrival tracking, synchronized
+straight MOVE legs, then nearby-base patrols through one shared native task.
+TECH's sequence/geometry, transports, recovery and the metal opening retain
+precedence. Existing saved reservations remain valid.
+
+**Why and alternatives.** Lowering the income gate alone could not repair a
+starter with no pins: zero pins made its support target zero forever. Only
+viable/active support sites reserve a production budget; blocked sites cannot
+freeze the factory. Individual edge clamping piles scouts together, so fit a
+whole formation, try transverse centring, then reduce spacing if necessary.
+Waiting for twenty fixed-wing orbit phases to coincide delayed dispatch for
+minutes: each plane must instead visit its slot and remain within the bounded
+holding envelope. Avoid repeated corrective orders. C++ provides geometry and
+read-only LOS; policy and settings remain in script. The raid draw does not
+waive visibility/payload admission or invent a Legion bomber build option.
+
+**Invariants.** INV-122 checks completed crew/support at opening recruitment and
+exact transferred bomber count. INV-123 checks complete recon transfer and
+straight MOVE route admission. INV-084/109 continue to protect complete support
+and reservation ownership. Physical/pure tests verify non-overlap, reach and
+twenty turrets credited to each of six advanced labs.
+
+**Verification.** Native suite, 303 pure script tests, 66 tooling tests and
+script/DLL parity passed. Final rendered Supreme/Glacial recon fixtures pass:
+twenty dispatch together and twenty enter base surveying. Six T2 labs and 120
+nanos physically fit. Three natural faction openings complete support and
+recruit their batch; Supreme launches it. Full natural verdicts remain FAIL
+for existing TECH/ferry invariants. Single-bomber Glacial dispatch is unobserved
+(KI-485); human takeover/release remains unplayed (KI-479). No 8v8 strength/FPS
+guarantee. [Plan, settings, times and retained evidence](air-opening-recon-plan.md).
+
+**Files.** [Settings](../data/script/src/global.as),
+[math](../data/script/src/helpers/air_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[layout revision](../data/script/src/manager/air_layout.as),
+[production](../data/script/src/manager/air_production.as),
+[T1 raids](../data/script/src/manager/air_raids.as),
+[recon](../data/script/src/manager/air_recon.as),
+[building](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[LOS binding](../src/circuit/script/InitScript.cpp),
+[geometry](../src/circuit/terrain/BaseLayoutGeometry.h),
+[geometry tests](../tests/base_layout_geometry_test.cpp),
+[policy tests](../tests/air_math_tests.as),
+[fixture preparer](../tools/playtest/prepare_air_recon_check.py),
+[probe](../tools/playtest/air_recon_probe.as),
+[observer](../tools/playtest/widgets/air_recon_watch.lua),
+[checks](../tools/playtest/checks/air/combat/air_recon.json),
+[arena compatibility](../tools/playtest/air_arena.py),
+[natural-run metadata](../tools/playtest/run_air_natural.py),
+[runner guide](../tools/playtest/README.md),
+[AIR reference](roles/air.md), [action reference](roles/air_build.md),
+[rule reference](roles/air_rules.md), [layout reference](base-layout.md),
+[API reference](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [verification gaps](known-issues.md),
+[benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).

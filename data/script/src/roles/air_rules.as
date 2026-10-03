@@ -46,6 +46,12 @@ namespace AirRules {
         }
         @t = AirBuild::Factory(u, false);
         if (t !is null) return AirBuild::Record(t, Team::Ferry::requestPending ? "transport.plant" : "opening.plant", u);
+        if (!AirEconomy::recovery && AirEconomy::OpeningSupportNeeded()) {
+            @t = AirBuild::Nano(u, true);
+            if (t !is null) return AirBuild::Record(t, "opening.support", u);
+            @t = AirBuild::Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(side)));
+            if (t !is null) return AirBuild::Record(t, "opening.support.assist", u);
+        }
         // T2 builders, including gifts, upgrade mexes without requiring a T2 plant.
         if ((!AirEconomy::TechGrowth() || AirEconomy::MassBombers() || AirEconomy::t2 == 0)
             && AirEconomy::BankedLab(ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side)))) {

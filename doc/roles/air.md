@@ -1,5 +1,13 @@
 # AIR Role
 
+D-179 adds [earlier opening support, compact factory rows and wide recon](../air-opening-recon-plan.md).
+`OpeningNanoCount=2` and `OpeningNanoMinEnergy=160` fund early support after the
+three-constructor opening and initial fighter screen. A missing reservation no
+longer reduces demand to zero: repair finds replacement sites near the starter.
+`T1OpeningBomberMin=1` / `T1OpeningBomberMax=10` draw one persistent opening
+batch; `T1OpeningRaidEnabled` controls it. Legion uses Mosquito gunships.
+Recovery, transports and immediate interceptions retain precedence.
+
 D-171 adds [committed air operations](../air-committed-operations-plan.md): shared fighter wall groups, all available fighters committed to each bomber sortie, persistent offensive attacks, strategic district targeting, a fighter/radar production owner, and income-based bomber readiness. The nearby startup lab is retired and later rebuilt in the campus. Native changes are opt-in; TECH retains its existing policy. Validation is recorded with the plan.
 
 D-170 adds an explicitly detected metal-field economy through
@@ -64,8 +72,13 @@ enemy army and unknown-threat allowances. Intended total attrition no longer
 penalizes future offensive missions as a failed return.
 
 Two completed advanced factories designate one live factory for fighters and
-20-plane radar cohorts every ten minutes. Radar aircraft patrol friendly
-territory while collecting, then sweep enemy starts without returning. Economy
+20-plane radar cohorts every ten minutes. Radar aircraft assemble at distinct
+friendly positions with `RadarSightOverlap=0.5` (linear overlap of sight
+diameters). Map-fitting parallel ranks preserve width; an off-centre start does
+not anchor the entire wall to a side edge. Each member must visit its slot and
+remain nearby; fixed-wing orbit phases need not coincide. The shared task then
+issues separate straight MOVE legs to the enemy backline, followed by nearby
+base patrols. PLAYER aircraft do not consume the eligible production quota. Economy
 and emergency constructor/transport recovery can preempt normal production.
 Sustained metal and energy admit bombers independently of the two-AFUS growth
 objective. See [design and validation](../air-committed-operations-plan.md).

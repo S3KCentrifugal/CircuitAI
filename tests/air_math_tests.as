@@ -1,4 +1,19 @@
 void test_air_parity_still_builds_bombers() { Check(AirMath::BomberOrders(1000,1000,6,3)==3); }
+void test_t1_opening_waits_for_completed_crew() { Check(!AirMath::T1OpeningReady(2,3,2,2,false)); }
+void test_t1_opening_waits_for_completed_support() { Check(!AirMath::T1OpeningReady(3,3,1,2,false)); }
+void test_t1_opening_defers_energy_recovery() { Check(!AirMath::T1OpeningReady(3,3,2,2,true)); }
+void test_t1_opening_admits_funded_complete_opening() { Check(AirMath::T1OpeningReady(3,3,2,2,false)); }
+void test_t1_opening_one_and_ten_are_inclusive() { Check(AirMath::OpeningWave(1,10,1)==1 && AirMath::OpeningWave(1,10,10)==10); }
+void test_recon_half_sight_overlap_uses_radius_pitch() { Check(AirMath::RadarSpacing(1250,.5f)==1250 && AirMath::RadarSpacing(1275,.5f)==1275); }
+void test_recon_zero_overlap_uses_diameter_pitch() { Check(AirMath::RadarSpacing(1250,0)==2500); }
+void test_recon_invalid_spacing_fails_closed() { Check(AirMath::RadarSpacing(0,.5f)==0 && AirMath::RadarSpacing(1250,-.1f)==0 && AirMath::RadarSpacing(1250,1)==0); }
+void test_recon_narrow_map_uses_multiple_ranks() { Check(AirMath::RadarColumns(20,5000,1250)==5); }
+void test_recon_full_width_line_has_no_extra_column() { Check(AirMath::RadarColumns(20,4999,1250)==4); }
+void test_recon_columns_cannot_exceed_cohort() { Check(AirMath::RadarColumns(20,1.0e10f,.001f)==20); }
+void test_recon_degenerate_span_keeps_one_column() { Check(AirMath::RadarColumns(20,0,1250)==1 && AirMath::RadarColumns(0,5000,1250)==0); }
+void test_recon_must_visit_its_slot_before_dispatch() { Check(!AirMath::RadarReady(false,100,480)); }
+void test_recon_reached_plane_can_circle_its_slot() { Check(AirMath::RadarReady(true,600*600,480)); }
+void test_recon_displaced_plane_is_not_ready() { Check(!AirMath::RadarReady(true,1000*1000,480) && !AirMath::RadarReady(true,0,0)); }
 void test_air_funded_workforce_precedes_peacetime_replacements() { Check(AirMath::WorkforceTurn(true,true,false,0,2)); }
 void test_air_immediate_incursion_gets_first_combat_order() { Check(!AirMath::WorkforceTurn(true,true,true,0,2)); }
 void test_air_continuous_incursion_cannot_starve_workforce() { Check(AirMath::WorkforceTurn(true,true,true,2,2)); }

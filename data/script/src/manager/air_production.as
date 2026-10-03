@@ -26,6 +26,9 @@ namespace AirProduction {
         IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(utility ? Task::RecruitType::BUILDPOWER : Task::RecruitType::FIREPOWER,
             priority, d, plant.GetPos(ai.frame), 64.0f));
         if (t !is null) {
+            if (purpose == "opening.raid" && !AirMath::T1OpeningReady(AirEconomy::CompletedConstructors(),
+                Global::RoleSettings::Air::OpeningAirConstructors, AirEconomy::OpeningNanoCompleted(), AirEconomy::OpeningNanoTarget(), AirEconomy::recovery))
+                Invariants::Violation("INV-122", name, "T1 opening ordered before crew/support readiness");
             if (purpose == "wave.bomber" && !AirEconomy::MassBombers())
                 Invariants::Violation("INV-102", name, "T2 bomber production below sustainable income gate");
             const string key = "air.crew.streak." + plant.id;
@@ -119,7 +122,13 @@ namespace AirProduction {
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
         const bool saving = AirEconomy::SavingForFirstLab();
-        const bool workforceTurn = !saving && AirMath::WorkforceTurn(Projected(builder) < constructors,
+        const bool supportBudget = basic && !emergency && AirBuild::OpeningSupportBudget();
+        const bool openingReady = basic && AirRaids::OpeningPending() && AirMath::T1OpeningReady(AirEconomy::CompletedConstructors(),
+            Global::RoleSettings::Air::OpeningAirConstructors, AirEconomy::OpeningNanoCompleted(), AirEconomy::OpeningNanoTarget(), AirEconomy::recovery);
+        const string openingBomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
+        const bool openingTurn = openingReady && (side == "legion" ? aiTerrainMgr.GetLayoutInt("air.t1.openingOrders", 0)
+            : Projected(ai.GetCircuitDef(openingBomber))) < AirRaids::OpeningSize();
+        const bool workforceTurn = !saving && !supportBudget && !openingTurn && AirMath::WorkforceTurn(Projected(builder) < constructors,
             AirEconomy::FundConstructor(builder), emergency,
             aiTerrainMgr.GetLayoutInt("air.combat.streak." + u.id, 0),
             Global::RoleSettings::Air::CombatOrdersPerEconomyConstructor);
@@ -141,7 +150,21 @@ namespace AirProduction {
             @t = Recruit(u, fighter, Projected(fighterDef) + missing, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
-        if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        if (!affordable || AirEconomy::recovery || supportBudget) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        if (openingReady) {
+            const int goal = AirRaids::OpeningSize();
+            aiTerrainMgr.SetLayoutInt("air.t1.openingReady", 1);
+            if (side != "legion" || aiTerrainMgr.GetLayoutInt("air.t1.openingOrders", 0) < goal) {
+                @t = Recruit(u, openingBomber, side == "legion" ? Projected(ai.GetCircuitDef(openingBomber)) + 1 : goal,
+                    "opening.raid", Task::Priority::NORMAL);
+                if (t !is null) {
+                    const int orders = aiTerrainMgr.GetLayoutInt("air.t1.openingOrders", 0) + 1;
+                    aiTerrainMgr.SetLayoutInt("air.t1.openingOrders", orders);
+                    if (side == "legion" && orders >= goal) aiTerrainMgr.SetLayoutInt("air.t1.openingDone", 1);
+                    return t;
+                }
+            }
+        }
         if (basic && AirBuild::StarterReadyToRetire(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(false, SECOND));
         if (saving) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         // A lost scout gets another route. Utility never consumes a strike slot.
@@ -164,7 +187,7 @@ namespace AirProduction {
             AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersClear : Global::RoleSettings::Air::BomberOrdersClear,
             AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersParity : Global::RoleSettings::Air::BomberOrdersParity);
         const bool strike = strikeOrders > 0 && AirMath::BomberTurn(aiTerrainMgr.GetLayoutInt("air.mix." + u.id, 0), strikeOrders);
-        if (basic && strike && AirEconomy::metal >= 12.0f) {
+        if (basic && strike && !AirRaids::OpeningPending() && AirEconomy::metal >= 12.0f) {
             const string bomber = side == "cortex" ? "corshad" : side == "legion" ? "legmos" : "armthund";
             // Alternate finite land support and reusable T1 bomber groups.
             const int phase = aiTerrainMgr.GetLayoutInt("air.t1.mix", 0);

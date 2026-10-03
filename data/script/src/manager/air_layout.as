@@ -70,6 +70,7 @@ namespace AirLayout {
     string Key(int i) { return "air.bay." + i; }
     void Save(Bay@ b)
     {
+        aiTerrainMgr.SetLayoutInt("air.supportRevision", aiTerrainMgr.GetLayoutInt("air.supportRevision", 0) + 1);
         aiTerrainMgr.SetLayoutInt(b.key + ".cluster", b.cluster);
         aiTerrainMgr.SetLayoutInt(b.key + ".slot", b.slot);
         aiTerrainMgr.SetLayoutInt(b.key + ".envelope", b.envelope);

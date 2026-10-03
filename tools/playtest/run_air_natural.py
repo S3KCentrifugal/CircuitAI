@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 import playtest
+import storage
 from prepare_air_operations_cases import MAPS
 
 
@@ -18,6 +19,12 @@ def run(args, entry):
     key, name, side, _, _ = entry
     base = args.dir.resolve()/key
     base.mkdir(parents=True, exist_ok=True)
+    # This runner nests maps below --dir; carry an allocated cohort's category
+    # into each actual engine write directory before its immutable archive.
+    if (args.dir/'run-plan.json').is_file():
+        plan = json.loads((args.dir/'run-plan.json').read_text())
+        plan['category']['map'] = key
+        storage.write_json(base/'run-plan.json', plan)
     map_source = args.data/"script/src/maps"/playtest.map_file_for(name).name if args.data else None
     spots = playtest.map_spots(name, map_source)
     selected = []

@@ -57,6 +57,7 @@ policy. Existing APIs retain their behavior.
 | `CCircuitDef.GetExtractsMetal()` | Loaded engine extraction rate; compare with the loaded advanced extractor to classify basic/advanced variants. Read-only observation; no classification policy is changed natively (D-148). |
 | `CCircuitDef.GetBuildSpeed()` | Physical engine worker time, work/second, before JSON `build_speed` tuning. Do not multiply by `SECOND`. |
 | `CCircuitDef.GetBuildDistance()` | Engine build reach in elmos. |
+| `CCircuitDef.GetLosRadius()` | Loaded ground sight radius in elmos; AIR uses it for configurable sight overlap, independently of radar range (D-179). |
 | `aiFactoryMgr.GetPendingRecruitCount(def)` | Live recruit tasks with this definition and no target frame. `def.count` already includes frames; add only this pending count. |
 | `aiTerrainMgr.ReservePersistentBuilding(def, pos, facing)` | Layout-enabled snapped footprint and private zone, retained after completion; negative on failure. Local footprint dimensions are rotated once. |
 | `aiTerrainMgr.ReleasePersistentBuilding(id)` | Release an unused reservation and its private zone, used for rollback. |

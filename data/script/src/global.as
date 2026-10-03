@@ -970,6 +970,11 @@ namespace Global {
             int T2ExpansionSupport = 20; // completed turrets per existing T2 air lab; banked metal cannot bypass
             int NanoParallel = 3; // funded support frames while metal floats
             int T1NanoLimit = 5;
+            int OpeningNanoCount = 2; // completed support near the first T1 plant before the opening raid
+            float OpeningNanoMinEnergy = 160.0f;
+            bool T1OpeningRaidEnabled = true;
+            int T1OpeningBomberMin = 1;
+            int T1OpeningBomberMax = 10;
             int MaxT1EconomyBuilders = 40;
             int MaxT2EconomyBuilders = 24;
             float EconomyBuildPowerPerMetal = 24.0f;
@@ -1032,6 +1037,9 @@ namespace Global {
             float StrikeImmediateRadius = 1800.0f;
             int RadarWaveSize = 20;
             int RadarWaveIntervalSeconds = 600;
+            float RadarSightOverlap = 0.5f; // linear overlap of neighbouring ground-LOS diameters
+            float RadarAssemblyRadius = 480.0f; // fixed-wing aircraft circle their assigned positions
+            float RadarBacklineInset = 256.0f;
             int MassBomberOrdersClear = 8;
             int MassBomberOrdersParity = 5;
             float StrikeReserveSeconds = 120.0f;

@@ -12,6 +12,8 @@ namespace AirEconomy {
     string state = "BOOTSTRAP";
     array<int> owned;
     dictionary nanoBay; // one primary bay per live assistant
+    dictionary supportOwner; // snapped reserved position -> bay; rebuilt only after layout changes
+    int supportRevision = -1;
     array<float> power;
     array<int> nanoCount;
     array<int> nanoFuture;
@@ -145,6 +147,7 @@ namespace AirEconomy {
         armedAirMemory = 0.0f; armedAirFrame = -1;
         t1 = 0; t2 = 0; state = "BOOTSTRAP";
         owned.resize(0); nanoBay.deleteAll(); power.resize(0); nanoCount.resize(0); nanoFuture.resize(0);
+        supportOwner.deleteAll(); supportRevision = -1;
     }
     string Fighter(bool advanced, const string &in faction = "")
     {
@@ -195,6 +198,25 @@ namespace AirEconomy {
     int SupportBay(const CCircuitDef@ d, const AIFloat3 &in pos)
     {
         if (d is null) return -1;
+        const int revision = aiTerrainMgr.GetLayoutInt("air.supportRevision", 0);
+        if (supportRevision != revision) {
+            supportOwner.deleteAll(); supportRevision = revision;
+            for (uint b = 0; b < AirLayout::bays.length(); ++b) {
+                for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {
+                    const int slot = AirLayout::bays[b].nanos[s];
+                    if (aiTerrainMgr.GetReservationState(slot) < 0) continue;
+                    const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
+                    supportOwner.set("" + int(at.x / 8.0f + 0.5f) + ":" + int(at.z / 8.0f + 0.5f), int(b));
+                }
+            }
+        }
+        int owner = -1;
+        if (supportOwner.get("" + int(pos.x / 8.0f + 0.5f) + ":" + int(pos.z / 8.0f + 0.5f), owner)
+            && owner >= 0 && owner < int(AirLayout::bays.length())) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(AirLayout::bays[owner].factoryId);
+            if (plant !is null && !Lifecycle::IsRetiring(plant)
+                && MapHelpers::SqDist(pos, plant.GetPos(ai.frame)) <= d.GetBuildDistance() * d.GetBuildDistance()) return owner;
+        }
         int best = -1;
         float dist = d.GetBuildDistance() * d.GetBuildDistance();
         for (uint b = 0; b < AirLayout::bays.length(); ++b) {
@@ -381,9 +403,11 @@ namespace AirEconomy {
         const int count = AiMax(1, advanced ? t2 : t1 + t2);
         const float share = Global::RoleSettings::Air::ProductionIncomeShare / float(count);
         float rate = ProductionMath::FundedRate(100.0f, cm, ce, metal * share, energy * share);
-        const int space = AiMax(int(AirLayout::bays[bay].nanos.length()), nanoCount[bay]);
         const int limit = advanced ? AiMin(20, AiMax(Global::RoleSettings::Air::T2NanoSoftLimit, Global::RoleSettings::Air::T2ExpansionSupport)) : AiMin(5, Global::RoleSettings::Air::T1NanoLimit);
-        const int cap = AiMin(space, limit);
+        // Demand must survive missing/blocked reservations. Otherwise a locally
+        // placed starter with no initial pins has target zero and never reaches
+        // RepairSupport to allocate its first turret.
+        const int cap = limit;
         const int production = ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds, rate, cap);
         // TECH's income/float principle, with AIR's independent bay ownership.
         // This power can help nearby construction whenever recruitment pauses.
@@ -391,7 +415,22 @@ namespace AirEconomy {
         // Factory build speed produces units; it cannot build our wind/solar economy.
         const int construction = energy >= 250.0f ? ProductionMath::WorkforceTarget(target, nano.GetBuildSpeed(), 0, cap) : 0;
         const int expansion = advanced && Transition(plant) ? AiMin(cap, Global::RoleSettings::Air::T2ExpansionSupport) : 0;
-        return AiMax(expansion, AiMax(production, construction));
+        const int opening = !advanced && CompletedConstructors() >= Global::RoleSettings::Air::OpeningAirConstructors
+            ? AiMin(cap, OpeningNanoTarget()) : 0;
+        return AiMax(opening, AiMax(expansion, AiMax(production, construction)));
+    }
+    int OpeningNanoTarget() { return AiMax(0, AiMin(5, AiMin(Global::RoleSettings::Air::T1NanoLimit, Global::RoleSettings::Air::OpeningNanoCount))); }
+    int OpeningNanoCompleted()
+    {
+        int count = 0;
+        for (uint b = 0; b < AirLayout::bays.length() && b < nanoCount.length(); ++b)
+            if (UnitHelpers::IsT1AircraftPlant(AirLayout::bays[b].defName) && AirLayout::bays[b].factoryId >= 0) count += nanoCount[b];
+        return count;
+    }
+    bool OpeningSupportNeeded()
+    {
+        return t1 > 0 && t2 == 0 && CompletedConstructors() >= Global::RoleSettings::Air::OpeningAirConstructors
+            && OpeningNanoCompleted() < OpeningNanoTarget();
     }
     float ConstructionTarget()
     {

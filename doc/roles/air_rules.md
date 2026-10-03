@@ -1,5 +1,12 @@
 # AIR ordered building rules
 
+D-179 inserts `opening.support` / `opening.support.assist` after starter/transport
+factory recovery and before discretionary expansion. They require three
+completed air constructors, funded resources, and no energy recovery. The
+commander handles the same support goal through its local action path. The
+metal-map dispatch stays ahead of these normal-map rows. See
+[opening and recon plan](../air-opening-recon-plan.md).
+
 `transition.storage` expands a nearly full pre-T2 metal store when it cannot
 hold the loaded advanced lab cost. Mex upgrades/recovery retain priority; the
 existing factory income or fully banked-cost admission is unchanged. The
@@ -89,7 +96,7 @@ Turning the feature off returns AIR to its existing legacy dispatcher.
 See [building actions](air_build.md), [AIR integration](air.md),
 [implementation/evidence](../air-management.md).
 
-<!-- source: data/script/src/roles/air_rules.as; blob: c63ec2c7c847bbd86fa84ca833a73dbec01371ad; lines: 164 -->
+<!-- source: data/script/src/roles/air_rules.as; blob: 89dad1a8ebb3e1e1af3fb79c7601283498e590c0; lines: 170 -->
 
 ## D-152 sequencing
 

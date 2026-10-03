@@ -213,26 +213,27 @@ struct AirFactoryCluster {
 	origin.x2 -= origin.x2 & 1;
 	origin.z2 -= origin.z2 & 1;
 	const int width = std::max(first.x, repeated.x);
-	const int depth = std::max(std::max(first.z, repeated.z), 5 * nano.z);
-	const int pitch = width + 4 * nano.x;
+	const int supportColumns = std::max(1, width / nano.x);
+	const int supportRows = (std::max(firstNanos, repeatedNanos) + supportColumns - 1) / supportColumns;
+	const int supportDepth = supportRows * nano.z;
+	const int depth = std::max(first.z, repeated.z) + supportDepth;
+	const int pitch = std::max(width, nano.x);
 	std::vector<Slot> all;
 	for (int b = 0; b < count; ++b) {
 		const Footprint fp = b == 0 ? first : repeated;
 		const Point corner = Offset(origin, facing, 2 * (b / columns) * depth, 2 * (b % columns) * pitch);
-		const int centreX2 = 4 * nano.x + AlignParity(width, fp.x);
-		const int centreZ2 = AlignParity(depth, fp.z);
+		const int centreX2 = AlignParity(pitch, fp.x);
+		const int centreZ2 = 2 * supportDepth + fp.z;
 		const Slot factory{Offset(corner, facing, centreZ2, centreX2), fp, facing, b};
 		result.factories.push_back(factory);
 		all.push_back(factory);
 		std::vector<Slot> support;
 		const int n = b == 0 ? firstNanos : repeatedNanos;
 		for (int i = 0; i < n; ++i) {
-			const int bank = i / 10;
-			const int col = (i % 10) / 5;
-			const int row = i % 5;
-			const int x2 = bank == 0 ? (2 * col + 1) * nano.x
-				: 4 * nano.x + 2 * width + (2 * col + 1) * nano.x;
-			const Slot slot{Offset(corner, facing, (2 * row + 1) * nano.z, x2), nano, facing, i};
+			const int col = i % supportColumns;
+			const int row = i / supportColumns;
+			const int x2 = (2 * col + 1) * nano.x;
+			const Slot slot{Offset(corner, facing, 2 * supportDepth - (2 * row + 1) * nano.z, x2), nano, facing, i};
 			support.push_back(slot);
 			all.push_back(slot);
 		}

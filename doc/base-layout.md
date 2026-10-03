@@ -1,5 +1,12 @@
 # Base layout
 
+D-179 compacts AIR's native compound into touching factory rows with dense
+rear support banks. Six T2 labs using loaded 9x9/3x3 footprints occupy a
+27x60-cell envelope, versus 63x30 previously. All twenty turrets per lab stay
+within 400-elmo reach. Existing reservations are retained; named support-slot
+ownership takes precedence over nearest-lab assignment. TECH geometry and
+sequence remain unchanged. See [design and simulations](air-opening-recon-plan.md).
+
 D-167: AIR uses the same native half-cell geometry and persistent reservation
 mechanism through `PlanAirFactoryCluster`, with its own six-lab compound policy.
 TECH's factory-pair/packing entry points and build sequence are unchanged. See

@@ -1,5 +1,12 @@
 # AIR building actions
 
+D-179: `OpeningSupportBudget` reserves spending for the first two supported
+turrets on normal maps once the screen exists. It first repairs missing slots;
+fully blocked support cannot freeze recruitment. `Nano(u, openingOnly)` keeps
+the early 160-energy exception confined to the configured opening support.
+`Commander` may build a turret only if capable, otherwise assists a nearby
+frame. See [design and evidence](../air-opening-recon-plan.md).
+
 `Record` audits the pre-T2 `transition.storage` exception with INV-118: the
 nearly full bank must still lack capacity for the loaded advanced lab cost.
 
@@ -120,7 +127,7 @@ See [implementation and evidence](../air-management.md),
 [design plan](../air-layout-and-priority-plan.md), and
 [actor matrix](../actor-matrix.md).
 
-<!-- source: data/script/src/roles/air_build.as; blob: 895dc051c7eedcff0710663420df00cc39aeaae3; lines: 629 -->
+<!-- source: data/script/src/roles/air_build.as; blob: 8fbe4ebcb56d7be9eb08c49032547b13e7b32aa8; lines: 658 -->
 
 ## D-153: income-gated plants and mex-first reactors
 

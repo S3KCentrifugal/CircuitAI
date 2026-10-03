@@ -227,6 +227,11 @@ def prepare(args):
     checked_replace(staged / 'src/manager/air_economy.as',
                     'bool MassBombers() {',
                     'bool MassBombers() { if (ai.frame >= 0) return true; // supplied combat arena only')
+    # Supplied combat deliberately has no opening crew/turrets or recruitment.
+    # Preserve older pinned data, which predates this economy-only admission.
+    if 'bool T1OpeningRaidEnabled = true;' in (staged / 'src/global.as').read_text():
+        checked_replace(staged / 'src/global.as', 'bool T1OpeningRaidEnabled = true;', 'bool T1OpeningRaidEnabled = false;')
+        overrides.append('T1 opening production gate disabled for supplied combat')
     if case.get('bomber_only', True):
         checked_replace(staged / 'src/global.as', 'float BomberWaveFighterRatio = 1.0f;', 'float BomberWaveFighterRatio = 0.0f;')
         checked_replace(staged / 'src/manager/air_raids.as', 'AirScreen::HomeValue() < AirEconomy::EnemyAir()', 'false /* bomber-only arena */')
