@@ -8,6 +8,16 @@ longer reduces demand to zero: repair finds replacement sites near the starter.
 batch; `T1OpeningRaidEnabled` controls it. Legion uses Mosquito gunships.
 Recovery, transports and immediate interceptions retain precedence.
 
+| D-179 AIR setting | Default | Meaning |
+| --- | --- | --- |
+| `OpeningNanoCount` | 2 | Completed starter support goal, capped by `T1NanoLimit`. |
+| `OpeningNanoMinEnergy` | 160 | Minimum sustained energy for early support, with funding checks. |
+| `T1OpeningRaidEnabled` | true | Enable the separate first T1 raid batch. |
+| `T1OpeningBomberMin` / `T1OpeningBomberMax` | 1 / 10 | Inclusive persistent random batch; Legion recruits Mosquito gunships. |
+| `RadarSightOverlap` | 0.5 | Linear overlap of ground-sight diameters, reduced spacing if terrain bounds require it. |
+| `RadarAssemblyRadius` | 480 | Required initial slot visit; holding envelope is twice this radius. |
+| `RadarBacklineInset` | 256 | Inset of MOVE destinations from the enemy-side map edge. |
+
 D-171 adds [committed air operations](../air-committed-operations-plan.md): shared fighter wall groups, all available fighters committed to each bomber sortie, persistent offensive attacks, strategic district targeting, a fighter/radar production owner, and income-based bomber readiness. The nearby startup lab is retired and later rebuilt in the campus. Native changes are opt-in; TECH retains its existing policy. Validation is recorded with the plan.
 
 D-170 adds an explicitly detected metal-field economy through
