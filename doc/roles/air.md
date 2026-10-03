@@ -47,6 +47,15 @@ Bomber HOLD_FIRE plus explicit target orders avoids deliberate T1 ground-unit
 attacks. Collateral splash is still possible. Legion's T1 Mosquito uses native
 RAID because it is a gunship, not an ordinary bomber.
 
+D-176 hands the final straight approach to ATTACK before its formation MOVE
+would reach the victim. During a committed offensive run, a locally LOS-visible
+AFUS can interrupt travel, search, or a lower-priority attack. It remains the
+target while visible, preventing repeated switches between adjacent reactors.
+Team LOS plus the bomber cohort's local radius is required; distant allied
+reconnaissance does not cancel an edge route. Defensive sorties keep their T3
+target policy and receive only the earlier final approach. See the
+[attack handoff plan](../air-afus-attack-handoff-plan.md).
+
 The first T2 economy raid keeps its configurable saved 10-20 draw. Defensive
 sorties and frontline assaults use separate payload budgets; an inaccessible
 backline can therefore produce a larger frontline wave before the opening
@@ -118,6 +127,8 @@ See [handoff validation](../air-idle-factory.md).
 | `MassBomberOrdersClear` / `MassBomberOrdersParity` | 8 / 5 | Post-milestone bomber orders per ten discretionary combat orders |
 | `StrikeReserveSeconds` / `StrikeUnknownReserve` | 120 / 0.25 | Funded replacement stock horizon and base uncertainty allowance |
 | `StrikeCleanupMobile` | false | Opt into all remaining surface mobile targets as the last offensive cleanup tier; default retains the T1-ground exclusion |
+| `StrikeEarlyAttack` | true | Replace the last target-centre travel MOVE with persistent ATTACK before arrival |
+| `StrikeImmediatePriority` / `StrikeImmediateRadius` | 4 / 1800 | During committed offense, interrupt for a stationary target at this priority or higher, currently in team LOS and within this many elmos of the bomber centre; priority 0 disables interruption |
 | `StrikeRiskScale` / `StrikeArmyReserve` / `StrikeLocalAaReserve` | 0.002 / 0.15 / 0.5 | Route proxy, observed army and local AA resistance coefficients |
 | `StrikeCorridorPadding` / `StrikeEdgeInset` / `StrikeSynchronize` | 320 / 480 / true | Padded route samples, edge candidates and nominal cohort static synchronization |
 | `StrikeLossGrowth` / `StrikeRiskRecovery` / `StrikeLearnedRiskMax` | 1.5 / 0.9 / 3 | Learned resistance increases after heavy losses and decays after strong survival |

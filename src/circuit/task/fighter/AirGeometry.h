@@ -29,6 +29,18 @@ inline bool PreferDistrictTarget(bool committed, bool local, bool bestLocal, flo
     if (committed && local != bestLocal) return local;
     return score > bestScore;
 }
+// Assembly/search legs are never final attack approaches. Hand off before
+// issuing the last travel MOVE, not after its arrival quorum flies over aim.
+inline bool FinalAttackLeg(bool enabled, int phase, int leg, int count)
+{
+    return enabled && phase == 1 && count > 0 && leg >= 0 && leg == count - 1;
+}
+inline bool ImmediateStrikeCandidate(float priority, float minimum, bool visible,
+        bool stationary, float distanceSq, float radius)
+{
+    return minimum > 0.f && priority >= minimum && visible && stationary
+        && radius > 0.f && distanceSq >= 0.f && distanceSq <= radius * radius;
+}
 // Short cohort legs bound how far faster escorts can run ahead. A leg is
 // longer than the arrival disc, so successive arrivals require real progress.
 inline int CohortLegCount(float distance, float arrivalRadius)

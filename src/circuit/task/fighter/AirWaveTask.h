@@ -73,6 +73,7 @@ public:
     void SetMissionPolicy(float padding, float inset, float unknown, float riskScale, float armyReserve, float localAAReserve, bool synchronize);
     void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
+    void SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority, float immediateRadius);
     void AddTargetFallback(int preference);
     bool PickOperationTarget(const springai::AIFloat3& from, float minStaticCost, bool includePrimary = true);
     void AllowStrikeDef(CCircuitDef* def, float priority);
@@ -91,6 +92,8 @@ public:
 private:
     void UpdateOperation();
     void IssueOperationLeg();
+    bool BeginOperationAttack(const char* reason);
+    bool TryImmediateStrike();
     bool NextOperationTarget();
     bool IsOperationBomber(CCircuitUnit* unit) const;
     springai::AIFloat3 OperationCentre() const;
@@ -187,6 +190,9 @@ private:
     float escortLead = 480.f;
     float routeCeiling = 500.f;
     float localRadius = 1600.f;
+    bool earlyAttackApproach = false;
+    float immediateStrikePriority = 0.f;
+    float immediateStrikeRadius = 0.f;
     springai::AIFloat3 assemblyPos;
     std::map<int, float> allowedStrikeDefs;
     std::set<int> operationBomberDefs;

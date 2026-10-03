@@ -111,7 +111,7 @@ local function receive(team,text)
         event("response",{team=team,active=args[3],wave=current and current.id or 0})
     elseif args[1]=="commitment" then
         local w=waves[tonumber(args[2])]
-        if w then w.returning=tonumber(args[6])==5 end
+        if w then w.returning=tonumber(args[6])==5;w.state=tonumber(args[6]) end
         event("commitment",{wave=args[2],escorts=args[3],owned=args[4],homeIntruders=args[5],state=args[6]})
     end
 end
@@ -146,6 +146,47 @@ local function onDamage(id,def,team,damage,paralyzer,weapon,projectile,attacker,
         local x,_,z=Spring.GetUnitPosition(id)
         if x then genericInterceptShot=true;photograph("native-aircraft-intercept",x,z,2000) end
     end
+end
+-- Opt-in, independent engine observer. It never assigns tasks or orders.
+local function observePriorityContact(f)
+    if not cfg.priority_targets then return end
+    for _,w in pairs(waves) do if w.state==3 and not w.returning then
+        local cx,cz,alive=0,0,0
+        for _,id in ipairs(w.members) do if valid(id) then
+            local x,_,z=Spring.GetUnitPosition(id)
+            if x then cx=cx+x;cz=cz+z;alive=alive+1 end
+        end end
+        if alive>0 then
+            cx=cx/alive;cz=cz/alive
+            w.contacts=w.contacts or {}
+            for id,u in pairs(units) do if u.team==1 and cfg.priority_targets[UnitDefs[u.def].name] and valid(id) then
+                local x,_,z=Spring.GetUnitPosition(id)
+                local los=Spring.GetUnitLosState(id,0,false)
+                local distance=x and math.sqrt((x-cx)^2+(z-cz)^2) or math.huge
+                if los and los.los and distance<=(cfg.priority_radius or 1800) then
+                    local contact=w.contacts[id]
+                    if not contact then
+                        contact={frame=f};w.contacts[id]=contact
+                        event("priority_visible",{wave=w.id,target=id,distance=math.floor(distance),alive=alive})
+                        photograph("wave"..w.id.."-priority-visible",x,z,2600)
+                    end
+                    local attacking=0
+                    for _,bomber in ipairs(w.members) do if valid(bomber) then
+                        local orders=Spring.GetUnitCommands(bomber,1) or {}
+                        if orders[1] and orders[1].id==CMD.ATTACK and orders[1].params[1]==id then attacking=attacking+1 end
+                    end end
+                    if attacking==alive and not contact.attack then
+                        contact.attack=f
+                        event("priority_attack",{wave=w.id,target=id,delayFrames=f-contact.frame,alive=alive,distance=math.floor(distance)})
+                    elseif not contact.attack and not contact.failed and f-contact.frame>30 then
+                        contact.failed=true
+                        event("priority_delay",{wave=w.id,target=id,delayFrames=f-contact.frame,attacking=attacking,alive=alive})
+                        Spring.Echo("[INVARIANT] INV-121 AIR arena: local visible priority target waiting for bomber ATTACK")
+                    end
+                end
+            end end
+        end
+    end end
 end
 function widget:Initialize()
     for _,g in ipairs(cfg.targets) do addGroup(g,"target") end
@@ -208,6 +249,7 @@ function widget:GameFrame(f)
     end
     if f>=150 and widgetHandler.UnitDamaged~=damageHook then event("error",{reason="damage_handler_replaced"}) end
     if not enabled then return end
+    if f%5==0 then observePriorityContact(f) end
     if f==300 or f%((cfg.refill_seconds or 45)*30)==0 then refill(f) end
     if #queue>0 and f%3==0 then
         local p=table.remove(queue,1);p.sent=f;pending[#pending+1]=p

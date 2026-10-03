@@ -7,6 +7,21 @@
 int main()
 {
     using namespace circuit::air_geometry;
+    // Never carry a target order through its final MOVE arrival quorum.
+    assert(FinalAttackLeg(true, 1, 0, 1));
+    assert(FinalAttackLeg(true, 1, 4, 5));
+    assert(!FinalAttackLeg(true, 1, 3, 5));
+    assert(!FinalAttackLeg(true, 0, 0, 1)); // assembling
+    assert(!FinalAttackLeg(true, 3, 0, 1)); // searching
+    assert(!FinalAttackLeg(false, 1, 0, 1));
+    assert(!FinalAttackLeg(true, 1, -1, 0));
+    assert(ImmediateStrikeCandidate(4, 4, true, true, 1800*1800, 1800));
+    assert(!ImmediateStrikeCandidate(3, 4, true, true, 100, 1800));
+    assert(!ImmediateStrikeCandidate(4, 0, true, true, 100, 1800)); // disabled/defense
+    assert(!ImmediateStrikeCandidate(4, 4, false, true, 100, 1800)); // radar only
+    assert(!ImmediateStrikeCandidate(4, 4, true, false, 100, 1800)); // mobile
+    assert(!ImmediateStrikeCandidate(4, 4, true, true, 1801*1801, 1800));
+    assert(!ImmediateStrikeCandidate(4, 4, true, true, 100, 0));
     // Cleanup admits support buildings but never confuses them with strategic
     // targets; mobile low-tier cleanup remains an explicit script opt-in.
     assert(OperationTargetClass(4, false, false, false, false, false));

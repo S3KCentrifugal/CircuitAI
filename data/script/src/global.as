@@ -1027,6 +1027,9 @@ namespace Global {
             float StrikeEscortLead = 480.0f;
             float StrikeBacklineRiskLimit = 500.0f;
             float StrikeDistrictRadius = 1800.0f;
+            bool StrikeEarlyAttack = true; // ATTACK before the final approach MOVE
+            float StrikeImmediatePriority = 4.0f; // visible local AFUS interrupts a committed raid; 0 disables
+            float StrikeImmediateRadius = 1800.0f;
             int RadarWaveSize = 20;
             int RadarWaveIntervalSeconds = 600;
             int MassBomberOrdersClear = 8;

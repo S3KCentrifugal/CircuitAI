@@ -1516,6 +1516,7 @@ void CInitScript::RegisterCAirWaveTask(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAssemblyPolicy(float, float, int)", asMETHOD(CAirWaveTask, SetAssemblyPolicy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "bool PickStrikeTarget(const AIFloat3& in from, int preference, float minStaticCost, bool includeHeavy)", asMETHOD(CAirWaveTask, PickStrikeTarget), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetOperationPolicy(bool, int, const AIFloat3& in, float, float, float)", asMETHOD(CAirWaveTask, SetOperationPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAttackHandoffPolicy(bool, float, float)", asMETHOD(CAirWaveTask, SetAttackHandoffPolicy), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void AddTargetFallback(int)", asMETHOD(CAirWaveTask, AddTargetFallback), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "bool PickOperationTarget(const AIFloat3& in, float, bool includePrimary = true)", asMETHOD(CAirWaveTask, PickOperationTarget), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void AllowStrikeDef(CCircuitDef@, float)", asMETHOD(CAirWaveTask, AllowStrikeDef), asCALL_THISCALL); ASSERT(r >= 0);

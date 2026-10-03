@@ -171,3 +171,4 @@ step.
 | INV-118 | AIR's transition storage exception spends only a nearly full pre-T2 bank whose capacity is below the loaded lab cost. | AirBuild::Record checks transition.storage against current economy observations. | D-171 |
 | INV-119 | A funded AIR workforce production turn recruits an available missing constructor. | AirProduction audits admission after the opening screen, with bounded combat-order precedence during incursions. | D-172 |
 | INV-120 | An eligible first T2 aircraft lab is considered before shared reactor growth. | AirBuild records the placement attempt's frame and builder; AirGrowth audits that handoff without assuming placement success. | D-172 |
+| INV-121 | A committed bombing run hands a local visible priority target to ATTACK without further formation MOVE orders. | CAirWaveTask rejects stale operation legs after handoff; the independent AFUS arena observer checks actual engine ATTACK commands within one second of local LOS. | D-176 |

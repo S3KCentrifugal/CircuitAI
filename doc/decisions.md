@@ -10581,3 +10581,77 @@ all three rendered profiles; balanced strict PASS, hard/terrible strict FAIL
 on KI-427 INV-008. The 196 hard/terrible donation decisions pass their focused
 audit. This makes the donation change Played, without claiming the full-match
 failures resolved.
+
+
+## D-176 - Hand bomber attacks off before overflight; interrupt for local visible AFUS
+
+**Date:** 2026-10-03. **Status:** Built, Checked and Played; measurements and
+exact binary identities are in the [validation report](air-afus-attack-handoff-results.md).
+
+**Decision.** Experimental AIR enables an early ATTACK handoff before the
+last target-centre MOVE leg, plus an offensive-only local priority override.
+A stationary allowed target of priority 4 or higher, currently in team LOS
+within 1,800 elmos of the bomber cohort centre, interrupts travel/search or a
+lower-priority attack. AIR already assigns AFUS priority 4. Native defaults
+are disabled; the script owns enabling, priority and radius. Defensive sorties
+receive the earlier terminal approach but retain their own T3 policy and
+return path. TECH's building sequence and other roles' policy are untouched.
+
+**Why.** The operation path held fire while waiting for an arrival quorum at
+the target itself. It did not use the older synchronized strike path. In the
+baseline Glitters fixture a visible local AFUS waited 16.33 seconds for ATTACK,
+while the wave approached storage first. Independent engine-command observers
+measure 0.33 seconds in the Legion, Armada and normal-LOS Cortex fixes. Early
+collateral damage in the baseline is why damage alone was insufficient proof.
+
+**Alternatives.** Reject enabling unrestricted fire-at-will (would bypass T1
+target exclusions), repeated ATTACK refreshes (command traffic and reset
+bombing runs), global AFUS diversion (would abandon edge routes for distant
+allied sightings), or waiting at the target for all formation slots. Retain
+assembly and intermediate cohort legs; once a visible priority target is
+attacked keep it instead of oscillating between nearby reactors. The radius
+uses the cohort centre and team LOS, not an expensive enemy-by-aircraft scan.
+There is no new rate limit, worker thread or durable task state. Existing
+transient-wave save/load limitations remain; existing KI-474 performance and
+KI-475 geometric escort limitations are not claimed solved.
+
+**Invariant.** INV-121 prohibits stale formation MOVE after attack handoff.
+The production task rejects/logs that transition. The independent arena reads
+actual bomber queues and fails when a qualifying AFUS waits more than one
+second for all cohort ATTACK orders. INV-115 escort ownership and INV-116
+no offensive return/landing remain enforced. Failed/hidden contacts are not
+permission to use omniscient target data. A native attack command is not an
+instantaneous weapon-fire guarantee.
+
+**Verification.** Native suites and 288 script arithmetic assertions pass;
+all three experimental profiles compile against runtime-exported declarations
+and load in rendered faction tests. Glitters AFUS destruction and subsequent
+cleanup pass for Legion, Armada and Cortex; the normal-LOS Cortex run uses the
+final reviewed DLL. Supreme's defensive T3 sortie attacks and returns home.
+No full economy or large multiplayer performance claim. Source/data staging
+excludes the concurrent unrelated map work. Details and strict verdicts are
+recorded in the report rather than inferred from screenshots alone.
+
+**Files.** [Native wave mechanism](../src/circuit/task/fighter/AirWaveTask.cpp),
+[wave contract](../src/circuit/task/fighter/AirWaveTask.h),
+[geometry policy helpers](../src/circuit/task/fighter/AirGeometry.h),
+[native assertions](../tests/air_geometry_test.cpp),
+[binding](../src/circuit/script/InitScript.cpp),
+[AIR operation policy](../data/script/src/manager/air_operations.as),
+[settings](../data/script/src/global.as), [AIR reference](roles/air.md),
+[API reference](angelscript-references.md), [actor matrix](actor-matrix.md),
+[invariants](invariants.md), [plan](air-afus-attack-handoff-plan.md),
+[results](air-afus-attack-handoff-results.md),
+[arena observer](../tools/playtest/widgets/air_arena.lua),
+[initial fixture](../tools/playtest/air_cases/afus-handoff-glitters.json),
+[reveal fixture](../tools/playtest/air_cases/afus-reveal-glitters.json),
+[strict checks](../tools/playtest/checks/air_afus_handoff.json),
+[timing audit](../tools/playtest/audit_afus_handoff.py),
+[baseline screenshot](images/d176/baseline-visible.png),
+[Legion screenshot](images/d176/legion-afus.png),
+[Armada screenshot](images/d176/armada-afus.png),
+[Cortex screenshot](images/d176/cortex-afus.png),
+[defense screenshot](images/d176/defensive-shiva.png).
+
+**Evidence.** [Pinned build and run manifest](benchmarks/d176-afus-handoff.json).
+All four fixed strict reports PASS; the old-DLL baseline fails INV-121 as expected.

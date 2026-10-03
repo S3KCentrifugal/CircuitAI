@@ -1740,3 +1740,18 @@ Committed retargeting uses the same operation policy with no minimum cost.
 Defensive operations have no fallback list; existing PickStrikeTarget callers
 retain their original non-operation behavior. No new state is serialized: wave
 objects remain transient under the existing save/load design.
+
+
+### AIR attack handoff policy (D-176)
+
+`CAirWaveTask.SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority,
+float immediateRadius)` configures operation-only handoff. Native defaults are
+false/0/0. Early approach replaces the final travel MOVE with persistent ATTACK
+before arrival, for either offensive or defensive operations. A positive
+priority/radius enables a separate committed-offense interruption for a live,
+stationary, currently LOS-visible allowed definition within the bomber cohort
+centre radius. The configured priority comes from `AllowStrikeDef`; AIR uses
+4 for AFUS and 1,800 elmos. Zero disables the interruption. An already attacked
+qualifying visible target is retained to avoid command churn. No new borrowed
+handles escape the update and no new state is serialized (transient wave
+lifecycle unchanged). See the [plan](air-afus-attack-handoff-plan.md).

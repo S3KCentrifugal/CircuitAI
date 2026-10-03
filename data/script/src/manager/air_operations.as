@@ -40,6 +40,9 @@ namespace AirOperations {
         wave.SetOperationPolicy(offensive, preference, Global::Map::StartPos,
             Global::RoleSettings::Air::StrikeEscortLead, Global::RoleSettings::Air::StrikeBacklineRiskLimit,
             Global::RoleSettings::Air::StrikeDistrictRadius);
+        wave.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack,
+            offensive ? Global::RoleSettings::Air::StrikeImmediatePriority : 0.0f,
+            Global::RoleSettings::Air::StrikeImmediateRadius);
         if (offensive) {
             // A committed wave exhausts each class before descending. This also
             // lets new waves finish a defeated base after its named targets die.
