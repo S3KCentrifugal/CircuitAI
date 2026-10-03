@@ -117,6 +117,7 @@ See [handoff validation](../air-idle-factory.md).
 | `FirstBomberWaveMin` / `FirstBomberWaveMax` | 10 / 20 | Inclusive saved opening T2 draw |
 | `MassBomberOrdersClear` / `MassBomberOrdersParity` | 8 / 5 | Post-milestone bomber orders per ten discretionary combat orders |
 | `StrikeReserveSeconds` / `StrikeUnknownReserve` | 120 / 0.25 | Funded replacement stock horizon and base uncertainty allowance |
+| `StrikeCleanupMobile` | false | Opt into all remaining surface mobile targets as the last offensive cleanup tier; default retains the T1-ground exclusion |
 | `StrikeRiskScale` / `StrikeArmyReserve` / `StrikeLocalAaReserve` | 0.002 / 0.15 / 0.5 | Route proxy, observed army and local AA resistance coefficients |
 | `StrikeCorridorPadding` / `StrikeEdgeInset` / `StrikeSynchronize` | 320 / 480 / true | Padded route samples, edge candidates and nominal cohort static synchronization |
 | `StrikeLossGrowth` / `StrikeRiskRecovery` / `StrikeLearnedRiskMax` | 1.5 / 0.9 / 3 | Learned resistance increases after heavy losses and decays after strong survival |
