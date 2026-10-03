@@ -931,7 +931,12 @@ and owned geo/advanced-mex perimeters with access gaps. See
 existing compatible lab after constructor upkeep and before island ground-army
 suppression; compatible gantries offer Marauders before their signature batch.
 Marauders use the existing combat gate plus the amphibious income/bank gate.
-D-160 Telchines instead require a ten-second minimum of +80 metal, their
+D-182 restricts TECH Telchine recruitment to `Global::Map::LandLocked` starts;
+ordinary starts (including both Supreme Isthmus TECH spots) reach the existing
+Sprinter/Fiend/Hoplite batch instead. Native fallback cannot bypass this
+restriction when amphibious waves are disabled. Already-owned or donated
+Telchines retain their combat controller; AIR and Marauder policy are unchanged.
+D-160 Telchines on eligible starts require a ten-second minimum of +80 metal, their
 600-metal cost plus 300 reserve banked, available energy and an income-scaled
 cadence (15% metal / 20% energy). TECH lab reclaim/rebuild rules remain exact;
 there is no early lab recovery exception. Native factory fallbacks use

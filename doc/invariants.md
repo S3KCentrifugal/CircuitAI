@@ -177,3 +177,4 @@ step.
 | INV-124 | Discretionary AIR constructor/turret expansion has a same-frame two-resource funding decision. | AirWorkforce::Fund/Admit bind admission to the definition and frame, reserve accepted costs and incremental spending immediately; opening/recovery constructors are explicit exceptions. | D-181 |
 | INV-125 | An economy-owned AIR turret cannot count as factory production support. | AirEconomy::SupportBay excludes the economic support index and RefreshSupport audits exclusive ownership. | D-181 |
 | INV-126 | AIR's assignment ledger cannot remove more build power than it owns. | AirWorkforce::Assign/AddPower reconcile per-worker IDs once per sample and at reassignment; negative ownership is an invariant violation. | D-181 |
+| INV-127 | TECH produces Telchines only from a landlocked start. | Invariants::OnUnitAdded rejects a completed Telchine with a local producer when Global::Map::LandLocked is false; gifts remain usable. | D-182 |

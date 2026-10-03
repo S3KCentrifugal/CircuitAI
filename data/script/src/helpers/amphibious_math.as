@@ -5,6 +5,9 @@ namespace AmphibiousMath {
         return index%2==1 ? (index+1)/2 : -index/2;
     }
     bool Scope(bool tech, bool air, bool experimental) { return experimental && (tech || air); }
+    // TECH reserves Telchine recruitment for starts whose land army cannot leave.
+    // AIR's auxiliary production and already-owned amphibious combat are separate.
+    bool TelchineStartAllowed(bool tech, bool landLocked) { return !tech || landLocked; }
     bool Gathered(int alive, int arrived, float fraction) {
         return alive > 0 && arrived > 0 && float(arrived) >= float(alive) * fraction;
     }

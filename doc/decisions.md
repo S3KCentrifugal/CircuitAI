@@ -11060,3 +11060,50 @@ line in generated record READMEs. Reformatting immutable publications would
 change retained bytes. [Git attributes](../.gitattributes) therefore permit that
 format only under benchmark records; source and ordinary documentation retain
 strict whitespace checks. No published file is rewritten for formatting.
+
+
+## D-182 - TECH Telchines require a landlocked start
+
+**Date:** 2026-10-03. **Status:** Played; focused recruitment checks pass, full games retain known TECH invariant failures.
+
+**Decision.** Restrict TECH Telchine recruitment to its own map start's
+`LandLocked` flag, including native fallback when amphibious waves are disabled.
+The existing ground batch remains Sprinter/Fiend/Hoplite on ordinary starts.
+The latest owner instruction narrows D-160's TECH recruitment scope; its
+budget and all lab/economy sequencing remain unchanged. AIR and Marauders keep
+their existing policies. Already-owned/gifted Telchines keep their controller.
+
+**Reasoning.** The unconditional shared amphibious producer ran before TECH's
+correct ground/island selection and could spend the separate +80 budget on
+Supreme Isthmus, whose TECH starts are both explicitly not landlocked. Water
+elsewhere on a map does not make that start eligible. Gate only recruitment,
+not the combat controller needed to use donated or surviving units.
+
+**Alternatives rejected.** A Supreme-only map ban misses other connected
+starts. Disabling the whole amphibious controller breaks legitimate island
+recruitment, Marauder raids and donated units. Changing the ordinary combat
+gate or TECH's exact lab cycle is unnecessary.
+
+**Invariant.** INV-127: a TECH start that is not landlocked never completes a
+locally produced Telchine. The unit-added check excludes gifts without a local
+producer. Existing INV-010 continues to enforce the ordinary combat gate.
+
+**Files.** [Pure eligibility](../data/script/src/helpers/amphibious_math.as),
+[production and native fallback](../data/script/src/manager/amphibious_ops.as),
+[runtime invariant](../data/script/src/manager/invariants.as),
+[unit tests](../tests/amphibious_math_tests.as),
+[observer](../tools/playtest/widgets/tech_t2_start_watch.lua),
+[ground check](../tools/playtest/checks/tech/combat/t2_ground_start.json),
+[landlocked check](../tools/playtest/checks/tech/combat/t2_landlocked_start.json),
+[TECH reference](roles/tech.md), [actor matrix](actor-matrix.md),
+[invariant register](invariants.md), [known issues](known-issues.md),
+[evidence catalog](benchmarks/catalog.json), [TECH evidence index](benchmarks/index/tech.md)
+and [verification report with immutable run records](tech-t2-start-results.md).
+
+**Verification.** Twenty-two pure policy tests and script/DLL API parity pass.
+Both TECH instances compiled in the engine. At forty minutes Supreme completed
+107 Hoplites and 92 Sprinters, with no Telchines; Tundra completed 22 Telchines
+and no Hoplites for Legion. Both focused audits pass. Whole games remain FAIL
+for known TECH invariant categories (KI-472), with zero script errors/INV-127.
+No new AIR/Marauder or waves-disabled fallback game was run. See the report
+for immutable evidence, screenshots and all verification limits.

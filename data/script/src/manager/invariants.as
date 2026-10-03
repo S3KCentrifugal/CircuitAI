@@ -40,6 +40,10 @@ namespace Invariants {
             Violation("INV-001", "" + u.id, "a retiring factory produced " + u.circuitDef.GetName() + " " + u.id);
         // INV-010: no mobile combat unit under the plan's income gate (D-080)
         const string name = u.circuitDef.GetName();
+        // Gifts have no local producer and retain normal amphibious control.
+        if (name == "legamph" && !Global::Map::LandLocked && u.GetProducerId() >= 0
+            && ai.GetTeamUnit(u.GetProducerId()) !is null)
+            Violation("INV-127", name, "TECH produced a Telchine from a non-landlocked start");
         const bool builder = UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) > 0 || UnitHelpers::IsAirConstructor(u.circuitDef)
             || UnitHelpers::GetAllRezBots().find(name) >= 0 || UnitHelpers::GetAllFastAssistBots().find(name) >= 0   // reclaimers and assist bots are build power, not combat
             || u.circuitDef.IsRoleAny(Unit::Role::TRANS.mask)   // D-093: the ferry's transport is logistics (played: armatlas and corvalk flagged)

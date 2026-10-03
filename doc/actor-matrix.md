@@ -362,7 +362,7 @@ ownership. Native `CRouteTask` reads its opt-in patrol flag; TECH never enables 
 
 | Object | Actors | Shared state and contract |
 | --- | --- | --- |
-| Telchine recruit | TECH factory, AIR auxiliary factory, AmphibiousOps::Produce | Existing constructor priority precedes admission. Economy sliding minima, bank reserve, energy buffer, pending count and team cooldown bound the optional budget. Marauders retain the caller gate. |
+| Telchine recruit | TECH factory, AIR auxiliary factory, AmphibiousOps::Produce/DefaultFactoryTask | TECH requires its own LandLocked start flag, including native fallback with waves disabled. AIR retains its existing policy. Existing constructor priority precedes admission. Economy sliding minima, bank reserve, energy buffer, pending count and team cooldown bound the optional budget. Marauders retain the caller gate. |
 | Assault wave | MilitaryTask, Tick, native route task | Stable member IDs and one owning task; secure/regroup before crossing again. RetainGuard transfers only dry members and preserves the assault minimum. |
 | Retained guard | RetainGuard, GuardTick, TaskRemoved, Reset | One GUARD route task, same dry component, hold-position. No amphibious route fallback. Lost assets or a winning allied claim release the group. |
 | Beachhead claim | AmphibiousBeaches, Team::HandleMessage | Actual completed allied economy, advisory shared-sea geometry, expiring team/serial claims; no second movement owner. |

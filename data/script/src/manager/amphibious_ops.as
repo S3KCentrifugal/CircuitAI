@@ -75,6 +75,9 @@ namespace AmphibiousOps {
         if (d is null) return -1;
         return d.GetName() == "legamph" ? 0 : (d.GetName() == "armmar" ? 1 : -1);
     }
+    bool TelchineStartAllowed() {
+        return AmphibiousMath::TelchineStartAllowed(Global::AISettings::Role == AiRole::TECH, Global::Map::LandLocked);
+    }
     int Size(int kind) { return kind == 0 ? telSize : marSize; }
     int Guards() {
         int count=0;
@@ -538,12 +541,15 @@ namespace AmphibiousOps {
         }
     }
     IUnitTask@ DefaultFactoryTask(CCircuitUnit@ f) {
-        if (!Active()) return aiFactoryMgr.DefaultMakeTask(f);
+        const bool active = Active();
+        if (!active && TelchineStartAllowed()) return aiFactoryMgr.DefaultMakeTask(f);
         // The ordinary chooser may still build other units and constructors,
         // but cannot bypass the shared amphibious budget with its own batch.
         array<string> names={"legamph","armmar"};
         array<CCircuitDef@> defs; array<int> limits;
         for (uint i=0;i<names.length();++i) {
+            // Preserve the TECH start restriction even with amphibious waves disabled.
+            if (!active && i!=0) continue;
             CCircuitDef@ d=ai.GetCircuitDef(names[i]);
             if (d is null) continue;
             defs.insertLast(d); limits.insertLast(d.maxThisUnit); d.maxThisUnit=0;
@@ -557,6 +563,7 @@ namespace AmphibiousOps {
             || int(waves.length())>=maxWaves) return null;
         array<string> names={"legamph","armmar"};
         for (uint k=0;k<names.length();++k) {
+            if (k==0 && !TelchineStartAllowed()) continue;
             CCircuitDef@ d=ai.GetCircuitDef(names[k]);
             const int limit=k==0 ? telLimit : Size(k)*2;
             if (d is null || !f.circuitDef.CanBuild(d) || d.count+aiFactoryMgr.GetPendingRecruitCount(d)>=limit

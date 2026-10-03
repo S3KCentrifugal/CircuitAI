@@ -3986,6 +3986,8 @@ findings by accepting the focused audit as the overall game verdict.
 
 **D-181 follow-up (2026-10-03).** All three metal controls observed zero converters, but not every player reached forty mexes and all whole-game checks failed existing TECH invariants. Seven protected TECH/controller/chooser/sharing sources remain unchanged. Baseline TECH-only opening/rush passed; later TECH-only repeats completed their opening/rush but reported INV-028/015/004. Runtime regression acceptance therefore remains incomplete; seeded inputs and source isolation are not a clean-game guarantee. See the retained reports in [workforce results](air-workforce-results.md).
 
+**D-182 production check (2026-10-03).** Forty-minute natural Supreme and Tundra games pass the focused start-type audit (107 Hoplites and zero Telchines on Supreme; 22 Telchines and zero Hoplites on Tundra). Whole-game verdicts still fail TECH layout, retirement, support and idle-builder invariant categories; no script error or new INV-127 violation. No paired baseline was run, so recurrence does not establish causal independence from the production change. Preserve all failures in [the results](tech-t2-start-results.md); the proposed TECH invariant investigation remains open.
+
 ### KI-473 - Unit-helper validation still reports unreachable static sonars
 
 **Problem.** The unit-helper checker reports armsonar/corsonar references in
@@ -4464,3 +4466,5 @@ includes the correction. Not fixed at review time; D-181 status follows.
 
 
 **D-181 implementation update (2026-10-03).** D-181 corrects all numeric boundaries/ranges in the active check and adds physical completion/working assertions. Python tests accept whole large counts and reject counts below the scenario floor. Archived checks/results are untouched; separate workforce audits observe spending and lifecycle events. Fixed test-definition defect; see [results](air-workforce-results.md).
+
+**D-182 storage audit note.** The immutable migration snapshot still hashes the pre-D-181 active air_build_power definition. Its mismatch is expected after the documented KI-492 fix; all 130 historical benchmark/image files match. Keep the original evidence hashes rather than rewriting them to hide an active-definition change.

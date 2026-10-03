@@ -1,4 +1,14 @@
 void test_role_scope() { Check(AmphibiousMath::Scope(true,false,true)); Check(AmphibiousMath::Scope(false,true,true)); Check(!AmphibiousMath::Scope(false,false,true)); Check(!AmphibiousMath::Scope(true,false,false)); }
+void test_tech_supreme_start_keeps_ground_bot_production() {
+    Check(!AmphibiousMath::TelchineStartAllowed(true,false));
+}
+void test_tech_island_start_retains_telchine_production() {
+    Check(AmphibiousMath::TelchineStartAllowed(true,true));
+}
+void test_air_auxiliary_production_keeps_existing_start_policy() {
+    Check(AmphibiousMath::TelchineStartAllowed(false,false));
+    Check(AmphibiousMath::TelchineStartAllowed(false,true));
+}
 void test_formation_spreads_centre_out_without_duplicate_slots() {
     Check(AmphibiousMath::FormationLane(0)==0);
     Check(AmphibiousMath::FormationLane(1)==1);

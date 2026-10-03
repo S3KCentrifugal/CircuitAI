@@ -1053,6 +1053,45 @@
       "verdict": "FAIL"
     },
     {
+      "area": "combat",
+      "domain": "tech",
+      "experiment_kind": "natural",
+      "id": "20261003T233544Z-ff3c558b",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/tech/combat/t2-ground-start/2026-10-03/20261003T233544Z-ff3c558b/result.json",
+      "scenario": "t2-ground-start",
+      "sha256": "b52cff0d93f42fd0c05011aefbe5c0507341add652517687fdd92fbd3911375b",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "tech",
+      "experiment_kind": "natural",
+      "id": "20261003T233412Z-25a490df",
+      "kind": "run-record",
+      "map": "tundra",
+      "map_name": "Tundra Continents v2.3.1",
+      "path": "records/tech/combat/t2-landlocked-start/2026-10-03/20261003T233412Z-25a490df/result.json",
+      "scenario": "t2-landlocked-start",
+      "sha256": "9d26a599ab2575695568624109e79349573f9a184be3714f5b82cbbc0a593d99",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "tech",
+      "experiment_kind": "regression",
+      "id": "20261003T232706Z-5ea12e39",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/tech/combat/t2-start-compile/2026-10-03/20261003T232706Z-5ea12e39/result.json",
+      "scenario": "t2-start-compile",
+      "sha256": "966a56748af94578aed6000e2d88d288b611e2cdd822e5a41d15eb6a479a671e",
+      "verdict": "FAIL"
+    },
+    {
       "area": "economy",
       "domain": "tech",
       "experiment_kind": "natural",
