@@ -2,4 +2,6 @@
 *.sh text eol=lf
 
 # Published evidence must retain its recorded bytes across checkouts.
-doc/benchmarks/records/** -text whitespace=cr-at-eol
+# The publisher's generated READMEs include a terminal blank line. Preserve it
+# with the recorded bytes; keep whitespace checks strict outside raw records.
+doc/benchmarks/records/** -text whitespace=cr-at-eol,-blank-at-eof

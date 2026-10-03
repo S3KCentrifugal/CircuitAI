@@ -11054,3 +11054,9 @@ additional observation cost, so no zero-overhead or FPS guarantee is claimed.
 [initial scaling failures](benchmarks/air-workforce-scaling-initial-2026-10-03.json),
 and [intermediate control failures](benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
 retain all interpretations separately from the immutable raw publications.
+
+**Published-byte preservation.** The existing publisher emits a terminal blank
+line in generated record READMEs. Reformatting immutable publications would
+change retained bytes. [Git attributes](../.gitattributes) therefore permit that
+format only under benchmark records; source and ordinary documentation retain
+strict whitespace checks. No published file is rewritten for formatting.
