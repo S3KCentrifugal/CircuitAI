@@ -4405,3 +4405,24 @@ defaults for TECH and other roles.
 **Verification.** Observe resource priority and actual progress under matched
 low/high-pull conditions, then run TECH/static-task regressions. See
 [review R6](reviews/2026-10-03-air-build-power-review.md#r6--medium-native-recruitment-can-lower-a-funded-constructors-priority-ki-491). Not fixed.
+
+
+### KI-492 - AIR build-power checks match count prefixes and narrow historical ranges
+
+**Problem.** The current `air_build_power` check accepts T1 counts matching
+`(8|9|10)` and T2 counts matching `[6-8]`, without a trailing numeric boundary.
+It rejects snapshots with 12 T1 or 9 T2 constructors but accepts 100 T1 or
+60 T2 through a prefix match. A run may still pass from an earlier snapshot;
+these checks do not reliably establish its intended workforce requirement or
+useful spending, and can misjudge future scaling changes.
+
+**Proposed solution.** Replace these assertions with explicit scenario-specific
+numeric requirements plus independent completion/progress and expenditure
+checks. Preserve archived check definitions and results. Do not remove the
+invariant/crash forbids.
+
+**Verification.** Executed the exact JSON regexes against the four snapshots
+above: false, true, false, true respectively. No gameplay failure is inferred
+from these synthetic strings. The
+[implementation and acceptance map](reviews/2026-10-03-air-build-power-review.md#implementation-map-and-acceptance-contract-2026-10-03)
+includes the correction. Not fixed.

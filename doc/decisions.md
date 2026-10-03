@@ -10889,3 +10889,27 @@ income or treating circulation as production. Preserve the existing donation
 threshold/percentage and TECH behavior. The review adds two computed runway
 examples and the donation-specific test matrix. This is design only, without
 new gameplay code, runtime invariants or simulations.
+
+
+**D-180 implementation-map amendment (2026-10-03).** Map the known fixes to
+functions, lifecycle/adoption work, metal-map early-return paths and independent
+acceptance checks before implementation. Keep TECH call sites unchanged by
+default; shared arithmetic extraction is optional and requires exact outcome
+parity. Keep economy support slots separate from the existing reactor/converter
+array so old named state and placement semantics survive. Use one sampled
+workforce decision with immediate admission deltas instead of independent
+budgets that can disagree or double-spend. Reject a global native recruitment
+priority rewrite: the task-scoped opt-in remains conditional on a progress-based
+reproduction. These choices preserve TECH behavior and bound the AIR repair.
+
+**Verification.** Source tracing covers the mapped callers and current test
+helpers; four synthetic regex probes confirm new KI-492. The plan identifies
+pure tests, supplied fixtures, five-map natural cohorts, three metal-map
+controls, TECH regressions, lifecycle checks, screenshots and 8v8 performance
+measurements. These are future acceptance tests, not simulation results.
+No gameplay code, runtime invariant or test definition changed in this amendment.
+The invariant promises in D-180 remain unchanged.
+
+**Files.** [Expanded plan](reviews/2026-10-03-air-build-power-review.md),
+[test-check finding](known-issues.md#ki-492---air-build-power-checks-match-count-prefixes-and-narrow-historical-ranges),
+and this decision record.

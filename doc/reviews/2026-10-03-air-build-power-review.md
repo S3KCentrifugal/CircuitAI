@@ -337,6 +337,124 @@ the reference engine's `CTeamHandler::GameFrame/CTeam::ResetResourceState`.
 The two runway examples were calculated directly. No gameplay policy or native
 priority override has been implemented or simulated by this amendment.
 
+## Implementation map and acceptance contract (2026-10-03)
+
+The following maps the known findings to implementation and verification. It is
+an implementation checklist, **not a list of completed changes**. R1-R5 have
+identified script paths; R6 requires a causal reproduction before a native fix.
+Unexpected failures during implementation must extend this map and the issue
+register rather than silently broaden the change. Proposed new paths below are
+written as code because the files do not exist yet.
+
+### Code changes, in dependency order
+
+| Step | Files and entry points | Required change | Verification |
+| --- | --- | --- | --- |
+| 1. Deterministic budget | New `data/script/src/helpers/build_power_math.as`; existing [production_math.as](../../data/script/src/helpers/production_math.as) (`ConstructionPower`, `ConstructorFunded`, `SupportQueueReady`, `AssistUseful`, `WorkforceTarget`); [air_math.as](../../data/script/src/helpers/air_math.as) (`WorkforceTurn`, `SaveForLab`) | Pure calculations for bank pressure, resource runway, committed capacity, affordable assistance and batch size. Reuse existing funding arithmetic where equivalent; replace AIR call sites that disagree. Inputs distinguish actual usage, requested pull, transfers and capital. Do not silently change a shared helper's behavior for other roles. | V1, V2 |
+| 2. One AIR observation and decision | New `data/script/src/manager/air_workforce.as`; [air_economy.as](../../data/script/src/manager/air_economy.as) (`Tick`, `Reset`, `ConstructorTarget`, `NanoTarget`, `RefreshSupport`, `SupportBay`, `ExistingT2SupportReady`); [global.as](../../data/script/src/global.as) (`RoleSettings::Air`) | Sample once per resource interval. Build an AIR-owned snapshot of funding, useful projects, assignments, available/arriving BP, queued investments and production demand. Replace independent income-ratio targets with a funded capacity request, keeping production cold-start estimates and unique twenty-per-lab accounting. Expose pressure bands/window, forecast horizon, reserve and safety bounds in AIR settings. Give every rejection a reason; a safety ceiling is not evidence of sufficient BP. Include the new modules through the existing AIR include graph. | V1, V3, V4, V7 |
+| 3. Builder admission and assistance | [air_build.as](../../data/script/src/roles/air_build.as) (`Commander`, `OpeningSupportBudget`, `Nano`, `SupportCommitted`, `Committed`, `FindAssistTarget`, `AssignedPower`, `Assist`, `Tick`, `Added`, `Removed`, `Leave`); [air_rules.as](../../data/script/src/roles/air_rules.as) (`MakeTask`) | Use the same funded decision for the commander branch, ordinary builders, opening support and first-lab savings. Reserve real costs; do not let an unaffordable preferred turret veto an affordable useful constructor. Allocate bounded support batches and assistance to actual reachable work. Distinguish travel from working BP, retain guard recovery, and account for newly accepted orders immediately so simultaneous callbacks cannot spend one budget twice. | V1, V3, V4 |
+| 4. Factory admission and turret dispatch | [air_production.as](../../data/script/src/manager/air_production.as) (`MakeTask`, `Recruit`, `Tick`, `Reset`, `Leave`); [air_growth.as](../../data/script/src/manager/air_growth.as) (`MakeTask`, `AssistReactor`) | Replace blanket `saving/supportBudget/openingTurn` workforce holds with the common admission result. Preserve transport precedence and opening prerequisites; interleave funded workforce with the opening bomber batch. Dispatch economy-owned turrets explicitly instead of falling through to the default factory task. Feed reachable economic BP into AIR's shared chooser and handle the workforce request before discretionary reactor assistance can hide it. | V3, V4, V6 |
+| 5. Economic support reservations and ownership | [air_eco_layout.as](../../data/script/src/manager/air_eco_layout.as) (`Module`, `Save`, `Init`, `Reserve`, `Activate`, `ReleaseUnused`, `PlanAhead`, `Place`, `Leave`); [air_layout.as](../../data/script/src/manager/air_layout.as) (`Init`, `PlanAhead`, `RepairSupport`, `Place`, `Leave`) | Reserve economy-local turret slots through the existing native layout engine, separate from factory bays. Add a versioned support-slot collection, preserving the reactor/converter slot meanings. Adopt old named state safely; reconcile completed, queued, gifted, destroyed and retiring units. Release unused claims on role exit. Keep occupied modules anchored, relocate blocked unstarted modules, and never encroach on allied reservations. | V3, V4, V5 |
+| 6. Metal-map bypass | [metal_economy.as](../../data/script/src/manager/metal_economy.as) (`AirTask`, `EconomyTask`, `DedicatedTask`); AIR's workforce snapshot and production caller above | The early metal-map return bypasses ordinary AirRules: integrate the new decision in its AIR branches too. Preserve the dedicated mex/energy opening workers, energy-limited sustainable spending, dense mex layout, converter prohibition and TECH rules. Do not substitute unlimited raw metal for an energy-funded budget. | V4, V6 |
+| 7. Conditional native priority | [RecruitTask.cpp](../../src/circuit/task/static/RecruitTask.cpp) / [RecruitTask.h](../../src/circuit/task/static/RecruitTask.h) (`Update` and task state); [FactoryManager.h](../../src/circuit/module/FactoryManager.h) (`TaskS::SRecruitTask`) / [FactoryManager.cpp](../../src/circuit/module/FactoryManager.cpp) (`Enqueue`); [FactoryScript.cpp](../../src/circuit/script/FactoryScript.cpp); [task.as](../../data/script/src/task.as) (`TaskS::Recruit`); AIR recruit caller | Only if V8 demonstrates harmful demotion: expose a script-controlled, task-scoped funded-workforce exception, default disabled. Define initialization, revocation when funding expires and role-exit behavior before implementation. Never infer permission from role names in native code or change all recruits globally. If the task needs a renewable lease, register that control as well; the fixture decides whether this branch is needed. | V3, V8 |
+| 8. Tests, observability and records | Files in the verification map below; [invariants.as](../../data/script/src/manager/invariants.as), [invariants.md](../invariants.md), [actor-matrix.md](../actor-matrix.md), [AIR reference](../roles/air.md), [build reference](../roles/air_build.md), [rule reference](../roles/air_rules.md), [base-layout.md](../base-layout.md), [angelscript-references.md](../angelscript-references.md), [decisions.md](../decisions.md), [known-issues.md](../known-issues.md) | Pair each implemented fix with its runtime invariant, all relevant actors, measured evidence and current source markers. Update API documentation only if the conditional binding is added. Mark Built versus Played accurately; close findings only to the extent demonstrated. | All |
+
+The existing lifecycle callbacks in [builder.as](../../data/script/src/manager/builder.as)
+and [air.as](../../data/script/src/roles/air.as) already deliver AIR task events.
+Use those hooks and AIR Init/Leave; do not add duplicate global callbacks without
+evidence of a missing event. Persist stable IDs, not borrowed native handles.
+Reconcile ownership after load, transfers, deaths, cancellation and role changes;
+ordinary production turrets may lend spare capacity, but cannot be credited to
+production and economy simultaneously.
+
+Avoid the current project-by-worker rescan in assistance selection. Index
+assignments by task/unit ID once per snapshot and use local candidate lookups.
+The recurring census should scale with owned units, active tasks and reservations,
+not their product. Geometry searches remain event-driven, separately bounded
+and profiled; do not claim the complete planner is O(n) merely because the census
+is. Refresh admission resources at enqueue time and commit a local budget delta;
+this avoids stale snapshot overspending without rescanning every unit per ask.
+
+**Save/adoption detail:** the current economic module loader accepts at most nine
+reactor/converter slots, and placement depends on slot zero being the reactor.
+Appending nanos to that array would break adoption and converter iteration.
+Keep a separate support array/count/schema version. For an occupied old module,
+reserve a validated supplementary support area or continue using mobile BP;
+do not move the reactor or expand its claim into an ally's area. Roll back every
+new reservation if the support batch cannot be reserved atomically. Keep the
+existing reactor/converter completeness assertion (INV-107) and add separate
+support/ownership assertions.
+
+**Protected boundaries:** retain [TECH's rules](../../data/script/src/roles/tech_rules.as),
+[build actions](../../data/script/src/roles/tech_build.as),
+[layout](../../data/script/src/manager/layout.as) and
+[shared chooser defaults](../../data/script/src/manager/eco_planner.as).
+AIR can override its chooser snapshot without changing TECH's read/decide path.
+Extracting TECH's existing bank arithmetic into a shared pure helper is optional
+and must follow exact parity tests; it is not a prerequisite for repairing AIR.
+Reuse stateless arithmetic, not TECH's mutable samples or rule execution.
+Keep [TeamEconomy::ShareOverflow](../../data/script/src/manager/team_economy.as)
+thresholds/percentages and the existing own-resource bindings unchanged. No
+`data_sample/`, roster, combat-routing or legacy profile change is required.
+
+### Verification files and fixtures
+
+| Surface | Implementation of verification |
+| --- | --- |
+| Pure policy and geometry | Add `tests/build_power_math_tests.as` to [tests/CMakeLists.txt](../../tests/CMakeLists.txt) and [run_native_tests.sh](../../tools/run_native_tests.sh), using the existing standalone AngelScript runner. Extend [production tests](../../tests/production_math_tests.as) and [AIR tests](../../tests/air_math_tests.as) where call contracts change. Keep existing geometry/allied-reservation tests; add geometry cases only for any new shared geometry primitive. |
+| Controlled workforce experiments | Extend [prepare_air_workforce.py](../../tools/playtest/prepare_air_workforce.py) with named staged scenarios and add a staged-only `tools/playtest/air_workforce_probe.as`. Add `tools/playtest/cases/air/economy/workforce-*.json` and `tools/playtest/checks/air/economy/air_workforce_budget.json`. Inject resources, blockers, losses and orders only in isolated test directories. |
+| Independent observations | Extend [air_workforce_watch.lua](../../tools/playtest/widgets/air_workforce_watch.lua) to measure actual engine usage, transfers in/out, excess, unit progress, working/travelling/idle BP, factory progress and task transitions. Join these with policy decision reasons and intended ownership; a policy log claiming assignment is not proof of useful work. Retain [air_command_watch.lua](../../tools/playtest/widgets/air_command_watch.lua) for APM. |
+| Natural games and comparisons | Extend [run_air_natural.py](../../tools/playtest/run_air_natural.py) to select explicit seeds/factions for paired runs; extend [analyze_air_natural.py](../../tools/playtest/analyze_air_natural.py) with workforce/funding measurements. Add tests for interval deduplication, missing observations, event parsing and cohort comparison in `tools/playtest/test_air_workforce.py`. |
+| Existing checks to audit | Replace the narrow/prefix-matching constructor-count assertions in [air_build_power.json](../../tools/playtest/checks/air/economy/air_build_power.json) (KI-492) with scenario-specific completion and useful-spending checks. Review [air_economy_capacity.json](../../tools/playtest/checks/air/economy/air_economy_capacity.json) and [air_economy_probe.as](../../tools/playtest/air_economy_probe.as): preserve the individual guard-release assertion, while separately checking that both T1/T2 economy workers eventually leave idle production guards. Do not weaken invariant forbids or rewrite archived checks/results. |
+| Metal and TECH regressions | Reuse [prepare_metal_check.py](../../tools/playtest/prepare_metal_check.py), [metal_watch.lua](../../tools/playtest/widgets/metal_watch.lua), [audit_metal_check.py](../../tools/playtest/audit_metal_check.py) and the existing TECH opening/rush checks. Observe the unchanged TECH sequence as well as outcomes. |
+
+### Acceptance matrix
+
+The timing bounds below apply to controlled fixtures where required sites,
+energy, builders and the requested task callback are available. Natural games
+have combat and placement constraints and must be measured separately.
+
+| ID | Experiment | Pass condition |
+| --- | --- | --- |
+| V1 | Pure arithmetic: rising/full/falling storage, negative own and total recurring balance, finite donated capital, five-second bursts, clipped receipts, repeated reads, skipped intervals, outbound sharing, donor loss, energy deficit, queues and travel | Full-bank negative-income fixtures admit a useful funded investment; insufficient runway, no useful job or already-sufficient queued capacity reject it. Every interval and commitment is counted once. Both resource reserves hold throughout the forecast, including before worker completion. Zero/near-zero costs or net drain produce defined finite decisions without division errors. |
+| V2 | TECH protection | If shared arithmetic is extracted, compare old/new outcomes at threshold boundaries, early/complete sample windows and float/full exceptions before changing a caller. TECH thresholds, rule ordering, reclaim/rebuild and twenty-BP exception remain identical. If callers stay unchanged, verify that source boundary and run the same opening/rush regression checks. Natural multiplayer timings need not be bit-identical when AIR changes. |
+| V3 | Compile and lifecycle | All three experimental profiles compile against the staged DLL; script/API parity passes before launch. Exercise AIR entry/exit, cancellation, gifts, destruction and re-adoption. No new ERR/crash/invariant lines, duplicate allocation or dangling ownership. AIR economy aircraft resume useful work after idle guard release; active PLAYER/ferry ownership is preserved. |
+| V4 | Isolated opening, donated capital and one/six-lab workloads, all three factions | With an idle eligible factory/builder, a funded shortage is admitted on its next applicable task request after the snapshot (snapshot no older than one second). A worker/turret physically completes and increases useful resource spending. Unaffordable opening support does not veto an affordable worker; protected first-lab capital remains funded. Donor removal prevents further admissions once the next sample shows insufficient runway. Energy-starved and already-sufficient controls do not buy unnecessary BP. Twenty completed turrets are uniquely credited to each existing T2 lab before expansion; economy turrets do not satisfy that production gate. |
+| V5 | Separated districts, blockers and old named state | Reactor assistance works while distant bay turrets continue aircraft production. Each turret has one credited workload. Test old nine-slot modules, metal-map reactor-only modules, blocked unstarted support, occupied modules, allied TECH/AIR reservations and role handoff. Reservations remain valid, occupied reactors remain anchored and failed batches leave no leaked pins. Screenshots show physical placement and assistance. |
+| V6 | Natural and map regressions | Run paired baseline/fix games on Glacial Gap v1.1, Supreme Isthmus v1.7, All That Glitters v2.2.3, Tundra Continents v2.3.1 and Serene Caldera v1.3. Use three paired seeds per map, covering Armada/Cortex/Legion across the cohort; observe at least 30 minutes, extending to 45 where needed for late scaling. Compare opening completion, actual expenditure, overflow duration, idle/reachable BP, energy stalls, T2/fusion/AFUS/bomber times and transport/combat progress. Repeat metal-map controls on Full Metal Plate 1.7, SpeedMetal BAR V2 and Nine_Metal_Islands_V1: dense mex/energy opening and zero converters must hold. |
+| V7 | Cost and command overhead | Profile the census at increasing worker/project counts, and paired full 8v8 games with one and multiple AIR roles. Confirm no per-project full unit scan, duplicate command spam or new combat-response delay. Measure AI update p50/p95/max, engine speed and actual synchronized commands per simulation minute. An unexplained repeatable p95 update regression over 5% requires investigation; do not hide it in run-to-run noise. Flag any sustained AIR APM above the owner's 3,000 threshold. Do not introduce a blanket rate limiter. |
+| V8 | Conditional native recruit-priority reproduction | Compare identical funded constructor requests with low/high competing pull, recording engine/BAR priority and physical build progress. Only implement step 7 if demotion measurably delays the funded recruit. Then verify the opt-in restores progress, expires safely when funding fails and leaves non-opted-in TECH/other-role recruits unchanged. A priority log alone is insufficient evidence. |
+
+For V6, report both the whole-game verdict and AIR-specific measurements. A
+known TECH invariant failure still makes the whole-game check fail; it does not
+disappear from the archive because AIR improved. Require all controlled fixes
+to pass and an improvement in useful spending or persistent overflow in each
+previously failing reproducible scenario. Investigate natural-game regressions
+in energy stalls, first T2 timing, transport and combat production before calling
+the change verified. Report first fusion and effective T2 raid timing against
+the owner's twenty-minute targets; a missed target remains visible, with its
+cause, rather than being treated as an automatic success. Three seeds provide
+regression evidence, not proof of globally optimal gameplay.
+
+Capture rendered opening, midgame and late-game screenshots, including the
+funded support project and separated factory/economy workers. Share behavior
+updates and screenshots while simulations run. Store unique raw games and
+immutable published evidence using [test-storage.md](../test-storage.md), with
+source/DLL/data hashes, engine/game/map versions, seeds, settings, supplied versus
+natural classification and original checks. Do not modify the live game install
+or an unrelated running match.
+
+### Implementation completion gate
+
+Proceed in this order: baseline fixtures and tests; pure decisions and sampled
+state; caller integration and layout ownership; focused reproductions; matched
+natural/metal/TECH games; performance checks; documentation and evidence. Step 7
+can be omitted with a recorded negative reproduction. An unavailable map or
+unexecuted test is a verification gap, never a pass. No additional user policy
+decision is needed to implement R1-R5; R6's branch is an engineering evidence
+gate. The current review commits contain no gameplay implementation or new
+simulation result.
+
 ## Evidence and validation
 
 Executed the current pure AngelScript helpers in the existing standalone
