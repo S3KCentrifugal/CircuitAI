@@ -5,7 +5,7 @@ Checks, all static:
 
 1. Every invariant id the scripts or native code can log ("[INVARIANT] INV-nnn")
    has a row in doc/invariants.md, and every row there is logged by code.
-2. Every playtest check file (tools/playtest/checks/*.json) forbids the
+2. Every playtest check file (tools/playtest/checks/**/*.json) forbids the
    "[INVARIANT]" line, so a broken invariant fails every benchmark run.
 3. Every rule row of the TECH table (Rule("key", ...) in tech_rules.as) appears
    in doc/actor-matrix.md, so a rule that acts on an object is listed beside
@@ -51,7 +51,7 @@ def main():
         findings.append("%s has a row in doc/invariants.md but no code logs it" % i)
 
     # 2. every check file forbids a broken invariant
-    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "playtest", "checks", "*.json"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "playtest", "checks", "**", "*.json"), recursive=True)):
         try:
             data = json.loads(read(path))
         except ValueError as exc:

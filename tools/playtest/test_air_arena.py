@@ -86,7 +86,7 @@ class ArenaTests(unittest.TestCase):
         self.assertEqual((stats['health_damage'], stats['paralysis'], stats['kill_value']), (50, 500, 50))
 
     def test_legion_early_air_is_a_gunship_not_a_fictitious_bomber(self):
-        case = resolve_case(Path(__file__).parent/'air_cases/t1-economy.json', 'legion', 'cortex', 1)
+        case = resolve_case(Path(__file__).parent/'cases/air/combat/t1-economy.json', 'legion', 'cortex', 1)
         self.assertEqual(case['aircraft'][0]['unit'], 'legmos')
         self.assertEqual(case['aircraft'][1]['unit'], 'corveng')
 

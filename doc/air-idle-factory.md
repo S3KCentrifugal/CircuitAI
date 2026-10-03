@@ -50,8 +50,8 @@ factory and unfinished crew states, plus scout exclusion from the screen.
 
 The independent [observer](../tools/playtest/widgets/air_opening_watch.lua)
 checks actual first-fighter frame timing and commander commands. The
-[opening checks](../tools/playtest/checks/air_opening.json) and
-[idle checks](../tools/playtest/checks/air_idle.json) retain all invariant forbids.
+[opening checks](../tools/playtest/checks/air/economy/air_opening.json) and
+[idle checks](../tools/playtest/checks/air/economy/air_idle.json) retain all invariant forbids.
 The [fixture preparer](../tools/playtest/prepare_air_check.py) pauses only the
 staged team-0 production controller from minute six through eight; it supplies
 no economy or units. This distinguishes a useful queued recruit's startup

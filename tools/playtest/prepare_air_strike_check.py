@@ -59,7 +59,7 @@ for name, manager, descriptor in [('builder', 'aiBuilderMgr', 'TaskB::Wait(60 * 
 (base / 'air-strike-fixture.json').write_text(json.dumps({'side': a.side, 'profile': a.profile,
     'engine_seed': a.seed, 'ai_seed': a.seed, 'assembly_radius_override': a.assembly_radius,
     'global_los': True, 'supplied_units': True, 'builders_and_factories_frozen': True}, indent=2))
-checks=json.loads((ROOT/'tools/playtest/checks/air_strike_stages.json').read_text())
+checks=json.loads((ROOT/'tools/playtest/checks/air/combat/air_strike_stages.json').read_text())
 checks['expect'].append({'key':'early-damage','pattern':r'\[AirStrike\] stage-damage stage=1','scope':'any','by_minute':4})
 (base/'checks.json').write_text(json.dumps(checks,indent=2))
 print(base)

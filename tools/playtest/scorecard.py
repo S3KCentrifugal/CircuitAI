@@ -233,14 +233,19 @@ def make_card(manifest, parsed):
 
 def record(directory, run, store=STORE):
     directory, run, store = Path(directory), Path(run), Path(store)
-    manifest = read_json(directory / 'scorecard-manifest.json')
-    launched = read_json(directory / 'launched.json')
+    # A reusable engine directory may already contain a later experiment.
+    # Prefer the watcher's snapshot for every input used to derive this card.
+    def input_path(name):
+        return run / name if (run / name).exists() else directory / name
+    manifest = read_json(input_path('scorecard-manifest.json'))
+    launched = read_json(input_path('launched.json'))
     engine = Path(launched['engine'])
     manifest['engine_version'] = engine.name
     headless = manifest['scenario'].get('headless')
     if not isinstance(headless,bool):
         raise ValueError('Manifest must declare the executed headless/display mode')
-    manifest['engine_sha256'] = file_hash(engine / ('spring-headless.exe' if headless else 'spring.exe'))
+    inputs = read_json(run / 'run-inputs.json') if (run / 'run-inputs.json').exists() else {}
+    manifest['engine_sha256'] = inputs.get('engine_sha256') or file_hash(engine / ('spring-headless.exe' if headless else 'spring.exe'))
     manifest['headless'] = headless
     parsed = parse_log(run / 'infolog.txt')
     card = make_card(manifest, parsed)
@@ -263,9 +268,14 @@ def record(directory, run, store=STORE):
     write_json(dest, card)
     render_card(card, dest.with_suffix('.md'))
     # Preserve input evidence with the archived run, not just its reusable write-dir.
-    write_json(run / 'scorecard-manifest.json', manifest)
+    # Preserve the pre-launch snapshot recorded by the generic watcher; store
+    # this engine-enriched interpretation as a separate artifact.
+    if not (run / 'scorecard-manifest.json').exists():
+        write_json(run / 'scorecard-manifest.json', read_json(directory / 'scorecard-manifest.json'))
+    write_json(run / 'scorecard-runtime-manifest.json', manifest)
     for name in ('script.txt', 'teams.json', 'staged.json', 'launched.json'):
-        shutil.copy2(directory / name, run / name)
+        if not (run / name).exists():
+            shutil.copy2(directory / name, run / name)
     return dest
 
 

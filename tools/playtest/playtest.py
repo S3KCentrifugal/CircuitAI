@@ -27,6 +27,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import storage
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -428,6 +429,7 @@ def launch(args):
         die("a playtest engine is already running (pids %s): 'stop' it first" % running_pids(d))
     eng = engine_dir(args.engine)
     exe = eng / ("spring-headless.exe" if getattr(args, "headless", False) else "spring.exe")
+    storage.capture_inputs(d, exe)
     # a fresh infolog per run; the previous one is kept with its run
     info = d / "infolog.txt"
     if info.exists():
@@ -503,10 +505,9 @@ NATIVE_RE = re.compile(r"Skirmish AI <[^>]*>: (EXP: |RESERVE: |BUILDER: |CBFacto
 
 
 def load_checks(path):
-    p = Path(path)
-    if not p.exists():
-        p = HERE / "checks" / (str(path) + ".json")
-    if not p.exists():
+    try:
+        p = storage.resolve_definition(path, 'checks')
+    except (ValueError, FileNotFoundError):
         die("no checks file %s" % path)
     return json.loads(p.read_text(encoding="utf-8")), p
 
@@ -514,6 +515,7 @@ def load_checks(path):
 def watch(args):
     d = Path(args.dir)
     checks, checks_path = load_checks(args.checks)
+    checks_bytes = checks_path.read_bytes()
     stop_minute = float(args.minutes) if args.minutes else float(checks.get("stop_minute", 12))
     stop_frame = int(stop_minute * 60 * FPS)
     info = d / "infolog.txt"
@@ -662,8 +664,8 @@ def watch(args):
         stop(args, quiet=True)
 
     # the report
-    run_dir = d / "runs" / dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = d / "runs" / storage.run_id()
+    run_dir.mkdir(parents=True, exist_ok=False)
     shots = sorted((d / "screenshots").glob("*.png"))
     for s in shots:
         shutil.copy2(s, run_dir / s.name)
@@ -704,6 +706,7 @@ def watch(args):
     report = "\n".join(R)
     (run_dir / "report.md").write_text(report, encoding="utf-8")
     (d / "report.md").write_text(report, encoding="utf-8")
+    storage.archive_metadata(d, run_dir, checks_bytes, verdict, reason, frame, not args.no_stop)
     print(report if args.print_report else "\n".join(R[:9 + len(expects) + len(forbids) + 4]))
     log("report: %s" % (run_dir / "report.md"))
     return 0 if verdict == "PASS" else 1

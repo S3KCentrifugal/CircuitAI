@@ -81,8 +81,8 @@ existing movement behavior. [AIR integration](../data/script/src/roles/air.as)
 continues to try home/scout policy before waves and native fallback.
 
 The [opening observer](../tools/playtest/widgets/air_opening_watch.lua),
-[opening checks](../tools/playtest/checks/air_opening.json), and updated
-[economy checks](../tools/playtest/checks/air_economy.json) inspect actual engine
+[opening checks](../tools/playtest/checks/air/economy/air_opening.json), and updated
+[economy checks](../tools/playtest/checks/air/economy/air_economy.json) inspect actual engine
 events. The [fixture](../tools/playtest/widgets/air_fixture.lua) and
 [preparer](../tools/playtest/prepare_air_check.py) supply mixed T1/T2 fighters
 and losses for a separate geometry test. That fixture explicitly raises the
@@ -171,7 +171,7 @@ Opening reports under `build-theatres/air/`:
 The same completed logs were judged separately by the unchanged
 `air_transition` checks; those failed reports remain alongside the opening
 reports. The final scripts are pinned in `build-theatres/air/build-06/data-d150`.
-The [screen checks](../tools/playtest/checks/air_screen.json) retain all invariants.
+The [screen checks](../tools/playtest/checks/air/combat/air_screen.json) retain all invariants.
 See the [playtest instructions](../tools/playtest/README.md) and
 [known limitations](known-issues.md).
 

@@ -1,2 +1,5 @@
 # release scripts run on the Linux CI runner
 *.sh text eol=lf
+
+# Published evidence must retain its recorded bytes across checkouts.
+doc/benchmarks/records/** -text whitespace=cr-at-eol

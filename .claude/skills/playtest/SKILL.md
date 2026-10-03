@@ -64,6 +64,22 @@ Recurring AngelScript errors:
 
 ## 3. Launch
 
+For new experiments follow [storage conventions](../../../doc/test-storage.md).
+AIR arenas and scorecard runs allocate a unique categorized write directory
+when `--dir` is omitted. For the generic runner or a specialised preparer,
+allocate one first and pass the returned path to every stage/run/watch/stop:
+
+```bash
+GAME_DIR=$(python tools/playtest/storage.py allocate --domain tech --area economy --scenario rush-afus --map supreme --kind benchmark)
+```
+
+Cases and checks are organized by domain and area. Legacy short check names
+still work. Keep the printed `runs/<UTC-id>/` archive path, publish compact
+evidence with `storage.py publish <archive> --screenshot <filename.png>`, and
+rebuild discovery with `storage.py index`. Never delete old raw evidence or
+rewrite an old verdict to make the benchmark pass. The explicit legacy paths
+below remain supported for reproducing old commands.
+
 ```bash
 python tools/playtest/playtest.py stop --dir C:/bardev/barb-playtest-simN   # always, first
 python tools/playtest/playtest.py run --dir C:/bardev/barb-playtest-simN --dll <dll> \

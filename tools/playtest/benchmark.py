@@ -13,8 +13,10 @@ table (77-eco-tech-player.md); floors are the simulator's.
 """
 import argparse
 import json
+import os
 import re
 import sys
+import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -150,7 +152,29 @@ def best_table(rows):
 def write(rows):
     DOC.parent.mkdir(parents=True, exist_ok=True)
     body = HEADER.replace("BEST_TABLE", best_table(rows)) + "\n".join(rows) + "\n"
-    DOC.write_text(body, encoding="utf-8")
+    temporary = DOC.with_name(DOC.name + '.' + uuid.uuid4().hex + '.tmp')
+    temporary.write_text(body, encoding="utf-8")
+    os.replace(temporary, DOC)
+
+
+def append_row(identifier, new_row):
+    DOC.parent.mkdir(parents=True, exist_ok=True)
+    lock = DOC.with_name(DOC.name + '.lock')
+    try:
+        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError as exc:
+        raise RuntimeError('Rush ledger is being written; retry after its owner finishes: ' + str(lock)) from exc
+    os.close(descriptor)
+    try:
+        rows = load_rows()
+        previous = [r for r in rows if r.startswith("| %s |" % identifier)]
+        if previous and previous != [new_row]:
+            raise ValueError('Conflicting benchmark run ID; refusing to replace historical rows: ' + identifier)
+        if not previous:
+            rows.append(new_row)
+            write(rows)
+    finally:
+        lock.unlink()
 
 
 def record(args):
@@ -165,10 +189,8 @@ def record(args):
     cells = [run_dir.name, objective, "%.1f" % d["minutes"]]
     cells += [mmss(first.get(l)) for l, _, _, _ in MILESTONES]
     cells += [metal, d["dll"] or "-", args.note or ""]
-    rows = load_rows()
-    rows = [r for r in rows if not r.startswith("| %s |" % run_dir.name)]
-    rows.append("| " + " | ".join(cells) + " |")
-    write(rows)
+    new_row = "| " + " | ".join(cells) + " |"
+    append_row(run_dir.name, new_row)
     label = OBJECTIVE_MILESTONE.get(objective)
     target = next((t for l, _, t, _ in MILESTONES if l == label), None)
     got = first.get(label) if label else None

@@ -10,6 +10,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import storage
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -154,15 +155,19 @@ def prepare(args):
         # Refuse to restage a potentially live game. The ordinary stop command
         # removes the pid; an unused stale directory can simply be given a new name.
         raise ValueError('Run playtest.py stop for this directory before restaging')
-    case_path = Path(args.case)
-    if not case_path.exists():
-        case_path = HERE / 'air_cases' / (args.case + '.json')
+    case_path = storage.resolve_definition(args.case, 'cases')
     case = resolve_case(case_path, args.side, args.defender, args.seed, args.visibility)
     args.checks = args.checks or case.get('checks', 'air_arena')
-    if not re.fullmatch('[a-z0-9_]+', args.checks) or not (HERE/'checks'/f'{args.checks}.json').is_file():
-        raise ValueError('Unknown arena checks: ' + args.checks)
-    if args.map != case.get('map', 'Supreme Isthmus v1.7') and case_path.parent.resolve() == (HERE/'air_cases').resolve():
+    checks_path = storage.resolve_definition(args.checks, 'checks')
+    if args.map != case.get('map', 'Supreme Isthmus v1.7') and case_path.is_relative_to(HERE/'cases'):
         raise ValueError('Built-in target coordinates require their declared map; supply a custom JSON case for another map')
+    # Explicit directories (including matrix children) need the same discovery
+    # metadata as automatically allocated games. Refresh it on intentional reuse.
+    compact = lambda text: re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')[:24].rstrip('-')
+    storage.write_json(base/'run-plan.json', {'schema':1, 'id':base.name,
+        'category':{'domain':'air','area':'combat','scenario':compact(case_path.stem),
+                    'map':compact(args.map),'kind':'supplied'},
+        'requested':{'case':str(case_path),'side':args.side,'profile':args.profile,'seed':args.seed,'map':args.map}})
     if args.unit:
         if not re.fullmatch('[a-z][a-z0-9_]*', args.unit):
             raise ValueError('Invalid aircraft UnitDef name')
@@ -244,9 +249,9 @@ def prepare(args):
     manifest = {'case': case, 'game': args.game, 'engine': args.engine, 'map': args.map, 'profile': args.profile,
                 'source_commit': subprocess.check_output(git, cwd=ROOT, text=True).strip(),
                 'dll_sha256': hashlib.sha256(Path(args.dll).read_bytes()).hexdigest(), 'overrides': overrides,
-                'harness_sha256': {str(p.relative_to(HERE)): hashlib.sha256(p.read_bytes()).hexdigest()
+                'harness_sha256': {str(p.relative_to(HERE)) if p.is_relative_to(HERE) else str(p): hashlib.sha256(p.read_bytes()).hexdigest()
                                    for p in (Path(__file__).resolve(), HERE/'air_arena_probe.as',
-                                             HERE/'widgets/air_arena.lua', HERE/'checks'/f'{args.checks}.json')},
+                                             HERE/'widgets/air_arena.lua', checks_path)},
                 'config_sha256': {str(p.relative_to(staged.parent)): hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in (staged.parent/'config').rglob('*.json')},
                 'staged_script_sha256': {str(p.relative_to(staged)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -259,7 +264,7 @@ def prepare(args):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('command', choices=['list', 'prepare', 'run', 'matrix', 'summarize'])
-    p.add_argument('--dir', type=Path, default=ROOT / 'build-theatres/air-arena')
+    p.add_argument('--dir', type=Path, help='Existing explicit write directory; otherwise allocate a unique categorized game')
     p.add_argument('--case', default='t2-intercept')
     p.add_argument('--checks', help='Behavior-specific checks; defaults to the case or air_arena')
     p.add_argument('--side', choices=ROSTERS, default='armada')
@@ -284,10 +289,14 @@ def main():
     p.add_argument('--endless', action='store_true')
     a = p.parse_args()
     if a.command == 'list':
-        for case in sorted((HERE / 'air_cases').glob('*.json')):
+        for case in storage.definitions('cases'):
+            if case.relative_to(HERE/'cases').parts[0] != 'air':
+                continue
             print(case.stem, '-', json.loads(case.read_text())['description'])
         return
     if a.command == 'summarize':
+        if a.dir is None:
+            p.error('summarize requires --dir')
         summarize(a.dir)
         return
     if any(not math.isfinite(v) or v <= 0 for v in (a.minutes, a.speed, a.wall_minutes)):
@@ -295,6 +304,8 @@ def main():
     if a.command == 'matrix':
         if a.endless:
             p.error('Endless mode is one interactive arena, not a bounded matrix')
+        if a.dir is None:
+            a.dir = storage.allocate('air','combat','matrix','multi-map','supplied')
         results = []
         for case in a.cases.split(','):
             for side in a.sides.split(','):
@@ -314,6 +325,11 @@ def main():
                     (a.dir/'matrix-results.json').write_text(json.dumps(results, indent=2)+'\n')
         summarize(a.dir)
         sys.exit(any(r['exit'] for r in results))
+    if a.dir is None:
+        case_path = storage.resolve_definition(a.case, 'cases')
+        map_slug = re.sub(r'[^a-z0-9]+', '-', a.map.lower()).strip('-')[:24].rstrip('-')
+        a.dir = storage.allocate('air','combat',case_path.stem,map_slug,'supplied',
+                                side=a.side, profile=a.profile, seed=a.seed, map=a.map)
     base = prepare(a)
     if a.command == 'prepare':
         return

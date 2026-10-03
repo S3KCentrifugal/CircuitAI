@@ -127,24 +127,24 @@ Recoil `recoil_2026.07.04`, BAR `test-31479-433a460`, and the pinned
 matching the required published build output. No new DLL build or live-install
 deployment is part of this verification.
 
-Run the [Supreme fixture](../tools/playtest/air_cases/edge-supreme.json):
+Run the [Supreme fixture](../tools/playtest/cases/air/combat/edge-supreme.json):
 
 ```powershell
 python tools/playtest/air_arena.py run --dir build-theatres/d177-supreme --case edge-supreme --map "Supreme Isthmus v1.7" --map-file build-theatres/d176-data/script/src/maps/supreme_isthmus.as --side armada --profile experimental_balanced --dll build-theatres/d176-build-2/SkirmishAI.dll --data build-theatres/d176-data --minutes 10 --speed 4 --wall-minutes 8
 ```
 
-For [Glitters flak](../tools/playtest/air_cases/edge-glitters.json), use
+For [Glitters flak](../tools/playtest/cases/air/combat/edge-glitters.json), use
 `--case edge-glitters --map "All That Glitters v2.2.3"`, its
 `all_that_glitters.as` map file, `--side cortex --profile experimental_hard`,
 `--minutes 8`, and a separate `--dir build-theatres/d177-glitters`.
-For the [clear control](../tools/playtest/air_cases/direct-glitters.json), use
+For the [clear control](../tools/playtest/cases/air/combat/direct-glitters.json), use
 the same Glitters command with `--case direct-glitters` and
 `--dir build-theatres/d177-direct-clear`. Stop an existing run before reusing
 its directory. Preserve logs before rerunning; staging replaces their contents.
 
-[Edge checks](../tools/playtest/checks/air_edge.json) require a selected edge,
+[Edge checks](../tools/playtest/checks/air/combat/air_edge.json) require a selected edge,
 an actual flank crossing, bomber target damage, AFUS destruction and a
-screenshot; [direct checks](../tools/playtest/checks/air_direct.json) require
+screenshot; [direct checks](../tools/playtest/checks/air/combat/air_direct.json) require
 a direct plan and central crossing. Both forbid script errors, runtime
 invariants, fixture errors and crashes. The existing
 [AFUS audit](../tools/playtest/audit_afus_handoff.py) also passes the two

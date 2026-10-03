@@ -81,11 +81,11 @@ appeared in those strict reports.
 
 ## Reproduction and artifacts
 
-Use [the initial fixture](../tools/playtest/air_cases/afus-handoff-glitters.json)
-or [the reveal fixture](../tools/playtest/air_cases/afus-reveal-glitters.json)
+Use [the initial fixture](../tools/playtest/cases/air/combat/afus-handoff-glitters.json)
+or [the reveal fixture](../tools/playtest/cases/air/combat/afus-reveal-glitters.json)
 with [the arena runner](../tools/playtest/air_arena.py). The
 [engine observer](../tools/playtest/widgets/air_arena.lua),
-[strict checks](../tools/playtest/checks/air_afus_handoff.json) and
+[strict checks](../tools/playtest/checks/air/combat/air_afus_handoff.json) and
 [timing auditor](../tools/playtest/audit_afus_handoff.py) are checked in.
 The [evidence manifest](benchmarks/d176-afus-handoff.json) records full DLL,
 debug, data and log hashes, overrides, measured contacts, command counts and

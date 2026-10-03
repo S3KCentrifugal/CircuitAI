@@ -79,7 +79,7 @@ Preserved run reports and full logs:
 `build-theatres/flank/ascendancy-results.json` contains extracted orders, roles,
 kill lists, losses, final censuses and invariant IDs. The extraction script is
 beside it. [The observer](../../tools/playtest/widgets/flank_effectiveness.lua)
-and [checks](../../tools/playtest/checks/flank_effectiveness.json) are retained.
+and [checks](../../tools/playtest/checks/shared/combat/flank_effectiveness.json) are retained.
 The checks now explicitly require actual TECH role snapshots, rather than
 trusting harness labels. Existing per-run reports are not rewritten.
 

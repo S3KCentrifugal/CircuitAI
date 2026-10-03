@@ -2765,7 +2765,7 @@ the production fallback or turn the two-player fixture into a universal map
 role layout. The current experiment forces only the staged fallback to TECH.
 
 **Verification.** The corrected runs log role=2 for both AIs and build dedicated
-flank labs. The [effectiveness checks](../tools/playtest/checks/flank_effectiveness.json)
+flank labs. The [effectiveness checks](../tools/playtest/checks/shared/combat/flank_effectiveness.json)
 now require actual TECH snapshots. General harness validation remains open.
 The scorecard runner now also verifies the actual role, faction and start in
 every recorded match and rejects mismatches for comparisons and ratings (D-140).
@@ -3040,7 +3040,7 @@ combat and the all-map/repeated-game performance matrix open, not the original
 56-minute baseline behavior.
 
 **Severity:** Medium performance limitation. **Location:**
-[transition check](../tools/playtest/checks/air_transition.json),
+[transition check](../tools/playtest/checks/air/economy/air_transition.json),
 `AirEconomy::Transition` and `AirRules::MakeTask`.
 
 **Historical problem (D-147).** The final 60-minute natural Armada run completed T2 at 36.87 min,
@@ -3129,7 +3129,7 @@ set, with no stale ownership after switching or removing an AI.
 
 ### KI-440 - Smoke opening check misses TECH's rush-chain mexes
 
-**Problem.** `tools/playtest/checks/smoke.json` requires `[Rule] opening.mex`
+**Problem.** `tools/playtest/checks/shared/reliability/smoke.json` requires `[Rule] opening.mex`
 by one minute. The 2026-09-30 intro-disabled startup run builds three team-0
 mexes at frames 526, 1006 and 1471, while TECH logs `chain.next`. Thus the
 smoke report fails despite a working opening. Retained evidence:
@@ -3148,7 +3148,7 @@ check or TECH policy. The current report is retained as FAIL.
 
 **Problem.** On Supreme Isthmus with Armada, experimental_hard and no income
 bonus, the current explicit nuke chain finishes the silo at 18:15, after the
-16:30 deadline in `tools/playtest/checks/rush_nuke.json`. The chain is active
+16:30 deadline in `tools/playtest/checks/tech/economy/rush_nuke.json`. The chain is active
 and completes; this is a timing failure, separate from KI-418's launch target.
 
 **Proposed solution.** Compare the retained step and builder-assignment timeline

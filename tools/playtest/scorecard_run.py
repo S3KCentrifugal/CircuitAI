@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import scorecard
+import storage
 
 ROOT = scorecard.ROOT
 MAPS = {'supreme': 'Supreme Isthmus v1.7', 'glacial': 'Glacial Gap v1.1', 'ascendancy': 'Ascendancy v2.2'}
@@ -15,7 +16,7 @@ MAPS = {'supreme': 'Supreme Isthmus v1.7', 'glacial': 'Glacial Gap v1.1', 'ascen
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('map', choices=MAPS)
-    p.add_argument('--dir', required=True)
+    p.add_argument('--dir', help='Optional explicit directory; otherwise allocate a categorized benchmark game')
     p.add_argument('--dll', required=True)
     p.add_argument('--game', required=True)
     p.add_argument('--minutes', type=int, default=45)
@@ -23,7 +24,8 @@ def main():
     p.add_argument('--swap', action='store_true')
     p.add_argument('--calendar', default='2026-09-29T17', help='Pinned in-game calendar YYYY-MM-DDTHH; wall-clock timestamps are independent')
     args = p.parse_args()
-    dest = Path(args.dir).resolve()
+    dest = Path(args.dir).resolve() if args.dir else storage.allocate(
+        'tech','strategy','scorecard',args.map,'benchmark', legion=args.legion, swap=args.swap)
     # Never accept a destination inside the live install.
     if not dest.is_relative_to(ROOT / 'build-theatres'):
         p.error('--dir must be inside this repository build-theatres directory')

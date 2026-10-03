@@ -323,7 +323,7 @@ Reused native facilities also include `body15` (submarine-depth components),
 movement-area size heuristics are deliberately retained, including when a
 candidate query rejects a small area; this change does not relax placement.
 
-Validation uses [`theatres_supreme.json`](../../tools/playtest/checks/theatres_supreme.json):
+Validation uses [`theatres_supreme.json`](../../tools/playtest/checks/shared/terrain/theatres_supreme.json):
 two ponds, two seas, two naval candidates, no pond shipyard, successful overlay
 delivery, screenshots, no script error or invariant violation. Current run
 evidence is recorded in [D-128](../decisions.md#d-128--water-theatres-and-a-read-only-lane-overlay).
@@ -334,7 +334,7 @@ uses the panel's own action paths to select a player, switch players, show all,
 hide all, and verify persistent visibility. It also checks geo/island/beach data.
 The final run `20260928-160012` passed, including an AIR-role request and a
 refresh that leaves the view hidden. For multiple origins, use `--roles TECH,AIR`
-with [theatres_multi.json](../../tools/playtest/checks/theatres_multi.json) and
+with [theatres_multi.json](../../tools/playtest/checks/shared/terrain/theatres_multi.json) and
 [theatres_multi_watch.lua](../../tools/playtest/widgets/theatres_multi_watch.lua).
 Run `20260928-164931` verified all four players' air-lane origins against their
 own starts. Ship the new native DLL, active data tree and control widget together;

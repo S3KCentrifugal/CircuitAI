@@ -25,6 +25,31 @@ def fixture():
 
 
 class ScorecardTests(unittest.TestCase):
+    def test_record_after_restaging_uses_archived_inputs_and_preserves_hashes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory, run = root/'working', root/'archive'
+            directory.mkdir(); run.mkdir()
+            manifest, _ = fixture()
+            manifest['started_at_local'] = '2026-09-29T13:00:00-03:00'
+            manifest['scenario']['headless'] = False
+            s.write_json(run/'scorecard-manifest.json', manifest)
+            s.write_json(run/'launched.json', {'engine':str(root/'old-engine')})
+            s.write_json(run/'run-inputs.json', {'engine_sha256':'original-engine-hash'})
+            (run/'script.txt').write_text('original start script')
+            (run/'teams.json').write_text('{}')
+            (run/'staged.json').write_text('{}')
+            (run/'infolog.txt').write_text('')
+            s.write_json(directory/'scorecard-manifest.json', {'a':'later experiment'})
+            original = {p.name:p.read_bytes() for p in run.iterdir()}
+
+            card_path = s.record(directory, run, root/'scorecards')
+
+            card = s.read_json(card_path)
+            self.assertEqual(card['manifest']['map'], 'Glacial Gap v1.1')
+            self.assertEqual(card['manifest']['engine_sha256'], 'original-engine-hash')
+            self.assertEqual({name:(run/name).read_bytes() for name in original}, original)
+
     def test_compare_legion_changed_rejects(self):
         m,p=fixture(); a=s.make_card(m,p)
         m=copy.deepcopy(m); m['modoptions']['experimentallegionfaction']='0'

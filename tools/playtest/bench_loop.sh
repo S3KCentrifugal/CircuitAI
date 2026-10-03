@@ -5,13 +5,14 @@
 cd /c/bardev/s3k-CircuitAI || exit 1
 SPEED=${SPEED:-8}
 # DLL=<path> tests that build (default: the docker install copy); DIR=<write dir>
-# runs in that dir (default: C:/bardev/barb-playtest; one dir per concurrent game)
-DIR=${DIR:-C:/bardev/barb-playtest}
+# explicitly reuses that dir. Otherwise each objective gets its own categorized
+# game. The actual lobby-selected map/version is retained in teams.json.
 declare -A MIN=( [t2]=13 [fusion]=18 [afus]=24 [nuke]=23 [gantry]=22 [titan]=32 )
 for obj in "$@"; do
-  python tools/playtest/playtest.py stop --dir "$DIR" >/dev/null 2>&1
+  RUN_DIR=${DIR:-$(python tools/playtest/storage.py allocate --domain tech --area economy --scenario "rush-$obj" --map lobby-map --kind benchmark)} || exit 1
+  python tools/playtest/playtest.py stop --dir "$RUN_DIR" >/dev/null 2>&1
   echo "=== $obj ($(date +%H:%M:%S))"
-  OUT=$(python tools/playtest/playtest.py run --dir "$DIR" ${DLL:+--dll "$DLL"} --headless --roles TECH --speed "$SPEED" \
+  OUT=$(python tools/playtest/playtest.py run --dir "$RUN_DIR" ${DLL:+--dll "$DLL"} --headless --roles TECH --speed "$SPEED" \
       --checks "rush_$obj" --set "RushObjective=\"$obj\"" --minutes "${MIN[$obj]}" --keep-going 2>&1)
   printf '%s\n' "$OUT" | grep -E "Verdict|Game time|report:|ERROR"
   # the run folder from this run's own report line (the newest folder can be an older run's)

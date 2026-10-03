@@ -1,5 +1,29 @@
 # Playtest: launch, watch, screenshot, stop
 
+## Organized storage
+
+[Storage conventions](../../doc/test-storage.md) define categories, naming,
+immutable publications and history preservation. [Benchmark evidence](../../doc/benchmarks/README.md)
+is indexed by domain without rewriting the historical records.
+
+Cases now live under `cases/<domain>/<area>/`, checks under
+`checks/<domain>/<area>/`. Existing short names and old explicit paths still
+resolve. AIR arenas and scorecard runs allocate unique categorized directories
+when `--dir` is omitted. Other preparers accept the directory returned by:
+
+```powershell
+$gameDir = python tools/playtest/storage.py allocate --domain tech --area economy --scenario rush-afus --map supreme --kind benchmark
+python tools/playtest/playtest.py run --dir $gameDir --roles TECH --checks rush_afus --set 'RushObjective="afus"' --speed 8 --minutes 24
+```
+
+Archives use UTC IDs with a random suffix and retain setup/checks/build hashes
+alongside their original report and log. `storage.py publish <archived-run>`
+copies compact evidence into the categorized benchmark store; add
+`--screenshot <filename.png>` for each selected image. It refuses conflicting
+IDs and still-running snapshots. Raw game directories are never automatically
+removed. Existing `--dir` workflows, scorecard comparison rules and rush history
+remain supported.
+
 Simulation updates must include actual in-game screenshots and analysis while
 the match is running (owner instruction, 2026-10-01). Headless runs remain useful
 for automated checks, but cannot provide visual evidence. Preserve screenshots
@@ -258,10 +282,10 @@ each minute; the tracker reads those lines. Two objectives per call fit the
 
 | File | Plays | Watches |
 | --- | --- | --- |
-| `checks/smoke.json` | 4 min | the AI and the widget load, the opening starts, a screenshot lands, no script error |
-| `checks/tech_opening.json` | 14 min | D-066..D-068: opening mexes, first lab after them, energy, turret, advanced lab by 14; no mobile def packed, no combat production, no T1 lab re-ordered after 9 min, no native default tasks |
+| `checks/shared/reliability/smoke.json` | 4 min | the AI and the widget load, the opening starts, a screenshot lands, no script error |
+| `checks/tech/economy/tech_opening.json` | 14 min | D-066..D-068: opening mexes, first lab after them, energy, turret, advanced lab by 14; no mobile def packed, no combat production, no T1 lab re-ordered after 9 min, no native default tasks |
 | `checks/rush_<objective>.json` | target + 1 | D-070: the chain announces the objective, the milestone finishes by the target; no script error, no combat production |
-| `checks/wall_exclusion.json` + `widgets/wall_exclusion_fixture.lua` | 14.2 min | D-154: mixed AIR/TECH, rear own/allied-base assets remain unwalled while forward resource walls complete; global invariant forbid remains active |
+| `checks/shared/layout/wall_exclusion.json` + `widgets/wall_exclusion_fixture.lua` | 14.2 min | D-154: mixed AIR/TECH, rear own/allied-base assets remain unwalled while forward resource walls complete; global invariant forbid remains active |
 
 Add a file per behaviour under test; keep the `[Rule] <key>` names as the
 patterns (they are the sequence's vocabulary, `doc/roles/tech_rules.md`).
@@ -344,7 +368,7 @@ For the lane-renderer memory regression, install `lupa==2.8` into
 automatic GC while measuring each frame (as Recoil does), and checks actual
 widget geometry and player selection. It does not substitute for engine rendering.
 Stage `widgets/lane_ui_memory_watch.lua` with `../widgets/gui_barb_team_link.lua`
-and use `checks/lane_ui_memory.json` for the engine check. Launch the graphical
+and use `checks/shared/performance/lane_ui_memory.json` for the engine check. Launch the graphical
 `spring.exe --hidden --write-dir <isolated-dir> <isolated-dir>/script.txt`:
 the observer calls the real widget DrawScreen from DrawGenesis's GL context,
 pauses the simulation, clicks player rows for 90 seconds and logs memory.
@@ -631,7 +655,7 @@ and archive their exact log, manifest, screenshots, strict report and
 if any case fails. Use a fresh directory for each comparison. A live/stale PID
 must be cleared through the scoped stop command before restaging.
 
-Cases are JSON under `air_cases/`. Change aircraft, counts, targets, AA, positions
+Cases are JSON under `cases/air/combat/`. Change aircraft, counts, targets, AA, positions
 and refill period there; a custom JSON path works with `--case`. `--unit armlance`
 replaces the primary attacker, `--fighters 0` isolates static AA, and
 `--visibility global` is an explicitly labeled omniscient diagnostic. Built-in

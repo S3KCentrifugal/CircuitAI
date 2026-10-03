@@ -7140,7 +7140,7 @@ detailed in the role document.
 [lanes.as](../data/script/src/manager/lanes.as),
 [lanes.json](../data/config/lanes.json),
 [gui_barb_team_link.lua](../tools/widgets/gui_barb_team_link.lua),
-[theatres_supreme.json](../tools/playtest/checks/theatres_supreme.json),
+[theatres_supreme.json](../tools/playtest/checks/shared/terrain/theatres_supreme.json),
 [theatres_watch.lua](../tools/playtest/widgets/theatres_watch.lua),
 [tech-lanes.md](roles/tech-lanes.md),
 [script README](../data/script/README.md), [AGENTS.md](../AGENTS.md),
@@ -7208,9 +7208,9 @@ No live-install writes. The paired DLL/debug build is under ignored
 [settings](../data/config/lanes.json),
 [control widget](../tools/widgets/gui_barb_team_link.lua),
 [watcher](../tools/playtest/widgets/theatres_watch.lua),
-[checks](../tools/playtest/checks/theatres_supreme.json),
+[checks](../tools/playtest/checks/shared/terrain/theatres_supreme.json),
 [multiplayer watcher](../tools/playtest/widgets/theatres_multi_watch.lua),
-[multiplayer checks](../tools/playtest/checks/theatres_multi.json),
+[multiplayer checks](../tools/playtest/checks/shared/terrain/theatres_multi.json),
 [lane documentation](roles/tech-lanes.md),
 [script README](../data/script/README.md),
 [API reference](angelscript-references.md), [repository map](../AGENTS.md),
@@ -7343,8 +7343,8 @@ availability remain explicit limitations.
 [threat watcher](../tools/playtest/widgets/tactical_threat_watch.lua),
 [screenshot harness](../tools/playtest/widgets/playtest_camera.lua),
 [playtest instructions](../tools/playtest/README.md),
-[UI checks](../tools/playtest/checks/tactical_guide.json),
-[threat checks](../tools/playtest/checks/tactical_threat.json),
+[UI checks](../tools/playtest/checks/tactical/strategy/tactical_guide.json),
+[threat checks](../tools/playtest/checks/tactical/strategy/tactical_threat.json),
 [Ascendancy fixture](../tools/playtest/fixtures/ascendancy.as),
 [lane documentation](roles/tech-lanes.md), [API reference](angelscript-references.md),
 [invariants](invariants.md), [actors](actor-matrix.md), [issues](known-issues.md),
@@ -7633,8 +7633,8 @@ The general save/load limitations remain; D-136 reconstruction is KI-426.
 [unit](../src/circuit/unit/CircuitUnit.h), [creation](../src/circuit/CircuitAI.cpp),
 [bindings](../src/circuit/script/InitScript.cpp),
 [runtime watcher](../tools/playtest/widgets/flank_watch.lua),
-[checks](../tools/playtest/checks/tech_flank.json),
-[traversal checks](../tools/playtest/checks/tech_flank_traversal.json),
+[checks](../tools/playtest/checks/tech/combat/tech_flank.json),
+[traversal checks](../tools/playtest/checks/tech/combat/tech_flank_traversal.json),
 [economy fixture](../tools/playtest/widgets/flank_economy_fixture.lua),
 [policy guide](roles/tech_flank.md), [TECH guide](roles/tech.md),
 [rules guide](roles/tech_rules.md), [factory guide](roles/tech_factories.md), [build guide](roles/tech_build.md),
@@ -7668,7 +7668,7 @@ Armada's eastern stream scored kills but did not break through. See the
 counts, screenshots, fixture limits and unchanged failing overall verdicts.
 
 **Files.** [observer](../tools/playtest/widgets/flank_effectiveness.lua),
-[checks](../tools/playtest/checks/flank_effectiveness.json),
+[checks](../tools/playtest/checks/shared/combat/flank_effectiveness.json),
 [issues](known-issues.md), [report](reviews/2026-09-29-ascendancy-flank-effectiveness.md).
 
 ## D-138 — Separate stale deployment from TECH production starvation
@@ -7819,7 +7819,7 @@ tracks that limit. No installed files were modified and no DLL rebuild is needed
 [Lua fixture](../tools/playtest/fixtures/lane_ui_mock.lua),
 [tests](../tools/playtest/test_lane_ui_memory.py),
 [engine watcher](../tools/playtest/widgets/lane_ui_memory_watch.lua),
-[engine checks](../tools/playtest/checks/lane_ui_memory.json),
+[engine checks](../tools/playtest/checks/shared/performance/lane_ui_memory.json),
 [usage](../tools/playtest/README.md), [incident review](reviews/2026-09-29-lane-ui-memory.md),
 [issue register](known-issues.md).
 
@@ -7881,8 +7881,8 @@ No live-game installation was modified.
 - [data/script/src/roles/tech_weapons.as](../data/script/src/roles/tech_weapons.as)
 - [tools/playtest/fixtures/artillery_probe.as](../tools/playtest/fixtures/artillery_probe.as)
 - [tools/playtest/widgets/artillery_fire_watch.lua](../tools/playtest/widgets/artillery_fire_watch.lua)
-- [tools/playtest/checks/artillery_fire.json](../tools/playtest/checks/artillery_fire.json)
-- [tools/playtest/checks/artillery_profiles.json](../tools/playtest/checks/artillery_profiles.json)
+- [tools/playtest/checks/shared/combat/artillery_fire.json](../tools/playtest/checks/shared/combat/artillery_fire.json)
+- [tools/playtest/checks/shared/reliability/artillery_profiles.json](../tools/playtest/checks/shared/reliability/artillery_profiles.json)
 - [tools/playtest/prepare_artillery_check.py](../tools/playtest/prepare_artillery_check.py)
 - [tools/playtest/README.md](../tools/playtest/README.md)
 - [tools/knowledge/barb_report.py](../tools/knowledge/barb_report.py)
@@ -7943,7 +7943,7 @@ or map-specific coordinates participate in production combat decisions.
 route task. The combat regression adds a measurable range promise: supplied
 Arquebus units in both directions must survive, kill a shorter-range defense
 without coming within 600 elmos, then resume beyond the target. Failure is
-forbidden by `checks/arquebus.json`; the watcher samples distance and health
+forbidden by `checks/shared/combat/arquebus.json`; the watcher samples distance and health
 once per second. An inaccessible firing ring stops the unit instead of
 substituting a close attack. This is not a claim of optimal terrain line of
 fire or survival against enemies that outrange or outrun the railgun.
@@ -7969,7 +7969,7 @@ live game installation is not modified.
 - [doc/spam-routes.md](../doc/spam-routes.md)
 - [tools/playtest/fixtures/arquebus_route.as](../tools/playtest/fixtures/arquebus_route.as)
 - [tools/playtest/widgets/arquebus_watch.lua](../tools/playtest/widgets/arquebus_watch.lua)
-- [tools/playtest/checks/arquebus.json](../tools/playtest/checks/arquebus.json)
+- [tools/playtest/checks/shared/combat/arquebus.json](../tools/playtest/checks/shared/combat/arquebus.json)
 - [doc/known-issues.md](../doc/known-issues.md)
 - [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
 - [data/config/easy/behaviour_leg.json](../data/config/easy/behaviour_leg.json)
@@ -8032,7 +8032,7 @@ are recorded in [lane-worker benchmarks](benchmarks/lane-workers/README.md).
 - [InitScript.cpp](../src/circuit/script/InitScript.cpp), [lanes.as](../data/script/src/manager/lanes.as), [lanes.json](../data/config/lanes.json)
 - [balanced main](../data/script/experimental_balanced/main.as), [hard main](../data/script/experimental_hard/main.as), [terrible main](../data/script/experimental_terrible/main.as)
 - [lane tests](../tests/lane_solver_test.cpp), [test CMake](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [CMakeLists.txt](../CMakeLists.txt)
-- [benchmark tool](../tools/playtest/lane_benchmark.py), [observer](../tools/playtest/widgets/lane_benchmark_watch.lua), [checks](../tools/playtest/checks/lane_workers.json)
+- [benchmark tool](../tools/playtest/lane_benchmark.py), [observer](../tools/playtest/widgets/lane_benchmark_watch.lua), [checks](../tools/playtest/checks/shared/performance/lane_workers.json)
 - [invariants](invariants.md), [actors](actor-matrix.md), [API](angelscript-references.md), [lanes](roles/tech-lanes.md), [known issues](known-issues.md)
 
 ## D-145 — Connected mountain traverses, not isolated hill detours
@@ -8072,7 +8072,7 @@ Armada traded poorly in the played matchups; route validity is not a promise of
 favorable combat against every counter. Omniscient test kill/loss counters are
 not available to recruitment policy. See the played review for measured limits.
 
-**Files.** [solver header](../src/circuit/terrain/LaneSolver.h), [solver](../src/circuit/terrain/LaneSolver.cpp), [native API](../src/circuit/terrain/BattleAnalysis.h), [adapter](../src/circuit/terrain/BattleLanes.cpp), [bindings](../src/circuit/script/InitScript.cpp), [lanes](../data/script/src/manager/lanes.as), [flank policy](../data/script/src/roles/tech_flank.as), [config](../data/config/lanes.json), [unit tests](../tests/lane_solver_test.cpp), [preparer](../tools/playtest/prepare_mountain_regression.py), [income observer](../tools/playtest/widgets/mountain_regression_watch.lua), [archived evidence verifier](../tools/playtest/verify_mountain_regression.py), [run instructions](../tools/playtest/README.md), [Supreme check](../tools/playtest/checks/mountain_supreme.json), [survey check](../tools/playtest/checks/mountain_survey.json), [profile load check](../tools/playtest/checks/mountain_startup.json), [startup request probe](../tools/playtest/widgets/mountain_startup_watch.lua), [invariants](invariants.md), [actors](actor-matrix.md), [script API](angelscript-references.md), [lane reference](roles/tech-lanes.md), [flank reference](roles/tech_flank.md), [issues](known-issues.md).
+**Files.** [solver header](../src/circuit/terrain/LaneSolver.h), [solver](../src/circuit/terrain/LaneSolver.cpp), [native API](../src/circuit/terrain/BattleAnalysis.h), [adapter](../src/circuit/terrain/BattleLanes.cpp), [bindings](../src/circuit/script/InitScript.cpp), [lanes](../data/script/src/manager/lanes.as), [flank policy](../data/script/src/roles/tech_flank.as), [config](../data/config/lanes.json), [unit tests](../tests/lane_solver_test.cpp), [preparer](../tools/playtest/prepare_mountain_regression.py), [income observer](../tools/playtest/widgets/mountain_regression_watch.lua), [archived evidence verifier](../tools/playtest/verify_mountain_regression.py), [run instructions](../tools/playtest/README.md), [Supreme check](../tools/playtest/checks/shared/terrain/mountain_supreme.json), [survey check](../tools/playtest/checks/shared/terrain/mountain_survey.json), [profile load check](../tools/playtest/checks/shared/terrain/mountain_startup.json), [startup request probe](../tools/playtest/widgets/mountain_startup_watch.lua), [invariants](invariants.md), [actors](actor-matrix.md), [script API](angelscript-references.md), [lane reference](roles/tech-lanes.md), [flank reference](roles/tech_flank.md), [issues](known-issues.md).
 
 ## D-146 — Plan AIR production bays without changing TECH
 
@@ -8261,15 +8261,15 @@ limits and superseded diagnostic runs.
 - [tests/CMakeLists.txt](../tests/CMakeLists.txt)
 - [tests/production_math_test.cpp](../tests/production_math_test.cpp)
 - [tests/production_math_tests.as](../tests/production_math_tests.as)
-- [tools/playtest/checks/air_attack.json](../tools/playtest/checks/air_attack.json)
-- [tools/playtest/checks/air_legacy.json](../tools/playtest/checks/air_legacy.json)
-- [tools/playtest/checks/air_capacity.json](../tools/playtest/checks/air_capacity.json)
-- [tools/playtest/checks/air_compile.json](../tools/playtest/checks/air_compile.json)
-- [tools/playtest/checks/air_economy.json](../tools/playtest/checks/air_economy.json)
-- [tools/playtest/checks/air_switch.json](../tools/playtest/checks/air_switch.json)
-- [tools/playtest/checks/air_transport.json](../tools/playtest/checks/air_transport.json)
-- [tools/playtest/checks/air_transition.json](../tools/playtest/checks/air_transition.json)
-- [tools/playtest/checks/tech_control.json](../tools/playtest/checks/tech_control.json)
+- [tools/playtest/checks/air/combat/air_attack.json](../tools/playtest/checks/air/combat/air_attack.json)
+- [tools/playtest/checks/air/reliability/air_legacy.json](../tools/playtest/checks/air/reliability/air_legacy.json)
+- [tools/playtest/checks/air/economy/air_capacity.json](../tools/playtest/checks/air/economy/air_capacity.json)
+- [tools/playtest/checks/air/reliability/air_compile.json](../tools/playtest/checks/air/reliability/air_compile.json)
+- [tools/playtest/checks/air/economy/air_economy.json](../tools/playtest/checks/air/economy/air_economy.json)
+- [tools/playtest/checks/air/reliability/air_switch.json](../tools/playtest/checks/air/reliability/air_switch.json)
+- [tools/playtest/checks/air/cooperation/air_transport.json](../tools/playtest/checks/air/cooperation/air_transport.json)
+- [tools/playtest/checks/air/economy/air_transition.json](../tools/playtest/checks/air/economy/air_transition.json)
+- [tools/playtest/checks/tech/economy/tech_control.json](../tools/playtest/checks/tech/economy/tech_control.json)
 - [tools/playtest/playtest.py](../tools/playtest/playtest.py)
 - [tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py)
 - [tools/playtest/summarize_air.py](../tools/playtest/summarize_air.py)
@@ -8345,8 +8345,8 @@ the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
 [rules](../data/script/src/roles/air_rules.as),
 [binding](../src/circuit/script/InitScript.cpp),
 [tests](../tests/production_math_tests.as),
-[transition checks](../tools/playtest/checks/air_transition.json),
-[gift checks](../tools/playtest/checks/air_fusion_gift.json),
+[transition checks](../tools/playtest/checks/air/economy/air_transition.json),
+[gift checks](../tools/playtest/checks/air/economy/air_fusion_gift.json),
 [fixture preparation](../tools/playtest/prepare_air_check.py),
 [fixture](../tools/playtest/widgets/air_fixture.lua),
 [observer](../tools/playtest/widgets/air_watch.lua),
@@ -8440,9 +8440,9 @@ save/load remains KI-209; no repeated PvP win-rate claim is made.
 [fixture preparation](../tools/playtest/prepare_air_check.py),
 [fixture](../tools/playtest/widgets/air_fixture.lua),
 [observer](../tools/playtest/widgets/air_watch.lua),
-[cluster checks](../tools/playtest/checks/air_clusters.json),
-[loss checks](../tools/playtest/checks/air_wind_loss.json),
-[workforce checks](../tools/playtest/checks/air_build_power.json),
+[cluster checks](../tools/playtest/checks/air/layout/air_clusters.json),
+[loss checks](../tools/playtest/checks/air/economy/air_wind_loss.json),
+[workforce checks](../tools/playtest/checks/air/economy/air_build_power.json),
 [plan and evidence](air-wind-and-build-power.md),
 [AIR management](air-management.md), [role settings](roles/air.md),
 [action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
@@ -8670,8 +8670,8 @@ Native contract: [terrain header](../src/circuit/terrain/TerrainManager.h),
 [ferry header](../src/circuit/task/fighter/FerryTask.h),
 [registration](../src/circuit/script/InitScript.cpp), [API reference](angelscript-references.md),
 [protocol](transport-ferry.md).
-Regression tooling: [expansion checks](../tools/playtest/checks/expansion.json),
-[wall checks](../tools/playtest/checks/fortification.json),
+Regression tooling: [expansion checks](../tools/playtest/checks/shared/economy/expansion.json),
+[wall checks](../tools/playtest/checks/shared/layout/fortification.json),
 [observer](../tools/playtest/widgets/expansion_watch.lua),
 [controlled assets](../tools/playtest/widgets/fortification_fixture.lua).
 Reviewed role references: [AIR](roles/air.md), [actions](roles/air_build.md),
@@ -8783,9 +8783,9 @@ Tests and tooling:
 [blocker widget](../tools/playtest/widgets/allied_layout_fixture.lua),
 [bank fixture](../tools/playtest/widgets/air_income_fixture.lua),
 [income fixture](../tools/playtest/widgets/air_sustained_fixture.lua),
-[layout checks](../tools/playtest/checks/allied_layout.json),
-[bank checks](../tools/playtest/checks/air_income.json),
-[income checks](../tools/playtest/checks/air_sustained.json),
+[layout checks](../tools/playtest/checks/shared/layout/allied_layout.json),
+[bank checks](../tools/playtest/checks/air/economy/air_income.json),
+[income checks](../tools/playtest/checks/air/economy/air_sustained.json),
 [expansion observer](../tools/playtest/widgets/expansion_watch.lua),
 [run instructions](../tools/playtest/README.md).
 
@@ -8849,9 +8849,9 @@ Files: [shared settings](../data/script/src/global.as),
 [CTest registration](../tests/CMakeLists.txt),
 [test runner](../tools/run_native_tests.sh),
 [wall fixture](../tools/playtest/widgets/wall_exclusion_fixture.lua),
-[wall checks](../tools/playtest/checks/wall_exclusion.json),
+[wall checks](../tools/playtest/checks/shared/layout/wall_exclusion.json),
 [forward fixture](../tools/playtest/widgets/fortification_fixture.lua),
-[forward checks](../tools/playtest/checks/fortification.json),
+[forward checks](../tools/playtest/checks/shared/layout/fortification.json),
 [playtest reference](../tools/playtest/README.md),
 [AIR rule reference](roles/air_rules.md),
 [fortification reference](roles/tech_fortifications.md),
@@ -8922,7 +8922,7 @@ Files: [settings](../data/script/src/global.as),
 [ordered rules](../data/script/src/roles/air_rules.as),
 [unit tests](../tests/production_math_tests.as),
 [observer](../tools/playtest/widgets/air_watch.lua),
-[support check](../tools/playtest/checks/air_support.json),
+[support check](../tools/playtest/checks/air/layout/air_support.json),
 [launcher](../tools/playtest/playtest.py),
 [playtest guide](../tools/playtest/README.md),
 [AIR role](roles/air.md), [building reference](roles/air_build.md),
@@ -9009,8 +9009,8 @@ Files: [settings](../data/script/src/global.as),
 [fixture preparation](../tools/playtest/prepare_air_check.py),
 [fixture](../tools/playtest/widgets/air_fixture.lua),
 [observer](../tools/playtest/widgets/air_watch.lua),
-[economy checks](../tools/playtest/checks/air_local_economy.json),
-[defense checks](../tools/playtest/checks/air_local_defence.json),
+[economy checks](../tools/playtest/checks/air/economy/air_local_economy.json),
+[defense checks](../tools/playtest/checks/air/combat/air_local_defence.json),
 [playtest guide](../tools/playtest/README.md),
 [AIR reference](roles/air.md), [actions reference](roles/air_build.md),
 [rules reference](roles/air_rules.md), [role index](roles/README.md),
@@ -9071,8 +9071,8 @@ Files: [super task](../src/circuit/task/static/SuperTask.cpp),
 [launch audit](../tools/playtest/audit_strategic_check.py),
 [playtest instructions](../tools/playtest/README.md),
 [fixture](../tools/playtest/widgets/strategic_fixture.lua),
-[Juno checks](../tools/playtest/checks/strategic_juno.json),
-[nuclear checks](../tools/playtest/checks/strategic_nuclear.json),
+[Juno checks](../tools/playtest/checks/shared/combat/strategic_juno.json),
+[nuclear checks](../tools/playtest/checks/shared/combat/strategic_nuclear.json),
 [invariant checker](../tools/knowledge/check_invariants.py),
 [Juno reference](juno-targets.md), [actor matrix](actor-matrix.md),
 [invariants](invariants.md), [known issues](known-issues.md),
@@ -9156,7 +9156,7 @@ Files:
 - [tests/amphibious_math_tests.as](../tests/amphibious_math_tests.as)
 - [tests/terrain_route_test.cpp](../tests/terrain_route_test.cpp)
 - [tools/playtest/audit_amphibious_check.py](../tools/playtest/audit_amphibious_check.py)
-- [tools/playtest/checks/amphibious.json](../tools/playtest/checks/amphibious.json)
+- [tools/playtest/checks/shared/combat/amphibious.json](../tools/playtest/checks/shared/combat/amphibious.json)
 - [tools/playtest/prepare_amphibious_check.py](../tools/playtest/prepare_amphibious_check.py)
 - [tools/playtest/widgets/amphibious_fixture.lua](../tools/playtest/widgets/amphibious_fixture.lua)
 - [Known issues](known-issues.md).
@@ -9248,8 +9248,8 @@ pass; eight pre-existing missing-hover-document links remain KI-404.
 [GameOver-aware audit](../tools/playtest/audit_telchine_match.py),
 [shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
 [shore fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
-[match checks](../tools/playtest/checks/telchine_match.json),
-[shore checks](../tools/playtest/checks/telchine_shore.json).
+[match checks](../tools/playtest/checks/shared/combat/telchine_match.json),
+[shore checks](../tools/playtest/checks/shared/combat/telchine_shore.json).
 
 ### D-160 - Budget Telchines separately and retain shared dry beachheads (2026-10-01)
 
@@ -9349,8 +9349,8 @@ Tests: [pure cases](../tests/amphibious_math_tests.as),
 [shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
 [paired match preparer](../tools/playtest/prepare_telchine_match.py),
 [fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
-[guard checks](../tools/playtest/checks/telchine_beachhead.json),
-[allied checks](../tools/playtest/checks/telchine_allied_beachhead.json),
+[guard checks](../tools/playtest/checks/shared/combat/telchine_beachhead.json),
+[allied checks](../tools/playtest/checks/shared/combat/telchine_allied_beachhead.json),
 [match audit](../tools/playtest/audit_telchine_match.py),
 [guide](../tools/playtest/README.md),
 [seed 1601 audit](telchine-natural-1601.json),
@@ -9438,9 +9438,9 @@ need correction under KI-455. Fixture evidence limits are KI-456. The accurate g
 [policy tests](../tests/amphibious_math_tests.as),
 [preparer](../tools/playtest/prepare_telchine_shore_check.py),
 [observer](../tools/playtest/widgets/telchine_shore_fixture.lua),
-[perimeter checks](../tools/playtest/checks/telchine_perimeter.json),
-[combat checks](../tools/playtest/checks/telchine_land_formation.json),
-[inland checks](../tools/playtest/checks/telchine_inland_formation.json),
+[perimeter checks](../tools/playtest/checks/shared/combat/telchine_perimeter.json),
+[combat checks](../tools/playtest/checks/shared/combat/telchine_land_formation.json),
+[inland checks](../tools/playtest/checks/shared/combat/telchine_inland_formation.json),
 [playtest guide](../tools/playtest/README.md),
 [results](telchine-perimeter-results.md),
 [TECH perimeter](images/d161/tech-shore-perimeter.png),
@@ -9536,7 +9536,7 @@ escort-limited reserve release, overflow bounds and constant-time sizing. Final 
 [tools/playtest/prepare_air_strike_check.py](../tools/playtest/prepare_air_strike_check.py),
 [tools/playtest/widgets/air_strike_fixture.lua](../tools/playtest/widgets/air_strike_fixture.lua),
 [tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua),
-[tools/playtest/checks/air_strike_stages.json](../tools/playtest/checks/air_strike_stages.json),
+[tools/playtest/checks/air/combat/air_strike_stages.json](../tools/playtest/checks/air/combat/air_strike_stages.json),
 [tools/playtest/compare_air_runs.py](../tools/playtest/compare_air_runs.py),
 [tools/playtest/prepare_air_economy_check.py](../tools/playtest/prepare_air_economy_check.py),
 [tools/playtest/README.md](../tools/playtest/README.md),
@@ -9575,7 +9575,7 @@ are retained alongside full-log re-observation reports, never silently replaced.
 Additional touched files:
 [seed preparer](../tools/playtest/prepare_air_check.py),
 [opening observer](../tools/playtest/widgets/air_opening_watch.lua),
-[opening checks](../tools/playtest/checks/air_capacity_opening.json),
+[opening checks](../tools/playtest/checks/air/economy/air_capacity_opening.json),
 [final data](benchmarks/air-d162-final.json),
 [results and screenshot evidence](air-enhancement-results.md).
 
@@ -9696,8 +9696,8 @@ the changes local, without pushing, per the owner's explicit instruction.
 [tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp),
 [tests/air_math_tests.as](../tests/air_math_tests.as),
 [tools/playtest/air_support_probe.as](../tools/playtest/air_support_probe.as),
-[tools/playtest/checks/air_growth.json](../tools/playtest/checks/air_growth.json),
-[tools/playtest/checks/air_support_repair.json](../tools/playtest/checks/air_support_repair.json),
+[tools/playtest/checks/air/economy/air_growth.json](../tools/playtest/checks/air/economy/air_growth.json),
+[tools/playtest/checks/air/layout/air_support_repair.json](../tools/playtest/checks/air/layout/air_support_repair.json),
 [tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py),
 [tools/playtest/prepare_air_support_check.py](../tools/playtest/prepare_air_support_check.py),
 [tools/playtest/widgets/air_fixture.lua](../tools/playtest/widgets/air_fixture.lua),
@@ -9788,9 +9788,9 @@ tracked in [known issues](known-issues.md).
 - Simulation tooling: [tools/playtest/README.md](../tools/playtest/README.md),
   [tools/playtest/air_economy_probe.as](../tools/playtest/air_economy_probe.as),
   [tools/playtest/audit_air_economy.py](../tools/playtest/audit_air_economy.py),
-  [tools/playtest/checks/air_economy_capacity.json](../tools/playtest/checks/air_economy_capacity.json),
-  [tools/playtest/checks/air_economy_natural.json](../tools/playtest/checks/air_economy_natural.json),
-  [tools/playtest/checks/air_economy_zone.json](../tools/playtest/checks/air_economy_zone.json),
+  [tools/playtest/checks/air/economy/air_economy_capacity.json](../tools/playtest/checks/air/economy/air_economy_capacity.json),
+  [tools/playtest/checks/air/economy/air_economy_natural.json](../tools/playtest/checks/air/economy/air_economy_natural.json),
+  [tools/playtest/checks/air/layout/air_economy_zone.json](../tools/playtest/checks/air/layout/air_economy_zone.json),
   [tools/playtest/prepare_air_economy_zone_check.py](../tools/playtest/prepare_air_economy_zone_check.py).
 - Documentation and evidence: [doc/actor-matrix.md](actor-matrix.md),
   [doc/air-economy-zone-plan.md](air-economy-zone-plan.md),
@@ -9867,14 +9867,14 @@ are unchanged; the mandatory output remains matched to the source data.
   [widget](../tools/playtest/widgets/air_arena.lua),
   [auditor](../tools/playtest/audit_air_arena.py),
   [tests](../tools/playtest/test_air_arena.py),
-  [strict checks](../tools/playtest/checks/air_arena.json),
+  [strict checks](../tools/playtest/checks/air/combat/air_arena.json),
   [run instructions](../tools/playtest/README.md).
-- Cases: [T1 economy](../tools/playtest/air_cases/t1-economy.json),
-  [T2 interception](../tools/playtest/air_cases/t2-intercept.json),
-  [layered AA](../tools/playtest/air_cases/t2-flak.json),
-  [gunships](../tools/playtest/air_cases/gunship.json),
-  [forward naval](../tools/playtest/air_cases/torpedo.json),
-  [covered naval](../tools/playtest/air_cases/torpedo-covered.json).
+- Cases: [T1 economy](../tools/playtest/cases/air/combat/t1-economy.json),
+  [T2 interception](../tools/playtest/cases/air/combat/t2-intercept.json),
+  [layered AA](../tools/playtest/cases/air/combat/t2-flak.json),
+  [gunships](../tools/playtest/cases/air/combat/gunship.json),
+  [forward naval](../tools/playtest/cases/air/combat/torpedo.json),
+  [covered naval](../tools/playtest/cases/air/combat/torpedo-covered.json).
 - Documentation: [plan](air-combat-arena-plan.md),
   [results](air-combat-arena-results.md),
   [measurements](benchmarks/air-d165-arena.json),
@@ -9942,7 +9942,7 @@ KI-465 remain open; existing KI-419/KI-433/KI-457/KI-461 are not claimed fixed.
 
 **Verification.** Built and Checked: native integration, full engine-free suites, API parity, invariant and role checks. Played: two controlled capacity games passed first-use relocation, wind retirement and expansion to eleven T2 labs; all experimental profiles loaded. Natural games missed the twenty-minute T2 wave target and retain full failure verdicts. Runtime lifecycle edges and camera faults remain KI-467/468; natural economy remains KI-461 and commander idle guards KI-466. See [measured results](air-cluster-reclaim-results.md) for exact artifacts and limitations.
 
-**Files.** [Plan](air-cluster-reclaim-plan.md), [geometry](../src/circuit/terrain/BaseLayoutGeometry.h), [terrain declaration](../src/circuit/terrain/TerrainManager.h), [terrain implementation](../src/circuit/terrain/TerrainManager.cpp), [binding](../src/circuit/script/InitScript.cpp), [API](angelscript-references.md), [AIR layout](../data/script/src/manager/air_layout.as), [reclaim](../data/script/src/manager/air_reclaim.as), [AIR build](../data/script/src/roles/air_build.as), [AIR rules](../data/script/src/roles/air_rules.as), [shared math](../data/script/src/helpers/production_math.as), [TECH execution](../data/script/src/roles/tech_build.as), [geometry tests](../tests/base_layout_geometry_test.cpp), [math tests](../tests/production_math_tests.as), [probe](../tools/playtest/air_cluster_probe.as), [fixture setup](../tools/playtest/prepare_air_cluster_check.py), [checks](../tools/playtest/checks/air_factory_clusters.json), [invariants](invariants.md), [actors](actor-matrix.md), [AIR reference](roles/air.md), [TECH reference](roles/tech_build.md).
+**Files.** [Plan](air-cluster-reclaim-plan.md), [geometry](../src/circuit/terrain/BaseLayoutGeometry.h), [terrain declaration](../src/circuit/terrain/TerrainManager.h), [terrain implementation](../src/circuit/terrain/TerrainManager.cpp), [binding](../src/circuit/script/InitScript.cpp), [API](angelscript-references.md), [AIR layout](../data/script/src/manager/air_layout.as), [reclaim](../data/script/src/manager/air_reclaim.as), [AIR build](../data/script/src/roles/air_build.as), [AIR rules](../data/script/src/roles/air_rules.as), [shared math](../data/script/src/helpers/production_math.as), [TECH execution](../data/script/src/roles/tech_build.as), [geometry tests](../tests/base_layout_geometry_test.cpp), [math tests](../tests/production_math_tests.as), [probe](../tools/playtest/air_cluster_probe.as), [fixture setup](../tools/playtest/prepare_air_cluster_check.py), [checks](../tools/playtest/checks/air/layout/air_factory_clusters.json), [invariants](invariants.md), [actors](actor-matrix.md), [AIR reference](roles/air.md), [TECH reference](roles/tech_build.md).
 
 
 **D-167 implementation refinement.** AIR now owns low-tier energy retirement
@@ -9958,8 +9958,8 @@ reclaimed AFUS. The two-AFUS bomber gate remains deliberately unchanged.
 [AIR action reference](roles/air_build.md), [AIR rule reference](roles/air_rules.md),
 [playtest guide](../tools/playtest/README.md),
 [economy probe](../tools/playtest/air_economy_probe.as),
-[growth check](../tools/playtest/checks/air_growth.json),
-[expansion check](../tools/playtest/checks/expansion.json),
+[growth check](../tools/playtest/checks/air/economy/air_growth.json),
+[expansion check](../tools/playtest/checks/shared/economy/expansion.json),
 [natural audit 1](benchmarks/d167-natural-1.json),
 [natural audit 2](benchmarks/d167-natural-2.json),
 [capacity audit 1](benchmarks/d167-clusters-1.json),
@@ -10206,11 +10206,11 @@ sibling knowledge repository.
 - [tools/knowledge/metal_map_economics.py](../tools/knowledge/metal_map_economics.py)
 - [tools/playtest/README.md](../tools/playtest/README.md)
 - [tools/playtest/audit_metal_check.py](../tools/playtest/audit_metal_check.py)
-- [tools/playtest/checks/metal_cancel.json](../tools/playtest/checks/metal_cancel.json)
-- [tools/playtest/checks/metal_field.json](../tools/playtest/checks/metal_field.json)
-- [tools/playtest/checks/metal_legacy.json](../tools/playtest/checks/metal_legacy.json)
-- [tools/playtest/checks/metal_normal_control.json](../tools/playtest/checks/metal_normal_control.json)
-- [tools/playtest/checks/metal_normal_tech_control.json](../tools/playtest/checks/metal_normal_tech_control.json)
+- [tools/playtest/checks/shared/economy/metal_cancel.json](../tools/playtest/checks/shared/economy/metal_cancel.json)
+- [tools/playtest/checks/shared/economy/metal_field.json](../tools/playtest/checks/shared/economy/metal_field.json)
+- [tools/playtest/checks/shared/economy/metal_legacy.json](../tools/playtest/checks/shared/economy/metal_legacy.json)
+- [tools/playtest/checks/shared/economy/metal_normal_control.json](../tools/playtest/checks/shared/economy/metal_normal_control.json)
+- [tools/playtest/checks/shared/economy/metal_normal_tech_control.json](../tools/playtest/checks/shared/economy/metal_normal_tech_control.json)
 - [tools/playtest/playtest.py](../tools/playtest/playtest.py)
 - [tools/playtest/prepare_metal_check.py](../tools/playtest/prepare_metal_check.py)
 - [tools/playtest/widgets/metal_watch.lua](../tools/playtest/widgets/metal_watch.lua)
@@ -10345,16 +10345,16 @@ feedback without replacing real initialization and gameplay.
 - [tools/playtest/README.md](../tools/playtest/README.md)
 - [tools/playtest/air_arena.py](../tools/playtest/air_arena.py)
 - [tools/playtest/air_arena_probe.as](../tools/playtest/air_arena_probe.as)
-- [tools/playtest/air_cases/blocked-backline.json](../tools/playtest/air_cases/blocked-backline.json)
-- [tools/playtest/air_cases/committed-home-incursion.json](../tools/playtest/air_cases/committed-home-incursion.json)
-- [tools/playtest/air_cases/defensive-t3.json](../tools/playtest/air_cases/defensive-t3.json)
+- [tools/playtest/cases/air/combat/blocked-backline.json](../tools/playtest/cases/air/combat/blocked-backline.json)
+- [tools/playtest/cases/air/combat/committed-home-incursion.json](../tools/playtest/cases/air/combat/committed-home-incursion.json)
+- [tools/playtest/cases/air/combat/defensive-t3.json](../tools/playtest/cases/air/combat/defensive-t3.json)
 - [tools/playtest/analyze_air_natural.py](../tools/playtest/analyze_air_natural.py)
 - [tools/playtest/analyze_air_operations.py](../tools/playtest/analyze_air_operations.py)
-- [tools/playtest/checks/air_arena.json](../tools/playtest/checks/air_arena.json)
-- [tools/playtest/checks/air_committed_incursion.json](../tools/playtest/checks/air_committed_incursion.json)
-- [tools/playtest/checks/air_compile.json](../tools/playtest/checks/air_compile.json)
-- [tools/playtest/checks/air_defensive.json](../tools/playtest/checks/air_defensive.json)
-- [tools/playtest/checks/air_frontline.json](../tools/playtest/checks/air_frontline.json)
+- [tools/playtest/checks/air/combat/air_arena.json](../tools/playtest/checks/air/combat/air_arena.json)
+- [tools/playtest/checks/air/combat/air_committed_incursion.json](../tools/playtest/checks/air/combat/air_committed_incursion.json)
+- [tools/playtest/checks/air/reliability/air_compile.json](../tools/playtest/checks/air/reliability/air_compile.json)
+- [tools/playtest/checks/air/combat/air_defensive.json](../tools/playtest/checks/air/combat/air_defensive.json)
+- [tools/playtest/checks/air/combat/air_frontline.json](../tools/playtest/checks/air/combat/air_frontline.json)
 - [tools/playtest/playtest.py](../tools/playtest/playtest.py)
 - [tools/playtest/prepare_air_operations_cases.py](../tools/playtest/prepare_air_operations_cases.py)
 - [tools/playtest/run_air_natural.py](../tools/playtest/run_air_natural.py)
@@ -10469,8 +10469,8 @@ output; live game installation untouched; concurrent map edits excluded.
 - [Operation policy](../data/script/src/manager/air_operations.as), [advanced waves](../data/script/src/manager/air_waves.as), [T1 raids](../data/script/src/manager/air_raids.as), [settings](../data/script/src/global.as)
 - [Native filter tests](../tests/air_geometry_test.cpp)
 - [Arena runner](../tools/playtest/air_arena.py), [engine observer/camera](../tools/playtest/widgets/air_arena.lua)
-- [Glitters case](../tools/playtest/air_cases/cleanup-glitters.json), [cleanup-only case](../tools/playtest/air_cases/cleanup-only-glitters.json), [defensive case](../tools/playtest/air_cases/defensive-t3.json)
-- [Cleanup checks](../tools/playtest/checks/air_cleanup.json), [cleanup-only checks](../tools/playtest/checks/air_cleanup_only.json), [defensive checks](../tools/playtest/checks/air_defensive.json)
+- [Glitters case](../tools/playtest/cases/air/combat/cleanup-glitters.json), [cleanup-only case](../tools/playtest/cases/air/combat/cleanup-only-glitters.json), [defensive case](../tools/playtest/cases/air/combat/defensive-t3.json)
+- [Cleanup checks](../tools/playtest/checks/air/combat/air_cleanup.json), [cleanup-only checks](../tools/playtest/checks/air/combat/air_cleanup_only.json), [defensive checks](../tools/playtest/checks/air/combat/air_defensive.json)
 - [AIR reference](roles/air.md), [script API](angelscript-references.md), [invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
 - [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](benchmarks/d173-bomber-cleanup.json)
 - [Phoenix screenshot](images/d173/phoenix-cleanup.png), [Cortex screenshot](images/d173/cortex-cleanup.png)
@@ -10566,7 +10566,7 @@ individual rendered runs and transfer audits.
 [test runner](../tools/run_native_tests.sh),
 [fixture preparer](../tools/playtest/prepare_team_share_check.py),
 [fixture widget](../tools/playtest/widgets/team_share_fixture.lua),
-[runtime checks](../tools/playtest/checks/team_share.json),
+[runtime checks](../tools/playtest/checks/shared/cooperation/team_share.json),
 [transfer audit](../tools/playtest/audit_team_share.py),
 [script guide](../data/script/README.md),
 [TECH build reference](roles/tech_build.md),
@@ -10643,9 +10643,9 @@ recorded in the report rather than inferred from screenshots alone.
 [invariants](invariants.md), [plan](air-afus-attack-handoff-plan.md),
 [results](air-afus-attack-handoff-results.md),
 [arena observer](../tools/playtest/widgets/air_arena.lua),
-[initial fixture](../tools/playtest/air_cases/afus-handoff-glitters.json),
-[reveal fixture](../tools/playtest/air_cases/afus-reveal-glitters.json),
-[strict checks](../tools/playtest/checks/air_afus_handoff.json),
+[initial fixture](../tools/playtest/cases/air/combat/afus-handoff-glitters.json),
+[reveal fixture](../tools/playtest/cases/air/combat/afus-reveal-glitters.json),
+[strict checks](../tools/playtest/checks/air/combat/air_afus_handoff.json),
 [timing audit](../tools/playtest/audit_afus_handoff.py),
 [baseline screenshot](images/d176/baseline-visible.png),
 [Legion screenshot](images/d176/legion-afus.png),
@@ -10697,13 +10697,88 @@ this verification.
 **Files.** [Plan, results and reproduction](air-edge-flank-verification.md),
 [measurement manifest](benchmarks/d177-air-routes.json),
 [read-only route observer](../tools/playtest/widgets/air_arena.lua),
-[Supreme fixture](../tools/playtest/air_cases/edge-supreme.json),
-[Glitters fixture](../tools/playtest/air_cases/edge-glitters.json),
-[clear control](../tools/playtest/air_cases/direct-glitters.json),
-[edge checks](../tools/playtest/checks/air_edge.json),
-[direct checks](../tools/playtest/checks/air_direct.json),
+[Supreme fixture](../tools/playtest/cases/air/combat/edge-supreme.json),
+[Glitters fixture](../tools/playtest/cases/air/combat/edge-glitters.json),
+[clear control](../tools/playtest/cases/air/combat/direct-glitters.json),
+[edge checks](../tools/playtest/checks/air/combat/air_edge.json),
+[direct checks](../tools/playtest/checks/air/combat/air_direct.json),
 [Supreme edge](images/d177/supreme-edge.png),
 [Supreme strike](images/d177/supreme-afus.png),
 [Glitters edge](images/d177/glitters-edge.png),
 [Glitters strike](images/d177/glitters-afus.png),
 [direct control](images/d177/glitters-direct.png).
+
+
+## D-178 - Categorize tests and new evidence while preserving benchmark history
+
+**Date:** 2026-10-03. **Status:** Checked and Played (tooling integration).
+No AI policy, UnitDef, native source or production binary change.
+
+**Decision.** Separate reusable cases/checks, local engine working state,
+archived observations, immutable compact publications and generated discovery.
+Use domain/area/scenario/map folders and UTC IDs with a random suffix for new
+games. Move the 97 definitions byte-for-byte with legacy-path aliases. Keep all
+70 historical benchmark files, 60 images, scorecard cohorts/ratings and existing
+raw game directories unchanged; index them rather than renaming their evidence.
+The generic runner retains its explicit/legacy-directory workflow; AIR,
+scorecard and rush-loop defaults allocate new categorized games.
+
+**Why and alternatives.** Moving 129,211 files of historical engine state would
+break raw evidence paths and add risk without making results more comparable.
+Reject a timestamp-only archive name or replacing a rush row with the same ID:
+both can lose evidence. Use exclusive allocation, an atomic locked rush-ledger
+write, and conflicting-ID rejection. Reject rebuilding scorecards from a reused
+working directory when the original archived inputs exist. Preserve the original
+manifest and record engine enrichment separately. Scope Git's no-conversion
+attribute to new published evidence so its SHA-256 values survive checkout.
+Keep generated views/revisions distinct from games; supplied combat is never a
+natural-economy or confirmed-win benchmark merely because its checks pass.
+
+**Invariant.** No historical observation or benchmark row is silently replaced.
+Identical publication is idempotent; changed evidence, conflicting IDs and live
+snapshots are rejected. Archived settings/checks remain tied to the observed
+run after restaging. Every nested check continues to forbid runtime invariants.
+These are tooling contracts covered by Python tests; no production actor or
+new in-game invariant is introduced.
+
+**Verification.** The cutover hash audit passes for all 97 definitions and 130
+historical benchmark/image files. The playtest tooling suite covers migration,
+aliases, collisions, archive provenance, publication, scorecard conditions and
+ratings, and preserved rush rows. A rendered Cortex direct-route arena on All
+That Glitters passed strict checks at four game minutes using the unchanged
+D-176 DLL: 14 bombers crossed directly and destroyed the AFUS at 2:14. The run
+was archived, published with a screenshot, indexed, and published again with
+no duplicate or replacement. This verifies the tooling lifecycle, not new
+gameplay strength. Full-match economy simulations were not rerun for folder
+changes. Historical missing-hover-document links remain KI-404.
+
+**Files.** [Storage design and validation](test-storage.md),
+[every moved definition](test-storage-moves.md),
+[cutover hash manifest](test-storage-migration.json),
+[storage implementation](../tools/playtest/storage.py),
+[compatibility aliases](../tools/playtest/storage-aliases.json),
+[storage tests](../tools/playtest/test_storage.py),
+[watcher](../tools/playtest/playtest.py), [arena runner](../tools/playtest/air_arena.py),
+[arena tests](../tools/playtest/test_air_arena.py),
+[rush tracker](../tools/playtest/benchmark.py), [rush loop](../tools/playtest/bench_loop.sh),
+[scorecard runner](../tools/playtest/scorecard_run.py),
+[scorecard archive handling](../tools/playtest/scorecard.py),
+[scorecard tests](../tools/playtest/test_scorecard.py),
+[strike preparer](../tools/playtest/prepare_air_strike_check.py),
+[recursive invariant checker](../tools/knowledge/check_invariants.py),
+[case naming](../tools/playtest/cases/README.md),
+[check naming](../tools/playtest/checks/README.md),
+[runner guide](../tools/playtest/README.md),
+[playtest skill](../.claude/skills/playtest/SKILL.md),
+[repository map](../AGENTS.md), [byte-preservation attributes](../.gitattributes),
+[benchmark guide](benchmarks/README.md), [catalog](benchmarks/catalog.json),
+[AIR index](benchmarks/index/air.md), [TECH index](benchmarks/index/tech.md),
+[FRONT index](benchmarks/index/front.md), [SEA index](benchmarks/index/sea.md),
+[TACTICAL index](benchmarks/index/tactical.md), [SUPPORT index](benchmarks/index/support.md),
+[shared index](benchmarks/index/shared.md),
+[rendered integration evidence](benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
+Historical documentation paths were updated in [AFUS results](air-afus-attack-handoff-results.md),
+[edge verification](air-edge-flank-verification.md), [idle-factory investigation](air-idle-factory.md),
+[opening/screen reference](air-opening-and-screen.md), [issue register](known-issues.md),
+[flank review](reviews/2026-09-29-ascendancy-flank-effectiveness.md),
+[lanes reference](roles/tech-lanes.md), and earlier entries in this decision record.

@@ -1,0 +1,509 @@
+{
+  "entries": [
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d162-final.json",
+      "sha256": "2ae1ccab9ae0423c233efa8ff61abc36ca5d787b5602ea41c0d2ab1ed8518b84"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d162-intermediate.json",
+      "sha256": "671f6e69aceed4a950f15975fcc4a9dde9114932ba78cd2998706c9573289793"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d163-feedback.json",
+      "sha256": "c07c7ba8fe0e85347988d470eb210e17e1b6f6b81d8132a5112f8359b79e3773"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d163-natural-feedback.json",
+      "sha256": "b0d79a71b24aa402955bf7da82575b64f297a45a75824fa2efdae7307c92a143"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d163.json",
+      "sha256": "247059c71d506dc8d404290a6f8517903d6f372683dec37f2624dc6c7d4ef61b"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d164-capacity.json",
+      "sha256": "5fa120fbf8c336733bd439cc57cd018928d7d1c8ebd8f2b8112ab1c9b7f8b3a8"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d164-final-natural.json",
+      "sha256": "003fda6d2f0127817d164b57f1e4d595eeaf1cca057e63c7203eda00799f7f1b"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d164-final-regression.json",
+      "sha256": "51e8fcd2d360f7ff9c13bceead2279f2116456ef351cbb23627c795868198d1a"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d164-queue-blocker.json",
+      "sha256": "3d3ab64f22fd13e3c9961b783db5967b8dd083de2e98adf2640dd3521196ba57"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d164-regression.json",
+      "sha256": "7c80d83dc54dae8301fdcbffb9a4f715c814e5b6717e2e54d320135b0eff3b80"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-d165-arena.json",
+      "sha256": "902510f2994a8d95c434251dfe05291fcec80fd858004baa28deba9c2627721e"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "air-management.md",
+      "sha256": "78a048f2ae64073884d45b7d88673fd10c3b82e9fc3862408364fcd2893f4ff2"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d167-clusters-1.json",
+      "sha256": "64609df139d30e1f4feb94e8356f6f4b98458112c68ac1d3c7425ad5644561fb"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d167-final-clusters.json",
+      "sha256": "9547bdb04da1b95da884ee336b172956900b62d9d1cd5a97800d9b004322a118"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d167-natural-1.json",
+      "sha256": "593c560909f609b2a71093e9210e60defe98949076833cac47353d11c909c9c1"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d167-natural-2.json",
+      "sha256": "0de9f3934c97dab9e261a8d10b8a15b3cbcef281d4bf9ae39db499a8d3a43702"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d167-natural-final.json",
+      "sha256": "513b0d0e9931b97815c5695bfd81b9904248028ed069ac684701df7d6ca0fe90"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d171-air-operations.json",
+      "sha256": "68cd24f3e514eb6fe787a8dcff3d496363a523329b7f8dd936c6bc4436f5a6e8"
+    },
+    {
+      "area": "economy",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d172-air-workforce.json",
+      "sha256": "4b78aee4f839e85658559df68058c72727a64c8224ac754fc5a5411be6f03550"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d173-bomber-cleanup.json",
+      "sha256": "9a9894b86303dcc50c6663788285f64e40af4d52e6e2b0f717c35085e3d55749"
+    },
+    {
+      "area": "cooperation",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "d175-team-sharing.json",
+      "sha256": "024b14919ac6e6fc69859dfd363cc677cada2f83a1282362d188a50a8d2627a4"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d176-afus-handoff.json",
+      "sha256": "2d23a7a9100bb0a62e860f98a8d8f9f3bb4509e90ef51e693bf8a11bc62a9e2d"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "kind": "legacy-evidence",
+      "path": "d177-air-routes.json",
+      "sha256": "565872f390250a536e4ca1603edcdb314d518a752b5587b7b79207173a4de967"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "lane-workers/2026-09-30/20260930T005435.764754Z-d16d0dd6.json",
+      "sha256": "42811c8de68fe709908656eb588da9b0b8e2d6d480422e60a41b63b8a5fc79c7"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "lane-workers/2026-09-30/20260930T005854.907848Z-40118188.json",
+      "sha256": "6eb00c9761946627235c07764e74c3aaffe77d57eb6a6da997120b38c25372d3"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "lane-workers/2026-09-30/20260930T010133.331433Z-0d662a64.json",
+      "sha256": "05041d17c67c93085f4d0336610dd0827d47e30221f604129a7a428e8ccf9544"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "lane-workers/2026-09-30/20260930T010133.625557Z-1eca8cbe.json",
+      "sha256": "181e16119cd2c64988bbd8b43168e763dc0a52c073a49cd849880a6a91925d3f"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "lane-workers/2026-09-30/20260930T010133.999566Z-69d04942.json",
+      "sha256": "0bcdd7f450a3594cca50c63c746e649bc76fb4e46b75e6a033ef281cb192d40b"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "kind": "derived-index",
+      "path": "lane-workers/README.md",
+      "sha256": "c5cd2c522557652562881fa7b03ba551bc078fe5f00459ef15495d78ca692074"
+    },
+    {
+      "area": "economy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "metal-map-economics.json",
+      "sha256": "5a4ada60bd8625b33ec06ba98106eac797c4cf66b5be224ea75ac8b13d9fe196"
+    },
+    {
+      "area": "economy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "metal-map-simulations.json",
+      "sha256": "94998d6ea40694d9ee6c3ac18444430a7b079a70d7e1c23f4021167f8c5242a9"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "experiment_kind": "supplied",
+      "id": "20261003T130427Z-8c8bf821",
+      "kind": "run-record",
+      "map": "all-that-glitters-v2-2-3",
+      "map_name": "All That Glitters v2.2.3",
+      "path": "records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/result.json",
+      "scenario": "direct-glitters",
+      "sha256": "57e7c4105c82ccbb37eab3e7bb662f47643b8d2f082a73868018650f02dda4b2",
+      "verdict": "PASS"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecard-design.md",
+      "sha256": "5a2ac7926633e84651068368848a93c1a82f7ab84845b6631200ba2c9f0871a9"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-29/20260929T200500.986984Z-9d1ad27b.json",
+      "sha256": "292cd5e2c386d0e04e8e333a03a2f3428778172c8a66e16935414c0bce6328d9"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-29/20260929T200500.986984Z-9d1ad27b.md",
+      "sha256": "96c0f04bb61fda3e013c07aef58417950d03c5fab36d0dda1c3aacd82df67eb0"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-29/20260929T200525.145334Z-e820bf80.json",
+      "sha256": "712e8a7aabe193bcca2b5aa49d5ade69ed1a098a2008df99eb62ace56ba010cb"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-29/20260929T200525.145334Z-e820bf80.md",
+      "sha256": "387d9ec42f39c2a6aae85d8cdf3b900271798c0ed89346f0d8f55f0e31d8e258"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-29/20260929T200916.953767Z-c8cfc6fe.json",
+      "sha256": "341ae4f79612f0bbf9cde307de40e833f2d07fd1e122ae56e94c753eb65962a8"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-29/20260929T200916.953767Z-c8cfc6fe.md",
+      "sha256": "72191093e1d3f883fd848915a9f8df4ab99df445c5937312a4963dd52b6c835b"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T005435.764754Z-d16d0dd6.json",
+      "sha256": "351048a30607efbd70c5bcc26c5bd579b9257e450ec63a5ef264cfc4bcfb040b"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T005435.764754Z-d16d0dd6.md",
+      "sha256": "d62de2ba310cac778eed70bef3f75013f1318d60e16b03b7b52fc41dd363bed7"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T005854.907848Z-40118188.json",
+      "sha256": "451701da742ac418db2c6eea4dc3b53b0c9bb7a477ac5d0620c746e7c398f3f3"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T005854.907848Z-40118188.md",
+      "sha256": "40d4f34443829da942a3cd518b9edaf536b7e90721b705fc75dac7b6b124a4c5"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T010133.331433Z-0d662a64.json",
+      "sha256": "448a4d1be870db4d6c02c41d5abfcffe828bfae2721dfc34d6985257ba98b4c5"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T010133.331433Z-0d662a64.md",
+      "sha256": "c260e474c1d05a80a40e89c305c8afcb0da5c4269b7364aee990eb37bf076efc"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T010133.625557Z-1eca8cbe.json",
+      "sha256": "155403f9b3b41e6398874edf36b02539709eca7948ce194f63feb99fe56d3d66"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T010133.625557Z-1eca8cbe.md",
+      "sha256": "0d8687624a8f2d9c39be149a25add22ed045b041bf37b33ea8d743d03de0f8a9"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T010133.999566Z-69d04942.json",
+      "sha256": "9c400c6f4162ade740a64ddbaa9fc06901ec6a4c228cdcfc7ce860b38ae4687a"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T010133.999566Z-69d04942.md",
+      "sha256": "72211c507efb4c0cbb88055339f651591e4339e194c4b5983add4ee8f97ee847"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020032.941670Z-66abf0ab.json",
+      "sha256": "976b66c467619f0b48da6e875222523823f56c9825d65dfb93a2e0fc4d6503a3"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020032.941670Z-66abf0ab.md",
+      "sha256": "66ca7cf31a1874216954d0d7b625f9b2252860ef35ebded0f7778d08d959c867"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020034.675142Z-fa8cab88.json",
+      "sha256": "8f83da01ffef16a84431424ee8b2a59d7b90d405be5f176ace7ec97b3988ccf1"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020034.675142Z-fa8cab88.md",
+      "sha256": "05da7a82722a2ef3b8ae40005622ce4768cc13af84ab863c989249535806b12f"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020144.527290Z-bdc31f79.json",
+      "sha256": "bcb0bfd599c4aea0b87598fa89cd092c9886ed842cd2965b5a8a36575a2919ff"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020144.527290Z-bdc31f79.md",
+      "sha256": "f7b3cad408f49a979dc3afcf7169b57feea2bcba4335341853566f40a41f95ea"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020145.984106Z-fa79a15b.json",
+      "sha256": "4b63487772ed7d1cf6dcbc00db326b48f5ca93fe5aad0124d623494da7ec3fb9"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020145.984106Z-fa79a15b.md",
+      "sha256": "fb1c594beaf32885499bbeeeee997070beda0beaca6ec7ea4d1e7a188769a49d"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020745.432085Z-35755fad.json",
+      "sha256": "a45d1f5bda81148b75a89831b9e1eece4d836f6b1e3ab1c37311d78927be853a"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020745.432085Z-35755fad.md",
+      "sha256": "2a724471fd66d652c5e01ba96fba2673b71e82fed2e5a63dd7d42488d2703b1c"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020747.074536Z-0303ea73.json",
+      "sha256": "2fb929778ce323cbc1d549e69a87ac9814989793dcea0a3684e5ee11ca00c9c2"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020747.074536Z-0303ea73.md",
+      "sha256": "20afb40b78bbb8a03b0f7f5857f05cfae6f1fe4e6cb69aa4a0a83c7117bc5ed7"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020748.765928Z-ceba1ff3.json",
+      "sha256": "6f65e255972dc20d520641fa871761b85473a2405b3d7d539cfa63776f59259a"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020748.765928Z-ceba1ff3.md",
+      "sha256": "137146abbcfa298c82757d0988c0bd71611b3cd49585961556789888ff721af1"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "legacy-evidence",
+      "path": "scorecards/2026-09-30/20260930T020750.317765Z-9f77d770.json",
+      "sha256": "f087f7e8b03d3b6c5baf7e001c70d82fbd0fb4b2d185c8dbd23cf52481ac6b51"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "rendered-view",
+      "path": "scorecards/2026-09-30/20260930T020750.317765Z-9f77d770.md",
+      "sha256": "6b45adb405265eccbf8a4c05e046266b39917e7cbe3aa92d8c68df941da0d7f8"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "derived-index",
+      "path": "scorecards/ratings.json",
+      "sha256": "2ced51ab4e4ff1ee2cc359b73969cf985c217995dbc54224db48f5110ce1e78d"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "derived-index",
+      "path": "scorecards/README.md",
+      "sha256": "8ca6aeb89ebb91454bb44eaad24a9d1b537cedd0f8d6afffdae90ef5597846fd"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "historical-revision",
+      "path": "scorecards/revisions/20260929T200500.986984Z-9d1ad27b/schema-1.json",
+      "sha256": "c4e3fa6b83513354d82e77a1fa112757eafe5193629a381a8ce6033c02e3bd35"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "historical-revision",
+      "path": "scorecards/revisions/20260929T200525.145334Z-e820bf80/schema-1.json",
+      "sha256": "dfa62ee922edb46de4fa4b8dc4b8eab1f7d95cca14903b9c2437267e87025caa"
+    },
+    {
+      "area": "strategy",
+      "domain": "shared",
+      "kind": "historical-revision",
+      "path": "scorecards/revisions/20260929T200916.953767Z-c8cfc6fe/schema-1.json",
+      "sha256": "b9744d106c81f6bfe40b3df8f5e94196b56ec14f7f0e8e1a8dbeafadc4fb2206"
+    },
+    {
+      "area": "economy",
+      "domain": "tech",
+      "kind": "legacy-evidence",
+      "path": "tech-rush.md",
+      "sha256": "2a5d27d0831e4bff8bc8ff6d0786dbb54a670155fde0857c744a1f7c312627b9"
+    }
+  ],
+  "schema": 1,
+  "unit": "evidence files, not match counts"
+}
