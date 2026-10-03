@@ -10878,3 +10878,14 @@ the proposed controller is distinguished from published advice.
 
 **Files.** [Review and correction plan](reviews/2026-10-03-air-build-power-review.md),
 [unresolved findings](known-issues.md), and this decision record.
+
+
+**D-180 donation amendment (2026-10-03).** A positive self-income/spending gap
+is not mandatory. Sustained full/refilling storage may fund useful BP despite
+negative own or recurring balance, provided a bounded investment and its work
+preserve metal/energy reserves if future donations stop. Sample actual transfers
+once per engine resource interval; avoid double-counting native receipt-inclusive
+income or treating circulation as production. Preserve the existing donation
+threshold/percentage and TECH behavior. The review adds two computed runway
+examples and the donation-specific test matrix. This is design only, without
+new gameplay code, runtime invariants or simulations.

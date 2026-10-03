@@ -19,6 +19,11 @@ does not justify more builders by itself. Requested metal **pull is not actual
 usage**. Retain energy recovery and explicitly distinguish planned savings from
 involuntary accumulation.
 
+The donation amendment below makes this explicit: a positive recurring spending
+gap is **not required** when sustained high storage and a funded useful project
+justify investing banked capital. Spending above self-produced income alone is
+not a metal-shortage veto.
+
 ## What TECH actually does
 
 - [TechBuild::TrackMetal/MetalAhead](../../data/script/src/roles/tech_build.as)
@@ -203,7 +208,9 @@ condition during an AIR repair.
 2. Separate recurring spendable income from finite donated/reclaimed/banked
    capital and explicit lab reserves. Compute a positive spending gap, allowing
    a configurable drain time for excess capital. Account for metal sent away
-   so overflow donations cannot hide a sustained capacity shortage.
+   so overflow donations cannot hide a sustained capacity shortage. Independently
+   admit bank-funded growth under the donation/full-bank policy below, even when
+   the recurring gap is zero or negative.
 3. Distinguish missing useful work, insufficient energy, insufficient reachable
    BP and delayed/idle workers. Finish energy with existing reachable BP when
    energy is the limiter. Add builders only when they have a funded useful job.
@@ -223,6 +230,112 @@ assistance: [economy guide](https://www.beyondallreason.info/guide/in-depth-look
 The specific controller above is an engineering recommendation, not a published
 optimal PvP formula. Metal maps must keep their energy-limited sustainable-metal
 budget, dedicated opening workers, dense mexes and converter prohibition.
+
+## Donation and full-bank amendment (2026-10-03)
+
+The owner points out that allied donations can keep AIR at maximum metal while
+its own economy spends more than it produces. The controller must distinguish
+three observations: self-produced income minus actual usage, net external
+support, and spendable stored capital. None alone describes the whole economy.
+A full bank is also a saturated observation: it cannot rise further, so requiring
+a positive bank slope would fail precisely when capacity is most needed.
+
+### Admission: capacity shortage plus either flow or capital funding
+
+Consider additional BP when a useful reachable workload lacks available or
+arriving workers, and **either** of these funding paths passes:
+
+- **Recurring funding:** conservative own income plus credible net support can
+  carry additional spending, with energy available.
+- **Stored-capital funding:** the bank stays high or repeatedly refills, and the
+  bank itself can fund a small BP investment plus useful work without consuming
+  protected reserves. This path does not require a positive own-income balance
+  or a positive recurring balance. It can also serve a one-off donation, with
+  the scale limited to what the bank funds.
+
+Use configurable high/low storage bands and a short persistence window to avoid
+oscillation. TECH's existing 90%/15-second signal is a candidate initial AIR
+pressure setting, not an established optimum or a prerequisite for replacement
+of lost opening workers. Record bank pressure before voluntary overflow sharing,
+then check fresh spendable capital after any actual or committed outbound share.
+Keep the existing all-role donation threshold and percentage unchanged.
+
+Before admitting a batch, project metal and energy over a configurable horizon
+(60 seconds is an initial test value). Deduct the new constructor/turret cost,
+existing expected spending, incremental spending on its intended job and
+protected reserves. Count queued investments and commitments once; do not
+subtract the same project as both a lump sum and a spend-rate forecast. Evaluate
+the reserve floor throughout the horizon, including the interval before the BP
+finishes. Reject an investment that only appears affordable because future
+unconfirmed donations are assumed to continue.
+
+For a conservative first batch, set future donations to zero. Repeated observed
+net receipts can inform the next batch and longer-term capacity target, with
+bounded forecasts and rapid decay when support stops. Re-evaluate actual bank
+drawdown, arrivals and spending after each admitted batch. Stop further growth
+when the reserve/runway condition fails; finish already funded useful work
+instead of cancelling jobs or reclaiming workers immediately.
+
+Example, illustrative rather than a game measurement:
+
+| Input | Value |
+| --- | ---: |
+| Own income | 30 metal/s |
+| Current actual spending | 80 metal/s |
+| Bank / protected reserve | 8,000 / 2,000 metal |
+| Proposed turret cost | 230 metal |
+| Additional funded workload | 15 metal/s |
+
+Even if all donations stop now, the approximate runway above reserve is
+`(8000 - 2000 - 230) / (80 + 15 - 30) = 88.8 seconds`. That can support a
+60-second admission test, subject to energy, other commitments and local BP
+need. An own-income deficit of 50 metal/s therefore must not reject it.
+With only 2,500 metal bank, the same proposal has about 4.2 seconds of runway
+and should be deferred. If the net drain is zero or negative, metal imposes no
+finite runway in this simplified calculation; energy and useful work still do.
+
+### Avoid false signals
+
+- Sample RECEIVED and SENT separately and estimate retained external support.
+  Repeated transfers around a full team are not permanent productive income
+  (existing KI-484). A transfer out is not construction spending.
+- A saturated bank can clip actual accepted receipts; do not infer that zero
+  received while full means there was no support. The stored-capital path still
+  works, without inventing the amount allies attempted to send.
+- Do not require the ten-second minimum receipt rate to be positive: periodic
+  donations have zero-receipt intervals. Track window totals at the engine's
+  sampling cadence and keep these separate from stable self-production.
+- The pinned engine exposes previous team resource-update amounts. Team resource
+  state resets every 30 frames; sample a given completed interval once, using
+  simulation time. Do not count repeated reads as additional transfers or
+  pretend skipped intervals were observed. Existing `metal.income` already
+  averages production plus receipts; do not add the receipt estimate to it again.
+- Full metal with energy starvation or unused reachable workers does not justify
+  indiscriminate BP growth. Reassign existing workers to energy first. A further
+  worker/turret remains eligible only if its own energy cost is funded and it
+  improves the identified energy-construction bottleneck.
+
+Prefer local turrets for funded stationary work and air constructors when work
+needs mobility or construction initiation. Preserve twenty completed support
+turrets per existing T2 lab, economy/factory separation, transport priority,
+metal-map isolation and TECH's exact sequence. Full storage is a funding and
+pressure signal, not permission to buy power with no useful destination.
+
+### Required donation cases
+
+Add policy tests and later matched fixtures for: full bank with negative own
+balance; full bank with negative total recurring balance but sufficient runway;
+five-second donor bursts; receipts clipped at full storage; one-off gifts;
+donations stopping abruptly; a whole team circulating metal; outgoing sharing
+between sampling and admission; queued BP already sufficient; and full metal
+with insufficient energy. Verify increased actual useful spending, maintained
+reserves and continued aircraft production. Do not merely assert more workers.
+
+This amendment is design only. Sampling contracts were traced through
+`TeamEconomy::OwnMetal`, `CEconomyManager::GetOwnEco/UpdateResourceIncome`, and
+the reference engine's `CTeamHandler::GameFrame/CTeam::ResetResourceState`.
+The two runway examples were calculated directly. No gameplay policy or native
+priority override has been implemented or simulated by this amendment.
 
 ## Evidence and validation
 

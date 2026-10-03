@@ -4322,6 +4322,11 @@ constructor ceilings have no sustained-overflow exception.
 TECH's outcomes. Allocate funded reachable capacity once, including queued BP
 and lab reserves. Existing usage/transfer bindings suffice; do not count receipts
 twice. This refines the unresolved overflow symptom in KI-442.
+The donation amendment also permits stored-capital-funded BP with a negative
+own-income balance: use sustained fullness and post-investment reserve/runway,
+not a mandatory positive income gap. Track net transfers separately to avoid
+counting KI-484 circulation as production. Test abrupt donor loss and clipped
+receipts while full.
 
 **Verification.** Current helper probes confirm threshold behavior. Matched
 natural/donation games must measure actual spending, trend and idle BP. See
