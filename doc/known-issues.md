@@ -4208,3 +4208,32 @@ landing violation for future reproduction. Payload calibration, nested scans,
 save/load and natural-game efficacy remain outside this repair. See
 [D-173 results and limitations](air-bomber-cleanup-results.md) and
 [decision D-173](decisions.md#d-173---committed-air-cleanup-after-strategic-target-exhaustion).
+
+
+### KI-482 - AIR lacks a coordinated response to ordinary ground infiltration at allied bases
+
+**Problem.** AirScreen::IntrusionCost reads only armed aircraft contacts.
+AirWaves' explicit defensive selection is limited to nearby gantry-exclusive
+ground units, while optional T1 support follows global strike/economy gates.
+Gunships otherwise fall through generic military assignment; there is no shared
+incident that owns allied-base ground targeting and a defensive recruitment
+deficit. A constructor/lab/jammer foothold therefore has no equivalent emergency
+response contract. This is verified in source, not a reconstruction of the
+owner's screenshot's visibility history.
+
+**Proposed solution.** Add an experimental AIR base-response controller over
+the existing BattleAnalysis ground snapshot and allied-start/asset caches.
+Extend snapshot value fields with target identity and capability flags. Dispatch
+available gunships immediately and share one configurable twenty-unit force
+deficit across factories. Separate EMP support, stocked damage gunships and
+transport ownership; do not reuse the T1 strike helper as a gunship classifier.
+Retain scouting/memory under jamming, finite chase limits and changed-mission
+group commands. Preserve transport requests, workforce recovery, committed
+bomber escorts and TECH policy. Details and counter-bait refinements are in
+[the proposed response plan](air-allied-base-response-plan.md).
+
+**Verification.** Source-reviewed only; not implemented or played. The plan
+specifies normal-vision cliff factory/jammer fixtures for all three factions,
+human-allied bases, multi-AIR accounting, AA/air raids, ownership regressions,
+economy comparisons and screenshot/latency/APM evidence. See
+[D-174](decisions.md#d-174---proposed-air-defense-of-allied-bases-against-ground-infiltration).

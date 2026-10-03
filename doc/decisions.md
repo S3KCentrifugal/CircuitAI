@@ -10474,3 +10474,45 @@ output; live game installation untouched; concurrent map edits excluded.
 - [AIR reference](roles/air.md), [script API](angelscript-references.md), [invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
 - [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](benchmarks/d173-bomber-cleanup.json)
 - [Phoenix screenshot](images/d173/phoenix-cleanup.png), [Cortex screenshot](images/d173/cortex-cleanup.png)
+
+
+## D-174 - Proposed AIR defense of allied bases against ground infiltration
+
+**Decision (proposal only).** Design an immediate available-force response and
+one shared twenty-unit recruitment target for observed ground enemies or hostile
+structures near active allied bases. Keep visual reconnaissance and a persistent
+incident when radar disappears. Prefer timely suitable gunships, with explicit
+Cortex EMP/lethal-damage and Legion stockpile/transport distinctions.
+
+**Reasoning.** This matches the owner's cliff factory/jammer example and the
+documented defensive use of Roughneck/Wasp. The existing aircraft intrusion
+signal and T3 bomber exception do not cover this class of incursion. Waiting for
+twenty before fighting loses time. Repeatedly queuing twenty per observation or
+per allied AIR invites economic bait. The recommended target stops new spending
+after a confirmed clear sweep; this is a proposed refinement, not a silently
+implemented exception to the user's requested batch.
+
+**Alternatives and compatibility.** A broad friendly-half-of-map trigger risks
+turning front-line combat into permanent emergency production. Use protected
+active base areas, independent of TECH's wall exclusion settings and ground
+pathability. Reject an EMP-only twenty-Shuriken response, treating Martyr as a
+reusable gunship, and choosing the highest-cost flyer solely by tier. Preserve
+the owner's earlier committed-escort and transport-priority choices; immediate
+response comes from free/new units. Reuse native snapshots and group command
+deduplication; keep force and target priorities in script. No rate cap.
+
+**Invariant (proposed).** One recruitment slot has one owner; active plus framed
+and reserved defenders are counted once. Only observed or explicitly remembered
+contacts drive an incident, and a disappearing radar blip is not a confirmed
+clear. No committed escort, player-owned unit or requested ferry is reassigned.
+These promises require runtime checks during implementation; they are not yet
+enforced by this documentation-only change.
+
+**Verification.** Checked against current AIR script/native dispatch, shared unit
+knowledge, local BAR build options and official unit guidance. No implementation,
+new build or simulations in this strategy-only turn. Twenty, radii, memory and
+reaction budgets are provisional test inputs, not measured optimal values.
+The missing behavior remains [KI-482](known-issues.md).
+
+**Files.** [Proposed response plan](air-allied-base-response-plan.md),
+[known issue register](known-issues.md), and this decision record.
