@@ -134,7 +134,7 @@ step.
 
 | INV-087 | Future TECH factory reservations have no active construction work. | TechFactories::PlanAhead | D-152 |
 
-| INV-088 | A reservation and a pinned construction task never overlap another allied AI's reserved layout. | Native publication checks plus LayoutHelpers::CheckAlliedPlacements, called by AIR and TECH. | D-153 |
+| INV-088 | A reservation and a pinned construction task never overlap another allied AI's reserved layout. | Native publication checks plus LayoutHelpers::CheckAlliedPlacements, called by AIR and TECH. D-197's occupancy index preserves this exact foreign-owner predicate. | D-153 / D-197 |
 | INV-089 | AIR and TECH wall construction footprints stay outside every known allied start's base exclusion. | LayoutHelpers::CheckAlliedPlacements audits assigned construction, including unpinned tasks. | D-154 |
 | INV-090 | An additional AIR T2 lab is ordered only after every existing T2 lab is finished and has at least twenty completed, uniquely assigned support turrets. | AirBuild::Record; admission/resume and unstarted-order reconciliation use fresh AirEconomy::ExistingT2SupportReady. | D-155 |
 

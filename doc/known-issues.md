@@ -4535,6 +4535,23 @@ This updates the remaining layout/query portions of KI-464; current AIR group
 and route-version guards already address parts of the older KI-462 discussion.
 
 
+**D-197 follow-up.** The allied index now uses exact direct-addressed paged
+occupancy; fixed-footprint checks are independent of claim count. Randomized
+old/new/oracle checks, the complete native suite and twelve in-game mixed-role
+exclusions pass. Query benchmarks stay flat from 100 to 50,000 claims, with
+explicit mutation and memory tradeoffs. See [implementation and runtime results](layout-reservation-performance.md).
+Shore's full forty-minute rerun has zero INV-088 violations and no script
+errors, but still reaches 23.96 ms average AI callback time and 225.25 ms p99
+in its final normal-speed window. A separate earlier sample resolves only one
+of 304 AI locations through AlliedReservations; it does not locate the final
+minute's hitches. The original gameplay FAIL is retained, not a speedup claim.
+This partially resolves the first recommendation. Local zone/slot scans,
+footprint recomputation, speculative retries/logging and engine lifecycle
+regression coverage remain open. The original D-195 proposal-only statement
+above describes its historical review, not the current implementation.
+
+
+
 ### KI-498 - Elapsed-frame performance runs can outlast competitive play
 
 **Problem.** The D-195 corrected-roster control reached frame 72,000, but its

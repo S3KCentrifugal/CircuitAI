@@ -1040,6 +1040,19 @@
       "verdict": "PASS"
     },
     {
+      "area": "layout",
+      "domain": "sea",
+      "experiment_kind": "regression",
+      "id": "20261004T232406Z-f0fcdb18",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/layout/allied-bases-mixed/2026-10-04/20261004T232406Z-f0fcdb18/result.json",
+      "scenario": "allied-bases-mixed",
+      "sha256": "4a68919181547e83914b33026906f599ead482d42336b60ebe1bded97b93031c",
+      "verdict": "PASS"
+    },
+    {
       "area": "combat",
       "domain": "shared",
       "experiment_kind": "regression",
@@ -1155,6 +1168,19 @@
       "scenario": "juno-edge-impacts",
       "sha256": "ddfee7d5baa5106ac9a658a0f376507a53a7c78a1595ac178f5e161ef50fd4b3",
       "verdict": "PASS"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261004T234203Z-870e40cb",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "ad78fc183c292fb6400232e70b1594aafa4bc30d1efe653f8382417dac9cb402",
+      "verdict": "FAIL"
     },
     {
       "area": "performance",

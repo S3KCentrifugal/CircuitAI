@@ -2,6 +2,13 @@
 
 Date: 2026-10-04. Decision: D-195. **Recommendations only; no gameplay optimization implemented.**
 
+Implementation follow-up: [D-197](../layout-reservation-performance.md) implements
+recommendation 1 with exact paged occupancy, making fixed-footprint allied
+reservation checks independent of claim count. The original proposal below is
+retained as the review record; D-197 documents its stronger representation,
+benchmarks, mutation/memory tradeoffs and gameplay verification. Other rankings
+remain proposals.
+
 Follow-up: the reported Juno shots beyond Shore's map edge are investigated in the [D-196 evidence report](2026-10-04-juno-map-edge-investigation.md). The report distinguishes logged aims, projectile motion and actual explosion centers; the observation remains unconfirmed (KI-499). It does not change the performance ranking or production behavior.
 
 The leading identifiable AI hotspot in the slowed discovery run is **construction-layout reservation checking**, particularly repeated tree lookups inside the existing allied spatial index. Optimizing AIR combat alone would miss it. Early FPS loss was mostly outside AI callbacks; later, AI callbacks became a substantial main-thread cost. The control did not independently reproduce that severe tail; this ranking targets observed waste, not a universal bottleneck or a promised FPS gain.

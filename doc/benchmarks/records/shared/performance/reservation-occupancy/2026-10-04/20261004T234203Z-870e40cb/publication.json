@@ -1,0 +1,30 @@
+{
+  "files": {
+    "README.md": "6a2c7c413feac99c40764dfc5815ba9e22cfefcc7ffeafb27b4c9a07fdc15984",
+    "build-inputs.json": "d3e3dfc585b39dc82ebaee259f7e94dc14b24634b91228c6ed5e07cac943a45b",
+    "build-verification.json": "30438b3e2adb1e50d668b9946869ada989450ce99ae3700be77a193e618b87bf",
+    "checks.json": "5035b447ef841213c5db1d18f356d4281406ea41ea25570914c15d2d0296e011",
+    "d197-verification.json": "5b8d06eed4acb6d04879fd471e8d831dbf8bccffbff0f34093a48cdc97544844",
+    "instruction-sample-raw.json": "c0cb6b7873889534ccaca13082c0ff77df2f8cd13c3fa04a79038c424e33da55",
+    "instruction-sample-summary.json": "4df837059acfb2dc3335ba25dbe773cbdef44086e622e71b74cc21c584bf1025",
+    "launched.json": "7003d84f0843d4f8ca0f97b4127266a03e470f8864fb3628164f88935a8a7ea1",
+    "report.md": "046ff4e166573c8213044dc8116f9985767b2b042fdeb29dc8e85b8610199918",
+    "reservation-fixture.json": "f72021bc4f5a0d6967bcf626fd764baaa5fa3fc59d16c1374ca0cf2de815adce",
+    "reservation-measurements.json": "5ec665926f7ff01d2e1947e4d6176e4e5eb29ea66045df48c28a29865fe14a11",
+    "result.json": "ad78fc183c292fb6400232e70b1594aafa4bc30d1efe653f8382417dac9cb402",
+    "run-inputs.json": "5c08bef227cd9e0f887df7d6214ec13a7fae68e529ad302a2319917ec2e1e5a3",
+    "run-plan.json": "1b23d1503cf5f02b81d6acfaeaf1ec385cac4755800cd46ec35984e42d14ac5a",
+    "screen_2026-10-04_23-27-09-860.png": "9bfa1c16ca6b9dc54f08a636642034a619708c94c38ea71fa46051eba9dff893",
+    "screen_2026-10-04_23-32-41-619.png": "e477144cbe519064380794281ebcb9f4b7c8f93703b30548c91828f7473261d2",
+    "screen_2026-10-04_23-36-01-094.png": "93f113ff40c6cd548158da46c0845dc70f6d1c5ce0f499dd66e8035149e4bcf1",
+    "screen_2026-10-04_23-41-50-731.png": "28007225ff2e2237ce73843118345831c197642ab90c88736a602ccde199f8b8",
+    "script.txt": "641aaa41dca96090bbd2bb525c69cc627e95b38cba00f686f1842c5fd9b9f5ef",
+    "shore-eight-starts.as": "b59b3117d7fa75af716178a47a83c79e9b3a53dbe5e6c04fb7a89261de6763ca",
+    "skirmish-performance.json": "bf63a8081371a767329af836775509a1c7916c67996d0caad340b81226c06e3a",
+    "staged.json": "6dafd843590ffc527b420fdf9c05a4256ea7517cedd145bd22ebc22ca65426fc",
+    "teams.json": "6328a2fd7939081506446d68e152b1b6dfe8202c827c4e377b027330b6ad77df"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\reservation-occupancy\\shore-to-shore\\20261004T232447Z-ed07c75f\\runs\\20261004T234203Z-870e40cb",
+  "schema": 1
+}

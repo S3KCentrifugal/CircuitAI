@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "41333fa763d94bb329b2666b2e03134f53b501ac62c0ad718b384087678a588f",
+    "base-source.json": "cf46723d43e2febea6758b8e1d3ac48be86e44f1e74707b7855c8299a358b144",
+    "build-inputs.json": "d3e3dfc585b39dc82ebaee259f7e94dc14b24634b91228c6ed5e07cac943a45b",
+    "build-verification.json": "30438b3e2adb1e50d668b9946869ada989450ce99ae3700be77a193e618b87bf",
+    "checks.json": "3977c2a2703e4282e849c0760f541b755efa59db61e7c9409ee1598fa000a0a9",
+    "d197-verification.json": "fb80d47c694430f9cc539dfd92db590cc936f6a34e68bdd045db2a46924c7824",
+    "launched.json": "7480a123c97c61659dff5e64717045713d189fd7ebe7c1a8e2a1216f2ae1a8b0",
+    "report.md": "c8e2ead596336cffa67269576dfcb5e7299784e80307cfb3d177341d3f79fee3",
+    "result.json": "4a68919181547e83914b33026906f599ead482d42336b60ebe1bded97b93031c",
+    "run-inputs.json": "7037381220d7ce5e53f581d683d3dcd53dc98289ff325112ef29cf0e52c330ad",
+    "run-plan.json": "e3cdb7072face312c04d30b8eba9b4bcf4058b8377d6984ad227953d52562148",
+    "screen_2026-10-04_23-23-50-858.png": "ff094d889d7fa8a6fcf1da065f9587b869aef215d138319f97bb1b56c404722e",
+    "screen_2026-10-04_23-24-03-118.png": "56eeaad3fc21ca60ee53af9ec00dcabd57af5c4f851496b1b1107904094e9164",
+    "script.txt": "6cd0b6392ca202fbd771027a88899756aa93c86f82e28cd2960cdb6de7f5dfab",
+    "staged.json": "e10c72126d679318480a085b49068cef159c4cfbb5ceb6acd0193357ed2bb78a",
+    "teams.json": "8a534418890e4b1937a2d553e270d111b496dadbe7d5aa5212d5e65416b81f5e"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\allied-bases-mixed\\supreme\\20261004T232245Z-f84eec02\\runs\\20261004T232406Z-f0fcdb18",
+  "schema": 1
+}

@@ -11380,3 +11380,58 @@ AngelScript behavior was changed.
 bounds remain guarded by the existing strategic checks/INV-095; test observations
 must distinguish projectile disappearance from a measured explosion. No new
 gameplay invariant or claimed gameplay fix is introduced.
+
+## D-197 - Exact occupancy makes allied reservation checks independent of claim count
+
+**Decision.** Replace the shared reservation bucket/member scan with a directly
+addressed paged occupancy index. Keep the authoritative owner/kind/ID rectangle
+ledger for mutations. A query inspects only intersecting pages and occupied
+footprint cells; fixed-footprint work does not grow with reservation count.
+No role policy, candidate order, command cadence or buildability rule changes.
+
+**Reasoning.** D-195 identified repeated reservation-tree work in the slowed
+Shore run, and the user requested constant-time checking. Stable bucket entry
+references would remove a lookup but still scan overlapping claims. Exact
+cell owner counts and XOR summaries remove that dependency while retaining own
+exclusions and arbitrarily nested claims. Whole-page owner counts avoid costly
+raster updates/storage for large aligned interiors; only partial boundaries
+need per-cell counts. Mutations remain synchronous on the existing AI thread.
+No worker offload or eventually consistent reservation view is introduced.
+
+**Alternatives and limits.** Strict O(1) for arbitrarily large rectangle queries
+would move excessive map-wide work into speculative mutations. The supported
+contract is constant in claim count for a fixed footprint, explicitly not a
+constant-time whole placement search. Exact owner reference counts are retained
+instead of booleans or lossy coarse blockers; releasing one slot must not free
+its surrounding zone. Sparse partial pages cost more memory and tiny
+reserve/release transactions can be slower. The report retains these results.
+Local TerrainManager scans and the remaining D-195 recommendations are deferred.
+
+**Files.** [Native index](../src/circuit/terrain/AlliedReservations.h),
+[regressions](../tests/allied_reservations_test.cpp),
+[frozen legacy reference](../tests/support/allied_reservations_legacy.h),
+[benchmark](../tests/allied_reservations_benchmark.cpp),
+[rendered runner](../tools/playtest/run_reservation_performance.py),
+[results and immutable evidence](layout-reservation-performance.md),
+[review follow-up](reviews/2026-10-04-skirmishai-performance-review.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[remaining issue KI-497](known-issues.md), [catalog](benchmarks/catalog.json),
+[shared index](benchmarks/index/shared.md), [sea index](benchmarks/index/sea.md).
+
+**Verification.** The complete native suite passes; the current worktree's
+reservation suite reports 200,159 checks without failures. Three optimized
+old/new benchmark runs establish flat query scaling and record update costs.
+The final DLL, symbols and current data are built and published together;
+script/API checking reports 295 members and zero findings. Supreme's twelve
+directed AIR/TECH/SEA factory/economy exclusions pass without runtime invariants.
+The results document retains Shore's full observation and original verdict.
+Tests/build include pre-existing dirty AIR/SEA work, identified by input hashes;
+this decision's commit alone does not reproduce those unrelated changes.
+Sanitizers are unavailable; real save/load and owner teardown are not played.
+
+**Invariant.** INV-088 is unchanged: no foreign allied reservation overlap.
+Existing runtime checks stay enabled. Per-owner nested counts, exact half-open
+geometry, replacement, release and reconstruction are covered by differential
+and oracle tests. Reusing the established invariant avoids a new per-frame
+cost solely to check the optimization. Game invariant failures are preserved
+and are not relabeled as passing performance results.
