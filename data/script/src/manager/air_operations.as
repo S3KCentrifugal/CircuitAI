@@ -82,8 +82,13 @@ namespace AirOperations {
             wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(sides[i])), 4.0f);
             wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(sides[i])), 3.0f);
             wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(sides[i])), 1.0f);
+            wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetAdvNavalEnergyConverterNameForSide(sides[i])), 0.5f);
         }
         wave.AllowStrikeDef(ai.GetCircuitDef("armckfus"), 1.0f); // real cloakable fusion; visibility gates still apply
+        const array<string> advancedGeos = {"armageo", "corageo", "legageo", "armgmm",
+            "armuwageo", "coruwageo", "leganavaladvgeo"};
+        for (uint i = 0; i < advancedGeos.length(); ++i)
+            wave.AllowStrikeDef(ai.GetCircuitDef(advancedGeos[i]), 0.75f);
         // Factory classifications are authoritative and include all enabled factions/options.
         array<string> defs = UnitHelpers::GetAllLabs();
         for (uint i = 0; i < defs.length(); ++i) wave.AllowStrikeDef(ai.GetCircuitDef(defs[i]), 2.0f);

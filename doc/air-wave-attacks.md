@@ -3,10 +3,15 @@ offensive sorties keep attacking, all available fighters escort them, and
 income gates bomber production. The historical modes and return behavior
 below remain available to legacy callers.
 
-**D-185 primary target weights (2026-10-03).** Experimental AIR T2 operations
+**D-185/D-186 primary target weights (2026-10-03).** Experimental AIR T2 operations
 score AFUS at x4, advanced energy converters at x3, factories at x2 and regular
 land fusions at x1 (Armada, Cortex, Legion, plus Armada's cloakable fusion when
-visible). These are multipliers within one primary stage, combined with value,
+visible), advanced geothermal powerplants at x0.75 and naval advanced energy
+converters at x0.5. Advanced geos include the three factions' land/naval power
+variants and Armada's safe Prude; submerged targets still obey the existing
+depth filter. Naval converters use their distinct faction definitions and do
+not inherit the land converters' x3 weight.
+These are multipliers within one primary stage, combined with value,
 distance and route risk, not strict sub-stages. Eligible fusions therefore
 precede the static-defense fallback. T1 mex/wind priorities, defensive heavy-unit
 selection and the AFUS-only immediate diversion threshold remain unchanged.

@@ -11222,3 +11222,55 @@ The initial sandboxed watcher falsely reported exit while the elevated engine
 continued; its partial FAIL archive is retained. Reattaching the watcher with
 process access produced the linked completed PASS, without altering that first
 archive.
+
+
+## D-186 - Advanced geos and naval converters follow fusions in AIR's primary roster
+
+**Date:** 2026-10-03. **Status:** Checked and Played in supplied combat.
+
+**Decision.** Keep existing primary weights and add advanced geothermal
+powerplants at x0.75, followed by naval advanced energy converters at x0.5.
+Reuse GetAdvNavalEnergyConverterNameForSide, independently of land converters'
+x3. Geos include the land and naval power variants for all three factions plus
+Armada's safe Prude. Geothermal weapons/support platforms retain their existing
+classification rather than joining the powerplant list.
+
+**Reasoning.** The owner's order extends D-185's weighted primary stage.
+Positive fractional weights preserve its existing value/distance/AA scoring
+and the AFUS-only immediate-diversion threshold. The shared API safely skips
+missing optional definitions. Naval converters are floating contacts and still
+pass ordinary visibility, payload, route and depth admission.
+
+**Alternative rejected.** Raising every existing weight to make room for two
+new integers changes AFUS diversion eligibility and relative target scoring.
+Treating naval converters as land converters gives them the wrong priority.
+Removing the submerged-target filter to admit deep naval geos would also admit
+unattackable contacts; that filter remains.
+
+**Invariant.** Primary targets rejected by admission cannot re-enter via a
+weaker fallback class. This roster-only change adds no lifecycle state or
+per-frame command path. T1 mex/wind and defensive heavy-unit selection remain.
+
+**Files.** [Target roster](../data/script/src/manager/air_operations.as),
+[targeting reference](air-wave-attacks.md), and this record.
+
+**Verification.** [Rendered Supreme combat record](benchmarks/records/air/combat/advanced-geo-naval/2026-10-04/20261004T015226Z-44312432/README.md)
+passes ten game minutes on experimental_hard. All three land advanced geos and
+all three floating naval advanced converters were explicitly selected at
+preference 5, took bomber damage and were destroyed. The launched 18-Phoenix
+wave killed armageo/corageo/legageo at frames 4893/5232/5394, then
+leganavaleconv/coruwmmm/armuwmmm at 6119/6230/6370. Admission also considered
+armuwmmm before launch; these weighted scores do not promise strict class
+ordering at different distances or visibility. The surviving operation
+continued on radar cleanup.
+
+The fixture supplies aircraft, freezes economy and supplies geos on dry land
+without vent construction. Its placement override and hash are retained in the
+manifest. This verifies combat targeting, not natural geo construction or an
+economy benchmark. The safe Prude and naval geo variants were roster-checked,
+not physically attacked in this run. No script, invariant or fixture errors
+occurred. Script/DLL API parity, invariant and whitespace checks pass. Unit-helper
+validation retains 167 baseline findings (KI-481/KI-473), and documentation
+checking retains eight missing hover-document links (KI-404); none are in the
+changed files. Current data is published with the unchanged matching D-184
+DLL/debug pair in the mandatory build output.
