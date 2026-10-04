@@ -514,6 +514,7 @@ namespace Invariants {
                 for (uint k = 0; k < c.turretPos.length(); ++k) {
                     CCircuitUnit@ t = TechFactories::TurretAt(c.turretPos[k]);
                     if (t is null || t.GetBuildProgress() < 1.0f || t.task is null) continue;
+					if (t.task.IsEnemyReclaim()) continue; // D-184: enemy denial overrides the factory binding
                     IBuilderTask@ bt = cast<IBuilderTask>(t.task);
                     // D-119: its recent focus task (a guard keeps its target as an id; a
                     // factory-side turret idles for moments between two units)

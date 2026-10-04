@@ -464,3 +464,12 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Economic support | AirEcoLayout::ReserveSupport/Save/Init/Nano/Activate/ReleaseUnused, AirBuild::Nano, AirProduction turret dispatch, AirEconomy::SupportBay/RefreshSupport | Separate schema-2 bank; actual unfinished reactor, reachability and funding required before construction; no factory-support credit. INV-125. |
 | Project assistance | AirBuild::Record/FindAssistTarget/AssignedPower, AirWorkforce::Assign/Useful/Tick | Worker-to-target ID index; arrivals and stalled progress distinguished from working power; bounded minimum job horizon. INV-126. |
 | Role handoff | AirLayout::Init/Leave, AirBuild::AdoptExisting/Added/Tick/Leave, AirWorkforce::Reset | Adopt framed native construction once; cancel unframed foreign orders and their newly exposed chain children before ownership audit; clear assignments and reservations on exit. PLAYER/ferry tasks retain their separate owners. INV-076. |
+
+
+## D-184 Construction turret enemy reclaim
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Enemy in turret reach | CFactoryManager::UpdateEnemyReclaim/GetReclaimEnemy | Current visible hostile, reclaimable target; actual loaded reach; current target retained, no bank/role/no_disrupt gate. |
+| Emergency turret task | CSReclaimTask, ITaskModule::AssignTask, Builder::TurretsOnReclaim | One enemy-mode NOW task. Friendly recycling and ordinary reassignment yield; player control can take over. Death, transfer, visibility/range loss or disabled policy release; normal role decisions resume. |
+| Turret invariants | Economy::AiUpdateEconomy, Invariants::Tick | INV-128 audits admission. INV-008 friendly recycling and INV-048 factory binding yield to active enemy reclaim. |

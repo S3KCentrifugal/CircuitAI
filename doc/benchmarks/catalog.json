@@ -1014,6 +1014,58 @@
       "verdict": "PASS"
     },
     {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261004T005115Z-3979c9d5",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005115Z-3979c9d5/result.json",
+      "scenario": "turret-enemy-reclaim",
+      "sha256": "959a8aeb5e3bdc30353bd858741ea758f5525e9ad5ce60a84aa0bd4de1074c19",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261004T005137Z-0fb8e491",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005137Z-0fb8e491/result.json",
+      "scenario": "turret-enemy-reclaim",
+      "sha256": "49d729c27ce49a9c0d928b1dbca6a3b2ae5f17a7fe594bec11ceaf14063f31e3",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261004T005339Z-a7e2a378",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005339Z-a7e2a378/result.json",
+      "scenario": "turret-enemy-reclaim",
+      "sha256": "6387d675fbaf503a0efdae7150f27a1c16c9d0f1af5068ac6404448c7d0c909c",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261004T005926Z-00846d17",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005926Z-00846d17/result.json",
+      "scenario": "turret-enemy-reclaim",
+      "sha256": "3ef1d8ff02d45968cc5b63ee188a4b9d977a0083175306912e2c59beabb7b29a",
+      "verdict": "PASS"
+    },
+    {
       "area": "economy",
       "domain": "shared",
       "experiment_kind": "natural",

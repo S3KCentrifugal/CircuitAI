@@ -11144,3 +11144,37 @@ pass. The local log records the quota, held pool, resumed bomber production
 and 38:48 launch. Current installed policy files match the repository after
 newline normalization; the historical match build is not pinned. See the
 report for exact evidence, uncertainty and proposed regression cases.
+
+
+## D-184 - Construction turret enemy reclaim interrupts ordinary AI work
+
+**Date:** 2026-10-03. **Status:** Implemented; build and runtime verification in progress.
+
+**Decision.** Apply the owner's highest-priority enemy reclaim instruction
+through the shared native assistant manager, with JSON/script enable controls.
+Use actual assist/reclaim capabilities, covering floating and Extra Units
+variants without a faction/name allowlist. Retain targets and commands while
+valid. Player control remains authoritative; enemy denial overrides
+no_disrupt factory bindings and friendly recycling, including at full metal.
+This narrows D-078/D-117's ordinary duty rules during a local enemy contact.
+
+**Reasoning.** Idle-only role rows cannot interrupt repair/guard/recycling.
+Static wreck reclaim currently yields to repair and full metal, so it needs
+a distinct enemy mode. One shared response reaches legacy and experimental
+profiles and preserves the original economic behavior once enemies leave.
+
+**Alternatives rejected.** Per-role copies omit legacy and optional variants.
+Permanent area reclaim would abandon productive assistance and repeatedly
+issue commands. Aborting an entire shared construction task interrupts other
+workers unnecessarily; only the affected turret leaves its old assignment.
+
+**Invariant.** INV-128: an eligible turret must take a NOW enemy-reclaim task
+before ordinary AI work. Existing friendly-reclaim/factory-duty invariants
+yield only during that explicit task. Physical interruption, damage and
+resumption are separately checked in the supplied game fixture.
+
+**Files.** [Implementation, all touched source/test files and verification](turret-enemy-reclaim.md),
+[API reference](angelscript-references.md), [invariants](invariants.md),
+[actor matrix](actor-matrix.md) and this record.
+
+**Verification.** Built, Checked and Played: all three experimental profiles pass twelve variants across six roles (216 physical reclaims and returns to repair), plus capture, neutrality, range exit/re-entry, turret removal and player takeover. Full native tests pass. The implementation record retains exact evidence, legacy coverage and limits; this is not a PvP/FPS benchmark. Required build output is published with matching data and API parity verified.

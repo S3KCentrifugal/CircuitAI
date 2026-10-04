@@ -33,6 +33,8 @@ namespace Economy {
 	*/
 	void AiUpdateEconomy()
 	{
+		if (aiFactoryMgr.GetEnemyReclaimMisses() > 0)
+			Invariants::Violation("INV-128", "turret.enemy", "eligible construction turret failed to take highest-priority enemy reclaim");
 		const SResourceInfo@ metal = aiEconomyMgr.metal;
 		const SResourceInfo@ energy = aiEconomyMgr.energy;
 

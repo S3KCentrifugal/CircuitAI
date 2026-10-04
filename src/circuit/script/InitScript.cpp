@@ -1412,6 +1412,7 @@ void CInitScript::RegisterIUnitTask(asIScriptEngine* engine, const char* cls)
 	T::RegisterRefCounted(engine, cls);
 	int r;
 	r = engine->RegisterObjectMethod(cls, "Type GetType() const", asMETHODPR(T, GetType, () const, IUnitTask::Type), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod(cls, "bool IsEnemyReclaim() const", asMETHOD(T, IsEnemyReclaim), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "array<CCircuitUnit@>@ GetUnits() const", asFUNCTION(IUnitTask_GetUnits), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "void Abort()", asMETHOD(T, Abort), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "void Done()", asMETHOD(T, Done), asCALL_THISCALL); ASSERT(r >= 0);

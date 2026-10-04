@@ -204,6 +204,9 @@ public:
 	float GetAirMapPerc() const { return airMapPerc; }
 	float GetMinOffset() const { return minOffset; }
 	float GetLenOffset() const { return lenOffset; }
+	// Shared emergency policy, independent of role, economy and no_disrupt bindings.
+	CEnemyInfo* GetReclaimEnemy(CCircuitUnit* turret, int enemyId) const;
+	int GetEnemyReclaimMisses() const { return enemyReclaimMisses; }
 
 	// Script-hooks
 	const SFactoryDef* GetFactoryDef(CCircuitDef* facDef) const;
@@ -218,6 +221,10 @@ private:
 	IUnitTask* CreateAssistTask(CCircuitUnit* unit);
 
 	void Watchdog();
+	void UpdateEnemyReclaim();
+	bool enemyReclaimEnabled = true;
+	int enemyReclaimMisses = 0;
+	std::vector<int> enemyReclaimUnits; // reused ID snapshot; callbacks may change assists
 
 	Handlers2 createdHandler;
 	Handlers1 finishedHandler;

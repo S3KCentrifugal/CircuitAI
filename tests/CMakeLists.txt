@@ -5,6 +5,10 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 
 include(CTest)
+add_executable(circuit_enemy_reclaim_policy_test enemy_reclaim_policy_test.cpp)
+target_compile_features(circuit_enemy_reclaim_policy_test PRIVATE cxx_std_20)
+target_include_directories(circuit_enemy_reclaim_policy_test PRIVATE ../src)
+add_test(NAME circuit_enemy_reclaim_policy_test COMMAND circuit_enemy_reclaim_policy_test)
 
 if(BUILD_TESTING)
     add_executable(circuit_allied_reservations_test allied_reservations_test.cpp)

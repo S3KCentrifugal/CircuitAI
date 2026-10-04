@@ -1316,6 +1316,7 @@ int CBuilderManager::TurretsOnReclaim(int targetId, float margin, bool apply)
 		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::PLAYER)) {
 			continue;
 		}
+		if (t != nullptr && t->IsEnemyReclaim()) continue; // enemy denial precedes friendly recycling (D-184)
 		if (u->IsAttrNoDisrupt()) {
 			continue;  // D-117: bound to its duty (a spam lab's turret assists that lab only)
 		}

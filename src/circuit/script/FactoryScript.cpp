@@ -65,6 +65,8 @@ CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 	r = engine->RegisterObjectMethod("CFactoryManager", "int GetFactoryCount() const", asMETHOD(CFactoryManager, GetFactoryCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "int GetPendingRecruitCount(const CCircuitDef@) const", asFUNCTION(CFactoryManager_GetPendingRecruitCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "bool isAssistRequired", asOFFSET(CFactoryManager, isAssistRequired)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CFactoryManager", "bool enemyReclaimEnabled", asOFFSET(CFactoryManager, enemyReclaimEnabled)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFactoryManager", "int GetEnemyReclaimMisses() const", asMETHOD(CFactoryManager, GetEnemyReclaimMisses), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "float buildpowerRatio", asOFFSET(CFactoryManager, bpRatio)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "float responseWeight", asOFFSET(CFactoryManager, reWeight)); ASSERT(r >= 0);
 

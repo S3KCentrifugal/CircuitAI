@@ -1756,3 +1756,15 @@ centre radius. The configured priority comes from `AllowStrikeDef`; AIR uses
 qualifying visible target is retained to avoid command churn. No new borrowed
 handles escape the update and no new state is serialized (transient wave
 lifecycle unchanged). See the [plan](air-afus-attack-handoff-plan.md).
+
+
+### Construction turret enemy reclaim (D-184)
+
+`aiFactoryMgr.enemyReclaimEnabled` enables the shared half-second emergency
+response for static construction assistants; defaults from
+`economy.turret_enemy_reclaim` (true). `IUnitTask.IsEnemyReclaim()` identifies
+its NOW-priority temporary task. `aiFactoryMgr.GetEnemyReclaimMisses()` reports
+failed admissions from the latest response pass, for shared INV-128.
+Normal assignments and friendly-reclaim pulls yield to this task; PLAYER
+control remains authoritative. No target pointers are exposed. See
+[behavior and verification](turret-enemy-reclaim.md).

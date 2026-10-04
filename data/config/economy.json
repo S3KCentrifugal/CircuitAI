@@ -1,6 +1,7 @@
 // Mono-space font required
 {
 "economy": {
+	"turret_enemy_reclaim": true, // enemy denial even when metal is full; all profiles default true
 	"energy": {
 		// If land area >= 40% of the map then "land" config used, "water" otherwise
 		"land": {

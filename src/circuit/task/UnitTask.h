@@ -83,6 +83,7 @@ public:
 
 	virtual void Dead();
 	bool IsDead() const { return isDead; }
+	virtual bool IsEnemyReclaim() const { return false; }
 
 	// AS API
 	void Abort();
