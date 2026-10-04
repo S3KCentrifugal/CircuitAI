@@ -1,0 +1,30 @@
+{
+  "files": {
+    "README.md": "39f3dfde1c683d7d261bbe1e1bdedea0c35207434a3987a2d3f224f77c92a414",
+    "checks.json": "e8aac94f933c88e27165e0168e46b1b3d988f2d319a3ac23d338b91ad33548d3",
+    "late.address-counts.json": "ae5aa522e9d6197b0d23135a4f9a16f80517b4f9f893c15ee5ea47b226ea9660",
+    "late.bythread.json": "e1c0ccc7f5d52eddc22d924c231d6f316f827e9874540d6c9427055e3fadd582",
+    "late.function-summary.json": "5caec567f1955ce935765f3e217259e082eefe63263b6654ea64cfa51216f0eb",
+    "late.modules.json": "8c68d2109c01db7505981512a0aaa2dc778cef975cc33986cd6659c3a9ab5413",
+    "late.threads-after.json": "e8a0d978adb560992807167fc26dd1bb0a7f9588c04ec3d7b53a114d565677dc",
+    "late.threads-before.json": "52f407cbb85d537dd74c8568b542f933656669c69ae480fa7b52e02bdc0826ea",
+    "launched.json": "766c19904d00d58b8ac91b324fe0de18b61c748b2119aa7bbbab45ea8fc2ae85",
+    "measurement-notes.json": "357dfd8cdae8c1f56cfcfe7ac7dc76fb433fcdfa9d692e57b204ab85897b5e56",
+    "performance-fixture.json": "b3a5527704173c4a8592d26479a3b3644cced22cf8635e172c52802cde332168",
+    "report.md": "68ad348f2bb1ab4d4ba4a30189c481e6f573421710b31c54d2fd1e6571aee718",
+    "result.json": "06ef5f32e0271596a73fb1cbcb9e414bffc46507ca0ef2a75d85c2465072cbe3",
+    "run-inputs.json": "4f35da7d6d9cee2eab01ecd77fd6cd2160300973bf3876f579bccd3b2889558a",
+    "run-plan.json": "fdba0178f895c354dd04c2cb3f6f3fc0b87ce6e3801924121aae29a1f70e9758",
+    "screen_2026-10-04_21-34-23-076.png": "9bdff202553d44f7ea5b1e807ff489a2cac24f5a4e0c9e0a8f48e16feec93c0d",
+    "screen_2026-10-04_21-40-39-561.png": "1527abaee1563736a37dbc32a6f897e32b95f30e315e3e3dffdfe2300328519a",
+    "screen_2026-10-04_21-50-44-396.png": "e0da44a8131bf3a578e5c57beb833414c43d4d6fcf109a16beeeb148082b0053",
+    "script.txt": "ae2e0bfb4228284d8514b22b338cf18d3f796c0ed63baabb620f55405490fe16",
+    "skirmish-performance-final.json": "29bbe56a7d68c644ecd2cb55ef5b56111b4353b0d3ce73501f55cb3aaba969b8",
+    "skirmish-performance.json": "650afbb69d4d36625f10589ba2db1b85a385b6577e7ab1863e6ad574e4443bdc",
+    "staged.json": "98ca15e56e373301208b42eede64d31abb58010791101fb5ea34c4dd668c5f1c",
+    "teams.json": "6328a2fd7939081506446d68e152b1b6dfe8202c827c4e377b027330b6ad77df"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\shore-8v8-d195\\shore-to-shore\\20261004T213111Z-b2a38464\\runs\\20261004T215058Z-7fcb4c2a",
+  "schema": 1
+}

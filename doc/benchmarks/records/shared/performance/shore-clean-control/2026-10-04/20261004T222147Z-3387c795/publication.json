@@ -1,0 +1,28 @@
+{
+  "files": {
+    "README.md": "7303061a125c26dc9140213303b8bada4723e70cd697ba84533933a19cc05a60",
+    "checks.json": "3b8c9e068b7c0946136c3ba4bcd4a172bbe17b7baa6ad6ab79d08b5f9b9984bb",
+    "clean-final.function-summary.json": "c7e4b48820c40599e3a6bf255d11845cecca77634a86b37534b9cb12b2021832",
+    "clean-late.function-summary.json": "f937a473f41fb3633d801975c431da32c9536d4d1814ab99b75822b82f1710f6",
+    "clean-mid.function-summary.json": "1288761072a010ed3c0a335e25f99808f0548eb274af9d5b79cdc31048fde136",
+    "instruction-samples.json": "266e136bfbf7c865ecad189764f53f5cc83788a6562149247cb622c1d0c11076",
+    "launched.json": "cfc320c827d431c232509850321e8e9be70da31231a3c5eb889b189b7f475992",
+    "performance-fixture.json": "8878f2bc4d4cd85c770c63a233a4567cf7d5ca5072961c1e13a5ecda23384159",
+    "report.md": "f5fc2efa984dd1557c8e4e6718511d5430a575ccec93e146621039cf27de689f",
+    "result.json": "495cecc3fa6985526632dfddb8238423d5a8235500df35ced91648bfa9c7f416",
+    "review-notes.json": "2d4479bc4a4c79394c16e2ea75ee7f995214fefda9fc5989e527227572cf0ef4",
+    "run-inputs.json": "892df87dc385756f9d88892d20c77ec315898d3c34cf5a0af4c7aa44f9d02a01",
+    "run-plan.json": "ba1028cb58fa6203a58b8e55fb056f89ce6a08fe516bd5bfde3104e2474364a9",
+    "screen_2026-10-04_22-05-01-378.png": "5d901c70244b042f90aad2b36d3803c955d30e28c08b284e7f844dcedd7be012",
+    "screen_2026-10-04_22-12-02-061.png": "a4d990134a709623b637932bb53ac8224fbce4051a32f028d9a5cef5f1b912d1",
+    "screen_2026-10-04_22-21-34-344.png": "2cb32a953f44c4531ccdb82821c63e0768688d43986c6b30686b038db698b425",
+    "script.txt": "2731995a35f9ea5d314ef42195ee408dbd05e6d5bd3247ec5f27bc68e8b74bd7",
+    "skirmish-performance-final.json": "90fe62addcca780c953f12db1584195d75d13fdca6439484c10653b161072f48",
+    "skirmish-performance.json": "73e1b4528936625ad55a233cd70bdeff9e81e4a5aed3146a5af785d3458816b4",
+    "staged.json": "c91fc8642e06d1923281271b71014f7bbf8b0d440d8435e99455ebea39846a84",
+    "teams.json": "6328a2fd7939081506446d68e152b1b6dfe8202c827c4e377b027330b6ad77df"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\shore-clean-control\\shore-to-shore\\20261004T220237Z-921ca60b\\runs\\20261004T222147Z-3387c795",
+  "schema": 1
+}

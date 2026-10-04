@@ -3,8 +3,10 @@ function widget:GetInfo()
 end
 local previous,hook
 local counts,last={},{}
-local function count(id,def,team,cmd,params)
-    local c=counts[team] or {all=0,air=0,repeated=0,byDef={},byCommand={}};counts[team]=c;c.all=c.all+1
+local function count(id,def,team,cmd,params,options,tag,player,fromSynced,fromLua)
+    local c=counts[team] or {all=0,air=0,repeated=0,byDef={},byCommand={},byOrigin={}};counts[team]=c;c.all=c.all+1
+    local origin=fromLua==true and "lua" or fromLua==false and "nonlua" or "unknown"
+    c.byOrigin[origin]=(c.byOrigin[origin] or 0)+1
     local d=UnitDefs[def]
     local name=d and d.name or "unknown"
     c.byDef[name]=(c.byDef[name] or 0)+1
@@ -41,6 +43,9 @@ function widget:GameFrame(frame)
             end
             for cmd,n in pairs(c.byCommand) do
                 Spring.Echo(string.format("[AirOrdersDetail] frame=%d team=%d cmd=%d orders=%d",frame,team,cmd,n))
+            end
+            for origin,n in pairs(c.byOrigin) do
+                Spring.Echo("[CommandOrigin] frame="..frame.." team_source="..team..":"..origin.." count="..n)
             end
         end
         counts={}

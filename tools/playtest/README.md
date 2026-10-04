@@ -748,3 +748,43 @@ holds factory/builder production and supplies 100, 500 and 1,000 idle air
 constructors. This isolates fixed-population observation overhead, not active
 project or combat throughput. Compare full minute windows after each spawn
 settles; spawn frames are not steady-state measurements.
+
+## Whole-AI performance observations (D-195)
+
+See the [ranked Shore review](../../doc/reviews/2026-10-04-skirmishai-performance-review.md)
+for exact fixtures, pinned hashes and limitations. Stage `skirmish_perf_watch.lua`
+and `air_command_watch.lua` as extra widgets in an isolated rendered game. The
+scope observer enables engine profiling by default; `LuaUI/Config/skirmish_perf.lua`
+can return `{profiling=false, changes={{minute=18,enabled=true},
+{minute=19,enabled=false}}}` for within-match control intervals. Disabled scope
+values are unavailable, not evidence of zero AI CPU. FPS remains observable.
+Use normal-speed windows and retain achieved speed as well as requested speed.
+
+`analyze_skirmish_performance.py <write-dir>` summarizes the completed infolog
+into `skirmish-performance.json`. Run it before final publication, or use a new
+filename when adding final analysis to an archive that already recorded an
+interim snapshot. Never overwrite published evidence. Scope intervals overlap;
+command events and `fromLua` observations are not network-packet counts.
+
+`sample_process_instruction.ps1 -TargetPid <explicit-benchmark-pid>
+-OutputPrefix <scratch-prefix> -Seconds 30 [-ThreadIds <comma-separated-ids>]`
+provides a fallback when WPR is unavailable. It briefly suspends/resumes only
+threads verified to belong to that spring process, records instruction locations
+and before/after thread CPU, and requires matching symbols for attribution.
+These are randomized wall-clock samples, not ETW CPU samples or runtime stacks.
+Measure its overhead and keep it out of ordinary gameplay tests.
+
+`perf_spectator_cleanup.lua` is a narrowly guarded fixture for the documented
+16-AI/17th-spectator roster only; it removes the harness spectator commander,
+not competing units. Use `shared/performance/skirmish_cpu_clean` checks and
+require the explicit zero-spectator/16-AI verification. Do not silently substitute
+it into arbitrary games. The discovery and failed control fixtures are retained
+separately from the final clean-roster control.
+
+
+The final D-195 observer also records `[SkirmishPerfEnd]` and
+`[SkirmishPerfTeamDied]`; reusable performance checks forbid premature GameOver.
+These hooks were added after the control's awards overlay exposed a missing
+lifecycle observation. Do not call an elapsed forty-minute log a competitive
+forty-minute match without checking these events and active-team state. The
+original D-195 late control is explicitly excluded, not retroactively repaired.

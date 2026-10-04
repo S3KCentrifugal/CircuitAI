@@ -1,0 +1,223 @@
+{
+  "main_ai_samples": 70,
+  "valid_main_samples": 808,
+  "last_valid_ms": 12610.924,
+  "leaf": [
+    [
+      "asCContext::ExecuteNext()",
+      8
+    ],
+    [
+      "CallSystemFunction(int, asCContext*)",
+      5
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::Insert(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*)",
+      4
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::MoveTo(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>**, void* const&) const",
+      4
+    ],
+    [
+      "asCContext::PrepareScriptFunction()",
+      3
+    ],
+    [
+      "asCScriptObject::EnumReferences(asIScriptEngine*)",
+      2
+    ],
+    [
+      "asCScriptEngine::GarbageCollect(unsigned long, unsigned int)",
+      2
+    ],
+    [
+      "circuit::CMetalManager::MarkAllyMexes()",
+      2
+    ],
+    [
+      "asCDataType::IsObject() const",
+      2
+    ],
+    [
+      "CCircuitUnit_GetBuildProgress",
+      2
+    ],
+    [
+      "??",
+      2
+    ],
+    [
+      "asCGarbageCollector::DestroyOldGarbage()",
+      2
+    ],
+    [
+      "circuit::CAllyTeam::UpdateFriendlyUnits()",
+      2
+    ],
+    [
+      "asCDataType::IsObjectHandle() const",
+      2
+    ],
+    [
+      "asCMap<int, asCTypeInfo*>::MoveTo(asSMapNode<int, asCTypeInfo*>**, int const&) const",
+      1
+    ],
+    [
+      "asCContext::Prepare(asIScriptFunction*)",
+      1
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::MoveNext(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>**, asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*) const",
+      1
+    ],
+    [
+      "asCGarbageCollector::GCEnumCallback(void*)",
+      1
+    ],
+    [
+      "circuit::ITaskModule::Update()",
+      1
+    ],
+    [
+      "circuit::CBuilderManager::GetUnfinishedCount(circuit::CCircuitDef const*) const",
+      1
+    ],
+    [
+      "CScriptDictionary::GetGCFlag()",
+      1
+    ],
+    [
+      "springai::WrappUnit::GetInstance(int, int)",
+      1
+    ],
+    [
+      "asCContext::GetReturnByte()",
+      1
+    ],
+    [
+      "circuit::CAttackTask::FindTarget()",
+      1
+    ],
+    [
+      "asCContext::PopState()",
+      1
+    ],
+    [
+      "asCArray<asCScriptFunction*>::operator[](unsigned int)",
+      1
+    ],
+    [
+      "CScriptArray::GetRefCount()",
+      1
+    ],
+    [
+      "asCContext::SetObject(void*)",
+      1
+    ],
+    [
+      "asCGarbageCollector::GarbageCollect(unsigned long, unsigned int)",
+      1
+    ],
+    [
+      "CScriptArray::Find(unsigned int, void const*) const",
+      1
+    ],
+    [
+      "asCThreadCriticalSection::TryEnter()",
+      1
+    ],
+    [
+      "circuit::CTerrainManager::MarkAllyBuildings()",
+      1
+    ],
+    [
+      "float3::SqDistance2D(float3 const&) const",
+      1
+    ],
+    [
+      "CScriptArray::Release() const",
+      1
+    ],
+    [
+      "std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()",
+      1
+    ],
+    [
+      "circuit::CMilitaryManager::UnitDamaged(circuit::CCircuitUnit*, circuit::CEnemyInfo*)",
+      1
+    ],
+    [
+      "circuit::ICoreUnit::~ICoreUnit()",
+      1
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::BalanceInsert(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*)",
+      1
+    ],
+    [
+      "circuit::IModule::GetCircuit() const",
+      1
+    ],
+    [
+      "asCScriptEngine::GetTypeIdFromDataType(asCDataType const&) const",
+      1
+    ],
+    [
+      "asCScriptEngine::RequestContext()",
+      1
+    ],
+    [
+      "asCGarbageCollector::DestroyNewGarbage()",
+      1
+    ]
+  ],
+  "first_circuit_source": [
+    [
+      "resource/MetalManager.cpp",
+      2
+    ],
+    [
+      "script/InitScript.cpp",
+      2
+    ],
+    [
+      "unit/ally/AllyTeam.cpp",
+      2
+    ],
+    [
+      "terrain/TerrainManager.cpp",
+      2
+    ],
+    [
+      "module/TaskModule.cpp",
+      1
+    ],
+    [
+      "module/BuilderManager.cpp",
+      1
+    ],
+    [
+      "task/fighter/AttackTask.cpp",
+      1
+    ],
+    [
+      "unit/action/TravelAction.cpp",
+      1
+    ],
+    [
+      "unit/CoreUnit.h",
+      1
+    ],
+    [
+      "module/Module.h",
+      1
+    ]
+  ],
+  "notes": [
+    "Final process termination truncated the requested 40-second capture; use only recorded samples.",
+    "837 capture attempts, 1757 failures including attempts after process exit; 808 valid samples.",
+    "Sampler was subsequently changed to stop when the target exits.",
+    "Locations are not call stacks or CPU cycles."
+  ]
+}

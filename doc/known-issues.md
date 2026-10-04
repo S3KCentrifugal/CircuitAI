@@ -4508,3 +4508,50 @@ See the [investigation](reviews/2026-10-03-air-first-wave-stall.md) and D-183.
 hidden-economy fixture must produce a real reconnaissance dispatch, discover
 a target and physically launch the funded wave without repeated orders or
 bypassing its damage/AA/escort checks.
+
+### KI-497 - Late-game layout reservation queries dominate identified Shore AI work
+
+**Problem.** D-195's forty-minute 8v8 Shore discovery records 255 of 1,304
+late main-thread AI instruction samples in AlliedReservations, another 156 in
+TerrainManager, and 296,651 reservation log lines. Allied reservations already
+have a spatial index, but bucket keys perform a second tree lookup per entry;
+local placement still scans zones/slots repeatedly. These are measured hotspots,
+not proven speedup percentages. Broad AI work and raw command volume are detailed
+in the [ranked performance review](reviews/2026-10-04-skirmishai-performance-review.md).
+
+**Proposed solution.** Preserve all decisions while replacing bucket keys with
+lifetime-safe entry access, deduplicating multi-bucket visits, indexing exact
+local rectangles, caching immutable footprints and gating speculative logs
+before formatting. Keep D-108's unfinished-unit lifetime protection when adding
+an ID-based query index. Review ranks 5-9 separately; do not change cadence,
+formation, build order, allied exclusions or attack response under this task.
+
+**Verification.** Proposal only. Discovery and corrected-roster profiler-off
+control evidence, sampling limitations and exact-equivalence acceptance tests
+are linked in the review. No optimization is implemented or claimed faster.
+Existing TECH invariant failures remain FAIL; future changes must compare
+query results and command semantics before normal-map performance regression.
+This updates the remaining layout/query portions of KI-464; current AIR group
+and route-version guards already address parts of the older KI-462 discussion.
+
+
+### KI-498 - Elapsed-frame performance runs can outlast competitive play
+
+**Problem.** The D-195 corrected-roster control reached frame 72,000, but its
+29.8- and 39.8-minute captures show the awards overlay. The original observer
+recorded neither GameOver nor TeamDied. Its late FPS, active-AI count and exact
+match-end frame cannot be certified as a continuing competitive 8v8. The raw
+measurements remain valid for that elapsed workload, not a matched speedup test.
+
+**Proposed solution.** The performance observer now emits explicit lifecycle
+markers and its reusable checks forbid GameOver before the target. Extend the
+runner to stop or label the competitive interval at that event, record active
+AI counts and lock camera coordinates for FPS comparisons. Validate an early
+win/defeat and ordinary continuing match. Preserve evidence from the original
+observer; do not infer the missing event frame from a unit-count drop.
+
+**Verification.** Parser sanity passes; the new lifecycle observer hooks have
+not been replayed in-engine. Late control comparisons are excluded in the
+[performance review](reviews/2026-10-04-skirmishai-performance-review.md).
+This fixture issue does not invalidate the discovery's source-resolved layout
+samples, but it prevents claiming an independent reproduction or stock FPS gain.

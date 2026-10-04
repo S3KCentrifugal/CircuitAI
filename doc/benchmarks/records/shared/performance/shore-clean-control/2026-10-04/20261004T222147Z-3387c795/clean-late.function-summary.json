@@ -1,0 +1,1069 @@
+{
+  "main_ai_samples": 217,
+  "leaf": [
+    [
+      "??",
+      33
+    ],
+    [
+      "asCContext::ExecuteNext()",
+      27
+    ],
+    [
+      "CallSystemFunction(int, asCContext*)",
+      10
+    ],
+    [
+      "asCContext::CallScriptFunction(asCScriptFunction*)",
+      10
+    ],
+    [
+      "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+      8
+    ],
+    [
+      "asCContext::PrepareScriptFunction()",
+      7
+    ],
+    [
+      "CallX64",
+      7
+    ],
+    [
+      "circuit::CInfluenceMap::AddUnarmed(circuit::CAllyUnit*)",
+      5
+    ],
+    [
+      "float3::SqDistance2D(float3 const&) const",
+      5
+    ],
+    [
+      "asCArray<unsigned long>::AddressOf()",
+      4
+    ],
+    [
+      "circuit::ICoreUnit::~ICoreUnit()",
+      4
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_S_right(std::_Rb_tree_node_base const*)",
+      3
+    ],
+    [
+      "asCDataType::IsEnumType() const",
+      3
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_S_right(std::_Rb_tree_node_base*)",
+      3
+    ],
+    [
+      "asCScriptEngine::CallObjectMethodRetPtr(void*, int, asCScriptFunction*) const",
+      3
+    ],
+    [
+      "circuit::IRefCounter<circuit::IUnitTask>::AddRef()",
+      3
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::Insert(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*)",
+      2
+    ],
+    [
+      "auto std::__detail::_Synth3way::operator()<int, int>(int const&, int const&) const",
+      2
+    ],
+    [
+      "asCContext::PushCallState()",
+      2
+    ],
+    [
+      "CCircuitDef_GetName",
+      2
+    ],
+    [
+      "circuit::SBlockingMap::IsZoneAlly(int, int) const",
+      2
+    ],
+    [
+      "circuit::ITaskModule::Update()",
+      2
+    ],
+    [
+      "cmp_str::operator()(char const*, char const*) const",
+      2
+    ],
+    [
+      "circuit::CBuilderManager::GetUnfinishedCount(circuit::CCircuitDef const*) const",
+      2
+    ],
+    [
+      "circuit::CScoutTask::FindTarget(circuit::CCircuitUnit*, springai::AIFloat3 const&)",
+      2
+    ],
+    [
+      "CCircuitUnit_GetBuildProgress",
+      2
+    ],
+    [
+      "_InterlockedIncrement",
+      2
+    ],
+    [
+      "asCDataType::GetSizeOnStackDWords() const",
+      2
+    ],
+    [
+      "lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true>::firstOut(lemon::SmartGraphBase::Arc&, lemon::SmartGraphBase::Node const&) const",
+      1
+    ],
+    [
+      "circuit::CMetalManager::MarkAllyMexes()",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+      1
+    ],
+    [
+      "pthread_once",
+      1
+    ],
+    [
+      "circuit::CThreatMap::GetBuilderThreatAt(springai::AIFloat3 const&) const",
+      1
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::MoveTo(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>**, void* const&) const",
+      1
+    ],
+    [
+      "circuit::CAntiCapAction::Update(circuit::CCircuitAI*)",
+      1
+    ],
+    [
+      "CScriptArray::Release() const",
+      1
+    ],
+    [
+      "Run",
+      1
+    ],
+    [
+      "std::_Rb_tree_iterator<std::pair<int const, circuit::CAllyUnit*> >::operator++()",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_check_length(unsigned long long, unsigned long long, char const*) const",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_S_left(std::_Rb_tree_node_base const*)",
+      1
+    ],
+    [
+      "circuit::CMilitaryManager::FindBCombatTarget(circuit::CCircuitUnit*, springai::AIFloat3 const&, float, bool)",
+      1
+    ],
+    [
+      "__mbrtowc_cp",
+      1
+    ],
+    [
+      "asCThreadManager::GetLocalData()",
+      1
+    ],
+    [
+      "CScriptArray::CScriptArray(unsigned int, asITypeInfo*)",
+      1
+    ],
+    [
+      "std::map<int, circuit::CAllyUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::operator[](int const&)",
+      1
+    ],
+    [
+      "circuit::CFactoryManager::UpdateEnemyReclaim()",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::GetExtractsM() const",
+      1
+    ],
+    [
+      "pthread_spin_lock",
+      1
+    ],
+    [
+      "circuit::CAntiCapAction::~CAntiCapAction()",
+      1
+    ],
+    [
+      "asCDataType::IsObject() const",
+      1
+    ],
+    [
+      "std::char_traits<char>::compare(char const*, char const*, unsigned long long)",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CCircuitUnit*> > const*, std::_Rb_tree_node_base const*, int const&) const",
+      1
+    ],
+    [
+      "StringEquals",
+      1
+    ],
+    [
+      "circuit::CAvailList<circuit::CEconomyManager::SMetalExt, std::function<float (circuit::CCircuitDef*, circuit::CEconomyManager::SMetalExt&)> >::GetBuildDefs(circuit::CCircuitDef*)",
+      1
+    ],
+    [
+      "bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+      1
+    ],
+    [
+      "circuit::CPathFinder::UpdateAreaUsers(circuit::CTerrainManager*)",
+      1
+    ],
+    [
+      "asCContext::ReserveStackSpace(unsigned int)",
+      1
+    ],
+    [
+      "CScriptArray::GetSize() const",
+      1
+    ],
+    [
+      "circuit::CThreatMap::PosToXZ(springai::AIFloat3 const&, int&, int&) const",
+      1
+    ],
+    [
+      "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::find(int const&) const",
+      1
+    ],
+    [
+      "asCGarbageCollector::AddScriptObjectToGC(void*, asCObjectType*)",
+      1
+    ],
+    [
+      "__mingw_pformat",
+      1
+    ],
+    [
+      "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+      1
+    ],
+    [
+      "circuit::CCircuitAI::Update(int)",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::IsMobile() const",
+      1
+    ],
+    [
+      "bool nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>::searchLevel<nanoflann::KNNCondResultSet<float, int, unsigned long long> >(nanoflann::KNNCondResultSet<float, int, unsigned long long>&, float const*, nanoflann::KDTreeBaseClass<nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>, nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>::Node*, float, std::array<float, 2ull>&, float) const",
+      1
+    ],
+    [
+      "circuit::CEconomyManager::StartFactoryJob()",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_S_right(std::_Rb_tree_node_base*)",
+      1
+    ],
+    [
+      "asCScriptEngine::CallObjectMethod(void*, int) const",
+      1
+    ],
+    [
+      "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+      1
+    ],
+    [
+      "CScriptDictValue::FreeValue(asIScriptEngine*)",
+      1
+    ],
+    [
+      "circuit::CScheduler::ProcessJobs(int)",
+      1
+    ],
+    [
+      "asCAtomic::get() const",
+      1
+    ],
+    [
+      "asCScriptEngine::CallObjectMethodRetBool(void*, int) const",
+      1
+    ],
+    [
+      "springai::AIFloat3::LoadInto(float*) const",
+      1
+    ],
+    [
+      "circuit::CAllyTeam::UpdateFriendlyUnits()",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, int>, std::_Select1st<std::pair<int const, int> >, std::less<int>, std::allocator<std::pair<int const, int> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, int> > const*, std::_Rb_tree_node_base const*, int const&) const",
+      1
+    ],
+    [
+      "std::_Rb_tree_const_iterator<circuit::CCircuitUnit*>::operator++()",
+      1
+    ],
+    [
+      "_InterlockedDecrement",
+      1
+    ],
+    [
+      "circuit::CEnemyManager::UpdateEnemyDatas(circuit::CQuadField&)",
+      1
+    ],
+    [
+      "asCContext::Prepare(asIScriptFunction*)",
+      1
+    ],
+    [
+      "lroundf",
+      1
+    ],
+    [
+      "asCScriptObject::GetRefCount()",
+      1
+    ],
+    [
+      "circuit::CInfluenceMap::Apply()",
+      1
+    ],
+    [
+      "CScriptArray::Find(unsigned int, void const*) const",
+      1
+    ],
+    [
+      "circuit::IRefCounter<circuit::IUnitTask>::Release()",
+      1
+    ]
+  ],
+  "first_circuit_source": [
+    [
+      "terrain/TerrainManager.cpp",
+      10
+    ],
+    [
+      "map/InfluenceMap.cpp",
+      6
+    ],
+    [
+      "CircuitAI.cpp",
+      5
+    ],
+    [
+      "unit/ally/AllyTeam.cpp",
+      5
+    ],
+    [
+      "script/InitScript.cpp",
+      4
+    ],
+    [
+      "unit/CoreUnit.h",
+      4
+    ],
+    [
+      "script/RefCounter.h",
+      4
+    ],
+    [
+      "unit/CircuitDef.h",
+      3
+    ],
+    [
+      "map/ThreatMap.cpp",
+      2
+    ],
+    [
+      "unit/action/AntiCapAction.cpp",
+      2
+    ],
+    [
+      "terrain/AlliedReservations.h",
+      2
+    ],
+    [
+      "terrain/BlockingMap.hpp",
+      2
+    ],
+    [
+      "module/TaskModule.cpp",
+      2
+    ],
+    [
+      "util/Defines.h",
+      2
+    ],
+    [
+      "module/BuilderManager.cpp",
+      2
+    ],
+    [
+      "task/fighter/ScoutTask.cpp",
+      2
+    ],
+    [
+      "resource/MetalManager.cpp",
+      1
+    ],
+    [
+      "scheduler/SchedulerJob.h",
+      1
+    ],
+    [
+      "module/MilitaryManager.cpp",
+      1
+    ],
+    [
+      "module/FactoryManager.cpp",
+      1
+    ],
+    [
+      "util/AvailList.h",
+      1
+    ],
+    [
+      "terrain/path/PathFinder.cpp",
+      1
+    ],
+    [
+      "module/EconomyManager.cpp",
+      1
+    ],
+    [
+      "scheduler/Scheduler.cpp",
+      1
+    ],
+    [
+      "unit/ally/AllyTeam.h",
+      1
+    ],
+    [
+      "task/builder/BuilderTask.cpp",
+      1
+    ],
+    [
+      "unit/enemy/EnemyManager.cpp",
+      1
+    ]
+  ],
+  "inline_presence_overlapping": [
+    [
+      "??",
+      33
+    ],
+    [
+      "asCContext::ExecuteNext()",
+      27
+    ],
+    [
+      "asCContext::CallScriptFunction(asCScriptFunction*)",
+      16
+    ],
+    [
+      "CallSystemFunction(int, asCContext*)",
+      10
+    ],
+    [
+      "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+      8
+    ],
+    [
+      "asCContext::PrepareScriptFunction()",
+      7
+    ],
+    [
+      "CallX64",
+      7
+    ],
+    [
+      "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+      6
+    ],
+    [
+      "circuit::CInfluenceMap::AddUnarmed(circuit::CAllyUnit*)",
+      5
+    ],
+    [
+      "float3::SqDistance2D(float3 const&) const",
+      5
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CCircuitUnit*> > const*, std::_Rb_tree_node_base const*, int const&) const",
+      4
+    ],
+    [
+      "std::map<int, circuit::CCircuitUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::find(int const&) const",
+      4
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::find(int const&) const",
+      4
+    ],
+    [
+      "circuit::CCircuitAI::GetTeamUnit(int) const",
+      4
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+      4
+    ],
+    [
+      "circuit::CTerrainManager::CanReachAt(circuit::CCircuitUnit*, springai::AIFloat3 const&, float)",
+      4
+    ],
+    [
+      "std::map<int, terrain::SAreaSector*, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+      4
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+      4
+    ],
+    [
+      "asCDataType::IsObject() const",
+      4
+    ],
+    [
+      "circuit::CAllyTeam::UpdateFriendlyUnits()",
+      4
+    ],
+    [
+      "asCArray<unsigned long>::AddressOf()",
+      4
+    ],
+    [
+      "circuit::ICoreUnit::~ICoreUnit()",
+      4
+    ],
+    [
+      "circuit::CAllyUnit::~CAllyUnit()",
+      4
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_S_right(std::_Rb_tree_node_base const*)",
+      3
+    ],
+    [
+      "asCDataType::IsPrimitive() const",
+      3
+    ],
+    [
+      "asCDataType::IsEnumType() const",
+      3
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_S_right(std::_Rb_tree_node_base*)",
+      3
+    ],
+    [
+      "asCScriptEngine::CallObjectMethodRetPtr(void*, int, asCScriptFunction*) const",
+      3
+    ],
+    [
+      "circuit::IRefCounter<circuit::IUnitTask>::AddRef()",
+      3
+    ],
+    [
+      "asCGarbageCollector::IdentifyGarbageWithCyclicRefs()",
+      2
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::Insert(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*)",
+      2
+    ],
+    [
+      "auto std::__detail::_Synth3way::operator()<int, int>(int const&, int const&) const",
+      2
+    ],
+    [
+      "std::strong_ordering std::__tuple_cmp<std::strong_ordering, std::tuple<int, int, int>, std::tuple<int, int, int>, 0ull, 1ull, 2ull>(std::tuple<int, int, int> const&, std::tuple<int, int, int> const&, std::integer_sequence<unsigned long long, 0ull, 1ull, 2ull>)",
+      2
+    ],
+    [
+      "std::less<std::tuple<int, int, int> >::operator()(std::tuple<int, int, int> const&, std::tuple<int, int, int> const&) const",
+      2
+    ],
+    [
+      "circuit::CTerrainManager::IsAllyLayoutRectBlocked(type2<int> const&, type2<int> const&) const",
+      2
+    ],
+    [
+      "std::common_comparison_category<decltype (std::__detail::__synth3way((declval<int&>)(), (declval<int&>)())), decltype (std::__detail::__synth3way((declval<int&>)(), (declval<int&>)())), decltype (std::__detail::__synth3way((declval<int&>)(), (declval<int&>)()))>::type std::operator<=><int, int, int, int, int, int>(std::tuple<int, int, int> const&, std::tuple<int, int, int> const&)",
+      2
+    ],
+    [
+      "std::map<std::tuple<int, int, int>, circuit::allied_layout::Rect, std::less<std::tuple<int, int, int> >, std::allocator<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> > >::at(std::tuple<int, int, int> const&) const",
+      2
+    ],
+    [
+      "std::_Rb_tree<std::tuple<int, int, int>, std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect>, std::_Select1st<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> >, std::less<std::tuple<int, int, int> >, std::allocator<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> > >::lower_bound(std::tuple<int, int, int> const&) const",
+      2
+    ],
+    [
+      "void circuit::allied_layout::Reservations::ForBuckets<circuit::allied_layout::Reservations::OverlapsOther(int, circuit::allied_layout::Rect const&) const::{lambda(std::pair<int, int> const&)#1}>(circuit::allied_layout::Rect const&, circuit::allied_layout::Reservations::OverlapsOther(int, circuit::allied_layout::Rect const&) const::{lambda(std::pair<int, int> const&)#1})",
+      2
+    ],
+    [
+      "circuit::allied_layout::Reservations::OverlapsOther(int, circuit::allied_layout::Rect const&) const",
+      2
+    ],
+    [
+      "std::_Rb_tree<std::tuple<int, int, int>, std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect>, std::_Select1st<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> >, std::less<std::tuple<int, int, int> >, std::allocator<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> > const*, std::_Rb_tree_node_base const*, std::tuple<int, int, int> const&) const",
+      2
+    ],
+    [
+      "std::map<std::tuple<int, int, int>, circuit::allied_layout::Rect, std::less<std::tuple<int, int, int> >, std::allocator<std::pair<std::tuple<int, int, int> const, circuit::allied_layout::Rect> > >::lower_bound(std::tuple<int, int, int> const&) const",
+      2
+    ],
+    [
+      "circuit::allied_layout::Reservations::OverlapsOther(int, circuit::allied_layout::Rect const&) const::{lambda(std::pair<int, int> const&)#1}::operator()(std::pair<int, int> const&) const",
+      2
+    ],
+    [
+      "asCContext::PushCallState()",
+      2
+    ],
+    [
+      "CCircuitDef_GetName",
+      2
+    ],
+    [
+      "circuit::SBlockingMap::IsZoneAlly(int, int) const",
+      2
+    ],
+    [
+      "circuit::CTerrainManager::IsZoneAlly(springai::AIFloat3 const&) const",
+      2
+    ],
+    [
+      "std::map<int, circuit::CAllyUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::operator[](int const&)",
+      2
+    ],
+    [
+      "circuit::ITaskModule::Update()",
+      2
+    ],
+    [
+      "bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+      2
+    ],
+    [
+      "StringEquals",
+      2
+    ],
+    [
+      "std::_Rb_tree<char const*, std::pair<char const* const, circuit::CCircuitDef*>, std::_Select1st<std::pair<char const* const, circuit::CCircuitDef*> >, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::find(char const* const&)",
+      2
+    ],
+    [
+      "cmp_str::operator()(char const*, char const*) const",
+      2
+    ],
+    [
+      "std::map<char const*, circuit::CCircuitDef*, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::find(char const* const&)",
+      2
+    ],
+    [
+      "circuit::CCircuitAI::GetCircuitDef(char const*)",
+      2
+    ],
+    [
+      "std::_Rb_tree<char const*, std::pair<char const* const, circuit::CCircuitDef*>, std::_Select1st<std::pair<char const* const, circuit::CCircuitDef*> >, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<char const* const, circuit::CCircuitDef*> >*, std::_Rb_tree_node_base*, char const* const&)",
+      2
+    ],
+    [
+      "circuit::CBuilderManager::GetUnfinishedCount(circuit::CCircuitDef const*) const",
+      2
+    ],
+    [
+      "asCScriptEngine::CallObjectMethod(void*, int) const",
+      2
+    ],
+    [
+      "circuit::CScoutTask::FindTarget(circuit::CCircuitUnit*, springai::AIFloat3 const&)",
+      2
+    ],
+    [
+      "CCircuitUnit_GetBuildProgress",
+      2
+    ],
+    [
+      "_InterlockedIncrement",
+      2
+    ],
+    [
+      "asAtomicInc",
+      2
+    ],
+    [
+      "asCDataType::GetSizeOnStackDWords() const",
+      2
+    ],
+    [
+      "lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true>::firstOut(lemon::SmartGraphBase::Arc&, lemon::SmartGraphBase::Node const&) const",
+      1
+    ],
+    [
+      "lemon::Dijkstra<lemon::FilterNodes<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, void>, lemon::GraphExtender<lemon::SmartGraphBase>::EdgeMap<float>, lemon::DijkstraDefaultTraits<lemon::FilterNodes<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, void>, lemon::GraphExtender<lemon::SmartGraphBase>::EdgeMap<float> > >::processNextNode()",
+      1
+    ],
+    [
+      "lemon::GraphAdaptorExtender<lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true> >::OutArcIt::OutArcIt(lemon::GraphAdaptorExtender<lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true> > const&, lemon::SmartGraphBase::Node const&)",
+      1
+    ],
+    [
+      "circuit::CMetalManager::MarkAllyMexes()",
+      1
+    ],
+    [
+      "pthread_once",
+      1
+    ],
+    [
+      "circuit::CThreatMap::GetBuilderThreatAt(springai::AIFloat3 const&) const",
+      1
+    ],
+    [
+      "asCGarbageCollector::GCEnumCallback(void*)",
+      1
+    ],
+    [
+      "asCMap<void*, asCGarbageCollector::asSIntTypePair>::MoveTo(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>**, void* const&) const",
+      1
+    ],
+    [
+      "circuit::CAntiCapAction::Update(circuit::CCircuitAI*)",
+      1
+    ],
+    [
+      "CScriptArray::Release() const",
+      1
+    ],
+    [
+      "Run",
+      1
+    ],
+    [
+      "std::_Rb_tree_iterator<std::pair<int const, circuit::CAllyUnit*> >::operator++()",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::replace(unsigned long long, unsigned long long, char const*, unsigned long long)",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::insert(unsigned long long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+      1
+    ],
+    [
+      "AddStringFloat",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::operator+<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&)",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long long, unsigned long long, char const*, unsigned long long)",
+      1
+    ],
+    [
+      "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_check_length(unsigned long long, unsigned long long, char const*) const",
+      1
+    ],
+    [
+      "std::strong_ordering std::__tuple_cmp<std::strong_ordering, std::tuple<int, int, int>, std::tuple<int, int, int>, 2ull>(std::tuple<int, int, int> const&, std::tuple<int, int, int> const&, std::integer_sequence<unsigned long long, 2ull>)",
+      1
+    ],
+    [
+      "std::strong_ordering std::__tuple_cmp<std::strong_ordering, std::tuple<int, int, int>, std::tuple<int, int, int>, 1ull, 2ull>(std::tuple<int, int, int> const&, std::tuple<int, int, int> const&, std::integer_sequence<unsigned long long, 1ull, 2ull>)",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::find(int const&) const",
+      1
+    ],
+    [
+      "circuit::CAllyTeam::GetFriendlyUnit(int) const",
+      1
+    ],
+    [
+      "std::map<int, circuit::CAllyUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::find(int const&) const",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CAllyUnit*> > const*, std::_Rb_tree_node_base const*, int const&) const",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_S_left(std::_Rb_tree_node_base const*)",
+      1
+    ],
+    [
+      "circuit::CMilitaryManager::FindBCombatTarget(circuit::CCircuitUnit*, springai::AIFloat3 const&, float, bool)",
+      1
+    ],
+    [
+      "__mbrtowc_cp",
+      1
+    ],
+    [
+      "asCThreadManager::GetLocalData()",
+      1
+    ],
+    [
+      "CScriptArray::CScriptArray(unsigned int, asITypeInfo*)",
+      1
+    ],
+    [
+      "circuit::CFactoryManager::UpdateEnemyReclaim()",
+      1
+    ],
+    [
+      "__invoke_impl<bool, circuit::CEconomyManager::UpdateMetalTasks(const springai::AIFloat3&, circuit::CCircuitUnit*)::<lambda(int)>&, int>",
+      1
+    ],
+    [
+      "_M_invoke",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::GetExtractsM() const",
+      1
+    ],
+    [
+      "__invoke_r<bool, circuit::CEconomyManager::UpdateMetalTasks(const springai::AIFloat3&, circuit::CCircuitUnit*)::<lambda(int)>&, int>",
+      1
+    ],
+    [
+      "operator()",
+      1
+    ],
+    [
+      "pthread_spin_lock",
+      1
+    ],
+    [
+      "circuit::CAntiCapAction::~CAntiCapAction()",
+      1
+    ],
+    [
+      "std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+      1
+    ],
+    [
+      "std::char_traits<char>::compare(char const*, char const*, unsigned long long)",
+      1
+    ],
+    [
+      "std::__detail::_Hashtable_base<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Hashtable_traits<true, false, true> >::_M_key_equals(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__detail::_Hash_node_value<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, true> const&) const",
+      1
+    ],
+    [
+      "std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+      1
+    ],
+    [
+      "circuit::CEconomyManager::UpdateMetalTasks(springai::AIFloat3 const&, circuit::CCircuitUnit*)",
+      1
+    ],
+    [
+      "circuit::CAvailList<circuit::CEconomyManager::SMetalExt, std::function<float (circuit::CCircuitDef*, circuit::CEconomyManager::SMetalExt&)> >::GetBuildDefs(circuit::CCircuitDef*)",
+      1
+    ],
+    [
+      "circuit::CPathFinder::UpdateAreaUsers(circuit::CTerrainManager*)",
+      1
+    ],
+    [
+      "asCContext::ReserveStackSpace(unsigned int)",
+      1
+    ],
+    [
+      "CScriptArray::GetSize() const",
+      1
+    ],
+    [
+      "circuit::CThreatMap::GetThreatAt(springai::AIFloat3 const&) const",
+      1
+    ],
+    [
+      "circuit::CThreatMap::PosToXZ(springai::AIFloat3 const&, int&, int&) const",
+      1
+    ],
+    [
+      "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::find(int const&) const",
+      1
+    ],
+    [
+      "circuit::IBuilderTask::CanAssignTo(circuit::CCircuitUnit*) const",
+      1
+    ],
+    [
+      "std::unordered_set<int, std::hash<int>, std::equal_to<int>, std::allocator<int> >::find(int const&) const",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::CanBuild(int) const",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::CanBuild(circuit::CCircuitDef const*) const",
+      1
+    ],
+    [
+      "asCGarbageCollector::AddScriptObjectToGC(void*, asCObjectType*)",
+      1
+    ],
+    [
+      "__mingw_pformat",
+      1
+    ],
+    [
+      "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+      1
+    ],
+    [
+      "circuit::CCircuitAI::Update(int)",
+      1
+    ],
+    [
+      "circuit::CCircuitDef::IsMobile() const",
+      1
+    ],
+    [
+      "bool nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>::searchLevel<nanoflann::KNNCondResultSet<float, int, unsigned long long> >(nanoflann::KNNCondResultSet<float, int, unsigned long long>&, float const*, nanoflann::KDTreeBaseClass<nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>, nanoflann::L2_Simple_Adaptor<float, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, float>, geom::SPointAdaptor<std::vector<circuit::CMetalData::SCluster, std::allocator<circuit::CMetalData::SCluster> > >, 2, int>::Node*, float, std::array<float, 2ull>&, float) const",
+      1
+    ],
+    [
+      "circuit::CEconomyManager::StartFactoryJob()",
+      1
+    ],
+    [
+      "std::map<int, circuit::CAllyUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::lower_bound(int const&)",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::lower_bound(int const&)",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_S_right(std::_Rb_tree_node_base*)",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, circuit::CAllyUnit*>, std::_Select1st<std::pair<int const, circuit::CAllyUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CAllyUnit*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CAllyUnit*> >*, std::_Rb_tree_node_base*, int const&)",
+      1
+    ],
+    [
+      "CScriptDictionary::DeleteAll()",
+      1
+    ],
+    [
+      "CScriptDictValue::FreeValue(asIScriptEngine*)",
+      1
+    ],
+    [
+      "circuit::CScheduler::ProcessJobs(int)",
+      1
+    ],
+    [
+      "asCAtomic::get() const",
+      1
+    ],
+    [
+      "asCScriptEngine::CallObjectMethodRetBool(void*, int) const",
+      1
+    ],
+    [
+      "springai::AIFloat3::LoadInto(float*) const",
+      1
+    ],
+    [
+      "std::map<int, int, std::less<int>, std::allocator<std::pair<int const, int> > >::find(int const&) const",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, int>, std::_Select1st<std::pair<int const, int> >, std::less<int>, std::allocator<std::pair<int const, int> > >::find(int const&) const",
+      1
+    ],
+    [
+      "circuit::CBuilderManager::IsReclaimUnit(circuit::CAllyUnit*) const",
+      1
+    ],
+    [
+      "circuit::CAllyTeam::IsReclaimMarked(int) const",
+      1
+    ],
+    [
+      "std::_Rb_tree<int, std::pair<int const, int>, std::_Select1st<std::pair<int const, int> >, std::less<int>, std::allocator<std::pair<int const, int> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, int> > const*, std::_Rb_tree_node_base const*, int const&) const",
+      1
+    ],
+    [
+      "circuit::IBuilderTask::GetNextAssignee()",
+      1
+    ],
+    [
+      "circuit::IBuilderTask::Update()",
+      1
+    ],
+    [
+      "std::_Rb_tree_const_iterator<circuit::CCircuitUnit*>::operator++()",
+      1
+    ],
+    [
+      "asAtomicDec",
+      1
+    ],
+    [
+      "asCAtomic::atomicDec()",
+      1
+    ],
+    [
+      "_InterlockedDecrement",
+      1
+    ],
+    [
+      "circuit::CEnemyManager::UpdateEnemyDatas(circuit::CQuadField&)",
+      1
+    ],
+    [
+      "asCContext::Prepare(asIScriptFunction*)",
+      1
+    ],
+    [
+      "lroundf",
+      1
+    ],
+    [
+      "asCScriptObject::GetRefCount()",
+      1
+    ],
+    [
+      "circuit::CInfluenceMap::Apply()",
+      1
+    ],
+    [
+      "CScriptArray::Find(unsigned int, void const*) const",
+      1
+    ],
+    [
+      "circuit::IRefCounter<circuit::IUnitTask>::Release()",
+      1
+    ]
+  ],
+  "notes": [
+    "Source categories are mutually exclusive; inline presence is overlapping.",
+    "Instruction locations, not runtime stack traces or CPU cycles."
+  ]
+}

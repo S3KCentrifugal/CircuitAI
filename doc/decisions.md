@@ -11274,3 +11274,73 @@ validation retains 167 baseline findings (KI-481/KI-473), and documentation
 checking retains eight missing hover-document links (KI-404); none are in the
 changed files. Current data is published with the unchanged matching D-184
 DLL/debug pair in the mandatory build output.
+
+## D-195 - Evidence-first whole-AI performance review, no gameplay changes
+
+2026-10-04. Measured and Reviewed; optimization proposals await owner selection.
+
+**Decision.** Run a rendered, ordinary-resource 8v8 Shore fixture, separate
+normal-speed measurement windows from fast-forward sections, and rank exact
+index/data-representation changes ahead of new threading or command policies.
+Use the existing D-194 DLL/data unchanged. Record callback elapsed time, FPS,
+unit population, command origins, lane timers and targeted instruction samples.
+Engine scopes overlap; instruction samples are wall-clock locations, not CPU
+cycles or complete call stacks. No specific AngelScript function attribution
+or network packet saving is inferred from these measurements.
+
+The first discovery retained the generic harness's extra spectator commander.
+After noticing it, preserve that evidence and run a corrected roster control.
+Cleanup waits for player information, validates the spectator-only team and
+removes only its units with cheats restored off. Two failed guards (early player
+information and camera-followed team identity) are retained as failed runs.
+A separate command-origin observer conflicted with the existing UnitCommand
+hook; remove it and extend the existing observer instead. The short conflicted
+control is excluded. These were fixture corrections, not AI policy fixes.
+
+**Rejected alternatives.** Do not optimize AIR by assumption: the late sample
+points primarily to layout queries and the highest observed command-minute is
+TECH. Do not add an index that already exists, undo stale-pointer safeguards,
+call overlapping profiler scopes CPU percentages, claim batching from control
+groups, run multiple loaded benchmarks concurrently, or move engine callbacks
+and script globals to workers. No APM cap, longer retry delay, weaker threat
+checking, altered spacing or frame-work budget is introduced. WPR CPU profiling
+was unavailable; its failure and the fallback's limitations are disclosed.
+
+**Files.** [Ranked review](reviews/2026-10-04-skirmishai-performance-review.md),
+[scope/FPS observer](../tools/playtest/widgets/skirmish_perf_watch.lua),
+[command observer](../tools/playtest/widgets/air_command_watch.lua),
+[roster cleanup](../tools/playtest/widgets/perf_spectator_cleanup.lua),
+[instruction sampler](../tools/playtest/sample_process_instruction.ps1),
+[measurement analyzer](../tools/playtest/analyze_skirmish_performance.py),
+[discovery checks](../tools/playtest/checks/shared/performance/skirmish_cpu.json),
+[clean checks](../tools/playtest/checks/shared/performance/skirmish_cpu_clean.json),
+[playtest usage](../tools/playtest/README.md), [remaining issue](known-issues.md),
+[benchmark catalog](benchmarks/catalog.json), [shared index](benchmarks/index/shared.md).
+The review links immutable evidence bundles and their screenshots/input hashes.
+
+**Verification.** Analyzer sanity cases and byte comparison of all 321 staged
+script/config files pass. Scope and command observers run in-engine; original
+invariant FAILs are retained. Main-thread instruction samples resolve against
+matching debug symbols; the sampler verifies each thread still belongs to the
+selected process and resumes it in finally. The report distinguishes measured
+hotspots, source-supported opportunities and unmeasured expected benefit.
+No native or active policy code was edited by D-195; no optimization benchmark
+or behavior-equivalence PASS is claimed. Existing unrelated broken hover-doc
+links remain tracked as KI-404.
+
+
+**Final evidence correction.** The corrected-roster control's final image
+shows the awards overlay; it is already visible at 29.8 minutes. The original
+observer lacks GameOver/TeamDied markers, so no exact end frame is claimed and
+late control FPS is excluded from competitive comparison. Its earlier sample
+does not reproduce the discovery's reservation hotspot. Preserve this result,
+add observer lifecycle markers plus a GameOver forbid for future performance
+runs, and record KI-498 rather than presenting the control as a matched win.
+Those final Lua hooks are source-reviewed and parser-checked, not played. The
+final sampler also stops after process exit; the already truncated final sample
+retains its failures and only valid instruction locations are analyzed.
+
+**Invariant.** D-195 changes no gameplay policy. Existing gameplay invariant
+forbids remain enabled in every performance fixture; failures are retained.
+Only measurements from a verified competitive interval qualify as normal-match
+comparisons (KI-498). No new runtime gameplay invariant is introduced.

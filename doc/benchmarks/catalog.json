@@ -1131,6 +1131,32 @@
       "verdict": "FAIL"
     },
     {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "benchmark",
+      "id": "20261004T215058Z-7fcb4c2a",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/shore-8v8-d195/2026-10-04/20261004T215058Z-7fcb4c2a/result.json",
+      "scenario": "shore-8v8-d195",
+      "sha256": "06ef5f32e0271596a73fb1cbcb9e414bffc46507ca0ef2a75d85c2465072cbe3",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "benchmark",
+      "id": "20261004T222147Z-3387c795",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/shore-clean-control/2026-10-04/20261004T222147Z-3387c795/result.json",
+      "scenario": "shore-clean-control",
+      "sha256": "495cecc3fa6985526632dfddb8238423d5a8235500df35ced91648bfa9c7f416",
+      "verdict": "FAIL"
+    },
+    {
       "area": "combat",
       "domain": "tech",
       "experiment_kind": "natural",

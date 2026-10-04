@@ -1,0 +1,15 @@
+{
+  "interpretation": "Performance discovery, not gameplay pass. Known spectator commander persists. No production code changed.",
+  "main_thread": 56088,
+  "pid": 55572,
+  "instruction_sampling": "Wall-clock RIP samples, not ETW CPU cycles; running/waiting filtering differs between early and subsequent fixed-thread captures.",
+  "early_capture_ms": 59.156,
+  "mid_capture_ms": 747.711,
+  "late_capture_ms": 776.614,
+  "late_duration_s": 60.014,
+  "wpr_error": "0xc5585011: profiling policy unavailable",
+  "cpu": "Intel Core i9-12900KF, 16 cores / 24 logical",
+  "gpu": "NVIDIA GeForce RTX 3080 Ti 12GB",
+  "ai_workers_cpu_ms_in_late_window": 4203.125,
+  "main_cpu_ms_in_late_window": 59562.5
+}

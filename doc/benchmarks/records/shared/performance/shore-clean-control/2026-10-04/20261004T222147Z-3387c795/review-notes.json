@@ -1,0 +1,11 @@
+{
+  "competitive_roster_verified_at_frame": 300,
+  "spectator_units": 0,
+  "ai_teams_at_roster_check": 16,
+  "last_observed_awards_free_screenshot_frame": 35640,
+  "awards_overlay_visible_by_frame": 53640,
+  "exact_game_over_frame": null,
+  "late_windows_excluded_from_competitive_fps_comparison": true,
+  "note": "The original observer did not record GameOver or TeamDied. The awards overlay is visible in the 29.8- and 39.8-minute captures. Preserve elapsed-frame measurements, but do not interpret them as a continuing sixteen-active-AI control. A later observer revision adds explicit lifecycle markers; it was not used in this run.",
+  "invariant_verdict": "FAIL preserved; 25 existing TECH invariant lines, no script or instrumentation error in final control."
+}
