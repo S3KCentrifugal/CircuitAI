@@ -4555,3 +4555,25 @@ not been replayed in-engine. Late control comparisons are excluded in the
 [performance review](reviews/2026-10-04-skirmishai-performance-review.md).
 This fixture issue does not invalidate the discovery's source-resolved layout
 samples, but it prevents claiming an independent reproduction or stock FPS gain.
+
+### KI-499 - Reported off-map Juno fire on Shore remains unreproduced
+
+**Problem.** A player observed Junos firing outside Shore to Shore's available
+map area. All 85 launch aims retained from D-195 are within 15,360 x 3,072 map
+bounds, although three are only 1-2 elmos inside an edge. The suspected-jammer
+inference branch clamps probes to the map edge. That identifies a plausible
+edge-aim source, not evidence that the reported missile was wasted outside.
+
+**Proposed solution.** Correlate the original launcher/shot timestamp with its
+AI aim, projectile target and actual explosion coordinates. Repair a proven
+coordinate or command defect if present; if inferred edge shots instead waste
+coverage, consider rejecting out-of-map inference probes before clamping and
+scoring useful coverage, retaining legitimate known edge-jammer targets. Do not
+silently introduce a large no-fire border or disturb other static weapons.
+
+**Verification.** D-196's two supplied three-faction Shore tests observed 24
+launches without an outside flight. The second test recorded all 12 actual
+explosion centers inside the map; the first records disappearance, not impact.
+Both reports PASS, with zero script/runtime invariant failures, but neither
+reproduces the user's original match. No production fix is applied. See the
+[full investigation and retained evidence](reviews/2026-10-04-juno-map-edge-investigation.md).

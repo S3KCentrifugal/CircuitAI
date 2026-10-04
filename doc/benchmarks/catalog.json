@@ -1131,6 +1131,32 @@
       "verdict": "FAIL"
     },
     {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261004T224559Z-8522f4df",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/combat/juno-edge-d196/2026-10-04/20261004T224559Z-8522f4df/result.json",
+      "scenario": "juno-edge-d196",
+      "sha256": "55b2cf45094af7baf371ce9aa16d1d8ed403dcdaf94186f8fe0da48e90f1759c",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261004T225027Z-e148b0f6",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/result.json",
+      "scenario": "juno-edge-impacts",
+      "sha256": "ddfee7d5baa5106ac9a658a0f376507a53a7c78a1595ac178f5e161ef50fd4b3",
+      "verdict": "PASS"
+    },
+    {
       "area": "performance",
       "domain": "shared",
       "experiment_kind": "benchmark",

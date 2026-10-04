@@ -1,0 +1,26 @@
+{
+  "game": "Beyond All Reason test-31479-433a460",
+  "map": "Shore_to_Shore_V3",
+  "teams": [
+    {
+      "team": 0,
+      "spot": 2,
+      "x": 550.0,
+      "z": 1740.0,
+      "role": "AIR",
+      "ally": 0,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 1,
+      "spot": 8,
+      "x": 14800.0,
+      "z": 1450.0,
+      "role": "AIR",
+      "ally": 1,
+      "ai": "test",
+      "side": "armada"
+    }
+  ]
+}

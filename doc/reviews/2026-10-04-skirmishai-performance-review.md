@@ -2,6 +2,8 @@
 
 Date: 2026-10-04. Decision: D-195. **Recommendations only; no gameplay optimization implemented.**
 
+Follow-up: the reported Juno shots beyond Shore's map edge are investigated in the [D-196 evidence report](2026-10-04-juno-map-edge-investigation.md). The report distinguishes logged aims, projectile motion and actual explosion centers; the observation remains unconfirmed (KI-499). It does not change the performance ranking or production behavior.
+
 The leading identifiable AI hotspot in the slowed discovery run is **construction-layout reservation checking**, particularly repeated tree lookups inside the existing allied spatial index. Optimizing AIR combat alone would miss it. Early FPS loss was mostly outside AI callbacks; later, AI callbacks became a substantial main-thread cost. The control did not independently reproduce that severe tail; this ranking targets observed waste, not a universal bottleneck or a promised FPS gain.
 
 The first forty-minute run fell from 203 to 39 median FPS in nominal 1x measurement windows. Aggregate AI time rose from 1.57 to 17.46 ms per simulation frame; late p95/p99 reached 88.69/113.00 ms. This run had engine profiling enabled and the harness's known extra spectator commander. It is discovery evidence, **not an uncontaminated stock-FPS measurement or a gameplay PASS**. The clean profiler-off control is documented below separately.

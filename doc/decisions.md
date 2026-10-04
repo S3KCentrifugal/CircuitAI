@@ -11344,3 +11344,39 @@ retains its failures and only valid instruction locations are analyzed.
 forbids remain enabled in every performance fixture; failures are retained.
 Only measurements from a verified competitive interval qualify as normal-match
 comparisons (KI-498). No new runtime gameplay invariant is introduced.
+
+## D-196 - Preserve Juno behavior while separating aim, flight and impact evidence
+
+**Decision.** Record the user's off-map Juno observation as unresolved KI-499;
+do not alter production firing without a reproduction. All 85 ordinary Shore
+launch aims examined are within bounds. Twelve supplied shots per iteration
+remain inside; the second iteration independently observes twelve actual
+explosion centers inside the map. This does not establish universal correctness.
+
+**Reasoning and rejected alternative.** Strategic shots already reject invalid
+coordinates at selection and execution. The suspected-jammer branch clamps
+inferred candidates, which can explain edge aims. Another identical guard or a
+blanket edge exclusion would not prove a fix and could suppress real edge jammer
+targets. Keep the source trace, exact launch/impact data, and original PASS
+reports separately from the unresolved gameplay observation. No behavior change
+or performance optimization is implemented.
+
+**Files.** [Investigation and reproduction](reviews/2026-10-04-juno-map-edge-investigation.md),
+[performance cross-reference](reviews/2026-10-04-skirmishai-performance-review.md),
+[fixture/observer](../tools/playtest/widgets/juno_edge_probe.lua),
+[acceptance checks](../tools/playtest/checks/shared/combat/juno-edge-probe.json),
+[issue](known-issues.md), [catalog](benchmarks/catalog.json),
+[shared index](benchmarks/index/shared.md). The investigation links both immutable
+bundles, including observer source, exact tagged log excerpts and screenshots.
+
+**Verification.** Both supplied tests played on Shore with all three factions;
+script/DLL parity reports zero findings. The repeat checks twelve launches,
+projectiles and explosions and zero outside flight/impact observations. This is
+supplied weapon mechanics, not live AI target-selection certification. The
+original match and other maps remain unverified. Neither native nor active
+AngelScript behavior was changed.
+
+**Invariant.** Existing runtime invariant forbids remain enabled. Juno aim
+bounds remain guarded by the existing strategic checks/INV-095; test observations
+must distinguish projectile disappearance from a measured explosion. No new
+gameplay invariant or claimed gameplay fix is introduced.

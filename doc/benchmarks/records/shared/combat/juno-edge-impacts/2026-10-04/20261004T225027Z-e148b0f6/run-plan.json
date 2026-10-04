@@ -1,0 +1,12 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "shore-to-shore",
+    "scenario": "juno-edge-impacts"
+  },
+  "id": "20261004T224829Z-eb8c1196",
+  "requested": {},
+  "schema": 1
+}

@@ -1,0 +1,12 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "shore-to-shore",
+    "scenario": "juno-edge-d196"
+  },
+  "id": "20261004T224048Z-24375389",
+  "requested": {},
+  "schema": 1
+}
