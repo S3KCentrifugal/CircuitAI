@@ -18,6 +18,10 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <deque>
+#include <algorithm>
+#include <chrono>
+#include <string>
 
 struct SSkirmishAICallback;
 
@@ -54,6 +58,7 @@ class CThreatMap;
 class CInfluenceMap;
 class CPathFinder;
 class CTerrainManager;
+class CBattleAnalysis;
 class CBuilderManager;
 class CFactoryManager;
 class CEconomyManager;
@@ -289,6 +294,30 @@ public:
 	springai::Lua*        GetLua()        const { return lua.get(); }
 	springai::Pathing*    GetPathing()    const { return pathing.get(); }
 	springai::Drawer*     GetDrawer()     const { return drawer.get(); }
+	// D-118: map drawing paced under the game server's flood guard (it drops a
+	// player's map-draw messages once more than 25 came under 50 ms apart): up
+	// to kDrawBatch items a batch, batches kDrawBatchMs of real time apart
+	void QueueDrawLine(const springai::AIFloat3& a, const springai::AIFloat3& b) { drawOps.push_back(SDrawOp{0, a, b, std::string()}); }
+	void QueueDrawPoint(const springai::AIFloat3& p, const std::string& label) { drawOps.push_back(SDrawOp{1, p, p, label}); }
+	void QueueDrawErase(const springai::AIFloat3& p) { drawOps.push_back(SDrawOp{2, p, p, std::string()}); }
+	int GetDrawQueueSize() const { return int(drawOps.size()); }
+	// D-124 (owner): a smiley face drawn on the map (map lines, the queue's pace)
+	void DrawSmiley(const springai::AIFloat3& centre, float radius);
+	void ClearDrawQueue() { drawOps.clear(); }
+	// the pace: up to `perBatch` items (1..20) a batch, batches `ms` apart (at
+	// least 55: the server's guard counts gaps under 50 ms)
+	void SetDrawPace(int perBatch, int ms) {
+		drawBatch = std::max(1, std::min(20, perBatch));
+		drawBatchMs = std::max(55, ms);
+	}
+private:
+	struct SDrawOp { int type; springai::AIFloat3 a, b; std::string label; };
+	int drawBatch = 20;
+	int drawBatchMs = 100;
+	std::deque<SDrawOp> drawOps;
+	std::chrono::steady_clock::time_point drawBatchTime;
+	void FlushDrawQueue();
+public:
 	springai::SkirmishAI* GetSkirmishAI() const { return skirmishAI.get(); }
 	springai::Team*       GetTeam()       const { return team.get(); }
 	CUnitAPI*             GetUnitAPI()    const { return unitAPI.get(); }
@@ -302,6 +331,7 @@ public:
 	CInfluenceMap*    GetInflMap()         const;
 	CPathFinder*      GetPathfinder()      const { return pathfinder.get(); }
 	CTerrainManager*  GetTerrainManager()  const { return terrainManager.get(); }
+	CBattleAnalysis*  GetBattle()          const { return battle.get(); }  // D-126
 	CBuilderManager*  GetBuilderManager()  const { return builderManager.get(); }
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -357,6 +387,7 @@ private:
 	std::shared_ptr<CMapManager> mapManager;
 	std::shared_ptr<CPathFinder> pathfinder;
 	std::shared_ptr<CTerrainManager> terrainManager;
+	std::shared_ptr<CBattleAnalysis> battle;  // D-126: TECH's weapon clusters
 	std::shared_ptr<CBuilderManager> builderManager;
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

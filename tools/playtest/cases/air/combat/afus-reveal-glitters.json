@@ -1,0 +1,16 @@
+{
+  "name":"afus-reveal-glitters",
+  "map":"All That Glitters v2.2.3",
+  "checks":"air_afus_handoff",
+  "description":"AFUS appears after a lower-priority raid launches; supplied fighters precede bombers so escort ownership is exercised",
+  "visibility":"global", "bomber_only":false,
+  "priority_targets":{"armafus":true,"corafus":true,"legafus":true},
+  "priority_radius":1800,
+  "aircraft":[{"unit":"$fighter2","count":32,"team":0,"once":true},{"unit":"$t2","count":40,"team":0,"once":true}],
+  "targets":[
+    {"unit":"armmmkr","count":1,"position":[4000,8700],"once":true},
+    {"unit":"armafus","count":1,"position":[4000,7900],"after_seconds":90,"once":true},
+    {"unit":"armestor","count":3,"position":[3200,8700],"once":true}
+  ],
+  "defenses":[], "refill_seconds":30
+}

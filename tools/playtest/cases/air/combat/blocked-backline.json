@@ -1,0 +1,16 @@
+{
+  "name": "blocked-backline",
+  "checks": "air_frontline",
+  "description": "Dense backline AA denies economic ingress; a larger funded wave should attack accessible front static",
+  "bomber_only": false,
+  "aircraft": [
+    {"unit":"$t2","count":80,"team":0,"once":true},
+    {"unit":"$fighter2","count":24,"team":0,"once":true}
+  ],
+  "targets": [{"unit":"armafus","count":1,"position":[10000,1500],"once":true}],
+  "defenses": [
+    {"unit":"armmercury","count":40,"position":[10000,1500],"once":true},
+    {"unit":"armguard","count":4,"position":[6400,6000],"once":true}
+  ],
+  "refill_seconds": 30
+}

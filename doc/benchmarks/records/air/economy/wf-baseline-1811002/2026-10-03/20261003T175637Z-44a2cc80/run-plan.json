@@ -1,0 +1,12 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "air",
+    "kind": "natural",
+    "map": "glacial",
+    "scenario": "wf-baseline-1811002"
+  },
+  "id": "20261003T172752Z-58ddbf8e",
+  "requested": {},
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "stop_minute": 20,
+  "expect": [
+    {"key": "field", "pattern": "METAL_FIELD: team=0 mode=1", "scope": "any", "by_minute": 1},
+    {"key": "observer", "pattern": "\\[MetalWatch\\] sample", "scope": "any", "by_minute": 1}
+  ],
+  "forbid": [
+    {"key": "invariant", "pattern": "\\[INVARIANT\\]", "scope": "any"},
+    {"key": "script", "pattern": ": ERR\\s+:|SCRIPT CRASH", "scope": "any"},
+    {"key": "converter", "pattern": "\\[MetalWatch\\] converter-created", "scope": "any"},
+    {"key": "native", "pattern": "Exception:|Access violation|has crashed|Fatal:", "scope": "any"}
+  ],
+  "note": "Native hard profile; no AngelScript AIR/TECH role assertions. Independently audit mex growth."
+}

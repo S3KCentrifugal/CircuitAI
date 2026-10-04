@@ -1,0 +1,20 @@
+{
+  "stop_minute":10,
+  "expect":[
+    {"key":"loaded","pattern":"\\[AirArena\\] event=loaded","scope":"any","by_minute":1},
+    {"key":"launch","pattern":"\\[AirArena\\] event=launch","scope":"any","by_minute":4},
+    {"key":"strategic","pattern":"WAVE: strike target armmmkr","scope":"any","by_minute":4},
+    {"key":"strategic-dead","pattern":"event=death.*team=1 unit=armmmkr","scope":"any","by_minute":7},
+    {"key":"cleanup-target","pattern":"WAVE: strike target armestor","scope":"any","by_minute":9,"after_key":"strategic-dead"},
+    {"key":"cleanup-damage","pattern":"event=damage.*adef=(legphoenix|armpnix|corhurc).*vdef=armestor","scope":"any","by_minute":9},
+    {"key":"cleanup-destroyed","pattern":"event=death.*attackerTeam=0.*team=1 unit=armestor","scope":"any","by_minute":9},
+    {"key":"airborne","pattern":"event=flight.*autoland=0 landed=0","scope":"any","by_minute":4},
+    {"key":"screenshot","pattern":"event=screenshot","scope":"any","by_minute":4}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT|\\[AirOrders\\] ERROR","scope":"any"},
+    {"key":"fixture","pattern":"event=error|Removed widget: AIR combat arena|Failed to load: air_arena|Error in.*air_arena","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

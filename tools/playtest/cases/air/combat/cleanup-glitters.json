@@ -1,0 +1,15 @@
+{
+  "name":"glitters-bomber-cleanup",
+  "map":"All That Glitters v2.2.3",
+  "checks":"air_cleanup",
+  "description":"One-time strategic target followed by surviving lower-value buildings; supplied bombers and energy",
+  "visibility":"global", "bomber_only":true,
+  "aircraft":[{"unit":"$t2","count":20,"team":0,"once":true}],
+  "targets":[
+    {"unit":"armmmkr","count":1,"position":[4000,8700],"once":true},
+    {"unit":"armestor","count":3,"position":[3200,8700],"once":true},
+    {"unit":"armrad","count":1,"position":[2100,8700],"once":true},
+    {"unit":"armflash","count":4,"position":[4200,8100],"once":true}
+  ],
+  "defenses":[], "refill_seconds":60
+}

@@ -1,5 +1,12 @@
 # tech_build.as - TECH's experimental build system
 
+D-167 extracts the scalar reclaim comparison into
+`ProductionMath::LowTierEnergyReclaim` for AIR reuse. TECH's expression order,
+thresholds, reactor prerequisite, rule order and reclaim execution are unchanged.
+
+D-136: normal advanced-lab existence checks use `TechFlank::NormalLabCount`.
+The dedicated specialist lab does not prevent replacing an ordinary lab.
+
 Script: [`data/script/src/roles/tech_build.as`](../../data/script/src/roles/tech_build.as),
 namespace `TechBuild`. Decision:
 [D-066](../decisions.md#d-066--the-experimental-build-system-a-hard-split-tech-only-one-switch).
@@ -23,7 +30,10 @@ three seconds and is asked again.
 
 `AirConRole` claims the two roles; `AirDedicated` (row `air.dedicated`) never falls
 through: its own structure through the layout, else assist a frame of its kind,
-else wait 3 s and log why. `LiftCapForRole` keeps a held role's structure one past
+else, with no site in the layout, defences meanwhile (`AirDefence`, D-123), else
+wait 3 s and log why. `AirDefence` (row `air.defend`, the lowest before `wait`) is
+every air constructor's last resort: reserved resource/lane fortifications, then
+funded weapon clusters (D-152). It no longer scatters a spiral of turrets. `LiftCapForRole` keeps a held role's structure one past
 its count (TECH's start caps and the chain's step targets pinned the advanced fusion
 at 1). `RefillAirRoles` hands a vacant role to another T2 air constructor at once
 (advanced fusions first) and `DropOtherJob` makes it drop a job of another kind
@@ -49,14 +59,14 @@ computes one.
 | `MetalAhead` / `TrackMetal` | (used by `power.turret`) | D-075: the metal bank sampled once a second in `Tick`; ahead = full for `PowerAheadSeconds` or up by `PowerAheadRise` |
 | `ReclaimEnergy` | `energy.reclaim` | D-077: with a fusion standing, reclaim winds and solars nearest the base centre once energy income without them covers the pull by `ReclaimT1EnergyMargin`; advanced solars at `ReclaimAdvSolarMargin`; everything once an advanced fusion stands; `ReclaimEnergyConcurrent` targets in flight |
 | `ReclaimT1Lab` | `lab.t1.reclaim` | the throwaway lab only (D-076); once the advanced lab's frame exists and the metal bank has room for the lab's metal (D-072: reclaim past the cap is lost; the advanced lab's build makes the room), reclaim the T1 bot lab: one native reclaim task that every builder within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) joins; turrets in reach take it first, and their assist tasks are 30 s so they re-ask soon |
-| `StartFactory` | `lab.t1.opening`, `lab.t1.recover`, `lab.t1.spam` | a T1 bot lab. By the commander: on the nearest buildable footprint within `ExpFirstLabRadius` (224) of where it stands whose edge is at least `ExpFirstLabClearance` (32) from the commander (a factory ordered on top of its builder has its command dropped by the engine), reserved and pinned - it is a throwaway, reclaimed once the advanced lab begins, so no walking; `Tick` holds an exit cone in front of it while it stands. By a constructor: the pair's reserved slot. Native's start-factory job is silent and `holdStartFactory` stays on for the whole game. The `IntoT2` guard lives in the table, not here |
+| `StartFactory` | `lab.t1.opening`, `lab.t1.recover`, `lab.t1.spam` | a T1 bot lab. By the commander: on the nearest buildable footprint within `ExpFirstLabRadius` (224) of where it stands whose edge is at least `ExpFirstLabClearance` (32) from the commander (a factory ordered on top of its builder has its command dropped by the engine), reserved and pinned - it is a throwaway, reclaimed once the advanced lab begins, so no walking. With no planned pair (`Layout::fallback`, cramped ground, D-120) the same ring search runs up to `CrampedFirstLabRadius` (800) with any facing, and the advanced lab's footprint is held beside it at once (`Layout::ReserveCrampedLabSlot`, D-121); `Tick` holds an exit cone in front of it while it stands. By a constructor: the pair's reserved slot. Native's start-factory job is silent and `holdStartFactory` stays on for the whole game. The `IntoT2` guard lives in the table, not here |
 | `ExpandMex` | `mex.expand` | the nearest open spot the builder can reach within `EcoMexExpandRadius` (every spot inside it considered, nearest first), allied ground excluded; logs `expands to a mex at (x, z)` and, once a minute, `no open mex spot within R` |
 | `EcoPlanner::Pick*` / `Enqueue`, `Layout::T2LabTask` (D-073: the advanced lab where the most turret slots reach it, front first) | `energy.*`, `lab.t2`, `mex.upgrade`, `energy.convert`, `turret.build`, `storage.*` | the planner's pieces, called one at a time by the rows that own them: energy, converters, the advanced lab, mex upgrades, turrets, storages, all packed into the turret box |
 | `Tech_Commander_AiMakeTask` / `Strategic` | `legacy.strategic` | the role's strategic rungs as they stand (recycle, nukes, anti-nuke, gantry, water factories, T2 constructor policy) with a null default; the planner they used to call answers nothing in this mode |
-| `Defence` | `defence.base` | once the first turret stands: `ExpDefenceLLT` (1) light laser and `ExpDefenceAA` (1) light AA turrets near the factories (packed by native within `ExpDefenceRadius` of the factory centre, outside the planned zones), at most `ExpDefenceMaxOrders` orders per def (D-075: native refused the site fifteen times in a row); nothing else, and native's porc chain is not asked (`Tech_AiMakeDefence` returns at once) |
+| `Defence` | `defence.fortify`, `defence.base` | D-152: shared resource perimeters and lane walls/guns, exactly pinned; five-percent income budget, two orders; T1 waits for base build power, T2 protection starts with construction access |
 | `QueuedOrder` | `order.repair` | native's queued repair orders for our own unfinished structures, nearest first (`aiBuilderMgr.FindQueuedTask`), within `ExpOrderRadius` of the base centre; native's defence, radar and sonar orders are left alone |
 | `AssistAny` | `assist.any` | the nearest structure of ours under construction within `ExpAssistRadius` (commander: `ExpCommanderHomeRadius`) |
-| `GuardFactory` | `guard.factory` | never a retiring lab (D-076); guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
+| `GuardFactory` | `guard.factory` | never a retiring lab (D-076), never a spam lab (D-119); guard the primary T1 lab (`GuardHelpers::AssignWorkerGuard`) |
 | `Wait` | `wait` | 3 s, then ask again |
 
 ## Placement
@@ -114,4 +124,20 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: 039b6e9418b7c0916c0cca31462c5f402ba1c71f; lines: 905 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: 36642ff337ebd203c35fbd988c745eca7a9ecf00; lines: 855 -->
+
+## D-152 defense ownership
+
+`Defence` delegates to `TechFortifications::Work`. Early guns now occupy pinned
+sites behind lane-side wall lines. The previous unpinned placement radius is
+removed. `AirDefence` shares this controller, then `TechWeapons::Work`; the old
+expanding defense spiral is removed. Expansion reservations precede defense reservations.
+
+
+## Shared metal donations (D-175)
+
+`TechBuild::Tick` retains dedicated-air-constructor maintenance. Overflow
+sharing now runs once from the shared economy callback as
+`TeamEconomy::ShareOverflow`, with the original TECH opening gate, threshold,
+budget and cooldown. All six roles use the same settings. See
+[shared metal donations](../team-metal-sharing.md).

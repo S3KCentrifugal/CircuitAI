@@ -10,6 +10,7 @@
 
 #include "module/Module.h"
 #include "util/AvailList.h"
+#include "resource/MetalField.h"
 
 #include "AIFloat3.h"
 
@@ -59,6 +60,7 @@ public:
 	void InitEconomyScores();
 private:
 	void ReadConfig(float& outMinEInc);
+	void InitMetalField();
 	void Init();
 
 public:
@@ -75,6 +77,17 @@ public:
 	float GetMetalMake(CCircuitDef* cdef) const;  // script
 	float GetEnergyMake(CCircuitDef* cdef) const;  // script
 	float GetEnergyUse(CCircuitDef* cdef) const;  // script: converter consumption
+	bool IsMetalMap() const { return metalMap; }
+	bool IsMetalConverter(const CCircuitDef* cdef) const;
+	int GetFieldMexCount(const springai::AIFloat3& center, float radius) const;
+	float GetFieldYield(CCircuitDef* def, const springai::AIFloat3& pos);
+	IBuilderTask* EnqueueFieldMex(CCircuitUnit* builder, const springai::AIFloat3& center, float radius);
+	IBuilderTask* EnqueueFieldUpgrade(CCircuitUnit* builder, const springai::AIFloat3& center, float radius);
+	bool ClaimFieldSite(metal_field::Key& key, CCircuitDef* def, const springai::AIFloat3& pos, int targetId = -1);
+	bool OwnsFieldSite(metal_field::Key key) const;
+	void ReleaseFieldSite(metal_field::Key key);
+	bool SyncFieldUnits();
+	int GetEffectiveUnitLimit() const;
 	int GetMexSpotCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
 	// D-086: the centroid of the maxSpots metal spots nearest center within radius
 	// (0 = all); center itself when there is none. Known from the map at setup.
@@ -151,8 +164,8 @@ public:
 	bool IsAllyOpenMexSpot(int spotId) const;
 	bool IsOpenMexSpot(int spotId) const;
 	void SetOpenMexSpot(int spotId, bool value);
-	bool IsUpgradingMexSpot(int spotId) const { return mexSpots[spotId].isUp; }
-	void SetUpgradingMexSpot(int spotId, bool value) { mexSpots[spotId].isUp = value; }
+	bool IsUpgradingMexSpot(int spotId) const { return spotId >= 0 && std::size_t(spotId) < mexSpots.size() && mexSpots[spotId].isUp; }
+	void SetUpgradingMexSpot(int spotId, bool value) { if (spotId >= 0 && std::size_t(spotId) < mexSpots.size()) mexSpots[spotId].isUp = value; }
 	bool IsOpenGeoSpot(int spotId) const { return geoSpots[spotId].isOpen; }
 	void SetOpenGeoSpot(int spotId, bool value) { geoSpots[spotId].isOpen = value; }
 	bool IsUpgradingGeoSpot(int spotId) const { return geoSpots[spotId].isUp; }
@@ -193,6 +206,13 @@ private:
 	void UpdateEconomy();
 
 	Handlers2 createdHandler;
+	bool metalMap = false;
+	float fieldLegacyEnergyRatio = 25.f, fieldHomeRadius = 2400.f;
+	int fieldCandidateBudget = 96, fieldCellBudget = 16384;
+	float fieldMinYieldFraction = 0.8f;
+	std::map<int, int> fieldCursors;
+	std::vector<int> fieldCells;
+	std::set<int> fieldConverters;
 	Handlers1 finishedHandler;
 	EHandlers destroyedHandler;
 

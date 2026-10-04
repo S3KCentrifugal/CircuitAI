@@ -1,0 +1,18 @@
+{
+  "_doc": "Supplied banks: all six roles must execute the shared donation; audit infolog for actual amounts and recipient arrivals.",
+  "stop_minute": 5,
+  "expect": [
+    {"key":"TECH shares","pattern":"\\[TECH\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"AIR shares","pattern":"\\[AIR\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"FRONT shares","pattern":"\\[FRONT\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"SEA shares","pattern":"\\[SEA\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"TACTICAL shares","pattern":"\\[TACTICAL\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"SUPPORT shares","pattern":"\\[SUPPORT\\]\\[Share\\] metal .*: sent ","by_minute":4.8,"scope":"any"},
+    {"key":"fixture","pattern":"\\[ShareFixture\\] loaded","by_minute":0.5,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script error","pattern":": ERR\\s+:","scope":"any"},
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"fixture removed","pattern":"Removed widget: Team metal share fixture","scope":"any"}
+  ]
+}

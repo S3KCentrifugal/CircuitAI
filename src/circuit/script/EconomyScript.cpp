@@ -41,6 +41,11 @@ static IUnitTask* CEconomyManager_EnqueueMexWithin(
 	return mgr->EnqueueMexWithin(builder, center, radius, maxSpots);
 }
 
+static IUnitTask* CEconomyManager_EnqueueFieldUpgrade(CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius)
+{
+	return mgr->EnqueueFieldUpgrade(builder, center, radius);
+}
+
 CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 		: IModuleScript(scr, mgr)
 {
@@ -55,6 +60,11 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 
 	r = engine->RegisterObjectType("CEconomyManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CEconomyManager aiEconomyMgr", manager); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GetFieldMexCount(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetFieldMexCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "float GetFieldYield(const CCircuitDef@, const AIFloat3& in)", asMETHOD(CEconomyManager, GetFieldYield), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueFieldUpgrade(CCircuitUnit@, const AIFloat3& in, float)", asFUNCTION(CEconomyManager_EnqueueFieldUpgrade), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "const SResourceInfo metal", asOFFSET(CEconomyManager, metal)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "const SResourceInfo energy", asOFFSET(CEconomyManager, energy)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isMetalEmpty", asOFFSET(CEconomyManager, isMetalEmpty)); ASSERT(r >= 0);

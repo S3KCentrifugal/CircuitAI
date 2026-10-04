@@ -1,0 +1,5 @@
+{
+  "stop_minute":8,
+  "expect":[{"key":"tech", "pattern":"experimental build system on", "by_minute":1}, {"key":"opening", "pattern":"\\[Rule\\] (opening.mex|chain.next)", "by_minute":1}],
+  "forbid":[{"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"}, {"key":"invariant", "pattern":"INVARIANT", "scope":"any"}, {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}]
+}

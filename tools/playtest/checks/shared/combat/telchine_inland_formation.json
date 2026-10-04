@@ -1,0 +1,65 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "ShoreProbe.*loaded controlled=1 gifted=6",
+      "by_minute": 1,
+      "scope": "any"
+    },
+    {
+      "key": "dry-travel",
+      "pattern": "\\[AMPH\\].*travel dry=[1-9][0-9]* water=0",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "formation-order",
+      "pattern": "\\[AMPH\\].*land line slots=[3-6]",
+      "by_minute": 4,
+      "scope": "any"
+    },
+    {
+      "key": "land-fire",
+      "pattern": "ShoreProbe.*land_hit",
+      "by_minute": 5,
+      "scope": "any",
+      "after_key": "formation-order"
+    },
+    {
+      "key": "formation-combat",
+      "pattern": "ShoreProbe.*land_formation dry_nearby=[3-6] span=[1-9][0-9]{2}",
+      "by_minute": 5,
+      "scope": "any",
+      "after_key": "formation-order"
+    },
+    {
+      "key": "kill",
+      "pattern": "ShoreProbe.*land_target_destroyed",
+      "by_minute": 8,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|Error in.*[Tt]elchine",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "terrain",
+      "pattern": "ShoreProbe.*terrain_bad_target",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

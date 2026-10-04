@@ -1,4 +1,65 @@
+Experimental AIR now uses [D-171 committed operations](air-committed-operations-plan.md):
+offensive sorties keep attacking, all available fighters escort them, and
+income gates bomber production. The historical modes and return behavior
+below remain available to legacy callers.
+
+**D-185/D-186 primary target weights (2026-10-03).** Experimental AIR T2 operations
+score AFUS at x4, advanced energy converters at x3, factories at x2 and regular
+land fusions at x1 (Armada, Cortex, Legion, plus Armada's cloakable fusion when
+visible), advanced geothermal powerplants at x0.75 and naval advanced energy
+converters at x0.5. Advanced geos include the three factions' land/naval power
+variants and Armada's safe Prude; submerged targets still obey the existing
+depth filter. Naval converters use their distinct faction definitions and do
+not inherit the land converters' x3 weight.
+These are multipliers within one primary stage, combined with value,
+distance and route risk, not strict sub-stages. Eligible fusions therefore
+precede the static-defense fallback. T1 mex/wind priorities, defensive heavy-unit
+selection and the AFUS-only immediate diversion threshold remain unchanged.
+Policy: [AirOperations::Configure](../data/script/src/manager/air_operations.as).
+
 # Air wave attacks
+
+**D-162 experimental AIR override.** The legacy description below applies to
+`ExperimentalBuild=false`. Enabled AIR uses home staging routes, ordinary
+lethal bomber pools and the [D-163 campus/mission policy](air-campus-strike-design.md).
+The first T2 wave draws once from a configurable 10-20 range after two completed
+AFUS. Later sorties use target health and padded corridor risk; the eight-aircraft
+minimum never waives that requirement. A separate income/energy/build-power
+funded reserve keeps production ahead of sorties.
+After sortie completion, heavy losses increase a saved resistance multiplier
+(bounded at 3 by default); good survival relaxes it. A below-25% survival raid
+excludes its 640-elmo target region for five minutes, with up to eight regions.
+These are AIR settings, not fixed native priorities. Temporary region memory
+resets on role initialization; the learned multiplier is saved.
+Three reusable T1 bombers can form an independent raid. Requested transports,
+required crews and emergency defense precede discretionary strikes.
+
+Native flight-policy opt-in bounds fronts to 1,320 elmos, with 180-elmo lanes
+and 240-elmo ranks. Slots are assigned nearby after the joining window. Arrival
+is latched within 600 elmos and cleared outside 1,200 to accommodate fixed-wing
+orbits; 80% must be ready. The timeout allows distance/speed transit plus the
+script's settling time. Incomplete assembly returns home. Target selection includes economic enemy
+data, estimates health feasibility and samples the entire route. Actual
+lethal weapon release (or an attributed lethal hit for scripted beams), target disappearance, pass completion and a 35% loss
+threshold control return to staging. Returned survivors remain in the
+immutable evaluation cohort. This does not change static AA behavior.
+
+Phoenix budgeting inspects its lethal heat-ray mount rather than its zero-damage
+targeting/sound mounts. Its nominal sweep upper bound still uses the configured
+pass fraction; release observations never assume that every sweep tick hits.
+See [measured results](air-enhancement-results.md) for faction-specific evidence.
+
+EMP timing, Liche pairs, coordinated target reservations, fighter sweeps and
+radar-plane missions remain in the [reviewed plan](air-enhancement-review.md).
+
+
+**D-147 update.** Enabled AIR reserves a separate home-fighter cohort before
+wave holds. `WaveAvoidHomeFocus` selects the nearest participating enemy start
+when no ground opposition is observed or the combat focus is absent/near home.
+An explicit STRIKE/DEEP target still overrides that fallback. This avoids
+carpeting the home runway in an AIR duel without changing TECH or the six wave
+methods. The [controlled sortie](benchmarks/air-management.md) launched 24
+bombers and independently observed their damage to enemy targets.
 
 How an AIR-role T2 bomber wave is sized, how it forms up, and the six
 methods it attacks with. The hold-and-release machinery that gathers a wave

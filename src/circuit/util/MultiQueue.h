@@ -35,6 +35,7 @@ public:
 	void Pop(T& item);
 	void PushBack(const T& item);
 	void PushFront(const T& item);
+    void PushBefore(const T& item, ConditionFunction before);
 	bool IsEmpty();
 	size_t Size();
 	/*

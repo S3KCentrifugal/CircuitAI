@@ -1,0 +1,13 @@
+{
+  "stop_minute":12,
+  "expect":[
+    {"key":"tech","pattern":"Role switch complete: now TECH","by_minute":4},
+    {"key":"air","pattern":"Role switch complete: now AIR","by_minute":7},
+    {"key":"front","pattern":"Role switch complete: now FRONT","by_minute":10}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

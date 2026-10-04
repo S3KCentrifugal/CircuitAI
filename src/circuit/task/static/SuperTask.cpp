@@ -13,8 +13,17 @@
 #include "terrain/TerrainManager.h"
 #include "unit/enemy/EnemyManager.h"
 #include "unit/enemy/EnemyUnit.h"
+#include "unit/ally/AllyTeam.h"
+#include "unit/ally/AllyUnit.h"
+#include "Command.h"
+#include "Sim/Units/CommandAI/Command.h"
+#include "task/static/StrategicTargeting.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
+
+#define SMILEY_RADIUS	400.f  // D-124: the face over a nuke's target
+#define SMILEY_DEDUPE	(FRAMES_PER_SEC * 5)  // D-124: the stockpile watch draws only if the event did not within this
+#define SMILEY_DEDUPE_EVENT	(FRAMES_PER_SEC * 1)  // D-124: two launch signals this close are one launch
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
@@ -57,6 +66,7 @@ bool CSuperTask::CanAssignTo(CCircuitUnit* unit) const
 
 void CSuperTask::RemoveAssignee(CCircuitUnit* unit)
 {
+	manager->GetCircuit()->GetAllyTeam()->GetPulseClaims().ReleasePending(unit->GetId());
 	IFighterTask::RemoveAssignee(unit);
 	if (units.empty()) {
 		manager->AbortTask(this);
@@ -79,6 +89,19 @@ void CSuperTask::Update()
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitUnit* unit = *units.begin();
+
+	// D-124 (owner): a nuclear missile launched: a smiley face on the map over
+	// the target. The weapon-fired event is the hook (CCircuitAI::WeaponFired);
+	// this stockpile watch is its safety net and draws only when the event did
+	// not in the last SMILEY_DEDUPE frames
+	if (IsNukeSilo(unit->GetCircuitDef()) || IsPulse(unit->GetCircuitDef())) {
+		const int stock = unit->GetUnit()->GetStockpile();
+		if ((lastStock >= 0) && (stock < lastStock) && state == State::ENGAGE
+			&& strategic::Valid({targetPos.x, targetPos.z}) && (frame - lastStrategicLaunch > SMILEY_DEDUPE)) {
+			OnLaunch(unit, "stockpile drop");
+		}
+		lastStock = stock;
+	}
 
 	if (unit->Blocker() != nullptr) {
 		return;  // Do not interrupt current action
@@ -105,13 +128,32 @@ void CSuperTask::Update()
 	}
 
 	CMilitaryManager* policyMgr = circuit->GetMilitaryManager();
-	const bool isPulse = policyMgr->GetPulseInfo().isEnabled
-			&& cdef->IsRespRoleAny(policyMgr->GetPulseInfo().pulseRole);
+	const bool isPulse = IsPulse(cdef);
 	const CWeaponDef* empWd = cdef->GetWeaponDef();
 	const bool isEmp = !isPulse && policyMgr->GetEmpInfo().isEnabled
 			&& cdef->IsRespRoleAny(policyMgr->GetEmpInfo().empRole)
 			&& (empWd != nullptr) && empWd->IsParalyzer();
 	if (isPulse || isEmp) {
+		if (isPulse && unit->GetUnit()->GetStockpile() <= 0) {
+			circuit->GetAllyTeam()->GetPulseClaims().ReleasePending(unit->GetId());
+			targetFrame = frame;
+			return;
+		}
+		if (isPulse) {
+			// Observe allied ground orders too, including human-controlled Junos.
+			// This only reads their commands; it never takes control of them.
+			const auto& policy = policyMgr->GetPulseInfo();
+			for (const auto& [id, ally] : circuit->GetAllyTeam()->GetFriendlyUnits()) {
+				if (id == unit->GetId() || ally->GetCircuitDef() == nullptr || !IsPulse(ally->GetCircuitDef())) continue;
+				auto commands = ally->GetUnit()->GetCurrentCommands();
+				if (!commands.empty() && commands.front()->GetId() == CMD_ATTACK) {
+					const auto params = commands.front()->GetParams();
+					if (params.size() >= 3) circuit->GetAllyTeam()->GetPulseClaims().Add(id, {params[0], params[2]},
+						ally->GetCircuitDef()->GetAoe(), frame, policy.pendingFrames, true);
+				}
+				utils::free_clear(commands);
+			}
+		}
 		// Neither weapon falls back to the group scan: spending the stockpile on
 		// the richest enemy blob, which one cannot damage and the other cannot
 		// hold, is worse than waiting for a target that works.
@@ -119,7 +161,7 @@ void CSuperTask::Update()
 		// target deep behind the line is still worth the shot. Only when nothing
 		// is known does the weapon fall back to inferring one from a radar hole.
 		const bool hasTarget = isPulse
-				? (SelectPulseTarget(unit, cdef) || SelectSuspectedJammer(unit, cdef))
+				? (SelectPulseTarget(unit, cdef) || SelectSuspectedJammer(unit, cdef) || SelectFogTarget(unit, cdef))
 				: SelectEmpTarget(unit, cdef);
 		if (hasTarget) {
 			ExecuteAttack(unit);
@@ -127,6 +169,15 @@ void CSuperTask::Update()
 			TRY_UNIT(circuit, unit,
 				unit->CmdStop();
 			)
+			SetTarget(nullptr);
+			targetFrame = frame;
+		}
+		return;
+	}
+	if (IsNukeSilo(cdef)) {
+		if (SelectNuclearTarget(unit, cdef)) ExecuteAttack(unit);
+		else {
+			TRY_UNIT(circuit, unit, unit->CmdStop();)
 			SetTarget(nullptr);
 			targetFrame = frame;
 		}
@@ -335,7 +386,8 @@ void CSuperTask::Update()
  *    the target may no longer be visible.
  */
 bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
-		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly)
+		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly,
+		bool allEnemies, bool pulseClaims, bool nuclearHistory)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
@@ -349,7 +401,10 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	std::vector<SAreaCand> cands;
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
 
-	for (const SEnemyData& e : circuit->GetEnemyManager()->GetHostileDatas()) {
+	const auto* enemies = circuit->GetEnemyManager();
+	for (const auto* pool : {&enemies->GetHostileDatas(), allEnemies ? &enemies->GetPeaceDatas() : nullptr}) {
+	if (pool == nullptr) continue;
+	for (const SEnemyData& e : *pool) {
 		if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore()) {
 			continue;
 		}
@@ -375,6 +430,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 			++rejRange;
 			continue;
 		}
+		if ((pulseClaims || nuclearHistory) && !CanAimStrategic(unit, e.pos)) continue;
 		if (avoidFriendly) {
 			// A damaging blast on our own units is never worth it, whatever the
 			// enemy value inside it (CR-005). The engine query is per candidate;
@@ -388,6 +444,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 			}
 		}
 		cands.push_back({e.pos, rank, value});
+	}
 	}
 
 	int bestRank = std::numeric_limits<int>::max();
@@ -503,30 +560,78 @@ bool CSuperTask::SelectPulseTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	return SelectAreaTarget(unit, cdef, "PULSE", SQUARE(cdef->GetAoe()),
 			pulse.minTargets, pulse.mobileMaxAge,
 			[&pulse](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
-		// Custom config roles live in respRole: AddRole() puts the requested role
-		// there and only the binded role in role.
-		const bool isJammer = edef->IsRespRoleAny(pulse.jammerRole);
-		const bool isRadar = edef->IsRespRoleAny(pulse.radarRole);
-		if (!isJammer && !isRadar) {
-			return false;
-		}
-		const bool isMobile = edef->IsMobile();
-		CMilitaryManager::PulseClass cls;
-		if (isJammer) {  // a def marked both counts as the jammer it is
-			cls = isMobile ? CMilitaryManager::PulseClass::JAMMER_MOBILE
-					: CMilitaryManager::PulseClass::JAMMER_STATIC;
-		} else {
-			cls = isMobile ? CMilitaryManager::PulseClass::RADAR_MOBILE
-					: CMilitaryManager::PulseClass::RADAR_STATIC;
-		}
-		const int r = pulse.rank[static_cast<CMilitaryManager::PulseC>(cls)];
+		const auto cls = pulse.targetClasses.find(edef->GetId());
+		if (cls == pulse.targetClasses.end()) return false;
+		const int r = pulse.rank[cls->second];
 		if (r < 0) {
 			return false;  // class excluded by config
 		}
 		rank = r;
 		value = e.cost;
 		return true;
-	});
+	}, 0.f, false, true, true);
+}
+
+bool CSuperTask::IsPulse(CCircuitDef* cdef) const
+{
+	const auto& p = manager->GetCircuit()->GetMilitaryManager()->GetPulseInfo();
+	return p.isEnabled && (cdef->IsRespRoleAny(p.pulseRole) || p.unitDefs.count(cdef->GetId()) != 0);
+}
+
+bool CSuperTask::CanAimStrategic(CCircuitUnit* unit, const AIFloat3& pos) const
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	if (!strategic::Valid({pos.x, pos.z}) || pos.x >= CTerrainManager::GetTerrainWidth() || pos.z >= CTerrainManager::GetTerrainHeight()) return false;
+	const int frame = circuit->GetLastFrame();
+	if (IsPulse(unit->GetCircuitDef())) return !circuit->GetAllyTeam()->GetPulseClaims().Blocked({pos.x, pos.z}, unit->GetId(), frame, false);
+	if (IsNukeSilo(unit->GetCircuitDef())) return !circuit->GetAllyTeam()->GetNuclearHistory().Blocked({pos.x, pos.z}, unit->GetId(), frame, true);
+	return true;
+}
+
+bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	const auto& policy = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo();
+	const float floor = StockedShotFloor(unit, cdef, manager->GetCircuit()->GetLastFrame(), cdef->GetWeaponDef()->GetCostMShot());
+	return SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
+		[&policy](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
+			if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
+			rank = 0; value = e.cost; return true;
+		}, floor, true, true, false, true);
+}
+
+bool CSuperTask::SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();
+	if (!policy.scatter) return false;
+	const auto* map = circuit->GetMapManager();
+	AIFloat3 best(-1.f, 0.f, -1.f);
+	float bestScore = -1.f;
+	const float width = CTerrainManager::GetTerrainWidth(), height = CTerrainManager::GetTerrainHeight();
+	const float step = std::max(policy.scatterStep, std::sqrt(width * height / 4096.f));
+	const auto& enemy = circuit->GetEnemyManager()->GetEnemyPos(); // known-contact aggregate, never hidden units
+	for (float z = step / 2; z < height; z += step) for (float x = step / 2; x < width; x += step) {
+		const AIFloat3 edge(x, 0.f, z);
+		if (!map->IsInLOS(edge)) continue;
+		for (int k = 0; k < 8; ++k) {
+			const float angle = float(k) * float(M_PI) / 4.f;
+			const AIFloat3 boundaryPos(x + std::cos(angle) * step, 0.f, z + std::sin(angle) * step);
+			AIFloat3 p(x + std::cos(angle) * (step + policy.scatterDepth), 0.f, z + std::sin(angle) * (step + policy.scatterDepth));
+			if (boundaryPos.x < 0 || boundaryPos.z < 0 || boundaryPos.x >= width || boundaryPos.z >= height || !CanAimStrategic(unit, p)
+				|| map->IsInLOS(boundaryPos) || map->IsInLOS(p) || position.SqDistance2D(p) >= SQUARE(cdef->GetMaxRange())) continue;
+			if (p.SqDistance2D(enemy) >= edge.SqDistance2D(enemy)) continue; // enemy-facing fog, not the back of our base
+			// Stable rotation prevents repeatedly favoring the same equal-valued edge.
+			const unsigned hash = unsigned(x) * 73856093u ^ unsigned(z) * 19349663u ^ unsigned(unit->GetId()) ^ unsigned(lastStrategicLaunch);
+			const float score = 1.f / (1.f + std::sqrt(p.SqDistance2D(enemy)) / step)
+				+ circuit->GetInflMap()->GetEnemyInflAt(p) + float(hash % 1000) * 0.0001f;
+			if (score > bestScore) { best = p; bestScore = score; }
+		}
+	}
+	if (best.x < 0.f) return false;
+	SetTarget(nullptr); targetPos = best;
+	targetPos.y = circuit->GetMap()->GetElevationAt(best.x, best.z);
+	circuit->LOG("PULSE %s(%i): fog scatter at (%i,%i)", cdef->GetDef()->GetName(), unit->GetId(), int(best.x), int(best.z));
+	return true;
 }
 
 /*
@@ -580,6 +685,7 @@ bool CSuperTask::SelectSuspectedJammer(CCircuitUnit* unit, CCircuitDef* cdef)
 					seed.pos.z + std::sin(angle) * pulse.holeProbeRadius);
 			CTerrainManager::CorrectPosition(probe);
 			probe.y = circuit->GetMap()->GetElevationAt(probe.x, probe.z);
+			if (!CanAimStrategic(unit, probe)) continue;
 			if (position.SqDistance2D(probe) >= maxSqRange) {
 				continue;
 			}
@@ -705,6 +811,59 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	});
 }
 
+bool CSuperTask::IsNukeSilo(CCircuitDef* cdef)
+{
+	const std::string name = cdef->GetDef()->GetName();
+	return (name == "armsilo") || (name == "corsilo") || (name == "legsilo");
+}
+
+AIFloat3 CSuperTask::GetAimPos() const
+{
+	if (!isTargetOverride && (GetTarget() != nullptr)) {
+		return GetTarget()->GetPos();
+	}
+	return targetPos;
+}
+
+void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	CCircuitDef* d = unit->GetCircuitDef();
+	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
+	if (!nuke && !pulse) return;
+	if (frame - lastStrategicLaunch <= SMILEY_DEDUPE_EVENT) return;
+	const AIFloat3 aim = GetAimPos();
+	if (!CanAimStrategic(unit, aim)) circuit->LOG("[INVARIANT] INV-095 strategic launch violates target-area exclusion: unit=%i", unit->GetId());
+	lastStrategicLaunch = frame;
+	if (nuke) {
+		const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+		circuit->GetAllyTeam()->GetNuclearHistory().Add(unit->GetId(), {aim.x, aim.z},
+			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);
+	} else {
+		const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();
+		circuit->GetAllyTeam()->GetPulseClaims().Add(unit->GetId(), {aim.x, aim.z}, d->GetAoe(), frame, policy.coverageFrames, false);
+		circuit->LOG("PULSE: launched from %s(%i) at (%.0f, %.0f) (%s)", d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, how);
+	}
+	// Attack-ground persists after launch; stop it before another stocked shot
+	// can fire without passing the updated ledger. Keep the aim for event users.
+	TRY_UNIT(circuit, unit, unit->CmdStop();)
+	SetTarget(nullptr); targetPos = aim; isTargetOverride = false; state = State::ROAM;
+	if (!nuke) return;
+	if (frame - lastSmileyFrame <= SMILEY_DEDUPE_EVENT) {
+		return;  // one smiley a launch
+	}
+	const AIFloat3 at = GetAimPos();
+	if (!geom::is_valid(at)) {
+		circuit->LOG("NUKE: launched from %s(%i) (%s) with no aim known: no smiley (D-124)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), how);
+		return;
+	}
+	lastSmileyFrame = frame;
+	circuit->LOG("NUKE: launched from %s(%i) at (%.0f, %.0f) (%s): a smiley on the target (D-124)",
+			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), at.x, at.z, how);
+	circuit->DrawSmiley(at, SMILEY_RADIUS);
+}
+
 void CSuperTask::SetTargetPos(const AIFloat3& pos)
 {
 	SetTarget(nullptr);
@@ -720,6 +879,33 @@ void CSuperTask::ExecuteAttack(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
+	CCircuitDef* d = unit->GetCircuitDef();
+	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
+	bool valid = CanAimStrategic(unit, targetPos);
+	if (nuke && circuit->GetMilitaryManager()->GetNuclearInfo().structuresOnly) {
+		bool structure = false;
+		const auto* enemies = circuit->GetEnemyManager();
+		for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) for (const auto& e : *pool) {
+			if (!e.IsFake() && !e.IsDead() && !e.IsDying() && !e.IsIgnore() && e.cdef != nullptr
+				&& !e.cdef->IsMobile() && targetPos.SqDistance2D(e.pos) < SQUARE(d->GetAoe())) { structure = true; break; }
+		}
+		valid = valid && structure;
+	}
+	if (nuke && valid) {
+		auto& allies = circuit->GetCallback()->GetFriendlyUnitsIn(targetPos, d->GetAoe());
+		valid = allies.empty();
+		utils::free(allies);
+	}
+	if ((nuke || pulse) && !valid) {
+		TRY_UNIT(circuit, unit, unit->CmdStop();)
+		circuit->GetAllyTeam()->GetPulseClaims().ReleasePending(unit->GetId());
+		SetTarget(nullptr); isTargetOverride = false; targetFrame = frame; state = State::ROAM;
+		return;
+	}
+	if (pulse && unit->GetUnit()->GetStockpile() > 0) {
+		const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();
+		circuit->GetAllyTeam()->GetPulseClaims().Add(unit->GetId(), {targetPos.x, targetPos.z}, d->GetAoe(), frame, policy.pendingFrames, true);
+	}
 
 	bool isFiring = !unit->GetCircuitDef()->IsAttrStock() || (unit->GetUnit()->GetStockpile() > 0);
 	std::string cmd = isFiring ? "ai_super_fire:" : "ai_super_intention:";

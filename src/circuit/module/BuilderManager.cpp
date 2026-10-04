@@ -234,6 +234,7 @@ void CBuilderManager::InitHandlers()
 		CCircuitDef* mexDef = unit->GetCircuitDef();
 		const int facing = unit->GetUnit()->GetBuildingFacing();
 		this->circuit->GetTerrainManager()->DelBlocker(mexDef, pos, facing, true);
+		if (this->circuit->GetEconomyManager()->IsMetalMap()) return;
 		int index = this->circuit->GetMetalManager()->FindNearestSpot(pos);
 		if ((index < 0) || (reclaimUnits.find(unit) != reclaimUnits.end())) {
 			return;
@@ -578,9 +579,26 @@ int CBuilderManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 
 int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 {
+	// Experimental AIR can have a second construction task adopt the same
+	// standing frame. Only one is in unfinishedUnits; the other must not keep
+	// recruiting workers to repair an already completed structure. Snapshot
+	// before dequeuing, and finish the registered owner exactly once below.
+	std::vector<IBuilderTask*> staleOwners;
+	if (IsExperimentalAirDirect()) {
+		for (const auto& byType : buildTasks) for (IBuilderTask* task : byType) {
+			if (!task->IsDead() && task->GetBuildType() <= IBuilderTask::BuildType::MEXUP
+				&& task->GetTarget() == unit) staleOwners.push_back(task);
+		}
+	}
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
 		DoneTask(iter->second);
+	}
+	for (IBuilderTask* task : staleOwners) {
+		if (!task->IsDead()) {
+			circuit->LOG("EXP: retire duplicate construction owner for completed frame %i", unit->GetId());
+			AbortTask(task);
+		}
 	}
 	// D-108 crash: the entry goes with the frame even when its task was already
 	// dequeued (DequeueTask erases by the task's current target only)
@@ -784,6 +802,30 @@ CCircuitUnit* CBuilderManager::FindUnfinishedNear(const AIFloat3& pos, float rad
 	return best;
 }
 
+CCircuitUnit* CBuilderManager::FindProducedNear(const AIFloat3& pos, float radius)
+{
+	// D-119: FindUnfinishedNear sees only the structures our builder tasks raise;
+	// a unit in a factory's production is none of those. The nearest mobile unit
+	// of ours still being built within radius.
+	const int frame = circuit->GetLastFrame();
+	const float radiusSq = SQUARE(radius);
+	CCircuitUnit* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if ((unit == nullptr) || unit->IsDead() || (unit->GetCircuitDef() == nullptr) || !unit->GetCircuitDef()->IsMobile()) {
+			continue;
+		}
+		const float sq = unit->GetPos(frame).SqDistance2D(pos);
+		if ((sq > radiusSq) || (sq >= bestSq) || !unit->GetUnit()->IsBeingBuilt()) {
+			continue;
+		}
+		bestSq = sq;
+		best = unit;
+	}
+	return best;
+}
+
 float CBuilderManager::GetBuildPowerNearExcept(const AIFloat3& position, float radius, const CCircuitDef* ex1, const CCircuitDef* ex2,
 		const CCircuitUnit* exUnit) const
 {
@@ -946,6 +988,23 @@ void CBuilderManager::ActivateTask(IBuilderTask* task)
 
 IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 {
+	// Positional requests from older role helpers still enter the field claim
+	// lifecycle. They may never fall back to nearest synthetic spot ownership.
+	if (circuit->GetEconomyManager()->IsMetalMap()
+		&& (ti.type == IBuilderTask::BuildType::MEX || ti.type == IBuilderTask::BuildType::MEXUP)
+		&& ti.i.spotId != metal_field::SiteTagV1) {
+		auto field = ti;
+		field.i.spotId = metal_field::SiteTagV1;
+		return Enqueue(field);
+	}
+	// Only construction types (the contiguous range before REPAIR) initialize
+	// buildDef. Service tasks such as Repair/Reclaim leave that field unset.
+	// A profile's construction veto survives scripts lifting temporary caps.
+	if ((ti.type < IBuilderTask::BuildType::REPAIR)
+			&& (ti.buildDef != nullptr) && (!ti.buildDef->IsBuildAllowed()
+				|| circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef))) {
+		return nullptr;
+	}
 	IBuilderTask* task;
 
 	switch (ti.type) {
@@ -1061,6 +1120,11 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 	}
 	lastEnqueued = task;
 	TaskAdded(task);
+	if ((ti.type == IBuilderTask::BuildType::MEX && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexTask*>(task)->HasFieldClaim())
+		|| (ti.type == IBuilderTask::BuildType::MEXUP && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexUpTask*>(task)->HasFieldClaim())) {
+		AbortTask(task);
+		return nullptr;
+	}
 	return task;
 }
 
@@ -1251,6 +1315,10 @@ int CBuilderManager::TurretsOnReclaim(int targetId, float margin, bool apply)
 		IUnitTask* t = u->GetTask();
 		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::PLAYER)) {
 			continue;
+		}
+		if (t != nullptr && t->IsEnemyReclaim()) continue; // enemy denial precedes friendly recycling (D-184)
+		if (u->IsAttrNoDisrupt()) {
+			continue;  // D-117: bound to its duty (a spam lab's turret assists that lab only)
 		}
 		if ((t != nullptr) && (t->GetType() == IUnitTask::Type::BUILDER)) {
 			IBuilderTask* bt = static_cast<IBuilderTask*>(t);
@@ -2200,7 +2268,9 @@ void CBuilderManager::Load(std::istream& is)
 				default: break;
 			}
 			if (task != nullptr) {
-				const bool isValid = is >> *task;
+				bool isValid = is >> *task;
+				if (circuit->GetEconomyManager()->IsMetalConverter(task->GetBuildDef())
+					&& task->GetBuildType() < IBuilderTask::BuildType::REPAIR) isValid = false;
 				buildTasks[i].insert(task);
 				buildTasksCount++;
 				updateTasks.push_back(task);

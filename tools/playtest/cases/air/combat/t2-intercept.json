@@ -1,0 +1,8 @@
+{
+  "name": "t2-intercept",
+  "description": "Repeated T2 bomber raids versus a replenished fighter screen and scattered economy",
+  "aircraft": [{"unit":"$t2","count":64,"team":0},{"unit":"$fighter2","count":16,"team":1}],
+  "targets": [{"unit":"armfus","count":1,"position":[11000,2600]},{"unit":"armmmkr","count":4,"position":[8400,1600]},{"unit":"armaap","count":1,"position":[9500,1800]}],
+  "defenses": [],
+  "refill_seconds": 45
+}

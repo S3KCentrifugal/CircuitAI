@@ -1,11 +1,35 @@
 # Base layout
 
+D-181 adds an independent support array to AIR economy modules (schema 2),
+leaving the original reactor-first nine slots unchanged. Twelve densely packed
+turrets are reserved atomically within reach of the reactor; failed batches
+release every new pin. The native footprint binding returns **half-cells**:
+adjacent nano centers need `2 * footprint * SQUARE_SIZE`. Module envelopes
+include the support gap before advanced converters. Metal-map modules retain
+only their reactor plus the separate support bank. Old nine-slot state loads
+with zero support; an occupied district stays anchored and can use mobile
+workers if no valid supplemental bank fits. An unused module relocates when
+its reactor, converter or support reservations are physically blocked.
+
+D-179 compacts AIR's native compound into touching factory rows with dense
+rear support banks. Six T2 labs using loaded 9x9/3x3 footprints occupy a
+27x60-cell envelope, versus 63x30 previously. All twenty turrets per lab stay
+within 400-elmo reach. Existing reservations are retained; named support-slot
+ownership takes precedence over nearest-lab assignment. TECH geometry and
+sequence remain unchanged. See [design and simulations](air-opening-recon-plan.md).
+
+D-167: AIR uses the same native half-cell geometry and persistent reservation
+mechanism through `PlanAirFactoryCluster`, with its own six-lab compound policy.
+TECH's factory-pair/packing entry points and build sequence are unchanged. See
+[AIR's cluster plan](air-cluster-reclaim-plan.md).
+
 > **Current picture:** [`roles/tech-layout-and-sequence.md`](roles/tech-layout-and-sequence.md) explains the layout and the build sequence as they play today (D-108). This file records how the design got there; where the two disagree (for example, the box no longer grows: D-099), that page is current.
 
 CircuitAI normally places structures with the existing nearest-free search.
 The experimental profiles additionally permit a native reservation mechanism,
-but only TECH opts its AI instance into it. This keeps every other role and
-every legacy profile on the ordinary placement path.
+used by TECH and, from D-147, the independent [AIR controller](air-management.md).
+Other roles and legacy profiles retain ordinary placement. The TECH history
+and geometry below are unchanged; AIR uses repeatable production bays instead.
 
 The current TECH design is decision
 [D-060](decisions.md#d-060--tech-layout-uses-native-canonical-clusters-and-an-ordered-economy-module)
@@ -23,9 +47,9 @@ Two conditions are required:
 
 1. the loaded experimental `behaviour.json` fragment contains
    `"layout": {"enabled": true}`; and
-2. `Tech_Init` calls `aiTerrainMgr.SetLayoutEnabled(true)`.
+2. the role enables it: TECH's existing initialization or AIR's `AirLayout::Init`.
 
-JSON only permits the mechanism. It does not activate it. No other role calls
+JSON only permits the mechanism. It does not activate it. Roles other than AIR/TECH do not call
 the opt-in API. If either condition is false, reservation matching is skipped
 and factory/building placement is unchanged.
 
@@ -262,3 +286,31 @@ Runtime behavior is not yet Played; see
 - [`roles/tech.md`](roles/tech.md#base-layout-plan)
 - [`angelscript-references.md`](angelscript-references.md#cterrainmanager-aiterrainmgr)
 - [`intent.md`](intent.md)
+
+## D-153: allied visibility
+
+All allied instances using this DLL share reservation rectangles through
+`CAllyTeam::GetLayoutReservations`. Slots and zones retain separate owner-local
+IDs; nested own claims are legal. Publication/release is synchronous and the
+spatial index is reconstructed on load. Foreign footprints are excluded by
+reservation admission and every placement search, including masked, coarse,
+ignore-blocker and experimental searches. Mex/geo execution also checks the
+shared exclusion. Ordinary searches cannot use the interior of own zones;
+explicitly reserved economy packing retains its existing contract.
+
+AIR production envelopes protect the spaces between plant and support banks.
+TECH future factory clusters protect interior gaps and exits. Script controls
+how many plans to reserve and when an untouched blocked plan relocates; native
+queries inspect complete member footprints without claiming them. Human/other
+AI builds cannot be prohibited by this registry, so activation rechecks engine
+buildability. See [design](allied-layout-air-income-plan.md).
+
+
+## Metal-field placement (D-170)
+
+Metal mode omits synthetic finite-spot blockers. Field extraction admission still
+checks precise allied reservations and factory exits. AIR uses the same atomic
+native compound geometry, tries rotated/narrower variants and can use smaller
+compounds after a bounded six-site search. Its metal-mode reactor district omits
+converter slots. TECH geometry and normal-map layouts remain unchanged. See
+[implementation and validation](metal-maps-implementation.md).

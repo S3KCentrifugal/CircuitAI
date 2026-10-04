@@ -3,6 +3,7 @@
 #include "../global.as"
 #include "../types/role_config.as"
 #include "../helpers/map_helpers.as"
+#include "team_economy.as"
 
 // void OpenStrategy(const CCircuitDef@ facDef, const AIFloat3& in pos)
 // {
@@ -32,6 +33,8 @@ namespace Economy {
 	*/
 	void AiUpdateEconomy()
 	{
+		if (aiFactoryMgr.GetEnemyReclaimMisses() > 0)
+			Invariants::Violation("INV-128", "turret.enemy", "eligible construction turret failed to take highest-priority enemy reclaim");
 		const SResourceInfo@ metal = aiEconomyMgr.metal;
 		const SResourceInfo@ energy = aiEconomyMgr.energy;
 
@@ -61,6 +64,10 @@ namespace Economy {
 		if (cfg !is null && cfg.EconomyUpdateHandler !is null) {
 			cfg.EconomyUpdateHandler();
 		}
+
+		// D-175: one overflow policy and cooldown for every experimental role.
+		TeamEconomy::ShareOverflow();
+		Invariants::CheckTeamShare();
 	}
 
 	// Resource getters (expose current resource info handles)
@@ -149,11 +156,20 @@ namespace Economy {
 	const int _WINDOW_10S_FRAMES = 10 * SECOND;
 	_SlidingMinQueue _metalMin10s;
 	_SlidingMinQueue _energyMin10s;
+	int _incomeFirstSample = -1, _incomeLastSample = -1;
 
 	void _UpdateSlidingMinima(int frameIdx, float metalIncome, float energyIncome)
 	{
+		if (_incomeFirstSample < 0 || frameIdx < _incomeLastSample || frameIdx - _incomeLastSample > 2 * SECOND)
+			_incomeFirstSample = frameIdx;
+		_incomeLastSample = frameIdx;
 		_metalMin10s.push(frameIdx, metalIncome, _WINDOW_10S_FRAMES);
 		_energyMin10s.push(frameIdx, energyIncome, _WINDOW_10S_FRAMES);
+	}
+	bool IncomeWindowReady()
+	{
+		return _incomeFirstSample >= 0 && ai.frame - _incomeFirstSample >= _WINDOW_10S_FRAMES
+			&& ai.frame - _incomeLastSample <= 2 * SECOND;
 	}
 
 	// Public getters: minimum income over the last 10 seconds (frame-based window)

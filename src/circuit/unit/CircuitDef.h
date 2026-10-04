@@ -222,7 +222,11 @@ public:
 	void SetSinceFrame(int frame) { sinceFrame = frame; }
 	void SetCooldown(int interval) { cooldown = interval; }
 	void AdjustSinceFrame(int frame) { sinceFrame = frame + cooldown; }
-	bool IsAvailable() const { return maxThisUnit > count; }
+	bool IsAvailable() const { return buildAllowed && maxThisUnit > count; }
+	bool IsBuildAllowed() const { return buildAllowed; }
+	float GetStandoff() const { return standoff; }
+	void SetStandoff(float value) { standoff = value; }
+	void SetBuildAllowed(bool value) { buildAllowed = value; }
 	bool IsAvailable(int frame) const { return IsAvailable() && (frame >= sinceFrame); }
 
 	void IncBuild() { ++buildCounts; }
@@ -437,6 +441,8 @@ private:
 	terrain::SMobileType::Id   mobileTypeId;
 
 	// ---- Bit fields ---- BEGIN
+	bool buildAllowed = true;  // JSON construction veto, independent of temporary role caps
+	float standoff = 0.f;  // Fraction of weapon range to hold; zero keeps legacy micro.
 	bool isIgnore : 1;
 
 	bool isAttacker : 1;

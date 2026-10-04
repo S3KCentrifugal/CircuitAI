@@ -188,6 +188,11 @@ void CAllyTeam::UpdateFriendlyUnits()
 		friendlyUnits[unitId] = unit;
 	}
 	lastUpdate = circuit->GetLastFrame();
+	const auto alive = [this](int id) { return friendlyUnits.find(id) != friendlyUnits.end(); };
+	// Launched missiles still cover their area if the firing Juno dies. Pending
+	// claims are released by RemoveAssignee, with the timeout as a safety net.
+	pulseClaims.Prune(lastUpdate, [](int) { return true; });
+	nuclearHistory.Prune(lastUpdate, alive);
 }
 
 CAllyUnit* CAllyTeam::GetFriendlyUnit(ICoreUnit::Id unitId) const

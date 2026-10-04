@@ -1,0 +1,16 @@
+{
+  "name": "workforce-donations",
+  "runner": "run_air_workforce.py",
+  "scenario": "donations",
+  "description": "Burst allied metal transfers stop at ten minutes; one supplied T2 lab.",
+  "kind": "supplied",
+  "map": "Supreme Isthmus v1.7",
+  "minutes": 16,
+  "seed": 1810001,
+  "checks": "air_workforce_budget",
+  "focused_assertions": [
+    "completed-workers",
+    "negative-own-balance-full-bank",
+    "donor-stop"
+  ]
+}

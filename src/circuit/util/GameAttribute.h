@@ -10,6 +10,7 @@
 
 #include "setup/SetupData.h"
 #include "resource/MetalData.h"
+#include "resource/MetalField.h"
 #include "resource/EnergyData.h"
 #include "terrain/TerrainData.h"
 #include "util/MaskHandler.h"
@@ -38,6 +39,7 @@ public:
 	const Circuits& GetCircuits() const { return circuits; }
 	CSetupData& GetSetupData() { return setupData; }
 	CMetalData& GetMetalData() { return metalData; }
+	metal_field::Grid& GetMetalField() { return metalField; }
 	CEnergyData& GetEnergyData() { return energyData; }
 	terrain::CTerrainData& GetTerrainData() { return terrainData; }
 	CMaskHandler& GetSideMasker() { return sideMasker; }
@@ -50,6 +52,7 @@ private:
 	Circuits circuits;
 	CSetupData setupData;
 	CMetalData metalData;
+	metal_field::Grid metalField;
 	CEnergyData energyData;
 	terrain::CTerrainData terrainData;
 	CMaskHandler sideMasker;

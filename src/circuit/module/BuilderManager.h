@@ -280,6 +280,7 @@ public:
 	// experimentalDirectRange the engine walks the last leg itself. Off by
 	// default; a role's script turns it on for its own AI instance only.
 	bool IsExperimentalBuild() const { return experimentalBuild; }
+	bool IsExperimentalAirDirect() const { return experimentalAirDirect; }
 	float GetExperimentalDirectRange() const { return experimentalDirectRange; }
 	float GetExperimentalSearchRadius() const { return experimentalSearchRadius; }
 	// D-066: the nearest live, untaken order of `type` in native's queue that
@@ -296,6 +297,8 @@ public:
 	// point within radius; for the planner's turret focus (D-063 follow-up 5).
 	int GetUnfinishedCount(const CCircuitDef* def) const;
 	CCircuitUnit* FindUnfinishedNear(const springai::AIFloat3& pos, float radius, const CCircuitDef* def);
+	// D-119: a mobile unit of ours still being built near pos: what a factory there is producing
+	CCircuitUnit* FindProducedNear(const springai::AIFloat3& pos, float radius);
 	// D-098: structures of ours under construction within radius costing at least minCostM, `except` not counted
 	int CountUnfinishedNear(const springai::AIFloat3& pos, float radius, float minCostM, const CCircuitDef* except);
 	// D-105: the build power (workertime) within radius, the two defs and one unit not counted
@@ -424,6 +427,7 @@ private:
 	std::map<CCircuitUnit*, int> dangerTime;  // unit: frame
 	int dangerHysteresis;  // frames
 	bool experimentalBuild = false;          // script property (D-064, D-066: the whole experimental build system)
+	bool experimentalAirDirect = false;     // opt-in: engine controls flying constructors' last approach
 	float experimentalDirectRange = 1600.f;  // elmos
 	float experimentalSearchRadius = 512.f;  // elmos: how far from the asked anchor a site may be packed (D-066)
 

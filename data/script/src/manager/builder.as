@@ -2154,7 +2154,9 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		if (cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
+		if (MetalEconomy::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
+			&& !UnitHelpers::IsCommander(u.circuitDef) && u.circuitDef.IsMobile()) @t = MetalEconomy::EconomyTask(u);
+		if (t is null && cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
 			@t = cfg.BuilderAiMakeTaskHandler(u);
 		}
 		// If no role-specific task or handler returned null, fallback to default
@@ -2177,6 +2179,7 @@ namespace Builder {
 
 	void AiTaskAdded(IUnitTask@ task)
 	{
+		if (Global::AISettings::Role == AiRole::AIR && Global::RoleSettings::Air::ExperimentalBuild) AirBuild::Added(task);
 		GenericHelpers::LogUtil("[BUILDER] AiTaskAdded called", 4);
 		// Mex ownership and upgrade state are role-independent: every role needs
 		// them to rank an upgrade against the energy ladder, so the bookkeeping
@@ -2339,6 +2342,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		MetalEconomy::Removed(task, done);
 		{
 			IBuilderTask@ mexTask = cast<IBuilderTask>(task);
 			if (mexTask !is null) {

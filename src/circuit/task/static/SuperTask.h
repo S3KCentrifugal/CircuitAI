@@ -49,7 +49,12 @@ private:
 	// rejected (damaging weapons: Perdition, Catalyst). EMP and Juno do no damage.
 	bool SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
-			float minValue = 0.f, bool avoidFriendly = false);
+			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
+			bool pulseClaims = false, bool nuclearHistory = false);
+	bool IsPulse(CCircuitDef* cdef) const;
+	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	bool SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	bool CanAimStrategic(CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	// Tactical launchers (Perdition, Catalyst): the richest blast in range.
 	bool SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, float minValue);
 	// The metal a target must be worth for a stockpiled shot; decays while the
@@ -64,9 +69,20 @@ private:
 	bool SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 
 	int targetFrame;
+	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
+public:
+	// D-124: where the silo aims: the attacked unit, else the aimed ground
+	springai::AIFloat3 GetAimPos() const;
+	static bool IsNukeSilo(CCircuitDef* cdef);
+	// D-124: a launch seen (the weapon-fired event, or a stockpile drop): the
+	// smiley over the aim, once per launch
+	void OnLaunch(CCircuitUnit* unit, const char* how);
+	int lastSmileyFrame = -1000000;
+private:
 	springai::AIFloat3 targetPos;
 	bool isTargetOverride;
 	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty
+	int lastStrategicLaunch = -1000000;
 };
 
 } // namespace circuit

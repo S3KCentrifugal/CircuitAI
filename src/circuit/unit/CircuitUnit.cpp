@@ -12,6 +12,7 @@
 #include "module/TaskModule.h"
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"  // Only for CorrectPosition
+#include "spring/SpringMap.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #ifdef DEBUG_VIS
@@ -509,8 +510,53 @@ void CCircuitUnit::TrySetMoveState(CCircuitDef::MoveT state)
 	)
 }
 
-void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
+bool CCircuitUnit::KeepWeaponRange(CEnemyInfo* enemy, int timeout)
 {
+	if (circuitDef->GetStandoff() <= 0.f || enemy == nullptr || enemy->IsHidden()
+			|| !enemy->IsInRadarOrLOS()) return false;
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3 here = GetPos(circuit->GetLastFrame());
+	const AIFloat3 there = enemy->GetPos();
+	AIFloat3 away = here - there;
+	const float distance = away.Length2D();
+	const float weaponRange = circuitDef->GetMaxRange() * circuitDef->GetStandoff();
+	// Conservative 3D range for direct-fire weapons on cliffs; never replace
+	// the weapon's reach with this unit's (possibly shorter) sight radius.
+	const float desired = std::sqrt(std::max(0.f, weaponRange * weaponRange - away.y * away.y));
+	if (desired < SQUARE_SIZE * 4) return false;
+	if (distance > 1.f) away.Normalize2D();
+	else away = AIFloat3(1.f, 0.f, 0.f);
+	const float tolerance = std::max(16.f, desired * 0.05f);
+	TRY_UNIT(circuit, this,
+		CmdSetMoveState(CCircuitDef::MoveType::HOLD_POS);
+		CmdSetFireState(CCircuitDef::FireType::OPEN);
+		if (std::fabs(distance - desired) > tolerance) {
+			AIFloat3 goal(there.x + away.x * desired, here.y, there.z + away.z * desired);
+			CTerrainManager::CorrectPosition(goal);
+			goal.y = circuit->GetMap()->GetElevationAt(goal.x, goal.z);
+			if (circuit->GetTerrainManager()->CanMoveToPos(GetArea(), goal)) {
+				CmdMoveTo(goal, 0, timeout);
+			} else {
+				CmdStop();  // Do not substitute a charge when the firing ring is inaccessible.
+			}
+		} else if (command->GetId() != CMD_STOP) {
+			CmdStop();
+		}
+	)
+	// Fire-at-will while holding/moving backwards. No queued fight or attack
+	// order may chase a departing enemy and erase the range advantage.
+	return true;
+}
+
+void CCircuitUnit::TrySetIdleMode(int mode)
+{
+    if (!circuitDef->IsAbleToFly() || (mode != 0 && mode != 1) || manager == nullptr) return;
+    TRY_UNIT(manager->GetCircuit(), this, unit->SetIdleMode(mode);)
+}
+
+void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool queueFight)
+{
+	if (KeepWeaponRange(enemy, timeout)) return;
 	target = enemy;
 	TRY_UNIT(manager->GetCircuit(), this,
 		const AIFloat3& pos = enemy->GetPos();
@@ -537,7 +583,9 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
 				unit->Attack(enemy->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			}
 		}
-		CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);  // los-cheat related
+		// Route/operation owners can handle contact loss themselves. Avoid a
+		// redundant follow-up order when they request a persistent target only.
+		if (queueFight) CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
 		CmdWantedSpeed(NO_SPEED_LIMIT);
 		CmdSetTarget(target);
 	)
@@ -545,6 +593,7 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout)
 
 void CCircuitUnit::Attack(const AIFloat3& pos, CEnemyInfo* enemy, bool isGround, bool isStatic, int timeout)
 {
+	if (KeepWeaponRange(enemy, timeout)) return;
 	TRY_UNIT(manager->GetCircuit(), this,
 		if (circuitDef->IsAttrMelee()) {
 			if (IsJumpReady()) {

@@ -19,6 +19,7 @@
 
 //#undef NDEBUG
 #include <cassert>
+#include <algorithm>
 
 namespace circuit {
 
@@ -254,6 +255,33 @@ void CThreatMap::SetThreatType(CCircuitUnit* unit)
 	} else {
 		threatArray = pThreatData.load()->roleThreatPtrs[role]->surfThreat.data();
 	}
+}
+
+float CThreatMap::GetSurfThreatAtPos(const AIFloat3& position) const
+{
+	int x, z;
+	PosToXZ(position, x, z);
+	x = std::max(0, std::min(width - 1, x));
+	z = std::max(0, std::min(height - 1, z));
+	return pThreatData.load()->defThreat->surfThreat[z * width + x] - THREAT_BASE;
+}
+
+float CThreatMap::GetAmphThreatAtPos(const AIFloat3& position) const
+{
+    int x, z;
+    PosToXZ(position, x, z);
+    x = std::clamp(x, 0, width - 1);
+    z = std::clamp(z, 0, height - 1);
+    return pThreatData.load()->defThreat->amphThreat[z * width + x] - THREAT_BASE;
+}
+
+float CThreatMap::GetAirThreatAtPos(const AIFloat3& position) const
+{
+	int x, z;
+	PosToXZ(position, x, z);
+	x = std::max(0, std::min(width - 1, x));
+	z = std::max(0, std::min(height - 1, z));
+	return pThreatData.load()->defThreat->airThreat[z * width + x] - THREAT_BASE;
 }
 
 float CThreatMap::GetThreatAt(const AIFloat3& position) const

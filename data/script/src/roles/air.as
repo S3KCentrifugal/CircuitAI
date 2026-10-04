@@ -10,6 +10,8 @@
 #include "../manager/factory_production.as"
 // T2 bomber waves
 #include "../manager/air_waves.as"
+#include "air_rules.as"
+#include "../manager/air_production.as"
 
 namespace RoleAir {
     IUnitTask@ g_airStrategicFocusTask = null;
@@ -326,7 +328,7 @@ namespace RoleAir {
         Global::Porc::LateGameMetalIncome = Global::RoleSettings::Air::PorcLateGameMetalIncome;
         Global::Porc::LateGameEnergyIncome = Global::RoleSettings::Air::PorcLateGameEnergyIncome;
         Global::Porc::LateBudgetMod = Global::RoleSettings::Air::PorcLateBudgetMod;
-        aiMilitaryMgr.porcAllyAA = Global::RoleSettings::Air::PorcAlliedClustersAA ? 1 : 0;
+        aiMilitaryMgr.porcAllyAA = !Global::RoleSettings::Air::ExperimentalBuild && Global::RoleSettings::Air::PorcAlliedClustersAA ? 1 : 0;
         // Change scout cap (unit count)
         aiMilitaryMgr.quota.scout = Global::RoleSettings::Air::MilitaryScoutCap;
 
@@ -396,6 +398,7 @@ namespace RoleAir {
     ******************************************************************************/
 
     void Air_MainUpdate() {
+        if (AirEconomy::Active()) { AirBuild::Tick(); AirEconomy::Tick(); AirProduction::Tick(); AirLayout::Draw(); Lanes::Tick(); }
         // Periodically update dynamic military quotas once the configured delay has passed
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();
@@ -468,6 +471,7 @@ namespace RoleAir {
     }
 
     IUnitTask@ Air_FactoryAiMakeTask(CCircuitUnit@ u) {
+        if (AirEconomy::Active()) return AirProduction::MakeTask(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
             return aiFactoryMgr.DefaultMakeTask(u);
@@ -681,6 +685,7 @@ namespace RoleAir {
     }
 
     string Air_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
+        if (AirEconomy::Active() && isReset) return "none";
         if(isStart) {
             if(Global::Map::NearestMapStartPosition !is null) {
                 return FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
@@ -695,6 +700,7 @@ namespace RoleAir {
 
     // Local default implementations (ready to customize per-role)
     bool Air_AiIsSwitchTime(int lastSwitchFrame) {
+        if (AirEconomy::Active()) return false;
         int interval = (30 * SECOND);
         return (lastSwitchFrame + interval) <= ai.frame;
     }
@@ -714,11 +720,16 @@ namespace RoleAir {
 
     ******************************************************************************/
     
-    // T2 bombers and T2 fighters belong to the wave system (manager/air_waves.as):
-    // held at base, released together, escorted. Every other air unit, including
-    // all T1 bombers, keeps the native default task (solo bomb runs as built).
+    // Experimental AIR: opening scout, T1/T2 home screen, then exclusive T2
+    // wave escorts/bombers. Other aircraft retain their native task selection.
     IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
     {
+        IUnitTask@ reconTask = AirRecon::MakeTask(u);
+    if (reconTask !is null) return reconTask;
+    IUnitTask@ homeTask = AirProduction::HomeTask(u);
+        if (homeTask !is null) return homeTask;
+        IUnitTask@ raidTask = AirRaids::MakeTask(u);
+        if (raidTask !is null) return raidTask;
         IUnitTask@ waveTask = AirWaves::MakeTask(u);
         if (waveTask !is null) return waveTask;
         return aiMilitaryMgr.DefaultMakeTask(u);
@@ -726,6 +737,7 @@ namespace RoleAir {
 
     void Air_MilitaryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        AirProduction::Removed(unit);
         AirWaves::OnUnitRemoved(unit);
     }
 
@@ -741,6 +753,7 @@ namespace RoleAir {
     ******************************************************************************/ 
 
     IUnitTask@ Air_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        if (AirEconomy::Active()) return AirRules::MakeTask(builder);
         GenericHelpers::LogUtil("[Air_BuilderAiMakeTask] called for builder", 3);
         if (builder is null) return null;
 
@@ -863,6 +876,7 @@ namespace RoleAir {
     }
 
     void Air_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
+        AirBuild::Removed(task);
         if (task !is null && task is g_airCommanderWindTask) {
             @g_airCommanderWindTask = null;
         }
@@ -1195,7 +1209,7 @@ namespace RoleAir {
             "corscreamer", "corgate", "cortron", "cortoast", "corbuzz", "cortoast", "cortoast"}},
         {"legion", array<string> = {
             "leglht", "legrl", "legflak", "leghive", "leglupara", "legflak", "legjuno", "leglraa",
-            "legabm", "legbastion", "legflak", "leglraa", "legdeflector", "legcluster", "leglrpc", "legflak",
+            "legabm", "legbastion", "legflak", "leglraa", "legdeflector", "legacluster", "leglrpc", "legflak",
             "legperdition", "leglraa", "legnanotc", "legnanotc", "leglrpc", "legdeflector", "leglrpc",
             "leglraa", "legdeflector", "legperdition", "legbastion", "legstarfall", "legbastion", "legbastion"}}
     };
@@ -1221,6 +1235,12 @@ namespace RoleAir {
         aiMilitaryMgr.SetPorcChain(side, false, land);
         aiMilitaryMgr.SetPorcChain(side, true, PorcHelpers::DefaultChain(side, true));
         GenericHelpers::LogUtil("[Porc] AIR: " + side + " air-denial chain set (" + land.length() + " entries)", 1);
+    }
+
+    void Air_AiMakeDefence(int cluster, const AIFloat3& in pos)
+    {
+        if (!Global::RoleSettings::Air::ExperimentalBuild && (ai.frame > 10 * MINUTE
+            || aiEconomyMgr.metal.income > 10.0f || aiEnemyMgr.mobileThreat > 0.0f)) Military::Porc::MakeDefence(cluster, pos);
     }
 
     void Register() {
@@ -1252,6 +1272,8 @@ namespace RoleAir {
         @cfg.MilitaryAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Air_MilitaryAiTaskRemoved);
 
         @cfg.PorcChainHandler = cast<PorcChainDelegate@>(@Air_PorcChain);
+        @cfg.AiMakeDefenceHandler = cast<AiMakeDefence@>(@Air_AiMakeDefence);
+        @cfg.LayoutPlanHandler = cast<LayoutPlanDelegate@>(@AirLayout::Init);
 
         RoleConfigs::Register(cfg);
     }

@@ -176,6 +176,17 @@ namespace TechBuild {
             || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), t2) > 0;
     }
 
+    // D-116: the advanced lab has begun: a frame or a finished lab, not only an
+    // order (played on All That Glitters, build99: the order's footprint was dead,
+    // every order aborted, yet the throwaway T1 lab was retired and reclaimed for
+    // an advanced lab that never had a frame, and TECH was left with no lab)
+    bool T2Begun()
+    {
+        CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
+        if (t2 is null) return false;
+        return t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0;
+    }
+
     IUnitTask@ StartFactory(CCircuitUnit@ u)
     {
         if (!RoleTech::Opening::complete || IntoT2()) return null;
@@ -196,11 +207,14 @@ namespace TechBuild {
                 return t;
             }
         }
-        if (UnitHelpers::IsCommander(u.circuitDef) && Layout::HasComplex()) {
+        // D-120: with no planned pair (Layout::fallback: cramped ground) the lab
+        // goes here too: the slot path below needs a planned slot and failed on
+        // every try (played: Tundra Continents, no lab in 30 minutes)
+        if (UnitHelpers::IsCommander(u.circuitDef) && (Layout::HasComplex() || Layout::fallback)) {
             const AIFloat3 at = u.GetPos(ai.frame);
-            const int facing = Layout::facing;
             const float step = SQUARE_SIZE * 2;
-            const int rings = int(Global::RoleSettings::Tech::ExpFirstLabRadius / step);
+            // D-120: cramped ground: the nearest footprint may be further out
+            const int rings = int((Layout::fallback ? Global::RoleSettings::Tech::CrampedFirstLabRadius : Global::RoleSettings::Tech::ExpFirstLabRadius) / step);
             // Never under the commander itself: a factory ordered on top of its
             // builder has its command dropped by the engine on every try (the
             // builder is in the way), which looked like a glitching commander.
@@ -209,9 +223,11 @@ namespace TechBuild {
             const float clear = float(lab.GetFootprintX() > lab.GetFootprintZ() ? lab.GetFootprintX() : lab.GetFootprintZ()) * 0.5f * step
                 + Global::RoleSettings::Tech::ExpFirstLabClearance;
             const int firstRing = int(clear / step) + 1;
+            const int tries = Layout::fallback ? 4 : 1;   // D-120: no planned facing: any
             for (int r = firstRing; r <= rings; ++r) {
                 const int n = 8 * r;
-                for (int k = 0; k < n; ++k) {
+                for (int k = 0; k < n; ++k) for (int fi = 0; fi < tries; ++fi) {
+                    const int facing = Layout::fallback ? (Layout::facing + fi) % 4 : Layout::facing;
                     const float a = 6.2831853f * float(k) / float(n);
                     AIFloat3 p = AIFloat3(at.x + cos(a) * float(r) * step, 0.0f, at.z + sin(a) * float(r) * step);
                     if (!aiTerrainMgr.CanReserveBuilding(lab, p, facing)) continue;
@@ -222,8 +238,9 @@ namespace TechBuild {
                     IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, lab, p, null, 0.0f, false, true, 300 * SECOND));
                     if (t is null) { aiTerrainMgr.ReleaseReservation(id); return null; }
                     if (!AiPinReservation(t, id)) GenericHelpers::LogUtil("[TECH][Build] could not pin the first lab to slot " + id, 1);
+                    if (Layout::fallback) Layout::ReserveCrampedLabSlot(p, u);   // D-121
                     GenericHelpers::LogUtil("[TECH][Build] first lab at the commander: (" + int(p.x) + ", " + int(p.z) + "), "
-                        + int(sqrt(MapHelpers::SqDist(p, at))) + " from it; the pair's slot stays planned", 1);
+                        + int(sqrt(MapHelpers::SqDist(p, at))) + " from it, facing " + facing + (Layout::fallback ? " (no planned pair, D-120)" : "; the pair's slot stays planned"), 1);
                     return t;
                 }
             }
@@ -241,10 +258,12 @@ namespace TechBuild {
     // 10-second minimum dipped under 200 at +309 and the rebuilt advanced lab was
     // reclaimed; the owner: above +200 there is no economic reason to reclaim a factory)
     bool ecoOnlineLatched = false;
+    int ecoOnlineFrame = -1;          // the frame it latched (INV-039 measures from it)
     bool EcoOnline()
     {
         if (!ecoOnlineLatched && Economy::GetMinMetalIncomeLast10s() >= Global::RoleSettings::Tech::LabEcoOnlineMetalIncome) {
             ecoOnlineLatched = true;
+            ecoOnlineFrame = ai.frame;
             GenericHelpers::LogUtil("[TECH][Build] the economy is online (+" + int(Economy::GetMinMetalIncomeLast10s()) + " metal): no lab is reclaimed for metal from now on (D-102, D-105)", 1);
         }
         return ecoOnlineLatched;
@@ -302,7 +321,7 @@ namespace TechBuild {
         if (!WasIntoT2()) return true;
         const int cons = T1Cons() + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
         if (cons == 0) return true;
-        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) return false;
+        if (TechFlank::NormalLabCount() == 0) return false;
         return T1Cons() < Global::RoleSettings::Tech::LabRebuildMinT1Cons || EcoOnline();
     }
     // D-102 (owner's rule): the lab native asks for when our last factory is gone
@@ -319,7 +338,7 @@ namespace TechBuild {
             return "";
         }
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
-        if (t2 !is null && t2.IsAvailable(ai.frame) && UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs()) == 0) {
+        if (t2 !is null && t2.IsAvailable(ai.frame) && TechFlank::NormalLabCount() == 0) {
             GenericHelpers::LogUtil("[TECH][Build] last factory gone: the advanced lab first (D-102)", 1);
             return t2.GetName();
         }
@@ -457,7 +476,27 @@ namespace TechBuild {
                 : (!u.circuitDef.CanBuild(d) ? "cannot build it" : "no site in the layout"));
             GenericHelpers::LogUtil("[TECH][Air] dedicated " + u.id + " waits for " + name + ": " + why + " (D-108)", 1);
         }
+        // D-123 (owner: an air constructor never does nothing): with no site for its
+        // structure (played: the layout full at 225 advanced converters, both
+        // dedicated builders waited for the rest of the game) it builds defences
+        // meanwhile; the role is kept and taken up again the moment a site frees
+        {
+            CCircuitDef@ d = ai.GetCircuitDef(name);
+            if (d !is null && d.IsAvailable(ai.frame) && u.circuitDef.CanBuild(d)) {
+                IUnitTask@ dt = AirDefence(u);
+                if (dt !is null) return dt;
+            }
+        }
         return Wait(3 * SECOND);
+    }
+
+    // D-152: idle air builders share the reserved wall/weapon plans. The old
+    // expanding spiral consumed future economy and factory ground.
+    IUnitTask@ AirDefence(CCircuitUnit@ u)
+    {
+        if (u is null || u.circuitDef is null || !UnitHelpers::IsAirConstructor(u.circuitDef)) return null;
+        IUnitTask@ t = TechFortifications::Work(u);
+        return t !is null ? t : TechWeapons::Work(u);
     }
     // the rest of the T2 air constructors: converters while energy overflows; the
     // advanced fusion going up the moment the converters cannot stay on
@@ -470,93 +509,20 @@ namespace TechBuild {
         return null;
     }
 
-    // D-106 (owner's rule): a fallback so no metal is lost to overflow when our
-    // build power cannot keep up: whenever the metal bank is over
-    // TeamShareMetalAbove of storage, refresh every teammate's economy and give
-    // up to TeamShareMetalBudget of our storage, the lowest-filled live teammate
-    // first, each filled up to its free storage
-    int teamShareFrame = -100000;
-    int teamShareLog = -100000;
-    bool firstLabStood = false;
-    int verifyFrame = -1;          // one check after a donation: did it arrive
-    array<int> verifyTeams;
-    void VerifyShare()
-    {
-        if (verifyFrame < 0 || ai.frame < verifyFrame) return;
-        verifyFrame = -1;
-        string line = "";
-        for (uint i = 0; i < verifyTeams.length(); ++i) {
-            TeamEconomy::UpdateTeam(verifyTeams[i]);
-            line += (line.length() > 0 ? ", " : "") + "team " + verifyTeams[i] + " received " + int(TeamEconomy::Metal(verifyTeams[i], TeamEconomy::RECEIVED))
-                + " (bank " + int(TeamEconomy::Metal(verifyTeams[i], TeamEconomy::CURRENT)) + ")";
-        }
-        GenericHelpers::LogUtil("[TECH][Share] after the donation: we sent " + int(TeamEconomy::OwnMetal(TeamEconomy::SENT)) + "; " + line + " (D-106)", 1);
-    }
-    void ShareOverflow()
-    {
-        VerifyShare();
-        RefillAirRoles();                                  // D-108
-        if (airConvId >= 0) LiftCapForRole(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));   // D-108
-        if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
-        if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108
-        const float stor = aiEconomyMgr.metal.storage;
-        const float cur = aiEconomyMgr.metal.current;
-        // not the start bank: until the first lab has stood a full bank is the
-        // opening's metal, not overflow (played: 420 metal given away at 15 s;
-        // the opening's own flag was already set)
-        if (!firstLabStood) {
-            CCircuitDef@ l1 = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side));
-            if (l1 !is null && l1.count > aiBuilderMgr.GetUnfinishedCount(l1)) firstLabStood = true;
-        }
-        if (!firstLabStood && !WasIntoT2()) return;
-        if (stor <= 0.0f || cur < Global::RoleSettings::Tech::TeamShareMetalAbove * stor) return;
-        if (ai.frame - teamShareFrame < int(Global::RoleSettings::Tech::TeamShareCheckSeconds * SECOND)) return;
-        teamShareFrame = ai.frame;
-        const int n = TeamEconomy::UpdateAll();
-        array<int> ids;
-        array<float> fills;
-        for (int i = 0; i < n; ++i) {
-            const int tid = TeamEconomy::TeamAt(i);
-            if (tid < 0 || !TeamEconomy::Alive(tid) || TeamEconomy::Metal(tid, TeamEconomy::FREE) < Global::RoleSettings::Tech::TeamShareMinAmount) continue;
-            // insertion by fill, lowest first
-            const float f = TeamEconomy::MetalFill(tid);
-            uint at = 0;
-            while (at < fills.length() && fills[at] <= f) ++at;
-            ids.insertAt(at, tid);
-            fills.insertAt(at, f);
-        }
-        float budget = Global::RoleSettings::Tech::TeamShareMetalBudget * stor;
-        if (budget > cur) budget = cur;
-        string sent = "";
-        for (uint i = 0; i < ids.length() && budget >= Global::RoleSettings::Tech::TeamShareMinAmount; ++i) {
-            float give = TeamEconomy::Metal(ids[i], TeamEconomy::FREE);
-            if (give > budget) give = budget;
-            if (give < Global::RoleSettings::Tech::TeamShareMinAmount) continue;
-            if (!TeamEconomy::SendMetal(ids[i], give)) continue;
-            budget -= give;
-            if (verifyFrame < 0) { verifyTeams.resize(0); verifyFrame = ai.frame + 45; }   // after the engine's next slow update
-            verifyTeams.insertLast(ids[i]);
-            sent += (sent.length() > 0 ? ", " : "") + int(give) + " to team " + ids[i] + " (" + int(fills[i] * 100.0f) + "% full)";
-        }
-        if (sent.length() > 0 || ai.frame - teamShareLog > 60 * SECOND) {
-            teamShareLog = ai.frame;
-            GenericHelpers::LogUtil("[TECH][Share] metal " + int(cur) + " of " + int(stor) + " (" + int(cur * 100.0f / stor) + "%): "
-                + ((sent.length() > 0) ? ("sent " + sent) : ("no teammate with room (" + n + " teammates)"))
-                + "; the engine counts " + int(TeamEconomy::OwnMetal(TeamEconomy::SENT)) + " metal sent in the last update (D-106)", 1);
-        }
-    }
-
     // From Tech_EconomyUpdate: the first lab's exit cone, held while it stands.
     void Tick()
     {
         TrackMetal();   // D-075
-        ShareOverflow();   // D-106
+        RefillAirRoles();                                  // D-108
+        if (airConvId >= 0) LiftCapForRole(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));   // D-108
+        if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
+        if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108
         TechForward::Tick();   // D-109
         // D-076: the T1 lab retires the moment the advanced lab is under way.
         // One state, read by every actor: production stops (Lifecycle::Retire
         // stops the unit, the factory rows return nothing), guards and the
         // commander's help end, only the reclaim touches it (lab.t1.reclaim).
-        if (IntoT2() && !throwawayDecided) {
+        if (T2Begun() && !throwawayDecided) {   // D-116: a frame, not an order
             // the throwaway is the lab standing when the advanced lab begins;
             // any T1 lab built later (lab.t1.spam) is a keeper (played: spam
             // labs were retired the moment they became the primary lab)
@@ -649,7 +615,7 @@ namespace TechBuild {
         if (!T2MayReclaim(u, lab)) return null;   // D-105: T2 constructors only as a last resort
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side));
         if (t2 is null) return null;
-        if (!IntoT2()) return null;   // not begun yet
+        if (!T2Begun()) return null;   // not begun yet (D-116: a frame, not an order)
         // D-072: reclaimed metal past the storage cap is lost, so the reclaim
         // waits until the bank has room for the lab's metal (the advanced lab's
         // build makes that room; it is part-built by then, as intended)
@@ -731,26 +697,9 @@ namespace TechBuild {
     // factories, packed by native nearest that anchor outside the planned
     // zones. Nothing more: TECH is a back-line role and the rest is the
     // team's.
-    array<int> defenceOrders = { 0, 0 };   // D-075: orders per def; native refusing the site ExpDefenceMaxOrders times ends the rung
     IUnitTask@ Defence(CCircuitUnit@ u)
     {
-        if (aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius) <= 0.0f)
-            return null;   // the first turret first
-        const string side = Global::AISettings::Side;
-        array<string> names = { UnitHelpers::GetStaticLLTNameForSide(side), UnitHelpers::GetStaticAALightNameForSide(side) };
-        array<int> wanted = { Global::RoleSettings::Tech::ExpDefenceLLT, Global::RoleSettings::Tech::ExpDefenceAA };
-        for (uint i = 0; i < names.length(); ++i) {
-            CCircuitDef@ def = ai.GetCircuitDef(names[i]);
-            if (def is null || !def.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(def)) continue;
-            if (def.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), def) >= wanted[i]) continue;
-            if (defenceOrders[i] >= Global::RoleSettings::Tech::ExpDefenceMaxOrders) continue;
-            AIFloat3 anchor = Layout::factoryCentre;
-            if (anchor.x < 0.0f) anchor = Global::Map::StartPos;
-            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::NORMAL, def, anchor, Global::RoleSettings::Tech::ExpDefenceRadius, true, 120 * SECOND));
-            if (t !is null) { defenceOrders[i]++; GenericHelpers::LogUtil("[TECH][Build] base defence: " + names[i] + " near the factories (order " + defenceOrders[i] + " of " + Global::RoleSettings::Tech::ExpDefenceMaxOrders + ")", 1); }
-            return t;
-        }
-        return null;
+        return TechFortifications::Work(u);
     }
 
     // D-077 (owner's rule): winds and solars are reclaimed once a fusion
@@ -796,8 +745,8 @@ namespace TechBuild {
         const float t1Make = s.winds * wind + s.solars * 20.0f;
         const float advMake = s.advSolars * 75.0f;
         const float pull = s.ePull;
-        const bool t1Ok = afusUp || (s.eIncome - t1Make >= pull * Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
-        const bool advOk = afusUp || (s.eIncome - t1Make - advMake >= pull * Global::RoleSettings::Tech::ReclaimAdvSolarMargin);
+        const bool t1Ok = ProductionMath::LowTierEnergyReclaim(afusUp, s.eIncome, t1Make, pull, Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
+        const bool advOk = ProductionMath::LowTierEnergyReclaim(afusUp, s.eIncome - t1Make, advMake, pull, Global::RoleSettings::Tech::ReclaimAdvSolarMargin);
         if (ReclaimsInFlight() >= Global::RoleSettings::Tech::ReclaimEnergyConcurrent) return null;
         const string side = Global::AISettings::Side;
         array<string> names;
@@ -852,6 +801,7 @@ namespace TechBuild {
     {
         CCircuitUnit@ fac = Factory::primaryT1BotLab;
         if (fac is null || fac is u || Lifecycle::IsRetiring(fac)) return null;   // D-076: nobody guards a retiring lab
+        if (TechFactories::IsSpamLab(fac)) return null;   // D-119: a spam lab is never assisted (its two turrets only)
         return GuardHelpers::AssignWorkerGuard(u, fac, Task::Priority::LOW, true, 20 * SECOND);
     }
 

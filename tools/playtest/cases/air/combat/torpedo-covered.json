@@ -1,0 +1,9 @@
+{
+  "name": "torpedo-covered",
+  "description": "Torpedo aircraft versus naval targets nearer the defending base, with supplied sonar",
+  "aircraft": [{"unit":"$torpedo","count":18,"team":0},{"unit":"$fighter1","count":6,"team":1}],
+  "targets": [{"unit":"armroy","count":2,"position":[6000,3500],"water":true},{"unit":"armuwfus","count":1,"position":[5000,3500],"water":true}],
+  "defenses": [{"unit":"armfrt","count":2,"position":[5700,3500],"water":true}],
+  "sensors": [{"unit":"armsonar","count":1,"team":0,"position":[5300,3900],"water":true}],
+  "refill_seconds": 60
+}

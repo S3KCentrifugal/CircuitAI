@@ -1,0 +1,12 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "tech",
+    "kind": "natural",
+    "map": "tech-opening",
+    "scenario": "workforce-control"
+  },
+  "id": "20261003T175307Z-e09dbb32",
+  "requested": {},
+  "schema": 1
+}

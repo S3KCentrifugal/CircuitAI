@@ -39,6 +39,7 @@ public:
 	bool CanChooseStartPos() const { return false/*startPosType == CGameSetup::StartPos_ChooseInGame*/; }
 
 	CAllyTeam* GetAllyTeam(int allyTeamId) { return allyTeams[allyTeamId]; }
+	int GetAllyTeamCount() const { return (int)allyTeams.size(); }  // D-127
 	const geom::CRegion* GetStartBox(int boxId) { return boxes[boxId]; }
 
 	const ModOptions& GetModOptions() const { return modoptions; }

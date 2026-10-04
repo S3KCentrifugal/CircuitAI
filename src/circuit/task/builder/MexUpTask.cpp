@@ -31,6 +31,17 @@ CBMexUpTask::CBMexUpTask(ITaskModule* mgr, Priority priority,
 		, reclaimMex(nullptr)
 {
 	manager->GetCircuit()->GetEconomyManager()->SetUpgradingMexSpot(spotId, true);
+	if (spotId == metal_field::SiteTagV1) {
+		auto* circuit = manager->GetCircuit();
+		for (const auto& [id, unit] : circuit->GetTeamUnits()) {
+			const float depth = unit->GetCircuitDef()->GetExtractsM();
+			if (depth > 0 && depth < buildDef->GetExtractsM()
+				&& unit->GetPos(circuit->GetLastFrame()).SqDistance2D(position) < 1.f) { fieldTargetId = id; break; }
+		}
+		FindFacing(position);
+		SetBuildPos(position);
+		if (fieldTargetId < 0 || !circuit->GetEconomyManager()->ClaimFieldSite(fieldKey, buildDef, buildPos, fieldTargetId)) fieldKey = 0;
+	}
 }
 
 CBMexUpTask::CBMexUpTask(ITaskModule* mgr)
@@ -47,6 +58,7 @@ CBMexUpTask::~CBMexUpTask()
 void CBMexUpTask::Finish()
 {
 	IBuilderTask::Finish();
+	if (spotId == metal_field::SiteTagV1) return; // BAR owns replacement/refund; never reclaim a neighboring mex
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	const float maxRange = buildDef->GetExtrRangeM();
@@ -73,6 +85,13 @@ void CBMexUpTask::Finish()
 	circuit->GetBuilderManager()->UnregisterReclaim(reclaimMex);
 }
 
+void CBMexUpTask::Stop(bool done)
+{
+	IBuilderTask::Stop(done);
+	if (fieldKey != 0) manager->GetCircuit()->GetEconomyManager()->ReleaseFieldSite(fieldKey);
+	fieldKey = 0;
+}
+
 void CBMexUpTask::Cancel()
 {
 	IBuilderTask::Cancel();
@@ -86,6 +105,10 @@ void CBMexUpTask::Cancel()
 
 bool CBMexUpTask::Execute(CCircuitUnit* unit)
 {
+	if (spotId == metal_field::SiteTagV1 && !manager->GetCircuit()->GetEconomyManager()->OwnsFieldSite(fieldKey)) {
+		manager->AbortTask(this);
+		return false;
+	}
 	executors.insert(unit);
 
 	CCircuitAI* circuit = manager->GetCircuit();
@@ -101,7 +124,8 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 		return true;
 	}
 	if (geom::is_valid(buildPos)
-		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
 			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
@@ -110,6 +134,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 	}
 
 	circuit->GetThreatMap()->SetThreatType(unit);
+	if (spotId == metal_field::SiteTagV1) { manager->AbortTask(this); return false; }
 
 	// FIXME: short on purpose, won't work with EnqueueReclaim() in Finish()
 	const float searchRadius = /*buildDef->GetDef()->GetResourceExtractorRange(metalRes) + */SQUARE_SIZE * 4;
@@ -164,6 +189,12 @@ void CBMexUpTask::OnUnitIdle(CCircuitUnit* unit)
 void CBMexUpTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, float searchRadius)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
+	if (spotId == metal_field::SiteTagV1) {
+		if (!circuit->GetEconomyManager()->OwnsFieldSite(fieldKey)) return;
+		FindFacing(position);
+		SetBuildPos(position); // exact upgrade identity; never drift onto another extractor
+		return;
+	}
 	AIFloat3 adjPos = pos;
 
 	// Check off-center ally unit
@@ -183,7 +214,8 @@ void CBMexUpTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, floa
 
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	if (terrainMgr->CanReachAtSafe(builder, adjPos, builder->GetCircuitDef()->GetBuildDistance())
-		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), adjPos, facing))
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, adjPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), adjPos, facing))
 	{
 		SetBuildPos(adjPos);
 	} else {
@@ -202,11 +234,17 @@ bool CBMexUpTask::Load(std::istream& is)
 {
 	CCircuitUnit::Id reclaimMexId;
 
-	IBuilderTask::Load(is);
+	const bool baseValid = IBuilderTask::Load(is);
 	SERIALIZE(is, read)
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	reclaimMex = circuit->GetTeamUnit(reclaimMexId);
+	if (spotId == metal_field::SiteTagV1) {
+		utils::binary_read(is, fieldKey);
+		utils::binary_read(is, fieldTargetId);
+		return baseValid && bool(is) && fieldTargetId >= 0
+			&& circuit->GetEconomyManager()->ClaimFieldSite(fieldKey, buildDef, buildPos, fieldTargetId);
+	}
 
 	if (!circuit->GetMetalManager()->IsSpotValid(spotId, GetPosition())) {
 		spotId = -1;
@@ -228,6 +266,7 @@ void CBMexUpTask::Save(std::ostream& os) const
 
 	IBuilderTask::Save(os);
 	SERIALIZE(os, write)
+	if (spotId == metal_field::SiteTagV1) { utils::binary_write(os, fieldKey); utils::binary_write(os, fieldTargetId); }
 #ifdef DEBUG_SAVELOAD
 	manager->GetCircuit()->LOG("%s | spotId=%i | reclaimMexId=%i", __PRETTY_FUNCTION__, spotId, reclaimMexId);
 #endif

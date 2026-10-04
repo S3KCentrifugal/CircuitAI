@@ -1,0 +1,257 @@
+/*
+ * BattleAnalysis.h
+ *
+ * D-126: the battlefield analysis TECH's weapon clusters are placed by
+ * (doc/roles/tech-weapon-clusters.md). Pure queries: nothing here orders a
+ * unit, so no other role changes. The script (roles/tech_weapons.as) is the
+ * only caller.
+ *
+ * - Effective range with height: the engine's own formulas (Weapon.cpp
+ *   TestRange, Cannon.cpp GetStaticRange2D).
+ * - Approach routes: a 64-elmo grid, Dijkstra from our base, one path to each
+ *   enemy source, repeated with the used cells penalised for alternatives;
+ *   path density is the route heat. Chokes are route cells whose clearance
+ *   (distance to impassable ground) is a local minimum.
+ * - Combat and air heat: decaying grids fed by our losses and damage and by
+ *   the enemy units we know of.
+ * - Enemy composition by movement class and role.
+ * - Water: seabed depth, bodies of water 8 and 15 deep, which are hostile,
+ *   beach segments and their classes, and the torpedo site rule.
+ */
+
+#ifndef SRC_CIRCUIT_TERRAIN_BATTLEANALYSIS_H_
+#define SRC_CIRCUIT_TERRAIN_BATTLEANALYSIS_H_
+
+#include "AIFloat3.h"
+#include "terrain/LaneSolver.h"
+
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <chrono>
+#include <memory>
+
+namespace circuit {
+
+class CCircuitAI;
+class CCircuitDef;
+class CWeaponDef;
+
+class CBattleAnalysis final : public std::enable_shared_from_this<CBattleAnalysis> {
+public:
+	friend class CInitScript;
+
+	// Enemy composition classes (EnemyCost(kind)); tech_weapons.as mirrors them.
+	enum Kind: int {LAND = 0, AIR, SHIP, SUB, HOVER, AMPH, ARTY, STATIC_DEF, HEAVY, NUKE, LRPC, _KIND_SIZE_};
+	// Beach class flags (GetBeachClass)
+	enum Beach: int {CLIFF = 1, WADING = 2, SHIP_WATER = 4, DEEP_WATER = 8, HOVER_BEACH = 16};
+	// Lane classes (D-127), least capable first: a lane is kept under the first class that finds it.
+	enum LaneClass: int {L_LAND = 0, L_BOT, L_AMPH, L_HOVER, L_ALLTERRAIN, L_NAVAL, L_AIR, _LANE_CLASSES_};
+
+	CBattleAnalysis(CCircuitAI* circuit);
+	~CBattleAnalysis();
+
+	void Update(int frame);   // every second from CCircuitAI::Update
+	void OnOwnDamaged(const springai::AIFloat3& pos);
+	void OnOwnLost(const springai::AIFloat3& pos, float cost);
+	void OnEnemyLost(const springai::AIFloat3& pos, float cost);
+	void SetHeatHalfLife(float combatSec, float airSec) { combatHalfLife = combatSec; airHalfLife = airSec; }
+
+	// --- terrain and range
+	float Height(const springai::AIFloat3& pos) const;
+	float Depth(const springai::AIFloat3& pos) const { return -Height(pos); }
+	float EffectiveRange(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to) const;
+	float MainRange(const CCircuitDef* cdef) const;   // the longest-range weapon's range
+	float InterceptorCoverage(const CCircuitDef* cdef) const;
+	float ShotEnergy(const CCircuitDef* cdef) const;   // energy one shot (salvo) takes from storage
+	float ShotReload(const CCircuitDef* cdef) const;
+	bool LineOfFire(const springai::AIFloat3& from, const springai::AIFloat3& to, float muzzle) const;
+	float HeightAbove(const springai::AIFloat3& pos, float radius) const;  // height minus the ring's mean at radius
+
+	// --- routes and chokes
+	void ClearSources() { sources.clear(); }
+	void AddSource(const springai::AIFloat3& pos) { sources.push_back(pos); }
+	int Analyse(const springai::AIFloat3& base, int alternatives, float chokeMaxHalfWidth, float chokeMerge);
+	bool IsAnalysed() const { return analysed; }
+	float RouteHeat(const springai::AIFloat3& pos) const;
+	float RouteShare(const springai::AIFloat3& pos) const;   // 0 at our base, 1 at the enemy source
+	bool IsFriendlyLane(const springai::AIFloat3& pos) const;
+	int GetChokeCount() const { return (int)chokes.size(); }
+	springai::AIFloat3 GetChokePos(int i) const;
+	springai::AIFloat3 GetChokeDir(int i) const;   // unit vector toward the enemy
+	float GetChokeWidth(int i) const;
+	float GetChokeHeat(int i) const;
+	float GetChokeShare(int i) const;
+	int GetRouteCount() const { return (int)routes.size(); }
+	springai::AIFloat3 GetRoutePoint(int route, float share) const;   // a point along a route, by share
+
+	// --- combat, air, composition
+	float CombatHeat(const springai::AIFloat3& pos, float radius) const;
+	springai::AIFloat3 CombatNear(const springai::AIFloat3& from, float minHeat) const;   // -1 x when none
+	float AirHeat(const springai::AIFloat3& pos, float radius) const;
+	springai::AIFloat3 AirCentre(const springai::AIFloat3& pos, float radius) const;   // -1 x when none
+	float EnemyCost(int kind) const;
+	int EnemyCount(int kind) const;
+	float SurfThreat(const springai::AIFloat3& pos) const;
+	float AirThreat(const springai::AIFloat3& pos) const;
+	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
+    int GetAirContactId(int index) const { return index >= 0 && static_cast<size_t>(index) < airContacts.size() ? airContacts[index].id : -1; }
+	springai::AIFloat3 GetAirContactPos(int index) const;
+	float GetAirContactCost(int index) const;
+    bool IsAirContactArmed(int index) const;
+    float GetArmedAirCost() const;
+    float AmphThreat(const springai::AIFloat3& pos) const;
+    int GetGroundContactCount() const { return static_cast<int>(groundContacts.size()); }
+    springai::AIFloat3 GetGroundContactPos(int index) const;
+    float GetGroundContactCost(int index) const;
+    bool IsGroundContactEconomy(int index) const;
+    int GetNavalContactCount() const { return static_cast<int>(navalContacts.size()); }
+    springai::AIFloat3 GetNavalContactPos(int index) const;
+    // Completed allied extractors, geothermal plants and factories. Lazy value
+    // snapshot: no borrowed unit/definition escapes and no enemy omniscience.
+    int GetAllyAssetCount();
+    springai::AIFloat3 GetAllyAssetPos(int index) const;
+    float GetAllyAssetCost(int index) const;
+    std::vector<springai::AIFloat3> GetTerrainRoute(const springai::AIFloat3& from,
+        const springai::AIFloat3& to, int cls, float landCost, float waterCost,
+        float threatWeight, float maxWaterThreat);
+    std::vector<springai::AIFloat3> GetUnitTerrainRoute(const CCircuitDef* def,
+        const springai::AIFloat3& from, const springai::AIFloat3& to, bool dry,
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat);
+
+	// --- water
+	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
+	bool IsHostileWater(int body, bool subDepth) const;
+	void MarkHostileWater(const springai::AIFloat3& pos, float radius);
+	bool TorpedoSiteOK(const CCircuitDef* cdef, const springai::AIFloat3& pos, float range, bool onLand) const;
+	int AnalyseBeaches(const springai::AIFloat3& centre, float radius);
+	int GetBeachCount() const { return (int)beaches.size(); }
+	springai::AIFloat3 GetBeachPos(int i) const;
+	springai::AIFloat3 GetBeachSeaward(int i) const;
+	int GetBeachClass(int i) const;
+	float GetBeachHeat(int i) const;
+	float GetBeachDepth(int i, float out) const;   // seabed depth this far out along the normal
+
+	// --- lanes (D-127): between both teams' start positions, per movement class
+	void ClearLaneEnds() { allyEnds.clear(); enemyEnds.clear(); }
+	void AddAllyEnd(const springai::AIFloat3& pos) { allyEnds.push_back(pos); }
+	void AddEnemyEnd(const springai::AIFloat3& pos) { enemyEnds.push_back(pos); }
+	int AnalyseLanes(int alternatives, float mergeRadius, float threatWeight, float specialistBias = 1.f,
+		float highGroundRise = 128.f, float highGroundDetour = 3.f, int highGroundRoutes = 3);
+    bool RequestLanes(int alternatives, float mergeRadius, float threatWeight, float specialistBias = 1.f,
+        float highGroundRise = 128.f, float highGroundDetour = 3.f, int highGroundRoutes = 3);
+    bool IsLanePending() const { return laneJobs.Pending(); }
+    int GetLaneRevision() const { return laneRevision; }
+    void CancelLaneRequest();
+    void BeginLanePostprocess() { lanePostStart = std::chrono::steady_clock::now(); }
+    void EndLanePostprocess();
+	int GetLaneCount() const { return (int)lanes.size(); }
+	int GetLaneClass(int i) const;
+	int GetLaneMask(int i) const;      // classes capable of the complete representative path
+	void SetCliffDescentParams(int approachClass, float minDrop, float maxRun, float minProgress);
+	void SetMountainPathParams(float gradeWeight, float peakTolerance);
+    bool IsLaneSpecialist(int i) const;
+    void SetSpecialistSpan(float minimum, float fraction);
+	void SetMountainShelfParams(float surfaceWeight, float heightWeight);
+	void SetCliffPreference(float weight, float qualityTolerance, float heightFraction);
+	springai::AIFloat3 GetLaneAscent(int i) const;
+	float GetLaneCliffQuality(int i, int end) const;
+	springai::AIFloat3 GetLaneDescent(int i) const; // start of a verified access-then-descent route, or -1
+	springai::AIFloat3 GetLanePoint(int i, float share) const;   // 0 at our end, 1 at the enemy's
+	float GetLaneLength(int i) const;
+	float GetLaneWidth(int i) const;   // the narrowest point, for ground lanes
+	springai::AIFloat3 GetLaneChoke(int i) const;
+	float GetLaneThreat(int i) const;   // mean threat along it (air lanes: enemy AA)
+	float GetLaneFront(int i) const;    // share where enemy threat begins, -1 when none
+	int GetLaneHeat(int i) const;       // paths merged into it
+	bool IsPassable(const springai::AIFloat3& pos, int cls) const;
+	std::vector<springai::AIFloat3> GetLaneRoute(int lane, const springai::AIFloat3& from, int cls) const;
+
+private:
+	// Value snapshots, refreshed each second from current ally-visible contacts.
+	struct AirContact {
+		springai::AIFloat3 pos;
+		float cost;
+		bool armed = false;
+        int id = -1;
+	};
+	std::vector<AirContact> airContacts;
+    struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; };
+    std::vector<GroundContact> groundContacts;
+    std::vector<springai::AIFloat3> navalContacts;
+    std::vector<AirContact> allyAssets;
+    int allyAssetFrame = -100000;
+	struct SChoke {
+		springai::AIFloat3 pos, dir;
+		float width, heat, share;
+	};
+	using SLane = lane::Route;
+	struct SBeach {
+		springai::AIFloat3 pos, seaward;
+		int cls;
+		float heat;
+	};
+	using Grid = std::vector<float>;
+    Grid observedWaterWeapons; // current weapon coverage, independent of profile threat multipliers
+    lane::Settings laneSettings;
+    std::shared_ptr<const lane::Terrain> laneTerrain;
+    lane::JobGate laneJobs;
+    std::shared_ptr<std::atomic<bool>> laneCancel;
+    int laneRevision = 0;
+    std::chrono::steady_clock::time_point lanePostStart;
+    lane::Request CaptureLaneRequest(int alternatives, float mergeRadius, float threatWeight, float specialistBias,
+        float highGroundRise, float highGroundDetour, int highGroundRoutes);
+    bool StartLaneAnalysis(bool background, int alternatives, float mergeRadius, float threatWeight, float specialistBias,
+        float highGroundRise, float highGroundDetour, int highGroundRoutes);
+	CWeaponDef* MainWeapon(const CCircuitDef* cdef) const;
+	mutable std::unordered_map<int, CWeaponDef*> mainWeapon;   // def id -> its longest-range weapon
+
+	void EnsureGrid();
+	void BuildWater();
+	int Cell(const springai::AIFloat3& pos) const;
+	springai::AIFloat3 CellPos(int c) const;
+	float CellHeight(int c) const;
+	float CellMaxHeight(int c) const;   // the shallowest point: water bodies are conservative
+	bool Passable(int from, int to, bool amph) const;
+	void BuildPass();
+	void Clearance(std::vector<int>& clr, int cls = L_BOT) const;
+	void Dijkstra(int start, const Grid& penalty, bool amph, Grid& dist, std::vector<int>& prev) const;
+	void Decay(Grid& g, float factor);
+	void AddHeat(Grid& g, const springai::AIFloat3& pos, float v);
+	float SumHeat(const Grid& g, const springai::AIFloat3& pos, float radius) const;
+	void Label(std::vector<int>& body, float minDepth);
+
+	CCircuitAI* circuit;
+	int cellSize;
+	int gw, gh;
+	Grid height, maxHeight;   // per cell: mean and highest point
+	Grid surfaceSlope;   // mean engine slope: catches sideways travel along a cliff
+    struct UnitTerrain { lane::Terrain grid; Grid slope; int frame = -100000; };
+    std::unordered_map<int, UnitTerrain> unitTerrain;
+	std::vector<springai::AIFloat3> sources;
+	Grid routeHeat, routeShare;
+	std::vector<char> lane;
+	std::vector<std::vector<int>> routes;   // cells, base first
+	std::vector<SChoke> chokes;
+	bool analysed;
+
+	int heatCell, hw, hh;
+	Grid combat, air;
+	int lastDecay;
+	float combatHalfLife, airHalfLife;
+	float cost[_KIND_SIZE_];
+	int count[_KIND_SIZE_];
+
+	std::vector<int> body8, body15;
+	std::vector<char> hostile8, hostile15;
+	bool waterBuilt;
+	std::vector<SBeach> beaches;
+
+	std::vector<char> pass[_LANE_CLASSES_];
+	std::vector<springai::AIFloat3> allyEnds, enemyEnds;
+	std::vector<SLane> lanes;
+};
+
+} // namespace circuit
+
+#endif // SRC_CIRCUIT_TERRAIN_BATTLEANALYSIS_H_

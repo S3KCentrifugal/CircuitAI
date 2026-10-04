@@ -1,0 +1,21 @@
+{
+  "stop_minute": 22,
+  "expect": [
+    {"key":"tech-telchine-water","pattern":"AmphFixture.*water team=0 unit=legamph","by_minute":8,"scope":"any"},
+    {"key":"tech-marauder-water","pattern":"AmphFixture.*water team=0 unit=armmar","by_minute":8,"scope":"any"},
+    {"key":"air-telchine-water","pattern":"AmphFixture.*water team=1 unit=legamph","by_minute":8,"scope":"any"},
+    {"key":"air-marauder-water","pattern":"AmphFixture.*water team=1 unit=armmar","by_minute":8,"scope":"any"},
+    {"key":"tech-telchine-land","pattern":"AmphFixture.*landed team=0 unit=legamph","by_minute":18,"scope":"any"},
+    {"key":"tech-marauder-land","pattern":"AmphFixture.*landed team=0 unit=armmar","by_minute":18,"scope":"any"},
+    {"key":"air-telchine-land","pattern":"AmphFixture.*landed team=1 unit=legamph","by_minute":18,"scope":"any"},
+    {"key":"air-marauder-land","pattern":"AmphFixture.*landed team=1 unit=armmar","by_minute":18,"scope":"any"},
+    {"key":"foothold-secured","pattern":"\\[AMPH\\].*secured","by_minute":18,"scope":"any"},
+    {"key":"combat","pattern":"AmphFixture.*kill team=","by_minute":22,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception|Error in.*[Aa]mphibious","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"fixture","pattern":"AmphFixture.*INVALID","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

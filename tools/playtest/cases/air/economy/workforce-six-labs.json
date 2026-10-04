@@ -1,0 +1,17 @@
+{
+  "name": "workforce-six-labs",
+  "runner": "run_air_workforce.py",
+  "scenario": "six-labs",
+  "description": "Six supplied planned T2 labs; separate economic support banks.",
+  "kind": "supplied",
+  "map": "Supreme Isthmus v1.7",
+  "minutes": 16,
+  "seed": 1810001,
+  "checks": "air_workforce_budget",
+  "focused_assertions": [
+    "completed-workers",
+    "six-working-factories",
+    "economic-static-power",
+    "donor-stop"
+  ]
+}

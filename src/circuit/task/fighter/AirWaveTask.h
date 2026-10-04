@@ -18,13 +18,14 @@
 #include <vector>
 
 namespace circuit {
+class CCircuitDef;
 
 class CAirWaveTask final: public IFighterTask {
 public:
 	// Numbers are the script's contract (Task::WaveMode in task.as).
 	enum class EMode: char {CARPET = 0, FLANK, PINCER, STRIKE, DEEP, FEINT};
 	// PLANNED until SetPlan; DONE is terminal and the task aborts itself.
-	enum class EState: char {PLANNED = 0, FORMING, HOLDING, ATTACKING, DONE};
+	enum class EState: char {PLANNED = 0, FORMING, HOLDING, ATTACKING, DONE, RETURNING};
 	// bearingDeg value meaning "sample the threat map and take the quietest".
 	static constexpr float SMART_BEARING = 999.f;
 
@@ -40,6 +41,8 @@ public:
 
 	virtual void OnUnitIdle(CCircuitUnit* unit) override;
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+    void OnWeaponFired(CCircuitUnit* unit, int weaponDefId);
+    void OnDamageDealt(CCircuitUnit* unit, int weaponDefId);
 
 	// Script hooks
 	/*
@@ -63,6 +66,22 @@ public:
 	 * False when nothing qualifies; the plan is untouched.
 	 */
 	bool PickStrikeTarget(const springai::AIFloat3& from, int preference, float minStaticCost, bool includeHeavy);
+    void SetFlightPolicy(float width, float rankSpacing, float lossAbort, const springai::AIFloat3& home);
+    void SetStrikePolicy(CCircuitDef* bomber, int count, float passFraction, float margin, float threatWeight, float maxThreat);
+    void ConsiderStrikeAircraft(CCircuitDef* bomber);
+    void SetAssemblyPolicy(float radius, float fraction, int joinFrames);
+    void SetMissionPolicy(float padding, float inset, float unknown, float riskScale, float armyReserve, float localAAReserve, bool synchronize);
+    void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
+    void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
+    void SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority, float immediateRadius);
+    void AddTargetFallback(int preference);
+    bool PickOperationTarget(const springai::AIFloat3& from, float minStaticCost, bool includePrimary = true);
+    void AllowStrikeDef(CCircuitDef* def, float priority);
+    void AddSearchPoint(const springai::AIFloat3& point);
+    int GetBomberCount() const;
+    int GetTargetsDestroyed() const { return targetsDestroyed; }
+    float GetDamageDealt() const { return operationDamage; }
+    int GetRequiredBombers() const { return requiredBombers; }
 	int GetState() const { return int(state_); }
 	int GetMode() const { return int(mode); }
 	const springai::AIFloat3& GetAim() const { return aim; }
@@ -71,6 +90,13 @@ public:
 	int GetFormedCount() const { return formedCount; }
 
 private:
+    void UpdateOperation();
+    void IssueOperationLeg();
+    bool BeginOperationAttack(const char* reason);
+    bool TryImmediateStrike();
+    bool NextOperationTarget();
+    bool IsOperationBomber(CCircuitUnit* unit) const;
+    springai::AIFloat3 OperationCentre() const;
 	void EnterState(EState next);
 	void ComputeLines();
 	float PickSmartBearingDeg(const springai::AIFloat3& baseDir) const;
@@ -81,6 +107,12 @@ private:
 	void IssueForm(CCircuitUnit* unit);
 	void IssueAttack(CCircuitUnit* unit);
 	bool IsPastAim(CCircuitUnit* unit, int frame) const;
+    float RouteExposure(const springai::AIFloat3& from, const springai::AIFloat3& to) const;
+    void ReturnHome(const char* reason);
+    bool AdvanceReturn(CCircuitUnit* unit, int frame, bool force = false);
+    float StrikeAlpha(CCircuitDef* bomber);
+    std::vector<springai::AIFloat3> PlanIngress(const springai::AIFloat3& from, const springai::AIFloat3& target, float& risk) const;
+    float RouteLength(const springai::AIFloat3& from, const springai::AIFloat3& target) const;
 	CEnemyInfo* GetStrikeTarget() const;
 
 	EMode mode;
@@ -102,6 +134,76 @@ private:
 	int strikeTargetId;
 	int formedCount;
 	bool linesReady;
+    bool safeFlight = false;
+    float maxWidth = 1320.f;
+    float rankSpacing = 240.f;
+    float abortFraction = .35f;
+    float damageBudget = 0.f;
+    float passDamage = 0.f;
+    int requiredBombers = 0;
+    float damageMargin = 1.f;
+    float threatWeight = 0.f;
+    float maxThreat = 0.f;
+    int launchCount = 0;
+    int expectedCount = 0;
+    int joinFrames = 0;
+    int assemblyTravelFrames = 0;
+    float assemblyRadius = WAVE_DEFAULT_ASSEMBLY_RADIUS;
+    float assemblyFraction = .8f;
+    float passFraction = 0.f;
+    static constexpr float WAVE_DEFAULT_ASSEMBLY_RADIUS = 400.f;
+    springai::AIFloat3 returnPos;
+    std::map<CCircuitUnit*, int> releasedAt;
+    std::set<CCircuitUnit*> outbound;
+    std::set<CCircuitUnit*> assembled;
+    std::map<int, float> strikeAlpha;
+    bool missionPolicy = false;
+    bool synchronize = false;
+    bool staticAssault = false;
+    float corridorPadding = 0.f;
+    float edgeInset = 480.f;
+    float unknownReserve = 0.f;
+    float riskScale = 0.f;
+    float armyReserve = 0.f;
+    float localAAReserve = 0.f;
+    float bomberMetal = 1.f;
+    std::vector<std::pair<springai::AIFloat3, float>> excludedStrikeRegions;
+    std::vector<springai::AIFloat3> ingress;
+    std::set<CCircuitUnit*> routed;
+    std::map<CCircuitUnit*, int> attackAt;
+    std::set<CCircuitUnit*> attackIssued;
+    std::map<CCircuitUnit*, std::vector<springai::AIFloat3>> returnRoutes;
+    std::map<CCircuitUnit*, size_t> returnSteps;
+    int returnFrames = 0;
+    bool operationPolicy = false;
+    bool offensive = false;
+    bool committed = false;
+    int operationPreference = 5;
+    std::vector<int> targetFallbacks;
+    int operationPhase = 0;
+    int operationLeg = 0;
+    int operationIssuedFrame = -1;
+    int operationScanFrame = -100000;
+    int targetsDestroyed = 0;
+    float operationDamage = 0.f;
+    float operationTargetHealth = 0.f;
+    float escortLead = 480.f;
+    float routeCeiling = 500.f;
+    float localRadius = 1600.f;
+    bool earlyAttackApproach = false;
+    float immediateStrikePriority = 0.f;
+    float immediateStrikeRadius = 0.f;
+    springai::AIFloat3 assemblyPos;
+    std::map<int, float> allowedStrikeDefs;
+    std::set<int> operationBomberDefs;
+    std::vector<springai::AIFloat3> operationRoute;
+    std::set<int> completedTargets;
+    std::set<CCircuitUnit*> operationIdle;
+    std::map<CCircuitUnit*, springai::AIFloat3> operationDestinations;
+    std::set<CCircuitUnit*> operationArrived;
+    std::vector<springai::AIFloat3> searchPoints;
+    unsigned int searchIndex = 0;
+    void PrepareOperationRoute();
 };
 
 } // namespace circuit

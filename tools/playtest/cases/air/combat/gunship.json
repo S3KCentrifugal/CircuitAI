@@ -1,0 +1,8 @@
+{
+  "name": "gunship",
+  "description": "Native gunship harassment, damage/paralysis and fighter interception",
+  "aircraft": [{"unit":"$gunship","count":24,"team":0},{"unit":"$fighter1","count":6,"team":1}],
+  "targets": [{"unit":"armmex","count":4,"position":[7800,4700]},{"unit":"armwin","count":6,"position":[8500,4000]}],
+  "defenses": [{"unit":"armrl","count":1,"position":[8500,4400]}],
+  "refill_seconds": 60
+}

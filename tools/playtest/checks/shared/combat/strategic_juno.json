@@ -1,0 +1,18 @@
+{
+  "stop_minute": 9,
+  "expect": [
+    {"key":"advanced-jammer","pattern":"PULSE .*rank=0 targets=","by_minute":3,"scope":"any"},
+    {"key":"basic-jammer","pattern":"PULSE .*rank=1 targets=","by_minute":5,"scope":"any"},
+    {"key":"advanced-radar","pattern":"PULSE .*rank=2 targets=","by_minute":6,"scope":"any"},
+    {"key":"radar","pattern":"PULSE .*rank=3 targets=","by_minute":7,"scope":"any"},
+    {"key":"launch","pattern":"PULSE: launched from","by_minute":3,"scope":"any"},
+    {"key":"scatter","pattern":"PULSE .*fog scatter at","by_minute":8,"scope":"any"},
+    {"key":"stock","pattern":"StrategicFixture.*stock-drop","by_minute":4,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"fixture","pattern":"StrategicFixture.*INVALID","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

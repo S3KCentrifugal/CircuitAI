@@ -1,5 +1,16 @@
 # tech_rules.as - TECH's build rules as one ordered table
 
+D-170 leaves the normal table unchanged. On metal fields, `OpeningWorker`
+protects the first mex worker, second power worker and initial third-constructor
+T2 transition from discretionary front/defense work. Ferry and existing lab
+reclaim rules retain precedence; `DedicatedTask` runs at `power.t1`, and the
+general `EconomyTask` at `mex.expand`. Converter/rush-chain rows are skipped.
+INV-113 checks selected discretionary rules against those worker identities.
+
+D-136 adds `flank.factory` / `DoFlankFactory` after `air.dedicated`, calling
+`TechFlank::Work` for an accessible specialist lane at +200 metal. It precedes
+forward defenses and the economic chain; ongoing construction stays first.
+
 Script: [`data/script/src/roles/tech_rules.as`](../../data/script/src/roles/tech_rules.as),
 namespace `TechRules`. Decision:
 [D-067](../decisions.md#d-067--techs-build-sequence-is-one-ordered-rule-table).
@@ -60,24 +71,38 @@ across rows, so a condition cannot be lost by one row when another moves.
 | 20 | `energy.float` | mobile | `MetalFloating`, `EnergyAhead`, `EnergyIdle` | best-payback energy anyway |
 | 21 | ~~`lab.t1.spam`~~ | - | - | removed by D-109: spam labs are built forward by the released T1 land constructors (`fwd.t1`) |
 | 22 | `legacy.strategic` | mobile | `ChainInactive` | the role's strategic rungs as they stand (nukes, anti-nuke, gantry, water factories, T2 constructor policy) |
-| 23 | `defence.base` | constructors | `FirstTurretStands` | one light laser and one light AA near the factories |
+| 23 | `defence.base` | constructors | `FirstTurretStands` | D-152 shared fortification fallback |
 | 24 | `order.repair` | constructors | - | native's queued repairs of our own unfinished structures within `ExpOrderRadius` |
 | 25 | `assist.any` | mobile | - | the nearest structure under construction within the builder's assist radius (commander: home radius) |
 | 26 | `guard.factory` | constructors | - | guard the primary T1 lab |
-| 27 | `wait` | mobile | - | 3 s |
+| 27 | `air.defend` | air constructors | - | D-123 (owner): nothing else to do: defences (the mex clusters' AA, then a ring round the base toward the front) |
+| `wait` | mobile | - | 3 s |
 
-### Rows added by D-107 to D-111
+### Rows added by D-126
+
+| Key | Who | When | Act |
+| --- | --- | --- | --- |
+| `weapons.super` | air constructors (the act refuses others) | - | D-126 (owner): a super cannon framed or startable: every air constructor frames it or assists the frame. Above `keep.current`. |
+| `weapons.cluster` | constructors | - | D-126: from +200 metal, within the weapon budget, the highest-priority weapon cluster's next open slot ([`tech_weapons.md`](tech_weapons.md)). Above `fwd.t2.defend`. |
+| `air.defend` | air constructors | - | now asks `TechWeapons::Work` before its defence ring |
+
+### Rows added by D-107 to D-114
 
 In table order (the full, current order is `TechRules::Init`, and the one-page
 picture is [`tech-layout-and-sequence.md`](tech-layout-and-sequence.md)):
 
 | Key | Who | When | Act |
 | --- | --- | --- | --- |
-| `turret.spam` | turrets | - | D-109: first turret row: the two turrets behind a spam lab always work for it (`TechForward::TurretFocus`) |
-| `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory |
+| `harbour.sea` | construction ships, subs, hover constructors (`SEA_CON`) | - | D-121: an island TECH's sea builders: the advanced shipyard, floating turrets, then the sea economy (`TechHarbour::SeaTask`) |
+| `harbour.yard` | commander, constructors | the harbour began | D-121: the hover plant on the island, once (`TechHarbour::LandTask`) |
+| `harbour.float` | commander | a land-locked start, energy floating | D-121: floating converters before the harbour (`TechHarbour::CommanderFloat`) |
+| `turret.spam` | turrets | - | D-109, D-114: first turret row: the turrets behind a front cluster's factory always work for it (`TechFactories::TurretFocus`) |
+| `turret.factory` | turrets | `MetalFloodedLong` | D-105: the bank full and nothing in reach: assist a producing factory, never a spam lab (D-119) |
 | `ferry.cargo` | mobile | - | D-110/D-112: a gift for a teammate (in flight or queued) keeps the ferry's hold, or its park behind the base (`Team::Ferry::Park`), until the drop-off; nothing else |
+| `lab.base.reclaim` | mobile | `BaseFactoryToGo` | D-114: with `FrontReclaimAtCount` land factories on the map, the base's land factories are retired and reclaimed (`TechFactories::ReclaimBaseFactory`) |
+| `lab.front` | constructors | `FrontClusterOpen` | D-114: a front cluster's lost turret; an open T2 or T3 front factory cluster: its turrets, help on one going up, then its factory (`TechFactories::OpenWork`) |
 | `land.recall` | constructors | - | D-109: a tier whose air constructors went down drops a forward job; the eco rows take the builder |
-| `air.dedicated` | T2 | - | D-107/D-108: the dedicated T2 air constructors: only advanced converters / advanced fusions, else wait |
+| `air.dedicated` | T2 | - | D-107/D-108: the dedicated T2 air constructors: only advanced converters / advanced fusions; with no site in the layout, defences meanwhile (D-123), else wait |
 | `air.flex` | T2 | - | D-107: the other T2 air constructors follow the energy |
 | `fwd.t2.defend` | T2 | `LandCon`, `T2LandReleased` | D-109: mex-cluster defences, long-range AA then flak (`TechForward::DefendMexes`) |
 | `fwd.t1` | T1 | `LandCon`, `T1LandReleased` | D-109: the spam cluster (`TechForward::ForwardT1`) |
@@ -123,4 +148,16 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: 8e2392859a23cad3d6d9f1dda10ac24feda107dc; lines: 505 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: aac069f2063d4c9688c70d996f5c66db845cad82; lines: 599 -->
+
+## D-152 fortification rule
+
+`defence.fortify` asks the shared `DoDefence` action after opening/recovery
+ownership rules and before weapon clusters. It allows T2 resource protection immediately; T1 lane work requires base build
+power. It has a separate five-percent income budget and two concurrent orders.
+The existing `defence.base` fallback uses the same controller.
+
+D-160 moves `ferry.cargo` ahead of `harbour.sea`, `harbour.yard` and
+`harbour.float`: valid donated bot constructors belong to the ferry before
+discretionary construction. Naval subs no longer consume bot-donation requests.
+The lab reclaim, recovery and rush-chain predicates and relative ordering are unchanged.

@@ -1,0 +1,15 @@
+{
+  "name":"afus-handoff-glitters",
+  "map":"All That Glitters v2.2.3",
+  "checks":"air_afus_handoff",
+  "description":"One supplied offensive bomber cohort must attack a visible AFUS before flying over it",
+  "visibility":"global", "bomber_only":false,
+  "priority_targets":{"armafus":true,"corafus":true,"legafus":true},
+  "priority_radius":1800,
+  "aircraft":[{"unit":"$t2","count":40,"team":0,"once":true},{"unit":"$fighter2","count":40,"team":0,"once":true}],
+  "targets":[
+    {"unit":"armafus","count":1,"position":[4000,8700],"once":true},
+    {"unit":"armestor","count":3,"position":[3200,8700],"once":true}
+  ],
+  "defenses":[], "refill_seconds":30
+}

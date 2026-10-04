@@ -27,6 +27,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import storage
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -208,6 +209,16 @@ def stage(args):
         "WindowPosY": "0",
         "LogFlush": "1",
     }
+    if getattr(args, "lean_render", False):
+        # Local test output only. Never alter the player's installation settings.
+        overrides.update({"CompressTextures":"0", "MSAALevel":"0", "Shadows":"-1",
+                          "Water":"0", "GrassDetail":"0", "GroundDetail":"60",
+                          "CubeTexSizeReflection":"128", "CubeTexGenerateMipMaps":"0",
+                          "VSync":"0", "VSyncGame":"0", "IdleFpsDivider":"0", "ThreadPinPolicy":"0"})
+    if args.headless:
+        # Concurrent headless engines otherwise choose the same preferred main
+        # core. Let the OS schedule these isolated test threads independently.
+        overrides["ThreadPinPolicy"] = "0"
     out = []
     seen = set()
     for line in lines:
@@ -225,6 +236,10 @@ def stage(args):
     # the camera / screenshot / speed / end widget
     wdir = d / "LuaUI" / "Widgets"
     wdir.mkdir(parents=True, exist_ok=True)
+    # only this run's widgets: an --extra-widget from an earlier run stayed in the
+    # write dir and ran again (played: an old draw test drew over the intro test)
+    for old in wdir.glob("*.lua"):
+        old.unlink()
     shots = []
     for tok in (args.shots or "").split(","):
         tok = tok.strip()
@@ -239,9 +254,28 @@ def stage(args):
             fx, _, fz = parts[2].partition(":")
             focus = ", x = %s, z = %s" % (float(fx), float(fz))
         shots.append("{ minute = %s, height = %s%s }" % (float(minute), float(height) if height else args.cam_height, focus))
+    # owner: fast-forward, and slow down near what the test watches. --speed-plan
+    # "minute:speed,...": each speed from its minute on; --slow-near-shots: speed 1
+    # from SLOW_LEAD minutes before each screenshot to just after it, --speed between
+    plan = []
+    for tok in (getattr(args, "speed_plan", None) or "").split(","):
+        tok = tok.strip()
+        if tok:
+            m, _, s = tok.partition(":")
+            plan.append((float(m), float(s)))
+    if getattr(args, "slow_near_shots", False):
+        lead = 0.3
+        for tok in (args.shots or "").split(","):
+            tok = tok.strip()
+            if tok:
+                m = float(tok.split("@")[0])
+                plan.append((max(0.0, m - lead), 1.0))
+                plan.append((m + 0.05, float(args.speed)))
+    plan.sort()
+    planLua = ", ".join("{ minute = %s, speed = %s }" % (m, s) for m, s in plan)
     cfg = ("{ role = %r, team = %d, speed = %s, end_minute = %s, forcestart = true, "
-           "log_prefix = '[Playtest]', shots = { %s } }") % (
-        args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots))
+           "log_prefix = '[Playtest]', shots = { %s }, speed_plan = { %s } }") % (
+        args.role, 0, float(args.speed), float(args.minutes) + 0.5, ", ".join(shots), planLua)
     tpl = (HERE / "widgets" / "playtest_camera.lua").read_text(encoding="utf-8")
     (wdir / "playtest_camera.lua").write_text(tpl.replace("__CFG__", cfg), encoding="utf-8")
     # extra widgets under test (e.g. tools/widgets/gui_barb_team_link.lua), staged into
@@ -386,13 +420,16 @@ def pid_file(d):
 
 
 def launch(args):
-    d = Path(args.dir)
+    # The engine starts in its own directory; keep all writable output in the
+    # explicitly selected test directory even when the caller used a relative path.
+    d = Path(args.dir).resolve()
     if not (d / "script.txt").exists() or not (d / "AI" / "Skirmish" / AI_SHORT / AI_VERSION / "SkirmishAI.dll").exists():
         die("nothing staged in %s: run 'stage' first" % d)
     if running_pids(d):
         die("a playtest engine is already running (pids %s): 'stop' it first" % running_pids(d))
     eng = engine_dir(args.engine)
     exe = eng / ("spring-headless.exe" if getattr(args, "headless", False) else "spring.exe")
+    storage.capture_inputs(d, exe)
     # a fresh infolog per run; the previous one is kept with its run
     info = d / "infolog.txt"
     if info.exists():
@@ -418,17 +455,21 @@ def launch(args):
 
 def running_pids(d):
     """Engine processes started on this write dir, and no other spring.exe."""
-    needle = str(d).replace("/", "\\").lower()
+    needle = str(Path(d).resolve()).replace("/", "\\").lower()
     ps = ("Get-CimInstance Win32_Process -Filter \"Name='spring.exe' or Name='spring-headless.exe'\" | "
           "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }")
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30).stdout
     except Exception:
         return []
+    # the exact write dir: "--write-dir <dir>" followed by a space, a quote or the
+    # end (a plain substring test matched C:\bardev\barb-playtest inside
+    # C:\bardev\barb-playtest-sim1, so one run's stop killed parallel runs)
+    pat = re.compile(r'--write-dir\s+"?' + re.escape(needle) + r'\\?"?(\s|$)')
     pids = []
     for line in out.splitlines():
         pid, _, cl = line.partition("|")
-        if needle in cl.lower() and pid.strip().isdigit():
+        if pat.search(cl.lower()) and pid.strip().isdigit():
             pids.append(int(pid))
     return pids
 
@@ -459,15 +500,14 @@ def stop(args, quiet=False):
 FRAME_RE = re.compile(r"\[f=(-?\d+)\]")
 AI_RE = re.compile(r":::AI LOG:S:(\d+):T:(\d+):F:(-?\d+):L::(.*)$")
 DETAILS_RE = re.compile(r"\[GameDetails\] skirmishAI=(\d+) team=(\d+) .*? role=(\d+)")
-TIMELINE_RE = re.compile(r"\[Rule\] |\[Eco\] next|\[TECH\]\[Build\]|\[TECH\]\[Opening\]|\[TECH\]\[Factory\]|\[TECH\]\[Labs\]|\[Layout\]|\[Team\]\[Roster\]|\[Playtest\]")
+TIMELINE_RE = re.compile(r"\[Rule\] |\[Eco\] next|\[TECH\]\[Build\]|\[TECH\]\[Opening\]|\[TECH\]\[Factory\]|\[TECH\]\[Labs\]|\[Layout\]|\[Team\]\[Roster\]|\[Playtest\]|\[AIR\]|\[AirWave\]|\[Ferry\]")
 NATIVE_RE = re.compile(r"Skirmish AI <[^>]*>: (EXP: |RESERVE: |BUILDER: |CBFactoryTask: )")
 
 
 def load_checks(path):
-    p = Path(path)
-    if not p.exists():
-        p = HERE / "checks" / (str(path) + ".json")
-    if not p.exists():
+    try:
+        p = storage.resolve_definition(path, 'checks')
+    except (ValueError, FileNotFoundError):
         die("no checks file %s" % path)
     return json.loads(p.read_text(encoding="utf-8")), p
 
@@ -475,6 +515,7 @@ def load_checks(path):
 def watch(args):
     d = Path(args.dir)
     checks, checks_path = load_checks(args.checks)
+    checks_bytes = checks_path.read_bytes()
     stop_minute = float(args.minutes) if args.minutes else float(checks.get("stop_minute", 12))
     stop_frame = int(stop_minute * 60 * FPS)
     info = d / "infolog.txt"
@@ -526,8 +567,9 @@ def watch(args):
             for line in lines:
                 line = line.rstrip("\r")
                 fm = FRAME_RE.search(line)
+                event_frame = int(fm.group(1)) if fm else frame
                 if fm:
-                    frame = max(frame, int(fm.group(1)))
+                    frame = max(frame, event_frame)
                 if "[Playtest] widget loaded" in line:
                     widget_loaded = True
                 if re.search(r": ERR\s+:", line) or "Fix compilation errors" in line:
@@ -558,11 +600,15 @@ def watch(args):
                         reason = "forbidden line"
                 for e in expects:
                     if e["seen"] is None and e["re"].search(text if am else line) and scope_ok(e.get("scope", "tech"), this_sid):
-                        e["seen"] = (frame, (text if am else line)[-200:])
+                        # Judge the event frame, not when its buffered log batch
+                        # was polled. A late match must not erase a deadline miss.
+                        if e.get("by_minute") is not None and minute(event_frame) > float(e["by_minute"]):
+                            continue
+                        e["seen"] = (event_frame, (text if am else line)[-200:])
                         if e.get("after_key"):
                             other = next((o for o in expects if o["key"] == e["after_key"]), None)
-                            if other is None or other["seen"] is None or other["seen"][0] > frame:
-                                failures.append("'%s' came before '%s' (%.1f min)" % (e["key"], e["after_key"], minute(frame)))
+                            if other is None or other["seen"] is None or other["seen"][0] is None or other["seen"][0] > event_frame:
+                                failures.append("'%s' came before '%s' (%.1f min)" % (e["key"], e["after_key"], minute(event_frame)))
                                 verdict = "FAIL"
                                 reason = "order"
                 if pass_on and pass_on["re"].search(text if am else line) and scope_ok(pass_on.get("scope", "tech"), this_sid):
@@ -587,6 +633,10 @@ def watch(args):
             reason = reason or "reached %.0f min" % stop_minute
             break
         if not alive and frame > 0:
+            # The engine can flush its final seconds while running_pids polls.
+            # Consume that tail before deciding an accelerated run ended early.
+            if info.exists() and info.stat().st_size > pos:
+                continue
             verdict = verdict or ("FAIL" if frame < stop_frame else "PASS")
             reason = reason or "engine exited at %.1f min" % minute(frame)
             break
@@ -614,8 +664,8 @@ def watch(args):
         stop(args, quiet=True)
 
     # the report
-    run_dir = d / "runs" / dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = d / "runs" / storage.run_id()
+    run_dir.mkdir(parents=True, exist_ok=False)
     shots = sorted((d / "screenshots").glob("*.png"))
     for s in shots:
         shutil.copy2(s, run_dir / s.name)
@@ -656,6 +706,7 @@ def watch(args):
     report = "\n".join(R)
     (run_dir / "report.md").write_text(report, encoding="utf-8")
     (d / "report.md").write_text(report, encoding="utf-8")
+    storage.archive_metadata(d, run_dir, checks_bytes, verdict, reason, frame, not args.no_stop)
     print(report if args.print_report else "\n".join(R[:9 + len(expects) + len(forbids) + 4]))
     log("report: %s" % (run_dir / "report.md"))
     return 0 if verdict == "PASS" else 1
@@ -673,6 +724,8 @@ def add_stage_args(p):
     p.add_argument("--data", help="AI data dir with config/ script/ AIOptions.lua AIInfo.lua (default: the repo's data/)")
     p.add_argument("--set", action="append", help='override a Global::RoleSettings::Tech setting in the staged script, e.g. --set RushObjective=\'"afus"\'')
     p.add_argument("--speed", default="1", help="game speed the widget sets at frame 1 (setminspeed/setmaxspeed)")
+    p.add_argument("--speed-plan", help="speed changes during the game, 'minute:speed,...' (e.g. '0:20,14:1,16:20')")
+    p.add_argument("--slow-near-shots", action="store_true", help="speed 1 from 0.3 min before each screenshot until just after it, --speed between")
     p.add_argument("--minutes", default=None, help="game minutes to play (default: the checks file's stop_minute)")
     p.add_argument("--shots", default="1,3,6,10", help="screenshot minutes, each optionally @height and @x:z (a map position to centre on), e.g. 2@1500,6,10@3000,27@1400@900:9700")
     p.add_argument("--cam-height", default="2200", help="overhead camera height for screenshots")
@@ -694,7 +747,8 @@ def add_script_args(p):
     p.add_argument("--engine", help="engine folder name under the install's engine/ (default: the one the lobby used last)")
     p.add_argument("--bonus", default=None, help="handicap percent for team 0 only (e.g. 50); benchmarks run at 0")
     p.add_argument("--extra-widget", action="append", help="an extra LuaUI widget to stage into the playtest write dir (repeatable)")
-    p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window, no widget, no screenshots; log only")
+    p.add_argument("--lean-render", action="store_true", help="reduce graphics memory in this isolated write directory")
+    p.add_argument("--headless", action="store_true", help="spring-headless.exe: no window; widgets, speed and [Playtest] lines still work; screenshots are blank 187-byte PNGs")
 
 
 def add_watch_args(p):

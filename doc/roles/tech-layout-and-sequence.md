@@ -190,16 +190,22 @@ up together.
 
 ### What the factories make (`Tech_FactoryAiMakeTask`, first match wins)
 
+0. A construction turret of a front cluster (turrets are the native factory
+   manager's assistants and are asked here): it works for its own factory
+   (`TechFactories::TurretFocus`, D-119).
 1. A T1 lab: T1 constructors until `MinimumT1ConstructorBots` (2).
 2. The T1 air plant: one air constructor while none exists (it builds the
    advanced aircraft plant; D-103).
 3. The advanced aircraft plant: a T2 air constructor whenever a dedicated
    role has no builder, whatever the bank or the cap (D-108).
 4. The advanced labs: T2 constructors while the metal bank is over
-   `T2ConstructorBankShare` (50%), up to `T2ConstructorCap` (60) bot and air
-   together (D-103).
-5. Then the role's production (fast-assist bots, the endgame's combat,
-   spam from +200).
+   `T2ConstructorBankShare` (50%): an advanced bot lab up to
+   `T2BotConstructorCap` (10) T2 construction bots, the advanced aircraft plant
+   up to `T2ConstructorCap` (60) air constructors (D-103, D-119).
+5. Then the role's production: fast-assist bots up to `FastAssistBotCap` (10),
+   then the fast assault bots (D-119); the endgame's combat; spam from +200.
+   Under the combat gate the advanced bot lab waits rather than fall to native
+   production (D-119).
 
 ### The two dedicated air constructors (D-107, D-108)
 
@@ -249,7 +255,10 @@ drop-off, the cargo and the transport take no other order:
 - the transport's run is not abandoned when it is hit;
 - "aboard" means lifted **and** following the transport, so a constructor
   standing on a raised factory pad is never mistaken for cargo; a run always
-  ends (delivered or failed, and the next queued run starts).
+  ends (delivered or failed, and the next queued run starts);
+- delivered, and given at once, as soon as the engine has finished the unload
+  (the transport's queue is empty) and the cargo is no longer aboard, even when
+  it stands on raised ground (D-122, INV-052).
 
 ### The metal bank (D-105, D-106)
 
@@ -257,7 +266,7 @@ A full bank is wasted metal. The sinks, in order: build power (turrets),
 production (T2 constructors, spam labs, turrets assisting factories), and,
 in a team game, the teammates: over 95% full, TECH refreshes every
 teammate's economy and gives up to 20% of its storage to the lowest-filled
-ones (`TechBuild::ShareOverflow`). No converters are built while the metal
+ones (`TeamEconomy::ShareOverflow`). No converters are built while the metal
 bank is full (they turn energy into metal nobody can store).
 
 ## Part 3: who decides what
@@ -280,8 +289,8 @@ bank is full (they turn energy into metal nobody can store).
 | The order of priorities | the row order in `TechRules::Init` | - |
 | The rush chain | `TechChain` recipes | `RushObjective` |
 | Parallel turrets | `Layout::TurretSlots` | `PowerTurretBatchSeconds`, `PowerTurretsMax` |
-| T2 constructors | `Tech_FactoryAiMakeTask` | `T2ConstructorBankShare`, `T2ConstructorCap` |
-| Donation | `TechBuild::ShareOverflow` | `TeamShare*` |
+| T2 constructors | `Tech_FactoryAiMakeTask` | `T2ConstructorBankShare`, `T2BotConstructorCap` (bots), `T2ConstructorCap` (air) |
+| Donation | `TeamEconomy::ShareOverflow` | `TeamShare*` |
 | Dedicated air roles | `TechBuild::AirDedicated`, `RefillAirRoles`, `LiftCapForRole` | `ConverterStarveEnergyShare` |
 
 ## The checks that guard it

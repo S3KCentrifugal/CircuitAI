@@ -134,7 +134,7 @@ def main():
         out.append("| %s | `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
             link(uid), uid, u["domain"], "`%s`" % roles[0] if roles else ("*absent*" if e is None else "-"),
             ", ".join("`%s`" % r for r in roles) or "-", ", ".join("`%s`" % a for a in attrs) or "-",
-            e.get("limit", "-") if e else "-", "`%s`" % thr if thr != "-" else "-",
+            ("build forbidden" if e.get("build", True) is False else e.get("limit", "-")) if e else "-", "`%s`" % thr if thr != "-" else "-",
             ", ".join("`%s`" % f for f in facs) or "-", ", ".join("`%s`" % c for c in differs) or "-", rf or "-"))
     out += ["", "## Notes", "",
             "- *absent* means no behaviour entry: CircuitAI falls back to native defaults for role and attributes.",

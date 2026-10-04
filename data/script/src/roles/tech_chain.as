@@ -242,6 +242,7 @@ namespace TechChain
     {
         steps.resize(0);
         active = false; done = false;
+        if (MetalEconomy::Active()) return; // field growth has no finite mex/converter recipe
         stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
         objective = Global::RoleSettings::Tech::RushObjective;
         if (objective == "auto") objective = Choose();
@@ -400,7 +401,12 @@ namespace TechChain
         }
         if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
         if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
-        if (key == "gantry") return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        if (key == "gantry") {
+            bool routed;   // D-114: a front factory cluster from +200 metal
+            IUnitTask@ ft = TechFactories::Route(UnitHelpers::GetLandGantryForSide(Global::AISettings::Side), u, routed);
+            if (routed) return ft;
+            return Builder::EnqueueLandGantry(Global::AISettings::Side);
+        }
         // D-103: both air plants placed by the layout (a turret stands); the old
         // spiral only when the layout has no site
         if (key == "ap" || key == "aap") {
@@ -444,6 +450,7 @@ namespace TechChain
         if (!UnitHelpers::IsCommander(u.circuitDef)) return null;
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (lab is null || lab is u || Lifecycle::IsRetiring(lab)) return null;   // D-076
+        if (TechFactories::IsSpamLab(lab)) return null;   // D-119
         if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors()) > 0) return null;
         IUnitTask@ g = GuardHelpers::AssignWorkerGuard(u, lab, Task::Priority::HIGH, true, 20 * SECOND);
         if (g !is null && ai.frame - firstConLog > 30 * SECOND) {

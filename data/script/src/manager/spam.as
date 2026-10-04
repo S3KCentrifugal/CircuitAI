@@ -53,6 +53,12 @@ namespace Spam {
     int activeSinceFrame = -1;
     dictionary routeByFactory;     // factory id string -> CRouteTask@
     dictionary laneByFactory;      // factory id string -> int lane (0, 1, -1, 2, -2 ...)
+    // D-119 (owner: each spam lab correlates to a lane; lanes spaced apart, spread
+    // across the active front, straight to the enemy backline): a role may give a
+    // factory a SPREAD lane: a line parallel to the axis from our start to the
+    // enemy starts, at a sideways place across the front. It replaces the lane
+    // number's offset for that factory
+    dictionary spreadByFactory;    // factory id string -> float sideways place (elmos from the axis)
     int lanesIssued = 0;
     // D-111 (owner: each factory correlates directly to a lane): a spam unit
     // runs the lane of the factory that built it, for good; the nearest
@@ -306,6 +312,105 @@ namespace Spam {
         return route;
     }
 
+    // D-119: the axis of the spread lanes: from our start toward the focus (the
+    // enemy start the runs end behind); `nx, nz` sideways. Not the centre of all
+    // unused start spots: on a many-spot map most of them are empty
+    void _Axis(float &out ax, float &out az, float &out nx, float &out nz)
+    {
+        _EnsureFocus();
+        ax = focus.x - Global::Map::StartPos.x; az = focus.z - Global::Map::StartPos.z;
+        float len = sqrt(ax * ax + az * az);
+        if (len < 1.0f) { ax = 1.0f; az = 0.0f; len = 1.0f; }
+        ax /= len; az /= len;
+        nx = -az; nz = ax;
+    }
+    float _Along(const AIFloat3 &in p, float ax, float az) { return (p.x - Global::Map::StartPos.x) * ax + (p.z - Global::Map::StartPos.z) * az; }
+    float _Side(const AIFloat3 &in p, float nx, float nz) { return (p.x - Global::Map::StartPos.x) * nx + (p.z - Global::Map::StartPos.z) * nz; }
+    AIFloat3 _At(float along, float side, float ax, float az, float nx, float nz)
+    {
+        return AIFloat3(Global::Map::StartPos.x + ax * along + nx * side, 0.0f, Global::Map::StartPos.z + az * along + nz * side);
+    }
+
+    // The lab -> half way to its lane's front point -> its lane's front point ->
+    // straight on to the enemy backline (BehindEnemyDistance past the focus), all
+    // but the first leg on one line parallel to the axis
+    array<AIFloat3> BuildSpreadRoute(const AIFloat3 &in from, float side)
+    {
+        float ax, az, nx, nz;
+        _Axis(ax, az, nx, nz);
+        const float back = _Along(focus, ax, az) + Global::Spam::BehindEnemyDistance;
+        const float fromAlong = _Along(from, ax, az);
+        float frontAlong = hasFront ? _Along(front, ax, az) : fromAlong + (back - fromAlong) * 0.5f;
+        if (frontAlong < fromAlong + 200.0f) frontAlong = fromAlong + 200.0f;
+        const AIFloat3 fp = _At(frontAlong, side, ax, az, nx, nz);
+        array<AIFloat3> route;
+        route.insertLast(_Clamp(AIFloat3((from.x + fp.x) * 0.5f, 0.0f, (from.z + fp.z) * 0.5f)));
+        route.insertLast(_Clamp(fp));
+        route.insertLast(_Clamp(_At(back, side, ax, az, nx, nz)));
+        return route;
+    }
+
+    // D-119: spread lanes for these factories, one each, LaneSpacing apart, centred
+    // on the active front (the combat focus; the axis while none is known), the
+    // set shifted to stay on the map. Sorted by the labs' own sideways places, so
+    // no two routes cross.
+    void SetSpreadLanes(array<CCircuitUnit@>@ labs)
+    {
+        const uint n = labs.length();
+        if (n == 0) return;
+        float ax, az, nx, nz;
+        _Axis(ax, az, nx, nz);
+        const float step = Global::Spam::LaneSpacing;
+        const float centre = hasFront ? _Side(front, nx, nz) : 0.0f;
+        float first = centre - step * float(n - 1) * 0.5f;
+        float last = first + step * float(n - 1);
+        // on the map: the corners' sideways places, less the margin
+        const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
+        const array<float> cx = { 0.0f, w, 0.0f, w }, cz = { 0.0f, 0.0f, h, h };
+        float mlo = 1.0e30f, mhi = -1.0e30f;
+        for (uint i = 0; i < 4; ++i) {
+            const float s = _Side(AIFloat3(cx[i], 0.0f, cz[i]), nx, nz);
+            if (s < mlo) mlo = s;
+            if (s > mhi) mhi = s;
+        }
+        mlo += Global::Spam::MapMargin; mhi -= Global::Spam::MapMargin;
+        if (last > mhi) { first -= last - mhi; last = mhi; }
+        if (first < mlo) { last += mlo - first; first = mlo; }
+        // the labs by their own sideways place
+        array<CCircuitUnit@> order;
+        array<float> key;
+        for (uint i = 0; i < n; ++i) {
+            if (labs[i] is null) continue;
+            const float s = _Side(labs[i].GetPos(ai.frame), nx, nz);
+            uint at = 0;
+            while (at < key.length() && key[at] <= s) ++at;
+            order.insertAt(at, labs[i]);
+            key.insertAt(at, s);
+        }
+        bool changed = false;
+        for (uint i = 0; i < order.length(); ++i) {
+            const float side = first + step * float(i);
+            const string k = "" + order[i].id;
+            float cur = 0.0f;
+            if (spreadByFactory.get(k, cur) && abs(cur - side) < 50.0f) continue;
+            spreadByFactory.set(k, side);
+            changed = true;
+            CRouteTask@ task = null;
+            if (routeByFactory.get(k, @task) && task !is null) task.SetRoute(BuildSpreadRoute(order[i].GetPos(ai.frame), side));
+            GenericHelpers::LogUtil("[Spam] factory " + order[i].id + " runs spread lane " + (i + 1) + " of " + order.length()
+                + " at " + int(side) + " elmos sideways (front at " + int(centre) + ", lanes " + int(step) + " apart) (D-119)", 1);
+        }
+        if (changed) ++routesVersion;
+    }
+    array<AIFloat3> _RouteOfKey(const string &in key, const AIFloat3 &in from)
+    {
+        float side = 0.0f;
+        if (spreadByFactory.get(key, side)) return BuildSpreadRoute(from, side);
+        int lane = 0;
+        laneByFactory.get(key, lane);
+        return BuildRoute(from, lane);
+    }
+
     // D-111: a role fixes a factory's lane (TECH: the lab's place in its row)
     void SetFactoryLane(CCircuitUnit@ factory, int lane)
     {
@@ -316,7 +421,7 @@ namespace Spam {
         laneByFactory.set(key, lane);
         CRouteTask@ task = null;
         if (routeByFactory.get(key, @task) && task !is null) {
-            task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
+            task.SetRoute(_RouteOfKey(key, factory.GetPos(ai.frame)));
             ++routesVersion;
         }
         GenericHelpers::LogUtil("[Spam] factory " + factory.id + " runs lane " + lane + " (D-111)", 1);
@@ -324,10 +429,8 @@ namespace Spam {
     // D-111: the waypoints of a factory's lane, for its factory route
     array<AIFloat3> RouteOf(CCircuitUnit@ factory)
     {
-        int lane = 0;
-        laneByFactory.get("" + factory.id, lane);
         _EnsureFocus();
-        return BuildRoute(factory.GetPos(ai.frame), lane);
+        return _RouteOfKey("" + factory.id, factory.GetPos(ai.frame));
     }
     void SetRepeatFactory(CCircuitUnit@ factory)
     {
@@ -364,7 +467,7 @@ namespace Spam {
             laneByFactory.set(key, lane);
         }
         _EnsureFocus();
-        task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
+        task.SetRoute(_RouteOfKey(key, factory.GetPos(ai.frame)));
         // Spread WITHIN the factory's line: each unit is dealt its own lane
         // across a band, so the stream crosses the map as a broad front that
         // one shell cannot erase and that sees a band's width, then focuses
@@ -387,9 +490,7 @@ namespace Spam {
             if (!routeByFactory.get(keys[i], @task) || task is null) continue;
             CCircuitUnit@ factory = ai.GetTeamUnit(int(parseInt(keys[i])));
             if (factory is null) { task.Abort(); routeByFactory.delete(keys[i]); continue; }
-            int lane = 0;
-            laneByFactory.get(keys[i], lane);
-            task.SetRoute(BuildRoute(factory.GetPos(ai.frame), lane));
+            task.SetRoute(_RouteOfKey(keys[i], factory.GetPos(ai.frame)));
         }
         ++routesVersion;
     }
@@ -452,6 +553,8 @@ namespace Spam {
         {
             const string key = "" + factory.id;
             int issued;
+            // D-119: nothing calls SetRepeatFactory any more (TECH's spam labs
+            // take one build per ask; a repeat queue did not survive a recruit)
             if (repeatFactory.get(key, issued)) {
                 int seen = -100000;
                 lastProduced.get(key, seen);
@@ -522,6 +625,7 @@ namespace Spam {
         }
         routeByFactory.delete(key);
         laneByFactory.delete(key);
+        spreadByFactory.delete(key);
         repeatFactory.delete(key);
         lastProduced.delete(key);
     }

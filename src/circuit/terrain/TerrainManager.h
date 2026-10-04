@@ -130,10 +130,25 @@ public:
 	static constexpr int kDeadSlotFails = 3;  // D-108: a slot the engine refuses this often is never served again; its ground stays held
 	// One footprint. Refuses (-1, logged) off-map, unbuildable, or overlapping ground.
 	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
+	// A single reusable slot. Its private zone preserves frame/unit identity after completion.
+	int ReservePersistentBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	void ReleasePersistentBuilding(int id);
+	int GetReservationState(int id) const; // -1 absent, 0 free, 1 claimed, 2 framed, 3 complete, 4 dead
+	bool IsReservationBuildable(int id) const;
+	int GetGroupActivationState(int group) const; // -1 missing, 0 ready, 1 blocked, 2 started
+	int GetGroupZone(int group) const;
+	int GetZoneActivationState(int zone) const;
+	int ReserveClusterEnvelope(int slot, int group);
+	bool IsAllyLayoutBlocked(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+	bool CanReserveArea(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong) const;
+	bool IsAllyLayoutRectBlocked(const int2& c1, const int2& c2) const;
+	void ShareSlot(int id);
+	void ShareZone(int id);
 	// cols x rows footprints of cdef behind frontCentre (the middle of the grid's
 	// front edge), rows receding away from `facing`, `gap` cells between them.
 	// Slots the terrain refuses are skipped. Returns the group id, 0 if nothing fit.
 	int ReserveGrid(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap, int ttlFrames = 0);
+	bool PlanMexCluster(const std::string& name, CCircuitDef* def, const springai::AIFloat3& origin, int facing, int cols, int rows);
 	// A nano block tight against the back of a factory footprint (built or reserved).
 	int ReserveNanoBlockAt(CCircuitDef* nanoDef, CCircuitDef* facDef, const springai::AIFloat3& facPos, int facing, int cols, int rows, int gap);
 	// The same behind a standing factory: position and facing read from the unit.
@@ -212,6 +227,12 @@ public:
 	int NextBuilt(int group, const springai::AIFloat3& anchor) const;  // nearest slot whose structure stands, -1 = none
 	springai::AIFloat3 GetReservationPos(int id) const;
 	int GetReservationFacing(int id) const;
+	// D-116: the engine refused this slot kDeadSlotFails times; it is never served
+	// again (its ground stays held), so a plan pinned to it must choose new ground
+	bool IsSlotDead(int id) const;
+	// D-116: the engine's own build test for a snapped build position (the
+	// reservation checks ask it, so no plan holds ground the engine refuses)
+	bool IsEngineBuildable(CCircuitDef* cdef, const springai::AIFloat3& buildPos, int facing) const;
 	CCircuitUnit* GetReservationUnit(int id) const;
 	// Share of the rectangle whose slope is at most maxSlope (engine units, 1 - cos).
 	float FlatFraction(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, float maxSlope) const;
@@ -227,6 +248,8 @@ public:
 	bool PlanFactoryPair(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
 			CCircuitDef* nanoDef, const springai::AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells);
 	int AcquireFactoryReservation(CCircuitDef* factoryDef);
+	bool PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* repeatedFactory,
+			CCircuitDef* nanoDef, const springai::AIFloat3& origin, int facing, int count, int columns, int firstNanos);
 	bool PinLayoutTask(IBuilderTask* task, const std::string& groupName, CCircuitUnit* builder);
 	bool PinFactoryNanoTask(IBuilderTask* task, CCircuitUnit* builder);
 	int GetFactoryNanoAvailable() const;
@@ -288,7 +311,7 @@ public:
 	// footprint covers it, and it is at least `avoidRadius` from every point in
 	// `avoid` (spots the engine already refused). -RgtVector when none.
 	springai::AIFloat3 FindDropSpot(CCircuitUnit* cargo, const springai::AIFloat3& around, float maxRadius,
-			const std::vector<springai::AIFloat3>& avoid, float avoidRadius);
+			const std::vector<springai::AIFloat3>& avoid, float avoidRadius, float maxSurfaceThreat = -1.f, float maxAirThreat = -1.f);
 	// Nearest unconsumed, unclaimed slot of a group, armed or held (a pinned
 	// task may take a held slot; NextSlot serves the armed ones only).
 	int NextSlotAny(int group, const springai::AIFloat3& anchor) const;
@@ -447,7 +470,7 @@ private:
 	void RemarkZoneCells(int2 c1, int2 c2);
 	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,
-			bool armed, bool anyReach, bool tenant, int zone, bool quiet);
+			bool armed, bool anyReach, bool tenant, int zone, bool quiet, bool exitsPreflighted = false);
 	int ReserveGridEx(CCircuitDef* cdef, const springai::AIFloat3& frontCentre, int facing, int cols, int rows, int gap,
 			int ttlFrames, bool armed, bool anyReach, bool tenant, int zone, int group);
 	bool FindReservedSite(CCircuitDef* cdef, const springai::AIFloat3& pos, TerrainPredicate& predicate,

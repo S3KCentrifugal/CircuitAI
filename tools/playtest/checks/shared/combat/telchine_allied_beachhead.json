@@ -1,0 +1,70 @@
+{
+  "stop_minute": 16,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "ShoreProbe.*loaded controlled=1 gifted=12.*beachhead=true",
+      "by_minute": 1,
+      "scope": "any"
+    },
+    {
+      "key": "guard-split",
+      "pattern": "\\[AMPH\\].*guard retained assets=[1-9][0-9]* assault=[3-9]",
+      "by_minute": 14,
+      "scope": "any"
+    },
+    {
+      "key": "guard-persistence",
+      "pattern": "\\[AMPH\\].*guard maintained assets=[1-9]",
+      "by_minute": 14,
+      "scope": "any"
+    },
+    {
+      "key": "naval-hit",
+      "pattern": "ShoreProbe.*naval_hit",
+      "by_minute": 14,
+      "scope": "any"
+    },
+    {
+      "key": "retreat",
+      "pattern": "ShoreProbe.*retreat_order",
+      "by_minute": 14,
+      "scope": "any"
+    },
+    {
+      "key": "dry-hold",
+      "pattern": "ShoreProbe.*result samples=[1-9][0-9]{2,} wet=0 wet_ship_attack_orders=0 non_hold=0 ship_alive=true ship_distance=[1-9][0-9]{3,}",
+      "by_minute": 16,
+      "scope": "any"
+    },
+    {
+      "key": "useful-beachhead",
+      "pattern": "ShoreProbe.*beachhead guards=[3-9] assets=2 advancing=([3-9]|[1-9][0-9]+) retained_seconds=[6-9][0-9]",
+      "by_minute": 16,
+      "scope": "any"
+    },
+    {
+      "key": "shared-claim",
+      "pattern": "ShoreProbe.*ally_coordination held=3 advancing=21",
+      "by_minute": 14,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|Error in.*[Tt]elchine|Removed widget: Telchine",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

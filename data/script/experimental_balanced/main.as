@@ -87,8 +87,21 @@ namespace Main {
 		ApplyProfileSettings();
 	}
 
+    void AiSuperWeaponFired(CCircuitUnit@ unit, const AIFloat3& in aim)
+    {
+        ArtilleryPolicy::Fired(unit, aim);
+    }
+    void AiUnitDestroyed(CCircuitUnit@ unit)
+    {
+        ArtilleryPolicy::Removed(unit);
+    }
+
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
+		ArtilleryPolicy::Check();
+        Lanes::Poll(); // complete async surveys for every role before consumers run
+        AmphibiousOps::Tick();
+		Commands::DrawTick();   // the widget's map drawing, paced under the server's flood guard
 		// Update cached enemy threat information roughly every 10 seconds (300 frames).
 		//if ((ai.frame % (10 * SECOND)) == 0) {
 		Military::UpdateEnemyThreatCache();

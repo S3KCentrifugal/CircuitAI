@@ -18,15 +18,22 @@ metadata:
 ## Locations
 
 Never hard-code a username. The install is portable and lives under
-`%LOCALAPPDATA%`; in Git Bash `$LOCALAPPDATA` expands correctly.
+`%LOCALAPPDATA%`. In Git Bash convert it once (`xargs` and unquoted globs
+strip its backslashes):
 
 ```bash
-BAR="$LOCALAPPDATA/Programs/Beyond-All-Reason/data"
+BAR="$(cygpath -u "$LOCALAPPDATA")/Programs/Beyond-All-Reason/data"
 ```
+
+Local playtests (`.claude/skills/playtest`) log in their own write dir, not
+the install: the live game in `<dir>/infolog.txt` (deleted at each launch),
+one game per `<dir>/runs/<stamp>/infolog.txt`. Their AI is
+`Skirmish AI <BARb playtest-test>`; the installed build is
+`<SMRTBARb-stable>`.
 
 | Path | What it holds |
 | --- | --- |
-| `$BAR/infolog.txt` | **Most recent run.** Overwritten on every launch. |
+| `$BAR/infolog.txt` | **Every game since the client started**, not just the last: cut at the last game with `N=$(grep -n '\[Game::Load\]\[1\]' "$L" \| tail -1 \| cut -d: -f1); tail -n +$N "$L"`. |
 | `$BAR/log/<YYYYMMDDHHMMSS>_infolog.txt` | Archived runs (`RotateLogFiles = 1` in `springsettings.cfg`). |
 | `$BAR/demos/*.sdfz` | Replays. Deterministic re-run of a crashed match. |
 | `$BAR/_script.txt` | Last game's setup: teams, allyteams, AI instances, mod options. |
@@ -71,11 +78,14 @@ ls -la "$LOG"; wc -l < "$LOG"          # size before anything else
 
 ### 1. Pick the right file
 
-`infolog.txt` is only the latest run. If the user has launched again since the
-incident, the evidence is in `log/`. Find it by time:
+`infolog.txt` holds every game since the client started: cut at the last
+`[Game::Load][1]` for the latest. After a client restart the evidence is in
+`log/`. Pick archives by order or content, never by time arithmetic (the
+names have run ahead of the files' times):
 
 ```bash
-ls -lat "$BAR/log" | head -5
+ls -t "$BAR/log" | head -5
+grep -l 'MAP_NAME: <map>' "$BAR"/log/*_infolog.txt
 ```
 
 ### 2. Locate the incident by line number, never by reading through
@@ -177,7 +187,7 @@ run before trusting a replay to reproduce.
 ## Checklist
 
 - [ ] Size established (`wc -l`) before any read.
-- [ ] Correct file chosen — `infolog.txt` vs a `log/` archive by timestamp.
+- [ ] Correct file chosen — the last game in `infolog.txt`, or a `log/` archive by order or content.
 - [ ] Incident located by `grep -n`, then read as a bounded window.
 - [ ] AI noise filtered, or a single `S:`/`T:` instance pinned.
 - [ ] Binary identity proven by hash before symbolising.

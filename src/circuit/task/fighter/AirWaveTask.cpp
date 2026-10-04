@@ -5,6 +5,9 @@
  */
 
 #include "task/fighter/AirWaveTask.h"
+#include "task/fighter/AirGeometry.h"
+#include "task/RetreatTask.h"
+#include "unit/CircuitWDef.h"
 #include "module/MilitaryManager.h"
 #include "map/ThreatMap.h"
 #include "terrain/TerrainManager.h"
@@ -20,6 +23,9 @@
 #include "AISCommands.h"
 #include "Log.h"
 #include "UnitDef.h"
+#include "Unit.h"
+#include "WeaponDef.h"
+#include "WeaponMount.h"
 
 #include <algorithm>
 #include <cmath>
@@ -78,6 +84,17 @@ void CAirWaveTask::RemoveAssignee(CCircuitUnit* unit)
 {
 	IFighterTask::RemoveAssignee(unit);
 	slots.erase(unit);
+    releasedAt.erase(unit);
+    outbound.erase(unit);
+    assembled.erase(unit);
+    routed.erase(unit); attackAt.erase(unit); attackIssued.erase(unit);
+    returnRoutes.erase(unit); returnSteps.erase(unit);
+    operationIdle.erase(unit); operationDestinations.erase(unit); operationArrived.erase(unit);
+    if (safeFlight) {
+        unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
+        unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
+        unit->TrySetIdleMode(1);
+    }
 	if (units.empty()) {
 		manager->AbortTask(this);  // the wave is gone; do not stay in the task sets forever (CR-011)
 	}
@@ -85,7 +102,13 @@ void CAirWaveTask::RemoveAssignee(CCircuitUnit* unit)
 
 void CAirWaveTask::Start(CCircuitUnit* unit)
 {
-	if (state_ == EState::FORMING) {
+    if (safeFlight) {
+        unit->TrySetIdleMode(0);
+        unit->TrySetFireState(operationPolicy && !IsOperationBomber(unit)
+            ? CCircuitDef::FireType::OPEN : CCircuitDef::FireType::HOLD);
+    }
+    if (operationPolicy) return; // cohort dispatch, never a per-member refresh
+	if (state_ == EState::FORMING && linesReady) {
 		IssueForm(unit);
 	} else if (state_ == EState::ATTACKING) {
 		IssueAttack(unit);
@@ -94,10 +117,12 @@ void CAirWaveTask::Start(CCircuitUnit* unit)
 
 void CAirWaveTask::OnUnitIdle(CCircuitUnit* unit)
 {
+    if (operationPolicy) { operationIdle.insert(unit); return; }
 	const int frame = manager->GetCircuit()->GetLastFrame();
 	switch (state_) {
 		case EState::FORMING:
 		case EState::HOLDING: {
+			if (!linesReady) break;
 			if (unit->GetPos(frame).SqDistance2D(SlotPos(unit)) > SQUARE(WAVE_SLOT_RADIUS)) {
 				IssueForm(unit);
 			}
@@ -107,6 +132,10 @@ void CAirWaveTask::OnUnitIdle(CCircuitUnit* unit)
 				IssueAttack(unit);  // the fight order was eaten by a retarget; go again
 			}
 		} break;
+
+        case EState::RETURNING: {
+            if (missionPolicy) AdvanceReturn(unit, frame, true);
+        } break;
 		default: break;
 	}
 }
@@ -117,10 +146,268 @@ void CAirWaveTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 	// what a formation exists not to do.
 }
 
+void CAirWaveTask::OnWeaponFired(CCircuitUnit* unit, int weaponDefId)
+{
+    if (!safeFlight || state_ != EState::ATTACKING || releasedAt.count(unit)) return;
+    CWeaponDef* weapon = manager->GetCircuit()->GetWeaponDef(weaponDefId);
+    if (weapon == nullptr || weapon->IsParalyzer() || weapon->GetDamage() <= 0.f) return;
+    releasedAt[unit] = manager->GetCircuit()->GetLastFrame();
+    manager->GetCircuit()->LOG("WAVE: released unit=%i weapon=%i", unit->GetId(), weaponDefId);
+}
+
+void CAirWaveTask::OnDamageDealt(CCircuitUnit* unit, int weaponDefId)
+{
+    // Preserve the earlier fired timestamp if the engine provided one.
+    // This fallback also observes scripted Phoenix heat-ray emissions.
+    OnWeaponFired(unit, weaponDefId);
+}
+
+void CAirWaveTask::SetFlightPolicy(float width, float depth, float loss, const AIFloat3& home)
+{
+    if (!std::isfinite(width) || !std::isfinite(depth) || !std::isfinite(loss)
+        || !std::isfinite(home.x) || !std::isfinite(home.z)) return;
+    safeFlight = true;
+    maxWidth = std::clamp(width, 0.f, 4000.f);
+    rankSpacing = std::clamp(depth, 64.f, 600.f);
+    abortFraction = std::clamp(loss, .05f, 1.f);
+    returnPos = home;
+    CTerrainManager::CorrectPosition(returnPos);
+}
+
+void CAirWaveTask::SetStrikePolicy(CCircuitDef* bomber, int count, float fraction, float margin, float weight, float ceiling)
+{
+    damageBudget = 0.f;
+    passDamage = 0.f;
+    if (bomber == nullptr || count <= 0 || !std::isfinite(fraction) || !std::isfinite(margin)
+        || !std::isfinite(weight) || !std::isfinite(ceiling)) return;
+    operationBomberDefs.insert(bomber->GetId());
+    passDamage = StrikeAlpha(bomber) * std::clamp(fraction, 0.f, 1.f);
+    bomberMetal = std::max(1.f, bomber->GetCostM());
+    damageBudget = passDamage * count;
+    expectedCount = count;
+    passFraction = std::clamp(fraction, 0.f, 1.f);
+    damageMargin = std::max(1.f, margin);
+    threatWeight = std::max(0.f, weight);
+    maxThreat = std::max(0.f, ceiling);
+}
+
+void CAirWaveTask::ConsiderStrikeAircraft(CCircuitDef* bomber)
+{
+    if (bomber != nullptr) operationBomberDefs.insert(bomber->GetId());
+    const float damage = StrikeAlpha(bomber) * passFraction;
+    if (bomber != nullptr) bomberMetal = std::min(bomberMetal, std::max(1.f, bomber->GetCostM()));
+    passDamage = std::min(passDamage, damage);
+    damageBudget = passDamage * expectedCount;
+}
+
+float CAirWaveTask::StrikeAlpha(CCircuitDef* bomber)
+{
+    if (bomber == nullptr) return 0.f;
+    const auto found = strikeAlpha.find(bomber->GetId());
+    if (found != strikeAlpha.end()) return found->second;
+    float alpha = 0.f;
+    // Representative weapons can be zero-damage targeting/sound mounts.
+    // Inspect loaded mounts locally; do not change shared/static classification.
+    for (WeaponMount* mount : bomber->GetDef()->GetWeaponMounts()) {
+        WeaponDef* wd = mount->GetWeaponDef();
+        CWeaponDef* weapon = manager->GetCircuit()->GetWeaponDef(wd->GetWeaponDefId());
+        const auto& params = wd->GetCustomParams();
+        if (weapon != nullptr && !weapon->IsParalyzer() && weapon->GetDamage() > 0.f
+            && !params.count("bogus") && !params.count("fake_weapon")) {
+            float loadedAlpha = weapon->GetAlpha();
+            const auto sweep = params.find("sweepfire_firetime");
+            if (sweep != params.end()) {
+                // BAR sweep scripts emit once per simulation frame. This is an
+                // upper bound; script passFraction accounts for time on target.
+                const float seconds = utils::string_to_float(sweep->second);
+                if (std::isfinite(seconds) && seconds > 0.f)
+                    loadedAlpha = weapon->GetDamage() * std::clamp(seconds * FRAMES_PER_SEC, 1.f, 900.f);
+            }
+            alpha = std::max(alpha, loadedAlpha);
+        }
+        delete wd;
+        delete mount;
+    }
+    strikeAlpha[bomber->GetId()] = alpha;
+    return alpha;
+}
+
+void CAirWaveTask::SetAssemblyPolicy(float radius, float fraction, int frames)
+{
+    if (!std::isfinite(radius) || !std::isfinite(fraction)) return;
+    assemblyRadius = std::clamp(radius, 64.f, 800.f);
+    assemblyFraction = std::clamp(fraction, .5f, 1.f);
+    joinFrames = std::clamp(frames, 0, FRAMES_PER_SEC * 60);
+}
+
+void CAirWaveTask::SetMissionPolicy(float padding, float inset, float unknown, float scale, float army, float localAA, bool sync)
+{
+    if (!std::isfinite(padding) || !std::isfinite(inset) || !std::isfinite(unknown)
+        || !std::isfinite(scale) || !std::isfinite(army) || !std::isfinite(localAA)) return;
+    missionPolicy = true;
+    corridorPadding = std::clamp(padding, 0.f, 2000.f);
+    edgeInset = std::clamp(inset, 128.f, 2000.f);
+    unknownReserve = std::clamp(unknown, 0.f, 2.f);
+    riskScale = std::clamp(scale, 0.f, 1.f);
+    armyReserve = std::clamp(army, 0.f, 2.f);
+    localAAReserve = std::clamp(localAA, 0.f, 2.f);
+    synchronize = sync;
+}
+
+std::vector<AIFloat3> CAirWaveTask::PlanIngress(const AIFloat3& from, const AIFloat3& target, float& risk) const
+{
+    auto* terrain = manager->GetCircuit()->GetTerrainManager();
+    const float left = std::min(edgeInset, terrain->GetTerrainWidth() * .25f);
+    const float bottom = std::min(edgeInset, terrain->GetTerrainHeight() * .25f);
+    const float right = terrain->GetTerrainWidth() - left;
+    const float top = terrain->GetTerrainHeight() - bottom;
+    std::vector<std::vector<AIFloat3>> routes = {{},
+        {{left,0.f,from.z},{left,0.f,target.z}}, {{right,0.f,from.z},{right,0.f,target.z}},
+        {{from.x,0.f,bottom},{target.x,0.f,bottom}}, {{from.x,0.f,top},{target.x,0.f,top}}};
+    float best = std::numeric_limits<float>::max();
+    std::vector<AIFloat3> chosen;
+    risk = 0.f;
+    for (auto& route : routes) {
+        AIFloat3 at = from;
+        float distance = 0.f, exposure = 0.f;
+        for (const auto& point : route) {
+            distance += std::sqrt(at.SqDistance2D(point));
+            exposure += RouteExposure(at, point);
+            at = point;
+        }
+        distance += std::sqrt(at.SqDistance2D(target));
+        exposure += RouteExposure(at, target);
+        const float terminal = std::max(1.f, std::sqrt(at.SqDistance2D(target)));
+        AIFloat3 exit(target.x + (target.x-at.x) * overrun / terminal, 0.f,
+            target.z + (target.z-at.z) * overrun / terminal);
+        CTerrainManager::CorrectPosition(exit);
+        const float exitDistance = std::sqrt(target.SqDistance2D(exit));
+        const float exitExposure = RouteExposure(target, exit);
+        // Include the reverse corridor and charge unknown distance too. Edges
+        // are candidates, never assumed safe or preferred merely for being edges.
+        const float cost = 2.f * ((distance + exitDistance) * (1.f + unknownReserve) + threatWeight * (exposure + exitExposure));
+        if (cost < best) { best = cost; chosen = route; risk = (exposure + exitExposure) / std::max(1.f, distance + exitDistance); }
+    }
+    return chosen;
+}
+
+float CAirWaveTask::RouteLength(const AIFloat3& from, const AIFloat3& target) const
+{
+    float distance = 0.f;
+    AIFloat3 at = from;
+    for (const auto& point : ingress) { distance += std::sqrt(at.SqDistance2D(point)); at = point; }
+    return distance + std::sqrt(at.SqDistance2D(target));
+}
+
+float CAirWaveTask::RouteExposure(const AIFloat3& from, const AIFloat3& to) const
+{
+    const float distance = std::sqrt(from.SqDistance2D(to));
+    const int samples = std::clamp(int(distance / 256.f) + 1, 1, 128);
+    float total = 0.f;
+    const CThreatMap* threat = manager->GetCircuit()->GetThreatMap();
+    for (int i = 0; i <= samples; ++i) {
+        const float f = float(i) / samples;
+        const AIFloat3 p(from.x + (to.x-from.x)*f, 0.f, from.z + (to.z-from.z)*f);
+        float value = threat->GetAirThreatAtPos(p);
+        if (missionPolicy && corridorPadding > 0.f && distance > 1.f) {
+            const float dx = (to.x-from.x) / distance, dz = (to.z-from.z) / distance;
+            AIFloat3 a(p.x-dz*corridorPadding,0.f,p.z+dx*corridorPadding);
+            AIFloat3 b(p.x+dz*corridorPadding,0.f,p.z-dx*corridorPadding);
+            CTerrainManager::CorrectPosition(a); CTerrainManager::CorrectPosition(b);
+            value = std::max(value, std::max(threat->GetAirThreatAtPos(a), threat->GetAirThreatAtPos(b)));
+        }
+        total += value;
+    }
+    return total * distance / float(samples + 1);
+}
+
+void CAirWaveTask::ReturnHome(const char* reason)
+{
+    CCircuitAI* circuit = manager->GetCircuit();
+    circuit->LOG("WAVE: returning reason=%s alive=%zu released=%zu initial=%i", reason, units.size(), releasedAt.size(), launchCount);
+    EnterState(EState::RETURNING);
+    attackAt.clear(); attackIssued.clear();
+    returnFrames = WAVE_ATTACK_TIMEOUT;
+    float exitRisk = 0.f;
+    const auto exitRoute = missionPolicy && linesReady && !units.empty()
+        ? PlanIngress(EndPos(*units.begin()), returnPos, exitRisk) : std::vector<AIFloat3>{};
+    for (CCircuitUnit* unit : units) {
+        unit->TrySetFireState(CCircuitDef::FireType::HOLD);
+        // A released aircraft completes the planned straight egress before
+        // turning home. Target disappearance must not force a U-turn over AA.
+        const bool finishPass = linesReady && releasedAt.count(unit) != 0;
+        // A loss abort during ingress must not send survivors onwards to the
+        // far edge waypoint. Rejoin the nearest point of the travelled corridor.
+        int returnIndex = int(ingress.size()) - 1;
+        if (!finishPass && !ingress.empty()) {
+            const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
+            float nearest = here.SqDistance2D(returnPos);
+            returnIndex = -1;
+            for (size_t i = 0; i < ingress.size(); ++i) {
+                const float d = here.SqDistance2D(ingress[i]);
+                if (d < nearest) { nearest = d; returnIndex = int(i); }
+            }
+        }
+        if (missionPolicy) {
+            auto& route = returnRoutes[unit];
+            route.clear();
+            if (finishPass) {
+                route.push_back(EndPos(unit));
+                route.insert(route.end(), exitRoute.begin(), exitRoute.end());
+            } else for (int i = returnIndex; i >= 0; --i) route.push_back(ingress[i]);
+            route.push_back(returnPos);
+            AIFloat3 at = unit->GetPos(circuit->GetLastFrame());
+            float distance = 0.f;
+            for (const auto& point : route) { distance += std::sqrt(at.SqDistance2D(point)); at = point; }
+            returnFrames = std::max(returnFrames, int(FRAMES_PER_SEC * (45.f + air_geometry::TransitSeconds(distance, unit->GetCircuitDef()->GetSpeed()))));
+            returnSteps[unit] = 0;
+            AdvanceReturn(unit, circuit->GetLastFrame(), true);
+            continue;
+        }
+        TRY_UNIT(circuit, unit,
+            if (finishPass) unit->CmdMoveTo(EndPos(unit), 0, circuit->GetLastFrame() + WAVE_ATTACK_TIMEOUT);
+            bool queued = finishPass;
+            if (finishPass && missionPolicy) {
+                for (const auto& point : exitRoute) {
+                    unit->CmdMoveTo(point, UNIT_COMMAND_OPTION_SHIFT_KEY, circuit->GetLastFrame() + WAVE_ATTACK_TIMEOUT);
+                }
+            } else for (int i = returnIndex; i >= 0; --i) {
+                    unit->CmdMoveTo(ingress[i], queued ? UNIT_COMMAND_OPTION_SHIFT_KEY : 0, circuit->GetLastFrame() + WAVE_ATTACK_TIMEOUT);
+                    queued = true;
+                }
+            unit->CmdMoveTo(returnPos, queued ? UNIT_COMMAND_OPTION_SHIFT_KEY : 0,
+                circuit->GetLastFrame() + WAVE_ATTACK_TIMEOUT);
+        )
+    }
+}
+
+bool CAirWaveTask::AdvanceReturn(CCircuitUnit* unit, int frame, bool force)
+{
+    auto route = returnRoutes.find(unit);
+    if (route == returnRoutes.end()) return false;
+    size_t& step = returnSteps[unit];
+    const size_t before = step;
+    while (step < route->second.size() && unit->GetPos(frame).SqDistance2D(route->second[step]) <= SQUARE(assemblyRadius)) ++step;
+    if (step >= route->second.size()) return true;
+    if (force || before != step) {
+        CCircuitAI* circuit = manager->GetCircuit();
+        TRY_UNIT(circuit, unit, unit->CmdMoveTo(route->second[step], 0, frame + returnFrames);)
+    }
+    return false;
+}
+
 void CAirWaveTask::EnterState(EState next)
 {
 	state_ = next;
 	stateFrame = manager->GetCircuit()->GetLastFrame();
+    if (next == EState::ATTACKING && missionPolicy && synchronize && staticAssault) {
+        float longest = 0.f;
+        for (auto* unit : units) longest = std::max(longest, air_geometry::TransitSeconds(
+            std::sqrt(unit->GetPos(stateFrame).SqDistance2D(aim)), unit->GetCircuitDef()->GetSpeed()));
+        for (auto* unit : units) attackAt[unit] = stateFrame + int(FRAMES_PER_SEC * air_geometry::AttackDelay(longest,
+            std::sqrt(unit->GetPos(stateFrame).SqDistance2D(aim)), unit->GetCircuitDef()->GetSpeed()));
+        manager->GetCircuit()->LOG("WAVE: synchronized terminal pass nominalImpact=%i aircraft=%zu", stateFrame + int(longest * FRAMES_PER_SEC), units.size());
+    }
 }
 
 /*
@@ -141,6 +428,7 @@ void CAirWaveTask::SetPlan(int m, const AIFloat3& a, float fd, float sp, float o
 	groups = (gr >= 2) ? 2 : 1;
 	linesReady = false;
 	formedCount = 0;
+	assembled.clear();
 	EnterState(EState::FORMING);
 }
 
@@ -149,38 +437,129 @@ CEnemyInfo* CAirWaveTask::GetStrikeTarget() const
 	return (strikeTargetId < 0) ? nullptr : manager->GetCircuit()->GetEnemyInfo(strikeTargetId);
 }
 
+void CAirWaveTask::ExcludeStrikeRegion(const AIFloat3& centre, float radius)
+{
+    if (!std::isfinite(centre.x) || !std::isfinite(centre.z) || !std::isfinite(radius)
+        || radius <= 0.f || excludedStrikeRegions.size() >= 8) return;
+    excludedStrikeRegions.emplace_back(centre, std::min(radius, 10000.f));
+}
+
 bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float minStaticCost, bool includeHeavy)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const AIFloat3 base = circuit->GetSetupManager()->GetBasePos();
 	const SEnemyData* best = nullptr;
 	float bestScore = -1.f;
-	for (const SEnemyData& e : circuit->GetEnemyManager()->GetHostileDatas()) {
+    bool bestLocal = false;
+    requiredBombers = 0;
+    int bestRequired = 0;
+    float bestLocalAA = 0.f, bestRisk = 0.f;
+    float enemyArmy = 0.f;
+    for (const auto& e : circuit->GetEnemyManager()->GetHostileDatas())
+        if (!e.IsDead() && !e.IsFake() && e.cdef != nullptr && e.cdef->IsMobile()) enemyArmy += e.cost;
+    std::vector<AIFloat3> bestIngress;
+    // The ordinary hostile set excludes peaceful economic structures. A
+    // strategic strike must also consider the known peace-unit snapshot.
+    const auto& hostile = circuit->GetEnemyManager()->GetHostileDatas();
+    const auto& peaceful = circuit->GetEnemyManager()->GetPeaceDatas();
+    const std::vector<const std::vector<SEnemyData>*> sets = safeFlight
+        ? std::vector<const std::vector<SEnemyData>*>{&hostile, &peaceful}
+        : std::vector<const std::vector<SEnemyData>*>{&hostile};
+	for (const auto* candidates : sets) for (const SEnemyData& e : *candidates) {
 		if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore() || (e.cdef == nullptr)) {
 			continue;
 		}
 		const bool isStatic = !e.cdef->IsMobile();
+        if (operationPolicy && completedTargets.count(e.id)) continue;
+        if (operationPolicy) {
+            if (!air_geometry::OperationTargetClass(preference, !isStatic, e.cdef->IsAbleToFly(),
+                e.cdef->IsAttacker(), e.cdef->GetExtractsM() > 0.f || e.cdef->IsWind(),
+                allowedStrikeDefs.count(e.cdef->GetId()) != 0, operationPreference) || e.pos.y < -SQUARE_SIZE * 5) continue;
+            // Remembered contacts can guide reconnaissance, but cannot hold a
+            // committed wave in an attack/search cycle against a hidden unit.
+            CEnemyInfo* known = circuit->GetEnemyInfo(e.id);
+            if (known == nullptr || known->IsHidden()) continue;
+            if (preference == 6 && e.pos.SqDistance2D(returnPos) > SQUARE(localRadius)) continue;
+        }
+        if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&e](const auto& region) {
+            return e.pos.SqDistance2D(region.first) <= region.second * region.second;
+        })) continue;
 		if (isStatic) {
 			if (e.cost < minStaticCost) {
 				continue;
 			}
-		} else if (!includeHeavy || !e.cdef->IsRoleHeavy() || e.cdef->IsAbleToFly()) {
+		} else if (!includeHeavy || (!(operationPolicy && preference >= 6) && !e.cdef->IsRoleHeavy()) || e.cdef->IsAbleToFly()) {
 			continue;
 		}
 		float score;
+        const bool earlyEco = e.cdef->GetExtractsM() > 0.f || e.cdef->IsWind();
+        const bool economic = !e.cdef->IsAttacker() && isStatic;
+        if (missionPolicy && ((preference == 2 && !earlyEco)
+            || (preference == 3 && (!isStatic || !e.cdef->IsAttacker()))
+            || (preference == 4 && !economic))) continue;
+        float routeRisk = 0.f;
+        float localAA = 0.f;
+        std::vector<AIFloat3> candidateRoute;
+        int required = 0;
+        if (safeFlight) {
+            if (e.health <= 0.f || passDamage <= 0.f || (!committed && circuit->GetThreatMap()->GetAirThreatAtPos(e.pos) > maxThreat)) continue;
+            if (missionPolicy) candidateRoute = PlanIngress(from, e.pos, routeRisk);
+            if (operationPolicy && preference == 5 && !committed && routeRisk > routeCeiling) continue;
+            required = missionPolicy ? air_geometry::RequiredForce(e.health, passDamage, damageMargin,
+                routeRisk * riskScale, unknownReserve, armyReserve * std::min(2.f, enemyArmy / 10000.f))
+                : static_cast<int>(std::ceil(e.health * damageMargin / passDamage));
+            if (missionPolicy) {
+                for (const auto& threat : hostile) {
+                    if (threat.IsDead() || threat.IsFake() || threat.IsDying() || threat.cdef == nullptr || !threat.cdef->IsRoleAA()) continue;
+                    const float radius = threat.cdef->GetMaxRange() + corridorPadding + assemblyRadius;
+                    if (threat.pos.SqDistance2D(e.pos) <= radius * radius) localAA += threat.cost;
+                }
+                required += air_geometry::AttritionReserve(localAA, bomberMetal, localAAReserve);
+            }
+            if (requiredBombers == 0 || required < requiredBombers) requiredBombers = required;
+            if (!committed && (missionPolicy ? expectedCount < required : damageBudget < e.health * damageMargin)) continue;
+        }
 		if (preference == 1) {
 			score = e.pos.SqDistance2D(base);                                   // deepest
 		} else {
 			score = e.cost / (1.f + std::sqrt(e.pos.SqDistance2D(from)) / 1000.f);  // value, discounted by distance
 		}
-		if (score > bestScore) {
+        if (safeFlight) {
+            const float length = std::max(1.f, std::sqrt(from.SqDistance2D(e.pos)));
+            score /= 1.f + threatWeight * (missionPolicy ? routeRisk : RouteExposure(from, e.pos) / length);
+            if (missionPolicy && preference == 3)
+                score /= 1.f + std::sqrt(aim.SqDistance2D(e.pos)) / 1000.f;
+            if (missionPolicy && earlyEco) {
+                float nearby = 0.f;
+                for (const auto& other : peaceful) if (!other.IsDead() && !other.IsFake() && other.cdef != nullptr
+                    && (other.cdef->IsWind() || other.cdef->GetExtractsM() > 0.f)
+                    && other.pos.SqDistance2D(e.pos) < SQUARE(240.f)) nearby += other.cost;
+                score += nearby / (1.f + length / 1000.f) / (1.f + threatWeight * routeRisk);
+            }
+        }
+        const bool district = operationPolicy && preference == 5 && committed;
+        const bool local = district && e.pos.SqDistance2D(aim) <= SQUARE(localRadius);
+        if (operationPolicy && preference == 5) {
+            score *= allowedStrikeDefs.at(e.cdef->GetId());
+            if (local) score *= 8.f;
+        }
+		if (air_geometry::PreferDistrictTarget(district, local, bestLocal, score, bestScore)) {
 			bestScore = score;
+            bestLocal = local;
 			best = &e;
+            bestRequired = required; bestIngress = candidateRoute;
+            bestLocalAA = localAA; bestRisk = routeRisk;
 		}
 	}
 	if (best == nullptr) {
 		return false;
 	}
+    if (missionPolicy) {
+        requiredBombers = bestRequired; ingress = bestIngress;
+        staticAssault = best->cdef->IsAttacker() && !best->cdef->IsMobile();
+        circuit->LOG("WAVE: mission target=%i required=%i available=%i route=%s unknown=%.2f army=%.0f localAA=%.0f risk=%.1f synchronized=%i",
+            best->id, requiredBombers, expectedCount, ingress.empty() ? "direct" : "edge", unknownReserve, enemyArmy, bestLocalAA, bestRisk, synchronize && staticAssault);
+    }
 	strikeTargetId = best->id;
 	aim = best->pos;
 	position = aim;
@@ -196,10 +575,10 @@ float CAirWaveTask::PickSmartBearingDeg(const AIFloat3& baseDir) const
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	CThreatMap* threatMap = circuit->GetThreatMap();
-	if (units.empty()) {
+	if (units.empty() && !safeFlight) {
 		return 0.f;
 	}
-	threatMap->SetThreatType(*units.begin());
+	if (!units.empty()) threatMap->SetThreatType(*units.begin());
 	const float baseAngle = std::atan2(baseDir.z, baseDir.x);
 	float bestDeg = 0.f;
 	float bestThreat = std::numeric_limits<float>::max();
@@ -213,7 +592,15 @@ float CAirWaveTask::PickSmartBearingDeg(const AIFloat3& baseDir) const
 		CTerrainManager::CorrectPosition(stand);
 		CTerrainManager::CorrectPosition(mid);
 		// Frontal is the cheapest flight; break ties toward it.
-		const float threat = threatMap->GetThreatAt(stand) + threatMap->GetThreatAt(mid) + std::fabs(deg) * 1e-4f;
+		float threat = threatMap->GetThreatAt(stand) + threatMap->GetThreatAt(mid) + std::fabs(deg) * 1e-4f;
+        if (safeFlight) {
+            AIFloat3 exit(aim.x + dir.x * overrun, 0.f, aim.z + dir.z * overrun);
+            CTerrainManager::CorrectPosition(exit);
+            const float distance = std::sqrt(returnPos.SqDistance2D(stand)) + formDistance
+                + overrun + std::sqrt(exit.SqDistance2D(returnPos));
+            threat = threatWeight * (RouteExposure(returnPos, stand) + RouteExposure(stand, exit)
+                + RouteExposure(exit, returnPos)) + distance;
+        }
 		if (threat < bestThreat) {
 			bestThreat = threat;
 			bestDeg = deg;
@@ -225,7 +612,7 @@ float CAirWaveTask::PickSmartBearingDeg(const AIFloat3& baseDir) const
 void CAirWaveTask::ComputeLines()
 {
 	CCircuitAI* circuit = manager->GetCircuit();
-	const AIFloat3 base = circuit->GetSetupManager()->GetBasePos();
+	const AIFloat3 base = missionPolicy && !ingress.empty() ? ingress.back() : circuit->GetSetupManager()->GetBasePos();
 	AIFloat3 baseDir(aim.x - base.x, 0.f, aim.z - base.z);
 	const float len = std::sqrt(baseDir.x * baseDir.x + baseDir.z * baseDir.z);
 	if (len < 1.f) {
@@ -236,7 +623,7 @@ void CAirWaveTask::ComputeLines()
 	}
 	float deg = bearingDeg;
 	if (deg >= SMART_BEARING - 1.f) {
-		deg = PickSmartBearingDeg(baseDir);
+		deg = missionPolicy ? 0.f : PickSmartBearingDeg(baseDir);
 	}
 	usedBearingDeg = deg;
 	const float baseAngle = std::atan2(baseDir.z, baseDir.x);
@@ -252,8 +639,33 @@ void CAirWaveTask::ComputeLines()
 		groupCentre.push_back(centre);
 	}
 	linesReady = true;
+    if (safeFlight) {
+        // Assign nearby slots once, after the asynchronous release window.
+        // ID order makes equal-distance ties independent of pointer addresses.
+        std::vector<CCircuitUnit*> ordered(units.begin(), units.end());
+        std::sort(ordered.begin(), ordered.end(), [](CCircuitUnit* a, CCircuitUnit* b) { return a->GetId() < b->GetId(); });
+        std::vector<bool> used(ordered.size(), false);
+        assemblyTravelFrames = 0;
+        for (CCircuitUnit* unit : ordered) {
+            int best = 0;
+            float distance = std::numeric_limits<float>::max();
+            for (size_t i = 0; i < ordered.size(); ++i) {
+                if (used[i]) continue;
+                slots[unit] = int(i);
+                const float candidate = unit->GetPos(circuit->GetLastFrame()).SqDistance2D(SlotPos(unit));
+                if (candidate < distance) { distance = candidate; best = int(i); }
+            }
+            slots[unit] = best;
+            used[best] = true;
+            assemblyTravelFrames = std::max(assemblyTravelFrames, int(std::ceil(FRAMES_PER_SEC *
+                air_geometry::TransitSeconds(missionPolicy ? RouteLength(unit->GetPos(circuit->GetLastFrame()), SlotPos(unit)) : std::sqrt(distance), unit->GetCircuitDef()->GetSpeed()))));
+        }
+        stateFrame = circuit->GetLastFrame();
+    }
+    launchCount = safeFlight ? std::max(expectedCount, int(units.size())) : int(units.size());
 	circuit->LOG("WAVE: %s lines ready: aim (%.0f, %.0f) bearing %+.0f deg, %i group(s), stand-off %.0f, spacing %.0f, %zu units",
 			(mode == EMode::STRIKE) ? "strike" : "carpet", aim.x, aim.z, usedBearingDeg, groups, formDistance, spacing, units.size());
+    if (safeFlight) circuit->LOG("WAVE: assembly travel=%i settle=%i seconds", assemblyTravelFrames / FRAMES_PER_SEC, formTimeout / FRAMES_PER_SEC);
 }
 
 int CAirWaveTask::LaneOf(int slot) const
@@ -272,8 +684,10 @@ AIFloat3 CAirWaveTask::SlotPos(CCircuitUnit* unit) const
 	}
 	const AIFloat3& dir = groupDir[g];
 	const AIFloat3& centre = groupCentre[g];
-	const float off = spacing * float(LaneOf(slot));
-	AIFloat3 p(centre.x - dir.z * off, centre.y, centre.z + dir.x * off);
+	const auto bounded = air_geometry::FormationSlot(groups <= 1 ? slot : slot / 2, maxWidth, spacing, rankSpacing);
+    const float off = safeFlight ? bounded.lateral : spacing * float(LaneOf(slot));
+    const float behind = safeFlight ? bounded.behind : 0.f;
+	AIFloat3 p(centre.x - dir.z * off - dir.x * behind, centre.y, centre.z + dir.x * off - dir.z * behind);
 	CTerrainManager::CorrectPosition(p);
 	return p;
 }
@@ -289,7 +703,9 @@ AIFloat3 CAirWaveTask::EndPos(CCircuitUnit* unit) const
 	const AIFloat3& dir = groupDir[g];
 	const AIFloat3 s = SlotPos(unit);
 	const float run = formDistance + overrun;
-	AIFloat3 p(s.x + dir.x * run, s.y, s.z + dir.z * run);
+    const auto bounded = air_geometry::FormationSlot(groups <= 1 ? slot : slot / 2, maxWidth, spacing, rankSpacing);
+    const float extra = safeFlight ? bounded.behind : 0.f;
+	AIFloat3 p(s.x + dir.x * (run + extra), s.y, s.z + dir.z * (run + extra));
 	CTerrainManager::CorrectPosition(p);
 	return p;
 }
@@ -314,7 +730,12 @@ void CAirWaveTask::IssueForm(CCircuitUnit* unit)
 	CCircuitAI* circuit = manager->GetCircuit();
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
-		unit->CmdMoveTo(SlotPos(unit), 0, circuit->GetLastFrame() + formTimeout + FRAMES_PER_SEC * 30);
+        bool queued = false;
+        if (missionPolicy && !operationPolicy && routed.insert(unit).second) for (const auto& point : ingress) {
+            unit->CmdMoveTo(point, queued ? UNIT_COMMAND_OPTION_SHIFT_KEY : 0, circuit->GetLastFrame() + formTimeout + assemblyTravelFrames + FRAMES_PER_SEC * 30);
+            queued = true;
+        }
+		unit->CmdMoveTo(SlotPos(unit), queued ? UNIT_COMMAND_OPTION_SHIFT_KEY : 0, circuit->GetLastFrame() + formTimeout + assemblyTravelFrames + FRAMES_PER_SEC * 30);
 	)
 }
 
@@ -322,11 +743,16 @@ void CAirWaveTask::IssueAttack(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
+    if (safeFlight && (outbound.count(unit) || releasedAt.count(unit))) return;
+    if (missionPolicy && synchronize && staticAssault && attackAt.count(unit) && frame < attackAt[unit]) return;
+    attackIssued.insert(unit);
+    if (safeFlight) unit->TrySetFireState(CCircuitDef::FireType::OPEN);
 	CEnemyInfo* target = ((mode == EMode::STRIKE) || (mode == EMode::DEEP)) ? GetStrikeTarget() : nullptr;
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		if (target != nullptr) {
-			unit->Attack(target, false, frame + WAVE_ATTACK_TIMEOUT);
+            if (safeFlight && !target->GetCircuitDef()->IsMobile()) unit->CmdAttackGround(target->GetPos(), 0, frame + WAVE_ATTACK_TIMEOUT);
+			else unit->Attack(target, false, frame + WAVE_ATTACK_TIMEOUT);
 		} else {
 			// Attack-move down the lane: the bombers release on what they cross
 			// and keep going, so the wave carpets the strip instead of stacking
@@ -341,6 +767,7 @@ void CAirWaveTask::IssueAttack(CCircuitUnit* unit)
  */
 void CAirWaveTask::Update()
 {
+    if (operationPolicy) { UpdateOperation(); return; }
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	if ((state_ == EState::PLANNED) || (state_ == EState::DONE)) {
@@ -350,26 +777,41 @@ void CAirWaveTask::Update()
 		return;  // the wave died or was never handed units; script aborts it
 	}
 	if (!linesReady) {
+        if (safeFlight && int(units.size()) < expectedCount && frame - stateFrame < joinFrames) return;
 		ComputeLines();
 		for (CCircuitUnit* unit : units) {
 			IssueForm(unit);
 		}
 		return;
 	}
+    launchCount = std::max(launchCount, static_cast<int>(units.size()));
+    if (safeFlight && state_ != EState::RETURNING
+        && air_geometry::LossAbort(launchCount, static_cast<int>(units.size()), abortFraction)) {
+        ReturnHome("loss threshold");
+        return;
+    }
 
 	switch (state_) {
 		case EState::FORMING: {
 			int formed = 0;
 			for (CCircuitUnit* unit : units) {
-				if (unit->GetPos(frame).SqDistance2D(SlotPos(unit)) < SQUARE(WAVE_SLOT_RADIUS)) {
+                const float distance = unit->GetPos(frame).SqDistance2D(SlotPos(unit));
+                if (safeFlight && distance < SQUARE(assemblyRadius)) assembled.insert(unit);
+                if (safeFlight && distance > SQUARE(assemblyRadius * 2.f)) assembled.erase(unit);
+				if (safeFlight ? assembled.count(unit) != 0 : distance < SQUARE(WAVE_SLOT_RADIUS)) {
 					++formed;
 				} else if (!circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
 					IssueForm(unit);
 				}
 			}
 			formedCount = formed;
-			const bool timedOut = (frame - stateFrame) > formTimeout;
-			if ((float(formed) >= WAVE_FORMED_FRACTION * float(units.size())) || timedOut) {
+			const bool timedOut = (frame - stateFrame) > formTimeout + assemblyTravelFrames;
+            const bool ready = float(formed) >= (safeFlight ? assemblyFraction : WAVE_FORMED_FRACTION) * float(units.size());
+            if (safeFlight && timedOut && !ready) {
+                circuit->LOG("WAVE: assembly incomplete formed=%i total=%zu radius=%.0f", formed, units.size(), assemblyRadius);
+                ReturnHome("assembly incomplete"); return;
+            }
+			if (ready || timedOut) {
 				circuit->LOG("WAVE: line %s with %i of %zu after %i s; %s",
 						timedOut ? "timed out" : "formed", formed, units.size(), (frame - stateFrame) / FRAMES_PER_SEC,
 						(holdFrames > 0) ? "holding" : "attacking");
@@ -395,6 +837,23 @@ void CAirWaveTask::Update()
 		} break;
 
 		case EState::ATTACKING: {
+
+            if (safeFlight) {
+                for (CCircuitUnit* unit : units) {
+                    if (missionPolicy && !attackIssued.count(unit)) IssueAttack(unit);
+                    auto shot = releasedAt.find(unit);
+                    if (shot != releasedAt.end() && frame - shot->second >= FRAMES_PER_SEC * 3 && !outbound.count(unit)) {
+                        outbound.insert(unit);
+                        unit->TrySetFireState(CCircuitDef::FireType::HOLD);
+                        TRY_UNIT(circuit, unit, unit->CmdMoveTo(EndPos(unit), 0, frame + WAVE_ATTACK_TIMEOUT);)
+                    }
+                }
+                if (outbound.size() == units.size()) {
+                    bool past = true;
+                    for (CCircuitUnit* unit : units) if (!IsPastAim(unit, frame)) { past = false; break; }
+                    if (past) { ReturnHome("pass complete"); return; }
+                }
+            }
 			bool over = false;
 			const char* why = "";
 			if ((mode == EMode::STRIKE) || (mode == EMode::DEEP)) {
@@ -420,6 +879,7 @@ void CAirWaveTask::Update()
 				why = "attack timed out";
 			}
 			if (over) {
+                if (safeFlight) { ReturnHome(why); return; }
 				circuit->LOG("WAVE: run over (%s) with %zu survivors; releasing to native bombing", why, units.size());
 				EnterState(EState::DONE);
 				manager->AbortTask(this);
@@ -427,8 +887,354 @@ void CAirWaveTask::Update()
 			}
 		} break;
 
+        case EState::RETURNING: {
+            bool home = true;
+            for (CCircuitUnit* unit : units) {
+                const bool arrived = missionPolicy ? AdvanceReturn(unit, frame) : unit->GetPos(frame).SqDistance2D(returnPos) <= SQUARE(600.f);
+                if (!arrived) home = false;
+            }
+            if (home || frame - stateFrame > returnFrames) {
+                circuit->LOG("WAVE: returned alive=%zu reachedHome=%i", units.size(), home);
+                EnterState(EState::DONE);
+                manager->AbortTask(this);
+                return;
+            }
+        } break;
+
 		default: break;
 	}
+}
+
+void CAirWaveTask::SetOperationPolicy(bool attack, int preference, const AIFloat3& assembly, float lead, float ceiling, float radius)
+{
+    if (!std::isfinite(assembly.x) || !std::isfinite(assembly.z) || !std::isfinite(lead)
+        || !std::isfinite(ceiling) || !std::isfinite(radius)) return;
+    operationPolicy = true;
+    offensive = attack;
+    operationPreference = preference;
+    targetFallbacks.clear();
+    assemblyPos = assembly;
+    CTerrainManager::CorrectPosition(assemblyPos);
+    escortLead = std::clamp(lead, 128.f, 1200.f);
+    routeCeiling = std::max(0.f, ceiling);
+    localRadius = std::clamp(radius, 256.f, 10000.f);
+}
+
+void CAirWaveTask::AddTargetFallback(int preference)
+{
+    if (!operationPolicy || !offensive || preference == operationPreference
+        || (preference != 0 && preference != 2 && preference != 3 && preference != 4
+            && preference != 5 && preference != 7 && preference != 8)) return;
+    if (std::find(targetFallbacks.begin(), targetFallbacks.end(), preference) == targetFallbacks.end())
+        targetFallbacks.push_back(preference);
+}
+
+void CAirWaveTask::SetAttackHandoffPolicy(bool earlyApproach, float priority, float radius)
+{
+    if (!std::isfinite(priority) || !std::isfinite(radius)) return;
+    earlyAttackApproach = earlyApproach;
+    immediateStrikePriority = std::max(0.f, priority);
+    immediateStrikeRadius = std::clamp(radius, 0.f, 10000.f);
+}
+
+bool CAirWaveTask::TryImmediateStrike()
+{
+    if (!committed || !offensive || operationPhase == 0 || immediateStrikePriority <= 0.f
+        || immediateStrikeRadius <= 0.f) return false;
+    auto* circuit = manager->GetCircuit();
+    CEnemyInfo* current = GetStrikeTarget();
+    if (operationPhase == 2 && current != nullptr && current->IsInLOS() && !current->IsHidden()) {
+        auto* def = current->GetCircuitDef();
+        const auto priority = def == nullptr ? allowedStrikeDefs.end() : allowedStrikeDefs.find(def->GetId());
+        // Keep the current priority victim: nearby AFUS must not reset each
+        // other's bombing passes. No scan or repeated order while it survives.
+        if (priority != allowedStrikeDefs.end() && priority->second >= immediateStrikePriority
+            && !def->IsMobile() && !def->IsAbleToFly()) return false;
+    }
+    const AIFloat3 centre = OperationCentre();
+    CEnemyInfo* best = nullptr;
+    float bestPriority = 0.f, bestDistance = 0.f;
+    // The live per-AI contact set includes peaceful economy, without the
+    // asynchronous threat snapshot's visibility delay. One scan; no route/AA
+    // planner or aircraft-by-enemy loop on this reactive path.
+    for (const auto& entry : circuit->GetEnemyInfos()) {
+        auto* enemy = entry.second;
+        const auto* data = enemy->GetData();
+        auto* def = enemy->GetCircuitDef();
+        if (def == nullptr || enemy->GetUnit() == nullptr || data->IsFake() || data->IsDead() || data->IsDying()
+            || enemy->IsHidden() || completedTargets.count(enemy->GetId())) continue;
+        const auto priority = allowedStrikeDefs.find(def->GetId());
+        if (priority == allowedStrikeDefs.end()) continue;
+        const auto& pos = enemy->GetPos();
+        const float distance = centre.SqDistance2D(pos);
+        if (!air_geometry::ImmediateStrikeCandidate(priority->second, immediateStrikePriority,
+            enemy->IsInLOS(), !def->IsMobile() && !def->IsAbleToFly(), distance, immediateStrikeRadius)
+            || pos.y < -SQUARE_SIZE * 5) continue;
+        if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&pos](const auto& region) {
+            return pos.SqDistance2D(region.first) <= SQUARE(region.second);
+        })) continue;
+        if (best == nullptr || priority->second > bestPriority
+            || (priority->second == bestPriority && (distance < bestDistance
+                || (distance == bestDistance && enemy->GetId() < best->GetId())))) {
+            best = enemy; bestPriority = priority->second; bestDistance = distance;
+        }
+    }
+    if (best == nullptr) return false;
+    const int previous = strikeTargetId;
+    // Preserve the ordinary disappeared-target accounting when acquisition
+    // interrupts the dead-target branch, before replacing its identity.
+    if (operationPhase == 2 && current == nullptr && previous >= 0
+        && completedTargets.insert(previous).second) ++targetsDestroyed;
+    strikeTargetId = best->GetId(); aim = best->GetPos();
+    operationTargetHealth = 0.f;
+    if (!BeginOperationAttack("visible-priority")) return false;
+    circuit->LOG("WAVE: immediate strike target=%s(%i) previous=%i distance=%.0f priority=%.1f",
+        best->GetCircuitDef()->GetDef()->GetName(), strikeTargetId, previous, std::sqrt(bestDistance), bestPriority);
+    return true;
+}
+
+bool CAirWaveTask::BeginOperationAttack(const char* reason)
+{
+    CEnemyInfo* target = GetStrikeTarget();
+    if (target == nullptr || target->GetUnit() == nullptr || target->IsHidden()) return false;
+    auto* circuit = manager->GetCircuit();
+    const int frame = circuit->GetLastFrame();
+    aim = target->GetPos();
+    AIFloat3 dir = aim - OperationCentre(); dir.y = 0.f;
+    const float length = std::sqrt(dir.SqLength2D());
+    dir = length > 1.f ? dir / length : AIFloat3(0.f, 0.f, 1.f);
+    operationPhase = 2;
+    operationIdle.clear(); operationArrived.clear(); operationDestinations.clear(); releasedAt.clear();
+    for (auto* unit : units) {
+        if (IsOperationBomber(unit)) {
+            // HOLD prevents incidental T1 attacks; explicit target attacks fire.
+            // Issue once, before overflight; the engine owns aim/reload/passes.
+            TRY_UNIT(circuit, unit, unit->Attack(target, false, frame + FRAMES_PER_SEC * 3600, false);)
+        } else {
+            const auto slot = air_geometry::FormationSlot(slots[unit], maxWidth, spacing, rankSpacing);
+            const float forward = escortLead - std::min(slot.behind, escortLead * .5f);
+            AIFloat3 p(aim.x-dir.z*slot.lateral+dir.x*forward, 0.f, aim.z+dir.x*slot.lateral+dir.z*forward);
+            CTerrainManager::CorrectPosition(p);
+            TRY_UNIT(circuit, unit, unit->CmdFightTo(p, 0, frame + FRAMES_PER_SEC * 3600);)
+        }
+    }
+    circuit->LOG("WAVE: committed attack target=%i bombers=%i escorts=%zu offensive=%i handoff=%s distance=%.0f",
+        strikeTargetId, GetBomberCount(), units.size()-GetBomberCount(), offensive, reason, length);
+    return true;
+}
+
+bool CAirWaveTask::PickOperationTarget(const AIFloat3& from, float minStaticCost, bool includePrimary)
+{
+    if (!operationPolicy) return false;
+    if (includePrimary && PickStrikeTarget(from, operationPreference, minStaticCost, operationPreference >= 6)) return true;
+    int minimum = includePrimary ? requiredBombers : 0;
+    for (int preference : targetFallbacks) {
+        if (PickStrikeTarget(from, preference, minStaticCost, preference >= 6)) return true;
+        if (requiredBombers > 0 && (minimum == 0 || requiredBombers < minimum)) minimum = requiredBombers;
+    }
+    requiredBombers = minimum;
+    return false;
+}
+
+void CAirWaveTask::AllowStrikeDef(CCircuitDef* def, float priority)
+{
+    if (def != nullptr && std::isfinite(priority) && priority > 0.f)
+        allowedStrikeDefs[def->GetId()] = priority;
+}
+
+void CAirWaveTask::AddSearchPoint(const AIFloat3& point)
+{
+    if (!std::isfinite(point.x) || !std::isfinite(point.z) || searchPoints.size() >= 64) return;
+    AIFloat3 p = point;
+    CTerrainManager::CorrectPosition(p);
+    searchPoints.push_back(p);
+}
+
+bool CAirWaveTask::IsOperationBomber(CCircuitUnit* unit) const
+{
+    return operationBomberDefs.count(unit->GetCircuitDef()->GetId()) != 0;
+}
+
+int CAirWaveTask::GetBomberCount() const
+{
+    int count = 0;
+    for (auto* unit : units) if (IsOperationBomber(unit)) ++count;
+    return count;
+}
+
+AIFloat3 CAirWaveTask::OperationCentre() const
+{
+    AIFloat3 centre;
+    int count = 0;
+    for (auto* unit : units) if (IsOperationBomber(unit)) {
+        centre += unit->GetPos(manager->GetCircuit()->GetLastFrame());
+        ++count;
+    }
+    if (count > 0) return centre / float(count);
+    return assemblyPos;
+}
+
+void CAirWaveTask::PrepareOperationRoute()
+{
+    operationRoute.clear();
+    AIFloat3 from = OperationCentre();
+    auto points = ingress;
+    points.push_back(aim);
+    for (const auto& goal : points) {
+        const int legs = air_geometry::CohortLegCount(std::sqrt(from.SqDistance2D(goal)), assemblyRadius);
+        for (int i = 1; i <= legs; ++i) operationRoute.push_back(from + (goal-from)*(float(i)/legs));
+        from = goal;
+    }
+}
+
+void CAirWaveTask::IssueOperationLeg()
+{
+    if (operationLeg >= int(operationRoute.size())) return;
+    auto* circuit = manager->GetCircuit();
+    if (operationPhase == 2) {
+        circuit->LOG("[INVARIANT] INV-121 AIR: stale formation MOVE after attack handoff target=%i", strikeTargetId);
+        return;
+    }
+    if (air_geometry::FinalAttackLeg(earlyAttackApproach, operationPhase, operationLeg, int(operationRoute.size()))
+        && BeginOperationAttack("final-approach")) return;
+    const int frame = circuit->GetLastFrame();
+    const AIFloat3 from = OperationCentre();
+    const AIFloat3 goal = operationRoute[operationLeg];
+    AIFloat3 dir(goal.x-from.x, 0.f, goal.z-from.z);
+    const float length = std::sqrt(dir.SqLength2D());
+    dir = length > 1.f ? dir / length : AIFloat3(0.f,0.f,1.f);
+    operationDestinations.clear(); operationArrived.clear(); operationIdle.clear();
+    for (auto* unit : units) {
+        const bool bomber = IsOperationBomber(unit);
+        const auto slot = air_geometry::FormationSlot(slots[unit], maxWidth, spacing, rankSpacing);
+        const float forward = bomber ? -std::min(slot.behind, 600.f) : escortLead - std::min(slot.behind, escortLead * .5f);
+        AIFloat3 p(goal.x-dir.z*slot.lateral+dir.x*forward, 0.f, goal.z+dir.x*slot.lateral+dir.z*forward);
+        CTerrainManager::CorrectPosition(p);
+        operationDestinations[unit] = p;
+        // Flight/fire state was set at task entry. TrySet* emits real engine
+        // commands; repeating it here would triple every cohort movement burst.
+        // One persistent leg per member, emitted only at a cohort transition.
+        // Faster escorts reach the forward screen first and circle there.
+        TRY_UNIT(circuit, unit, unit->CmdMoveTo(p, 0, frame + FRAMES_PER_SEC * 3600);)
+    }
+    operationIssuedFrame = frame;
+    circuit->LOG("WAVE: operation leg=%i/%zu bombers=%i aircraft=%zu offensive=%i", operationLeg,
+        operationRoute.size(), GetBomberCount(), units.size(), offensive);
+}
+
+bool CAirWaveTask::NextOperationTarget()
+{
+    const AIFloat3 centre = OperationCentre();
+    expectedCount = std::max(1, GetBomberCount());
+    damageBudget = passDamage * expectedCount;
+    if (!PickOperationTarget(centre, 0.f)) return false;
+    PrepareOperationRoute();
+    operationLeg = 0;
+    operationPhase = 1;
+    operationTargetHealth = 0.f;
+    EnterState(EState::ATTACKING);
+    IssueOperationLeg();
+    return true;
+}
+
+void CAirWaveTask::UpdateOperation()
+{
+    auto* circuit = manager->GetCircuit();
+    const int frame = circuit->GetLastFrame();
+    if (state_ == EState::PLANNED || state_ == EState::DONE || units.empty()) return;
+    if (GetBomberCount() == 0) {
+        if (frame-stateFrame < joinFrames && !committed) return;
+        circuit->LOG("WAVE: operation exhausted targets=%i damage=%.0f escorts=%zu", targetsDestroyed, operationDamage, units.size());
+        EnterState(EState::DONE);
+        manager->AbortTask(this);
+        return;
+    }
+    if (state_ == EState::RETURNING) {
+        bool arrived = true;
+        for (auto* unit : units) if (!AdvanceReturn(unit, frame)) arrived = false;
+        if (arrived || frame-stateFrame > returnFrames) {
+            circuit->LOG("WAVE: defensive return complete alive=%zu reachedHome=%i", units.size(), arrived);
+            std::vector<CCircuitUnit*> damaged;
+            for (auto* unit : units) if (unit->GetHealthPercent() < .95f) damaged.push_back(unit);
+            EnterState(EState::DONE); manager->AbortTask(this);
+            // A completed defensive mission may use normal repair/retreat
+            // services. Offensive operations never reach this branch.
+            for (auto* unit : damaged) manager->AssignTask(unit, manager->EnqueueRetreat());
+        }
+        return;
+    }
+    if (!linesReady) {
+        if (GetBomberCount() < expectedCount && frame-stateFrame < joinFrames) return;
+        // Stable ID ordering is O(n log n); no all-pairs nearest-slot assignment.
+        std::vector<CCircuitUnit*> ordered(units.begin(), units.end());
+        std::sort(ordered.begin(), ordered.end(), [](auto* a, auto* b) { return a->GetId() < b->GetId(); });
+        int bombers = 0, fighters = 0;
+        for (auto* unit : ordered) slots[unit] = IsOperationBomber(unit) ? bombers++ : fighters++;
+        linesReady = true;
+        operationRoute = {assemblyPos}; operationLeg = 0; operationPhase = 0;
+        IssueOperationLeg();
+        return;
+    }
+    if (TryImmediateStrike()) return;
+    if (operationPhase == 0 || operationPhase == 1 || operationPhase == 3) {
+        int arrived = 0, total = 0, escortArrived = 0, escortTotal = 0;
+        for (auto* unit : units) {
+            const auto dest = operationDestinations.find(unit);
+            if (dest != operationDestinations.end() && unit->GetPos(frame).SqDistance2D(dest->second) <= SQUARE(assemblyRadius))
+                operationArrived.insert(unit);
+            if (IsOperationBomber(unit)) { ++total; if (operationArrived.count(unit)) ++arrived; }
+            else { ++escortTotal; if (operationArrived.count(unit)) ++escortArrived; }
+            if (dest != operationDestinations.end() && !operationArrived.count(unit) && operationIdle.erase(unit)
+                && !circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
+                TRY_UNIT(circuit, unit, unit->CmdMoveTo(dest->second, 0, frame + FRAMES_PER_SEC * 3600);)
+            }
+        }
+        formedCount = arrived;
+        // Actual arrivals latch. Never require fast fixed-wing units to arrive simultaneously.
+        if (arrived < std::max(1, int(std::ceil(total*assemblyFraction)))
+            || (operationPhase == 0 && escortArrived < int(std::ceil(escortTotal*assemblyFraction)))) return;
+        if (operationPhase == 0) {
+            committed = offensive;
+            PrepareOperationRoute();
+            operationLeg = 0; operationPhase = 1;
+            EnterState(EState::ATTACKING); IssueOperationLeg(); return;
+        }
+        if (++operationLeg < int(operationRoute.size())) { IssueOperationLeg(); return; }
+        if (operationPhase == 3) {
+            if (frame-operationScanFrame < FRAMES_PER_SEC * 5) return;
+            operationScanFrame = frame;
+            if (NextOperationTarget()) return;
+            if (!searchPoints.empty()) {
+                operationRoute = {searchPoints[searchIndex++ % searchPoints.size()]}; operationLeg = 0;
+                IssueOperationLeg();
+            }
+            return;
+        }
+        // A vanished/hidden target falls through to the existing retarget path.
+        if (!BeginOperationAttack("arrived")) operationPhase = 2;
+    }
+    if (operationPhase != 2) return;
+    CEnemyInfo* target = GetStrikeTarget();
+    if (target != nullptr && target->GetUnit() != nullptr && !target->IsHidden()) {
+        const float health = target->GetUnit()->GetHealth();
+        if (operationTargetHealth > health) operationDamage += operationTargetHealth-health;
+        operationTargetHealth = health;
+        // A target order persists across reloads/passes. Only repair a genuinely empty queue.
+        for (auto* unit : units) if (IsOperationBomber(unit) && operationIdle.erase(unit)
+            && !circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
+            TRY_UNIT(circuit, unit, unit->Attack(target, false, frame + FRAMES_PER_SEC * 3600, false);)
+        }
+        return;
+    }
+    if (frame-operationScanFrame < FRAMES_PER_SEC) return;
+    operationScanFrame = frame;
+    if (target == nullptr) { completedTargets.insert(strikeTargetId); ++targetsDestroyed; }
+    if (NextOperationTarget()) return;
+    if (!offensive) { ReturnHome("defensive threats cleared"); return; }
+    operationPhase = 3;
+    operationRoute = {searchPoints.empty() ? aim : searchPoints[searchIndex++ % searchPoints.size()]};
+    operationLeg = 0;
+    IssueOperationLeg();
 }
 
 } // namespace circuit

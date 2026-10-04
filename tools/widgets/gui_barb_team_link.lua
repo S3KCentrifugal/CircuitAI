@@ -38,6 +38,587 @@ function widget:GetInfo()
 	}
 end
 
+local theatres = (function()
+local surveys, staging = {}, {}
+local PREFIX = "barbtheatre|1|"
+local mode = nil
+local activeTeams = {}
+local options = {live=true, routes=true, sites=false, shores=false, cues=true, teaching=true, labels=true, context=true, opacity=0.85, collapsed=false}
+local classFilter = {[0]=true,true,true,true,true,true,true}
+local selectedLane, selectedTeam, controls, badges = nil,nil,{},{}
+local refreshRequested, refreshAction = {}, nil
+local dockX,dockY,drag,pressed
+local lessonTitles = {[0]="RECON / ADVANCE", "CONTAIN THE CHOKE", "SPECIALIST FLANK", "CONTEST THE SEA", "AIR APPROACH", "PASSAGE / CLIFF DESCENT"}
+local lessons = {
+    [0]={"Scout the approach before committing your army.","Spread out in open ground; preserve a retreat route."},
+    {"Cover the narrow approach with overlapping fire.","Scout both flanks. Do not feed units into a bottleneck."},
+    {"This route crosses terrain ordinary bots cannot use.","Scout the exit; bring units that can cross the whole route."},
+    {"Sea access can open a second front along the coast.","Protect your shipyard exit and scout for torpedoes."},
+    {"Aircraft can bypass terrain, but not enemy anti-air.","Scout AA, choose an approach, then concentrate the strike."},
+    {"Follow the high passage to the far-side cliff exit.","Descend with crawlers; scout the landing before committing."},
+}
+local previous, wrapper, globals
+local names = {[0]="LAND", "BOT", "AMPHIBIOUS", "HOVER", "ALL-TERRAIN", "NAVAL", "AIR"}
+local colours = {
+    [0]={1,0.75,0.30,1}, {1,0.85,0.45,1}, {0.3,0.88,0.68,1}, {0.3,0.88,0.68,1},
+    {0.75,0.86,0.40,1}, {0.22,0.76,1,1}, {0.78,0.62,1,1},
+}
+local mint, muted, ink = {0.35,0.9,0.73,1}, {0.65,0.73,0.8,1}, {0.025,0.045,0.07,0.94}
+local occupied = {}
+local function freeRect(x,y,w,h)
+    for _,r in ipairs(occupied) do
+        if x < r[3]+6 and x+w > r[1]-6 and y < r[4]+6 and y+h > r[2]-6 then return false end
+    end
+    return true
+end
+local function split(s, delimiter)
+    local t = {}
+    for v in (s .. delimiter):gmatch("(.-)" .. delimiter) do t[#t+1] = v end
+    return t
+end
+local function numbers(s)
+    local t = {}
+    for v in s:gmatch("[^,]+") do
+        local n = tonumber(v)
+        if not n or n ~= n or math.abs(n) > 1e12 then return nil end
+        t[#t+1] = n
+    end
+    return t
+end
+local function permitted(team)
+    local spec = Spring.GetSpectatingState()
+    return spec or Spring.AreTeamsAllied(team, Spring.GetMyTeamID())
+end
+local function receive(team, msg)
+    if type(msg) ~= "string" or msg:sub(1,#PREFIX) ~= PREFIX then return nil end
+    local f = split(msg,"|")
+    if #f < 5 or tonumber(f[3]) ~= team or not permitted(team) then return nil end
+    local topic = f[4]
+    if topic == "remove" then surveys[team],staging[team]=nil,nil; return "theatre-v1" end
+    if topic == "begin" then
+        local n = numbers(f[5]); if not n or #n ~= 2 then return nil end
+        staging[team] = {lanes={}, bodies={}, geos={}, islands={}, beaches={}, seconds=math.max(1,math.min(120,n[1])), tidal=n[2]}
+        return "theatre-v1"
+    end
+    if topic == "hide" then
+        if surveys[team] then surveys[team].untilFrame = 0 end
+        return "theatre-v1"
+    end
+    local s = staging[team]
+    if not s then return nil end
+    if topic == "lane" and f[6] then
+        local n = numbers(f[5]); if not n or #n ~= 2 or not names[n[2]] then return nil end
+        local pts = {}
+        for row in f[6]:gmatch("[^;]+") do
+            local p = numbers(row); if p and #p == 2 then pts[#pts+1] = p end
+        end
+        s.lanes[#s.lanes+1] = {id=n[1], class=n[2], points=pts}
+    elseif topic == "body" then
+        local n = numbers(f[5]); if not n or #n ~= 14 then return nil end
+        s.bodies[n[1]] = {id=n[1], pond=n[2]==1, shared=n[3]==1, friendly=n[4]==1,
+            x=n[5], z=n[6], area=n[7], yard={n[8],n[9]}, tidal={n[10],n[11]}, plane={n[12],n[13]}, facing=n[14], shore={}}
+    elseif topic == "laneinfo" then
+        local n=numbers(f[5])
+        if not n or #n~=11 then return nil end
+        for _,l in ipairs(s.lanes) do if l.id==n[1] then
+            l.length,l.width,l.threat,l.front,l.mask=n[2],n[3],n[4],n[5],n[6]
+            l.lesson,l.anchor,l.calcFrame,l.revision=n[7],{n[8],n[9]},n[10],n[11]
+        end end
+    elseif topic == "cliffinfo" then
+        local n=numbers(f[5]); if not n or #n~=5 then return nil end
+        for _,l in ipairs(s.lanes) do if l.id==n[1] then l.ascent={n[2],n[3]}; l.cliffQuality={n[4],n[5]} end end
+    elseif topic == "shore" and f[6] then
+        local b = s.bodies[tonumber(f[5])]; if not b then return nil end
+        for row in f[6]:gmatch("[^;]+") do
+            local p = numbers(row); if p and #p==4 then b.shore[#b.shore+1]=p end
+        end
+    elseif topic == "geo" then
+        local n=numbers(f[5]); if n and #n==6 then s.geos[#s.geos+1]=n end
+    elseif topic == "island" then
+        local n=numbers(f[5]); if n and #n==5 then s.islands[#s.islands+1]=n end
+    elseif topic == "beach" and f[6] then
+        local n=numbers(f[5]); if not n or #n~=2 then return nil end
+        local b={use=n[2],edges={}}
+        for row in f[6]:gmatch("[^;]+") do local e=numbers(row); if e and #e==6 then b.edges[#b.edges+1]=e end end
+        s.beaches[#s.beaches+1]=b
+    elseif topic == "show" or topic == "refresh" then
+        s.frame = Spring.GetGameFrame()
+        s.untilFrame = topic=="show" and (Spring.GetGameFrame()+s.seconds*30) or (surveys[team] and surveys[team].untilFrame or 0)
+        if options.live or not surveys[team] or refreshRequested[team] then surveys[team]=s end
+        staging[team],refreshRequested[team] = nil,nil
+        Spring.Echo("[TheatresUI] received " .. #s.lanes .. " lanes for team " .. team)
+    end
+    return "theatre-v1"
+end
+
+local function setMode(value, teams)
+    if value~=mode then selectedLane,selectedTeam=nil,nil end
+    mode=value
+    activeTeams={}
+    if value=="all" then
+        for _,id in ipairs(teams or Spring.GetTeamList()) do if permitted(id) then activeTeams[id]=true end end
+    elseif type(value)=="number" and permitted(value) then activeTeams[value]=true end
+end
+local function snapshot(team)
+    local s=surveys[team]; if not s or not permitted(team) then return nil end
+    local r={lanes=#s.lanes,ponds=0,seas=0,yards=0,pondYards=0,tidals=0,planes=0,
+        geos=#s.geos,islands=#s.islands,beaches=#s.beaches,visible=activeTeams[team]==true,frame=s.frame,
+        live=options.live,classes={},details={}}
+    for _,l in ipairs(s.lanes) do
+        r.classes[l.class]=(r.classes[l.class] or 0)+1
+        r.details[#r.details+1]={id=l.id,class=l.class,mask=l.mask,lesson=l.lesson,anchor=l.anchor,ascent=l.ascent,cliffQuality=l.cliffQuality,revision=l.revision,calcFrame=l.calcFrame,threat=l.threat,points=l.points}
+    end
+    for _,l in ipairs(s.lanes) do if l.class==6 and l.points[1] then r.airOrigin={l.points[1][1],l.points[1][2]}; break end end
+    for _,b in pairs(s.bodies) do
+        if b.pond then r.ponds=r.ponds+1 else r.seas=r.seas+1 end
+        if b.yard[1]>=0 then r.yards=r.yards+1; if b.pond then r.pondYards=r.pondYards+1 end end
+        if b.tidal[1]>=0 then r.tidals=r.tidals+1 end
+        if b.plane[1]>=0 then r.planes=r.planes+1 end
+    end
+    return r
+end
+
+local function project(x,z)
+    if x < 0 or z < 0 or x > Game.mapSizeX or z > Game.mapSizeZ then return nil end
+    -- Screen-space rendering deliberately floats above the water, never on the seabed.
+    local sx,sy,sz = Spring.WorldToScreenCoords(x,math.max(0,Spring.GetGroundHeight(x,z))+12,z)
+    if not sx or not sz or sz < 0 or sz > 1 then return nil end
+    return sx,sy
+end
+local function lineVertices(x,y,a,b)
+    gl.Vertex(x,y); gl.Vertex(a,b)
+end
+local function line(x,y,a,b,width,c)
+    gl.Color(c[1],c[2],c[3],(c[4] or 1)*options.opacity); gl.LineWidth(width)
+    gl.BeginEnd(GL.LINES,lineVertices,x,y,a,b)
+end
+-- One reusable projection buffer for all lanes, and two batches per
+-- route. Per-segment closures/tables can allocate tens of MB each DrawScreen
+-- with all players visible; the engine deliberately stops automatic Lua GC.
+local routeContextInk = {0.025,0.045,0.07,0.2}
+local routeScreen = {}
+local function routeVertices(screen,count,cls)
+    for i=2,count do
+        local a,b=(i-2)*2+1,(i-1)*2+1
+        if screen[a] and screen[b] and not (cls==6 and i%6>=3) then
+            gl.Vertex(screen[a],screen[a+1]); gl.Vertex(screen[b],screen[b+1])
+        end
+    end
+end
+local function path(points,x,y,size,c,width)
+    gl.Color(c); gl.LineWidth(width or 1.7)
+    gl.BeginEnd(GL.LINE_STRIP,function()
+        for i=1,#points,2 do gl.Vertex(x+points[i]*size,y+points[i+1]*size) end
+    end)
+end
+local function disk(x,y,r,c)
+    gl.Color(c)
+    gl.BeginEnd(GL.TRIANGLE_FAN,function()
+        gl.Vertex(x,y)
+        for i=0,32 do local a=i*math.pi/16; gl.Vertex(x+math.cos(a)*r,y+math.sin(a)*r) end
+    end)
+end
+local function ring(x,y,r,c)
+    gl.Color(c); gl.LineWidth(1.4)
+    gl.BeginEnd(GL.LINE_LOOP,function()
+        for i=0,31 do local a=i*math.pi/16; gl.Vertex(x+math.cos(a)*r,y+math.sin(a)*r) end
+    end)
+end
+local function icon(kind,x,y,c)
+    disk(x,y,17,ink); ring(x,y,17,c)
+    if kind=="yard" then
+        path({-10,-7,-10,7,-3,7,-3,0,3,0,3,7,10,7,10,-7},x,y,1,c)
+        path({-12,-10,12,-10},x,y,1,c)
+        path({-4,-5,0,-8,4,-5},x,y,1,c)
+    elseif kind=="tidal" then
+        path({2,11,-4,2,2,2,-2,-7,6,3,1,3},x,y,1,c)
+        path({-10,-10,-5,-8,0,-10,5,-8,10,-10},x,y,1,c)
+    elseif kind=="plane" or kind=="air" then
+        path({0,-10,0,11,-2,4,-11,-2,-11,-4,-2,-1,-2,-7,-6,-10,0,-8,6,-10,2,-7,2,-1,11,-4,11,-2,2,4,0,11},x,y,1,c)
+        if kind=="plane" then path({-11,-13,-6,-11,0,-13,6,-11,11,-13},x,y,1,c) end
+    elseif kind=="naval" then
+        ring(x,y+8,3,c)
+        path({0,5,0,-10,-6,-7,-10,-2,-6,-4},x,y,1,c)
+        path({0,-10,6,-7,10,-2,6,-4},x,y,1,c)
+        path({-7,2,7,2},x,y,1,c)
+    else
+        path({-10,-7,10,-7,10,6,-10,6,-10,-7},x,y,1,c)
+        path({-5,-3,5,-3,5,3,-5,3,-5,-3},x,y,1,c)
+        path({0,3,0,12},x,y,1,c)
+    end
+end
+local function label(x,y,title,subtitle,c)
+    local w = math.max(gl.GetTextWidth(title)*13,gl.GetTextWidth(subtitle or "")*10)+20
+    local ox,oy=x,y
+    local vw,vh=gl.GetViewSizes()
+    local choices={{0,0},{0,48},{0,-48},{-w-48,0},{0,96},{-w-48,48},{-w-48,-48},{0,-96},{-w-48,96},{0,144}}
+    for _,o in ipairs(choices) do
+        local cx=math.max(12,math.min(vw-w-12,ox+o[1]))
+        local cy=math.max(44,math.min(vh-145,oy+o[2]))
+        if freeRect(cx,cy-30,w,39) then x,y=cx,cy; break end
+    end
+    occupied[#occupied+1]={x,y-30,x+w,y+9}
+    if x~=ox or y~=oy then line(ox-7,oy-8,x+2,y-8,1,c) end
+    gl.Color(ink); gl.Rect(x,y-30,x+w,y+9)
+    gl.Color(c); gl.Rect(x,y-30,x+2,y+9)
+    gl.Text(title,x+10,y-5,13,"o")
+    gl.Color(0.82,0.88,0.94,1); gl.Text(subtitle or "",x+10,y-21,10,"o")
+end
+local function marker(p,kind,title,detail,c,offset)
+    if p[1]<0 then return end
+    local x,y=project(p[1],p[2]); if not x then return end
+    if not options.labels then icon(kind,x,y,c); return end
+    local vw,vh=gl.GetViewSizes()
+    local w=math.max(gl.GetTextWidth(title)*13,gl.GetTextWidth(detail)*10)+20
+    local ox,oy = math.max(25,math.min(vw-w-45,x+38)),math.max(150,math.min(vh-160,y+(offset or 0)))
+    local baseY=oy
+    for _,dy in ipairs({0,54,-54,108,-108,162,-162}) do
+        local cy=math.max(150,math.min(vh-160,baseY+dy))
+        if freeRect(ox-18,cy-23,w+43,42) then oy=cy; break end
+    end
+    line(x,y,ox-18,oy,2,ink); line(x,y,ox-18,oy,1,c)
+    ring(x,y,4,c); icon(kind,ox,oy,c); label(ox+23,oy+8,title,detail,c)
+    occupied[#occupied+1]={ox-18,oy-18,ox+18,oy+18}
+end
+
+local function drawSurvey(team,s,first,index,count)
+    local shift=mode=="all" and (index-(count+1)/2)*12 or 0
+    local tr,tg,tb=Spring.GetTeamColor(team)
+    local teamColour={tr,tg,tb,1}
+    -- Geometry, classifications and extents arrive from the AI.
+    for _,b in pairs(options.shores and s.bodies or {}) do
+        local c=b.pond and (b.friendly and mint or muted) or colours[5]
+        gl.Color(c[1],c[2],c[3],0.42); gl.LineWidth(1.2)
+        gl.BeginEnd(GL.LINES,function()
+            for _,e in ipairs(b.shore) do
+                local x,y=project(e[1],e[2]); local a,d=project(e[3],e[4])
+                if x and a then gl.Vertex(x,y); gl.Vertex(a,d) end
+            end
+        end)
+    end
+    local ordered={}
+    for _,l in ipairs(s.lanes) do if not (team==selectedTeam and l.id==selectedLane) then ordered[#ordered+1]=l end end
+    for _,l in ipairs(s.lanes) do if team==selectedTeam and l.id==selectedLane then ordered[#ordered+1]=l end end
+    for _,l in ipairs(options.routes and ordered or {}) do
+      if classFilter[l.class] and (options.context or (selectedTeam==team and selectedLane==l.id)) then
+        local chosen=selectedTeam==team and selectedLane==l.id
+        local base=colours[l.class]
+        local c={base[1],base[2],base[3],chosen and 1 or 0.25}
+        -- Shared scratch storage is consumed immediately; it never retains
+        -- old surveys or grows with the number of teams/frames.
+        local screen=routeScreen
+        local count=#l.points
+        for i,p in ipairs(l.points) do
+            local x,y=project(p[1],p[2]); screen[i*2-1],screen[i*2]=x or false,y or false
+        end
+        local border=chosen and ink or routeContextInk
+        gl.Color(border[1],border[2],border[3],border[4]*options.opacity); gl.LineWidth(chosen and 6 or 2)
+        gl.BeginEnd(GL.LINES,routeVertices,screen,count,l.class)
+        gl.Color(c[1],c[2],c[3],c[4]*options.opacity); gl.LineWidth(chosen and 3 or 1.5)
+        gl.BeginEnd(GL.LINES,routeVertices,screen,count,l.class)
+        -- Small directional chevrons instead of oversized repeated unit silhouettes.
+        for i=14,count-1,24 do
+            local a,b=(i-1)*2+1,i*2+1
+            if screen[a] and screen[b] then
+                local x,y=screen[a],screen[a+1]
+                local dx,dy=screen[b]-x,screen[b+1]-y; local d=math.sqrt(dx*dx+dy*dy)
+                if d>0.1 then
+                    dx,dy=dx/d,dy/d
+                    line(x-dx*7-dy*4,y-dy*7+dx*4,x,y,2,c)
+                    line(x-dx*7+dy*4,y-dy*7-dx*4,x,y,2,c)
+                end
+            end
+        end
+        local p=(math.max(1,math.floor(count*(l.id%2==0 and 0.62 or 0.38)))-1)*2+1
+        if count>0 and screen[p] and options.labels then
+            local x,y=screen[p],screen[p+1]
+            if chosen or freeRect(x-22,y-12,44,24) then
+                gl.Color(ink); gl.Rect(x-22,y-12,x+22,y+12)
+                gl.Color(base); gl.Text("P"..team.." / "..l.id,x,y-4,11,"oc")
+                badges[#badges+1]={x-22,y-12,x+22,y+12,team=team,lane=l.id}
+                occupied[#occupied+1]={x-22,y-12,x+22,y+12}
+            end
+        end
+        if chosen and options.cues and l.anchor then
+          for cueIndex,cueAnchor in ipairs(l.ascent and {l.anchor,l.ascent} or {l.anchor}) do
+            local x,y=project(cueAnchor[1],cueAnchor[2])
+            -- Orient the symbol along the published route at its actual anchor.
+            -- The route midpoint can face a different direction from a cliff exit.
+            local nearest,bestDistance=1,math.huge
+            for i,p in ipairs(l.points) do
+                local distance=(p[1]-cueAnchor[1])^2+(p[2]-cueAnchor[2])^2
+                if distance<bestDistance then nearest,bestDistance=i,distance end
+            end
+            local before=l.points[math.max(1,nearest-2)]
+            local after=l.points[math.min(#l.points,nearest+2)]
+            if x and before and after then
+                local a,b=project(before[1],before[2]); local d,e=project(after[1],after[2])
+                if a and d then
+                    local dx,dy=d-a,e-b; local len=math.sqrt(dx*dx+dy*dy)
+                    if len>1 then
+                        dx,dy=dx/len,dy/len
+                        local c=base
+                        if l.lesson==1 then
+                            -- Battle-position bracket faces the enemy avenue of approach.
+                            line(x-dy*27,y+dx*27,x+dy*27,y-dx*27,5,ink)
+                            line(x-dy*27,y+dx*27,x+dy*27,y-dx*27,3,mint)
+                            for _,side in ipairs({-1,1}) do
+                                local px,py=x+dy*27*side,y-dx*27*side
+                                line(px,py,px+dx*13,py+dy*13,3,mint)
+                            end
+                        else
+                            -- Open axis-of-advance arrow: an opportunity, not an order.
+                            for _,side in ipairs({-1,1}) do
+                                line(x-dx*35+dy*7*side,y-dy*35-dx*7*side,x+dy*7*side,y-dx*7*side,3,c)
+                                line(x-dx*8+dy*19*side,y-dy*8-dx*19*side,x+dx*20,y+dy*20,3,c)
+                            end
+                        end
+                        if options.teaching then label(x+32,y+32,cueIndex==2 and "STEEP CLIFF / WALKERS" or (lessonTitles[l.lesson] or "SCOUT"),names[l.class].." / terrain opportunity",c) end
+                    end
+                end
+            end
+          end
+        end
+        if chosen and options.cues and l.front and l.front>=0 then
+            local p=l.points[math.min(#l.points,1+math.floor(l.front*(#l.points-1)))]
+            local x,y=project(p[1],p[2]); if x then
+                path({0,13,13,0,0,-13,-13,0,0,13},x,y,1,{1,0.4,0.3,1},2)
+                if options.labels then label(x+20,y+12,"OBSERVED THREAT","Scout before crossing",{1,0.4,0.3,1}) end
+            end
+        end
+      end
+    end
+    for _,b in pairs(options.sites and s.bodies or {}) do
+        local x,y=project(b.x,b.z)
+        if x and first and options.labels then
+            local c=b.pond and (b.friendly and mint or muted) or colours[5]
+            local title=(b.pond and "POND " or "SEA ") .. (b.id+1)
+            local detail=b.shared and "shared naval theatre" or (mode=="all" and "isolated water" or (b.friendly and "friendly rear water" or "enemy / neutral water"))
+            if b.pond then detail=detail .. " / no navy" end
+            label(x-60,y+35,title,detail,c)
+        end
+        marker(b.yard,"yard","SHIPYARD","player " .. team .. " / clear exit",colours[5],-38)
+        marker(b.tidal,"tidal","TIDAL",s.tidal .. " E/s / candidate",mint,-38)
+        marker(b.plane,"plane","SEAPLANES","player " .. team .. " / platform",mint,35)
+    end
+
+    for _,g in ipairs(options.sites and s.geos or {}) do
+        local x,y=project(g[2],g[3])
+        if x and (mode~="all" or first) then
+            local c=mode=="all" and {1,0.83,0.4,1} or (g[4]==1 and {1,0.62,0.3,1} or mint)
+            disk(x,y,12,ink)
+            path({0,11,10,0,0,-11,-10,0,0,11},x,y,1,c,2)
+            gl.Color(c); gl.Text(mode=="all" and "G" or (g[4]==1 and "+" or "~"),x,y-4,13,"oc")
+            if options.labels then gl.Text(mode=="all" and "GEO" or (g[5] .. "%"),x,y-24,10,"oc") end
+            local mx,my=Spring.GetMouseState()
+            if (mx-x)^2+(my-y)^2<500 then
+                -- Group duplicate map positions for presentation, preserving every AI's assessment.
+                local rows={}
+                for id in pairs(activeTeams) do
+                    local other=surveys[id]
+                    if other and permitted(id) then
+                        for _,item in ipairs(other.geos) do
+                            if item[2]==g[2] and item[3]==g[3] then
+                                rows[#rows+1]={id=id,use=item[4],coverage=item[5],friendly=item[6]}
+                            end
+                        end
+                    end
+                end
+                table.sort(rows,function(a,b) return a.id<b.id end)
+                local vw,vh=gl.GetViewSizes()
+                local h=38+#rows*19
+                local tx,ty=math.max(12,math.min(vw-350,x+20)),math.max(h+12,math.min(vh-40,y+20))
+                gl.Color(ink); gl.Rect(tx,ty-h,tx+335,ty)
+                gl.Color(1,0.9,0.65,1); gl.Text("GEOTHERMAL / FORWARD TERRAIN VIEW",tx+10,ty-19,12,"o")
+                for n,row in ipairs(rows) do
+                    gl.Color(row.use==1 and {1,0.62,0.3,1} or mint)
+                    gl.Text("P" .. row.id .. "  " .. (row.use==1 and "BATTERY" or "POWER") .. "  " .. row.coverage .. "%" .. (row.friendly==1 and "  friendly" or "  capture / contested"),tx+10,ty-20-n*19,11,"o")
+                end
+            end
+        end
+    end
+    if first and options.sites then
+        for _,p in ipairs(s.islands) do
+            local x,y=project(p[2],p[3]); if x then
+                path({0,7,7,0,0,-7,-7,0,0,7},x,y,1,colours[6],1.5)
+                local mx,my=Spring.GetMouseState()
+                if (mx-x)^2+(my-y)^2<350 then label(x+14,y+8,"ISLAND / AIR FIRST","isolated land / sea landing later",colours[6]) end
+            end
+        end
+    end
+    for _,b in ipairs(options.cues and options.shores and s.beaches or {}) do
+        local c=mode=="all" and teamColour or (b.use==0 and mint or {1,0.48,0.32,1})
+        for i,e in ipairs(b.edges) do
+            local x,y=project(e[1],e[2]); local a,d=project(e[3],e[4])
+            if x and a then
+                y,d=y+shift,d+shift
+                line(x,y,a,d,5,ink); line(x,y,a,d,2.4,c)
+                -- Same continuous shoreline ribbon; bars defend, teeth point inland to assault.
+                if i%3==1 then
+                    local mx,mz=(e[1]+e[3])/2,(e[2]+e[4])/2
+                    local sx,sy=project(mx,mz); local tx,ty=project(mx+e[5]*110,mz+e[6]*110)
+                    if sx and tx then
+                        sy,ty=sy+shift,ty+shift
+                        local dx,dy=tx-sx,ty-sy; local len=math.sqrt(dx*dx+dy*dy)
+                        if len>0 then
+                            dx,dy=dx/len,dy/len
+                            if b.use==0 then line(sx-dx*4,sy-dy*4,sx+dx*7,sy+dy*7,2,c)
+                            else
+                                line(sx-dy*4,sy+dx*4,sx+dx*8,sy+dy*8,2,c)
+                                line(sx+dy*4,sy-dx*4,sx+dx*8,sy+dy*8,2,c)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+local function button(id,x,y,w,title,on,action)
+    gl.Color(on and {0.12,0.30,0.34,0.98} or {0.09,0.13,0.18,0.98}); gl.Rect(x,y,x+w,y+26)
+    gl.Color(on and mint or {0.83,0.87,0.93,1}); gl.Text(title,x+w/2,y+8,11,"oc")
+    controls[#controls+1]={x,y,x+w,y+26,id=id,action=action}
+end
+local function config(data)
+    if type(data)~="table" then return end
+    for k,v in pairs(options) do if type(v)=="boolean" and type(data[k])=="boolean" then options[k]=data[k] end end
+    if type(data.opacity)=="number" then options.opacity=math.max(0.25,math.min(1,data.opacity)) end
+    if type(data.x)=="number" and type(data.y)=="number" then dockX,dockY=data.x,data.y end
+    if type(data.classes)=="table" then for k=0,6 do if type(data.classes[k])=="boolean" then classFilter[k]=data.classes[k] end end end
+end
+local function getConfig()
+    local result={}; for k,v in pairs(options) do result[k]=v end
+    result.x,result.y=dockX,dockY; result.classes={}
+    for k=0,6 do result.classes[k]=classFilter[k] end
+    return result
+end
+local function draw(panel)
+    controls,badges={},{}
+    if not mode or Spring.IsGUIHidden() then return end
+    local vw,vh=gl.GetViewSizes()
+    local w,h=420,options.collapsed and 38 or 550
+    dockX=math.max(8,math.min(vw-w-8,dockX or vw-w-22))
+    dockY=math.max(h+8,math.min(vh-65,dockY or vh-80))
+    local x,top=dockX,dockY
+    occupied={{x,top-h,x+w,top},{0,vh-350,350,vh},{vw-440,0,vw,210}}
+    if panel then occupied[#occupied+1]={panel.x1,panel.y1,panel.x2,panel.y2} end
+    local ids,rows={},{}
+    for id in pairs(activeTeams) do if permitted(id) and surveys[id] then ids[#ids+1]=id end end
+    table.sort(ids)
+    for _,id in ipairs(ids) do for _,l in ipairs(surveys[id].lanes) do
+        if classFilter[l.class] then rows[#rows+1]={team=id,lane=l} end
+    end end
+    local selected,selectedIndex=nil,1
+    for i,r in ipairs(rows) do if r.team==selectedTeam and r.lane.id==selectedLane then selected,selectedIndex=r,i end end
+    if not selected and rows[1] then selected=rows[1]; selectedTeam,selectedLane=selected.team,selected.lane.id end
+    for i,id in ipairs(ids) do if id~=selectedTeam then drawSurvey(id,surveys[id],i==1,i,#ids) end end
+    for i,id in ipairs(ids) do if id==selectedTeam then drawSurvey(id,surveys[id],i==1,i,#ids) end end
+    gl.Color(0.025,0.04,0.06,0.97); gl.Rect(x,top-h,x+w,top)
+    gl.Color(mint); gl.Rect(x,top-3,x+w,top)
+    gl.Color(0.93,0.96,1,1); gl.Text("BATTLEFIELD GUIDE",x+14,top-25,15,"o")
+    controls[#controls+1]={x,top-36,x+w-100,top,id="guideDrag",action=function() end}
+    button("guideCollapse",x+w-98,top-31,42,options.collapsed and "+" or "-",false,function() options.collapsed=not options.collapsed end)
+    button("guideHide",x+w-50,top-31,42,"Hide",false,function() setMode(nil) end)
+    if options.collapsed then return end
+    local y=top-58
+    gl.Color(muted); gl.Text((mode=="all" and "ALL PLAYERS" or "PLAYER "..mode).."  /  "..(options.live and "LIVE" or "FROZEN VIEW"),x+14,y,11,"o")
+    y=y-36
+    button("guideLive",x+12,y,124,options.live and "Live updates: ON" or "Live updates: OFF",options.live,function() options.live=not options.live end)
+    button("guideRefresh",x+144,y,124,"Refresh now",false,function() if refreshAction then refreshAction() end end)
+    button("guideTeach",x+276,y,132,"Teaching: "..(options.teaching and "ON" or "OFF"),options.teaching,function() options.teaching=not options.teaching end)
+    y=y-33
+    for i,k in ipairs({"routes","sites","shores","cues"}) do
+        local key=k
+        button("guide_"..key,x+12+(i-1)*99,y,93,key:sub(1,1):upper()..key:sub(2)..(options[key] and " +" or " -"),options[key],function() options[key]=not options[key] end)
+    end
+    y=y-32
+    for i,k in ipairs({"labels","context","opacity","reset"}) do
+        local key=k
+        local title=key=="labels" and (options.labels and "Labels: ON" or "Labels: OFF") or (key=="context" and (options.context and "Context: ON" or "Focus only") or (key=="opacity" and ("Ink: "..math.floor(options.opacity*100).."%") or "Reset view"))
+        button("guide_"..key,x+12+(i-1)*99,y,93,title,false,function()
+            if key=="labels" then options.labels=not options.labels
+            elseif key=="context" then options.context=not options.context
+            elseif key=="opacity" then options.opacity=options.opacity>0.8 and 0.55 or (options.opacity>0.5 and 0.3 or 0.85)
+            else config({live=true,routes=true,sites=false,shores=false,cues=true,teaching=true,labels=true,context=true,opacity=0.85}); for c=0,6 do classFilter[c]=true end; dockX,dockY=nil,nil end
+        end)
+    end
+    y=y-27
+    gl.Color(muted); gl.Text("ROUTE TYPES  /  click to filter",x+14,y,10,"o")
+    y=y-31
+    local short={[0]="Land","Bot","Amph","Hover","Cliff","Sea","Air"}
+    for c=0,6 do local cls=c
+        button("guideClass"..c,x+12+c*57,y,53,short[c],classFilter[c],function() classFilter[cls]=not classFilter[cls] end)
+    end
+    y=y-35
+    button("guidePrev",x+12,y,32,"<",false,function()
+        local r=rows[(selectedIndex-2)%math.max(1,#rows)+1]; if r then selectedTeam,selectedLane=r.team,r.lane.id end
+    end)
+    button("guideNext",x+w-44,y,32,">",false,function()
+        local r=rows[selectedIndex%math.max(1,#rows)+1]; if r then selectedTeam,selectedLane=r.team,r.lane.id end
+    end)
+    if selected then
+        local l=selected.lane; local c=colours[l.class]
+        gl.Color(c); gl.Text(names[l.class].."  /  P"..selected.team.." ROUTE "..l.id,x+54,y+8,13,"o")
+        y=y-23
+        gl.Color(muted); gl.Text(selectedIndex.." of "..#rows.." routes  /  select a map badge or use arrows",x+14,y,10,"o")
+        y=y-24
+        gl.Color(0.9,0.94,1,1); gl.Text((l.length or 0).." elmos   /   "..(l.width and l.width>0 and ("narrowest ~"..l.width) or "no ground choke"),x+14,y,12,"o")
+        y=y-21
+        local age=math.max(0,math.floor((Spring.GetGameFrame()-(l.calcFrame or surveys[selected.team].frame))/30))
+        local threat=l.threat and l.threat>1 and ("Reported "..(l.class==6 and "AA" or "surface").." threat: "..string.format("%.1f",l.threat)) or "No reported threat - this does not mean safe"
+        gl.Color(l.threat and l.threat>1 and {1,0.55,0.35,1} or muted); gl.Text(threat,x+14,y,11,"o")
+        y=y-21
+        gl.Color(muted); gl.Text("Survey "..age.."s ago / rev "..(l.revision or "?").." / AI sight + profile weights",x+14,y,11,"o")
+        y=y-21
+        local capable={}
+        for cls=0,6 do if l.mask and math.floor(l.mask/2^cls)%2==1 then capable[#capable+1]=short[cls] end end
+        gl.Color(muted); gl.Text("Terrain fits: "..table.concat(capable," / "),x+14,y,10,"o")
+        if options.teaching then
+            y=y-28
+            gl.Color(mint); gl.Text(lessonTitles[l.lesson or 0],x+14,y,13,"o")
+            local teaching=l.ascent and {"Use steep walker-only cliffs at both ends of the passage.","Scout both landings before committing walkers."} or (lessons[l.lesson or 0] or lessons[0])
+            for _,txt in ipairs(teaching) do y=y-20; gl.Color(0.91,0.93,0.96,1); gl.Text(txt,x+14,y,11,"o") end
+        end
+    else
+        gl.Color(muted); gl.Text(#ids==0 and "Waiting for an AI survey..." or "No routes match these filters",x+56,y+8,12,"o")
+    end
+    gl.Color(muted); gl.Text("Arrows: approach   Brackets: contain   Diamonds: observed threat",x+14,top-h+30,10,"o")
+    gl.Text("Terrain estimate, not orders. Sites are candidates. Drag header to move.",x+14,top-h+13,10,"o")
+    gl.LineWidth(1); gl.Color(1,1,1,1)
+end
+local function hitAt(x,y)
+    for i=#controls,1,-1 do local r=controls[i]; if x>=r[1] and y>=r[2] and x<=r[3] and y<=r[4] then return r end end
+    for _,r in ipairs(badges) do if x>=r[1] and y>=r[2] and x<=r[3] and y<=r[4] then return r end end
+end
+local function mousePress(x,y,b)
+    if not mode or Spring.IsGUIHidden() then return false end
+    local r=hitAt(x,y)
+    if r then
+        if b==1 then pressed=r; if r.id=="guideDrag" then drag={x,y,dockX,dockY} end end
+        return true
+    end
+    return dockX and x>=dockX and x<=dockX+420 and y<=dockY and y>=dockY-(options.collapsed and 38 or 550) or false
+end
+local function mouseRelease(x,y,b)
+    local was=pressed~=nil
+    if drag then drag=nil
+    elseif pressed and b==1 then
+        local r=hitAt(x,y)
+        if r and r.id==pressed.id and r.team==pressed.team and r.lane==pressed.lane then
+            if r.action then r.action() else selectedTeam,selectedLane=r.team,r.lane end
+        end
+    end
+    pressed=nil; return was
+end
+return {Receive=receive,Draw=draw,SetMode=setMode,Mode=function() return mode end,Snapshot=snapshot,
+    Config=config,GetConfig=getConfig,Live=function() return options.live end,
+    SetRefresh=function(fn) refreshAction=fn end,Requested=function(id) refreshRequested[id]=true end,
+    Select=function(team,lane) selectedTeam,selectedLane=team,lane end,
+    ButtonRect=function(id) for _,r in ipairs(controls) do if r.id==id then return {r[1],r[2],r[3],r[4]} end end end,
+    MousePress=mousePress,MouseRelease=mouseRelease,
+    MouseMove=function(x,y) if drag then dockX=drag[3]+x-drag[1]; dockY=drag[4]+y-drag[2]; return true end end}
+end)()
+
 -- ---------------------------------------------------------------- constants
 
 local ROLES = { "FRONT", "AIR", "TECH", "SEA", "SUPPORT", "TACTICAL" }
@@ -63,11 +644,12 @@ local ICON = {
 	queryall = "icons/radar_t2.png",
 	overlay  = "icons/eye.png",
 	close    = "LuaUI/Images/advplayerslist/cross.dds",
+	goto     = "LuaUI/Images/advplayerslist/camera.dds",
 	lead     = "LuaUI/Images/advplayerslist/indicator.dds",
 }
 local MAX_EVENTS = 120
 local QUERY_INTERVAL_FRAMES = 1800
-local WIN_W, WIN_H = 300, 300   -- unscaled px
+local WIN_W, WIN_H = 340, 346   -- unscaled px
 local LAUNCHER = 26             -- unscaled px
 
 local C = {
@@ -95,18 +677,29 @@ local spEcho, spGetGameFrame, spGetMouseState = Spring.Echo, Spring.GetGameFrame
 local spGetTeamList, spGetTeamInfo, spGetAIInfo, spGetTeamColor = Spring.GetTeamList, Spring.GetTeamInfo, Spring.GetAIInfo, Spring.GetTeamColor
 local spGetMyTeamID, spAreTeamsAllied, spGetSpectatingState = Spring.GetMyTeamID, Spring.AreTeamsAllied, Spring.GetSpectatingState
 local spSendSkirmishAIMessage, spPlaySoundFile = Spring.SendSkirmishAIMessage, Spring.PlaySoundFile
+local spGetMyPlayerID, spGetTeamUnits, spGetUnitDefID = Spring.GetMyPlayerID, Spring.GetTeamUnits, Spring.GetUnitDefID
+local spGetUnitPosition, spSetCameraTarget, spGetTeamStartPosition = Spring.GetUnitPosition, Spring.SetCameraTarget, Spring.GetTeamStartPosition
 local mathFloor, mathMax, mathMin = math.floor, math.max, math.min
 
 -- Only teams allied with the local player are listed, drawn and commanded
--- (CR-008): a host running both sides must not see the enemy BARb's plan or
--- steer its builders. A spectator sees every AI but may route none of them.
+-- (CR-008): a host playing in a game must not see the enemy BARb's plan or
+-- steer its builders. A spectator sees every AI. Commanding needs the AI to be
+-- hosted by this client (it runs here, and only here does the message reach
+-- it): a spectating host commands every AI it hosts (an AI-only game, the
+-- owner's usual set-up; before this, every role button was greyed out there),
+-- a playing host only its allies.
 local function isSpectator() return spGetSpectatingState() == true end
 local function isPermittedTeam(teamId)
 	if isSpectator() then return true end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
 end
+local function hostedHere(teamId)
+	local _, _, host = spGetAIInfo(teamId)
+	return host ~= nil and host == spGetMyPlayerID()
+end
 local function mayCommand(teamId)
-	if isSpectator() then return false end
+	if not hostedHere(teamId) then return false end
+	if isSpectator() then return true end
 	return spAreTeamsAllied(teamId, spGetMyTeamID()) == true
 end
 
@@ -119,7 +712,7 @@ local font, font2
 local hasFlowUI = false
 
 local open = false               -- the window is shown
-local firstRun = true            -- no saved config yet: open once, so the widget is found
+local firstRun = true            -- no saved config yet (owner: the window starts closed; the launcher shows it is there)
 local offX, offY = 0, 0          -- the user's drag, from the default place (scaled px)
 local launcher = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
 local win = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
@@ -139,6 +732,7 @@ local firstAnnounceFrame = nil
 local layoutShown = false
 local layoutData = {}
 local hookAIMessages, unhookAIMessages   -- defined with the message code below
+local lastRowClick = nil                 -- a row's last click (double-click flies the camera)
 
 -- ---------------------------------------------------------------- helpers
 
@@ -224,6 +818,60 @@ end
 
 local function playClick() spPlaySoundFile(SOUND_CLICK, 0.5, "ui") end
 
+-- a role switch request: the role grid's buttons and WG.barblink.SetRole
+local function requestRole(teamId, role)
+	if not mayCommand(teamId) then
+		addEvent(string.format("Team %d: switch to %s refused here (this AI is not hosted by you)", teamId, role), "warn")
+		return false
+	end
+	addEvent(string.format("Team %d: switch to %s requested", teamId, role), "info")
+	return send(teamId, "barb|setrole|" .. teamId .. "|" .. role)
+end
+
+-- Fly the camera to an AI: its commander, else its factory nearest its start
+-- (the owner's request). Only when asked: the widget never moves the camera
+-- by itself.
+local commanderDef, factoryDef = {}, {}
+for id, ud in pairs(UnitDefs) do
+	if ud.customParams and ud.customParams.iscommander then commanderDef[id] = true end
+	if ud.isFactory then factoryDef[id] = true end
+end
+local function focusUnit(teamId)
+	local units = spGetTeamUnits(teamId)
+	if not units then return nil end
+	local e = ais[teamId]
+	local bx, bz = e and e.roster and e.roster.x, e and e.roster and e.roster.z
+	if not bx then local sx, _, sz = spGetTeamStartPosition(teamId); bx, bz = sx, sz end
+	bx, bz = bx or 0, bz or 0
+	local best, bestD, bestKind = nil, math.huge, nil
+	for _, uid in ipairs(units) do
+		local d = spGetUnitDefID(uid)
+		local kind = (d and commanderDef[d]) and "commander" or ((d and factoryDef[d]) and "factory" or nil)
+		if kind and (bestKind ~= "commander" or kind == "commander") then
+			local x, _, z = spGetUnitPosition(uid)
+			if x then
+				local dist = (x - bx) * (x - bx) + (z - bz) * (z - bz)
+				if (kind == "commander" and bestKind ~= "commander") or dist < bestD then
+					best, bestD, bestKind = uid, dist, kind
+				end
+			end
+		end
+	end
+	return best, bestKind
+end
+local function goTo(teamId)
+	local uid, kind = focusUnit(teamId)
+	if not uid then
+		addEvent(string.format("Team %d: no commander or factory in view", teamId), "warn")
+		return false
+	end
+	local x, y, z = spGetUnitPosition(uid)
+	spSetCameraTarget(x, y, z, 0.4)
+	local name = UnitDefs[spGetUnitDefID(uid)] and UnitDefs[spGetUnitDefID(uid)].translatedHumanName or kind
+	addEvent(string.format("Camera: team %d's %s (%s)", teamId, kind, name or "?"), "info")
+	return true, uid, kind
+end
+
 local function setOpen(v)
 	open = v
 	if v then refreshTeams() end
@@ -290,14 +938,61 @@ function widget:ViewResize(newX, newY)
 	updatePlacement()
 end
 
+local theatrePending = {}
+local theatreStatus = ""
+local function setTheatres(value)
+    theatrePending = {}
+    theatreStatus = value and "Requesting lanes..." or ""
+    local ids={}
+    for _,id in ipairs(aiOrder) do if mayCommand(id) then ids[#ids+1]=id end end
+    theatres.SetMode(value,ids)
+    local function request(id)
+        theatrePending[id]={time=Spring.GetTimer(),frame=spGetGameFrame()}
+        theatres.Requested(id)
+        spSendSkirmishAIMessage(id,"barb|theatres|" .. id .. "|refresh")
+    end
+    if value=="all" then
+        for _,id in ipairs(ids) do request(id) end
+        if #ids==0 then theatreStatus="Lanes require a locally hosted BARb AI." end
+    elseif type(value)=="number" and mayCommand(value) then
+        request(value)
+    elseif value~=nil then theatreStatus="Lanes require a locally hosted BARb AI."
+    end
+end
+
 function widget:Initialize()
+	 theatres.SetRefresh(function() if theatres.Mode() then setTheatres(theatres.Mode()) end end)
 	self:ViewResize(Spring.GetViewGeometry())
 	refreshTeams()
-	if firstRun then open = true end
 	hookAIMessages()
 	WG.barblink = {
+		SetTheatres = setTheatres,
+        TheatreSnapshot = theatres.Snapshot,
+        TheatreStatus = function() return theatreStatus end,
+        TheatreOptions = theatres.Config,
+        TheatreConfig = theatres.GetConfig,
+        SelectLane = theatres.Select,
+        MousePress = function(x,y,b) return widget:MousePress(x,y,b) end,
+        MouseRelease = function(x,y,b) return widget:MouseRelease(x,y,b) end,
+        ButtonRect = function(id)
+            local guide=theatres.ButtonRect(id); if guide then return guide end
+            for _,r in ipairs(hit) do if r[5]==id then return {r[1],r[2],r[3],r[4]} end end
+        end,
 		IsOpen = function() return open end,
 		SetOpen = setOpen,
+		-- the same paths as the buttons (tools/playtest drives them)
+		SetRole = function(teamId, role) return requestRole(teamId, role) end,
+		GoTo = function(teamId) return goTo(teamId) end,
+		MayCommand = function(teamId) return mayCommand(teamId) end,
+		-- teamId -> { role, allyTeam, name } of every listed AI that announced itself
+		Roster = function()
+			local out = {}
+			for id, e in pairs(ais) do
+				if e.roster then out[id] = { role = e.roster.role, allyTeam = e.allyTeam, name = e.name } end
+			end
+			return out
+		end,
+		LastReply = function(teamId) local e = ais[teamId]; return e and e.lastReply end,
 	}
 end
 
@@ -311,11 +1006,12 @@ function widget:Shutdown()
 end
 
 function widget:GetConfigData()
-	return { open = open, offX = offX / mathMax(scale, 0.01), offY = offY / mathMax(scale, 0.01), overlay = layoutShown }
+	return { open = open, offX = offX / mathMax(scale, 0.01), offY = offY / mathMax(scale, 0.01), overlay = layoutShown, theatres=theatres.GetConfig() }
 end
 
 function widget:SetConfigData(data)
 	if type(data) ~= "table" then return end
+	theatres.Config(data.theatres)
 	if data.open ~= nil then
 		firstRun = false   -- a config of this version: its open state stands
 		open = data.open == true
@@ -324,8 +1020,24 @@ function widget:SetConfigData(data)
 	offY = (tonumber(data.offY) or 0) * scale
 end
 
+function widget:Update()
+    local waiting=false
+    for id,p in pairs(theatrePending) do
+        local result=theatres.Snapshot(id)
+        if result and result.frame>=p.frame then theatrePending[id]=nil
+        elseif Spring.DiffTimers(Spring.GetTimer(),p.time)>5 then
+            theatrePending[id]=nil
+            theatreStatus="No lane reply: update AI DLL + scripts, then restart game."
+            addEvent("Player " .. id .. ": " .. theatreStatus,"warn")
+            spEcho("[BARb link] " .. theatreStatus)
+        else waiting=true end
+    end
+    if not waiting and next(theatrePending)==nil and theatreStatus=="Requesting lanes..." then theatreStatus="" end
+end
+
 function widget:GameFrame(n)
 	if n < 90 then return end
+	if n % 900 == 0 and theatres.Mode() and theatres.Live() then setTheatres(theatres.Mode()) end
 	if lastQueryFrame < 0 or n % QUERY_INTERVAL_FRAMES == 0 then
 		local missing = false
 		for _, id in ipairs(aiOrder) do
@@ -430,6 +1142,7 @@ end
 -- ---------------------------------------------------------------- messages
 
 local function onAIMessage(aiTeam, dataStr)
+	local ack=theatres.Receive(aiTeam,dataStr); if ack then return ack end
 	if type(dataStr) ~= "string" or string.sub(dataStr, 1, 5) ~= "barb|" then return end
 	local p = split(dataStr, "|")
 	local topic, sender, senderAlly = p[2], tonumber(p[3]), tonumber(p[4])
@@ -487,7 +1200,7 @@ local hooked, previousGlobal = false, nil
 
 function widget:RecvSkirmishAIMessage(aiTeam, dataStr)
 	if hooked then return end
-	onAIMessage(aiTeam, dataStr)
+	return onAIMessage(aiTeam, dataStr)
 end
 
 hookAIMessages = function()
@@ -498,7 +1211,7 @@ hookAIMessages = function()
 	rawset(G, AI_CALLIN, function(aiTeam, dataStr)
 		local ok, err = pcall(onAIMessage, aiTeam, dataStr)
 		if not ok then spEcho("[BARb link] message error: " .. tostring(err)) end
-		return nil
+		return ok and err or nil
 	end)
 	Script.UpdateCallIn(AI_CALLIN)
 	hooked = true
@@ -660,7 +1373,23 @@ local function drawWindow()
 	bx = iconButton(bx, by, bs, ICON.overlay, "overlay", function() playClick(); setOverlay(not layoutShown) end,
 		layoutShown and "Layout overlay on: click to hide (/barblayout)" or "Show every AI's planned base on the map (/barblayout)", layoutShown, "o")
 	bx = iconButton(bx, by, bs, ICON.queryall, "queryall", function() playClick(); queryAll() end, "Ask every AI for its details", false, "*")
-	local cy = hy1 - px(5)
+    local cy = hy1 - px(5)
+    local bw=(w-px(8))/3
+    labelButton(left,cy-px(22),left+bw,cy,ICON.overlay,"Lanes: player","lanesPlayer",function()
+        playClick(); if theatres.Mode()==selected then setTheatres(nil) else setTheatres(selected) end
+    end,"Toggle lanes and strategic sites for the selected player",theatres.Mode()~=nil and theatres.Mode()==selected)
+    labelButton(left+bw+px(4),cy-px(22),left+2*bw+px(4),cy,ICON.queryall,"All players","lanesAll",function()
+        playClick(); if theatres.Mode()=="all" then setTheatres(nil) else setTheatres("all") end
+    end,"Toggle every permitted local AI's strategic map",theatres.Mode()=="all")
+    labelButton(left+2*bw+px(8),cy-px(22),right,cy,ICON.close,"Hide lanes","lanesOff",function()
+        playClick(); setTheatres(nil)
+    end,"Hide lanes and strategic sites immediately",theatres.Mode()==nil)
+    cy=cy-px(28)
+    if theatreStatus~="" then
+        text(font,fitText(font,theatreStatus,px(8),w),left,cy-px(9),px(8),"o",C.warn)
+        register(left,cy-px(15),right,cy,"laneStatus",function() end,theatreStatus)
+    end
+    cy=cy-px(16)
 
 	-- ally-team chips (only when more than one ally team has an AI)
 	if #allyTeams > 1 then
@@ -671,6 +1400,7 @@ local function drawWindow()
 			local cw = textWidth(font2, label, px(9)) + px(28)
 			labelButton(cx, cy - chH, cx + cw, cy, ICON.team, label, "ally" .. at, function()
 				playClick(); selectedAlly = at; selected = aisOfAlly(at)[1]; listScroll = 0
+                if type(theatres.Mode())=="number" then setTheatres(selected) end
 			end, string.format("Show team %d's AIs (%d)", at + 1, #aisOfAlly(at)), at == selectedAlly)
 			cx = cx + cw + px(4)
 			if cx > right - px(40) then break end
@@ -713,7 +1443,15 @@ local function drawWindow()
 				rx = rx - px(14)
 			end
 			text(font, fitText(font, a.name, px(9.5), rx - left - px(22)), left + px(19), ry1 + rowH * 0.5 - px(3.4), px(9.5), "o", sel and C.onSurface or C.onSurfaceVariant)
-			register(left, ry1, right, ry2, "row" .. id, function() playClick(); selected = id end,
+			register(left, ry1, right, ry2, "row" .. id, function()
+				playClick()
+				local now = Spring.GetTimer()
+				if selected == id and lastRowClick and Spring.DiffTimers(now, lastRowClick) < 0.4 then goTo(id) end
+				local follow=type(theatres.Mode())=="number"
+				selected = id
+				if follow then setTheatres(id) end
+				lastRowClick = now
+			end,
 				string.format("Team %d: %s%s", id, a.name, a.roster and (", " .. a.roster.role .. ", " .. (a.roster.side or "?")) or ""))
 		end
 		if #ids > maxRows then
@@ -734,9 +1472,11 @@ local function drawWindow()
 			line = (firstAnnounceFrame == nil and spGetGameFrame() > 60 * 30) and "no announcement: is this AI hosted here?" or "waiting for the AI's announcement"
 		end
 		local qs = px(18)
-		iconButton(right - qs, cy - qs + px(3), qs, ICON.query, "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end,
+		local qx = iconButton(right - qs, cy - qs + px(3), qs, ICON.query, "query", function() playClick(); send(e.teamId, "barb|query|" .. e.teamId) end,
 			"Ask this AI for its details", false, "?")
-		text(font, fitText(font, line, px(8.5), w - qs - px(4)), left, cy - px(10), px(8.5), "o", C.onSurfaceVariant)
+		iconButton(qx, cy - qs + px(3), qs, ICON.goto, "goto", function() playClick(); goTo(e.teamId) end,
+			"Fly the camera to this AI's commander (else its factory nearest its start); double-click a row does the same", false, ">")
+		text(font, fitText(font, line, px(8.5), w - 2 * qs - px(6)), left, cy - px(10), px(8.5), "o", C.onSurfaceVariant)
 		cy = cy - px(18)
 
 		local segH = px(22)
@@ -751,14 +1491,13 @@ local function drawWindow()
 			labelButton(sx1, sy2 - segH, sx1 + segW, sy2, ICON[role], role, "role" .. role, function()
 				if active then return end
 				playClick()
-				addEvent(string.format("Team %d: switch to %s requested", e.teamId, role), "info")
-				send(e.teamId, "barb|setrole|" .. e.teamId .. "|" .. role)
-			end, role .. ": " .. (ROLE_HINT[role] or "") .. (cmd and "" or " (spectators cannot switch roles)"), active, cmd)
+				requestRole(e.teamId, role)
+			end, role .. ": " .. (ROLE_HINT[role] or "") .. (cmd and "" or " (only this AI's host can switch its role)"), active, cmd)
 		end
 		cy = cy - 2 * segH - sgap - px(4)
 		local replyColor = C.onSurfaceVariant
 		if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
-		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "spectating: roles are read-only"), px(8.5), w),
+		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "read-only: this AI is not hosted by you"), px(8.5), w),
 			left, cy - px(9), px(8.5), "o", replyColor)
 		cy = cy - px(14)
 	end
@@ -791,6 +1530,7 @@ function widget:DrawScreen()
 	hit = {}
 	if not hasFlowUI or not font then initFlowUI() end
 	updatePlacement()
+	theatres.Draw(open and win or nil)
 	drawLauncher()
 	if open then drawWindow() end
 
@@ -821,6 +1561,7 @@ function widget:GetTooltip(mx, my)
 end
 
 function widget:MousePress(mx, my, mb)
+	if theatres.MousePress(mx,my,mb) then return true end
 	if not (overLauncher(mx, my) or overWindow(mx, my)) then return false end
 	if mb ~= 1 then return true end
 	local top = nil
@@ -836,6 +1577,7 @@ function widget:MousePress(mx, my, mb)
 end
 
 function widget:MouseMove(mx, my, dx, dy, mb)
+	if theatres.MouseMove(mx,my) then return end
 	if dragging then
 		offX = dragging[3] + (mx - dragging[1])
 		offY = dragging[4] + (my - dragging[2])
@@ -844,6 +1586,7 @@ function widget:MouseMove(mx, my, dx, dy, mb)
 end
 
 function widget:MouseRelease(mx, my, mb)
+	if theatres.MouseRelease(mx,my,mb) then return false end
 	if dragging then
 		dragging = nil
 		return false
@@ -876,6 +1619,7 @@ function widget:MouseWheel(up, value)
 end
 
 function widget:TextCommand(cmd)
+	if cmd=="barbtheatres" then if theatres.Mode() then setTheatres(nil) else setTheatres(selected or "all") end; return true end
 	if cmd == "barblink" then setOpen(not open); return true end
 	if cmd == "barblayout" then setOverlay(not layoutShown); return true end
 	return false

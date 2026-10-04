@@ -1,0 +1,21 @@
+{
+  "stop_minute": 20,
+  "expect": [
+    {"key":"opening", "pattern":"\\[AirEconomyProbe\\] PASS opening reserves", "by_minute":5},
+    {"key":"adoption", "pattern":"\\[AirEconomyProbe\\] PASS named-state adoption", "by_minute":1},
+    {"key":"physical", "pattern":"\\[LayoutProbe\\] physical wall exists team=0", "scope":"any", "by_minute":2},
+    {"key":"relocation", "pattern":"\\[AirEconomyProbe\\] PASS unused economic module relocated", "by_minute":20},
+    {"key":"inject", "pattern":"\\[AirEconomyProbe\\] confirmed injected legacy production guard", "by_minute":5},
+    {"key":"release", "pattern":"\\[AirEconomyProbe\\] PASS T2 constructor left injected guard", "by_minute":5},
+    {"key":"peer", "pattern":"\\[AirEconomyProbe\\] PASS T1 peer retained the shared production guard", "by_minute":5},
+    {"key":"work", "pattern":"\\[AirEconomyProbe\\] PASS recovered T2 aircraft working advanced economy", "by_minute":20},
+    {"key":"overflow", "pattern":"\\[AIR\\]\\[Growth\\] afus reason=funded surplus", "by_minute":20},
+    {"key":"six-labs", "pattern":"plants=1/([6-9]|[1-9][0-9]+) aircraftDemand", "by_minute":20}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"probe", "pattern":"\\[AirEconomyProbe\\] FAIL", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"}
+  ]
+}

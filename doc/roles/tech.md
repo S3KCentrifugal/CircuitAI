@@ -1,5 +1,17 @@
 # TECH Role
 
+D-170 gives metal-field TECH a first T1 constructor assigned to forty dense
+mexes, a second assigned to power, and a third initiating T2. Dedicated workers
+skip discretionary defense/frontline rows; ferry ownership, current construction
+and the existing lab reclaim rules keep precedence. Other economic work uses
+`MetalEconomy::EconomyTask` at mex.expand. Metal mode keeps useful wind and excludes
+conversion/rush-chain economy. Normal TECH retains its prior decision path. See
+[implementation and validation](../metal-maps-implementation.md).
+
+D-136: `TechFlank::Tick` maintains the separate accessible mountain-flank
+factory. Its production and routing hooks leave ordinary TECH production
+available; see [specialist flank production](tech_flank.md).
+
 Reference for the `TECH` AngelScript role: how it is loaded, which native
 callbacks reach it, which registered C++ APIs it depends on, how its decisions
 are actually gated, and where it is currently broken.
@@ -222,12 +234,16 @@ Evaluated top to bottom; the first branch that returns a task wins.
 2  T1 bot lab?        t1Ctors < MinimumT1ConstructorBots (2) -> recruit T1 constructor
 3  T2 bot lab?        t2Ctors < MinimumT2ConstructorBots (1) -> recruit T2 constructor
 4  T2 bot lab?        PRIMARY lab only: fast-assist bot if below dynamic cap
-                      and metal.current > 2000
+                      (at most FastAssistBotCap, 10, D-119) and metal.current > 2000
 5  primary air plant? air constructors < 100 -> recruit
 6  T1 bot lab?        mi >= botLabGate -> 10x T1 scout (or amphib AA if landlocked)
 7  T2 bot lab?        mi >= botLabGate -> 10x fast T2 bot (or amphib if landlocked)
 8  T1/T2 vehicle plant? mi >= vehiclePlantGate -> 10x scout / main battle tank
-9  fallback           aiFactoryMgr.DefaultMakeTask(u)
+9  fallback           aiFactoryMgr.DefaultMakeTask(u); the T2 bot lab under the
+                      combat gate waits instead (D-119)
+0  (first) a front cluster's turret: TechFactories::TurretFocus (D-119);
+   an island TECH's hover plant and shipyards: TechHarbour::YardTask (D-121);
+   once the harbour runs, land labs make constructors only (HoldsLandCombat)
 ```
 
 `botLabGate` and `vehiclePlantGate` depend on `Strategy::T2_RUSH` (85% chance
@@ -380,6 +396,10 @@ it means TECH contributes nothing for a long opening and cannot defend itself.
 
 ### D4 - the fast-assist cap never saturates
 
+**Resolved by D-119:** the cap is clamped to `FastAssistBotCap` (10), and T2
+construction bots to `T2BotConstructorCap` (10); the lab then makes fast assault
+bots. The text below describes the state before.
+
 `g_fastAssistBotCap` is `5*floor(mi/20)` above 100 income - unbounded, with a
 2.5x discontinuity at exactly `mi = 100` (10 to 25). Fast-assist bots raise
 income, which raises the cap, so `haveAssist` never catches it. Before the
@@ -431,7 +451,7 @@ Ordered by impact. Items 1-2 are applied; the rest are not.
 2. ~~Move `armfast` to the T2 list (D2).~~ Done in the unit-helper review.
 3. **Decouple the scout-cap release from `mi >= 200` (D3).** The gated T2 bots
    already release at `botLabGate`; the T1 scout raise still waits for 200.
-4. **Bound `g_fastAssistBotCap` (D4)** with an absolute ceiling, and replace the
+4. ~~Bound `g_fastAssistBotCap` (D4) with an absolute ceiling~~ (done, D-119: 10), and replace the
    `metal.current > 2000` stock test with an income or ratio test.
 5. **Implement `Economy::AiUnitAdded`/`AiUnitRemoved` and extend the script
    `Unit::UseAs` enum to all 14 values (D5).**
@@ -842,6 +862,19 @@ constructor under turrets from both. Now:
 | `AssistNanoEnabled` | false | `aiEconomyMgr.assistNanoEnabled`: native assist nanos off for this instance; the script owns the count |
 | `AssistNanoIncomeMod` | 1.0 | `aiEconomyMgr.assistNanoIncomeMod`: when enabled, scales the income a native assist nano must be covered by |
 
+## Lanes and weapon clusters (D-126, D-127)
+
+`Tech_EconomyUpdate` calls `Lanes::Tick` then `TechWeapons::Tick` once a
+second, before `Invariants::Tick`, and `Commands::SwitchRole` clears both on a
+role switch (`OnRoleLeave`). Both run only under the experimental build system:
+- `Lanes` computes the lanes between both teams' starts at game start, draws
+  them for 30 s after the intro, and recalculates them as the front moves
+  ([`tech-lanes.md`](tech-lanes.md));
+- `TechWeapons` places weapon clusters from +200 metal
+  ([`tech_weapons.md`](tech_weapons.md)).
+The rows `weapons.super` and `weapons.cluster` are in
+[`tech_rules.md`](tech_rules.md).
+
 ## Lifecycle and invariants (D-076)
 
 `tech.as` includes `manager/lifecycle.as` and `manager/invariants.as`.
@@ -881,4 +914,47 @@ air constructors (D-109: more than 5 release the T1 land constructors, see
 [`tech_forward.md`](tech_forward.md)). While spam runs, `TechForward::TickSpam`
 puts the spam labs on repeat with their lane as the factory route (D-111).
 
-<!-- source: data/script/src/roles/tech.as; blob: 7fe0c1c1522a0433600eaaed8ada19cde173354c; lines: 2661 -->
+<!-- source: data/script/src/roles/tech.as; blob: 59eaa0797a24d3397ebac903709804da59d1af0d; lines: 2740 -->
+
+## D-152 protected expansion
+
+`Tech_AiUpdate` calls `TechFactories::PlanAhead` before
+`TechFortifications::Tick` and weapon planning. Future factory/turret/exit
+claims do not authorize spending. The fortification controller reserves
+lane-side teeth and, after advanced construction access, a second wall line
+and owned geo/advanced-mex perimeters with access gaps. See
+[design](../air-tech-expansion-plan.md).
+
+## D-158 amphibious units
+
+`Tech_FactoryAiMakeTask` offers a bounded `AmphibiousOps::Produce` wave from an
+existing compatible lab after constructor upkeep and before island ground-army
+suppression; compatible gantries offer Marauders before their signature batch.
+Marauders use the existing combat gate plus the amphibious income/bank gate.
+D-182 restricts TECH Telchine recruitment to `Global::Map::LandLocked` starts;
+ordinary starts (including both Supreme Isthmus TECH spots) reach the existing
+Sprinter/Fiend/Hoplite batch instead. Native fallback cannot bypass this
+restriction when amphibious waves are disabled. Already-owned or donated
+Telchines retain their combat controller; AIR and Marauder policy are unchanged.
+D-160 Telchines on eligible starts require a ten-second minimum of +80 metal, their
+600-metal cost plus 300 reserve banked, available energy and an income-scaled
+cadence (15% metal / 20% energy). TECH lab reclaim/rebuild rules remain exact;
+there is no early lab recovery exception. Native factory fallbacks use
+`AmphibiousOps::DefaultFactoryTask` to prevent an unbudgeted amphibious batch.
+`Military::AiMakeTask` routes owned Telchines and Marauders through the shared
+controller before generic army routing. Telchines regroup and secure dry
+footholds; Marauders exploit known economy on the reached landmass. All policy
+is experimental TECH/AIR only. See the [design](../amphibious-operations-plan.md).
+
+`Tech_MilitaryAiUnitAdded` retains these two unit types for their wave instead
+of splitting Telchines through the opening combat donation. T2 constructor
+donations and other combat-unit donations retain their previous policy.
+
+D-160 retained guards protect completed allied economic assets from a dry
+shore position while the remainder advances. Three guards leave at least
+three attackers; at most two guard groups exist per AI. Allied claims avoid
+duplicate coverage. See [implementation and tests](../telchine-beachhead-results.md).
+
+D-161 gives Telchines land-first, footprint-checked routes and distinct dry
+shore perimeter or land assault slots. Marauder travel and TECH's exact lab
+cycle stay unchanged. See the [formation plan](../telchine-perimeter-plan.md).

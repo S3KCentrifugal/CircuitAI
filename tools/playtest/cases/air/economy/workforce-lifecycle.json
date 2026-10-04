@@ -1,0 +1,19 @@
+{
+  "name": "workforce-lifecycle",
+  "runner": "run_air_workforce.py",
+  "scenario": "lifecycle",
+  "description": "Old named state, blocked support, cancellation, loss, guard release and role handoff.",
+  "kind": "supplied",
+  "map": "Supreme Isthmus v1.7",
+  "minutes": 16,
+  "seed": 1810001,
+  "checks": "air_workforce_budget",
+  "focused_assertions": [
+    "old-nine-slot-adoption",
+    "blocked-support-relocation",
+    "cancelled-support",
+    "both-tiers-released",
+    "player-ownership",
+    "role-reentry"
+  ]
+}

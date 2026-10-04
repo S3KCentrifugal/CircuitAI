@@ -1,11 +1,13 @@
 /*
  * RouteTask.h
  *
- * A fighter task that owns a waypoint route and issues only move orders.
+ * A fighter task that owns a waypoint route; patrol traversal is opt-in.
  * Script (Spam:: in data/script/src/manager/spam.as) creates one per factory
  * with TaskF::Route(), sets the route with SetRoute() and assigns every unit
  * that factory produces. Units follow the queued waypoints, hold at the end,
- * never retreat, and are re-issued the route whenever it changes.
+ * never retreat, and are re-issued the route whenever it changes. Definitions
+ * with a configured standoff fraction temporarily pause for range-controlled
+ * combat, then resume their route without changing task ownership.
  */
 
 #ifndef SRC_CIRCUIT_TASK_FIGHTER_ROUTETASK_H_
@@ -35,6 +37,10 @@ public:
 
 	// Script hooks
 	void SetRoute(std::vector<springai::AIFloat3>&& waypoints);
+    // AIR opts into exact final-route deduplication and transient ownership.
+    void SetAirControl(bool enabled) { airControl = enabled; }
+    void SetAirTarget(int id) { if (airControl && airTarget != id) { airTarget = id; ++version; dirty = true; } }
+    bool SetUnitRoute(CCircuitUnit* unit, std::vector<springai::AIFloat3>&& waypoints, float radius);
 	/*
 	 * Per-unit lane spread. The route is one line; each unit assigned to the
 	 * task is dealt a lane - 0, +1, -1, +2, -2 ... - and follows the line
@@ -46,6 +52,10 @@ public:
 	 * backline, so this is kept small. `count` 1 disables the spread.
 	 */
 	void SetLanes(int count, float spacing, float endSpread);
+	void SetTraversal(bool preserveWaypoints, float radius, bool fightAtEnd);
+    void SetHoldPosition(bool enabled) { holdPosition = enabled; }
+	// Opt-in looping engine patrol; ordinary routes retain their traversal.
+	void SetPatrol(bool enabled) { patrol = enabled; dirty = !route.empty(); }
 	int GetRouteVersion() const { return version; }
 	unsigned int GetRouteSize() const { return route.size(); }
 	bool IsAtEnd(CCircuitUnit* unit) const;
@@ -60,7 +70,14 @@ private:
 	int LaneOf(CCircuitUnit* unit) const;
 
 	std::vector<springai::AIFloat3> route;
+    std::map<CCircuitUnit*, std::vector<springai::AIFloat3>> unitRoutes;
+    std::map<CCircuitUnit*, float> unitArrival;
+    std::set<CCircuitUnit*> issuing;
+    std::set<CCircuitUnit*> retryUnits;
+    std::map<CCircuitUnit*, int> lastIssue;
+    const std::vector<springai::AIFloat3>& RouteFor(CCircuitUnit* unit) const;
 	std::map<CCircuitUnit*, int> lanes;   // unit -> signed lane index
+	std::set<CCircuitUnit*> engaging;  // temporarily paused for configured range micro
 	int laneCount;
 	float laneSpacing;
 	float laneEndSpread;
@@ -68,6 +85,14 @@ private:
 	int version;
 	bool dirty;
 	float arriveRadius;
+	bool preserveWaypoints = false;
+	bool fightAtEnd = false;
+	bool patrol = false;
+    bool holdPosition = false;
+    bool airControl = false;
+    bool hadAssignee = false;
+    int airTarget = -1;
+    std::map<CCircuitUnit*, int> issuedVersion;
 };
 
 } // namespace circuit

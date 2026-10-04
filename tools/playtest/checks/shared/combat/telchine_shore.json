@@ -1,0 +1,17 @@
+{
+  "stop_minute": 12,
+  "expect": [
+    {"key":"fixture","pattern":"ShoreProbe.*loaded controlled=1","by_minute":1,"scope":"any"},
+    {"key":"enemy-control","pattern":"ShoreProbe.*enemy_command_move=true","by_minute":1,"scope":"any"},
+    {"key":"secured","pattern":"\\[AMPH\\].*secured","by_minute":10,"scope":"any"},
+    {"key":"naval-hit","pattern":"ShoreProbe.*naval_hit","by_minute":11,"scope":"any"},
+    {"key":"retreat","pattern":"ShoreProbe.*retreat_order","by_minute":11,"scope":"any"},
+    {"key":"dry-hold","pattern":"ShoreProbe.*result samples=360 wet=0 wet_ship_attack_orders=0 non_hold=0 ship_alive=true ship_distance=[1-9][0-9]{3,}","by_minute":12,"scope":"any"}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception|Error in.*[Tt]elchine|Removed widget: Telchine","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"pursuit-review","pattern":"TelMatch.*CHASE_CANDIDATE","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}

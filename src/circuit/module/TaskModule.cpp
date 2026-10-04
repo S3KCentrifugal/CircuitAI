@@ -66,6 +66,10 @@ void ITaskModule::Release()
 
 void ITaskModule::AssignTask(CCircuitUnit* unit, IUnitTask* task)
 {
+	if (unit->GetTask()->IsEnemyReclaim() && task->GetType() != IUnitTask::Type::PLAYER) {
+		if (task != unit->GetTask() && task->GetAssignees().empty()) task->GetManager()->DiscardUnusedTask(task);
+		return;
+	}
 	{
 		// D-070 diagnostics: a task swap of an experimental builder
 		CBuilderManager* bm = dynamic_cast<CBuilderManager*>(this);
@@ -81,6 +85,7 @@ void ITaskModule::AssignTask(CCircuitUnit* unit, IUnitTask* task)
 
 void ITaskModule::AssignTask(CCircuitUnit* unit)
 {
+	if (unit->GetTask()->IsEnemyReclaim()) return;
 	IUnitTask* task = MakeTask(unit);
 	if (task == nullptr) {
 		return;

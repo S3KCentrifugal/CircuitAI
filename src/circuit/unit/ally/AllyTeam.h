@@ -11,6 +11,9 @@
 #include "unit/enemy/EnemyManager.h"
 #include "util/math/QuadField.h"
 #include "util/math/Region.h"
+#include "terrain/AlliedReservations.h"
+#include "resource/MetalField.h"
+#include "task/static/StrategicTargeting.h"
 
 #include <memory>
 #include <map>
@@ -126,7 +129,14 @@ public:
 	void MarkReclaim(ICoreUnit::Id unitId) { ++reclaimMarks[unitId]; }
 	void UnmarkReclaim(ICoreUnit::Id unitId);
 	bool IsReclaimMarked(ICoreUnit::Id unitId) const { return reclaimMarks.find(unitId) != reclaimMarks.end(); }
+	allied_layout::Reservations& GetLayoutReservations() { return layoutReservations; }
+	metal_field::Claims& GetMetalClaims() { return metalClaims; }
+	strategic::Ledger& GetPulseClaims() { return pulseClaims; }
+	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
 private:
+	strategic::Ledger pulseClaims, nuclearHistory;
+	allied_layout::Reservations layoutReservations;
+	metal_field::Claims metalClaims;
 	void DelegateAuthority();
 	void ApplyAuthority(CCircuitAI* newOwner);
 

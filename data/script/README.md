@@ -24,6 +24,23 @@ The experimental runtime sequence is:
 
 ## Shared foundation
 
+Experimental AIR uses `roles/air_rules.as` and `roles/air_build.as` over
+`manager/air_layout.as`, `air_economy.as` and `air_production.as`. Its T1-first
+economy, production bays and transport-first factory decisions are independent
+of TECH's controller. `helpers/production_math.as` supplies pure, unit-tested
+throughput, funding and support calculations. Native persistent reservations
+share task/claim/frame machinery without sharing role policy. See
+[AIR management](../../doc/air-management.md) and its simulation evidence.
+
+The optional visual theatre survey lives in `src/manager/water_theatres.as`
+and is called by `src/manager/lanes.as`. It reuses native connected water bodies
+and terrain-manager buildability queries to label ponds, shared seas and
+advisory shipyard/tidal/seaplane sites. It creates no tasks or reservations.
+`src/manager/strategic_sites.as` calculates geo, island and beach advisories.
+The existing `tools/widgets/gui_barb_team_link.lua` renders the results locally
+with player/all/off controls; it can request surveys from any experimental role. See
+[lane and theatre documentation](../../doc/roles/tech-lanes.md).
+
 | Component | Responsibility |
 |---|---|
 | `src/common.as` | Shared initialization data such as armor definitions and categories used by every profile `init.as`. |
@@ -175,3 +192,23 @@ code.
 4. Validate every configured UnitDef against the target BAR version and each factory's actual build options.
 5. Load every profile at least once with Armada, Cortex, and Legion/optional-unit modes relevant to that profile.
 6. Treat AngelScript warnings as failures because the host application compiles with warnings-as-errors.
+
+
+### Metal-field adapter (D-170)
+
+`src/manager/metal_economy.as` is included by setup and dispatches only when
+`aiEconomyMgr.IsMetalMap()` is true. AIR replaces its normal economic task ladder;
+TECH evaluates the adapter at mex.expand while preserving prior lab lifecycle
+rows. Other experimental mobile constructors share the economic chooser. The
+native legacy-profile adapter uses the separate `metal_map` JSON fragment loaded
+by each active profile. See [implementation](../../doc/metal-maps-implementation.md).
+
+
+### Shared metal overflow (D-175)
+
+The shared economy callback calls `TeamEconomy::ShareOverflow` and
+`Invariants::CheckTeamShare` for all six experimental roles. TECH's existing
+`TeamShare*` settings remain the one shared configuration: 95% full, a 20%
+storage budget, five-second interval, and 25-metal minimum gift. Opening
+resources are protected until a completed factory; TECH retains its original
+T1-bot/T2 recovery gate. See [details](../../doc/team-metal-sharing.md).

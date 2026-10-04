@@ -1,0 +1,18 @@
+{
+  "name": "committed-home-incursion",
+  "checks": "air_committed_incursion",
+  "description": "An enemy bomber group appears at home after the offensive escort departs; owned escort count must remain unchanged except deaths",
+  "bomber_only": false,
+  "aircraft": [
+    {"unit":"$t2","count":32,"team":0,"once":true},
+    {"unit":"$fighter2","count":24,"team":0,"once":true},
+    {"unit":"corshad","count":12,"team":1,"position":[2800,11000],"after_seconds":180,"once":true}
+  ],
+  "targets": [
+    {"unit":"armafus","count":1,"position":[10100,1300]},
+    {"unit":"armmmkr","count":4,"position":[10300,1700]},
+    {"unit":"armwin","count":6,"team":0,"position":[2600,11300],"once":true}
+  ],
+  "defenses": [{"unit":"armrl","count":1,"position":[9500,1500]}],
+  "refill_seconds": 30
+}

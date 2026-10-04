@@ -41,6 +41,7 @@ public:
 	}
 
 	float GetWaterDamage() const { return map->GetWaterDamage(); }
+	float GetGravity() const { return map->GetGravity(); }  // D-126: per frame, negative
 	float GetMinWind() const { return map->GetMinWind(); }
 	float GetMaxWind() const { return map->GetMaxWind(); }
 	float GetCurWind() const { return map->GetCurWind(); }

@@ -1,6 +1,73 @@
 # CircuitAI AngelScript Reference
 
+## Amphibious operation queries (D-158)
+
+D-161 adds `aiBattle.GetUnitTerrainRoute(const CCircuitDef@, from, to,
+bool dryOnly, float landCost, float waterCost, float threatWeight,
+float maxWaterThreat)`, returning a new owned waypoint array. It supports
+ground MoveData classes, validates the loaded movement footprint and dry
+slope on land and seabed against fine terrain samples along edges, and forbids any wet footprint
+sample in dry mode. Invalid/unreachable endpoints return an empty array;
+endpoint-to-grid connectors are checked too. Terrain masks refresh every
+sixty seconds; observed threats are current per query. This conservative
+terrain query excludes allied structure footprints per query; the engine still
+resolves mobile traffic and enemy structures.
+Existing class-based lane queries retain their behavior.
+
+`CRouteTask.SetUnitRoute(CCircuitUnit@, const array<AIFloat3>@+, float arrivalRadius)` returns false
+for non-members, null/empty arrays or non-finite coordinates/radius. The
+script-selected member arrival radius is clamped to 16–512 elmos. It copies the
+route and issues it only to that task's assignee. `SetRoute` clears all member
+overrides; removing an assignee erases its override. Arrival, idle and resume
+use the member route. Script owns formation policy and retains stable IDs,
+not borrowed unit pointers. Specialist callers validate terrain before use.
+
+`aiBattle.GetTerrainRoute(from, to, movementClass, landCost, waterCost,
+threatWeight, maxWaterThreat)` returns a fresh `array<AIFloat3>` of grid waypoints,
+or an empty array when either endpoint is invalid or no allowed route exists.
+It never snaps endpoints. The amphibious class uses the observed amphibious
+threat layer; `aiBattle.AmphThreat(pos)` exposes that layer with a floor of one
+inside currently observed underwater-weapon coverage, even when a profile zeros
+that weapon's combat weight. The coverage includes two grid cells of clearance.
+The existing threat maps are unchanged. Queries run on
+the AI thread and should be throttled, not called per unit per frame.
+
+`GetGroundContactCount`, `GetGroundContactPos`, `GetGroundContactCost` and
+`IsGroundContactEconomy` expose per-second value snapshots of current known
+ground contacts. These snapshots include observed units suppressed only by a
+role's target preference, such as TECH's T1-combat ignore flag, while respecting
+hidden/dead/neutral contacts and the game's `ignoredByAI` exclusion.
+Indexes last only until the next update; no enemy pointers
+escape. `CRouteTask.SetHoldPosition(true)` opts into hold-position movement
+during the task so automatic pursuit cannot drag coastal guards underwater;
+removal restores the UnitDef movement policy. Existing route users retain
+their previous behavior.
+
 ## Purpose
+
+### AIR management additions (D-147)
+
+These additions are mechanisms; role thresholds and build order remain script
+policy. Existing APIs retain their behavior.
+
+| API | Contract |
+| --- | --- |
+| `ai.GetOwnedUnitIds()` | New owned array of this AI's IDs, including frames. Resolve each borrowed unit with `GetTeamUnit` at use time; a lost/transferred ID can return null. |
+| `CCircuitDef.GetBuildTime()` | UnitDef build work. |
+| `CCircuitDef.GetExtractsMetal()` | Loaded engine extraction rate; compare with the loaded advanced extractor to classify basic/advanced variants. Read-only observation; no classification policy is changed natively (D-148). |
+| `CCircuitDef.GetBuildSpeed()` | Physical engine worker time, work/second, before JSON `build_speed` tuning. Do not multiply by `SECOND`. |
+| `CCircuitDef.GetBuildDistance()` | Engine build reach in elmos. |
+| `CCircuitDef.GetLosRadius()` | Loaded ground sight radius in elmos; AIR uses it for configurable sight overlap, independently of radar range (D-179). |
+| `aiFactoryMgr.GetPendingRecruitCount(def)` | Live recruit tasks with this definition and no target frame. `def.count` already includes frames; add only this pending count. |
+| `aiTerrainMgr.ReservePersistentBuilding(def, pos, facing)` | Layout-enabled snapped footprint and private zone, retained after completion; negative on failure. Local footprint dimensions are rotated once. |
+| `aiTerrainMgr.ReleasePersistentBuilding(id)` | Release an unused reservation and its private zone, used for rollback. |
+| `aiTerrainMgr.GetReservationState(id)` | -1 absent, 0 free, 1 claimed, 2 frame/consumed, 3 completed owned structure, 4 exhausted/dead slot. |
+| `aiBuilderMgr.experimentalAirDirect` | False by default. When enabled, flying construction uses the engine's final build approach instead of the experimental ground disc. AIR enables/resets it; TECH never opts in. |
+
+Persistent sites use the existing pin, task claim, frame, destruction and native
+serialization machinery. A saved named layout does not imply complete script
+state persistence (KI-209). Check positions against map bounds before grid
+queries such as `IsZoneAlly`; see [AIR management](air-management.md).
 
 This document is the practical reference for writing and maintaining CircuitAI
 AngelScript. It covers:
@@ -64,6 +131,68 @@ the shared manager and role implementation. The legacy `easy`, `medium`,
 mostly on native defaults and JSON configuration.
 
 ## Runtime rules
+
+### Tactical lane survey (D-131)
+
+D-136: `aiBattle.GetLaneRoute(int lane, const AIFloat3& in from, int cls)`
+returns an owned `array<AIFloat3>@` containing a connected approach and every
+lane cell, or an empty array when inaccessible. It never snaps an invalid start
+across a barrier. `CCircuitUnit.GetProducerId()` reads the creation-event builder
+ID, or -1 when unknown (including reconstruction after load).
+`CRouteTask.SetTraversal(bool preserveWaypoints, float arrivalRadius, bool fightAtEnd)`
+keeps intermediate waypoints on refresh; ordinary spam defaults remain unchanged.
+`CRouteTask.SetPatrol(bool enabled)` opts into looping engine patrol orders
+(D-150). It defaults to false. Patrol routes start with a move to the first
+point and queue patrol points after it; script owns geometry and refresh timing.
+
+D-144 adds `aiBattle.RequestLanes(...)` with the same arguments as the
+synchronous call below. It returns true only when a job was admitted; false
+coalesces an already pending request. `IsLanePending()` includes queued and
+running work. `GetLaneRevision()` advances on successful main-thread publication,
+not enqueue. Existing getters keep returning the previous complete result.
+`CancelLaneRequest()` invalidates publication and signals cooperative cancellation;
+the admission slot remains occupied until that worker completes. No callbacks
+enter AngelScript from a worker. `Lanes::Poll()` in all three experimental profile
+updates finalizes teaching/theatre data and increments `Lanes::calcs` once.
+`BeginLanePostprocess()` / `EndLanePostprocess()` time that main-thread phase;
+they do not affect decisions. These methods require the D-144 DLL.
+
+`aiBattle.AnalyseLanes(alternatives, mergeRadius, threatWeight, specialistBias,
+highGroundRise, highGroundDetour, highGroundRoutes)` returns the cached lane
+count. The final four parameters default to `1`, `128`, `3`, `3` in the native
+registration. `GetLaneMask(int)` returns a bit mask using the same class order
+as `GetLaneClass`: land, bot, amphibious, hover, all-terrain, naval, air.
+The mask describes terrain passability of the full representative path, not
+  unit-specific movement or combat safety. Existing length, width, choke,
+  threat, front and point getters operate on this same AI-owned result.
+  D-132 adds `SetCliffDescentParams(int approachClass, float minDrop, float maxRun,
+  float minProgress)` before a survey: class 0/1 selects tank/bot access and other
+  values disable this tactic. `GetLaneDescent(int)` returns its staging point or
+  negative x for an ordinary lane. The mechanism joins the ordinary-class access
+  path to a verified all-terrain descent and retains the complete route in the
+  existing point getters. Script reapplies the parameters on every calculation.
+  D-133 adds `SetMountainPathParams(float gradeWeight, float peakTolerance)`:
+  quadratic grade cost controls smoothness before descent; elevation tolerance
+  selects a band below the component's highest ordinary-class-reachable point.
+  The route now includes a smooth all-terrain traverse between that approach
+  and the final cliff exit. Zero tolerance requires the highest reachable point.
+  D-134 adds `SetCliffPreference(float weight, float qualityTolerance, float
+  heightFraction)`, `GetLaneAscent(int)` (negative x without a paired crossing),
+  and `GetLaneCliffQuality(int lane, int end)` (0=home, 1=enemy, zero if absent).
+  Paired crossings keep the high passage but use steep walker-only legs at both
+  ends. The home leg is reversed to obtain the ascent in this lane's direction;
+  both quality values describe downhill terrain, not actual unit speed/safety.
+  D-135 adds `SetMountainShelfParams(float surfaceWeight, float heightWeight)`.
+  The first weights the mean engine surface slope for all-terrain transit searches,
+  including lateral movement with no route-height change. Intentional short
+  cliff endpoint legs retain the existing cliff-discount cost. The second penalizes
+  dropping below the peak tolerance band during the elevated traverse. Both
+  are nonnegative, finite-clamped policy controls; zero disables each cost.
+  The shelf fallback connects upper-band gates through the high component and
+  its immediately adjacent land cells, retaining short saddle crossings.
+  An elevated two-ended crossing can remain a terrain opportunity without
+  advertising verified steep-cliff gates when the stricter cliff test fails.
+See [lanes](roles/tech-lanes.md) for script policy, widget publication and controls.
 
 ### Compiler configuration
 
@@ -154,6 +283,13 @@ declarations.
 | `Main` | `void AiMessage(const string& in data, int fromTeamId)` | Receive `AiSendMessage` traffic from an allied CircuitAI instance. |
 | `Main` | `void AiUnitFinished(CCircuitUnit@ unit)` | Observe completed friendly units. |
 | `Main` | `void AiUnitDestroyed(CCircuitUnit@ unit)` | Observe destroyed friendly units. |
+| `Main` | `void AiSuperWeaponFired(CCircuitUnit@ unit, const AIFloat3& in aim)` | Optional notification from a confirmed engine weapon-fired event for a unit assigned a native super-weapon task. Aim can be invalid; do not retain the unit handle. |
+
+`CCircuitDef.IsBuildAllowed()` reads the persistent `behaviour/<unit>/build`
+construction permission (default true). A false value overrides `maxThisUnit`
+in `IsAvailable(frame)` and rejects native construction task enqueueing;
+raising a cap cannot undo it. The active profiles veto `armguard`, `corpun`,
+and `legcluster`. This does not delete existing or captured structures.
 
 Minimal profile entry points:
 
@@ -498,6 +634,13 @@ Keep save and load fields in exactly the same order and update both together.
 
 ## Core AI objects
 
+The read-only strategic survey bindings on `ai` include `int GetGeoSpotCount()`
+and `AIFloat3 GetGeoSpot(int)`. They expose the energy manager's existing
+geothermal feature list (filtered for its initial geo definition's terrain
+feasibility), not reservations or a fresh availability check. An invalid index
+returns `(-1,0,-1)`. Geothermal scoring, island topology and beach classification
+live in `src/manager/strategic_sites.as`; LuaUI only renders their output.
+
 ### `CCircuitAI ai`
 
 Read-only properties:
@@ -655,6 +798,9 @@ Type GetType() const;
 array<CCircuitUnit@>@ GetUnits() const;
 void Abort();
 void Done();
+bool IsDead() const;   // D-114: the task ended (a kept handle stays valid, its task may not)
+// CTerrainManager (D-116): bool IsSlotDead(int id) const -- the engine refused the
+// slot three times; it is never served again (its ground stays held)
 ```
 
 `IBuilderTask` extends `IUnitTask`:
@@ -680,11 +826,13 @@ void SetTargetPos(const AIFloat3& in pos);
 ```
 
 `CRouteTask` extends `IFighterTask` (created by `TaskF::Route()`; a
-script-owned waypoint route that issues move orders only, see
+script-owned waypoint route with optional traversal/patrol modes, see
 `doc/spam-routes.md`):
 
 ```angelscript
 void SetRoute(const array<AIFloat3>@ waypoints);
+void SetTraversal(bool preserveWaypoints, float arrivalRadius, bool fightAtEnd);
+void SetPatrol(bool enabled);
 int GetRouteVersion() const;
 uint GetRouteSize() const;
 bool IsAtEnd(CCircuitUnit@ unit) const;
@@ -896,6 +1044,26 @@ int GetEnergyLimit(const CCircuitDef@ def) const;
 
 ### `CAirWaveTask`
 
+D-162 adds opt-in ordinary-aircraft strike controls. Default native tasks
+retain their original behavior. Register signatures:
+
+```angelscript
+void SetFlightPolicy(float width, float rankSpacing, float lossAbort, const AIFloat3& in home);
+void SetAssemblyPolicy(float radius, float assembledFraction, int joinFrames);
+void SetStrikePolicy(CCircuitDef@ bomber, int count, float passFraction, float damageMargin, float threatWeight, float maxThreat);
+void ConsiderStrikeAircraft(CCircuitDef@ bomber); // conservative mixed ordinary payloads
+int GetRequiredBombers() const; // smallest eligible target health requirement
+```
+
+`GetState()` adds 5=RETURNING, preserving previous enum values.
+`CCircuitUnit.SetIdleMode(int)` accepts 0 (fly) or 1 (land), for aircraft only.
+`aiBattle.IsAirContactArmed(index)` and `GetArmedAirCost()` expose unique observed
+armed air; unarmed death explosions do not count as weapons. Flight policy
+includes peaceful economic snapshots, feasible health budgets, formation,
+weapon-release tracking, loss abort and return. See
+[the wave reference](air-wave-attacks.md).
+
+
 A script-planned bomber wave (`doc/air-wave-attacks.md`): made with
 `aiMilitaryMgr.Enqueue(TaskF::Wave())` and reached with
 `cast<CAirWaveTask>(cast<IFighterTask>(t))`.
@@ -1022,6 +1190,7 @@ CCircuitUnit@ aiBuilderMgr.FindReclaimTargetFor(CCircuitUnit@ builder);
 CCircuitUnit@ aiBuilderMgr.FindUnfinishedFor(CCircuitUnit@ builder, const CCircuitDef@ def);
 int aiBuilderMgr.GetUnfinishedCount(const CCircuitDef@ def) const;                 // our structures of def under construction
 CCircuitUnit@ aiBuilderMgr.FindUnfinishedNear(const AIFloat3& in pos, float radius, const CCircuitDef@ def);  // nearest of them within radius
+CCircuitUnit@ aiBuilderMgr.FindProducedNear(const AIFloat3& in pos, float radius);  // D-119: nearest mobile unit of ours still being built (a factory's production; FindUnfinishedNear sees only builder-task structures)
 // GetBuildPowerNear returns workertime units (commander 300, turret 200), not the engine's per-frame figure.
 float aiBuilderMgr.GetStaticBuildPowerNear(const AIFloat3& in pos, float radius) const;  // turrets only, workertime units
 // The experimental build system (D-066): with experimentalBuild on, DefaultMakeTask returns null for this
@@ -1436,3 +1605,166 @@ When changing the script API:
 When changing policy rather than the API, begin with
 `data/script/README.md`. For historical BAR/Recoil compatibility issues and
 known migration risks, also read `data/script/CHANGE_RECOMMENDATIONS.md`.
+
+### Connected mountain lanes (D-145)
+
+`aiBattle.SetSpecialistSpan(float minimum, float fraction)` controls the minimum
+projected distance on a connected elevated component, as an absolute distance
+and a fraction of lane endpoint separation. Both requirements apply. Native
+sanitization clamps minimum to 0..16384 and fraction to 0..1. Defaults are 1024
+elmos and 0.45. `high_ground_rise` supplies the elevation threshold above the
+higher endpoint. A lane must exclude ordinary bots as well.
+
+`aiBattle.IsLaneSpecialist(int lane) const` returns true only for a published
+all-terrain lane that passed this qualification. Invalid indices return false.
+The worker computes the flag from its snapshot; scripts only read published
+results on the main thread. Generic `IsPassable` / connector reachability is
+unchanged. An isolated hill remains reachable without becoming a battle lane.
+
+### D-152 landing search
+
+`aiTerrainMgr.FindSafeDropSpot(cargo, around, radius, surfaceThreat, airThreat)`
+returns the nearest sampled free, reachable, threat-qualified landing position
+or a negative x sentinel. It does not enqueue a command.
+`CFerryTask.SetCargo(id, drop, surfaceThreat = -1, airThreat = -1)` retains the
+legacy unrestricted defaults; ferry policy supplies explicit limits.
+
+### D-153 reservation coordination queries
+
+`aiTerrainMgr.IsReservationBuildable(id)` tests a free, unclaimed slot against
+the current engine footprint and allied plans. `GetGroupActivationState(group)`
+and `GetZoneActivationState(zone)` return -1 absent, 0 clear/unused, 1 blocked
+unused, 2 any claimed/framed/completed member. A started plan must not be moved.
+`GetGroupZone(group)` exposes its first slot's containing zone for compound
+rollback. `ReserveClusterEnvelope(slot, group)` reserves the gaps in the union's
+bounding rectangle. `CanReserveArea(centre, facing, halfAcross, halfAlong)` is a
+side-effect-free whole-rectangle admission test, including bounds and allied
+plans. `IsAllyLayoutBlocked(def, position, facing)` checks a snapped footprint
+against foreign reservations, without changing local marks.
+
+### D-156 current air contacts and interceptor coverage
+
+`aiBattle.GetAirContactCount()`, `GetAirContactPos(index)` and
+`GetAirContactCost(index)` expose value snapshots refreshed once per second
+from non-hidden known aircraft currently in allied radar or LOS. Unknown radar
+blips without a known aircraft definition are excluded. Invalid indexes return
+a negative position or zero cost. This does not expose unseen opponents and
+does not reuse decaying air heat as a live-contact signal. AIR owns grouping,
+friendly-territory classification and response orders in script.
+
+`aiBattle.InterceptorCoverage(def)` returns the largest finite positive
+coverage of the definition's interceptor weapons, or zero. The generated
+weapon mounts/definitions are temporary owned wrappers; no wrapper is retained
+across frames. Missile travel range is not interception coverage.
+
+### D-160 beachhead observation and task transfer
+
+`aiBattle.GetNavalContactCount() const` and
+`AIFloat3 GetNavalContactPos(int) const` expose current observed mobile
+floater/submarine positions over water. The existing once-per-second observed
+contact refresh excludes hidden/unseen contacts; this is not omniscient navy
+tracking. Invalid indexes return a negative-x position.
+
+`int aiBattle.GetAllyAssetCount()` refreshes a value snapshot at most every
+five seconds, from completed immobile allied mexes, production/build-option
+structures and geothermal structures. Call Count before indexing.
+`AIFloat3 GetAllyAssetPos(int) const` and `float GetAllyAssetCost(int) const`
+return copied positions/metal costs, or negative-x/zero for invalid indexes.
+No UnitDef/AllyUnit handle is exported or retained in the snapshot; definitions
+are resolved in the querying AI to survive another AI resigning.
+
+`bool aiMilitaryMgr.TransferUnit(CCircuitUnit@, IUnitTask@)` reassigns an owned
+unit between live tasks of the same military manager. The destination must be
+a fighter task; null, foreign, dead and cross-manager requests return false.
+It delegates removal/start to native AssignTask and does not choose priorities
+or destinations. Arguments remain borrowed; the call returns no new handle.
+Script retains stable member IDs and updates its wave membership on success.
+
+## D-163 AIR mission mechanism
+
+`CAirWaveTask::SetMissionPolicy(float padding, float edgeInset, float unknownReserve, float riskScale, float armyReserve, float localAAReserve, bool synchronize)` opts a wave into padded direct/edge corridor planning and execution. Call after `SetStrikePolicy`, before `PickStrikeTarget`. Preferences: 2 requires mex/wind, 3 ranks static attackers near the current plan aim (ground-front objective), 4 requires peaceful static economy, 0 admits other qualifying statics. `GetRequiredBombers` returns the selected target budget or the smallest evaluated requirement when none fits. Aircraft damage, target health and known threat snapshots are native mechanisms; AIR supplies all coefficients and chooses which preference to try. The script subsequently calls `SetPlan` with the selected aim. No other role opts into this mechanism.
+
+D-163: `CAirWaveTask::ExcludeStrikeRegion(const AIFloat3& in, float)` adds
+one target-selection exclusion to that task (up to eight finite regions).
+Radius and expiry are AIR script policy; no exclusion applies by default.
+
+
+## D-167: compact AIR factory compounds
+
+`aiTerrainMgr.PlanAirFactoryCluster(name, firstFactory, repeatedFactory, nanoDef, origin, facing, count, columns, firstNanos)` atomically plans up to six flying-output factories. It uses actual UnitDef footprints and the shared half-cell/reservation engine. Existing exit lanes, allied reservations, every footprint and support reach are preflighted. Internal ground exit lanes are omitted only in this transaction. Named layout integers `name + ".bay.N.slot"`, `.nano.N`, `.n`, plus `name + ".count"` and `.envelope` expose ordinary persistent reservation IDs to policy. Each building has its own zone, so releasing a pin cannot erase sibling slots. Failed commits release all created pins; successful state uses existing native serialization. The call does not set TECH factory-front/line state. Callers must release an unused prior compound before retrying the same name.
+
+
+## D-170 metal-field economy API
+
+The following methods are registered on `aiEconomyMgr` in EconomyScript.cpp:
+`bool IsMetalMap() const`, `int GetEffectiveUnitLimit() const`,
+`int GetFieldMexCount(const AIFloat3& in, float) const`,
+`float GetFieldYield(const CCircuitDef@, const AIFloat3& in)`, and
+`IUnitTask@+ EnqueueFieldUpgrade(CCircuitUnit@, const AIFloat3& in, float)`.
+The existing `EnqueueMexWithin` dispatches to bounded field search when enabled.
+GetFieldYield returns isolated M/s, zero outside metal mode and -1 when its cell
+budget cannot complete. GetFieldMexCount counts owned units/frames and untargeted
+queued mex orders in the radius. EffectiveUnitLimit returns zero when no owned
+unit can expose the engine limit. Returned task ownership follows the existing
+manager-owned AddRef convention. See [implementation](metal-maps-implementation.md).
+
+
+`aiTerrainMgr.PlanMexCluster(name, mexDef, origin, facing, columns, rows)` is
+metal-mode only. It atomically reserves a snapped dense extraction module,
+using the shared native slot geometry, allied reservation checks and persistent
+layout state. Membership is 1..8 in each dimension. Policy reads `name + ".n"`,
+`.slot.N`, `.zone`, and `.started`; failed commits roll back their slots.
+MetalLayout chooses eight-mex modules, replans blocked unused modules and
+preplans at least forty sites. Extra demand may add further modules.
+
+## D-171 AIR operation and compile tooling API
+
+`CRouteTask.SetAirControl(bool)` opts into equal-route suppression, target identity tracking and empty-group cleanup. `SetAirTarget(int)` replaces repeated intercept-coordinate orders with a persistent enemy ID; -1 resumes the shared route. `aiBattle.GetAirContactId(int)` resolves a current observed contact. Defaults preserve legacy route behavior.
+
+`CAirWaveTask.SetOperationPolicy(bool offensive, int preference, const AIFloat3& assembly, float escortLead, float routeCeiling, float districtRadius)` enables the separate operation state machine. `AllowStrikeDef(CCircuitDef@, float)` supplies script priorities and allowed T3 defense definitions. `AddSearchPoint` supplies enemy-base search anchors. Bomber definitions come from `SetStrikePolicy`/`ConsiderStrikeAircraft`; escorts use the same task but are not counted as bombers. `GetBomberCount` exposes that distinction. `GetDamageDealt` currently reports observed target-health loss, including other attackers, and `GetTargetsDestroyed` counts disappeared target identities; neither is authoritative kill attribution. Use the arena damage observer for that.
+
+For offline type checking, set `CIRCUIT_AS_INTERFACE` to an explicit local output prefix for one engine launch. ScriptManager writes `<prefix>.init.cfg` and `<prefix>.main.cfg` containing declarations/compiler settings, without game state. `tools/compile_script.cpp` compiles a profile against this snapshot without executing policy or global initializers. Regenerate the snapshot after native API changes; an engine run remains necessary to validate initialization and behavior.
+
+
+### AIR cleanup target policy (D-173)
+
+`CAirWaveTask.AddTargetFallback(int preference)` appends a unique fallback
+class to an offensive operation. `SetOperationPolicy` clears this list.
+Classes: 4 other economy/support statics, 3 armed statics, 7 script-allowed
+mobile ground heavies, 0 all remaining statics, 8 remaining surface mobiles.
+No aircraft, hidden contacts or deeply submerged contacts qualify.
+`PickOperationTarget(const AIFloat3& in, float minStaticCost, bool includePrimary = true)`
+tries the primary then each fallback in order and preserves the lowest unmet
+force requirement on failure. `includePrimary=false` lets first-wave planning
+retain its strategic opening-size budget while testing cleanup separately.
+Committed retargeting uses the same operation policy with no minimum cost.
+Defensive operations have no fallback list; existing PickStrikeTarget callers
+retain their original non-operation behavior. No new state is serialized: wave
+objects remain transient under the existing save/load design.
+
+
+### AIR attack handoff policy (D-176)
+
+`CAirWaveTask.SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority,
+float immediateRadius)` configures operation-only handoff. Native defaults are
+false/0/0. Early approach replaces the final travel MOVE with persistent ATTACK
+before arrival, for either offensive or defensive operations. A positive
+priority/radius enables a separate committed-offense interruption for a live,
+stationary, currently LOS-visible allowed definition within the bomber cohort
+centre radius. The configured priority comes from `AllowStrikeDef`; AIR uses
+4 for AFUS and 1,800 elmos. Zero disables the interruption. An already attacked
+qualifying visible target is retained to avoid command churn. No new borrowed
+handles escape the update and no new state is serialized (transient wave
+lifecycle unchanged). See the [plan](air-afus-attack-handoff-plan.md).
+
+
+### Construction turret enemy reclaim (D-184)
+
+`aiFactoryMgr.enemyReclaimEnabled` enables the shared half-second emergency
+response for static construction assistants; defaults from
+`economy.turret_enemy_reclaim` (true). `IUnitTask.IsEnemyReclaim()` identifies
+its NOW-priority temporary task. `aiFactoryMgr.GetEnemyReclaimMisses()` reports
+failed admissions from the latest response pass, for shared INV-128.
+Normal assignments and friendly-reclaim pulls yield to this task; PLAYER
+control remains authoritative. No target pointers are exposed. See
+[behavior and verification](turret-enemy-reclaim.md).

@@ -1,0 +1,17 @@
+{
+  "stop_minute": 4.4,
+  "expect": [
+    {"key":"metadata","pattern":"\\[TacticalGuide\\] PASS AI metadata","scope":"any","by_minute":1},
+    {"key":"north","pattern":"\\[TacticalGuide\\] PASS northern mountain crossing","scope":"any","by_minute":1},
+    {"key":"south","pattern":"\\[TacticalGuide\\] PASS southern mountain crossing","scope":"any","by_minute":1.5},
+    {"key":"freeze","pattern":"\\[TacticalGuide\\] PASS frozen snapshot retained","scope":"any","by_minute":2},
+    {"key":"reroute","pattern":"\\[TacticalThreat\\] PASS reroute around observed AA","scope":"any","by_minute":4.2},
+    {"key":"screenshot","pattern":"\\[Playtest\\] screenshot","scope":"any","by_minute":4.4}
+  ],
+  "forbid": [
+    {"key":"script","pattern":": ERR\\s+:","scope":"any"},
+    {"key":"invariant","pattern":"\\[INVARIANT\\]","scope":"any"},
+    {"key":"ui","pattern":"\\[Tactical(Guide|Threat)\\] FAIL|Error in.*gui_barb_team_link|Removed widget: BARb team link|Failed to load: gui_barb_team_link|Error in.*tactical_.*watch","scope":"any"},
+    {"key":"crash","pattern":"Access violation|SCRIPT CRASH","scope":"any"}
+  ]
+}

@@ -19,6 +19,7 @@
 #include "task/static/WaitTask.h"
 #include "task/static/RepairTask.h"
 #include "task/static/ReclaimTask.h"
+#include "task/static/EnemyReclaimPolicy.h"
 #include "task/static/PatrolTask.h"
 #include "unit/FactoryData.h"
 #include "CircuitAI.h"
@@ -331,6 +332,7 @@ void CFactoryManager::InitHandlers()
 void CFactoryManager::ReadConfig()
 {
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();
+	enemyReclaimEnabled = root["economy"].get("turret_enemy_reclaim", true).asBool();
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
 
 	CMaskHandler& sideMasker = circuit->GetGameAttribute()->GetSideMasker();
@@ -444,6 +446,8 @@ void CFactoryManager::ReadConfig()
 			cdef->SetOnSlow(slowOnOff.asBool());
 		}
 		cdef->SetOn(behaviour.get("on", true).asBool());
+		cdef->SetBuildAllowed(behaviour.get("build", true).asBool());
+		cdef->SetStandoff(std::clamp(behaviour.get("standoff", 0.f).asFloat(), 0.f, 0.95f));
 
 		const Json::Value& reload = behaviour["reload"];
 		if (!reload.isNull()) {
@@ -739,6 +743,8 @@ void CFactoryManager::Init()
 		const int offset = circuit->GetSkirmishAIId() % interval;
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::UpdateIdle, this), interval, offset + 0);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::Update, this), interval, offset + 2);
+		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::UpdateEnemyReclaim, this),
+				FRAMES_PER_SEC / 2, circuit->GetSkirmishAIId() % (FRAMES_PER_SEC / 2));
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -1592,6 +1598,95 @@ IUnitTask* CFactoryManager::CreateAssistTask(CCircuitUnit* unit)
 	}
 
 	return Enqueue(TaskS::Wait(false, FRAMES_PER_SEC * 3));
+}
+
+CEnemyInfo* CFactoryManager::GetReclaimEnemy(CCircuitUnit* turret, int enemyId) const
+{
+	if (turret == nullptr || turret->IsDead() || enemyId < 0) return nullptr;
+	CEnemyInfo* enemy = circuit->GetEnemyInfo(enemyId);
+	if (enemy == nullptr || enemy->GetCircuitDef() == nullptr || enemy->GetUnit() == nullptr) return nullptr;
+	const CEnemyUnit* data = enemy->GetData();
+	Unit* target = enemy->GetUnit();
+	// Role target preferences must not hide an enemy next to a construction turret.
+	// Engine LOS, current allegiance and game-level exclusions still apply.
+	if (!enemy_reclaim::EligibleTarget(enemy->IsInLOS(),
+			target->GetAllyTeam() != circuit->GetAllyTeamId() && !target->IsNeutral(),
+			enemy->GetCircuitDef()->IsReclaimable(), !data->IsDead() && !data->IsDying() && target->GetHealth() > 0.f,
+			target->GetRulesParamFloat("ignoredByAI", 0.f) > 0.f)) return nullptr;
+	const AIFloat3& pos = turret->GetPos(circuit->GetLastFrame());
+	const AIFloat3 targetPos = target->GetPos(); // live visible position, not the slow threat snapshot
+	CCircuitDef* def = turret->GetCircuitDef();
+	const float distance = def->GetDef()->IsBuildRange3D() ? pos.SqDistance(targetPos) : pos.SqDistance2D(targetPos);
+	return enemy_reclaim::InRange(distance, def->GetBuildDistance(), enemy->GetCircuitDef()->GetRadius()) ? enemy : nullptr;
+}
+
+void CFactoryManager::UpdateEnemyReclaim()
+{
+	ZoneScopedN(__PRETTY_FUNCTION__);
+	enemyReclaimMisses = 0;
+	// Snapshot IDs: task removal/assignment dispatches script callbacks.
+	enemyReclaimUnits.clear();
+	enemyReclaimUnits.reserve(assists.size());
+	for (const auto& entry : assists) enemyReclaimUnits.push_back(entry.first->GetId());
+	for (int id : enemyReclaimUnits) {
+		CCircuitUnit* unit = circuit->GetTeamUnit(id);
+		if (unit == nullptr || unit->IsDead() || unit->GetTask() == nullptr) continue;
+		IUnitTask* current = unit->GetTask();
+		CCircuitDef* def = unit->GetCircuitDef();
+		if (!enemy_reclaim::EligibleTurret(def->IsMobile(), def->IsAssist(), def->IsAbleToReclaim(),
+				!unit->GetUnit()->IsBeingBuilt(), current->GetType() == IUnitTask::Type::PLAYER)) continue;
+		CSReclaimTask* active = current->IsEnemyReclaim() ? static_cast<CSReclaimTask*>(current) : nullptr;
+		int targetId = active == nullptr ? -1 : active->GetEnemyId();
+		CEnemyInfo* target = enemyReclaimEnabled ? GetReclaimEnemy(unit, targetId) : nullptr;
+		if (enemyReclaimEnabled && target == nullptr) {
+			const AIFloat3 pos = unit->GetPos(circuit->GetLastFrame());
+			float best = std::numeric_limits<float>::max();
+			// Engine quad-field query includes target model radii and filters LOS.
+			const auto& enemies = circuit->GetCallback()->GetEnemyUnitIdsIn(pos, def->GetBuildDistance(), false);
+			for (int candidate : enemies) {
+				CEnemyInfo* enemy = GetReclaimEnemy(unit, candidate);
+				if (enemy == nullptr) continue;
+				const float distance = pos.SqDistance2D(enemy->GetUnit()->GetPos());
+				if (distance < best || (distance == best && candidate < targetId)) {
+					best = distance; target = enemy; targetId = candidate;
+				}
+			}
+		}
+		if (target == nullptr) {
+			if (active != nullptr) {
+				circuit->LOG("[TurretReclaim] release turret=%i target=%i", id, active->GetEnemyId());
+				DoneTask(active); // returns to ordinary role decisions
+			}
+			continue;
+		}
+		if (active == nullptr) {
+			active = new CSReclaimTask(this, targetId); // ownership transfers to updateTasks
+			updateTasks.push_back(active);
+			TaskAdded(active);
+			unit = circuit->GetTeamUnit(id);
+			if (unit == nullptr || unit->IsDead() || active->IsDead() || unit->GetTask() != current) {
+				if (!active->IsDead()) AbortTask(active);
+				continue;
+			}
+			// Remove the old manager's idle membership as well as its assignment.
+			// TECH recycling can temporarily lend a factory-owned nano to Builder.
+			ITaskModule* oldManager = current->GetManager();
+			current->RemoveAssignee(unit);
+			unit = circuit->GetTeamUnit(id);
+			if (unit == nullptr || unit->IsDead() || active->IsDead()
+				|| unit->GetTask() != oldManager->GetIdleTask()) {
+				if (!active->IsDead()) AbortTask(active);
+				continue;
+			}
+			oldManager->GetIdleTask()->RemoveAssignee(unit);
+			active->AssignTo(unit);
+			active->Start(unit);
+			circuit->LOG("[TurretReclaim] interrupt turret=%i def=%s target=%i", id, def->GetDef()->GetName(), targetId);
+		} else {
+			active->ReclaimEnemy(unit, targetId);
+		}
+		if (unit->GetTask() != active || active->IsDead() || active->GetPriority() != IUnitTask::Priority::NOW) ++enemyReclaimMisses;
+	}
 }
 
 void CFactoryManager::Watchdog()

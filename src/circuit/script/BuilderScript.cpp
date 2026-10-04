@@ -89,10 +89,12 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterObjectMethod("CBuilderManager", "int GetQueuedBuildCount(int, const CCircuitDef@) const", asFUNCTION(CBuilderManager_GetQueuedBuildCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "int dangerHysteresis", asOFFSET(CBuilderManager, dangerHysteresis)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "bool experimentalBuild", asOFFSET(CBuilderManager, experimentalBuild)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "bool experimentalAirDirect", asOFFSET(CBuilderManager, experimentalAirDirect)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindReclaimTargetFor(CCircuitUnit@)", asMETHOD(CBuilderManager, FindReclaimTargetFor), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedFor(CCircuitUnit@, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedFor), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "int GetUnfinishedCount(const CCircuitDef@) const", asMETHOD(CBuilderManager, GetUnfinishedCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedNear(const AIFloat3& in, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedNear), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindProducedNear(const AIFloat3& in, float)", asMETHOD(CBuilderManager, FindProducedNear), asCALL_THISCALL); ASSERT(r >= 0);  // D-119
 	r = engine->RegisterObjectMethod("CBuilderManager", "int CountUnfinishedNear(const AIFloat3& in, float, float, const CCircuitDef@)", asMETHOD(CBuilderManager, CountUnfinishedNear), asCALL_THISCALL); ASSERT(r >= 0);  // D-098
 	r = engine->RegisterObjectMethod("CBuilderManager", "float GetBuildPowerNearExcept(const AIFloat3& in, float, const CCircuitDef@, const CCircuitDef@, const CCircuitUnit@) const", asMETHOD(CBuilderManager, GetBuildPowerNearExcept), asCALL_THISCALL); ASSERT(r >= 0);  // D-105
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindOwnNear(const AIFloat3& in, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindOwnNear), asCALL_THISCALL); ASSERT(r >= 0);  // D-077

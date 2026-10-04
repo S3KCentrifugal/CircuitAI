@@ -31,6 +31,10 @@ CBMexTask::CBMexTask(ITaskModule* mgr, Priority priority,
 		, blockCount(0)
 {
 	SetBuildPos(position);
+	if (spotId == metal_field::SiteTagV1) {
+		if (!manager->GetCircuit()->GetEconomyManager()->ClaimFieldSite(fieldKey, buildDef, buildPos)) fieldKey = 0;
+		ignoreAlly = true; // field service already validates ownership and full footprints
+	}
 	manager->GetCircuit()->GetEconomyManager()->SetOpenMexSpot(spotId, false);
 }
 
@@ -84,8 +88,21 @@ bool CBMexTask::CanAssignTo(CCircuitUnit* unit) const
 	return (guard != nullptr) && !guard->GetAssignees().empty();
 }
 
+void CBMexTask::Stop(bool done)
+{
+	IBuilderTask::Stop(done);
+	if (fieldKey != 0) manager->GetCircuit()->GetEconomyManager()->ReleaseFieldSite(fieldKey);
+	fieldKey = 0;
+}
+
 void CBMexTask::Cancel()
 {
+	if (spotId == metal_field::SiteTagV1) {
+		// Field mexes can own persistent layout pins. The legacy spot-only
+		// cleanup below never returned served/claimed pins after cancellation.
+		IBuilderTask::Cancel();
+		return;
+	}
 	if ((target == nullptr) && geom::is_valid(buildPos)) {
 		CCircuitAI* circuit = manager->GetCircuit();
 		if (spotId >= 0) {  // for broken Load
@@ -114,8 +131,14 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 	}
 	CMetalManager* metalMgr = circuit->GetMetalManager();
 	CEconomyManager* economyMgr = circuit->GetEconomyManager();
-	if (circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
-		if ((State::ENGAGE == state) || metalMgr->IsOpenSpot(spotId)) {  // !isFirstTry
+	if (spotId == metal_field::SiteTagV1 && pinRequired && reservationId < 0) {
+		FindBuildSite(unit, position, 0.f);
+		if (pinFailed || reservationId < 0) { manager->AbortTask(this); return false; }
+	}
+	if (!circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
+        && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+		if ((spotId == metal_field::SiteTagV1) ? economyMgr->OwnsFieldSite(fieldKey)
+			: ((State::ENGAGE == state) || metalMgr->IsOpenSpot(spotId))) {
 			state = State::ENGAGE;  // isFirstTry = false
 //			metalMgr->SetOpenSpot(index, false);
 			TRY_UNIT(circuit, unit,
@@ -126,6 +149,7 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 			economyMgr->SetOpenMexSpot(spotId, true);
 		}
 	} else {
+		if (spotId == metal_field::SiteTagV1) { manager->AbortTask(this); return false; }
 		metalMgr->SetOpenSpot(spotId, true);
 		economyMgr->SetOpenMexSpot(spotId, true);
 		if (!CheckLandBlock(unit)) {
@@ -146,7 +170,7 @@ bool CBMexTask::Reevaluate(CCircuitUnit* unit)
 	if (circuit->IsAllyAware() && !ignoreAlly) {
 		auto closeTask = [this, circuit]() {
 			circuit->GetEconomyManager()->SetOpenMexSpot(spotId, true);
-			spotId = 0;  // prevent spot opening on Cancel
+			spotId = -1;  // no ownership: valid spot zero belongs to someone else
 			manager->AbortTask(this);
 			return false;
 		};
@@ -327,10 +351,15 @@ bool CBMexTask::CheckWaterBlock(CCircuitUnit* unit)
 
 bool CBMexTask::Load(std::istream& is)
 {
-	IBuilderTask::Load(is);
+	const bool baseValid = IBuilderTask::Load(is);
 	SERIALIZE(is, read)
 
 	CCircuitAI* circuit = manager->GetCircuit();
+	if (spotId == metal_field::SiteTagV1) {
+		utils::binary_read(is, fieldKey);
+		ignoreAlly = true;
+		return baseValid && bool(is) && circuit->GetEconomyManager()->ClaimFieldSite(fieldKey, buildDef, buildPos);
+	}
 	if (!circuit->GetMetalManager()->IsSpotValid(spotId, GetPosition())) {
 		spotId = -1;
 #ifdef DEBUG_SAVELOAD
@@ -349,6 +378,7 @@ void CBMexTask::Save(std::ostream& os) const
 {
 	IBuilderTask::Save(os);
 	SERIALIZE(os, write)
+	if (spotId == metal_field::SiteTagV1) utils::binary_write(os, fieldKey);
 #ifdef DEBUG_SAVELOAD
 	manager->GetCircuit()->LOG("%s | spotId=%i", __PRETTY_FUNCTION__, spotId);
 #endif

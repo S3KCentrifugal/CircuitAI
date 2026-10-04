@@ -229,8 +229,15 @@ void IBuilderTask::Update()
 void IBuilderTask::Stop(bool done)
 {
 	IUnitTask::Stop(done);
+	// D-117 crash (owner's game, build101, F25307): IUnitTask::Stop clears
+	// `units`, and unitIt was left on a freed node; a stopped task stays listed
+	// until the update loop drops it, so ForgetUnitEverywhere (a turret dying)
+	// then read and advanced the dangling iterator
+	unitIt = units.end();
 	traveled.clear();
 	executors.clear();
+	engaged.clear();
+	approaching.clear();
 
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	if ((buildDef != nullptr) && !economyMgr->IsIgnorePull(this)) {
@@ -299,6 +306,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		return true;
 	}
 	if (geom::is_valid(buildPos)
+		&& !circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
 		&& circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
@@ -554,7 +562,12 @@ void IBuilderTask::Update(CCircuitUnit* unit)
 			return;
 		}
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
+	// D-114 crash (role-swap playtest, build97, F36014): a unit can be listed by
+	// a task with no travel action (CCircuitUnit::ClearAct on leaving another
+	// task wipes it; a role switch aborts and reassigns many at once). No travel
+	// action: nothing to walk, as FighterTask already assumes.
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
 		UpdatePath(unit);  // Execute(unit) within OnTravelEnd
 	}
 }
@@ -592,6 +605,12 @@ int IBuilderTask::CmdTimeout(int frame) const
 
 bool IBuilderTask::Approach(CCircuitUnit* unit)
 {
+	// Flying builders can stop outside a ground approach disc because altitude
+	// contributes to engine build range. Opt-in lets the engine's build command
+	// choose their final position; existing ground/TECH approach stays unchanged.
+	const auto* builderMgr = dynamic_cast<const CBuilderManager*>(manager);
+	if ((builderMgr != nullptr) && builderMgr->IsExperimentalAirDirect()
+		&& unit->GetCircuitDef()->IsAbleToFly()) return false;
 	CCircuitAI* circuit = manager->GetCircuit();
 	if (!geom::is_valid(GetPosition())) {
 		return false;
@@ -601,8 +620,9 @@ bool IBuilderTask::Approach(CCircuitUnit* unit)
 	if (!geom::is_valid(ap)) {
 		return false;
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
-		unit->GetTravelAct()->StateFinish();
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
+		travelAct->StateFinish();
 	}
 	TRY_UNIT(circuit, unit,
 		unit->CmdMoveTo(ap, 0, INT_MAX);
@@ -640,8 +660,9 @@ bool IBuilderTask::TryEngage(CCircuitUnit* unit)
 			return true;
 		}
 	}
-	if (!unit->GetTravelAct()->IsFinished()) {
-		unit->GetTravelAct()->StateFinish();  // no more waypoints; the engine walks into range
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if ((travelAct != nullptr) && !travelAct->IsFinished()) {
+		travelAct->StateFinish();  // no more waypoints; the engine walks into range
 	}
 	if (!Execute(unit)) {
 		return false;  // no site, fallback or abort: the unit is no longer ours to path
@@ -731,7 +752,7 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 				// the builder off its order (played: the first lab and the opening
 				// solars took minutes whenever energy was empty). The sequence
 				// manages energy itself; a slow build beats an abandoned one.
-				if (!IsExperimental() && unit->GetTravelAct()->IsFinished()) {
+				if (!IsExperimental() && ((unit->GetTravelAct() == nullptr) || unit->GetTravelAct()->IsFinished())) {
 					unit->CmdWait(ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
 							&& (buildType != BuildType::STORE) && (buildType != BuildType::RECLAIM));
 				}
@@ -749,6 +770,18 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	}
 	HideAssignee(unit);
 	IUnitTask* task = manager->MakeTask(unit);
+	// D-114 crash (owner's game, build94, F43291): MakeTask runs the script's
+	// policy for this unit, and a rule can drop THIS task (land.recall aborts a
+	// forward job). The unit is then no longer ours; carrying on used its cleared
+	// travel action in Approach. The unit stays with the idle task, which assigns
+	// it on a later update: assigning it here started the new task at once, whose
+	// own re-evaluation dropped it again, recursing until the stack overflowed
+	// (build96 playtest, F73809, 6066 recalls in one frame).
+	if (IsDead() || (units.find(unit) == units.end())) {
+		ShowAssignee(unit);  // RemoveAssignee hid it again: one Hide stands, as for any unit that left
+		manager->DiscardUnusedTask(task);
+		return false;
+	}
 	ShowAssignee(unit);
 	if ((task != nullptr)
 		&& ((task->GetType() != IUnitTask::Type::BUILDER)
@@ -786,7 +819,9 @@ void IBuilderTask::UpdatePath(CCircuitUnit* unit)
 		|| (geom::is_in_range(basePos, startPos, baseDefRange)
 			&& (geom::is_in_range(basePos, endPos, baseDefRange))))
 	{
-		unit->GetTravelAct()->StateFinish();
+		if (unit->GetTravelAct() != nullptr) {
+			unit->GetTravelAct()->StateFinish();
+		}
 		return;
 	}
 
@@ -810,10 +845,14 @@ void IBuilderTask::ApplyPath(const CQueryPathSingle* query)
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
 
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if (travelAct == nullptr) {
+		return;  // it left the task (or lost its actions) while the path was computed
+	}
 	if (pPath->path.size() > 2) {
-		unit->GetTravelAct()->SetPath(pPath);
+		travelAct->SetPath(pPath);
 	} else {
-		unit->GetTravelAct()->StateFinish();
+		travelAct->StateFinish();
 	}
 }
 
@@ -906,6 +945,16 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 bool IBuilderTask::PinReservation(int id)
 {
 	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
+	// Positional mex construction marks its footprint in the constructor. A
+	// field module transfers that footprint back to its persistent slot before
+	// claiming it; otherwise FindReservedSite drops our own slot as ground taken.
+	if (buildType == BuildType::MEX && target == nullptr
+		&& manager->GetCircuit()->GetEconomyManager()->IsMetalMap()
+		&& terrainMgr->GetReservationState(id) == 0 && geom::is_valid(buildPos)
+		&& buildPos.SqDistance2D(terrainMgr->GetReservationPos(id)) < 1.f) {
+		SetBuildPos(-RgtVector);
+		terrainMgr->RestoreReservation(id);
+	}
 	pinRequired = true;
 	layoutOwned = true;
 	pinnedReservation = id;

@@ -1,0 +1,16 @@
+{
+  "name":"edge-supreme",
+  "map":"Supreme Isthmus v1.7",
+  "checks":"air_edge",
+  "description":"Central AA blocks the direct diagonal; observe the actual bomber flank and distant AFUS handoff",
+  "visibility":"global", "bomber_only":false,
+  "route_probe":{"axis":"z","crossing":6200,"safe_below":4200,"safe_above":8800,"height":7000},
+  "priority_targets":{"armafus":true}, "priority_radius":1800,
+  "aircraft":[{"unit":"$fighter2","count":40,"team":0,"once":true},{"unit":"$t2","count":48,"team":0,"once":true}],
+  "targets":[
+    {"unit":"armmmkr","count":1,"position":[9500,1800],"once":true},
+    {"unit":"armafus","count":1,"position":[10000,1200],"once":true}
+  ],
+  "defenses":[{"unit":"armmercury","count":12,"position":[6400,6000],"once":true}],
+  "refill_seconds":30
+}

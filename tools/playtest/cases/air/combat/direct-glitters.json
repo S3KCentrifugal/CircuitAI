@@ -1,0 +1,88 @@
+{
+  "name": "direct-glitters",
+  "map": "All That Glitters v2.2.3",
+  "checks": "air_direct",
+  "description": "Fully visible clear corridor; targets and their exit path are separated from the bootstrap enemy commander",
+  "visibility": "global",
+  "bomber_only": false,
+  "route_probe": {
+    "axis": "z",
+    "crossing": 5100,
+    "safe_below": 1800,
+    "safe_above": 4700,
+    "height": 6000,
+    "require_flank": false
+  },
+  "priority_targets": {
+    "armafus": true
+  },
+  "priority_radius": 1800,
+  "aircraft": [
+    {
+      "unit": "$fighter2",
+      "count": 40,
+      "team": 0,
+      "once": true
+    },
+    {
+      "unit": "$t2",
+      "count": 48,
+      "team": 0,
+      "once": true
+    }
+  ],
+  "targets": [
+    {
+      "unit": "armmmkr",
+      "count": 1,
+      "position": [
+        4000,
+        6500
+      ],
+      "once": true
+    },
+    {
+      "unit": "armafus",
+      "count": 1,
+      "position": [
+        4000,
+        7400
+      ],
+      "once": true
+    }
+  ],
+  "defenses": [],
+  "sensors": [
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2900,
+        4900
+      ],
+      "once": true
+    },
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3400,
+        5200
+      ],
+      "once": true
+    },
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3900,
+        8900
+      ],
+      "once": true
+    }
+  ],
+  "refill_seconds": 30
+}

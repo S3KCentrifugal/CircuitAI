@@ -5000,6 +5000,13 @@ INV-019 (turret frames within the slots), as amended above.
 [`invariants.as`](../data/script/src/manager/invariants.as),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md).
 
+**D-160 correction (2026-10-01).** The extra INV-018 requirement that a
+completed lab never face away from a later changing front was invalid: a
+standing factory cannot rotate. Compare its saved order facing and retain
+the physical exit-obstruction check. This supersedes only that moving-front
+assertion, not D-098's original placement, reclaim or build-power policy.
+See [D-160 results](telchine-beachhead-results.md).
+
 ## D-099 — Structures fill the ground within reach of a cluster's turrets, then the next cluster; no reservation in a factory's exit
 
 **Date:** 2026-09-23. **Status:** Built (native, script; build56); unit-tested; played on build54 and build55 (small box).
@@ -5680,6 +5687,8 @@ roles are held within 60 s.
 
 ## D-108 — The dedicated air constructors are never interrupted, never capped, and always replaced
 
+*Amended by [D-123](#d-123--an-air-constructor-with-nothing-to-build-builds-defences): with no site in the layout for its structure, a dedicated builder builds defences meanwhile instead of waiting; the role is kept.*
+
 **Date:** 2026-09-24. **Status:** Played (build78; runs `20260924-185830`, no enemy, and `20260924-190045`, tech versus tech; 36 min each, zero bonus, Supreme Isthmus). Advanced fusions: 11 by 33.7 min and 13 by 36.1 min (before: six to seven, the last at about 27 min), one every 60 to 90 s after 25 min; metal +600 and +727, energy +35,200 and +38,000 at 36 min. Both roles taken at 23.8/24.3 and 27.1/27.4 min; five dead slots given up in the first game, none needed in the second; no crash in either. INV-034, INV-035 and INV-036 silent; INV-037 fired once (32.6 min in the first game: ten advanced fusions stood or were building and the next frame came after three minutes).
 
 **Owner's report and rule.** "The tech player does not make more than 6
@@ -6012,6 +6021,2435 @@ AIs' announcements and replies in its log.
 [`widget_link.as`](../data/script/src/manager/widget_link.as),
 [`playtest.py`](../tools/playtest/playtest.py).
 
+## D-114 — Land factories move toward the front in front factory clusters, turrets first
+
+**Date:** 2026-09-25. **Status:** Played. Build93, TECH 1v1, run `20260925-172313` (45 min): every front lab ordered only with its turret block standing, clusters from 32% to 56% toward the front, T2 and T3 clusters planned. Build95, 16 AIs, run `20260925-194132` (45 min, no crash): T1, T2 and T3 clusters built turrets-first (Legion TECH, team 9), one INV-025 (fixed below). Build96, 16 AIs, run `20260925-202445`: the gantry limits held (two gantry clusters in 20 minutes, not four), but the game died at 41 min in a recursion the build94 crash fix had introduced (below); build96 was never released to play. Build97 carries the corrected fix; see the entry's last bullets for its run.
+
+**Owner's rule.** The TECH role (not FRONT/SUPPORT's front tech; the two are
+distinct) moves its land factories gradually toward the front. From +200 metal each
+new land factory stands at least 20% closer to the front, further as needed: the
+first spot that fits a construction turret cluster with the factory. A front factory
+cluster is like a base cluster but holds only construction turrets and one lab: T1
+two turrets, T2 more, T3 more still. The turret cluster is always built first. Flat
+ground where the factory is placeable, away from allied buildings when possible,
+close when necessary. With 3 land factories of any tier, the ones in range of the
+main base's turret cluster are reclaimed and never rebuilt there; their zones become
+economic zones. With no land factory on the map the base may hold one again.
+
+**Decision.** A new module `TechFactories`
+([`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_factories.md`](roles/tech_factories.md)):
+- **Routing.** Every TECH land factory order (the layout's `OrderFactory` and
+  `T2LabTask`, the chain's `gantry`, the legacy lab paths of `tech.as`) passes
+  `TechFactories::Route` first; once the economy is online and a land factory
+  stands, front placement replaces the base's. The D-109 spam labs are the T1
+  clusters (`TechForward::SpamClusters`); D-109's own spam search is gone.
+- **The search.** From `FrontMinShare` (20%) of the way from home toward the front,
+  never behind the furthest cluster yet, up to `FrontMaxShare`, in
+  `FrontShareStep` steps with `FrontLateralTries` side positions. Every spot needs
+  the cluster's ground `FrontMinFlat` flat, the factory reservable and its exit
+  clear; pass 1 also wants a ring of `FrontClearCells` round it `FrontRoomyShare`
+  buildable and the site outside allied zones; pass 2 drops that room.
+- **The block.** T1 2 x 1, T2 2 x 2, T3 3 x 2 turrets directly behind the factory.
+- **Turrets first.** The factory is ordered only once every turret of its block
+  stands finished. The first played run ordered the lab in the same tick as the
+  turrets ("orders corlab for front cluster 1 (its 0 turrets stand)"): the gate only
+  asked whether a slot was free, and claimed slots answer no before any frame
+  exists. A slot the engine refuses (a dead slot) never fills, so after 240 s
+  without turret work the factory goes up behind the turrets that stand, logged.
+- **The base's factories.** Rule `lab.base.reclaim`: with `FrontReclaimAtCount` (3)
+  land factories on the map, a land factory within `FrontBaseRadius` of the base
+  centre is retired and reclaimed (`ReclaimBaseFactory`) and the layout's planned
+  factory footprints there are released to the economy
+  (`ReleaseBaseFactoryGround`). `Route` never sends a land factory to the base while
+  one stands; with none on the map the opening rules place one again.
+
+- **Carrying T2 and T3 clusters.** Rule `lab.front` (after `lab.base.reclaim`):
+  any constructor reaching it rebuilds a standing factory's lost turret, plans a
+  T2 front cluster when no advanced lab stands, and works an open T2 or T3
+  cluster. The first played run of this left the T2 cluster half-built for 7+
+  minutes: its only caller was `lab.t2`, far down the table, which the T2
+  constructors never reached while metal floated.
+- **The advanced lab first (D-102 kept).** Rezoning retires the base's advanced
+  lab too, as the rule asks. After that, and while an advanced lab is only a frame,
+  no T1 front lab is ordered and no new T1 cluster planned; the T2 cluster comes
+  first. Played: 6 INV-025 before this; one more on build95 (a T1 lab ordered
+  while the rezoned advanced lab was being reclaimed), so a retiring advanced lab
+  no longer counts. The cost the owner should know: T2
+  constructor production stops from the rezoning until the front advanced lab
+  stands.
+- **Losses.** A standing factory's lost turret is rebuilt (played: INV-038, a
+  cluster 56% forward lost both turrets). A lost factory is rebuilt at its
+  cluster, its footprint reserved again (played: native had forgotten the
+  reservation and a lab was ordered at (-1, 0)); if the ground is taken the
+  cluster is given up.
+- **Other invariants adjusted.** INV-023 and INV-029 exempt a front lab (it stands
+  at its own block); INV-026 exempts the rezoning; INV-039's T1 clock starts no
+  earlier than the economy online (it fired the tick the economy latched).
+
+- **A crash the rezoning exposed (build93, run `20260925-180954`, F53834).** Access
+  violation in `CIdleTask::Update` (`IdleTask.cpp:64`, symbolised with build93's
+  `.dbg`) in the frame team 1 rezoned its base. The idle task walked its
+  `updateUnits` set with an iterator and called `AssignTask` for each unit;
+  `AssignTask` runs the rule table, and `lab.base.reclaim` re-tasks other idle
+  units (the retired factory, the turrets pulled onto it), whose `RemoveAssignee`
+  erased them from the set under the iterator. The hazard is older (every turret
+  pull could hit it); the rezoning hit it squarely. Fixed in
+  [`IdleTask.cpp`](../src/circuit/task/IdleTask.cpp): the slice is taken out of
+  the set first, and each unit is assigned only while it is still in the idle
+  task (build94).
+
+- **The owner's game crashed on build94 (F43291, TECH as team 10).** Access
+  violation in `IBuilderTask::Approach` (`BuilderTask.cpp:604`, symbolised with
+  build94's `.dbg`; the deployed DLL's md5 matched build94). `lab.front` gave
+  `armck 9237`, a T1 land constructor whose tier was recalled (its air
+  constructors down, D-109), a turret for the T3 cluster. The task's own
+  `Reevaluate` ran the script policy (`MakeTask`); `land.recall` aborted that very
+  task, `lab.front` ordered the same turret again, `Reevaluate` kept "the current
+  task" (the aborted one), and `Update` walked on with the unit's actions cleared.
+  Two fixes: `Reevaluate` stops when the policy dropped its own task (the unit
+  takes what the policy made, or stays idle; build power balanced), in
+  [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp) (build95);
+  and `TechFactories::Work` and `Refill` give no front work to a recalled
+  constructor (`TechForward::Recalled`), so the two rows no longer fight.
+
+- **One factory order per cluster.** The factory's order is kept (a new
+  `IUnitTask.IsDead()` binding checks it before reuse); while it lives a capable
+  builder joins it (at most two), and a new order goes out only once it ended.
+  Played on build95: a T2 lab ordered and not started was re-ordered after
+  120 s, and the new order could not pin the slot the first one still held.
+
+- **The replaced paths' limits kept.** Played on build95 (16 AIs): team 9
+  planned four gantry clusters in 20 minutes; routing had bypassed
+  `EnqueueLandGantry`'s cap (`IsAvailable`) and its cooldown, and `Work` lifted
+  the cap. A new cluster is now planned only when the replaced path would have
+  ordered the factory (`MayPlan`); a gantry's cap is never lifted.
+
+- **The build94 crash fix recursed (build96, F73809).** A recalled T2 land
+  constructor's far mex expansion counted as a forward job: `land.recall`
+  aborted it, `mex.expand` handed out the same mex, and `Reevaluate` (build96)
+  assigned that new task at once; its start re-evaluated, the recall aborted it
+  again, 6066 times in one frame until the stack overflowed and the process died
+  mid-line. Fixed in build97: `Reevaluate` leaves the unit with the idle task
+  (assigned on a later update, never re-entrantly); a mex or mex upgrade is not
+  a forward job; the recall aborts one unit's task at most once per 30 s.
+- **Duplicate advanced lab, a stalled factory order (build96).** With no land
+  factory the base rebuilt its advanced lab (the owner's rule); being a frame, it
+  did not count, and `lab.front` planned a second at the front. Now any advanced
+  lab, a frame included, means none is needed. That front order then never
+  became a frame for 12 minutes while builders cycled round the site (INV-046
+  caught it): a factory order with no frame for `FrontClusterStallSeconds` (300 s)
+  now gives its cluster up and releases the ground.
+- **Dictionary reads.** The new recall throttle, `searchTry` and D-111's
+  `factoryRouteVersion` read their frame values as `int64`, the dictionary's
+  integer type (D-112's attempt counter). Played logs show the `int` reads of the
+  last two worked (one "on repeat" line per spam lab), so this is consistency,
+  not a fix.
+
+**Rejected.** Reusing D-109's row-of-labs search: it anchored a fixed distance
+forward and packed labs beside each other, so it could not honour "the first spot
+20% closer" nor per-tier blocks.
+
+**Invariant.** INV-045 (new): a front cluster's factory frame starts only with its
+whole turret block finished. INV-044 (new): with the count reached, no land factory
+stands at the base for `FrontBaseReclaimSeconds`. INV-046 (new): an open T2 or T3
+cluster has its factory within `FrontClusterOpenSeconds`. INV-038 now covers every
+front cluster, not only the spam labs.
+
+**Not this decision.** INV-004, INV-014 and INV-022 (late-game converter and
+fusion packing, metal floating) fire at similar rates in 2-AI runs from
+2026-09-24, before D-114.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-115 — The host commands the AIs it hosts; camera fly-to; role switches played; crash guards
+
+**Date:** 2026-09-25. **Status:** Played (widget checks and a TECH/AIR swap, build98;
+the owner's switch chain replayed without a crash, build98). Open: the owner's
+build98 crash (below) did not reproduce; build99 adds the reporter that names it
+next time.
+
+**Owner's reports and requests.** The widget's buttons were not clickable in the
+owner's game; a way to fly the camera to an AI's commander (else its nearest
+factory); role swaps tested from 20 minutes into a game, after checking the
+widget works.
+
+**Found.**
+- The owner hosts AI-only games as a spectator (`[player0] spectator=1`), and
+  the widget let only a *player* allied with an AI switch its role (CR-008): for
+  a spectator every role button was drawn grey and registered no click.
+- The role switch itself (`Commands::SwitchRole`) was wired and working; it had
+  simply never been reachable from the owner's seat.
+
+**Decision.**
+- [`gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua): the host
+  commands the AIs it hosts (`Spring.GetAIInfo`'s hosting player is this
+  client): a spectating host every AI, a playing host its allies only (CR-008
+  kept for play). A fly-to button beside the query button, and a double-click on
+  an AI's row, move the camera to that AI's commander, else its factory nearest
+  its start; only when asked. `WG.barblink` exposes the same paths (`SetRole`,
+  `GoTo`, `MayCommand`, `Roster`, `LastReply`).
+- [`role_swap_test.lua`](../tools/playtest/widgets/role_swap_test.lua) drives
+  them in a playtest: the host check and a fly-to check at 2 min, TECH/AIR
+  swaps at 20, 30 and 40 min, and the owner's switch chain (TECH, FRONT, AIR,
+  SEA, FRONT at 8.5 to 18.5 min).
+- **Crash on the first swap (build97, F36014):** `IBuilderTask::Update` used a
+  builder's travel action after `CCircuitUnit::ClearAct` (a unit leaving another
+  task) had wiped it; the switch aborts and reassigns many tasks at once. Every
+  travel-action use in [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp)
+  is guarded now (no travel action: nothing to walk), as `FighterTask` already was.
+- **The owner's crash on build98 (F38302, after one AI was switched TECH, FRONT,
+  AIR, SEA, FRONT):** an access violation inside the script engine (`asBC_FREE`
+  released an object already freed, during `AiMakeTask` from
+  `IBuilderTask::Reevaluate`). The engine's trace names no AI and no script line;
+  replaying the chain did not crash. [`ScriptManager.cpp`](../src/circuit/script/ScriptManager.cpp)
+  now installs a reporter (a Windows vectored exception handler, first in the
+  chain, removed with the last AI): an access violation inside a script call
+  logs `SCRIPT CRASH` with the team and the script call stack before the engine's
+  crash handler runs (build99).
+- **Forward pads:** a pad the ground could not hold was kept empty (build98:
+  groups 123 and 124 with 0 of 4 slots filled `SpamPadsMax`); now released, and
+  retried at most once a minute ([`tech_forward.as`](../data/script/src/roles/tech_forward.as)).
+
+**Played.** Build98, 16 AIs: the spectating host may command all 16; fly-to put
+the camera on team 0's commander (0 elmos) in two runs (a third read 1,846 elmos
+while the window was in use); TECH/AIR swap at 20 min: both "ok", no crash
+(build97 crashed there); a manual switch clicked in the game window completed;
+the owner's chain replayed to 30 min without a crash.
+
+**Invariant.** None in the AI for the widget (host-side LuaUI): the playtest
+driver's `[RoleSwap]` lines are its check (host may command, camera on the
+target, each switch replied "ok"). The crash guards are checked by the swap run.
+
+**Not this decision.** Construction turrets told to "approach" a far site
+(`EXP: approach: armnanotc`, over a thousand a game since 2026-09-24): harmless,
+the engine ignores a move for a static unit.
+
+**Files.** [`gui_barb_team_link.lua`](../tools/widgets/gui_barb_team_link.lua),
+[`role_swap_test.lua`](../tools/playtest/widgets/role_swap_test.lua),
+[`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp),
+[`ScriptManager.cpp`](../src/circuit/script/ScriptManager.cpp),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`playtest README`](../tools/playtest/README.md).
+
+## D-116 — An advanced lab footprint the engine refuses is given up; the T1 lab waits for a real frame
+
+**Date:** 2026-09-26. **Status:** Built (build101), played for regressions; the refused-site path itself not yet met in play. Build100 (the safety nets alone), partly played. The owner's infolog shows the cause. A headless replay on All That Glitters with an Armada TECH on the northern spot (build100, 16 AIs, 14 min) built the advanced lab, and the throwaway T1 lab was retired only once its frame existed (F6661, order at F5745). The harness starts the AI at the map file's spot (4211, 609), not the owner's (4286, 592), so the layout planned the footprint 144 elmos west, at (4056, 1048), and the engine accepted it: the dead-footprint branch itself is not yet played. In play it logs "[Layout] advanced lab's planned footprint ... refused by the engine (a dead slot)".
+
+**Owner's report.** In the owner's game on All That Glitters (build99) the TECH AI
+on one side never built its advanced lab and got stuck; the TECH AI on the other
+side played well.
+
+**Found (the owner's infolog).** Team 2 (Armada, the northern TECH spot):
+- F153: the layout reserved the advanced lab's footprint at (4200, 1048), slot 63;
+- F5335: the engine refused that ground three times ("pinned slot 63 for armalab
+  cannot be served: the engine refuses the ground"); the slot went dead (D-108:
+  never served again, its ground held) and the order was aborted;
+- from F10733, every advanced lab order was pinned to the same dead slot again
+  (`Layout::labSlot` still named it; `GetReservationPos` still answers for a dead
+  slot) and aborted at once: "no atomic factory cluster fits", "aborting armalab
+  task after required slot 63 failed", for 15 minutes (INV-015 every minute);
+- F10743: meanwhile the throwaway T1 lab was retired "because the advanced lab is
+  under way": `TechBuild::IntoT2` counts a queued order, and the order was queued,
+  so team 2 was left with no land factory at all.
+
+Team 3 (Legion, the southern spot) got its advanced lab at F5828 and went on to
+the advanced fusion. Both labs have the same 9 x 9 footprint and slope limit; the
+map is not a perfect mirror.
+
+**Why the ground was refused (probed in a game on the same map).** At (4200, 1048)
+the engine's own test (`Spring.TestBuildOrder`) answers BLOCKED: the footprint's
+ground runs from 167.6 to 328.8, a 161-elmo cliff across its east side, against
+an allowed 17 (`maxHeightDif`). No feature or unit stood on it. The accepted site
+144 elmos west spans 7.9, Legion's 7.1.
+
+**Which logic chose it.** `Layout::ReserveFrontLab` ([`layout.as`](../data/script/src/manager/layout.as))
+slides the advanced lab along the turret box's front edge and takes the
+candidate nearest the home centre that passes `CanReserveBuilding` and
+`IsExitClear`. The box itself is checked for flat ground (`FlatFraction`), the lab
+strip ahead of it is not. And the native reservation checks never asked the
+engine: `CanReserveBuilding` and `ReserveBuildingEx`
+([`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp)) accept a
+footprint on `CanBeBuiltAt`, a sector test (is the footprint's centre sector in
+a usable movement area), plus the AI's own occupancy grid; the footprint's cells,
+their slope and what stands on them are never looked at. The engine's test,
+`IsPossibleToBuildAt`, ran only when a builder was sent to the slot. So any plan
+could reserve ground the engine will never build on.
+
+**Decision.**
+- **The fix at the source:** both native reservation checks (`CanReserveBuilding`,
+  `ReserveBuildingEx`) now also ask the engine (`IsEngineBuildable`, i.e.
+  `IsPossibleToBuildAt`) once the cheaper checks pass, so no plan reserves ground
+  the engine refuses: every reservation path is covered (the front lab, turret
+  grids, the packers, D-114's front clusters). The engine's test fails only for
+  lasting obstacles (slope, water, structures); units standing there and
+  reclaimable features pass. Zone bands and tenant slots, laid over our own
+  structures on purpose, skip it. A refusal logs "RESERVE: refused ... the engine
+  refuses the ground (slope, water or a structure)".
+- **Safety nets**, for ground that becomes unbuildable after it was reserved:
+- New native query `CTerrainManager::IsSlotDead` (script `aiTerrainMgr.IsSlotDead`).
+- [`layout.as`](../data/script/src/manager/layout.as) `T2LabTask`: a planned
+  advanced lab footprint that is dead is given up (logged); the lab goes through
+  the normal placement (the footprint most turret slots reach, else nearest a
+  turret slot). The dead ground stays held, so it is not chosen again.
+- [`tech_build.as`](../data/script/src/roles/tech_build.as): the throwaway T1 lab
+  is retired, and reclaimed, only once the advanced lab has begun: a frame or a
+  finished lab (`T2Begun`), not an order.
+
+**Invariant.** INV-015 (a dear chain order with no frame for 45 s) caught this in
+the owner's game. Build101 on All That Glitters and Supreme Isthmus (16 AIs,
+14 min each): no reservation refused by the engine at plan or build time, no dead
+slot, the same turret boxes and advanced lab sites as build100, no new slow
+calls (the `PackNearGroup` ones predate it).
+
+**Files.** [`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`TerrainManager.h`](../src/circuit/terrain/TerrainManager.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as).
+
+## D-117 — Spam labs stand in rows of up to four, their two turrets bound to them, a T3 lane always open
+
+**Date:** 2026-09-26. **Status:** Played (build103 and later, TECH-vs-TECH). Rows began, each with at least one lane. Rows never grew past one lab: a flush neighbour stands in the lab's blocker yard, fixed in [D-119](#d-119--gantries-get-up-to-50-turrets-tech-caps-t2-constructors-and-fast-assist-bots-at-10-spam-labs-are-never-assisted-one-spread-lane-per-spam-lab). That entry also fixes a lane lost after a failed growth (INV-047) and the turrets that were never bound to their lab (INV-048).
+
+**Owner's rule.** For TECH's late-game T1 spam labs: the construction turrets that
+belong to a spam cluster are forced to assist its factory; exactly two turrets
+per spam lab; labs side by side in rows of up to four where the ground allows,
+each with its own two turrets, often a single lab per cluster; they never cramp
+the ground so far that T3 cannot get through: the largest T3 must be able to go
+from the factories behind these labs to the front line.
+
+**Found.** The turrets were bound only by the first turret row (`turret.spam`):
+before the lab stood they took other work, and the reclaim pull
+(`TurretsOnReclaim`, D-078) took every turret in reach, spam turrets included.
+Each spam lab was placed alone by D-114's search, 2 cells from the next, with no
+thought for passage.
+
+**Decision.**
+- **Bound turrets.** A T1 cluster's turrets are marked `no_disrupt`; native
+  `TurretsOnReclaim` now skips `no_disrupt` units; before their lab exists they
+  wait instead of taking other work; once it stands they guard it (repair it
+  while it is a frame). Exactly two per lab (`FrontT1TurretCols/Rows` 2 x 1).
+- **Rows.** A new T1 cluster first joins an existing spam row at either end
+  (`ExtendRow`), side by side (`FrontRowGapCells` 0), up to `FrontRowMaxLabs` (4);
+  else it starts a row through D-114's search.
+- **T3 lanes.** Beside each end of a row a lane `FrontT3LaneCells` (6) wide, over
+  the cluster's whole depth and the same beyond each end, is held as a corridor
+  (nothing of ours is placed on it) when its ground is passable
+  (`FrontLaneMinFlat` of it flat and free). The largest T3 movement classes
+  (HBOT7, HTANK7: Korgoth, Juggernaut and the like) are 7 map squares, 3.5 cells,
+  wide. A row needs at least one lane: a place with none is refused, and a row
+  grows at an end only while a lane stays open at one end.
+
+- **A crash in the owner's game (build101, F25307).** Construction turrets were
+  dying several per frame; `CCircuitAI::DeleteTeamUnit` asks every task to forget
+  a dead unit (`ForgetUnitEverywhere`, D-108), and `IBuilderTask::ForgetUnit`
+  advanced its update iterator `unitIt` on a freed node (`BuilderTask.h:82`,
+  symbolised with build101's `.dbg`). `IUnitTask::Stop` clears the task's
+  `units`, but `IBuilderTask` kept `unitIt`, and a stopped task stays listed until
+  the update loop drops it. [`BuilderTask.cpp`](../src/circuit/task/builder/BuilderTask.cpp)
+  `Stop` now resets `unitIt` (and clears `engaged` and `approaching`); it is the
+  only saved iterator into a task's unit set (build103).
+
+**Invariant.** INV-047: every spam row holds a T3 lane, and no structure stands
+on a held lane. INV-048: a standing spam lab's turret works for that lab.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp).
+
+## D-118 — The AI draws on the map: an intro, the credits, lettering from BAR's typeface
+
+**Date:** 2026-09-26. **Status:** Played (build105). The owner watched the intro and
+asked for the changes below; the `intro_test` widget counted every drawing
+received by a spectator. Strokes missing on screen are terrain in front of the
+line, not lost messages.
+
+**Current default (2026-09-30).** At the owner's request, automatic match-start
+artwork is disabled with `Commands::IntroEnabled = false` in
+[`commands.as`](../data/script/src/manager/commands.as). The title, Armada
+commander, warning, contributors, glyphs and manual draw commands are retained.
+The existing disabled path still marks the intro complete for lane scheduling.
+This supersedes automatic playback below; it does not remove the drawing system.
+
+**Default-off verification.** Played all three experimental profiles in the
+same isolated Supreme match, one minute, DLL `fcc2c7ea532f9ef3`, run
+`build-theatres/intro-disabled/runs/20260930-204542`. All four AI instances
+initialize; no intro drawing/credits commands, script errors or invariant lines
+occur. The generic smoke report remains FAIL only on its opening-rule log
+expectation despite three completed team-0 mexes (KI-440). Invariant practice,
+diff checks and published script/DLL API parity pass. The existing eight missing
+hover-document links remain KI-404. Matching DLL/symbols/current data are
+published to the required build output; no live game folder is changed.
+
+**Owner's requests.** Draw an Armada commander large in the map's centre, with
+"Do not spec cheat!" beneath it. Keep it 10 s after it is drawn, then erase it.
+Then a contributors list, also held 10 s, then erased. Spectators must see it.
+The text must look stylised and hand-drawn in BAR's typography, not typed pings.
+Draw a little slower, like a hand, and thicker. The list goes top-left in the
+default view, "Contributors" underlined, no border, names without "@".
+
+**Found.**
+- An AI's map lines (`Drawer::AddLine`) are a player's map drawing: allies and
+  spectators see them in the sender's colour.
+- The game server drops a player's map-draw messages once more than 25 arrive
+  under 50 ms apart (`GameServer.cpp`). In play, 80 lines in one frame showed 25.
+- `EraseNear` erases only lines whose start lies within 100 elmos.
+
+**Decision.**
+- A native draw queue ([`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp)):
+  `AiQueueLine` / `AiQueuePoint` / `AiQueueErase`, sent in batches paced by
+  real time (`AiDrawPace`: at most 20 a batch, at least 55 ms apart).
+- Every start is kept, so the erase removes exactly these lines.
+- Lettering comes from Exo 2 Bold, the game's UI typeface.
+  [`tools/draw/make_glyphs.py`](../tools/draw/make_glyphs.py) flattens and
+  simplifies the outlines into
+  [`glyphs.as`](../data/script/src/manager/glyphs.as).
+- Each stroke is drawn twice side by side (bold) with a small repeatable wobble.
+- The intro runs once, from skirmish AI 0 only
+  ([`commands.as`](../data/script/src/manager/commands.as) `IntroTick`):
+  - the title "SMRTBARb", the commander and the warning at a hand's pace
+    (844 strokes in 16 s), then 10 s;
+  - an erase, then the credits at double that pace (16 a batch: 2634 strokes
+    in 11 s, all received by a spectator), then 10 s;
+  - an erase.
+
+**Invariant.** None: drawing changes no game state. The `intro_test` widget
+checks what arrives.
+
+**Files.** [`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`CircuitAI.h`](../src/circuit/CircuitAI.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`commands.as`](../data/script/src/manager/commands.as),
+[`glyphs.as`](../data/script/src/manager/glyphs.as),
+[`make_glyphs.py`](../tools/draw/make_glyphs.py), and the three
+`experimental_*/main.as`.
+
+## D-119 — Gantries get up to 50 turrets; TECH caps T2 constructors and fast assist bots at 10; spam labs are never assisted; one spread lane per spam lab
+
+**Date:** 2026-09-26. **Status:** Played. The work ran on build105 and then
+build106 (`FindProducedNear`), over many TECH-vs-TECH games of 40 to 45
+minutes on Supreme Isthmus, All That Glitters and Glacial Gap. The new
+`unit_census` widget counted live units by type every 5 minutes. The last two
+games (build106, runs `20260926-215715` and `20260926-215641`) finished without
+a crash.
+- **Gantry.** Every gantry cluster reserved the full 10 x 5 block. The gantry
+  was ordered once 10 of its 50 turrets stood; in one game it finished 38 s
+  later. All 50 turret orders were issued.
+- **Caps.** Live counts never passed 10 T2 construction bots or 10 fast assist
+  bots. The advanced labs made fast assault bots instead, up to 93 alive.
+  INV-010 (combat under the gate) did not fire once the advanced lab waited
+  under the gate.
+- **Spam labs.**
+  - INV-049 never fired, so no constructor assisted a spam lab.
+  - Rows grew to 2 and 3 labs, and INV-047 was silent.
+  - Spam production went from 37 units alive at 40 min to 652 at 45 min
+    (Supreme Isthmus) once the labs produced back to back.
+  - Turrets are tasked for their own lab. INV-048 went from dozens a game to
+    one.
+- **Lanes.** 39 to 41 lane assignments a game, 900 elmos apart, centred on the
+  moving front.
+
+**Owner's requests.**
+- The construction turret cluster for gantries holds up to 50 turrets, and they
+  are filled.
+- Late game the T2 labs make too many construction bots and fast assist bots
+  instead of fast assault bots. Cap both at 10 for TECH.
+- Factories assigned as spam never have constructors assisting. The first bot
+  lab is not spam (it is often reclaimed); the late T1 labs are placed for spam.
+- Each forward T1 spam lab correlates to a lane. Lanes have space between them,
+  spread across the active battle front, and run straight to the enemy backline.
+- There are still issues with the forward clusters that place labs.
+
+**Found.**
+- A gantry's block was 3 x 2.
+- The advanced bot lab made T2 constructors up to `T2ConstructorCap` (60, bot
+  and air together). Fast assist bots were capped by income (`5 x income/45`,
+  50 at the start).
+- Three acts put constructors on a spam lab:
+  - `fwd.t1` guarded the nearest spam lab, and repaired "anything unfinished" at
+    a cluster, which includes the units the lab is producing;
+  - `DoTurretFactory` sent any turret to any producing factory in reach;
+  - `guard.factory` and the chain's commander step guarded the primary T1 lab
+    whatever it was.
+- Every spam lab ran lane `n x LaneSpacing` sideways off its own line to the
+  focus, so lanes fanned from each lab rather than spreading across the front.
+- In play, forward clusters had three faults:
+  - **Rows never grew.** The new reason log showed each attempt refused with
+    none of our reservations on the spot. `IsSlotFree` refuses any cell a
+    structure's blocker covers. An Armada T1 bot lab's blocker
+    ([`block_map.json`](../data/config/experimental_hard/block_map.json)
+    `fac_bot`) has a 6-cell yard, 3 cells each side of the footprint. A flush
+    neighbour (`FrontRowGapCells` 0), or one 2 cells away, stood in it.
+  - **A row lost its T3 lane** (INV-047). To try the next place a row lets its
+    end lane go. When the place failed, the lane was held again only if the
+    ground still passed the passability test, and wrecks or units on it since
+    then failed it.
+  - **A front cluster's turrets were never bound to their factory.** The rule
+    `turret.spam` (D-109, D-114, D-117) never fired in any run on record.
+    - Construction turrets are the native factory manager's assistants
+      ([`FactoryManager.cpp`](../src/circuit/module/FactoryManager.cpp)
+      `assistFinishedHandler`). Their tasks come from `Tech_FactoryAiMakeTask`,
+      which fell through to native `CreateAssistTask`: help whatever is under
+      construction in reach, else wait.
+    - The builder rules only see a turret after a native builder task, such as
+      the reclaim pull, has moved it to the builder side. D-117 made spam
+      turrets `no_disrupt`, so they were never pulled and never reached the
+      rules.
+    - A builder task returned for a factory-side unit is refused by
+      `ITaskModule::AssignTask` ("refused task of another manager"), and a
+      turret has no BUILDER role, so `AssignWorkerGuard` refuses it too.
+    - INV-048 was right to fire. It also misread guards: a native guard task
+      keeps its target as an id (`CBGuardTask::vipId`), and
+      `IBuilderTask.target` is null for it.
+  - **Spam labs barely produced.** 6 labs had 37 spam units alive at 40 min,
+    and the census found no T1 lab building at any sample.
+    - D-111 put each spam lab on repeat and answered its later asks with 20 s
+      waits.
+    - Native clears a factory's whole build queue whenever a recruit task
+      finishes (`CRecruitTask::Finish` then `Cancel`). So the repeat queue
+      lasted one unit, and the lab idled until `RepeatStallSeconds` (45)
+      ordered the next.
+
+**Decision.**
+- **Gantry block.** `FrontT3TurretCols/Rows` is 10 x 5.
+  - `Plan` searches with room for the smallest block, then reserves the biggest
+    that fits: 10x5, 8x5, 8x4, 6x4, 6x3, 3x2 (`T3Blocks`).
+  - The gantry is ordered once `FrontT3TurretsFirst` (10) of its turrets stand.
+    A builder that can build it takes that order first.
+  - The turret orders go on until every slot is filled. The standing turrets
+    build the gantry meanwhile, at 200 build power each.
+- **Caps.**
+  - `T2BotConstructorCap` 10 caps the T2 construction bots: the D-103 branch
+    counts only bot constructors for a bot lab, and the unit cap is clamped each
+    economy update. T2 air constructors keep `T2ConstructorCap`, because the
+    dedicated roles need them.
+  - `FastAssistBotCap` 10 clamps the income-scaled cap, and
+    `StartCapFastAssistBots` is now 10.
+  - With both capped, the advanced bot lab falls through to the fast assault
+    rush. Under the combat gate it now waits; before, it fell to native
+    `DefaultMakeTask`, which chose combat (played: Pyros at +91, INV-010).
+- **Spam labs never assisted.**
+  - `TechFactories::IsSpamLab` names a lab as spam when it belongs to a T1
+    front cluster.
+  - `fwd.t1` no longer guards spam labs, and repairs only non-mobile unfinished
+    things at a spam cluster.
+  - `DoTurretFactory`, `GuardFactory` and `CommanderOnFirstConstructor` skip
+    spam labs.
+  - Every guard of a lab passes through `GuardHelpers::AssignWorkerGuard`, so
+    the check sits there: a guard of a spam lab by anything but its own two
+    turrets is refused and logged (INV-049).
+- **Spread lanes** ([`spam.as`](../data/script/src/manager/spam.as)
+  `SetSpreadLanes`, `BuildSpreadRoute`).
+  - The axis runs from our start to the focus, the enemy start the runs end
+    behind.
+  - Each spam lab gets its own lane parallel to the axis, `LaneSpacing` (900)
+    apart. The set is centred on the combat front and shifted to stay on the
+    map.
+  - Labs are sorted by their own sideways place, so routes never cross.
+  - Route: the lab, half way to its lane's front point, the front point, then
+    straight on to `BehindEnemyDistance` past the focus.
+  - `TickSpam` re-spreads when the count of spam labs changes, and every 30 s.
+    Every route refresh reuses the lane.
+- **Rows.**
+  - `FrontRowGapCells` is now 3 (48 elmos): side by side, clear of the
+    neighbour's blocker yard.
+  - A released end lane is put back without the passability test.
+  - A row that cannot grow says why, once a minute.
+- **Turrets bound to their factory.** `Tech_FactoryAiMakeTask` sends a
+  cluster's own turrets to `TurretFocus(u, true)`, which returns factory-side
+  tasks (`TaskS`):
+  - repair the factory while it is a frame;
+  - else repair the unit it is producing (a mobile frame within
+    `LabYardRadius`, 96). This uses the new native `FindProducedNear`
+    (build106), because `FindUnfinishedNear` sees only structures raised by
+    builder tasks;
+  - else wait 2 s.
+
+  A spam lab's turrets wait (5 s) for a lab that is not up yet. A turret on the
+  builder side still gets `turret.spam`'s builder tasks: a non-interruptible
+  guard, enqueued directly.
+- **Spam labs produce back to back.** Repeat is off, and every ask gets the
+  next unit (`Spam::FactoryMakeTask`).
+- **INV-048 reads the focus.** `TurretFocus` records the lab each turret last
+  worked for (`focusOf`) and when (`focusFrame`). A turret works for its lab
+  when its last task was for that lab within `FocusFreshSeconds` (30). A
+  factory-side turret's tasks last seconds (a unit in production, a 2 s wait),
+  so a single sample often finds it idle between two of them.
+
+**Not changed.** On Glacial Gap in a 1v1, TECH's income peaks at +165 with every
+mex upgraded. The rush chain waits for +200 for the rest of the game, which is
+the owner's S5 gate; combat and spam stay locked and the bank sits full. This
+predates D-119 and is left for the owner.
+
+**Invariant.** INV-049: a spam lab is assisted only by its own two turrets
+(checked at the one door every guard passes). INV-028 now counts only T2
+construction bots, up to `T2BotConstructorCap`.
+
+**Files.** [`tech_factories.as`](../data/script/src/roles/tech_factories.as),
+[`tech_forward.as`](../data/script/src/roles/tech_forward.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_chain.as`](../data/script/src/roles/tech_chain.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`spam.as`](../data/script/src/manager/spam.as),
+[`guard_helpers.as`](../data/script/src/helpers/guard_helpers.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`unit_census.lua`](../tools/playtest/widgets/unit_census.lua),
+[`BuilderManager.cpp`](../src/circuit/module/BuilderManager.cpp),
+[`BuilderScript.cpp`](../src/circuit/script/BuilderScript.cpp).
+
+## D-120 — When the planned layout does not fit, TECH still builds; cramped maps get a measured layout choice
+
+**Date:** 2026-09-27. **Status:** Played (build106, Tundra Continents, 16 AIs,
+TECH on the north island). The two fixes are in. The layout choice and the
+harbour layout are a proposal, written in
+[`roles/tech-cramped-maps.md`](roles/tech-cramped-maps.md).
+
+**Owner's request.** TECH works well on flat maps; find a strategy for cramped
+maps such as Tundra Continents. Measure the build area to pick a layout, invent
+one if needed, and move to sea or air where the map calls for it.
+
+**Found.**
+- On Tundra, TECH had 4 units and +8 metal at 30 minutes.
+- The factory pair did not fit the island (`Layout::Plan`), so the fallback
+  switched the reservation registry off ("TECH retains normal placement").
+  Every TECH placement goes through that registry, so every site was refused.
+- With the registry kept on, the start lab still failed: it was ordered on a
+  pinned slot, and with no pair the slot is -1.
+
+**Decision.**
+- The fallback keeps the registry on and skips only the planned pair and turret
+  box ([`layout.as`](../data/script/src/manager/layout.as)).
+- The first lab uses the commander ring search in the fallback too, with any
+  facing, up to `CrampedFirstLabRadius` (800)
+  ([`tech_build.as`](../data/script/src/roles/tech_build.as)).
+- Played after both fixes: a lab, constructors, 33 turbines and +460 energy at
+  22 minutes, but +13 metal. The island has 3 mexes, and converters, the
+  advanced lab and turrets are still placed relative to the pair and box.
+
+**Proposed.** Measure the ground at the start: the largest connected lab patch,
+and floatable water against lab ground. Then pick an open, compact or
+**harbour** layout. The harbour layout keeps labs and advanced fusions on land
+and puts a quay of floating turrets with tidals, floating converters and naval
+fusions on the water. An island TECH fights by air (or by sea when no allied SEA
+role exists).
+
+**Invariant.** INV-050: a factory stands by `FirstFactorySeconds` (300). The
+stall also showed as INV-015 (a dear chain order with no frame).
+
+**Tools.** [`build_area.lua`](../tools/playtest/widgets/build_area.lua) and
+[`build_area.py`](../tools/playtest/build_area.py) survey and measure a map's
+buildable ground.
+
+**Files.** [`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-121 — An island TECH builds its land phase on cramped ground, then moves its economy and production to the water
+
+**Date:** 2026-09-27. **Status:** Played (build108 plus scripts), partly.
+- **Tundra 1v1 (TECH on both islands, 45 min).**
+  - Advanced lab at 3 to 7 min.
+  - Harbour at 15 min, then the hover plant and the advanced shipyard.
+  - The north island ends with 21 floating advanced converters, floating
+    turrets, tidals and a fleet of 66 ships (79k metal).
+  - Metal at 44 min: north +278 (was +8 before D-120, +13 after it), south
+    +400.
+  - No crash; INV-050 and INV-051 silent.
+- **Open 1: the fleets dealt no damage.** In a 1v1 their route leads to the
+  nearest empty start spot: Spam's focus takes every non-allied spot for an
+  enemy.
+- **Open 2: in a full 16-AI game the island TECH died at about 26 minutes,**
+  shelled by enemy fleets before its advanced shipyard stood. It has no sea
+  defence during the land phase.
+- **Land maps unaffected.** Supreme Isthmus had no harbour or cramped line;
+  its advanced lab came at 6.4 min and +500 metal at 30 min, against 34.3 min
+  before.
+
+**Owner's request.**
+- Build the harbour layout for Tundra: start with a bot lab, tech up to the T2
+  lab, upgrade mexes, then get a fusion down.
+- Once two advanced fusions stand, transition to the harbour. Land units can go
+  on building, since they will be isolated, but the priority becomes expanding
+  the sea economy and pumping out sea units.
+- T2 sea units are high priority after the second advanced fusion.
+- Land maps must be unaffected.
+
+**Found while building it** (each played on Tundra, 16 AIs):
+- **Cramped-ground placement, D-120's fallback with no planned pair.**
+  - Economy structures packed within 8 cells of the bare start found no site
+    (T1 converters, 1608 times).
+  - The advanced lab went "on the pair's slot" (-1).
+  - Turrets were never ordered: `NanoTask` and `CanPlaceTurret` required the
+    planned layout.
+  - Native's packed search gave up after the 400 nearest free cells, all
+    slopes on that island.
+- **Reach.** A ridge splits the north island. Lab sites across it were "out of
+  the builder's reach". Once reach was tested, the site near the first lab had
+  often been taken by wind turbines, and a site across the island was refused
+  where raiders stood (native serves a pinned slot only away from threat).
+- **Metal.** The island has 3 mexes. With the flat ground full, T1 converters
+  found no site, and metal stayed at +13 under the advanced lab's +18 gate.
+- **Land constructors cannot build the sea economy.** Tidals, floating
+  converters, naval fusions, floating turrets and the advanced shipyard need
+  construction ships, subs or hover constructors.
+- **The T1 shipyard needs water 30 deep,** further out than a land
+  constructor's reach ("no site for corsy at all ... reach=0"). Native's search
+  for the advanced shipyard also started from the island's middle.
+- **A crash, found in play.** A ring point off the map's edge made the native
+  reach test index a sector out of range. The D-117 crash reporter named it
+  ("SCRIPT CRASH ... Layout::CrampedLabSite").
+
+**Decision.**
+- **Cramped ground** (`Layout::fallback`, only when the planned pair does not
+  fit):
+  - structures are packed within `CrampedPlaceRadius` (640) of the nearest
+    lab;
+  - turrets go near the labs, as many as the income pays for
+    (`CrampedNanoTask`);
+  - the advanced lab's footprint is held beside the first lab when that lab is
+    placed (`ReserveCrampedLabSlot`: cramped ground's version of the pair),
+    else found by a ring search that skips unreachable and off-map points;
+  - INV-017 (flush) does not apply there.
+- **Native (build107, build108).**
+  - `PackNearPoint` tries 2000 candidates, not 400.
+  - The script can ask `CanReachAt(builder, pos, range)` (movement areas, no
+    threat).
+- **The harbour** ([`tech_harbour.as`](../data/script/src/roles/tech_harbour.as),
+  [`tech_harbour.md`](roles/tech_harbour.md)), only on a start the map file
+  flags land-locked:
+  - Before the harbour, the commander puts floating converters on the water
+    while energy floats.
+  - It begins at the second advanced fusion (owner), or 15 minutes in once an
+    advanced lab has stood. On Tundra's north island the second advanced fusion
+    never fits within reach, and raids begin around 17 minutes.
+  - A land constructor builds a **hover plant** on the island. Its hover
+    constructors float out and build the advanced shipyard first, on a site the
+    script picks, then floating turrets, tidals and floating converters.
+  - Construction subs alternate naval fusions and floating advanced
+    converters.
+  - The advanced yard pumps cruisers, missile ships and AA ships whatever the
+    income (INV-010 exempts them).
+  - Land labs make constructors only.
+  - Sea builders keep a construction they hold (`TechBuild::KeepCurrent`).
+    Played: a hover constructor left the ordered yard for a tidal on every
+    re-ask, and neither island's yard was built.
+  - Construction subs add floating advanced converters while energy is over
+    60% of storage, else a naval fusion.
+  - The harbour's unit caps are re-opened after TECH re-applies its limits.
+  - Harbour sea units run the advanced yard's route (Spam's route task).
+- **Land maps.** `Global::Map::LandLocked` is false there, so no harbour code
+  runs, and the cramped paths run only when the planned pair does not fit.
+  Played on Supreme Isthmus: no harbour or cramped line in the log.
+
+**Invariant.** INV-051: the advanced shipyard stands or is framed 480 s after
+the harbour begins.
+
+**Tools.** [`team_stats.lua`](../tools/playtest/widgets/team_stats.lua) and
+[`unit_census.lua`](../tools/playtest/widgets/unit_census.lua) measured each
+run.
+
+**Files.** [`tech_harbour.as`](../data/script/src/roles/tech_harbour.as),
+[`layout.as`](../data/script/src/manager/layout.as),
+[`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as),
+[`TerrainManager.cpp`](../src/circuit/terrain/TerrainManager.cpp),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp).
+
+## D-122 — A ferried constructor is given as soon as the transport has set it down
+
+**Date:** 2026-09-27. **Status:** Played (build109). Two 16-AI games, Supreme
+Isthmus and All That Glitters, 35 min: 18 deliveries. Each unloaded in 2.0 to
+6.5 s, with no unload retry and no failed run, and the gift followed within
+half a second. Before, in the owner's game, one delivery took over 90 s.
+
+**Owner's report.** When TECH delivers a T2 constructor it does not transfer
+the unit right away, and the light transport idles. It transfers eventually,
+but that is time the constructor could spend upgrading mexes.
+
+**Found (the owner's infolog, build106).**
+- The run entered UNLOADING, and 7 s later the cargo was out: "cargo aboard=0",
+  the transport's command queue empty.
+- The run still waited 45 s, retried the unload twice and waited again.
+- `CFerryTask` counted a delivery only when the cargo stood within 1 elmo of
+  the terrain height, or was "not lifted" (under 4 elmos above it) and not
+  aboard. The cargo stood higher than that: a pad or a ramp. Only after the
+  retries did the run end and the script give the unit.
+
+**Decision.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp)
+also counts the cargo as landed when the engine has finished the unload (the
+transport's command queue is empty) and the cargo is not aboard. `IsAboard`
+means risen above where the cargo stood and under the transport (D-110, D-112).
+The empty queue keeps a cargo still attached during the descent from being
+counted, so a unit is never given while it hangs under our transport (D-056).
+The transport heads home at once, and the script gives the unit on its next
+poll.
+
+**Invariant.** INV-052: a run unloads within `FerryUnloadSeconds` (15)
+([`ferry.as`](../data/script/src/manager/ferry.as)).
+
+**Files.** [`FerryTask.cpp`](../src/circuit/task/fighter/FerryTask.cpp),
+[`ferry.as`](../data/script/src/manager/ferry.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-123 — An air constructor with nothing to build builds defences
+
+**Date:** 2026-09-27. **Status:** Built (build110), played. The fallback fires, but INV-053 still reports air constructors left in the engine's idle state after a finished task (142 spells in a Supreme Isthmus game): an open item, the idle re-ask.
+
+**Owner's report and rule.** Scaling worked well, but once 225 advanced energy
+converters were built every air constructor stopped moving. Was the layout
+grid exhausted, with no safe places left? Identify the cause. If air
+constructors ever get stuck or have nothing to do, never let them do nothing:
+always fall back, at the lowest priority, to building defences.
+
+**Found (the owner's infolog, Supreme Isthmus, 35 min, TECH Legion, AI 7).**
+- Yes: the layout was full. From about minute 29 the log says "no room within
+  reach of any turret cluster for legadveconv" and "for legafus" (INV-020, 94
+  s and more), and "advanced fusion set held ahead: no room".
+- The two dedicated builders "wait for legafus: no site in the layout". D-108
+  lets them do nothing else.
+- The other T2 air constructors went to "assist anything under construction".
+  With the layout full, nothing was under construction, and they stood still.
+- The rule table is asked for these units about 40 times a minute until
+  minute 29, and almost never after.
+
+**Decision.** `TechBuild::AirDefence`
+([`tech_build.as`](../data/script/src/roles/tech_build.as)):
+- first, long-range AA and flak at the mex clusters (D-109's `DefendMexes`);
+- else a ring of defences round the base centre, fanned about the direction of
+  the front, `AirDefenceRadius` (900) out and `AirDefenceRingStep` further
+  every `AirDefenceRingSize` places;
+- T2 anti-ground turrets and flak in turn (a T1 air constructor: light lasers
+  and heavy AA), at most `AirDefenceMax` (60) of each of six kinds (T2 turrets, flak, long-range AA, T2 artillery; light lasers and heavy AA for T1 air constructors).
+
+TECH's start caps hold land defences at 0; each one is lifted as it is ordered.
+It runs from:
+- the new lowest row `air.defend`, just above `wait`, for any air
+  constructor;
+- `AirDedicated`, when the layout has no site for the dedicated structure. The
+  role is kept and resumed as soon as a site frees; this amends D-108;
+- the rule evaluator, in place of any wait a row hands an air constructor.
+  Played: the rush chain's "order out" left one idle for 60 s;
+- the rule evaluator, after `AirIdleAsks` (2) asks in a row while the air
+  constructor is idle. Played: `chain.next` and `power.turret` kept handing
+  one a job it never took up.
+
+**Invariant.** INV-053: no T2 air constructor waits or idles at three samples
+in a row, 30 s apart
+([`invariants.as`](../data/script/src/manager/invariants.as)).
+
+**Files.** [`tech_build.as`](../data/script/src/roles/tech_build.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`invariants.as`](../data/script/src/manager/invariants.as),
+[`global.as`](../data/script/src/global.as).
+
+## D-124 — A nuke launch draws a smiley face over its target; the credits show in 5% of games
+
+**Date:** 2026-09-27. **Status:** Built (build111), played. With full map vision from minute 20 (so the silo has a target), a Legion TECH on Supreme Isthmus launched 6 nukes; all 6 were caught by the weapon-fired event and each drew its face (50 lines, screenshots by [`smiley_watch.lua`](../tools/playtest/widgets/smiley_watch.lua)). Without full vision, TECH 1v1 silos often fire nothing: "SUPER legsilo: no target | groups=1 inRange=0", no enemy seen.
+
+**Owner's report (build110).** No smiley was seen. The owner's game ran
+`SMRTBARb\stable\` (build106, `32f6f0ca`, and its older scripts). Build110
+and the current scripts had been copied to `SMRTBARb\` itself, which the engine
+does not load: an AI runs from `AI/Skirmish/<name>/<version>/`. The hook was
+still moved from the stockpile watch to the exact event.
+
+**Owner's request.** Whenever a nuclear missile is launched, the AI draws a
+smiley face on the map over the target. The intro's second screen, the
+contributors, shows only 5% of the time.
+
+**Decision.**
+- **Smiley.** The hook is the engine's weapon-fired event
+  ([`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp), build111). The engine
+  raises it for every shot fired on an attack command, and a nuke silo
+  (`armsilo`, `corsilo`, `legsilo`) fires only on one. The silo's
+  `CSuperTask` then draws over its aim.
+  [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp) keeps build110's
+  stockpile watch as a safety net: a drop in the silo's stockpile draws only
+  if the event has not drawn in the last 5 s, and one launch draws one face. `CCircuitAI::DrawSmiley` then puts a face over the target, `SMILEY_RADIUS`
+  (400 elmos): its outline, two eyes and a smile, about 50 map lines through
+  the paced draw queue of D-118. The target is the attacked unit's position, or
+  the aimed ground. Logged as "NUKE: launched ...". The face stays on the map.
+- **Credits.** [`commands.as`](../data/script/src/manager/commands.as) rolls
+  once a game after the first drawing is erased: under `IntroCreditsPercent`
+  (5) the credits follow, else the intro ends. The roll is logged either way.
+
+**Invariant.** None: drawing changes no game state (as D-118).
+
+**Files.** [`SuperTask.cpp`](../src/circuit/task/static/SuperTask.cpp),
+[`SuperTask.h`](../src/circuit/task/static/SuperTask.h),
+[`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`CircuitAI.h`](../src/circuit/CircuitAI.h),
+[`commands.as`](../data/script/src/manager/commands.as).
+
+## D-125 — TECH weapon clusters: designed, for the owner's review
+
+**Date:** 2026-09-27. **Status:** built as [D-126](#d-126--tech-weapon-clusters-built-found-at-strategic-defence-points-gated-by-income-configured-in-json).
+
+**Owner's request.** A new cluster type, weapon clusters, like the economy and
+factory clusters, for TECH only.
+- A more advanced selection, from battlefield tactics: where flak and
+  long-range AA help, where long-range artillery and LRPCs go, counting the
+  range altitude adds.
+- A super-cannon cluster (Calamity, Starfall) that follows the enemy's
+  composition and behaviour, 20% to 40% behind the front, safe, preferring
+  altitude.
+- Front clusters keep friendly movement open, and obstruct, endanger and funnel
+  the enemy's: spam turrets and high-DPS long-range weapons, and walls round
+  whatever fires over them.
+- At least 4 construction turrets per cluster.
+- No strategically important defensive capability depends on one structure,
+  position, weapon class, radar or line.
+
+**Found (research).**
+- Height: an LRPC gains 2.5 to 4 elmos of range per elmo of height (BAR sets
+  `heightboostfactor` 6 to 8 on them), an ordinary cannon 0.4 to 0.8, a super
+  cannon little; beam turrets lose range on hills. Formulas and tables:
+  rjm.bar.docs `60-tactics/66-defensive-placement.md`.
+- LRPCs, super cannons, flak, long-range AA, silos and anti-nukes fire through
+  friendly units; smart artillery lobs over blocks. All can be walled in
+  fully. Direct-fire turrets cannot.
+- The native AI has threat and influence maps, enemy groups with role costs,
+  a path finder and bwem chokepoints, none of them bound to the script; its
+  own wall and choke code is commented out.
+
+**Decision.** The design in
+[`tech-weapon-clusters.md`](roles/tech-weapon-clusters.md):
+- a native battlefield-analysis layer: avenues of approach from path
+  density, chokes, friendly lanes, effective range with height, line of
+  fire, composition and decaying heatmaps;
+- five cluster kinds: kill zone, air defence, artillery, long-range, super
+  cannon;
+- a need score per kind from composition and behaviour;
+- site scoring per kind; walls and funnels; seven redundancy rules as
+  invariants;
+- coasts and beaches (owner's follow-up): a depth grid, water bodies,
+  beach segments and landing routes; beach classes (cliff, wading shelf,
+  ship water, deep water, hover beach); a hard torpedo rule (15 deep, in a
+  hostile submarine body, no sandbar in the line of fire; the engine
+  allows 12, a submarine needs 15); layers from the sea to the beach's
+  emergence band;
+- the super-cannon cluster (owner's rules): 20% to 40% of its range back
+  from an active combat zone; every air constructor on it the moment it is
+  framed; metal income +500 to start, ideally +1000; its escort of two
+  advanced energy storages, dense forward flak, long-range AA, two plasma
+  deflectors and anti-nuke, with a full wall ring. Found: the engine fires a
+  salvo only with its whole cost in storage, and a Starfall salvo is
+  360,000 energy, so a Starfall needs about 7 storages, not 2. Owner:
+  meet its energy requirement, whatever it is; the percentage is of the
+  cannon's range. Storage is sized from the weapon's shot cost;
+- seven phases, each its own decision.
+
+**Invariant.** None yet: nothing is built. The design proposes seven
+(section 6), each shipped with its phase.
+
+Awaiting the owner's answers on the 20% to 40% reading, the weapon budget, and
+where to start.
+
+## D-126 — TECH weapon clusters: built, found at strategic defence points, gated by income, configured in JSON
+
+**Date:** 2026-09-28. **Status:** Built (build112 to build114; md5 of build114 `d25051e1`), played in five TECH vs TECH games on Supreme Isthmus, fast-forwarded (up to 60 minutes). Clusters are found from about minute 20 (+200 metal). In the last run: 155 and 206 weapon orders, and the flat-ground range check matched every gun's listed range within 2 elmos. None of INV-054 or INV-057 to INV-061 fired once the super cluster kept its point. Open: no super cannon was framed in the runs after that fix (+500 metal and 25,000 E/s spare came late or not at all), so INV-057 and INV-058 still wait for a played frame; kill zones fill slowly (11 of 47 slots at 40 minutes) and some slots at the base find no site.
+
+**Owner's request.** Make the economic settings configurable in JSON and in the
+TECH role. Weapon cluster types are income gated, prioritised by strategic
+defence points, and discovered and re-prioritised as the game progresses.
+Build all the weapon types and the criteria for their locations, terrain
+analysis included. No weapon cluster before +200 metal. The system runs under
+the experimental settings, for TECH only, and may later serve other roles.
+
+**Decision.** Built as designed in D-125
+([`tech-weapon-clusters.md`](roles/tech-weapon-clusters.md)); what is built is
+in [`tech_weapons.md`](roles/tech_weapons.md).
+- **Native analysis** (`aiBattle`,
+  [`BattleAnalysis.cpp`](../src/circuit/terrain/BattleAnalysis.cpp)). Queries
+  only:
+  - effective range with height (the engine's formulas, the unit's
+    longest-range weapon);
+  - approach routes and chokes on the engine's own passability;
+  - decaying combat and air heat, and enemy composition by movement class;
+  - water bodies, hostile water, beach classes, and the torpedo rule.
+- **Script** ([`tech_weapons.as`](../data/script/src/roles/tech_weapons.as)):
+  - six kinds (kill zone, air defence, artillery, long range, super cannon,
+    coast), found again and re-ranked every 60 s by need x site score;
+  - slots shaped per kind: first weapon, 4 construction turrets, the rest,
+    walls last;
+  - a budget of 25% of income (40% under attack);
+  - the owner's super-cannon rules.
+- **Settings.** In `Global::RoleSettings::Tech`, overridden by
+  [`data/config/weapons.json`](../data/config/weapons.json) (a new config part
+  in every profile). The script reads the JSON through
+  `aiSetupMgr.ConfigFloat/Int/Bool`, and the config's `weapons` and `lanes`
+  sections are kept past the engine's config close.
+- **Gate.** `WeaponClustersEnabled` and `ExperimentalBuild`, from +200 metal;
+  rows `weapons.super` and `weapons.cluster` in TECH's table only.
+
+**Found in play (Supreme Isthmus, TECH vs TECH, build112 to build114).**
+- `out` is reserved in AngelScript, and the script has no `max`/`min`; a Windows
+  macro named `near` broke two C++ names.
+- The JSON was freed before the script read it (a crash in `LoadSettings`).
+- A raid on the base made the base the combat zone, and the LRPC site went
+  behind it to the map edge. Fighting within `WeaponBaseRadius` is now base
+  defence.
+- The Starfall's recorded weapon is a short auxiliary mount: its reach read 1
+  to 4. The analysis uses the longest-range weapon.
+- A framed Ragnarok's cluster went stale when the combat zone moved, and its
+  air builders left (INV-057, 238 times). A cluster with anything framed or
+  standing now keeps its point.
+
+**Invariants.** INV-054, INV-057, INV-058, INV-059, INV-060, INV-061.
+
+**Files.** [`BattleAnalysis.cpp`](../src/circuit/terrain/BattleAnalysis.cpp),
+[`BattleAnalysis.h`](../src/circuit/terrain/BattleAnalysis.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`CircuitAI.cpp`](../src/circuit/CircuitAI.cpp),
+[`SetupManager.cpp`](../src/circuit/setup/SetupManager.cpp),
+[`ThreatMap.cpp`](../src/circuit/map/ThreatMap.cpp),
+[`tech_weapons.as`](../data/script/src/roles/tech_weapons.as),
+[`tech_rules.as`](../data/script/src/roles/tech_rules.as),
+[`tech.as`](../data/script/src/roles/tech.as),
+[`global.as`](../data/script/src/global.as),
+[`weapons.json`](../data/config/weapons.json), the profiles' `init.as`.
+
+## D-127 — Lanes between both teams' starts, per movement class, drawn after the intro, recalculated as the front moves
+
+**Date:** 2026-09-28. **Status:** Built (build113, build114), played. Five lanes a side on Supreme Isthmus (2 land, 2 naval, 1 air), drawn after the intro, shown 30 s, erased; recalculated on the front moving. Open: the front flips between the combat heat and the fallback front as heat comes and goes, so lanes recalculate every minute (throttled by `LaneRecalcMinSeconds`); TECH's attack code does not follow lanes yet.
+
+**Owner's request.**
+- Lanes are calculated first, at game start, from both teams' start positions.
+- They are drawn with symbols that tell naval, air (edging round AA),
+  all-terrain (often edge lanes) and land lanes apart, for 30 s after the
+  first intro drawing.
+- They are cached and recalculated as the front shifts, and TECH plans attacks
+  on them.
+- They run under the experimental settings, for TECH, maybe other roles later.
+- Research the meta for how lanes are identified.
+- Separately: speed games up with the set-speed command, slowing down near what
+  a test watches.
+
+**Decision.** [`tech-lanes.md`](roles/tech-lanes.md).
+- **Classes.** Land, bot, amphibious, hover, all-terrain, naval, air, least
+  capable first. Passability is the engine's slope map against each BAR
+  movedef class's `maxslope` and depth
+  ([`BattleLanes.cpp`](../src/circuit/terrain/BattleLanes.cpp)).
+- **Paths.** Diverse paths by penalty, merged within a domain, so an
+  all-terrain lane is one only spiders take.
+- **Ends.**
+  - The start script's playing teams: an AI or a non-spectator player on the
+    team; the spectating host's team at (64, 64) was a false start, and is what
+    an earlier nuke hit.
+  - Else the enemy's start boxes, else every spot not ours.
+  - Naval ends: every sea near a start.
+- **Drawing.**
+  - A symbol per class (tank, walker, chevron over a wave, hovercraft, spider,
+    anchor, plane) and each lane's name in BAR's typeface. The glyph table
+    gained the letters and digits.
+  - Skirmish AI 0 marks the intro's end for every AI (one library).
+  - Each TECH draws 2 s after the one before, at the intro's pace: two AIs
+    drawing at once lost half their strokes to the server's rate.
+  - Shown 30 s, then erased.
+- **Recalculation.** When the front moves 1000, or every 180 s, weighing enemy
+  threat (air lanes: enemy AA).
+- **Attack plan.** `Lanes::BestLane` and `Waypoints`, logged each
+  calculation. TECH's attack code adopting them is the next step.
+- **Settings.** [`lanes.json`](../data/config/lanes.json) and
+  `Global::RoleSettings::Tech` "LANES".
+- **Playtests.**
+  - `--speed-plan "minute:speed,..."` and `--slow-near-shots`
+    (`playtest_camera.lua`).
+  - The engine keeps max speed at or above min, so a slow-down sets min first.
+
+**Invariant.** None: lanes order nothing and change no game state.
+
+**Files.** [`BattleLanes.cpp`](../src/circuit/terrain/BattleLanes.cpp),
+[`BattleAnalysis.h`](../src/circuit/terrain/BattleAnalysis.h),
+[`SetupManager.cpp`](../src/circuit/setup/SetupManager.cpp),
+[`SetupData.h`](../src/circuit/setup/SetupData.h),
+[`InitScript.cpp`](../src/circuit/script/InitScript.cpp),
+[`lanes.as`](../data/script/src/manager/lanes.as),
+[`commands.as`](../data/script/src/manager/commands.as),
+[`glyphs.as`](../data/script/src/manager/glyphs.as),
+[`make_glyphs.py`](../tools/draw/make_glyphs.py),
+[`lanes.json`](../data/config/lanes.json),
+[`playtest.py`](../tools/playtest/playtest.py),
+[`playtest_camera.lua`](../tools/playtest/widgets/playtest_camera.lua).
+
+## D-128 — Water theatres and a read-only lane overlay
+
+**Date:** 2026-09-28. **Status:** Played; final Supreme Isthmus overlay check passed. Separate-widget and automatic-display decisions superseded by D-129 below.
+
+**Request.** Identify Supreme Isthmus's two isolated ponds and two seas
+programmatically, improve lane symbols, and mark useful shipyard, tidal and
+seaplane opportunities without changing placement.
+
+**Decision.** Reuse `CBattleAnalysis::WaterBody` (conservative 64-elmo,
+8-deep connected cells, sourced from the terrain manager), then classify size
+and shore affiliation in AngelScript. Affiliation uses proximity to both sides'
+actual starts, with a neutral margin; it is an estimate, not military control.
+Only a large body reaching both sides can receive a shipyard candidate. Friendly
+isolated ponds can receive tidal/seaplane candidates. All markers pass the
+existing terrain manager's single-site `BuildableFraction` query. The
+shipyard additionally needs a same-body exit corridor. Settings stay in JSON.
+
+**Visuals.** A companion LuaUI widget consumes a versioned, acknowledged local
+message stream. It draws coloured, outlined lanes and screen-size symbols,
+including naval lines above water. One AI perspective avoids duplicate labels.
+It chains the prior UI message callback, preserves the 30-second initial view,
+and provides `/barbtheatres` for the cached survey. Without the widget, the
+existing map strokes remain. No live-install files are written.
+
+**Alternatives rejected.** Map-specific pond coordinates; classifying navy by
+water area alone; rewriting native placement or movement-area heuristics; and
+forcing colour/above-water graphics through the engine's monochrome map-draw
+messages. None is necessary for this advisory visualisation. Native flood fill,
+lane paths, factory selection, reservations and task queues remain unchanged.
+
+**Invariant.** The theatre survey is read-only: no Enqueue, Reserve, Release,
+unit-cap or placement-setting calls. The map-specific integration check forbids
+a pond shipyard and script/invariant errors. No gameplay invariant is added
+because this visualisation changes no gameplay state.
+
+**Verification.** API parity: 210 used members, zero findings against pinned
+build114 (`c6057cbd60efaf8d`). Initial live survey found two ponds and two seas
+for both TECH sides, two feasible shipyard candidates each, and tidal/seaplane
+opportunities only in each side's own pond (map tidal 21 E/s). Final isolated
+run `C:/bardev/barb-playtest-theatres-codex/runs/20260928-134645/report.md`
+passed at 4.1 game minutes: five lanes, two ponds/two seas, no pond shipyards,
+friendly pond opportunities, team-link callback coexistence, automatic expiry,
+cached toggle and refresh without reopening. No script or invariant errors.
+Overview and pond-detail screenshots were visually inspected. Invariant practice
+check passes; doc links retain eight existing missing-hover-document references
+(KI-404). An earlier run raised a frameless Legion lab order (INV-015), recorded
+as KI-420; it did not recur in the final run and no gameplay fix was attempted.
+Resolution, start-distance affiliation and bounded candidate search limits are
+detailed in the role document.
+
+**Files.** [water_theatres.as](../data/script/src/manager/water_theatres.as),
+[lanes.as](../data/script/src/manager/lanes.as),
+[lanes.json](../data/config/lanes.json),
+[gui_barb_team_link.lua](../tools/widgets/gui_barb_team_link.lua),
+[theatres_supreme.json](../tools/playtest/checks/shared/terrain/theatres_supreme.json),
+[theatres_watch.lua](../tools/playtest/widgets/theatres_watch.lua),
+[tech-lanes.md](roles/tech-lanes.md),
+[script README](../data/script/README.md), [AGENTS.md](../AGENTS.md),
+[known issues](known-issues.md).
+
+## D-129 — Strategic surveys in the BARb control panel
+
+**Date:** 2026-09-28. **Status:** Built and Played; integrated-panel and four-player origin checks passed.
+
+**Request and decision.** Replace D-128's separate widget with one integrated
+renderer inside the existing BARb control widget. The panel offers selected
+player, all permitted local AIs, and immediate hide. A single-player view follows
+row selection. Default visibility is off, manual visibility persists, and
+recalculation cannot reopen a hidden view. Remove the old automatic lane strokes
+and the standalone theatre widget. The existing versioned channel is dispatched
+by the control widget, including returning acknowledgements through its LuaUI hook.
+
+**Invariant.** The renderer never computes strategic locations or changes construction; hidden surveys remain hidden when refreshed. The panel and multiplayer fixtures enforce this UI contract alongside the existing gameplay invariant checks.
+
+**AI ownership.** Reuse the native energy manager's filtered geothermal feature
+list through two read-only bindings. AngelScript scores enemy-facing terrain
+visibility using the actual Cerberus range, and proximity to land lanes; a
+conservative threshold distinguishes battery opportunities from power preferences.
+The line-of-fire test is straight terrain screening, not ballistic proof. This
+is a site assessment even when the inspecting faction cannot build Cerberus.
+Terrain flood fill identifies isolated land components, and joined shoreline
+edges screened for grade produce continuous defend/assault beach fronts. All
+coordinates, classifications and scores originate in CircuitAI/AngelScript.
+Lua only projects and draws, with compact geo/island diamonds, hover detail,
+stretched beach ribbons and player colours/offsets in all-player view.
+
+**Alternatives rejected.** Widget-side feature scanning or strategic heuristics;
+map-specific geo/island coordinates; treating an enemy-side geo as equally useful
+after capture; automatically changing build placement. Start-based affiliation,
+conservative visibility and isolated dry-land topology are explicitly advisory:
+they do not establish ownership, ballistic clearance, resource yield, buildable
+landing footprints or time-to-capture. No placement, reservations, construction
+orders or role policy is changed by the survey. The command also works on demand
+for non-TECH experimental roles. Lane origins use the requesting AI player's
+start; territory classification continues to use all allied starts, so selecting
+a player does not misclassify an ally's rear water as hostile.
+
+**Verification.** Native target BARb builds; stripped DLL `31153b61d5698386`
+has matching debug symbols. API check: 214 members, zero findings. Invariant
+practice check: zero findings. First four-minute panel run `20260928-155228`
+passed player selection, switch, all, off, persistence and topology checks.
+Six geos, 23 islands and eight beach fronts were calculated. The central geo
+at (5430,7188) scores 90% forward visibility from player 0 versus 42% at
+(6900,5070); player 1 reverses the advantage (28% versus 90%). Final panel run
+`C:/bardev/barb-playtest-theatres-panel/runs/20260928-160012/report.md` passed
+4.1 game minutes, including an AIR role request and refresh while hidden. Its
+single/all-player screenshots were inspected. After changing lane origins to
+the individual player, the four-AI TECH/AIR test
+`C:/bardev/barb-playtest-theatres-multi/runs/20260928-164931/report.md` passed:
+all four surveys arrived and every air lane started within one 128-elmo sample
+of its own player's start. Neither final run raised script or invariant errors.
+Doc links retain the eight pre-existing missing-hover-document links (KI-404).
+No live-install writes. The paired DLL/debug build is under ignored
+`build-theatres/`; deploy the new DLL, data and control widget together.
+
+**Files.** [native bindings](../src/circuit/script/InitScript.cpp),
+[strategic sites](../data/script/src/manager/strategic_sites.as),
+[lanes](../data/script/src/manager/lanes.as),
+[commands](../data/script/src/manager/commands.as),
+[settings](../data/config/lanes.json),
+[control widget](../tools/widgets/gui_barb_team_link.lua),
+[watcher](../tools/playtest/widgets/theatres_watch.lua),
+[checks](../tools/playtest/checks/shared/terrain/theatres_supreme.json),
+[multiplayer watcher](../tools/playtest/widgets/theatres_multi_watch.lua),
+[multiplayer checks](../tools/playtest/checks/shared/terrain/theatres_multi.json),
+[lane documentation](roles/tech-lanes.md),
+[script README](../data/script/README.md),
+[API reference](angelscript-references.md), [repository map](../AGENTS.md),
+[build-output ignore](../.gitignore).
+The D-128 standalone `tools/widgets/gui_barb_theatres.lua` was removed.
+
+## D-130 — Report missing lane replies and ship matching AI data
+
+**Date:** 2026-09-28. **Status:** Mouse controls Played; owner installation pending.
+
+**Finding.** The user's installed control widget matches the repository, but
+the installed SMRTBARb command handler has no `theatres` branch and the DLL is
+missing 59 current bindings. D-129's playtests used a matched build; their
+action-level tests did not exercise mouse press/release. Do not misdiagnose
+this as a button callback defect or copy only new scripts over an old DLL.
+
+**Decision.** Track lane requests with a five-second wall-clock deadline and
+show an actionable panel/event message if no survey arrives. Also explain
+when a selected AI is not hosted locally. Expose read-only button rectangles
+for the regression watcher, which now calls the actual widget MousePress and
+MouseRelease methods for player/all/off. Prepare a matched, checksummed update
+under ignored `build-theatres/release`, including an owner-run installer that
+refuses running games, backs up the existing AI and preserves its identity.
+No live game files are changed. KI-421 tracks pending owner deployment.
+
+**Invariant.** A lane request must produce a survey or visible failure feedback;
+mouse-button tests must traverse press/release rather than call SetTheatres.
+This is UI state, not a gameplay invariant; the integration fixture retains its
+existing `[INVARIANT]` forbid and `[TheatresCheck] FAIL` checks.
+
+**Verification.** Current API parity: 214 members, zero findings against
+`31153b61d5698386`. Run `20260928-180042` in
+`C:/bardev/barb-playtest-theatres-click/runs/` passed actual MousePress/MouseRelease
+checks for player/all/off, with survey received at frame 1140. It also passed
+switch, AIR survey, visibility persistence and hidden refresh checks. The overall
+run FAILED because the existing INV-015 frameless order issue (KI-420) recurred;
+no script or overlay failures. The first watcher attempt called an unavailable
+widget-handler wrapper method; it was corrected to delegate mouse events through
+WG to the real widget methods. Timeout feedback is code-reviewed, not exercised
+against the live mismatched AI. Installer parses without errors; package checksums
+cover 228 files. The installer has not been run against the owner's game.
+
+**Files.** [control widget](../tools/widgets/gui_barb_team_link.lua),
+[click watcher](../tools/playtest/widgets/theatres_watch.lua),
+[known issues](known-issues.md). Generated owner artifacts:
+`build-theatres/release/Install-Theatres.ps1`, `build-theatres/release/SHA256.json`
+and `build-theatres/barb-theatres-update.zip`.
+
+**Correction after owner feedback.** A scratch build/archive was insufficient:
+the completed build must always be published to
+`C:/bardev/bar-RecoilEngine/build-amd64-windows/install/AI/Skirmish/BARb/stable`.
+The matched stripped DLL, debug symbols and current active data have now been
+staged there; API parity checks 214 members with zero findings. The live game
+installation remains separate. This requirement is explicit in
+[AGENTS.md](../AGENTS.md) and the [playtest skill](../.claude/skills/playtest/SKILL.md).
+
+## D-131 — AI-owned tactical surveys with a controllable teaching overlay
+
+**Call.** Retain route calculation in C++, refresh/tuning/lesson anchors in
+AngelScript, and rendering/preferences in Lua. Expose route capability masks and
+survey revisions alongside existing geometry. Preserve cliff alternatives by
+capability-aware merging and search connected high ground with configurable rise,
+detour and route limits. Avoid diagonal corner cutting and measure clearance for
+the route's own movement class. Teach scouting and terrain opportunities without
+presenting candidates as orders or unobserved territory as safe.
+
+**Why.** A shortest-path-only survey missed Ascendancy's large mountain even
+though it produced a nominal all-terrain lane. Map-specific coordinates and Lua
+pathfinding were rejected: the same generic survey must remain available to AI
+attack planning. Absolute-summit routing was revised after screenshot review to
+prefer a cheaper crossing in the upper part of each high-ground region. No attack
+task is rewired by this decision. See the [UX review](reviews/2026-09-28-tactical-guide-ux.md)
+for three review rounds, failed evidence and validation boundaries.
+
+**Invariant.** INV-062 requires the representative class to be present in the
+capability mask and traverse the sampled route after every survey. The widget
+does not calculate routes or issue game commands; freezing retains the visible
+snapshot until an explicit refresh, and incoming data must not reopen a hidden view.
+INV-063 requires enemy destinations for a tactical survey. Profile testing found
+that the start parser discarded an entire AI block containing nested OPTIONS;
+it now reads direct fields while skipping child sections, retaining Team before
+or after OPTIONS. Inferring opponents from arbitrary map spots was rejected when
+the actual participating teams are present in the script.
+The last screenshot review also rejected twice-nearest-wall distance as a
+corridor width: shortest paths hug coasts. Width now measures both sides of a
+perpendicular cross-section and puts the choke anchor in its traversable centre,
+also checked by INV-062.
+Observed-AA testing then found `armflak.GetAirThreat()` was zero before route
+calculation. **Rejected after testing:** a temporary engine armor-index lookup
+returned the same indices as the existing initializer (vtol 14, subs 13), and
+flak threat remained zero. That speculative API/script change was removed.
+INV-064 checks nonzero BAR flak AA threat. The native probe confirmed correct
+weapon classification and 250 air-armor damage. The actual cause was explicit
+zero `air` and `default` threat multipliers in all three experimental profiles.
+Restore those two multipliers to 1 for their 47 AA-role definitions (141 entries
+across the six base/Legion files). Both are required: enemy damage has a default
+damage gate before its air component. Native weapon capabilities still determine
+actual AA damage; this does not invent an AA weapon for a multi-role definition.
+Keep surface/water tuning unchanged. This also changes ordinary AI AA avoidance,
+not just the overlay. Globally resetting every combat unit's tuning was rejected
+as an untested balance change; remaining surface/water zeros are KI-424.
+The screenshot harness also waits for three rendered frames and one wall-clock
+second after moving the camera. Six simulation frames were insufficient at 8x:
+the captured terrain could still be flat or incompletely textured. This affects
+test capture timing only; schedule captures early enough to finish before quit.
+
+**Status.** Built with MinGW and exercised in isolated engine playtests. Final
+map/control/dynamic-threat evidence is recorded in the linked UX review. This is
+not independent player usability testing. The default four-player Glacial run
+also found the unrelated forward-cluster failure [KI-423](known-issues.md#ki-423--unbuildable-forward-cluster-retries-the-same-search-without-exhausting-attempts).
+No live game installation was written. Cached terrain and host-local AI survey
+availability remain explicit limitations.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[start parser](../src/circuit/setup/SetupManager.cpp),
+[lane mechanism](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[lane policy](../data/script/src/manager/lanes.as),
+[commands](../data/script/src/manager/commands.as),
+[settings](../data/config/lanes.json),
+[balanced threats](../data/config/experimental_balanced/behaviour.json),
+[balanced Legion threats](../data/config/experimental_balanced/behaviour_leg.json),
+[hard threats](../data/config/experimental_hard/behaviour.json),
+[hard Legion threats](../data/config/experimental_hard/behaviour_leg.json),
+[terrible threats](../data/config/experimental_terrible/behaviour.json),
+[terrible Legion threats](../data/config/experimental_terrible/behaviour_leg.json),
+[regenerated unit report](knowledge/barb-unit-config.md),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[UI watcher](../tools/playtest/widgets/tactical_guide_watch.lua),
+[threat watcher](../tools/playtest/widgets/tactical_threat_watch.lua),
+[screenshot harness](../tools/playtest/widgets/playtest_camera.lua),
+[playtest instructions](../tools/playtest/README.md),
+[UI checks](../tools/playtest/checks/tactical/strategy/tactical_guide.json),
+[threat checks](../tools/playtest/checks/tactical/strategy/tactical_threat.json),
+[Ascendancy fixture](../tools/playtest/fixtures/ascendancy.as),
+[lane documentation](roles/tech-lanes.md), [API reference](angelscript-references.md),
+[invariants](invariants.md), [actors](actor-matrix.md), [issues](known-issues.md),
+[UX evidence](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-132 — Reach a mountain passage before committing to a crawler descent
+
+**Refined by D-133:** retain the smooth high traverse to the far-side exit.
+
+**Correction to D-131.** The owner marked Ascendancy's northern passage and
+enemy-facing cliff descent. D-131's centre-ridge candidate was passable but did
+not express that tactic; the previous northern-coordinate check was too weak.
+Keep the earlier decision and screenshots as evidence of the rejected result.
+
+**Call.** For each major high-ground component, prefer a two-stage candidate:
+reach an upper-half staging cell using the configured ordinary tank/bot class,
+then follow an all-terrain path toward its actual enemy destination. Require an
+ordinary-bot-impassable descending section and a lower bot-passable landing
+within the configured drop/run bounds. Require forward progress toward the
+destination, enforce the existing weighted detour limit, reject repeated-cell
+loops, and retain the generic crest fallback when this tactic is unavailable.
+The configured high-ground route count bounds additional descent candidates.
+Ordinary route alternatives remain; this does not declare the northern route
+universally best or send units along it.
+
+**Why.** Merely increasing uphill cost still found a central zigzag on the
+exported Ascendancy terrain. Restricting the approach to ordinary-bot terrain
+found the northern passage, followed by the cliff descent. A map-name waypoint
+override was rejected. The initial terrain check found a roughly 23,652 weighted
+cost route, within the existing 3x detour bound of roughly 25,448.
+
+The first native run exposed an additional ranking error: selecting the
+cheapest candidate before checking its joined approach/descent path meant a
+looping candidate suppressed every valid descent in that component. Check
+approach/suffix intersections before ranking. A generation-marked cell vector
+avoids allocating a map-sized visited array per candidate. Native-grid export
+also showed why Lua slope sampling is only an exploratory approximation;
+the runtime regression uses native published lanes as its authority.
+
+**Policy and display.** JSON controls approach class (`-1` disables), minimum
+drop, maximum descent run and minimum progress. AngelScript reapplies these
+parameters for each calculation, assigns the passage/descent teaching cue at
+the native staging point, and keeps the existing refresh cadence. Lua only
+orients the symbol along the published route near that anchor; using the
+route's overall middle direction was wrong for a turning cliff approach.
+
+**Invariant.** INV-065 requires a descent anchor to be accessible to the chosen
+approach class and belong to a crawler-only lane. Native construction verifies
+the approach tree, downhill cliff and lower landing. The Ascendancy runtime
+fixture now requires lesson 5, the northern passage and an enemy-side northern
+staging anchor, rather than accepting any route that grazes the mountain.
+
+**Verification.** Native build and 218-member DLL/API parity pass. Ascendancy
+run `20260928-235127` passes the stronger northern/descent assertions, controls,
+refresh and invariant checks. Its selected route reaches z=544 and stages at
+(7200, 992), following the northern passage before descending toward the enemy.
+The tactical UX review records screenshots and profile regression evidence.
+This validates survey geometry, not a completed attack by actual crawler units.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json),
+[policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[runtime check](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [lane guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-133 — Smooth high-ground traverse before the far-side descent
+
+**Endpoint selection superseded by D-134 when paired steep cliffs are available.**
+
+**Correction to D-132.** The owner's second annotated Ascendancy image shows
+that reaching the north passage is insufficient: the route drops too early on
+the east and cuts the western approach. D-132's cheap staging-cell objective
+and upper-half staging-height requirement caused that behavior. D-132 remains
+as the history of the intermediate result.
+
+**Call.** First find the highest ordinary-class-reachable elevation in each
+major component within the detour budget. Select a smooth approach within a
+configurable band below that elevation (256 elmos by default). Traverse the
+same high-ground component with all-terrain movement before descending at 0.9
+progress along the source-to-actual-destination vector. The staging point may
+be lower than the peak already reached. The approach and traverse add quadratic
+absolute-grade cost (weight 8); the intentional final cliff drop does not.
+
+**Why and alternatives.** A shortest ordinary-bot approach to a far eastern
+staging point can bypass the mountain entirely. Merely forcing a visited-height
+flag can instead create an out-and-back peak visit. Joining an explicit high
+approach and a traverse, blocking reuse of the approach, avoids both. Forcing
+the absolute maximum reached an isolated bump and caused a small hairpin in the
+terrain prototype. The elevation band balances sustained height and smoothness;
+zero tolerance remains available. This optimizes grade changes along a route,
+not temporal hysteresis between threat-driven recalculations. No map coordinates
+or map names enter production code.
+
+**Budget and controls.** The longer traverse requires a default 4x rather than
+3x detour allowance. Complete joined paths are checked against actual
+travel/uphill/threat cost, separately from the smoothness score. Reject loops
+before ranking. Both smoothness and elevation tolerance are native mechanisms
+exposed through `SetMountainPathParams` and loaded from active JSON by script.
+The existing generic crest fallback remains when no valid tactic is found.
+
+**Invariant.** INV-065 additionally checks the published exit's destination-side
+progress; INV-062 retains whole-path class/passability checks.
+
+**Verification.** Native build and 219-member script/DLL parity pass. Engine
+geometry, screenshots and profile regressions are recorded in the tactical UX
+review. Actual crawler movement/combat and terrain deformation remain outside
+this validation.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json), [policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[regression](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariant](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-134 — Prefer the steep cliff faces at both ends of the passage
+
+**Extended by D-135:** endpoint steepness alone does not prevent long lateral
+cliff-face travel on Glacial Gap. The surface and shelf costs supplement it.
+
+**Correction to D-133.** The owner accepts the northern passage but marks more
+outward, steeper western/eastern cliff faces. Ordinary-bot access on the west
+and cheapest descent on the east still optimize away the walkers' advantage.
+Keep D-133's high-passage mechanism as the centre and fallback, not the default
+endpoint objective when a paired cliff crossing is available.
+
+**Call.** Search from the high passage toward both bases with positive-cost
+all-terrain paths that discount steep bot-impassable downhill edges. Require
+an upper-half gate, early qualifying cliff drop/landing, directional progress,
+no repeated cells and the complete travel/threat budget. Rank eligible legs by
+height-drop-weighted exclusive grade, allowing a 10% quality band before cost
+breaks the tie. Reverse the home leg for the source-to-enemy lane, so its ascent
+uses the same cliff a reverse-direction attack could descend. Emit both anchors
+and quality values; Lua renders two cues and explains the terrain advantage.
+
+**Why and rejected alternatives.** Merely extending a progress threshold does
+not reward a steep face. Pure shortest cost still selected the gentler inner
+slope. Pure maximum steepness selected remote map-edge bumps for marginal
+quality; the band chooses a shorter similarly steep face. A lower cliff alone
+could win while the route gently left the upper plateau: the gate-height bound
+prevents that. Quality divides by all downhill height, so uphill/downhill
+oscillation does not gain a net-drop normalization bonus. The edge discount is
+bounded and positive; ordinary lane search defaults remain unchanged.
+
+**Policy and limits.** Active JSON/AngelScript controls the discount, quality
+band and upper-height fraction. Zero discount retains D-133. The pair search
+is bounded to 16 candidates at each end; if none forms a valid joined crossing,
+the existing fallback remains. No map coordinates appear in production search.
+The coordinate assertions are confined to the Ascendancy regression fixture.
+
+**Invariant.** INV-066 requires both gates and positive native walker-only
+quality at both ends; INV-062/065 retain capability and exit-progress checks.
+
+**Verification.** Terrain prototypes found outward gates near x=1,300 and
+x=11,100 and a joined travel cost within the existing 4x budget. The tactical UX
+review records the actual engine run, screenshots, API parity and final binary.
+This is route-survey validation, not completed walker movement/combat.
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[settings](../data/config/lanes.json), [policy](../data/script/src/manager/lanes.as),
+[widget](../tools/widgets/gui_barb_team_link.lua),
+[regression](../tools/playtest/widgets/tactical_guide_watch.lua),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[review](reviews/2026-09-28-tactical-guide-ux.md).
+
+## D-135 — Cross mountain shelves instead of walking along cliff faces
+
+**Call.** Preserve steep endpoint opportunities, but charge all-terrain searches
+for mean engine surface slope as well as height change along their direction.
+A constant-height line along a cliff is expensive; a flat upper shelf is cheap.
+Between gates, additionally penalize descent below the configured peak band.
+Expose both weights through JSON, AngelScript and the native binding.
+
+**Why.** The owner's Glacial Gap correction identifies a positional objective:
+cross the top and retain places where all-terrain constructors can establish
+defenses. Longitudinal grade alone cannot distinguish a flat plateau from
+sideways movement across a vertical wall. A first runtime iteration proved that
+surface cost alone is insufficient: it selected a valley approach and climbed
+only at the far end. Endpoint legs must stay within their own configured
+progress band, and the fallback must try a two-ended elevated crossing before
+falling back to an ordinary-bot approach. The shelf fallback uses a weighted
+multi-source search between upper-band gates, rather than forcing two paths
+through one peak waypoint. Short saddles remain traversable: the component and
+adjacent land cells are searched with an elevation cost, not an absolute height
+wall. The approach cost seeds its entry candidates;
+the exit cost completes their ranking. The peak tolerance is not subtracted
+again after selecting a reference point in that band. A shelf crossing is not
+advertised as a verified steep paired descent. Blocked-region diagonals obey
+the same no-corner-cutting rule as movement masks. Physical detour allowance
+uses a separate shortest-cost search without the new preference costs.
+
+**Alternatives and scope.** A blanket map-boundary attraction can choose a
+cliff face over a usable shelf. Instead terrain determines which edge corridor
+is useful; there are no map names or coordinates in production search. Actual
+building placement still requires unit-specific footprint, terrain and obstacle
+checks. This change does not issue constructor orders. The test independently
+probes Legion radar and defense placement within Proteus's construction reach
+of the published Glacial Gap routes. This does not certify a continuous chain
+of buildings or completed unit movement. Intentional short endpoint legs retain
+the steep-cliff cost policy rather than receiving the lateral-traverse penalty.
+
+**Invariant.** Existing INV-062/065/066 retain capability and gate contracts.
+The Glacial Gap fixture measures both central mountain traverses for sustained
+elevation, surface slope and engine-tested construction positions; merely
+touching the northern/southern mountain is insufficient acceptance evidence.
+
+**Verification.** Native compilation and 223-member API parity checked. Final
+runtime geometry, screenshots and the matching binary are recorded in the
+[tactical review](reviews/2026-09-28-tactical-guide-ux.md).
+
+**Files.** [native interface](../src/circuit/terrain/BattleAnalysis.h),
+[search](../src/circuit/terrain/BattleLanes.cpp),
+[binding](../src/circuit/script/InitScript.cpp),
+[policy](../data/script/src/manager/lanes.as),
+[settings](../data/config/lanes.json),
+[runtime fixture](../tools/playtest/widgets/tactical_guide_watch.lua),
+[API](angelscript-references.md), [guide](roles/tech-lanes.md),
+[actors](actor-matrix.md).
+
+## D-136 — A separate factory continuously exploits an accessible mountain flank
+
+**Decision.** At +200 metal (ten-second minimum), TECH orders one additional
+advanced bot lab for a connected all-terrain specialist lane. The normal T2 lab
+remains separate for constructors and ordinary combat production. Defaults use
+the effective Recluse, Termite and Arquebus factory build edges. Production is
+continuous after establishment, including income dips; replacement construction
+still requires the gate. Air transport is explicitly deferred.
+
+**Why.** A visible lane is not proof that units from this TECH can reach it.
+The native query proves land connectivity from the start and the reserved lab
+site to the friendly lane end without a distant snap across water. Constructor
+reach and footprint/exit checks independently gate construction. The policy
+prefers sustained high ground, keeps the factory's theatre stable and owns only
+its offspring. Other factories and spam keep their existing decisions. Ordinary
+spam's direct retarget would abandon mountain waypoints; a native task option
+preserves them and fights only at the final destination. Full grid waypoints
+avoid smoothing across cliff cuts. Unit membership uses the creation-event
+producer ID, not proximity to a factory producing the same unit.
+
+**Invariant.** INV-067 checks that assigned specialist units retain their route.
+The isolated Glacial Gap regression observes factory creation by an AI builder,
+income at creation, repeated completed production, and actual high-ground travel
+from both sides. Pending build-task ownership prevents duplicate factory orders.
+Lifecycle retirement remains authoritative; dedicated labs are excluded from
+base reclaim and primary-lab assignment.
+
+**Verification.** Built and played on Glacial Gap from both sides with Armada,
+Cortex and Legion. Natural-economy orders occurred at +203/+202 metal; both
+streams repeatedly produced and reached the mountain. A separate no-damage
+test proved full traversal in both directions and disconnected southern-bank
+queries returned empty. Overall playtest reports still fail broader TECH
+invariants; see the [evidence and limitations](reviews/2026-09-29-tech-flank-production.md).
+No live game installation is modified.
+
+**Accounting and scope.** The dedicated lab is not an economy turret-box
+tenant: its independently reachable site is exempt from INV-029, as front
+clusters already are. It does not count toward ordinary T2 availability or
+base-reclaim factory totals. Otherwise an extra flank lab could suppress normal
+lab replacement and accidentally remove the production the owner asked to keep.
+The general save/load limitations remain; D-136 reconstruction is KI-426.
+
+**Files.** [policy](../data/script/src/roles/tech_flank.as),
+[rules](../data/script/src/roles/tech_rules.as), [TECH](../data/script/src/roles/tech.as),
+[reclaim](../data/script/src/roles/tech_factories.as),
+[factory hooks](../data/script/src/manager/factory.as),
+[military hooks](../data/script/src/manager/military.as),
+[normal lab accounting](../data/script/src/roles/tech_build.as),
+[economy state](../data/script/src/manager/eco_planner.as),
+[runtime invariants](../data/script/src/manager/invariants.as),
+[settings](../data/config/lanes.json),
+[lane interface](../src/circuit/terrain/BattleAnalysis.h),
+[lane query](../src/circuit/terrain/BattleLanes.cpp),
+[route interface](../src/circuit/task/fighter/RouteTask.h),
+[route commands](../src/circuit/task/fighter/RouteTask.cpp),
+[unit](../src/circuit/unit/CircuitUnit.h), [creation](../src/circuit/CircuitAI.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[runtime watcher](../tools/playtest/widgets/flank_watch.lua),
+[checks](../tools/playtest/checks/tech/combat/tech_flank.json),
+[traversal checks](../tools/playtest/checks/tech/combat/tech_flank_traversal.json),
+[economy fixture](../tools/playtest/widgets/flank_economy_fixture.lua),
+[policy guide](roles/tech_flank.md), [TECH guide](roles/tech.md),
+[rules guide](roles/tech_rules.md), [factory guide](roles/tech_factories.md), [build guide](roles/tech_build.md),
+[API](angelscript-references.md), [invariants](invariants.md), [actors](actor-matrix.md).
+
+## D-137 — Judge Ascendancy flanks by observed combat outcomes
+
+**Decision.** Test the unchanged D-136 production policy on Ascendancy with
+explicit TECH roles in isolated data. Identify dedicated combat offspring by
+engine producer IDs and their queued mountain route, then count actual kills,
+losses, nominal metal values and arrival near the enemy start. Keep normal
+damage, ordinary armies and AI visibility. Supply only economy in accelerated
+runs, and retain a separate natural-economy observation.
+
+**Why.** Following a line is insufficient evidence of a useful attack. Kills
+are credited by the engine's attacker ID, not proximity or team-wide totals.
+Metal is nominal UnitDef cost, not reclaimed value or assisted damage credit.
+BAR drops attacker arguments in widget UnitDamaged dispatch; a raw observer
+can also be replaced by UI call-in updates. Damage totals are consequently
+diagnostic only and excluded from the effectiveness conclusion. Full-map
+spectator visibility does not grant the AI extra vision.
+
+**Invariant.** Retain the global invariant forbid and require both actual
+role=2 snapshots; the harness labels alone are insufficient (KI-428). No route,
+production, unit-stat or combat policy was changed for this experiment.
+
+**Verification.** Both sides built and traversed the mountain. Legion's western
+stream killed the eastern commander in the first valid accelerated run;
+Armada's eastern stream scored kills but did not break through. See the
+[played report](reviews/2026-09-29-ascendancy-flank-effectiveness.md) for final
+counts, screenshots, fixture limits and unchanged failing overall verdicts.
+
+**Files.** [observer](../tools/playtest/widgets/flank_effectiveness.lua),
+[checks](../tools/playtest/checks/shared/combat/flank_effectiveness.json),
+[issues](known-issues.md), [report](reviews/2026-09-29-ascendancy-flank-effectiveness.md).
+
+## D-138 — Separate stale deployment from TECH production starvation
+
+**Decision.** Preserve the owner's live-game log, inspect the actual script
+load paths and all duplicate native installations, and run a full-team current
+build control. Provide a complete owner-installable package with the unique
+identity SMRTBARb/flank-20260929. Do not overwrite the live installation or
+claim a package update fixes all ordinary production problems.
+
+**Why.** The live game lacks the new flank script, so earlier isolated
+playtests cannot validate that installation. Separately, its high-income TECH
+shows a real forward-factory delay and constructor-first production. Reducing
+constructor caps or reordering the entire build policy based only on that old
+run would conflate two causes and undo previously deliberate owner policy.
+Unique version metadata avoids the three stable-identity collisions without
+deleting or renaming the owner's installations.
+
+**Invariant.** The update is one matching DLL/debug/data set, with explicit
+identity metadata. Income, planned clusters and construction orders are not
+accepted as evidence of completed combat production. Existing invariant
+failures remain failures.
+
+**Verification.** The packaged DLL matches D-136, 225 API members pass, and
+all 230 files have a hash manifest. Deployment remains owner work. See the
+[investigation](reviews/2026-09-29-live-tech-production.md) and KI-429/430.
+
+**Files.** [issues](known-issues.md),
+[investigation](reviews/2026-09-29-live-tech-production.md),
+[owner instructions](../build-theatres/tech-production-investigation/INSTALL.md).
+No production code changed in this diagnosis.
+
+## D-139 — Verify every faction from both Glacial Gap TECH starts without policy overrides
+
+**Decision.** Run three natural-economy faction mirror matches plus a separate
+8v8 control using the current workspace data and pinned D-136 DLL. Do not change
+production policy or extend the forward-layout invariant timeout to obtain a
+pass. Stop completed mirror matches once all six core production/traversal
+observations are met and retain their actual durations and failing raw reports.
+Keep the live game installation untouched while the owner uses it concurrently.
+
+**Why.** The owner's separate script/config and DLL copy workflow is valid.
+The D-138 filesystem observation was overextended into an explanation for all
+reported games. Direct production evidence is needed, and earlier fixture or
+timeout-relaxed runs are insufficient for this new validation. Both map sides
+matter because their build sites, economy timing and opponents differ.
+
+**Invariant.** A factory order is not completed production. Require an
+AI-built factory, at least eight completed routed units spanning five minutes,
+and two units reaching the central mountain per faction/side. Keep every global
+invariant forbid; wider failures are not relabeled as passes. In full teams,
+observe actual TECH IDs 0/9, not an allied FRONT AI at team 1.
+
+**Verification.** All six mirror cases met the core observations with no script
+errors or INV-067 violations. The 8v8 control lost its western side before the
+gate; eastern TECH remained below +200, so the high-income full-team report
+remains unresolved (KI-430). No gameplay code changed. The
+[played report](reviews/2026-09-29-glacial-faction-validation.md) records unit
+counts, first completion times, raw reports, unchanged failures and input hashes.
+
+**Files.** [report](reviews/2026-09-29-glacial-faction-validation.md),
+[corrected investigation](reviews/2026-09-29-live-tech-production.md),
+[issues](known-issues.md),
+[mirror runner](../build-theatres/faction-validation/run_mirror.py),
+[full-team runner](../build-theatres/faction-validation/run_full.py),
+[log summary](../build-theatres/faction-validation/summarize.py).
+
+## D-140 — Outcome-based OpenSkill and strict map/settings scorecards
+
+**Decision.** Record scorecards by UTC/local timestamp, map/game content checksums,
+engine binary, complete gameplay settings, actual/expected roles and starts,
+factions, scenario and tested DLL/data hashes. Keep map/settings cohorts separate,
+including Legion enabled versus disabled. The AI build is the experimental
+variable and the entrant identity, not a reason to reject matching conditions.
+Use pinned OpenSkill Plackett–Luce 6.1.2 for confirmed outcomes only; retain raw
+economy/combat/production/reliability diagnostics as separate measures.
+
+**Why.** Combining economy, damage and army size into invented skill points
+would reward high-income inactivity or damage farming. Pooling different maps,
+content versions, factions or fixtures would obscure regressions. One measured
+match is a provisional baseline, not a calibrated public BAR rating. Time limits
+are censored; no winner is inferred from leading in resources or killing units.
+The in-game calendar is pinned separately from wall-clock timestamps because
+BAR can use date options for seasonal content. Start tolerances (64 elmos from
+request, 32 between comparisons) are explicit and tested.
+
+**Invariant.** Only a valid engine GameOver callback can produce a rating update.
+Invalid/censored evidence and duplicated identical entrants cannot update skill.
+Legion on/off, different maps and altered starts cannot silently compare as equal.
+Missing/zero-denominator metrics remain null. Evidence changes cannot overwrite
+an existing run; schema reinterpretations preserve prior records and are counted
+once. Raw gameplay invariant failures stay visible and cannot be hidden by a
+successful recorder. All writes remain outside the main game installation.
+
+**Verification.** Nineteen tests pass, including actual library win/draw updates,
+censored priors, role/position/content mismatches and comparator settings. The
+three requested maps completed 45-minute observations with verified roles, starts,
+runtime content checksums and error-free telemetry. None produced a confirmed
+outcome, so all three correctly leave OpenSkill priors unchanged. The initial
+batch has not exercised a live completed-match rating update. See the
+[timestamped index](benchmarks/scorecards/README.md) and
+[design/methodology](benchmarks/scorecard-design.md). No AI policy/native code changed.
+
+**Files.** [recorder/model](../tools/playtest/scorecard.py),
+[isolated runner](../tools/playtest/scorecard_run.py),
+[observer](../tools/playtest/widgets/scorecard_metrics.lua),
+[tests](../tools/playtest/test_scorecard.py),
+[pinned dependency](../tools/playtest/requirements-scorecard.txt),
+[playtest usage](../tools/playtest/README.md),
+[methodology](benchmarks/scorecard-design.md),
+[scorecard index](benchmarks/scorecards/README.md),
+[rating ledger](benchmarks/scorecards/ratings.json), [issues](known-issues.md).
+
+## D-141 — Batch lane rendering to avoid exhausting LuaUI memory
+
+**Problem and evidence.** On 2026-09-29 the owner selected all-player lanes,
+then a player name, and lost the entire UI. The installed widget SHA256 matched
+the source. At frame 44395 the main infolog records three emergency collections
+above 1.2 GB followed by `LUA_ERRMEM` in DrawScreen and LuaUI's 1.5 GiB allocator
+limit. There is no widget-specific traceback, so this proves UI exhaustion,
+not that a particular mouse callback was the sole cause.
+
+**Decision.** Replace each route segment's closures and temporary colour/point
+tables with two GL.LINES batches per route and one shared flat projection buffer.
+The generic line primitive also uses a stable callback with arguments. Projection
+still runs every frame, so camera motion remains current; lane calculation and
+player/all/frozen controls are unchanged. Rejected raising the engine memory
+limit or forcing global LuaUI garbage collection from this widget: neither
+removes its allocation churn, and global collection affects every widget.
+
+**Invariant.** All-player rendering must have bounded per-frame allocation and
+retained state; selecting a player in all mode must preserve all-player visibility.
+Batching must preserve route endpoints, air dashes and gaps at clipped vertices,
+including a shorter or empty replacement survey. These are LuaUI invariants,
+checked by the dedicated Lua fixture and engine watcher rather than the AI's
+AngelScript Invariants module.
+
+**Verification.** Three Lua 5.1 tests pass. The same 16-player, nine-lanes-per-player,
+400-points-per-lane fixture measured roughly 40 MB of temporary allocation per
+frame before this change, versus 80.6 KiB peak after it; retained growth across
+120 draws/clicks was 0.1 KiB. This isolates rendering allocation from engine and
+other widgets. The hidden graphical engine test and remaining limits are recorded
+in the [incident review](reviews/2026-09-29-lane-ui-memory.md). The original
+incident has not been replayed; [KI-431](known-issues.md#ki-431--lane-ui-memory-fix-needs-confirmation-in-the-original-session)
+tracks that limit. No installed files were modified and no DLL rebuild is needed.
+
+**Files.** [Widget](../tools/widgets/gui_barb_team_link.lua),
+[Lua fixture](../tools/playtest/fixtures/lane_ui_mock.lua),
+[tests](../tools/playtest/test_lane_ui_memory.py),
+[engine watcher](../tools/playtest/widgets/lane_ui_memory_watch.lua),
+[engine checks](../tools/playtest/checks/shared/performance/lane_ui_memory.json),
+[usage](../tools/playtest/README.md), [incident review](reviews/2026-09-29-lane-ui-memory.md),
+[issue register](known-issues.md).
+
+## D-142 — Forbid T1 artillery and celebrate the first super-cannon shot
+
+**Decision.** Respect the owner's no-T1-static-artillery rule in every active
+profile and role. `behaviour/<unit>/build: false` vetoes `armguard`, `corpun`,
+and `legcluster`; runtime cap increases cannot undo it. Availability excludes
+these definitions and construction enqueue rejects them. Repair/reclaim tasks
+are outside this check: their task payload does not initialize `buildDef`.
+
+TECH's artillery slots use actual T2 artillery, gated at +300 metal by default;
+LRPC and super-cannon gates and energy affordability remain in JSON. There is
+no new mandatory build order. Correct the shared T2 helper's swapped
+artillery/pop-up classification and AIR's Legion T2 allowance. Preserve the
+legacy `art1` array index with empty definitions rather than shift role indices.
+Do not alter porcupine array indices or enemy classification.
+
+**Rationale and alternatives.** A zero unit cap alone is insufficient because
+forward policy intentionally lifts caps. `ignore` changes enemy classification
+and `on` controls activation, so neither is a construction prohibition. Keep
+named-unit policy in JSON/AngelScript, not hardcoded native priorities. Include
+the Legion veto in base fragments as well as Legion fragments: the definition
+can exist even without Legion being selected. Existing/captured buildings are
+not deleted.
+
+**Drawing.** An optional `Main::AiSuperWeaponFired` callback observes the actual
+engine event for native super-weapon tasks. Script selects Ragnarok, Calamity
+and Starfall and queues 32 lowercase `lol` strokes at the aim (or the cannon
+when no aim exists), through the nuke smiley's paced line queue. One drawing
+per unit ID per AI session prevents repeated salvos flooding the map. Destruction
+forgets the ID. JSON controls enablement and letter height. Nuclear smileys are
+unchanged. The decision to draw on first shot, not construction or an attack
+order, is deliberate; save/load starts a new script session.
+
+**Invariant.** INV-069 checks the three definition vetoes in every profile.
+The integration probe raises their caps and directly enqueues construction;
+all must remain unavailable and return null. Allowed T2/LRPC/super definitions
+must retain permission. Repair tasks must continue normally.
+
+**Status.** Built with matching stripped DLL/debug symbols; verification results
+are recorded in [the artillery review](reviews/2026-09-29-artillery-policy.md).
+No live-game installation was modified.
+
+**Files.**
+- [src/circuit/unit/CircuitDef.h](../src/circuit/unit/CircuitDef.h)
+- [src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp)
+- [src/circuit/module/FactoryManager.cpp](../src/circuit/module/FactoryManager.cpp)
+- [src/circuit/script/InitScript.h](../src/circuit/script/InitScript.h)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/CircuitAI.cpp](../src/circuit/CircuitAI.cpp)
+- [data/config/weapons.json](../data/config/weapons.json)
+- [data/script/src/manager/artillery_policy.as](../data/script/src/manager/artillery_policy.as)
+- [data/script/src/setup.as](../data/script/src/setup.as)
+- [data/script/src/helpers/unit_helpers.as](../data/script/src/helpers/unit_helpers.as)
+- [data/script/src/helpers/defense_helpers.as](../data/script/src/helpers/defense_helpers.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/tech_forward.as](../data/script/src/roles/tech_forward.as)
+- [data/script/src/roles/tech_weapons.as](../data/script/src/roles/tech_weapons.as)
+- [tools/playtest/fixtures/artillery_probe.as](../tools/playtest/fixtures/artillery_probe.as)
+- [tools/playtest/widgets/artillery_fire_watch.lua](../tools/playtest/widgets/artillery_fire_watch.lua)
+- [tools/playtest/checks/shared/combat/artillery_fire.json](../tools/playtest/checks/shared/combat/artillery_fire.json)
+- [tools/playtest/checks/shared/reliability/artillery_profiles.json](../tools/playtest/checks/shared/reliability/artillery_profiles.json)
+- [tools/playtest/prepare_artillery_check.py](../tools/playtest/prepare_artillery_check.py)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/knowledge/barb_report.py](../tools/knowledge/barb_report.py)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/tech_forward.md](../doc/roles/tech_forward.md)
+- [doc/roles/tech_weapons.md](../doc/roles/tech_weapons.md)
+- [data/config/behaviour.json](../data/config/behaviour.json)
+- [data/config/easy/behaviour.json](../data/config/easy/behaviour.json)
+- [data/config/easy/behaviour_leg.json](../data/config/easy/behaviour_leg.json)
+- [data/config/experimental_balanced/behaviour.json](../data/config/experimental_balanced/behaviour.json)
+- [data/config/experimental_balanced/behaviour_leg.json](../data/config/experimental_balanced/behaviour_leg.json)
+- [data/config/experimental_hard/behaviour.json](../data/config/experimental_hard/behaviour.json)
+- [data/config/experimental_hard/behaviour_leg.json](../data/config/experimental_hard/behaviour_leg.json)
+- [data/config/experimental_terrible/behaviour.json](../data/config/experimental_terrible/behaviour.json)
+- [data/config/experimental_terrible/behaviour_leg.json](../data/config/experimental_terrible/behaviour_leg.json)
+- [data/config/hard/behaviour.json](../data/config/hard/behaviour.json)
+- [data/config/hard/behaviour_leg.json](../data/config/hard/behaviour_leg.json)
+- [data/config/hard_aggressive/behaviour.json](../data/config/hard_aggressive/behaviour.json)
+- [data/config/hard_aggressive/behaviour_leg.json](../data/config/hard_aggressive/behaviour_leg.json)
+- [data/config/medium/behaviour.json](../data/config/medium/behaviour.json)
+- [data/config/medium/behaviour_leg.json](../data/config/medium/behaviour_leg.json)
+- [data/script/easy/main.as](../data/script/easy/main.as)
+- [data/script/experimental_balanced/main.as](../data/script/experimental_balanced/main.as)
+- [data/script/experimental_hard/main.as](../data/script/experimental_hard/main.as)
+- [data/script/experimental_terrible/main.as](../data/script/experimental_terrible/main.as)
+- [data/script/hard/main.as](../data/script/hard/main.as)
+- [data/script/hard_aggressive/main.as](../data/script/hard_aggressive/main.as)
+- [data/script/medium/main.as](../data/script/medium/main.as)
+
+## D-143 — Arquebus holds weapon range instead of charging along a flank
+
+**Decision.** Enable `behaviour/legsrail/standoff: 0.90` in all seven Legion
+profiles. Native unit micro maintains a firing distance based on weapon reach,
+conservatively adjusted for elevation, with a five-percent dead band. It holds
+position/fire-at-will, moves back when too close, and never appends a fight
+command that would pursue the enemy. The same mechanism intercepts ordinary
+unit attack orders. Zero is the default for other definitions and disables it.
+
+**Cause.** D-136 reused the spam route task: plain queued moves through every
+waypoint, ignoring combat until the last fight command. Thus an Arquebus could
+fire while continuing straight toward the target. Ordinary micro also had a
+sight-radius-limited firing position followed by attack/fight orders. Moving
+Arquebus to the artillery role alone would not fix the dedicated route and
+would restrict targets to structures.
+
+**Route ownership.** The route task detects observed, targetable enemies near
+weapon range and pauses its queue while using the range controller. It owns
+idle events during engagement, so Stop cannot immediately restart the charge.
+After contact loss/death it resumes the nearest preserved waypoint; route
+revisions cannot override an ongoing engagement. No known enemy means normal
+lane traversal. Membership is removed on normal unit removal. No widget logic
+or map-specific coordinates participate in production combat decisions.
+
+**Invariant.** INV-067 still checks that flank units retain their dedicated
+route task. The combat regression adds a measurable range promise: supplied
+Arquebus units in both directions must survive, kill a shorter-range defense
+without coming within 600 elmos, then resume beyond the target. Failure is
+forbidden by `checks/shared/combat/arquebus.json`; the watcher samples distance and health
+once per second. An inaccessible firing ring stops the unit instead of
+substituting a close attack. This is not a claim of optimal terrain line of
+fire or survival against enemies that outrange or outrun the railgun.
+
+**Verification.** Native build and DLL API parity pass. Engine comparison
+results are recorded in [the range review](reviews/2026-09-29-arquebus-range.md).
+Played on both Supreme Isthmus sides: the old DLL lost both supplied railguns;
+the new DLL destroyed both HLTs and resumed both routes, with minimum sampled
+health 2200 and distances 674/627. Natural production and cliff firing geometry
+were not exercised by this focused fixture.
+Build output contains matching DLL/debug symbols and source data; the owner's
+live game installation is not modified.
+
+**Files.**
+- [src/circuit/unit/CircuitDef.h](../src/circuit/unit/CircuitDef.h)
+- [src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h)
+- [src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp)
+- [src/circuit/module/FactoryManager.cpp](../src/circuit/module/FactoryManager.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [doc/roles/tech_flank.md](../doc/roles/tech_flank.md)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/spam-routes.md](../doc/spam-routes.md)
+- [tools/playtest/fixtures/arquebus_route.as](../tools/playtest/fixtures/arquebus_route.as)
+- [tools/playtest/widgets/arquebus_watch.lua](../tools/playtest/widgets/arquebus_watch.lua)
+- [tools/playtest/checks/shared/combat/arquebus.json](../tools/playtest/checks/shared/combat/arquebus.json)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [data/config/easy/behaviour_leg.json](../data/config/easy/behaviour_leg.json)
+- [data/config/experimental_balanced/behaviour_leg.json](../data/config/experimental_balanced/behaviour_leg.json)
+- [data/config/experimental_hard/behaviour_leg.json](../data/config/experimental_hard/behaviour_leg.json)
+- [data/config/experimental_terrible/behaviour_leg.json](../data/config/experimental_terrible/behaviour_leg.json)
+- [data/config/hard/behaviour_leg.json](../data/config/hard/behaviour_leg.json)
+- [data/config/hard_aggressive/behaviour_leg.json](../data/config/hard_aggressive/behaviour_leg.json)
+- [data/config/medium/behaviour_leg.json](../data/config/medium/behaviour_leg.json)
+
+## D-144 — Snapshot-based lane workers with measured main-thread cost
+
+**Decision.** Extract one engine-free `lane::Solver` for synchronous and worker
+execution. The main-thread adapter captures observed threats and starts, reuses
+an immutable per-AI terrain snapshot, and submits at most one background job.
+The scheduler gives later ordinary path jobs priority over queued background
+work. Script controls background mode, staggering and refresh frequency.
+
+**Why.** Strategic lane searches run many full-grid passes over stable terrain.
+They do not need to block the simulation until finished: the previous complete
+lanes remain usable. Starting one OS thread per AI, sharing mutable analysis
+objects, or invoking AngelScript on a worker were rejected. Parallelizing each
+alternative was rejected because penalty/merge ordering is dependent. The same
+solver avoids separate sync/async algorithms drifting apart.
+
+**Ownership.** Worker closures own request/scratch data and immutable terrain,
+with no raw AI pointer. The main completion is allocated before enqueue;
+worker exceptions are captured, never allowed across the thread entry. The
+scheduler's synchronized completion queue hands off the result. Only the main
+callback locks the weak owner and swaps the complete lanes. Cancellation marks
+an atomic token and invalidates a main-only generation gate without freeing the
+admission slot early. Shutdown cannot publish into a destroyed AI.
+
+**Invariant.** INV-070: script finalization observes a new successfully published
+generation; cancellation/failed work cannot impersonate one. `Lanes::Poll` and
+`Finish` log violations; the native gate additionally rejects duplicate/stale
+completion. Tests cover admission, cancellation, independent threat snapshots,
+parallel determinism, disconnected water, corner blocking and high ground.
+
+**Deliberate limits.** Terrain snapshots are shared between jobs of one AI,
+not globally interned between AIs: measured capture is below one millisecond,
+and a cross-instance terrain cache adds identity/invalidation complexity.
+Threats must never be shared between teams with different observations. Existing
+terrain-grid caching semantics are retained. Script validation, water/site
+advisories, overlay publication and `GetLaneRoute`'s connection search remain
+main-thread operations. The benchmark includes postprocessing rather than
+claiming all strategic survey work is off-thread. Worker completion timing can
+change the frame an AI adopts a new route; geometric determinism does not promise
+identical whole-match outcomes across thread schedules.
+
+**Verification.** Six standalone lane suites pass, including eight simultaneous
+solvers, alongside existing native tests. Integration build and 231-member API
+check pass. Sample games, timings, exact settings and any unrelated game failures
+are recorded in [lane-worker benchmarks](benchmarks/lane-workers/README.md).
+
+**Files.**
+- [LaneSolver.h](../src/circuit/terrain/LaneSolver.h), [LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp)
+- [BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h), [BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp), [BattleLanes.cpp](../src/circuit/terrain/BattleLanes.cpp)
+- [Scheduler.h](../src/circuit/scheduler/Scheduler.h), [Scheduler.cpp](../src/circuit/scheduler/Scheduler.cpp), [MultiQueue.h](../src/circuit/util/MultiQueue.h), [MultiQueue.hpp](../src/circuit/util/MultiQueue.hpp)
+- [InitScript.cpp](../src/circuit/script/InitScript.cpp), [lanes.as](../data/script/src/manager/lanes.as), [lanes.json](../data/config/lanes.json)
+- [balanced main](../data/script/experimental_balanced/main.as), [hard main](../data/script/experimental_hard/main.as), [terrible main](../data/script/experimental_terrible/main.as)
+- [lane tests](../tests/lane_solver_test.cpp), [test CMake](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [CMakeLists.txt](../CMakeLists.txt)
+- [benchmark tool](../tools/playtest/lane_benchmark.py), [observer](../tools/playtest/widgets/lane_benchmark_watch.lua), [checks](../tools/playtest/checks/shared/performance/lane_workers.json)
+- [invariants](invariants.md), [actors](actor-matrix.md), [API](angelscript-references.md), [lanes](roles/tech-lanes.md), [known issues](known-issues.md)
+
+## D-145 — Connected mountain traverses, not isolated hill detours
+
+**Decision.** Filter every native all-terrain candidate through the same
+connected-elevated-terrain test before publication. Require projected progress
+of at least 1024 elmos and 45% of lane endpoint separation on one elevated
+component, with rise above the higher endpoint controlled by the existing
+high-ground setting. Expose span controls and the resulting qualification to
+script. TECH accepts only qualified reachable routes and clears qualification
+before every refresh selection.
+
+**Why.** Supreme's small isolated hills were being treated as strategic flanks,
+triggering an extra T2 lab and perpetual all-terrain production. Class/movement
+capability does not establish tactical value. A map-name blacklist was rejected:
+it would hide the same defect on another flat map. Adding disjoint hill spans
+or measuring sideways path length was rejected because neither connects the
+opposing sides with a mountain traverse. Isolated artillery perches are not
+attack lanes; no Vanguard placement policy is introduced here.
+
+**Invariant.** INV-071: every published all-terrain lane crosses one substantial
+connected mountain. The native filter checks all generator outputs; script
+checks the published qualification. A failed selection also blocks subsequent
+flank recruitment until a successful requalification.
+
+**Verification.** Eight native suites pass, including a control that produces
+false specialist routes when span thresholds are disabled, rejection of several
+disconnected mesas in both directions, retention of a connected ridge, and
+rejection of two ridge-end visits joined through the valley.
+Build and 233-member API check pass; all three affected experimental profiles
+load and publish lanes in BAR. Runtime results are recorded in the
+[played review](reviews/2026-09-29-connected-mountain-lanes.md); do not infer
+combat effectiveness from route generation alone. KI-434 tracks the incident.
+
+**Deliberate non-change.** Fixed per-faction flank recruitment remains unchanged.
+Armada traded poorly in the played matchups; route validity is not a promise of
+favorable combat against every counter. Omniscient test kill/loss counters are
+not available to recruitment policy. See the played review for measured limits.
+
+**Files.** [solver header](../src/circuit/terrain/LaneSolver.h), [solver](../src/circuit/terrain/LaneSolver.cpp), [native API](../src/circuit/terrain/BattleAnalysis.h), [adapter](../src/circuit/terrain/BattleLanes.cpp), [bindings](../src/circuit/script/InitScript.cpp), [lanes](../data/script/src/manager/lanes.as), [flank policy](../data/script/src/roles/tech_flank.as), [config](../data/config/lanes.json), [unit tests](../tests/lane_solver_test.cpp), [preparer](../tools/playtest/prepare_mountain_regression.py), [income observer](../tools/playtest/widgets/mountain_regression_watch.lua), [archived evidence verifier](../tools/playtest/verify_mountain_regression.py), [run instructions](../tools/playtest/README.md), [Supreme check](../tools/playtest/checks/shared/terrain/mountain_supreme.json), [survey check](../tools/playtest/checks/shared/terrain/mountain_survey.json), [profile load check](../tools/playtest/checks/shared/terrain/mountain_startup.json), [startup request probe](../tools/playtest/widgets/mountain_startup_watch.lua), [invariants](invariants.md), [actors](actor-matrix.md), [script API](angelscript-references.md), [lane reference](roles/tech-lanes.md), [flank reference](roles/tech_flank.md), [issues](known-issues.md).
+
+## D-146 — Plan AIR production bays without changing TECH
+
+**Status.** Proposed design and source analysis only. No implementation,
+configuration, unit-test or gameplay changes. Online guidance was inspected on
+2026-09-30; no new replay sample or factory-throughput experiment was run.
+
+**Decision.** AIR will use its own T1-first economy states, ordered build rules
+and repeatable production bays over the existing native task/reservation
+mechanisms. Treat twenty ordinary nanos per T2 air plant as an initial soft
+consideration point, measure cold opening separately from warm handoff, and
+support six or more plants according to funded production demand. Separate
+late reactors from critical production. Preserve existing air scouting,
+transport, defence, strike and wave capabilities through explicit integration.
+
+**Reasoning.** Aircraft production needs continuing energy and military
+allocation; TECH's AFUS rush, dense economic sets and builder specialisation
+are not an AIR economic policy. Existing shared geometry and pinned tasks are
+reusable, but native experimental mode also disables economy/storage/start
+factory planning, and factory reservation acquisition contains TECH-specific
+names. Enabling it without a complete AIR path would remove required work.
+
+**Rejected.** Copying the TECH controller; merely raising the three-plant
+ceiling; a mandatory six-plant build order; treating all nanos in range as
+available to every plant; broad refactoring of TECH before differential
+tests. Extract parameter-only utilities where useful, keeping compatibility
+wrappers/defaults. Leave TECH's current code path in place if parity cannot
+be demonstrated.
+
+**Invariant.** For identical inputs, TECH keeps its current ordered decisions,
+task/site/facing/priority results, reservations and random draws. AIR state,
+caps, resource budgets and layout identities belong only to that AI instance
+and role. This is a proposed implementation acceptance contract; no new runtime
+invariant IDs are claimed by this documentation-only change.
+
+**Open defects.** KI-217 records per-factory nano counts that do not reconcile
+losses or cancelled orders. KI-218 records AIR's unreachable explicit mex-first
+priority on its T1 caller. Existing KI-209 save/load and KI-427 TECH baseline
+failures remain; their presence must not be hidden by the migration tests.
+
+**Files.** [Comprehensive plan](air-layout-and-priority-plan.md),
+[issues](known-issues.md), this [decision record](decisions.md), and the separate
+[game-only AIR study](../../rjm.bar.docs/knowledge/70-strategy/78-air-pvp-meta.md).
+
+**Verification.** Source trace covers all 42 functions of `air.as`, shared
+callback routing, native placement/economy gates and relevant script bindings.
+The plan specifies pure-function, lifecycle, geometry, throughput and TECH
+differential tests. Documentation validation is recorded in the plan; it does
+not verify the proposed runtime behaviour.
+
+## D-147 — AIR owns T1 economy, production bays and transport-first recruitment
+
+**Status.** Built and played on 2026-09-30. The final native DLL is
+`4455871a7febabbc` with matching symbols and current data in the mandatory
+Recoil build output. The live game installation is unchanged. Full results,
+including failed checks and data revisions, are in the
+[AIR evidence report](benchmarks/air-management.md).
+
+**Decision.** Enable an independent AIR controller in experimental profiles:
+`AirRules` selects ordered actions, `AirBuild` owns tasks, `AirEconomy` observes
+income/commitments/owned units, `AirLayout` reserves repeatable production bays,
+and `AirProduction` controls finite utility/home quotas and military output.
+T1 energy and combat continue until a complete T2 package is funded. T1 mobile
+builders grow to six when funded, because factory-bound nanos cannot build a
+remote wind field. Keep the T1 plant for transports after T2 arrives.
+
+A starter has up to five rear nanos. Each T2 bay has up to twenty side-bank
+slots, with partial banks accepted on cramped terrain and capacity calculated
+from actual space. Further plants need sustained spare resources, available
+support and funding; twelve is a configurable ceiling. Late reactors search
+away from factories. Native persistent single sites share existing claims,
+required pins, completion/destruction and serialization; AIR metadata is named
+separately. Pure production, funding and geometry arithmetic is reusable and
+executes under the real AngelScript runtime in unit tests.
+
+Transport obligations precede optional AIR recruitment and spam. Accept any
+allied requestor role, deduplicate active/queued teams, service FIFO, and latch
+an order only after enqueue succeeds. Pending recruits, frames and owned units
+are counted separately. TECH's requester trigger and cargo protocol stay as
+before. Home fighters never enter wave ledgers. With no observed ground front
+or a home-area combat focus, new AIR wave planning falls back to an actual
+participating enemy start; explicit strike targeting still takes precedence.
+
+**Why these implementation choices.** Reusing TECH's AFUS chain, turret box
+or thresholds would change the role's economy and risk TECH behavior. Shared
+native mechanisms and small pure helpers remove duplication without migrating
+TECH. Script `GetBuildSpeed` exposes physical worker time, not JSON's policy
+speed; applying a frame multiplier produced wrong capacity estimates and was
+removed. Native completion chains can create unassigned economy orders despite
+experimental mode, so AIR reconciles ownership after enqueue and resumes its
+own orphan orders. Otherwise a phantom nano or energy job can block all future
+work. Flying builders can orbit a ground approach disc; an AIR-only native
+lever delegates their final approach to the engine's build command. Negative
+rear candidates are rejected before native grid queries. Completed T2 mexes
+are reconciled from owned units, including direct native MEX builds. The original
+12-ring/12-sample coastal energy search exhausted its candidates while banks
+floated; AIR now expands across 24 rings with 24 samples and backs off failed
+definitions for three seconds. A transition check requires actual T2, mex
+upgrade and reactor completion instead of only a valid opening.
+The 55-minute natural run missed its reactor deadline while building its first
+AFUS. A large metal bank had admitted that project without established reactor
+income. AIR now chooses ordinary fusion first and requires an observed completed
+reactor before selecting AFUS. This keeps the initial energy investment within
+the smaller AIR construction crew; unfinished reactor frames do not qualify.
+
+**Rejected or deferred.** No general TECH extraction, no sample/profile edits,
+no mandatory six-factory order and no unbounded constructor/scout/transport
+queue. The first capacity policy fills useful funded support up to twenty
+before another bay; a calibrated marginal-capital optimizer, every product's
+0–40-nano experiment, floating campus templates and full script save/load are
+not claimed. The warm-gap value is a prior, not a measurement of cold startup.
+The initial observer incorrectly included factory construction in cold idle;
+the final observer starts at completion. Damage collection hooks the complete
+LuaUI event and forwards it unchanged, reinstating after dispatcher resets.
+
+**Invariant.** INV-072 separates home/wave fighters; INV-073 keeps one nano
+planner; INV-074 bounds published bays; INV-075 prevents duplicate obligations
+per provider; INV-076 rejects unowned queued nano work. Existing TECH invariants
+and all playtest forbids remain intact. For identical valid inputs TECH keeps
+its policy sequence, sites, caps, defaults and random calls. Protected TECH
+scripts/configuration are byte-for-byte unchanged; this does not assert equal
+emergent matches when AIR changes allied resources or threats.
+
+**Verification.** Native compilation succeeded, registration parity passed
+239 used members, 28 executable AS math tests passed, as did 76 ranking checks,
+base geometry and eight lane suites. Natural AIR reached T2 while continuing
+combat; supplied Cortex/Legion economies exceeded six factories and replaced
+real nano losses; role switches passed. A controlled sortie produced observed
+bomber damage after the outbound fallback. TECH and mixed-team reports retain
+baseline invariant failures. Source checks pass apart from documented existing
+hover links and TECH sonar findings. Exact repeated-game equality, full
+save/load and competitive win-rate improvement remain unverified.
+The final natural run completed ordinary fusion at 56.13 minutes, 2.13 minutes
+after the unchanged benchmark; it completed 14 T2 mexes and maintained combat
+without script/crash/invariant errors. This functional result does not turn
+the deadline scorecard into a pass.
+
+**Open issues.** KI-112 records the native grid query's unchecked caller
+contract (AIR is guarded); KI-217/218 retain legacy bookkeeping limitations;
+KI-209 covers script persistence; KI-219 covers several AIR providers accepting
+one broadcast; KI-220 records warm-gap calibration from observed effective
+factory delays; KI-435 covers a gifted transport misattributed by TECH's
+retiring-factory invariant; KI-436 retains the natural reactor timing miss.
+KI-427 baseline TECH failures are not hidden.
+
+**Files.** The implementation, references, fixtures and tests touched by this
+change are linked below; the evidence report distinguishes completed work from
+limits and superseded diagnostic runs.
+
+- [data/script/README.md](../data/script/README.md)
+- [data/script/src/global.as](../data/script/src/global.as)
+- [data/script/src/helpers/production_math.as](../data/script/src/helpers/production_math.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as)
+- [data/script/src/manager/builder.as](../data/script/src/manager/builder.as)
+- [data/script/src/manager/commands.as](../data/script/src/manager/commands.as)
+- [data/script/src/manager/factory.as](../data/script/src/manager/factory.as)
+- [data/script/src/manager/ferry.as](../data/script/src/manager/ferry.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [doc/actor-matrix.md](actor-matrix.md)
+- [doc/air-layout-and-priority-plan.md](air-layout-and-priority-plan.md)
+- [doc/air-management.md](air-management.md)
+- [doc/air-wave-attacks.md](air-wave-attacks.md)
+- [doc/angelscript-references.md](angelscript-references.md)
+- [doc/base-layout.md](base-layout.md)
+- [doc/benchmarks/air-management.md](benchmarks/air-management.md)
+- [doc/decisions.md](decisions.md)
+- [doc/invariants.md](invariants.md)
+- [doc/known-issues.md](known-issues.md)
+- [doc/roles/README.md](roles/README.md)
+- [doc/roles/air.md](roles/air.md)
+- [doc/roles/air_build.md](roles/air_build.md)
+- [doc/roles/air_rules.md](roles/air_rules.md)
+- [doc/transport-ferry.md](transport-ferry.md)
+- [src/circuit/module/BuilderManager.h](../src/circuit/module/BuilderManager.h)
+- [src/circuit/script/BuilderScript.cpp](../src/circuit/script/BuilderScript.cpp)
+- [src/circuit/script/FactoryScript.cpp](../src/circuit/script/FactoryScript.cpp)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/builder/BuilderTask.cpp](../src/circuit/task/builder/BuilderTask.cpp)
+- [src/circuit/terrain/TerrainManager.cpp](../src/circuit/terrain/TerrainManager.cpp)
+- [src/circuit/terrain/TerrainManager.h](../src/circuit/terrain/TerrainManager.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/production_math_test.cpp](../tests/production_math_test.cpp)
+- [tests/production_math_tests.as](../tests/production_math_tests.as)
+- [tools/playtest/checks/air/combat/air_attack.json](../tools/playtest/checks/air/combat/air_attack.json)
+- [tools/playtest/checks/air/reliability/air_legacy.json](../tools/playtest/checks/air/reliability/air_legacy.json)
+- [tools/playtest/checks/air/economy/air_capacity.json](../tools/playtest/checks/air/economy/air_capacity.json)
+- [tools/playtest/checks/air/reliability/air_compile.json](../tools/playtest/checks/air/reliability/air_compile.json)
+- [tools/playtest/checks/air/economy/air_economy.json](../tools/playtest/checks/air/economy/air_economy.json)
+- [tools/playtest/checks/air/reliability/air_switch.json](../tools/playtest/checks/air/reliability/air_switch.json)
+- [tools/playtest/checks/air/cooperation/air_transport.json](../tools/playtest/checks/air/cooperation/air_transport.json)
+- [tools/playtest/checks/air/economy/air_transition.json](../tools/playtest/checks/air/economy/air_transition.json)
+- [tools/playtest/checks/tech/economy/tech_control.json](../tools/playtest/checks/tech/economy/tech_control.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py)
+- [tools/playtest/summarize_air.py](../tools/playtest/summarize_air.py)
+- [tools/playtest/widgets/air_fixture.lua](../tools/playtest/widgets/air_fixture.lua)
+- [tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
+## D-148 — AIR targets fusion by twenty minutes after every owned mex upgrade
+
+**Date:** 2026-09-30. **Status:** Played: Armada/Cortex meet the target;
+Legion finishes 2.5 seconds late after three T2-constructor losses. All three
+finish every owned mex upgrade before starting fusion.
+
+**Decision.** The owner's target is a completed first fusion by 20 minutes,
+with all owned mexes upgraded before construction begins. The priority is
+absolute; the time is an aim, not permission to skip distant, unsafe, gifted,
+unfinished or currently reclaiming extractors. Existing reactor frames finish
+if a new basic mex arrives afterwards. This supersedes D-147's late reactor
+benchmark and the proposed partial-upgrade reactor lane in KI-436.
+
+AIR starts preparation twelve minutes before the target. A separate forecast
+buys T2 access when no advanced constructor exists; it no longer waits to fund
+the plant, constructor, mexes and support simultaneously. Initial own expansion
+is bounded at six mexes and stops during preparation. This prevents creating
+new upgrade obligations faster than they can finish. Gifted mexes still count.
+The ordinary late-production funding gate is unchanged. T1 assistants and two
+T2 builders work on upgrades; optional aircraft pause after the interception
+floor. The existing transport-first dispatch remains first.
+
+The access forecast covers 300 seconds at +12 metal/+450 energy. In intermediate
+games the 600-energy floor delayed a funded plant with a full bank; fusion
+finished 20:50 for Armada and 21:39 for Cortex. The second T2 constructor now
+precedes the full T2 fighter quota: previously it arrived at 20:50, too late to
+finish the mex obligations. Recovery and cost forecasts remain mandatory.
+
+**Mechanism.** The sole native addition exposes the existing extraction rate
+as `GetExtractsMetal`. AIR compares live owned extractor rates with loaded
+advanced definitions, avoiding a three-name list that misses cloaked/armed or
+underwater variants. Every reactor admission reads current owned units and
+pending MEX/MEXUP orders, covering the reclaim-to-frame gap. Upgrade selection
+uses actual ownership and per-spot claims without the old 3,500-elmo radius.
+AirBuild cancels invalid unstarted reactor orders and blocks their resumption.
+
+**Rejected.** A timer that forces fusion while upgrades remain, a reactor lane
+after only initial upgrades, treating queued/unfinished upgrades as complete,
+or changing TECH's economy/controller. The target cannot be guaranteed after
+combat losses, inaccessible owned mexes or insufficient income.
+
+**Invariant.** INV-077: no AIR reactor is admitted with pending owned mex work.
+The independent playtest observer also checks actual reactor-frame creation.
+Pure tests cover basic/advanced extraction, queued and unfinished work, and
+the fact that passing the target time never overrides the mex gate.
+The playtest judge must not accept events whose recorded frame exceeds their
+deadline, even when a buffered log read crosses it. Its previous batch-level
+check incorrectly accepted Legion's 20:02.5 completion; event-time checks and
+six regression tests fix that measurement error without changing gameplay.
+
+**Verification.** Native build `6a963dd33d8a9b1d` succeeded; 38 executable
+AngelScript policy tests and six Python watcher regressions passed. Final
+natural first fusions: Armada 18:41, Cortex 19:16, Legion 20:02.5. All six owned
+mexes were upgraded in each case; no script/crash/invariant errors. The
+intermediate gift test completed at 19:09. Legion retains a deadline failure,
+recorded in KI-436; the mex gate is never bypassed. Simulation evidence is in
+[AIR benchmarks](benchmarks/air-management.md). TECH policy/config remains
+unchanged. An initial host compile rejected a mutable definition argument;
+the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
+
+**Files.** [settings](../data/script/src/global.as),
+[pure policy](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[binding](../src/circuit/script/InitScript.cpp),
+[tests](../tests/production_math_tests.as),
+[transition checks](../tools/playtest/checks/air/economy/air_transition.json),
+[gift checks](../tools/playtest/checks/air/economy/air_fusion_gift.json),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[playtest judge](../tools/playtest/playtest.py),
+[deadline tests](../tools/playtest/test_playtest_deadlines.py),
+[AIR management](air-management.md), [AIR role](roles/air.md),
+[action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
+[API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [issues](known-issues.md),
+[benchmarks](benchmarks/air-management.md), [decision record](decisions.md).
+
+## D-149 — AIR packs six-wind groups and scales construction from income
+
+**Date:** 2026-09-30. **Status:** Played: compact groups, lost-slot replacement,
+earlier turret growth and funded mobile scaling. Exact reactor deadlines still
+fail in some contested runs; every owned mex must finish first.
+
+**Decision.** Follow the owner's six-wind request with atomically reserved
+3-by-2 groups of touching loaded footprints and a 144-elmo gap between group
+bounding circles. Fill holes before opening another group. Native slots own
+claims, frames and destruction; `air.wind.*` metadata supports adoption. Use
+existing reservation primitives and pure grid arithmetic rather than introducing
+a second native placement engine or altering TECH's turret box.
+
+TECH's useful construction principle is eight work/second per metal/second,
+with 1.5 times the target while metal floats. AIR applies it to independent
+mobile work and production-bay support. Loaded work rates determine constructor
+counts; post-T2 shares are 40% T1 and 60% T2, capped at ten/eight. T1 stays useful
+for winds and ordinary nanos. Bay support takes the larger of funded aircraft
+throughput and an income-based floor, preserving the five/twenty turret bounds.
+Funding, recovery and queue accounting still gate actual recruitment/building.
+
+Finish pending nanos and grow support before general fusion-preparation
+assistance. Reuse one target selector for mobile builders and idle production
+turrets, with actual reach for immobile units. Static repair has no timeout;
+the AIR tick aborts economy assistance when the owning plant has a unit frame,
+returning its turrets to production. This avoids capturing production support
+for an entire long construction project. The existing allied-transport prehook
+still runs before AIR recruitment. Immediate fighter coverage precedes funded
+workforce growth; the full interception quota follows it.
+
+**Rejected.** Per-wind 96-elmo scattering, one contiguous field without raid
+separation, copying TECH's layout, counting factory-bound nanos as mobile work,
+fixed constructor thresholds independent of faction work rate, or relaxing the
+all-owned-mex gate to meet the fusion clock. TECH policy/settings, JSON, native
+code and samples remain unchanged. Legacy AIR remains the explicit old path
+(KI-437), not a second copy of this controller.
+
+**Invariant.** INV-078 requires every new AIR wind construction order to belong
+to a reserved six-slot cluster. The observer independently checks actual grid
+positions and group gaps. INV-076 retains sole ownership of nano construction;
+INV-077 still blocks reactors until every owned mex upgrade is complete.
+
+**Corrections found while playing.** The first INV-078 implementation read a
+served slot before task assignment; required pins are served later, so the
+checker must inspect the planned position first. A Legion replay then showed
+repair tasks carry the wind target's definition but no placement slot: only
+ENERGY construction belongs in that invariant. Neither correction changes
+placement. The reactor observer also misclassified fixture-spawned AFUS as AI
+construction; BAR forwards the engine's builder ID, allowing provenance-aware
+checks while logging spawns separately. Natural scorecards now require an
+observed reactor frame with zero pending mexes. Turret assertions are scoped
+to the independent team-0 observer, not another AI's bay log. Failed reports
+remain in the [evidence](air-wind-and-build-power.md).
+
+**Verification.** The native ranking, geometry and lane suites and 46 executable
+AngelScript policy tests pass. API parity checks 239 used members. Natural
+Armada reaches fusion at 18:09.7 and doubles the prior turret count at ten and
+twenty minutes. Cortex rebuilds an induced wind loss in the same slot but
+finishes fusion at 20:45.2 after three early constructor losses; KI-436 retains
+that performance limitation. A supplied-income Legion game reaches ten T1,
+eight T2 constructors and twenty turrets by 11:20. It supplies economy and two
+advanced constructors and is not evidence of natural late-game income.
+Final code completes Legion fusion at 19:10.1; Armada misses at 21:46.5 after
+losing its first T2 plant and nine constructors. The final capacity replay has
+ten/eight constructors and twenty-three turrets at twelve minutes. Actual nano
+construction and return-to-production events are observed. No final run has a
+script, crash, invariant or observer error; the timing failure remains explicit.
+The [evidence](air-wind-and-build-power.md) records final replays, combat and
+stall measurements, diagnostic failures and verification limits. Complete
+save/load remains KI-209; no repeated PvP win-rate claim is made.
+
+**Files.** [settings](../data/script/src/global.as),
+[pure arithmetic](../data/script/src/helpers/production_math.as),
+[layout](../data/script/src/manager/air_layout.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[tests](../tests/production_math_tests.as),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[cluster checks](../tools/playtest/checks/air/layout/air_clusters.json),
+[loss checks](../tools/playtest/checks/air/economy/air_wind_loss.json),
+[workforce checks](../tools/playtest/checks/air/economy/air_build_power.json),
+[plan and evidence](air-wind-and-build-power.md),
+[AIR management](air-management.md), [role settings](roles/air.md),
+[action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[issues](known-issues.md), [benchmarks](benchmarks/air-management.md),
+[decisions](decisions.md).
+
 ## Process decisions
 
 **No automatic commits.** Nothing in this work was committed by the assistant.
@@ -6046,6 +8484,95 @@ variable does not survive the call.
 **Deploy `config/` and `script/` with the DLL.** Several of these changes are
 config-only or script-only; a DLL-only refresh silently ships stale policy.
 
+## D-150 — AIR uses commander factory assistance and a growing fighter screen
+
+**Partly superseded by D-151.** The fixed initial-fighter income gate and
+strictly local post-crew fallback left a commander guarding an empty factory
+in the owner's game. D-151 corrects both; the original decision/evidence remains.
+
+**Decision.** Implement the owner's scout → three completed air constructors
+→ fighter opening. Once the first air factory exists, the commander finishes
+and guards it, using local energy recovery only when necessary. Flying builders
+own remote mex work. Later commander work remains local or assists the factory.
+Wind placement tries local holes and a complete local six-slot group before
+walking; remote fallback is permitted only before a constructor completes.
+
+The fighter screen starts near the closest allied TECH start (own start when
+none is known), widens and advances with live strength, and retracts after
+losses. All T1 fighters screen; T2 reserves use income/threat quotas and remain
+exclusive with bomber escorts. Each fighter owns a route, distributed across
+at most eight patrol cells. Native `SetPatrol` is opt-in and defaults off, so
+existing TECH routes retain their behavior. Legion's opening Noctua receives a
+scouting route because the shared roster identifies it as the fighter/scout
+but its native classification is anti-air, not SCOUT.
+
+**Reasoning / alternative rejected.** Keeping the commander on generic economy
+rules permits distant repair and mex work despite fast flying builders. Moving
+all fighters together forms a blob instead of a screen. Sharing native patrol
+execution avoids another fighter task implementation; script retains every
+count, anchor, geometry and timing decision. Initial scout completion is
+latched; a scout loss must not continuously reset recruitment. Transport
+requests stay above this opening through the existing shared ferry prehook.
+
+**Invariant.** INV-079 forbids new commander mex orders once an air plant exists
+and observes scout/crew/fighter completion order. INV-080 keeps screen endpoints
+inside the map. INV-072 still excludes simultaneous home and wave membership;
+INV-077 still requires all owned mex upgrades before reactor construction.
+
+**Files and verification.** The [design and evidence](air-opening-and-screen.md)
+lists implementation files, checks and played results. No TECH policy, JSON
+profile, sample tree or unit classification is changed. All 62 arithmetic tests
+and native suites pass. Final 25-minute natural Armada/Cortex/Legion games pass
+the opening and screen checks with no gameplay invariant failure. Fusion is
+20:23.4 / 20:06.7 / 20:22.6, so the exact deadline still fails (KI-436).
+The controlled mixed-team fixtures prove screen growth/contraction and
+transport delivery but fail TECH invariants: gift provenance in the initial
+run (KI-435), and unfinished turret count in the final run (INV-019, KI-427).
+Neither is labelled a passing combined test. Recalibrating
+reactor timing or changing TECH's diagnostic is deliberately deferred; neither
+check was weakened. Commit remains local under the owner's explicit instruction.
+
+## D-151 — AIR leaves idle factories and immediately recruits its first screen
+
+**Decision.** The initial fighter floor follows three completed air constructors
+without the normal production income gate. Pending recruitment still prevents
+duplicate orders; other defenders count toward the floor, while Legion's
+opening scout does not. Transports retain their shared priority prehook.
+
+After the crew, a commander guards only a plant with actual work: an unfinished
+plant or a live recruit task, including its pre-frame delay. Local work remains
+preferred; an idle factory permits an economy search up to 900 elmos. Assist
+the nearest unfinished reachable structure rather than chase an air constructor.
+If neither assistance nor energy construction is possible, wait briefly.
+
+**Reasoning / rejected alternative.** The owner's log shows 130 energy income
+and over 1,150 stored energy, yet the hard 160-income gate refused fighters.
+Removing all production gates would overspend later; only the initial defensive
+floor bypasses them, at NORMAL priority below emergency energy construction.
+The D-150 local-only fallback repeatedly re-selected an empty factory. Unlimited
+commander travel is unnecessary; bounded movement retains the walking-cost
+preference while using otherwise idle build power. TECH and native code stay
+unchanged. The guard timeout expires, but builder wait preserves the previous
+engine command. D-151 therefore explicitly stops that stale guard when no
+economy task can be selected; the independent observer caught this during play.
+
+**Invariant.** INV-081 forbids renewing post-crew commander guard on an idle
+plant; the game observer checks actual commands after ten idle seconds.
+INV-082 requires initial fighter admission, with the observer checking the
+first frame within five seconds of crew completion unless a transport intervenes.
+INV-077/078/079 retain mex-before-reactor, six-wind placement and no commander
+mex orders after a plant exists.
+
+**Files and verification.** [Plan and played evidence](air-idle-factory.md)
+tracks the implementation and test results. All 67 pure policy tests pass.
+Final 12-minute natural Armada, Cortex and Legion runs pass all opening checks:
+first fighter frames arrive 1.07, 1.50 and 1.27 seconds after the third
+constructor. The forced-idle fixture passes with actual commander economy
+assistance during the pause. No script errors, crashes or invariant violations
+occur in these final runs. The initial stale-engine-guard failure is retained
+in the evidence. TECH, native code and profile JSON are unchanged; the existing
+fusion benchmark limitation is not re-measured by these opening tests.
+
 ## Maintaining this record
 
 Add an entry when a change involved a judgement a reader could reasonably
@@ -6071,3 +8598,2679 @@ one.
 - [`known-issues.md`](known-issues.md) — open problems.
 - [`intent.md`](intent.md) — the long-term goals these decisions serve.
 - [`../AGENTS.md`](../AGENTS.md) — the repository map and working rules.
+
+
+## D-152 � Reserve expansion before fortification; AIR mex-first access and first-mex delivery
+
+**Superseded in part by D-153.** The all-mex T2 lab gate below is historical.
+Labs now use sustained income or a full-cost metal bank; the fusion mex gate
+remains. See [D-153 validation](allied-layout-air-income-results.md).
+
+**Decision.** Implement the owner's [design](air-tech-expansion-plan.md):
+[AIR economy](../data/script/src/manager/air_economy.as),
+[AIR layout](../data/script/src/manager/air_layout.as),
+[AIR build](../data/script/src/roles/air_build.as) and
+[dispatch](../data/script/src/roles/air_rules.as) gate all T2 plants on actual
+mex completion and scale T1 conversion without an income ceiling. Hold six
+complete T2 turret banks plus two T1 sites; count only real factories as
+production capacity. Strict upgrading implies reliance on allied T2 access;
+a solo self-tech exception was rejected because it contradicts the request.
+
+Reuse [TECH's factory planner](../data/script/src/roles/tech_factories.as),
+with a distinct future state, ahead of
+[fortification](../data/script/src/roles/tech_fortifications.as). Existing
+spending rules activate future clusters. `defence.fortify` and early defense
+share the new action; [weapon clusters](../data/script/src/roles/tech_weapons.as)
+order walls first and pin their sites. Reserve exits too; closed asset rings
+were rejected because they trap builders and obstruct upgrades.
+
+[Allied roster](../data/script/src/manager/roster.as) appends the first completed
+mex anchor compatibly. [Ferry policy](../data/script/src/manager/ferry.as)
+uses [native free-ground search](../src/circuit/terrain/TerrainManager.cpp)
+with script-selected threat limits; [ferry task](../src/circuit/task/fighter/FerryTask.cpp)
+revalidates at landing. A no-safe-site result retains ownership for retry.
+The anchor stays latched through mex loss and upgrades. This applies to
+controlled AI peers; the protocol cannot report human construction.
+
+**Invariant.** INV-083 forbids premature AIR T2 plant orders; INV-084 requires
+complete twenty-turret speculative banks; INV-085 forbids fortification in
+friendly lanes; INV-086 forbids a ferry destination over its threat limits.
+The [actor matrix](actor-matrix.md) names every new actor.
+
+**Status.** Built, Checked, Played with limits. [Measured results](air-tech-expansion-results.md)
+retain every failed and successful scenario. 78 executable pure policy tests,
+native geometry/ranking checks, API parity, role docs and invariant-practice
+checks pass. Mixed TECH reports still fail global invariants (KI-427); fusion
+misses twenty minutes in the measured natural sample (KI-436). Lifecycle and
+contested-landing coverage is incomplete (KI-439).
+
+D-152 additional invariant: INV-087 distinguishes a future reservation from an active construction project. Role re-entry discards invalid future IDs and resets fortification caches before adopting native saved claims.
+
+**Further decisions.** A future reservation requires both the caller's
+`planNew` authorization and `MayPlan`; treating it as an already-funded project
+was rejected. Idle TECH air builders share the finite fortification/weapon
+plans instead of keeping the old scattering fallback. Resource protection can
+start with T2 access even before a base turret stands. Empty geo perimeters
+retry at wider radii rather than being marked protected forever. A ferry landing
+checks the cargo movement class at the destination, not connectivity from the
+origin; walking off its factory pad retains a separate same-area check.
+The engine's 256-elmo area unload remains (D-110); nearest sampled safe ground
+is not an exact-coordinate landing guarantee.
+
+**Supporting files.** Configuration and shared arithmetic:
+[settings](../data/script/src/global.as), [weapons profile](../data/config/weapons.json),
+[layout offsets](../data/script/src/helpers/layout_helpers.as),
+[production math](../data/script/src/helpers/production_math.as),
+[unit cases](../tests/production_math_tests.as).
+TECH wiring: [role](../data/script/src/roles/tech.as),
+[actions](../data/script/src/roles/tech_build.as), [rules](../data/script/src/roles/tech_rules.as),
+[forward filters](../data/script/src/roles/tech_forward.as),
+[invariant actor](../data/script/src/manager/invariants.as), [promises](invariants.md).
+Native contract: [terrain header](../src/circuit/terrain/TerrainManager.h),
+[ferry header](../src/circuit/task/fighter/FerryTask.h),
+[registration](../src/circuit/script/InitScript.cpp), [API reference](angelscript-references.md),
+[protocol](transport-ferry.md).
+Regression tooling: [expansion checks](../tools/playtest/checks/shared/economy/expansion.json),
+[wall checks](../tools/playtest/checks/shared/layout/fortification.json),
+[observer](../tools/playtest/widgets/expansion_watch.lua),
+[controlled assets](../tools/playtest/widgets/fortification_fixture.lua).
+Reviewed role references: [AIR](roles/air.md), [actions](roles/air_build.md),
+[sequence](roles/air_rules.md), [TECH](roles/tech.md), [build](roles/tech_build.md),
+[factories](roles/tech_factories.md), [forward](roles/tech_forward.md),
+[fortification](roles/tech_fortifications.md), [rules](roles/tech_rules.md),
+[weapons](roles/tech_weapons.md). [Generated roster/config report](knowledge/barb-unit-config.md)
+and [known issues](known-issues.md) updated.
+
+D-152 delivery-race correction: the final natural regression exposed a gift
+created before TECH's +20-income transport request. `TryCarry` formerly
+returned false, giving it at base 2,219 elmos from AIR's first mex. With an
+allied AIR provider, it now requests and queues the constructor until the
+carrier/task exists. Existing `ferry.cargo` owns that wait; `AwaitTransportSeconds`
+(120) bounds failure to obtain a carrier. No-provider and expired-arrival cases
+retain walking fallback. The expansion observer explicitly expects team 0's
+handover within 999 elmos in this Supreme scenario; INV-086 still checks the
+chosen safe point. Actual queued and delivered positions are recorded in the
+final evidence, rather than accepting a log of the chosen target alone.
+
+Final verification: the 45-minute supplied-economy capacity game passes with
+eight completed T2 plants, full twenty-nano support banks and a bomber wave.
+The final natural game physically delivers both queued gifts near their first
+mexes (182/216 elmos) and starts its T2 air plant only after all six upgrades.
+Its fusion is still pending at 25 minutes; no 20-minute success is claimed.
+The [results](air-tech-expansion-results.md) retain strict overall TECH invariant
+failures and unplayed lifecycle limits. The matching DLL, symbols and complete
+current data tree are published to the mandatory engine build output; no live
+BAR installation is written and the commit stays local as requested.
+
+
+## D-153 — Allied reservations and income-gated AIR labs
+
+**Decision.** Implement the [recorded plan](allied-layout-air-income-plan.md).
+Use one spatial rectangle index in native `CAllyTeam` for all allied slot/zone
+owners. Sharing geometry rather than copying role policy avoids a second
+reservation ledger over messages. All admissions, ordinary site searches and
+build-command retries honor foreign footprints. Full owner cluster envelopes
+exclude unrelated defenses, including holes vacated by old structures.
+Same-owner overlap is legal for nested slots and zones and releases independently.
+
+AIR and TECH recheck untouched clusters before their first order, release only
+that plan if physically blocked, and search again. A native claim/frame or
+persisted start locks the cluster. AIR retries reuse the same saved bay key;
+a failed relocation does not count as a still-held speculative bay. The Armada
+obstruction run exhausted the old 17-ring search, so AIR now exposes
+`BaySearchRings=25` (128-elmo steps). The longer search still rejects every
+foreign footprint and map-boundary violation. TECH plans
+two future clusters per tier without purchasing them or changing its spending
+sequence. Its partial economy boxes keep initial terrain holes; treating those
+holes as new obstructions was rejected after the first regression. Failed
+forward searches now advance their bounded persisted attempt count (KI-423).
+
+Replace only AIR's lab gate: minimum income over a complete fresh ten-second
+window >=50 metal/s OR current bank >= loaded lab metal cost. Full-bank orders
+precede mex upgrading and bypass existing support/capacity waits, as explicitly
+requested. One unfinished plant and the configured cap still apply. Reactors
+retain mex completion. Keep transport requests, scout/three-constructor opening,
+initial fighters and funded build-power growth ahead of optional strikes.
+T1 strikes replenish toward bounded income-scaled targets; Cortex uses Shurikens.
+A low-income T2 purchase does not shut the T1 plant off. Energy recovery still
+protects the economy; first-fusion preparation alone no longer pauses strikes.
+
+**Invariant.** INV-083 now checks income/full-bank lab admission, superseding its
+D-152 mex promise. INV-088 rejects cross-owner reservations and checks pinned
+building orders. INV-084 retains complete twenty-slot speculative AIR banks;
+INV-087 keeps speculative TECH plans out of active project accounting. The
+[actor matrix](actor-matrix.md) and [register](invariants.md) describe ownership.
+
+**Status.** Built, Checked, Played with limits. The [measured results](allied-layout-air-income-results.md)
+retain failed iterations and final runs. Native geometry/ranking, eleven shared
+index cases and 93 executable AngelScript policy cases pass. Actual games prove
+reciprocal exclusion, forced relocation, active-cluster stability, both funding
+paths, continued T1 fighters/bombers/Shurikens and constructor production.
+Mixed games retain TECH invariant failures (KI-427); the natural fusion still
+misses twenty minutes (KI-436). Shared save/load and runtime-role lifecycle
+coverage remain incomplete (KI-439). Do not infer a clean PvP benchmark.
+
+**Files.** Shared native mechanism:
+[index](../src/circuit/terrain/AlliedReservations.h),
+[ally ownership](../src/circuit/unit/ally/AllyTeam.h),
+[terrain implementation](../src/circuit/terrain/TerrainManager.cpp),
+[terrain contract](../src/circuit/terrain/TerrainManager.h),
+[bindings](../src/circuit/script/InitScript.cpp),
+[build retries](../src/circuit/task/builder/BuilderTask.cpp),
+[mex](../src/circuit/task/builder/MexTask.cpp),
+[mex upgrades](../src/circuit/task/builder/MexUpTask.cpp),
+[geo](../src/circuit/task/builder/GeoTask.cpp).
+
+Script policy:
+[settings](../data/script/src/global.as),
+[layout helpers](../data/script/src/helpers/layout_helpers.as),
+[production math](../data/script/src/helpers/production_math.as),
+[income window](../data/script/src/manager/economy.as),
+[AIR economy](../data/script/src/manager/air_economy.as),
+[AIR layout](../data/script/src/manager/air_layout.as),
+[AIR production](../data/script/src/manager/air_production.as),
+[AIR actions](../data/script/src/roles/air_build.as),
+[AIR sequence](../data/script/src/roles/air_rules.as),
+[TECH economy layout](../data/script/src/manager/layout.as),
+[TECH factory plans](../data/script/src/roles/tech_factories.as).
+
+Tests and tooling:
+[native cases](../tests/allied_reservations_test.cpp),
+[test target](../tests/CMakeLists.txt),
+[policy cases](../tests/production_math_tests.as),
+[probe](../tools/playtest/allied_layout_probe.as),
+[probe preparer](../tools/playtest/prepare_allied_layout_check.py),
+[blocker widget](../tools/playtest/widgets/allied_layout_fixture.lua),
+[bank fixture](../tools/playtest/widgets/air_income_fixture.lua),
+[income fixture](../tools/playtest/widgets/air_sustained_fixture.lua),
+[layout checks](../tools/playtest/checks/shared/layout/allied_layout.json),
+[bank checks](../tools/playtest/checks/air/economy/air_income.json),
+[income checks](../tools/playtest/checks/air/economy/air_sustained.json),
+[expansion observer](../tools/playtest/widgets/expansion_watch.lua),
+[run instructions](../tools/playtest/README.md).
+
+Reviewed references:
+[AIR](roles/air.md), [AIR actions](roles/air_build.md),
+[AIR sequence](roles/air_rules.md), [TECH factories](roles/tech_factories.md),
+[AIR management](air-management.md), [native layout](base-layout.md),
+[API](angelscript-references.md), [known issues](known-issues.md).
+
+## D-154 - AIR and TECH walls leave allied start areas open
+
+**Later requirement:** D-155 supersedes the bank-funded bypass of expansion
+support; the first-lab income/full-bank rule remains. See
+[support admission](air-support-before-expansion.md).
+
+**Decision.** Use one shared script wall policy, with a configurable 1,200-elmo
+base exclusion around the union of known allied starts. Test full footprints,
+not just centres, at candidate selection and after native snapping. Advance
+TECH lane walls beyond the exclusion, keep forward resource perimeters, and
+omit wall rings around rear-base assets. AIR's queued-defense admission uses
+the same helper. Late start announcements release invalid unstarted TECH wall
+claims; existing frames are preserved. No native change or role build-order
+change is needed.
+
+**Why.** The owner wants walls nearer the front, keeping the slow commander's
+base and economic/factory expansion open. The old 752/800-elmo lane anchors
+were inside the base area. This explicitly supersedes D-152's requirement to
+wall every geo and advanced mex. The radius matches the existing front-factory
+base-radius default but is independently configurable. Rejected: disabling all
+walls (loses forward protection), checking only this AI's start (still clutters
+allies), centre-only tests (allow footprint intrusion), and hardcoded native
+role policy. Ordinary guns and AA keep their existing placement rules.
+
+**Invariant.** INV-089: AIR and TECH wall construction footprints stay outside
+every known allied start's base exclusion. The shared placement audit checks
+assigned building tasks once per second, and both controlled checks retain the
+global invariant forbid. The new fixture also audits actual wall creation.
+
+**Verification.** Ten geometry cases and the full required native/AS suite
+pass. Four-AI games compiled the scripts and verified rear-base exclusion plus
+forward geo/mex walls; see the exact run manifests and limitations in the
+[design and results](wall-base-exclusion.md). Those games remain strict FAIL
+because other TECH invariants fired; no INV-089 or script error occurred.
+Save/reload migration and unknown human starts are not claimed verified.
+
+The requested nuke investigation used an unchanged control with
+`RushObjective="nuke"`: silo at 18:15, positive stockpile but no target or launch
+by 25.1 minutes. `auto` still selects `afus`. Do not silently enable a nuke rush
+or change targeting while answering this question: the shared-super dispatch
+bypass is documented in KI-418, and the 16:30 timing miss in KI-441.
+
+Files: [shared settings](../data/script/src/global.as),
+[JSON radius](../data/config/weapons.json),
+[geometry](../data/script/src/helpers/placement_math.as),
+[wall policy](../data/script/src/helpers/wall_helpers.as),
+[placement audit](../data/script/src/helpers/layout_helpers.as),
+[AIR services](../data/script/src/roles/air_rules.as),
+[fortifications](../data/script/src/roles/tech_fortifications.as),
+[weapon clusters](../data/script/src/roles/tech_weapons.as),
+[unit cases](../tests/placement_math_tests.as),
+[CTest registration](../tests/CMakeLists.txt),
+[test runner](../tools/run_native_tests.sh),
+[wall fixture](../tools/playtest/widgets/wall_exclusion_fixture.lua),
+[wall checks](../tools/playtest/checks/shared/layout/wall_exclusion.json),
+[forward fixture](../tools/playtest/widgets/fortification_fixture.lua),
+[forward checks](../tools/playtest/checks/shared/layout/fortification.json),
+[playtest reference](../tools/playtest/README.md),
+[AIR rule reference](roles/air_rules.md),
+[fortification reference](roles/tech_fortifications.md),
+[weapon reference](roles/tech_weapons.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), and regenerated
+[unit configuration report](knowledge/barb-unit-config.md).
+
+## D-155 - AIR completes twenty support turrets per T2 lab before expansion
+
+**Decision.** Additional T2 air labs require every existing T2 lab to be
+finished and supported by twenty completed, owned, in-range turrets. A turret
+belongs to one nearest live bay. Queued/framed turrets are future capacity,
+not admission credit. Recheck gifts, losses and completion on new/resumed
+orders and cancel invalid unstarted orders; retain actual frames. New T2
+reservations require all twenty slots. The first lab retains D-153's
+income/full-bank test; the bank exception no longer bypasses expansion support.
+
+Floating metal raises construction demand by a sixty-second drawdown toward
+half storage. Factory production speed cannot offset economy construction
+power. When expansion is affordable, existing T2 banks target twenty. Up to
+three funded turret projects precede converters during overflow, followed by
+assistance; energy recovery and mex upgrades still lead. Funded constructor
+growth during overflow does not subtract the full remaining cost of every
+large project from a short recruitment forecast. TECH policy is unchanged.
+
+**Why.** The owner explicitly requires twenty completed turrets before the
+next T2 lab. The control run built four labs with just two turrets on the first
+and none on the others. Full-bank admission bypassed support, unfinished
+support counted toward a low dynamic target, and construction growth could
+be blocked by whole-project cost accounting. Rejected: crediting queued
+support, averaging turrets across labs, bypassing support with stored metal,
+unbounded construction concurrency, or increasing TECH's spending targets.
+The exact twenty threshold is owner policy; the game meta supports assisting
+factories before duplicating them, not a universal twenty-turret optimum.
+
+The test launcher also resolves relative write directories before launching
+and matching processes: its engine working directory differs from the caller.
+An initial relative-path invocation could not start the intended test; the
+corrected launch uses the explicit workspace directory. This resolves KI-438,
+verified by launch/targeted-stop boundary probes and live engine lookup. No game-install
+configuration is changed.
+
+**Invariant.** INV-090: an additional AIR T2 lab is ordered only after every
+existing T2 lab is finished and has twenty completed uniquely assigned support
+turrets. Record audits admission; an independent engine observer checks actual
+new frames. Both capacity and support checks forbid all invariant violations.
+
+**Verification.** The native suite passes: 76 ranking checks, geometry tests,
+eight lane suites, 109 production-policy cases and ten placement-policy cases.
+The host compiler caught a const-handle mismatch; corrected before the final
+runs. The donated-constructor game finishes fusion at 18:33.7, its second lab
+starts with twenty completed turrets, and no script/invariant errors occur.
+The strict 14-minute first-lab deadline still fails (KI-436). The capacity
+game reaches ten labs and launches a wave, with every observed expansion
+properly supported. Its strict run times out at 44.5 of 45 game minutes; all
+gameplay expectations and support event checks are met with no script or
+invariant errors. Exact manifests and limits are recorded in the
+[plan and evidence](air-support-before-expansion.md).
+Metal still overflows in the later unboosted economy (KI-442); increased build
+power is verified, elimination of overflow is not. Save/load and a full
+cross-faction/map matrix were not played for this change.
+
+Files: [settings](../data/script/src/global.as),
+[pure policy](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[building actions](../data/script/src/roles/air_build.as),
+[ordered rules](../data/script/src/roles/air_rules.as),
+[unit tests](../tests/production_math_tests.as),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[support check](../tools/playtest/checks/air/layout/air_support.json),
+[launcher](../tools/playtest/playtest.py),
+[playtest guide](../tools/playtest/README.md),
+[AIR role](roles/air.md), [building reference](roles/air_build.md),
+[rule reference](roles/air_rules.md), [management reference](air-management.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), and [plan/results](air-support-before-expansion.md).
+
+
+## D-156 - AIR keeps its economy local and defends allied airspace with fighters
+
+**Decision.** Apply the pre-written [design](air-local-economy-plan.md) to the
+experimental AIR controller. Constructor targets use 24 work/metal, caps 40/24,
+and a short recruitment forecast rather than charging a whole unfinished
+reactor to the next constructor. Interleave a fighter after two constructor
+orders. Permit six funded energy projects and cap incremental assistance by
+remaining work. Keep factory support separate, including the strict twenty
+completed turrets per existing T2 lab. Constrain new mex expansion to the start
+area; keep one worker available for previously owned distant mex upgrades.
+
+The owner explicitly replaces distributed static AA with fighter response.
+AIR opts out of shared porc/queued defense and owns bounded base flak, long-range
+AA and anti-nuke orders. The anti-nuke keeps its own core covered and chooses the
+closest feasible position toward the nearest allied start, using actual loaded
+interceptor coverage. Fresh known radar/LOS aircraft snapshots are native
+mechanism; territory, threat grouping and dispatch remain script policy.
+TECH files and spending behavior are deliberately unchanged. Existing TECH
+invariant failures observed in the mixed fixture remain strict whole-game
+failures, recorded under KI-427 rather than hidden by an AIR-only verdict.
+
+Optional strikes compare completed available fighter value against known enemy
+air (1.25 times), counting home fighters and waiting wave escorts, not escorts
+already committed to an attack. The fixed enemy-air cutoff rejected a Cortex
+strike despite a superior fighter reserve. Base-defense caps sum all faction
+variants: a donated foreign constructor must not bypass the single anti-nuke
+limit. Both cases were exposed and corrected in the mixed defense fixtures.
+
+**Alternatives rejected.** Raising constructor caps alone leaves serialized
+construction and distributed defense jobs intact. Counting factory turrets as
+idle economic work double-counts production capacity. A fixed bomber/gunship
+clock ignores air control and resources. Decaying air heat is not a live raid.
+Missile travel range is not anti-nuke coverage. Expanding around the current
+worker continually moves the home boundary. We keep the all-owned-mex reactor
+gate while limiting remote upgrade concurrency; dropping distant owned mexes
+from that gate would violate the owner's standing instruction.
+
+**Invariant.** INV-091 bounds AIR static-defense orders to its base; INV-092
+bounds new mex expansion to home; INV-093 confines defensive interception targets
+to friendly territory; INV-094 retains anti-nuke own-core coverage. INV-077/078/
+090 still guard reactor mex completion, six-wind placement and twenty-turret
+expansion. The wind audit now resolves framed units through native reservation
+identity: Legion's model-midpoint offset made an exact position comparison
+incorrect when resuming a damaged wind frame. The independent observer supports
+all six possible first-built slots, so parallel building does not invent a
+misaligned cluster.
+
+**Verification.** Native build and unit suite pass (76 ranking checks, geometry,
+eight lane suites, 128 production and twenty placement cases). The matched
+Armada constructor-gift run passes 25 minutes with zero script/invariant lines,
+fusion before twenty minutes and all sampled constructors local. The mixed
+Armada fixture demonstrates fighter dispatch/damage/return and anti-nuke
+completion plus stockpile; its strict report fails TECH invariants and the
+since-corrected Legion framed-wind audit. Exact final runs, timings, quantitative
+limits and subsequent Cortex checks are in [the results](air-local-economy-plan.md).
+Persistent native constructor movement stalls are recorded as KI-443; broad
+late overflow remains KI-442. Save/load and a full map matrix are not verified.
+
+Files: [settings](../data/script/src/global.as),
+[home geometry](../data/script/src/helpers/air_home.as),
+[placement math](../data/script/src/helpers/placement_math.as),
+[production math](../data/script/src/helpers/production_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[layout](../data/script/src/manager/air_layout.as),
+[recruitment](../data/script/src/manager/air_production.as),
+[fighter screen](../data/script/src/manager/air_screen.as),
+[base defense](../data/script/src/manager/air_defence.as),
+[role hooks](../data/script/src/roles/air.as),
+[building actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[native observations](../src/circuit/terrain/BattleAnalysis.cpp),
+[native interface](../src/circuit/terrain/BattleAnalysis.h),
+[bindings](../src/circuit/script/InitScript.cpp),
+[production tests](../tests/production_math_tests.as),
+[geometry tests](../tests/placement_math_tests.as),
+[fixture preparation](../tools/playtest/prepare_air_check.py),
+[fixture](../tools/playtest/widgets/air_fixture.lua),
+[observer](../tools/playtest/widgets/air_watch.lua),
+[economy checks](../tools/playtest/checks/air/economy/air_local_economy.json),
+[defense checks](../tools/playtest/checks/air/combat/air_local_defence.json),
+[playtest guide](../tools/playtest/README.md),
+[AIR reference](roles/air.md), [actions reference](roles/air_build.md),
+[rules reference](roles/air_rules.md), [role index](roles/README.md),
+[management](air-management.md), [API reference](angelscript-references.md),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[known issues](known-issues.md), [plan/results](air-local-economy-plan.md).
+
+
+## D-157 - Shared sensor priorities, coordinated Junos and per-silo nuclear cooldowns
+
+**Decision.** Follow the owner's explicit order: advanced jammer, jammer,
+advanced radar, radar, then other eligible sensors. Read both known-enemy
+snapshot pools; non-combat towers were missing from the previous scan. Use
+loaded sensor vulnerability/properties plus compatible role extensions and
+JSON priorities for every profile. Empty known-target and radar-hole passes
+fall back to enemy-facing fog boundaries, without querying hidden enemies.
+
+Ally-team Juno claims cover pending orders and recent confirmed launches.
+Observe allied ground commands too, including humans, without controlling
+those units. Strategic silos count only immobile structures and keep a
+300-second blast-sized location history per physical silo. Different silos
+may strike the same place. Histories survive task recreation and allied
+transfers; destruction clears nuclear history, while an airborne Juno claim
+outlives its launcher. Stop persistent attack orders after a confirmed shot.
+Both weapon-fired and stockpile-drop paths share deduplication and accounting.
+JSON remains the policy lever. Tactical launchers/EMP keep their selectors.
+
+**Alternatives rejected.** Merely increasing jammer weights cannot recover
+targets absent from the candidate pool. An allied/global nuke lock would
+violate the explicit per-silo requirement. Recording selection time would
+cool down unfired orders; allowing a persistent attack command would bypass
+the new history. Blind random map points do not follow the observed fog edge.
+The rework option changes Juno effects, but does not supersede the owner's
+explicit tower order with scout priority.
+
+**Invariant.** INV-095 checks a confirmed strategic launch against active
+Juno claims or that silo's nuclear history. The controlled fixture also audits
+mobile-only nuclear withholding, actual launch spacing and separate silo IDs.
+
+**Verification.** See [design and measured results](strategic-targeting-plan.md).
+Six focused pure-rule suites cover priorities, mobile rejection, claim release,
+overlap, independent silos, multiple remembered areas and the exact expiry
+boundary. Save/load persistence and manually changed human orders are not
+claimed verified by those tests.
+
+Files: [super task](../src/circuit/task/static/SuperTask.cpp),
+[super interface](../src/circuit/task/static/SuperTask.h),
+[pure rules](../src/circuit/task/static/StrategicTargeting.h),
+[event dispatch](../src/circuit/CircuitAI.cpp),
+[policy loading](../src/circuit/module/MilitaryManager.cpp),
+[policy settings](../src/circuit/module/MilitaryManager.h),
+[ally state](../src/circuit/unit/ally/AllyTeam.h),
+[ally lifecycle](../src/circuit/unit/ally/AllyTeam.cpp),
+[active profiles](../data/config/),
+[unit tests](../tests/strategic_targeting_test.cpp),
+[test runner](../tools/run_native_tests.sh),
+[fixture preparation](../tools/playtest/prepare_strategic_check.py),
+[launch audit](../tools/playtest/audit_strategic_check.py),
+[playtest instructions](../tools/playtest/README.md),
+[fixture](../tools/playtest/widgets/strategic_fixture.lua),
+[Juno checks](../tools/playtest/checks/shared/combat/strategic_juno.json),
+[nuclear checks](../tools/playtest/checks/shared/combat/strategic_nuclear.json),
+[invariant checker](../tools/knowledge/check_invariants.py),
+[Juno reference](juno-targets.md), [actor matrix](actor-matrix.md),
+[invariants](invariants.md), [known issues](known-issues.md),
+[plan/results](strategic-targeting-plan.md).
+
+
+## D-158 - Experimental TECH/AIR amphibious waves and secured landfalls
+
+**Decision.** Give owned Telchines and Marauders one shared AngelScript wave
+controller, enabled only for experimental TECH/AIR with lanes enabled. Telchines
+assemble, cross, regroup on usable dry land and clear local opposition before
+advancing. Marauders exploit known economy on the reached landmass first.
+Both prefer quiet water approaches and hold/replan if no acceptable route exists.
+A timed-out crossing cannot declare a foothold secure. TECH retains these two
+unit types instead of splitting their opening wave through combat donation.
+
+Native code supplies reusable point-to-point terrain routes, observed contacts,
+underwater weapon coverage and an opt-in hold-position route command. Script
+and lanes.json own wave sizes, income gates, target scoring, quorum, dwell time
+and allowed threat. The new coverage query gives observed torpedo weapons a
+nonzero floor despite zero profile weights; existing threat maps are unchanged.
+AIR's aircraft queues and constructor/transport priorities keep their order.
+Only already-owned compatible ground factories can supply these waves, behind
+economic prerequisites; AIR does not receive a new ground-factory build order.
+
+**Alternatives rejected.** Generic attack groups skip intermediate security;
+direct attack orders can chase targets into water. A timeout-only landing admits
+stranded units. Tiny dry shoreline samples cannot hold a whole wave, so approach
+selection samples a dry square and checks actual surviving-member positions.
+Global role or torpedo-profile changes would exceed the requested TECH/AIR scope.
+
+**Invariant.** INV-096 requires a dry, regrouped foothold before onward travel.
+The controller's secured latch prevents a stalled crossing from bypassing that
+check. Factory production, donations and task lifecycle share the wave ownership
+and owned/pending count instead of issuing competing commands. The independent
+fixture audit checks actual water entry, distinct unit landfalls, onward progress,
+secured waves, combat attribution, guarded approach clearance and role isolation.
+
+**Verification.** See the [plan and measured results](amphibious-operations-plan.md).
+The initial plan preceded implementation. Tests cover the pure route and wave
+rules; real-engine capability fixtures cover Tundra Continents, Supreme Isthmus
+and Serene Caldera, with all three experimental profiles. These are controlled
+movement/combat tests with injected units, not competitive win-rate or natural
+production benchmarks. Save/load reconstruction and unmodified economic
+production remain unplayed; see KI-446. Zero torpedo weights for other native
+threat-map users remain separate (KI-447).
+
+Files:
+
+- [data/config/lanes.json](../data/config/lanes.json)
+- [data/script/experimental_balanced/main.as](../data/script/experimental_balanced/main.as)
+- [data/script/experimental_hard/main.as](../data/script/experimental_hard/main.as)
+- [data/script/experimental_terrible/main.as](../data/script/experimental_terrible/main.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/lanes.as](../data/script/src/manager/lanes.as)
+- [data/script/src/manager/military.as](../data/script/src/manager/military.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/tech.as](../data/script/src/roles/tech.as)
+- [data/script/src/roles/tech_flank.as](../data/script/src/roles/tech_flank.as)
+- [doc/actor-matrix.md](actor-matrix.md)
+- [doc/angelscript-references.md](angelscript-references.md)
+- [doc/invariants.md](invariants.md)
+- [doc/roles/air.md](roles/air.md)
+- [doc/roles/tech.md](roles/tech.md)
+- [doc/roles/tech_flank.md](roles/tech_flank.md)
+- [src/circuit/map/ThreatMap.cpp](../src/circuit/map/ThreatMap.cpp)
+- [src/circuit/map/ThreatMap.h](../src/circuit/map/ThreatMap.h)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp)
+- [src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h)
+- [src/circuit/terrain/BattleLanes.cpp](../src/circuit/terrain/BattleLanes.cpp)
+- [src/circuit/terrain/LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp)
+- [src/circuit/terrain/LaneSolver.h](../src/circuit/terrain/LaneSolver.h)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+- [data/script/src/helpers/amphibious_math.as](../data/script/src/helpers/amphibious_math.as)
+- [data/script/src/manager/amphibious_ops.as](../data/script/src/manager/amphibious_ops.as)
+- [doc/amphibious-operations-plan.md](amphibious-operations-plan.md)
+- [tests/amphibious_math_tests.as](../tests/amphibious_math_tests.as)
+- [tests/terrain_route_test.cpp](../tests/terrain_route_test.cpp)
+- [tools/playtest/audit_amphibious_check.py](../tools/playtest/audit_amphibious_check.py)
+- [tools/playtest/checks/shared/combat/amphibious.json](../tools/playtest/checks/shared/combat/amphibious.json)
+- [tools/playtest/prepare_amphibious_check.py](../tools/playtest/prepare_amphibious_check.py)
+- [tools/playtest/widgets/amphibious_fixture.lua](../tools/playtest/widgets/amphibious_fixture.lua)
+- [Known issues](known-issues.md).
+
+
+### D-158 follow-up - Rendered evidence and simulation reporting (2026-10-01)
+
+**Decision.** Honor the owner's standing request for screenshots with ongoing
+in-game analysis. Add an opt-in rendered amphibious observer and retain the
+headless fixture for automated checks. Capture actual unit positions and landfalls; select nearby units for visibility
+but issue no orders. A weapon-hit-trigger prototype missed events in repeats,
+so it was removed; combat conclusions use the independent fixture telemetry.
+Briefly slow rendering captures to 0.25 game speed and restore the previous
+speed. Recoil rejects `setmaxspeed` at or below 0.2, so the initial 0.1 attempt
+was ineffective and was corrected. Do not substitute illustrations or route
+announcements for gameplay evidence.
+
+**Alternative rejected.** Headless-only success reports and screenshots only
+after the run cannot meet the owner's request to inspect behavior as it unfolds.
+A new policy change is not justified by screenshot instrumentation alone.
+
+**Verification.** The first rendered Tundra run passed the watcher and independent
+audit at 9.4 game minutes: 20/20 distinct landfalls, four secured groups, four
+Telchine and twelve Marauder kills, 1,067-elmo minimum underwater clearance from
+a live 890-range torpedo tower. Screenshots were shown during the run. One
+close-up replay left AIR Marauders unenrolled; retain its failed report and
+[KI-448](known-issues.md#ki-448---one-rendered-tundra-repeat-did-not-enroll-air-marauders).
+Final camera verification and archive details are in the
+[results](amphibious-operations-plan.md). No production behavior changed here.
+
+**Files.** [AGENTS.md](../AGENTS.md),
+[playtest guide](../tools/playtest/README.md),
+[preparer](../tools/playtest/prepare_amphibious_check.py),
+[fixture](../tools/playtest/widgets/amphibious_fixture.lua),
+[visual observer](../tools/playtest/widgets/amphibious_visual.lua),
+[results](amphibious-operations-plan.md), [known issues](known-issues.md).
+
+
+### D-159 - Measure natural Telchine timing separately from naval pursuit restraint (2026-10-01)
+
+**Decision.** Run the requested full sixteen-AI Tundra match with ordinary
+production/economies, the pinned D-158 DLL and current scripts. Preserve the
+existing asymmetric map roster, record it explicitly, and place Legion on both
+TECH positions. A read-only observer supplies screenshots and behavioral
+updates during the simulation. End competitive metrics at GameOver, not when
+the engine later stops: the first persistent coastal hold was post-victory.
+
+**Reasoning.** Landfalls alone do not establish useful combat or strategic
+garrison behavior. The natural match completed at 38:37 with seven Telchines,
+six distinct landers, two secured stops and zero damage/kills. The +200 metal
+gate delayed their first completion until 32:58. Naval-pursuit restraint was
+therefore unexercised. Use an explicitly labelled separate controlled encounter:
+gift six Telchines, freeze economy/production, leave their orders to the AI,
+then retreat an enemy battleship after a verified hit. Spectator godmode grants
+only order permission; the fixture orders enemy team 2 and retains read access
+to the Telchine queues. No production policy changes are justified solely by
+fixing camera/fixture instrumentation; record candidate recruitment and garrison
+work as KI-449/KI-450 for scoped implementation and further natural tests.
+
+**Alternatives rejected.** Counting after-victory guards as match impact,
+declaring no chase from zero naval encounters, or using supplied units as
+natural-production evidence would overstate the result. A nearby cruiser died
+before escape, so the final target is tougher and starts at least 520 elmos
+from every Telchine. The strict result requires a surviving target beyond
+range. Onshore engine-generated ATTACK commands are automatic firing, not
+proof of pursuit; the audit checks actual ground height and hold-position state.
+
+**Invariant.** Preserve INV-096's dry regrouping/security requirement and the
+global invariant forbid in both new checks. The shore probe additionally
+requires 360 dry, hold-position samples, zero submerged naval attack orders
+and a live target over 1,000 elmos away. Match audit excludes post-GameOver
+frames. No new production invariant is introduced by observer-only tooling.
+
+**Verification.** Natural match archive
+`build-theatres/d159-tundra-full/runs/20261001-121509` is FAIL on existing and
+newly reproduced TECH invariant categories (65 pre-victory, 121 total), with
+no script errors or INV-096. This does not establish every warning's root cause.
+Final shore archive `build-theatres/d159-tundra-retreat/runs/20261001-123039`
+is PASS: 1,401.1 naval damage, ship alive 1,481 elmos away, 360/360 dry
+hold-position samples and no pursuit. Three preliminary probe failures remain
+archived and explained. Screenshots were inspected and shown during the runs.
+API parity (259 members), Python compilation and invariant-practice checks
+pass; eight pre-existing missing-hover-document links remain KI-404.
+
+**Files.** [Analysis and screenshots](tundra-8v8-telchine-analysis.md),
+[known issues](known-issues.md),
+[playtest guide](../tools/playtest/README.md),
+[natural observer](../tools/playtest/widgets/telchine_match_watch.lua),
+[GameOver-aware audit](../tools/playtest/audit_telchine_match.py),
+[shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[shore fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[match checks](../tools/playtest/checks/shared/combat/telchine_match.json),
+[shore checks](../tools/playtest/checks/shared/combat/telchine_shore.json).
+
+### D-160 - Budget Telchines separately and retain shared dry beachheads (2026-10-01)
+
+**Decision.** Add a Telchine admission budget and retained beachhead phase to
+the experimental TECH/AIR amphibious controller. Keep ordinary TECH lab
+reclaim/rebuild predicates and relative sequencing exact. The owner explicitly
+chose the existing cycle over an earlier +80 coastal lab recovery exception,
+accepting later units. No ground lab is built for AIR. Marauders keep their
+existing gate and raid behavior. Plan written before implementation:
+[telchine-beachhead-implementation-plan](telchine-beachhead-implementation-plan.md).
+
+**Reasoning.** The [official unit reference](https://www.beyondallreason.info/unit/legamph)
+and local weapon script require dry firing. A secured island is useful as a
+staging stop, but moving the entire wave onward leaves valuable allied economy
+uncovered. Rank actual completed allied mex/geo/factory assets with observed
+naval approaches; keep three dry guards while at least three attackers advance.
+Bound groups to two per AI and share sixty-second claims with twenty-second
+refresh. Resolve simultaneous claims by team/serial ordering. Loss of asset
+value for sixty seconds or a winning allied claim releases the group.
+
+Telchine production uses the existing ten-second income minima, +80 metal,
+unit cost plus 300 metal banked, an energy buffer and no stall. Cadence budgets
+15% of metal income and 20% of energy income. Values live in lanes.json/script,
+not native build orders. Native fallback selection temporarily excludes the
+two managed amphibious definitions and restores their caps afterward, so it
+can still choose ordinary units without bypassing the shared budget. These
+initial shares are not a proven optimal PvP build order. Constructor and ferry
+obligations remain ahead of optional combat.
+
+**Alternatives rejected.** Lowering the general TECH +200 gate or rebuilding
+its lab early violates the owner's decision. Permanent hold of every wave
+would remove assault pressure. Sending guards toward naval unit positions
+would submerge units unable to fire. A second movement owner would fight the
+route controller: native instead supplies one checked same-manager task
+transfer, while script owns member IDs, assignments and priorities. Do not
+infer natural combat usefulness from injected encounters or after-victory
+landings.
+
+**Corrections from simulation.** Concurrent allied waves could push a landed
+wave outside its tight arrival circle and strand it indefinitely in SECURE.
+Initial landing still requires the configured quorum within 240 elmos;
+subsequent security allows dry dispersal to 360 on the same connected land.
+The full eighteen-second dwell and dry landing requirement remain. The final
+combined probe waits until all twenty-one attackers clear the three-unit guard
+before introducing a naval target. Earlier fixture failures are retained.
+
+The donation consumer accepted naval subs although its producer orders bot
+constructors. It now matches the producer's bot roster, preserves dedicated
+air constructor claims and gives ferry ownership priority over discretionary
+harbour construction. INV-018 now compares a lab with its saved construction
+facing rather than requiring it to rotate when the front moves. Real exit
+obstructions still fail. Cramped fallback geometry and harbour-specific
+support checks are left to KI-451/452, not hidden by relaxed expectations.
+
+**Invariant.** INV-097 requires every retained guard route/unit to remain dry
+and every split to leave the minimum assault group. INV-096 retains dry
+regroup/security before onward crossing. INV-010 exempts only experimental
+Telchines admitted by the separate budget, not ordinary combat or Marauders.
+INV-041 still rejects building orders on ferry gifts; INV-018 still checks
+saved facing and actual obstruction. Every new check forbids all invariants.
+
+**Verification.** Native/DLL build pin `082783d682ef926e` with matching debug
+symbols. Standalone native suites and eighteen amphibious policy tests pass;
+API parity checks 265 members. TECH/balanced and AIR/hard independent probes
+pass. The final combined terrible-profile probe passes sixteen minutes with
+three retained guards, twenty-one onward attackers, two surviving factories,
+180 dry hold-position samples and a surviving ship 1,421 elmos away. Its
+archive is `build-theatres/d160-allied-beachhead-terrible-03/runs/20261001-134844/`.
+The complete run ledger, screenshots, final profile repeats and publication
+record are in [results](telchine-beachhead-results.md).
+
+Two natural sixteen-AI runs complete, but strict reports remain FAIL on TECH
+invariants. They demonstrate no Telchine damage or kills. The spectator's
+extra commander also survives longer than the harness expects, delaying
+GameOver after the opposing AI side is eliminated (KI-453). The audit now
+records the first all-dead competitive-side census as an upper bound and
+warns against treating GameOver as the competitive endpoint. These are
+behavior traces, not clean PvP balance evidence. Preserve KI-449/450's natural
+verification limits, AIR natural recruitment/save-load KI-446, and all failed
+archives. Commit locally; the owner declined pushing.
+
+**Files.** Policy: [amphibious operations](../data/script/src/manager/amphibious_ops.as),
+[beach sites/claims](../data/script/src/manager/amphibious_beaches.as),
+[pure policy](../data/script/src/helpers/amphibious_math.as),
+[settings](../data/config/lanes.json),
+[AIR production](../data/script/src/manager/air_production.as),
+[TECH](../data/script/src/roles/tech.as),
+[donation](../data/script/src/manager/donation.as),
+[TECH rules](../data/script/src/roles/tech_rules.as),
+[team dispatch](../data/script/src/manager/team.as),
+[runtime assertions](../data/script/src/manager/invariants.as).
+Mechanisms: [observation source](../src/circuit/terrain/BattleAnalysis.cpp),
+[observation declarations](../src/circuit/terrain/BattleAnalysis.h),
+[query bindings](../src/circuit/script/InitScript.cpp),
+[task transfer](../src/circuit/script/MilitaryScript.cpp).
+Tests: [pure cases](../tests/amphibious_math_tests.as),
+[shore preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[paired match preparer](../tools/playtest/prepare_telchine_match.py),
+[fixture](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[guard checks](../tools/playtest/checks/shared/combat/telchine_beachhead.json),
+[allied checks](../tools/playtest/checks/shared/combat/telchine_allied_beachhead.json),
+[match audit](../tools/playtest/audit_telchine_match.py),
+[guide](../tools/playtest/README.md),
+[seed 1601 audit](telchine-natural-1601.json),
+[seed 1602 audit](telchine-natural-1602.json).
+Contracts: [API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [issues](known-issues.md),
+[TECH role](roles/tech.md), [AIR role](roles/air.md), [rules reference](roles/tech_rules.md).
+Screenshots: [TECH guard](images/d160/tech-guards-after-retreat.png),
+[AIR guard](images/d160/air-guards-after-retreat.png),
+[natural landing](images/d160/natural-1601-landfall.png),
+[allied guard](images/d160/allied-guard-after-retreat.png),
+[allied assault](images/d160/allied-assault-final-landfall.png).
+
+
+### D-161 - Telchine land-first travel and terrain-fitted firing formations
+
+**Decision.** Experimental TECH/AIR Telchines try a strictly dry route first,
+then minimize exposed water travel with script-configured cost 6 versus land 1.
+Keep Marauder travel, recruitment and TECH's exact lab cycle unchanged. Use
+separate dry firing slots: nominal shore spacing 192, land spacing 96, with
+terrain-fitted alternatives. The plan was written before implementation in
+[telchine-perimeter-plan](telchine-perimeter-plan.md).
+
+**Reasoning.** Telchines cannot fire submerged. A shared guard endpoint caused
+clumping, and a majority-passable coarse cell did not establish a usable shore
+transition. Reuse the lane solver with optional edge masks, fine loaded
+MoveData footprint/slope checks and current allied structure exclusions.
+The engine checks ground slope on the seabed too. Script selects formations,
+travel costs and objectives; native code supplies routes and per-member
+command overrides. Guard claims and island security remain shared owners.
+
+**Alternatives rejected.** Blind lane offsets can place wings in water or on
+cliffs. Banning all water prevents island assaults. Changing the general lane
+passability rules would affect other roles; the strict query is opt-in.
+Changing TECH's lab cycle contradicts the owner's explicit choice. Do not
+call controlled encounters PvP win-rate evidence.
+
+**Corrections from testing.** Refresh arrival after assigning late slots;
+exclude allied factories from approach routes and search nearby dry ground
+when the strategic anchor is occupied. Individual formation arrival is 128
+elmos in script and native, accounting for observed idle centres 97-106 elmos
+from requested positions. Initial landing quorum and dry-component security
+remain exact. Exact-route idle retries are deferred and rate-limited rather
+than synchronous or silently discarded. Preserve all failed runs.
+
+**Invariant.** INV-098 requires distinct, dry firing positions and dry
+formation connectors. INV-096 still requires a regrouped, secure dry foothold
+before onward travel; INV-097 still requires actual retained guards to stay
+dry. Independent observers check actual spread, Recoil terrain legality and
+naval retreat without pursuit. All check files forbid every invariant.
+
+**Verification.** Played: balanced TECH and hard AIR each passed the strict
+16-minute Tundra perimeter/retreat check; terrible TECH passed eight minutes of
+Tundra land combat. A strengthened eight-minute Supreme test observed inland
+combat after formation deployment. No invariant, illegal terrain target, script
+or crash markers in these final runs. Native/pure suites passed, including 18
+terrain and 19 amphibious scenarios; 266-member API/DLL parity, role docs and
+invariant checks passed. Published matching DLL/debug/data to the required
+engine build output. Full archives, failures, hashes and inspected screenshots
+are in [the results](telchine-perimeter-results.md).
+
+**Limits and deliberate non-changes.** These are controlled behavior fixtures,
+not natural 8v8 recruitment or PvP win-rate benchmarks. Frozen energy limits
+combat-value conclusions; inland casualties are reported rather than used to
+tune production policy. A unit without a safe individual slot keeps the parent
+dry anchor. One initial memory failure remains KI-454; generated shared notes
+need correction under KI-455. Fixture evidence limits are KI-456. The accurate game mechanic is recorded in
+`../rjm.bar.docs/knowledge/60-tactics/68-telchine-shoreline-tactics.md`
+(local knowledge commit `e2e748a`). Existing KI-449/450/453 remain unchanged.
+
+**Files.** [Plan](telchine-perimeter-plan.md),
+[controller](../data/script/src/manager/amphibious_ops.as),
+[formations](../data/script/src/manager/amphibious_formation.as),
+[pure helper](../data/script/src/helpers/amphibious_math.as),
+[settings](../data/config/lanes.json),
+[route task declarations](../src/circuit/task/fighter/RouteTask.h),
+[route task commands](../src/circuit/task/fighter/RouteTask.cpp),
+[terrain declarations](../src/circuit/terrain/BattleAnalysis.h),
+[terrain queries](../src/circuit/terrain/BattleLanes.cpp),
+[fine corridor](../src/circuit/terrain/TerrainCorridor.h),
+[solver declarations](../src/circuit/terrain/LaneSolver.h),
+[solver](../src/circuit/terrain/LaneSolver.cpp),
+[bindings](../src/circuit/script/InitScript.cpp),
+[terrain tests](../tests/terrain_route_test.cpp),
+[policy tests](../tests/amphibious_math_tests.as),
+[preparer](../tools/playtest/prepare_telchine_shore_check.py),
+[observer](../tools/playtest/widgets/telchine_shore_fixture.lua),
+[perimeter checks](../tools/playtest/checks/shared/combat/telchine_perimeter.json),
+[combat checks](../tools/playtest/checks/shared/combat/telchine_land_formation.json),
+[inland checks](../tools/playtest/checks/shared/combat/telchine_inland_formation.json),
+[playtest guide](../tools/playtest/README.md),
+[results](telchine-perimeter-results.md),
+[TECH perimeter](images/d161/tech-shore-perimeter.png),
+[AIR landfall](images/d161/air-accessible-landfall.png),
+[AIR formation](images/d161/air-next-island-formation.png),
+[land combat](images/d161/tundra-land-combat.png),
+[API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [TECH](roles/tech.md), [AIR](roles/air.md),
+[issues](known-issues.md).
+
+
+## D-162 - AIR allocates funded strikes and retains explicit sortie ownership
+
+**Date:** 2026-10-01. **State:** Built; simulation verification in progress.
+
+**Decision.** Correct the reviewed AIR plan before implementation. Count unique
+observed armed aircraft instead of overlapping role costs; admit bounded strike
+orders after transports, initial crew and emergency defense. Forecast the same
+order mix in the economy. Keep TECH's sequence, mex-before-reactor and twenty
+completed turrets per existing T2 lab. Reject the proposed bank bypass, arbitrary
+25-fighter cap, guaranteed bomber share during emergencies, and return-fire-only
+static AA. These conflict with protected behavior or lack PvP evidence.
+
+Ordinary T1 raids and T2 waves stage on owned routes. Fund a linear capped
+schedule; cadence waives only the schedule, never target feasibility or minimum
+escorts. Release a supported subset rather than demanding escorts for the entire
+reserve. Preserve an immutable cohort for survival measurement. Specialists
+(EMP/Liche) retain native behavior until their payload/timing is modeled.
+
+Native flight policy is opt-in. It scans armed AND peaceful enemy snapshots,
+checks loaded damage/health margin, integrates route exposure, bounds ranks and
+assigns nearby slots after asynchronous release. Fixed-wing readiness remembers
+arrival within an inner radius while requiring continued presence inside twice
+that radius; missing assembly returns home. Actual lethal release triggers
+straight egress before turning home. Loss abort and return keep task ownership;
+there is no autonomous experimental mop-up. This is not speed matching, a full
+route solver, multi-target allocation, or proof against hidden AA.
+
+The natural candidate also reproduced KI-443. Releasing exhausted idle workers
+was tried and rejected: the same completed wind frames were repeatedly chosen.
+Observer IDs proved those structures were complete, with duplicate construction
+owners left behind. Under AIR's existing direct-flight opt-in, UnitFinished
+finishes the registered owner once and aborts remaining construction owners of
+that structure. It preserves the building and avoids duplicate build chains.
+TECH keeps its previous path. INV-101 audits completed targets retaining workers.
+Assembly also adds distance/speed transit before its script settling allowance;
+the earlier fixed deadline could expire before a distant flank was reached.
+
+**Alternatives rejected.** Bigger fixed home quotas and mass factories mask
+allocation/energy limits. Income-only waves strand funded bombers. Unbounded
+lines, point-hover assembly and immediate U-turns expose aircraft unnecessarily.
+A whole-reserve escort requirement reproduces the original launch deadlock.
+Changing shared static defaults or TECH rules expands the risk beyond AIR.
+
+**Invariant.** INV-099 counts survivors from immutable launch IDs; INV-100
+forbids autonomous DEFEND/BOMB ownership of held experimental bombers. Existing
+INV-077/078/083/088/090/091/092/093 preserve reactor, income, layout, support and home
+bounds. All simulation checks retain the global invariant forbid. Controlled
+fixtures cannot establish natural economy milestones or unbeatable PvP strength.
+
+**Verification.** See the [review](air-enhancement-review.md), corrected
+[plan](air-enhancement-plan.md), and [measured results](air-enhancement-results.md). Failed and
+interrupted runs remain under build-theatres/d162-*. Pure geometry tests cover
+300 distinct slots, extreme finite inputs and loss thresholds. Twenty-eight
+AngelScript air-math tests cover funding, defense, interleave, cadence and
+escort-limited reserve release, overflow bounds and constant-time sizing. Final run IDs, screenshots and limitations are recorded in the results.
+
+**Files.**
+[data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+[data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as),
+[data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as),
+[data/script/src/manager/air_screen.as](../data/script/src/manager/air_screen.as),
+[data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as),
+[data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as),
+[data/script/src/roles/air.as](../data/script/src/roles/air.as),
+[data/script/src/global.as](../data/script/src/global.as),
+[data/config/experimental_balanced/behaviour.json](../data/config/experimental_balanced/behaviour.json),
+[data/config/experimental_hard/behaviour.json](../data/config/experimental_hard/behaviour.json),
+[data/config/experimental_terrible/behaviour.json](../data/config/experimental_terrible/behaviour.json),
+[src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h),
+[src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp),
+[src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h),
+[src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp),
+[src/circuit/CircuitAI.cpp](../src/circuit/CircuitAI.cpp),
+[src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp),
+[src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h),
+[src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h),
+[src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp),
+[src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp),
+[tests/air_math_tests.as](../tests/air_math_tests.as),
+[tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp),
+[tools/run_native_tests.sh](../tools/run_native_tests.sh),
+[tools/playtest/prepare_air_strike_check.py](../tools/playtest/prepare_air_strike_check.py),
+[tools/playtest/widgets/air_strike_fixture.lua](../tools/playtest/widgets/air_strike_fixture.lua),
+[tools/playtest/widgets/air_watch.lua](../tools/playtest/widgets/air_watch.lua),
+[tools/playtest/checks/air/combat/air_strike_stages.json](../tools/playtest/checks/air/combat/air_strike_stages.json),
+[tools/playtest/compare_air_runs.py](../tools/playtest/compare_air_runs.py),
+[tools/playtest/prepare_air_economy_check.py](../tools/playtest/prepare_air_economy_check.py),
+[tools/playtest/README.md](../tools/playtest/README.md),
+[doc/air-enhancement-plan.md](air-enhancement-plan.md),
+[doc/air-enhancement-review.md](air-enhancement-review.md),
+[doc/air-wave-attacks.md](air-wave-attacks.md),
+[doc/roles/air.md](roles/air.md),
+[doc/angelscript-references.md](angelscript-references.md),
+[doc/invariants.md](invariants.md),
+[doc/actor-matrix.md](actor-matrix.md),
+[doc/known-issues.md](known-issues.md),
+[doc/knowledge/barb-unit-config.md](knowledge/barb-unit-config.md).
+
+D-162 follow-up decisions: Phoenix mount inspection remains local to the opt-in
+wave task. Script-emitted heat rays use attributed positive non-paralyzing enemy
+damage as a fallback release observation, preserving the first fired timestamp
+for ordinary bombers. Legion Mosquitos reuse native RAID rather than DEFEND.
+The first-fusion rule drops its additional 500-metal bank veto but retains
+owned-mex completion, recovery and 180-second M/E funding with commitments; the
+repeat natural game completed Armada fusion at 19:03 after all owned upgrades.
+See [results](air-enhancement-results.md), [AIR builder](roles/air_build.md),
+[builder policy](../data/script/src/roles/air_build.as) and
+[measurement data](benchmarks/air-d162-intermediate.json). The latest sizing
+helpers also bound before integer conversion and avoid reserve-length loops;
+four adversarial tests cover oversized configuration and fractional escorts.
+
+D-162 final calibration: adopt a script-controlled 600-elmo assembly arrival
+radius after Armada's 400-elmo run failed late formation, and the unchanged
+600-elmo three-stage test passed unseeded and with engine/AI seed 1621. Keep
+80% readiness and deadlines; changing the deadline or ignoring missing aircraft
+was rejected. The observer now tracks commander commands before first factory
+creation, avoiding a false new-mex allegation when a gifted builder starts the
+lab. A focused seeded opening repeat passed. RNG helpers pin both independent
+seeds; prior natural measurements remain non-paired. Process-inspection failures
+are retained alongside full-log re-observation reports, never silently replaced.
+Additional touched files:
+[seed preparer](../tools/playtest/prepare_air_check.py),
+[opening observer](../tools/playtest/widgets/air_opening_watch.lua),
+[opening checks](../tools/playtest/checks/air/economy/air_capacity_opening.json),
+[final data](benchmarks/air-d162-final.json),
+[results and screenshot evidence](air-enhancement-results.md).
+
+**Final state: Built, Checked, Played (bounded acceptance).** Final seeded
+Armada/balanced, Cortex/hard and Legion/terrible three-stage combat fixtures
+passed, as did the donated-constructor fusion case and focused gifted-opening
+regression. Natural runs completed fifty minutes but remain FAIL for TECH
+invariants and the last run's constructor-locality excursion (KI-460). The
+supplied capacity case reached six supported T2 labs but exited at 33.6 of
+45 intended minutes with an observer failure; it is not a full PASS. KI-457
+retains unimplemented specialist/navigation work and loss/crowding calibration.
+All evidence, seeds, artifact hash and limitations are in the
+[results](air-enhancement-results.md). No TECH rule sequence, static firing
+policy, twenty-turret expansion condition or transport-request priority changed.
+
+
+## D-163 - Dense AIR campus, shared growth objective and target-funded raids
+
+**Refined by D-164.** Five-second guards still allowed repeated production assistance by T2 aircraft. Those workers now retain an economic role, and opening economic/campus reservations prevent the newly diagnosed spatial starvation. TECH policy is unchanged.
+
+2026-10-02. Owner requested six-plus dense T2 production blocks, a sustained
+50-metal transition into TECH-style growth, two completed AFUS before mass
+bombers, a saved random 10-20 opening, and target/route/resistance-sized raids.
+[Design](air-campus-strike-design.md) was written before implementation.
+
+**Call.** Share EcoPlanner's economic choices through an explicit AIR context;
+default TECH state/ordering remains unchanged. AIR owns placement, lab admission,
+mex prerequisites, support and aircraft budgets. Keep a zero-by-default policy
+factory cap, lift AIR profile definition caps only during experimental AIR,
+reserve six speculative T2 blocks and expand incrementally. Preserve the twenty
+completed uniquely assigned turrets per existing T2 lab before expansion. Failed
+support pins remain quarantined and get replacement ground within the same lab's
+reach. Flying workers may cross their home disc to assist reactors. Reactor
+placement searches that whole disc despite a rear anchor, and maintains campus
+separation. Ground gifts keep their travel bound.
+
+Save the first random bomber draw and two-AFUS milestone. Keep replacement stock
+separate from each sortie's target budget. Native opt-in mission primitives read
+loaded payload/health and known threats; script sets corridor padding, unknown,
+army and local-AA reserves and target class. Execute the selected direct/edge
+route, nominally synchronize one owner's static attack, then follow latched
+return waypoints. T1 reusable bombers select known mexes/wind. Do not claim
+multi-owner synchronization or optimal casualty predictions.
+
+**Why and rejected alternatives.** Fixed factory caps contradict the requested
+income-scaled campus; infinite up-front reservations steal allied/eco space.
+Invoking TECH's chain/executor would alter its exact lab lifecycle or make AIR
+build bot labs. Using generic native fallback production would spend on bombers
+before the economic milestone. Linear wave growth ignores mission resistance;
+forcing the opening draw onto an unaffordable target wastes the force. A timeout
+does not waive target funding. Simultaneous return proximity was rejected after
+healthy aircraft orbited past one another until timeout. Local AA reserve was
+added after an eight-bomber flak package failed. Mission coefficients remain
+calibration knobs, not a promise of PvP dominance. Two natural waves were
+wiped out at the same defended solar target: the experimental target budget
+had discarded survival feedback. Evaluate only completed sorties, persist a
+bounded resistance multiplier, and exclude up to eight failed target regions
+for a script-configured interval. Native filtering takes script-supplied areas;
+it contains no hardcoded target cooldown. Keeping the same budget after a
+complete loss was rejected. Temporary areas reset on role initialization;
+the learned multiplier persists. The independent log audit checks actual later
+target coordinates against active exclusions.
+
+The natural run also diagnosed AIR's interruptible fallback guards: their native
+timer is deactivated while assigned. Use non-interruptible five-second guards
+(as already used by the commander) so mobile workers reconsider the economy.
+After the opening crew, the commander needs a real unfinished aircraft frame,
+not merely a recruit-task label. These are AIR policy changes, not native guard
+or TECH behavior changes.
+
+**Invariant.** INV-084/088 preserve complete speculative support and reciprocal
+allied exclusion; INV-090 preserves completed support before lab expansion.
+INV-102 requires the completed AFUS milestone before ordinary bomber orders;
+INV-103 funds every actual release and keeps the first at its saved draw.
+INV-104 audits fallback guard leases; INV-081 retains the independent commander
+idle check. INV-105 independently audits native failed-raid region exclusion. No existing playtest forbid was removed.
+
+**Verification.** Native and AngelScript helper suites passed. The twenty-minute
+Armada three-stage combat test passed, including T1 economic attacks, a ten-unit
+opening, target-sized edge attacks, destroyed flak/AFUS and actual returns home.
+The Cortex bootstrap built both AFUS and six supported labs; its idle-commander
+failure remains recorded. The later natural team run finishes its first
+fusion at 18.47 minutes and both AFUS at 23.90/26.73. TECH's existing invariant
+failures and the T2-lab deadline remain failures. Paired TECH games reached
+twelve minutes with the same T1-then-T2 sequence, not identical timing; historical
+smoke expectations make both reports FAIL. Full details and final obstruction
+test results are in [the evidence report](air-campus-strike-results.md).
+Unresolved natural timing is KI-461; combat calibration remains KI-457. Keep
+the changes local, without pushing, per the owner's explicit instruction.
+
+**Files.**
+[data/script/src/global.as](../data/script/src/global.as),
+[data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+[data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as),
+[data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as),
+[data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as),
+[data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as),
+[data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as),
+[data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as),
+[data/script/src/manager/eco_planner.as](../data/script/src/manager/eco_planner.as),
+[data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as),
+[data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as),
+[doc/actor-matrix.md](actor-matrix.md),
+[doc/air-campus-strike-design.md](air-campus-strike-design.md),
+[doc/air-campus-strike-results.md](air-campus-strike-results.md),
+[doc/air-enhancement-plan.md](air-enhancement-plan.md),
+[doc/air-wave-attacks.md](air-wave-attacks.md),
+[doc/angelscript-references.md](angelscript-references.md),
+[doc/invariants.md](invariants.md),
+[doc/known-issues.md](known-issues.md),
+[doc/roles/air.md](roles/air.md),
+[doc/roles/air_build.md](roles/air_build.md),
+[doc/roles/air_rules.md](roles/air_rules.md),
+[src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp),
+[src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h),
+[src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp),
+[src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h),
+[tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp),
+[tests/air_math_tests.as](../tests/air_math_tests.as),
+[tools/playtest/air_support_probe.as](../tools/playtest/air_support_probe.as),
+[tools/playtest/checks/air/economy/air_growth.json](../tools/playtest/checks/air/economy/air_growth.json),
+[tools/playtest/checks/air/layout/air_support_repair.json](../tools/playtest/checks/air/layout/air_support_repair.json),
+[tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py),
+[tools/playtest/prepare_air_support_check.py](../tools/playtest/prepare_air_support_check.py),
+[tools/playtest/widgets/air_fixture.lua](../tools/playtest/widgets/air_fixture.lua),
+[tools/playtest/widgets/air_strike_fixture.lua](../tools/playtest/widgets/air_strike_fixture.lua).
+
+Additional verification files: [playtest guide](../tools/playtest/README.md),
+[raid feedback audit](../tools/playtest/audit_air_raid_feedback.py),
+[campus screenshot](images/d163/cortex-campus-30min.png),
+[edge ingress](images/d163/edge-ingress.png),
+[static strike](images/d163/synchronized-flak-attack.png).
+
+Final feedback verification: build 6 Armada combat repeat `d163-strike-feedback/runs/20261002-022342` passed twenty-minute checks.
+The independent audit observed three alternate missions during an active
+failed-region exclusion and increased then relaxed resistance. The forty-two
+minute natural repeat again missed the fusion deadline (21.48 minutes);
+the earlier 18.47 result is not a consistency claim. KI-442 metal overflow
+remains open. [Feedback audit](benchmarks/air-d163-feedback.json),
+[measurements](benchmarks/air-d163.json),
+[natural base](images/d163/natural-base-20min.png),
+[repaired campus](images/d163/support-repaired-campus.png).
+
+Natural feedback evidence: `d163-team-feedback/runs/20261002-022726`
+completed forty-two minutes; both AIR teams logged no role invariants,
+while existing TECH/ferry failures kept the full report FAIL. Cortex
+built its two AFUS at 27.62/33.01 and launched its saved eleven.
+Legion selected four later missions outside active failed regions;
+[natural audit](benchmarks/air-d163-natural-feedback.json) passed its
+narrow contract. Heavy combat losses remain KI-457, not a solved outcome.
+
+
+## D-164 - AIR economy workers and separately reserved advanced economy
+
+**Decision.** Exclude advanced aircraft constructors from fallback production
+guards and individually reassign an existing builder guard to a one-second
+recheck. Leave shared guards alive for their other workers. Keep real unfinished
+construction/repair assistance. Use the shared economic chooser unchanged, with
+an AIR-only funded surplus-reactor fallback after the two-AFUS milestone.
+
+Reserve four AFUS/eight-converter modules, the starter and at least six future
+T2 factory/turret modules during the opening. Native slots and zones enforce
+local/allied exclusion; named native state reconstructs module ownership.
+Revalidate unused modules before first use and relocate atomically around
+physical blockage. Claimed modules remain fixed. A 128-elmo economic search
+and half-pitch factory fallback fit terrain while retaining native geometry.
+
+**Reasoning and rejected alternatives.** A short guard timeout alone does not
+prevent indefinite renewals. Aborting the whole guard would affect innocent
+workers, so use individual assignment. Reservation must precede construction:
+waiting until the first lab order let wind and allied expansion consume space.
+Two modules and 700-elmo reactor/factory exclusion passed an isolated fixture
+but failed the crowded natural team test. Four initial modules, 384-elmo
+reactor/factory spacing and 512-elmo reactor spacing preserve more useful room.
+Neither spacing is explosion-proof; the owner allows the districts to connect.
+Do not weaken TECH reservations, extend AIR's home radius, bypass twenty
+completed turrets per existing T2 lab, or change TECH's exact reclaim sequence.
+
+**Invariant.** INV-106 forbids advanced AIR aircraft production guards and
+checks individual release. INV-107 requires new AFUS/advanced-converter tasks
+to use a complete persistent economic module. INV-108 serializes owned reactor projects without letting unrelated T1 energy
+orders block advanced growth. Existing shared placement, reactor-mex, support
+and bounded-guard invariants remain active.
+
+An additional natural-run diagnosis showed generic ENERGY queues preventing
+AFUS starts with no reactor underway. AIR now reads its own queued/unfinished
+reactor projects for this gate; completed targets, small energy and repair
+tasks cannot block it. The shared TECH context is deliberately unchanged.
+
+**Verification.** Engine-free AIR policy: 61 tests pass. Rendered controlled
+runs confirm actual injected task ownership, release within 30 frames, T1 peer
+retention, saved-name module adoption, physical first-use relocation, new
+reactors and continued combat-aircraft production. The latest natural opening
+reserved all four economic modules and all seven factory bays by twelve game
+seconds. Complete evidence and limits, including the intermediate failures,
+are in [the results](air-economy-zone-results.md). This is not a claim of optimal
+PvP balance or a complete engine save/load round trip. KI-442 and KI-461 remain
+tracked in [known issues](known-issues.md).
+
+**Files.**
+
+- Active policy: [data/script/src/global.as](../data/script/src/global.as),
+  [data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as),
+  [data/script/src/manager/air_eco_layout.as](../data/script/src/manager/air_eco_layout.as),
+  [data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as),
+  [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as),
+  [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as),
+  [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as).
+- Tests: [tests/air_math_tests.as](../tests/air_math_tests.as).
+- Simulation tooling: [tools/playtest/README.md](../tools/playtest/README.md),
+  [tools/playtest/air_economy_probe.as](../tools/playtest/air_economy_probe.as),
+  [tools/playtest/audit_air_economy.py](../tools/playtest/audit_air_economy.py),
+  [tools/playtest/checks/air/economy/air_economy_capacity.json](../tools/playtest/checks/air/economy/air_economy_capacity.json),
+  [tools/playtest/checks/air/economy/air_economy_natural.json](../tools/playtest/checks/air/economy/air_economy_natural.json),
+  [tools/playtest/checks/air/layout/air_economy_zone.json](../tools/playtest/checks/air/layout/air_economy_zone.json),
+  [tools/playtest/prepare_air_economy_zone_check.py](../tools/playtest/prepare_air_economy_zone_check.py).
+- Documentation and evidence: [doc/actor-matrix.md](actor-matrix.md),
+  [doc/air-economy-zone-plan.md](air-economy-zone-plan.md),
+  [doc/air-economy-zone-results.md](air-economy-zone-results.md),
+  [doc/benchmarks/air-d164-capacity.json](benchmarks/air-d164-capacity.json),
+  [doc/benchmarks/air-d164-final-natural.json](benchmarks/air-d164-final-natural.json),
+  [doc/benchmarks/air-d164-final-regression.json](benchmarks/air-d164-final-regression.json),
+  [doc/benchmarks/air-d164-queue-blocker.json](benchmarks/air-d164-queue-blocker.json),
+  [doc/benchmarks/air-d164-regression.json](benchmarks/air-d164-regression.json),
+  [doc/decisions.md](decisions.md),
+  [doc/images/d164/capacity-19min.png](images/d164/capacity-19min.png),
+  [doc/images/d164/final-growth-24min.png](images/d164/final-growth-24min.png),
+  [doc/images/d164/growth-24min.png](images/d164/growth-24min.png),
+  [doc/images/d164/natural-40min.png](images/d164/natural-40min.png),
+  [doc/invariants.md](invariants.md),
+  [doc/known-issues.md](known-issues.md),
+  [doc/roles/air.md](roles/air.md),
+  [doc/roles/air_build.md](roles/air_build.md),
+  [doc/roles/air_rules.md](roles/air_rules.md).
+
+## D-165 - Replenishing AIR combat arenas with measured outcomes
+
+**Date.** 2026-10-02.
+
+**Decision.** Add combat-only AIR fixtures under playtest tooling, using the
+published native build and staged copies of policy. Supply units, radar, energy
+and ammunition; freeze economic construction and waive the documented economic
+and escort gates. Keep real target selection, routes, formations, returns,
+resistance feedback and home fighter interception. JSON cases, UnitDef overrides,
+serial matrices, per-case comparison and an explicit endless/stop lifecycle
+provide one reusable harness instead of separate hard-coded unit tests.
+
+**Reasoning and rejected alternatives.** Waiting for a full economy obscures
+combat regressions and costs far more time. Issuing widget attack orders would
+test the widget rather than AIR. Removing survivors between rounds would hide
+return behavior. Global LOS cannot prove radar reaction, and a completed sortie
+cannot be inferred from an arbitrary wave timer. The observer retains each
+actual task and waits for evaluation before recording its resistance outcome.
+BAR regenerates the LuaUI damage dispatcher, so the final observer wraps the
+handler method and checks ownership instead of wrapping only the global callin.
+Completed cohorts are released, preventing an endless accumulation of retained
+wave tables. Bounded audits exclude shutdown overrun and unfinished sorties
+remain censored.
+
+Deliberately leave production doctrine unchanged. These samples establish a
+measurement baseline and working loss feedback, not an efficient solution to
+layered AA. Tuning a scalar until one supplied-force matchup wins would not
+establish stronger PvP play. KI-457 remains open. The forward naval fixture
+also does not exercise home interception at those targets; a separate covered
+naval case changes geography and supplies sonar without changing fighter policy.
+
+**Invariant.** A fixture never commands, teleports or heals a living combat
+unit to force an outcome. Only actual launched members contribute to a bomber
+cohort; EMP is separate from health damage; completed cohorts do not accumulate
+later losses. Fixture checks reject missing units/sites, broken callbacks,
+script/crash errors and every existing production invariant. This changes no
+production actor or rule, so it adds no production INV identifier.
+
+**Verification.** Fourteen measurement/input tests pass. Seventeen final rendered
+observations pass strict checks: the 18-minute T2 radar baseline, twelve
+10-minute faction cases, three 8-minute covered naval cases, and an endless
+observation beyond its nominal one-minute cutoff to frame 11097. All were
+stopped explicitly or by their bounded watcher. The initial failed observer
+and its provisional successor remain archived and excluded from final scores.
+The final radar baseline shows resistance 1 -> 1.5 -> 2.25 -> 3 and later fusion
+kills, with poor exchanges; the layered-AA baseline retains zero-damage failures.
+See the evidence and limits in the results. Production data, TECH and the DLL
+are unchanged; the mandatory output remains matched to the source data.
+
+**Files.**
+
+- Harness: [runner](../tools/playtest/air_arena.py),
+  [read-only probe](../tools/playtest/air_arena_probe.as),
+  [widget](../tools/playtest/widgets/air_arena.lua),
+  [auditor](../tools/playtest/audit_air_arena.py),
+  [tests](../tools/playtest/test_air_arena.py),
+  [strict checks](../tools/playtest/checks/air/combat/air_arena.json),
+  [run instructions](../tools/playtest/README.md).
+- Cases: [T1 economy](../tools/playtest/cases/air/combat/t1-economy.json),
+  [T2 interception](../tools/playtest/cases/air/combat/t2-intercept.json),
+  [layered AA](../tools/playtest/cases/air/combat/t2-flak.json),
+  [gunships](../tools/playtest/cases/air/combat/gunship.json),
+  [forward naval](../tools/playtest/cases/air/combat/torpedo.json),
+  [covered naval](../tools/playtest/cases/air/combat/torpedo-covered.json).
+- Documentation: [plan](air-combat-arena-plan.md),
+  [results](air-combat-arena-results.md),
+  [measurements](benchmarks/air-d165-arena.json),
+  [known issues](known-issues.md), [decision record](decisions.md).
+- Original screenshots: [interception](images/d165/t2-intercept.png),
+  [fusion strike](images/d165/t2-fusion-strike.png),
+  [mex strike](images/d165/t1-mex-strike.png),
+  [layered AA](images/d165/layered-aa-strike.png),
+  [torpedo strike](images/d165/torpedo-strike.png),
+  [Shurikens](images/d165/shuriken-strike.png).
+
+
+## D-166 - AIR performance review before optimization
+
+**Date.** 2026-10-02 05:04:39 -03:00.
+
+**Decision.** Complete the requested runtime/APM review against AI revision
+`2c391ab6` and the trusted Recoil source before changing gameplay. Prioritize
+transient AIR task retirement, unchanged-route command suppression, exact
+revision-aware economy aggregates, and indexed/budgeted placement and target
+queries. Preserve emergency interception, transport requests, bomber mission
+budgets, constructor economy work and TECH's existing sequence. Leave the
+production implementation unchanged in this review.
+
+**Reasoning.** Source tracing confirms synchronous AI callbacks in the engine
+simulation path and networked unit orders. Repeated whole-screen routes create
+avoidable orders; empty transient routes can survive losses; several nested
+queries multiply with late-game armies and layouts. These justify focused
+optimizations, but source operation counts are not measured FPS gains. Existing
+D-165 arena outcomes do not measure AI CPU cost, network bursts or relay delay.
+The review specifies instrumentation and exact-output/runtime acceptance tests.
+
+**Alternatives rejected.** A blanket slower AIR tick or global APM cap could
+delay defense, ferry handoffs and volleys. Changing generic RouteTask lifetime
+or SetRoute semantics globally could break persistent Spam and TECH amphibious
+routes. Moving live engine/script objects to workers is unsafe. Arbitrary target
+shortlists, six-lab caps or stale economy caches could change efficacy. Begin
+with exact, opt-in mechanisms and measure before considering those tradeoffs.
+
+**Invariant.** This documentation-only change leaves production code, settings,
+TECH actors and all existing invariant contracts unchanged. A future optimization
+must retain timely threat reaction, fresh order admission, allied reservation
+exclusion, exact TECH lab sequencing and current mission/transport ownership.
+No new production invariant ID is introduced before an implementation exists.
+
+**Verification.** Checked the active AIR script graph, recent native air tasks,
+shared query/scheduler mechanisms and the pinned engine dispatch/network path.
+Independently calculated command-volume and candidate-enumeration examples.
+No new game was run and no optimization was Built or Played. KI-462 through
+KI-465 remain open; existing KI-419/KI-433/KI-457/KI-461 are not claimed fixed.
+
+**Files.** [Full review](reviews/2026-10-02-air-performance-review.md),
+[known issues](known-issues.md), and this [decision record](decisions.md).
+
+
+## D-167 - Compact AIR lab compounds and shared early-energy retirement
+
+**Decision.** Reserve six total labs per compound: one T1 plus five T2 first, then six T2 per expansion, with no default total cap. Use shared native half-cell geometry and persistent pins, atomic preflight and allied exclusion; keep AIR policy independent. Extract TECH's exact scalar reclaim comparison for AIR and retire early energy behind completed reactors. Preserve the two-AFUS bomber gate pending the user's conflict resolution.
+
+**Reasoning.** Individually searched bays spread production across the base. Flying constructors and factory output allow touching support banks without an internal ground exit lane. The complete first compound must exist before spending; a blocked unused compound relocates together. Existing and gifted occupied legacy bays remain anchored. Finished AFUS permits retirement, while frames cannot substitute for working energy.
+
+**Alternatives rejected.** Calling TECH's controller would alter its lab sequence. Global changes to factory exit semantics could affect ground factories. Six T2 plus a T1 inside one compound would exceed the requested six-lab cluster size. Claiming a twenty-minute bomber deadline from a resource-supplied test would confuse capacity with natural economy.
+
+**Invariant.** INV-109: each new AIR compound publishes exactly six reserved lab sites. INV-110: early energy reclaim requires a completed reactor and the shared TECH permission outside energy stalls. Existing INV-084/090 retain twenty support pins/completed turrets respectively; TECH's actors and sequence remain unchanged.
+
+**Verification.** Built and Checked: native integration, full engine-free suites, API parity, invariant and role checks. Played: two controlled capacity games passed first-use relocation, wind retirement and expansion to eleven T2 labs; all experimental profiles loaded. Natural games missed the twenty-minute T2 wave target and retain full failure verdicts. Runtime lifecycle edges and camera faults remain KI-467/468; natural economy remains KI-461 and commander idle guards KI-466. See [measured results](air-cluster-reclaim-results.md) for exact artifacts and limitations.
+
+**Files.** [Plan](air-cluster-reclaim-plan.md), [geometry](../src/circuit/terrain/BaseLayoutGeometry.h), [terrain declaration](../src/circuit/terrain/TerrainManager.h), [terrain implementation](../src/circuit/terrain/TerrainManager.cpp), [binding](../src/circuit/script/InitScript.cpp), [API](angelscript-references.md), [AIR layout](../data/script/src/manager/air_layout.as), [reclaim](../data/script/src/manager/air_reclaim.as), [AIR build](../data/script/src/roles/air_build.as), [AIR rules](../data/script/src/roles/air_rules.as), [shared math](../data/script/src/helpers/production_math.as), [TECH execution](../data/script/src/roles/tech_build.as), [geometry tests](../tests/base_layout_geometry_test.cpp), [math tests](../tests/production_math_tests.as), [probe](../tools/playtest/air_cluster_probe.as), [fixture setup](../tools/playtest/prepare_air_cluster_check.py), [checks](../tools/playtest/checks/air/layout/air_factory_clusters.json), [invariants](invariants.md), [actors](actor-matrix.md), [AIR reference](roles/air.md), [TECH reference](roles/tech_build.md).
+
+
+**D-167 implementation refinement.** AIR now owns low-tier energy retirement
+exclusively while active, retaining/restoring the prior native setting rather
+than allowing two different reclaim policies. Dead owned project handles no
+longer hold its reactor serialization gate. All AIR placement callers reject
+wind/basic/advanced solar while AFUS stands, preventing a build/reclaim cycle.
+Neither defensive change is claimed to explain the first natural run's
+reclaimed AFUS. The two-AFUS bomber gate remains deliberately unchanged.
+
+**Additional files.** [Results](air-cluster-reclaim-results.md),
+[known issues](known-issues.md), [base layout](base-layout.md),
+[AIR action reference](roles/air_build.md), [AIR rule reference](roles/air_rules.md),
+[playtest guide](../tools/playtest/README.md),
+[economy probe](../tools/playtest/air_economy_probe.as),
+[growth check](../tools/playtest/checks/air/economy/air_growth.json),
+[expansion check](../tools/playtest/checks/shared/economy/expansion.json),
+[natural audit 1](benchmarks/d167-natural-1.json),
+[natural audit 2](benchmarks/d167-natural-2.json),
+[capacity audit 1](benchmarks/d167-clusters-1.json),
+[capacity audit final](benchmarks/d167-final-clusters.json),
+[capacity capture 15](images/d167/capacity-15.png),
+[capacity capture 24](images/d167/capacity-24.png),
+[natural capture 20](images/d167/natural-20.png).
+
+
+**D-167 final natural repeat.** [Final audit](benchmarks/d167-natural-final.json):
+first fusion 17.48 minutes, AFUS 21.95/26.65, all wind gone at 28.6 and seven T2
+labs by 38.18. First bomber wave 29.72; twenty bombers with zero escorts, then
+zero survivors. Retain the failed timing/efficacy verdict and KI-457/461 rather
+than accepting production counts as effective combat. The final all-caller
+low-tier energy admission guard was loaded in this natural run.
+
+
+## D-168 - Metal-map support requires explicit isolation before implementation
+
+**Date.** 2026-10-02.
+
+**Decision.** Retain the metal-map proposal as research with a linked source
+review. Do not implement its current contracts verbatim. Require early coherent
+mode selection, unchanged false-mode paths, corrected yield units and complete
+positional task ownership/persistence before enabling metal-specific policy.
+Treat the existing spot-zero cancellation repair separately from the claim that
+normal-map behavior is identical.
+
+**Reasoning.** Shared initialization happens before script map setup; the proposed
+T1 M/s skeleton income is multiplied by extraction rate again; AIR's candidate
+cap is not an opening total; positional upgrades reject -1 on load. These are
+concrete code conflicts, not tuning preferences. Economy arithmetic and layout
+ownership also need the corrections listed in the review.
+
+**Alternatives rejected.** Implementing the proposal as written would introduce
+avoidable startup, production and restore regressions. Rewriting the entire
+proposal would obscure which evidence and recommendations were originally
+supplied. This review does not approve owner-rule exceptions or change native,
+AngelScript, profile or map behavior.
+
+**Invariant.** Preserve existing normal-map rule order, factory/reclaim behavior,
+layout pins and converter policies, including existing INV-107/109/110 promises.
+Future metal variants need separate applicable checks, not unconditional skips.
+No new runtime invariant is introduced by this documentation-only review.
+
+**Verification.** Source review at aacbfc8a against Recoil 92efda5e60 and BAR
+1d267c20d1; independent extraction-cell and economy arithmetic checks; audited
+three retained headless logs/reports. All retained smoke verdicts remain FAIL.
+No new games, binary builds or runtime behavior changes; performance unmeasured.
+
+**Files.** [Proposal](metal-maps-proposal.md),
+[source review](reviews/2026-10-02-metal-maps-proposal-review.md),
+[known issues KI-469-471](known-issues.md).
+
+
+## D-169 - Base metal-map recommendations on marginal value and funded workloads
+
+**Date.** 2026-10-02.
+
+**Decision.** Recommend an explicitly enabled metal-field economy whose desired
+production, sustainable resource funding and local build capacity are separate.
+Keep legacy spot data and normal-mode policy intact; add per-AI mode context and
+separate field claims with typed yield and task identity. Resolve F1-F9 through
+the revised design before implementation. Treat metal-only exceptions to AIR's
+raw-income, upgrade, wind-reclaim and two-AFUS gates as proposed settings, not
+owner decisions already made. Preserve TECH's exact lab reclaim/rebuild rules.
+
+**Reasoning.** Actual aircraft costs exceed the proposed generic energy ratio.
+On safe free ground, three new T1 mexes are a much cheaper source of the same
+additional income as upgrading an existing one. Constant high wind can remain
+efficient after AFUS access; space, slots, risk and affordable throughput decide
+when compression pays. Rich strips, flat plates and void platforms have different
+opportunities. Workload arithmetic and source mechanics justify these decisions;
+limited player recordings do not establish optimal timings or winning strategy.
+Correct the shared extraction-circle and average-income documentation rather
+than propagating those errors into the design.
+
+**Alternatives rejected.** Raw +50 metal as proof that production is funded;
+upgrading an unbounded field before power growth; unconditional wind retirement;
+one roster-wide energy ratio; overwriting the shared legacy spot catalog with
+M/s field nodes; reusing optional instant-build quick-start timings as an ordinary
+PvP opening benchmark. Retain the original proposal/review with follow-up links
+so the superseded claims and failed tests remain visible.
+
+**Invariant.** Reuse D-168's normal-map, TECH sequence, pin and converter-policy
+boundary. Proposed field promises cover lifecycle identity, non-duplicated income,
+bounded opening/search work and ammunition-ready defense. No new runtime check
+or behavior is claimed by this research change, and existing checks are not
+disabled. Arithmetic fixtures do not replace game validation.
+
+**Verification.** Pinned BAR 1d267c20d1 and Recoil 92efda5e60 source inspection;
+scalar unit costs cross-checked against the shared cache; reproducible strict
+circle, mex-upgrade, energy and bomber/fighter workload arithmetic. Official
+map/economy/air pages checked; three player-video identities inspected, transcripts
+unavailable, one private Cloud9 game's description and early scene sampled.
+No representative competitive replay cohort, new simulation, native build or
+runtime performance measurement. Implementation and PvP efficacy remain unverified.
+
+**Files.** [Revised design](metal-maps-revised-design.md),
+[original proposal](metal-maps-proposal.md),
+[review disposition](reviews/2026-10-02-metal-maps-proposal-review.md),
+[arithmetic tool](../tools/knowledge/metal_map_economics.py),
+[arithmetic results](benchmarks/metal-map-economics.json),
+[known issues](known-issues.md),
+[shared gameplay research](../../rjm.bar.docs/knowledge/70-strategy/79-metal-map-pvp.md),
+[corrected extraction mechanics](../../rjm.bar.docs/knowledge/20-game-mechanics/27-metal-maps-and-spots.md).
+
+
+## D-170 - Continuous metal fields, dense AIR/TECH extraction and dedicated opening workers
+
+**Date.** 2026-10-02.
+
+**Decision.** Implement D-168/169 with the owner's subsequent forty-mex amendment.
+Native C++ owns detection, extraction-circle arithmetic, shared claims, exact
+positional task identities and atomic layout geometry. Script/JSON own budgets,
+workload economics, worker assignments, module membership and progression.
+All seven active profiles load a separate metal_map fragment. The field branch
+requires the published metal-map sentinel plus positive broad/recognized ground;
+missing metadata and ordinary finite spot maps keep the existing path.
+
+AIR/TECH preplan five dense eight-mex modules using the same native reservation
+engine as labs and economy. Forty is a minimum, not a cap. The first T1 worker
+keeps constructing/resuming extraction commitments despite full metal storage;
+the second meets power demand. TECH's third starts its initial T2 lab. AIR's
+first T2 follows its completed configured fighter screen. Dedicated workers skip
+discretionary defense/frontline assignments while ferry ownership, current
+construction and TECH's existing lab reclaim rules keep precedence. Later AIR
+labs still require twenty completed support turrets per existing T2 lab.
+
+**Reasoning.** Unlimited deposit area changes priorities but does not remove
+energy/build-power constraints. Exact extraction circles and maximum-depth claims
+prevent synthetic spot accounting and ownership errors. Separate dense modules
+reserve usable ground before production/defense expansion. Natural tests exposed
+own-blocker rejection, cancellation bypassing shared pin cleanup, a coarse ally
+exclusion covering the owner's start, and defense rules stealing the mex worker.
+Fix their mechanisms instead of accepting sparse expansion. The forty-mex target
+and first-T2 triggers are explicit owner policy, not universal researched timings.
+
+**Alternatives rejected.** Replacing the normal spot catalog; a blanket raw-metal
+income gate; continuing to pause initial extraction at a full bank; allowing
+converters through profile cap changes; mandatory useful-wind retirement on metal
+fields; overlapping allied reservations; forcing six-lab shapes where constrained
+platforms cannot fit them; reordering TECH's lab reclaim/rebuild table; hiding
+invariant failures behind the focused economic audit. A six-site AIR search may
+fall back to atomic three-/one-site metal compounds after 120 seconds, preserving
+full support membership. Normal AIR shapes are unchanged.
+
+**Invariant.** INV-111 forbids queued converters, independently checked by actual
+Lua unit creation. INV-112 keeps framed mexes at their served module positions.
+INV-113 protects dedicated opening workers from discretionary front/defense rows.
+INV-114 checks that cancelled unframed mex tasks release served pins after native
+cleanup. Every test keeps the full invariant forbid. INV-006/009/021 are explicitly
+ordinary-economy promises; metal mode uses its separate energy policy. The normal
+branch gains only bounds/spot-zero cancellation repairs and an actual-producer
+invariant diagnostic, aside from early false-mode guards.
+
+**Verification.** Built and played. Final DLL 9d1c668474924f01 with matching symbols;
+all native/AngelScript policy unit suites pass and 275 used API members match.
+Final Nine Metal Islands reaches forty completed mexes on all four AIR/TECH
+players at 12:00-15:30, with zero converters. Plate and repeated SpeedMetal games
+verify dense expansion under combat, with incomplete forty-mex outcomes after
+base losses explicitly retained. Native hard profile passes twenty minutes with
+111-147 peak mexes per player and zero converters. Controlled cancellation passes:
+pin 247 is released, served again, and followed by eleven more mex completions.
+Twenty-minute ordinary Supreme and Glacial comparisons preserve finite spots,
+ordinary upgrades/converters and no field-policy entry. Their full invariant
+reports, and several metal reports, still fail. No claim of optimal PvP play,
+seeded deterministic equivalence, runtime save/load completion, full profile
+matrix coverage or measured 8v8 p95/p99/APM performance. See
+[results](metal-maps-results.md) and KI-472/473; original failed runs remain.
+
+**Files.** The complete repository change set for the research and implementation
+is linked below. Generated binaries and local playtest artifacts are described
+in the results, not committed. Shared gameplay-only research remains in the
+sibling knowledge repository.
+
+- [data/config/metal_map.json](../data/config/metal_map.json)
+- [data/script/README.md](../data/script/README.md)
+- [data/script/easy/init.as](../data/script/easy/init.as)
+- [data/script/experimental_balanced/init.as](../data/script/experimental_balanced/init.as)
+- [data/script/experimental_hard/init.as](../data/script/experimental_hard/init.as)
+- [data/script/experimental_terrible/init.as](../data/script/experimental_terrible/init.as)
+- [data/script/hard/init.as](../data/script/hard/init.as)
+- [data/script/hard_aggressive/init.as](../data/script/hard_aggressive/init.as)
+- [data/script/medium/init.as](../data/script/medium/init.as)
+- [data/script/src/helpers/metal_math.as](../data/script/src/helpers/metal_math.as)
+- [data/script/src/manager/air_eco_layout.as](../data/script/src/manager/air_eco_layout.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_reclaim.as](../data/script/src/manager/air_reclaim.as)
+- [data/script/src/manager/builder.as](../data/script/src/manager/builder.as)
+- [data/script/src/manager/eco_planner.as](../data/script/src/manager/eco_planner.as)
+- [data/script/src/manager/invariants.as](../data/script/src/manager/invariants.as)
+- [data/script/src/manager/metal_economy.as](../data/script/src/manager/metal_economy.as)
+- [data/script/src/manager/metal_layout.as](../data/script/src/manager/metal_layout.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [data/script/src/roles/tech.as](../data/script/src/roles/tech.as)
+- [data/script/src/roles/tech_chain.as](../data/script/src/roles/tech_chain.as)
+- [data/script/src/roles/tech_rules.as](../data/script/src/roles/tech_rules.as)
+- [data/script/src/setup.as](../data/script/src/setup.as)
+- [doc/Profile.md](../doc/Profile.md)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/base-layout.md](../doc/base-layout.md)
+- [doc/benchmarks/metal-map-economics.json](../doc/benchmarks/metal-map-economics.json)
+- [doc/benchmarks/metal-map-simulations.json](../doc/benchmarks/metal-map-simulations.json)
+- [doc/decisions.md](../doc/decisions.md)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/metal-maps-implementation.md](../doc/metal-maps-implementation.md)
+- [doc/metal-maps-proposal.md](../doc/metal-maps-proposal.md)
+- [doc/metal-maps-results.md](../doc/metal-maps-results.md)
+- [doc/metal-maps-revised-design.md](../doc/metal-maps-revised-design.md)
+- [doc/reviews/2026-10-02-metal-maps-proposal-review.md](../doc/reviews/2026-10-02-metal-maps-proposal-review.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/air_build.md](../doc/roles/air_build.md)
+- [doc/roles/air_rules.md](../doc/roles/air_rules.md)
+- [doc/roles/tech.md](../doc/roles/tech.md)
+- [doc/roles/tech_chain.md](../doc/roles/tech_chain.md)
+- [doc/roles/tech_rules.md](../doc/roles/tech_rules.md)
+- [src/circuit/module/BuilderManager.cpp](../src/circuit/module/BuilderManager.cpp)
+- [src/circuit/module/EconomyManager.cpp](../src/circuit/module/EconomyManager.cpp)
+- [src/circuit/module/EconomyManager.h](../src/circuit/module/EconomyManager.h)
+- [src/circuit/module/MetalFieldEconomy.cpp](../src/circuit/module/MetalFieldEconomy.cpp)
+- [src/circuit/resource/MetalField.h](../src/circuit/resource/MetalField.h)
+- [src/circuit/resource/MetalManager.cpp](../src/circuit/resource/MetalManager.cpp)
+- [src/circuit/resource/MetalManager.h](../src/circuit/resource/MetalManager.h)
+- [src/circuit/script/EconomyScript.cpp](../src/circuit/script/EconomyScript.cpp)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/builder/BuilderTask.cpp](../src/circuit/task/builder/BuilderTask.cpp)
+- [src/circuit/task/builder/MexTask.cpp](../src/circuit/task/builder/MexTask.cpp)
+- [src/circuit/task/builder/MexTask.h](../src/circuit/task/builder/MexTask.h)
+- [src/circuit/task/builder/MexUpTask.cpp](../src/circuit/task/builder/MexUpTask.cpp)
+- [src/circuit/task/builder/MexUpTask.h](../src/circuit/task/builder/MexUpTask.h)
+- [src/circuit/terrain/TerrainManager.cpp](../src/circuit/terrain/TerrainManager.cpp)
+- [src/circuit/terrain/TerrainManager.h](../src/circuit/terrain/TerrainManager.h)
+- [src/circuit/unit/ally/AllyTeam.h](../src/circuit/unit/ally/AllyTeam.h)
+- [src/circuit/util/GameAttribute.h](../src/circuit/util/GameAttribute.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/metal_field_test.cpp](../tests/metal_field_test.cpp)
+- [tests/metal_math_tests.as](../tests/metal_math_tests.as)
+- [tools/knowledge/metal_map_economics.py](../tools/knowledge/metal_map_economics.py)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/playtest/audit_metal_check.py](../tools/playtest/audit_metal_check.py)
+- [tools/playtest/checks/shared/economy/metal_cancel.json](../tools/playtest/checks/shared/economy/metal_cancel.json)
+- [tools/playtest/checks/shared/economy/metal_field.json](../tools/playtest/checks/shared/economy/metal_field.json)
+- [tools/playtest/checks/shared/economy/metal_legacy.json](../tools/playtest/checks/shared/economy/metal_legacy.json)
+- [tools/playtest/checks/shared/economy/metal_normal_control.json](../tools/playtest/checks/shared/economy/metal_normal_control.json)
+- [tools/playtest/checks/shared/economy/metal_normal_tech_control.json](../tools/playtest/checks/shared/economy/metal_normal_tech_control.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_metal_check.py](../tools/playtest/prepare_metal_check.py)
+- [tools/playtest/widgets/metal_watch.lua](../tools/playtest/widgets/metal_watch.lua)
+- [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
+
+## D-171 - Committed AIR operations, stable control groups and income admission
+
+**Call.** Experimental AIR uses opt-in native cohort/route mechanisms controlled
+by AngelScript. Offensive bombers remain airborne and attack until exhausted;
+all available fighters accompany a sortie and do not peel for a home incursion.
+The owner's explicit answer selects this over intercepting with committed
+escorts. Newly produced/uncommitted fighters remain home defenders. Defensive
+T3 sorties can return and repair. TECH's executor and lab rules are unchanged.
+
+**Reasoning.** Stable route versions, shared wall cells and persistent target
+orders remove needless per-aircraft refreshes. Recoil's GiveGroupOrder is a
+no-op, so logical groups are not a network-packet reduction by themselves.
+An early natural run exposed 3,254 AIR commands in one minute: TrySetIdleMode
+and TrySetFireState each emit a command even when unchanged. D-171 sets these
+states once on operation entry, not again on every movement leg or target.
+No general command rate limiter or delayed emergency decision is added.
+
+Sustained M/E affordability replaces the named two-AFUS bomber gate while the
+two-AFUS growth objective remains. A nearby temporary T1 lab avoids forcing
+the sole commander to a speculative campus. It is retired when idle, supported
+and affordable T2 access has a planned site; transport requests preempt this.
+Later T1 recovery uses a planned campus bay. The fighter/radar factory identity
+persists while that factory is valid, including when a new lab has a lower ID.
+
+**Alternatives rejected.** A global APM cap would suppress urgent responses.
+Moving every unit each tick defeats multiplayer efficiency. Holding excess
+T2 fighters at the factory wastes the home wall. Counting intentional losses
+as failed return missions suppresses the requested attrition doctrine. Forcing
+a large frontline assault into the 10-20 opening raid size can deadlock the
+first attack; the random size now applies to the first economy raid, while
+frontline and defensive missions have separate payload budgets.
+
+**Invariant.** INV-115 keeps committed escorts with their live operation;
+INV-116 forbids offensive RETURNING. INV-093 preserves friendly-territory
+interception; INV-102 checks sustained production income; INV-103 checks the
+opening economy draw and every mission's payload budget. Existing construction,
+transport, twenty-turret expansion, shared reservations and TECH invariants stay
+enabled. See the updated actor matrix and invariant register.
+
+Further full-game evidence found paired ATTACK/FIGHT orders. AIR's opt-in
+controllers now request only the persistent target; all other callers retain
+the native fallback. Legion replacement scouts transfer individually, avoiding
+whole-cell aborts. A three-owned-mex gate fixes the opening search-cap mistake;
+rotated smaller campuses fit constrained terrain while retaining complete
+support and aggregate six-lab planning. Large six-lab compounds stay preferred.
+
+Natural handoff failures also showed that cancelling an AI task does not clear
+its engine queue. AIR clears a commander factory guard once before another
+action waits for a path, stops a released T2 economy aircraft, and stops current
+assignees before cancelling an unstarted building. Changing all native guard
+semantics or TECH's builder ownership was rejected as unnecessary scope.
+
+Fighter cells now retain eligible contact IDs before assigning free cells; switching merely because contact indexes or positions move was rejected. The full natural repeat still reaches 3482 aircraft orders/minute, so this is not a universal APM bound. The storage transition fix reserves one pending metal store at a time when a nearly full pre-T2 bank cannot contain the loaded lab cost; lowering the income gate was rejected. INV-118 audits that narrow exception. The first natural Tundra repeat reaches T2 lab at 15.00 minutes after admitting its full bank at M10=16. The camera holds an explicit controller through render settling; the idle observer measures continuous guarding of a completed factory, avoiding false positives while finishing replacement labs.
+
+**Verification.** All three experimental script graphs compile; actual engine
+initialization succeeds. Native suites, 83 real AngelScript AIR policy tests,
+14 arena-validation tests and five independent audit tests pass. The final
+native build passes all five supplied-combat maps plus strict escort-incursion,
+defensive-return and blocked-backline cases. Forty-five-minute natural games
+were run on the same five non-metal maps; their full failures and repeats are
+retained in [the results](air-committed-operations-results.md). A final Legion
+natural repeat passes all enabled checks after the guard handoff fix. Normal
+economic timing and mixed-role TECH checks are not uniformly clean. Earlier
+invalid fixtures, an underfunded defensive case and a wall-time-limited run
+are not counted as successful acceptance tests. Save/load and 8v8 FPS remain
+unverified.
+
+**References.** [Design and PvP sources](air-committed-operations-plan.md),
+[results and screenshots](air-committed-operations-results.md),
+[machine-readable evidence](benchmarks/d171-air-operations.json).
+Escort lead is not an engine speed lock (KI-475); strike scans retain nested
+cost (KI-474), and total command/FPS bounds remain unproven (KI-477). The
+optional CIRCUIT_AS_INTERFACE dump and compile-only checker accelerate type/API
+feedback without replacing real initialization and gameplay.
+
+**Files touched.**
+- [data/script/src/global.as](../data/script/src/global.as)
+- [data/script/src/helpers/air_math.as](../data/script/src/helpers/air_math.as)
+- [data/script/src/manager/air_economy.as](../data/script/src/manager/air_economy.as)
+- [data/script/src/manager/air_growth.as](../data/script/src/manager/air_growth.as)
+- [data/script/src/manager/air_layout.as](../data/script/src/manager/air_layout.as)
+- [data/script/src/manager/air_operations.as](../data/script/src/manager/air_operations.as)
+- [data/script/src/manager/air_production.as](../data/script/src/manager/air_production.as)
+- [data/script/src/manager/air_raids.as](../data/script/src/manager/air_raids.as)
+- [data/script/src/manager/air_recon.as](../data/script/src/manager/air_recon.as)
+- [data/script/src/manager/air_screen.as](../data/script/src/manager/air_screen.as)
+- [data/script/src/manager/air_waves.as](../data/script/src/manager/air_waves.as)
+- [data/script/src/roles/air.as](../data/script/src/roles/air.as)
+- [data/script/src/roles/air_build.as](../data/script/src/roles/air_build.as)
+- [data/script/src/roles/air_rules.as](../data/script/src/roles/air_rules.as)
+- [doc/actor-matrix.md](../doc/actor-matrix.md)
+- [doc/air-committed-operations-plan.md](../doc/air-committed-operations-plan.md)
+- [doc/air-committed-operations-results.md](../doc/air-committed-operations-results.md)
+- [doc/air-wave-attacks.md](../doc/air-wave-attacks.md)
+- [doc/angelscript-references.md](../doc/angelscript-references.md)
+- [doc/benchmarks/d171-air-operations.json](../doc/benchmarks/d171-air-operations.json)
+- [doc/decisions.md](../doc/decisions.md)
+- [doc/images/d171/defensive-return.png](../doc/images/d171/defensive-return.png)
+- [doc/images/d171/frontline-strike.png](../doc/images/d171/frontline-strike.png)
+- [doc/images/d171/glitters-legion-strike.png](../doc/images/d171/glitters-legion-strike.png)
+- [doc/images/d171/tundra-island-strike.png](../doc/images/d171/tundra-island-strike.png)
+- [doc/images/d171/tundra-natural-opening.png](../doc/images/d171/tundra-natural-opening.png)
+- [doc/images/d171/tundra-natural-t2.png](../doc/images/d171/tundra-natural-t2.png)
+- [doc/invariants.md](../doc/invariants.md)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/air_build.md](../doc/roles/air_build.md)
+- [doc/roles/air_rules.md](../doc/roles/air_rules.md)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/script/ScriptManager.cpp](../src/circuit/script/ScriptManager.cpp)
+- [src/circuit/task/fighter/AirGeometry.h](../src/circuit/task/fighter/AirGeometry.h)
+- [src/circuit/task/fighter/AirWaveTask.cpp](../src/circuit/task/fighter/AirWaveTask.cpp)
+- [src/circuit/task/fighter/AirWaveTask.h](../src/circuit/task/fighter/AirWaveTask.h)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [src/circuit/task/fighter/RouteTask.h](../src/circuit/task/fighter/RouteTask.h)
+- [src/circuit/terrain/BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp)
+- [src/circuit/terrain/BattleAnalysis.h](../src/circuit/terrain/BattleAnalysis.h)
+- [src/circuit/unit/CircuitUnit.cpp](../src/circuit/unit/CircuitUnit.cpp)
+- [src/circuit/unit/CircuitUnit.h](../src/circuit/unit/CircuitUnit.h)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tests/air_geometry_test.cpp](../tests/air_geometry_test.cpp)
+- [tests/air_math_tests.as](../tests/air_math_tests.as)
+- [tests/production_math_test.cpp](../tests/production_math_test.cpp)
+- [tools/compile_script.cpp](../tools/compile_script.cpp)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/playtest/air_arena.py](../tools/playtest/air_arena.py)
+- [tools/playtest/air_arena_probe.as](../tools/playtest/air_arena_probe.as)
+- [tools/playtest/cases/air/combat/blocked-backline.json](../tools/playtest/cases/air/combat/blocked-backline.json)
+- [tools/playtest/cases/air/combat/committed-home-incursion.json](../tools/playtest/cases/air/combat/committed-home-incursion.json)
+- [tools/playtest/cases/air/combat/defensive-t3.json](../tools/playtest/cases/air/combat/defensive-t3.json)
+- [tools/playtest/analyze_air_natural.py](../tools/playtest/analyze_air_natural.py)
+- [tools/playtest/analyze_air_operations.py](../tools/playtest/analyze_air_operations.py)
+- [tools/playtest/checks/air/combat/air_arena.json](../tools/playtest/checks/air/combat/air_arena.json)
+- [tools/playtest/checks/air/combat/air_committed_incursion.json](../tools/playtest/checks/air/combat/air_committed_incursion.json)
+- [tools/playtest/checks/air/reliability/air_compile.json](../tools/playtest/checks/air/reliability/air_compile.json)
+- [tools/playtest/checks/air/combat/air_defensive.json](../tools/playtest/checks/air/combat/air_defensive.json)
+- [tools/playtest/checks/air/combat/air_frontline.json](../tools/playtest/checks/air/combat/air_frontline.json)
+- [tools/playtest/playtest.py](../tools/playtest/playtest.py)
+- [tools/playtest/prepare_air_operations_cases.py](../tools/playtest/prepare_air_operations_cases.py)
+- [tools/playtest/run_air_natural.py](../tools/playtest/run_air_natural.py)
+- [tools/playtest/test_air_operations.py](../tools/playtest/test_air_operations.py)
+- [tools/playtest/widgets/air_arena.lua](../tools/playtest/widgets/air_arena.lua)
+- [tools/playtest/widgets/air_command_watch.lua](../tools/playtest/widgets/air_command_watch.lua)
+- [tools/playtest/widgets/air_opening_watch.lua](../tools/playtest/widgets/air_opening_watch.lua)
+- [tools/playtest/widgets/playtest_camera.lua](../tools/playtest/widgets/playtest_camera.lua)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+
+
+## D-172 - AIR workforce ownership and first advanced-lab capital
+
+**Decision.** Both aircraft constructor tiers are mobile economy workers;
+release inherited native guards individually and clear their engine order.
+After the initial screen, give funded missing workers a recruitment turn,
+including after two combat orders during an incursion. Attempt the first
+eligible advanced lab before optional shared reactor growth. Save its full
+loaded cost after the existing eight-minute, +12 metal/+450 energy access
+conditions; retain recovery, mex work, transports and immediate defense.
+The normal +50 metal/+1200 energy admission or full-bank waiver is unchanged.
+
+**Reasoning.** T1 fallback guards checked neither active production nor engine
+order lifetime. Repeated fighter-floor/interception orders preceded workforce
+recruitment indefinitely. Shared growth preceded first income-qualified lab
+placement; below that income, optional spending never explicitly budgeted lab
+capital. BAR's low-build-power aircraft need multiple workers and local turret
+support. Increasing only constructor caps would not repair order ownership or
+recruitment starvation. Global guard changes and command throttles were rejected;
+TECH's exact rules and native semantics are unchanged.
+
+**Invariant.** INV-106 now covers both aircraft tiers. INV-119 requires a
+funded workforce turn to recruit an available missing constructor. INV-120
+requires an eligible first-lab placement attempt before shared reactor growth,
+using fresh counts to avoid a just-completed-lab snapshot race.
+
+**Verification.** 98 AIR and 133 shared math tests; three compiled experimental
+profiles; 276 API members checked. Final natural Glacial completed T2 at 12:56,
+fusion 13:26, bomber 16:24; final natural Caldera T2 15:31, fusion 19:18,
+bomber 20:15. Both aircraft tiers left injected non-interruptible guards in
+one second, and allied receipts were confirmed. AIR checks were clean in the
+final games; Caldera passed all enabled checks. Mixed TECH reports remain FAIL.
+An earlier patrol-boundary report is KI-480. See the results for exact run
+paths, hashes, limitations, initial diagnostic failures and screenshots.
+No save/load or universal FPS/APM claim. Build output was published with the
+matched DLL/debug/data; the live game install was not modified.
+
+**Files.**
+- [AIR actions](../data/script/src/roles/air_build.as)
+- [AIR rules](../data/script/src/roles/air_rules.as)
+- [Economy](../data/script/src/manager/air_economy.as)
+- [Growth](../data/script/src/manager/air_growth.as)
+- [Recruitment](../data/script/src/manager/air_production.as)
+- [AIR arithmetic](../data/script/src/helpers/air_math.as)
+- [Settings](../data/script/src/global.as)
+- [Math tests](../tests/air_math_tests.as)
+- [Role reference](roles/air.md), [actions reference](roles/air_build.md), [rules reference](roles/air_rules.md)
+- [Invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
+- [Plan](air-workforce-repair-plan.md), [results](air-workforce-repair-results.md)
+- [Evidence](benchmarks/d172-air-workforce.json)
+- [Baseline image](images/d172/glacial-baseline-5.png), [natural image](images/d172/glacial-natural-20.png), [donation image](images/d172/glacial-donation-20.png)
+- [Natural runner](../tools/playtest/run_air_natural.py)
+- [Guard fixture preparer](../tools/playtest/prepare_air_workforce.py)
+- [Workforce observer](../tools/playtest/widgets/air_workforce_watch.lua)
+- [Donation fixture](../tools/playtest/widgets/air_donation_fixture.lua)
+
+
+## D-173 - Committed AIR cleanup after strategic target exhaustion
+
+**Decision.** Let script supply a bounded fallback list shared by launch and
+retargeting. Retain strategic targets and the existing armed-static fallback,
+then admit other economy/support, approved heavy ground units and other static
+targets. All-mobile cleanup is opt-in; preserve the owner's T1-ground exclusion
+until explicitly changed. Keep committed offensive survivors airborne and active;
+defensive operations retain their return lifecycle. Hold an unlaunched response
+whose known nearby T3 payload exceeds the available bombers.
+
+**Reasoning.** The old advanced operation searched only named strategic and armed
+structures, then surveyed starts despite known surviving utility buildings. The
+Glitters baseline killed the converter but ignored all three stores. Falling back
+through broad unarmed/static classes must exclude primary targets; otherwise a
+rejected strategic route or opening-force budget could be bypassed. Hidden contacts
+are excluded from attack admission, matching the attack-state visibility contract.
+The defensive accumulation guard prevents a cheap cleanup commitment from consuming
+an incomplete response. Already committed waves are never recalled.
+
+**Alternatives.** Repeatedly resending idle-mode commands was rejected: baseline
+and fixed launched cohorts already report fly mode and no active landing in these
+tests. The exact reported late-game landing remains unproven. Putting utility
+targets ahead of the existing armed-static fallback was rejected on final review
+to preserve frontline assault when backline AA blocks ingress. No TECH, legacy
+task or economy policy was changed. No global rate limit was introduced.
+
+**Invariant.** INV-116 now includes independently observed engine flight state
+for launched cohorts; defensive return is exempt. The cleanup checks require an
+explicit lower-priority selection after primary destruction plus actual damage
+and death, allowing incidental earlier splash damage.
+
+**Verification.** Built, Checked, Played. Native and policy suites pass; all three
+experimental profiles compile/load; 19 arena/attribution tests pass. Final DLL
+Glitters tests pass for Phoenix, Armada and Cortex. Radar-only cleanup admission,
+defensive return and blocked-backline artillery cases pass. Failed early fixtures
+and the overly strict splash-order check are retained. The final script reorder
+is separately exercised by blocked-route and cleanup-only games; the other cases
+contain no armed structures. Exact source/build hashes, logs, screenshots and
+limits are recorded below. Existing strike-calibration and nested-scan concerns
+remain KI-457/KI-474. Matched DLL/debug/data published to the required Recoil build
+output; live game installation untouched; concurrent map edits excluded.
+
+**Files.**
+- [Wave task](../src/circuit/task/fighter/AirWaveTask.cpp), [API](../src/circuit/task/fighter/AirWaveTask.h), [target filter](../src/circuit/task/fighter/AirGeometry.h), [bindings](../src/circuit/script/InitScript.cpp)
+- [Operation policy](../data/script/src/manager/air_operations.as), [advanced waves](../data/script/src/manager/air_waves.as), [T1 raids](../data/script/src/manager/air_raids.as), [settings](../data/script/src/global.as)
+- [Native filter tests](../tests/air_geometry_test.cpp)
+- [Arena runner](../tools/playtest/air_arena.py), [engine observer/camera](../tools/playtest/widgets/air_arena.lua)
+- [Glitters case](../tools/playtest/cases/air/combat/cleanup-glitters.json), [cleanup-only case](../tools/playtest/cases/air/combat/cleanup-only-glitters.json), [defensive case](../tools/playtest/cases/air/combat/defensive-t3.json)
+- [Cleanup checks](../tools/playtest/checks/air/combat/air_cleanup.json), [cleanup-only checks](../tools/playtest/checks/air/combat/air_cleanup_only.json), [defensive checks](../tools/playtest/checks/air/combat/air_defensive.json)
+- [AIR reference](roles/air.md), [script API](angelscript-references.md), [invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
+- [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](benchmarks/d173-bomber-cleanup.json)
+- [Phoenix screenshot](images/d173/phoenix-cleanup.png), [Cortex screenshot](images/d173/cortex-cleanup.png)
+
+
+## D-174 - Proposed AIR defense of allied bases against ground infiltration
+
+**Decision (proposal only).** Design an immediate available-force response and
+one shared twenty-unit recruitment target for observed ground enemies or hostile
+structures near active allied bases. Keep visual reconnaissance and a persistent
+incident when radar disappears. Prefer timely suitable gunships, with explicit
+Cortex EMP/lethal-damage and Legion stockpile/transport distinctions.
+
+**Reasoning.** This matches the owner's cliff factory/jammer example and the
+documented defensive use of Roughneck/Wasp. The existing aircraft intrusion
+signal and T3 bomber exception do not cover this class of incursion. Waiting for
+twenty before fighting loses time. Repeatedly queuing twenty per observation or
+per allied AIR invites economic bait. The recommended target stops new spending
+after a confirmed clear sweep; this is a proposed refinement, not a silently
+implemented exception to the user's requested batch.
+
+**Alternatives and compatibility.** A broad friendly-half-of-map trigger risks
+turning front-line combat into permanent emergency production. Use protected
+active base areas, independent of TECH's wall exclusion settings and ground
+pathability. Reject an EMP-only twenty-Shuriken response, treating Martyr as a
+reusable gunship, and choosing the highest-cost flyer solely by tier. Preserve
+the owner's earlier committed-escort and transport-priority choices; immediate
+response comes from free/new units. Reuse native snapshots and group command
+deduplication; keep force and target priorities in script. No rate cap.
+
+**Invariant (proposed).** One recruitment slot has one owner; active plus framed
+and reserved defenders are counted once. Only observed or explicitly remembered
+contacts drive an incident, and a disappearing radar blip is not a confirmed
+clear. No committed escort, player-owned unit or requested ferry is reassigned.
+These promises require runtime checks during implementation; they are not yet
+enforced by this documentation-only change.
+
+**Verification.** Checked against current AIR script/native dispatch, shared unit
+knowledge, local BAR build options and official unit guidance. No implementation,
+new build or simulations in this strategy-only turn. Twenty, radii, memory and
+reaction budgets are provisional test inputs, not measured optimal values.
+The missing behavior remains [KI-482](known-issues.md).
+
+**Files.** [Proposed response plan](air-allied-base-response-plan.md),
+[known issue register](known-issues.md), and this decision record.
+
+
+## D-175 - One metal overflow donation policy for all six roles
+
+**Date:** 2026-10-03. **Status:** Checked; rendered runtime results recorded in
+[the validation report](team-metal-sharing.md).
+
+**Decision.** Move D-106's TECH donation implementation and its one cooldown
+into TeamEconomy, invoked once after the shared economy callback's role
+adjustment. TECH, AIR, FRONT, SEA, TACTICAL and SUPPORT share at an inclusive
+95% storage threshold, budgeting at most 20% of storage every five seconds,
+with 25-metal minimum gifts and the same lowest-filled live-ally ordering.
+This includes human teammates. Preserve the Tech::TeamShare* setting names as
+the sole configuration so existing overrides continue to work for all roles;
+reject six copied policies/settings that could drift.
+
+**Opening and ownership.** TECH keeps its original completed T1 bot lab or
+WasIntoT2 recovery gate. Other roles latch eligibility on a completed native
+factory of any terrain/tier; frames and constructor-only starts cannot donate
+their opening bank. The latch survives role changes and factory reclaim/loss
+within an instance. TECH's unrelated air-constructor refill/cap/layout upkeep
+stays in TechBuild::Tick. The prior lack of script save-state persistence is
+unchanged (KI-209); a restored instance reconstructs eligibility from extant
+factories/T2 state rather than a serialized historic latch. Save/load during
+a factory-free recovery is not established by these tests.
+
+**Invariant.** INV-033 now runs from the shared economy callback for every
+role after opening eligibility: the bank does not remain at/above the threshold
+for 60 seconds while a live teammate has a quarter of our capacity free. Pure
+allocation tests cover exact threshold, opening protection, storage-based budget,
+overdraw, recipient capacity, minimum gift and one budget across recipients.
+
+**Scope.** No C++ or UnitDef/profile-classification changes. Legacy profiles
+remain on their prior behavior (KI-483). Near-full-team recirculation is a
+separate recipient-policy follow-up (KI-484), not silently changed as part of
+matching TECH. The test fixture supplies banks and occasional missing factories;
+it does not measure natural economy strength. The native/AngelScript suite,
+three profile compilations and script/DLL parity pass; see the report for
+individual rendered runs and transfer audits.
+
+**Files.** [team economy](../data/script/src/manager/team_economy.as),
+[shared callback](../data/script/src/manager/economy.as),
+[TECH upkeep](../data/script/src/roles/tech_build.as),
+[settings](../data/script/src/global.as),
+[invariant checker](../data/script/src/manager/invariants.as),
+[allocation arithmetic](../data/script/src/helpers/team_share_math.as),
+[allocation tests](../tests/team_share_math_tests.as),
+[test runner](../tools/run_native_tests.sh),
+[fixture preparer](../tools/playtest/prepare_team_share_check.py),
+[fixture widget](../tools/playtest/widgets/team_share_fixture.lua),
+[runtime checks](../tools/playtest/checks/shared/cooperation/team_share.json),
+[transfer audit](../tools/playtest/audit_team_share.py),
+[script guide](../data/script/README.md),
+[TECH build reference](roles/tech_build.md),
+[layout/sequence reference](roles/tech-layout-and-sequence.md),
+[invariant register](invariants.md), [actor matrix](actor-matrix.md),
+[known issues](known-issues.md), [plan and results](team-metal-sharing.md).
+
+**D-175 evidence artifacts.** [Audit manifest](benchmarks/d175-team-sharing.json),
+[hard screenshot](images/d175/sharing-hard.png),
+[terrible screenshot](images/d175/sharing-terrible.png). All six roles sent in
+all three rendered profiles; balanced strict PASS, hard/terrible strict FAIL
+on KI-427 INV-008. The 196 hard/terrible donation decisions pass their focused
+audit. This makes the donation change Played, without claiming the full-match
+failures resolved.
+
+
+## D-176 - Hand bomber attacks off before overflight; interrupt for local visible AFUS
+
+**Date:** 2026-10-03. **Status:** Built, Checked and Played; measurements and
+exact binary identities are in the [validation report](air-afus-attack-handoff-results.md).
+
+**Decision.** Experimental AIR enables an early ATTACK handoff before the
+last target-centre MOVE leg, plus an offensive-only local priority override.
+A stationary allowed target of priority 4 or higher, currently in team LOS
+within 1,800 elmos of the bomber cohort centre, interrupts travel/search or a
+lower-priority attack. AIR already assigns AFUS priority 4. Native defaults
+are disabled; the script owns enabling, priority and radius. Defensive sorties
+receive the earlier terminal approach but retain their own T3 policy and
+return path. TECH's building sequence and other roles' policy are untouched.
+
+**Why.** The operation path held fire while waiting for an arrival quorum at
+the target itself. It did not use the older synchronized strike path. In the
+baseline Glitters fixture a visible local AFUS waited 16.33 seconds for ATTACK,
+while the wave approached storage first. Independent engine-command observers
+measure 0.33 seconds in the Legion, Armada and normal-LOS Cortex fixes. Early
+collateral damage in the baseline is why damage alone was insufficient proof.
+
+**Alternatives.** Reject enabling unrestricted fire-at-will (would bypass T1
+target exclusions), repeated ATTACK refreshes (command traffic and reset
+bombing runs), global AFUS diversion (would abandon edge routes for distant
+allied sightings), or waiting at the target for all formation slots. Retain
+assembly and intermediate cohort legs; once a visible priority target is
+attacked keep it instead of oscillating between nearby reactors. The radius
+uses the cohort centre and team LOS, not an expensive enemy-by-aircraft scan.
+There is no new rate limit, worker thread or durable task state. Existing
+transient-wave save/load limitations remain; existing KI-474 performance and
+KI-475 geometric escort limitations are not claimed solved.
+
+**Invariant.** INV-121 prohibits stale formation MOVE after attack handoff.
+The production task rejects/logs that transition. The independent arena reads
+actual bomber queues and fails when a qualifying AFUS waits more than one
+second for all cohort ATTACK orders. INV-115 escort ownership and INV-116
+no offensive return/landing remain enforced. Failed/hidden contacts are not
+permission to use omniscient target data. A native attack command is not an
+instantaneous weapon-fire guarantee.
+
+**Verification.** Native suites and 288 script arithmetic assertions pass;
+all three experimental profiles compile against runtime-exported declarations
+and load in rendered faction tests. Glitters AFUS destruction and subsequent
+cleanup pass for Legion, Armada and Cortex; the normal-LOS Cortex run uses the
+final reviewed DLL. Supreme's defensive T3 sortie attacks and returns home.
+No full economy or large multiplayer performance claim. Source/data staging
+excludes the concurrent unrelated map work. Details and strict verdicts are
+recorded in the report rather than inferred from screenshots alone.
+
+**Files.** [Native wave mechanism](../src/circuit/task/fighter/AirWaveTask.cpp),
+[wave contract](../src/circuit/task/fighter/AirWaveTask.h),
+[geometry policy helpers](../src/circuit/task/fighter/AirGeometry.h),
+[native assertions](../tests/air_geometry_test.cpp),
+[binding](../src/circuit/script/InitScript.cpp),
+[AIR operation policy](../data/script/src/manager/air_operations.as),
+[settings](../data/script/src/global.as), [AIR reference](roles/air.md),
+[API reference](angelscript-references.md), [actor matrix](actor-matrix.md),
+[invariants](invariants.md), [plan](air-afus-attack-handoff-plan.md),
+[results](air-afus-attack-handoff-results.md),
+[arena observer](../tools/playtest/widgets/air_arena.lua),
+[initial fixture](../tools/playtest/cases/air/combat/afus-handoff-glitters.json),
+[reveal fixture](../tools/playtest/cases/air/combat/afus-reveal-glitters.json),
+[strict checks](../tools/playtest/checks/air/combat/air_afus_handoff.json),
+[timing audit](../tools/playtest/audit_afus_handoff.py),
+[baseline screenshot](images/d176/baseline-visible.png),
+[Legion screenshot](images/d176/legion-afus.png),
+[Armada screenshot](images/d176/armada-afus.png),
+[Cortex screenshot](images/d176/cortex-afus.png),
+[defense screenshot](images/d176/defensive-shiva.png).
+
+**Evidence.** [Pinned build and run manifest](benchmarks/d176-afus-handoff.json).
+All four fixed strict reports PASS; the old-DLL baseline fails INV-121 as expected.
+
+## D-177 - Verify edge routes through actual flight without retuning AIR
+
+**Date:** 2026-10-03. **Status:** Checked and Played against the published
+D-176 DLL; no production source, script policy or binary change.
+
+**Decision.** Preserve the existing direct/four-edge planner, intermediate
+formation legs and local AFUS handoff. Add opt-in fixture observation of the
+live bomber cohort crossing a defended corridor, with screenshots and target
+damage/destruction. Experimental STRIKE missions can use an edge ingress;
+the historical randomized FLANK/PINCER labels are not evidence that this path
+is disabled. Do not change gameplay to satisfy a verification-only request.
+
+**Why and alternatives.** A selected `route=edge` log cannot prove the units
+flew it. Actual positions on two maps show they did: Supreme west with Armada,
+Glitters east with Cortex under normal visibility. Both reached and destroyed
+the AFUS after the crossing; local AFUS ATTACK handoff took 0.33 seconds.
+Reject retuning threat weights or assuming flak removal alone makes a clear
+control. Two initial controls still had an enemy commander near the targets'
+exit corridor and failed the direct-crossing expectation. Keep those failures
+in the evidence. A corrected control separates the targets from the commander
+and the unchanged AI selects and flies direct. This is not a per-candidate
+threat-cost attribution or an economy/performance benchmark.
+
+**Invariant.** Existing INV-115 escort ownership, INV-116 offensive commitment
+and INV-121 attack handoff remain enforced. The test-only route observer
+raises `event=error` if a required flank crosses the configured central band;
+strict checks forbid that event and all runtime invariants. It measures cohort
+centre every 60 frames, not each aircraft's individual AA clearance. No new
+production invariant or actor state is needed because no behaviour changed.
+
+**Verification.** Both defended cases and the corrected clear control pass
+rendered 8-10 minute runs. Both discarded control designs remain strict FAIL
+for their missing direct crossing. No runtime invariant, script, fixture or
+crash failures in any of the five games. Two factions and two experimental
+profiles were played, not all maps or legacy randomized attack modes. Existing
+KI-474 performance and KI-475 exact escort-speed limitations remain outside
+this verification.
+
+**Files.** [Plan, results and reproduction](air-edge-flank-verification.md),
+[measurement manifest](benchmarks/d177-air-routes.json),
+[read-only route observer](../tools/playtest/widgets/air_arena.lua),
+[Supreme fixture](../tools/playtest/cases/air/combat/edge-supreme.json),
+[Glitters fixture](../tools/playtest/cases/air/combat/edge-glitters.json),
+[clear control](../tools/playtest/cases/air/combat/direct-glitters.json),
+[edge checks](../tools/playtest/checks/air/combat/air_edge.json),
+[direct checks](../tools/playtest/checks/air/combat/air_direct.json),
+[Supreme edge](images/d177/supreme-edge.png),
+[Supreme strike](images/d177/supreme-afus.png),
+[Glitters edge](images/d177/glitters-edge.png),
+[Glitters strike](images/d177/glitters-afus.png),
+[direct control](images/d177/glitters-direct.png).
+
+
+## D-178 - Categorize tests and new evidence while preserving benchmark history
+
+**Date:** 2026-10-03. **Status:** Checked and Played (tooling integration).
+No AI policy, UnitDef, native source or production binary change.
+
+**Decision.** Separate reusable cases/checks, local engine working state,
+archived observations, immutable compact publications and generated discovery.
+Use domain/area/scenario/map folders and UTC IDs with a random suffix for new
+games. Move the 97 definitions byte-for-byte with legacy-path aliases. Keep all
+70 historical benchmark files, 60 images, scorecard cohorts/ratings and existing
+raw game directories unchanged; index them rather than renaming their evidence.
+The generic runner retains its explicit/legacy-directory workflow; AIR,
+scorecard and rush-loop defaults allocate new categorized games.
+
+**Why and alternatives.** Moving 129,211 files of historical engine state would
+break raw evidence paths and add risk without making results more comparable.
+Reject a timestamp-only archive name or replacing a rush row with the same ID:
+both can lose evidence. Use exclusive allocation, an atomic locked rush-ledger
+write, and conflicting-ID rejection. Reject rebuilding scorecards from a reused
+working directory when the original archived inputs exist. Preserve the original
+manifest and record engine enrichment separately. Scope Git's no-conversion
+attribute to new published evidence so its SHA-256 values survive checkout.
+Keep generated views/revisions distinct from games; supplied combat is never a
+natural-economy or confirmed-win benchmark merely because its checks pass.
+
+**Invariant.** No historical observation or benchmark row is silently replaced.
+Identical publication is idempotent; changed evidence, conflicting IDs and live
+snapshots are rejected. Archived settings/checks remain tied to the observed
+run after restaging. Every nested check continues to forbid runtime invariants.
+These are tooling contracts covered by Python tests; no production actor or
+new in-game invariant is introduced.
+
+**Verification.** The cutover hash audit passes for all 97 definitions and 130
+historical benchmark/image files. The playtest tooling suite covers migration,
+aliases, collisions, archive provenance, publication, scorecard conditions and
+ratings, and preserved rush rows. A rendered Cortex direct-route arena on All
+That Glitters passed strict checks at four game minutes using the unchanged
+D-176 DLL: 14 bombers crossed directly and destroyed the AFUS at 2:14. The run
+was archived, published with a screenshot, indexed, and published again with
+no duplicate or replacement. This verifies the tooling lifecycle, not new
+gameplay strength. Full-match economy simulations were not rerun for folder
+changes. Historical missing-hover-document links remain KI-404.
+
+**Files.** [Storage design and validation](test-storage.md),
+[every moved definition](test-storage-moves.md),
+[cutover hash manifest](test-storage-migration.json),
+[storage implementation](../tools/playtest/storage.py),
+[compatibility aliases](../tools/playtest/storage-aliases.json),
+[storage tests](../tools/playtest/test_storage.py),
+[watcher](../tools/playtest/playtest.py), [arena runner](../tools/playtest/air_arena.py),
+[arena tests](../tools/playtest/test_air_arena.py),
+[rush tracker](../tools/playtest/benchmark.py), [rush loop](../tools/playtest/bench_loop.sh),
+[scorecard runner](../tools/playtest/scorecard_run.py),
+[scorecard archive handling](../tools/playtest/scorecard.py),
+[scorecard tests](../tools/playtest/test_scorecard.py),
+[strike preparer](../tools/playtest/prepare_air_strike_check.py),
+[recursive invariant checker](../tools/knowledge/check_invariants.py),
+[case naming](../tools/playtest/cases/README.md),
+[check naming](../tools/playtest/checks/README.md),
+[runner guide](../tools/playtest/README.md),
+[playtest skill](../.claude/skills/playtest/SKILL.md),
+[repository map](../AGENTS.md), [byte-preservation attributes](../.gitattributes),
+[benchmark guide](benchmarks/README.md), [catalog](benchmarks/catalog.json),
+[AIR index](benchmarks/index/air.md), [TECH index](benchmarks/index/tech.md),
+[FRONT index](benchmarks/index/front.md), [SEA index](benchmarks/index/sea.md),
+[TACTICAL index](benchmarks/index/tactical.md), [SUPPORT index](benchmarks/index/support.md),
+[shared index](benchmarks/index/shared.md),
+[rendered integration evidence](benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
+Historical documentation paths were updated in [AFUS results](air-afus-attack-handoff-results.md),
+[edge verification](air-edge-flank-verification.md), [idle-factory investigation](air-idle-factory.md),
+[opening/screen reference](air-opening-and-screen.md), [issue register](known-issues.md),
+[flank review](reviews/2026-09-29-ascendancy-flank-effectiveness.md),
+[lanes reference](roles/tech-lanes.md), and earlier entries in this decision record.
+
+
+## D-179 - AIR opening support, compact factories and LOS-spaced recon (2026-10-03)
+
+**Decision.** Fund two early support turrets after the first three constructors
+and initial fighter screen, ahead of extra peacetime aircraft. Preserve demand
+when initial support pins are missing so repair can run. Add a saved configurable
+1-10 T1 raid (Legion uses Mosquito gunships). Pack AIR lab rows together with
+rear support banks and explicit cached bay ownership. Recon uses loaded sight,
+a map-centred friendly formation, per-member arrival tracking, synchronized
+straight MOVE legs, then nearby-base patrols through one shared native task.
+TECH's sequence/geometry, transports, recovery and the metal opening retain
+precedence. Existing saved reservations remain valid.
+
+**Why and alternatives.** Lowering the income gate alone could not repair a
+starter with no pins: zero pins made its support target zero forever. Only
+viable/active support sites reserve a production budget; blocked sites cannot
+freeze the factory. Individual edge clamping piles scouts together, so fit a
+whole formation, try transverse centring, then reduce spacing if necessary.
+Waiting for twenty fixed-wing orbit phases to coincide delayed dispatch for
+minutes: each plane must instead visit its slot and remain within the bounded
+holding envelope. Avoid repeated corrective orders. C++ provides geometry and
+read-only LOS; policy and settings remain in script. The raid draw does not
+waive visibility/payload admission or invent a Legion bomber build option.
+
+**Invariants.** INV-122 checks completed crew/support at opening recruitment and
+exact transferred bomber count. INV-123 checks complete recon transfer and
+straight MOVE route admission. INV-084/109 continue to protect complete support
+and reservation ownership. Physical/pure tests verify non-overlap, reach and
+twenty turrets credited to each of six advanced labs.
+
+**Verification.** Native suite, 303 pure script tests, 66 tooling tests and
+script/DLL parity passed. Final rendered Supreme/Glacial recon fixtures pass:
+twenty dispatch together and twenty enter base surveying. Six T2 labs and 120
+nanos physically fit. Three natural faction openings complete support and
+recruit their batch; Supreme launches it. Full natural verdicts remain FAIL
+for existing TECH/ferry invariants. Single-bomber Glacial dispatch is unobserved
+(KI-485); human takeover/release remains unplayed (KI-479). No 8v8 strength/FPS
+guarantee. [Plan, settings, times and retained evidence](air-opening-recon-plan.md).
+
+**Files.** [Settings](../data/script/src/global.as),
+[math](../data/script/src/helpers/air_math.as),
+[economy](../data/script/src/manager/air_economy.as),
+[layout revision](../data/script/src/manager/air_layout.as),
+[production](../data/script/src/manager/air_production.as),
+[T1 raids](../data/script/src/manager/air_raids.as),
+[recon](../data/script/src/manager/air_recon.as),
+[building](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as),
+[LOS binding](../src/circuit/script/InitScript.cpp),
+[geometry](../src/circuit/terrain/BaseLayoutGeometry.h),
+[geometry tests](../tests/base_layout_geometry_test.cpp),
+[policy tests](../tests/air_math_tests.as),
+[fixture preparer](../tools/playtest/prepare_air_recon_check.py),
+[probe](../tools/playtest/air_recon_probe.as),
+[observer](../tools/playtest/widgets/air_recon_watch.lua),
+[checks](../tools/playtest/checks/air/combat/air_recon.json),
+[arena compatibility](../tools/playtest/air_arena.py),
+[natural-run metadata](../tools/playtest/run_air_natural.py),
+[runner guide](../tools/playtest/README.md),
+[AIR reference](roles/air.md), [action reference](roles/air_build.md),
+[rule reference](roles/air_rules.md), [layout reference](base-layout.md),
+[API reference](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [verification gaps](known-issues.md),
+[benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).
+
+
+## D-180 - Review AIR build-power allocation before replacing its scaling policy
+
+**Decision.** Record the requested review and recommend a shared spending-gap
+signal with role-specific capacity allocation. Make no gameplay changes in this
+review. Preserve TECH's exact sequence, thresholds and reclaim rules; do not call
+its mutable role state from AIR.
+
+**Reasoning.** AIR shares the chooser but not TECH's bank-trend response or
+calculated support batches. Independent targets, broad static counts, budget
+holds and assistance horizons can hide useful capacity shortages. The legacy
+three-constructor fallback is bypassed. Native recruit priority is a separate
+risk requiring an observed reproduction. Raising caps or using income minus
+requested pull would leave the interactions unresolved. Usage and transfer
+observations already have script bindings; no new resource API is needed.
+
+**Invariant.** Preserve existing ownership, opening, allied reservation,
+twenty-support-per-lab and TECH build/reclaim promises. Proposed checks will
+ensure a funded reachable shortage is not masked by unavailable support or BP
+credited to two concurrent workloads. No new runtime invariant is added before
+its behavioral implementation exists.
+
+**Verification.** Source trace and retained D-179 Glacial team-0 telemetry;
+133 production and 113 AIR tests pass. Five temporary probes confirm the current
+arithmetic, not corrected behavior. No new game ran. Six unresolved findings
+are KI-486 through KI-491. Official BAR economy/air guidance informs the plan;
+the proposed controller is distinguished from published advice.
+
+**Files.** [Review and correction plan](reviews/2026-10-03-air-build-power-review.md),
+[unresolved findings](known-issues.md), and this decision record.
+
+
+**D-180 donation amendment (2026-10-03).** A positive self-income/spending gap
+is not mandatory. Sustained full/refilling storage may fund useful BP despite
+negative own or recurring balance, provided a bounded investment and its work
+preserve metal/energy reserves if future donations stop. Sample actual transfers
+once per engine resource interval; avoid double-counting native receipt-inclusive
+income or treating circulation as production. Preserve the existing donation
+threshold/percentage and TECH behavior. The review adds two computed runway
+examples and the donation-specific test matrix. This is design only, without
+new gameplay code, runtime invariants or simulations.
+
+
+**D-180 implementation-map amendment (2026-10-03).** Map the known fixes to
+functions, lifecycle/adoption work, metal-map early-return paths and independent
+acceptance checks before implementation. Keep TECH call sites unchanged by
+default; shared arithmetic extraction is optional and requires exact outcome
+parity. Keep economy support slots separate from the existing reactor/converter
+array so old named state and placement semantics survive. Use one sampled
+workforce decision with immediate admission deltas instead of independent
+budgets that can disagree or double-spend. Reject a global native recruitment
+priority rewrite: the task-scoped opt-in remains conditional on a progress-based
+reproduction. These choices preserve TECH behavior and bound the AIR repair.
+
+**Verification.** Source tracing covers the mapped callers and current test
+helpers; four synthetic regex probes confirm new KI-492. The plan identifies
+pure tests, supplied fixtures, five-map natural cohorts, three metal-map
+controls, TECH regressions, lifecycle checks, screenshots and 8v8 performance
+measurements. These are future acceptance tests, not simulation results.
+No gameplay code, runtime invariant or test definition changed in this amendment.
+The invariant promises in D-180 remain unchanged.
+
+**Files.** [Expanded plan](reviews/2026-10-03-air-build-power-review.md),
+[test-check finding](known-issues.md#ki-492---air-build-power-checks-match-count-prefixes-and-narrow-historical-ranges),
+and this decision record.
+
+
+## D-181 - Fund AIR workforce from useful work and stored capital
+
+**Decision.** Implement the D-180 policy in AIR-owned sampled state and shared
+pure arithmetic. Own production and actual usage are distinct from receipts;
+future gifts are not forecast. A sustained full/refilling bank can pay for
+useful build power while own income is negative, subject to both resource
+reserves and outstanding investments. Debit accepted costs and incremental
+spending before another callback can spend the same budget. Constructor floors
+and ordinary/safety ceilings remain guards; available and arriving workers
+reduce the next request. Record real target progress and suppress expansion
+behind stalled assignments instead of treating nominal assignment as work.
+
+Remove the opening-bomber/support and first-lab blanket workforce vetoes.
+Protect concrete lab capital and opening/transport prerequisites. Place economic
+support in twelve separate, atomically reserved pins per AFUS module; preserve
+the original nine-slot array and named-state adoption. Exclude those turrets
+from factory support and dispatch them to reachable economic frames. AIR asks
+for support before shared growth, without changing TECH's chooser or sequence.
+Metal-mode AIR already calls these actions; its dedicated opening workers retain
+priority. Observe existing construction on AIR role entry so a previous role's
+unframed native orders cannot bypass ownership reconciliation.
+
+**Alternatives rejected.** Raising every fixed constructor cap blindly would
+buy idle workers without checking energy or useful demand. Requiring positive
+own-income balance rejects usable donated capital. Adding receipts to the
+native receipt-inclusive average double-counts transfers. Crediting factory
+nanos to distant reactors misstates capacity. Appending support to the reactor/
+converter slot array breaks its loader and placement indices. Rewriting native
+recruit priority globally would affect TECH; observed priority-zero constructors
+made progress and finished, so the conditional exception is not implemented.
+A matched causal priority experiment remains an explicit verification gap.
+
+**Invariant.** INV-124 requires same-frame two-resource funding for discretionary
+workforce admissions, with opening/recovery exceptions explicit. INV-125 keeps
+factory and economy support disjoint. INV-126 audits assignment ownership.
+Existing INV-076, INV-090, INV-106 and INV-107 continue to protect task ownership,
+twenty-per-lab support, guard release and complete economic reservations.
+
+**Verification.** Built and played through the supplied, natural, metal and TECH
+matrix. Nineteen pure funding/capacity tests pass; all existing standalone native and
+AngelScript suites passed. All three experimental profiles compiled and ran
+against the pinned DLL. Physical support, donor cessation, blocked support,
+old-state adoption and role handoff have played evidence. Failed initial runs
+are retained. See [results and limitations](air-workforce-results.md) for the
+final verification extent; no claim of globally optimal or universally
+pre-twenty-minute economy is made.
+
+**Files.** Policy:
+[workforce](../data/script/src/manager/air_workforce.as),
+[arithmetic](../data/script/src/helpers/build_power_math.as),
+[settings](../data/script/src/global.as),
+[economy](../data/script/src/manager/air_economy.as),
+[production](../data/script/src/manager/air_production.as),
+[growth](../data/script/src/manager/air_growth.as),
+[economy layout](../data/script/src/manager/air_eco_layout.as),
+[layout entry](../data/script/src/manager/air_layout.as),
+[actions](../data/script/src/roles/air_build.as),
+[rules](../data/script/src/roles/air_rules.as).
+Tests and evidence:
+[math tests](../tests/build_power_math_tests.as),
+[CMake](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh),
+[fixture runner](../tools/playtest/run_air_workforce.py),
+[probe](../tools/playtest/air_workforce_probe.as),
+[fixture widget](../tools/playtest/widgets/air_workforce_fixture.lua),
+[independent observer](../tools/playtest/widgets/air_workforce_watch.lua),
+[budget checks](../tools/playtest/checks/air/economy/air_workforce_budget.json),
+[count/progress checks](../tools/playtest/checks/air/economy/air_build_power.json),
+[focused audit](../tools/playtest/audit_air_workforce.py),
+[metrics](../tools/playtest/workforce_metrics.py),
+[metrics tests](../tools/playtest/test_air_workforce.py),
+[paired cohort](../tools/playtest/run_air_workforce_cohort.py),
+[natural runner](../tools/playtest/run_air_natural.py),
+[natural analysis](../tools/playtest/analyze_air_natural.py),
+[matched comparison](../tools/playtest/analyze_air_workforce_cohort.py),
+[metal/TECH controls](../tools/playtest/run_workforce_regressions.py),
+[8v8 controls](../tools/playtest/run_workforce_performance.py),
+[performance observer](../tools/playtest/widgets/workforce_perf_watch.lua),
+[performance analysis](../tools/playtest/analyze_workforce_performance.py),
+[timer contract test](../tools/playtest/test_workforce_perf_watch.py),
+[performance checks](../tools/playtest/checks/air/performance/air_workforce_performance.json),
+[donation case](../tools/playtest/cases/air/economy/workforce-donations.json),
+[six-lab case](../tools/playtest/cases/air/economy/workforce-six-labs.json),
+[energy case](../tools/playtest/cases/air/economy/workforce-energy-starved.json),
+[lifecycle case](../tools/playtest/cases/air/economy/workforce-lifecycle.json).
+Documentation:
+[results](air-workforce-results.md), [review](reviews/2026-10-03-air-build-power-review.md),
+[AIR](roles/air.md), [actions reference](roles/air_build.md),
+[rules reference](roles/air_rules.md), [layout](base-layout.md),
+[invariants](invariants.md), [actors](actor-matrix.md), [issues](known-issues.md),
+[playtest guide](../tools/playtest/README.md), and this record.
+
+
+**Final accounting review.** Existing assignments, including travellers and
+energy-limited workers, consume newly fundable project demand before another
+investment. Delivered progress plus affordable extra spending defines desired
+power; current assignments and queued support are subtracted once. Production
+turret admissions do not reduce the separate economic shortage, even inside one
+snapshot. Tests cover both corrections. Assistance uses delivered power rather
+than adding affordable extra capacity repeatedly to the assignment total.
+
+**Evidence handling.** Natural comparisons stop at the earlier AIR removal
+frame; an advancing spectator clock after defeat is not live economic evidence.
+Initial per-run analyses remain immutable. The version-2 cohort measurements
+in the results document supersede their uncensored comparisons. Engine AI timer
+measurements cover all AI callbacks, not isolated AIR census CPU time.
+
+**Ownership review.** PLAYER/RETREAT tasks do not cast to builder tasks, but that
+does not make their workers available. The final census admits idle task kinds
+explicitly; it never releases protected ownership. The lifecycle probe uses
+the existing UnitControl API to hold and return a constructor.
+
+Additional verification files: [fixed-population runner](../tools/playtest/run_workforce_scaling.py),
+[population widget](../tools/playtest/widgets/workforce_scaling.lua),
+[scaling analysis](../tools/playtest/analyze_workforce_scaling.py),
+[scaling checks](../tools/playtest/checks/air/performance/air_workforce_scaling.json),
+[timer contract test](../tools/playtest/test_workforce_perf_watch.py),
+[performance checks](../tools/playtest/checks/air/performance/air_workforce_performance.json),
+[initial portable cohort](benchmarks/air-workforce-cohort-2026-10-03.json),
+[final portable cohort](benchmarks/air-workforce-final-2026-10-03.json),
+and the generated [evidence catalog](benchmarks/catalog.json).
+
+**Final handoff correction.** The strengthened lifecycle run passed PLAYER
+ownership but exposed an unassigned native nano left by SUPPORT. A walk of
+current unit tasks cannot see it. AIR entry now searches reachable unassigned
+nanos through the existing native API before enabling its layout-only filter,
+cancels unframed orders and retains frames. The follow-up sixteen-minute
+lifecycle game passed every assertion with no invariant or script failure.
+The lookup is bounded and entry-only; it does not assign its probe builder.
+
+**Final measurements.** Nineteen policy and 81 tooling tests pass. The final
+strengthened lifecycle and both supplied-factory population controls pass.
+Natural and TECH whole-game results remain mixed. Serial 8v8 measurements
+retain elimination/population caveats; idle-population p99 shows measurable
+additional observation cost, so no zero-overhead or FPS guarantee is claimed.
+[8v8 evidence](benchmarks/air-workforce-performance-2026-10-03.json),
+[final scaling](benchmarks/air-workforce-scaling-2026-10-03.json),
+[initial scaling failures](benchmarks/air-workforce-scaling-initial-2026-10-03.json),
+and [intermediate control failures](benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
+retain all interpretations separately from the immutable raw publications.
+
+**Published-byte preservation.** The existing publisher emits a terminal blank
+line in generated record READMEs. Reformatting immutable publications would
+change retained bytes. [Git attributes](../.gitattributes) therefore permit that
+format only under benchmark records; source and ordinary documentation retain
+strict whitespace checks. No published file is rewritten for formatting.
+
+
+## D-182 - TECH Telchines require a landlocked start
+
+**Date:** 2026-10-03. **Status:** Played; focused recruitment checks pass, full games retain known TECH invariant failures.
+
+**Decision.** Restrict TECH Telchine recruitment to its own map start's
+`LandLocked` flag, including native fallback when amphibious waves are disabled.
+The existing ground batch remains Sprinter/Fiend/Hoplite on ordinary starts.
+The latest owner instruction narrows D-160's TECH recruitment scope; its
+budget and all lab/economy sequencing remain unchanged. AIR and Marauders keep
+their existing policies. Already-owned/gifted Telchines keep their controller.
+
+**Reasoning.** The unconditional shared amphibious producer ran before TECH's
+correct ground/island selection and could spend the separate +80 budget on
+Supreme Isthmus, whose TECH starts are both explicitly not landlocked. Water
+elsewhere on a map does not make that start eligible. Gate only recruitment,
+not the combat controller needed to use donated or surviving units.
+
+**Alternatives rejected.** A Supreme-only map ban misses other connected
+starts. Disabling the whole amphibious controller breaks legitimate island
+recruitment, Marauder raids and donated units. Changing the ordinary combat
+gate or TECH's exact lab cycle is unnecessary.
+
+**Invariant.** INV-127: a TECH start that is not landlocked never completes a
+locally produced Telchine. The unit-added check excludes gifts without a local
+producer. Existing INV-010 continues to enforce the ordinary combat gate.
+
+**Files.** [Pure eligibility](../data/script/src/helpers/amphibious_math.as),
+[production and native fallback](../data/script/src/manager/amphibious_ops.as),
+[runtime invariant](../data/script/src/manager/invariants.as),
+[unit tests](../tests/amphibious_math_tests.as),
+[observer](../tools/playtest/widgets/tech_t2_start_watch.lua),
+[ground check](../tools/playtest/checks/tech/combat/t2_ground_start.json),
+[landlocked check](../tools/playtest/checks/tech/combat/t2_landlocked_start.json),
+[TECH reference](roles/tech.md), [actor matrix](actor-matrix.md),
+[invariant register](invariants.md), [known issues](known-issues.md),
+[evidence catalog](benchmarks/catalog.json), [TECH evidence index](benchmarks/index/tech.md)
+and [verification report with immutable run records](tech-t2-start-results.md).
+
+**Verification.** Twenty-two pure policy tests and script/DLL API parity pass.
+Both TECH instances compiled in the engine. At forty minutes Supreme completed
+107 Hoplites and 92 Sprinters, with no Telchines; Tundra completed 22 Telchines
+and no Hoplites for Legion. Both focused audits pass. Whole games remain FAIL
+for known TECH invariant categories (KI-472), with zero script errors/INV-127.
+No new AIR/Marauder or waves-disabled fallback game was run. See the report
+for immutable evidence, screenshots and all verification limits.
+
+
+## D-183 - Investigate first bomber wave starvation without waiving launch budgets
+
+**Date:** 2026-10-03. **Status:** Investigated; existing game evidence and pure
+policy checks, no gameplay changes or new simulation.
+
+**Decision.** Record the actual first-wave admission gates and the observed
+18/20 Phoenix delay. Recommend bounded funded quota completion and explicit
+blocked-state/reconnaissance handling. Preserve current gameplay in this
+investigation, which asks why the wave waits and what triggers launch.
+
+**Reasoning.** The matching Supreme game drew 20 and held 18 for roughly
+nineteen game minutes before launching. Current production can postpone the
+last orders indefinitely. The logs do not name all launch vetoes, so neither
+missing escorts nor lack of vision is established as the sole cause. The
+owner has not yet confirmed this is the reported match.
+
+**Alternatives rejected.** Merely disabling landing leaves the same wait in
+the air. Changing the legacy eight-minute timeout does not affect the
+experimental branch. Blind timed release can waive required damage or send
+an unfunded raid through known AA; lowering the configured opening quota
+conceals its incomplete production rather than coordinating the two owners.
+
+**Invariant.** No new runtime invariant: no behavior fix is shipped. Existing
+operation payload/route and committed-escort policies remain unchanged. A
+follow-up fix must check bounded readiness progress and exercise physical
+assembly, ingress and weapon damage, not just a launch log.
+
+**Files.** [Investigation and evidence](reviews/2026-10-03-air-first-wave-stall.md),
+[known issues KI-493 and KI-494](known-issues.md), and this decision record.
+
+**Verification.** 113 existing AIR math tests and six scratch policy probes
+pass. The local log records the quota, held pool, resumed bomber production
+and 38:48 launch. Current installed policy files match the repository after
+newline normalization; the historical match build is not pinned. See the
+report for exact evidence, uncertainty and proposed regression cases.
+
+
+## D-184 - Construction turret enemy reclaim interrupts ordinary AI work
+
+**Date:** 2026-10-03. **Status:** Implemented; build and runtime verification in progress.
+
+**Decision.** Apply the owner's highest-priority enemy reclaim instruction
+through the shared native assistant manager, with JSON/script enable controls.
+Use actual assist/reclaim capabilities, covering floating and Extra Units
+variants without a faction/name allowlist. Retain targets and commands while
+valid. Player control remains authoritative; enemy denial overrides
+no_disrupt factory bindings and friendly recycling, including at full metal.
+This narrows D-078/D-117's ordinary duty rules during a local enemy contact.
+
+**Reasoning.** Idle-only role rows cannot interrupt repair/guard/recycling.
+Static wreck reclaim currently yields to repair and full metal, so it needs
+a distinct enemy mode. One shared response reaches legacy and experimental
+profiles and preserves the original economic behavior once enemies leave.
+
+**Alternatives rejected.** Per-role copies omit legacy and optional variants.
+Permanent area reclaim would abandon productive assistance and repeatedly
+issue commands. Aborting an entire shared construction task interrupts other
+workers unnecessarily; only the affected turret leaves its old assignment.
+
+**Invariant.** INV-128: an eligible turret must take a NOW enemy-reclaim task
+before ordinary AI work. Existing friendly-reclaim/factory-duty invariants
+yield only during that explicit task. Physical interruption, damage and
+resumption are separately checked in the supplied game fixture.
+
+**Files.** [Implementation, all touched source/test files and verification](turret-enemy-reclaim.md),
+[API reference](angelscript-references.md), [invariants](invariants.md),
+[actor matrix](actor-matrix.md) and this record.
+
+**Verification.** Built, Checked and Played: all three experimental profiles pass twelve variants across six roles (216 physical reclaims and returns to repair), plus capture, neutrality, range exit/re-entry, turret removal and player takeover. Full native tests pass. The implementation record retains exact evidence, legacy coverage and limits; this is not a PvP/FPS benchmark. Required build output is published with matching data and API parity verified.
+
+
+## D-185 - Regular fusions join AIR's primary bomber targets
+
+**Date:** 2026-10-03. **Status:** Checked and Played in a supplied combat fixture.
+
+**Decision.** Add the three factions' regular land fusions and Armada's real
+cloakable fusion to the primary strike roster at x1, below factories' x2.
+AFUS stays x4 and advanced converters x3. Reuse existing faction helpers and
+the native weighted picker; T1 primary classes, defensive sorties and the
+AFUS immediate-diversion threshold stay unchanged.
+
+**Reasoning.** The owner explicitly requests regular fusions after factories
+in the primary stage. Previously they were ordinary economy fallback targets,
+behind static defenses. The cloakable reactor is also a real regular fusion;
+ordinary visibility checks must still admit it. Decoys and submerged reactors
+are not added to this land-bomber roster.
+
+**Alternative rejected.** Turning the four weights into strict separate tiers
+would change how all existing primary targets trade value against distance and
+AA exposure. The request fits the existing weighted primary stage.
+
+**Files.** [Script policy](../data/script/src/manager/air_operations.as),
+[current targeting reference](air-wave-attacks.md), and this decision record.
+
+**Invariant.** Existing primary-class exclusion prevents rejected regular fusions
+from bypassing admission through the economy fallback. No new lifecycle state
+or command path is introduced.
+
+**Verification.** [Rendered Glitters check](benchmarks/records/air/combat/case/2026-10-04/20261004T013840Z-8ec95ae8/README.md)
+passes after eight game minutes on experimental_hard. The real picker selected
+corfus, legfus and armckfus at preference 5; bomber damage destroyed corfus and
+legfus. armfus was supplied but no explicit selection was observed, and armckfus
+survived the window. A radar was the initial launch target; this verifies live
+primary retargeting, not a controlled pairwise weighting or launch test. All
+four roster IDs resolve in the shared unit data. No full economy game was run.
+Script/DLL parity and invariant checks pass. Unit-helper validation retains
+167 existing findings (KI-481/KI-473); link checking retains eight missing
+hover-document links (KI-404), with no findings in this change. Current data was
+published beside the matching D-184 DLL/debug pair in the required build output.
+The initial sandboxed watcher falsely reported exit while the elevated engine
+continued; its partial FAIL archive is retained. Reattaching the watcher with
+process access produced the linked completed PASS, without altering that first
+archive.
+
+
+## D-186 - Advanced geos and naval converters follow fusions in AIR's primary roster
+
+**Date:** 2026-10-03. **Status:** Checked and Played in supplied combat.
+
+**Decision.** Keep existing primary weights and add advanced geothermal
+powerplants at x0.75, followed by naval advanced energy converters at x0.5.
+Reuse GetAdvNavalEnergyConverterNameForSide, independently of land converters'
+x3. Geos include the land and naval power variants for all three factions plus
+Armada's safe Prude. Geothermal weapons/support platforms retain their existing
+classification rather than joining the powerplant list.
+
+**Reasoning.** The owner's order extends D-185's weighted primary stage.
+Positive fractional weights preserve its existing value/distance/AA scoring
+and the AFUS-only immediate-diversion threshold. The shared API safely skips
+missing optional definitions. Naval converters are floating contacts and still
+pass ordinary visibility, payload, route and depth admission.
+
+**Alternative rejected.** Raising every existing weight to make room for two
+new integers changes AFUS diversion eligibility and relative target scoring.
+Treating naval converters as land converters gives them the wrong priority.
+Removing the submerged-target filter to admit deep naval geos would also admit
+unattackable contacts; that filter remains.
+
+**Invariant.** Primary targets rejected by admission cannot re-enter via a
+weaker fallback class. This roster-only change adds no lifecycle state or
+per-frame command path. T1 mex/wind and defensive heavy-unit selection remain.
+
+**Files.** [Target roster](../data/script/src/manager/air_operations.as),
+[targeting reference](air-wave-attacks.md), and this record.
+
+**Verification.** [Rendered Supreme combat record](benchmarks/records/air/combat/advanced-geo-naval/2026-10-04/20261004T015226Z-44312432/README.md)
+passes ten game minutes on experimental_hard. All three land advanced geos and
+all three floating naval advanced converters were explicitly selected at
+preference 5, took bomber damage and were destroyed. The launched 18-Phoenix
+wave killed armageo/corageo/legageo at frames 4893/5232/5394, then
+leganavaleconv/coruwmmm/armuwmmm at 6119/6230/6370. Admission also considered
+armuwmmm before launch; these weighted scores do not promise strict class
+ordering at different distances or visibility. The surviving operation
+continued on radar cleanup.
+
+The fixture supplies aircraft, freezes economy and supplies geos on dry land
+without vent construction. Its placement override and hash are retained in the
+manifest. This verifies combat targeting, not natural geo construction or an
+economy benchmark. The safe Prude and naval geo variants were roster-checked,
+not physically attacked in this run. No script, invariant or fixture errors
+occurred. Script/DLL API parity, invariant and whitespace checks pass. Unit-helper
+validation retains 167 baseline findings (KI-481/KI-473), and documentation
+checking retains eight missing hover-document links (KI-404); none are in the
+changed files. Current data is published with the unchanged matching D-184
+DLL/debug pair in the mandatory build output.

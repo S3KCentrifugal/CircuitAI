@@ -1,0 +1,15 @@
+{
+  "stop_minute": 10,
+  "expect": [
+    {"key":"handoff", "pattern":"\\[AirOpening\\] first-fighter-frame delay=", "scope":"any", "by_minute":6},
+    {"key":"idle", "pattern":"\\[AIR\\]\\[Fixture\\] factory idle interval", "by_minute":7},
+    {"key":"commander-work", "pattern":"\\[f=001[123][0-9]{3}\\].*\\[AirOpening\\] idle-factory-economy", "scope":"any", "by_minute":8},
+    {"key":"bounded-work", "pattern":"\\[AIR\\]\\[Rule\\] commander.idle.(assist|energy)", "by_minute":8}
+  ],
+  "forbid": [
+    {"key":"script", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariant", "pattern":"INVARIANT", "scope":"any"},
+    {"key":"crash", "pattern":"Access violation|has crashed|Fatal:", "scope":"any"},
+    {"key":"observer", "pattern":"Removed widget: AIR opening|Error in.*air_opening_watch", "scope":"any"}
+  ]
+}

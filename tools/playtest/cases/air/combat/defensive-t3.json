@@ -1,0 +1,14 @@
+{
+  "name": "defensive-t3",
+  "checks": "air_defensive",
+  "description": "One T3 incursion near the bomber home; a defensive sortie may return after killing it",
+  "bomber_only": false,
+  "aircraft": [
+    {"unit":"$t2","count":48,"team":0,"once":true},
+    {"unit":"$fighter2","count":16,"team":0,"once":true}
+  ],
+  "targets": [{"unit":"corshiva","count":1,"position":[2600,11500],"after_seconds":60,"once":true}],
+  "sensors": [{"unit":"armeyes","count":1,"team":0,"position":[2600,11500]}],
+  "defenses": [],
+  "refill_seconds": 30
+}

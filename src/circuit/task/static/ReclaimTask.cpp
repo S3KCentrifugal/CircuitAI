@@ -30,6 +30,12 @@ CSReclaimTask::~CSReclaimTask()
 {
 }
 
+CSReclaimTask::CSReclaimTask(ITaskModule* mgr, int id)
+		: IReclaimTask(mgr, Priority::NOW, Type::FACTORY, -RgtVector, {0.f, 0.f}, 0, 0.f, false)
+		, enemyId(id)
+{
+}
+
 void CSReclaimTask::AssignTo(CCircuitUnit* unit)
 {
 	IUnitTask::AssignTo(unit);
@@ -49,11 +55,53 @@ void CSReclaimTask::AssignTo(CCircuitUnit* unit)
 
 void CSReclaimTask::Start(CCircuitUnit* unit)
 {
+	if (IsEnemyReclaim()) {
+		// No economic or anti-capture action may replace this defensive command.
+		unit->ClearAct();
+		ReclaimEnemy(unit, enemyId);
+		return;
+	}
 	Execute(unit);
+}
+
+void CSReclaimTask::ReclaimEnemy(CCircuitUnit* unit, int id)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CEnemyInfo* enemy = circuit->GetFactoryManager()->GetReclaimEnemy(unit, id);
+	if (enemy == nullptr) return;
+	const int frame = circuit->GetLastFrame();
+	if (id == enemyId && (!commandNeeded || frame - lastEnemyCommand < FRAMES_PER_SEC)) return;
+	enemyId = id;
+	TRY_UNIT(circuit, unit,
+		unit->CmdReclaimEnemy(enemy); // replace current order; one command until idle or target change
+	)
+	commandNeeded = false;
+	lastEnemyCommand = frame;
+}
+
+void CSReclaimTask::OnUnitIdle(CCircuitUnit* unit)
+{
+	if (IsEnemyReclaim()) {
+		// Revalidate/retarget in the shared response pass, not a stale idle callback.
+		commandNeeded = true;
+		return;
+	}
+	IReclaimTask::OnUnitIdle(unit);
+}
+
+void CSReclaimTask::Stop(bool done)
+{
+	if (IsEnemyReclaim()) {
+		for (CCircuitUnit* unit : units) {
+			TRY_UNIT(manager->GetCircuit(), unit, unit->CmdStop();)
+		}
+	}
+	IReclaimTask::Stop(done);
 }
 
 void CSReclaimTask::Update()
 {
+	if (IsEnemyReclaim()) return; // validity/release is owned by the shared response pass
 	CCircuitAI* circuit = manager->GetCircuit();
 	if (circuit->GetEconomyManager()->IsMetalFull()) {
 		manager->AbortTask(this);
@@ -92,6 +140,7 @@ void CSReclaimTask::Update()
 
 void CSReclaimTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	if (IsEnemyReclaim()) return;
 	if (unit->GetHealthPercent() < unit->GetCircuitDef()->GetSelfDHP()) {
 		unit->CmdSelfD(true);
 	}

@@ -3,9 +3,11 @@ Circuit AI (requires info update)
 C++ Skirmish AI for Recoil RTS engine.
 
 ### SMRTBARb
-This fork ships as **SMRTBARb** (an alias of BARb). Every push to `master` or `smrt` builds it in
-GitHub Actions with BAR's Recoil docker harness and publishes `SMRTBARb-v<version>.zip` as a GitHub
-release; see [doc/release.md](doc/release.md).
+This fork ships as **SMRTBARb** (an alias of BARb). Every push to `smrt-test` (test builds, pre-releases)
+or `smrt-prod` (production, Latest) builds it in GitHub Actions with BAR's Recoil docker harness and
+publishes it for Windows (`SMRTBARb-v<version>-<channel>-windows.zip`) and Linux
+(`SMRTBARb-v<version>-<channel>-linux.tar.gz`) as one GitHub release with generated notes; see
+[doc/release.md](doc/release.md).
 
 ### Requirements
 * gcc 5.4+

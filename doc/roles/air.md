@@ -1,10 +1,200 @@
 # AIR Role
 
+D-181 replaces independent constructor income ratios with `AirWorkforce`'s
+once-per-second own-resource and workload snapshot. A full/refilling bank may
+fund growth despite an own-income deficit; future donations are never assumed.
+Factory and economy turret ownership are disjoint. See the
+[workforce review and implementation map](../reviews/2026-10-03-air-build-power-review.md).
+
+D-179 adds [earlier opening support, compact factory rows and wide recon](../air-opening-recon-plan.md).
+`OpeningNanoCount=2` and `OpeningNanoMinEnergy=160` fund early support after the
+three-constructor opening and initial fighter screen. A missing reservation no
+longer reduces demand to zero: repair finds replacement sites near the starter.
+`T1OpeningBomberMin=1` / `T1OpeningBomberMax=10` draw one persistent opening
+batch; `T1OpeningRaidEnabled` controls it. Legion uses Mosquito gunships.
+Recovery, transports and immediate interceptions retain precedence.
+
+| D-179 AIR setting | Default | Meaning |
+| --- | --- | --- |
+| `OpeningNanoCount` | 2 | Completed starter support goal, capped by `T1NanoLimit`. |
+| `OpeningNanoMinEnergy` | 160 | Minimum sustained energy for early support, with funding checks. |
+| `T1OpeningRaidEnabled` | true | Enable the separate first T1 raid batch. |
+| `T1OpeningBomberMin` / `T1OpeningBomberMax` | 1 / 10 | Inclusive persistent random batch; Legion recruits Mosquito gunships. |
+| `RadarSightOverlap` | 0.5 | Linear overlap of ground-sight diameters, reduced spacing if terrain bounds require it. |
+| `RadarAssemblyRadius` | 480 | Required initial slot visit; holding envelope is twice this radius. |
+| `RadarBacklineInset` | 256 | Inset of MOVE destinations from the enemy-side map edge. |
+
+D-171 adds [committed air operations](../air-committed-operations-plan.md): shared fighter wall groups, all available fighters committed to each bomber sortie, persistent offensive attacks, strategic district targeting, a fighter/radar production owner, and income-based bomber readiness. The nearby startup lab is retired and later rebuilt in the campus. Native changes are opt-in; TECH retains its existing policy. Validation is recorded with the plan.
+
+D-170 adds an explicitly detected metal-field economy through
+`MetalEconomy::AirTask`. It replaces converter/finite-mex priorities only in
+metal mode. The first T1 constructor builds toward forty dense mexes, the second
+meets power demand, and the first T2 lab follows the completed initial fighter
+screen. Later investments consider power and support capacity. It reserves
+reactor modules without converters. Crowded metal platforms may use
+smaller atomic factory compounds after the six-site search deadline. Normal
+AIR retains the rules below. See [implementation and validation](../metal-maps-implementation.md).
+
+D-167 changes factory planning to compact native compounds of six labs total:
+one T1 plus five T2 in the first, then six T2 per additional compound, without a
+default overall cap. Each T2 site has twenty dedicated construction-turret pins.
+AIR now reclaims early energy using TECH's threshold calculation and prevents
+wind/solar reconstruction while a completed AFUS stands. See the
+[cluster and reclaim plan](../air-cluster-reclaim-plan.md) and
+[measured results](../air-cluster-reclaim-results.md).
+
 Reference for the `AIR` AngelScript role: aircraft plants, air constructors and
 the wind-economy opening. How it is registered, what it installs at init, how its
 build-focus system works, and where it is currently wrong.
 
-Source: `data/script/src/roles/air.as` (1042 lines), namespace `RoleAir`.
+## Current air combat controller (D-171)
+
+`Air_MilitaryAiMakeTask` offers radar missions, the shared fighter wall,
+`AirRaids::MakeTask`, then `AirWaves::MakeTask`. All uncommitted fighters join
+wall cells, including surplus Legion interceptors. Contact identity changes
+replace a group's mission; identical routes leave existing commands intact.
+
+T1 bombers raid mex/wind targets. T2 bombers select AFUS, advanced converters
+and factories, clearing valuable local targets before moving to another base.
+D-173 extends the existing armed-structure fallback with other economy/support
+buildings, approved heavy ground units, then remaining structures.
+Both launch admission and surviving waves use this fallback. Setting
+`StrikeCleanupMobile=true` adds all remaining surface mobile units as the last
+tier; it defaults to false to retain the earlier T1 exclusion. See the
+[cleanup repair plan](../air-bomber-cleanup-plan.md). A known nearby T3 whose
+minimum payload exceeds the available bombers holds an unlaunched wave until
+it has a viable defensive force; already committed offense is unaffected.
+All available fighters transfer to each bomber operation and remain committed
+until that offensive wave has no bombers. New fighters defend home. Offensive
+operations never return; nearby T3 defensive sorties may return and repair.
+Bomber HOLD_FIRE plus explicit target orders avoids deliberate T1 ground-unit
+attacks. Collateral splash is still possible. Legion's T1 Mosquito uses native
+RAID because it is a gunship, not an ordinary bomber.
+
+D-176 hands the final straight approach to ATTACK before its formation MOVE
+would reach the victim. During a committed offensive run, a locally LOS-visible
+AFUS can interrupt travel, search, or a lower-priority attack. It remains the
+target while visible, preventing repeated switches between adjacent reactors.
+Team LOS plus the bomber cohort's local radius is required; distant allied
+reconnaissance does not cancel an edge route. Defensive sorties keep their T3
+target policy and receive only the earlier final approach. See the
+[attack handoff plan](../air-afus-attack-handoff-plan.md).
+
+The first T2 economy raid keeps its configurable saved 10-20 draw. Defensive
+sorties and frontline assaults use separate payload budgets; an inaccessible
+backline can therefore produce a larger frontline wave before the opening
+economy raid. Subsequent raids use target health, route exposure, local AA,
+enemy army and unknown-threat allowances. Intended total attrition no longer
+penalizes future offensive missions as a failed return.
+
+Two completed advanced factories designate one live factory for fighters and
+20-plane radar cohorts every ten minutes. Radar aircraft assemble at distinct
+friendly positions with `RadarSightOverlap=0.5` (linear overlap of sight
+diameters). Map-fitting parallel ranks preserve width; an off-centre start does
+not anchor the entire wall to a side edge. Each member must visit its slot and
+remain nearby; fixed-wing orbit phases need not coincide. The shared task then
+issues separate straight MOVE legs to the enemy backline, followed by nearby
+base patrols. PLAYER aircraft do not consume the eligible production quota. Economy
+and emergency constructor/transport recovery can preempt normal production.
+Sustained metal and energy admit bombers independently of the two-AFUS growth
+objective. See [design and validation](../air-committed-operations-plan.md).
+
+Home demand is `clamp(6,60,ceil(1.2*armedAirValue/fighterCost))`; the old income
+coefficient is unused. `BomberOrdersClear=6` and `BomberOrdersParity=3` allocate
+strike turns per ten combat orders, after utility and emergency work.
+`StrikeFirstSize=8` is the later raid minimum and `StrikeWaveCap=80` bounds one
+dispatch. `StrikeAssemblyRadius=600`, `StrikeAssemblyFraction=0.8`, and
+`StrikeJoinSeconds=20` control assembly. Specialists (EMP/Liche) retain their
+existing tasks. Escort lead is positional, not an engine speed lock. See the
+[review](../air-enhancement-review.md) and [wave reference](../air-wave-attacks.md).
+
+## Current building controller (D-147)
+
+`Global::RoleSettings::Air::ExperimentalBuild = true` selects the independent
+[AIR management controller](../air-management.md). `LayoutPlanHandler` delegates
+to `AirLayout::Init`; `Air_BuilderAiMakeTask` and `Air_FactoryAiMakeTask`
+dispatch to `AirRules::MakeTask` and `AirProduction::MakeTask`. Those total
+dispatchers own building/production decisions while enabled. The build-focus,
+commander wind and legacy factory flows described below remain the fallback
+when the feature is disabled; they are not a second concurrent planner.
+
+`Air_MainUpdate` reconciles task ownership, samples the economy, maintains
+military assignments and draws the layout before the existing quota and wave
+updates. The shared builder hook calls `AirBuild::Added` only for experimental
+AIR; the registered `Air_BuilderAiTaskAdded` remains a legacy log hook.
+`Air_BuilderAiTaskRemoved`
+removes project handles. `Air_SelectFactoryHandler` returns `none` after its
+initial selection and `Air_AiIsSwitchTime` returns false under this controller,
+so native switching cannot add competing plants.
+
+`Air_MilitaryAiMakeTask` assigns a home interceptor before calling the existing
+wave handler. Unit removal clears both ledgers. T1 fighters join the patrol
+screen; T2 fighters also stay on the wall until committed to an operation.
+Armada/Cortex scouts keep native scouting. Legion's first fighter/scout drone
+receives an explicit scouting route. Ferry requests run ahead of the role's factory handler.
+Role switching releases AIR projects/holds and reservations before the next
+role initializes. D-153 shares native reservation geometry and increases TECH's
+speculative plan count; TECH retains its own spending sequence and economy.
+
+D-151 admits the initial fighter floor immediately after the three completed
+constructors, without the ordinary 160-energy-income gate. Production remains
+one aircraft per decision, transport requests remain first, and energy recovery
+construction has higher priority. The commander leaves an idle factory for
+nearby economy construction/assistance. After the opening crew, D-163 requires
+an actual unfinished aircraft frame for useful recruitment assistance.
+See [handoff validation](../air-idle-factory.md).
+
+| New AIR setting | Default | Meaning |
+| --- | --- | --- |
+| `ExperimentalBuild` | true | Enable this controller in experimental profiles |
+| `CommanderEconomyRadius` | 900 | Maximum nearby economy search when the crew is complete and the factory is idle; try current reach first |
+| `MaxProductionBays` | 0 | No default numerical T2 ceiling; positive values explicitly cap construction |
+| `PlannedT2Bays` / `PlannedT1Bays` | 6 / 1 | Minimum speculative footprint/support blocks; extend beyond completed demand |
+| `BaySpacing` / `BayExitClearance` | 16 / 64 | Additional footprint-lattice clearance and protected exit space |
+| `TechEconomyMinMetal` / `MassBomberAfusCount` | 50 / 2 | Sustained ten-second income switches the shared chooser on; completed AFUS unlock mass bombers |
+| `FirstBomberWaveMin` / `FirstBomberWaveMax` | 10 / 20 | Inclusive saved opening T2 draw |
+| `MassBomberOrdersClear` / `MassBomberOrdersParity` | 8 / 5 | Post-milestone bomber orders per ten discretionary combat orders |
+| `StrikeReserveSeconds` / `StrikeUnknownReserve` | 120 / 0.25 | Funded replacement stock horizon and base uncertainty allowance |
+| `StrikeCleanupMobile` | false | Opt into all remaining surface mobile targets as the last offensive cleanup tier; default retains the T1-ground exclusion |
+| `StrikeEarlyAttack` | true | Replace the last target-centre travel MOVE with persistent ATTACK before arrival |
+| `StrikeImmediatePriority` / `StrikeImmediateRadius` | 4 / 1800 | During committed offense, interrupt for a stationary target at this priority or higher, currently in team LOS and within this many elmos of the bomber centre; priority 0 disables interruption |
+| `StrikeRiskScale` / `StrikeArmyReserve` / `StrikeLocalAaReserve` | 0.002 / 0.15 / 0.5 | Route proxy, observed army and local AA resistance coefficients |
+| `StrikeCorridorPadding` / `StrikeEdgeInset` / `StrikeSynchronize` | 320 / 480 / true | Padded route samples, edge candidates and nominal cohort static synchronization |
+| `StrikeLossGrowth` / `StrikeRiskRecovery` / `StrikeLearnedRiskMax` | 1.5 / 0.9 / 3 | Learned resistance increases after heavy losses and decays after strong survival |
+| `StrikeFailedSurvival` / `StrikeFailedRetrySeconds` / `StrikeFailedRegionRadius` | 0.25 / 300 / 640 | Failed-region admission, lifetime and target-exclusion radius |
+| `T1NanoLimit` / `T2NanoSoftLimit` | 5 / 20 | Ordinary support limits per plant |
+| `T2ExpansionSupport` / `NanoParallel` | 20 / 3 | Completed turrets required on every existing T2 lab before expansion; funded simultaneous turret projects while metal floats |
+| `MaxT1EconomyBuilders` / `MaxT2EconomyBuilders` | 40 / 24 | Funded mobile construction ceilings; T1 remains available after T2 |
+| `EconomyBuildPowerPerMetal` / `BuildPowerFloatFactor` | 24 / 1.5 | Income-based work target, raised when metal storage is at least 75% full (minimum 300 metal) |
+| `BuildPowerBankDrainSeconds` | 60 | Construction target includes drawing floating metal down toward half storage over this horizon |
+| `WindClusterGap` | 144 | Minimum gap between wind-cluster bounding circles; six touching footprints per 3-by-2 group |
+| `EconomySearchRings` | 24 | Ordinary 96-elmo search rings; reactor search additionally covers the whole home disc with increasing angular samples |
+| `FirstFusionTargetSeconds` / `FirstFusionLeadSeconds` | 1200 / 720 | Aim for fusion at 20 minutes; prepare from minute 8; mex completion always wins |
+| `PreFusionMexLimit` | 6 | Bound own early expansion before first reactor; gifts still require upgrades |
+| `FusionAccessMinMetal` / `FusionAccessMinEnergy` / `FusionAccessFundSeconds` | 12 / 450 / 300 | Historical settings retained; D-153 no longer uses this separate access gate |
+| `WarmFactoryGapSeconds` | 0.5 | Configured prior, separate from cold startup |
+| `ProductionIncomeShare` | 0.65 | Resource share used to size support |
+| `TransitionMinMetal` | 50 | Minimum over a complete fresh ten-second window; full lab metal cost banked bypasses income |
+| `TransitionMinEnergy` / `TransitionEarliestSeconds` / `TransitionFundSeconds` | 1200 / 480 / 100 | Historical settings retained; unused by the D-153 lab gate |
+| `T1BomberMetalStep` / `T1BomberCap` | 8 / 12 | Income-scaled replenishing T1 bomber target |
+| `T1SupportMetalStep` / `T1SupportCap` | 4 / 16 | Cortex Shuriken target; other factions keep three support gunships |
+| `HomeFighterFloor` / `HomeFighterCeiling` / `HomeFightersPerMetal` | 6 / 60 / 0.5 | Armed-threat target; income coefficient retained but unused |
+| `OpeningAirConstructors` | 3 | Completed T1 constructors before commander release and initial fighter production |
+| `ScreenFullFighters` / `ScreenCells` | 40 / 8 | Fleet size for full advance, maximum patrol segments |
+| `ScreenRearWidth` / `ScreenFrontWidth` | 600 / 6000 | Width grows with live screen fighters; endpoints stay inside map |
+| `ScreenRearAdvance` / `ScreenFrontSetback` | 400 / 600 | Rear offset and setback from the midpoint toward nearest participating enemy start |
+| `ScreenUpdateSeconds` | 10 | Refresh geometry; membership changes also refresh immediately |
+| `BaySpacing` / `CapacityStableSeconds` | 560 / 20 | Factory separation and sustained-capacity gate |
+| `BaySearchRings` | 25 | Bounded factory search in 128-elmo steps, including unused-bay relocation |
+| `TelemetrySeconds` | 10 | Economy and per-bay reporting interval |
+| `WaveAvoidHomeFocus` | true | Use an enemy start when the wave front is absent or near home |
+
+See [ordered rules](air_rules.md), [building actions](air_build.md),
+[commander opening and fighter screen](../air-opening-and-screen.md),
+[simulation evidence](../benchmarks/air-management.md) and
+[original feature trace](../air-layout-and-priority-plan.md).
+
+Source: `data/script/src/roles/air.as` (1270 lines), namespace `RoleAir`.
 Line references are as of branch `smrt`, 2026-09-17. Prefer function names over
 line numbers when navigating.
 
@@ -27,6 +217,10 @@ line numbers when navigating.
 
 ## Intent
 
+D-142: Legion's T2 land-defense allowance uses `legacluster`, not the T1
+`legcluster`. All factions' T1 static artillery has a configuration construction
+veto, independent of this role's temporary unit caps.
+
 AIR commits to aircraft plants as the army source. It suppresses ground
 production entirely at start, opens on wind energy where the map rewards it,
 races a small number of air constructors, and funnels early build power into one
@@ -37,9 +231,8 @@ T1 land defences - AIR does not intend to fight on the ground.
 
 ## Registration
 
-`RoleAir::Register()` fills **17 of 24** slots - the common thirteen plus
-`FactoryAiMakeTaskHandler` and the three military hooks that drive the bomber
-waves.
+`RoleAir::Register()` fills **20 of 26** slots: the common thirteen, factory
+production, three military hooks, the porc chain, the layout hook and defense placement.
 
 | Slot | Handler |
 | --- | --- |
@@ -60,9 +253,12 @@ waves.
 | `MilitaryAiMakeTaskHandler` | `Air_MilitaryAiMakeTask` |
 | `MilitaryAiUnitRemoved` | `Air_MilitaryAiUnitRemoved` |
 | `MilitaryAiTaskRemovedHandler` | `Air_MilitaryAiTaskRemoved` |
+| `PorcChainHandler` | `Air_PorcChain` |
+| `LayoutPlanHandler` | `AirLayout::Init` |
+| `AiMakeDefenceHandler` | `Air_AiMakeDefence` |
 
 Not filled: both factory task hooks, both factory unit hooks,
-`MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`, `AiMakeDefenceHandler`.
+`MilitaryAiUnitAdded`, `MilitaryAiTaskAddedHandler`.
 
 ## Settings
 
@@ -190,7 +386,7 @@ Settings: `Global::RoleSettings::MexUpgradeFirst`, `MexUpgradeRadius` (2500),
 
 ## Decision flows
 
-### Builder
+### Legacy builder (ExperimentalBuild disabled)
 
 `Air_BuilderAiMakeTask(builder)`:
 
@@ -214,7 +410,7 @@ The T1 air constructor set is matched by **hardcoded name string comparison**
 (`uname == "armca" || uname == "corca" || uname == "legca"`), not by a
 `UnitHelpers` accessor.
 
-### Factory
+### Legacy factory (ExperimentalBuild disabled)
 
 `Air_FactoryAiMakeTask(u)` bails to `aiFactoryMgr.DefaultMakeTask(u)` unless the
 factory is a T1 or T2 aircraft plant. For a T1 plant it uses the sliding-window
@@ -241,8 +437,9 @@ next wave's target - and only then dynamic production or the native default.
 
 ### Economy
 
-`Air_EconomyUpdate()` is **empty**. All AIR economy shaping happens through
-start limits and the factory handler's income gates.
+`Air_EconomyUpdate()` is **empty**. Enabled AIR samples `AirEconomy` from the
+main update and task entry points. Legacy economy shaping uses start limits
+and the factory handler's income gates.
 
 ### Dynamic quotas
 
@@ -293,8 +490,8 @@ ATTACK-promoting defend tasks every 5 s. Held ids live in `heldBombers` and
 
 **Launch** (`AirWaves::Update`, from `Air_MainUpdate`): when the hold has
 `Required()` bombers and `FightersFor(Required())` fighters, or when
-`BomberWaveFirstSize` bombers have been held for `BomberWaveMaxHoldSeconds`
-(escort requirement waived). `Required()` is the survival-grown
+the full `Required()` bomber target has been held for `BomberWaveMaxHoldSeconds`
+(escort requirement waived, bomber target still required). `Required()` is the survival-grown
 `nextWaveSize` raised to the **income floor**: `BomberWaveSizePerIncomeStep`
 (50) bombers per `BomberWaveIncomeStep` (100) of sliding-minimum metal income
 - 50 at +100, 100 at +200 - see
@@ -503,4 +700,70 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: e5c9e03c3c31e449d064b1a7cfe9fec5eb8253e2; lines: 1258 -->
+<!-- source: data/script/src/roles/air.as; blob: bbd3141a3c6f9d9b5f93e5eda14780e582293010; lines: 1280 -->
+
+## D-152 expansion and access
+
+AIR holds two T1 sites plus six T2 sites with complete twenty-turret banks
+before building them. Counts and production support use actual factories.
+T1 conversion follows surplus energy until every owned mex is upgraded.
+Reactors keep that mex gate. D-153 replaces the lab gate with a ten-second
+minimum of 50 metal/s or a fully banked lab cost; AIR can now self-tech before
+all upgrades finish and continues requesting TECH's T2 constructor. See
+[design](../air-tech-expansion-plan.md).
+
+D-152 AIR settings: `PlannedT2Bays=6`, `PlannedT1Bays=2`,
+`ConverterParallel=3`, `ConverterDraw=70`, `ConverterEnergyReserve=150`.
+At D-152, `MaxProductionBays=12` bounded actual production expansion;
+preplanned sites neither count as active plants nor authorize spending.
+
+D-153 publishes native reservations to allied instances, protects production
+bay interiors from ordinary defenses, and relocates unused blocked clusters.
+See the [shared layout and income design](../allied-layout-air-income-plan.md).
+T1 bombers and Cortex Shuriken support are replenished alongside the fighter
+screen; fusion preparation no longer stops them indefinitely.
+
+## D-158 amphibious units
+
+Experimental AIR calls `Lanes::Tick` for shared terrain and island surveys.
+The shared military hook gives owned Telchines and Marauders to
+`AmphibiousOps::MilitaryTask` before ordinary army routing. `AmphibiousOps::Tick`
+runs in each experimental profile and releases operations on role loss.
+Existing compatible ground factories may produce bounded waves through
+`AirProduction::MakeTask`; AIR does not build a new ground factory for them.
+Aircraft production, requested transports and economic constructors keep their
+existing priority. See the [operation design](../amphibious-operations-plan.md).
+
+D-160 uses the same Telchine budget and beachhead claims as TECH, including
+a native-fallback exclusion so an auxiliary lab cannot bypass recruitment
+cadence. No aircraft queue or ground-factory construction priority changes.
+Guard repositioning remains on the secured dry land component.
+See [implementation and tests](../telchine-beachhead-results.md).
+
+D-161 gives Telchines land-first, footprint-checked routes and distinct dry
+shore perimeter or land assault slots. Marauder travel and AIR economy stay
+unchanged. See the [formation plan](../telchine-perimeter-plan.md).
+
+## D-163 dense campus and strategic bomber phase
+
+Experimental AIR reserves at least six T2 aircraft bays and one T1 bay, tiled by actual footprints with dense independent twenty-turret banks. Growth continues without a default factory cap. Shared TECH economy decisions begin at a sustained +50 metal minimum; AIR keeps all placements and tasks. D-171 replaces the original two-AFUS bomber gate with sustained metal/energy admission; two AFUS remain an economy growth objective. The opening economy raid draws once from `FirstBomberWaveMin`/`FirstBomberWaveMax` (10-20); defensive and frontline sorties use their own payload budgets. Later raids use target and route budgets, with a separate funded replacement pool. T1 reusable bombers select mexes/wind. See [original design](../air-campus-strike-design.md) and [current operations](../air-committed-operations-plan.md).
+
+D-164 reserves a separate advanced-economy district at the opening: four modules
+of one AFUS/eight advanced-converter slots, expanding one unused module ahead.
+The native reservations exclude other local and allied building placement;
+unused blocked modules move at first use. T2 aircraft constructors no longer
+renew production guards, and existing guards release only those workers.
+Overflow may fund serial reactor growth alongside continued factory production.
+See [design and verification plan](../air-economy-zone-plan.md).
+
+D-172 extends `AirBuild::EconomyAircraft` to T1 as well as T2 aircraft:
+mobile workers assist unfinished economy structures and do not renew factory
+or constructor guards. `ReturnEconomyWorkers` releases any inherited builder
+guard individually and clears its engine order. Once the initial fighter
+screen exists, `AirMath::WorkforceTurn` gives funded missing constructors a
+production turn; `CombatOrdersPerEconomyConstructor` defaults to two during
+an incursion. This allocates factory output without delaying combat commands.
+The first eligible T2 lab precedes shared reactor growth; `SavingForFirstLab`
+reserves capital after the existing preparation time and energy threshold
+while preserving recovery, mex upgrades, transport and immediate defense.
+See [repair plan](../air-workforce-repair-plan.md).

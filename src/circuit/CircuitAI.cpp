@@ -5,6 +5,8 @@
  *      Author: rlcevg
  */
 
+#include "task/static/SuperTask.h"  // D-124
+#include "task/fighter/AirWaveTask.h"
 #include "CircuitAI.h"
 #include "scheduler/Scheduler.h"
 #include "script/ScriptManager.h"
@@ -18,6 +20,7 @@
 #include "module/MilitaryManager.h"
 #include "resource/MetalManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/path/PathFinder.h"
 #include "task/PlayerTask.h"
 #include "unit/CircuitUnit.h"
@@ -372,6 +375,13 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			TRACY_TOPIC("EVENT_ENEMY_DAMAGED", EnemyDamaged);
 
 			struct SEnemyDamagedEvent* evt = (struct SEnemyDamagedEvent*)data;
+			// Script-emitted beams can deal damage without WEAPON_FIRED.
+			// Only an attributed lethal hit from our active wave proves release.
+			if (evt->damage > 0.f && !evt->paralyzer) {
+				CCircuitUnit* attacker = GetTeamUnit(evt->attacker);
+				CAirWaveTask* wave = attacker == nullptr ? nullptr : dynamic_cast<CAirWaveTask*>(attacker->GetTask());
+				if (wave != nullptr) wave->OnDamageDealt(attacker, evt->weaponDefId);
+			}
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			ret = (enemy != nullptr) ? this->EnemyDamaged(enemy) : ERROR_ENEMY_DAMAGED;
 		} break;
@@ -390,6 +400,29 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 		case EVENT_WEAPON_FIRED: {
 			TRACY_TOPIC("EVENT_WEAPON_FIRED", WeaponFired);
 
+			// D-124 (owner: a smiley over every nuke's target, every time): the
+			// engine raises this for each shot fired on an attack command, which
+			// is the only way a nuke silo fires
+			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
+			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
+			if (unit != nullptr) {
+				CAirWaveTask* wave = dynamic_cast<CAirWaveTask*>(unit->GetTask());
+                if (wave != nullptr) wave->OnWeaponFired(unit, evt->weaponDefId);
+				CSuperTask* firingTask = dynamic_cast<CSuperTask*>(unit->GetTask());
+				if (firingTask != nullptr) {
+					const AIFloat3 aim = firingTask->GetAimPos();
+					firingTask->OnLaunch(unit, "weapon fired");
+					script->SuperWeaponFired(unit, aim);
+				}
+			}
+			if ((unit != nullptr) && (unit->GetCircuitDef() != nullptr) && CSuperTask::IsNukeSilo(unit->GetCircuitDef())) {
+				CSuperTask* task = dynamic_cast<CSuperTask*>(unit->GetTask());
+				if (task != nullptr) {
+					// Handled above for both Junos and strategic silos.
+				} else {
+					LOG("NUKE: %s(%i) fired outside its super task: no aim known, no smiley (D-124)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId());
+				}
+			}
 			ret = 0;
 		} break;
 		case EVENT_PLAYER_COMMAND: {
@@ -654,6 +687,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
 	modules.push_back(economyManager);  // NOTE: Uses unit's manager != nullptr, thus must be last.
 
 	terrainManager->Init();
+	battle = std::make_shared<CBattleAnalysis>(this);  // D-126
 	economyManager->InitEconomyScores();
 
 	script->RegisterMgr();
@@ -771,6 +805,7 @@ int CCircuitAI::Release(int reason)
 	economyManager = nullptr;
 	factoryManager = nullptr;
 	builderManager = nullptr;
+	battle = nullptr;
 	terrainManager = nullptr;
 	metalManager = nullptr;
 	energyManager = nullptr;
@@ -843,6 +878,10 @@ int CCircuitAI::Update(int frame)
 
 	allyTeam->Update(this);
 
+	if ((battle != nullptr) && (frame % FRAMES_PER_SEC == teamId % FRAMES_PER_SEC)) {
+		battle->Update(frame);  // D-126: heat decay, enemy composition, hostile water
+	}
+
 	scheduler->ProcessJobs(frame);
 	if (frame % TEAM_SLOWUPDATE_RATE == skirmishAIId) {
 		// NOTE: Probably should be last in ProcessJobs queue, after all income updates if it was in the same frame.
@@ -851,6 +890,7 @@ int CCircuitAI::Update(int frame)
 		script->Update();
 	}
 	UpdateActions();
+	FlushDrawQueue();  // D-118
 
 #ifdef DEBUG_VIS
 	if (frame % FRAMES_PER_SEC == 0) {
@@ -860,6 +900,57 @@ int CCircuitAI::Update(int frame)
 #endif
 
 	return 0;  // signaling: OK
+}
+
+void CCircuitAI::DrawSmiley(const AIFloat3& centre, float radius)
+{
+	// North is up in the default view: z grows southward, so the eyes sit at -z
+	// and the mouth's arc below the centre, at +z
+	auto arc = [this](const AIFloat3& c, float r, float a0, float a1, int segs) {
+		const float mw = float(GetMap()->GetWidth() * SQUARE_SIZE), mh = float(GetMap()->GetHeight() * SQUARE_SIZE);
+		auto at = [&](float a) {
+			AIFloat3 p(c.x + std::cos(a) * r, 0.f, c.z + std::sin(a) * r);
+			p.x = std::clamp(p.x, 1.f, mw - 1.f);
+			p.z = std::clamp(p.z, 1.f, mh - 1.f);
+			return p;
+		};
+		AIFloat3 prev = at(a0);
+		for (int i = 1; i <= segs; ++i) {
+			const AIFloat3 next = at(a0 + (a1 - a0) * float(i) / float(segs));
+			QueueDrawLine(prev, next);
+			prev = next;
+		}
+	};
+	constexpr float PI2 = 6.2831853f;
+	arc(centre, radius, 0.f, PI2, 24);                                                          // the face
+	arc(AIFloat3(centre.x - radius * 0.35f, 0.f, centre.z - radius * 0.3f), radius * 0.1f, 0.f, PI2, 8);   // an eye
+	arc(AIFloat3(centre.x + radius * 0.35f, 0.f, centre.z - radius * 0.3f), radius * 0.1f, 0.f, PI2, 8);   // the other
+	arc(centre, radius * 0.55f, PI2 * 0.06f, PI2 * 0.44f, 10);                                  // the smile
+}
+
+void CCircuitAI::FlushDrawQueue()
+{
+	// D-118: wall-clock pacing, not frames: at a game speed of 3 three frames
+	// are 33 ms apart, under the server's 50 ms
+	if (drawOps.empty()) {
+		return;
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (now - drawBatchTime < std::chrono::milliseconds(drawBatchMs)) {
+		return;
+	}
+	drawBatchTime = now;
+	for (int n = 0; (n < drawBatch) && !drawOps.empty(); ++n) {
+		const SDrawOp& op = drawOps.front();
+		if (op.type == 0) {
+			drawer->AddLine(op.a, op.b);
+		} else if (op.type == 1) {
+			drawer->AddPoint(op.a, op.label.c_str());
+		} else {
+			drawer->DeletePointsAndLines(op.a);
+		}
+		drawOps.pop_front();
+	}
 }
 
 int CCircuitAI::Message(int playerId, const char* message)
@@ -1066,6 +1157,7 @@ int CCircuitAI::Message(int playerId, const char* message)
 
 int CCircuitAI::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 {
+	unit->SetProducerId(builder != nullptr ? builder->GetId() : -1);
 	for (auto& module : modules) {
 		module->UnitCreated(unit, builder);
 	}
@@ -1172,6 +1264,9 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 {
 	unit->SetDamagedFrame(lastFrame);
 	CEnemyInfo* attacker = GetEnemyInfo(attackerId);
+	if (battle != nullptr) {
+		battle->OnOwnDamaged(unit->GetPos(lastFrame));  // D-126: combat heat
+	}
 
 	if (IsValidWeaponDefId(weaponId)) {
 		if (attacker != nullptr) {
@@ -1191,6 +1286,12 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	destroyed.insert(unit->GetId());
+	const int lostId = unit->GetId();
+	allyTeam->GetNuclearHistory().Prune(lastFrame, [lostId](int owner) { return owner != lostId; });
+	allyTeam->GetPulseClaims().ReleasePending(lostId);
+	if (battle != nullptr) {
+		battle->OnOwnLost(unit->GetPos(lastFrame), unit->GetCircuitDef()->GetCostM());  // D-126
+	}
 	for (auto& module : modules) {
 		module->UnitDestroyed(unit, attacker);
 	}
@@ -1312,6 +1413,9 @@ int CCircuitAI::EnemyDamaged(CEnemyInfo* enemy)
 
 int CCircuitAI::EnemyDestroyed(CEnemyInfo* enemy)
 {
+	if (battle != nullptr) {
+		battle->OnEnemyLost(enemy->GetPos(), enemy->GetCost());  // D-126
+	}
 	allyTeam->EnemyDestroyed(enemy->GetData(), this);
 
 	militaryManager->DelPointOfInterest(enemy);

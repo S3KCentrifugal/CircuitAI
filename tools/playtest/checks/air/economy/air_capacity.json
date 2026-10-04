@@ -1,0 +1,14 @@
+{
+  "stop_minute":45,
+  "expect":[
+    {"key":"layout","pattern":"\\[AIR\\]\\[Layout\\] enabled","by_minute":1},
+    {"key":"six","pattern":"plants=1/[6-9]","by_minute":44},
+    {"key":"support","pattern":"nanos=20\\+0/20","by_minute":30},
+    {"key":"wave","pattern":"\\[AIR\\]\\[Waves\\].*launched","by_minute":44}
+  ],
+  "forbid":[
+    {"key":"script","pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception","scope":"any"},
+    {"key":"invariant","pattern":"INVARIANT","scope":"any"},
+    {"key":"crash","pattern":"Access violation|has crashed|Fatal:","scope":"any"}
+  ]
+}
