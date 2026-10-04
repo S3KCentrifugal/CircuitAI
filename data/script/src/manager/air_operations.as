@@ -81,7 +81,9 @@ namespace AirOperations {
         for (uint i = 0; i < sides.length(); ++i) {
             wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(sides[i])), 4.0f);
             wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(sides[i])), 3.0f);
+            wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(sides[i])), 1.0f);
         }
+        wave.AllowStrikeDef(ai.GetCircuitDef("armckfus"), 1.0f); // real cloakable fusion; visibility gates still apply
         // Factory classifications are authoritative and include all enabled factions/options.
         array<string> defs = UnitHelpers::GetAllLabs();
         for (uint i = 0; i < defs.length(); ++i) wave.AllowStrikeDef(ai.GetCircuitDef(defs[i]), 2.0f);

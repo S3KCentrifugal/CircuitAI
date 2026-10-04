@@ -11178,3 +11178,47 @@ resumption are separately checked in the supplied game fixture.
 [actor matrix](actor-matrix.md) and this record.
 
 **Verification.** Built, Checked and Played: all three experimental profiles pass twelve variants across six roles (216 physical reclaims and returns to repair), plus capture, neutrality, range exit/re-entry, turret removal and player takeover. Full native tests pass. The implementation record retains exact evidence, legacy coverage and limits; this is not a PvP/FPS benchmark. Required build output is published with matching data and API parity verified.
+
+
+## D-185 - Regular fusions join AIR's primary bomber targets
+
+**Date:** 2026-10-03. **Status:** Checked and Played in a supplied combat fixture.
+
+**Decision.** Add the three factions' regular land fusions and Armada's real
+cloakable fusion to the primary strike roster at x1, below factories' x2.
+AFUS stays x4 and advanced converters x3. Reuse existing faction helpers and
+the native weighted picker; T1 primary classes, defensive sorties and the
+AFUS immediate-diversion threshold stay unchanged.
+
+**Reasoning.** The owner explicitly requests regular fusions after factories
+in the primary stage. Previously they were ordinary economy fallback targets,
+behind static defenses. The cloakable reactor is also a real regular fusion;
+ordinary visibility checks must still admit it. Decoys and submerged reactors
+are not added to this land-bomber roster.
+
+**Alternative rejected.** Turning the four weights into strict separate tiers
+would change how all existing primary targets trade value against distance and
+AA exposure. The request fits the existing weighted primary stage.
+
+**Files.** [Script policy](../data/script/src/manager/air_operations.as),
+[current targeting reference](air-wave-attacks.md), and this decision record.
+
+**Invariant.** Existing primary-class exclusion prevents rejected regular fusions
+from bypassing admission through the economy fallback. No new lifecycle state
+or command path is introduced.
+
+**Verification.** [Rendered Glitters check](benchmarks/records/air/combat/case/2026-10-04/20261004T013840Z-8ec95ae8/README.md)
+passes after eight game minutes on experimental_hard. The real picker selected
+corfus, legfus and armckfus at preference 5; bomber damage destroyed corfus and
+legfus. armfus was supplied but no explicit selection was observed, and armckfus
+survived the window. A radar was the initial launch target; this verifies live
+primary retargeting, not a controlled pairwise weighting or launch test. All
+four roster IDs resolve in the shared unit data. No full economy game was run.
+Script/DLL parity and invariant checks pass. Unit-helper validation retains
+167 existing findings (KI-481/KI-473); link checking retains eight missing
+hover-document links (KI-404), with no findings in this change. Current data was
+published beside the matching D-184 DLL/debug pair in the required build output.
+The initial sandboxed watcher falsely reported exit while the elevated engine
+continued; its partial FAIL archive is retained. Reattaching the watcher with
+process access produced the linked completed PASS, without altering that first
+archive.
