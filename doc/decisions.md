@@ -12380,3 +12380,38 @@ added KI-504 and a KI-503 priority clarification in
 [known issues](known-issues.md). This decision records the correction. Checked
 against source and official unit guides; the battle is reported evidence,
 not a reproduced simulation. Runtime/config/deployed files are unchanged.
+
+
+## D-205 - Plan an opt-in ranged controller without erasing combat classifications
+
+**Call.** Plan a configured RangedEngagement component inside the existing
+artillery task lifecycle, with native and experimental-script admission for
+the ten reviewed land definitions. Preserve existing role/attribute lists,
+production weights and non-opted artillery behavior. This is an implementation
+proposal, not a runtime change or a benchmark-selected winner.
+
+**Reasoning and alternatives.** D-204 requires safe useful fire before heavy
+preference. Reusing the artillery task avoids a new task kind and duplicated
+lifecycle plumbing, while an explicit branch avoids importing structure-only
+selection, return-fire and FIGHT travel into every ranged unit. A per-unit
+standoff number alone checks neither other weapons' coverage nor the route.
+Changing shared squad or anti-heavy defaults would affect unrelated units.
+The uniform artillery/siege configuration remains a controlled comparison.
+Native default dispatch alone is insufficient because experimental military
+handlers can bypass it, including TECH's low-income combat gate. The proposed
+script admission intentionally overrides generic dispatch only for enabled
+ranged definitions, including already-built or donated units. Carrier mode
+requires its own gadget-interoperability test before enabling Mantis.
+
+**Invariant.** Proposed: safety is an eligibility gate before target value;
+a firing target never takes ownership of a pursuit path; one task owns orders;
+known coverage constrains the whole approach; useful safe fire and advancement
+must occur when available. No new runtime invariant is claimed until built.
+
+**Files and verification.** Added the numbered [implementation plan](ranged-support-implementation-plan.md),
+linked it from the [review](reviews/2026-10-05-siege-classification-request.md),
+and added the continuation pointer to [KI-503/KI-504](known-issues.md). This
+record explains the planned architecture. Checked against native/script source,
+local BAR target/carrier gadgets and official unit guides. No native, profile,
+script, deployment or simulated behavior changed. Unit tradeoffs and CPU/APM
+benefits remain unmeasured until the specified A/B/C fixtures are played.

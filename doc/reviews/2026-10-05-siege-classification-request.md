@@ -6,6 +6,11 @@ criteria.** Reduced heavy-target preference is an acceptable tradeoff when it
 prevents greater unit losses while preserving useful damage and progress.
 No runtime code or profile was changed for this review.
 
+The [implementation breakdown](../ranged-support-implementation-plan.md) maps
+these findings to numbered C++, configuration and AngelScript changes, with
+proposed code samples and explicit Sharpshooter/Starlight behavior. It remains
+a plan; the comparison candidates have not been implemented or simulated.
+
 This document records source-confirmed mechanisms, reported gameplay failures,
 and solutions grounded in the official PvP unit guidance linked below. The
 proposed changes still require comparative combat tests. Numerical balance can
@@ -193,8 +198,8 @@ JSON recipes. Exact tuning requires controlled combat tests.
 | --- | --- |
 | [Fatboy](https://www.beyondallreason.info/unit/armfboy) `armfboy` | Ranged anti-swarm support, screened and spread; preserve grouped mobile targets and avoid friendly splash. Its official use includes destroying grouped units and supporting snipers against Sheldons. Do not force structure-only artillery. |
 | [Hound](https://www.beyondallreason.info/unit/armfido) `armfido` | Mobile skirmishing with spotters, maintaining a safe range while attacking T1 units. Keep anti-army selection. |
-| [Sharpshooter](https://www.beyondallreason.info/unit/armsnipe) `armsnipe` | Preserve anti-heavy/commander targeting, vision support, cloak and reload-aware positioning. Long range alone is not a reason to replace its task with a static-target selector. |
-| [Starlight](https://www.beyondallreason.info/unit/armmanni) `armmanni` | Preserve mobile-heavy targeting and useful static attacks; keep a screen and spacing. Account for the safety/damage tradeoff rather than requiring exact maximum range. |
+| [Sharpshooter](https://www.beyondallreason.info/unit/armsnipe) `armsnipe` | Safe in-range precision fire comes first; heavy/commander preference is secondary. Keep vision support, cloak and reload-aware positioning. Cancel pursuit of retreating bait and use worthwhile reachable targets. |
+| [Starlight](https://www.beyondallreason.info/unit/armmanni) `armmanni` | Safe in-range heavy or static fire with a screen and spacing. Preserve beam completion; neither target value nor close-range damage can justify pursuit into static coverage. |
 | [Sheldon](https://www.beyondallreason.info/unit/cormort) `cormort` | Mobile skirmisher/fire support with radar/jammer support and defensive-line targets. Current experimental artillery+siege behavior already warrants correction; removing its skirmish attribute does not fix that. See KI-503. |
 | [Banisher](https://www.beyondallreason.info/unit/corban) `corban` | Burst skirmish/anti-army targeting with reload withdrawal and supporting units; preserve opportunistic AA capability. The official guide specifically identifies Hounds and fast units as targets. |
 | [Tremor](https://www.beyondallreason.info/unit/cortrem) `cortrem` | Strong artillery candidate, but select safe bombardment areas including mobile concentrations. Retain heavy enemy classification. Friendly splash checks and screening are essential. |

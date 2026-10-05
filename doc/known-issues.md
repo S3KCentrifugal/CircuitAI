@@ -5151,3 +5151,10 @@ shot positions, target orders and APM. See the
 mobile-target selection must not restore pursuit into static coverage. KI-504's
 safety contract takes precedence; accepting reduced heavy-target specialization
 can be the better gameplay tradeoff.
+
+
+**KI-503/KI-504 implementation breakdown.** The [numbered plan](ranged-support-implementation-plan.md)
+and [D-205](decisions.md#d-205---plan-an-opt-in-ranged-controller-without-erasing-combat-classifications)
+specify native mechanisms, per-definition JSON, experimental task admission,
+carrier handling, lifecycle/command safety and comparative fixtures. Both issues
+remain open; the plan does not represent an implemented or played fix.
