@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "f002392e7821762f8d9766cb175371886bc24d7830515462619414da19eb98f8",
+    "checks.json": "bbf7fe2e2315899772870fca7ffea01eebaab69c54ff3bfa38f2756362553990",
+    "launched.json": "eafcdb264070391644cb0bb49a2ed6fc4b774d1b83400b7b9e5422459c0cfa65",
+    "report.md": "9ddbdfa586c063ab2028de06f6a263f0c7b2815eb597c6533b0bb4cfa492ff90",
+    "result.json": "ba2bd3769ec38473381e68f531792816ed2aad943214ab6e7c5cd91d3681d206",
+    "run-inputs.json": "407fe07a29fa324df874b6e8b82602734b3a8adebe9e367331979de06b45d7d4",
+    "run-plan.json": "751f4009bd3bea84a35456547c4a6754f2979256d1a15a793074e68c297dfa6b",
+    "screen_2026-10-05_02-41-40-470.png": "9b0737ccbb7ae1f53d7204ed3f73b2f70c66f857dbcfa7b32e9cdcf458668c23",
+    "script.txt": "61f491c56ff026ecea6843573fc5cb91e3eae54df06af5ae7e5f99818e87f69e",
+    "staged.json": "f565f228265c529abc217a6969ef4062e07203f8ba9600b28265247a7c773d0f",
+    "teams.json": "db7fc3be9c28338eab4ccd05ae01741409db53cef58e718553a6962b9aab2333",
+    "weapon-fixture-source.json": "345defc5275bca5e6f77ad34ca3fc4136a25c4d69bcbd99d9173d219a5630bc2",
+    "weapon-performance.json": "044af95ad98d5fb2907019d014c42f686251db2e78b24d416a66279abc791693"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\weapon-work-balanced\\supreme\\20261005T023926Z-81c2200d\\runs\\20261005T024142Z-47d285c7",
+  "schema": 1
+}

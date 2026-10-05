@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "regression",
+    "map": "supreme",
+    "scenario": "allied-bases-mixed"
+  },
+  "id": "20261005T011226Z-ecc8dd3e",
+  "requested": {
+    "seed": 1921
+  },
+  "schema": 1
+}

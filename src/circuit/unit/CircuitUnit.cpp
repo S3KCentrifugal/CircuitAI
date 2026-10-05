@@ -13,6 +13,7 @@
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"  // Only for CorrectPosition
 #include "spring/SpringMap.h"
+#include "spring/CustomCommand.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #ifdef DEBUG_VIS
@@ -281,7 +282,7 @@ float CCircuitUnit::GetHealthPercent()
  */
 void CCircuitUnit::CmdRemove(std::vector<float>&& params, short options)
 {
-	unit->ExecuteCustomCommand(CMD_REMOVE, params, options);
+	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_REMOVE, params, options);
 }
 
 void CCircuitUnit::CmdMoveTo(const AIFloat3& pos, short options, int timeout)
@@ -312,7 +313,8 @@ void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
 void CCircuitUnit::CmdAttackGround(const AIFloat3& pos, short options, int timeout)
 {
 	assert(geom::is_in_map(pos));
-	unit->ExecuteCustomCommand(CMD_ATTACK_GROUND, {pos.x, pos.y, pos.z}, options, timeout);
+	float params[] = {pos.x, pos.y, pos.z};
+	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_ATTACK_GROUND, params, options, timeout);
 }
 
 void CCircuitUnit::CmdWantedSpeed(float speed)
@@ -334,7 +336,8 @@ void CCircuitUnit::CmdSetTarget(CEnemyInfo* enemy)
 
 void CCircuitUnit::CmdCloak(bool state)
 {
-	unit->ExecuteCustomCommand(CMD_WANT_CLOAK, {state ? 1.f : 0.f});  // personal
+	float params[] = {state ? 1.f : 0.f};
+	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_WANT_CLOAK, params);  // personal
 //	unit->ExecuteCustomCommand(CMD_CLOAK_SHIELD, {state ? 1.f : 0.f});  // area
 //	unit->Cloak(state);
 }
@@ -347,7 +350,7 @@ void CCircuitUnit::CmdFireAtRadar(bool state)
 void CCircuitUnit::CmdFindPad(int timeout)
 {
 //	unit->ExecuteCustomCommand(CMD_FIND_PAD, {}, 0, timeout);
-	unit->ExecuteCustomCommand(CMD_LAND_AT_AIRBASE, {}, 0, timeout);
+	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_LAND_AT_AIRBASE, {}, 0, timeout);
 }
 
 void CCircuitUnit::CmdManualFire(short options, int timeout)
@@ -381,7 +384,8 @@ void CCircuitUnit::CmdBARPriority(float value)
 		return;
 	}
 	priority = value;
-	unit->ExecuteCustomCommand(CMD_BAR_PRIORITY, {value});
+	float params[] = {value};
+	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_BAR_PRIORITY, params);
 }
 
 void CCircuitUnit::CmdTerraform(std::vector<float>&& params)

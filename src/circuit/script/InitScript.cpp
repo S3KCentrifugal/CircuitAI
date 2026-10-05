@@ -31,6 +31,7 @@
 #include "util/MaskHandler.h"
 #include "util/ExtAS.h"
 #include "util/Utils.h"
+#include "util/Performance.h"
 
 #include "angelscript/include/angelscript.h"
 #include "angelscript/add_on/scriptarray/scriptarray.h"
@@ -900,6 +901,11 @@ void CInitScript::RegisterCore()
 //	asbind20::global(engine)
 //		.function("void AiLog(const string& in)", &CInitScript::Log, asbind20::auxiliary(this));
 	r = engine->RegisterGlobalFunction("void AiLog(const string& in)", asMETHOD(CInitScript, Log), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalProperty("const bool AiPerfEnabled", const_cast<bool*>(&performance::enabled)); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiPerfBegin(int)", asMETHOD(CInitScript, PerfBegin), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiPerfEnd(int)", asMETHOD(CInitScript, PerfEnd), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiPerfBeginLabel(const string &in)", asMETHOD(CInitScript, PerfBeginLabel), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
+	r = engine->RegisterGlobalFunction("void AiPerfEndLabel()", asMETHOD(CInitScript, PerfEndLabel), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiAddPoint(const AIFloat3& in, const string& in)", asMETHOD(CInitScript, AddPoint), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiDelPoint(const AIFloat3& in)", asMETHOD(CInitScript, DelPoint), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
 	r = engine->RegisterGlobalFunction("void AiAddLine(const AIFloat3& in, const AIFloat3& in)", asMETHOD(CInitScript, AddLine), asCALL_THISCALL_ASGLOBAL, this); ASSERT(r >= 0);
@@ -1554,6 +1560,11 @@ CMaskHandler::TypeMask CInitScript::AddRole(const std::string& name, int actAsRo
 	circuit->BindRole(result.type, actAsRole);
 	return result;
 }
+
+void CInitScript::PerfBegin(int phase) const { performance::Begin(circuit, phase); }
+void CInitScript::PerfEnd(int phase) const { performance::End(circuit, phase); }
+void CInitScript::PerfBeginLabel(const std::string& label) const { performance::BeginLabel(circuit, label); }
+void CInitScript::PerfEndLabel() const { performance::EndLabel(circuit); }
 
 void CInitScript::Log(const std::string& msg) const
 {

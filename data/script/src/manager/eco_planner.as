@@ -188,6 +188,14 @@ namespace EcoPlanner {
 
     State@ Read(CCircuitUnit@ u, float metalIncome, float energyIncome, bool air = false)
     {
+        if (AiPerfEnabled) AiPerfBegin(2);
+        State@ result = ReadMeasured(u, metalIncome, energyIncome, air);
+        if (AiPerfEnabled) AiPerfEnd(2);
+        return result;
+    }
+
+    State@ ReadMeasured(CCircuitUnit@ u, float metalIncome, float energyIncome, bool air)
+    {
         State@ s = State();
         s.air = air;
         s.windMin = ai.GetWindMin();
@@ -320,7 +328,7 @@ namespace EcoPlanner {
     }
 
     // The energy sources this constructor could build now, cheapest metal per E/s first.
-    array<Option@> EnergyOptions(const State@ s)
+    array<Option@>@ EnergyOptions(const State@ s)
     {
         const string side = Global::AISettings::Side;
         array<Option@> opts;
@@ -337,19 +345,21 @@ namespace EcoPlanner {
             if (o !is null && s.mIncome >= Global::RoleSettings::Tech::MinimumMetalIncomeForAFUS) opts.insertLast(o);
         }
         // affordable first, then metal per E/s, then the larger output
-        array<Option@> sorted;
-        for (uint i = 0; i < opts.length(); ++i) {
+        // Stable insertion in the owned array: preserve ties and comparison
+        // order without allocating a second GC array or copying on return.
+        for (uint i = 1; i < opts.length(); ++i) {
             Option@ c = opts[i];
-            uint at = sorted.length();
-            for (uint k = 0; k < sorted.length(); ++k) {
+            uint at = i;
+            for (uint k = 0; k < i; ++k) {
                 const bool ca = Affordable(c, s);
-                const bool ka = Affordable(sorted[k], s);
+                const bool ka = Affordable(opts[k], s);
                 if (ca && !ka) { at = k; break; }
-                if (ca == ka && (c.metalPerE < sorted[k].metalPerE || (c.metalPerE == sorted[k].metalPerE && c.output > sorted[k].output))) { at = k; break; }
+                if (ca == ka && (c.metalPerE < opts[k].metalPerE || (c.metalPerE == opts[k].metalPerE && c.output > opts[k].output))) { at = k; break; }
             }
-            sorted.insertAt(at, c);
+            for (uint k = i; k > at; --k) @opts[k] = opts[k - 1];
+            @opts[at] = c;
         }
-        return sorted;
+        return opts;
     }
 
     // The cheapest energy per E/s the bank can pay; else the cheapest lump.
@@ -358,7 +368,7 @@ namespace EcoPlanner {
     // outgrown solars (owner's rule; played, advanced solars kept coming).
     string PickEnergy(const State@ s, string &out why, const string &in reason)
     {
-        array<Option@> opts = EnergyOptions(s);
+        array<Option@>@ opts = EnergyOptions(s); // this owned list is filtered below
         // D-100 (owner: the fusion comes sooner once the mexes near it are
         // upgraded; played: energy.short ordered the fusion with 3 of 8 upgraded,
         // the upgrades' own drain making energy short): while upgrades are
@@ -572,7 +582,7 @@ namespace EcoPlanner {
 
         // 7. metal floating with energy ahead: the best payback anyway, up to twice the target.
         if (floatingM && s.eIncome < 2.0f * target && !oneAtATime) {
-            array<Option@> opts = EnergyOptions(s);
+            const array<Option@>@ opts = EnergyOptions(s);
             for (uint i = 0; i < opts.length(); ++i) {
                 if (Affordable(opts[i], s)) {
                     why = "metal floating at " + int(s.mCur) + "; best payback energy";

@@ -22,6 +22,12 @@ rows in the knowledge base's
 
 ## How a decision is made
 
+D-199 adds optional timing wrappers: `Build` calls `BuildMeasured`, and
+`Evaluate` calls `EvaluateMeasured`. With `CIRCUIT_PERF_PHASES` unset the timing
+hooks do no work. The constructor total reuses the two counts already obtained
+by `EcoPlanner::Read` within this same read-only context. Rows, predicates, acts
+and their order are unchanged. See the [performance implementation](../reviews/2026-10-04-high-severity-performance-implementation.md).
+
 `TechRules::Evaluate(unit)` builds one context (`Build`) - who is asking,
 the 10-second incomes, the planner's `State` (banks, counts, build power,
 what the box can hold), the opening and T2 flags, lab and constructor counts,
@@ -148,7 +154,7 @@ its owner: the opening in [`tech.md`](tech.md), the economy in
 [`../eco-planner.md`](../eco-planner.md), the acts in
 [`tech_build.md`](tech_build.md).
 
-<!-- source: data/script/src/roles/tech_rules.as; blob: aac069f2063d4c9688c70d996f5c66db845cad82; lines: 599 -->
+<!-- source: data/script/src/roles/tech_rules.as; blob: c761c5cdb2141b6fa45476e4676a194afaaf7ede; lines: 624 -->
 
 ## D-152 fortification rule
 

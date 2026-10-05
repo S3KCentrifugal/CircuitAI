@@ -473,3 +473,14 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Enemy in turret reach | CFactoryManager::UpdateEnemyReclaim/GetReclaimEnemy | Current visible hostile, reclaimable target; actual loaded reach; current target retained, no bank/role/no_disrupt gate. |
 | Emergency turret task | CSReclaimTask, ITaskModule::AssignTask, Builder::TurretsOnReclaim | One enemy-mode NOW task. Friendly recycling and ordinary reassignment yield; player control can take over. Death, transfer, visibility/range loss or disabled policy release; normal role decisions resume. |
 | Turret invariants | Economy::AiUpdateEconomy, Invariants::Tick | INV-128 audits admission. INV-008 friendly recycling and INV-048 factory binding yield to active enemy reclaim. |
+
+### D-199 derived local occupancy and diagnostic spans
+
+| Object | Readers/actors | State and ownership |
+| --- | --- | --- |
+| Active local footprint | ShareSlot/IndexLocalSlot, serve/restore/recycle/release/load, IsSlotFree | Exact derived cell counts; consumed slots excluded; ignored ID remains exact with overlaps. Authoritative reservation records and lifecycle unchanged. |
+| Local zone envelope | ShareZone, ReleaseZone, LoadLayout, IsSlotFree | Complete rectangle counts, including nested/partially marked zones; original zone authority and allied checks remain separate. |
+| Economy option array | EnergyOptions, PickEnergy, Choose, TechRules::DoBestPayback | One invocation owns the array; PickEnergy filters its owned list, other callers use read-only handles; no shared scratch state or retained unit handles. |
+| Custom order payload | CircuitUnit command helpers, SendCustomCommand, synchronous engine C bridge | Borrowed payload valid for the bridge call; all order fields, dispatch timing and error propagation retained. |
+| Performance span | Script/native wrappers, AI Update, exception unwind, destructor | Opt-in per-thread/per-AI diagnostics; no engine/script ownership transfer to workers. |
+| Weapon pending count | TechWeapons::Work, OutstandingOrders | Invocation-local observation; invalidated on dead-slot changes and before every Order attempt, including failed enqueue/abort; no cross-frame reuse or suppressed site attempt. |

@@ -97,6 +97,14 @@ namespace TechRules {
 
     Ctx@ Build(CCircuitUnit@ u)
     {
+        if (AiPerfEnabled) AiPerfBegin(1);
+        Ctx@ result = BuildMeasured(u);
+        if (AiPerfEnabled) AiPerfEnd(1);
+        return result;
+    }
+
+    Ctx@ BuildMeasured(CCircuitUnit@ u)
+    {
         Ctx@ c = Ctx();
         @c.u = u;
         @c.d = u.circuitDef;
@@ -111,8 +119,8 @@ namespace TechRules {
         c.intoT2 = TechBuild::IntoT2();
         c.t1Labs = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotLabs());
         c.t2Labs = TechFlank::NormalLabCount();
-        c.constructors = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors())
-            + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+        // Read already by EcoPlanner above; only read-only getters intervened.
+        c.constructors = c.eco.t1Cons + c.eco.t2Cons;
         c.spamGate = Global::Spam::Enabled && c.mi >= Global::Spam::MinMetalIncome && c.ei >= Global::Spam::MinEnergyIncome;
         const EcoPlanner::State@ s = c.eco;
         c.energyTarget = EcoPlanner::TargetEnergy(s.mIncome);
@@ -394,7 +402,7 @@ namespace TechRules {
     }
     IUnitTask@ DoBestPayback(Ctx@ c)
     {
-        array<EcoPlanner::Option@> opts = EcoPlanner::EnergyOptions(c.eco);
+        const array<EcoPlanner::Option@>@ opts = EcoPlanner::EnergyOptions(c.eco);
         for (uint i = 0; i < opts.length(); ++i)
             if (EcoPlanner::Affordable(opts[i], c.eco)) return ByKey(c, opts[i].key);
         return null;
@@ -502,6 +510,14 @@ namespace TechRules {
 
     IUnitTask@ Evaluate(CCircuitUnit@ u)
     {
+        if (AiPerfEnabled) AiPerfBegin(3);
+        IUnitTask@ result = EvaluateMeasured(u);
+        if (AiPerfEnabled) AiPerfEnd(3);
+        return result;
+    }
+
+    IUnitTask@ EvaluateMeasured(CCircuitUnit@ u)
+    {
         if (u is null || u.circuitDef is null) return null;
         Init();
         Ctx@ c = Build(u);
@@ -524,7 +540,9 @@ namespace TechRules {
             asks = idleNow ? asks + 1 : 0;
             lastIdleAsks.set(ik, asks);
             if (asks >= Global::RoleSettings::Tech::AirIdleAsks) {
+                if (AiPerfEnabled) AiPerfBeginLabel("idle-air-defense");
                 IUnitTask@ dt = TechBuild::AirDefence(u);
+                if (AiPerfEnabled) AiPerfEndLabel();
                 if (dt !is null) { lastIdleAsks.set(ik, int64(0)); Trace(c, airDefendRule); return dt; }
             }
         }
@@ -556,10 +574,15 @@ namespace TechRules {
                 if (MetalEconomy::SkipTechRule(r.key)) continue;
             }
             if ((r.who & c.who) == 0) continue;
+            if (AiPerfEnabled) AiPerfBeginLabel(r.key);
             bool ok = true;
             for (uint k = 0; k < r.when.length() && ok; ++k) ok = r.when[k](c);
-            if (!ok) continue;
+            if (!ok) {
+                if (AiPerfEnabled) AiPerfEndLabel();
+                continue;
+            }
             IUnitTask@ t = r.act(c);
+            if (AiPerfEnabled) AiPerfEndLabel();
             if (t is null) continue;
             // D-123 (owner: an air constructor never does nothing): whichever row
             // answered with a wait (played: the rush chain's "order out", 60 s
@@ -567,7 +590,9 @@ namespace TechRules {
             if (UnitHelpers::IsAirConstructor(c.d)) {
                 IBuilderTask@ bt = cast<IBuilderTask>(t);
                 if (bt !is null && Task::BuildType(bt.GetBuildType()) == Task::BuildType::WAIT) {
+                    if (AiPerfEnabled) AiPerfBeginLabel("wait-air-defense");
                     IUnitTask@ dt = TechBuild::AirDefence(c.u);
+                    if (AiPerfEnabled) AiPerfEndLabel();
                     if (dt !is null) {
                         aiBuilderMgr.AbortTask(t);
                         Trace(c, airDefendRule);

@@ -27,6 +27,8 @@
 #include "unit/enemy/EnemyUnit.h"
 #include "util/GameAttribute.h"
 #include "util/Utils.h"
+#include "util/Performance.h"
+#include "angelscript/include/angelscript.h"
 #include "util/Profiler.h"
 #ifdef DEBUG_VIS
 #include "map/InfluenceMap.h"
@@ -147,6 +149,7 @@ CCircuitAI::~CCircuitAI()
 	if (isInitialized) {
 		Release(0);
 	}
+	performance::Release(this);
 }
 
 int CCircuitAI::HandleEvent(int topic, const void* data)
@@ -891,6 +894,12 @@ int CCircuitAI::Update(int frame)
 	}
 	UpdateActions();
 	FlushDrawQueue();  // D-118
+	if (performance::enabled && frame % (60 * FRAMES_PER_SEC) == 0) {
+		performance::Flush(this);
+		unsigned current = 0, destroyedObjects = 0, detected = 0;
+		scriptManager->GetEngine()->GetGCStatistics(&current, &destroyedObjects, &detected);
+		performance::Garbage(this, current, destroyedObjects, detected);
+	}
 
 #ifdef DEBUG_VIS
 	if (frame % FRAMES_PER_SEC == 0) {

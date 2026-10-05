@@ -518,7 +518,7 @@ namespace Layout {
                         // walled in by windmills.
                         const AIFloat3 home = HomeCentre();
                         const float flush = Global::RoleSettings::Tech::LayoutLabFlushElmos;
-                        const array<int> labFacings = LabFacings();
+                        const array<int>@ labFacings = LabFacings();
                         int bestF = -1;
                         // D-096: the front line first, when the block itself faces the front
                         labSlot = (LabFacing() == facing) ? ReserveFrontLab(t2, boxFront, across) : -1;
@@ -779,25 +779,13 @@ namespace Layout {
         return 0.0f;
     }
 
-    // Would the box hold this def within a turret's reach? Without a box the
-    // spiral fallback always can.
-    dictionary canPlaceAt;    // D-083: def name -> frame of the last native probe
-    dictionary canPlaceWas;   // def name -> its answer
+    // D-199: admission has always accepted every non-null definition: the
+    // old probe's false result was unconditionally promoted to true because
+    // Place may grow the box. Avoid that discarded search and its memo objects.
+    // Actual placement retains every terrain, occupancy and reach check.
     bool CanPlace(const CCircuitDef@ def)
     {
-        if (def is null) return false;
-        if (!HasBox()) return true;
-        // the native probe walks the whole zone; it was asked for every option
-        // of every builder every second (played: a 15 s freeze at a converter)
-        const string key = def.GetName();
-        int64 at = -100000; canPlaceAt.get(key, at);
-        if (ai.frame - int(at) < int(Global::RoleSettings::Tech::LayoutCanPlaceMemoSeconds * SECOND)) { bool was = true; canPlaceWas.get(key, was); return was; }
-        bool ok = false;
-        for (int i = 0; i < ZoneCount() && !ok; ++i)
-            if (aiTerrainMgr.CanPackNearGroup(ZoneAt(i), def, nanoGroup, facing, 0.0f, MinNanoDist(def))) ok = true;
-        if (!ok) ok = true;   // the box grows when it is full (Place)
-        canPlaceAt.set(key, int64(ai.frame)); canPlaceWas.set(key, ok);
-        return ok;
+        return def !is null;
     }
 
     // Enqueue a structure on the box cells nearest to a turret, pinned to
@@ -904,7 +892,7 @@ namespace Layout {
                 return fid;
             }
         }
-        const array<int> labFacings = LabFacings();
+        const array<int>@ labFacings = LabFacings();
         for (uint f = 0; f < labFacings.length(); ++f) {
             for (int i = 0; i < ZoneCount(); ++i) {
                 const int id = aiTerrainMgr.PackNearGroup(ZoneAt(i), def, nanoGroup, labFacings[f], TurretSeed(), 0.0f, 0.0f, 0);
@@ -1029,6 +1017,14 @@ namespace Layout {
     string noRoomDef = "";
 
     IUnitTask@ Place(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder = null)
+    {
+        if (AiPerfEnabled) AiPerfBegin(4);
+        IUnitTask@ result = PlaceMeasured(type, priority, def, timeout, builder);
+        if (AiPerfEnabled) AiPerfEnd(4);
+        return result;
+    }
+
+    IUnitTask@ PlaceMeasured(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder)
     {
         if (def is null) return null;
         // Among the cells equally close to a turret, the one nearest the
@@ -1510,7 +1506,7 @@ namespace Layout {
             // D-087: before the pair's slot, the footprint nearest a turret slot, in
             // any facing whose exit is clear (played: the pair's facing had no site
             // with a clear exit in the block and the lab went to the pair's slot)
-            const array<int> labFacings = LabFacings();   // D-096: the front first, never away
+            const array<int>@ labFacings = LabFacings();   // D-096: the front first, never away
             for (uint f = 0; f < labFacings.length(); ++f) {
                 const int ff = labFacings[f];
                 for (int i = 0; i < ZoneCount(); ++i) {

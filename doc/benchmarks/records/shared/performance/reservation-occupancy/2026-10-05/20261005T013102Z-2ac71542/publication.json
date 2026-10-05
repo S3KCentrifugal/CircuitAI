@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "bf8a33052746e3dbd35d4cea8103084aa5821a0842e8d96f7f8b4a2295e78bad",
+    "checks.json": "5035b447ef841213c5db1d18f356d4281406ea41ea25570914c15d2d0296e011",
+    "launched.json": "56261d74812d668322767c1197999772c5e5e183238c3311ad409c8c94f1e99b",
+    "report.md": "d856c68c06d417818483f37e1bf9595a444b8fc69f38e41eb65b760fa09b16f9",
+    "reservation-fixture.json": "f72021bc4f5a0d6967bcf626fd764baaa5fa3fc59d16c1374ca0cf2de815adce",
+    "result.json": "d4d08fc53e32de28e97e413918be197ac54b6c5dd6a82709991fa9f37d8d768a",
+    "run-inputs.json": "a87716e9794045acc5bfcafdbec8fc4d283d32a2af17a6cfa0af7f90ee5bf6d1",
+    "run-plan.json": "448280eda09e7bd4e45e518d8e41802113c8b0ab0ec03da96759485d0065e58c",
+    "screen_2026-10-05_01-30-49-877.png": "e591db8a934e5d825b0ba5ac7179d5c342040b8c647585ca5fa253a835c76805",
+    "script.txt": "b3b480db54d485fab10c5158691179a30e58bd462fc3f733551f560269f8715b",
+    "shore-eight-starts.as": "b59b3117d7fa75af716178a47a83c79e9b3a53dbe5e6c04fb7a89261de6763ca",
+    "skirmish-performance.json": "4750ca2b16c12dcb152d7fd19b5bb11dd3be156a8bc60b4ffcfa96d149170967",
+    "staged.json": "c478b2b101b7a6d73ef33f69cf9bd87aed31a7c10d3d08e168d07c6df4f20512",
+    "teams.json": "6328a2fd7939081506446d68e152b1b6dfe8202c827c4e377b027330b6ad77df"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\reservation-occupancy\\shore-to-shore\\20261005T011539Z-0c89a5b6\\runs\\20261005T013102Z-2ac71542",
+  "schema": 1
+}

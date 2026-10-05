@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "8bab3222d28c8de47106dd14771a8e2ba257a20bb8a19de1c6616406d2fee5d8",
+    "checks.json": "5035b447ef841213c5db1d18f356d4281406ea41ea25570914c15d2d0296e011",
+    "launched.json": "42535aa282dd0a4e3e60b732151a50029b761f3525ff426e5f2c9025d164d87a",
+    "performance-phases-final.json": "3fdb9c3d659c61d0f7afbc088d6c7bed38868ff6d2d41f29e79eeeec98c1068a",
+    "report.md": "432a7d57578983f7f9428ad49e426b944e343fcec400a078e389007b12a0ea3e",
+    "reservation-fixture.json": "df9a8d757ab6e6d1ed0f3a3c37a63a092126243c712de7cabdeb8d748c0adba2",
+    "result.json": "a6ef40173c276f0869d7bf798c07fc66676bfc7c3c7b0ebbce95a3664614ee9a",
+    "run-inputs.json": "2dd65fb3a9a85426f58fd96e5443d3c5a25623c933023ae2c25a496e22365505",
+    "run-plan.json": "534423bda33b611483337434d19bd893abc71de2051e010b27d7a5747e504062",
+    "screen_2026-10-05_02-28-28-407.png": "824bc0162109235a0d8e1fa142bca6fa90ecb92c16cd25c49abb0fbfaaea2714",
+    "script.txt": "90303fb5253f54e553b2e01c2b76dfeb788fdf8652065b97ff8043be6c991fd3",
+    "shore-eight-starts.as": "b59b3117d7fa75af716178a47a83c79e9b3a53dbe5e6c04fb7a89261de6763ca",
+    "staged.json": "a310539f8c3fa0b4f1b29dddad3d4f387f03ce3acb785a676c215598c99120ae",
+    "teams.json": "6328a2fd7939081506446d68e152b1b6dfe8202c827c4e377b027330b6ad77df"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\reservation-soak\\shore-to-shore\\20261005T021952Z-fe77c971\\runs\\20261005T023341Z-a75d9adb",
+  "schema": 1
+}

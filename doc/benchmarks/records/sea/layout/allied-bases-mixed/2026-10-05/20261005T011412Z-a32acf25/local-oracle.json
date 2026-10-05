@@ -1,0 +1,12 @@
+{
+  "lines": [
+    "[t=00:01:00.511843][f=0000152] Skirmish AI <BARb playtest-test>: [LocalOracle] team=1 frame=152 queries=1 mismatches=0 cell_bytes=24592",
+    "[t=00:01:00.574886][f=0000154] Skirmish AI <BARb playtest-test>: [LocalOracle] team=3 frame=154 queries=1 mismatches=0 cell_bytes=24592",
+    "[t=00:01:04.390469][f=0001363] Skirmish AI <BARb playtest-test>: [LocalOracle] team=2 frame=1363 queries=1 mismatches=0 cell_bytes=0",
+    "[t=00:01:04.427113][f=0001373] Skirmish AI <BARb playtest-test>: [LocalOracle] team=4 frame=1373 queries=1 mismatches=0 cell_bytes=0",
+    "[t=00:01:08.049827][f=0002555] Skirmish AI <BARb playtest-test>: [LocalOracle] team=5 frame=2555 queries=1 mismatches=0 cell_bytes=0",
+    "[t=00:01:08.356368][f=0002670] Skirmish AI <BARb playtest-test>: [LocalOracle] team=0 frame=2670 queries=1 mismatches=0 cell_bytes=0"
+  ],
+  "mismatch_count": 0,
+  "note": "Periodic diagnostics are a lower bound on checked calls; this short run did not cross the 100000-call reporting interval."
+}

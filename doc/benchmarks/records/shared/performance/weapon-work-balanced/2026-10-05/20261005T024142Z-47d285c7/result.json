@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 773,
+      "sha256": "bbf7fe2e2315899772870fca7ffea01eebaab69c54ff3bfa38f2756362553990"
+    },
+    "infolog.txt": {
+      "bytes": 545121,
+      "sha256": "d3dccd247a80a0674447e9f24ceb079629fec5368f94836a8cb06452557cbd1f"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "eafcdb264070391644cb0bb49a2ed6fc4b774d1b83400b7b9e5422459c0cfa65"
+    },
+    "report.md": {
+      "bytes": 18094,
+      "sha256": "9ddbdfa586c063ab2028de06f6a263f0c7b2815eb597c6533b0bb4cfa492ff90"
+    },
+    "run-inputs.json": {
+      "bytes": 35893,
+      "sha256": "407fe07a29fa324df874b6e8b82602734b3a8adebe9e367331979de06b45d7d4"
+    },
+    "run-plan.json": {
+      "bytes": 265,
+      "sha256": "751f4009bd3bea84a35456547c4a6754f2979256d1a15a793074e68c297dfa6b"
+    },
+    "screen_2026-10-05_02-41-30-300.png": {
+      "bytes": 1985520,
+      "sha256": "d63007cd422f18c750e6988de5f26d100bfd97bca4ed4ab11a03f16c5bea786d"
+    },
+    "screen_2026-10-05_02-41-40-470.png": {
+      "bytes": 1997619,
+      "sha256": "9b0737ccbb7ae1f53d7204ed3f73b2f70c66f857dbcfa7b32e9cdcf458668c23"
+    },
+    "script.txt": {
+      "bytes": 6147,
+      "sha256": "61f491c56ff026ecea6843573fc5cb91e3eae54df06af5ae7e5f99818e87f69e"
+    },
+    "staged.json": {
+      "bytes": 243,
+      "sha256": "f565f228265c529abc217a6969ef4062e07203f8ba9600b28265247a7c773d0f"
+    },
+    "teams.json": {
+      "bytes": 463,
+      "sha256": "db7fc3be9c28338eab4ccd05ae01741409db53cef58e718553a6962b9aab2333"
+    },
+    "weapon-fixture-source.json": {
+      "bytes": 36048,
+      "sha256": "345defc5275bca5e6f77ad34ca3fc4136a25c4d69bcbd99d9173d219a5630bc2"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "weapon-work-balanced"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T024142Z-47d285c7",
+  "last_frame": 7265,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\weapon-work-balanced\\supreme\\20261005T023926Z-81c2200d\\runs\\20261005T024142Z-47d285c7",
+  "reason": "reached 4 min",
+  "recorded_at_utc": "2026-10-05T02:41:42.504654+00:00",
+  "requested": {
+    "seed": 1991
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 2,
+      "team": 0,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 10,
+      "team": 1,
+      "x": 11456.0,
+      "z": 1901.0
+    }
+  ],
+  "verdict": "PASS"
+}

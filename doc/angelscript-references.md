@@ -1768,3 +1768,15 @@ failed admissions from the latest response pass, for shared INV-128.
 Normal assignments and friendly-reclaim pulls yield to this task; PLAYER
 control remains authoritative. No target pointers are exposed. See
 [behavior and verification](turret-enemy-reclaim.md).
+
+## D-199 optional performance diagnostics
+
+`AiPerfEnabled` is a read-only global boolean set from the process environment
+variable `CIRCUIT_PERF_PHASES`. `AiPerfBegin(int)` and `AiPerfEnd(int)` bracket
+aggregate diagnostics on the owning thread; scripts guard both calls with the
+boolean. Phases 1/2/3/4 are TECH context, economy read, TECH evaluation and layout
+placement. Native phases include script execution and placement subroutines.
+`AiPerfBeginLabel(const string &in)` / `AiPerfEndLabel()` add nested, named
+rule scopes in diagnostic mode; production callers use bounded rule keys.
+These calls neither schedule work nor change policy. Deploy script and native
+binary together. See the [implementation and evidence](reviews/2026-10-04-high-severity-performance-implementation.md).

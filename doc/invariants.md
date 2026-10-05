@@ -179,3 +179,5 @@ step.
 | INV-126 | AIR's assignment ledger cannot remove more build power than it owns. | AirWorkforce::Assign/AddPower reconcile per-worker IDs once per sample and at reassignment; negative ownership is an invariant violation. | D-181 |
 | INV-127 | TECH produces Telchines only from a landlocked start. | Invariants::OnUnitAdded rejects a completed Telchine with a local producer when Global::Map::LandLocked is false; gifts remain usable. | D-182 |
 | INV-128 | An eligible construction turret takes the highest-priority enemy reclaim response before ordinary AI work. | CFactoryManager validates admission after its half-second response pass; Economy reports missed admissions. The supplied observer independently checks physical reclaim and return to repair. | D-184 |
+
+| INV-144 | Indexed local slot/zone occupancy gives the same answer as the legacy scan, including consumed and ignored slots. | TerrainManager::IsSlotFree compares both paths when CIRCUIT_VERIFY_LOCAL_LAYOUT is enabled; lifecycle differential tests run independently. | D-199 |

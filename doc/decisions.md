@@ -11489,3 +11489,77 @@ All recommendations preserve the unresolved attribution and original ranking;
 items 1-4 overlap and their benefits cannot be summed. This follow-up touches
 only this decision and the linked report. No runtime change or new simulation
 is claimed; documentation checks are the applicable verification.
+
+## D-199 - Remove redundant placement and allocation work without changing policy
+
+**Decision.** Remove TECH's discarded CanPlace geometry probe; replace remaining
+local slot/envelope scans with an exact sparse occupancy index; reduce owned
+energy-array copies and duplicate context counts; remove custom-order parameter
+copies through the same synchronous engine bridge. Add opt-in phase/GC
+instrumentation and a live index-versus-scan oracle. Preserve every decision
+threshold, rule order, candidate ordering, retry opportunity, random call,
+command count, option, timeout and update interval.
+
+**Reasoning.** The old admission gate promoted every failed probe to true, so
+it could be simplified without guessing whether two failed placements share
+all engine inputs. Local occupancy has fully observable mutations and admits
+exact indexing. Invocation-owned arrays avoid shared-scratch/reentrancy risks.
+The existing engine custom-command bridge consumes temporary parameters before
+returning, so stack/span parameters preserve its contract without editing the
+generated wrapper or vendor libraries.
+
+**Alternatives rejected.** No whole-placement negative cache across decisions:
+engine blockers/reclaim/terrain inputs do not have a complete tracked revision.
+No GC tuning, coarser threat updates, new worker-thread engine calls, global
+APM limit, or command suppression based only on repeated coordinates/state.
+The latter can change queue renewal, timeouts or interaction with external
+orders. The command allocation saving therefore does not resolve the unproved
+multiplayer traffic risk. Nor does a microbenchmark prove that every late-game
+TECH stall has been eliminated. These limits remain in KI-497.
+
+**Files.** The [implementation and measured evidence](reviews/2026-10-04-high-severity-performance-implementation.md)
+contains the full affected-file map, before/after examples, benchmark method,
+runtime observations and remaining acceptance limits. Supporting contracts are
+[this decision](decisions.md), [remaining issues](known-issues.md),
+[invariants](invariants.md), [actor matrix](actor-matrix.md),
+[script API](angelscript-references.md), and [TECH rules](roles/tech_rules.md).
+
+**Verification.** The complete native suite passes, including 200,038 local
+and 200,159 allied reservation checks. Extracted old/new AngelScript bodies
+pass 20,000 ranking/filtering cases and 20,000 admission/memo cases. The actual
+command adapter passes exact payload/option/timeout/error checks. Isolated
+microbenchmarks measure indexed lookup scaling, script-array time/GC objects,
+and command temporary allocations. The rebuilt DLL/symbols/data are published
+together to the engine development install, with script/API parity checked.
+The six-minute Supreme cross-role oracle run passes all twelve directed
+exclusions without a runtime invariant. The detailed report retains the initial
+compile failure and all full-game FAIL verdicts; final game measurements and
+source identities are recorded there. No real engine save/reload, targeted
+ownership-transfer scenario or host/peer multiplayer benchmark is claimed.
+
+**Invariant.** INV-144 compares the exact local predicate with the old scan
+when explicitly enabled. INV-088 and all existing gameplay checks remain
+unchanged. Unit tests cover multiplicity, ignored/consumed slots, boundaries,
+replacement, release and reconstruction. The oracle is disabled for timing.
+No change to economy/combat policy is accepted as a performance improvement.
+
+
+**D-199 measured refinement.** Named rule timers subsequently attributed the
+remaining late-game cost to TECH weapon work reached through weapons.cluster,
+air.defend and idle-air-defense. OutstandingOrders rescanned all weapon slots
+for every eligible cluster. Work now shares that pure observation inside one
+synchronous invocation, invalidating on dead-slot changes and before every
+Order attempt. It skips definition resolution for slots already outside the
+unchanged 300-second window. Repeated Work invocations were deliberately not
+suppressed: earlier calls can alter slots and tasks. TechForward::Buildable
+can also change a definition's cap, so it was not treated as a pure filter.
+
+The extracted original/optimized Work and OutstandingOrders pass 20,000
+three-invocation differential cases, including state mutation, an obstruction
+clearing and time advancing. The engine-free 32-by-16-slot workload is 18.48x
+faster, and an isolated engine fixture retains the real string/UnitDef mapping
+for an additional same-input comparison. See the report for exact timings,
+profile results and original verdicts. Full reruns lost the original late TECH
+workload to combat, so the function-level gain is not presented as proof of
+all-game FPS improvement. The new fixture files, runner and checks are listed
+in the report; they are never deployed to production data.

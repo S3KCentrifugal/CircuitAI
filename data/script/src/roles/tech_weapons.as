@@ -846,8 +846,9 @@ namespace TechWeapons {
                 // out: ordered in the last 30 s, or a frame going up (a failed order
                 // no longer holds a place for a minute)
                 if (ai.frame - s.orderedFrame < 30 * SECOND) { ++n; continue; }
+                if (ai.frame - s.orderedFrame >= 300 * SECOND) continue;
                 CCircuitDef@ d = Def(s.role);
-                if (d !is null && ai.frame - s.orderedFrame < 300 * SECOND && aiBuilderMgr.FindUnfinishedNear(s.pos, 96.0f, d) !is null) ++n;
+                if (d !is null && aiBuilderMgr.FindUnfinishedNear(s.pos, 96.0f, d) !is null) ++n;
             }
         }
         return n;
@@ -859,6 +860,10 @@ namespace TechWeapons {
         const bool air = UnitHelpers::IsAirConstructor(u.circuitDef);
         const AIFloat3 from = u.GetPos(ai.frame);
         const float mi = MetalIncome();
+        // One synchronous Work invocation, never a frame-to-frame cache.
+        // Pure cluster filters cannot change the pending count. Any slot
+        // mutation or attempted order invalidates it before the next cluster.
+        int pending = -1;
         for (uint i = 0; i < clusters.length(); ++i) {
             WCluster@ c = clusters[i];
             if (c.stale || mi < Gate(c.kind)) continue;
@@ -867,14 +872,21 @@ namespace TechWeapons {
             const bool escort = (c.kind == SUPER);
             // a full metal bank: the economy has nothing to spend it on, so no budget and twice the orders
             const bool flooded = aiEconomyMgr.isMetalFull;
-            if (!escort && OutstandingOrders() >= Global::RoleSettings::Tech::WeaponMaxConcurrent * (flooded ? 2 : 1)) return null;
+            if (!escort) {
+                if (pending < 0) {
+                    if (AiPerfEnabled) AiPerfBeginLabel("weapons-outstanding");
+                    pending = OutstandingOrders();
+                    if (AiPerfEnabled) AiPerfEndLabel();
+                }
+                if (pending >= Global::RoleSettings::Tech::WeaponMaxConcurrent * (flooded ? 2 : 1)) return null;
+            }
             for (uint j = 0; j < c.slots.length(); ++j) {
                 Slot@ s = c.slots[j];
                 if (s.dead || s.standFrame >= 0 || ai.frame - s.orderedFrame < 60 * SECOND) continue;
                 if (s.role == "art2" && mi < Global::RoleSettings::Tech::WeaponArtyMinIncome) continue;
                 if (s.role == "super" && air) continue;   // the cannon itself: SuperTask frames it with all air build power
                 CCircuitDef@ d = Def(s.role);
-                if (d is null) { s.dead = true; continue; }
+                if (d is null) { s.dead = true; pending = -1; continue; }
                 if (!u.circuitDef.CanBuild(d)) continue;
                 if (aiBuilderMgr.FindUnfinishedNear(s.pos, 64.0f, d) !is null) continue;   // going up: someone is on it
                 if (!escort && !flooded && tokens < d.costM) {
@@ -885,8 +897,14 @@ namespace TechWeapons {
                     return null;
                 }
                 AIFloat3 at;
-                if (!Site(s, d, at)) { s.dead = true; continue; }
+                if (AiPerfEnabled) AiPerfBeginLabel("weapons-site");
+                const bool site = Site(s, d, at);
+                if (AiPerfEnabled) AiPerfEndLabel();
+                if (!site) { s.dead = true; pending = -1; continue; }
+                pending = -1; // enqueue/abort hooks may mutate other slots
+                if (AiPerfEnabled) AiPerfBeginLabel("weapons-order");
                 IUnitTask@ t = Order(u, c, s, d, at);
+                if (AiPerfEnabled) AiPerfEndLabel();
                 if (t is null) continue;
                 if (!escort) tokens -= d.costM;
                 return t;

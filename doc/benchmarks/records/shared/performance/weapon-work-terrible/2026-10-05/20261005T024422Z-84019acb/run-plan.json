@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "weapon-work-terrible"
+  },
+  "id": "20261005T024205Z-59ffc177",
+  "requested": {
+    "seed": 1991
+  },
+  "schema": 1
+}

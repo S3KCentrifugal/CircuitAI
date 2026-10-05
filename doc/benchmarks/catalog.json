@@ -302,19 +302,6 @@
       "area": "combat",
       "domain": "air",
       "experiment_kind": "supplied",
-      "id": "20261003T145857Z-25a42eb3",
-      "kind": "run-record",
-      "map": "supreme",
-      "map_name": "Supreme Isthmus v1.7",
-      "path": "records/air/combat/recon-d179/2026-10-03/20261003T145857Z-25a42eb3/result.json",
-      "scenario": "recon-d179",
-      "sha256": "810699455859a05422523afee240a4a2e2abb784cf51afd0190a9f0bf3ab8ec6",
-      "verdict": "FAIL"
-    },
-    {
-      "area": "combat",
-      "domain": "air",
-      "experiment_kind": "supplied",
       "id": "20261003T151752Z-6be08fde",
       "kind": "run-record",
       "map": "glacial",
@@ -348,6 +335,19 @@
       "path": "records/air/combat/recon-d179-final/2026-10-03/20261003T151316Z-5d2874ef/result.json",
       "scenario": "recon-d179-final",
       "sha256": "b864a4f305f6481debc55a0ebb98e559eef5ff645882f54c0aa3a311921c2fbd",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "air",
+      "experiment_kind": "supplied",
+      "id": "20261003T145857Z-25a42eb3",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/air/combat/recon-d179/2026-10-03/20261003T145857Z-25a42eb3/result.json",
+      "scenario": "recon-d179",
+      "sha256": "810699455859a05422523afee240a4a2e2abb784cf51afd0190a9f0bf3ab8ec6",
       "verdict": "FAIL"
     },
     {
@@ -1053,6 +1053,45 @@
       "verdict": "PASS"
     },
     {
+      "area": "layout",
+      "domain": "sea",
+      "experiment_kind": "regression",
+      "id": "20261005T011412Z-a32acf25",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/layout/allied-bases-mixed/2026-10-05/20261005T011412Z-a32acf25/result.json",
+      "scenario": "allied-bases-mixed",
+      "sha256": "ebb6b495be4ff98cf7ae1de24db33dcd0c854ce0099957f609417694821f953d",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261004T224559Z-8522f4df",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/combat/juno-edge-d196/2026-10-04/20261004T224559Z-8522f4df/result.json",
+      "scenario": "juno-edge-d196",
+      "sha256": "55b2cf45094af7baf371ce9aa16d1d8ed403dcdaf94186f8fe0da48e90f1759c",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261004T225027Z-e148b0f6",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/result.json",
+      "scenario": "juno-edge-impacts",
+      "sha256": "ddfee7d5baa5106ac9a658a0f376507a53a7c78a1595ac178f5e161ef50fd4b3",
+      "verdict": "PASS"
+    },
+    {
       "area": "combat",
       "domain": "shared",
       "experiment_kind": "regression",
@@ -1144,32 +1183,6 @@
       "verdict": "FAIL"
     },
     {
-      "area": "combat",
-      "domain": "shared",
-      "experiment_kind": "supplied",
-      "id": "20261004T224559Z-8522f4df",
-      "kind": "run-record",
-      "map": "shore-to-shore",
-      "map_name": "Shore_to_Shore_V3",
-      "path": "records/shared/combat/juno-edge-d196/2026-10-04/20261004T224559Z-8522f4df/result.json",
-      "scenario": "juno-edge-d196",
-      "sha256": "55b2cf45094af7baf371ce9aa16d1d8ed403dcdaf94186f8fe0da48e90f1759c",
-      "verdict": "PASS"
-    },
-    {
-      "area": "combat",
-      "domain": "shared",
-      "experiment_kind": "supplied",
-      "id": "20261004T225027Z-e148b0f6",
-      "kind": "run-record",
-      "map": "shore-to-shore",
-      "map_name": "Shore_to_Shore_V3",
-      "path": "records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/result.json",
-      "scenario": "juno-edge-impacts",
-      "sha256": "ddfee7d5baa5106ac9a658a0f376507a53a7c78a1595ac178f5e161ef50fd4b3",
-      "verdict": "PASS"
-    },
-    {
       "area": "performance",
       "domain": "shared",
       "experiment_kind": "regression",
@@ -1180,6 +1193,84 @@
       "path": "records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/result.json",
       "scenario": "reservation-occupancy",
       "sha256": "ad78fc183c292fb6400232e70b1594aafa4bc30d1efe653f8382417dac9cb402",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T003731Z-adb18a7b",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-05/20261005T003731Z-adb18a7b/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "4af2ccc65b8cab361a983bfeedfb146193a8b3730c822a02414f1344dfde38d9",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T013102Z-2ac71542",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-05/20261005T013102Z-2ac71542/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "d4d08fc53e32de28e97e413918be197ac54b6c5dd6a82709991fa9f37d8d768a",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T015059Z-a65805e7",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-05/20261005T015059Z-a65805e7/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "f66cadd4668ac183efe794da487a5be8ec4a677d3d75f2044a66c54887896eff",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T020650Z-e7b6d9eb",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-05/20261005T020650Z-e7b6d9eb/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "68c84640f9d1e6dcada4b2ec5113d7096483c2419ed71dbc252544af1ae35321",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T021916Z-b271da6f",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-occupancy/2026-10-05/20261005T021916Z-b271da6f/result.json",
+      "scenario": "reservation-occupancy",
+      "sha256": "b9455ed34f166fa0746347aa0db09c1d528e1e606c6f24d58b48592d315bda7a",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "regression",
+      "id": "20261005T023341Z-a75d9adb",
+      "kind": "run-record",
+      "map": "shore-to-shore",
+      "map_name": "Shore_to_Shore_V3",
+      "path": "records/shared/performance/reservation-soak/2026-10-05/20261005T023341Z-a75d9adb/result.json",
+      "scenario": "reservation-soak",
+      "sha256": "a6ef40173c276f0869d7bf798c07fc66676bfc7c3c7b0ebbce95a3664614ee9a",
       "verdict": "FAIL"
     },
     {
@@ -1207,6 +1298,45 @@
       "scenario": "shore-clean-control",
       "sha256": "495cecc3fa6985526632dfddb8238423d5a8235500df35ced91648bfa9c7f416",
       "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261005T024142Z-47d285c7",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/performance/weapon-work-balanced/2026-10-05/20261005T024142Z-47d285c7/result.json",
+      "scenario": "weapon-work-balanced",
+      "sha256": "ba2bd3769ec38473381e68f531792816ed2aad943214ab6e7c5cd91d3681d206",
+      "verdict": "PASS"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261005T023830Z-c65baf4f",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/performance/weapon-work-hard/2026-10-05/20261005T023830Z-c65baf4f/result.json",
+      "scenario": "weapon-work-hard",
+      "sha256": "960abde8df62e791f81c873ea3ac2675847f13f600e770a2c9cadab37c56a419",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
+      "experiment_kind": "supplied",
+      "id": "20261005T024422Z-84019acb",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/shared/performance/weapon-work-terrible/2026-10-05/20261005T024422Z-84019acb/result.json",
+      "scenario": "weapon-work-terrible",
+      "sha256": "a1fd464a957e71746bfd5d8ef9353b506fc7e55192b62db67581a0b981705836",
+      "verdict": "PASS"
     },
     {
       "area": "combat",
@@ -1534,15 +1664,15 @@
       "area": "strategy",
       "domain": "shared",
       "kind": "derived-index",
-      "path": "scorecards/ratings.json",
-      "sha256": "2ced51ab4e4ff1ee2cc359b73969cf985c217995dbc54224db48f5110ce1e78d"
+      "path": "scorecards/README.md",
+      "sha256": "8ca6aeb89ebb91454bb44eaad24a9d1b537cedd0f8d6afffdae90ef5597846fd"
     },
     {
       "area": "strategy",
       "domain": "shared",
       "kind": "derived-index",
-      "path": "scorecards/README.md",
-      "sha256": "8ca6aeb89ebb91454bb44eaad24a9d1b537cedd0f8d6afffdae90ef5597846fd"
+      "path": "scorecards/ratings.json",
+      "sha256": "2ced51ab4e4ff1ee2cc359b73969cf985c217995dbc54224db48f5110ce1e78d"
     },
     {
       "area": "strategy",

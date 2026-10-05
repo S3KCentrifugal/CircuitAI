@@ -383,3 +383,12 @@ Recommended next selection: **instrument TECH's failed-decision path, then
 implement exact reuse and allocation reduction where the timings point**.
 Local occupancy indexing is the next concrete native mechanism, but it should
 not be represented as a guaranteed cure for the entire remaining hitch.
+
+
+## Implementation follow-up
+
+[D-199's implementation and measurements](2026-10-04-high-severity-performance-implementation.md)
+record the subsequent exact occupancy index, allocation changes, discarded
+preflight removal and measured weapon-work bottleneck. This ranking is retained
+as the evidence available when the work was selected. The follow-up separates
+verified function savings from still-open full-game and multiplayer acceptance.

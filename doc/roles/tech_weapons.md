@@ -172,7 +172,7 @@ start caps one at a time) and logs `[TECH][Weapons] <kind> #<id>: ... orders`.
 - `budget: ...`
 - `super cannon framed ...`
 
-<!-- source: data/script/src/roles/tech_weapons.as; blob: ecf5cc47ea01842876a810d6ec17d629dbf4d1a0; lines: 1108 -->
+<!-- source: data/script/src/roles/tech_weapons.as; blob: 81fa23e52c3009564f9e4f5a0df8a5bcce1250e4; lines: 1126 -->
 
 ## D-152 protected weapon placement
 
@@ -185,3 +185,11 @@ D-154: `Site` and `Order` also apply shared `WallHelpers::Allowed` to wall
 footprints before and after snapping. Walls inside the 1,200-elmo default
 allied-start exclusion are omitted; other weapons keep their existing placement
 rules. See [wall base exclusion](../wall-base-exclusion.md).
+
+D-199 reuses the outstanding-order count only within one synchronous `Work`
+call. Changing a slot's dead flag or attempting an order invalidates it;
+later calls always observe current state. `OutstandingOrders` skips definition
+lookups for orders already outside its unchanged 300-second window. Rule,
+cluster and slot order, budgets, candidate probes and concurrent-order limits
+are unchanged. Optional named timing separates the outstanding scan, site
+search and order submission. See [performance evidence](../reviews/2026-10-04-high-severity-performance-implementation.md).

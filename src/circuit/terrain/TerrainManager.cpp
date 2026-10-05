@@ -23,6 +23,7 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "util/Profiler.h"
+#include "util/Performance.h"
 #include "json/json.h"
 
 #include "spring/SpringMap.h"
@@ -37,6 +38,7 @@
 #include <limits>
 #include <cmath>
 #include <chrono>
+#include <cstdlib>
 
 // D-083 diagnosis (KI-419): any layout call over SLOW_CALL_MS is logged with its
 // cost, so a sim stall names the function that caused it.
@@ -1099,8 +1101,21 @@ int CTerrainManager::ReserveNanoBlockAt(CCircuitDef* nanoDef, CCircuitDef* facDe
 }
 
 
+void CTerrainManager::IndexLocalSlot(int id)
+{
+    const auto it = reservations.find(id);
+    int2 a, b;
+    if (it == reservations.end() || it->second.consumed
+            || !ReservationCells(it->second.def, it->second.pos, it->second.facing, a, b)) {
+        localReservations.EraseSlot(id);
+        return;
+    }
+    localReservations.PutSlot(id, {a.x, a.y, b.x, b.y});
+}
+
 void CTerrainManager::ShareSlot(int id)
 {
+    IndexLocalSlot(id);
     const auto it = reservations.find(id);
     if (it == reservations.end()) return;
     int2 a, b;
@@ -1117,6 +1132,7 @@ void CTerrainManager::ShareZone(int id)
     const auto it = zones.find(id);
     if (it == zones.end()) return;
     const auto& z = it->second;
+    localReservations.PutZone(id, {z.c1.x, z.c1.y, z.c2.x, z.c2.y});
     if (IsAllyLayoutRectBlocked(z.c1, z.c2)) circuit->LOG("[INVARIANT] INV-088: zone %i overlaps an allied plan", id);
     circuit->GetAllyTeam()->GetLayoutReservations().Put(circuit->GetTeamId(), allied_layout::Reservations::ZONE,
         id, {z.c1.x, z.c1.y, z.c2.x, z.c2.y});
@@ -1917,6 +1933,7 @@ void CTerrainManager::ReleaseReservation(int id)
 		}
 	}
 	circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, it->first);
+	localReservations.EraseSlot(it->first);
 	reservations.erase(it);
 }
 
@@ -1968,11 +1985,13 @@ void CTerrainManager::RestoreReservation(int id)
 	if (ReservationCells(r.def, r.pos, r.facing, c1, c2) && IsSlotFree(c1, c2, r.zone, id)) {
 		MarkReservation(c1, c2, true);
 		r.consumed = false;
+		IndexLocalSlot(r.id);
 		r.unitId = 0;
 		r.claimed = false;
 		circuit->LOG("RESERVE: restored %s at (%.0f, %.0f) (id %i)", r.def->GetDef()->GetName(), r.pos.x, r.pos.z, id);
 	} else {
 		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, it->first);
+		localReservations.EraseSlot(it->first);
 		reservations.erase(it);  // something took the ground meanwhile
 	}
 }
@@ -1985,6 +2004,7 @@ void CTerrainManager::FinishReservation(int id, int unitId)
 	}
 	if ((it->second.zone == 0) || (unitId == 0)) {
 		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, it->first);
+		localReservations.EraseSlot(it->first);
 		reservations.erase(it);  // a plain reservation is met and forgotten
 		return;
 	}
@@ -2184,6 +2204,7 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 		UnmarkSlot(c1, c2);
 	}
 	best->consumed = true;
+	IndexLocalSlot(best->id);
 	best->claimed = true;
 	outPos = best->pos;
 	outFacing = best->facing;
@@ -2219,6 +2240,56 @@ int CTerrainManager::ZoneAt(int x, int z) const
 }
 
 bool CTerrainManager::IsSlotFree(const int2& c1, const int2& c2, int zone, int ignoreId) const
+{
+    const bool result = IsSlotFreeIndexed(c1, c2, zone, ignoreId);
+    // D-199: opt-in differential runtime oracle; never changes the answer.
+    static const bool verify = std::getenv("CIRCUIT_VERIFY_LOCAL_LAYOUT") != nullptr;
+    if (verify) {
+        ++localOracleQueries;
+        if (result != IsSlotFreeLegacy(c1, c2, zone, ignoreId)) {
+            ++localOracleMismatches;
+            circuit->LOG("[INVARIANT] INV-144: local occupancy differs from legacy scan team=%i zone=%i ignore=%i rect=%i,%i,%i,%i",
+                circuit->GetTeamId(), zone, ignoreId, c1.x, c1.y, c2.x, c2.y);
+        }
+        if (localOracleQueries == 1 || localOracleQueries % 100000 == 0)
+            circuit->LOG("[LocalOracle] team=%i frame=%i queries=%llu mismatches=%llu cell_bytes=%llu",
+                circuit->GetTeamId(), circuit->GetLastFrame(),
+                static_cast<unsigned long long>(localOracleQueries), static_cast<unsigned long long>(localOracleMismatches),
+                static_cast<unsigned long long>(localReservations.CellStorageBytes()));
+    }
+    return result;
+}
+
+bool CTerrainManager::IsSlotFreeIndexed(const int2& c1, const int2& c2, int zone, int ignoreId) const
+{
+	if (IsAllyLayoutRectBlocked(c1, c2)) return false;
+	// Fresh unscoped reservations cannot fill holes inside a planned rectangle
+	// (for example after a wreck or old structure disappears). Zone packing and
+	// restoring an existing exact slot retain their explicit authority.
+	if (zone == 0 && ignoreId < 0 && localReservations.OverlapsZone({c1.x, c1.y, c2.x, c2.y})) return false;
+	const SBlockingMap::SM all = static_cast<SBlockingMap::SM>(SBlockingMap::StructMask::ALL);
+	for (int z = c1.y; z < c2.y; ++z) {
+		for (int x = c1.x; x < c2.x; ++x) {
+			if (!blockingMap.IsInBounds(x, z)) {
+				return false;
+			}
+			if (!blockingMap.IsBlocked(x, z, all)) {
+				continue;
+			}
+			// Inside its own zone a slot may stand on the zone's marks and in the
+			// yards of the zone's other structures (converters are stacked, the
+			// spine sits in the fusions' circle); a structure's own cells refuse.
+			if ((zone > 0) && blockingMap.IsReserved(x, z) && (ZoneAt(x, z) == zone)) {
+				continue;
+			}
+			return false;
+		}
+	}
+	if (zone > 0 && localReservations.OverlapsSlot({c1.x, c1.y, c2.x, c2.y}, ignoreId)) return false;
+	return true;
+}
+
+bool CTerrainManager::IsSlotFreeLegacy(const int2& c1, const int2& c2, int zone, int ignoreId) const
 {
 	if (IsAllyLayoutRectBlocked(c1, c2)) return false;
 	// Fresh unscoped reservations cannot fill holes inside a planned rectangle
@@ -2616,6 +2687,7 @@ void CTerrainManager::OnStructureGone(CCircuitDef* cdef, const AIFloat3& pos)
 		circuit->LOG("RESERVE: tenant %s at (%.0f, %.0f) gone; its ground goes to the successor band (id %i)",
 				cdef->GetDef()->GetName(), pos.x, pos.z, id);
 		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, it->first);
+		localReservations.EraseSlot(it->first);
 		reservations.erase(it);
 		return;
 	}
@@ -2626,11 +2698,13 @@ void CTerrainManager::OnStructureGone(CCircuitDef* cdef, const AIFloat3& pos)
 		circuit->LOG("RESERVE: %s at (%.0f, %.0f) reclaimed; its ground is free again (id %i)",
 				cdef->GetDef()->GetName(), pos.x, pos.z, id);
 		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, it->first);
+		localReservations.EraseSlot(it->first);
 		reservations.erase(it);
 		return;
 	}
 	r.unitId = 0;
 	r.consumed = false;
+	IndexLocalSlot(r.id);
 	int2 c1, c2;
 	if (ReservationCells(cdef, pos, r.facing, c1, c2)) {
 		MarkReservation(c1, c2, true);
@@ -2718,6 +2792,7 @@ void CTerrainManager::ReleaseZone(int id)
 	}
 	for (int rid : ids) {
 		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, rid);
+		localReservations.EraseSlot(rid);
 		reservations.erase(rid);
 	}
 	const SZone& zn = it->second;
@@ -2733,6 +2808,7 @@ void CTerrainManager::ReleaseZone(int id)
 	}
 	circuit->LOG("RESERVE: %s %i released", zn.corridor ? "corridor" : "zone", id);
 	circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::ZONE, id);
+	localReservations.EraseZone(it->first);
 	zones.erase(it);
 }
 
@@ -2921,6 +2997,7 @@ AIFloat3 CTerrainManager::PackNearPoint(CCircuitDef* cdef, const AIFloat3& pos, 
 		if ((it != reservations.end()) && ReservationCells(cdef, it->second.pos, it->second.facing, c1, c2)) {
 			UnmarkSlot(c1, c2);
 			it->second.consumed = true;
+			IndexLocalSlot(it->first);
 			it->second.claimed = true;
 			lastReservedId = id;
 			lastReservedFacing = it->second.facing;
@@ -3081,6 +3158,7 @@ int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
 std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup,
 		int facing, const AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing) const
 {
+	performance::Scope measured(circuit, performance::PACK_CANDIDATES);
 	std::vector<SPackCandidate> out;
 	if (!layoutEnabled || (cdef == nullptr) || (cdef->GetDef() == nullptr)) {
 		return out;
@@ -3218,6 +3296,7 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int
 
 bool CTerrainManager::LeavesPocket(int zone, CCircuitDef* cdef, const AIFloat3& pos, int facing) const
 {
+	performance::Scope measured(circuit, performance::POCKET);
 	SSlowCall slow("LeavesPocket", circuit);
 	// D-072: a constructor was walled in by a turbine cluster. Every free cell
 	// of the zone must stay connected to the zone's edge once this footprint
@@ -3485,6 +3564,7 @@ int CTerrainManager::PackNearGroupMost(int zone, CCircuitDef* cdef, int nanoGrou
 int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, const AIFloat3& anchor,
 		float maxReach, float minNanoDist, int group)
 {
+	performance::Scope measured(circuit, performance::PACK_GROUP);
 	SSlowCall slow("PackNearGroup", circuit);
 	constexpr int POCKET_TESTS_MAX = 40;  // D-090
 	int pocketTests = 0;
@@ -3519,6 +3599,7 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 
 bool CTerrainManager::CanPackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, int facing, float maxReach, float minNanoDist)
 {
+	performance::Scope measured(circuit, performance::CAN_PACK);
 	SSlowCall slow("CanPackNearGroup", circuit);
 	const std::vector<SPackCandidate> candidates = PackCandidates(zone, cdef, nanoGroup, facing, ZeroVector, maxReach, minNanoDist);
 	int tried = 0;
@@ -3761,6 +3842,7 @@ void CTerrainManager::LoadLayout(std::istream& is)
 	circuit->GetAllyTeam()->GetLayoutReservations().RemoveOwner(circuit->GetTeamId());
 	zones.clear();
 	reservations.clear();
+	localReservations.Clear();
 	uint32_t groupNameCount = 0;
 	utils::binary_read(is, groupNameCount);
 	for (uint32_t i = 0; i < groupNameCount; ++i) {

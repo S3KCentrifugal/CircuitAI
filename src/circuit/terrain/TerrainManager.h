@@ -9,6 +9,7 @@
 #define SRC_CIRCUIT_TERRAIN_TERRAINMANAGER_H_
 
 #include "terrain/BlockingMap.h"
+#include "terrain/LocalReservations.h"
 #include "terrain/BaseLayoutGeometry.h"
 #include "terrain/LayoutRanking.h"
 #include "unit/CoreUnit.h"
@@ -379,6 +380,10 @@ private:
 	int allyZoneCells;  // side of a square
 	SBlockingMap blockingMap;
 	std::map<int, SReservation> reservations;
+	local_layout::Reservations localReservations;
+	mutable uint64_t localOracleQueries = 0;
+	mutable uint64_t localOracleMismatches = 0;
+	void IndexLocalSlot(int id);
 	std::map<std::string, int> layoutGroups;
 	std::map<std::string, int> layoutZones;
 	std::map<std::string, int> layoutInts;
@@ -422,6 +427,8 @@ private:
 	// Cells free for a slot: unblocked, or held by `zone` itself (its marks and
 	// its other structures' yards), and not under another unconsumed slot.
 	bool IsSlotFree(const int2& c1, const int2& c2, int zone, int ignoreId) const;
+	bool IsSlotFreeLegacy(const int2& c1, const int2& c2, int zone, int ignoreId) const;
+	bool IsSlotFreeIndexed(const int2& c1, const int2& c2, int zone, int ignoreId) const;
 	struct SPackCandidate {
 		springai::AIFloat3 pos;
 		float nanoSq;    // squared distance to the nearest slot of the nano group

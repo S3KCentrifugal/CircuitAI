@@ -18,8 +18,11 @@ def main():
     parser.add_argument('--dll', type=Path, required=True)
     parser.add_argument('--data', type=Path, default=playtest.REPO / 'data')
     parser.add_argument('--minutes', type=int, default=40)
+    parser.add_argument('--speed', type=int, default=4)
+    parser.add_argument('--speed-plan', default='0:4,3:1,4:4,9:1,10:4,19:1,20:4,29:1,30:4,39:1')
+    parser.add_argument('--never-end', action='store_true', help='Soak fixture: disable victory elimination; do not compare as a competitive game.')
     args = parser.parse_args()
-    directory = storage.allocate('shared', 'performance', 'reservation-occupancy',
+    directory = storage.allocate('shared', 'performance', 'reservation-soak' if args.never_end else 'reservation-occupancy',
                                  'shore-to-shore', 'regression', seed=1954001)
     print('RESERVATION_GAME_DIRECTORY=' + str(directory), flush=True)
     starts = []
@@ -36,16 +39,19 @@ def main():
         '--game', 'Beyond All Reason test-31479-433a460', '--engine', 'recoil_2026.07.04',
         '--roles', 'all', '--role', 'AIR', '--side', 'armada', '--bonus', '0',
         '--ai-option', 'profile=experimental_hard', '--ai-option', 'random_seed=1954001',
-        '--minutes', str(args.minutes), '--speed', '4',
-        '--speed-plan', '0:4,3:1,4:4,9:1,10:4,19:1,20:4,29:1,30:4,39:1',
+        '--minutes', str(args.minutes), '--speed', str(args.speed),
+        '--speed-plan', args.speed_plan,
         '--shots', '3.8@2200@680:2016,19.8@2200@680:2016,29.8@2200@680:2016,39.8@2200@680:2016',
         '--width', '1280', '--height', '720', '--lean-render']
     for name in ('skirmish_perf_watch.lua', 'air_command_watch.lua', 'perf_spectator_cleanup.lua'):
         command += ['--extra-widget', str(playtest.HERE / 'widgets' / name)]
+    if args.never_end:
+        command += ['--modoption', 'deathmode=neverend']
     subprocess.run(command, check=True)
     (directory / 'reservation-fixture.json').write_text(json.dumps({
         'purpose': 'ordinary economy with exact D195 expanded 8v8 start fixture',
         'profiling': True, 'production_data_unchanged': True,
+        'never_end_soak': args.never_end,
         'warning': 'Do not compare FPS after GameOver; retain original invariant failures.'}, indent=2))
     subprocess.run([sys.executable, str(playtest.REPO / 'tools/knowledge/check_script_api.py'),
         '--dll', str(args.dll), '--scripts', str(args.data / 'script')], check=True)

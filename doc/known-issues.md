@@ -4606,3 +4606,36 @@ explosion centers inside the map; the first records disappearance, not impact.
 Both reports PASS, with zero script/runtime invariant failures, but neither
 reproduces the user's original match. No production fix is applied. See the
 [full investigation and retained evidence](reviews/2026-10-04-juno-map-edge-investigation.md).
+
+### D-199 follow-up to KI-497 / KI-498 - measured partial performance remediation
+
+The [implementation report](reviews/2026-10-04-high-severity-performance-implementation.md)
+records removed TECH admission probes, exact local occupancy indexing, script
+array/context savings and custom-command payload allocation removal. The full
+native/differential tests and six-minute cross-role runtime oracle pass. Failed
+placement attempts still execute live, and command dispatches/traffic are
+unchanged: a complete dependency revision for failure caching and a proof of
+safe command suppression have not been established. Thus KI-497's broader
+late-game attribution and multiplayer acceptance remain open; targeted savings
+must not be described as resolving every Extra high/High risk.
+
+The new baseline confirms KI-498: GameOver at frame 60,037 precedes the requested
+40-minute endpoint. Its later measurements are excluded. Gameplay failures
+including INV-013, INV-008 and INV-022 occur in the old baseline as well; their
+original FAIL verdicts are retained. Check the report for the new run's final
+verdict, performance windows and any additional observations. Engine save/load,
+targeted transfer and host/peer tests remain required before broad equivalence
+claims beyond the tested paths.
+
+
+**D-199 refinement and remaining acceptance.** Function attribution is now
+known: the retained named-rule game spent 17.375 s in air.defend, 9.120 s in
+weapons.cluster and 8.689 s in idle-air-defense for TECH team 1 in its final
+minute. The weapon work's repeated all-slot outstanding-order count is now
+reused within one unchanged invocation, with exact mutation invalidation.
+Differential fixtures and a real-engine controlled workload validate this
+specific improvement. Later natural/never-end games lost the relevant builder
+workload before the original hitch window; their low late timings do not close
+whole-game hitch acceptance. Host/peer traffic tests, real engine save/reload
+and targeted ownership-transfer checks are still unperformed. No claim of
+reduced network traffic or fully resolved gameplay invariants is made.

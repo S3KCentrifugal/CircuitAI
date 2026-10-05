@@ -1,0 +1,135 @@
+{
+  "artifacts": {
+    "base-source.json": {
+      "bytes": 36046,
+      "sha256": "0be9e610dd98e4248b0d8bd9e0c1d654fd9b088692fbd42ac12c003ce9b87a8e"
+    },
+    "checks.json": {
+      "bytes": 2292,
+      "sha256": "3977c2a2703e4282e849c0760f541b755efa59db61e7c9409ee1598fa000a0a9"
+    },
+    "infolog.txt": {
+      "bytes": 1698661,
+      "sha256": "35f6e2d87e0d1282958a68c19e463bf96e744a50c6e87ba42b09046a54b52b82"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "9349838c0c441e020cc310cea9a8429077319bd8a3112e6daac9f31e89640ae2"
+    },
+    "report.md": {
+      "bytes": 17351,
+      "sha256": "37d60459135058bff8e674eca80597eb654955c25937d2fd6ec0b732751a2130"
+    },
+    "run-inputs.json": {
+      "bytes": 36111,
+      "sha256": "1dd4276f6e3166e4d519030643a3ca7639050e767546f0daee153df8d8397c71"
+    },
+    "run-plan.json": {
+      "bytes": 257,
+      "sha256": "1856a8af8a3d780c8344136d01447d2c606106523f3d58e913bf1cda76ca3e28"
+    },
+    "screen_2026-10-05_01-13-50-135.png": {
+      "bytes": 1923622,
+      "sha256": "560564df4640eea0e22195f239eb61fbe7f80b0917869cbd76ff90c44ccaa4ba"
+    },
+    "screen_2026-10-05_01-14-09-049.png": {
+      "bytes": 1930639,
+      "sha256": "d72511dc021a7c215555b30038d9dec8b3e434e7c6ffce480ebeb7cff606fbd4"
+    },
+    "script.txt": {
+      "bytes": 7446,
+      "sha256": "33aea304de2b9f60e9f32949e68b52e440f622921fdc41121f54945ed4a06efa"
+    },
+    "staged.json": {
+      "bytes": 235,
+      "sha256": "607b04548f5e9a4be95a184dddf7dcb348f3482b41ef61ad5ff3d29eedf3de8f"
+    },
+    "teams.json": {
+      "bytes": 1171,
+      "sha256": "8a534418890e4b1937a2d553e270d111b496dadbe7d5aa5212d5e65416b81f5e"
+    }
+  },
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "regression",
+    "map": "supreme",
+    "scenario": "allied-bases-mixed"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T011412Z-a32acf25",
+  "last_frame": 10894,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\allied-bases-mixed\\supreme\\20261005T011226Z-ecc8dd3e\\runs\\20261005T011412Z-a32acf25",
+  "reason": "reached 6 min",
+  "recorded_at_utc": "2026-10-05T01:14:12.610859+00:00",
+  "requested": {
+    "seed": 1921
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "legion",
+      "spot": 10,
+      "team": 3,
+      "x": 11456.0,
+      "z": 1901.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 11,
+      "team": 4,
+      "x": 10129.0,
+      "z": 541.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 16,
+      "team": 5,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

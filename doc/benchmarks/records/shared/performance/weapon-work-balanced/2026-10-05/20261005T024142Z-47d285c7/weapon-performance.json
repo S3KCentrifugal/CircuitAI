@@ -1,0 +1,90 @@
+{
+  "rows": [
+    {
+      "team": 0,
+      "frame": 1800,
+      "label": "weapon-fixture-new",
+      "calls": 26,
+      "inclusive_ms": 538.6744,
+      "exclusive_ms": 525.1376,
+      "max_ms": 23.3578
+    },
+    {
+      "team": 0,
+      "frame": 1800,
+      "label": "weapon-fixture-old",
+      "calls": 25,
+      "inclusive_ms": 15622.7908,
+      "exclusive_ms": 15622.7908,
+      "max_ms": 636.0099
+    },
+    {
+      "team": 1,
+      "frame": 1800,
+      "label": "weapon-fixture-new",
+      "calls": 25,
+      "inclusive_ms": 514.3278,
+      "exclusive_ms": 501.1848,
+      "max_ms": 21.8895
+    },
+    {
+      "team": 1,
+      "frame": 1800,
+      "label": "weapon-fixture-old",
+      "calls": 25,
+      "inclusive_ms": 15537.6592,
+      "exclusive_ms": 15537.6592,
+      "max_ms": 627.0591
+    },
+    {
+      "team": 0,
+      "frame": 3600,
+      "label": "weapon-fixture-new",
+      "calls": 24,
+      "inclusive_ms": 497.6568,
+      "exclusive_ms": 484.9787,
+      "max_ms": 22.4965
+    },
+    {
+      "team": 0,
+      "frame": 3600,
+      "label": "weapon-fixture-old",
+      "calls": 25,
+      "inclusive_ms": 15625.4442,
+      "exclusive_ms": 15625.4442,
+      "max_ms": 633.1713
+    },
+    {
+      "team": 1,
+      "frame": 3600,
+      "label": "weapon-fixture-new",
+      "calls": 25,
+      "inclusive_ms": 512.1509,
+      "exclusive_ms": 499.1347,
+      "max_ms": 21.5975
+    },
+    {
+      "team": 1,
+      "frame": 3600,
+      "label": "weapon-fixture-old",
+      "calls": 25,
+      "inclusive_ms": 15556.8763,
+      "exclusive_ms": 15556.8763,
+      "max_ms": 632.7472
+    }
+  ],
+  "totals": {
+    "old": {
+      "batches": 100,
+      "asks": 1000,
+      "milliseconds": 62342.7705
+    },
+    "new": {
+      "batches": 100,
+      "asks": 1000,
+      "milliseconds": 2062.8099
+    }
+  },
+  "ratio": 30.222256786725715,
+  "note": "Synthetic 32x16 no-order cluster fixture using actual engine UnitDefs; not whole-game speedup."
+}

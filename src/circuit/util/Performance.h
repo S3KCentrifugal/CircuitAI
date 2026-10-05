@@ -1,0 +1,39 @@
+#ifndef CIRCUIT_UTIL_PERFORMANCE_H
+#define CIRCUIT_UTIL_PERFORMANCE_H
+
+#include <string>
+
+namespace circuit {
+class CCircuitAI;
+namespace performance {
+
+// Opt-in aggregate diagnostics. No timers or allocations when disabled.
+// Numeric script phases are an ABI: append rather than reorder.
+enum Phase {
+    SCRIPT, TECH_CONTEXT, ECO_READ, TECH_EVALUATE, LAYOUT_PLACE,
+    PACK_CANDIDATES, POCKET, PACK_GROUP, CAN_PACK, COMMAND_STATE,
+    PHASE_COUNT
+};
+extern const bool enabled;
+void Begin(CCircuitAI* ai, int phase);
+void End(CCircuitAI* ai, int phase);
+void BeginLabel(CCircuitAI* ai, const std::string& label);
+void EndLabel(CCircuitAI* ai);
+void UnwindScript(CCircuitAI* ai);
+void Flush(CCircuitAI* ai);
+void Release(CCircuitAI* ai);
+void Garbage(CCircuitAI* ai, unsigned current, unsigned destroyed, unsigned detected);
+
+class Scope final {
+public:
+    Scope(CCircuitAI* ai, Phase phase) : ai(ai), phase(phase) { if (enabled) Begin(ai, phase); }
+    ~Scope() { if (enabled) End(ai, phase); }
+    Scope(const Scope&) = delete;
+    Scope& operator=(const Scope&) = delete;
+private:
+    CCircuitAI* ai;
+    Phase phase;
+};
+} // namespace performance
+} // namespace circuit
+#endif

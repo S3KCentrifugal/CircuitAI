@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "regression",
+    "map": "shore-to-shore",
+    "scenario": "reservation-occupancy"
+  },
+  "id": "20261005T011539Z-0c89a5b6",
+  "requested": {
+    "seed": 1954001
+  },
+  "schema": 1
+}

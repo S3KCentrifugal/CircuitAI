@@ -11,6 +11,10 @@ target_include_directories(circuit_enemy_reclaim_policy_test PRIVATE ../src)
 add_test(NAME circuit_enemy_reclaim_policy_test COMMAND circuit_enemy_reclaim_policy_test)
 
 if(BUILD_TESTING)
+    add_executable(circuit_local_reservations_test local_reservations_test.cpp)
+    target_compile_features(circuit_local_reservations_test PRIVATE cxx_std_20)
+    target_include_directories(circuit_local_reservations_test PRIVATE ../src)
+    add_test(NAME circuit_local_reservations_test COMMAND circuit_local_reservations_test)
     add_executable(circuit_allied_reservations_test allied_reservations_test.cpp)
     target_compile_features(circuit_allied_reservations_test PRIVATE cxx_std_20)
     target_include_directories(circuit_allied_reservations_test PRIVATE ../src)
@@ -30,6 +34,17 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/air_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/air_math_tests.as")
     add_test(NAME circuit_build_power_math_test COMMAND circuit_production_math_test
         "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/build_power_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/build_power_math_tests.as")
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME circuit_performance_policy_test COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../tools/knowledge/check_performance_policy.py"
+            --runner "$<TARGET_FILE:circuit_production_math_test>"
+            --output "${CMAKE_CURRENT_BINARY_DIR}/performance-policy")
+        add_test(NAME circuit_weapon_work_test COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../tools/knowledge/check_weapon_work.py"
+            --runner "$<TARGET_FILE:circuit_production_math_test>"
+            --output "${CMAKE_CURRENT_BINARY_DIR}/weapon-policy")
+    endif()
     add_executable(circuit_air_geometry_test air_geometry_test.cpp)
     target_compile_features(circuit_air_geometry_test PRIVATE cxx_std_20)
     target_include_directories(circuit_air_geometry_test PRIVATE ../src ../src/circuit)
