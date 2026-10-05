@@ -11471,3 +11471,21 @@ link checking retains only the known missing hover reference (KI-404).
 input hashes and evidence limits remain intact. Any later optimization must
 preserve INV-088 and exact candidate/rule/task ordering, not trade behavior for
 a lower benchmark number.
+
+**Severity and solution follow-up (2026-10-04).** At the user's request, the
+[re-ranked report](reviews/2026-10-04-skirmishai-performance-rerank.md) now
+defines Low/Medium/High/Extra high and gives all nine items a concrete proposed
+change, behavior safeguards and acceptance evidence. Severity rates impact,
+not implementation effort or confidence in a fix. The confirmed TECH stall is
+Extra high; script churn and local geometry are High; command production is
+High provisionally for multiplayer risk, not a proved cause of the local
+hitch. Owned-unit scans, diagnostics and worker duplication are Medium; AIR
+query scaling and a production observer/UI rewrite are Low on current evidence.
+The observer-off control remains necessary from the first experiment.
+
+The alternative of equating command events with packets, promising an FPS
+gain, or interpreting every same-frame failure as safely cacheable is rejected.
+All recommendations preserve the unresolved attribution and original ranking;
+items 1-4 overlap and their benefits cannot be summed. This follow-up touches
+only this decision and the linked report. No runtime change or new simulation
+is claimed; documentation checks are the applicable verification.
