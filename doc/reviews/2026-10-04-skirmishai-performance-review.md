@@ -9,6 +9,12 @@ retained as the review record; D-197 documents its stronger representation,
 benchmarks, mutation/memory tradeoffs and gameplay verification. Other rankings
 remain proposals.
 
+Current order: [D-198's reranking](2026-10-04-skirmishai-performance-rerank.md)
+uses the latest per-team timers and failed-placement counts. TECH accounts for
+87.41% of the final minute's AI callback time; AIR accounts for 2.30%. Repeated
+failed TECH decisions and script/allocation work now lead the investigation.
+The D-195 ordering below remains a historical record.
+
 Follow-up: the reported Juno shots beyond Shore's map edge are investigated in the [D-196 evidence report](2026-10-04-juno-map-edge-investigation.md). The report distinguishes logged aims, projectile motion and actual explosion centers; the observation remains unconfirmed (KI-499). It does not change the performance ranking or production behavior.
 
 The leading identifiable AI hotspot in the slowed discovery run is **construction-layout reservation checking**, particularly repeated tree lookups inside the existing allied spatial index. Optimizing AIR combat alone would miss it. Early FPS loss was mostly outside AI callbacks; later, AI callbacks became a substantial main-thread cost. The control did not independently reproduce that severe tail; this ranking targets observed waste, not a universal bottleneck or a promised FPS gain.

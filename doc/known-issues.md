@@ -4552,6 +4552,18 @@ above describes its historical review, not the current implementation.
 
 
 
+**D-198 attribution.** Reanalysis of the already recorded per-AI timers
+localizes 84.88% of final-minute aggregate AI time to TECH team 1 (87.41% to
+both TECHs; AIR is 2.30%). The same minute records 647 failed T1-converter
+packing signatures. The earlier sample contains 216/304 AngelScript locations,
+including 41 explicitly naming GC/reference enumeration. This supports timing
+TECH's failed builder/placement decisions and allocations first; it does not
+prove a particular script function, a memory leak or a native pack duration.
+The [updated ranked review](reviews/2026-10-04-skirmishai-performance-rerank.md)
+links exact derived counts and the input hashes, source paths, behavior-safe
+reuse/index proposals and required validation. No new fix or simulation is
+claimed; retain the original FAIL and the still-unresolved function attribution.
+
 ### KI-498 - Elapsed-frame performance runs can outlast competitive play
 
 **Problem.** The D-195 corrected-roster control reached frame 72,000, but its

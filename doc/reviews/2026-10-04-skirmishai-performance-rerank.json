@@ -1,0 +1,392 @@
+{
+  "source": "D-197 existing observation; no new simulation or production edits",
+  "source_files": {
+    "doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/skirmish-performance.json": {
+      "sha256": "bf63a8081371a767329af836775509a1c7916c67996d0caad340b81226c06e3a"
+    },
+    "doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-summary.json": {
+      "sha256": "4df837059acfb2dc3335ba25dbe773cbdef44086e622e71b74cc21c584bf1025"
+    },
+    "doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-raw.json": {
+      "sha256": "c0cb6b7873889534ccaca13082c0ff77df2f8cd13c3fa04a79038c424e33da55"
+    },
+    "build-theatres/games/shared/performance/reservation-occupancy/shore-to-shore/20261004T232447Z-ed07c75f/runs/20261004T234203Z-870e40cb/infolog.txt": {
+      "sha256": "b5a9c8a9886518e0705a29f7c9b957d1697a00ea921fd498b00d14e21f4a063c"
+    }
+  },
+  "per_team_minutes": [
+    {
+      "minute": 20,
+      "all_ai_ms": 5672.304688,
+      "team_ms": {
+        "0": 346.462402,
+        "1": 428.056152,
+        "10": 193.269043,
+        "11": 255.71582,
+        "12": 294.603027,
+        "13": 136.084961,
+        "14": 1409.09082,
+        "15": 422.908691,
+        "2": 160.000488,
+        "3": 208.864258,
+        "4": 308.80127,
+        "5": 108.948975,
+        "6": 378.316895,
+        "7": 405.730469,
+        "8": 323.980469,
+        "9": 272.815186
+      },
+      "tech_1_percent": 7.546423817916038,
+      "tech_combined_percent": 13.258043464959934,
+      "air_combined_percent": 10.917565646819146
+    },
+    {
+      "minute": 30,
+      "all_ai_ms": 5655.296875,
+      "team_ms": {
+        "0": 465.15918,
+        "1": 691.950195,
+        "10": 184.042969,
+        "11": 248.266113,
+        "12": 212.30957,
+        "13": 91.260742,
+        "14": 442.246094,
+        "15": 224.432617,
+        "2": 356.343262,
+        "3": 218.977051,
+        "4": 309.313477,
+        "5": 87.962402,
+        "6": 421.503906,
+        "7": 562.785156,
+        "8": 718.46582,
+        "9": 403.253418
+      },
+      "tech_1_percent": 12.235435385520764,
+      "tech_combined_percent": 24.939734308819993,
+      "air_combined_percent": 15.355738473057615
+    },
+    {
+      "minute": 32,
+      "all_ai_ms": 8729.046875,
+      "team_ms": {
+        "0": 497.270508,
+        "1": 2837.137695,
+        "10": 303.924316,
+        "11": 255.483398,
+        "12": 236.126465,
+        "13": 91.364014,
+        "14": 655.361328,
+        "15": 204.045898,
+        "2": 340.527344,
+        "3": 232.429199,
+        "4": 333.010742,
+        "5": 87.511719,
+        "6": 483.256836,
+        "7": 416.983398,
+        "8": 1257.223633,
+        "9": 477.862305
+      },
+      "tech_1_percent": 32.502262109802224,
+      "tech_combined_percent": 46.90502166652645,
+      "air_combined_percent": 11.171125862467084
+    },
+    {
+      "minute": 34,
+      "all_ai_ms": 12732.390625,
+      "team_ms": {
+        "0": 558.487305,
+        "1": 4132.357422,
+        "10": 186.959961,
+        "11": 234.186523,
+        "12": 157.71582,
+        "13": 95.67749,
+        "14": 148.476563,
+        "15": 174.003906,
+        "2": 343.354004,
+        "3": 278.986328,
+        "4": 400.262695,
+        "5": 90.254883,
+        "6": 424.755859,
+        "7": 592.839844,
+        "8": 4661.450195,
+        "9": 234.199707
+      },
+      "tech_1_percent": 32.45547158980602,
+      "tech_combined_percent": 69.0664296752991,
+      "air_combined_percent": 6.225751591720427
+    },
+    {
+      "minute": 35,
+      "all_ai_ms": 14891.796875,
+      "team_ms": {
+        "0": 600.923828,
+        "1": 6700.017578,
+        "10": 220.075195,
+        "11": 261.311523,
+        "12": 151.920898,
+        "13": 99.125977,
+        "14": 104.976563,
+        "15": 167.933594,
+        "2": 324.085449,
+        "3": 526.859375,
+        "4": 477.527344,
+        "5": 92.72168,
+        "6": 477.245117,
+        "7": 536.916016,
+        "8": 3745.892578,
+        "9": 386.674316
+      },
+      "tech_1_percent": 44.991330691918265,
+      "tech_combined_percent": 70.14539778968077,
+      "air_combined_percent": 6.631826584056868
+    },
+    {
+      "minute": 36,
+      "all_ai_ms": 13109.078125,
+      "team_ms": {
+        "0": 642.360352,
+        "1": 5330.646484,
+        "10": 268.600098,
+        "11": 248.898438,
+        "12": 170.231445,
+        "13": 105.772461,
+        "14": 95.318359,
+        "15": 166.481445,
+        "2": 390.73291,
+        "3": 627.450195,
+        "4": 520.760742,
+        "5": 91.943359,
+        "6": 467.680664,
+        "7": 730.666992,
+        "8": 2710.474609,
+        "9": 520.805176
+      },
+      "tech_1_percent": 40.66377843789072,
+      "tech_combined_percent": 61.340095896331384,
+      "air_combined_percent": 8.87297731319303
+    },
+    {
+      "minute": 37,
+      "all_ai_ms": 35815.15625,
+      "team_ms": {
+        "0": 630.000977,
+        "1": 10728.171875,
+        "10": 310.606445,
+        "11": 229.761719,
+        "12": 79.064453,
+        "13": 90.250488,
+        "14": 104.894531,
+        "15": 168.975586,
+        "2": 462.988281,
+        "3": 473.594727,
+        "4": 452.010742,
+        "5": 97.531738,
+        "6": 586.616211,
+        "7": 722.02832,
+        "8": 20140.404297,
+        "9": 513.93457
+      },
+      "tech_1_percent": 29.95427913287409,
+      "tech_combined_percent": 86.18858439853938,
+      "air_combined_percent": 3.1939984821370144
+    },
+    {
+      "minute": 38,
+      "all_ai_ms": 29981.21875,
+      "team_ms": {
+        "0": 706.198242,
+        "1": 15970.765625,
+        "10": 304.924805,
+        "11": 170.079102,
+        "12": 105.634766,
+        "13": 76.160156,
+        "14": 42.462891,
+        "15": 160.241211,
+        "2": 591.763184,
+        "3": 532.273438,
+        "4": 414.441406,
+        "5": 103.186035,
+        "6": 501.795898,
+        "7": 637.863281,
+        "8": 9257.097656,
+        "9": 382.295898
+      },
+      "tech_1_percent": 53.26923417681277,
+      "tech_combined_percent": 84.14555622759664,
+      "air_combined_percent": 3.6305866985477366
+    },
+    {
+      "minute": 39,
+      "all_ai_ms": 24340.125,
+      "team_ms": {
+        "0": 627.958008,
+        "1": 14979.140625,
+        "10": 240.59082,
+        "11": 125.567383,
+        "12": 91.383789,
+        "13": 95.785645,
+        "14": 54.833984,
+        "15": 153.492188,
+        "2": 490.051758,
+        "3": 1533.699219,
+        "4": 450.551758,
+        "5": 101.110352,
+        "6": 485.782227,
+        "7": 619.549805,
+        "8": 3973.398438,
+        "9": 296.460938
+      },
+      "tech_1_percent": 61.54093549231978,
+      "tech_combined_percent": 77.86541385058622,
+      "air_combined_percent": 3.797921933432963
+    },
+    {
+      "minute": 40,
+      "all_ai_ms": 43121.34375,
+      "team_ms": {
+        "0": 710.959961,
+        "1": 36600.023438,
+        "10": 212.412109,
+        "11": 116.576172,
+        "12": 62.499023,
+        "13": 64.598145,
+        "14": 42.490234,
+        "15": 117.477539,
+        "2": 497.771484,
+        "3": 1503.449219,
+        "4": 461.693359,
+        "5": 99.053711,
+        "6": 487.044922,
+        "7": 755.206055,
+        "8": 1091.453125,
+        "9": 280.539063
+      },
+      "tech_1_percent": 84.87681564422489,
+      "tech_combined_percent": 87.40793603631612,
+      "air_combined_percent": 2.2993231142060595
+    }
+  ],
+  "final_normal_speed_window": {
+    "frame": 72000.0,
+    "units": 1661.0,
+    "wall_s": 62.183998,
+    "speed_wanted": 1.0,
+    "speed_actual": 0.921,
+    "ai_n": 1800.0,
+    "ai_mean_ms": 23.956303,
+    "ai_p50_ms": 2.46875,
+    "ai_p95_ms": 194.59375,
+    "ai_p99_ms": 225.25,
+    "ai_max_ms": 247.9375,
+    "fps_n": 57.0,
+    "fps_p10": 5.0,
+    "fps_p50": 8.0,
+    "fps_p90": 39.0,
+    "profiling": 1.0
+  },
+  "instruction_samples": {
+    "all": 1923,
+    "ai": 304,
+    "angelscript": 216,
+    "explicit_gc_or_reference_enumeration_subset": 41,
+    "native": 70,
+    "unresolved": 18,
+    "allied_index_inline": 1
+  },
+  "final_minute_failed_packs": [
+    {
+      "def": "armmmkr",
+      "zone": 7,
+      "candidates": 29,
+      "tried": 29,
+      "count": 647
+    },
+    {
+      "def": "corestor",
+      "zone": 7,
+      "candidates": 8,
+      "tried": 8,
+      "count": 55
+    },
+    {
+      "def": "cormstor",
+      "zone": 7,
+      "candidates": 8,
+      "tried": 8,
+      "count": 55
+    },
+    {
+      "def": "armafus",
+      "zone": 7,
+      "candidates": 5,
+      "tried": 5,
+      "count": 4
+    }
+  ],
+  "t1_converter_failures_by_minute": {
+    "36": 47,
+    "37": 83,
+    "38": 30,
+    "39": 647,
+    "40": 21
+  },
+  "additional_same_def_same_frame_failures": 558,
+  "slow_call_log_count": 0,
+  "largest_same_frame_log_gaps": [
+    {
+      "seconds": 0.201223,
+      "frame": 70442,
+      "preceding": "Skirmish AI <BARb playtest-test>: :::AI LOG:S:1:T:1:F:70442:L::[TECH][Share] after the donation: we sent 0; team 0 received 0 (bank 3284), team 7 received 0 (bank 23237) (D-106)",
+      "following": "Skirmish AI <BARb playtest-test>: :::AI LOG:S:9:T:9:F:70442:L::[AIR][Produce] base.defence legstronghold plant=556 projected=1/1"
+    },
+    {
+      "seconds": 0.140604,
+      "frame": 71426,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)"
+    },
+    {
+      "seconds": 0.140137,
+      "frame": 71578,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)"
+    },
+    {
+      "seconds": 0.139051,
+      "frame": 71954,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)"
+    },
+    {
+      "seconds": 0.138846,
+      "frame": 71706,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)"
+    },
+    {
+      "seconds": 0.131156,
+      "frame": 71466,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: corridor 16204 at (4240, 2432) facing 1, 30x18 cells: 0 of 540 held"
+    },
+    {
+      "seconds": 0.130779,
+      "frame": 71586,
+      "preceding": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: zone 16210 at (2808, 1784) facing 1, 3x3 cells: 9 of 9 held"
+    },
+    {
+      "seconds": 0.127424,
+      "frame": 71842,
+      "preceding": "Skirmish AI <BARb playtest-test>: :::AI LOG:S:1:T:1:F:71842:L::[Layout] no room within reach of any turret cluster for armmmkr (114 s without room)",
+      "following": "Skirmish AI <BARb playtest-test>: RESERVE: no room for armmmkr in zone 7 (29 candidates, 29 tried)"
+    }
+  ],
+  "limitations": [
+    "Log gaps span unobserved work and are not function durations.",
+    "Native log lines do not identify the owning team; team ownership comes from timers/role traces.",
+    "Instruction sample is earlier than the final minute and has no script function stacks.",
+    "Overlapping engine scope times must not be added as disjoint costs.",
+    "Same failed-pack signature is not proof of identical query inputs or safe caching."
+  ]
+}

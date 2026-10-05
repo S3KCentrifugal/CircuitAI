@@ -153,6 +153,13 @@ events are 16,435 per game minute; TACTICAL team 10 reaches 4,699. These include
 game/Lua commands and do not measure network packets. No command behavior or
 diagnostic cadence was changed.
 
+Follow-up analysis: [D-198's updated ranking](reviews/2026-10-04-skirmishai-performance-rerank.md)
+breaks down the already captured per-team timers. TECH team 1 accounts for
+84.88% of final-minute AI time, both TECHs 87.41%, and both AIRs 2.30%. The log
+contains 647 failed T1-converter packing attempts with the same zone/candidate
+signature in that minute. This localizes the next investigation to TECH's
+repeated decision path, without claiming the exact costly function is proven.
+
 ## Retained evidence
 
 - [Supreme mixed-role regression](benchmarks/records/sea/layout/allied-bases-mixed/2026-10-04/20261004T232406Z-f0fcdb18/README.md):

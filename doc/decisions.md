@@ -11435,3 +11435,39 @@ geometry, replacement, release and reconstruction are covered by differential
 and oracle tests. Reusing the established invariant avoids a new per-frame
 cost solely to check the optimization. Game invariant failures are preserved
 and are not relabeled as passing performance results.
+
+## D-198 - Rank remaining performance work by TECH attribution and repeated failures
+
+**Decision.** Re-rank the remaining work using D-197's existing per-team timers,
+failed-pack signatures and instruction evidence. Put repeated failed TECH
+builder decisions and script allocation/GC ahead of another allied-index rewrite.
+Keep local geometry, owned-unit scans, logs, commands, worker work and AIR
+queries in the ranked follow-up. No production behavior or diagnostic cadence
+is changed, and no new simulation is claimed.
+
+**Reasoning and limits.** TECH team 1 contributes 84.88% of aggregate AI elapsed
+time in the last minute; both AIRs contribute 2.30%. Identical failure signatures
+occur 647 times for the same T1-converter zone/candidate count. These data
+localize the responsible AI and workload, but log gaps are not function timings
+and the VM/GC instruction sample predates the final window. Do not claim an
+exact function, a leak, purely GC-driven pauses or safe cache equality from
+these observations. Reject an AIR-first rewrite, global APM cap, reduced update
+cadence or arbitrary worker offload as unsupported responses to this hitch.
+
+**Files.** [Re-ranked report](reviews/2026-10-04-skirmishai-performance-rerank.md),
+[derived evidence and source hashes](reviews/2026-10-04-skirmishai-performance-rerank.json),
+[historical review link](reviews/2026-10-04-skirmishai-performance-review.md),
+[D-197 results follow-up](layout-reservation-performance.md),
+[remaining issue KI-497](known-issues.md).
+
+**Verification.** Checked existing observer scope semantics, exact team roles,
+per-minute totals and raw failure counts, and re-read current script/native
+paths under the AngelScript and BAR-log skills. Individual final-minute AI
+scopes total 43.103 s against 43.121 s aggregate. The original benchmark bundles
+are unchanged. New analysis contains no new gameplay validation. Documentation
+link checking retains only the known missing hover reference (KI-404).
+
+**Invariant.** No gameplay or invariant checker changes. Original FAIL verdicts,
+input hashes and evidence limits remain intact. Any later optimization must
+preserve INV-088 and exact candidate/rule/task ordering, not trade behavior for
+a lower benchmark number.
