@@ -1650,6 +1650,28 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/cases/sea/combat/sea-control-lost-yard-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "control-yard-lost",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "790febd54cef03276bf22584f92ddf0e74a12a39ba058bc67211941142f1cdae",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/sea-control-visible-yard-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "control-yard-seen",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "aa3ff6ffe7876fb48e11439c115fded32e7f0718c57e1bcffbf460ab83bf0aab",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/cases/sea/combat/shore-siege.json",
       "domain": "sea",
       "area": "combat",
@@ -3022,6 +3044,48 @@
       ],
       "detail": "",
       "sha256": "94dedf93ff5dc43628a5a1f7fbbfd99054631d7b3998248cb9922e1ead89d7d7",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/sea-control-lost-yard.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-control-lost-yard",
+      "definitions": [
+        "expect: loaded",
+        "expect: radar-removed",
+        "expect: yard-damaged",
+        "expect: yard-destroyed",
+        "expect: yard-lost-from-vision",
+        "expect: yard-visible",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "c70e3861ef1b837f07117c101cea30bd2f8119e4c85a07d2c917452ee25192b4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/sea-control-visible-yard.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-control-visible-yard",
+      "definitions": [
+        "expect: loaded",
+        "expect: yard-damaged",
+        "expect: yard-destroyed",
+        "expect: yard-visible",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "01268c5229a943eb0a6b7b59132e1ada60b1f914007fdf12ea030c830e1cf555",
       "execution": "not inferred"
     },
     {
@@ -5645,7 +5709,7 @@
       "title": "sea_arena",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "d22fdee61a7757753f3d815dd0cf8ad8d41c482cb68a6787e5c2f29c1574bea6",
+      "sha256": "ffd9d787f6b1135923a5f07faf16cdadcd850402b585bdbd8c81b18f3476288d",
       "execution": "not inferred"
     },
     {

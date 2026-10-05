@@ -12521,3 +12521,53 @@ retains the pending bundle. [Tests](../tools/playtest/test_storage.py) exercise
 both outcomes; 20 storage tests passed. This change does not touch runtime AI.
 The single-line sensor travel threshold and the stronger two-line coverage
 scenario are distinguished in KI-511 and the benchmark report.
+
+
+## D-208 - Investigate SEA control separately from scouting and shared combat
+
+**Call.** Push the existing ranged work first, then investigate SEA water-control
+and coastal-support selection on a separate branch. Retain gameplay policy
+unchanged in this investigation; add two reusable Supreme shipyard fixtures,
+optional observer-only asset removal/visibility measurements, and a concrete
+SEA-only implementation/acceptance plan.
+
+**Why.** A detected yard surviving is not sufficient evidence of a universal
+shipyard firing defect. The visible-yard fixture kills at 39.6 seconds; the
+short-fog fixture reacquires and kills at 46.2 seconds even though the director
+returns to search. Current source lacks persistent static-site objectives,
+unfinished-yard admission, strategic shipyard ranking, a target-preserving
+contact handoff, explicit surplus shore allocation, and alternate known-target
+selection after route failure. The specific reported PvP incident remains
+unidentified in available target logs.
+
+**Rejected alternative.** Do not replace the improved scout/AA patrols or
+rewrite shared AttackTask priorities based on the report alone. Do not label a
+brief lost contact as a reproduced permanent abandonment. Native default
+combat already succeeds in both small baseline scenarios.
+
+**Invariant.** No new runtime promise is claimed in this investigation. All
+new playtest checks forbid existing invariant violations. Spectator observations
+never enter AI policy, and the fixture never commands friendly warships.
+Proposed mission invariants belong to the future implementation and its actor
+matrix, as listed in the plan.
+
+**Files.** [Investigation and implementation plan](sea-control-investigation.md),
+[known issues KI-512 through KI-515](known-issues.md), [SEA reference](roles/sea.md),
+[visible-yard case](../tools/playtest/cases/sea/combat/sea-control-visible-yard-supreme.json),
+[fog-loss case](../tools/playtest/cases/sea/combat/sea-control-lost-yard-supreme.json),
+[visible checks](../tools/playtest/checks/sea/combat/sea-control-visible-yard.json),
+[fog checks](../tools/playtest/checks/sea/combat/sea-control-lost-yard.json),
+[observer](../tools/playtest/widgets/sea_arena.lua),
+[test inventory](testing/README.md), [test catalog](testing/catalog.json),
+[SEA test index](testing/index/sea.md), [benchmark catalog](benchmarks/catalog.json),
+[SEA evidence index](benchmarks/index/sea.md). The investigation links every
+immutable observation bundle, including setup and watcher failures.
+
+**Verification.** Two supplied gameplay cases pass on experimental_balanced,
+with snapshots, commands, visibility samples and physical damage/destruction.
+Three original failure observations are retained: invalid dry spawn, disk-space
+startup failure, and an incomplete watcher that lacked process access. The
+complete reattached observation is the same fog game, not another independent
+replicate. API parity checks 303 members with zero findings. These runs do not
+establish the original PvP incident, front-support correctness, FPS improvement
+or a completed SEA fix. No `data/`, native code or profile file was changed.

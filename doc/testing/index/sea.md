@@ -67,6 +67,30 @@ Generated source inventory. Execution is not inferred.
 - `forbid: invariant`
 - `forbid: script`
 
+### [sea-control-lost-yard](../../../tools/playtest/checks/sea/combat/sea-control-lost-yard.json)
+
+- `expect: loaded`
+- `expect: radar-removed`
+- `expect: yard-damaged`
+- `expect: yard-destroyed`
+- `expect: yard-lost-from-vision`
+- `expect: yard-visible`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [sea-control-visible-yard](../../../tools/playtest/checks/sea/combat/sea-control-visible-yard.json)
+
+- `expect: loaded`
+- `expect: yard-damaged`
+- `expect: yard-destroyed`
+- `expect: yard-visible`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
 ### [sea-fleet-escort](../../../tools/playtest/checks/sea/combat/sea-fleet-escort.json)
 
 - `expect: combat`
@@ -197,6 +221,14 @@ Map: selected by runner
 ### [scout-fog](../../../tools/playtest/cases/sea/combat/scout-fog.json)
 
 Map: selected by runner
+
+### [control-yard-lost](../../../tools/playtest/cases/sea/combat/sea-control-lost-yard-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
+### [control-yard-seen](../../../tools/playtest/cases/sea/combat/sea-control-visible-yard-supreme.json)
+
+Map: Supreme Isthmus v1.7
 
 ### [shore-siege](../../../tools/playtest/cases/sea/combat/shore-siege.json)
 

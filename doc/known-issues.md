@@ -5338,3 +5338,77 @@ lines (six targets), lost no ranged units, and recorded radar advance 1692
 and jammer advance 975 elmos. That Played result verifies an advancing case;
 it does not prove every coverage/lease interaction. See the original and new
 [benchmark records](benchmarks/ranged-combat.md).
+
+
+### KI-512 - SEA fleet objectives omit unfinished and remembered hidden shipyards
+
+**Severity:** High
+**Location:** `CBattleAnalysis::GetNavalForceCount/GetSeaForceCount`, `SeaOperations::Tick`.
+
+**Problem.** The director's candidate list excludes unfinished factories and
+requires current radar/LOS for identified enemy yards. An existing approach can
+continue briefly, but there is no persistent last-known static-site mission.
+The nearby fog-loss case still kills its yard, so this is not proof of the
+reported Supreme northwest yard's particular cause.
+
+**Proposed solution.** SEA-only legal objective data including factory frames
+and last-seen static sites; script-owned verification, commitment and lifecycle.
+Keep AIR's naval force snapshot unchanged and never update hidden positions.
+
+**Verification.** Source trace plus two played baseline cases; distant/assembly
+fog-loss and unfinished-frame denial still pending. See the
+[SEA control investigation](sea-control-investigation.md).
+
+### KI-513 - SEA approach selection lacks shipyard priority and target-preserving handoff
+
+**Severity:** High
+**Location:** `SeaOperations::Tick`, `CAttackTask::FindTarget`.
+
+**Problem.** Nearest compatible water contact wins without production-denial
+priority. Entering weapon range transfers ships to generic ATTACK without
+carrying the chosen target ID; native combat independently selects again.
+A route toward a yard therefore does not guarantee its destruction.
+
+**Proposed solution.** Script-ranked SEA missions with committed coverage and
+an opt-in native contact objective. Preserve native formations/repair and
+D-202's aircraft-only priority-fire semantics. Do not modify other roles'
+shared targeting or replace this with periodic attack spam.
+
+**Verification.** Visible-yard and short-fog fixtures both kill their target;
+the mixed-target/handoff failure is source-established, not yet isolated in a
+played competing-target case. [Plan and evidence](sea-control-investigation.md).
+
+### KI-514 - SEA has no explicit surplus-fleet assignment to the coastal front
+
+**Severity:** High
+**Location:** `SeaOperations::Search/Tick`.
+
+**Problem.** With no compatible water contact, ordinary fleets search toward
+start hypotheses or water rings. They do not select ground contacts or coastal
+support positions based on friendly front needs and retained naval cover.
+Native combat/artillery can still shoot land independently, but no SEA mission
+owns the requested secure-water-then-support transition.
+
+**Proposed solution.** SEA-only body-local reserve and subcohort allocation,
+legal ground-contact selection, reachable water firing positions, and recall
+on renewed naval danger. Preserve scout/AA patrol, carrier and retreat owners.
+
+**Verification.** Source-confirmed absence of this policy; coastal damage and
+recall scenarios remain unplayed. [Detailed plan](sea-control-investigation.md).
+
+### KI-515 - SEA failed-route retry can starve other reachable targets
+
+**Severity:** Medium
+**Location:** failed `Route` branch in `SeaOperations::Tick`.
+
+**Problem.** The failure branch increments search and waits ten seconds, but
+the next known-contact scan selects the same nearest target. Search changes
+only the no-contact fallback. No failed-target exclusion or second candidate
+is tried, despite a log saying another objective will be selected.
+
+**Proposed solution.** Bounded per-body/MoveDef/target failure records, alternate
+firing points and next-ranked candidates; invalidate on relevant geometry or
+contact changes and bounded retry expiry.
+
+**Verification.** Control flow traced; blocked-nearest/reachable-second and
+coastal geometry cases still required. [Investigation](sea-control-investigation.md).

@@ -1,0 +1,7 @@
+{
+  "log_sha256": "978087d741018c1bbf5a724c6bf3fbac165e051f0bea7eac0a3ea4012671477e",
+  "events": [
+    "[t=00:00:40.951199][f=0000330] [SeaArena] frame=330 detected id=11472 unit=corsy"
+  ],
+  "scope": "Read-only extraction; no target rejection reason or PvP incident identity inferred."
+}

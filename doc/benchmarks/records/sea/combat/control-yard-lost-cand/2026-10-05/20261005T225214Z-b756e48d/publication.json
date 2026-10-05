@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "33735f9aba96eb43ea2c29ceee3dc216803258306e14481e0d3225aff651313c",
+    "checks.json": "c70e3861ef1b837f07117c101cea30bd2f8119e4c85a07d2c917452ee25192b4",
+    "combat-scorecard.json": "94e5564c677622f07b5b488120cd81a5f57397680b7d3580fbffb5c3c6f2abd7",
+    "launched.json": "be363086c4208203ebd8ced8ef3a32e7cb65efdf267fcdedd20989199f23a58c",
+    "objective-observations.json": "3afa3fac84d7bb94731b9c2d556ad5f6ecbdfb94bc8c75cd7ae71324e7bbb303",
+    "report.md": "0fb5e161b2d6b89bd753ec30b6d42cbcbdb930769fab5b73cd204948d6c7bfcd",
+    "result.json": "6425bbc2081b7aed417b42c3947bb138350a76bef261e1e8d74dc8567a339a12",
+    "run-inputs.json": "c31593c0296640ad033ab46f094b511c93165aae684f6b26bd2ac524f49d012d",
+    "run-plan.json": "4951deb67a57a6b3e8fa056998682d393c8655e442314eaee118fedc00abd24f",
+    "script.txt": "50cc448e1f35d3a2a2c0b433f3530bdf55732379ce77b511d29632945781284a",
+    "sea-arena-pins.json": "d16e5b5b53320602e4cdebbf0b931f6d1506898b0a9f33299a79fca23c99f19d",
+    "sea-arena.json": "433a2f7cb2271d256ac0f6bae28d0791d342a0cb0228b363b0c00dc9aab00539",
+    "staged.json": "283c7564f8b73f1d01741ab2964f9542c4ed9281f16ba1473d097b7750a97d01",
+    "starts.as": "be44fcda0e04630bc4212dd6402c41860b805b35238b15c99a2c18e9daba86ef",
+    "teams.json": "99b956956e00a8c4747203fa1e0b1db334abf8a962f120f0a63309486dbe0653"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\control-yard-lost-cand\\supreme\\20261005T225208Z-e0873a13\\runs\\20261005T225214Z-b756e48d",
+  "schema": 1
+}

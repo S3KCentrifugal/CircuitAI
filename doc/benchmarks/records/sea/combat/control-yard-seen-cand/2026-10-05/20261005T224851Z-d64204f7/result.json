@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 908,
+      "sha256": "01268c5229a943eb0a6b7b59132e1ada60b1f914007fdf12ea030c830e1cf555"
+    },
+    "infolog.txt": {
+      "bytes": 494152,
+      "sha256": "978087d741018c1bbf5a724c6bf3fbac165e051f0bea7eac0a3ea4012671477e"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "0faaa8042ff139aa335d5c5980c8f2d8db60f1dbb84fbbe8111fddb9810caaac"
+    },
+    "report.md": {
+      "bytes": 3181,
+      "sha256": "db107d4e9f27d66b5d0a36bcd40f1aecb72c7aebdff12674efb7a12641cdcd46"
+    },
+    "run-inputs.json": {
+      "bytes": 36437,
+      "sha256": "a0e9d6de4b08f624f7136a6ccf366f5ced8cb45d738e559182a321137cd09424"
+    },
+    "run-plan.json": {
+      "bytes": 259,
+      "sha256": "79526019f148578cb0ed1988c71ce60940ba4c00d97e05563e3555e82569d09a"
+    },
+    "script.txt": {
+      "bytes": 6177,
+      "sha256": "50cc448e1f35d3a2a2c0b433f3530bdf55732379ce77b511d29632945781284a"
+    },
+    "sea-arena-pins.json": {
+      "bytes": 36607,
+      "sha256": "1574590c5eb0a5f9caf8ab18b2706aafc98db20cf170c5a9ca10b94cd7b953ac"
+    },
+    "sea-arena.json": {
+      "bytes": 921,
+      "sha256": "71981acab1bb69e5daf40ff3fff0f7e70ca238622791078820856574cbe2cb82"
+    },
+    "staged.json": {
+      "bytes": 292,
+      "sha256": "a2d7e457494b096a3986623023eb5a98591bdb31a62178060cdd038eef183b5e"
+    },
+    "starts.as": {
+      "bytes": 111,
+      "sha256": "be44fcda0e04630bc4212dd6402c41860b805b35238b15c99a2c18e9daba86ef"
+    },
+    "teams.json": {
+      "bytes": 460,
+      "sha256": "99b956956e00a8c4747203fa1e0b1db334abf8a962f120f0a63309486dbe0653"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "control-yard-seen-cand"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T224851Z-d64204f7",
+  "last_frame": 300,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\control-yard-seen-cand\\supreme\\20261005T224805Z-85900259\\runs\\20261005T224851Z-d64204f7",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-05T22:48:51.952850+00:00",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 7492.0,
+      "z": 1220.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 4814.0,
+      "z": 11077.0
+    }
+  ],
+  "verdict": "FAIL"
+}

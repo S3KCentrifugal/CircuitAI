@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "e833bfae4b7d6c5e1f0b1160580af4f2db7a9ac6a68e758b7a82ea4b3cd7d681",
+    "checks.json": "01268c5229a943eb0a6b7b59132e1ada60b1f914007fdf12ea030c830e1cf555",
+    "combat-scorecard.json": "b1c4392d46bcbf265e89324cac0cbf6ae5e94bac35e8932dc3dd4051372b5ccc",
+    "launched.json": "62e430b80c80457b2d9fb38cd5b7f34e6a87041ae0c8ef9ae979c493bbafbcfc",
+    "objective-observations.json": "de5fd01d83a2abf234c07cdad239d09113bedbeb16fbd94a9d61c30baa92ce35",
+    "report.md": "356df20e879d06138cc6ab9191942311cbff443c076cbc0ee27aa799faa3b504",
+    "result.json": "7a4dc12bf2e9d18600effc434e47307646e2244a8fb2b208d8cb53f688628fb5",
+    "run-inputs.json": "6bcf8d80dba81ef3e280ffd24b8c492cc4df119dc1e61e293bddd1e47fecd253",
+    "run-plan.json": "0181833038c74fce49b1b41747e08a7a0387c4c04572374b592ef97b3fc957af",
+    "screen_2026-10-05_22-50-26-634.png": "50ffa948ca38bee1cf8d5ddf78151cc7350bc664a31b12ec2c04525516b2909b",
+    "script.txt": "50cc448e1f35d3a2a2c0b433f3530bdf55732379ce77b511d29632945781284a",
+    "sea-arena-pins.json": "1574590c5eb0a5f9caf8ab18b2706aafc98db20cf170c5a9ca10b94cd7b953ac",
+    "sea-arena.json": "1077f017681baa4cf681044606c35115de94475b55406ced45c5c587fe6362b5",
+    "staged.json": "282a382e61f8941ddde49ec8b0f3d164fa3216c289c337546795288b1d67afc6",
+    "starts.as": "be44fcda0e04630bc4212dd6402c41860b805b35238b15c99a2c18e9daba86ef",
+    "teams.json": "99b956956e00a8c4747203fa1e0b1db334abf8a962f120f0a63309486dbe0653"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\control-yard-seen-cand\\supreme\\20261005T224934Z-5dd56760\\runs\\20261005T225123Z-7f45ffe7",
+  "schema": 1
+}

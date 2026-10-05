@@ -411,3 +411,13 @@ combat-ship completion, not merely a finished factory frame.
   a role.
 
 <!-- source: data/script/src/roles/sea.as; blob: 8a6e6b4efd622c9bf5446786d99351a0728c9f2f; lines: 847 -->
+
+
+## Water-control investigation (2026-10-05)
+
+The current fleet director does not yet implement a full secure-water,
+production-denial and surplus coastal-support mission lifecycle. See the
+[SEA control investigation](../sea-control-investigation.md) for the exact
+source gaps, two played Supreme yard tests, unresolved KI-512 through KI-515,
+and the SEA-only implementation/acceptance plan. This investigation changes
+no gameplay policy; the improved D-202 scout and AA ownership is retained.

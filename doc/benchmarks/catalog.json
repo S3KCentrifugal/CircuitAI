@@ -271,7 +271,7 @@
       "domain": "shared",
       "kind": "rendered-view",
       "path": "ranged-combat.md",
-      "sha256": "102df2a76eece0be547c960f97f48315ec0ce99332873ed0a19343c361efa7b3"
+      "sha256": "03a1bc7353c037e2c93047092ce56187ebeb40638cbca797beb47ae433a733b9"
     },
     {
       "area": "combat",
@@ -1922,6 +1922,71 @@
       "path": "records/sea/combat/carrier-release-cand/2026-10-05/20261005T043624Z-ba305efa/result.json",
       "scenario": "carrier-release-cand",
       "sha256": "c7d0beaa1bbd9b0840c81df4c008e14da75dae2daf25365463e219c001b24b53",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261005T225214Z-b756e48d",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225214Z-b756e48d/result.json",
+      "scenario": "control-yard-lost-cand",
+      "sha256": "6425bbc2081b7aed417b42c3947bb138350a76bef261e1e8d74dc8567a339a12",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261005T225429Z-dd34499a",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225429Z-dd34499a/result.json",
+      "scenario": "control-yard-lost-cand",
+      "sha256": "3109758f030ae0bb2e4cdc3aa470690e9dd6cdee54b89ca304c1068bdc0eec58",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261005T225638Z-42f7b8ed",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225638Z-42f7b8ed/result.json",
+      "scenario": "control-yard-lost-cand",
+      "sha256": "f6a6d769d29dd2d44538574f18c659702986c5e9211e4e2142cf3249fe74573a",
+      "verdict": "PASS"
+    },
+    {
+      "area": "combat",
+      "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261005T224851Z-d64204f7",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T224851Z-d64204f7/result.json",
+      "scenario": "control-yard-seen-cand",
+      "sha256": "e103eeaa002cd0bb4c217e5c1a05812fcc68925fb166f99b0abd0d6aa2aabde4",
+      "verdict": "FAIL"
+    },
+    {
+      "area": "combat",
+      "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261005T225123Z-7f45ffe7",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T225123Z-7f45ffe7/result.json",
+      "scenario": "control-yard-seen-cand",
+      "sha256": "7a4dc12bf2e9d18600effc434e47307646e2244a8fb2b208d8cb53f688628fb5",
       "verdict": "PASS"
     },
     {

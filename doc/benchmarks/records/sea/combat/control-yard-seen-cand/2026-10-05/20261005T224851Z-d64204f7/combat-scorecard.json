@@ -1,0 +1,81 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\control-yard-seen-cand\\supreme\\20261005T224805Z-85900259\\runs\\20261005T224851Z-d64204f7\\infolog.txt",
+  "fixture_errors": [
+    "[t=00:00:40.830510][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6680 z=2100",
+    "[t=00:00:40.830542][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6680 z=2280",
+    "[t=00:00:40.830564][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6500 z=2460",
+    "[t=00:00:40.830583][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6680 z=2460",
+    "[t=00:00:40.830610][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6500 z=2640",
+    "[t=00:00:40.830631][f=0000300] [SeaArena] frame=300 ERROR dry_site=armroy x=6680 z=2640"
+  ],
+  "order_sources": [],
+  "carrier_ownership": [],
+  "raw_weapon_damage_by_team": [
+    0.0,
+    0.0
+  ],
+  "metal_lost_by_team": [
+    0.0,
+    0.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    0.0,
+    0.0
+  ],
+  "minute_apm_by_team": [
+    [],
+    []
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [],
+    []
+  ],
+  "peak_apm_by_team": [
+    0,
+    0
+  ],
+  "detection_to_first_attack_order_seconds": [],
+  "median_detection_to_order": null,
+  "response_decisions": [],
+  "threat_observations": [],
+  "decisions": [],
+  "produced": [],
+  "finished": [
+    {
+      "frame": 302,
+      "id": "28301",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 304,
+      "id": "14996",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 307,
+      "id": "31764",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 311,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsy"
+    }
+  ],
+  "samples": [],
+  "engine_ai_timings": [],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}
