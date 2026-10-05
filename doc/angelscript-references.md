@@ -1407,6 +1407,7 @@ if (lab !is null) {
 
 ```angelscript
 IUnitTask@+ DefaultMakeTask(CCircuitUnit@ unit);
+IUnitTask@+ TryMakeRangedTask(CCircuitUnit@ unit);
 IUnitTask@+ Enqueue(const SFightTask& in request);
 IUnitTask@+ EnqueueRetreat();
 void DefaultMakeDefence(int cluster, const AIFloat3& in pos);
@@ -1417,6 +1418,13 @@ float porcBudgetMod;    // multiplier on the per-point defence budget
 SQuotaMilitary quota;
 SResponseInfo@ GetResponseInfo(Type role) const;
 ```
+
+`TryMakeRangedTask` (D-207) enqueues an artillery-lifecycle task only for a
+mobile land unit opted in with the JSON `ranged` attribute. It otherwise returns
+null. Call it during ordinary assignment, after specialist mission dispatch;
+it is not a polling override for player, ferry, flank or amphibious ownership.
+Per-unit `ranged` settings control target mode, range, spacing, withdrawal and
+sensor offsets. See [ranged combat](ranged-combat.md) for the full schema.
 
 `porcMode` and `porcBudgetMod` are read by `DefaultMakeDefence` on every call;
 set them immediately before calling it. `Military::Porc::MakeDefence`

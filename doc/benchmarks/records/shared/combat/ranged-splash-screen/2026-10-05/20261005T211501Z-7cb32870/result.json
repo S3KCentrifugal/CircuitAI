@@ -1,0 +1,107 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 799,
+      "sha256": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc"
+    },
+    "infolog.txt": {
+      "bytes": 507677,
+      "sha256": "9956133eff57b86866b49266b9d66a5a100f3b857bb7e6e72a8cf7fb4c0845d2"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "8c43b1f6383f3cb38f0fae1f90878ae28ca7dcfb0691b716d07d9d5d81154866"
+    },
+    "ranged-arena-pins.json": {
+      "bytes": 36492,
+      "sha256": "d9565a4c18ce12c7cd70a20e22cb20c21503bb92220ca189787a8e0792972880"
+    },
+    "ranged-arena.json": {
+      "bytes": 1793,
+      "sha256": "4369da7d72656e9d60658fc178571291f100216a44c7fd2c11761eb8329efae0"
+    },
+    "report.md": {
+      "bytes": 3740,
+      "sha256": "b9dd35b36582c68064b8c98a5ece12d293133e2aa12d50f2c2974f0eda2a69c0"
+    },
+    "run-inputs.json": {
+      "bytes": 36443,
+      "sha256": "416ebb6fd66266273dc45aae392ea167ef1c05921f46642b0232e806dbeb2533"
+    },
+    "run-plan.json": {
+      "bytes": 261,
+      "sha256": "0f98a8b1c4f272ba2b94628528e2732086dd4fdf2046d80c852f7004b70e5700"
+    },
+    "screen_2026-10-05_21-14-34-599.png": {
+      "bytes": 1736531,
+      "sha256": "9a4261ef573887b42c08f9c4ac3019d2c5bd3f7857e39126d4936ae28bd736f0"
+    },
+    "screen_2026-10-05_21-14-44-603.png": {
+      "bytes": 1719100,
+      "sha256": "d6dc3acdf86267d7e8e8ecbab0d00278f57626b7dc31e0717757456b02da4f41"
+    },
+    "screen_2026-10-05_21-14-56-336.png": {
+      "bytes": 1717655,
+      "sha256": "a7a644abc9b0d983a53c9d0efdf43dfbab8cb219a6de97301d70d5e15a077886"
+    },
+    "script.txt": {
+      "bytes": 6184,
+      "sha256": "aab3067b0353cb777f5858e17e75585125acfb35d8bcdb9095ffe4d53c77dc7b"
+    },
+    "staged.json": {
+      "bytes": 292,
+      "sha256": "f905dfed4e2fee44f8b1b15ca0db2d7bc0a6354a4bafcdead601cbda84fafe2f"
+    },
+    "starts.as": {
+      "bytes": 114,
+      "sha256": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a"
+    },
+    "teams.json": {
+      "bytes": 467,
+      "sha256": "9f089a5bd7a370205239ed0079f565391c907d1b2ff0014f49b81d8812e304c8"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-splash-screen"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T211501Z-7cb32870",
+  "last_frame": 7350,
+  "map": "All That Glitters v2.2.3",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-splash-screen\\glitters\\20261005T211346Z-f33aebf5\\runs\\20261005T211501Z-7cb32870",
+  "reason": "reached 4 min",
+  "recorded_at_utc": "2026-10-05T21:15:01.917263+00:00",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 4000.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 4000.0,
+      "z": 9800.0
+    }
+  ],
+  "verdict": "PASS"
+}

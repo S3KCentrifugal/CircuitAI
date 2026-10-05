@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-corban"
+  },
+  "id": "20261005T210544Z-b6d55b31",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

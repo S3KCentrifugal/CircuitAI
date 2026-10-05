@@ -1,0 +1,46 @@
+{
+  "schema": 5,
+  "case": "ranged-legmed",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-legmed\\glitters\\20261005T193656Z-eca943db",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 16.666666666666668,
+  "raw_damage_including_overkill": 1000,
+  "shooters_fired": 2,
+  "shots": 8,
+  "enemy_kills": 0,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 0,
+  "nonlua_commands": 0,
+  "commands_per_game_minute": null,
+  "command_window_frame": 0,
+  "last_observed_frame": 518,
+  "watch_verdict": "FAIL",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "legmed"
+  ],
+  "minimum_sampled_spacing_after_60s": null,
+  "render_fps_after_60s": [],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 500,
+  "deaths": [
+    {
+      "t": "00:00:37.557102][f=0000500]",
+      "frame": "500",
+      "id": "14262",
+      "team": "0",
+      "unit": "armarad",
+      "cost": "400"
+    }
+  ],
+  "engine_ai_windows": [],
+  "failures": [
+    "insufficient target kills",
+    "incomplete observation window",
+    "original watch verdict: FAIL"
+  ],
+  "passed": false
+}

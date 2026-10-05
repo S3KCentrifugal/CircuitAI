@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 799,
+      "sha256": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc"
+    },
+    "infolog.txt": {
+      "bytes": 404875,
+      "sha256": "200e1123b39102788f51aacb5321a43334f0010a6c146f6ff109fbd50dd2f915"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "545c66cc038440fcfa5e4bd3e725fc6cd02ec62a66c0721001e7c6af8df2baa8"
+    },
+    "ranged-arena-pins.json": {
+      "bytes": 36492,
+      "sha256": "f99cc2cfd8fdf11aa3696e74b3e4bfe79e32ed07e6d3cde2d8eab5d82e7749d3"
+    },
+    "ranged-arena.json": {
+      "bytes": 1625,
+      "sha256": "62bf97c7b436675af80c993692f68cb34d25fe81bedcf3c1f95f3c604cb41c43"
+    },
+    "report.md": {
+      "bytes": 2950,
+      "sha256": "1d9573af0f4255986f9636b364131370dc9ef7431ded44e787b89602971bbba9"
+    },
+    "run-inputs.json": {
+      "bytes": 36443,
+      "sha256": "74e37146ccaac6c7a5c4444d29741b492c0d6b9efe43890fae60f99572c4bd79"
+    },
+    "run-plan.json": {
+      "bytes": 254,
+      "sha256": "5d82f69b8e31596bd7d477dca3daae3e45fd3f60d4385a86f640c0a50a30e694"
+    },
+    "script.txt": {
+      "bytes": 6184,
+      "sha256": "655002344d557e4b3420a129d47cea01dd0b1eaec3457985ae07426a15045683"
+    },
+    "staged.json": {
+      "bytes": 291,
+      "sha256": "8c2fc9d62732aff767e86f74ed502c7a74896230174c71c7d3747aa072506417"
+    },
+    "starts.as": {
+      "bytes": 114,
+      "sha256": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a"
+    },
+    "teams.json": {
+      "bytes": 467,
+      "sha256": "719845caf1e0dad2ff63f420cc947919f80d66a4befc7301d1ea3cc432017840"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-legmed"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T193854Z-7a2fd14d",
+  "last_frame": 526,
+  "map": "All That Glitters v2.2.3",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-legmed\\glitters\\20261005T193656Z-eca943db\\runs\\20261005T193854Z-7a2fd14d",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-05T19:38:54.253127+00:00",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 1,
+      "team": 0,
+      "x": 4000.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 4000.0,
+      "z": 9800.0
+    }
+  ],
+  "verdict": "FAIL"
+}

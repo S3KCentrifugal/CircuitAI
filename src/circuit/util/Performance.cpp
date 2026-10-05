@@ -17,7 +17,8 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr std::array<const char*, PHASE_COUNT> names{
     "script", "tech-context", "eco-read", "tech-evaluate", "layout-place",
-    "pack-candidates", "pocket", "pack-group", "can-pack", "command-state"
+    "pack-candidates", "pocket", "pack-group", "can-pack", "command-state",
+    "ranged-snapshot", "ranged-decision", "ranged-escort"
 };
 struct Stat {
     uint64_t calls = 0;

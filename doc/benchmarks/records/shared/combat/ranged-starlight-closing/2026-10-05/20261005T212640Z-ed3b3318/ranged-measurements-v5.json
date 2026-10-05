@@ -1,0 +1,221 @@
+{
+  "schema": 5,
+  "case": "ranged-starlight-closing",
+  "variant": "baseline",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-starlight-closing\\glitters\\20261005T212521Z-d10e78e2",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 11.0,
+  "raw_damage_including_overkill": 10065,
+  "shooters_fired": 6,
+  "shots": 16,
+  "enemy_kills": 14,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 856.0,
+  "nonlua_commands": 1302,
+  "commands_per_game_minute": 325.5,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7650,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [],
+  "minimum_sampled_spacing_after_60s": 55.036351623268054,
+  "render_fps_after_60s": [
+    53.0,
+    53.0,
+    146.0,
+    145.0,
+    142.0,
+    163.0,
+    144.0,
+    167.0,
+    157.0,
+    156.0,
+    178.0,
+    164.0,
+    152.0,
+    169.0,
+    176.0,
+    179.0,
+    174.0,
+    155.0,
+    163.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 1909,
+  "deaths": [
+    {
+      "t": "00:00:41.630912][f=0000349]",
+      "frame": "349",
+      "id": "15598",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:42.065925][f=0000431]",
+      "frame": "431",
+      "id": "29947",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:50.973554][f=0002414]",
+      "frame": "2414",
+      "id": "14262",
+      "team": "0",
+      "unit": "armarad",
+      "cost": "400"
+    },
+    {
+      "t": "00:00:52.246529][f=0002720]",
+      "frame": "2720",
+      "id": "3031",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.642453][f=0002815]",
+      "frame": "2815",
+      "id": "15146",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.652904][f=0002817]",
+      "frame": "2817",
+      "id": "26019",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.834302][f=0002860]",
+      "frame": "2860",
+      "id": "10821",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.846995][f=0002864]",
+      "frame": "2864",
+      "id": "31054",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.859660][f=0002866]",
+      "frame": "2866",
+      "id": "15398",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.951198][f=0002889]",
+      "frame": "2889",
+      "id": "14370",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.003157][f=0002902]",
+      "frame": "2902",
+      "id": "24732",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.225062][f=0002954]",
+      "frame": "2954",
+      "id": "10085",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.237012][f=0002958]",
+      "frame": "2958",
+      "id": "18782",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.245261][f=0002960]",
+      "frame": "2960",
+      "id": "14057",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:59.488331][f=0004341]",
+      "frame": "4341",
+      "id": "679",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.054199,
+      "ai_all_p95_ms": 0.380615,
+      "ai_all_max_ms": 10.280273,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.834473,
+      "ai_all_mean_ms": 0.11152
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.0354,
+      "ai_all_p95_ms": 0.376709,
+      "ai_all_max_ms": 2.973389,
+      "sim_speed": 8.009,
+      "ai_all_p99_ms": 0.769043,
+      "ai_all_mean_ms": 0.092767
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.031006,
+      "ai_all_p95_ms": 0.373047,
+      "ai_all_max_ms": 2.289307,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.72583,
+      "ai_all_mean_ms": 0.083686
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.029297,
+      "ai_all_p95_ms": 0.3479,
+      "ai_all_max_ms": 2.069824,
+      "sim_speed": 7.517,
+      "ai_all_p99_ms": 0.6604,
+      "ai_all_mean_ms": 0.080927
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

@@ -5117,6 +5117,9 @@ See the [full review and profile inventory](reviews/2026-10-05-siege-classificat
 and [D-203](decisions.md#d-203---review-siege-normalization-before-changing-ranged-unit-target-policy).
 
 
+
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+
 ### KI-504 - Ranged target pursuit can surrender range to repaired static bait
 
 **Problem.** Fatboy bait inside a repaired static line has been reported to
@@ -5160,6 +5163,9 @@ carrier handling, lifecycle/command safety and comparative fixtures. Both issues
 remain open; the plan does not represent an implemented or played fix.
 
 
+
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+
 ### KI-505 - Balanced Starlight health-retreat override prevents ordinary early escape
 
 **Problem.** experimental_balanced gives armmanni retreat:0. In
@@ -5179,6 +5185,9 @@ frontal/rear pursuers, screen loss and terrain exits. Require real escape and
 continued useful fire after rejoining, not indefinite retreat. See the
 [complete review](reviews/2026-10-05-balanced-siege-attributes.md) and
 [D-206](decisions.md#d-206---one-ranged-attribute-with-capability-aware-withdrawal-and-mission-ownership).
+
+
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 ### KI-506 - Sensor escort selection has no anti-heavy/artillery cohort anchor
 
@@ -5200,6 +5209,9 @@ firing lines, destruction, transfer and save/load. See the
 [implementation plan](ranged-support-implementation-plan.md) and
 [review](reviews/2026-10-05-balanced-siege-attributes.md).
 
+
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+
 ### KI-507 - Cloak initialization overrides retreat hold-fire policy
 
 **Problem.** RetreatTask::AssignTo first sets HOLD for ret_hold, then the
@@ -5218,3 +5230,111 @@ which may stop to engage. Test before broadening the fix to legacy units.
 cloak/recloak delay, retaliation, low energy and near-enemy decloak, then repair
 and rejoin. Verify fire-state ownership on release/player handover. See the
 [review](reviews/2026-10-05-balanced-siege-attributes.md).
+
+
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+
+
+### KI-508 - Legacy sensor rebalancing still misses secondary radar/jammer labels
+
+**Problem.** FactoryManager stores secondary role-list labels in enemyRole,
+while legacy IsSensorUnit tests respRole. Radar/jammer vehicles with those
+secondary labels can therefore be omitted from legacy escort quotas.
+
+**Solution and scope.** D-207 recognizes the labels while an opted-in ranged
+cohort exists and uses an explicit live-task handover. Broader legacy-only
+behavior was deliberately preserved. A separate legacy squad migration should
+validate group detach, role-controlled missions and sensor quotas before
+extending it globally.
+
+**Verification.** The ranged mixed-sensor fixture reproduced four sensors
+counted as zero and then verified advancing radar/jammer escorts on Glitters
+and Comet. The legacy-only defect remains source-confirmed; no claim of a
+legacy-only fix. See [ranged combat](ranged-combat.md).
+
+
+### KI-509 - Starlight closing-assault survival regresses in the unscreened fixture
+
+**Problem.** D-207's final Starlight policy destroys all 14 supplied targets
+but loses one Starlight; the pinned old build destroys all 14 without ranged
+losses. The final candidate records zero allied damage in this fixture, while
+the old Starlight trial records 1,909 including overkill. Those are distinct
+metrics and do not erase the lost Starlight. Passing the fixture's broad
+casualty bound is not evidence that the new policy beats the old one.
+
+An intermediate unknown-radar gate also regressed Sharpshooters. Restoring
+their cloaked/turreted approach produced 14 kills with zero losses in two
+successive closing trials; repaired-bait results are recorded separately.
+Starlights retain the conservative identification gate.
+
+**Proposed solution.** Isolate the interaction of committed withdrawal,
+forward-arc firing suppression, screen absence and per-unit formation routing
+in [RangedEngagement](../src/circuit/task/fighter/RangedEngagement.cpp).
+Test covering fire from rear members while threatened members withdraw, using
+[RangedWorld](../src/circuit/task/fighter/RangedWorld.cpp)'s spatial cohort
+rather than an all-pairs army scan. Preserve unknown-radar movement gating and
+friendly-fire protection; do not recover the score by restoring unsafe pursuit
+or deleting the failing comparison. Tighten casualty acceptance only after a
+corrected repeated cohort passes. No single causal fix is claimed yet.
+
+**Verification.** Played on Glitters with the same supplied armies and seed.
+Half-turn timing and unknown-radar advancement were corrected, but did not
+remove the Starlight survival difference. A rear-only idle dispersal trial
+failed to improve survival and reduced bait clearance from nine targets to
+two; that trial was rejected and its evidence retained. See
+[original and revised measurements](benchmarks/ranged-combat.md). The feature
+PR remains a review candidate rather than a proven strength upgrade.
+
+### KI-510 - Ranged rework has not established FPS parity with legacy combat
+
+**Problem.** Serial 120-unit fast-forwarded trials measured approximately
+0.18 ms aggregate AI time per simulation frame for the optimized candidate
+versus 0.12 ms for the pinned old build, with median rendered samples of
+105-107 versus 112 FPS. Shared snapshot allocation was improved, but richer
+combat behavior still adds work. These observations do not establish a
+multiplayer or long-game FPS guarantee.
+
+**Proposed solution.** Use the final release timing records and repeat a
+fixed-army 1x/8x and natural 8v8 cohort before adopting a performance budget.
+Profile remaining [snapshot and decision work](../src/circuit/task/fighter/RangedWorld.cpp)
+and [terrain/friendly-corridor candidate evaluation](../src/circuit/task/fighter/RangedEngagement.cpp).
+Evaluate persistent static metadata/index reuse only with complete lifecycle
+and terrain invalidation, preserving tie order and the differential oracle.
+Do not hide the cost through a broad APM cap or slower emergency response.
+The [engineering guide](performance/engineering-guide.md) defines the proof
+requirements; no unmeasured extra optimization is claimed.
+
+**Verification.** Built, phase-profiled and Played; snapshot exclusive time
+fell about 34% in the diagnostic trials. Local AI order counts fell while CPU
+cost increased. Normal-speed and release-build observations are separated in
+[the benchmark report](benchmarks/ranged-combat.md); internet peer behavior
+and late-game 8v8 acceptance remain unverified. The final same-DLL 1x control
+measured 0.129329 ms/frame and 341 median FPS versus 0.198573 and 282 with
+ranged policy enabled. Orders fell 17.0%, but no-FPS-drop acceptance failed.
+The native timing increment does not by itself identify the entire rendering
+difference; also profile scene effects and visible command-path rendering
+before assigning that gap to a single cause.
+
+
+### KI-511 - Single-line sensor fixture confounds escort travel with useful coverage
+
+**Problem.** The final D-207 mixed-sensor run clears all three defenses by
+frame 1894 with no ranged losses, but fails its fixed 600-elmo advance
+threshold. Radar/jammer placement can protect rear guns or stop advancing
+when targets disappear, so net travel alone cannot distinguish a broken
+escort from a covered, finished engagement. This is an unresolved measurement
+limitation, not a proven universal sensor-controller failure.
+
+**Proposed solution.** Extend [the observer](../tools/playtest/widgets/ranged_arena.lua)
+and [measurement reader](../tools/playtest/ranged_benchmark.py) to measure
+coverage while objectives remain: uncovered gun value, legal LOS over active
+targets, safe jammer overlap and successful reassignment after cohort loss.
+Keep the original failure and its threshold; do not lower it just to pass.
+Use successive defensive lines for advancement acceptance, and a separate
+stationary covered cohort to verify that no unnecessary advance is required.
+
+**Verification.** The additional ranged-sensor-advance fixture cleared both
+lines (six targets), lost no ranged units, and recorded radar advance 1692
+and jammer advance 975 elmos. That Played result verifies an advancing case;
+it does not prove every coverage/lease interaction. See the original and new
+[benchmark records](benchmarks/ranged-combat.md).

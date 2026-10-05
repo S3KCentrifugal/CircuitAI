@@ -1,0 +1,8 @@
+{
+  "staged": "2026-10-05T18:46:00",
+  "dll": "C:\\bardev\\bar-RecoilEngine\\build-amd64-windows\\install\\AI\\Skirmish\\BARb\\stable\\SkirmishAI.dll",
+  "dll_sha256_16": "68fa9679ca2841d0",
+  "dll_bytes": 7943432,
+  "data": "C:\\bardev\\s3k-CircuitAI\\data",
+  "ai": "BARbTest/test"
+}

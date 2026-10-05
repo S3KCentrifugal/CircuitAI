@@ -1,0 +1,127 @@
+{
+  "schema": 5,
+  "case": "ranged-mixed-sensors",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-mixed-sensors\\glitters\\20261005T220451Z-b71f2013",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 51.8,
+  "raw_damage_including_overkill": 9500,
+  "shooters_fired": 7,
+  "shots": 9,
+  "enemy_kills": 2,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 880.0,
+  "nonlua_commands": 424,
+  "commands_per_game_minute": 106.0,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7650,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {
+    "armaser": 0,
+    "armseer": 132.0
+  },
+  "assigned_unit_types": [
+    "armfboy",
+    "armmanni",
+    "armsnipe"
+  ],
+  "minimum_sampled_spacing_after_60s": 56.64803615307419,
+  "render_fps_after_60s": [
+    38.0,
+    56.0,
+    167.0,
+    180.0,
+    176.0,
+    187.0,
+    170.0,
+    180.0,
+    137.0,
+    172.0,
+    167.0,
+    161.0,
+    147.0,
+    153.0,
+    150.0,
+    168.0,
+    192.0,
+    163.0,
+    172.0
+  ],
+  "cloaked_units_observed": 4,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:47.415308][f=0001615]",
+      "frame": "1615",
+      "id": "6003",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:48.172816][f=0001773]",
+      "frame": "1773",
+      "id": "7383",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.050293,
+      "ai_all_p95_ms": 0.332764,
+      "ai_all_max_ms": 9.747681,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.859375,
+      "ai_all_mean_ms": 0.105243
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.03418,
+      "ai_all_p95_ms": 0.344727,
+      "ai_all_max_ms": 2.904297,
+      "sim_speed": 8.003,
+      "ai_all_p99_ms": 0.78833,
+      "ai_all_mean_ms": 0.085929
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.035889,
+      "ai_all_p95_ms": 0.360352,
+      "ai_all_max_ms": 2.297607,
+      "sim_speed": 7.511,
+      "ai_all_p99_ms": 0.692871,
+      "ai_all_mean_ms": 0.087716
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036377,
+      "ai_all_p95_ms": 0.377441,
+      "ai_all_max_ms": 3.123291,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.690918,
+      "ai_all_mean_ms": 0.091033
+    }
+  ],
+  "failures": [
+    "sensor did not advance: armseer",
+    "sensor did not advance: armaser"
+  ],
+  "passed": false
+}

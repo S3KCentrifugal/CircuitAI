@@ -1,0 +1,151 @@
+{
+  "schema": 5,
+  "case": "ranged-corban-air",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-corban-air\\glitters\\20261005T212210Z-f558448f",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 15.6,
+  "raw_damage_including_overkill": 13872,
+  "shooters_fired": 4,
+  "shots": 9,
+  "enemy_kills": 6,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 1860.0,
+  "nonlua_commands": 175,
+  "commands_per_game_minute": 43.75,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7500,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "corban"
+  ],
+  "minimum_sampled_spacing_after_60s": 386.08030252785494,
+  "render_fps_after_60s": [
+    35.0,
+    82.0,
+    230.0,
+    223.0,
+    230.0,
+    219.0,
+    229.0,
+    216.0,
+    194.0,
+    202.0,
+    224.0,
+    205.0,
+    232.0,
+    193.0,
+    220.0,
+    215.0,
+    251.0,
+    189.0,
+    199.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:41.159637][f=0000522]",
+      "frame": "522",
+      "id": "22963",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    },
+    {
+      "t": "00:00:42.186694][f=0000769]",
+      "frame": "769",
+      "id": "3874",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    },
+    {
+      "t": "00:00:42.237836][f=0000781]",
+      "frame": "781",
+      "id": "29202",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    },
+    {
+      "t": "00:00:42.278147][f=0000790]",
+      "frame": "790",
+      "id": "7383",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    },
+    {
+      "t": "00:00:42.466225][f=0000836]",
+      "frame": "836",
+      "id": "31054",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    },
+    {
+      "t": "00:00:43.092000][f=0000986]",
+      "frame": "986",
+      "id": "14370",
+      "team": "1",
+      "unit": "armbrawl",
+      "cost": "310"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.040283,
+      "ai_all_p95_ms": 0.315796,
+      "ai_all_max_ms": 8.757813,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.702759,
+      "ai_all_mean_ms": 0.091334
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.02124,
+      "ai_all_p95_ms": 0.299805,
+      "ai_all_max_ms": 3.779297,
+      "sim_speed": 8.01,
+      "ai_all_p99_ms": 0.70874,
+      "ai_all_mean_ms": 0.069293
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.021729,
+      "ai_all_p95_ms": 0.320068,
+      "ai_all_max_ms": 2.068115,
+      "sim_speed": 7.506,
+      "ai_all_p99_ms": 0.587402,
+      "ai_all_mean_ms": 0.069885
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.022461,
+      "ai_all_p95_ms": 0.325439,
+      "ai_all_max_ms": 2.364014,
+      "sim_speed": 7.512,
+      "ai_all_p99_ms": 0.655273,
+      "ai_all_mean_ms": 0.070429
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

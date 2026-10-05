@@ -1,0 +1,90 @@
+{
+  "schema": 5,
+  "case": "ranged-profile-load",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-profile-load\\comet\\20261005T214504Z-c19ffbc2",
+  "measurement_deadline_frame": 1800,
+  "first_damage_seconds": 18.4,
+  "raw_damage_including_overkill": 8535,
+  "shooters_fired": 7,
+  "shots": 50,
+  "enemy_kills": 4,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 680.0,
+  "nonlua_commands": 381,
+  "commands_per_game_minute": 381.0,
+  "command_window_frame": 1800,
+  "last_observed_frame": 2100,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfboy",
+    "armfido",
+    "armmanni",
+    "armsnipe",
+    "corban",
+    "cormort",
+    "cortrem",
+    "legamcluster",
+    "legmed",
+    "legvcarry"
+  ],
+  "minimum_sampled_spacing_after_60s": 131.88252348207476,
+  "render_fps_after_60s": [
+    57.0
+  ],
+  "cloaked_units_observed": 1,
+  "carrier_children_observed": 3,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:44.652665][f=0000923]",
+      "frame": "923",
+      "id": "14370",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:44.818971][f=0000958]",
+      "frame": "958",
+      "id": "15146",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:45.229759][f=0001047]",
+      "frame": "1047",
+      "id": "3031",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:45.882959][f=0001192]",
+      "frame": "1192",
+      "id": "31054",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.062744,
+      "ai_all_p95_ms": 0.367432,
+      "ai_all_max_ms": 12.071045,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.70752,
+      "ai_all_mean_ms": 0.118356
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

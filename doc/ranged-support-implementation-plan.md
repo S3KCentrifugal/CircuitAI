@@ -1,6 +1,11 @@
 # Ranged support implementation plan
 
-2026-10-05. Source baseline: `f65f10db`. **Proposed, not implemented or played.**
+2026-10-05. Historical design baseline: `f65f10db`.
+**Implementation follow-up:** D-207 implements the refined opt-in design on
+`codex/ranged-combat-rework`. See the [current implementation](ranged-combat.md)
+and [played results, regressions and performance costs](benchmarks/ranged-combat.md).
+The sketches below remain the design history; the current reference identifies
+the actual API names and which verification remains outstanding.
 This breaks down the [siege review](reviews/2026-10-05-siege-classification-request.md)
 and [D-204](decisions.md#d-204---safe-range-outranks-heavy-target-preference-for-ranged-support)
 into code changes. It addresses KI-503 and KI-504 in the

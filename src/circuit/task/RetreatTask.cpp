@@ -83,7 +83,9 @@ void CRetreatTask::AssignTo(CCircuitUnit* unit)
 	if (unit->GetCircuitDef()->IsAbleToCloak()) {
 		TRY_UNIT(manager->GetCircuit(), unit,
 			unit->CmdCloak(true);
-			unit->CmdSetFireState(CCircuitDef::FireType::RETURN);
+			// Opted-in precision retreat must not decloak on return fire.
+			unit->CmdSetFireState(cdef->IsAttrRanged() && cdef->IsAttrRetHold()
+				? CCircuitDef::FireType::HOLD : CCircuitDef::FireType::RETURN);
 		)
 	}
 

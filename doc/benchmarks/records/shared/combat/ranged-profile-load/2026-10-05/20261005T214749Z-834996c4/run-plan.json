@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "comet",
+    "scenario": "ranged-profile-load"
+  },
+  "id": "20261005T214655Z-e6f3dd26",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

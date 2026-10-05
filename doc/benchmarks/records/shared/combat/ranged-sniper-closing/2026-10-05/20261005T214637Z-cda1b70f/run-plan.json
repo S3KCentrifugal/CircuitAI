@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-sniper-closing"
+  },
+  "id": "20261005T214514Z-dcf0ec50",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

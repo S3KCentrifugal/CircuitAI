@@ -8,6 +8,8 @@
 #ifndef SRC_CIRCUIT_SPRING_SPRINGUNIT_H_
 #define SRC_CIRCUIT_SPRING_SPRINGUNIT_H_
 
+#include <vector>
+
 struct SSkirmishAICallback;
 
 namespace circuit {
@@ -19,6 +21,10 @@ public:
 
 	int GetCMDQueueSize(int unitId);
 	int GetCMD(int unitId, int commandIdx = 0);
+	// Callback-thread snapshots, without allocating per-unit C++ wrappers.
+	// The buffer retains MAX_UNITS elements; only the returned prefix is valid.
+	int GetFriendlyUnitIds(std::vector<int>& buffer) const;
+	void GetPosition(int unitId, float* position) const;
 
 private:
 	const struct SSkirmishAICallback* sAICallback;
