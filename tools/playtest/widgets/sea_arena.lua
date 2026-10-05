@@ -4,6 +4,7 @@ local queue,pending,tracked,seen={},nil,{},{}
 local carrierOwners={}
 local expectedRemoved={}
 local counts,last={},{}
+local camera,photos=nil,{}
 local priorDamage,damageHook,priorCommand,commandHook
 local function log(s) Spring.Echo("[SeaArena] frame="..Spring.GetGameFrame().." "..s) end
 local function child(id)
@@ -113,6 +114,48 @@ function widget:GameFrame(f)
             if v and (v.los or v.radar) then seen[id]=f;log("detected id="..id.." unit="..UnitDefs[u.def].name) end
         end end
     end
+    if cfg.patrol_observer and f%150==0 then
+        -- Observe physical positions and engine queues, not AI decision logs.
+        local positions={}
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].canMove and not UnitDefs[u.def].canFly then
+                local x,_,z=Spring.GetUnitPosition(id)
+                if x then
+                    positions[#positions+1]={id=id,x=x,z=z}
+                    local patrol=false
+                    for _,cmd in ipairs(Spring.GetUnitCommands(id,12) or {}) do if cmd.id==CMD.PATROL then patrol=true end end
+                    log("boat id="..id.." x="..math.floor(x).." z="..math.floor(z).." patrol="..tostring(patrol)
+                        .." target="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1))
+                end
+            end
+        end
+        local nearest=1000000
+        for i=1,#positions do for j=1,i-1 do
+            local a,b=positions[i],positions[j]
+            nearest=math.min(nearest,math.sqrt((a.x-b.x)^2+(a.z-b.z)^2))
+        end end
+        log("separation n="..#positions.." min="..math.floor(nearest))
+        for _,second in ipairs(cfg.follow_shots or {}) do
+            if f>=second*30 and not photos[second] and not camera and #positions>0 then
+                photos[second]=true
+                local x0,z0,x1,z1=math.huge,math.huge,-math.huge,-math.huge
+                local ids={}
+                for _,p in ipairs(positions) do ids[#ids+1]=p.id;x0=math.min(x0,p.x);x1=math.max(x1,p.x);z0=math.min(z0,p.z);z1=math.max(z1,p.z) end
+                Spring.SelectUnitArray(ids,false)
+                local state={mode=1,px=(x0+x1)/2,py=0,pz=(z0+z1)/2,height=math.max(2200,math.max((x1-x0)/1.6,z1-z0)*1.8+1200),angle=0.9}
+                Spring.SendCommands({"setmaxspeed 0.25","setminspeed 0.25","setmaxspeed 0.25"})
+                Spring.SetCameraState(state,0)
+                camera={state=state,at=Spring.GetTimer(),draws=0,second=second}
+            end
+        end
+    end
+    if cfg.remove_air_at and f>=cfg.remove_air_at*30 and not cfg.air_removed then
+        cfg.air_removed=true
+        local ids={}
+        for id,u in pairs(tracked) do if u.team==1 and UnitDefs[u.def].canFly then ids[#ids+1]=id;expectedRemoved[id]=f end end
+        Spring.SelectUnitArray(ids,false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
+        log("fixture_air_removed n="..#ids)
+    end
     if cfg.production and f%300==0 then
         for id,u in pairs(tracked) do
             if u.team==0 and UnitDefs[u.def].isFactory and not Spring.GetUnitIsBuilding(id) then
@@ -166,6 +209,15 @@ function widget:GameFrame(f)
         counts={}
         local metal={0,0};for id,u in pairs(tracked) do metal[u.team+1]=metal[u.team+1]+UnitDefs[u.def].metalCost end
         log("sample live0="..metal[1].." live1="..metal[2])
+    end
+end
+function widget:DrawScreen()
+    if not camera then return end
+    Spring.SetCameraState(camera.state,0);camera.draws=camera.draws+1
+    if camera.draws>=5 and Spring.DiffTimers(Spring.GetTimer(),camera.at)>=1 then
+        Spring.SendCommands("screenshot png");log("follow_screenshot second="..camera.second)
+        Spring.SendCommands({"setmaxspeed "..cfg.speed,"setminspeed "..cfg.speed,"setmaxspeed "..cfg.speed})
+        camera=nil;Spring.SelectUnitArray({},false)
     end
 end
 function widget:Shutdown()

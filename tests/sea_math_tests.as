@@ -93,3 +93,22 @@ void test_opening_exception_does_not_return_after_factory_loss() {
     Check(!SeaMath::OpeningFactory(true,true,false,true));
     Check(!SeaMath::OpeningFactory(true,true,true,false));
 }
+void test_aa_screen_slots_stay_separate_and_overlap() {
+    // Reinforcements/losses do not move survivors' slots. Fixed six columns
+    // form as many rows as necessary rather than collapsing to a centre.
+    for (int n=0;n<120;++n) for (int j=0;j<n;++j)
+        Check(SeaMath::AAColumn(n,6)!=SeaMath::AAColumn(j,6)
+            || SeaMath::AARow(n,6)!=SeaMath::AARow(j,6));
+    Check(SeaMath::AAColumn(0,6)==0 && SeaMath::AAColumn(1,6)==1 && SeaMath::AAColumn(2,6)==-1);
+    Check(SeaMath::AARow(6,6)==1 && SeaMath::AAColumn(6,6)==0);
+    Check(SeaMath::AARow(6,0)==6); // invalid column tuning cannot divide by zero
+    Check(SeaMath::AASpacing(320,750)==320);
+    Check(SeaMath::AASpacing(320,400)==220);
+}
+void test_interception_respects_speed_weapon_reach_and_horizon() {
+    Check(SeaMath::InterceptLead(700,60,750,12)==0);
+    Check(SeaMath::InterceptLead(990,60,750,12)==4);
+    Check(SeaMath::InterceptLead(5000,60,750,12)==12);
+    Check(SeaMath::InterceptLead(5000,0,750,12)==0);
+    Check(SeaMath::InterceptLead(5000,60,750,0)==0);
+}

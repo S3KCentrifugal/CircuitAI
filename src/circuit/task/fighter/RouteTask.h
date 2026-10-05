@@ -42,6 +42,7 @@ public:
     // SEA opts into the same exact route lifetime/queue preservation, with
     // terrain-checked lane offsets. Defaults leave every other role unchanged.
     void SetSeaControl(bool enabled) { seaControl = enabled; }
+    bool SetSeaTarget(int id); // BAR priority fire only; never replaces movement
     void SetAirTarget(int id) { if (airControl && airTarget != id) { airTarget = id; ++version; dirty = true; } }
     bool SetUnitRoute(CCircuitUnit* unit, std::vector<springai::AIFloat3>&& waypoints, float radius);
 	/*
@@ -97,6 +98,7 @@ private:
     bool ManagedControl() const { return airControl || seaControl; }
     bool hadAssignee = false;
     int airTarget = -1;
+    int seaTarget = -1;
     std::map<CCircuitUnit*, int> issuedVersion;
 };
 

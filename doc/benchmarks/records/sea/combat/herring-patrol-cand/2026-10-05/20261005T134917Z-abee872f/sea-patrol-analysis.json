@@ -1,0 +1,18 @@
+{
+  "aircraft_kills_before_fixture_removal": 0,
+  "first_air_spawn_frame": null,
+  "first_formation_frame": null,
+  "friendly_deaths": 0,
+  "limitations": [
+    "Orders are engine commands, not network packets or FPS measurements.",
+    "Distinct destinations do not guarantee minimum spacing while ships cross paths.",
+    "Supplied forces do not test economic affordability or victory."
+  ],
+  "orders_per_game_minute": [],
+  "physical_air_damage": 0,
+  "physical_samples": [],
+  "responder_types": [],
+  "responders": [],
+  "schema": 1,
+  "spawned": {}
+}

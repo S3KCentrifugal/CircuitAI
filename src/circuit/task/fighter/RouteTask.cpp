@@ -14,6 +14,8 @@
 #include "unit/enemy/EnemyUnit.h"
 #include "CircuitAI.h"
 #include "spring/SpringCallback.h"
+#include "spring/CustomCommand.h"
+#include "spring/SpringUnit.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
@@ -61,6 +63,15 @@ void CRouteTask::AssignTo(CCircuitUnit* unit)
 
 void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 {
+    if (seaTarget >= 0) {
+        // BAR accepts an ID-specific cancel, including pending out-of-range
+        // targets. Do not cancel a player's replacement priority list.
+        TRY_UNIT(manager->GetCircuit(), unit,
+            float params[] = {float(seaTarget)};
+            SendCustomCommand(manager->GetCircuit()->GetSkirmishAIId(), unit->GetId(), CMD_UNIT_CANCEL_TARGET, params);
+        )
+        unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
+    }
 	// The task belongs to a factory and outlives its units; script aborts it
 	// when the factory is gone. Fighter tasks have no timeout, so an empty
 	// route task simply idles in the update list.
@@ -145,7 +156,7 @@ void CRouteTask::Update()
 		CCircuitDef* def = unit->GetCircuitDef();
 		CEnemyInfo* nearest = nullptr;
 		float nearestSq = SQUARE(def->GetMaxRange() * 1.1f);
-		if (def->GetStandoff() > 0.f) {
+		if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
 			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
 			for (const auto& kv : circuit->GetEnemyInfos()) {
 				CEnemyInfo* enemy = kv.second;
@@ -206,6 +217,42 @@ void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	if (seaControl) IFighterTask::OnUnitDamaged(unit, attacker);
 	// No retreat: spam trades bodies for pressure.
+}
+
+bool CRouteTask::SetSeaTarget(int id)
+{
+    if (!seaControl) return false;
+    auto* circuit = manager->GetCircuit();
+    if (id >= 0) {
+        const auto* enemy = circuit->GetEnemyInfo(id);
+        if (enemy == nullptr || !enemy->IsInRadarOrLOS() || enemy->GetCircuitDef() == nullptr
+            || !enemy->GetCircuitDef()->IsAbleToFly()) return false;
+        const auto data = enemy->GetData()->GetData();
+        if (data.losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL
+            | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD)) return false;
+        if (data.IsIgnore() && (!enemy->GetCircuitDef()->IsIgnore()
+            || enemy->GetUnit()->GetRulesParamFloat("ignoredByAI", 0.f) > 0.f)) return false;
+    }
+    if (id == seaTarget) return true;
+    // Explicit SEA opt-in: do not enable CircuitUnit's shared CmdSetTarget stub.
+    // BAR's priority-fire command leaves the MOVE/patrol queue intact. Issue on
+    // target transitions only; script reacquires legal contacts each census.
+    for (auto* unit : units) {
+        if (!unit->GetCircuitDef()->HasSurfToAir()) continue;
+        TRY_UNIT(circuit, unit,
+            if (id >= 0) {
+                float params[] = {float(id)};
+                SendCustomCommand(circuit->GetSkirmishAIId(), unit->GetId(), CMD_UNIT_SET_TARGET, params);
+                unit->TrySetFireState(CCircuitDef::FireType::OPEN);
+            } else if (seaTarget >= 0) {
+                float params[] = {float(seaTarget)};
+                SendCustomCommand(circuit->GetSkirmishAIId(), unit->GetId(), CMD_UNIT_CANCEL_TARGET, params);
+                unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
+            }
+        )
+    }
+    seaTarget = id;
+    return true;
 }
 
 void CRouteTask::SetRoute(std::vector<AIFloat3>&& waypoints)

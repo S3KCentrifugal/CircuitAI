@@ -1591,7 +1591,13 @@ namespace Global {
             float FleetLaneSpacing = 72.0f;
             int FleetScouts = 3;
             bool RespectCarrierControl = true; // yield attached drones to the game's carrier gadget
-            bool HybridScoutAirResponse = true; // Armada scout boats must use their AA task during a raid
+            bool HybridScoutAirResponse = true; // SEA scout/dedicated AA interception, all factions
+            int ScoutPatrolSeconds = 120;
+            float ScoutPatrolCell = 640.0f;
+            float NavalAAFormationSpacing = 320.0f; // capped by shortest AA range for overlapping coverage
+            int NavalAAColumns = 6;
+            float NavalAAInterceptSeconds = 12.0f;
+            int NavalAAContactMemorySeconds = 8;
             float HybridSubCoverWeight = .5f; // T1 destroyer cost includes its surface gun; avoid valuing all of it as anti-sub
             float ThreatResponseRadius = 6000.0f;
             float AirCounterRatio = 0.7f;

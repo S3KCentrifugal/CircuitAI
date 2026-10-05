@@ -1,0 +1,119 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1403,
+      "sha256": "aab1a500e890612655b11b39916011163f3007ceab4c95a06a651a6ac04c098e"
+    },
+    "infolog.txt": {
+      "bytes": 552922,
+      "sha256": "5e0c7685a45348e3422be4b2810a76930d5f6f10e00cddbb8041992422b2ddc5"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "a84d3bf3e6bf7457d4ceea9826c8785d54bdd129703efd7a241b8759f8e9156d"
+    },
+    "report.md": {
+      "bytes": 4784,
+      "sha256": "189d0c08da7bace8073ff3e9e08ff79d878b9f1f57465b61825736cdb20ac11c"
+    },
+    "run-inputs.json": {
+      "bytes": 36437,
+      "sha256": "d9f55e9772008bfeadb684e77e3436af90dc8a3b27e0c70b5b6ff95edd8e3f97"
+    },
+    "run-plan.json": {
+      "bytes": 258,
+      "sha256": "a3421e7ec6af2502fae530c66b05992813a5fca3bb7d8134efef3d651420c7f6"
+    },
+    "screen_2026-10-05_14-02-08-728.png": {
+      "bytes": 1585699,
+      "sha256": "31feaf57af38ee99be25faef00e52c33906ce4996e4cedbf67c3ae10b806c024"
+    },
+    "screen_2026-10-05_14-02-14-690.png": {
+      "bytes": 1564940,
+      "sha256": "2f0f844d35ad6d50f39eefd083d1d5a7be4104db8864ccce85b35b5497a128e8"
+    },
+    "screen_2026-10-05_14-02-18-985.png": {
+      "bytes": 1604358,
+      "sha256": "b535f0f7d41c4deb67a63816739e99622b16566b8192b1b31c50424a262965a7"
+    },
+    "screen_2026-10-05_14-02-21-614.png": {
+      "bytes": 1604773,
+      "sha256": "7e8d2753531074685af70e82579560b2cc8fcaf87287b794142371cf3980a3f3"
+    },
+    "screen_2026-10-05_14-02-27-571.png": {
+      "bytes": 1612509,
+      "sha256": "5c24c63a15944a1c16c69b92065921f0d7becf2f24bce32b0a38e3dc818b4826"
+    },
+    "screen_2026-10-05_14-02-48-534.png": {
+      "bytes": 1637636,
+      "sha256": "c0a226124cdb16a0859c860050e3ad2840cca49b2646a89eafdf9e7f5fa152b7"
+    },
+    "script.txt": {
+      "bytes": 6169,
+      "sha256": "579b637a99e704b052870a938616007d86f96662e0916d50be74a97aa0abe0d1"
+    },
+    "sea-arena-pins.json": {
+      "bytes": 36607,
+      "sha256": "d1dceb27bd191d8226c75772645edf1b12e26246689fc06bffbeda5de2c73a5b"
+    },
+    "sea-arena.json": {
+      "bytes": 1194,
+      "sha256": "2a2ee66f8625792bce6839b34b086f4fc518907083fb10d50529d2d646e2035a"
+    },
+    "staged.json": {
+      "bytes": 235,
+      "sha256": "bf23fcce5811fb3e480b5e90128a161b81ceee7d28d7ea1fae0864794e8d5051"
+    },
+    "starts.as": {
+      "bytes": 111,
+      "sha256": "90ea267dfdb8709a24cc08b106c64a6211f14ad7d91b06e23f3e777f0b64415b"
+    },
+    "teams.json": {
+      "bytes": 460,
+      "sha256": "00809dcce735e3556aa7f0b8e9d64da9a97dc571575f50830dd68b899e2c475f"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "herring-aa-flank-cand"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T140306Z-b35bba27",
+  "last_frame": 10950,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\herring-aa-flank-cand\\supreme\\20261005T140113Z-e09ffdc1\\runs\\20261005T140306Z-b35bba27",
+  "reason": "reached 6 min",
+  "recorded_at_utc": "2026-10-05T14:03:06.206737+00:00",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 1,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

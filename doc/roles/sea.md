@@ -380,15 +380,17 @@ it is config-driven per def.
 
 The opt-in combat migration installs `SeaCombat::MilitaryTask` as
 `MilitaryAiMakeTaskHandler`. Ordinary hulls retain native task selection.
-`HybridScoutAirResponse` assigns Armada scout/AA boats to native AA tasks
-while hostile strike aircraft are observed, and the one-second census transfers
-existing scouting boats once. It does not reset already-correct AA tasks.
-`SeaCombat::MilitaryRemoved`, wired through `MilitaryAiUnitRemoved`, clears
-tracked responder IDs on death/transfer. Role exit restores native selection
-for surviving tracked AA responders.
-When the observed air threat and its short memory expire, tracked hybrid AA
-responders also return to native selection so a raid cannot consume all scouts
-for the rest of the game.
+D-202's `SeaPatrol` owns T1 scout and dedicated AA movement. Herrings are
+recognized independently of their AA-only experimental profile label. Scouts
+lease individual patrol sectors across navigable safe water; dedicated AA
+covers the friendly coast. `HybridScoutAirResponse` interrupts eligible AA
+patrols for any legal same-sea aircraft contact, including unarmed transits.
+Ships move to distinct rows/columns, holding positions while BAR priority-fire
+targets nearby aircraft. No shared ATTACK destination collapses the screen.
+Patrols resume after the contact memory expires. Player, carrier and repair
+retreat owners are preserved. `SeaCombat::MilitaryRemoved` leaves ID cleanup
+to the next owned census through `MilitaryAiUnitRemoved`; role exit releases routes immediately.
+See [patrol and air-defense design/evidence](../sea-patrol-air-defense.md).
 With `RespectCarrierControl`, attached carrier drones use a passive native
 task until their game-owned host rule disappears; a one-second census also
 handles the rule arriving after creation. Role exit releases this ownership.

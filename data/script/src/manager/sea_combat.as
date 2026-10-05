@@ -2,6 +2,7 @@
 // retain path traversal, contact combat and repair. No per-unit orders here.
 #include "sea_economy.as"
 #include "sea_operations.as"
+#include "sea_patrol.as"
 namespace SeaCombat {
     class Hull {
         CCircuitDef@ def;
@@ -13,16 +14,12 @@ namespace SeaCombat {
     }
     array<Hull@> roster;
     array<int> owned;
-    dictionary airResponders;
     int frame=-100000;
     int subSeen=-100000, airSeen=-100000;
     float surface=0, underwater=0, air=0, shore=0, fleet=0;
     bool Active() { return Global::AISettings::Role==AiRole::SEA && Global::RoleSettings::Sea::AdaptiveFleet; }
-    bool HybridScoutAA(const CCircuitDef@ def) {
-        return def !is null && def.GetName()=="armpt" && def.HasSurfToAir();
-    }
     void MilitaryRemoved(CCircuitUnit@ u, Unit::UseAs usage) {
-        if (u !is null) airResponders.delete(""+u.id);
+        // The next owned census releases the ID and its route/sector lease.
     }
     IUnitTask@ MilitaryTask(CCircuitUnit@ u) {
         if (u is null) return null;
@@ -31,43 +28,7 @@ namespace SeaCombat {
             if (u.task !is null && u.task.IsExternalControlled()) return u.task;
             return aiMilitaryMgr.EnqueueExternalControl("carrier_host_unit_id");
         }
-        if (Active() && Global::RoleSettings::Sea::HybridScoutAirResponse && air>0 && HybridScoutAA(u.circuitDef)) {
-            airResponders.set(""+u.id,true);
-            return aiMilitaryMgr.Enqueue(TaskF::Common(Task::FightType::AA));
-        }
         return aiMilitaryMgr.DefaultMakeTask(u);
-    }
-    void AirResponse() {
-        if (!Global::RoleSettings::Sea::HybridScoutAirResponse) return;
-        if (air<=0) {
-            // A transient raid must not permanently consume every sonar scout.
-            // Restore only our own AA assignments after threat memory expires;
-            // player, external and retreat owners remain untouched.
-            for (uint i=0;i<owned.length();++i) {
-                if (!airResponders.exists(""+owned[i])) continue;
-                CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
-                IFighterTask@ old=u is null ? null : cast<IFighterTask>(u.task);
-                if (old is null || old.GetFightType()!=int(Task::FightType::AA)) continue;
-                IUnitTask@ native=aiMilitaryMgr.DefaultMakeTask(u);
-                if (native !is null && !aiMilitaryMgr.TransferUnit(u,native)) native.Abort();
-            }
-            return;
-        }
-        for (uint i=0;i<owned.length();++i) {
-            CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
-            if (u is null || !HybridScoutAA(u.circuitDef)) continue;
-            IFighterTask@ old=cast<IFighterTask>(u.task);
-            // Preserve player, retreat, transport and already-correct tasks.
-            if (old is null || old.GetFightType()!=int(Task::FightType::SCOUT)) continue;
-            IUnitTask@ task=aiMilitaryMgr.Enqueue(TaskF::Common(Task::FightType::AA));
-            if (task !is null && aiMilitaryMgr.TransferUnit(u,task)) {
-                airResponders.set(""+u.id,true);
-                GenericHelpers::LogUtil("[SEA][AirCover] scout joins AA task "+u.id,1);
-            } else if (task !is null) {
-                task.Abort();
-                Invariants::Violation("INV-133",""+u.id,"SEA could not assign hybrid scout air defense");
-            }
-        }
     }
     void CarrierControl() {
         if (!Global::RoleSettings::Sea::RespectCarrierControl) return;
@@ -89,18 +50,16 @@ namespace SeaCombat {
     }
     void Leave() {
         SeaOperations::Leave();
+        SeaPatrol::Leave();
         for (uint i=0;i<owned.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
             if (u is null || u.task is null) continue;
-            IFighterTask@ fighter=cast<IFighterTask>(u.task);
-            const bool hybrid=airResponders.exists(""+u.id) && fighter !is null && fighter.GetFightType()==int(Task::FightType::AA);
-            if (!u.task.IsExternalControlled() && !hybrid) continue;
+            if (!u.task.IsExternalControlled()) continue;
             IUnitTask@ old=u.task;
             IUnitTask@ task=aiMilitaryMgr.DefaultMakeTask(u);
             if (task !is null && !aiMilitaryMgr.TransferUnit(u,task)) task.Abort();
             if (old.IsExternalControlled()) old.Abort();
         }
-        airResponders.deleteAll();
         frame=-100000;
         subSeen=-100000; airSeen=-100000; surface=0; underwater=0; air=0; shore=0;
     }
@@ -148,7 +107,7 @@ namespace SeaCombat {
         underwater=SeaMath::RememberThreat(underwater,nextSub,ai.frame-subSeen,memory);
         air=SeaMath::RememberThreat(air,nextAir,ai.frame-airSeen,memory);
         shore=aiBattle.GetNavalThreatCost(3);
-        AirResponse();
+        SeaPatrol::Tick();
         // Avoid the legacy map-wide army/per-player comparison. The native
         // reachable-group gate and damage-triggered response remain active.
         aiMilitaryMgr.quota.attack=Global::RoleSettings::Sea::MilitaryAttackThreshold;

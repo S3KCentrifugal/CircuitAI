@@ -630,8 +630,10 @@
       "kind": "suite",
       "title": "sea_math_tests",
       "definitions": [
+        "test_aa_screen_slots_stay_separate_and_overlap",
         "test_canceled_unframed_berth_is_retryable",
         "test_counter_admission_and_time_to_coverage",
+        "test_interception_respects_speed_weapon_reach_and_horizon",
         "test_opening_exception_does_not_return_after_factory_loss",
         "test_rear_fusion_footprint_keeps_protected_margin",
         "test_safety_interruption_restarts_unchanged_site_timer",
@@ -640,7 +642,7 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "b12addf9d0de4a77e1036db6537808c20cc79893261d2a9aba41b02325cb7495",
+      "sha256": "95d80fe9d28a51b905b549f61f1870a1fc5d5fd0babde724b2a3d166bf853fc4",
       "execution": "not inferred"
     },
     {
@@ -945,6 +947,17 @@
       "definitions": [],
       "detail": "Independent SEA combat/order scorecard; never overwrites evidence.",
       "sha256": "f2a256e134f96ed07e8035c27ec1d91bfe5729b9d2b498f202fd57b6de74a281",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_sea_patrol.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_sea_patrol",
+      "definitions": [],
+      "detail": "Summarize physical SEA patrol/AA evidence without rewriting a run verdict.",
+      "sha256": "6217d45f654e2c4ddf2acf38b8003e2bf124216f1458ec9830d9ab7ccd03d83f",
       "execution": "not inferred"
     },
     {
@@ -1380,6 +1393,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/cases/sea/combat/armada-air-screen-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "armada-aa-screen",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "aa0214c6745d53c81d59846ea66be369e3152a579acb008dc7d758bc2e702d27",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/cases/sea/combat/carrier-release.json",
       "domain": "sea",
       "area": "combat",
@@ -1402,6 +1426,50 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/cases/sea/combat/herring-air-flank-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "herring-aa-flank",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "6ea44f937839f1519961127b967fc71990bff4fb2e4efa602de63be7ea5e1ae4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/herring-air-screen-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "herring-aa-screen",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "3a18d310ad547b21f0712784c2c880c809558992f5cb7b925c84766cd5dfe499",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/herring-patrol-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "herring-patrol",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "0487cf051b781c4ac247dccb39832a6f7c932ba9abb3dce2cfa32e699cb56997",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/herring-unarmed-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "herring-aa-unarmed",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "8238bab49abf4119e9abb840f120d9d4ec2cd1ea6d7b54933a3c508eb8238027",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/cases/sea/combat/hover-screen.json",
       "domain": "sea",
       "area": "combat",
@@ -1421,6 +1489,17 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "d2173e314563cb43d81649d5e18b17d2dd4394be05a5cc75f93ca9aff876c8d9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/legion-air-screen-supreme.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "legion-aa-screen",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "e40aee841200d17cb764e58caa386dbf970a7537ac14ef67a282e78268a61834",
       "execution": "not inferred"
     },
     {
@@ -2568,6 +2647,74 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/sea/combat/sea-aa-legion.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-aa-legion",
+      "definitions": [
+        "expect: dedicated_aa_damage",
+        "expect: dedicated_aa_response",
+        "expect: loaded",
+        "expect: orders",
+        "expect: physical_air_damage",
+        "expect: physical_patrol",
+        "expect: screen",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "01afd75b2a7dab6b207f22d253a2b05a51d112d52923330468b2331feff95cc9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/sea-aa-screen.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-aa-screen",
+      "definitions": [
+        "expect: loaded",
+        "expect: orders",
+        "expect: physical_air_damage",
+        "expect: physical_patrol",
+        "expect: screen",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "aab1a500e890612655b11b39916011163f3007ceab4c95a06a651a6ac04c098e",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/sea-aa-unarmed.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-aa-unarmed",
+      "definitions": [
+        "expect: loaded",
+        "expect: orders",
+        "expect: physical_air_damage",
+        "expect: physical_patrol",
+        "expect: screen",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "2072a59f7931da0278d54601f58e436e4412f885ebc1cd7554a4853213803edb",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/sea/combat/sea-arena.json",
       "domain": "sea",
       "area": "combat",
@@ -2622,6 +2769,26 @@
       ],
       "detail": "",
       "sha256": "10079cdf7db434b1a3fe1075bbfd2492972babe2fd6b5c2a6204c6f0c4d095ad",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/sea-patrol.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "sea-patrol",
+      "definitions": [
+        "expect: loaded",
+        "expect: orders",
+        "expect: physical_patrol",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "4cfe7daca4b99d7cf278403ee76268f11cd89c08a488401108b5a66ebb47acfe",
       "execution": "not inferred"
     },
     {
@@ -4341,7 +4508,7 @@
       "title": "sea_arena",
       "definitions": [],
       "detail": "Isolated SEA combat fixtures. Assets are supplied; AI alone commands combat.",
-      "sha256": "ab7785dc43879784ed798d5857369b8fa933859af771323b1a8ef9b9c1e1d4b2",
+      "sha256": "0de7f68a1739a3549c779c78875c7c25a08b753dc6e58eb44af092e7784f1090",
       "execution": "not inferred"
     },
     {
@@ -5078,7 +5245,7 @@
       "title": "sea_arena",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "51f04e32f9ca0e9cc58a80026446452347961fbee6a550d6d47b181c64c2feb2",
+      "sha256": "d22fdee61a7757753f3d815dd0cf8ad8d41c482cb68a6787e5c2f29c1574bea6",
       "execution": "not inferred"
     },
     {

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "legion-aa-screen-cand"
+  },
+  "id": "20261005T140614Z-750abf6c",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1
+}

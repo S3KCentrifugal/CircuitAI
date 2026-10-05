@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "13f764d6499616cd6e616ab7400a0ed43f423f3f6155cf68d7b36240906040dd",
+    "checks.json": "aab1a500e890612655b11b39916011163f3007ceab4c95a06a651a6ac04c098e",
+    "d202-review.json": "d5e031a8611bf76c82ab60e8191903a9a55f1dbb847b44ed00e2d09dde92c188",
+    "launched.json": "3cda9525fc3a6f6e66eab107677c0e5ef09bab5497883dd6f6a960c1dd638ff2",
+    "report.md": "e867adf0ca4035bdbdb00bd0f213dc20abbe1e98cdead483bd9f69e4a683bce5",
+    "result.json": "7f16fc304ef348609602a8041885d1004f3f9203fe99f28c27c1ad639f37d461",
+    "run-inputs.json": "7242c2d25b8f5545a60fca81d4ffc6f91a954a8a0db323f2129f444ec68530b2",
+    "run-plan.json": "91dfb04234ada739d07ba97cc9cc2299bf01b3b06cf1ad0a8149bfae41ceb2be",
+    "screen_2026-10-05_14-23-41-935.png": "cf2ca41a8cf2028088a852c0d980dd9f45b22835edb20a6022f2b613d3ba17a0",
+    "script.txt": "579b637a99e704b052870a938616007d86f96662e0916d50be74a97aa0abe0d1",
+    "sea-arena-pins.json": "68e9eef386f2b15f21a6376c18c2422be05dfc781a0a314fa28a72219b4f54ed",
+    "sea-arena.json": "b371d182cd3f6477a1f56c6e9cc577aad81002f97c94d8530beb2439edae6662",
+    "sea-patrol-analysis.json": "5b6e00e966fe2e8b8e1145870df056dfb7fa9699924922d21c1822085f809799",
+    "staged.json": "09bcca72e4f6c40a22d6d6024d189b850384f39634524c2c4f260f0c933d8661",
+    "starts.as": "90ea267dfdb8709a24cc08b106c64a6211f14ad7d91b06e23f3e777f0b64415b",
+    "teams.json": "00809dcce735e3556aa7f0b8e9d64da9a97dc571575f50830dd68b899e2c475f"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\herring-aa-flank-cand\\supreme\\20261005T142240Z-cd009b73\\runs\\20261005T142415Z-effde436",
+  "schema": 1
+}

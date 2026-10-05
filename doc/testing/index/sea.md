@@ -15,6 +15,47 @@ Generated source inventory. Execution is not inferred.
 - `forbid: invariant`
 - `forbid: script`
 
+### [sea-aa-legion](../../../tools/playtest/checks/sea/combat/sea-aa-legion.json)
+
+- `expect: dedicated_aa_damage`
+- `expect: dedicated_aa_response`
+- `expect: loaded`
+- `expect: orders`
+- `expect: physical_air_damage`
+- `expect: physical_patrol`
+- `expect: screen`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [sea-aa-screen](../../../tools/playtest/checks/sea/combat/sea-aa-screen.json)
+
+- `expect: loaded`
+- `expect: orders`
+- `expect: physical_air_damage`
+- `expect: physical_patrol`
+- `expect: screen`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [sea-aa-unarmed](../../../tools/playtest/checks/sea/combat/sea-aa-unarmed.json)
+
+- `expect: loaded`
+- `expect: orders`
+- `expect: physical_air_damage`
+- `expect: physical_patrol`
+- `expect: screen`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
 ### [sea-arena](../../../tools/playtest/checks/sea/combat/sea-arena.json)
 
 - `expect: combat`
@@ -45,6 +86,17 @@ Generated source inventory. Execution is not inferred.
 - `forbid: invariant`
 - `forbid: script`
 
+### [sea-patrol](../../../tools/playtest/checks/sea/combat/sea-patrol.json)
+
+- `expect: loaded`
+- `expect: orders`
+- `expect: physical_patrol`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
 ### [sea-sub-production](../../../tools/playtest/checks/sea/combat/sea-sub-production.json)
 
 - `expect: counter-started`
@@ -66,6 +118,10 @@ Generated source inventory. Execution is not inferred.
 
 ## Combat / Scenario
 
+### [armada-aa-screen](../../../tools/playtest/cases/sea/combat/armada-air-screen-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
 ### [carrier-release](../../../tools/playtest/cases/sea/combat/carrier-release.json)
 
 Map: selected by runner
@@ -74,6 +130,22 @@ Map: selected by runner
 
 Map: selected by runner
 
+### [herring-aa-flank](../../../tools/playtest/cases/sea/combat/herring-air-flank-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
+### [herring-aa-screen](../../../tools/playtest/cases/sea/combat/herring-air-screen-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
+### [herring-patrol](../../../tools/playtest/cases/sea/combat/herring-patrol-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
+### [herring-aa-unarmed](../../../tools/playtest/cases/sea/combat/herring-unarmed-supreme.json)
+
+Map: Supreme Isthmus v1.7
+
 ### [hover-screen](../../../tools/playtest/cases/sea/combat/hover-screen.json)
 
 Map: selected by runner
@@ -81,6 +153,10 @@ Map: selected by runner
 ### [large-fleet](../../../tools/playtest/cases/sea/combat/large-fleet.json)
 
 Map: selected by runner
+
+### [legion-aa-screen](../../../tools/playtest/cases/sea/combat/legion-air-screen-supreme.json)
+
+Map: Supreme Isthmus v1.7
 
 ### [legion-t2-production](../../../tools/playtest/cases/sea/combat/legion-t2-production.json)
 
@@ -275,8 +351,10 @@ Map: glacial
 
 ### [sea_math_tests](../../../tests/sea_math_tests.as)
 
+- `test_aa_screen_slots_stay_separate_and_overlap`
 - `test_canceled_unframed_berth_is_retryable`
 - `test_counter_admission_and_time_to_coverage`
+- `test_interception_respects_speed_weapon_reach_and_horizon`
 - `test_opening_exception_does_not_return_after_factory_loss`
 - `test_rear_fusion_footprint_keeps_protected_margin`
 - `test_safety_interruption_restarts_unchanged_site_timer`

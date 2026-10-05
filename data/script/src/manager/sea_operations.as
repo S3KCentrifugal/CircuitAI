@@ -31,6 +31,7 @@ namespace SeaOperations {
             || u.circuitDef.IsAbleToFly() || u.circuitDef.GetBuildSpeed()>0
             || u.GetRulesParam("carrier_host_unit_id",-1)>=0) return false;
         const CCircuitDef@ d=u.circuitDef;
+        if (SeaPatrol::Handles(d)) return false;
         // Explicit roster membership excludes amphibious land. Siege hulls
         // participate only in emergency screening, then regain native artillery.
         bool member=false;

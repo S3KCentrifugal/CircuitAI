@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "supplied_assets": false,
+  "map": "Supreme Isthmus v1.7",
+  "seed": 1881001,
+  "engine_seed": 1881001,
+  "minutes": 20.0,
+  "profile": "experimental_hard",
+  "side": "cortex",
+  "dll_sha256": "9af405acf9a6180b3d060f9431f8531f1259a61247532b621e7b96cba29cc997"
+}

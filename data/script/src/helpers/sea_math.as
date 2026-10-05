@@ -1,5 +1,19 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    // Centre-out columns keep existing members' slots when reinforcements
+    // arrive. Fixed columns avoid a sqrt(N) grid reshuffle at every birth/death.
+    int SpreadIndex(int index) { return index==0 ? 0 : (index%2==1 ? (index+1)/2 : -index/2); }
+    int AAColumn(int slot,int columns) { return SpreadIndex(slot%(columns>0 ? columns : 1)); }
+    int AARow(int slot,int columns) { return slot/(columns>0 ? columns : 1); }
+    float AASpacing(float configured,float shortestRange) {
+        const float overlap=shortestRange*.55f;
+        return configured<overlap ? configured : overlap;
+    }
+    float InterceptLead(float distance,float shipSpeed,float weaponRange,float maximum) {
+        if (distance<=weaponRange || shipSpeed<=0 || maximum<=0) return 0;
+        const float seconds=(distance-weaponRange)/shipSpeed;
+        return seconds<maximum ? seconds : maximum;
+    }
     float RememberThreat(float previous, float observed, int age, int lifetime) {
         return observed>0 ? observed : age<lifetime ? previous : 0.0f;
     }

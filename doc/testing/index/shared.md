@@ -1127,6 +1127,10 @@ Summarize opt-in D-199 phases without double-counting nested scopes.
 
 Independent SEA economy/egress scorecard; never rewrites original reports.
 
+### [analyze_sea_patrol](../../../tools/playtest/analyze_sea_patrol.py)
+
+Summarize physical SEA patrol/AA evidence without rewriting a run verdict.
+
 ### [analyze_skirmish_performance](../../../tools/playtest/analyze_skirmish_performance.py)
 
 Summarize observer evidence; no FPS/CPU attribution is inferred from APM.

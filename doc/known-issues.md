@@ -5066,3 +5066,25 @@ capacity. Do not weaken the original check or promise instantaneous counters.
 original FAIL. With six supplied construction turrets, a separate Cortex case
 started a sub at frame 2803 and damaged a submarine at frame 3238. This is a
 capacity experiment, not a replacement verdict or a funded-economy guarantee.
+
+### KI-502 - Native idle AA can repeatedly replace identical fight orders
+
+**Problem.** The D-202 twelve-Herring Supreme baseline, using native AntiAirTask,
+recorded 4,398 team orders in minute one and 5,441 in minute two; 5,386 of the
+latter repeated each unit's previous signature. Unit breakdown attributes
+5,440 orders to the twelve Herrings. They formed an 81-by-93-elmo group at
+90 seconds with no patrol queues. D-202 bypasses that owner for adaptive SEA
+scouts/AA only; the native implementation remains unchanged for other roles
+and legacy/disabled SEA policy. No claim is made that every other-role AA
+population reproduces the same rate.
+
+**Proposed solution.** Trace AntiAirTask's regroup/fallback FightTo path and
+synchronous idle events. Suppress only an identical still-live order for the
+same owner/intent; invalidate on target, membership, position, task handover,
+queue loss and damage response. Keep threat observation cadence unchanged.
+Compare old/new command streams and combat outcomes for mobile ground AA and
+naval AA outside adaptive SEA before changing the shared native task.
+
+**Verification.** The original baseline FAIL and candidate patrol PASS are
+retained in the [D-202 report](sea-patrol-air-defense-results.md). This task
+fixes SEA ownership, not the remaining shared mechanism.

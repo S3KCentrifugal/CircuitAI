@@ -183,7 +183,7 @@ step.
 | INV-130 | A SEA yard retires only after its operational replacement has produced a physically exiting ship. | SeaFactories::Tick and independent harbor-lifecycle fixture. | D-188 |
 | INV-131 | A selected SEA fleet counter has an actual weapon for its requested target layer. | SeaCombat::Select and SeaArena target-category/damage observer. | D-189 |
 | INV-132 | Active SEA can transfer an attached military drone to a task that leaves the game's command queue alone. | SeaCombat::CarrierControl checks transfer; the carrier arena separately observes host ownership, command source, firing and release. | D-189 |
-| INV-133 | Active SEA can reassign a hybrid scout/AA boat from scouting to native air defense when aircraft are observed. | SeaCombat::AirResponse checks task transfer; independent raid fixtures measure actual aircraft losses and base preservation. | D-189 |
+| INV-133 (superseded by INV-146) | Active SEA could reassign Armada hybrid scout/AA boats to native air defense. | D-202 replaces this narrow native-AA handover with all-faction individual patrol/interception routes. | D-189, D-202 |
 | INV-134 (retired experiment) | SEA's attempted stalled-approach recovery excluded frames/factories. | The progress-timeout experiment passed boundary checks but regressed natural Tundra timing; implementation was removed. Retained as history, not an active runtime promise. | D-189 |
 | INV-135 | Every SEA production-support turret order is within its actual assist range of its selected factory. | SeaBuild::Support audits accepted pinned positions; the supplied fixture observes completed turrets assisting active shipyard/amphibious products. | D-190 |
 | INV-136 | Newly reserved AIR advanced-converter and SEA economy grids retain their intended pitch after native snapping. | LayoutHelpers::CheckGrid checks each successful reservation once; independent fixtures measure completed physical footprints and shared edges. | D-190 |
@@ -201,3 +201,4 @@ step.
 | INV-144 | Indexed local slot/zone occupancy gives the same answer as the legacy scan, including consumed and ignored slots. | TerrainManager::IsSlotFree compares both paths when CIRCUIT_VERIFY_LOCAL_LAYOUT is enabled; lifecycle differential tests run independently. | D-199 |
 
 | INV-145 | Eligible SEA cohort members accept the selected route task; player, retreat, carrier and AA tasks are excluded. | SeaOperations::Route logs failed TransferUnit; SEA arena checks forbid all invariants. | D-201 |
+| INV-146 | Eligible SEA scout/AA hulls accept their individual patrol/interception route; player, carrier and repair retreat ownership remains protected. | SeaPatrol::Order audits handover; Supreme observer measures physical separation, patrol queues and AA damage. | D-202 |

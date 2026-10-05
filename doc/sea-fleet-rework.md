@@ -9,6 +9,10 @@ Implementation and played acceptance are recorded in the
 [results report](sea-fleet-rework-results.md). The design below is broader than
 the fixtures completed; unplayed acceptance rows remain explicit there.
 
+D-202 supersedes the scout/AA ownership portion below with
+[individual patrols and dispersed interception](sea-patrol-air-defense.md);
+the D-201 text and observations remain as historical design/evidence.
+
 ## Findings and PvP interpretation
 
 The [official naval guide](https://www.beyondallreason.info/guide/basics-on-sea-warfare)

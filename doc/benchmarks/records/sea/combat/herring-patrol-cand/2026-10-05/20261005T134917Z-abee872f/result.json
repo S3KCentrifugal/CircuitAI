@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1091,
+      "sha256": "4cfe7daca4b99d7cf278403ee76268f11cd89c08a488401108b5a66ebb47acfe"
+    },
+    "infolog.txt": {
+      "bytes": 393585,
+      "sha256": "76a228b1f693f55f262d476ac7aabd914232f4bf03501a5bca6fea887b9bd3ed"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "54b4170899615b53d66d722e7cecf0a69c0f503361a066fc5f874ba4be0567a1"
+    },
+    "report.md": {
+      "bytes": 3844,
+      "sha256": "9772f94bfe8e82fc89dabe0cc526e7e9709fa73cc0a20d01a37052d433d720ee"
+    },
+    "run-inputs.json": {
+      "bytes": 36328,
+      "sha256": "277c1da74d64c31c064a40b75e2ee3c73374bcfbd2d04b6404bbd9a6204437a2"
+    },
+    "run-plan.json": {
+      "bytes": 256,
+      "sha256": "2d5cb81eea65bd8f2bc301965bd5e21cd7403c44516d8d7f30155ce94499c835"
+    },
+    "script.txt": {
+      "bytes": 6169,
+      "sha256": "5f814bec3cf21c83242a38c5d4f4a58ab7da15fcfb4ecd35d2b28b913db68fd0"
+    },
+    "sea-arena-pins.json": {
+      "bytes": 36495,
+      "sha256": "c2f1443b933858b3e1df9ef0f9422138f9eabd73075b4b95eafdace2dceee2f9"
+    },
+    "sea-arena.json": {
+      "bytes": 661,
+      "sha256": "b49ddce4d46b5d425ef18e132b5756573b15f64de7ba2b49b60c0ee44c297f59"
+    },
+    "staged.json": {
+      "bytes": 240,
+      "sha256": "de83d976c7ba5d76a858fd227779543be9c54f10587873c3decdeed965716def"
+    },
+    "starts.as": {
+      "bytes": 111,
+      "sha256": "90ea267dfdb8709a24cc08b106c64a6211f14ad7d91b06e23f3e777f0b64415b"
+    },
+    "teams.json": {
+      "bytes": 460,
+      "sha256": "00809dcce735e3556aa7f0b8e9d64da9a97dc571575f50830dd68b899e2c475f"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "herring-patrol-cand"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T134917Z-abee872f",
+  "last_frame": 300,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\herring-patrol-cand\\supreme\\20261005T134825Z-83d33147\\runs\\20261005T134917Z-abee872f",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-05T13:49:17.303436+00:00",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 1,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

@@ -12233,3 +12233,77 @@ fixtures; no all-unit optimality or multiplayer FPS claim follows from them.
 **D-201 completed observations.** See the [results report](sea-fleet-rework-results.md): twelve final combat fixtures and three natural twenty-minute games on Glacial, Supreme and Shore, fourteen PASS and one retained Cortex capacity FAIL; an older screen observation is retained separately. Native/VM tests, API, role and invariant checks pass. Existing benchmark evidence (4,985 files) is byte-for-byte preserved. KI-500/501 and unplayed acceptance limits remain explicit; these are not PvP victory or FPS claims.
 
 **D-201 cleanup follow-up.** Final review replaced repeated dead-cohort removeAt with stable O(G) compaction while retaining reverse abort order and survivor order. A separate candidate-10 surface fixture with losses passed; the [results report](sea-fleet-rework-results.md) links its original record. Seventeen observations are now published, with earlier verdicts unchanged.
+
+
+## D-202 - SEA scouts patrol independently and AA intercepts without merging
+
+**Call.** Adaptive SEA owns one persistent route per scout/AA hull. Idle scouts
+lease distinct safe water sectors. Known aircraft in the same connected sea,
+including unarmed aircraft and coastal transits, interrupt available AA hulls
+into a separated overlapping grid. Priority fire preserves MOVE/patrol queues;
+lost contacts clear fire priority immediately, then movement memory expires
+back to patrols. Other roles, production and economy retain their behavior.
+
+**Why.** Herring is AA-only in experimental_hard, so the prior scout director
+excluded it; the hybrid response admitted Armada alone. Native AA merged boats
+to one point and repeatedly replaced idle FIGHT orders. The controlled baseline
+recorded no patrol queues and 5,441 team orders in minute two. Persistent routes
+and distinct slots address the reported behavior without a global rate limit.
+One primary air contact per sea is selected near the protected coast; individual
+weapons select nearer legal aircraft in range. Full multi-raid allocation is
+not demonstrated. Destination separation cannot prevent all physical path crossings.
+
+**Alternatives rejected.** Changing shared unit roles or native AntiAirTask
+would affect other roles. A generic HasSurfToAir test admitted Legion's weak
+scout gun but missed scout-first Iapetus metadata; explicit SEA AA admission
+with actual AA capability is used. General surface danger includes aircraft,
+so using it for interception made AA avoid its own counter target. Interception
+instead excludes known naval/sub weapon danger, cached within one census;
+patrol admission still checks surface and underwater danger. No omniscient
+positions, blanket APM limit or worker-thread engine callbacks are introduced.
+
+**Invariant.** INV-146: one SEA route owns each available scout/AA ship; a failed
+transfer is logged, and all checks forbid invariant violations. Sector leases
+and target priority release with ownership. Player, carrier and repair retreat
+owners remain protected. Native priority-target commands require explicit SEA
+control and cancel only the route's target ID. INV-133 is superseded rather
+than silently kept as an unreachable old promise. See the
+[invariant register](invariants.md) and [actor matrix](actor-matrix.md).
+
+**Implementation.** [SeaPatrol](../data/script/src/manager/sea_patrol.as),
+[combat census](../data/script/src/manager/sea_combat.as),
+[surface owner exclusion](../data/script/src/manager/sea_operations.as),
+[settings](../data/script/src/global.as),
+[geometry policy](../data/script/src/helpers/sea_math.as),
+[RouteTask](../src/circuit/task/fighter/RouteTask.cpp),
+[route declaration](../src/circuit/task/fighter/RouteTask.h),
+[bindings](../src/circuit/script/InitScript.cpp),
+[VM regressions](../tests/sea_math_tests.as),
+[arena runner](../tools/playtest/sea_arena.py),
+[physical observer](../tools/playtest/widgets/sea_arena.lua),
+[analysis](../tools/playtest/analyze_sea_patrol.py).
+New scenario/check files are individually linked in the generated
+[SEA test inventory](testing/index/sea.md); the
+[catalog](testing/catalog.json), [inventory root](testing/README.md) and
+[shared index](testing/index/shared.md) retain their established layout.
+
+**Documentation.** [Design](sea-patrol-air-defense.md),
+[results](sea-patrol-air-defense-results.md), [SEA reference](roles/sea.md),
+[native trace](sea-native-trace.md), [superseded D-201 boundary](sea-fleet-rework.md),
+[script API](angelscript-references.md), [known residuals](known-issues.md),
+[benchmark catalog](benchmarks/catalog.json), [SEA evidence index](benchmarks/index/sea.md).
+The results link all fifteen immutable evidence bundles, including the original
+Legion prototype PASS rejected after detailed review. No older verdict was rewritten.
+
+**Verification: Built and Played.** Twelve native executables and 372 embedded
+VM functions pass. Six final Supreme supplied-force cases and a separate normal
+20-minute economy game pass across all three experimental profiles. AA fixtures
+kill their six/eight aircraft before administrative cleanup; the Herring patrol
+fixture records twelve physical patrols at 90 seconds with 488-elmo mean nearest
+separation, versus 22.4 in the baseline. First-minute team orders fall from
+4,398 to 146. This is a behavior/control change, not measured FPS or packet gain.
+Final matched DLL/debug/data were published to the required development output;
+the live game installation was not changed. API/role/invariant/index checks pass.
+Eight pre-existing missing-hover doc links and 167 existing unit-helper findings
+remain. KI-502 records repeated native AA orders outside adaptive SEA. No 8v8
+late-game performance or PvP victory claim follows from these fixtures.

@@ -13,12 +13,12 @@ def prepare(a):
     # supported/unsupported counter cases into the same discovery category.
     # storage.allocate normalizes names and still gives every game a unique ID.
     label=case.get('name',Path(a.case).stem)+('-ctrl' if a.control else '-cand')
-    d=storage.allocate('sea','combat',label,'glacial','supplied',seed=a.seed)
-    starts=d/'starts.as'; starts.write_text('StartSpot(AIFloat3(2300,0,4400), AiRole::SEA, false),\nStartSpot(AIFloat3(4600,0,4400), AiRole::SEA, false),\n')
+    d=storage.allocate('sea','combat',label,case.get('map_key','glacial'),'supplied',seed=a.seed)
+    starts=d/'starts.as'; starts.write_text(''.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::SEA, false),\n' for x,z in case.get('starts',[[2300,4400],[4600,4400]])))
     call=[sys.executable,str(HERE/'playtest.py')]
-    subprocess.run(call+['stage','--dir',str(d),'--dll',str(a.dll),'--data',str(a.data),'--map','Glacial Gap v1.1','--map-file',str(starts),
+    subprocess.run(call+['stage','--dir',str(d),'--dll',str(a.dll),'--data',str(a.data),'--map',case.get('map','Glacial Gap v1.1'),'--map-file',str(starts),
         '--game','Beyond All Reason test-31479-433a460','--engine','recoil_2026.07.04','--role','SEA','--roles','all','--ally-spots','1','--side',a.side,
-        '--speed',str(a.speed),'--minutes',str(a.minutes),'--shots','0.4@2400@3400:4450,0.7@2400@3400:4450,3@3200@3400:4450,7@4000@3400:4450',
+        '--speed',str(a.speed),'--minutes',str(a.minutes),'--shots',case.get('shots','0.4@2400@3400:4450,0.7@2400@3400:4450,3@3200@3400:4450,7@4000@3400:4450'),
         '--width','1280','--height','720','--lean-render','--bonus','0','--ai-option','profile='+a.profile,'--ai-option','random_seed='+str(a.seed),
         '--modoption','deathmode=neverend','--modoption','startenergy=1000000','--modoption','startenergystorage=1000000',
         '--extra-widget',str(HERE/'widgets/sea_arena.lua'),
@@ -46,7 +46,17 @@ def prepare(a):
         p=staged/'src/manager/factory.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
         p.write_text(s[:b+1]+'\n if (ai.frame<600) return aiFactoryMgr.Enqueue(TaskS::Wait(false,SECOND)); // fixture setup barrier\n'+s[b+1:])
     setup=staged/'src/setup.as';s=setup.read_text();s=s.replace('Global::AISettings::Role = derivedRole;','derivedRole=AiRole::SEA;\nGlobal::AISettings::Role = derivedRole;');setup.write_text(s)
-    case.update(seed=a.seed,side=a.side,minutes=a.minutes,control=a.control,order_slack=a.order_slack)
+    if case.get('enemy_air_route'):
+        # Script only the enemy transit. Friendly scout/AA orders remain wholly
+        # production policy, so physical response is not a fixture instruction.
+        points=','.join(f'AIFloat3({float(x)},160,{float(z)})' for x,z in case['enemy_air_route'])
+        p=staged/'src/manager/military.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
+        s=s[:b+1]+'''\n if (ai.teamId==1 && u.circuitDef.IsAbleToFly()) {
+            CRouteTask@ transit=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+            array<AIFloat3> points={'''+points+'''};
+            transit.SetTraversal(true,64,false); transit.SetPatrol(true); transit.SetRoute(points); return transit;
+        } // enemy flight path fixture only\n'''+s[b+1:];p.write_text(s)
+    case.update(seed=a.seed,side=a.side,minutes=a.minutes,speed=a.speed,control=a.control,order_slack=a.order_slack)
     (d/'LuaUI/Config').mkdir(exist_ok=True,parents=True);(d/'LuaUI/Config/sea_arena.lua').write_text('return '+lua(case)+'\n')
     (d/'sea-arena.json').write_text(json.dumps(case,indent=2))
     (d/'sea-arena-pins.json').write_text(json.dumps({

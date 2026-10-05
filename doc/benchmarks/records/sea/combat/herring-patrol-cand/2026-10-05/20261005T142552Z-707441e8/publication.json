@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "62fde8ec88102bb8f3f3f4f75f586bcb28bc8a722c4eb3556889f624ed84563e",
+    "checks.json": "4cfe7daca4b99d7cf278403ee76268f11cd89c08a488401108b5a66ebb47acfe",
+    "d202-review.json": "d5e031a8611bf76c82ab60e8191903a9a55f1dbb847b44ed00e2d09dde92c188",
+    "launched.json": "76e539a8a6bf9cc598bd2e63483636cc005bff75de1d12d5c29a03904f334b3c",
+    "report.md": "b839fe0648499e75669a98448a7bd4077be693d3b010939840aa26667ba1b7ee",
+    "result.json": "eccd2b575821478356dff4e5cb4b3787a43a45342d81230fe508bf6ca64320e1",
+    "run-inputs.json": "37484ae8a4cdf546b6fd570f84412f46d67c72d9fc129c69016a06c9e10bba42",
+    "run-plan.json": "3b99b89f7a4602622d6846d250d4f73fe45f8005a258d811e14c040ca5606e74",
+    "screen_2026-10-05_14-25-12-750.png": "8932c35b49f273f514279b3660569190ed85e40df9aca48aaf6fc87a0f376542",
+    "script.txt": "579b637a99e704b052870a938616007d86f96662e0916d50be74a97aa0abe0d1",
+    "sea-arena-pins.json": "471b429aabcfb6029c42515ad7462e88f64bae4a7b3bacc6cbbdf434192695b5",
+    "sea-arena.json": "2ddf98343f9d5a3fa808ddc3a2169969b186727fed71b3421dd1f62f41567a01",
+    "sea-patrol-analysis.json": "a53518f4c259795e3582868ea9f75725d723e009ea5d8a778f8c4bde9b4bd985",
+    "staged.json": "9a3d99b6b94ffefb61eda09049eb13fe048e56fd848ff25a9a2bf4e1490e8bf2",
+    "starts.as": "90ea267dfdb8709a24cc08b106c64a6211f14ad7d91b06e23f3e777f0b64415b",
+    "teams.json": "00809dcce735e3556aa7f0b8e9d64da9a97dc571575f50830dd68b899e2c475f"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\herring-patrol-cand\\supreme\\20261005T142415Z-37ef9a2c\\runs\\20261005T142552Z-707441e8",
+  "schema": 1
+}

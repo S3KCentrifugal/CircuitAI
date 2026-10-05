@@ -1838,3 +1838,16 @@ placement. Native phases include script execution and placement subroutines.
 rule scopes in diagnostic mode; production callers use bounded rule keys.
 These calls neither schedule work nor change policy. Deploy script and native
 binary together. See the [implementation and evidence](reviews/2026-10-04-high-severity-performance-implementation.md).
+
+### D-202 naval patrol mechanisms
+
+`aiTerrainMgr.CanMoveTo(unit, pos)` validates finite map-bounded coordinates
+against that hull's actual native movement area. It performs no path search.
+`CRouteTask.SetSeaTarget(id)` is valid only after `SetSeaControl(true)` and
+applies BAR priority fire without replacing the movement queue. It validates
+legal aircraft observations, respects game-level `ignoredByAI`, and issues only
+target changes. `-1` clears the task's target; removal uses an ID-specific cancel
+so another priority is preserved. SEA hold-position routes bypass shared
+standoff micro; all other route behavior is unchanged. See
+[SEA patrol policy](../data/script/src/manager/sea_patrol.as) and
+[design and tests](sea-patrol-air-defense.md).

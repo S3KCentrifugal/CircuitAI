@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "ae2a56617fd8751f41edf9958b55e07eff3e54c090601dad7a5f1049b05ce8a8",
+    "checks.json": "aab1a500e890612655b11b39916011163f3007ceab4c95a06a651a6ac04c098e",
+    "d202-review.json": "4c5062a338349f20b4c508a272dd8ecb8792aa7514193736266b41835a275ac9",
+    "launched.json": "d762313dabe61f9799f561a1a0b547db5bf62ebc102d33d3fd4c02fbc071d753",
+    "report.md": "9426ac3d472e56199e62a5c2ff1b986c6458ce49ac99b361d55ebedb52d622b4",
+    "result.json": "97bdcd03d66ae383733f16ea24c9c6935e5dd698c86ecef2792f2bf11d2935b9",
+    "run-inputs.json": "44f4ba7aa7e20b4853b872a17149b06c7e78ebb9af472191dea18bc0ee1da559",
+    "run-plan.json": "345ff98757451b67e9fb1216ff3bd7ed1829f25d35628ef24ee7cb1a0023c74b",
+    "script.txt": "4289801f5dfce05e2c5553be5a3c4b18b890002e45f45b885e289cdbe2144088",
+    "sea-arena-pins.json": "77d4c0c9934749e3a0cae2b2ea2ed87228d62a6930b4f55a7469e066040f9cbc",
+    "sea-arena.json": "0f6809be915c8afa1a7120b0550fb3ae4619bb54e7e09e90921177d05509515a",
+    "sea-patrol-analysis.json": "c387645e7ae54dc46391f85530cccdf66580902704ae7ec5bb236a9667d6eb9a",
+    "staged.json": "b991e7af46fbae33b48cca9a75bf9e509e7101e0ecaef226ac1cdb0380674aca",
+    "starts.as": "90ea267dfdb8709a24cc08b106c64a6211f14ad7d91b06e23f3e777f0b64415b",
+    "teams.json": "35a4d200bbfeaf71dac7b823e78830cdd0c7db2353a46298c050d9552b78de3d"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\armada-aa-screen-cand\\supreme\\20261005T140348Z-27dee017\\runs\\20261005T140538Z-849a5aab",
+  "schema": 1
+}
