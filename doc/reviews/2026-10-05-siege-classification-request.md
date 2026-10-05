@@ -1,25 +1,22 @@
-# Review: proposed Cent / legion-sea artillery normalization
+# Ranged support: safe firing positions and siege target selection
 
-Reviewed 2026-10-05 against CircuitAI `ff1925d0`; revised after the user's
-Fatboy-bait/static-defense example at `5dcf78bc`. **Current recommendation:
-make safe firing range and refusal to pursue bait the primary acceptance
-criteria.** Loss of heavy-target preference is an acceptable tradeoff if it
-prevents the reported mass losses. The initial review below over-weighted
-preserving existing combat roles and under-weighted their observed failure.
-Its source findings remain valid; its risk ranking is superseded by the
-revision below. No runtime code or profile was changed for this review.
+Reviewed 2026-10-05 against CircuitAI `ff1925d0` and `5dcf78bc`.
+**Safe firing range and refusal to pursue bait are the primary acceptance
+criteria.** Reduced heavy-target preference is an acceptable tradeoff when it
+prevents greater unit losses while preserving useful damage and progress.
+No runtime code or profile was changed for this review.
 
-No `legion-sea` ref is present in the local repository and no new Cent package
-was supplied. This verifies the proposed rule against this fork, not byte-for-byte
-parity with an unavailable distribution. Another distribution's native semantics
-must be checked independently. The official unit pages below were consulted on
-the review date; numerical balance can differ from the locally pinned game.
+This document records source-confirmed mechanisms, reported gameplay failures,
+and solutions grounded in the official PvP unit guidance linked below. The
+proposed changes still require comparative combat tests. Numerical balance can
+differ from the locally pinned game; recommendations must use loaded weapon
+capabilities and legal enemy observations.
 
-## Revised priority: survival and useful fire before target preference
+## PvP engagement priorities: survival and useful fire before target preference
 
-The user relayed Cal's match observation: a Fatboy inside a repaired static line
-can bait hundreds of ranged units into fatal exposure. This is user-supplied
-runtime evidence, not a fixture reproduced during this review. Against that
+A reported gameplay failure involves a Fatboy inside a repaired static line
+baiting large numbers of ranged units into fatal exposure. The battle has not
+been reproduced in a controlled fixture. Against that
 failure, preserving an anti-heavy label is not a sufficient reason to keep the
 existing behavior. Sharpshooters and Starlights must not be exempt from the
 range/no-pursuit requirement merely because they have an anti-heavy niche.
@@ -48,7 +45,7 @@ Additional source tracing identified paths consistent with the report:
   proving the proposed position/path is outside other enemy weapons. Simply
   adding a standoff number is not a verified fix for the static bait case.
 
-The revised engagement contract, in order, is:
+The engagement contract, in order, is:
 
 1. Establish a reachable firing position near the usable maximum range, with
    line of fire and clearance from known hostile static coverage. A higher-value
@@ -73,10 +70,10 @@ likewise recommends a protected, spread-out position; the
 [Sharpshooter guide](https://www.beyondallreason.info/unit/armsnipe) emphasizes
 vision support.
 
-**Revised experiment.** Compare (A) current profiles, (B) the exact requested
+**Comparison experiment.** Compare (A) current profiles, (B) the uniform
 artillery/siege patch, including Sharpshooter and Starlight, and (C) an explicit
 safe-range/no-pursuit implementation. B is a credible conservative workaround,
-not rejected solely because it deprioritizes heavy units. Its structure-only
+whose loss of heavy-target preference is a measurable tradeoff. Its structure-only
 selection/return-fire restrictions still require measurement. If B is materially
 safer and useful against the defense line, reduced mobile-target specialization
 is acceptable; preserve useful in-range fire in C without restoring bait pursuit.
@@ -90,9 +87,9 @@ target switches, and orders. Repeat without spotters, with mixed weapon ranges,
 and after the static line dies. Require **both survival and useful progress**.
 This diagnostic is recorded as KI-504; no comparative simulation has yet run.
 
-## Original findings (source facts retained; priority superseded above)
+## Implementation constraints and tradeoffs
 
-### High: artillery plus siege suppresses proactive anti-army targeting
+### Target selection and fire state
 
 [MilitaryManager::DefaultMakeTask](../../src/circuit/module/MilitaryManager.cpp)
 maps the main artillery role to `CArtilleryTask`. Its
@@ -110,16 +107,16 @@ when `fireState >= FIRESTATE_FIREATWILL`. Therefore FIGHT travel does not negate
 the return-fire restriction. Explicit orders and retaliation remain possible;
 this is not a claim that these units can never shoot a mobile unit.
 
-The most serious proposed regressions are removing Sharpshooter/Starlight
-anti-heavy selection and reducing Hound/Fatboy/Banisher proactive anti-army
-fire. [AntiHeavyTask](../../src/circuit/task/fighter/AntiHeavyTask.cpp) currently
+Tradeoffs to measure include removing Sharpshooter/Starlight anti-heavy
+selection and reducing Hound/Fatboy/Banisher proactive anti-army fire. These
+costs must be weighed against survival and useful damage from safe positions. [AntiHeavyTask](../../src/circuit/task/fighter/AntiHeavyTask.cpp) currently
 selects HEAVY/COMM targets; replacing its role removes that behavior.
 
-### High: this is not a SEA-only classification adjustment
+### Shared classifications affect multiple roles
 
 These are land units in shared per-profile UnitDefs. Every role using those
-definitions, including FRONT and donated TECH units, can be affected. The
-branch name `legion-sea` does not make the edit naval in scope.
+definitions, including FRONT and donated TECH units, can be affected. Scope
+changes through explicit policy settings and verify other-role regressions.
 
 [FactoryManager::ReadConfig](../../src/circuit/module/FactoryManager.cpp)
 treats the first `role` entry as the own-unit main role. All role entries also
@@ -139,7 +136,7 @@ For example, Hound/Sharpshooter/Sheldon are selected as skirmish production,
 Fatboy as riot, Starlight/Medusa as assault and Mantis as support. A JSON-only
 rewrite would not align those production intentions with their new combat task.
 
-### High: Mantis needs carrier-specific acceptance
+### Carrier mechanics require separate acceptance
 
 Mantis is a drone carrier, not a conventional damage-dealing artillery barrel.
 The local `legvcarry.lua` has a zero-damage targeting weapon and carrier custom
@@ -151,7 +148,7 @@ engagement. Do not infer safety from its 1,000-elmo targeting range. The
 describes harassment, catching raiders and point-attack patrols. Carrier
 positioning and drone ownership need their own fixture before reclassification.
 
-### Medium: neither tag guarantees a protected formation or exact maximum range
+### Range control and formation safety
 
 `CArtilleryTask::CanAssignTo` accepts one unit, so this is an independent
 structure-hunting task, not a formation slot behind the allied frontline.
@@ -164,7 +161,7 @@ Starlight also trades damage for distance: the
 damage falloff and recommends protected, spread-out positioning. Maximum range
 is a safety preference, not a universally optimal damage position.
 
-### Medium: the mechanical migration needs a precise patch contract
+### Configuration edits must preserve unrelated data
 
 The active source is `data/config/`; `stable/config/` is deployment output.
 Do not edit the live BAR installation or `data_sample/`. The
@@ -205,7 +202,7 @@ JSON recipes. Exact tuning requires controlled combat tests.
 | [Medusa](https://www.beyondallreason.info/unit/legmed) `legmed` | Protected long-range salvo control, prioritizing useful static targets and valuable mobile concentrations. Candidate for artillery-style movement, with volley completion and reload tests. |
 | [Mantis](https://www.beyondallreason.info/unit/legvcarry) `legvcarry` | Carrier standoff and support behavior with explicit mobile/area target policy; preserve the game gadget's drone control, launch, recall, stockpile and repair behavior. Test independently. |
 
-## Recommended replacement change request
+## Proposed solutions
 
 1. Separate **target policy**, **range/formation policy**, **travel mode** and
    **fire state**. Keep their settings script/JSON-controlled. Preserve D-031's
@@ -219,7 +216,7 @@ JSON recipes. Exact tuning requires controlled combat tests.
 4. Review the existing Sheldon mismatch first; pilot Tremor/Cleaver/Medusa
    bombardment separately; use anti-heavy and carrier-specific fixtures for
    Sharpshooter/Starlight and Mantis respectively.
-5. For any eventual Cent import, pin source and destination commits plus
+5. For configuration migrations, pin source and destination commits plus
    game/engine versions, generate a per-profile diff manifest, patch only
    approved properties with byte preservation, and run runtime checks against
    the actually loaded profile paths.

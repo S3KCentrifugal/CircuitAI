@@ -5119,8 +5119,8 @@ and [D-203](decisions.md#d-203---review-siege-normalization-before-changing-rang
 
 ### KI-504 - Ranged target pursuit can surrender range to repaired static bait
 
-**Problem.** User/Cal reports Fatboy bait inside a repaired static line causing
-mass ranged-unit losses. Source tracing shows AntiHeavyTask can select a heavy
+**Problem.** Fatboy bait inside a repaired static line has been reported to
+cause mass ranged-unit losses. Source tracing shows AntiHeavyTask can select a heavy
 using aggregate squad power versus threat at its position and path toward an
 out-of-range target with a path-cell goal radius, not weapon range. Ordinary
 CircuitUnit::Attack can queue FIGHT at that target. Separately, SquadTask uses
@@ -5136,16 +5136,16 @@ heavy targets only among safe in-range shots. Cancel pursuit when bait retreats;
 use an in-range defense/other target or hold until a safe advance exists. Do not
 use a valuable ranged unit as its own sacrificial LOS scout. Audit AntiHeavyTask,
 SquadTask, CircuitUnit attack/queued-FIGHT and KeepWeaponRange paths. Preserve
-other roles/units unless explicitly opted into this behavior. Compare the exact
-requested artillery/siege configuration as a conservative candidate instead of
-rejecting it merely for lost mobile-target specialization.
+other roles/units unless explicitly opted into this behavior. Compare the uniform
+artillery/siege configuration as a conservative candidate, measuring survival
+and useful damage against the cost of reduced mobile-target specialization.
 
 **Verification.** Pending runtime reproduction and candidate comparison. Spawn
 repair-supported statics, a mobile Fatboy bait and allied spotters; vary bait
 movement, spotter loss and mixed ranges. Require reduced exposure/metal losses
 plus actual damage/progress against defenses, not idle survival. Measure real
 shot positions, target orders and APM. See the
-[revised review](reviews/2026-10-05-siege-classification-request.md#revised-priority-survival-and-useful-fire-before-target-preference).
+[engagement priorities](reviews/2026-10-05-siege-classification-request.md#pvp-engagement-priorities-survival-and-useful-fire-before-target-preference).
 
 **KI-503 priority clarification.** Its source finding remains, but restoring
 mobile-target selection must not restore pursuit into static coverage. KI-504's
