@@ -5032,3 +5032,37 @@ workload before the original hitch window; their low late timings do not close
 whole-game hitch acceptance. Host/peer traffic tests, real engine save/reload
 and targeted ownership-transfer checks are still unperformed. No claim of
 reduced network traffic or fully resolved gameplay invariants is made.
+
+### KI-500 - SEA pending counter credit is not yet water-body scoped
+
+**Problem.** D-201 counts completed counter hulls in the requesting yard's water
+body, but GetPendingRecruitCount is AI-wide. On disconnected seas an order at
+one yard can temporarily offset the other yard's deficit. The runtime API has
+no pending-recruit owner/body query; this is a code-level scope gap, not a
+measured failure in the connected Glacial fixtures.
+
+**Proposed solution.** Expose a native, read-only pending recruitment snapshot
+with factory assignment and count unassigned work explicitly. Preserve current
+fresh-at-admission semantics; do not cache counts across enqueues. Add a two-pond,
+two-yard case that verifies both threats receive physically useful reinforcements.
+
+**Verification.** Source trace complete; connected-sea production tested in the
+[SEA rework](sea-fleet-rework.md). Disconnected pending assignment remains unplayed.
+
+### KI-501 - Under-supported Cortex yard can lose its first sub before completion
+
+**Problem.** The D-201 Glacial response-sub-cortex fixture supplies two destroyers,
+a single unassisted yard and twelve enemy submarines arriving after one minute.
+Correct counter selection starts at frame 1959, but that frame is destroyed at
+2875 before finishing. The original six-minute report remains FAIL. Selecting
+the right counter is not proof that an inadequate initial screen/build power
+can survive a substantially larger supplied force.
+
+**Proposed solution.** Keep this stress case, compare a separate assisted-yard
+fixture, then measure natural detection lead time and funded emergency assist
+capacity. Do not weaken the original check or promise instantaneous counters.
+
+**Verification.** The [results report](sea-fleet-rework-results.md) retains the
+original FAIL. With six supplied construction turrets, a separate Cortex case
+started a sub at frame 2803 and damaged a submarine at frame 3238. This is a
+capacity experiment, not a replacement verdict or a funded-economy guarantee.

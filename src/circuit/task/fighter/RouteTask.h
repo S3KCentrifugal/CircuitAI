@@ -39,6 +39,9 @@ public:
 	void SetRoute(std::vector<springai::AIFloat3>&& waypoints);
     // AIR opts into exact final-route deduplication and transient ownership.
     void SetAirControl(bool enabled) { airControl = enabled; }
+    // SEA opts into the same exact route lifetime/queue preservation, with
+    // terrain-checked lane offsets. Defaults leave every other role unchanged.
+    void SetSeaControl(bool enabled) { seaControl = enabled; }
     void SetAirTarget(int id) { if (airControl && airTarget != id) { airTarget = id; ++version; dirty = true; } }
     bool SetUnitRoute(CCircuitUnit* unit, std::vector<springai::AIFloat3>&& waypoints, float radius);
 	/*
@@ -90,6 +93,8 @@ private:
 	bool patrol = false;
     bool holdPosition = false;
     bool airControl = false;
+    bool seaControl = false;
+    bool ManagedControl() const { return airControl || seaControl; }
     bool hadAssignee = false;
     int airTarget = -1;
     std::map<CCircuitUnit*, int> issuedVersion;

@@ -783,6 +783,8 @@ namespace Layout {
     // old probe's false result was unconditionally promoted to true because
     // Place may grow the box. Avoid that discarded search and its memo objects.
     // Actual placement retains every terrain, occupancy and reach check.
+    // Admission is O(1); actual Place search is not. The original/optimized
+    // predicate oracle lives in tools/knowledge/check_performance_policy.py.
     bool CanPlace(const CCircuitDef@ def)
     {
         return def !is null;

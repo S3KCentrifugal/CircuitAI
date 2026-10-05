@@ -1,6 +1,7 @@
-// SEA-owned fleet procurement. Native tasks retain movement, target and repair
-// ownership; this module never issues per-unit movement orders.
+// SEA-owned fleet procurement. SeaOperations selects objectives; native tasks
+// retain path traversal, contact combat and repair. No per-unit orders here.
 #include "sea_economy.as"
+#include "sea_operations.as"
 namespace SeaCombat {
     class Hull {
         CCircuitDef@ def;
@@ -11,10 +12,12 @@ namespace SeaCombat {
         }
     }
     array<Hull@> roster;
+    array<int> owned;
     dictionary airResponders;
     int frame=-100000;
+    int subSeen=-100000, airSeen=-100000;
     float surface=0, underwater=0, air=0, shore=0, fleet=0;
-    bool Active() { return SeaLayout::Active() && Global::RoleSettings::Sea::AdaptiveFleet; }
+    bool Active() { return Global::AISettings::Role==AiRole::SEA && Global::RoleSettings::Sea::AdaptiveFleet; }
     bool HybridScoutAA(const CCircuitDef@ def) {
         return def !is null && def.GetName()=="armpt" && def.HasSurfToAir();
     }
@@ -35,9 +38,23 @@ namespace SeaCombat {
         return aiMilitaryMgr.DefaultMakeTask(u);
     }
     void AirResponse() {
-        if (!Global::RoleSettings::Sea::HybridScoutAirResponse || air<=0) return;
-        for (uint i=0;i<SeaEconomy::owned.length();++i) {
-            CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]);
+        if (!Global::RoleSettings::Sea::HybridScoutAirResponse) return;
+        if (air<=0) {
+            // A transient raid must not permanently consume every sonar scout.
+            // Restore only our own AA assignments after threat memory expires;
+            // player, external and retreat owners remain untouched.
+            for (uint i=0;i<owned.length();++i) {
+                if (!airResponders.exists(""+owned[i])) continue;
+                CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
+                IFighterTask@ old=u is null ? null : cast<IFighterTask>(u.task);
+                if (old is null || old.GetFightType()!=int(Task::FightType::AA)) continue;
+                IUnitTask@ native=aiMilitaryMgr.DefaultMakeTask(u);
+                if (native !is null && !aiMilitaryMgr.TransferUnit(u,native)) native.Abort();
+            }
+            return;
+        }
+        for (uint i=0;i<owned.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
             if (u is null || !HybridScoutAA(u.circuitDef)) continue;
             IFighterTask@ old=cast<IFighterTask>(u.task);
             // Preserve player, retreat, transport and already-correct tasks.
@@ -56,8 +73,8 @@ namespace SeaCombat {
         if (!Global::RoleSettings::Sea::RespectCarrierControl) return;
         // Host ownership is assigned after the engine's creation callback.
         // Adopt on the next SEA census as well as at normal task assignment.
-        for (uint i=0;i<SeaEconomy::owned.length();++i) {
-            CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]);
+        for (uint i=0;i<owned.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
             if (u is null || u.task is null || u.task.IsExternalControlled()
                 || u.task.GetType()==int(Task::Type::PLAYER) || !u.circuitDef.IsMobile()
                 || u.circuitDef.GetBuildSpeed()>0 || u.GetRulesParam("carrier_host_unit_id",-1)<0) continue;
@@ -71,8 +88,9 @@ namespace SeaCombat {
         }
     }
     void Leave() {
-        for (uint i=0;i<SeaEconomy::owned.length();++i) {
-            CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]);
+        SeaOperations::Leave();
+        for (uint i=0;i<owned.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
             if (u is null || u.task is null) continue;
             IFighterTask@ fighter=cast<IFighterTask>(u.task);
             const bool hybrid=airResponders.exists(""+u.id) && fighter !is null && fighter.GetFightType()==int(Task::FightType::AA);
@@ -84,6 +102,7 @@ namespace SeaCombat {
         }
         airResponders.deleteAll();
         frame=-100000;
+        subSeen=-100000; airSeen=-100000; surface=0; underwater=0; air=0; shore=0;
     }
     void Add(const string &in name,float s,float w,float a,bool siege=false) { roster.insertLast(Hull(name,s,w,a,siege)); }
     void Init() {
@@ -98,21 +117,43 @@ namespace SeaCombat {
     }
     void Tick() {
         if (!Active() || ai.frame-frame<SECOND) return;
-        frame=ai.frame; Init(); CarrierControl(); fleet=0;
+        frame=ai.frame; Init();
+        // Independent of builder/layout census; IDs are owned by this policy
+        // and reacquired inside each consumer, including transfer/role exit.
+        array<Id>@ ids=ai.GetOwnedUnitIds(); owned.resize(0);
+        for (uint i=0;i<ids.length();++i) owned.insertLast(ids[i]);
+        CarrierControl(); fleet=0;
         for (uint i=0;i<roster.length();++i) if (roster[i].def !is null) fleet+=roster[i].def.costM*float(roster[i].def.count);
         AIFloat3 origin=Global::Map::StartPos;
         for (uint i=0;i<SeaLayout::berths.length();++i) if (SeaLayout::berths[i].slot>=0 && !SeaLayout::berths[i].retired) { origin=SeaLayout::berths[i].centre; break; }
         aiBattle.SampleNavalThreat(origin,Global::RoleSettings::Sea::ThreatResponseRadius);
-        const float nextSub=aiBattle.GetNavalThreatCost(1), nextAir=aiBattle.GetNavalThreatCost(2);
+        float nextSub=aiBattle.GetNavalThreatCost(1);
+        const float nextAir=aiBattle.GetNavalThreatCost(2);
+        const int contacts=aiBattle.GetSeaForceCount(), basin=aiBattle.WaterBody(origin,false);
+        for (int i=0;i<contacts;++i) {
+            if ((aiBattle.GetSeaForceFlags(i)&16)==0 || (basin>=0 && aiBattle.GetSeaForceBody(i)!=basin)) continue;
+            const float radius=Global::RoleSettings::Sea::ThreatResponseRadius;
+            if (MapHelpers::SqDist(origin,aiBattle.GetSeaForcePos(i))<=radius*radius)
+                nextSub+=Global::RoleSettings::Sea::UnknownSubContactMetal;
+        }
         if ((nextSub>0 && underwater==0) || (nextAir>0 && air==0))
             GenericHelpers::LogUtil("[SEA][Threat] submarine="+nextSub+" aircraft="+nextAir,1);
-        surface=aiBattle.GetNavalThreatCost(0); underwater=nextSub;
-        air=nextAir; shore=aiBattle.GetNavalThreatCost(3);
+        if (nextSub>0) subSeen=ai.frame;
+        if (nextAir>0) airSeen=ai.frame;
+        const int memory=Global::RoleSettings::Sea::FleetThreatMemorySeconds*SECOND;
+        surface=aiBattle.GetNavalThreatCost(0);
+        // Sonar coverage can blink while a hull moves or a scout dies. Forget
+        // its cost after a bounded policy interval, not at the next factory
+        // ask. This retains no hidden positions and never issues a blind shot.
+        underwater=SeaMath::RememberThreat(underwater,nextSub,ai.frame-subSeen,memory);
+        air=SeaMath::RememberThreat(air,nextAir,ai.frame-airSeen,memory);
+        shore=aiBattle.GetNavalThreatCost(3);
         AirResponse();
         // Avoid the legacy map-wide army/per-player comparison. The native
         // reachable-group gate and damage-triggered response remain active.
         aiMilitaryMgr.quota.attack=Global::RoleSettings::Sea::MilitaryAttackThreshold;
         aiMilitaryMgr.quota.attackWait=Global::RoleSettings::Sea::FleetAssemblySeconds;
+        SeaOperations::Tick();
     }
     float Coverage(Hull@ h,int kind) {
         const CCircuitDef@ d=h.def;
@@ -124,16 +165,33 @@ namespace SeaCombat {
     CCircuitDef@ Select(CCircuitUnit@ yard,bool urgentOnly=false) {
         if (!Active()) return null;
         Tick();
-        if (!urgentOnly && fleet<1000 && UnitHelpers::IsT1Shipyard(yard.circuitDef.GetName())) {
+        if (!urgentOnly && UnitHelpers::IsT1Shipyard(yard.circuitDef.GetName())) {
             const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
             CCircuitDef@ scout=ai.GetCircuitDef(side=="armada" ? "armpt" : side=="cortex" ? "corpt" : "legnavyscout");
-            if (scout !is null && scout.count+aiFactoryMgr.GetPendingRecruitCount(scout)==0
+            const int desired=fleet<1000 ? 1 : Global::RoleSettings::Sea::FleetScouts;
+            if (scout !is null && scout.count+aiFactoryMgr.GetPendingRecruitCount(scout)<desired
                 && scout.IsAvailable(ai.frame) && yard.circuitDef.CanBuild(scout)) return scout;
         }
         array<float> have(3,0.0f);
+        dictionary localCounts;
+        const int body=aiBattle.WaterBody(yard.GetPos(ai.frame),false);
+        // One owned pass, then O(R) roster arithmetic. A fleet in another sea
+        // cannot repay this yard's underwater deficit. Unfinished frames are
+        // already represented by pending recruits; do not count them twice.
+        for (uint i=0;i<owned.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
+            if (u is null || u.GetBuildProgress()<1 || aiBattle.WaterBody(u.GetPos(ai.frame),false)!=body) continue;
+            const string key=""+u.circuitDef.id;
+            // dictionary.get uses an out parameter: on a missing key its
+            // temporary need not retain our initializer. Always reset on
+            // failure or phantom coverage can suppress emergency production.
+            const int count=DictIntOr(localCounts,key);
+            localCounts.set(key,count+1);
+        }
         for (uint i=0;i<roster.length();++i) {
             Hull@ h=roster[i]; if (h.def is null) continue;
-            const float value=h.def.costM*float(h.def.count+aiFactoryMgr.GetPendingRecruitCount(h.def));
+            const int count=DictIntOr(localCounts,""+h.def.id);
+            const float value=h.def.costM*float(count+aiFactoryMgr.GetPendingRecruitCount(h.def));
             for (int k=0;k<3;++k) have[k]+=value*Coverage(h,k);
         }
         const float needAir=SeaMath::Deficit(air*Global::RoleSettings::Sea::AirCounterRatio,have[2],0);
@@ -148,7 +206,7 @@ namespace SeaCombat {
             else { kind=0; deficit=AiMax(1000.0f,surface); }
         }
         CCircuitDef@ best=null; float score=0;
-        const float power=SeaEconomy::LocalPower(yard);
+        const float power=SeaLayout::Enabled() ? SeaEconomy::LocalPower(yard) : yard.circuitDef.GetBuildSpeed();
         for (uint i=0;i<roster.length();++i) {
             Hull@ h=roster[i]; CCircuitDef@ d=h.def;
             if (d is null || !d.IsAvailable(ai.frame) || !yard.circuitDef.CanBuild(d)) continue;
@@ -167,7 +225,7 @@ namespace SeaCombat {
             }
             if (rank>score) { @best=d; score=rank; }
         }
-        if (best !is null && urgentOnly) GenericHelpers::LogUtil("[SEA][Response] layer="+kind+" deficit="+deficit+" recruit="+best.GetName(),1);
+        if (best !is null) GenericHelpers::LogUtil("[SEA]["+(urgentOnly ? "Response" : "Production")+"] layer="+kind+" deficit="+deficit+" observedSub="+underwater+" subCover="+have[1]+" recruit="+best.GetName(),1);
         if (best !is null && ((kind==2 && !best.HasSurfToAir())
             || (kind==1 && !best.HasSurfToWater() && !best.HasSubToWater())
             || (kind==0 && !best.HasSurfToLand()))) {

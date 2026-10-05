@@ -199,3 +199,5 @@ step.
 | INV-143 (retired diagnostic experiment) | Attempted water-only exclusion from land emergencies. | Removed after Glacial contact probe identified the spectator commander; no production base-response change was needed. | D-194 |
 
 | INV-144 | Indexed local slot/zone occupancy gives the same answer as the legacy scan, including consumed and ignored slots. | TerrainManager::IsSlotFree compares both paths when CIRCUIT_VERIFY_LOCAL_LAYOUT is enabled; lifecycle differential tests run independently. | D-199 |
+
+| INV-145 | Eligible SEA cohort members accept the selected route task; player, retreat, carrier and AA tasks are excluded. | SeaOperations::Route logs failed TransferUnit; SEA arena checks forbid all invariants. | D-201 |

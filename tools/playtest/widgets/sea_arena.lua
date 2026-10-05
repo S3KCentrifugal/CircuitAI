@@ -33,7 +33,9 @@ local function damage(id,def,team,amount,paralyzer,weapon,projectile,attacker,at
     child(id);child(attacker)
     if not attacker or team==attackerTeam or not tracked[id] or not tracked[attacker] then return end
     if amount>0 and not paralyzer then
-        log("damage victim="..id.." attacker="..attacker.." team="..attackerTeam.." amount="..string.format("%.1f",amount))
+        log("damage victim="..id.." attacker="..attacker.." team="..attackerTeam.." amount="..string.format("%.1f",amount)
+            .." attackerUnit="..UnitDefs[tracked[attacker].def].name.." victimUnit="..UnitDefs[tracked[id].def].name
+            .." produced="..tostring(tracked[attacker].produced==true))
         tracked[id].attackerTeam=attackerTeam
     end
 end
@@ -75,7 +77,7 @@ function widget:UnitCreated(id,def,team,builder)
     if pending and team==pending.g.team and UnitDefs[def].name==pending.g.unit then
         tracked[id]={team=team,def=def};log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name);pending=nil
     elseif builder and tracked[builder] then
-        tracked[id]={team=team,def=def};log("produced id="..id.." team="..team.." unit="..UnitDefs[def].name)
+        tracked[id]={team=team,def=def,produced=true};log("produced id="..id.." team="..team.." unit="..UnitDefs[def].name)
     end
 end
 function widget:UnitDestroyed(id,def,team)

@@ -9,7 +9,10 @@ ROOT=HERE.parents[1]
 
 def prepare(a):
     case=json.loads(storage.resolve_definition(a.case,'cases').read_text())
-    label=a.case[:19]+('-ctrl' if a.control else '-cand')
+    # Keep the full scenario identity: truncating at 19 characters collapsed
+    # supported/unsupported counter cases into the same discovery category.
+    # storage.allocate normalizes names and still gives every game a unique ID.
+    label=case.get('name',Path(a.case).stem)+('-ctrl' if a.control else '-cand')
     d=storage.allocate('sea','combat',label,'glacial','supplied',seed=a.seed)
     starts=d/'starts.as'; starts.write_text('StartSpot(AIFloat3(2300,0,4400), AiRole::SEA, false),\nStartSpot(AIFloat3(4600,0,4400), AiRole::SEA, false),\n')
     call=[sys.executable,str(HERE/'playtest.py')]
@@ -22,7 +25,7 @@ def prepare(a):
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')],check=True)
     script=d/'script.txt'; s=script.read_text();s=s.replace('[GAME]\n{','[GAME]\n{\n FixedRNGSeed='+str(a.seed)+';',1);script.write_text(s)
     staged=d/'AI/Skirmish/BARbTest/test/script'; g=staged/'src/global.as';s=g.read_text();before,sea=s.split('namespace Sea {',1)
-    sea,n=re.subn(r'bool ExperimentalBuild = (true|false);','bool ExperimentalBuild = true;',sea,count=1);assert n==1
+    sea,n=re.subn(r'bool ExperimentalBuild = (true|false);','bool ExperimentalBuild = '+('false' if a.legacy_layout else 'true')+';',sea,count=1);assert n==1
     if a.control: sea=sea.replace('bool AdaptiveFleet = true;','bool AdaptiveFleet = false;')
     if a.order_slack is not None:
         sea,n=re.subn(r'float OrderPositionSlack = [^;]+;', 'float OrderPositionSlack = '+str(a.order_slack)+'f;',sea,count=1);assert n==1
@@ -60,6 +63,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--case',default='surface-line');p.add_argument('--dll',required=True,type=Path)
     p.add_argument('--data',type=Path,default=ROOT/'data');p.add_argument('--side',default='armada');p.add_argument('--profile',default='experimental_hard')
     p.add_argument('--control',action='store_true');p.add_argument('--seed',type=int,default=1891);p.add_argument('--minutes',type=int,default=8);p.add_argument('--speed',type=int,default=10)
+    p.add_argument('--legacy-layout',action='store_true',help='Verify adaptive combat independently of experimental building')
     p.add_argument('--order-slack',type=float,help='Isolate optional native naval order changes; zero uses native defaults')
     a=p.parse_args();d,call,checks=prepare(a)
     subprocess.run(call+['launch','--dir',str(d),'--engine','recoil_2026.07.04'],check=True)

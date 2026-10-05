@@ -1,0 +1,59 @@
+---
+name: convention-cpp
+description: 'Write or review CircuitAI native C++ mechanisms, Recoil callback and script bindings, task ownership, spatial indexes and performance-sensitive code. Use for native AI changes; verify behavior preservation, callback threading, resource lifetime and measured costs against the deployed BAR/Recoil pins.'
+metadata:
+  version: '1.0.0'
+---
+
+# CircuitAI C++ conventions
+
+Read [intent](../../doc/intent.md), applicable decisions and known issues first.
+Native code provides mechanisms; role priorities and tuning belong in active
+`data/` script/JSON. Expose new controls through registered bindings; a public
+C++ method alone is not script accessible. Never apply role policy globally by
+changing a shared UnitDef to fix one role.
+
+## Procedure
+
+1. Trace the real owner from engine event through manager, task and unit action.
+   Identify role gates, callbacks, engine source pin and generated wrapper ABI.
+2. Follow local C++ conventions and configured language standard. Use RAII for
+   owned resources, explicit borrowing, bounds-checked inputs and total cleanup.
+   Prefer small dependency-free decision/geometry helpers for exact tests.
+3. Preserve task handover, player control, carrier gadget ownership, retreat,
+   destruction and reload semantics. Store unit IDs across callbacks; reacquire
+   and validate units. Do not retain temporary wrapper objects or span storage.
+4. Read the [performance engineering guide](../../doc/performance/engineering-guide.md)
+   for callback complexity, index mutation, cache invalidation, VM allocation,
+   synchronous command borrowing, multiplayer evidence and worker restrictions.
+5. State complexity in terms of actual inputs, including mutation and memory.
+   Comment the reason, invalidation contract and test pointer near an optimized
+   path. Fixed-size footprint lookup may be O(1) in reservation count while
+   candidate search remains linear; do not conflate them.
+6. Keep optimizations exact: preserve command fields, failures, iteration/tie
+   order and random draws. Do not suppress orders or change update frequency
+   without separate behavioral authorization and combat evidence.
+7. Measure same-input old/new kernels and serial equivalent engine windows.
+   Separate component timing from FPS/APM/peer claims. Preserve regressions.
+8. Run meaningful native tests, script API checks and actual runtime loading.
+   Compile all supported experimental profiles when bindings change. Publish
+   the matched stripped DLL, debug symbols and data to the development output
+   required by AGENTS.md; keep the live installation untouched.
+
+## Threading and callbacks
+
+Default to engine callbacks and managers being owned by the simulation thread.
+Existing path workers do not make arbitrary wrappers thread-safe. Workers use
+owned immutable inputs and return versioned results; the owner checks freshness
+before applying them. Never access an AngelScript context concurrently. Review
+lock ownership and cancellation/lifetime before adding a worker.
+
+## Review checklist
+
+- Behavior and role scope are explicit, with opt-in controls for new mechanisms.
+- Borrowed/owned lifetimes survive every early return and destruction path.
+- Cache invalidation includes all writers, transfers and load reconstruction.
+- Algorithmic, native-boundary, allocation and order costs are distinguished.
+- Hot-path comments explain the reason and link reproducible evidence.
+- Tests exercise overlap, empty/dead inputs, ties and mutation boundaries.
+- No claim of whole-game improvement is based only on microbenchmarks.

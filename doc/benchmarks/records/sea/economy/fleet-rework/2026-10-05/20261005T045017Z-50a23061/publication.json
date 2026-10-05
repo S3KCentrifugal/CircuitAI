@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "cff2b25edf22f3e245c374789856b13e41fea226bd785389e4722eadb1a04bf5",
+    "checks.json": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808",
+    "launched.json": "8955c9ec8aba3369b8421fdb207f71271f6de51d680e9f0d7278a74a28ebe812",
+    "report.md": "dc884e646bd6883b95884bd2f2575fafd0cd056249d291196bbd535119691cc7",
+    "result.json": "1f251d57ecdd971af439672eff639d5f3fbd35a6d9cbd63d081dbce3d186b047",
+    "run-inputs.json": "a186f820d779a3c13c18fbbb27d0bc3b3e3988b6294df3d74f75ba1014ac6c71",
+    "run-plan.json": "aeac30eacb7a530c4e938847251634455197e8c24b273ca805e25c0da236bdf4",
+    "screen_2026-10-05_04-50-15-837.png": "165bfd33a2f0f3196573014361d87c186a1f59dc744acaae16607d3c41ddd6cb",
+    "script.txt": "d28bccc66aa0a7f46bce3a135c501d741c5a8a38ecd3badb077f3883e79d5131",
+    "sea-fixture.json": "13e8fec36f6ee5cd32b26c0395ec17a881cbf8d6ca24f709a611ed8ce88d2d94",
+    "staged.json": "900aeeac9c2c4499d1099686cd371aa4c37e722026bbd750d86cc238e0f8c8eb",
+    "teams.json": "6068dfe9f28b6b09d0563556b39e377f0facdd22af89d078d1548754242f6a97"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\fleet-rework\\shore\\20261005T044807Z-750b1ae3\\runs\\20261005T045017Z-50a23061",
+  "schema": 1
+}

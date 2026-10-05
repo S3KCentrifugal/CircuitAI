@@ -10,7 +10,7 @@ import storage
 
 MAPS = {'glacial':'Glacial Gap v1.1', 'supreme':'Supreme Isthmus v1.7',
         'tundra':'Tundra Continents v2.3.1', 'caldera':'Serene Caldera v1.3',
-        'erebos':'Erebos Lakes v1.0'}
+        'erebos':'Erebos Lakes v1.0', 'shore':'Shore_to_Shore_V3'}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -46,6 +46,8 @@ def main():
         '--ai-option','profile='+a.profile,'--ai-option','random_seed='+str(a.seed),
         '--extra-widget',str(playtest.HERE/'widgets/sea_watch.lua')]
     if a.headless: cmd.append('--headless')
+    if a.map=='shore':
+        cmd += ['--map-file',str(playtest.REPO/'data/script/src/maps/shore_to_shore.as')]
     if a.base_observer:
         cmd += ['--extra-widget',str(playtest.HERE/'widgets/sea_allied_base_watch.lua')]
     if a.fixture:

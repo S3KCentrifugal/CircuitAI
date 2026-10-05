@@ -2,6 +2,11 @@
 
 ## Organized storage
 
+The [test definition catalog](../../doc/testing/README.md) indexes scenarios,
+checks, native/AngelScript suites, tooling tests and parameterized runners by
+domain. Regenerate with `python tools/knowledge/index_test_cases.py`; use
+`--check` to detect stale documentation. Execution evidence remains separate.
+
 [Storage conventions](../../doc/test-storage.md) define categories, naming,
 immutable publications and history preservation. [Benchmark evidence](../../doc/benchmarks/README.md)
 is indexed by domain without rewriting the historical records.

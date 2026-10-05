@@ -10,6 +10,10 @@ Read `data/script/README.md` before changing AngelScript policy code. Apply `ski
 
 For every AngelScript or profile change, inspect and modify `data/`. Use `data_sample/` only to understand examples or historical patterns, and do not implement, mirror, or apply the requested change there unless the user explicitly asks to update sample material.
 
+Apply `skills/convention-cpp/SKILL.md` when writing or reviewing native C++;
+it covers callback ownership, script levers and performance proof. Read
+`doc/performance/engineering-guide.md` before replacing a recent optimization.
+
 Read `doc/intent.md` before deciding **where** a behaviour belongs. It states
 the goals this fork is aiming at and the rule that follows from them: C++ is
 mechanism, AngelScript is policy, and a native change must leave an equivalent
@@ -61,10 +65,13 @@ reference-only material.
 | `.junie/guidelines.md` | Router for JetBrains Junie. |
 | `skills/` | Repository skills in the Agent Skills format; one subdirectory per skill, each with a `SKILL.md`. |
 | `skills/convention-angelscript/SKILL.md` | AngelScript conventions: version-compatible language subset, ownership, functional style, safety, performance. Apply when writing or reviewing AngelScript. |
+| `skills/convention-cpp/SKILL.md` | Native CircuitAI/Recoil C++ conventions: task ownership, bindings, callback threading, exact optimization and evidence. Apply when writing or reviewing native AI code. |
+| `doc/performance/engineering-guide.md` | Maintenance contracts for measured optimizations: complexity, invalidation, allocation, command and threading constraints. Read before changing optimized native or script paths. |
+| `doc/testing/README.md`, `doc/testing/catalog.json`, `doc/testing/index/` | Generated categorized inventory of designed scenarios, checks, unit suites, validators and runner families; execution evidence stays in the benchmark catalog. Regenerate with `tools/knowledge/index_test_cases.py`. |
 | `skills/convention-angelscript/references/` | Supporting detail for that skill: `idioms.md`, `performance-and-safety.md`, `version-compatibility.md`. |
 | `skills/maintain-changelog/SKILL.md` | Changelog entry format, timestamping, and file layout. Opt-in: invoke only when the user explicitly asks for a changelog. |
 | `skills/troubleshoot-bar-logs/SKILL.md` | BAR runtime log investigation: size discipline, crash-marker search, AI log filtering, and symbolising `SkirmishAI.dll` stack offsets. |
-| `.agents/skills/` | Symlinks that expose `skills/` to harnesses which discover skills under `.agents/` (`convention-angelscript`, `maintain-changelog`, `troubleshoot-bar-logs`). Add a symlink here when adding a skill. |
+| `.agents/skills/` | Symlinks that expose `skills/` to harnesses which discover skills under `.agents/` (`convention-angelscript`, `convention-cpp`, `maintain-changelog`, `troubleshoot-bar-logs`). Add a symlink here when adding a skill. |
 
 ### Active implementation - `data/`
 

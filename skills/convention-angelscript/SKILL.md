@@ -1,9 +1,9 @@
 ---
 name: convention-angelscript
 description: 'Apply AngelScript 2.39.0 WIP-compatible best practices when writing or reviewing scripts. Use for AngelScript APIs, handles, arrays, dictionaries, callbacks, functional-style policy code, memory safety, and performance-sensitive game logic. Targets CircuitAI commit-compatible behavior while distinguishing host APIs from language features.'
-compatibility: 'AngelScript 2.39.0 WIP as pinned by CircuitAI at upstream commit 365b8fb; Windows or cross-platform source editing. Host-registered APIs must be verified separately.'
 metadata:
-  version: '1.0.0'
+  compatibility: 'AngelScript 2.39.0 WIP as pinned by CircuitAI at upstream commit 365b8fb; Windows or cross-platform source editing. Host-registered APIs must be verified separately.'
+  version: '1.1.0'
   angelscript-baseline: '2.39.0-wip-365b8fb'
 ---
 
@@ -125,6 +125,9 @@ that the language does not provide.
      host registers it.
 
 8. **Perform a performance pass.**
+   - Read the [CircuitAI performance contracts](../../doc/performance/engineering-guide.md).
+     Document complexity, lifetime, invalidation and an equivalence test near
+     optimized code; distinguish native calls, CPU time and synchronized orders.
    - Identify callback frequency and collection sizes.
    - Remove repeated native lookups and avoid temporary strings/containers in
      hot loops.
@@ -211,14 +214,21 @@ a handle: `array<int>@ positive = CollectPositive(values);`.
 
 ### Dictionaries
 
+Check the boolean result of `dictionary.get`. A missing entry or failed
+conversion can overwrite an initialized scalar via its `out` temporary. Set
+the fallback **after** failure, or use CircuitAI's `DictIntOr`. D-201's SEA
+coverage regression produced millions of nonexistent counter metal when it
+ignored this result. See `tests/collection_helpers_tests.as`.
+
 ```angelscript
 bool TryReadWeight(
     const dictionary& in values,
     const string& in key,
     float& out weight)
 {
+    if (values.get(key, weight)) return true;
     weight = 0.0f;
-    return values.get(key, weight);
+    return false;
 }
 ```
 

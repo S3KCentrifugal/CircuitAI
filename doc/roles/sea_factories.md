@@ -4,6 +4,8 @@
 is enabled. `Recruit` verifies faction build options and availability. Each tier
 has a two-constructor opening/recovery guarantee; discretionary additional
 workers require a resource-funding decision. With `AdaptiveFleet=true`,
+the D-201 emergency counter check may interrupt after the first constructor;
+the second constructor resumes when that immediate deficit is covered.
 `SeaCombat::Select` replaces fixed combat quotas with observed aircraft/submarine
 coverage deficits, a small standing AA/underwater screen, then surface or siege
 production. Candidates must be buildable and have a weapon for that layer
@@ -40,4 +42,4 @@ movement-area connectivity are not a guarantee of an unobstructed full route.
 See the [plan](../sea-layout-migration-plan.md) and
 [runtime results](../sea-layout-migration-results.md).
 
-<!-- source: data/script/src/roles/sea_factories.as; blob: 87093e4c112a203c4e2d877bede410fd6bae159b; lines: 199 -->
+<!-- source: data/script/src/roles/sea_factories.as; blob: 8ad791d877b3ba4f4b498c0af3120fb45b3f65c7; lines: 207 -->

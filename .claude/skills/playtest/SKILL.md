@@ -5,6 +5,15 @@ description: 'Run a local BAR simulation with a fresh BARb build: stage, launch 
 
 # Playtest: local simulations
 
+For optimization work, apply the
+[performance contracts](../../../doc/performance/engineering-guide.md) and
+use the [test definition index](../../../doc/testing/README.md). Compare pinned
+old/new inputs in serial games; changing populations or concurrent games cannot
+establish a CPU/FPS gain. Keep raw verdicts, distinguish per-unit engine orders
+from Lua orders and network packets, and report compilation failures separately
+from played behavior. A static script API check does not compile all object
+methods; the actual embedded VM load remains mandatory.
+
 Tool: `tools/playtest/playtest.py` (reference: `tools/playtest/README.md`).
 It stages a DLL plus the repo's `data/` as `BARbTest/test` into its own
 engine write dir, never the install, and stops only its own engine.

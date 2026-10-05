@@ -1,5 +1,26 @@
 # Performance, Memory, and Safety
 
+## CircuitAI maintenance contracts
+
+Read the [Recoil/BAR performance guide](../../../doc/performance/engineering-guide.md)
+before changing an optimized callback. D-199 measured array copying, repeated
+weapon-slot scans, layout probes and wrapper allocation separately from FPS.
+An unchanged callback cadence does not prove equivalent decisions.
+
+- Bind an owned returned array to a handle to avoid another copy. A consumer
+  that removes candidates needs a mutable private handle; adding const blindly
+  breaks filtering. Preserve stable order for equal scores.
+- Reuse a census only across proven read-only calls. Cache pending-order counts
+  within one invocation and invalidate at every enqueue/cleanup mutation.
+- Helpers named Buildable or CanPlace may mutate caps or perform native scans.
+  Inspect their bodies before hoisting, memoizing or deduplicating calls.
+- Shared scratch arrays require a reentrancy proof. A local owned array can be
+  faster and safer than a global reusable buffer with aliases.
+- Keep randomized policy draws and task side-effect ordering unchanged during
+  optimization. A lower update frequency or APM cap is a behavioral change.
+- Add comments with input-size variables, mutation boundaries and oracle tests.
+  Validate profiles in the actual embedded VM; static API checks are insufficient.
+
 ## Functional Style by Execution Frequency
 
 Use functional style selectively:
@@ -278,6 +299,12 @@ Do not make correctness depend on JIT behavior. CircuitAI can be compiled with
 or without its AngelScript JIT.
 
 ## Hot-Path Review
+
+Dictionary defaults are a correctness prerequisite: never consume a `get`
+output on false, even if initialized before the call. The add-on can receive
+a conversion temporary for primitive outputs. Reset on failure. D-201's
+counter census and `collection_helpers_tests.as` cover absent, deleted and
+wrong-type values; do not optimize away the success check.
 
 - [ ] Is this called per frame, periodic update, per unit, or only at setup?
 - [ ] Can native values be read once?

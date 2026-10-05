@@ -863,6 +863,10 @@ namespace TechWeapons {
         // One synchronous Work invocation, never a frame-to-frame cache.
         // Pure cluster filters cannot change the pending count. Any slot
         // mutation or attempted order invalidates it before the next cluster.
+        // This avoids C repeated scans of all S slots on a read-only pass
+        // (O(C*S) -> O(C+S)); mutations can legitimately require another scan.
+        // Do not hoist this across Work calls: same-frame enqueues are visible.
+        // tools/knowledge/check_weapon_work.py is the differential oracle.
         int pending = -1;
         for (uint i = 0; i < clusters.length(); ++i) {
             WCluster@ c = clusters[i];

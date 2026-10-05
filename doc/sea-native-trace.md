@@ -1,6 +1,7 @@
 # SEA policy to engine trace
 
-Read alongside the [plan](sea-combat-enhancement-plan.md) and [roster](sea-unit-controls.md).
+Read alongside the [current fleet rework](sea-fleet-rework.md),
+[original plan](sea-combat-enhancement-plan.md) and [roster](sea-unit-controls.md).
 These are code ownership and complexity findings, not measured speedups.
 
 | Stage | Active source and behavior |
@@ -34,7 +35,45 @@ caching them for a second could overproduce counters. Capital assistance uses
 two owned-unit passes per free worker request; it is not an all-pairs per-frame
 scan. Forward-site candidates are capped before full cover checks.
 
-The policy sends no per-unit fleet movement orders. It can hand carrier children
+## D-201 ownership and cost extension
+
+AdaptiveFleet now runs for SEA independently of ExperimentalBuild, which still
+selects the economy/layout implementation. SEA obtains its own owned-ID census;
+no other role delegates to SeaOperations. Missing Legion T2 yard metadata is
+registered for either SEA option.
+
+SeaOperations groups by definition/water body, releases at seven hulls or 60
+seconds, and searches again after 45 seconds. Scouts have separate cohorts and
+bearings. Approach/search/withdrawal use CRouteTask with SetSeaControl;
+compatible close contact returns to native ATTACK. Utility sensor/ABM cohorts
+follow a valuable same-water cohort from behind: native SupportTask only sees
+ATTACK/DEFEND squads. Siege only overrides artillery during emergency screening.
+Player, carrier, retreat and AA ownership are preserved.
+
+GetSeaForceCount owns an extension of the unchanged five-second naval snapshot.
+It adds detected unidentified submerged contacts and known water statics. No
+hidden UnitDef is queried: unknowns have defId=-1/cost=0, with a script-controlled
+UnknownSubContactMetal estimate (500). An unidentified submerged structure can
+therefore conservatively prompt a counter. This is not its actual cost/type.
+The snapshot copies/scans O(E+F), sorts O(C log C), and owns values. It is cached
+within the requesting frame; SEA requests once per second. AIR is unchanged.
+
+Policy costs O(U + G*E + S*G) per second for hulls, cohorts, contacts and utility
+cohorts. Route searches are separate and occur on changed/expired objectives;
+escape legs are retained while travelling. The NAVAL lane graph supplies water
+waypoints, offsets are checked against each ship's movement area, and the
+engine executes actual MoveDefs. GetUnitTerrainRoute is ground-only and rejects
+naval MoveDefs: do not use it here.
+
+Procurement counts body-local completed hulls plus fresh AI-wide pending counts.
+DictIntOr chooses a fallback after dictionary.get fails; an initializer before
+an out call did not prevent conversion-temporary garbage from inventing enormous
+coverage. The actual-VM test covers missing, deleted and wrong-type entries.
+Recently lost threat cost expires after 30 seconds; hidden positions are not
+updated or used to aim weapons.
+
+Policy selects routes; the native executor still submits per-unit commands.
+It can hand carrier children
 to a passive task once per ownership change. Existing native repeated
 formation queues can nevertheless produce high synchronized APM. Two attempts
 to suppress them reduced APM but lost previously won surface fixtures; both

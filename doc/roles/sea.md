@@ -1,14 +1,52 @@
 # SEA Role
 
+## Independent fleet operations (D-201)
+
+`SeaCombat::Active` now requires SEA plus AdaptiveFleet, independently of
+ExperimentalBuild. `Sea_MainUpdate` ticks combat with either economic path;
+`Sea_FactoryAiMakeTask` admits emergency counters after one constructor and
+adaptive hulls/scouts after two. The legacy Legion T2 constructor uses
+`SeaEconomy::Constructor` rather than Cortex's unavailable constructor.
+
+[SeaOperations](../../data/script/src/manager/sea_operations.as) groups hulls
+by definition and water body, separates scouts, releases a seven-hull cohort
+or a sixty-second wait, searches water when there is no observed objective,
+and withdraws surface-only cohorts from insufficiently screened sub threats.
+It uses native terrain routes and contact tasks, preserves player/retreat/AA/
+carrier ownership, and restores artillery after emergency screening. Sensors
+and ABM ships escort cohorts from behind. Unknown sonar contacts contribute a
+configurable response estimate; lost contact costs expire after thirty seconds.
+Dictionary misses explicitly contribute zero completed hulls. The
+[rework design](../sea-fleet-rework.md) defines limits and runtime acceptance;
+[played results](../sea-fleet-rework-results.md) distinguish check coverage from
+unverified lifecycle and multiplayer claims.
+The earlier D-188/D-189 gating description below is historical for combat;
+experimental economic production remains gated.
+
+All of these settings belong to `Global::RoleSettings::Sea`:
+
+| Setting | Default | Meaning |
+| --- | ---: | --- |
+| `AdaptiveFleet` | true | SEA-only adaptive combat, independent of the layout switch |
+| `FleetOperations` | true | Route/search/screen director; procurement remains independently gated by AdaptiveFleet |
+| `FleetReleaseCount` / `FleetReleaseSeconds` | 7 / 60 | Release a combat cohort on size **or** elapsed time |
+| `FleetSearchSeconds` / `FleetContactSeconds` | 45 / 20 | Search-objective expiry and native-contact observation interval |
+| `FleetScreenRadius` / `FleetScreenRatio` | 1100 / 1.2 | Local underwater screen radius and required coverage multiplier |
+| `FleetLaneSpacing` | 72 | Maximum approach-lane spacing; invalid coast offsets collapse to the route |
+| `FleetScouts` | 3 | Minimum scout count once fleet metal reaches 1000; hybrid AA can raise actual counts |
+| `FleetThreatMemorySeconds` | 30 | Bounded lost-contact cost memory, without querying hidden positions |
+| `UnknownSubContactMetal` | 500 | Uncertainty budget for each legally detected, unidentified submerged contact |
+
 ## Experimental layout migration (D-188)
 
 `LayoutPlanHandler` now calls `SeaLayout::Init`. With
-`Sea::ExperimentalBuild=false` the legacy production/combat flow is retained.
+`Sea::ExperimentalBuild=false` the legacy economic flow is retained; D-201's
+independent combat policy still runs when AdaptiveFleet is enabled.
 D191 adds default-on `Sea::CompactEconomy`: `Sea_BuilderAiMakeTask` dispatches
 through `SeaBuild::LegacyTask`, which wraps `Sea_LegacyBuilderTask` and routes
 naval economy orders to compact blocks. Coastal land work stays native.
 `SeaLayout::Enabled` gates placement/census, while `SeaLayout::Active` also
-requires ExperimentalBuild and still gates the broader production/combat migration.
+requires ExperimentalBuild and gates the broader economic migration.
 See the [economy-block plan](../sea-economy-block-plan.md).
 When enabled, `Sea_MainUpdate` ticks the planner before the legacy six-minute
 military-quota gate; builder and factory dispatch use
@@ -18,7 +56,7 @@ then reapplies explicit map limits. Reservations share AIR/TECH's native layout
 ownership. The migration is opt-in pending the full acceptance matrix; see
 [results](../sea-layout-migration-results.md).
 
-The D-189 candidate adds `SeaCombat`, gated by both SEA migration and
+Historically, the D-189 candidate added `SeaCombat`, gated by both SEA migration and
 `AdaptiveFleet`. It samples current known contacts once per second and selects
 capability-checked counters at each factory decision, then skips the legacy
 global army/per-player quota recalculation. Native movement, weapon firing,
@@ -348,6 +386,9 @@ existing scouting boats once. It does not reset already-correct AA tasks.
 `SeaCombat::MilitaryRemoved`, wired through `MilitaryAiUnitRemoved`, clears
 tracked responder IDs on death/transfer. Role exit restores native selection
 for surviving tracked AA responders.
+When the observed air threat and its short memory expire, tracked hybrid AA
+responders also return to native selection so a raid cannot consume all scouts
+for the rest of the game.
 With `RespectCarrierControl`, attached carrier drones use a passive native
 task until their game-owned host rule disappears; a one-second census also
 handles the rule arriving after creation. Role exit releases this ownership.
@@ -355,7 +396,7 @@ See the [complete source trace](../sea-native-trace.md) and
 [combat acceptance plan](../sea-combat-enhancement-plan.md).
 
 `Sea_Init` registers missing Legion advanced-yard native metadata through
-`RegisterScriptFactory`, gated by `Sea::ExperimentalBuild`. Existing profile
+`RegisterScriptFactory`, gated by `Sea::ExperimentalBuild || Sea::AdaptiveFleet`. Existing profile
 entries are preserved; missing entries use the actual build options and the
 Cortex advanced yard's generic lifecycle handlers. This runs before layout
 activation. Supplied terrible/balanced fixtures check physical constructor and
@@ -367,4 +408,4 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: f57792960264e21d871ba63b7017309f7d2a2d23; lines: 829 -->
+<!-- source: data/script/src/roles/sea.as; blob: 8a6e6b4efd622c9bf5446786d99351a0728c9f2f; lines: 847 -->

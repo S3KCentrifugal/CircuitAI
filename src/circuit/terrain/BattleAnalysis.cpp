@@ -653,8 +653,11 @@ void CBattleAnalysis::SampleNavalThreat(const AIFloat3& origin, float radius)
 	for (const auto& entry : circuit->GetEnemyManager()->GetEnemyUnits()) {
 		const CEnemyUnit* enemy = entry.second;
 		CCircuitDef* def = enemy->GetCircuitDef();
-		if (def == nullptr || !enemy->IsInRadarOrLOS() || enemy->IsHidden()
-			|| (enemy->GetData().losStatus & (SEnemyData::LosMask::NEUTRAL | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))) continue;
+		// IsHidden() includes the profile IGNORE bit. Using it here made the
+		// deliberate profile-ignore exception below unreachable. This sampler is
+		// requested by SEA only; true fog and game-level ignoredByAI still apply.
+		if (def == nullptr || !enemy->IsInRadarOrLOS()
+			|| (enemy->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))) continue;
 		if (enemy->IsIgnore() && (!def->IsIgnore() || enemy->GetUnit()->GetRulesParamFloat("ignoredByAI", 0.f) > 0.f)) continue;
 		const AIFloat3& pos = enemy->GetPos();
 		if (origin.SqDistance2D(pos) > radius * radius) continue;
@@ -823,6 +826,37 @@ int CBattleAnalysis::GetNavalForceCount() {
     return int(navalForces.size());
 }
 int CBattleAnalysis::GetNavalForceId(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].id : -1; }
+int CBattleAnalysis::GetSeaForceCount() {
+    const int frame=circuit->GetLastFrame();
+    if (frame==seaForceFrame) return int(seaForces.size());
+    seaForceFrame=frame;
+    GetNavalForceCount();
+    // Own the extension, never append to AIR's cached snapshot. One O(F+E)
+    // copy/scan per requesting frame, then O(C log C) stable contact ordering;
+    // SEA requests once per second. No callback wrappers escape this function.
+    seaForces=navalForces;
+    for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+        const auto* e=kv.second;
+        auto* d=e->GetCircuitDef();
+        if (!e->IsInRadarOrLOS() || (e->GetData().losStatus &
+            (SEnemyData::LosMask::HIDDEN|SEnemyData::LosMask::NEUTRAL|SEnemyData::LosMask::DYING|SEnemyData::LosMask::DEAD))) continue;
+        if (e->IsIgnore() && (d==nullptr || !d->IsIgnore() || e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
+        const auto& p=e->GetPos(); // last legal observation, never query hidden UnitDef
+        if (Height(p)>=-8.f) continue;
+        const int body=WaterBody(p,false);
+        if (body<0) continue;
+        if (d==nullptr) {
+            // Underwater sonar blips have a legal submerged position but no
+            // identified definition/cost. Script chooses the uncertainty budget.
+            if (p.y < -1.f) seaForces.push_back({p,0.f,e->GetId(),-1,2|16,body});
+        } else if (!d->IsMobile() && !d->IsBuilder() && !e->IsBeingBuilt()) {
+            seaForces.push_back({p,d->GetCostM(),e->GetId(),d->GetId(),
+                (d->IsInWater(Height(p),p.y) ? 2 : 0)|8,body});
+        }
+    }
+    std::sort(seaForces.begin(),seaForces.end(),[](const NavalForce& a,const NavalForce& b){return a.id<b.id;});
+    return int(seaForces.size());
+}
 int CBattleAnalysis::GetNavalForceDefId(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].defId : -1; }
 int CBattleAnalysis::GetNavalForceFlags(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].flags : 0; }
 int CBattleAnalysis::GetNavalForceBody(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].body : -1; }

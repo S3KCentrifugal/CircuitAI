@@ -78,8 +78,9 @@ bool TryGetLimit(
     const string& in name,
     int& out limit)
 {
+    if (limits.get(name, limit)) return true;
     limit = 0;
-    return limits.get(name, limit);
+    return false;
 }
 ```
 

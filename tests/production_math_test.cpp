@@ -1,5 +1,7 @@
 #include <angelscript.h>
 #include "scriptarray.h"
+#include "scriptstdstring.h"
+#include "scriptdictionary.h"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -26,6 +28,12 @@ int main(int argc, char** argv) {
     asIScriptEngine* engine = asCreateScriptEngine();
     engine->SetMessageCallback(asFUNCTION(Message), nullptr, asCALL_CDECL);
     RegisterScriptArray(engine, true);
+    // Some differential fixtures deliberately supply a tiny dictionary stub.
+    // Opt into the real add-on only for tests of its runtime semantics.
+    if (argc == 4 && std::string(argv[3]) == "--dictionary") {
+        RegisterStdString(engine);
+        RegisterScriptDictionary(engine);
+    }
     engine->RegisterGlobalFunction("void Check(bool)", asFUNCTION(Check), asCALL_GENERIC);
     asIScriptModule* mod = engine->GetModule("tests", asGM_ALWAYS_CREATE);
     const auto policy = Read(argv[1]);

@@ -1,0 +1,388 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\surface-line-cand\\glacial\\20261005T050545Z-17417428\\runs\\20261005T050658Z-fb9160e8\\infolog.txt",
+  "fixture_errors": [],
+  "order_sources": [
+    {
+      "frame": 1800,
+      "team": 1,
+      "armcom_nonlua": 6,
+      "corason_nonlua": 4,
+      "corfrad_nonlua": 4,
+      "corroy_nonlua": 60,
+      "nonlua": 74
+    },
+    {
+      "frame": 1800,
+      "team": 2,
+      "armcom_nonlua": 2,
+      "nonlua": 2
+    },
+    {
+      "frame": 1800,
+      "team": 0,
+      "armason_nonlua": 4,
+      "armcom_nonlua": 6,
+      "armfrad_nonlua": 4,
+      "armroy_nonlua": 300,
+      "nonlua": 314
+    },
+    {
+      "frame": 3600,
+      "team": 1,
+      "armcom_nonlua": 5,
+      "corroy_nonlua": 53,
+      "nonlua": 58
+    },
+    {
+      "frame": 3600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armroy_nonlua": 60,
+      "nonlua": 61
+    },
+    {
+      "frame": 5400,
+      "team": 1,
+      "armcom_nonlua": 4,
+      "corroy_nonlua": 140,
+      "nonlua": 144
+    },
+    {
+      "frame": 5400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 7200,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corroy_nonlua": 104,
+      "nonlua": 105
+    },
+    {
+      "frame": 7200,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 9000,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corroy_nonlua": 202,
+      "nonlua": 203
+    },
+    {
+      "frame": 9000,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 10800,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corroy_nonlua": 52,
+      "nonlua": 53
+    },
+    {
+      "frame": 10800,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    }
+  ],
+  "carrier_ownership": [],
+  "raw_weapon_damage_by_team": [
+    17775.1,
+    23682.199999999997
+  ],
+  "metal_lost_by_team": [
+    5280.0,
+    3170.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    3170.0,
+    5280.0
+  ],
+  "minute_apm_by_team": [
+    [
+      314,
+      61,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      74,
+      58,
+      144,
+      105,
+      203,
+      53
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      13,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "peak_apm_by_team": [
+    314,
+    203
+  ],
+  "detection_to_first_attack_order_seconds": [
+    13.8,
+    27.733333333333334,
+    33.9,
+    41.9,
+    53.6
+  ],
+  "median_detection_to_order": 33.9,
+  "response_decisions": [],
+  "threat_observations": [
+    {
+      "team": 0,
+      "frame": 360,
+      "submarine": "500",
+      "aircraft": "0"
+    },
+    {
+      "team": 1,
+      "frame": 361,
+      "submarine": "500",
+      "aircraft": "0"
+    }
+  ],
+  "decisions": [],
+  "produced": [],
+  "finished": [
+    {
+      "frame": 302,
+      "id": "24620",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 306,
+      "id": "10560",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 310,
+      "id": "12834",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 313,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 316,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 319,
+      "id": "17971",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 321,
+      "id": "10684",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 324,
+      "id": "124",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 327,
+      "id": "10994",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 330,
+      "id": "22326",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 333,
+      "id": "30373",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 337,
+      "id": "18885",
+      "team": "1",
+      "unit": "corroy"
+    },
+    {
+      "frame": 339,
+      "id": "15500",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 343,
+      "id": "15236",
+      "team": "1",
+      "unit": "corfrad"
+    },
+    {
+      "frame": 346,
+      "id": "6519",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 350,
+      "id": "22959",
+      "team": "1",
+      "unit": "corason"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 2940.0,
+      "live1": 3840.0
+    },
+    {
+      "frame": 3600,
+      "live0": 300.0,
+      "live1": 2880.0
+    },
+    {
+      "frame": 5400,
+      "live0": 300.0,
+      "live1": 2880.0
+    },
+    {
+      "frame": 7200,
+      "live0": 300.0,
+      "live1": 2880.0
+    },
+    {
+      "frame": 9000,
+      "live0": 300.0,
+      "live1": 2880.0
+    },
+    {
+      "frame": 10800,
+      "live0": 300.0,
+      "live1": 2880.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.031982,
+      "ai_all_p95_ms": 0.709961,
+      "ai_all_max_ms": 8.028931,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.465576,
+      "ai_all_mean_ms": 0.111713
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.017456,
+      "ai_all_p95_ms": 0.568726,
+      "ai_all_max_ms": 1.845337,
+      "sim_speed": 11.995,
+      "ai_all_p99_ms": 1.355225,
+      "ai_all_mean_ms": 0.082345
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.012939,
+      "ai_all_p95_ms": 0.54126,
+      "ai_all_max_ms": 1.957886,
+      "sim_speed": 12.002,
+      "ai_all_p99_ms": 1.25293,
+      "ai_all_mean_ms": 0.07733
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.01416,
+      "ai_all_p95_ms": 0.513672,
+      "ai_all_max_ms": 2.038086,
+      "sim_speed": 10.032,
+      "ai_all_p99_ms": 1.223145,
+      "ai_all_mean_ms": 0.078165
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.012695,
+      "ai_all_p95_ms": 0.532471,
+      "ai_all_max_ms": 1.803223,
+      "sim_speed": 12.002,
+      "ai_all_p99_ms": 1.280029,
+      "ai_all_mean_ms": 0.076206
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.013672,
+      "ai_all_p95_ms": 0.51709,
+      "ai_all_max_ms": 1.917725,
+      "sim_speed": 11.995,
+      "ai_all_p99_ms": 1.237549,
+      "ai_all_mean_ms": 0.07663
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

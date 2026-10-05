@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "46d60a7d5703a46633de0e7cca6d01d097e8124106cce3691e233067ebce8dd0",
+    "checks.json": "2ddc474676f7351233dd7e2153a16b17b471be843e4396c938a6a7fe17183d90",
+    "launched.json": "456028ed1082e4c3ec653c45ed9e3981cf6ba4dd77d6002eb940475290cfa870",
+    "report.md": "2d7c4c4d9732b259b64bfcc47d473c6cce15b2401e518ab8e7eb9d5df3b06e24",
+    "result.json": "01f84dac05ef5fedd235e00c8eabc40125b1239127fa6f4b1605adfbae8d61ab",
+    "run-inputs.json": "2a084565ef6ce15a2050f7d5411bcf7dfe964e5a6b5742e3cc08c116c77a0312",
+    "run-plan.json": "73ac2b77a61e1d017edf03fbfd6ec8d0878d89c31a6fe8bc83c49238912a01b4",
+    "script.txt": "3e62f9ad01756935468baf7bbd00baa238f3bf0a85d8133bab0c4729486728d7",
+    "sea-arena-pins.json": "0ccc604195741220a4a0b3aac9a04ea7686f74b8a8c89a79f0b150ad383407ec",
+    "sea-arena.json": "1644e76d2945da9dcb1e44749752ebd963ae83f1409b953cc7cc770826843c03",
+    "staged.json": "dfc74c407b00d0313e0f149a83bad0862052f3b637b0fbc59355e3946a1d6ab5",
+    "starts.as": "de2c5147e08c07cdc819c9666b7f971f4707be7961c90c835852983b8b958b61",
+    "teams.json": "a815f9fc6425ef9a33cb7a23d0bcc47f49aae9c3244e9a169a23a380fb2cdbaf"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-submarine-cand\\glacial\\20261005T042854Z-284ea2ff\\runs\\20261005T043009Z-6bbb7889",
+  "schema": 1
+}

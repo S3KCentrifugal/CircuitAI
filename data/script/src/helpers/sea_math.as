@@ -1,5 +1,17 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    float RememberThreat(float previous, float observed, int age, int lifetime) {
+        return observed>0 ? observed : age<lifetime ? previous : 0.0f;
+    }
+    bool ReleaseFleet(int count, int ageFrames, int desired, int waitFrames) {
+        return count>0 && (count>=desired || ageFrames>=waitFrames);
+    }
+    bool NeedsScreen(float enemySubMetal, float readyCover, float ratio) {
+        return enemySubMetal>0 && readyCover<enemySubMetal*ratio;
+    }
+    bool NewObjective(int oldTarget, int target, float movedSq, int age, int expiry) {
+        return oldTarget!=target || movedSq>192.0f*192.0f || age>=expiry;
+    }
     bool ForwardFootprint(float along, float halfDepth, float frontier, float margin) {
         return halfDepth>=0 && margin>=0 && along-halfDepth>=frontier+margin;
     }

@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "d3153cccd25d92f8e97b4900c0ce218ca2f5be522b4530472c0d8493eb2f2b19",
+    "checks.json": "2ddc474676f7351233dd7e2153a16b17b471be843e4396c938a6a7fe17183d90",
+    "launched.json": "b2dcdc59b5da2e34d775db80b09b3281474121bdedaff7a71f9781f31715ecf9",
+    "report.md": "261b6b3e77136078a5da84b277a56acaf65f3a560d265675e60ab912e2b6f672",
+    "result.json": "8244691574f2b7325d365c2029288398fca3fb3ff56105e9f10ff965addc2dff",
+    "run-inputs.json": "4a09b273fdf67c63fc6e67c7b8e16a8e7856409a86ed15b28ae59d6a3da49ee2",
+    "run-plan.json": "f320b5b4b93390218d461be08711d5a290ad198a87661ae99901671df0c9675d",
+    "script.txt": "11b692c8cb5faf306c3fa15b53188950572c1f5b4f443ff931b0129f12432b7d",
+    "sea-arena-pins.json": "cf9cf8df5e47e93a3a018ac9c238f271b1d1faef3cef0e1f51e6e6851986a68a",
+    "sea-arena.json": "4bda7a4e4dcc65c1ad1ad84861439de323b86a514387c9e86756edd555bf9b71",
+    "staged.json": "f4c7213f006a58f4c85d962e15350be808782d9422c7fc81d64bdb069ee241fb",
+    "starts.as": "de2c5147e08c07cdc819c9666b7f971f4707be7961c90c835852983b8b958b61",
+    "teams.json": "f9266c64d9280daa9b3086e91a92ba29d8bb7a9c83e13480c2eed1fb2691ee49"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-sub-cortex-cand\\glacial\\20261005T043734Z-fa4abacc\\runs\\20261005T043848Z-bdfdc6ac",
+  "schema": 1
+}

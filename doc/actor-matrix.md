@@ -555,3 +555,15 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Custom order payload | CircuitUnit command helpers, SendCustomCommand, synchronous engine C bridge | Borrowed payload valid for the bridge call; all order fields, dispatch timing and error propagation retained. |
 | Performance span | Script/native wrappers, AI Update, exception unwind, destructor | Opt-in per-thread/per-AI diagnostics; no engine/script ownership transfer to workers. |
 | Weapon pending count | TechWeapons::Work, OutstandingOrders | Invocation-local observation; invalidated on dead-slot changes and before every Order attempt, including failed enqueue/abort; no cross-frame reuse or suppressed site attempt. |
+
+
+### D-201 SEA operation cohorts
+
+| Object | Actors | State and ownership |
+| --- | --- | --- |
+| SEA cohort | SeaOperations Census, Tick, Route, Leave | Owned IDs reacquired per callback; body/definition cohorts, finite assembly/search deadlines, native contact grace; dead cohorts compacted. |
+| SEA naval route | CRouteTask SetSeaControl, LanePoint, Update, OnUnitIdle, OnUnitDamaged | Explicit opt-in, terrain-checked offsets, exact unchanged-route suppression, live queue preservation; native damage retreat retained; empty task aborts. |
+| SEA response | SeaCombat Tick/Select, RoleSea factory hook, SeaFactories Produce | Separate combat activation; complete local hulls plus pending recruits; one recovery constructor precedes emergencies. |
+| Naval observations | SampleNavalThreat, GetSeaForceCount, GetNavalForceCount | SEA owns its snapshot extension: legal known contacts plus unidentified submerged sonar blips and water statics; unknown cost is a script estimate. AIR's snapshot is unchanged. |
+| SEA utility escort | SeaOperations Escort/Tick, native SupportTask | Naval sensors/ABM follow a combat cohort behind its line; no builder, carrier child or other-role support ownership changes. |
+| Scalar count | DictIntOr, SeaCombat Select | A failed dictionary out lookup chooses zero after the call; pending recruits are read fresh, not stored across admissions. |

@@ -107,6 +107,15 @@ public:
     int GetNavalForceBody(int index) const;
     float GetNavalForceCost(int index) const;
     springai::AIFloat3 GetNavalForcePos(int index) const;
+    // SEA-only extension: legal unidentified sonar contacts (flags 16|2) and
+    // visible water statics. AIR retains its original snapshot and cadence.
+    int GetSeaForceCount();
+    int GetSeaForceId(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].id : -1; }
+    int GetSeaForceDefId(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].defId : -1; }
+    int GetSeaForceFlags(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].flags : 0; }
+    int GetSeaForceBody(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].body : -1; }
+    float GetSeaForceCost(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].cost : 0.f; }
+    springai::AIFloat3 GetSeaForcePos(int i) const { return i>=0 && i<int(seaForces.size()) ? seaForces[i].pos : springai::AIFloat3(-1.f,0.f,-1.f); }
 	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
     int GetAirContactId(int index) const { return index >= 0 && static_cast<size_t>(index) < airContacts.size() ? airContacts[index].id : -1; }
 	springai::AIFloat3 GetAirContactPos(int index) const;
@@ -187,6 +196,8 @@ private:
 	float navalThreatCost[4] = {}; // surface mobile, submerged, strike aircraft, water static
     struct NavalForce { springai::AIFloat3 pos; float cost; int id, defId, flags, body; };
     std::vector<NavalForce> navalForces;
+    std::vector<NavalForce> seaForces;
+    int seaForceFrame = -100000;
     int navalForceFrame = -100000;
     // Lazily requested by the AIR safety query only. Real weapon envelopes
     // remain hazardous when a role profile intentionally assigns zero threat.

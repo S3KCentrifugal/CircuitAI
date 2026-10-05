@@ -1,14 +1,21 @@
 ---
 name: troubleshoot-bar-logs
 description: 'Read Beyond All Reason runtime logs and related diagnostic artifacts to investigate CircuitAI/BARb crashes, AI misbehaviour, desyncs, and startup failures. Use when a game log, infolog, crash stacktrace, or replay needs analysis. Covers safe handling of multi-hundred-megabyte logs, locating crash stacktraces, symbolising SkirmishAI.dll offsets, filtering AI log noise, and the full set of BAR diagnostic sources.'
-compatibility: 'Windows BAR install (portable layout under %LOCALAPPDATA%). Symbolising requires the matching unstripped SkirmishAI.dll or .dbg from a local build.'
 metadata:
-  version: '1.0.0'
+  version: '1.1.0'
+  compatibility: 'Windows BAR install (portable layout under %LOCALAPPDATA%). Symbolising requires the matching unstripped SkirmishAI.dll or .dbg from a local build.'
 ---
 
 # Troubleshoot BAR Logs
 
 ## When to Use
+
+For CPU/APM investigations read the repository
+[performance evidence guide](../../doc/performance/engineering-guide.md).
+Keep inclusive versus exclusive phase timing separate, record unit populations
+and game/content/build pins, and distinguish AI orders from Lua gadget orders.
+Do not infer network packets or whole-game FPS improvements from order counts
+or a microbenchmark. Preserve failed original verdicts and compare serial runs.
 
 - A crash stacktrace mentioning `SkirmishAI.dll` needs investigating.
 - The AI misbehaves in game and the run log may explain it.

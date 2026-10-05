@@ -328,6 +328,10 @@ namespace EcoPlanner {
     }
 
     // The energy sources this constructor could build now, cheapest metal per E/s first.
+    // D-199: return one privately owned array handle. Value assignments at
+    // callers copy the array; PickEnergy needs ownership because it filters.
+    // Stable insertion below preserves equal-payback choices/random behavior.
+    // See doc/performance/engineering-guide.md and check_performance_policy.py.
     array<Option@>@ EnergyOptions(const State@ s)
     {
         const string side = Global::AISettings::Side;

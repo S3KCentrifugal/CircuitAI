@@ -74,7 +74,7 @@ namespace RoleSea {
         // native factory metadata. SEA's opt-in must register it before a
         // frame exists; otherwise the finished yard never receives a task.
         // InitHandler precedes LayoutPlanHandler, which sets Layout::enabled.
-        if (Global::RoleSettings::Sea::ExperimentalBuild) {
+        if (Global::RoleSettings::Sea::ExperimentalBuild || Global::RoleSettings::Sea::AdaptiveFleet) {
             CCircuitDef@ yard=ai.GetCircuitDef("legadvshipyard");
             if (yard !is null && aiFactoryMgr.RegisterScriptFactory(yard,ai.GetCircuitDef("corasy"))) {
                 Factory::userData[yard.id].attr |= Factory::Attr::T2;
@@ -196,6 +196,7 @@ namespace RoleSea {
 
     void Sea_MainUpdate() {
         if (SeaLayout::Enabled()) SeaBuild::Tick();
+        SeaCombat::Tick();
         if (SeaCombat::Active()) return;
         // Delay dynamic quota adjustments until configured time into the game
         if (ai.frame < (Global::RoleSettings::Sea::DynamicQuotaDelaySeconds * SECOND)) {
@@ -242,7 +243,24 @@ namespace RoleSea {
 
         // Resolve side-specific constructor unit names (with safe fallbacks)
         string t1Ctor = (side == "armada" ? "armcs" : side == "cortex" ? "corcs" : side == "legion" ? "legnavyconship" : "armcs");
-        string t2Ctor = (side == "armada" ? "armacsub" : side == "cortex" ? "coracsub" : side == "legion" ? "coracsub" : "armacsub");
+        string t2Ctor = SeaEconomy::Constructor(side,true);
+
+        // Keep the selected economic builder path. Emergency combat selection
+        // is independent of layouts and follows one recovery constructor.
+        if (SeaCombat::Active()) {
+            CCircuitDef@ con=ai.GetCircuitDef(isT1Shipyard ? t1Ctor : t2Ctor);
+            const int workers=con is null ? 0 : con.count+aiFactoryMgr.GetPendingRecruitCount(con);
+            if (workers>=1) {
+                CCircuitDef@ counter=SeaCombat::Select(u,true);
+                if (counter !is null) return SeaFactories::Recruit(u,counter,Task::RecruitType::FIREPOWER);
+            }
+            if (workers>=2) {
+                IUnitTask@ utility=SeaFactories::Utility(u);
+                if (utility !is null) return utility;
+                CCircuitDef@ combat=SeaCombat::Select(u);
+                if (combat !is null) return SeaFactories::Recruit(u,combat,Task::RecruitType::FIREPOWER);
+            }
+        }
 
         if (isT1Shipyard) {
             // Ensure at least two T1 construction ships exist before producing other units

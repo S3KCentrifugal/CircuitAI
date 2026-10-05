@@ -19,6 +19,26 @@ namespace SeaFactories {
         if (t !is null && funded) SeaEconomy::Admit(d,true);
         return t;
     }
+    IUnitTask@ Utility(CCircuitUnit@ yard) {
+        if (!SeaCombat::Active() || yard is null) return null;
+        const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
+        const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
+        array<string> names;
+        if (!advanced && SeaCombat::fleet>=1500)
+            names.insertLast(side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub");
+        if (advanced && SeaCombat::fleet>=5000) {
+            names.insertLast(UnitHelpers::GetNavalAntiNukeShipNameForSide(side));
+            names.insertLast(UnitHelpers::GetNavalJammerShipNameForSide(side));
+        }
+        for (uint i=0;i<names.length();++i) {
+            CCircuitDef@ d=ai.GetCircuitDef(names[i]);
+            if (d !is null && d.count+aiFactoryMgr.GetPendingRecruitCount(d)==0) {
+                IUnitTask@ t=Recruit(yard,d,Task::RecruitType::FIREPOWER);
+                if (t !is null) return t;
+            }
+        }
+        return null;
+    }
     IUnitTask@ Produce(CCircuitUnit@ yard) {
         if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.DefaultMakeTask(yard);
         if (Hold(yard)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
@@ -26,7 +46,7 @@ namespace SeaFactories {
         const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
         const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
         CCircuitDef@ con=ai.GetCircuitDef(SeaEconomy::Constructor(side,advanced));
-        if (con !is null && con.count+aiFactoryMgr.GetPendingRecruitCount(con)>=2) {
+        if (con !is null && con.count+aiFactoryMgr.GetPendingRecruitCount(con)>=1) {
             CCircuitDef@ counter=SeaCombat::Select(yard,true);
             if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER); if (response !is null) return response; }
             // A safe, established fleet can briefly reserve income for its T2
@@ -53,21 +73,9 @@ namespace SeaFactories {
             }
         }
         if (SeaCombat::Active()) {
-            // One recovery sub behind a real fleet pays for itself in wrecks.
-            const string rezName=side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub";
-            CCircuitDef@ rez=ai.GetCircuitDef(rezName);
-            if (!advanced && SeaCombat::fleet>=1500 && rez !is null && rez.count+aiFactoryMgr.GetPendingRecruitCount(rez)==0) {
-                IUnitTask@ recovery=Recruit(yard,rez,Task::RecruitType::FIREPOWER); if (recovery !is null) return recovery;
-            }
-            if (advanced && SeaCombat::fleet>=5000) {
-                const array<string> support={UnitHelpers::GetNavalAntiNukeShipNameForSide(side),UnitHelpers::GetNavalJammerShipNameForSide(side)};
-                for (uint i=0;i<support.length();++i) {
-                    CCircuitDef@ d=ai.GetCircuitDef(support[i]);
-                    if (d !is null && d.count+aiFactoryMgr.GetPendingRecruitCount(d)==0) {
-                        IUnitTask@ escort=Recruit(yard,d,Task::RecruitType::FIREPOWER); if (escort !is null) return escort;
-                    }
-                }
-            }
+            // Shared by both economic implementations; counter emergencies
+            // above retain precedence over discretionary utility hulls.
+            IUnitTask@ utility=Utility(yard); if (utility !is null) return utility;
             CCircuitDef@ selected=SeaCombat::Select(yard);
             if (selected !is null) {
                 IUnitTask@ combat=Recruit(yard,selected,Task::RecruitType::FIREPOWER); if (combat !is null) return combat;

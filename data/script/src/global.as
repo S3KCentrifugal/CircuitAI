@@ -1580,13 +1580,24 @@ namespace Global {
             // D-188: independent policy over the shared native reservation engine.
             bool ExperimentalBuild = false;
             bool ForwardHarbors = true;
-            bool AdaptiveFleet = true; // applies only inside SEA ExperimentalBuild
+            bool AdaptiveFleet = true; // SEA combat is independent of base-layout migration
+            bool FleetOperations = true;
+            int FleetReleaseCount = 7;
+            int FleetReleaseSeconds = 60;
+            int FleetSearchSeconds = 45;
+            int FleetContactSeconds = 20;
+            float FleetScreenRadius = 1100.0f;
+            float FleetScreenRatio = 1.2f;
+            float FleetLaneSpacing = 72.0f;
+            int FleetScouts = 3;
             bool RespectCarrierControl = true; // yield attached drones to the game's carrier gadget
             bool HybridScoutAirResponse = true; // Armada scout boats must use their AA task during a raid
             float HybridSubCoverWeight = .5f; // T1 destroyer cost includes its surface gun; avoid valuing all of it as anti-sub
             float ThreatResponseRadius = 6000.0f;
             float AirCounterRatio = 0.7f;
             float SubCounterRatio = 1.2f;
+            int FleetThreatMemorySeconds = 30; // retain a lost contact's cost, never its live hidden position
+            float UnknownSubContactMetal = 500.0f; // conservative sonar uncertainty, not a revealed UnitDef cost
             float FleetAirCoverShare = 0.06f;
             float FleetSubCoverShare = 0.3f;
             float SiegeFleetMetal = 4500.0f;

@@ -15,6 +15,11 @@ namespace circuit::local_layout {
 // Exact half-open occupancy of unconsumed local slots and complete zone
 // envelopes. The blocking map still owns terrain, yards and zone authority.
 // Queries are O(footprint cells), independent of the number of reservations.
+// This moves work to Put/Erase: O(log N + changed cells), with sparse 32x32
+// pages plus the ID maps. Counts, not XOR alone, preserve overlapping owners
+// when ignoring one slot. Every consume/release/load writer must update here.
+// See tests/local_reservations_test.cpp and doc/performance/engineering-guide.md;
+// this contract does not make the surrounding placement candidate search O(1).
 class Reservations {
 public:
     struct Rect {

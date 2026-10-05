@@ -172,7 +172,7 @@ start caps one at a time) and logs `[TECH][Weapons] <kind> #<id>: ... orders`.
 - `budget: ...`
 - `super cannon framed ...`
 
-<!-- source: data/script/src/roles/tech_weapons.as; blob: 81fa23e52c3009564f9e4f5a0df8a5bcce1250e4; lines: 1126 -->
+<!-- source: data/script/src/roles/tech_weapons.as; blob: ae83f79405a7dbb011a414c4b7d54ad8bf929f66; lines: 1130 -->
 
 ## D-152 protected weapon placement
 

@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "7bd6a9998f5a21b7d3feefebd1674f0dd942e2abaf67c98ea1207390ca495d57",
+    "checks.json": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808",
+    "launched.json": "e2d9dce13b29bb1dda53c8d73e9c63e5e9d83701ffd0b62d30fa48a237b1291b",
+    "report.md": "389c6bc45e1901bc0d55df68eaf623f8f4b3b1255610c772acc194a052bbd5cc",
+    "result.json": "4655594c5a80f9d52c397debe7dc019c69d6468ca9140ec8097c102911b017db",
+    "run-inputs.json": "b25cb64dc9eef1097a573e8476ebf6fbab9b400f3ea857078e945f6e040a8a2b",
+    "run-plan.json": "7b4377d9d74415ae63677079b301b23e3fcf2fa5e91441a56a3fbc0b79d4aa97",
+    "screen_2026-10-05_04-44-52-450.png": "5c0b31ca6baf6a8bfebe36c139ad4c659b466b705f28f06d047c3b2704babaae",
+    "script.txt": "5ff7da99127de4f892f7fdc175b09a784fcfb3760de02ca65f40593b8a14e7f5",
+    "sea-fixture.json": "f20eea01a993d0ae935fc1aad1b9f7d5fe26c4c6bbc4af4371e2624b85769fbf",
+    "staged.json": "a08da8aab35cb5978967fc3b742563f5313f8c4ee616489c985304f37b5054ab",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\fleet-rework\\glacial\\20261005T044232Z-c0082086\\runs\\20261005T044453Z-5972c2a3",
+  "schema": 1
+}

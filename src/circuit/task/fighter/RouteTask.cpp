@@ -74,7 +74,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	engaging.erase(unit);
     issuedVersion.erase(unit);
     if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
-    if (airControl && hadAssignee && units.empty()) manager->AbortTask(this);
+    if (ManagedControl() && hadAssignee && units.empty()) manager->AbortTask(this);
 }
 
 void CRouteTask::SetLanes(int count, float spacing, float endSpread)
@@ -119,6 +119,9 @@ AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 	const float off = laneSpacing * float(lane) * scale;
 	AIFloat3 out(p.x + (-dir.z / len) * off, p.y, p.z + (dir.x / len) * off);
 	CTerrainManager::CorrectPosition(out);
+	// Formation offsets can cross a coast even when the centre route is legal.
+	// SEA collapses that member to the route, rather than issuing a cliff order.
+	if (seaControl && !manager->GetCircuit()->GetTerrainManager()->CanMoveToPos(unit->GetArea(), out)) return p;
 	return out;
 }
 
@@ -164,16 +167,16 @@ void CRouteTask::Update()
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
         bool retry=retryUnits.count(unit) && circuit->GetLastFrame()-lastIssue[unit]>=FRAMES_PER_SEC;
-        if (airControl && retry && circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
+        if (ManagedControl() && retry && circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
             // Idle events can describe an order just replaced by another
             // callback. Preserve that live queue; only repair an empty one.
             retryUnits.erase(unit);
             retry = false;
         }
         if (!changed && !resume && !retry) continue;
-        if (airControl && !resume && !retry && issuedVersion.count(unit) && issuedVersion[unit] == version) continue;
+        if (ManagedControl() && !resume && !retry && issuedVersion.count(unit) && issuedVersion[unit] == version) continue;
         retryUnits.erase(unit);
-        if (!changed && !resume && !airControl && IsAtEnd(unit)) continue;
+        if (!changed && !resume && !ManagedControl() && IsAtEnd(unit)) continue;
 		if (patrol) IssueRoute(unit, 0);
 		else if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
 		else IssueDirect(unit);
@@ -187,7 +190,7 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
     // opt-in exact routes instead of filling the engine's command/event queues.
 	if (engaging.count(unit) != 0) return;  // Update owns contact loss and lane resumption.
 	if (patrol && !route.empty()) {
-		if (airControl) { retryUnits.insert(unit); return; }
+		if (ManagedControl()) { retryUnits.insert(unit); return; }
 		IssueRoute(unit, 0);
 		return;
 	}
@@ -201,12 +204,13 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	if (seaControl) IFighterTask::OnUnitDamaged(unit, attacker);
 	// No retreat: spam trades bodies for pressure.
 }
 
 void CRouteTask::SetRoute(std::vector<AIFloat3>&& waypoints)
 {
-    if (airControl && unitRoutes.empty() && waypoints.size() == route.size()
+    if (ManagedControl() && unitRoutes.empty() && waypoints.size() == route.size()
         && std::equal(route.begin(), route.end(), waypoints.begin(), [](const AIFloat3& a, const AIFloat3& b) {
             return a.x == b.x && a.y == b.y && a.z == b.z;
         })) return;
@@ -300,7 +304,7 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 		}
 	)
 	issuing.erase(unit);
-    if (airControl) issuedVersion[unit] = version;
+    if (ManagedControl()) issuedVersion[unit] = version;
 }
 
 const std::vector<AIFloat3>& CRouteTask::RouteFor(CCircuitUnit* unit) const

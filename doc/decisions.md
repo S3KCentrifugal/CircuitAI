@@ -12139,3 +12139,97 @@ profile results and original verdicts. Full reruns lost the original late TECH
 workload to combat, so the function-level gain is not presented as proof of
 all-game FPS improvement. The new fixture files, runner and checks are listed
 in the report; they are never deployed to production data.
+
+
+## D-200 - Document performance contracts and index test definitions
+
+**Decision.** Preserve D-199's exact behavior optimizations and explain their
+complexity, ownership, invalidation and evidence in a shared engineering guide,
+linked from the updated AngelScript skill and new C++ skill. Source comments
+record paged occupancy and synchronous command borrowing constraints. Generate
+categorized test documentation from existing definitions without moving evidence.
+
+**Why.** Future changes need the proof behind an optimization, not only a faster
+looking loop. A source inventory is different from a list of passing games.
+Duplicating all guidance in every skill or renaming old benchmark directories
+was rejected because it invites drift or broken evidence links.
+
+**Invariant.** Documentation and discovery do not change runtime decisions or
+rewrite historical results. Catalog records explicitly do not infer execution.
+
+**Files and verification.** [Engineering guide](performance/engineering-guide.md),
+[AS skill](../skills/convention-angelscript/SKILL.md), [AS performance reference](../skills/convention-angelscript/references/performance-and-safety.md),
+[C++ skill](../skills/convention-cpp/SKILL.md), [agent map](../AGENTS.md),
+[local index](../src/circuit/terrain/LocalReservations.h),
+[command bridge](../src/circuit/spring/CustomCommand.cpp),
+[test generator](../tools/knowledge/index_test_cases.py),
+[generator tests](../tools/knowledge/test_index_test_cases.py) and
+[generated catalog](testing/README.md). Three generator tests pass; documentation
+link check reports only the eight pre-existing KI-404 hover links. The skill
+creator's validator passes for all four updated/new skills after PyYAML was installed into an
+isolated ignored validation directory; no global Python install changed.
+
+## D-201 - Separate SEA combat from layout and give idle fleets finite objectives
+
+**Decision.** Adaptive combat is SEA-only and independent of ExperimentalBuild.
+Use a separate owned-unit census, body-local completed counter counts, recurring
+scout procurement and earlier emergency admission after one recovery constructor.
+A SEA director groups compatible hulls, searches reachable water, and routes
+surface-only cohorts away from observed subs when nearby cover is inadequate.
+Native close-contact tasks and existing artillery remain in use.
+
+**Why.** A second blind periodic ATTACK command does not solve no-contact native
+fallback. Broad formation/order suppression regressed D-189 fixtures. Reusing
+native path/route execution and contact combat isolates the policy while enabling
+objective-level regression checks. Zero threat weights are not themselves proof
+of an ignored enemy; the independently verified SampleNavalThreat mask bug is
+that IsHidden includes IGNORE, bypassing its intended profile exception.
+
+**Invariant.** INV-145: an eligible SEA cohort member must accept its selected
+route task. Player, retreat, carrier gadget and AA ownership take precedence.
+Only explicitly SEA-managed routes gain naval offset checks and lifetime rules;
+other roles retain their existing paths.
+
+**Files.** [Design and acceptance matrix](sea-fleet-rework.md),
+[operations](../data/script/src/manager/sea_operations.as),
+[procurement](../data/script/src/manager/sea_combat.as),
+[SEA role](../data/script/src/roles/sea.as), [factories](../data/script/src/roles/sea_factories.as),
+[settings](../data/script/src/global.as), [pure decisions](../data/script/src/helpers/sea_math.as),
+[tests](../tests/sea_math_tests.as), [route header](../src/circuit/task/fighter/RouteTask.h),
+[route executor](../src/circuit/task/fighter/RouteTask.cpp),
+[bindings](../src/circuit/script/InitScript.cpp), [contact sampler](../src/circuit/terrain/BattleAnalysis.cpp),
+[arena runner](../tools/playtest/sea_arena.py), [fog case](../tools/playtest/cases/sea/combat/scout-fog.json),
+[sub screen case](../tools/playtest/cases/sea/combat/surface-sub-danger.json),
+[fog checks](../tools/playtest/checks/sea/combat/sea-fleet-search.json),
+[screen checks](../tools/playtest/checks/sea/combat/sea-sub-screen.json),
+[invariants](invariants.md), [actor matrix](actor-matrix.md), [role reference](roles/sea.md).
+
+**Verification.** Baseline supplied surface combat on Glacial Gap engages by
+0.5 game minutes. Candidate runtime results and limitations will be recorded
+in the rework document; source inspection is not a claim of completed gameplay
+acceptance.
+
+**D-201 refinements found while playing.** The initial local dictionary census
+ignored a failed get output, allowing conversion-temporary garbage to invent
+counter coverage. DictIntOr now supplies a fallback after failure and has a real
+embedded-dictionary regression. Sonar-only enemies can lack UnitDefs; SEA's own
+GetSeaForceCount extension adds legal submerged unknowns (defId=-1, cost=0),
+with script-controlled uncertainty credit. AIR keeps its original snapshot.
+Threat costs expire after a 30-second memory; hidden locations are never queried.
+Utility ships now follow routed cohorts because native SupportTask sees only
+ATTACK/DEFEND. Siege is overridden only for immediate underwater screening and
+then regains native control. Tracked hybrid AA boats return after a raid expires.
+Legion T2 metadata registration follows either SEA combat or economy opt-in.
+
+Additional files: [collection helper](../data/script/src/helpers/collection_helpers.as),
+[dictionary regression](../tests/collection_helpers_tests.as),
+[VM harness](../tests/production_math_test.cpp), [suite runner](../tools/run_native_tests.sh),
+[snapshot header](../src/circuit/terrain/BattleAnalysis.h),
+[observer](../tools/playtest/widgets/sea_arena.lua),
+[source trace](sea-native-trace.md), [known limits](known-issues.md).
+The rework report records original failed builds/checks as well as corrected
+fixtures; no all-unit optimality or multiplayer FPS claim follows from them.
+
+**D-201 completed observations.** See the [results report](sea-fleet-rework-results.md): twelve final combat fixtures and three natural twenty-minute games on Glacial, Supreme and Shore, fourteen PASS and one retained Cortex capacity FAIL; an older screen observation is retained separately. Native/VM tests, API, role and invariant checks pass. Existing benchmark evidence (4,985 files) is byte-for-byte preserved. KI-500/501 and unplayed acceptance limits remain explicit; these are not PvP victory or FPS claims.
+
+**D-201 cleanup follow-up.** Final review replaced repeated dead-cohort removeAt with stable O(G) compaction while retaining reverse abort order and survivor order. A separate candidate-10 surface fixture with losses passed; the [results report](sea-fleet-rework-results.md) links its original record. Seventeen observations are now published, with earlier verdicts unchanged.

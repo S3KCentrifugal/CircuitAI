@@ -1,4 +1,18 @@
 void test_sea_policy_boundaries() {
+    Check(SeaMath::RememberThreat(1000,800,0,900)==800);
+    Check(SeaMath::RememberThreat(1000,0,899,900)==1000);
+    Check(SeaMath::RememberThreat(1000,0,900,900)==0);
+    Check(SeaMath::RememberThreat(1000,0,0,0)==0);
+    Check(!SeaMath::ReleaseFleet(0,9999,7,1800));
+    Check(SeaMath::ReleaseFleet(7,0,7,1800));
+    Check(!SeaMath::ReleaseFleet(6,1799,7,1800));
+    Check(SeaMath::ReleaseFleet(1,1800,7,1800));
+    Check(!SeaMath::NeedsScreen(0,0,1.2f));
+    Check(SeaMath::NeedsScreen(1000,1199,1.2f));
+    Check(!SeaMath::NeedsScreen(1000,1200,1.2f));
+    Check(SeaMath::NewObjective(1,2,0,0,600));
+    Check(!SeaMath::NewObjective(1,1,0,599,600));
+    Check(SeaMath::NewObjective(1,1,0,600,600));
     Check(SeaMath::Deficit(1000,400,600)==0);
     Check(SeaMath::Deficit(1000,400,200)==400);
     Check(SeaMath::CounterScore(1000,1000,20,false)==0);

@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "979d1ab397c1226fabfcb0cb4f8f3c1449fdc93e7385957f16ab11d3a0a2575a",
+    "checks.json": "94dedf93ff5dc43628a5a1f7fbbfd99054631d7b3998248cb9922e1ead89d7d7",
+    "launched.json": "3f5a3d434e73cd7f905362e31e524fe85955e0deb11ab8ee74645a4072bb6a46",
+    "report.md": "da746647615282244e07b648ed5aeb4a2436459498de70ee61fa4f71f7431897",
+    "result.json": "c7d0beaa1bbd9b0840c81df4c008e14da75dae2daf25365463e219c001b24b53",
+    "run-inputs.json": "232f7c14d07caabcd670d353fc8ffb2d5ac3d7dce795144ad42894e9fb810445",
+    "run-plan.json": "f9885b3ca5ffbad810af9fbda1de8307323125b72ef8cc6f04bd8469a48544bf",
+    "script.txt": "b487a4999484d4e06fae6414dd87b765d085e1c1536b27d542c33b8bc27339cb",
+    "sea-arena-pins.json": "d932a74e5b69dd22d97e9af30bdbcfb2a23ebbcf6e47d740755c98489aff9378",
+    "sea-arena.json": "0be2b03443c015f11afacaffde5a8bfdb5b2520768073c5f874446f0d349ae4b",
+    "staged.json": "d636094ca09ad0fb7715051c76067fbb43035779e5144b5913495bec9811afa0",
+    "starts.as": "de2c5147e08c07cdc819c9666b7f971f4707be7961c90c835852983b8b958b61",
+    "teams.json": "678b59e1209963e08a1134434bebeee2eba26f9b5619f52128d120e89310184e"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\carrier-release-cand\\glacial\\20261005T043510Z-a78737dd\\runs\\20261005T043624Z-ba305efa",
+  "schema": 1
+}

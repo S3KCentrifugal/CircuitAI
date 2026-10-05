@@ -1083,6 +1083,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetBuildSpeed() const", asMETHOD(CCircuitDef, GetWorkerTime), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetBuildDistance() const", asMETHOD(CCircuitDef, GetBuildDistance), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetLosRadius() const", asMETHOD(CCircuitDef, GetLosRadius), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitDef", "bool HasSubToLand() const", asMETHOD(CCircuitDef, HasSubToLand), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitDef", "int GetFootprintZ() const", asFUNCTION(CCircuitDef_GetFootprintZ), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "int maxThisUnit", asOFFSET(CCircuitDef, maxThisUnit)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "int sinceFrame", asOFFSET(CCircuitDef, sinceFrame)); ASSERT(r >= 0);
@@ -1298,6 +1299,13 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float SurfThreat(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, SurfThreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float AirThreat(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, AirThreat), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "float AirThreatAlong(const AIFloat3& in, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, AirThreatAlong), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetSeaForceCount()", asMETHOD(CBattleAnalysis, GetSeaForceCount), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetSeaForceId(int) const", asMETHOD(CBattleAnalysis, GetSeaForceId), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetSeaForceDefId(int) const", asMETHOD(CBattleAnalysis, GetSeaForceDefId), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetSeaForceFlags(int) const", asMETHOD(CBattleAnalysis, GetSeaForceFlags), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetSeaForceBody(int) const", asMETHOD(CBattleAnalysis, GetSeaForceBody), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetSeaForceCost(int) const", asMETHOD(CBattleAnalysis, GetSeaForceCost), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetSeaForcePos(int) const", asMETHOD(CBattleAnalysis, GetSeaForcePos), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetNavalForceCount()", asMETHOD(CBattleAnalysis, GetNavalForceCount), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetNavalForceId(int) const", asMETHOD(CBattleAnalysis, GetNavalForceId), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetNavalForceDefId(int) const", asMETHOD(CBattleAnalysis, GetNavalForceDefId), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1518,6 +1526,7 @@ void CInitScript::RegisterCRouteTask(asIScriptEngine* engine)
 	r = engine->RegisterObjectMethod("CRouteTask", "void SetTraversal(bool, float, bool)", asMETHOD(CRouteTask, SetTraversal), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "void SetPatrol(bool)", asMETHOD(CRouteTask, SetPatrol), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CRouteTask", "void SetAirControl(bool)", asMETHOD(CRouteTask, SetAirControl), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CRouteTask", "void SetSeaControl(bool)", asMETHOD(CRouteTask, SetSeaControl), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CRouteTask", "void SetAirTarget(int)", asMETHOD(CRouteTask, SetAirTarget), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CRouteTask", "void SetHoldPosition(bool)", asMETHOD(CRouteTask, SetHoldPosition), asCALL_THISCALL); ASSERT(r >= 0);
 }
