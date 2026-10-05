@@ -12307,3 +12307,39 @@ the live game installation was not changed. API/role/invariant/index checks pass
 Eight pre-existing missing-hover doc links and 167 existing unit-helper findings
 remain. KI-502 records repeated native AA orders outside adaptive SEA. No 8v8
 late-game performance or PvP victory claim follows from these fixtures.
+
+
+## D-203 - Review siege normalization before changing ranged-unit target policy
+
+**Call.** Do not apply the reviewed ten-unit artillery/siege normalization as
+an automatic range fix. The user's request is a review. Keep runtime code and
+configuration unchanged, and recommend separate target, range, travel and fire
+policies plus per-unit acceptance tests.
+
+**Why.** Native artillery excludes mobile targets; siege-tagged artillery uses
+return fire and FIGHT travel. This is D-031's intentional structure-bombardment
+behavior, not a generic stop-at-first-enemy promise. Reclassifying snipers,
+skirmishers and the Mantis carrier can discard essential mobile-target behavior.
+Replacing role lists also removes enemy-response classifications, and changing
+shared profiles affects land roles regardless of the legion-sea branch name.
+
+**Alternative rejected.** A byte-preserving two-property patch is mechanically
+possible but does not satisfy the stated gameplay rationale. Forty-four objects
+lack an attribute property, so even literal two-line replacement needs an
+insertion rule. Exact parity with legion-sea remains unverified because neither
+that ref nor a new Cent distribution was supplied locally.
+
+**Invariant.** Review-only: no runtime behavior, configuration bytes, sample
+files or deployed build changes. Any future implementation must preserve naval
+D-031 behavior unless explicitly changed and must demonstrate proactive mobile
+engagement for units intended to fight armies. No new runtime invariant is
+claimed before implementation.
+
+**Files and verification.** The [review](reviews/2026-10-05-siege-classification-request.md)
+records all ten units, native/engine/gadget traces, official unit references,
+77 definitions across 15 active files, 75 differing objects, newline constraints
+and a physical combat verification plan. The [known-issue register](known-issues.md)
+adds KI-503 for the already-existing experimental Sheldon mismatch. Checked by
+source/data inspection and primary-source research; no simulation or measured
+performance improvement is claimed for this proposed change. This decision
+file is the third and final documentation surface changed by the review.

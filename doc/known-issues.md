@@ -5088,3 +5088,30 @@ naval AA outside adaptive SEA before changing the shared native task.
 **Verification.** The original baseline FAIL and candidate patrol PASS are
 retained in the [D-202 report](sea-patrol-air-defense-results.md). This task
 fixes SEA ownership, not the remaining shared mechanism.
+
+
+### KI-503 - Experimental Sheldon artillery policy excludes proactive mobile targets
+
+**Problem.** At ff1925d0, all three experimental behaviour.json profiles give
+cormort main role artillery and attributes skirmish/siege. The native default
+owner is ArtilleryTask: both target passes exclude mobile units, while the
+siege attribute enables return fire (D-031). Recoil FIGHT travel only searches
+for nearby attack targets in fire-at-will or higher, so selecting FightAction
+is not a substitute for anti-army acquisition. This conflicts with Sheldon's
+mobile skirmish/fire-support use. The skirmish attribute adds an own-unit role
+mask, but does not replace the main artillery task. The source path is verified;
+the size of the gameplay regression has not been isolated in a fresh fixture.
+
+**Proposed solution.** Preserve D-031's naval siege behavior and separate ranged
+positioning from mobile/static target selection. Pilot an opt-in skirmish or
+ranged controller for Sheldon with script/JSON policy, auditing the experimental
+behaviour profiles, FactoryManager role semantics, ArtilleryTask and the bot
+factory production groups. Do not normalize every long-range unit to artillery
+plus siege or remove counter categories as a positioning workaround.
+
+**Verification.** Source/data review only, not a modified-candidate playtest.
+Use a Sheldon fixture with mobile enemies in range and no enemy buildings;
+require proactive damage before self-defense, safe spacing during approach,
+continued movement/fire after target loss and a static-line siege regression.
+See the [full review and profile inventory](reviews/2026-10-05-siege-classification-request.md)
+and [D-203](decisions.md#d-203---review-siege-normalization-before-changing-ranged-unit-target-policy).
