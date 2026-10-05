@@ -1,0 +1,105 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 835,
+      "sha256": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4"
+    },
+    "infolog.txt": {
+      "bytes": 775972,
+      "sha256": "c55c3283518d36a815c0c3ea4016233617242b22a425d32add5f339c30d2f921"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "0d1ec814700c6b7dd272e6849257627e512ed59c8eb9ad57769feb59169f24a5"
+    },
+    "naval-checks.json": {
+      "bytes": 835,
+      "sha256": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4"
+    },
+    "naval-manifest.json": {
+      "bytes": 37216,
+      "sha256": "1791b30a41a6097d06c621a2b490ce1c3cc1aee9c7e9b5dfb5e5ef64dab4e81e"
+    },
+    "report.md": {
+      "bytes": 43014,
+      "sha256": "bae2d6cd4767a847861e8047fc877d9490dc6e731c166c8a24b9a936a72df354"
+    },
+    "run-inputs.json": {
+      "bytes": 36243,
+      "sha256": "849e2e9d9c2df281fbf7b47fb5c368306336e4c5f02d126a4c7d90a8f8348713"
+    },
+    "run-plan.json": {
+      "bytes": 253,
+      "sha256": "9a9aa3e57313bcf635a93cd0fef0a67c2c46cb2ecf8ef6f7dd0bb539a86cc60d"
+    },
+    "script.txt": {
+      "bytes": 6502,
+      "sha256": "fb16465328358257da3502458b53cce781723734609fa0059f5d6819fac6b974"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "85cddf43fbfbb95046c9b3188c0477f8e70e55d385dd04b2424734c907d267cb"
+    },
+    "starts.as": {
+      "bytes": 170,
+      "sha256": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162"
+    },
+    "teams.json": {
+      "bytes": 640,
+      "sha256": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "an-danger-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T203933Z-31f4b961",
+  "last_frame": 12810,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-danger-armada\\supreme\\20261004T203808Z-27b3627c\\runs\\20261004T203933Z-31f4b961",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-04T20:39:33.535526+00:00",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "FAIL"
+}

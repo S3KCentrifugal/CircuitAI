@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-sub-armada\\supreme\\20261004T203013Z-d995845a\\runs\\20261004T203151Z-3ff765f9\\infolog.txt",
+  "naval_launches": [
+    {
+      "frame": 1830,
+      "event": "11 wanted=11 target=723 reason=full ingress=6541,9368"
+    }
+  ],
+  "recon_launches": [],
+  "patrol_assignments": 0,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 20,
+  "first_damage_frame": 2906,
+  "damage": 6840,
+  "naval_kills": 6,
+  "peak_air_apm": 315,
+  "peak_all_apm": 379,
+  "max_patrols": 0,
+  "max_patrol_span": [
+    0,
+    0
+  ],
+  "return_survivors": [
+    11
+  ],
+  "invariants": []
+}

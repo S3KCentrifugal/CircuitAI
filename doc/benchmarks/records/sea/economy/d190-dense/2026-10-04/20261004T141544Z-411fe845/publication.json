@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "2a3a4dd0051b3a4289cefef041cb160f00db5bed9f552abf8ff6426011b68a41",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "launched.json": "0a0d9e4b9b98ffd4be3962b7cb944250960e99623929bd6ea93bf465651f9266",
+    "report.md": "712bf2b47a4d12e3ee12a3f58b0c698a06f2075e26dfe6ae879b3b23f4dee09d",
+    "result.json": "ce081fac62b8b3ee3185d81bc4d4b59ee397bdd3e9baafb06bbe421767788fa7",
+    "run-inputs.json": "e16f4d024c8083c994573f15987f398031f368c4670c3bdf41648efa15a9de88",
+    "run-plan.json": "7d583a666e7665f73a4d01e0789a8f48af8b67a0d6b8b00991b3befef0187b9b",
+    "screen_2026-10-04_14-15-43-787.png": "e894fc27e28c615315f22f5a4d2bcfe681e52bee2b6ce9204c3193c129d8665a",
+    "script.txt": "aeff7b29ed094e280920b2dc5aab51de571987866ebcf1a4a7ec07a9990e4087",
+    "sea-fixture.json": "b0377a6a9a47d9e74e77a154fac763c42054966a077aaf900a3b4f92abe762d4",
+    "staged.json": "01c5c000e666b1e2a8c51f12615cbd64bdcd4398af8ea8e7bf4e214b70b02d7e",
+    "teams.json": "9eef94c3b0d0c8d3fcfcc80871bf6805268134eac14edd83f89e4cd570e05527"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d190-dense\\tundra\\20261004T141249Z-f2fe9570\\runs\\20261004T141544Z-411fe845",
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "an-zero-armada"
+  },
+  "id": "20261004T204532Z-cca061ec",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1
+}

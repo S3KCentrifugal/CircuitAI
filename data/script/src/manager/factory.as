@@ -108,6 +108,7 @@ namespace Factory {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+		if (SeaFactories::Hold(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true, SECOND));
 		// Only AIR changes ordering: transport obligations precede optional spam and combat.
 		if (Global::AISettings::Role == AiRole::AIR) {
 			IUnitTask@ ferry = Team::Ferry::FactoryMakeTask(u);
@@ -115,6 +116,9 @@ namespace Factory {
 		}
 		IUnitTask@ t = TechFlank::Produce(u);
 		if (t !is null) return t;
+		// Emergency AIR production must reach its role before optional spam.
+		if (AirBaseResponse::Emergency() && (UnitHelpers::IsT1AircraftPlant(u.circuitDef.GetName())
+			|| UnitHelpers::IsT2AircraftPlant(u.circuitDef.GetName()))) return AirProduction::MakeTask(u);
 		@t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision
 		if (t !is null) return t;
 

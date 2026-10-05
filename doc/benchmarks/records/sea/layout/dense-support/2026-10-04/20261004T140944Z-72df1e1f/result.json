@@ -1,0 +1,111 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 536,
+      "sha256": "10b58e95b0768d87b07a4caf8a92f85d88cf6e0d499bd1e77eb96b6c006d94bc"
+    },
+    "dense-checks.json": {
+      "bytes": 536,
+      "sha256": "10b58e95b0768d87b07a4caf8a92f85d88cf6e0d499bd1e77eb96b6c006d94bc"
+    },
+    "dense-fixture.json": {
+      "bytes": 260,
+      "sha256": "9962702ab75b3ab7da402ddbb7e3cfdfd91f4ce72e3da42c05acdc2e1b376a1c"
+    },
+    "infolog.txt": {
+      "bytes": 3603109,
+      "sha256": "a43a28c54e58ae0677544c444fe2c24ae33f5801a22d40f49d19e2fde9534ba8"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "e9182e08fa0e5792579ab4d4b81dc6e0a3eee173aecdbac74684132a4d54eec9"
+    },
+    "report.md": {
+      "bytes": 12586,
+      "sha256": "97e91e058fc109027be206ac5b38f5cf1c5a78a0442b9d310455255bf3154652"
+    },
+    "run-inputs.json": {
+      "bytes": 35885,
+      "sha256": "6852f1843a3f8a89ff19aac3bc7233f4ad71a2812f8f1e4a9fef941bb8836dd3"
+    },
+    "run-plan.json": {
+      "bytes": 250,
+      "sha256": "7663764425e45e39734aba01451e6c8e55e5dec16c5993ea4af897ea0fbebb8b"
+    },
+    "screen_2026-10-04_14-09-16-565.png": {
+      "bytes": 1794483,
+      "sha256": "af27d20dd0b0836018a1199320791da76a01c904d3f8ca0ff9721158b6e29f62"
+    },
+    "screen_2026-10-04_14-09-29-550.png": {
+      "bytes": 1792632,
+      "sha256": "2e02c882e74628117731e4b893701c29f4b5b7a6f25185e8f4c9d3b277e9b55c"
+    },
+    "screen_2026-10-04_14-09-33-603.png": {
+      "bytes": 1783304,
+      "sha256": "01b704f53ee47fff9255fcba291a33d036f5e18f679da21250abf18a16ba763b"
+    },
+    "screen_2026-10-04_14-09-38-536.png": {
+      "bytes": 1792696,
+      "sha256": "a96954ec172fc3090969e17d5598fe9798c92fe6872fa33a9b92030e1997f7e4"
+    },
+    "script.txt": {
+      "bytes": 6147,
+      "sha256": "a293fb858dd031648df7ed36e36ae291a6ae34d4fe631d374578d8f4ea4fab1f"
+    },
+    "staged.json": {
+      "bytes": 235,
+      "sha256": "74136f0902298dedfed287fef196b3498cf965117eb9f3bafdd03d90b1b4241d"
+    },
+    "starts.as": {
+      "bytes": 110,
+      "sha256": "a1230783c7a728f37cc7a7942c61d12e42245ea14451e1d4f940d9960fdb5570"
+    },
+    "teams.json": {
+      "bytes": 455,
+      "sha256": "58cf35dbd8e349132e5eead19c1c4127401f4415b2a840c5c135269509b1f88a"
+    }
+  },
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "dense-support"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T140944Z-72df1e1f",
+  "last_frame": 14731,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\dense-support\\glacial\\20261004T140827Z-eddf94f3\\runs\\20261004T140944Z-72df1e1f",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-04T14:09:44.790420+00:00",
+  "requested": {
+    "seed": 1901
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2300.0,
+      "z": 4400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 7000.0,
+      "z": 6500.0
+    }
+  ],
+  "verdict": "FAIL"
+}

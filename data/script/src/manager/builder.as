@@ -2154,7 +2154,7 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		if (MetalEconomy::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
+		if (MetalEconomy::Active() && !SeaLayout::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
 			&& !UnitHelpers::IsCommander(u.circuitDef) && u.circuitDef.IsMobile()) @t = MetalEconomy::EconomyTask(u);
 		if (t is null && cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
 			@t = cfg.BuilderAiMakeTaskHandler(u);
@@ -2162,6 +2162,7 @@ namespace Builder {
 		// If no role-specific task or handler returned null, fallback to default
 		if (t is null) {
 			@t = aiBuilderMgr.DefaultMakeTask(u);
+			if (SeaLayout::Enabled()) @t = SeaBuild::LayoutTask(u,t);
 		}
 
 		// Record tracking for this builder if any (best-effort owner): grace ~3s, timeout ~45s
@@ -2342,6 +2343,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		SeaEconomy::Removed(task);
 		MetalEconomy::Removed(task, done);
 		{
 			IBuilderTask@ mexTask = cast<IBuilderTask>(task);

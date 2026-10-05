@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "55731a9fd467235cd6ca7e56236b909c56b31167fed30e026eea335c715eeeb5",
+    "air-naval-analysis.json": "8fbedf30902c735a318c0750193faa410df8fe759e2508a80b3a7f77c875f7dc",
+    "checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "launched.json": "56dd1c30706a66c592df0310e8e52bd84a0d12f54b0d0f46d707b980c5cc422d",
+    "naval-checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "naval-manifest.json": "5dd8f9cea307a5f41e68d93853de6f4f3d0255c3e49b8e2d2a2b064ff4ce7264",
+    "report.md": "4334b11e68e19b0902eadeb5f30c34de8bf9a5197bc3ed200ba8705ce84e5569",
+    "result.json": "5d712f28ce3233ba022a58a4cfacb1a7d126833ec2ae2e2dc36adc87224b240b",
+    "run-inputs.json": "d4ee5be43c8da5e9b32b17dd611a7fb37c5c05a1aca44e3f5d4dd9de754df3d4",
+    "run-plan.json": "12b128380d0440a1b4e9e16e5681b76abd28fd2495a9b70c61f1fa4b7dc1ee28",
+    "script.txt": "fb16465328358257da3502458b53cce781723734609fa0059f5d6819fac6b974",
+    "staged.json": "e9f614ed8a7ea58b5cbba7708bc8d8358c4db43f7a0a9a258393ba776aa7849f",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-danger-armada\\supreme\\20261004T204630Z-f94ce6e9\\runs\\20261004T204803Z-1ccbd873",
+  "schema": 1
+}

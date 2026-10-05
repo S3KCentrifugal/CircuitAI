@@ -62,6 +62,7 @@ CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ Enqueue(const SServSTask& in)", asMETHODPR(CFactoryManager, Enqueue, (const TaskS::SServSTask&), IUnitTask*), asCALL_THISCALL); ASSERT(r >= 0);
 //	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CFactoryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "CCircuitDef@ GetRoleDef(const CCircuitDef@, Type) const", asMETHOD(CFactoryManager, GetRoleDef), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CFactoryManager", "bool RegisterScriptFactory(CCircuitDef@, const CCircuitDef@)", asMETHOD(CFactoryManager, RegisterScriptFactory), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "int GetFactoryCount() const", asMETHOD(CFactoryManager, GetFactoryCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "int GetPendingRecruitCount(const CCircuitDef@) const", asFUNCTION(CFactoryManager_GetPendingRecruitCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CFactoryManager", "bool isAssistRequired", asOFFSET(CFactoryManager, isAssistRequired)); ASSERT(r >= 0);

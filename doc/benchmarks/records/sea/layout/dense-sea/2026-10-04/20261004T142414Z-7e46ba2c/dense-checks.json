@@ -1,0 +1,30 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {
+      "key": "armtide",
+      "pattern": "DenseFixture\\] PASS touching armtide",
+      "by_minute": 8,
+      "scope": "any"
+    },
+    {
+      "key": "armfmkr",
+      "pattern": "DenseFixture\\] PASS touching armfmkr",
+      "by_minute": 8,
+      "scope": "any"
+    },
+    {
+      "key": "armuwmmm",
+      "pattern": "DenseFixture\\] PASS touching armuwmmm",
+      "by_minute": 8,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": "INVARIANT|SCRIPT CRASH|: ERR\\s+:|has crashed|Lib exception|DenseFixture\\] FAIL|Error in.*dense_economy",
+      "scope": "any"
+    }
+  ]
+}

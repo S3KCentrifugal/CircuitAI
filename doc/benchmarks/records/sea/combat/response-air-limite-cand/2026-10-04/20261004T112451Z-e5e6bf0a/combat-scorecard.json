@@ -1,0 +1,1149 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-air-limite-cand\\glacial\\20261004T112311Z-9950b007\\runs\\20261004T112451Z-e5e6bf0a\\infolog.txt",
+  "fixture_errors": [],
+  "order_sources": [
+    {
+      "frame": 1800,
+      "team": 1,
+      "armcom_nonlua": 6,
+      "corason_nonlua": 4,
+      "nonlua": 10
+    },
+    {
+      "frame": 1800,
+      "team": 2,
+      "armcom_nonlua": 2,
+      "nonlua": 2
+    },
+    {
+      "frame": 1800,
+      "team": 0,
+      "armason_nonlua": 4,
+      "armcom_nonlua": 6,
+      "armcs_nonlua": 18,
+      "armfrad_nonlua": 4,
+      "armnanotcplat_nonlua": 120,
+      "armrecl_nonlua": 6,
+      "armroy_nonlua": 100,
+      "armsy_nonlua": 16,
+      "armuwfus_nonlua": 16,
+      "armuwmmm_nonlua": 32,
+      "armuwms_nonlua": 16,
+      "nonlua": 338
+    },
+    {
+      "frame": 3600,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "cortitan_nonlua": 127,
+      "nonlua": 128
+    },
+    {
+      "frame": 3600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 10,
+      "armnanotcplat_nonlua": 121,
+      "armpt_nonlua": 4,
+      "armrecl_nonlua": 4,
+      "armroy_nonlua": 108,
+      "nonlua": 248
+    },
+    {
+      "frame": 5400,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "cortitan_nonlua": 253,
+      "nonlua": 254
+    },
+    {
+      "frame": 5400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 347,
+      "armpt_nonlua": 111,
+      "armroy_nonlua": 108,
+      "armsub_nonlua": 24,
+      "armsy_nonlua": 19,
+      "nonlua": 612
+    },
+    {
+      "frame": 7200,
+      "team": 1,
+      "armcom_nonlua": 6,
+      "cortitan_nonlua": 325,
+      "nonlua": 331
+    },
+    {
+      "frame": 7200,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 256,
+      "armpt_nonlua": 96,
+      "armrecl_nonlua": 8,
+      "armroy_nonlua": 60,
+      "armsub_nonlua": 42,
+      "armsy_nonlua": 17,
+      "nonlua": 482
+    },
+    {
+      "frame": 9000,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 174,
+      "armpt_nonlua": 56,
+      "armrecl_nonlua": 1,
+      "armroy_nonlua": 48,
+      "armsy_nonlua": 12,
+      "nonlua": 294
+    },
+    {
+      "frame": 10800,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 171,
+      "armpt_nonlua": 47,
+      "armrecl_nonlua": 1,
+      "armroy_nonlua": 48,
+      "armsy_nonlua": 21,
+      "nonlua": 291
+    },
+    {
+      "frame": 12600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 138,
+      "armpt_nonlua": 74,
+      "armrecl_nonlua": 1,
+      "armroy_nonlua": 33,
+      "armsy_nonlua": 18,
+      "nonlua": 267
+    },
+    {
+      "frame": 14400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 116,
+      "armpt_nonlua": 32,
+      "armrecl_nonlua": 1,
+      "armroy_nonlua": 44,
+      "armsy_nonlua": 18,
+      "nonlua": 214
+    }
+  ],
+  "carrier_ownership": [],
+  "raw_weapon_damage_by_team": [
+    5384.6,
+    30901.0
+  ],
+  "metal_lost_by_team": [
+    24910.0,
+    1390.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    1390.0,
+    22050.0
+  ],
+  "minute_apm_by_team": [
+    [
+      338,
+      248,
+      612,
+      482,
+      294,
+      291,
+      267,
+      214
+    ],
+    [
+      10,
+      128,
+      254,
+      331
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      53,
+      91,
+      7,
+      54,
+      88,
+      50,
+      76,
+      38
+    ],
+    [
+      1,
+      65,
+      116,
+      265
+    ]
+  ],
+  "peak_apm_by_team": [
+    612,
+    331
+  ],
+  "detection_to_first_attack_order_seconds": [
+    8.3
+  ],
+  "median_detection_to_order": 8.3,
+  "response_decisions": [
+    "[t=00:00:56.950908][f=0003841] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3841:L::[SEA][Response] layer=2 deficit=499 recruit=armpt",
+    "[t=00:00:57.522068][f=0004013] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4013:L::[SEA][Response] layer=2 deficit=137 recruit=armpt",
+    "[t=00:00:58.500325][f=0004305] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4305:L::[SEA][Response] layer=2 deficit=62 recruit=armpt",
+    "[t=00:00:59.204200][f=0004517] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4517:L::[SEA][Response] layer=1 deficit=2360 recruit=armsub",
+    "[t=00:01:00.432348][f=0004885] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4885:L::[SEA][Response] layer=2 deficit=274 recruit=armpt",
+    "[t=00:01:01.273472][f=0005137] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5137:L::[SEA][Response] layer=2 deficit=199 recruit=armpt",
+    "[t=00:01:02.153401][f=0005401] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5401:L::[SEA][Response] layer=2 deficit=124 recruit=armpt",
+    "[t=00:01:03.997699][f=0005661] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5661:L::[SEA][Response] layer=1 deficit=1920 recruit=armsub",
+    "[t=00:01:05.325079][f=0006061] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:6061:L::[SEA][Response] layer=1 deficit=1480 recruit=armsub"
+  ],
+  "threat_observations": [
+    {
+      "team": 0,
+      "frame": 3030,
+      "submarine": "0",
+      "aircraft": "1230"
+    },
+    {
+      "team": 1,
+      "frame": 3301,
+      "submarine": "2940",
+      "aircraft": "0"
+    },
+    {
+      "team": 0,
+      "frame": 4470,
+      "submarine": "2700",
+      "aircraft": "820"
+    },
+    {
+      "team": 0,
+      "frame": 5610,
+      "submarine": "2700",
+      "aircraft": "410"
+    },
+    {
+      "team": 0,
+      "frame": 5730,
+      "submarine": "2700",
+      "aircraft": "410"
+    },
+    {
+      "team": 1,
+      "frame": 5731,
+      "submarine": "2700",
+      "aircraft": "0"
+    },
+    {
+      "team": 0,
+      "frame": 6030,
+      "submarine": "2700",
+      "aircraft": "410"
+    },
+    {
+      "team": 0,
+      "frame": 6300,
+      "submarine": "0",
+      "aircraft": "410"
+    },
+    {
+      "team": 1,
+      "frame": 6301,
+      "submarine": "3140",
+      "aircraft": "0"
+    },
+    {
+      "team": 0,
+      "frame": 6540,
+      "submarine": "0",
+      "aircraft": "410"
+    },
+    {
+      "team": 1,
+      "frame": 6571,
+      "submarine": "2700",
+      "aircraft": "0"
+    },
+    {
+      "team": 1,
+      "frame": 6961,
+      "submarine": "2940",
+      "aircraft": "0"
+    }
+  ],
+  "decisions": [
+    {
+      "team": 0,
+      "frame": 3841,
+      "layer": "2",
+      "deficit": "499",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 4013,
+      "layer": "2",
+      "deficit": "137",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 4305,
+      "layer": "2",
+      "deficit": "62",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 4517,
+      "layer": "1",
+      "deficit": "2360",
+      "recruit": "armsub"
+    },
+    {
+      "team": 0,
+      "frame": 4885,
+      "layer": "2",
+      "deficit": "274",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 5137,
+      "layer": "2",
+      "deficit": "199",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 5401,
+      "layer": "2",
+      "deficit": "124",
+      "recruit": "armpt"
+    },
+    {
+      "team": 0,
+      "frame": 5661,
+      "layer": "1",
+      "deficit": "1920",
+      "recruit": "armsub"
+    },
+    {
+      "team": 0,
+      "frame": 6061,
+      "layer": "1",
+      "deficit": "1480",
+      "recruit": "armsub"
+    }
+  ],
+  "produced": [
+    {
+      "frame": 358,
+      "id": "596",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 622,
+      "id": "28374",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 3513,
+      "id": "31764",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3853,
+      "id": "11472",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4018,
+      "id": "27000",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4349,
+      "id": "21302",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4584,
+      "id": "6833",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 4916,
+      "id": "7986",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5154,
+      "id": "6218",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5413,
+      "id": "17119",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5668,
+      "id": "5597",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 6073,
+      "id": "18818",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 6343,
+      "id": "29845",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 6628,
+      "id": "17431",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 6989,
+      "id": "28362",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 7469,
+      "id": "31702",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 7914,
+      "id": "15212",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 8395,
+      "id": "15398",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 8740,
+      "id": "15944",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9280,
+      "id": "25694",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 9416,
+      "id": "379",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9731,
+      "id": "30878",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 9911,
+      "id": "7596",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10332,
+      "id": "12903",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 10482,
+      "id": "6306",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10797,
+      "id": "1003",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 11308,
+      "id": "15696",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 11413,
+      "id": "31050",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 11743,
+      "id": "20357",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 11894,
+      "id": "3311",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12224,
+      "id": "12893",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 12386,
+      "id": "26926",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12731,
+      "id": "2473",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 12851,
+      "id": "5925",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13226,
+      "id": "22507",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13512,
+      "id": "29302",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 13617,
+      "id": "23540",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 14322,
+      "id": "7300",
+      "team": "0",
+      "unit": "armpt"
+    }
+  ],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "armsy"
+    },
+    {
+      "frame": 304,
+      "id": "10560",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 310,
+      "id": "12834",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 313,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 317,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 319,
+      "id": "17971",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 323,
+      "id": "10684",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 326,
+      "id": "124",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 327,
+      "id": "10994",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 332,
+      "id": "22326",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 335,
+      "id": "30373",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 336,
+      "id": "18885",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 340,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 342,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 346,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 349,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 352,
+      "id": "11235",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 354,
+      "id": "27380",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 359,
+      "id": "20517",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 360,
+      "id": "1602",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 365,
+      "id": "207",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 366,
+      "id": "23411",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 370,
+      "id": "23745",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 373,
+      "id": "23943",
+      "team": "1",
+      "unit": "corason"
+    },
+    {
+      "frame": 378,
+      "id": "16218",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 382,
+      "id": "4690",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 385,
+      "id": "8691",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 387,
+      "id": "22392",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 391,
+      "id": "26627",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 395,
+      "id": "26186",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 497,
+      "id": "596",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 767,
+      "id": "28374",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 3001,
+      "id": "10155",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3004,
+      "id": "28301",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3009,
+      "id": "14996",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3820,
+      "id": "31764",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3990,
+      "id": "11472",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4284,
+      "id": "27000",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4495,
+      "id": "21302",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4864,
+      "id": "6833",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 5116,
+      "id": "7986",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5380,
+      "id": "6218",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5641,
+      "id": "17119",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 6021,
+      "id": "5597",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 6297,
+      "id": "18818",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 6592,
+      "id": "29845",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 6863,
+      "id": "17431",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 7396,
+      "id": "28362",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 7766,
+      "id": "31702",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 8256,
+      "id": "15212",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 8652,
+      "id": "15398",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9139,
+      "id": "15944",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9349,
+      "id": "25694",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 9661,
+      "id": "379",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9824,
+      "id": "30878",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 10151,
+      "id": "7596",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10450,
+      "id": "12903",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 10736,
+      "id": "6306",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 11220,
+      "id": "1003",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 11382,
+      "id": "15696",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 11663,
+      "id": "31050",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 11865,
+      "id": "20357",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 12147,
+      "id": "3311",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12348,
+      "id": "12893",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 12638,
+      "id": "26926",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12817,
+      "id": "2473",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 13085,
+      "id": "5925",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13460,
+      "id": "22507",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13577,
+      "id": "29302",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 14244,
+      "id": "23540",
+      "team": "0",
+      "unit": "armroy"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 29890.0,
+      "live1": 160.0
+    },
+    {
+      "frame": 3600,
+      "live0": 26390.0,
+      "live1": 1390.0
+    },
+    {
+      "frame": 5400,
+      "live0": 6650.0,
+      "live1": 1230.0
+    },
+    {
+      "frame": 7200,
+      "live0": 9350.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 9000,
+      "live0": 12870.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 10800,
+      "live0": 16840.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 12600,
+      "live0": 19930.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 14400,
+      "live0": 23020.0,
+      "live1": 0.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.034424,
+      "ai_all_p95_ms": 0.624512,
+      "ai_all_max_ms": 8.616943,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.782715,
+      "ai_all_mean_ms": 0.132957
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.040527,
+      "ai_all_p95_ms": 0.749268,
+      "ai_all_max_ms": 2.911377,
+      "sim_speed": 9.838,
+      "ai_all_p99_ms": 1.8479,
+      "ai_all_mean_ms": 0.139887
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.044189,
+      "ai_all_p95_ms": 0.810303,
+      "ai_all_max_ms": 2.853027,
+      "sim_speed": 9.998,
+      "ai_all_p99_ms": 1.594971,
+      "ai_all_mean_ms": 0.138779
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.043457,
+      "ai_all_p95_ms": 0.685791,
+      "ai_all_max_ms": 3.304932,
+      "sim_speed": 8.6,
+      "ai_all_p99_ms": 1.849854,
+      "ai_all_mean_ms": 0.140402
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.030029,
+      "ai_all_p95_ms": 0.641846,
+      "ai_all_max_ms": 2.991211,
+      "sim_speed": 10.002,
+      "ai_all_p99_ms": 1.771973,
+      "ai_all_mean_ms": 0.128201
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.033447,
+      "ai_all_p95_ms": 0.746338,
+      "ai_all_max_ms": 3.887207,
+      "sim_speed": 10.003,
+      "ai_all_p99_ms": 2.043945,
+      "ai_all_mean_ms": 0.154017
+    },
+    {
+      "t": 0.0,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036621,
+      "ai_all_p95_ms": 0.697754,
+      "ai_all_max_ms": 3.833252,
+      "sim_speed": 10.0,
+      "ai_all_p99_ms": 2.061279,
+      "ai_all_mean_ms": 0.150963
+    },
+    {
+      "t": 0.0,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036865,
+      "ai_all_p95_ms": 0.804932,
+      "ai_all_max_ms": 3.937256,
+      "sim_speed": 8.594,
+      "ai_all_p99_ms": 2.476563,
+      "ai_all_mean_ms": 0.171808
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

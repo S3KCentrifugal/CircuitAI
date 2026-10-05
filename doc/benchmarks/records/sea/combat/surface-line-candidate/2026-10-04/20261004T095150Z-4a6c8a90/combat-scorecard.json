@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\surface-line-candidate\\glacial\\20261004T095013Z-472d93c3\\runs\\20261004T095150Z-4a6c8a90\\infolog.txt",
+  "fixture_errors": [],
+  "raw_weapon_damage_by_team": [
+    20502.899999999998,
+    20148.6
+  ],
+  "metal_lost_by_team": [
+    5280.0,
+    4130.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    4130.0,
+    5280.0
+  ],
+  "minute_apm_by_team": [
+    [
+      329,
+      34,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      81,
+      1
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      7,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      2,
+      0
+    ]
+  ],
+  "peak_apm_by_team": [
+    329,
+    81
+  ],
+  "detection_to_first_attack_order_seconds": [
+    13.933333333333334,
+    24.2,
+    25.3,
+    25.366666666666667,
+    29.933333333333334,
+    3.6,
+    36.4,
+    42.7
+  ],
+  "median_detection_to_order": 25.333333333333336,
+  "response_decisions": [],
+  "produced": [],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 2940.0,
+      "live1": 2880.0
+    },
+    {
+      "frame": 3600,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 5400,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 7200,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 9000,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 10800,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 12600,
+      "live0": 300.0,
+      "live1": 1920.0
+    },
+    {
+      "frame": 14400,
+      "live0": 300.0,
+      "live1": 1920.0
+    }
+  ],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit synchronized callbacks, not player UI actions or network packet bytes.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

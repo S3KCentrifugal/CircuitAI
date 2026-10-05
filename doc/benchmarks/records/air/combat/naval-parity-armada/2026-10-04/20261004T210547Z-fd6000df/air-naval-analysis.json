@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-parity-armada\\supreme\\20261004T210409Z-f2eb5381\\runs\\20261004T210547Z-fd6000df\\infolog.txt",
+  "naval_launches": [],
+  "recon_launches": [],
+  "patrol_assignments": 0,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 20,
+  "first_damage_frame": null,
+  "damage": 0,
+  "naval_kills": 0,
+  "peak_air_apm": 40,
+  "peak_all_apm": 53,
+  "max_patrols": 0,
+  "max_patrol_span": [
+    0,
+    0
+  ],
+  "return_survivors": [],
+  "invariants": []
+}

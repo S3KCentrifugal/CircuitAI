@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "tundra",
+    "scenario": "d189-native-travel"
+  },
+  "id": "20261004T112434Z-501b0212",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

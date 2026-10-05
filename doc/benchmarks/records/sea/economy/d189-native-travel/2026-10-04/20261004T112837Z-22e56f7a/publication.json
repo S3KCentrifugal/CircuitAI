@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "6bba012896b0d297bf88a8d5af4820e6424eca8876fea783a9277e5e22d46107",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "eco-score-v3.json": "2eb42b80d906fc3456309cfbe4af9d37f598429d28c0b783e940c3667438ba8d",
+    "launched.json": "a1c27e6e5e5fd4b1a02c08bc18ec24b330342afb21dc30c53b899d8de000f019",
+    "report.md": "17acee76e142e4fe5b690bf2514720991e4ab79bd6dc21fea33821af91ace3af",
+    "result.json": "d934827195e6c56b90401d022ba9edfba7537f83893e7e58ba845796d8dcc262",
+    "run-inputs.json": "a88cbfb258f2cd14c08d283a2c0e6f87e7b2aa69bfba2c9cb557397e1fc4105a",
+    "run-plan.json": "4a2fa0cd3069a79847d4c5dc71741207e3909c34b4b56c119b3d7e3b9c3efc10",
+    "screen_2026-10-04_11-28-24-522.png": "7377d894f6ae829b2cc8f6ccb1831a61cc2319e38b0cab7f27f7283b9950339c",
+    "script.txt": "c877d0d5f738339132f5c44e42dda29011fdee0de75881570e03ebf36599ae48",
+    "sea-fixture.json": "f694aca45c68685e5d92d9fe010942fc115a75bb9cba2c732134b0b89ef9d62c",
+    "staged.json": "aa3e3d474229517a84bb6f1d2fe0dbd4b5588e17b36569c7377ead267e74c7f1",
+    "teams.json": "9eef94c3b0d0c8d3fcfcc80871bf6805268134eac14edd83f89e4cd570e05527"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d189-native-travel\\tundra\\20261004T112434Z-501b0212\\runs\\20261004T112837Z-22e56f7a",
+  "schema": 1
+}

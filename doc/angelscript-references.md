@@ -32,7 +32,8 @@ that weapon's combat weight. The coverage includes two grid cells of clearance.
 The existing threat maps are unchanged. Queries run on
 the AI thread and should be throttled, not called per unit per frame.
 
-`GetGroundContactCount`, `GetGroundContactPos`, `GetGroundContactCost` and
+`GetGroundContactCount`, `GetGroundContactId`, `GetGroundContactDefId`,
+`GetGroundContactPos`, `GetGroundContactCost` and
 `IsGroundContactEconomy` expose per-second value snapshots of current known
 ground contacts. These snapshots include observed units suppressed only by a
 role's target preference, such as TECH's T1-combat ignore flag, while respecting
@@ -1768,6 +1769,63 @@ failed admissions from the latest response pass, for shared INV-128.
 Normal assignments and friendly-reclaim pulls yield to this task; PLAYER
 control remains authoritative. No target pointers are exposed. See
 [behavior and verification](turret-enemy-reclaim.md).
+
+
+### Opt-in naval layout mechanisms (D-188)
+
+`aiTerrainMgr.PlanNavalBerth(key, def, position, facing, exitLength, margin)`
+returns bool and atomically reserves an ordinary shipyard footprint and exit.
+It validates actual Ship products, maximum hull/draft, strict native movement
+areas, swept terrain clearance and allied reservations. Success stores `.slot`,
+`.exit`, `.facing`, `.x`, `.z` under the key. Failure leaves no partial berth.
+Policy retains ownership and pins the eventual task. This does not certify
+long-distance dynamic obstacles or auxiliary naval/seaplane factories.
+
+`aiTerrainMgr.CanNavalRoute(def, from, to)` is strict movement-area membership
+without endpoint snapping, not full pathfinding. `CanUpgradeTerrain(def, pos)`
+validates actual water-depth bounds and native buildable terrain, ignoring the
+existing mex occupancy. `aiBattle.PrepareWater()` idempotently initializes the
+water survey without enabling lane/objective policy. No borrowed object handles
+escape these methods. See [SEA results](sea-layout-migration-results.md).
+
+
+### D-189 optional SEA queries and external command ownership
+
+`CCircuitDef.HasSurfToAir/HasSurfToLand/HasSurfToWater/HasSubToWater()` expose native weapon-layer capabilities. `aiBattle.SampleNavalThreat(origin, radius)` refreshes four cost buckets; `GetNavalThreatCost(0..3)` reads surface/submerged/air/static-water, with invalid indices yielding zero. Sampling is explicit and SEA-gated, not a global update change.
+
+`aiMilitaryMgr.EnqueueExternalControl(ownerRule)` creates a passive same-manager task. Script chooses the nonnegative owner-id rules parameter; the task never changes the game command queue and returns its unit to idle after the rule disappears. `IUnitTask.IsExternalControlled()` identifies it. `TransferUnit` accepts this task as well as fighters, retaining live-unit and same-manager checks. SEA alone opts in using `carrier_host_unit_id`; callers must not transfer a human PLAYER task. Matching DLL/data is required.
+
+
+### D-189: explicitly registered script factories
+
+`aiFactoryMgr.RegisterScriptFactory(CCircuitDef@ factory, const CCircuitDef@ prototype)` returns false for invalid definitions or an unregistered prototype, and preserves an existing definition. It copies generic lifecycle handlers and tier/energy/nano metadata, derives the actual mobile build roster, and uses zero native start/switch importance. Call before the first unit of this factory type exists. SEA calls it during role initialization, before layout activation, to cover Legion advanced-yard omissions in hard/terrible profiles. It does not edit global JSON or run automatically for other roles. Runtime role entry with an already-existing unregistered yard still needs adoption testing.
+
+
+## D-194 opt-in AIR safety and naval facts
+
+`aiBattle.AirThreatAlong(from,to,padding)` returns the maximum existing weighted
+AA threat in a padded corridor. Invalid/out-of-map geometry returns infinity.
+A known physical AA envelope adds a minimum value of one even when a profile
+sets that unit's threat weights to zero. This is presence, not damage parity.
+Weapon facts refresh lazily once per second. Existing `AirThreat` and SEA
+contact/sample behavior remain unchanged.
+
+Call `aiBattle.GetNavalForceCount()` before indexed reads: it refreshes the copied
+snapshot at most every five seconds. `GetNavalForceId`, `GetNavalForceDefId`,
+`GetNavalForceFlags`, `GetNavalForceBody`, `GetNavalForceCost`, and
+`GetNavalForcePos` then read that same snapshot. Flags: allied=1, submerged=2,
+anti-sub capability=4, naval factory=8. Costs and positions are value copies;
+definition IDs resolve in this AI. Only completed allied/current-observed enemy
+combat navy and factory anchors are included. Hovers, dry units, constructors,
+unarmed mobile units and stale unseen enemies are excluded. Sort order is unit
+ID. No other AI's borrowed `CCircuitDef` handle escapes the snapshot.
+
+The ordinary `aiXxx` static API checker does not prove methods on local
+definition variables compile: engine compilation remains mandatory. The three
+movement-classification bindings attempted during diagnosis were removed when
+the spectator-team fixture was identified as the actual cause.
+See [plan](air-patrol-naval-support-plan.md) and [results](air-patrol-naval-support-results.md).
+
 
 ## D-199 optional performance diagnostics
 

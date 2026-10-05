@@ -1,0 +1,1255 @@
+{
+  "carrier_ownership": [
+    {
+      "frame": 390,
+      "host": "23745",
+      "id": "23943"
+    },
+    {
+      "frame": 420,
+      "host": "16218",
+      "id": "8691"
+    },
+    {
+      "frame": 990,
+      "host": "23745",
+      "id": "26627"
+    },
+    {
+      "frame": 990,
+      "host": "16218",
+      "id": "26186"
+    },
+    {
+      "frame": 3540,
+      "host": "11472",
+      "id": "27000"
+    },
+    {
+      "frame": 3570,
+      "host": "11472",
+      "id": "21302"
+    },
+    {
+      "frame": 3600,
+      "host": "11472",
+      "id": "7986"
+    },
+    {
+      "frame": 3630,
+      "host": "11472",
+      "id": "6218"
+    },
+    {
+      "frame": 3870,
+      "host": "11472",
+      "id": "17119"
+    },
+    {
+      "frame": 4110,
+      "host": "11472",
+      "id": "18818"
+    },
+    {
+      "frame": 5070,
+      "host": "11472",
+      "id": "7596"
+    },
+    {
+      "frame": 5310,
+      "host": "11472",
+      "id": "6306"
+    },
+    {
+      "frame": 5370,
+      "host": "-1",
+      "id": "26627"
+    },
+    {
+      "frame": 5520,
+      "host": "-1",
+      "id": "6306"
+    },
+    {
+      "frame": 5550,
+      "host": "11472",
+      "id": "1003"
+    },
+    {
+      "frame": 5790,
+      "host": "11472",
+      "id": "15696"
+    },
+    {
+      "frame": 5970,
+      "host": "23745",
+      "id": "31050"
+    },
+    {
+      "frame": 6030,
+      "host": "11472",
+      "id": "20357"
+    },
+    {
+      "frame": 6270,
+      "host": "11472",
+      "id": "12893"
+    },
+    {
+      "frame": 6270,
+      "host": "16218",
+      "id": "26926"
+    },
+    {
+      "frame": 6510,
+      "host": "11472",
+      "id": "5925"
+    },
+    {
+      "frame": 6570,
+      "host": "23745",
+      "id": "22507"
+    },
+    {
+      "frame": 6750,
+      "host": "11472",
+      "id": "23540"
+    }
+  ],
+  "decisions": [],
+  "detection_to_first_attack_order_seconds": [
+    1.4,
+    5.133333333333334,
+    7.0,
+    26.4,
+    29.366666666666667,
+    29.4,
+    32.06666666666667
+  ],
+  "engine_ai_timings": [
+    {
+      "ai_all_max_ms": 10.446167,
+      "ai_all_mean_ms": 0.127583,
+      "ai_all_p50_ms": 0.02002,
+      "ai_all_p95_ms": 0.57666,
+      "ai_all_p99_ms": 1.821289,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "sim_speed": 0.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 3.533936,
+      "ai_all_mean_ms": 0.136694,
+      "ai_all_p50_ms": 0.0271,
+      "ai_all_p95_ms": 0.707764,
+      "ai_all_p99_ms": 2.071045,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "sim_speed": 10.017,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 3.617432,
+      "ai_all_mean_ms": 0.153407,
+      "ai_all_p50_ms": 0.029541,
+      "ai_all_p95_ms": 0.800781,
+      "ai_all_p99_ms": 2.439209,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "sim_speed": 9.83,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 3.252441,
+      "ai_all_mean_ms": 0.152643,
+      "ai_all_p50_ms": 0.038818,
+      "ai_all_p95_ms": 0.62915,
+      "ai_all_p99_ms": 2.130371,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "sim_speed": 8.597,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 3.477295,
+      "ai_all_mean_ms": 0.150426,
+      "ai_all_p50_ms": 0.031738,
+      "ai_all_p95_ms": 0.666504,
+      "ai_all_p99_ms": 2.149658,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "sim_speed": 9.997,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 3.706543,
+      "ai_all_mean_ms": 0.157305,
+      "ai_all_p50_ms": 0.033203,
+      "ai_all_p95_ms": 0.665771,
+      "ai_all_p99_ms": 2.281494,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "sim_speed": 10.005,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 4.351318,
+      "ai_all_mean_ms": 0.165654,
+      "ai_all_p50_ms": 0.032471,
+      "ai_all_p95_ms": 0.658203,
+      "ai_all_p99_ms": 2.470947,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "sim_speed": 10.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 4.347656,
+      "ai_all_mean_ms": 0.164177,
+      "ai_all_p50_ms": 0.031738,
+      "ai_all_p95_ms": 0.623779,
+      "ai_all_p99_ms": 2.523193,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "sim_speed": 8.595,
+      "t": 0.0
+    }
+  ],
+  "finished": [
+    {
+      "frame": 302,
+      "id": "24620",
+      "team": "0",
+      "unit": "leganavalfusion"
+    },
+    {
+      "frame": 303,
+      "id": "10560",
+      "team": "0",
+      "unit": "leganavalfusion"
+    },
+    {
+      "frame": 307,
+      "id": "12834",
+      "team": "0",
+      "unit": "leganavalfusion"
+    },
+    {
+      "frame": 311,
+      "id": "29006",
+      "team": "0",
+      "unit": "leganavalfusion"
+    },
+    {
+      "frame": 313,
+      "id": "5984",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 315,
+      "id": "17971",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 319,
+      "id": "10684",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 321,
+      "id": "124",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 324,
+      "id": "10994",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 327,
+      "id": "22326",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 330,
+      "id": "30373",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 334,
+      "id": "18885",
+      "team": "0",
+      "unit": "leganavaleconv"
+    },
+    {
+      "frame": 337,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 339,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 343,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 346,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 348,
+      "id": "11235",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 354,
+      "id": "27380",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 358,
+      "id": "596",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 360,
+      "id": "20517",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 364,
+      "id": "1602",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 366,
+      "id": "207",
+      "team": "0",
+      "unit": "legnanotcplat"
+    },
+    {
+      "frame": 370,
+      "id": "23411",
+      "team": "0",
+      "unit": "legadvshipyard"
+    },
+    {
+      "frame": 373,
+      "id": "23745",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 378,
+      "id": "16218",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 860,
+      "id": "4690",
+      "team": "0",
+      "unit": "leganavyconsub"
+    },
+    {
+      "frame": 1300,
+      "id": "22392",
+      "team": "0",
+      "unit": "leganavyconsub"
+    },
+    {
+      "frame": 1540,
+      "id": "28374",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 1770,
+      "id": "10155",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 2150,
+      "id": "28301",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 2655,
+      "id": "14996",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 3000,
+      "id": "31764",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 3495,
+      "id": "11472",
+      "team": "0",
+      "unit": "leganavyantinukecarrier"
+    },
+    {
+      "frame": 3903,
+      "id": "6833",
+      "team": "0",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4286,
+      "id": "5597",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 4502,
+      "id": "17431",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4505,
+      "id": "28362",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4507,
+      "id": "31702",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4511,
+      "id": "15212",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4513,
+      "id": "15398",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4516,
+      "id": "15944",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4518,
+      "id": "25694",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4521,
+      "id": "379",
+      "team": "1",
+      "unit": "corah"
+    },
+    {
+      "frame": 4767,
+      "id": "29845",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 5114,
+      "id": "30878",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 5982,
+      "id": "12903",
+      "team": "0",
+      "unit": "leganavybattleship"
+    },
+    {
+      "frame": 6399,
+      "id": "3311",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 6628,
+      "id": "2473",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 7015,
+      "id": "29302",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 7541,
+      "id": "7300",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 7870,
+      "id": "12183",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 8249,
+      "id": "13953",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 8651,
+      "id": "12437",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 8905,
+      "id": "30930",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 9282,
+      "id": "22152",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 9626,
+      "id": "26311",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 10006,
+      "id": "25589",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 10404,
+      "id": "15789",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 10659,
+      "id": "13626",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 11037,
+      "id": "26768",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 11439,
+      "id": "11580",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 11771,
+      "id": "6790",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 12149,
+      "id": "26278",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 12657,
+      "id": "22485",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 13001,
+      "id": "16708",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 13377,
+      "id": "14295",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 13724,
+      "id": "2829",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 14110,
+      "id": "27743",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 14515,
+      "id": "18291",
+      "team": "0",
+      "unit": "leganavycruiser"
+    }
+  ],
+  "fixture_errors": [],
+  "last_hit_kill_metal_by_team": [
+    2000.0,
+    165.0
+  ],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ],
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\legion-t2-productio-cand\\glacial\\20261004T111110Z-ccb46d85\\runs\\20261004T111248Z-6f2f4117\\infolog.txt",
+  "median_detection_to_order": 26.4,
+  "metal_lost_by_team": [
+    165.0,
+    2000.0
+  ],
+  "minute_apm_by_team": [
+    [
+      331,
+      223,
+      719,
+      698,
+      194,
+      201,
+      179,
+      207
+    ],
+    [
+      6,
+      1,
+      92,
+      11
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      32,
+      42,
+      45,
+      72,
+      39,
+      43,
+      48,
+      49
+    ],
+    [
+      1,
+      1,
+      12,
+      4
+    ]
+  ],
+  "order_sources": [
+    {
+      "armcom_nonlua": 6,
+      "frame": 1800,
+      "nonlua": 6,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 2,
+      "frame": 1800,
+      "nonlua": 2,
+      "team": 2
+    },
+    {
+      "armuwms_nonlua": 16,
+      "frame": 1800,
+      "legadvshipyard_nonlua": 20,
+      "leganavaleconv_nonlua": 32,
+      "leganavalfusion_nonlua": 16,
+      "leganavyantiswarm_nonlua": 22,
+      "leganavyconsub_nonlua": 17,
+      "legcom_nonlua": 6,
+      "legdrone_lua": 22,
+      "legdrone_nonlua": 24,
+      "legnanotcplat_nonlua": 128,
+      "legnavydestro_lua": 6,
+      "legnavydestro_nonlua": 22,
+      "lua": 28,
+      "nonlua": 303,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "frame": 3600,
+      "nonlua": 1,
+      "team": 1
+    },
+    {
+      "frame": 3600,
+      "legadvshipyard_nonlua": 14,
+      "leganavyantinukecarrier_lua": 1,
+      "leganavyantinukecarrier_nonlua": 11,
+      "leganavyantiswarm_nonlua": 13,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 26,
+      "leganavyradjamship_nonlua": 3,
+      "legcom_nonlua": 1,
+      "legdrone_lua": 24,
+      "legdrone_nonlua": 18,
+      "legnanotcplat_nonlua": 110,
+      "lua": 25,
+      "nonlua": 198,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corah_nonlua": 91,
+      "frame": 5400,
+      "nonlua": 92,
+      "team": 1
+    },
+    {
+      "frame": 5400,
+      "legadvshipyard_nonlua": 12,
+      "leganavyantinukecarrier_nonlua": 40,
+      "leganavyantiswarm_nonlua": 93,
+      "leganavybattleship_nonlua": 4,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 169,
+      "leganavyradjamship_nonlua": 47,
+      "legcom_nonlua": 1,
+      "legdrone_lua": 125,
+      "legdrone_nonlua": 30,
+      "legnanotcplat_nonlua": 114,
+      "legnavydestro_lua": 2,
+      "legnavydestro_nonlua": 80,
+      "lua": 127,
+      "nonlua": 592,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 5,
+      "corah_nonlua": 6,
+      "frame": 7200,
+      "nonlua": 11,
+      "team": 1
+    },
+    {
+      "frame": 7200,
+      "legadvshipyard_nonlua": 12,
+      "leganavyantinukecarrier_nonlua": 30,
+      "leganavyantiswarm_nonlua": 183,
+      "leganavybattleship_nonlua": 7,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 143,
+      "leganavyradjamship_nonlua": 20,
+      "legcom_nonlua": 1,
+      "legdrone_lua": 75,
+      "legdrone_nonlua": 54,
+      "legnanotcplat_nonlua": 97,
+      "legnavydestro_lua": 1,
+      "legnavydestro_nonlua": 73,
+      "lua": 76,
+      "nonlua": 622,
+      "team": 0
+    },
+    {
+      "frame": 9000,
+      "legadvshipyard_nonlua": 15,
+      "leganavyantiswarm_nonlua": 24,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 33,
+      "legcom_nonlua": 1,
+      "legnanotcplat_nonlua": 119,
+      "nonlua": 194,
+      "team": 0
+    },
+    {
+      "frame": 10800,
+      "legadvshipyard_nonlua": 15,
+      "leganavyantiswarm_nonlua": 27,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 33,
+      "legcom_nonlua": 1,
+      "legnanotcplat_nonlua": 123,
+      "nonlua": 201,
+      "team": 0
+    },
+    {
+      "frame": 12600,
+      "legadvshipyard_nonlua": 12,
+      "leganavyantiswarm_nonlua": 14,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 33,
+      "legcom_nonlua": 1,
+      "legnanotcplat_nonlua": 117,
+      "nonlua": 179,
+      "team": 0
+    },
+    {
+      "frame": 14400,
+      "legadvshipyard_nonlua": 15,
+      "leganavyantiswarm_nonlua": 24,
+      "leganavyconsub_nonlua": 2,
+      "leganavycruiser_nonlua": 37,
+      "legcom_nonlua": 1,
+      "legnanotcplat_nonlua": 128,
+      "nonlua": 207,
+      "team": 0
+    }
+  ],
+  "peak_apm_by_team": [
+    719,
+    92
+  ],
+  "produced": [
+    {
+      "frame": 394,
+      "id": "4690",
+      "team": "0",
+      "unit": "leganavyconsub"
+    },
+    {
+      "frame": 909,
+      "id": "22392",
+      "team": "0",
+      "unit": "leganavyconsub"
+    },
+    {
+      "frame": 1345,
+      "id": "28374",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 1578,
+      "id": "10155",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 1806,
+      "id": "28301",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 2307,
+      "id": "14996",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 2802,
+      "id": "31764",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 3042,
+      "id": "11472",
+      "team": "0",
+      "unit": "leganavyantinukecarrier"
+    },
+    {
+      "frame": 3568,
+      "id": "6833",
+      "team": "0",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 3940,
+      "id": "5597",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 4421,
+      "id": "29845",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 4917,
+      "id": "30878",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 5151,
+      "id": "12903",
+      "team": "0",
+      "unit": "leganavybattleship"
+    },
+    {
+      "frame": 6205,
+      "id": "3311",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 6434,
+      "id": "2473",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 6672,
+      "id": "29302",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 7168,
+      "id": "7300",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 7678,
+      "id": "12183",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 7907,
+      "id": "13953",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 8309,
+      "id": "12437",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 8714,
+      "id": "30930",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 8939,
+      "id": "22152",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 9431,
+      "id": "26311",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 9663,
+      "id": "25589",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 10062,
+      "id": "15789",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 10467,
+      "id": "13626",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 10695,
+      "id": "26768",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 11097,
+      "id": "11580",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 11578,
+      "id": "6790",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 11807,
+      "id": "26278",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 12313,
+      "id": "22485",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 12808,
+      "id": "16708",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 13034,
+      "id": "14295",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 13529,
+      "id": "2829",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    },
+    {
+      "frame": 13769,
+      "id": "27743",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 14174,
+      "id": "18291",
+      "team": "0",
+      "unit": "leganavycruiser"
+    },
+    {
+      "frame": 14654,
+      "id": "16814",
+      "team": "0",
+      "unit": "leganavyantiswarm"
+    }
+  ],
+  "raw_weapon_damage_by_team": [
+    10044.80000000001,
+    3894.4999999999995
+  ],
+  "response_decisions": [],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 34270.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 3600,
+      "live0": 38665.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 5400,
+      "live0": 43820.0,
+      "live1": 1000.0
+    },
+    {
+      "frame": 7200,
+      "live0": 46740.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 9000,
+      "live0": 50440.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 10800,
+      "live0": 54140.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 12600,
+      "live0": 57340.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 14400,
+      "live0": 61040.0,
+      "live1": 0.0
+    }
+  ],
+  "schema": 2,
+  "target_category_mismatches": [
+    {
+      "frame": 4516,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4572,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4684,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4740,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4799,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4855,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4912,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 4996,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5020,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5117,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5232,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5305,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5345,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5414,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5445,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5538,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5567,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5593,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    },
+    {
+      "frame": 5631,
+      "id": "6833",
+      "target": "corah",
+      "unit": "leganavyradjamship"
+    }
+  ],
+  "threat_observations": [
+    {
+      "aircraft": "90",
+      "frame": 4921,
+      "submarine": "0",
+      "team": 1
+    },
+    {
+      "aircraft": "0",
+      "frame": 5580,
+      "submarine": "2700",
+      "team": 0
+    }
+  ]
+}

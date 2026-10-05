@@ -1,0 +1,91 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 492777,
+      "sha256": "cc950a34cbec0e2c9a449dc4eb409d927a02985977743382187b75b45e692788"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "5b3ca4cf871db93d5a4cb5452a35b69ec1a143956af23b202f8f72dd843bda8d"
+    },
+    "report.md": {
+      "bytes": 11939,
+      "sha256": "c71d27eb50b028d5ee335392d59ebd43d78fc075f936196244faf281dd66ddff"
+    },
+    "run-inputs.json": {
+      "bytes": 35765,
+      "sha256": "b82168509851a2e1e4e71b088a7efa32149cf209eca85b04f86b0fd1cf4236f1"
+    },
+    "run-plan.json": {
+      "bytes": 251,
+      "sha256": "4aaa7aab1c1126ff444714e0d6ffc3b46c8ac04b7e77c6924490e7934c6e9e85"
+    },
+    "screen_2026-10-04_16-25-46-878.png": {
+      "bytes": 1926169,
+      "sha256": "a98efbccf0febaee754394c83fce53225d52f24a1da0228bc5239be9adbe3157"
+    },
+    "script.txt": {
+      "bytes": 6158,
+      "sha256": "f1741c20e1c4446b689113028720b145d9622d3f9c6a63c67e63da364999ff6d"
+    },
+    "sea-fixture.json": {
+      "bytes": 289,
+      "sha256": "4a3e1230c69cd6bec6f5c330aaff1e8693f25c159564935f890b4ead9a07624c"
+    },
+    "staged.json": {
+      "bytes": 235,
+      "sha256": "18088d83c0d0efd8e4351c52fcd33a0a51a3ce3d4e5e78d9e298ce2e6881c328"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "d191-compact"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T162552Z-9940fa19",
+  "last_frame": 10920,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d191-compact\\supreme\\20261004T162435Z-0110d95e\\runs\\20261004T162552Z-9940fa19",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-04T16:25:52.432920+00:00",
+  "requested": {
+    "seed": 1911
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

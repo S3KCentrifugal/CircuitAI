@@ -474,6 +474,77 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Emergency turret task | CSReclaimTask, ITaskModule::AssignTask, Builder::TurretsOnReclaim | One enemy-mode NOW task. Friendly recycling and ordinary reassignment yield; player control can take over. Death, transfer, visibility/range loss or disabled policy release; normal role decisions resume. |
 | Turret invariants | Economy::AiUpdateEconomy, Invariants::Tick | INV-128 audits admission. INV-008 friendly recycling and INV-048 factory binding yield to active enemy reclaim. |
 
+
+## D-188 SEA migration
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Naval berth/exit | SeaLayout::Add/Search/Validate/Factory/Save/Init/Leave, TerrainManager::PlanNavalBerth, allied reservations | Atomic footprint/corridor and required pin; unused blockage replans; canceled claim returns to available; active frame stays fixed; retired footprint released after removal. |
+| Economy/support patch | SeaLayout::PlanPatch/Place/Discard/SavePatch, SeaBuild::Tick/Place/Support | Six footprint-sized slots, per-slot assist reach, atomic unused-patch rollback; no drift after activation. |
+| Construction ledger | SeaLayout::Pinned, SeaEconomy::Added/Removed/Tick, Builder::AiTaskRemoved | Only successful SEA-pinned tasks retained; never native inactive chain children. Owned live units account framed costs and factory/product state. |
+| Workforce | SeaFactories::Produce/Recruit, SeaBuild::Support, SeaEconomy::Fund/Admit/UsefulPower/LocalPower | Both resources, actual usage, pending capacity and local work; same-frame discretionary admission INV-129; two-constructor opening/recovery exception. |
+| Builder | SeaBuild::MakeTask/Resume/Assist/NativeTask/Tick | Preserve PLAYER/enemy reclaim/current construction; resume pins; expansion worker; empty guard release; defer native discretionary choice. |
+| Handover | SeaFactories::Tick/Safe/Hold, SeaLayout::Validate, SeaBuild::MakeTask, Lifecycle::Retire | One replacement; same capability; real product exit before old drains/retires/reclaims (INV-130). Independent fixture observes actual egress then reclaim. |
+| Role transition | Commands, SeaBuild::Leave, SeaLayout::Init/Leave | Release ledger/reservations; restore captured switches. Disabled path adds no census. Engine reload/role-transition matrix remains unplayed. |
+
+## D-189 SEA fleet response
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Known naval contacts | EnemyManager, BattleAnalysis::SampleNavalThreat, SeaCombat::Tick | Current visible/radar known contacts, same water body for naval units, bounded radius; hidden/neutral/dead/explicitly ignored contacts excluded; one sample per second. |
+| Counter deficit | SeaCombat::Coverage/Select, SeaFactories::Produce/Recruit | Live plus pending cost-weighted coverage; actual weapon layer (INV-131), availability and factory edge; one recruit per ask. No changes to shared TACTICAL lists. |
+| Tech saving | SeaFactories::Produce, SeaEconomy::TechReady, SeaBuild::MakeTask | Established screen and safe harbor; rolling income and full two-resource package; brief waits yield to observed counter need; resumes after T2 order exists. |
+| Naval workforce | SeaEconomy::Tick/LocalPower/Fund/Admit | Only construction ships/subs count as mobile expansion power; commander counted when actually assisting a yard; queued pinned projects and newly admitted recruits each reserve capital once. |
+| Combat orders | Existing MilitaryManager, fighter/squad tasks, CircuitUnit | Original native formation/firing/retreat code retained. Rejected SEA order suppression is absent; policy adds no per-unit orders. |
+
+| Carrier child | SeaCombat::MilitaryTask/CarrierControl/Leave, CExternalControlTask | Host rule controls queue ownership; no AI commands while attached; missing owner returns to native idle; human task takes precedence. INV-132. |
+| Hybrid scout/AA boat | SeaCombat::MilitaryTask/AirResponse/Leave, CAntiAirTask | During observed air raids, Armada scout boats leave SCOUT for native AA; existing AA tasks persist without order resets. Player and retreat tasks retain ownership; role exit restores native selection for tracked responders. INV-133. |
+
+## D-190 dense economy and production support
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| AIR converter bank | AirEcoLayout::Reserve/Activate/Place, LayoutHelpers::CheckGrid | Zero internal footprint gap; normal module claims, AFUS/support clearance and T1 spacing retained; snapped-pitch INV-136. |
+| SEA economy strip | SeaLayout::PlanPatch/Place/Discard | Dense per-building pins suffice without empty outer envelopes; small patches extend sideways; site-specific search state; factory exits and allied claims excluded. |
+| Factory support | SeaBuild::ReserveSupport/Support/Assist, SeaEconomy::Tick/Product/SupportTarget/LocalPower/Fund | Actual products and shared resource allocation, least-supported factory first; completed/framed/queued capacity counted once; same-frame funding and actual reach checked by INV-129/135. |
+
+## D-191 SEA economy block ownership
+
+| Object | Actors | Shared state and contract |
+| --- | --- | --- |
+| Naval economy order | SeaBuild::LegacyTask/ControlledEconomy/PlacementKind, SeaBuild::Tick, SeaLayout::Pinned, SeaEconomy::OwnsTask | Actual UnitDef selects the naval owner; claimed ledger membership protects travel before native serves the slot. Existing frames and coastal land work are preserved. No dormant-chain handles are retained. |
+| Economy block | SeaEcoLayout::Plan/Tick/Place, native ReserveZone/LayBand/PackNearGroup/PackSet | Square nano grid and rear fusion reserved before converters. Empty blocked blocks replan; started blocks remain fixed; existing set slots activate their own block. Factory exits and allied reservations remain excluded. |
+| Fusion workforce | SeaEcoLayout::Support/Nano, SeaBuild::Assist, native builder tasks | Persisted preparation demand bridges T2-sub and T1-turret build lists; initial two turrets then funded support for the frame. Planned turret range and actual repair are checked. INV-137 protects the rear footprint. |
+| Converter retention | SeaLayout::Init/Leave, native EconomyManager | SEA suppresses automatic tier reclaim while compact placement is enabled, restoring the captured prior multiplier on exit. Converter admission observes the native storage cancellation boundary. |
+
+### D192 shared base clusters and later naval factories
+
+| Object | Actors | State and contract |
+| --- | --- | --- |
+| SEA tidal cluster | SeaLayout::PlanPatch, Place, native allied index | Reserve all 48 touching sites before first use; foreign owners cannot fill future sites. |
+| Allied economy/factory cluster | AIR/TECH/SEA planners, native placement and retries | Native owner-scoped slot/zone index is authoritative; no additional exclusive envelopes for weapon/forward-mex areas. |
+| Later SEA shipyard | SeaBuild::Tick, LegacyTask/LayoutTask, shared builder fallback, NativeTask, MakeTask, SeaLayout::Factory/Search | Preplan in compact and experimental modes; persist hadFactory; normalize native yard proposals into pinned forward enemy-facing berths; preserve frames and claims. |
+| Naval economy frontier | SeaLayout::RefreshGeometry, SeaEcoLayout, tidal planner | Existing naval economy plus reserved footprints/blocks; refresh once per second and invalidate on new claims. |
+
+### D-193 AIR reconnaissance and defensive reserve
+
+| Object | Readers/actors | State and ownership |
+| --- | --- | --- |
+| Radar cohort | AirRecon::MakeTask/Tick/Reset, AirProduction | Eligible waiting IDs, first-wait frame, assembled slots; full cohort or deadline dispatch; PLAYER excluded. |
+| Allied base incident | BattleAnalysis value snapshot, AirBaseResponse::Tick | Observed ground IDs/definitions/positions; allied start radius; short last-seen search, then release. |
+| Defensive aircraft | AirBaseResponse::TaskFor/Free, AirWaves/AirRaids, AirScreen, AirOperations | Exclusive shared route ownership; held-ledger removal; live operations, ferry, PLAYER and retreat exclusions. |
+| Defensive recruit | Factory::AiMakeTask, AirProduction::MakeTask, AirBaseResponse::Produce/Deficit | Shared twenty-unit reserve including frames and unframed orders; transport/recovery and bounded workforce turns first; no repeated twenty-unit queues. |
+
+### D-194 AIR radar patrols and naval relief
+
+| Object | Readers/actors | State and ownership |
+| --- | --- | --- |
+| Waiting radar patrol | AirRecon::MakeTask/Patrols/Fallback/Tick/Reset, native CRouteTask | Per-unit route on shared task; padded current-visible threat, friendly vertices, retained assignments; original first-wait deadline never reset by replanning. |
+| Naval support demand | BattleAnalysis::GetNavalForceCount, AirNavalSupport::Assess/Required/Produce | Copied visible enemy/allied facts, connected water body, local sectors plus friendly halo; actual runtime costs; one live/frame/pending count across factories. |
+| Torpedo cohort | AirNavalSupport::TaskFor/Census/Tick/Return/Reset | Held/approach/attack ownership, current target, open-water ingress, full or timed partial release; unavailable/player aircraft excluded. |
+| Naval escort | AirNavalSupport::Escort, AirOperations::AttachAvailableFighters/Tick, AirBaseResponse | Existing escort ledger protects other committed attacks; one shared ahead route; released when defensive sortie ends. |
+| Base emergency | AirBaseResponse::Tick, AirNavalSupport::Tick | Existing base-contact policy takes priority over defensive naval relief; offensive commitments remain protected. |
+
 ### D-199 derived local occupancy and diagnostic spans
 
 | Object | Readers/actors | State and ownership |

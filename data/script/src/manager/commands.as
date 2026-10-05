@@ -565,6 +565,7 @@ namespace Commands {
         // Leave: the old role's layout (reservations, zones, the native flag)
         // and the native manager settings its InitHandler changed (CR-007).
         if (Global::AISettings::Role == AiRole::AIR) AirBuild::Leave();
+        if (Global::AISettings::Role == AiRole::SEA) SeaBuild::Leave();
         Layout::OnRoleLeave();
         TechWeapons::OnRoleLeave();   // D-126
         Lanes::OnRoleLeave();         // D-127

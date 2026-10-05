@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "response-sub-suppor-cand"
+  },
+  "id": "20261004T105654Z-55f731d0",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1
+}

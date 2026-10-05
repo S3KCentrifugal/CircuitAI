@@ -1,0 +1,127 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 1719089,
+      "sha256": "ab0964bb12315ce38e79bef91b601833937a3d11673cfe1c98f819748ce944ac"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "30e90b1b863b3d425fbc343db85918d2d0e07fcc92c5f2a81b0c11c7baae014a"
+    },
+    "report.md": {
+      "bytes": 12014,
+      "sha256": "0ee80fa61d04bd6178420895379a3c0166dca219afc994957ec63d8c60b9c7e2"
+    },
+    "run-inputs.json": {
+      "bytes": 35661,
+      "sha256": "395f1ae910b366f8fbd3bbfb36f2e30de950082e7440f02bb391f4ca4a426b1e"
+    },
+    "run-plan.json": {
+      "bytes": 254,
+      "sha256": "bfc99bea5f2a5a34ab7d64ed692137c3526db8d4d6abf87051f9585293dd0865"
+    },
+    "script.txt": {
+      "bytes": 7476,
+      "sha256": "2699adf172dc83237bb6979008268dd27434adadd222860022aa37ab52ec03d9"
+    },
+    "sea-fixture.json": {
+      "bytes": 289,
+      "sha256": "8cb506909cc880b0c423d0614d16ba6fc19880d7dd3cd1b08533270130d5196d"
+    },
+    "staged.json": {
+      "bytes": 235,
+      "sha256": "793b85c565f1421745a8e36256e3efc16fd415eaa4aa5c0994cb667bbb037e7a"
+    },
+    "teams.json": {
+      "bytes": 1164,
+      "sha256": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "d190-compile"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T140247Z-74cc04f9",
+  "last_frame": 2134,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d190-compile\\glacial\\20261004T140206Z-2fa3b90d\\runs\\20261004T140247Z-74cc04f9",
+  "reason": "expected lines never seen: first-ship-exit",
+  "recorded_at_utc": "2026-10-04T14:02:47.990216+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 0,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 6,
+      "team": 1,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 7,
+      "team": 2,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 3,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 4,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 5,
+      "x": 12618.0,
+      "z": 5800.0
+    }
+  ],
+  "verdict": "FAIL"
+}

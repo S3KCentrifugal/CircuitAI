@@ -1,0 +1,682 @@
+{
+  "carrier_ownership": [],
+  "decisions": [
+    {
+      "deficit": "8352",
+      "frame": 2645,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    }
+  ],
+  "detection_to_first_attack_order_seconds": [
+    7.933333333333334,
+    0.0,
+    0.06666666666666667,
+    0.03333333333333333,
+    6.0
+  ],
+  "engine_ai_timings": [
+    {
+      "ai_all_max_ms": 7.660645,
+      "ai_all_mean_ms": 0.120697,
+      "ai_all_p50_ms": 0.030762,
+      "ai_all_p95_ms": 0.578857,
+      "ai_all_p99_ms": 1.578735,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "sim_speed": 0.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.546143,
+      "ai_all_mean_ms": 0.134821,
+      "ai_all_p50_ms": 0.045166,
+      "ai_all_p95_ms": 0.756104,
+      "ai_all_p99_ms": 1.61084,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "sim_speed": 9.891,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.902588,
+      "ai_all_mean_ms": 0.117356,
+      "ai_all_p50_ms": 0.037354,
+      "ai_all_p95_ms": 0.67041,
+      "ai_all_p99_ms": 1.330811,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "sim_speed": 10.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.61084,
+      "ai_all_mean_ms": 0.116186,
+      "ai_all_p50_ms": 0.036133,
+      "ai_all_p95_ms": 0.656494,
+      "ai_all_p99_ms": 1.252197,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "sim_speed": 8.6,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.309814,
+      "ai_all_mean_ms": 0.110209,
+      "ai_all_p50_ms": 0.035645,
+      "ai_all_p95_ms": 0.635254,
+      "ai_all_p99_ms": 1.115479,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "sim_speed": 10.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.248779,
+      "ai_all_mean_ms": 0.111648,
+      "ai_all_p50_ms": 0.0354,
+      "ai_all_p95_ms": 0.639648,
+      "ai_all_p99_ms": 1.222656,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "sim_speed": 9.997,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.152832,
+      "ai_all_mean_ms": 0.111873,
+      "ai_all_p50_ms": 0.036133,
+      "ai_all_p95_ms": 0.639404,
+      "ai_all_p99_ms": 1.134277,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "sim_speed": 10.002,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.187744,
+      "ai_all_mean_ms": 0.111725,
+      "ai_all_p50_ms": 0.034668,
+      "ai_all_p95_ms": 0.657959,
+      "ai_all_p99_ms": 1.095215,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "sim_speed": 8.597,
+      "t": 0.0
+    }
+  ],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "armsy"
+    },
+    {
+      "frame": 304,
+      "id": "10560",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 308,
+      "id": "12834",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 310,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 313,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 316,
+      "id": "17971",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 318,
+      "id": "10684",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 321,
+      "id": "124",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 324,
+      "id": "10994",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 327,
+      "id": "22326",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 331,
+      "id": "30373",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 334,
+      "id": "18885",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 336,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 339,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 342,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 346,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 348,
+      "id": "11235",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 351,
+      "id": "27380",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 355,
+      "id": "596",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 358,
+      "id": "1602",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 362,
+      "id": "207",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 363,
+      "id": "23411",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 367,
+      "id": "23745",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 370,
+      "id": "23943",
+      "team": "1",
+      "unit": "corason"
+    },
+    {
+      "frame": 372,
+      "id": "16218",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 376,
+      "id": "4690",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 379,
+      "id": "8691",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 381,
+      "id": "22392",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 385,
+      "id": "26627",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 389,
+      "id": "26186",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 530,
+      "id": "20517",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 717,
+      "id": "28374",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 1805,
+      "id": "10155",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1809,
+      "id": "28301",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1815,
+      "id": "14996",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1820,
+      "id": "31764",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1821,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1826,
+      "id": "27000",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1827,
+      "id": "21302",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1831,
+      "id": "6833",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1836,
+      "id": "7986",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1841,
+      "id": "6218",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1842,
+      "id": "17119",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1847,
+      "id": "5597",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 2623,
+      "id": "18818",
+      "team": "0",
+      "unit": "armpt"
+    }
+  ],
+  "fixture_errors": [],
+  "last_hit_kill_metal_by_team": [
+    1160.0,
+    25880.0
+  ],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ],
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-sub-suppor-cand\\glacial\\20261004T105654Z-55f731d0\\runs\\20261004T105832Z-303d0f65\\infolog.txt",
+  "median_detection_to_order": 0.06666666666666667,
+  "metal_lost_by_team": [
+    27240.0,
+    3480.0
+  ],
+  "minute_apm_by_team": [
+    [
+      349,
+      200,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      10,
+      447,
+      242,
+      85,
+      96,
+      66,
+      74,
+      80
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      59,
+      61,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      16,
+      3,
+      13,
+      12,
+      13,
+      6,
+      12
+    ]
+  ],
+  "order_sources": [
+    {
+      "armcom_nonlua": 6,
+      "corason_nonlua": 4,
+      "frame": 1800,
+      "nonlua": 10,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 2,
+      "frame": 1800,
+      "nonlua": 2,
+      "team": 2
+    },
+    {
+      "armason_nonlua": 4,
+      "armcom_nonlua": 6,
+      "armcs_nonlua": 20,
+      "armfrad_nonlua": 4,
+      "armnanotcplat_nonlua": 129,
+      "armrecl_nonlua": 6,
+      "armroy_nonlua": 100,
+      "armsy_nonlua": 16,
+      "armuwfus_nonlua": 16,
+      "armuwmmm_nonlua": 32,
+      "armuwms_nonlua": 16,
+      "frame": 1800,
+      "nonlua": 349,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 446,
+      "frame": 3600,
+      "nonlua": 447,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 5,
+      "armcs_nonlua": 29,
+      "armnanotcplat_nonlua": 94,
+      "armpt_nonlua": 13,
+      "armrecl_nonlua": 3,
+      "armroy_nonlua": 48,
+      "armsub_nonlua": 4,
+      "armsy_nonlua": 4,
+      "frame": 3600,
+      "nonlua": 200,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 241,
+      "frame": 5400,
+      "nonlua": 242,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 5400,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 84,
+      "frame": 7200,
+      "nonlua": 85,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 7200,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 95,
+      "frame": 9000,
+      "nonlua": 96,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 9000,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 65,
+      "frame": 10800,
+      "nonlua": 66,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 10800,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 73,
+      "frame": 12600,
+      "nonlua": 74,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 12600,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 79,
+      "frame": 14400,
+      "nonlua": 80,
+      "team": 1
+    },
+    {
+      "armcs_nonlua": 1,
+      "frame": 14400,
+      "nonlua": 1,
+      "team": 0
+    }
+  ],
+  "peak_apm_by_team": [
+    349,
+    447
+  ],
+  "produced": [
+    {
+      "frame": 356,
+      "id": "20517",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 577,
+      "id": "28374",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 2539,
+      "id": "18818",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 2654,
+      "id": "29845",
+      "team": "0",
+      "unit": "armsub"
+    }
+  ],
+  "raw_weapon_damage_by_team": [
+    3168.4,
+    43332.39999999997
+  ],
+  "response_decisions": [
+    "[t=00:00:51.214159][f=0002645] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2645:L::[SEA][Response] layer=1 deficit=8352 recruit=armsub"
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 29890.0,
+      "live1": 160.0
+    },
+    {
+      "frame": 3600,
+      "live0": 20160.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 5400,
+      "live0": 3240.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 7200,
+      "live0": 3240.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 9000,
+      "live0": 3240.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 10800,
+      "live0": 3240.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 12600,
+      "live0": 3240.0,
+      "live1": 3640.0
+    },
+    {
+      "frame": 14400,
+      "live0": 3240.0,
+      "live1": 3640.0
+    }
+  ],
+  "schema": 2,
+  "target_category_mismatches": [],
+  "threat_observations": [
+    {
+      "aircraft": "0",
+      "frame": 1830,
+      "submarine": "2320",
+      "team": 0
+    },
+    {
+      "aircraft": "0",
+      "frame": 2521,
+      "submarine": "240",
+      "team": 1
+    },
+    {
+      "aircraft": "0",
+      "frame": 2641,
+      "submarine": "2700",
+      "team": 1
+    }
+  ]
+}

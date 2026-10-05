@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "8d3081224dff9266f189f095407ac662f04829e8b2ec96180f8c42664375eb78",
+    "air-naval-analysis.json": "0e2c277e1d28c4cbf399f1a72b18d85ae9d885b6b50b317a6ce5c10fd99a2b73",
+    "checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "launched.json": "c85fb9d8cfb04e1c0d00fe5981f22e9dca0b60fec1e136dce5bcd4e03ec1ed39",
+    "naval-checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "naval-manifest.json": "efeba03df07ff1c4a928da929a91bc5f9e5e8105f4ae6554787e522ef06f2c39",
+    "report.md": "be8f237ccd8788e8c0094cb5749bc2cdd461c29cdffd563a9101f3463a520d47",
+    "result.json": "0eaf0e1ebdc2200547371e1692f14f463f1ff2dd3ff56b8992ff252bd45b9b4e",
+    "run-inputs.json": "6f4adb27ca0274e71ade0c71bd85e122bb6a043fde9c156f0a748c50e662dca4",
+    "run-plan.json": "3dd456dc81fc965529b6ac1ab03530130b74f93885753b58034ef75b1000ffb3",
+    "script.txt": "263db349e112500d6da601293f09dc18fa2f698607e97382aa27ac6a04c5a216",
+    "staged.json": "9921fe44eefc23ca8da7408edfa8cd6d010baeb99127f3d6f7faa2d4520cca33",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-parity-armada\\supreme\\20261004T202959Z-e43e390e\\runs\\20261004T203138Z-c6627e7c",
+  "schema": 1
+}

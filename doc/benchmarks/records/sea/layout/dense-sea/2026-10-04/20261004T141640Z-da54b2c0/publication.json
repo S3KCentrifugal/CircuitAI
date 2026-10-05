@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "fe635604e23a003f214f7a802206e03145597103114cc47b32c49b13db9ced68",
+    "checks.json": "48f83722674b53659936c87e3bf7002605e3d82521db4523b71b75d546c92156",
+    "dense-checks.json": "48f83722674b53659936c87e3bf7002605e3d82521db4523b71b75d546c92156",
+    "dense-fixture.json": "0173dfd1403bee65caf9d52e0fd394d73d09e5cc9cbaf7a3fccd09e91561b2fa",
+    "launched.json": "2461e897d3766a443d6559648971dcedc195b300b7582a7aabe0399242736076",
+    "report.md": "be0bf19a10dc384b77642a140e4ef04bc04e5ec2312ebbe99f738b43fe6a2253",
+    "result.json": "8f5661dd95c866993a05331d14d46b232077745bc7a542d9fb72ea88c36cd6ac",
+    "run-inputs.json": "39114512a34cffc73bae6d545bb74fad28712b7c32f982f0379fa24d4c799982",
+    "run-plan.json": "617fdb561ff4894367d0f0ca7c9567ae0221158187e288a06894e12fdafcad8f",
+    "screen_2026-10-04_14-16-30-119.png": "c03b87b4fea6ee4c9eb00bf159c108c349b39b1759ad1062cbf7eec23f959ba1",
+    "script.txt": "b79a2f5cdbc58fcb024b8381588b1553b2cb83c67d99aceda3c5fb719f402bae",
+    "staged.json": "a00f5de285734dca2814dcee8a921b4db795a7bd116f8bdb8773dce990681412",
+    "starts.as": "1e856f976fbe9c33ecef4a0493e6f9fe34a490641c0ad704648ffc16a4e9baf5",
+    "teams.json": "2e86372643111891b5293c37bdbbde4bbc26687900d30d2ac71e3114217b046b"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\dense-sea\\glacial\\20261004T141518Z-d3a97d7d\\runs\\20261004T141640Z-da54b2c0",
+  "schema": 1
+}

@@ -7,6 +7,8 @@
 
 #include "terrain/TerrainManager.h"
 #include "terrain/LayoutRanking.h"
+#include "terrain/NavalGeometry.h"
+#include "Sim/MoveTypes/MoveDefHandler.h"
 #include "terrain/BlockRectangle.h"
 #include "terrain/BlockCircle.h"
 #include "terrain/path/PathFinder.h"
@@ -2010,6 +2012,60 @@ void CTerrainManager::FinishReservation(int id, int unitId)
 	}
 	it->second.claimed = false;
 	it->second.unitId = unitId;  // a zone slot remembers its structure (restore or forget when it goes)
+}
+
+bool CTerrainManager::CanNavalRoute(CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& to)
+{
+	if (cdef == nullptr || !geom::is_in_map(from) || !geom::is_in_map(to)) return false;
+	auto* mt = GetMobileTypeById(cdef->GetMobileId());
+	if (mt == nullptr) return false;
+	// Strict membership: GetCurrentMapArea deliberately snaps impossible spawns,
+	// which is inappropriate evidence for a new production berth.
+	const auto* a = mt->sector[GetSectorIndex(from)].area;
+	return a != nullptr && a == mt->sector[GetSectorIndex(to)].area;
+}
+
+bool CTerrainManager::PlanNavalBerth(const std::string& key, CCircuitDef* cdef,
+        const AIFloat3& pos, int facing, float length, float margin)
+{
+	if (!layoutEnabled || cdef == nullptr || facing < 0 || facing > 3 || length <= 0.f
+	    || length > 2048.f || margin < 0.f || margin > 256.f
+	    || !CanReserveBuilding(cdef, pos, facing)) return false;
+	const AIFloat3 p = Pos2BuildPos(cdef, pos, facing);
+	const float halfDepth = cdef->GetDef()->GetZSize() * SQUARE_SIZE * .5f;
+	const float halfWidth = cdef->GetDef()->GetXSize() * SQUARE_SIZE * .5f + margin;
+	const AIFloat3 forward(facing == 1 ? 1.f : facing == 3 ? -1.f : 0.f, 0.f,
+	                      facing == 0 ? 1.f : facing == 2 ? -1.f : 0.f);
+	bool hasShip = false;
+	float hullHalf = 0.f, draft = 0.f;
+	for (const auto id : cdef->GetBuildOptions()) {
+		auto* product = circuit->GetCircuitDef(id);
+		if (product == nullptr || !product->IsMobile() || product->GetDef()->IsAbleToFly()) continue;
+		std::unique_ptr<MoveData> move(product->GetDef()->GetMoveData());
+		if (!move || move->GetSpeedModClass() != MoveDef::Ship) continue;
+		hasShip = true;
+		hullHalf = std::max(hullHalf, float(std::max(move->GetXSize(), move->GetZSize())) * SQUARE_SIZE * .5f);
+		draft = std::max(draft, move->GetDepth());
+		if (!CanNavalRoute(product, p, p + forward * (halfDepth + length))) return false;
+	}
+	if (!hasShip || hullHalf > halfWidth) return false;
+	const auto elevation = [this](float x, float z) {
+		return geom::is_in_map(AIFloat3(x,0.f,z)) ? areaData->GetElevationAt(x,z)
+		    : std::numeric_limits<float>::quiet_NaN();
+	};
+	if (!naval::Corridor(p.x,p.z,facing,halfDepth+length,hullHalf,draft,elevation)
+	    || !IsExitClear(cdef,p,facing,length,margin)) return false;
+	int2 low, high;
+	if (!ExitLaneCells(cdef,p,facing,length,margin,low,high) || IsAllyLayoutRectBlocked(low,high)) return false;
+	const int slot = ReservePersistentBuilding(cdef,p,facing);
+	if (slot < 0) return false;
+	const int exit = ReserveZone(p + forward * (halfDepth + length*.5f), facing, halfWidth, length*.5f, true);
+	if (exit <= 0) { ReleasePersistentBuilding(slot); return false; }
+	SetLayoutInt(key+".slot",slot);
+	SetLayoutInt(key+".exit",exit);
+	SetLayoutInt(key+".facing",facing);
+	SetLayoutInt(key+".x",int(p.x)); SetLayoutInt(key+".z",int(p.z));
+	return true;
 }
 
 int CTerrainManager::ReservePersistentBuilding(CCircuitDef* cdef, const AIFloat3& pos, int facing)

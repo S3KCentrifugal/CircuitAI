@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "ba3d44dbd76006eac4d880d0ae11c032ee1982a2be646d70ef9022443d3cbeea",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "eco-score-v3.json": "ad71baa53a403e3e6c94a73858733d94adc5d0192324009f40c3cb35dc41678a",
+    "launched.json": "93e013bbaa019a302ed7ec07aa8dec063232dff63c25b1eddd81b3b7ff58a3cd",
+    "report.md": "bdbea0562d3e0bfcd0e5edb50cbf1c58724bdc272ba755953153926784e5c676",
+    "result.json": "99ea9f8ccee28a345b36211ccc1ce4e069220a3d8c805ad505270338783a705c",
+    "run-inputs.json": "dbb78b1b56bf3d11d8c8d91fa07089b7e4057257e780b5d4d5ae9f9e57f099ff",
+    "run-plan.json": "3058ce5026ed8fda2b7a1455bc9d7e49959ed77273111022c51a6cc4d460ae34",
+    "screen_2026-10-04_11-51-38-116.png": "0ce32eede6deac10d3a37fd6d4b6d31f2099ce05b7aedf877cb6cfda7bf46388",
+    "script.txt": "c877d0d5f738339132f5c44e42dda29011fdee0de75881570e03ebf36599ae48",
+    "sea-fixture.json": "f694aca45c68685e5d92d9fe010942fc115a75bb9cba2c732134b0b89ef9d62c",
+    "staged.json": "05d6bf16a4b19d42ed7b4778d6168e4fec1cedcb4adf1da410a8cdd0097cfb43",
+    "teams.json": "9eef94c3b0d0c8d3fcfcc80871bf6805268134eac14edd83f89e4cd570e05527"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d189-approach-recovery\\tundra\\20261004T114716Z-75a4fa43\\runs\\20261004T115149Z-d5ddb6e2",
+  "schema": 1
+}

@@ -1,0 +1,103 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 788063,
+      "sha256": "3f26d3448396e1838201f4574959785a7d3104357032f148b622e4c29bd385f5"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "48e4a9467ffc8461c383602b2e69a229218c08738efbb1ba7f6c4b29674732e8"
+    },
+    "report.md": {
+      "bytes": 22876,
+      "sha256": "3445e632e477dc726ebe0bd1a5f2fc8a2e8448a83fcacb65449a74727151e958"
+    },
+    "run-inputs.json": {
+      "bytes": 35652,
+      "sha256": "c6a3a990e09965632b1fb29a01a806f326e17160535583dd8c09394a2b0a8057"
+    },
+    "run-plan.json": {
+      "bytes": 257,
+      "sha256": "9ae663b710bfb53d1784c1862d422c4c5a9d197925c85df5af6ad3dae6f1b18f"
+    },
+    "screen_2026-10-04_10-37-40-003.png": {
+      "bytes": 2035740,
+      "sha256": "bd2d0c3375c1f41951cd70f9c617ca9044c029491337e0be0e7c49cc0c834536"
+    },
+    "screen_2026-10-04_10-38-01-146.png": {
+      "bytes": 2024283,
+      "sha256": "1b9532dd036c13a7ac615c6ae1f4df23c53e702806611d0cc0313b74873b31b5"
+    },
+    "screen_2026-10-04_10-38-42-153.png": {
+      "bytes": 2034877,
+      "sha256": "0bc2b93435c92f6d0d12580903db06312e0d2abeca1f07290ed981cf0bbb1005"
+    },
+    "screen_2026-10-04_10-39-19-138.png": {
+      "bytes": 2050410,
+      "sha256": "7f21d9a70972dc2fcc707b6dd292173b2909bd42a360e715b7679b83da8af944"
+    },
+    "script.txt": {
+      "bytes": 6163,
+      "sha256": "c6fbbc5d78fa331f3553faf86f77837125d5942084e346c0c68032b266475c86"
+    },
+    "sea-fixture.json": {
+      "bytes": 291,
+      "sha256": "2aeea31f80cf5c7423009137d2f05da39c962f99a112e067a82a7d3b861fdfb2"
+    },
+    "staged.json": {
+      "bytes": 328,
+      "sha256": "c64a8f86744084a2c0a80899be522c343f202a6c1f0612f6c0a9901cc4a52a1e"
+    },
+    "teams.json": {
+      "bytes": 457,
+      "sha256": "8c7ccb7667f1eb42b9bc8bd1a34c8707a688c44ffee99cb73ee44a48eedcaed8"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "erebos",
+    "scenario": "cohort-candidate"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T103924Z-fb167533",
+  "last_frame": 54297,
+  "map": "Erebos Lakes v1.0",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\cohort-candidate\\erebos\\20261004T103622Z-6cba3cd7\\runs\\20261004T103924Z-fb167533",
+  "reason": "reached 30 min",
+  "recorded_at_utc": "2026-10-04T10:39:24.852677+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 4,
+      "team": 0,
+      "x": 2076.0,
+      "z": 6352.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 12,
+      "team": 1,
+      "x": 8128.0,
+      "z": 3879.0
+    }
+  ],
+  "verdict": "PASS"
+}

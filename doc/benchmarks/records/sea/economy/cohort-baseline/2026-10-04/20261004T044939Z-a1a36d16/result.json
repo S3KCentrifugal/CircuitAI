@@ -1,0 +1,91 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 407238,
+      "sha256": "9a0bfe751402714146c8dacf28a82fd1690744a245c534e5b0a015e734030358"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "7b01bc42b33710982ef7d79b40f99dc1828b3be448fa20e0f535eeb24f5294f4"
+    },
+    "report.md": {
+      "bytes": 6010,
+      "sha256": "88e380652c6ffefd2b8aee47873d85f6d3b28059b169035475d36f3de2a39c41"
+    },
+    "run-inputs.json": {
+      "bytes": 35001,
+      "sha256": "1f6bab7a5779b2a9de9d41c44370ee3807f4e7005e209405d39f54c8a859dc77"
+    },
+    "run-plan.json": {
+      "bytes": 257,
+      "sha256": "eee8ae82e4868db594d8b0176090bac787e4356628c2604759509ebbc215afef"
+    },
+    "screen_2026-10-04_04-49-32-790.png": {
+      "bytes": 1913446,
+      "sha256": "ea1d70f5e09a788a04940b29bee7d3fb0ed535ffc7794480de6bb6d7d40c17c2"
+    },
+    "script.txt": {
+      "bytes": 6143,
+      "sha256": "9b12920b7a4432456d09f2c05e78586a236c6a414167e0f209b151b25875d51f"
+    },
+    "sea-fixture.json": {
+      "bytes": 268,
+      "sha256": "5f6bffd2d41e010c2ce6d2712c08521ecee9ebbef9be7fe785353b6c0c941aa8"
+    },
+    "staged.json": {
+      "bytes": 327,
+      "sha256": "7e84539ebaa50772124e667b1dc58817cd5d94358d53dfe0d24886c146dab314"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "cohort-baseline"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T044939Z-a1a36d16",
+  "last_frame": 11124,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\cohort-baseline\\supreme\\20261004T044821Z-cd9ec9fa\\runs\\20261004T044939Z-a1a36d16",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-04T04:49:39.553681+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

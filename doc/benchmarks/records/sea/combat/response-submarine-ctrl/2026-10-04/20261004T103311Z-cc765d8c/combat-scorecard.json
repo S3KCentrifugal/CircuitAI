@@ -1,0 +1,464 @@
+{
+  "schema": 1,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-submarine-ctrl\\glacial\\20261004T103131Z-7707693c\\runs\\20261004T103311Z-cc765d8c\\infolog.txt",
+  "fixture_errors": [],
+  "raw_weapon_damage_by_team": [
+    4669.599999999999,
+    44537.59999999998
+  ],
+  "metal_lost_by_team": [
+    29330.0,
+    4800.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    1900.0,
+    26160.0
+  ],
+  "minute_apm_by_team": [
+    [
+      186,
+      145
+    ],
+    [
+      10,
+      432,
+      298,
+      44,
+      45,
+      112,
+      87,
+      58
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      4,
+      12
+    ],
+    [
+      1,
+      33,
+      4,
+      5,
+      5,
+      13,
+      11,
+      8
+    ]
+  ],
+  "peak_apm_by_team": [
+    186,
+    432
+  ],
+  "detection_to_first_attack_order_seconds": [
+    7.933333333333334,
+    3.2666666666666666,
+    14.066666666666666,
+    14.4,
+    14.0,
+    29.933333333333334,
+    31.166666666666668
+  ],
+  "median_detection_to_order": 14.066666666666666,
+  "response_decisions": [],
+  "threat_observations": [],
+  "decisions": [],
+  "produced": [
+    {
+      "frame": 360,
+      "id": "20517",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1571,
+      "id": "16218",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2797,
+      "id": "21302",
+      "team": "0",
+      "unit": "armpship"
+    }
+  ],
+  "finished": [
+    {
+      "frame": 302,
+      "id": "24620",
+      "team": "0",
+      "unit": "armsy"
+    },
+    {
+      "frame": 305,
+      "id": "10560",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 308,
+      "id": "12834",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 312,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 316,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 318,
+      "id": "17971",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 322,
+      "id": "10684",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 325,
+      "id": "124",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 328,
+      "id": "10994",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 331,
+      "id": "22326",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 334,
+      "id": "30373",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 336,
+      "id": "18885",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 340,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 342,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 345,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 348,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 351,
+      "id": "11235",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 356,
+      "id": "27380",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 358,
+      "id": "596",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 362,
+      "id": "1602",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 365,
+      "id": "207",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 366,
+      "id": "23411",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 370,
+      "id": "23745",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 374,
+      "id": "23943",
+      "team": "1",
+      "unit": "corason"
+    },
+    {
+      "frame": 1520,
+      "id": "20517",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1805,
+      "id": "4690",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1809,
+      "id": "8691",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1816,
+      "id": "22392",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1818,
+      "id": "26627",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1824,
+      "id": "26186",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1831,
+      "id": "28374",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1834,
+      "id": "10155",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1839,
+      "id": "28301",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1845,
+      "id": "14996",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1852,
+      "id": "31764",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1855,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1861,
+      "id": "27000",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 2731,
+      "id": "16218",
+      "team": "0",
+      "unit": "armsub"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 28950.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 3600,
+      "live0": 19960.0,
+      "live1": 4060.0
+    },
+    {
+      "frame": 5400,
+      "live0": 3040.0,
+      "live1": 2320.0
+    },
+    {
+      "frame": 7200,
+      "live0": 0.0,
+      "live1": 2320.0
+    },
+    {
+      "frame": 9000,
+      "live0": 0.0,
+      "live1": 2320.0
+    },
+    {
+      "frame": 10800,
+      "live0": 0.0,
+      "live1": 2320.0
+    },
+    {
+      "frame": 12600,
+      "live0": 0.0,
+      "live1": 2320.0
+    },
+    {
+      "frame": 14400,
+      "live0": 0.0,
+      "live1": 2320.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.029907,
+      "ai_all_p95_ms": 0.528931,
+      "ai_all_max_ms": 9.976685,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.820068,
+      "ai_all_mean_ms": 0.121602
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.044189,
+      "ai_all_p95_ms": 0.765137,
+      "ai_all_max_ms": 2.667236,
+      "sim_speed": 10.025,
+      "ai_all_p99_ms": 1.636719,
+      "ai_all_mean_ms": 0.134141
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.024414,
+      "ai_all_p95_ms": 0.645996,
+      "ai_all_max_ms": 2.570801,
+      "sim_speed": 10.0,
+      "ai_all_p99_ms": 1.220215,
+      "ai_all_mean_ms": 0.104055
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.020264,
+      "ai_all_p95_ms": 0.561523,
+      "ai_all_max_ms": 2.795166,
+      "sim_speed": 8.59,
+      "ai_all_p99_ms": 0.95459,
+      "ai_all_mean_ms": 0.092915
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018555,
+      "ai_all_p95_ms": 0.496094,
+      "ai_all_max_ms": 2.88208,
+      "sim_speed": 10.007,
+      "ai_all_p99_ms": 0.886475,
+      "ai_all_mean_ms": 0.087453
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018311,
+      "ai_all_p95_ms": 0.50708,
+      "ai_all_max_ms": 2.883057,
+      "sim_speed": 9.995,
+      "ai_all_p99_ms": 1.012207,
+      "ai_all_mean_ms": 0.089889
+    },
+    {
+      "t": 0.0,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018555,
+      "ai_all_p95_ms": 0.536621,
+      "ai_all_max_ms": 2.460938,
+      "sim_speed": 10.003,
+      "ai_all_p99_ms": 1.00708,
+      "ai_all_mean_ms": 0.090581
+    },
+    {
+      "t": 0.0,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018555,
+      "ai_all_p95_ms": 0.554688,
+      "ai_all_max_ms": 2.729492,
+      "sim_speed": 8.596,
+      "ai_all_p99_ms": 1.252686,
+      "ai_all_mean_ms": 0.095441
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit synchronized callbacks, not player UI actions or network packet bytes.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

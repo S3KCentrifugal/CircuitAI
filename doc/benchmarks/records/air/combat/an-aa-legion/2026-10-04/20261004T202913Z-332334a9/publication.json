@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "b9c104524a7df08ccb2b6ca61b93b97c1be6d0dfafcb51aa470613f42d3376d9",
+    "air-naval-analysis.json": "cdea1a732ac1842aee99942aa39d0ddce9e579a2705f70cd032dede915617fd7",
+    "checks.json": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf",
+    "launched.json": "d228546a624f43a30aa318a8cffccac1fa3b2e28585d1efa94ae03efb9711380",
+    "naval-checks.json": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf",
+    "naval-manifest.json": "1ed56ff101fdca9ed4a64bd29da3b320fdf67f6c584b10061ac74fec21b9801f",
+    "report.md": "3d564777c8c30c76830be610723c354833309206aadcb4487d5607e27a45e343",
+    "result.json": "8f613829181089cbbe0442cb6ff383f841ec532de15dd97f34f047736d95d2ad",
+    "run-inputs.json": "9482840e205d1579710ac2bfccaada01612d92499fadbbc6b89c01580710feee",
+    "run-plan.json": "f443839099fa76314afbb37444f8849e724e0b054e733c258f04a7aa49c3df01",
+    "script.txt": "b299b4ff195383054c61a051c34587eb1530805b4d1f7dd7cdb13b5b9cb27eae",
+    "staged.json": "0a0b1adb51b6e210e957b77f25ca9363726b0267bcd65ec012b8734287e2d1a7",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "e126ecbb3dae24c36eac51865b5982e8591e0606c09621acf0f2b4c6b50bfefd"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-aa-legion\\supreme\\20261004T202735Z-88344b44\\runs\\20261004T202913Z-332334a9",
+  "schema": 1
+}

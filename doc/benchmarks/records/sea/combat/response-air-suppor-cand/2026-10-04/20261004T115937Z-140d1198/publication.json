@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "c11e6f8c9d9a7345f30f75f4437db7d0fe18e91d4689937747d4e02947f86147",
+    "checks.json": "94dedf93ff5dc43628a5a1f7fbbfd99054631d7b3998248cb9922e1ead89d7d7",
+    "combat-score-v2.json": "3e5af38e09c3cf20578fa5fb42144c896838d06b86041f03f0c4f42f9b709d97",
+    "launched.json": "5ec6c99d02df822753c75b151c1b4836291c11969cd7890b8610a7c9230925a5",
+    "report.md": "2041b411a8f819b2055864100de1bbf4e77f123c780db03140465bd0af3458c4",
+    "result.json": "47b29824693e30613f87b663db22503d90cc87fdb99c02058d619f0147358cd9",
+    "run-inputs.json": "eaf82f9f584d3171f1d0c93996b2acf17f2194195ea20a7946af3d197d5e6dd5",
+    "run-plan.json": "61d1d596391b23fc9373913cf7c3573b4ba9983f308bb88a44cbb9da95cc635c",
+    "screen_2026-10-04_11-59-29-694.png": "8c758f26083a981a891f647e8a3cffc69ce1f6aac1d6650829b5f9d3f234b6df",
+    "script.txt": "74e5bd5b6ea60002af96acfc8efd7ecdeac568112948d0138260d92b9c376b18",
+    "sea-arena-pins.json": "e96759b7505b485a82b9053d4d2dd48d5a559f7b91ae9ec7b72d4dfd54b45c67",
+    "sea-arena.json": "0ddd7243111695db6b8dc6ca574d349a601d2dbf78f84252cc65f4d69cb80f14",
+    "staged.json": "9dadbcd75785c705cf9679529b23639ffe4bc0a6da80679dda605b140d7abd72",
+    "starts.as": "de2c5147e08c07cdc819c9666b7f971f4707be7961c90c835852983b8b958b61",
+    "teams.json": "a815f9fc6425ef9a33cb7a23d0bcc47f49aae9c3244e9a169a23a380fb2cdbaf"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-air-suppor-cand\\glacial\\20261004T115829Z-92ada641\\runs\\20261004T115937Z-140d1198",
+  "schema": 1
+}

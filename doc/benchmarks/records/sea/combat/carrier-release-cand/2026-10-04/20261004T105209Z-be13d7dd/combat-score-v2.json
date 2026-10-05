@@ -1,0 +1,489 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\carrier-release-cand\\glacial\\20261004T105100Z-f2e722c1\\runs\\20261004T105209Z-be13d7dd\\infolog.txt",
+  "fixture_errors": [],
+  "order_sources": [
+    {
+      "frame": 1800,
+      "team": 1,
+      "armcom_nonlua": 6,
+      "corfrad_nonlua": 4,
+      "corsnap_nonlua": 1065,
+      "nonlua": 1075
+    },
+    {
+      "frame": 1800,
+      "team": 2,
+      "armcom_nonlua": 2,
+      "nonlua": 2
+    },
+    {
+      "frame": 1800,
+      "team": 0,
+      "armcom_nonlua": 6,
+      "armfrad_nonlua": 4,
+      "legdrone_lua": 559,
+      "legdrone_nonlua": 99,
+      "legnavydestro_lua": 18,
+      "legnavydestro_nonlua": 325,
+      "lua": 577,
+      "nonlua": 434
+    },
+    {
+      "frame": 3600,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corsnap_nonlua": 88,
+      "nonlua": 89
+    },
+    {
+      "frame": 3600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "legdrone_lua": 52,
+      "legnavydestro_nonlua": 4,
+      "lua": 52,
+      "nonlua": 5
+    },
+    {
+      "frame": 5400,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corsnap_nonlua": 273,
+      "nonlua": 274
+    },
+    {
+      "frame": 5400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "legdrone_lua": 389,
+      "legnavydestro_nonlua": 198,
+      "lua": 389,
+      "nonlua": 199
+    },
+    {
+      "frame": 7200,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 7200,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    }
+  ],
+  "carrier_ownership": [
+    {
+      "frame": 330,
+      "id": "22326",
+      "host": "12834"
+    },
+    {
+      "frame": 330,
+      "id": "15236",
+      "host": "10560"
+    },
+    {
+      "frame": 330,
+      "id": "18885",
+      "host": "29006"
+    },
+    {
+      "frame": 330,
+      "id": "17971",
+      "host": "5984"
+    },
+    {
+      "frame": 330,
+      "id": "10994",
+      "host": "24620"
+    },
+    {
+      "frame": 360,
+      "id": "11235",
+      "host": "10684"
+    },
+    {
+      "frame": 930,
+      "id": "26627",
+      "host": "29006"
+    },
+    {
+      "frame": 930,
+      "id": "26186",
+      "host": "5984"
+    },
+    {
+      "frame": 930,
+      "id": "22392",
+      "host": "12834"
+    },
+    {
+      "frame": 930,
+      "id": "8691",
+      "host": "10560"
+    },
+    {
+      "frame": 930,
+      "id": "4690",
+      "host": "24620"
+    },
+    {
+      "frame": 930,
+      "id": "28374",
+      "host": "10684"
+    },
+    {
+      "frame": 1260,
+      "id": "26627",
+      "host": "-1"
+    },
+    {
+      "frame": 1260,
+      "id": "18885",
+      "host": "-1"
+    },
+    {
+      "frame": 1470,
+      "id": "11235",
+      "host": "-1"
+    }
+  ],
+  "raw_weapon_damage_by_team": [
+    28335.199999999986,
+    9318.6
+  ],
+  "metal_lost_by_team": [
+    1940.0,
+    6000.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    6000.0,
+    1925.0
+  ],
+  "minute_apm_by_team": [
+    [
+      1011,
+      57,
+      588,
+      1
+    ],
+    [
+      1075,
+      89,
+      274,
+      1
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      60,
+      2,
+      70,
+      1
+    ],
+    [
+      16,
+      9,
+      7,
+      1
+    ]
+  ],
+  "peak_apm_by_team": [
+    1011,
+    1075
+  ],
+  "detection_to_first_attack_order_seconds": [
+    5.866666666666666,
+    9.0,
+    17.133333333333333,
+    19.333333333333332,
+    25.4,
+    29.666666666666668,
+    31.566666666666666,
+    31.666666666666668,
+    31.8,
+    34.1,
+    35.46666666666667,
+    45.03333333333333,
+    2.6666666666666665,
+    7.466666666666667,
+    5.666666666666667,
+    10.466666666666667,
+    6.666666666666667,
+    8.5,
+    9.4,
+    13.2
+  ],
+  "median_detection_to_order": 15.166666666666666,
+  "response_decisions": [],
+  "threat_observations": [
+    {
+      "team": 1,
+      "frame": 541,
+      "submarine": "0",
+      "aircraft": "15"
+    },
+    {
+      "team": 1,
+      "frame": 3991,
+      "submarine": "0",
+      "aircraft": "15"
+    }
+  ],
+  "decisions": [],
+  "produced": [],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 305,
+      "id": "10560",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 308,
+      "id": "12834",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 311,
+      "id": "29006",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 313,
+      "id": "5984",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 316,
+      "id": "10684",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 319,
+      "id": "124",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 324,
+      "id": "30373",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 327,
+      "id": "15500",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 332,
+      "id": "6519",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 333,
+      "id": "22959",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 336,
+      "id": "27380",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 340,
+      "id": "596",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 342,
+      "id": "20517",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 345,
+      "id": "1602",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 349,
+      "id": "207",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 352,
+      "id": "23411",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 355,
+      "id": "23745",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 357,
+      "id": "23943",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 361,
+      "id": "16218",
+      "team": "1",
+      "unit": "corfrad"
+    },
+    {
+      "frame": 3301,
+      "id": "10155",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3304,
+      "id": "28301",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3306,
+      "id": "14996",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3310,
+      "id": "31764",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3313,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3316,
+      "id": "27000",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3318,
+      "id": "21302",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3321,
+      "id": "6833",
+      "team": "1",
+      "unit": "corsnap"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 3620.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 3600,
+      "live0": 3620.0,
+      "live1": 2530.0
+    },
+    {
+      "frame": 5400,
+      "live0": 3620.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 7200,
+      "live0": 3620.0,
+      "live1": 130.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.040161,
+      "ai_all_p95_ms": 0.718628,
+      "ai_all_max_ms": 8.514282,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.7146,
+      "ai_all_mean_ms": 0.12808
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018188,
+      "ai_all_p95_ms": 0.606201,
+      "ai_all_max_ms": 2.277588,
+      "sim_speed": 10.008,
+      "ai_all_p99_ms": 1.358154,
+      "ai_all_mean_ms": 0.094195
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.030518,
+      "ai_all_p95_ms": 0.623291,
+      "ai_all_max_ms": 2.223145,
+      "sim_speed": 10.007,
+      "ai_all_p99_ms": 1.20166,
+      "ai_all_mean_ms": 0.098779
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.015137,
+      "ai_all_p95_ms": 0.514404,
+      "ai_all_max_ms": 1.730713,
+      "sim_speed": 8.598,
+      "ai_all_p99_ms": 0.816162,
+      "ai_all_mean_ms": 0.080492
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

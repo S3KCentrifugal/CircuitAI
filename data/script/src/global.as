@@ -1051,6 +1051,30 @@ namespace Global {
             float StrikeImmediateRadius = 1800.0f;
             int RadarWaveSize = 20;
             int RadarWaveIntervalSeconds = 600;
+            int RadarMaxWaitSeconds = 90; // launch available planes even below the full cohort
+            int RadarPatrolCheckSeconds = 2;
+            float RadarPatrolRadius = 280.0f;
+            float RadarThreatPadding = 320.0f;
+            float RadarSafeThreat = 0.0f;
+            int RadarPatrolGrid = 14; // bounded candidate lattice, not a map-wide path search
+            bool NavalSupportEnabled = true;
+            int NavalSupportCheckSeconds = 5;
+            float NavalSupportRadius = 2400.0f;
+            float NavalSupportFriendlyRadiusFactor = 1.25f;
+            float NavalSupportMinDeficit = 300.0f;
+            float NavalSupportReserveFactor = 1.25f;
+            int NavalSupportMinWave = 2;
+            int NavalSupportMaxWave = 60;
+            int NavalSupportMaxWaitSeconds = 90;
+            float NavalSupportApproach = 1100.0f;
+            float NavalSupportMaxThreat = 180.0f; // existing threat-grid units; verified in supplied cases
+            int NavalSupportSearchSeconds = 20;
+
+            bool BaseResponseEnabled = true;
+            float BaseResponseRadius = 1800.0f;
+            int BaseResponseSearchSeconds = 20;
+            int BaseResponseGunships = 20; // one shared reserve, including frames/orders
+            int BaseResponseEmpSupport = 4;
             float RadarSightOverlap = 0.5f; // linear overlap of neighbouring ground-LOS diameters
             float RadarAssemblyRadius = 480.0f; // fixed-wing aircraft circle their assigned positions
             float RadarBacklineInset = 256.0f;
@@ -1547,6 +1571,49 @@ namespace Global {
         }
 
         namespace Sea {
+            bool CompactEconomy = true; // placement only, independent of experimental fleet/production
+            int EconomyTurretSide = 4;
+            int TidalClusterSites = 48;
+            float FactoryEconomyClearance = 128.0f;
+            int FusionMinimumTurrets = 2;
+            float EconomyBlockRadius = 1400.0f;
+            // D-188: independent policy over the shared native reservation engine.
+            bool ExperimentalBuild = false;
+            bool ForwardHarbors = true;
+            bool AdaptiveFleet = true; // applies only inside SEA ExperimentalBuild
+            bool RespectCarrierControl = true; // yield attached drones to the game's carrier gadget
+            bool HybridScoutAirResponse = true; // Armada scout boats must use their AA task during a raid
+            float HybridSubCoverWeight = .5f; // T1 destroyer cost includes its surface gun; avoid valuing all of it as anti-sub
+            float ThreatResponseRadius = 6000.0f;
+            float AirCounterRatio = 0.7f;
+            float SubCounterRatio = 1.2f;
+            float FleetAirCoverShare = 0.06f;
+            float FleetSubCoverShare = 0.3f;
+            float SiegeFleetMetal = 4500.0f;
+            float FleetAssemblySeconds = 120.0f;
+            float TechMinimumMetalIncome = 30.0f;
+            float TechScreenMetal = 1800.0f;
+            float CapitalAssistRadius = 900.0f;
+            int CapitalAssistWorkers = 3;
+            float HarborSearchRadius = 1200.0f;
+            float ForwardHarborSearchRadius = 2400.0f; // crowded allied coasts can exhaust the opening-radius search
+            float FirstPlannedHarborAdvance = 768.0f; // leave rear economy room when the native opening yard hugs shore/map edge
+            float EnergyPerMetal = 25.0f;
+            float ExitLength = 480.0f;
+            float ExitMargin = 48.0f;
+            float HarborMaxThreat = 1.0f;
+            int PreplannedYards = 3;
+            int MaxProductionYards = 8;
+            float TechPackageSeconds = 150.0f;
+            float TechPackageIncomeShare = 0.65f;
+            float WorkforceHorizon = 45.0f;
+            float EconomyIncomeShare = 0.45f;
+            float ForwardMinimumGain = 800.0f;
+            float ForwardStep = 900.0f;
+            int ForwardStableSeconds = 30;
+            int ForwardRecheckSeconds = 120;
+            int MaxSupportPerBerth = 40;
+            int ReservedSupportPerFactory = 20; // compact rear bank, expand as funded demand grows
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;

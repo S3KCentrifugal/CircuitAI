@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "erebos",
+    "scenario": "cohort-candidate"
+  },
+  "id": "20261004T042446Z-66d49ff1",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

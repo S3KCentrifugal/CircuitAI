@@ -18,40 +18,33 @@ namespace AirOperations {
     int AttachFighters(CAirWaveTask@ wave, bool attack = true)
     {
         operations.insertLast(wave); offensive.insertLast(attack);
+        return AttachAvailableFighters(wave);
+    }
+    // Shared ownership for bomber operations and defensive naval relief. The
+    // caller owns route/lead geometry and ends its task when the mission ends.
+    int AttachAvailableFighters(IUnitTask@ owner)
+    {
+        if (owner is null || owner.IsDead()) return 0;
         int count = 0;
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.GetBuildProgress() < 1.0f || !AirScreen::IsFighter(u.circuitDef)
-                || Committed(u.id) || (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER))) continue;
+                || Committed(u.id) || (u.task !is null && (u.task.GetType() == int(Task::Type::PLAYER)
+                    || u.task.GetType() == int(Task::Type::RETREAT) || u.task.IsExternalControlled()))) continue;
             // Transfer only this member; aborting a shared wall task steals its neighbours.
-            if (!aiMilitaryMgr.TransferUnit(u, wave)) continue;
+            if (!aiMilitaryMgr.TransferUnit(u, owner)) continue;
             const string key = "" + u.id;
-            IUnitTask@ owner = wave;
             escorts.set(key, @owner);
+            u.SetIdleMode(0); u.SetFireState(2);
             AirProduction::home.delete(key); AirScreen::Removed(u.id);
             AirWaves::heldFighters.delete(key);
             ++count;
         }
         return count;
     }
-    void Configure(CAirWaveTask@ wave, bool offensive, int preference)
+    void InitHeavyRoster()
     {
-        wave.SetOperationPolicy(offensive, preference, Global::Map::StartPos,
-            Global::RoleSettings::Air::StrikeEscortLead, Global::RoleSettings::Air::StrikeBacklineRiskLimit,
-            Global::RoleSettings::Air::StrikeDistrictRadius);
-        wave.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack,
-            offensive ? Global::RoleSettings::Air::StrikeImmediatePriority : 0.0f,
-            Global::RoleSettings::Air::StrikeImmediateRadius);
-        if (offensive) {
-            // A committed wave exhausts each class before descending. This also
-            // lets new waves finish a defeated base after its named targets die.
-            wave.AddTargetFallback(3); // preserve the existing frontline assault fallback
-            wave.AddTargetFallback(4); // other economy and support structures
-            wave.AddTargetFallback(7); // approved heavy ground units
-            wave.AddTargetFallback(0); // remaining structures
-            if (Global::RoleSettings::Air::StrikeCleanupMobile) wave.AddTargetFallback(8);
-        }
         if (!rosterReady) {
             rosterReady = true;
             const array<string> gantries = UnitHelpers::GetAllGantries();
@@ -76,6 +69,25 @@ namespace AirOperations {
                 }
             }
         }
+    }
+    void Configure(CAirWaveTask@ wave, bool offensive, int preference)
+    {
+        wave.SetOperationPolicy(offensive, preference, Global::Map::StartPos,
+            Global::RoleSettings::Air::StrikeEscortLead, Global::RoleSettings::Air::StrikeBacklineRiskLimit,
+            Global::RoleSettings::Air::StrikeDistrictRadius);
+        wave.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack,
+            offensive ? Global::RoleSettings::Air::StrikeImmediatePriority : 0.0f,
+            Global::RoleSettings::Air::StrikeImmediateRadius);
+        if (offensive) {
+            // A committed wave exhausts each class before descending. This also
+            // lets new waves finish a defeated base after its named targets die.
+            wave.AddTargetFallback(3); // preserve the existing frontline assault fallback
+            wave.AddTargetFallback(4); // other economy and support structures
+            wave.AddTargetFallback(7); // approved heavy ground units
+            wave.AddTargetFallback(0); // remaining structures
+            if (Global::RoleSettings::Air::StrikeCleanupMobile) wave.AddTargetFallback(8);
+        }
+        InitHeavyRoster();
         for (uint i = 0; i < groundHeavyDefs.length(); ++i) wave.AllowStrikeDef(ai.GetCircuitDef(groundHeavyDefs[i]), 1.0f);
         const array<string> sides = {"armada", "cortex", "legion"};
         for (uint i = 0; i < sides.length(); ++i) {

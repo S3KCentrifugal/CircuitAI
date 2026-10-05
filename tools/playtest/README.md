@@ -749,6 +749,148 @@ constructors. This isolates fixed-population observation overhead, not active
 project or combat throughput. Compare full minute windows after each spawn
 settles; spawn frames are not steady-state measurements.
 
+
+## SEA migration benchmarks (D-188)
+
+`python tools/playtest/run_sea.py --dll <pinned.dll> --map glacial --minutes 30`
+allocates categorized storage, stages current data with SEA migration enabled,
+checks the staged scripts against the DLL, and records screenshots plus the
+independent `sea_watch.lua` census. `--legacy` disables migration in staged data;
+`--data <tree>` selects another source and `--profile` selects the profile.
+`--roles` filters existing map spots: inspect `teams.json`, since a filter does
+not create a role for which the map has no selected spot.
+
+`run_sea_cohort.py --dll <dll> --baseline <preserved-data> --maps glacial,supreme,tundra,caldera,erebos`
+copies/hashes both trees before paired thirty-minute games. Concurrent runs
+cannot establish CPU/FPS improvements. The same AI seed does not guarantee
+engine-wide determinism. Both teams use one variant per match, not candidate
+versus baseline in the same match.
+
+`run_sea.py --dll <dll> --fixture harbor --profile experimental_balanced --minutes 20`
+is a supplied Glacial Armada lifecycle fixture. It supplies economy, storage,
+advanced builders and stationary cover, freezes other teams' construction,
+and supplies no factory/reclaim orders. Tests require reservation adoption,
+physical-blocker replan, actual replacement production/exit and old-yard reclaim.
+An independent engine observer checks departure precedes reclaim and no product
+remains in the old yard. This is not a natural-economy score.
+
+`analyze_sea.py <archive/infolog.txt> --output <new-score.json>` writes an
+immutable scorecard. Empty-team checkpoints indicate elimination; compile-only
+or no-egress logs cannot pass physical checks. General departures use 320 elmos,
+harbor retirement 480. Older observers lack complete censored-product/delay
+denominators; retain original evidence and label limits. API checks accept
+`--scripts <staged-script-root>` for a pinned cohort. Publish completed archives
+with `storage.py publish`, preserving supplied versus benchmark metadata.
+See [migration results](../../doc/sea-layout-migration-results.md).
+
+## SEA combat and response (D-189)
+
+`sea_arena.py --dll <dll> --case surface-line` supplies forces on Glacial Gap;
+the AI retains all combat command ownership. Ordinary cases freeze constructors
+and factories. Response cases supply economy and keep real factory production;
+`support_turrets` permits static assistance and native recovery-submarine work
+while economic constructors/commanders remain frozen. Production waits until
+frame 600 so the supplied workforce exists before the first admission. Older
+fixture versions froze recovery units too and raced initial constructor creation;
+keep those original outcomes, but use matched harness versions for comparisons.
+`run_sea_combat.py` pins paired control/candidate cases. The optional case
+`checks` selects physical acceptance conditions: `legion-t2-production` requires
+both an actual T2 constructor and an actual combat ship to finish. Use Legion
+with `experimental_terrible` and `experimental_balanced` to exercise missing
+and existing native factory metadata respectively.
+
+`analyze_sea_arena.py <log> --output <new-score.json>` measures damage, loss,
+production, detection/order timing and command sources. Gadget-generated orders
+are reported separately where the observer supports it; engine callbacks are
+not network bytes. `carrier-release` independently checks host destruction;
+surviving released drones require a separate observation of resumed combat.
+Do not count a reached-duration smoke PASS as a combat win. See the
+[combat plan](../../doc/sea-combat-enhancement-plan.md) and
+[unit/control review](../../doc/sea-unit-controls.md).
+
+
+## Dense economy and naval support fixtures (D-190)
+
+`python tools/playtest/run_dense_economy.py --case air|sea|support --dll <pinned DLL>`
+stages isolated Glacial games with supplied constructors/resources. Cases and
+checks live under `cases/{air,sea}/layout/` and `checks/{air,sea}/layout/`.
+The Lua observer measures completed footprint adjacency with facing, and actual
+turret repair/guard commands at busy shipyard/amphibious products. It rejects
+dry naval spawns. The staged script probe owns finite fixture work; it is never
+included by production data. Every run records staged hashes and overrides.
+Use natural `run_sea_cohort.py` for economy comparison, not these supplied games.
+
+## SEA economy blocks on Supreme (D-191)
+
+`python tools/playtest/run_sea_economy_block.py --dll <pinned DLL>` verifies
+ordinary builder movement; add `--experimental` for migrated movement. The
+fixture supplies water factories/constructors and resource banks, then requests
+finite converter/fusion work through production placement code and two finite
+factory production waves. It does not test natural admission decisions. The
+observer measures completed converter adjacency/retention, square turret grid,
+actual factory/fusion assistance, orphan reach, and the rear reactor footprint.
+Use normal `run_sea.py --legacy` to test the new placement adapter with existing
+SEA decision rules. `--keep-going` preserves failed checks while continuing to
+the requested horizon. Failed observations are never reclassified as passes.
+
+## Allied naval bases (D-192)
+
+`python tools/playtest/run_sea_allied_base.py --dll <pinned DLL>` runs six
+SEA/AIR/TECH players on Supreme and attempts foreign placement inside every
+role's empty economy/factory reservations. All 12 directed class checks must
+pass; unrelated invariants still fail the overall report.
+
+Add `--supplied` for six SEA players on Glacial. The opening shipyards are
+built normally; the fixture then supplies constructors and resource banks,
+requests economy and a later yard, and overrides the income-derived yard cap
+only for that explicit test demand. It verifies placement, not tech timing.
+The independent Lua observer checks all three western allies' completed yard
+footprints/facing and foreign construction within claimed tidal blocks.
+`run_sea.py --legacy --base-observer` retains ordinary economy decisions while
+checking later yard geometry. Both runners use isolated categorized games;
+publish original reports, failed iterations and screenshots with `storage.py`.
+
+
+## AIR recon deadlines and base response (D-193)
+
+`python tools/playtest/run_air_response.py --case partial --dll <pinned DLL>`
+runs three radar planes through the normal waiting wall and deadline. `full`
+checks the ordinary twenty-plane release. `defense` supplies parked T2 bombers
+and real production against two northwest Marauder pushes on Supreme; `t1`
+checks lower-tier faction fallbacks, `small` supplies only two parked bombers,
+and `outside` checks visible intruders outside the base radius. Use `--side`
+for Armada/Cortex/Legion, `--profile` for experimental profile compilation,
+and matched `--data --dll --baseline` for old-build comparison. Resources are
+supplied and builders frozen; these are response tests, not economy benchmarks.
+
+The observer records actual damage, deaths, aircraft orders and screenshots
+under ordinary LOS/radar. A twenty-unit reserve is a production target, not a
+guarantee of defeating T3 with T1 aircraft. `air_arena.py run --case
+base-response-commitment` adds simultaneous home ground/air contacts while
+measuring retained offensive escort ownership. The natural runner and arena
+API checks honor their pinned data rather than comparing an old DLL to current
+repository scripts. See [results](../../doc/air-recon-base-defense-results.md).
+
+## AIR patrol and naval relief fixtures (D-194)
+
+`python tools/playtest/run_air_naval_support.py --case patrol --dll <pinned DLL>`
+uses the live AIR controllers with ordinary LOS/radar/sonar. `partial`, `full`
+and `zero` test recon deadlines, full waves and zero-weight physical AA.
+`naval` permits real factory production; `stall` supplies only two aircraft.
+`sub`, `aa`, `factory` exercise ASW mismatch, light AA and a shipyard-only ally.
+Negative controls: `parity`, `hover`, `remote`, `basin`, `danger` (heavy naval AA).
+Use `--side armada|cortex|legion`, `--map supreme|glacial`, `--profile` or
+`--headless`. Cases are runner variants; generated checks/fixtures/manifests
+are archived separately in categorized raw game directories. Supplied resources
+and frozen economic builders make these combat tests, not economy benchmarks.
+
+`python tools/playtest/analyze_air_naval_support.py <archive>` adds a separate
+post-run summary of launches, actual damage, patrol commands, AA escape and
+observed team-0 AIR orders. It never rewrites the original verdict. Publish
+failed iterations and their explanations along with corrected repeats. See
+[results](../../doc/air-patrol-naval-support-results.md).
+
+
 ## Whole-AI performance observations (D-195)
 
 See the [ranked Shore review](../../doc/reviews/2026-10-04-skirmishai-performance-review.md)

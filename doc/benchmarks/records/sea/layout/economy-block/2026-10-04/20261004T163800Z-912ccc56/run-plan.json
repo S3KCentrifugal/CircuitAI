@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "economy-block"
+  },
+  "id": "20261004T163617Z-748b6d38",
+  "requested": {
+    "seed": 1911
+  },
+  "schema": 1
+}

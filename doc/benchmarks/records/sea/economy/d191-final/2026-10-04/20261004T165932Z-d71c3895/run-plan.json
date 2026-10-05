@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "d191-final"
+  },
+  "id": "20261004T165636Z-ddc666be",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

@@ -1,0 +1,113 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 471,
+      "sha256": "51e9aca8e8f7891de20fdbb2c42bad645f25a26068cff00b0fca037d181496b2"
+    },
+    "infolog.txt": {
+      "bytes": 2374844,
+      "sha256": "ef567f864d85b749689cc7a1d0d4b47000c776ead117bdf5131270836538f5e2"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "89c1b1f0914b1fe990b6ced5851d169ed79e3a45667048225384927ce21e3d57"
+    },
+    "report.md": {
+      "bytes": 42643,
+      "sha256": "66d7b25faddce9510da8ff4da3c4c6f015a616ca47a79f10d8e1d49dc0a7c38a"
+    },
+    "run-inputs.json": {
+      "bytes": 36109,
+      "sha256": "e88d386dc3b3725d70d87d7714f98517b09fa773154c34d38ebc19432f116c88"
+    },
+    "run-plan.json": {
+      "bytes": 227,
+      "sha256": "53df5272be714d2115522e591390b735e5c6c86757d74f9fb0c6b670602dceb3"
+    },
+    "screen_2026-10-04_20-51-07-829.png": {
+      "bytes": 1841248,
+      "sha256": "eac66373aed1c5c16a41e904c4f2cc3c51e59c561d3086190c4ae002b4552d23"
+    },
+    "screen_2026-10-04_20-52-14-842.png": {
+      "bytes": 1854580,
+      "sha256": "927afd36e08dfab5b907ea0be3c684530808c30f2d9b0787abaa91d6abcdc98b"
+    },
+    "screen_2026-10-04_20-52-53-541.png": {
+      "bytes": 1877175,
+      "sha256": "5a92d606944c27b2f2259e827d91a3aba6e308143fef9434862db460b1863dbf"
+    },
+    "script.txt": {
+      "bytes": 6788,
+      "sha256": "edeb31999465b4c5412493fbc350916e577ca1ac2accd1ed2c4731333e332fcc"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "41ee3f595f707e45bcac5f9528759c1dc172e2cdf9980f46c0cda66d4f484e70"
+    },
+    "teams.json": {
+      "bytes": 815,
+      "sha256": "908bb5999e5ebac3dab885f7587e3e7f45e28ba33af736fd22c819d0ff5ffbd9"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "natural",
+    "map": "supreme",
+    "scenario": "naval-natural"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T205254Z-b0090b40",
+  "last_frame": 36030,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-natural\\supreme\\20261004T204953Z-7e1add8e\\runs\\20261004T205254Z-b0090b40",
+  "reason": "reached 20 min",
+  "recorded_at_utc": "2026-10-04T20:52:54.688004+00:00",
+  "requested": {},
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 3,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 1,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 11,
+      "team": 2,
+      "x": 10129.0,
+      "z": 541.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 16,
+      "team": 3,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

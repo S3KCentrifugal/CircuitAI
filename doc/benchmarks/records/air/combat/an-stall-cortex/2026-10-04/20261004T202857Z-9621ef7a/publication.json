@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "e5d4a501f782ce18db486c5fadefe07b393fcbd54a27ad967d47d483f9fa142b",
+    "air-naval-analysis.json": "cd09036bbdfb21b8ab63c478f482e24b6b657d4ba4da07b6851dae5e6d4e7b33",
+    "checks.json": "86c4ee08f09aa947c78a2285239d19a5181e3cafbab544e1811ec1583cefe0d0",
+    "launched.json": "9b0e61c2dff2d5c0eb8a1b9b6c56560f2c6d7cfb3acde1aa7fbfc6b86ed8be09",
+    "naval-checks.json": "86c4ee08f09aa947c78a2285239d19a5181e3cafbab544e1811ec1583cefe0d0",
+    "naval-manifest.json": "91e0a5bbdf5d08c459c5cd9a2525569806f5fade4db74c565cfd2e03cb97d0fa",
+    "report.md": "dcf0d3d8a4527b00c87c132483c4e481c28016d4d24face4cd58e81cc817c164",
+    "result.json": "2144a7295703747e392409fd235d296e8d18db4db37cc5607dd9022e3f86bf3d",
+    "run-inputs.json": "e03144a0f0dd683acfa6a231ad9bfd2a53ea56746dd266fb9396f233e599a3a5",
+    "run-plan.json": "adaeec264f3435885837de454f18380dda8d89f8d49c92dad6b429d100191e49",
+    "script.txt": "0ec18040c55505aa607f5778aff126bd4618a30f92cc2443f57cc20970014efd",
+    "staged.json": "6ccfbcb10c67bd4903f0123b63ec5a157029befdf265d3cbea6a0d21ac999fb0",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "e9aee302fac12520db4a32d18b4ca2df8d4c0d6fefb81e326c896579c7e7f7b0"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-stall-cortex\\supreme\\20261004T202722Z-0ee5ce75\\runs\\20261004T202857Z-9621ef7a",
+  "schema": 1
+}

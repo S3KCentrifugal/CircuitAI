@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "bad2286873182dca008ac0a6ace916a4177eefd54d182b33dd451b2a66ae72e5",
+    "checks.json": "33452a52878646aa44d1dd5c18979f2c07c0318e50de63b71c2d9ff805e9b876",
+    "launched.json": "76e0a651fe51d7fe534816b17ea4e9313083f4117b3e8d207ba65773b5970000",
+    "report.md": "5da62436a22db381fc3d3e287a2727b5acf7781e820c280ec432766906c0d534",
+    "result.json": "9156cd1389646b5201ed69709720fc449932e979244293075146c756e5174bd4",
+    "run-inputs.json": "ecf5857cfb9f3e6601b513a8225d0217a1c70640e691a31c57573c7c31d9c7fa",
+    "run-plan.json": "bf59cc65bb8770057743ad379e9579286af519b8a8e59ff23141ce78bbda0a2a",
+    "screen_2026-10-04_04-46-49-762.png": "cf374904c2a7c7c811c238b6da63fde87ec40e5cbbe46fcc4c7fe84fc0ec08f0",
+    "screen_2026-10-04_04-47-53-321.png": "9085b4659b9bf16c4b9606a1ecc65191f9d7174ef53b436509b88911523c6795",
+    "script.txt": "19a6a4e58c37fe218cd536d7c6b559a62f1625e5fcb8a3cf5ef906aedd4e5d6f",
+    "sea-fixture.json": "bc377ee4a82c04d71518b14bc08def228e23af971af37c8e640cf178396f0e3d",
+    "sea-score-v2.json": "faebabd077e4f11728d1c3a06cce9377c9605336ed51986c760a5ebf0b71036c",
+    "staged.json": "d01a4a461a327a432c54b18b52b306575f4361af792dad372d11bc8ffae74f43",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\harbor-observed\\glacial\\20261004T044526Z-93b1ae26\\runs\\20261004T044800Z-a38be670",
+  "schema": 1
+}

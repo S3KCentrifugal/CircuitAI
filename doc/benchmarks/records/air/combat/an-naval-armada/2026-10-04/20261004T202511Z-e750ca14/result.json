@@ -1,0 +1,113 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1354,
+      "sha256": "e641deeb1b4c3d118f0b7d7c13acd9367a59e44f275c98a4f1fcfdc02a689419"
+    },
+    "infolog.txt": {
+      "bytes": 881586,
+      "sha256": "9a34f2ed8c4003b0358f3eeeaef6f7425fa6a128b71084d969c8ff10c5140bd0"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "051d73cf28929963f6979971a4266cb9697ff7a2fca141a4c54a9842b8f9d382"
+    },
+    "naval-checks.json": {
+      "bytes": 1354,
+      "sha256": "e641deeb1b4c3d118f0b7d7c13acd9367a59e44f275c98a4f1fcfdc02a689419"
+    },
+    "naval-manifest.json": {
+      "bytes": 37216,
+      "sha256": "78c49feb09447e6600f896e95a4176f7b6d2771e6ccc73c4de4a79fef02dea10"
+    },
+    "report.md": {
+      "bytes": 44914,
+      "sha256": "a490cc2d37295b40c175af90d78458471cf5251e04e700b8a9a2e255ff53fc3c"
+    },
+    "run-inputs.json": {
+      "bytes": 36234,
+      "sha256": "ad48eba6cd13a1a507d19affda5e435289d7fbde2ba8c02c8de144cadb4c7ff8"
+    },
+    "run-plan.json": {
+      "bytes": 252,
+      "sha256": "2a49364ca5ff2892227daeb22daea1f15e4ef2ca93043a6e2dbecfa5598747bd"
+    },
+    "screen_2026-10-04_20-24-36-319.png": {
+      "bytes": 1787658,
+      "sha256": "8f70650407dd766995e6df7e5262b8feaaac41703de45817e7e30a2989ec8f07"
+    },
+    "screen_2026-10-04_20-24-46-003.png": {
+      "bytes": 1774973,
+      "sha256": "882813f8f23b5e0b56f4c73aa625b43bc9b2fc18315e7bee7ca289b3255ab581"
+    },
+    "script.txt": {
+      "bytes": 6481,
+      "sha256": "3271a0d23b043d418e9fad430f1ecf6aecb40a6365b905761236ccb55b5f4487"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "ae1b7d552398b6fe5a17390ebe528b679bb267d89f355361320287f99dda880d"
+    },
+    "starts.as": {
+      "bytes": 170,
+      "sha256": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162"
+    },
+    "teams.json": {
+      "bytes": 640,
+      "sha256": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "an-naval-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T202511Z-e750ca14",
+  "last_frame": 12662,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-naval-armada\\supreme\\20261004T202328Z-dff151d0\\runs\\20261004T202511Z-e750ca14",
+  "reason": "reached 7 min",
+  "recorded_at_utc": "2026-10-04T20:25:11.536411+00:00",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "PASS"
+}

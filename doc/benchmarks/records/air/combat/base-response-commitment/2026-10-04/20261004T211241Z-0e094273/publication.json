@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "41e8f3b1b9d0e6985dcee8243c24db89ab5ca379469216ddcdf07ba764dee40e",
+    "air-naval-analysis.json": "11ba8227668952fc1134d4713fecb6955b4841c572f21f987cbd8cd88dd518a6",
+    "arena-manifest.json": "581a22f8a32384893f8a70b81d0049cf9f00e70499f15773e563ae0f5105ed22",
+    "arena-results.json": "6135075bb38e0d686350aee5498dc062c8a0089e52f555a09a65f9bc81dd6ccf",
+    "arena-starts.as": "9ddcac01380ccb38880ff7ba649765fa96fd23754a5f982871a6eacd91d58dce",
+    "checks.json": "37b2564dd26cc8422bb3310690964dde232805065002cdb111aaa4810c57629f",
+    "launched.json": "7523f61b312639ea67dbac8ade5f89be9f9cc64a267966274e748f1a81367a3e",
+    "report.md": "012cc9d1b88c933836db4ca2ea8f33b1b7fc5065b0803886a2036b58b35d2f88",
+    "result.json": "e6db2585e0eda7188bfd122bebf4b7656ca143e1397f452b64ddb6caba13ef71",
+    "run-inputs.json": "eddfe1c98ccd08b3223fc1bc45356e91b9f6aaf7f596204e2bee797c0f268745",
+    "run-plan.json": "de179f7cb7efb09f1629f04ef3696d98a8c2a4ac39b94cacc930552c706fdc5f",
+    "script.txt": "41acb8ca338d8e9bdab5615ea4c780d32a292ed4bd4f3faa1d947eb6be2023fe",
+    "staged.json": "aafaad6077f93ae5d3998be3b2e66f82d5928f25200cc96a6d6fc92bbdf8966f",
+    "teams.json": "264cab5d285af156a3ced7848e08df27d823f40f3d4f0236e501243aa19599e8"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\base-response-commitment\\supreme-isthmus-v1-7\\20261004T211059Z-1570f726\\runs\\20261004T211241Z-0e094273",
+  "schema": 1
+}

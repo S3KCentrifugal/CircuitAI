@@ -3,6 +3,8 @@
 #include "air_screen.as"
 #include "air_raids.as"
 #include "air_recon.as"
+#include "air_base_response.as"
+#include "air_naval_support.as"
 #include "../helpers/air_math.as"
 namespace AirProduction {
     dictionary home; // mutually exclusive with AirWaves' held/launch ledgers
@@ -126,7 +128,7 @@ namespace AirProduction {
             }
         }
         const float homeValue = AirScreen::HomeValue();
-        const bool emergency = AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
+        const bool emergency = AirBaseResponse::Emergency() || AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
         const bool saving = AirEconomy::SavingForFirstLab();
@@ -150,6 +152,12 @@ namespace AirProduction {
             }
             if (t !is null) return t;
         }
+        // Fighters covering this ground response are intentionally absent from
+        // the home-wall ledger. Do not refill that floor ahead of gunships.
+        if (!AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio)) {
+            @t = AirBaseResponse::Produce(u);
+            if (t !is null) return t;
+        }
         if (affordable) {
             const float cost = fighterDef is null ? 150.0f : fighterDef.costM;
             const float urgent = AiMax(float(Global::RoleSettings::Air::HomeFighterFloor) * cost,
@@ -158,7 +166,11 @@ namespace AirProduction {
             @t = Recruit(u, fighter, Projected(fighterDef) + missing, "intercept", Task::Priority::HIGH);
             if (t !is null) return t;
         }
+        @t = AirBaseResponse::Produce(u);
+        if (t !is null) return t;
         if (!affordable || AirEconomy::recovery) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        @t = AirNavalSupport::Produce(u);
+        if (t !is null) return t;
         if (openingReady) {
             const int goal = AirRaids::OpeningSize();
             aiTerrainMgr.SetLayoutInt("air.t1.openingReady", 1);
@@ -256,6 +268,8 @@ namespace AirProduction {
     void Reset() { home.deleteAll(); AirScreen::Reset(); countLog = -100000; }
     void Leave()
     {
+        AirNavalSupport::Reset();
+        AirBaseResponse::Reset();
         AirRecon::Reset();
         AirOperations::Reset();
         AirRaids::Reset();
@@ -288,7 +302,7 @@ namespace AirProduction {
             aiTerrainMgr.SetLayoutInt("air.scout.finished", 1);
             // Legion's Noctua is the roster's fighter/scout drone, without a
             // native SCOUT classification. Only the opening aircraft scouts.
-            if (u.id == aiTerrainMgr.GetLayoutInt("air.scout.id", -1) && AirScreen::IsFighter(u.circuitDef)) {
+            if (!AirScreen::IsFighter(u.circuitDef) || u.id == aiTerrainMgr.GetLayoutInt("air.scout.id", -1)) {
                 if (openingScout !is null && !openingScout.IsDead()) return openingScout;
                 @openingScout = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
                 if (openingScout !is null) {
@@ -296,7 +310,9 @@ namespace AirProduction {
                     array<AIFloat3> starts = Lanes::ScriptStarts(true);
                     if (starts.length() == 0) starts.insertLast(LayoutHelpers::TerrainCentre());
                     for (uint i = 0; i < starts.length(); ++i) route.insertLast(AirScreen::Clamp(starts[i]));
-                    openingScout.SetAirControl(true);
+                    if (route.length() == 1) route.insertLast(AirScreen::Clamp(AIFloat3(route[0].x+512.0f,0,route[0].z+512.0f)));
+                    openingScout.SetAirControl(true); openingScout.SetPatrol(true);
+                    u.SetIdleMode(0); u.SetFireState(0);
                     openingScout.SetRoute(route);
                     GenericHelpers::LogUtil("[AIR][Scout] opening drone=" + u.id + " enemy starts=" + route.length(), 1);
                     return openingScout;
@@ -323,7 +339,9 @@ namespace AirProduction {
     }
     void Tick()
     {
+        AirBaseResponse::Tick();
         AirRecon::Tick();
+        AirNavalSupport::Tick();
         AirOperations::Tick();
         AirRaids::Update();
         AirScreen::Tick();

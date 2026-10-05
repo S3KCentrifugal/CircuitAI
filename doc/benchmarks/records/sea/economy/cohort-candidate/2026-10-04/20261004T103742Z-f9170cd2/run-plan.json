@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "caldera",
+    "scenario": "cohort-candidate"
+  },
+  "id": "20261004T102840Z-dd3361c2",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

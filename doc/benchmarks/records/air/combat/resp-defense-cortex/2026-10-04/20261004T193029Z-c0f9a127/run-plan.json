@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "resp-defense-cortex"
+  },
+  "id": "20261004T192843Z-670861e3",
+  "requested": {
+    "seed": 1931
+  },
+  "schema": 1
+}

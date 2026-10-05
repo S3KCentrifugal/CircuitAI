@@ -82,7 +82,8 @@ def run(args, entry):
         "dll_sha256": hashlib.sha256(args.dll.read_bytes()).hexdigest(),
         "staged_script_sha256": {str(p.relative_to(source.parents[1])): hashlib.sha256(p.read_bytes()).hexdigest()
                                  for p in source.parents[1].rglob('*.as')}}, indent=2))
-    subprocess.run([sys.executable, str(playtest.REPO/"tools/knowledge/check_script_api.py"), "--dll", str(args.dll)], check=True)
+    subprocess.run([sys.executable, str(playtest.REPO/"tools/knowledge/check_script_api.py"),
+        "--dll", str(args.dll), "--scripts", str(source.parents[1])], check=True)
     launch = call+["launch", "--dir", str(base), "--engine", "recoil_2026.07.04"]
     if args.headless:
         launch.append("--headless")

@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "4e89153a185f9ca4c87ba560841fdd2bd075c0e4a1bc0a787f66b26362259468",
+    "checks.json": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808",
+    "launched.json": "57d613f0984cb4bc8fb667bf50627cca17a0f0cefae9fe67785e8b25d04de373",
+    "report.md": "b886f2d50020337fd7b5ca3f0b3b8548fcb4386b3ec726ffbf309f27c9bbaeed",
+    "result.json": "4a16ce2cecda9bc0be2565b40abd09517e380370b934b3cbea0fc25801773473",
+    "run-inputs.json": "43a583f88fcbcd2d5ed418dc58ea5729ed826592de6de878e20c5623b670ed62",
+    "run-plan.json": "f74ee578cfa12037b2f7bb3826f11b7c632316d9667860f44c128a589866a728",
+    "screen_2026-10-04_18-33-42-495.png": "7d3c7364c45014f580c30af0d6396342d6a469273b976a7e1cdbd8f76280c5c1",
+    "script.txt": "3044cb7a30451e2752411aa0b185e3b68491e7325d55abea99d96200cd6c809b",
+    "sea-fixture.json": "119d09889222ad68d50d5d754aa16c15246ae78342ace69cd6807892126fa8f3",
+    "sea-score.json": "4dd40f8e90c001e2a637656582f239d9514d5a925d16ef0eee26c050c417493f",
+    "source-manifest.json": "612ec34c83a1adceb44771b842eaecf57ffcaf4ce3b2f646c048c09d56e33301",
+    "staged.json": "7a642f3712312b4afdd0dcd31d37b0dec82d8b52d51251115faaed24ff6878a8",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d192-final\\glacial\\20261004T183041Z-8fd5db8b\\runs\\20261004T183418Z-835583e4",
+  "schema": 1
+}

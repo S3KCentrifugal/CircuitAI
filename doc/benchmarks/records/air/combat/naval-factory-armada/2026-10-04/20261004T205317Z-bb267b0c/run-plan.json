@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "naval-factory-armada"
+  },
+  "id": "20261004T205147Z-b4829bff",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1
+}

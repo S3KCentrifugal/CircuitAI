@@ -604,6 +604,7 @@ namespace AirWaves {
 
     void _TryLaunch(int frame)
     {
+        if (AirBaseResponse::Emergency()) return;
         const int bombers = int(heldBombers.getSize());
         const int fighters = Global::RoleSettings::Air::ExperimentalBuild ? int(AirProduction::home.getSize()) : int(heldFighters.getSize());
         if (bombers == 0) { holdSinceFrame = -1; return; }

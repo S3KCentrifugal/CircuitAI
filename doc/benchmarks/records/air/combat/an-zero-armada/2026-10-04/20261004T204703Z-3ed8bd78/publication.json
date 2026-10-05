@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "7f65395d99d0c120c66a74e6468f3ebc4f3f043f08852b0ce28f9eaf614af2ba",
+    "air-naval-analysis.json": "ce7f50761b46851eeb64f1aae277139ac7f2d9bd7ad2f0d03995c7df3c224c5e",
+    "checks.json": "fa707cac0aa2ae12f02d0599b3cf2cc4dc7246d0af0a7fc4925e9ab44e42b93d",
+    "launched.json": "6f3c46712a983be9e4a02b9e2bf5489433c9fbb830fb6fbbc915b41af3b779d7",
+    "naval-checks.json": "fa707cac0aa2ae12f02d0599b3cf2cc4dc7246d0af0a7fc4925e9ab44e42b93d",
+    "naval-manifest.json": "cf558e6c4f2746766d0679bfd197cafecf591962585525a321ec90d78b09ceda",
+    "report.md": "bead654c5384116f2d11580f6117ff48a5d9339f5a89288500bddbfa1cfbfbc6",
+    "result.json": "ba418ee333983d494029a1cafb30fb3a0e1424a015733445e31c371c1788d912",
+    "run-inputs.json": "767f0bdf70af19c2ee544e8972a9712baab74e13a0e29de2ad0dfb631d51f9f4",
+    "run-plan.json": "d68fb7205a1841a1ed1b3f0a4a145ef0f573487eb7798c83a04458a1b4b75a66",
+    "script.txt": "fb16465328358257da3502458b53cce781723734609fa0059f5d6819fac6b974",
+    "staged.json": "1d9a7c30295b5d48b2e01dc12dca30975d8bdeb6f878a355afb7edaa4bcf577f",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-zero-armada\\supreme\\20261004T204532Z-cca061ec\\runs\\20261004T204703Z-3ed8bd78",
+  "schema": 1
+}

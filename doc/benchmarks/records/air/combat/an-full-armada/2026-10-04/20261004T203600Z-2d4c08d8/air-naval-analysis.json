@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-full-armada\\supreme\\20261004T203429Z-168ef32c\\runs\\20261004T203600Z-2d4c08d8\\infolog.txt",
+  "naval_launches": [],
+  "recon_launches": [
+    {
+      "frame": 2970,
+      "event": "20 formed=20 spacing=1275 reason=full"
+    }
+  ],
+  "patrol_assignments": 20,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 0,
+  "first_damage_frame": null,
+  "damage": 0,
+  "naval_kills": 0,
+  "peak_air_apm": 317,
+  "peak_all_apm": 318,
+  "max_patrols": 20,
+  "max_patrol_span": [
+    9066,
+    9408
+  ],
+  "return_survivors": [],
+  "invariants": []
+}

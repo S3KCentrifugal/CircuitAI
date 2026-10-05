@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "supplied_assets": false,
+  "map": "Erebos Lakes v1.0",
+  "seed": 1881001,
+  "minutes": 30.0,
+  "profile": "experimental_hard",
+  "side": "armada",
+  "dll_sha256": "ac71826721992d8407da872b01e3001df4de47bb2d5c2ca7cea80d660c06d006"
+}

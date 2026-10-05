@@ -133,6 +133,9 @@ public:
 	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
 	// A single reusable slot. Its private zone preserves frame/unit identity after completion.
 	int ReservePersistentBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	bool PlanNavalBerth(const std::string& key, CCircuitDef* cdef, const springai::AIFloat3& pos,
+	                    int facing, float length, float margin);
+	bool CanNavalRoute(CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to);
 	void ReleasePersistentBuilding(int id);
 	int GetReservationState(int id) const; // -1 absent, 0 free, 1 claimed, 2 framed, 3 complete, 4 dead
 	bool IsReservationBuildable(int id) const;

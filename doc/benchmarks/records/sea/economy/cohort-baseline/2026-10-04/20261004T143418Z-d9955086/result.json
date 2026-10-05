@@ -1,0 +1,169 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 3000813,
+      "sha256": "61d112287240810a8179590df40ae69e4e7e4638c7249b83445f47c163069b2e"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "de1feb7e8e7627f5c33e364f36c2811298c15769deced9a484b66b2cbaab05b7"
+    },
+    "report.md": {
+      "bytes": 21803,
+      "sha256": "7fef284d765240a5c6afa4c00b7431f0c216979ee720d47be1084e2caf0d3081"
+    },
+    "run-inputs.json": {
+      "bytes": 35652,
+      "sha256": "97f2d35892a0d25b002125372adb3d421ccb9c392fa5826765b5ff12d7b4d818"
+    },
+    "run-plan.json": {
+      "bytes": 253,
+      "sha256": "5742d7590cb4986347bf801b005bbbf85846a617512cda5eabd104358f2b928d"
+    },
+    "screen_2026-10-04_14-32-32-699.png": {
+      "bytes": 1663293,
+      "sha256": "55a7cba190f34c5b6a791d5da2115748965aa5ef86e02af013834917f740f115"
+    },
+    "screen_2026-10-04_14-32-57-286.png": {
+      "bytes": 1690448,
+      "sha256": "3038f5f1efdce4fa02564025f0ed8837768d9419c28f163e261d83e58418a2a3"
+    },
+    "screen_2026-10-04_14-34-17-570.png": {
+      "bytes": 1701217,
+      "sha256": "cae4a96d391946899d71405476e94adbc241708f6d0bbf77b03bdfb649dc8c1b"
+    },
+    "script.txt": {
+      "bytes": 8439,
+      "sha256": "c3661e9dd412b71639b74d28566c60d785cb88d3287bd86860ecc7e9654da994"
+    },
+    "sea-fixture.json": {
+      "bytes": 292,
+      "sha256": "3b437092625f47836aa041af38f3a18a249bd6f7138e2b71efbca409ce080691"
+    },
+    "staged.json": {
+      "bytes": 328,
+      "sha256": "5973a8d2c8c3cfb173b9c65f90b1cbf917b600d4a709f1effd1683c11b774c07"
+    },
+    "teams.json": {
+      "bytes": 1702,
+      "sha256": "9eef94c3b0d0c8d3fcfcc80871bf6805268134eac14edd83f89e4cd570e05527"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "tundra",
+    "scenario": "cohort-baseline"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T143418Z-d9955086",
+  "last_frame": 36008,
+  "map": "Tundra Continents v2.3.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\cohort-baseline\\tundra\\20261004T143120Z-e4c91d14\\runs\\20261004T143418Z-d9955086",
+  "reason": "reached 20 min",
+  "recorded_at_utc": "2026-10-04T14:34:18.566070+00:00",
+  "requested": {
+    "seed": 1902
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 4,
+      "team": 0,
+      "x": 4100.0,
+      "z": 2100.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 1,
+      "x": 5400.0,
+      "z": 800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 6,
+      "team": 2,
+      "x": 6400.0,
+      "z": 800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 7,
+      "team": 3,
+      "x": 7800.0,
+      "z": 1500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 9,
+      "team": 4,
+      "x": 1504.0,
+      "z": 12000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 10,
+      "team": 5,
+      "x": 1610.0,
+      "z": 10300.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 14,
+      "team": 6,
+      "x": 6700.0,
+      "z": 10600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 15,
+      "team": 7,
+      "x": 8200.0,
+      "z": 10900.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 16,
+      "team": 8,
+      "x": 9000.0,
+      "z": 11400.0
+    }
+  ],
+  "verdict": "PASS"
+}

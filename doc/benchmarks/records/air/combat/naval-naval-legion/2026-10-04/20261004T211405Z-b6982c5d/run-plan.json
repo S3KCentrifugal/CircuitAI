@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "naval-naval-legion"
+  },
+  "id": "20261004T211233Z-999329cd",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1
+}

@@ -1,0 +1,305 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\hover-screen-cand\\glacial\\20261004T103341Z-d5e85a86\\runs\\20261004T103457Z-846b49c3\\infolog.txt",
+  "fixture_errors": [],
+  "order_sources": [
+    {
+      "frame": 1800,
+      "team": 1,
+      "nonlua": 1095
+    },
+    {
+      "frame": 1800,
+      "team": 2,
+      "nonlua": 2
+    },
+    {
+      "frame": 1800,
+      "team": 0,
+      "lua": 872,
+      "nonlua": 1680
+    },
+    {
+      "frame": 3600,
+      "team": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 3600,
+      "team": 0,
+      "lua": 169,
+      "nonlua": 136
+    },
+    {
+      "frame": 5400,
+      "team": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 5400,
+      "team": 0,
+      "nonlua": 1
+    }
+  ],
+  "carrier_ownership": [],
+  "raw_weapon_damage_by_team": [
+    13812.300000000017,
+    3747.099999999999
+  ],
+  "metal_lost_by_team": [
+    130.0,
+    3600.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    3300.0,
+    130.0
+  ],
+  "minute_apm_by_team": [
+    [
+      2552,
+      305,
+      1
+    ],
+    [
+      1095,
+      1,
+      1
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      64,
+      33,
+      1
+    ],
+    [
+      20,
+      1,
+      1
+    ]
+  ],
+  "peak_apm_by_team": [
+    2552,
+    1095
+  ],
+  "detection_to_first_attack_order_seconds": [
+    20.666666666666668,
+    21.6,
+    26.366666666666667,
+    27.866666666666667,
+    28.0,
+    31.9,
+    34.6,
+    40.6
+  ],
+  "median_detection_to_order": 27.933333333333334,
+  "response_decisions": [],
+  "threat_observations": [
+    {
+      "team": 1,
+      "frame": 541,
+      "submarine": "0",
+      "aircraft": "15"
+    },
+    {
+      "team": 1,
+      "frame": 1771,
+      "submarine": "0",
+      "aircraft": "15"
+    },
+    {
+      "team": 1,
+      "frame": 1861,
+      "submarine": "0",
+      "aircraft": "15"
+    }
+  ],
+  "decisions": [],
+  "produced": [],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 303,
+      "id": "10560",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 306,
+      "id": "12834",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 310,
+      "id": "29006",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 312,
+      "id": "5984",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 328,
+      "id": "22326",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 334,
+      "id": "18885",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 339,
+      "id": "15236",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 342,
+      "id": "6519",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 347,
+      "id": "22959",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 348,
+      "id": "11235",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 351,
+      "id": "27380",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 355,
+      "id": "596",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 358,
+      "id": "20517",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 363,
+      "id": "1602",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 367,
+      "id": "207",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 370,
+      "id": "23411",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 373,
+      "id": "23745",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 375,
+      "id": "23943",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 379,
+      "id": "16218",
+      "team": "1",
+      "unit": "corfrad"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 3600,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 5400,
+      "live0": 5250.0,
+      "live1": 130.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.052246,
+      "ai_all_p95_ms": 0.833496,
+      "ai_all_max_ms": 9.57251,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.966553,
+      "ai_all_mean_ms": 0.159352
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.028076,
+      "ai_all_p95_ms": 0.776123,
+      "ai_all_max_ms": 3.723633,
+      "sim_speed": 10.012,
+      "ai_all_p99_ms": 1.625244,
+      "ai_all_mean_ms": 0.131246
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.029053,
+      "ai_all_p95_ms": 0.838867,
+      "ai_all_max_ms": 4.15625,
+      "sim_speed": 9.993,
+      "ai_all_p99_ms": 1.937744,
+      "ai_all_mean_ms": 0.137682
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

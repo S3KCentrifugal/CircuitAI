@@ -112,6 +112,7 @@ public:
 	}
 
 	IFighterTask* Enqueue(const TaskF::SFightTask& ti);
+	IUnitTask* EnqueueExternalControl(const std::string& ownerRule);
 	virtual CRetreatTask* EnqueueRetreat() override;
 
 	/*

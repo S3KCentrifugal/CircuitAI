@@ -134,7 +134,7 @@ step.
 
 | INV-087 | Future TECH factory reservations have no active construction work. | TechFactories::PlanAhead | D-152 |
 
-| INV-088 | A reservation and a pinned construction task never overlap another allied AI's reserved layout. | Native publication checks plus LayoutHelpers::CheckAlliedPlacements, called by AIR and TECH. D-197's occupancy index preserves this exact foreign-owner predicate. | D-153 / D-197 |
+| INV-088 | A reservation and a pinned construction task never overlap another allied AI's reserved layout. | Native publication checks plus LayoutHelpers::CheckAlliedPlacements, called by AIR, TECH and enabled SEA layout policy. D-197's occupancy index preserves this exact foreign-owner predicate. | D-153 / D-192 / D-197 |
 | INV-089 | AIR and TECH wall construction footprints stay outside every known allied start's base exclusion. | LayoutHelpers::CheckAlliedPlacements audits assigned construction, including unpinned tasks. | D-154 |
 | INV-090 | An additional AIR T2 lab is ordered only after every existing T2 lab is finished and has at least twenty completed, uniquely assigned support turrets. | AirBuild::Record; admission/resume and unstarted-order reconciliation use fresh AirEconomy::ExistingT2SupportReady. | D-155 |
 
@@ -173,11 +173,29 @@ step.
 | INV-120 | An eligible first T2 aircraft lab is considered before shared reactor growth. | AirBuild records the placement attempt's frame and builder; AirGrowth audits that handoff without assuming placement success. | D-172 |
 | INV-121 | A committed bombing run hands a local visible priority target to ATTACK without further formation MOVE orders. | CAirWaveTask rejects stale operation legs after handoff; the independent AFUS arena observer checks actual engine ATTACK commands within one second of local LOS. | D-176 |
 | INV-122 | AIR's first T1 raid is recruited after the completed opening crew and support turrets; its bomber dispatch matches the saved random draw. | AirProduction::Recruit checks admission; AirRaids::Update checks transferred cohort size. Legion uses accepted gunship orders because its T1 roster has no bomber. | D-179 |
-| INV-123 | Recon dispatch transfers exactly the assembled cohort and assigns every member its straight MOVE route. | AirRecon::Tick checks transfer and route admission; the supplied engine observer rejects combat orders during ingress. | D-179 |
+| INV-123 | Recon dispatch transfers the full assembled cohort or the available cohort at its maximum-wait deadline, assigning every member its straight MOVE route. | AirRecon::Tick checks transfer and route admission; the supplied engine observer rejects combat orders during ingress. | D-179 |
 | INV-124 | Discretionary AIR constructor/turret expansion has a same-frame two-resource funding decision. | AirWorkforce::Fund/Admit bind admission to the definition and frame, reserve accepted costs and incremental spending immediately; opening/recovery constructors are explicit exceptions. | D-181 |
 | INV-125 | An economy-owned AIR turret cannot count as factory production support. | AirEconomy::SupportBay excludes the economic support index and RefreshSupport audits exclusive ownership. | D-181 |
 | INV-126 | AIR's assignment ledger cannot remove more build power than it owns. | AirWorkforce::Assign/AddPower reconcile per-worker IDs once per sample and at reassignment; negative ownership is an invariant violation. | D-181 |
 | INV-127 | TECH produces Telchines only from a landlocked start. | Invariants::OnUnitAdded rejects a completed Telchine with a local producer when Global::Map::LandLocked is false; gifts remain usable. | D-182 |
 | INV-128 | An eligible construction turret takes the highest-priority enemy reclaim response before ordinary AI work. | CFactoryManager validates admission after its half-second response pass; Economy reports missed admissions. The supplied observer independently checks physical reclaim and return to repair. | D-184 |
+| INV-129 | Discretionary SEA workforce admission has a same-frame two-resource funding decision for that definition. | SeaEconomy::Fund/Admit; opening/recovery constructor guarantees are explicit exceptions. | D-188 |
+| INV-130 | A SEA yard retires only after its operational replacement has produced a physically exiting ship. | SeaFactories::Tick and independent harbor-lifecycle fixture. | D-188 |
+| INV-131 | A selected SEA fleet counter has an actual weapon for its requested target layer. | SeaCombat::Select and SeaArena target-category/damage observer. | D-189 |
+| INV-132 | Active SEA can transfer an attached military drone to a task that leaves the game's command queue alone. | SeaCombat::CarrierControl checks transfer; the carrier arena separately observes host ownership, command source, firing and release. | D-189 |
+| INV-133 | Active SEA can reassign a hybrid scout/AA boat from scouting to native air defense when aircraft are observed. | SeaCombat::AirResponse checks task transfer; independent raid fixtures measure actual aircraft losses and base preservation. | D-189 |
+| INV-134 (retired experiment) | SEA's attempted stalled-approach recovery excluded frames/factories. | The progress-timeout experiment passed boundary checks but regressed natural Tundra timing; implementation was removed. Retained as history, not an active runtime promise. | D-189 |
+| INV-135 | Every SEA production-support turret order is within its actual assist range of its selected factory. | SeaBuild::Support audits accepted pinned positions; the supplied fixture observes completed turrets assisting active shipyard/amphibious products. | D-190 |
+| INV-136 | Newly reserved AIR advanced-converter and SEA economy grids retain their intended pitch after native snapping. | LayoutHelpers::CheckGrid checks each successful reservation once; independent fixtures measure completed physical footprints and shared edges. | D-190 |
+
+| INV-137 | A new SEA naval fusion footprint stays at least 64 elmos behind its harbor along the strategic enemy-facing axis. | SeaEcoLayout::Rear/Place; independent Supreme observer checks the completed reactor footprint, native assistance, and grid placement. | D-191 |
+
+| INV-138 | Every later SEA shipyard admission faces the enemy and its full footprint is forward of existing/reserved naval economy; only the first T1 berth may bypass. | SeaLayout::Factory / ForwardSite | D-192 |
+
+| INV-139 | An eligible partial radar cohort cannot remain held after its configured deadline because task creation/transfer silently failed. | AirRecon::Tick reports failed deadline dispatch; the supplied three-plane fixture measures physical scouting. | D-193 |
+| INV-140 | AIR base response transfers only available aircraft and never owns player, retreat, ferry, carrier or live bomber-wave commitments. | AirBaseResponse::Free/TaskFor/Tick gate and audit transfers; existing committed-wave observer checks escort ownership. | D-193 |
+| INV-141 | A waiting radar aircraft accepts its selected distinct patrol route. | AirRecon::Patrols reports failed SetUnitRoute; independent observer measures airborne patrols and AA escape. | D-194 |
+| INV-142 | Naval reserve/active ledgers are disjoint and an eligible launch cannot silently fail to transfer every aircraft. | AirNavalSupport::Census/Tick audit duplicate ownership and failed task creation/zero transfers. | D-194 |
+| INV-143 (retired diagnostic experiment) | Attempted water-only exclusion from land emergencies. | Removed after Glacial contact probe identified the spectator commander; no production base-response change was needed. | D-194 |
 
 | INV-144 | Indexed local slot/zone occupancy gives the same answer as the legacy scan, including consumed and ignored slots. | TerrainManager::IsSlotFree compares both paths when CIRCUIT_VERIFY_LOCAL_LAYOUT is enabled; lifecycle differential tests run independently. | D-199 |

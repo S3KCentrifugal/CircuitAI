@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "response-air-suppor-cand"
+  },
+  "id": "20261004T105709Z-e831cf18",
+  "requested": {
+    "seed": 1891
+  },
+  "schema": 1
+}

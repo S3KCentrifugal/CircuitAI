@@ -1,0 +1,458 @@
+{
+  "carrier_ownership": [
+    {
+      "frame": 330,
+      "host": "10560",
+      "id": "6519"
+    },
+    {
+      "frame": 330,
+      "host": "12834",
+      "id": "30373"
+    },
+    {
+      "frame": 330,
+      "host": "29006",
+      "id": "15500"
+    },
+    {
+      "frame": 330,
+      "host": "5984",
+      "id": "17971"
+    },
+    {
+      "frame": 330,
+      "host": "24620",
+      "id": "10994"
+    },
+    {
+      "frame": 360,
+      "host": "10684",
+      "id": "27380"
+    },
+    {
+      "frame": 930,
+      "host": "29006",
+      "id": "26627"
+    },
+    {
+      "frame": 930,
+      "host": "5984",
+      "id": "26186"
+    },
+    {
+      "frame": 930,
+      "host": "12834",
+      "id": "22392"
+    },
+    {
+      "frame": 930,
+      "host": "10560",
+      "id": "8691"
+    },
+    {
+      "frame": 930,
+      "host": "24620",
+      "id": "4690"
+    },
+    {
+      "frame": 930,
+      "host": "10684",
+      "id": "28374"
+    }
+  ],
+  "decisions": [],
+  "detection_to_first_attack_order_seconds": [
+    4.866666666666666,
+    7.866666666666666,
+    17.466666666666665,
+    19.0,
+    20.866666666666667,
+    31.133333333333333,
+    31.633333333333333,
+    31.866666666666667,
+    33.733333333333334,
+    35.5,
+    36.13333333333333,
+    40.46666666666667
+  ],
+  "engine_ai_timings": [
+    {
+      "ai_all_max_ms": 7.870239,
+      "ai_all_mean_ms": 0.126915,
+      "ai_all_p50_ms": 0.037109,
+      "ai_all_p95_ms": 0.721436,
+      "ai_all_p99_ms": 1.645264,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "sim_speed": 0.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.165283,
+      "ai_all_mean_ms": 0.090813,
+      "ai_all_p50_ms": 0.016357,
+      "ai_all_p95_ms": 0.532227,
+      "ai_all_p99_ms": 1.068604,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "sim_speed": 9.995,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.304443,
+      "ai_all_mean_ms": 0.100899,
+      "ai_all_p50_ms": 0.03125,
+      "ai_all_p95_ms": 0.592285,
+      "ai_all_p99_ms": 1.129395,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "sim_speed": 9.997,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.637939,
+      "ai_all_mean_ms": 0.09993,
+      "ai_all_p50_ms": 0.023193,
+      "ai_all_p95_ms": 0.554688,
+      "ai_all_p99_ms": 1.148926,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "sim_speed": 8.601,
+      "t": 0.0
+    }
+  ],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 304,
+      "id": "10560",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 306,
+      "id": "12834",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 309,
+      "id": "29006",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 312,
+      "id": "5984",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 316,
+      "id": "10684",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 319,
+      "id": "124",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 322,
+      "id": "22326",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 325,
+      "id": "18885",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 328,
+      "id": "15236",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 331,
+      "id": "22959",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 333,
+      "id": "11235",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 336,
+      "id": "596",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 339,
+      "id": "20517",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 342,
+      "id": "1602",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 347,
+      "id": "207",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 348,
+      "id": "23411",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 353,
+      "id": "23745",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 355,
+      "id": "23943",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 358,
+      "id": "16218",
+      "team": "1",
+      "unit": "corfrad"
+    },
+    {
+      "frame": 3300,
+      "id": "10155",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3303,
+      "id": "28301",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3306,
+      "id": "14996",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3309,
+      "id": "31764",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3312,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3315,
+      "id": "27000",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3319,
+      "id": "21302",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 3321,
+      "id": "6833",
+      "team": "1",
+      "unit": "corsnap"
+    }
+  ],
+  "fixture_errors": [],
+  "last_hit_kill_metal_by_team": [
+    3600.0,
+    4610.0
+  ],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ],
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\carrier-release-cand\\glacial\\20261004T105351Z-be4ec398\\runs\\20261004T105506Z-46e2b136\\infolog.txt",
+  "median_detection_to_order": 31.383333333333333,
+  "metal_lost_by_team": [
+    5560.0,
+    3600.0
+  ],
+  "minute_apm_by_team": [
+    [
+      1016,
+      127,
+      1,
+      1
+    ],
+    [
+      980,
+      84,
+      723,
+      15
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      54,
+      9,
+      1,
+      1
+    ],
+    [
+      15,
+      9,
+      14,
+      15
+    ]
+  ],
+  "order_sources": [
+    {
+      "armcom_nonlua": 6,
+      "corfrad_nonlua": 4,
+      "corsnap_nonlua": 970,
+      "frame": 1800,
+      "nonlua": 980,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 2,
+      "frame": 1800,
+      "nonlua": 2,
+      "team": 2
+    },
+    {
+      "armcom_nonlua": 6,
+      "armfrad_nonlua": 4,
+      "frame": 1800,
+      "legdrone_lua": 650,
+      "legdrone_nonlua": 72,
+      "legnavydestro_lua": 18,
+      "legnavydestro_nonlua": 266,
+      "lua": 668,
+      "nonlua": 348,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsnap_nonlua": 83,
+      "frame": 3600,
+      "nonlua": 84,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "frame": 3600,
+      "legdrone_lua": 112,
+      "legnavydestro_nonlua": 14,
+      "lua": 112,
+      "nonlua": 15,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsnap_nonlua": 722,
+      "frame": 5400,
+      "nonlua": 723,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "frame": 5400,
+      "nonlua": 1,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 1,
+      "corsnap_nonlua": 14,
+      "frame": 7200,
+      "nonlua": 15,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "frame": 7200,
+      "nonlua": 1,
+      "team": 0
+    }
+  ],
+  "peak_apm_by_team": [
+    1016,
+    980
+  ],
+  "produced": [],
+  "raw_weapon_damage_by_team": [
+    18337.29999999999,
+    2449.1
+  ],
+  "response_decisions": [],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 5430.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 3600,
+      "live0": 0.0,
+      "live1": 2530.0
+    },
+    {
+      "frame": 5400,
+      "live0": 0.0,
+      "live1": 2530.0
+    },
+    {
+      "frame": 7200,
+      "live0": 0.0,
+      "live1": 2530.0
+    }
+  ],
+  "schema": 2,
+  "target_category_mismatches": [],
+  "threat_observations": [
+    {
+      "aircraft": "15",
+      "frame": 511,
+      "submarine": "0",
+      "team": 1
+    }
+  ]
+}

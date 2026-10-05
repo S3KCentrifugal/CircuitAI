@@ -70,6 +70,22 @@ void test_dense_index_agrees_with_rectangle_reference() {
     }
     Check(equivalent, __func__);
 }
+void test_three_roles_keep_private_clusters_but_share_forward_space() {
+    Reservations r;
+    // Owner IDs stand for AIR, SEA and TECH. Policy does not enter the index.
+    for (int owner = 0; owner < 3; ++owner)
+        r.Put(owner, Reservations::ZONE, 1, {owner * 100, 0, owner * 100 + 80, 80});
+    bool isolated = true;
+    for (int owner = 0; owner < 3; ++owner)
+        for (int requester = 0; requester < 3; ++requester)
+            isolated &= r.OverlapsOther(requester, {owner * 100 + 10, 10, owner * 100 + 12, 12}) == (requester != owner);
+    Check(isolated, __func__);
+    // A forward weapon/mex area has individual slots, not an exclusive envelope.
+    r.Put(0, Reservations::SLOT, 9, {100, 200, 104, 204});
+    r.Put(1, Reservations::SLOT, 9, {108, 200, 112, 204});
+    Check(!r.OverlapsOther(2, {104, 200, 108, 204}), __func__);
+    Check(r.OverlapsOther(2, {100, 200, 104, 204}), __func__);
+}
 void test_overlapping_owners_survive_independent_release() {
     Reservations r;
     // XOR can equal a real owner's ID; the distinct-owner count must disambiguate.
@@ -165,6 +181,7 @@ int main() {
     test_release_is_owner_scoped(); test_releasing_last_claim_frees_ground();
     test_invalid_rectangle_cannot_hold_space(); test_separate_alliances_do_not_share();
     test_dense_index_agrees_with_rectangle_reference();
+    test_three_roles_keep_private_clusters_but_share_forward_space();
     test_overlapping_owners_survive_independent_release();
     test_large_nested_claim_counts_do_not_clear_early();
     test_invalid_replacement_releases_previous_claim();

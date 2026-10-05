@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "d4bebec70ce4d71978f27254a2fac9891688a4f09bdbbb754a6d9a6a7568f94b",
+    "air-naval-analysis.json": "19f8873887778fea66c4d93fc2bb27738fa069be8043e3086e10204bd4d3ff2b",
+    "checks.json": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf",
+    "launched.json": "4281b025fdb27c5847a0154bbb78f42444a0dcb6dfc9b870b9801f1b5ab153ca",
+    "naval-checks.json": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf",
+    "naval-manifest.json": "2a34960f7619278c108fbae533149dcc74bc8698fd1821439efeddb69d417fe8",
+    "report.md": "d0dea8430d006b158eb43af841c5df8ca86e183d9366f1820bdfcdb3aa99568b",
+    "result.json": "5a661a8a9f3ef2aba02fd0faecb9487318d8db1ff32f62c625131c1a55c25b9a",
+    "run-inputs.json": "8a55e70426baac38dbe197b1e92a66b6a006dfc2f36d98e33d10b7f1a588ec30",
+    "run-plan.json": "6b2792204b74d7c185c70a3efe0116b045a49274e0ed7c6dedd3ff6f9ec49d35",
+    "script.txt": "6c317344888959d97c8c45444ad33302ff2152727219ac552f1b7df8084af9e2",
+    "staged.json": "67cf81dd1878a3996779c1cccc6cfd74a524663262c3c0e21873e3d6a3c9f7be",
+    "starts.as": "713dfd9af8e93e74fd76ade63384f382ff44dda9d154423a8f85bc730375fdf9",
+    "teams.json": "49290958661d830ff9324e0b50187b926917178974ccc1dac186edf5e13161aa"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-factory-armada\\glacial\\20261004T210424Z-95587e74\\runs\\20261004T210556Z-1f39b8d6",
+  "schema": 1
+}

@@ -8,6 +8,7 @@
 #include "../helpers/objective_helpers.as"
 #include "../manager/factory_production.as"
 #include "../helpers/sea_constructor_helpers.as"
+#include "sea_build.as"
 
 namespace RoleSea {
 
@@ -68,6 +69,18 @@ namespace RoleSea {
         aiMilitaryMgr.quota.raid.avg = Global::RoleSettings::Sea::MilitaryRaidAvgPower; 
 
         Sea_ApplyStartLimits();
+
+        // Some experimental profiles omit the Legion advanced shipyard from
+        // native factory metadata. SEA's opt-in must register it before a
+        // frame exists; otherwise the finished yard never receives a task.
+        // InitHandler precedes LayoutPlanHandler, which sets Layout::enabled.
+        if (Global::RoleSettings::Sea::ExperimentalBuild) {
+            CCircuitDef@ yard=ai.GetCircuitDef("legadvshipyard");
+            if (yard !is null && aiFactoryMgr.RegisterScriptFactory(yard,ai.GetCircuitDef("corasy"))) {
+                Factory::userData[yard.id].attr |= Factory::Attr::T2;
+                GenericHelpers::LogUtil("[SEA][Factory] Legion T2 runtime metadata ready",1);
+            }
+        }
 
         // SEA-only: Set default fire state for all T1 naval combat units to 3 (fire at everything)
         // Aligns with FRONT role pattern for T1 land units.
@@ -182,6 +195,8 @@ namespace RoleSea {
     }
 
     void Sea_MainUpdate() {
+        if (SeaLayout::Enabled()) SeaBuild::Tick();
+        if (SeaCombat::Active()) return;
         // Delay dynamic quota adjustments until configured time into the game
         if (ai.frame < (Global::RoleSettings::Sea::DynamicQuotaDelaySeconds * SECOND)) {
             return;
@@ -208,6 +223,7 @@ namespace RoleSea {
 
     IUnitTask@ Sea_FactoryAiMakeTask(CCircuitUnit@ u)
     {
+        if (SeaLayout::Active()) return SeaFactories::Produce(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
             return aiFactoryMgr.DefaultMakeTask(u);
@@ -448,6 +464,12 @@ namespace RoleSea {
     ******************************************************************************/ 
 
     IUnitTask@ Sea_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        if (SeaLayout::Active()) return SeaBuild::MakeTask(builder);
+        if (SeaLayout::Enabled()) return SeaBuild::LegacyTask(builder);
+        return Sea_LegacyBuilderTask(builder);
+    }
+
+    IUnitTask@ Sea_LegacyBuilderTask(CCircuitUnit@ builder) {
         GenericHelpers::LogUtil("[Sea_BuilderAiMakeTask] called for builder", 3);
         if (builder is null) return null; // Defensive
 
@@ -609,6 +631,10 @@ namespace RoleSea {
     }
 
     void Sea_IncomeLabLimits(float metalIncome) {
+        if (SeaLayout::Active()) {
+            UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllT2Shipyards(), Global::RoleSettings::Sea::MaxProductionYards + 1);
+            return;
+        }
         // Determine cap: 50 metal income per lab (e.g., 100 -> 2 labs)
         int seaLabCap = int(metalIncome / 75.0f);
 
@@ -737,7 +763,9 @@ namespace RoleSea {
             AIFloat3 pos2 = Sea_GetObjectiveBuildPos(currentObjective, conLocation);
             // Assign to avoid multiple builders colliding on the same tidal in one frame
             if (!ObjectiveHelpers::TryAssign(currentObjective.id, "SEA_" + label + "_TIDAL")) return null;
-            IUnitTask@ tTidal = Builder::EnqueueT1Tidal(unitSide, pos2, SQUARE_SIZE * 32, SECOND * 30, Task::Priority::NOW);
+            IUnitTask@ tTidal = SeaLayout::Active()
+                ? SeaLayout::Place(builder,ai.GetCircuitDef(UnitHelpers::GetTidalNameForSide(unitSide)),Task::BuildType::ENERGY,pos2)
+                : Builder::EnqueueT1Tidal(unitSide, pos2, SQUARE_SIZE * 32, SECOND * 30, Task::Priority::NOW);
             if (tTidal !is null) {
                 ObjectiveHelpers::IncrementDefenseQueued(currentObjective.id, UnitHelpers::GetTidalNameForSide(unitSide), 1);
                 ObjectiveHelpers::Unassign(currentObjective.id);
@@ -773,6 +801,7 @@ namespace RoleSea {
         RoleConfig@ cfg = RoleConfig(AiRole::SEA, cast<MainUpdateDelegate@>(@Sea_MainUpdate));
 
         @cfg.InitHandler = cast<InitDelegate@>(@Sea_Init);
+        @cfg.LayoutPlanHandler = cast<LayoutPlanDelegate@>(@SeaLayout::Init);
 
         @cfg.AiIsSwitchTimeHandler = cast<AiIsSwitchTimeDelegate@>(@Sea_AiIsSwitchTime);
         @cfg.AiIsSwitchAllowedHandler = cast<AiIsSwitchAllowedDelegate@>(@Sea_AiIsSwitchAllowed);
@@ -783,6 +812,8 @@ namespace RoleSea {
 
         @cfg.BuilderAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Sea_BuilderAiMakeTask);
         @cfg.FactoryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@Sea_FactoryAiMakeTask);
+        @cfg.MilitaryAiMakeTaskHandler = cast<AiMakeTaskDelegate@>(@SeaCombat::MilitaryTask);
+        @cfg.MilitaryAiUnitRemoved = cast<AiUnitRemovedDelegate@>(@SeaCombat::MilitaryRemoved);
 
         @cfg.BuilderAiTaskAddedHandler = cast<AiTaskAddedDelegate@>(@Sea_BuilderAiTaskAdded);
         @cfg.BuilderAiTaskRemovedHandler = cast<AiTaskRemovedDelegate@>(@Sea_BuilderAiTaskRemoved);

@@ -1,0 +1,800 @@
+{
+  "carrier_ownership": [],
+  "decisions": [
+    {
+      "deficit": "2360",
+      "frame": 1709,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    },
+    {
+      "deficit": "1920",
+      "frame": 2393,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    },
+    {
+      "deficit": "1480",
+      "frame": 2577,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    },
+    {
+      "deficit": "1040",
+      "frame": 2793,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    },
+    {
+      "deficit": "600",
+      "frame": 3001,
+      "layer": "1",
+      "recruit": "armsub",
+      "team": 0
+    },
+    {
+      "deficit": "2221",
+      "frame": 3209,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "1285",
+      "frame": 3345,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "2071",
+      "frame": 3433,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "1996",
+      "frame": 4465,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "1921",
+      "frame": 4985,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "124",
+      "frame": 5265,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    },
+    {
+      "deficit": "336",
+      "frame": 5601,
+      "layer": "2",
+      "recruit": "armpt",
+      "team": 0
+    }
+  ],
+  "detection_to_first_attack_order_seconds": [
+    7.0
+  ],
+  "engine_ai_timings": [
+    {
+      "ai_all_max_ms": 8.007935,
+      "ai_all_mean_ms": 0.115557,
+      "ai_all_p50_ms": 0.026367,
+      "ai_all_p95_ms": 0.526733,
+      "ai_all_p99_ms": 1.506348,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "sim_speed": 0.0,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 2.477295,
+      "ai_all_mean_ms": 0.131949,
+      "ai_all_p50_ms": 0.035767,
+      "ai_all_p95_ms": 0.621582,
+      "ai_all_p99_ms": 1.602905,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "sim_speed": 10.023,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 1.971436,
+      "ai_all_mean_ms": 0.122956,
+      "ai_all_p50_ms": 0.03894,
+      "ai_all_p95_ms": 0.685303,
+      "ai_all_p99_ms": 1.483398,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "sim_speed": 10.007,
+      "t": 0.0
+    },
+    {
+      "ai_all_max_ms": 1.841309,
+      "ai_all_mean_ms": 0.099029,
+      "ai_all_p50_ms": 0.025146,
+      "ai_all_p95_ms": 0.505615,
+      "ai_all_p99_ms": 1.384277,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "sim_speed": 8.6,
+      "t": 0.0
+    }
+  ],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "armsy"
+    },
+    {
+      "frame": 304,
+      "id": "10560",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 308,
+      "id": "12834",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 309,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 312,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 315,
+      "id": "17971",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 318,
+      "id": "10684",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 321,
+      "id": "124",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 325,
+      "id": "10994",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 328,
+      "id": "22326",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 331,
+      "id": "30373",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 334,
+      "id": "18885",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 337,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 340,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 342,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 345,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 348,
+      "id": "11235",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 351,
+      "id": "27380",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 355,
+      "id": "596",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 357,
+      "id": "20517",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 360,
+      "id": "1602",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 363,
+      "id": "207",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 366,
+      "id": "23411",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 369,
+      "id": "23745",
+      "team": "1",
+      "unit": "corason"
+    },
+    {
+      "frame": 372,
+      "id": "23943",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 375,
+      "id": "16218",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 378,
+      "id": "4690",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 381,
+      "id": "8691",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 384,
+      "id": "22392",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 387,
+      "id": "26627",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 900,
+      "id": "26186",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 1013,
+      "id": "28374",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 1847,
+      "id": "10155",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2531,
+      "id": "28301",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2746,
+      "id": "14996",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2956,
+      "id": "31764",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 3000,
+      "id": "11472",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3006,
+      "id": "27000",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3011,
+      "id": "21302",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3012,
+      "id": "6833",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3015,
+      "id": "7986",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3019,
+      "id": "6218",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3022,
+      "id": "17119",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3025,
+      "id": "5597",
+      "team": "1",
+      "unit": "cortitan"
+    },
+    {
+      "frame": 3164,
+      "id": "18818",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 3305,
+      "id": "29845",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3410,
+      "id": "17431",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3851,
+      "id": "28362",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 4420,
+      "id": "31702",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 4965,
+      "id": "15212",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5231,
+      "id": "15398",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5460,
+      "id": "25694",
+      "team": "0",
+      "unit": "corason"
+    },
+    {
+      "frame": 5555,
+      "id": "15944",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5776,
+      "id": "379",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 6037,
+      "id": "30878",
+      "team": "0",
+      "unit": "armsub"
+    }
+  ],
+  "fixture_errors": [],
+  "last_hit_kill_metal_by_team": [
+    3440.0,
+    20620.0
+  ],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ],
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-air-suppor-cand\\glacial\\20261004T115829Z-92ada641\\runs\\20261004T115937Z-140d1198\\infolog.txt",
+  "median_detection_to_order": 7.0,
+  "metal_lost_by_team": [
+    23980.0,
+    3440.0
+  ],
+  "minute_apm_by_team": [
+    [
+      381,
+      476,
+      393,
+      212
+    ],
+    [
+      10,
+      324,
+      991,
+      106
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      117,
+      187,
+      42,
+      17
+    ],
+    [
+      1,
+      108,
+      587,
+      67
+    ]
+  ],
+  "order_sources": [
+    {
+      "armcom_nonlua": 6,
+      "corason_nonlua": 4,
+      "frame": 1800,
+      "nonlua": 10,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 2,
+      "frame": 1800,
+      "nonlua": 2,
+      "team": 2
+    },
+    {
+      "armason_nonlua": 4,
+      "armcom_nonlua": 6,
+      "armcs_nonlua": 12,
+      "armfrad_nonlua": 4,
+      "armnanotcplat_nonlua": 124,
+      "armpt_nonlua": 16,
+      "armrecl_nonlua": 43,
+      "armroy_nonlua": 76,
+      "armsub_nonlua": 4,
+      "armsy_nonlua": 28,
+      "armuwfus_nonlua": 16,
+      "armuwmmm_nonlua": 32,
+      "armuwms_nonlua": 16,
+      "frame": 1800,
+      "nonlua": 381,
+      "team": 0
+    },
+    {
+      "armcom_nonlua": 6,
+      "cortitan_nonlua": 318,
+      "frame": 3600,
+      "nonlua": 324,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 172,
+      "armpt_nonlua": 34,
+      "armrecl_nonlua": 74,
+      "armroy_nonlua": 77,
+      "armsub_nonlua": 90,
+      "armsy_nonlua": 26,
+      "frame": 3600,
+      "nonlua": 476,
+      "team": 0
+    },
+    {
+      "cortitan_nonlua": 991,
+      "frame": 5400,
+      "nonlua": 991,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 9,
+      "armnanotcplat_nonlua": 291,
+      "armpt_nonlua": 59,
+      "armrecl_nonlua": 5,
+      "armsub_nonlua": 16,
+      "armsy_nonlua": 12,
+      "frame": 5400,
+      "nonlua": 393,
+      "team": 0
+    },
+    {
+      "cortitan_nonlua": 106,
+      "frame": 7200,
+      "nonlua": 106,
+      "team": 1
+    },
+    {
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 2,
+      "armnanotcplat_nonlua": 132,
+      "armpt_nonlua": 30,
+      "armrecl_nonlua": 3,
+      "armroy_nonlua": 4,
+      "armsub_nonlua": 27,
+      "armsy_nonlua": 9,
+      "corason_nonlua": 4,
+      "frame": 7200,
+      "nonlua": 212,
+      "team": 0
+    }
+  ],
+  "peak_apm_by_team": [
+    476,
+    991
+  ],
+  "produced": [
+    {
+      "frame": 680,
+      "id": "26186",
+      "team": "0",
+      "unit": "armrecl"
+    },
+    {
+      "frame": 946,
+      "id": "28374",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 1711,
+      "id": "10155",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2394,
+      "id": "28301",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2606,
+      "id": "14996",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2817,
+      "id": "31764",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 3026,
+      "id": "18818",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 3236,
+      "id": "29845",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3347,
+      "id": "17431",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3521,
+      "id": "28362",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 3882,
+      "id": "31702",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 4572,
+      "id": "15212",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5006,
+      "id": "15398",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5395,
+      "id": "15944",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5460,
+      "id": "25694",
+      "team": "0",
+      "unit": "corason"
+    },
+    {
+      "frame": 5603,
+      "id": "379",
+      "team": "0",
+      "unit": "armpt"
+    },
+    {
+      "frame": 5823,
+      "id": "30878",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 6086,
+      "id": "7596",
+      "team": "0",
+      "unit": "armroy"
+    }
+  ],
+  "raw_weapon_damage_by_team": [
+    13719.000000000013,
+    44006.89999999998
+  ],
+  "response_decisions": [
+    "[t=00:00:42.799875][f=0001709] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1709:L::[SEA][Response] layer=1 deficit=2360 recruit=armsub",
+    "[t=00:00:45.079627][f=0002393] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2393:L::[SEA][Response] layer=1 deficit=1920 recruit=armsub",
+    "[t=00:00:45.692800][f=0002577] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2577:L::[SEA][Response] layer=1 deficit=1480 recruit=armsub",
+    "[t=00:00:46.410834][f=0002793] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2793:L::[SEA][Response] layer=1 deficit=1040 recruit=armsub",
+    "[t=00:00:47.115914][f=0003001] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3001:L::[SEA][Response] layer=1 deficit=600 recruit=armsub",
+    "[t=00:00:47.797666][f=0003209] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3209:L::[SEA][Response] layer=2 deficit=2221 recruit=armpt",
+    "[t=00:00:48.254066][f=0003345] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3345:L::[SEA][Response] layer=2 deficit=1285 recruit=armpt",
+    "[t=00:00:48.545203][f=0003433] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3433:L::[SEA][Response] layer=2 deficit=2071 recruit=armpt",
+    "[t=00:00:51.984061][f=0004465] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4465:L::[SEA][Response] layer=2 deficit=1996 recruit=armpt",
+    "[t=00:00:53.717226][f=0004985] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4985:L::[SEA][Response] layer=2 deficit=1921 recruit=armpt",
+    "[t=00:00:54.652235][f=0005265] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5265:L::[SEA][Response] layer=2 deficit=124 recruit=armpt",
+    "[t=00:00:56.749898][f=0005601] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5601:L::[SEA][Response] layer=2 deficit=336 recruit=armpt"
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 30280.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 3600,
+      "live0": 30560.0,
+      "live1": 3280.0
+    },
+    {
+      "frame": 5400,
+      "live0": 11910.0,
+      "live1": 1640.0
+    },
+    {
+      "frame": 7200,
+      "live0": 10790.0,
+      "live1": 0.0
+    }
+  ],
+  "schema": 2,
+  "target_category_mismatches": [],
+  "threat_observations": [
+    {
+      "aircraft": "0",
+      "frame": 1680,
+      "submarine": "2700",
+      "team": 0
+    },
+    {
+      "aircraft": "0",
+      "frame": 2340,
+      "submarine": "2700",
+      "team": 0
+    },
+    {
+      "aircraft": "3280",
+      "frame": 3030,
+      "submarine": "2700",
+      "team": 0
+    },
+    {
+      "aircraft": "0",
+      "frame": 3031,
+      "submarine": "440",
+      "team": 1
+    },
+    {
+      "aircraft": "0",
+      "frame": 5371,
+      "submarine": "4020",
+      "team": 1
+    }
+  ]
+}

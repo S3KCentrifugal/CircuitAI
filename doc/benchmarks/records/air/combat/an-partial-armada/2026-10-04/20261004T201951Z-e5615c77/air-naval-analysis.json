@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-partial-armada\\supreme\\20261004T201818Z-6ef4a1d8\\runs\\20261004T201951Z-e5615c77\\infolog.txt",
+  "naval_launches": [],
+  "recon_launches": [
+    {
+      "frame": 4530,
+      "event": "3 formed=3 spacing=1275 reason=deadline"
+    }
+  ],
+  "patrol_assignments": 3,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 0,
+  "first_damage_frame": null,
+  "damage": 0,
+  "naval_kills": 0,
+  "peak_air_apm": 36,
+  "peak_all_apm": 37,
+  "max_patrols": 3,
+  "max_patrol_span": [
+    7392,
+    6234
+  ],
+  "return_survivors": [],
+  "invariants": []
+}

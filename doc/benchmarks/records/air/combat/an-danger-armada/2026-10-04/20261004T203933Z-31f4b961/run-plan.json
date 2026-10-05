@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "an-danger-armada"
+  },
+  "id": "20261004T203808Z-27b3627c",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1
+}

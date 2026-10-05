@@ -1,0 +1,736 @@
+{
+  "last_frame": 14400,
+  "measurement_end_frame": 14400,
+  "events": {
+    "loaded": 1,
+    "catalog": 88,
+    "ready": 1,
+    "refill": 17,
+    "energy": 96,
+    "spawn": 161,
+    "damage": 461,
+    "death": 129,
+    "sample": 16,
+    "camera": 9,
+    "screenshot": 9,
+    "screenshot_file": 9,
+    "launch": 2,
+    "commitment": 41,
+    "flight": 82,
+    "detected": 2,
+    "target_dead": 2,
+    "first_hit": 2,
+    "end": 1
+  },
+  "fixture_errors": [],
+  "waves": [
+    {
+      "wave": 1,
+      "launch_frame": 2160,
+      "target": 27721,
+      "ids": [
+        12916,
+        12983,
+        16009,
+        21074,
+        21566,
+        23078,
+        23172,
+        23393,
+        24300,
+        25997,
+        29783,
+        2983,
+        30003,
+        31145,
+        5756,
+        616,
+        6711,
+        8848
+      ],
+      "count": 18,
+      "risk_before": 1.0,
+      "completed": true,
+      "detected_frame": 4605,
+      "response_frame": null,
+      "fighter_hit_frame": null,
+      "target_hit_frame": null,
+      "target_dead_frame": 5649,
+      "target_damage": 0.0,
+      "paralysis": 0.0,
+      "aircraft_metal_lost": 4140.0,
+      "target_metal_destroyed": 380.0,
+      "survivors": 0,
+      "home": 0,
+      "end_frame": 8790,
+      "risk_after": 1.0,
+      "detection_to_response_seconds": null,
+      "detection_to_fighter_hit_seconds": null,
+      "intercept_before_target_damage": null
+    },
+    {
+      "wave": 2,
+      "launch_frame": 8820,
+      "target": 13248,
+      "ids": [
+        16290,
+        17146,
+        2286,
+        25763,
+        26974,
+        29163,
+        31830,
+        5557
+      ],
+      "count": 8,
+      "risk_before": 1.0,
+      "completed": false,
+      "detected_frame": 12000,
+      "response_frame": null,
+      "fighter_hit_frame": null,
+      "target_hit_frame": null,
+      "target_dead_frame": 12984,
+      "target_damage": 0.0,
+      "paralysis": 0.0,
+      "aircraft_metal_lost": 1150.0,
+      "target_metal_destroyed": 380.0,
+      "survivors": null,
+      "home": null,
+      "detection_to_response_seconds": null,
+      "detection_to_fighter_hit_seconds": null,
+      "intercept_before_target_damage": null
+    }
+  ],
+  "completed_waves": 1,
+  "censored_waves": 1,
+  "screenshots": [
+    {
+      "frame": 1808,
+      "key": "arena-overview",
+      "file": "screen_2026-10-04_20-51-02-273.png"
+    },
+    {
+      "frame": 2169,
+      "key": "wave1-launch",
+      "file": "screen_2026-10-04_20-51-04-828.png"
+    },
+    {
+      "frame": 5473,
+      "key": "native-aircraft-intercept",
+      "file": "screen_2026-10-04_20-51-16-825.png"
+    },
+    {
+      "frame": 5587,
+      "key": "wave1-cleanup",
+      "file": "screen_2026-10-04_20-51-18-195.png"
+    },
+    {
+      "frame": 5672,
+      "key": "native-aircraft-strike",
+      "file": "screen_2026-10-04_20-51-19-461.png"
+    },
+    {
+      "frame": 5746,
+      "key": "wave1-intercept",
+      "file": "screen_2026-10-04_20-51-20-689.png"
+    },
+    {
+      "frame": 8828,
+      "key": "wave2-launch",
+      "file": "screen_2026-10-04_20-51-31-946.png"
+    },
+    {
+      "frame": 12946,
+      "key": "wave2-cleanup",
+      "file": "screen_2026-10-04_20-51-46-658.png"
+    },
+    {
+      "frame": 13177,
+      "key": "wave2-intercept",
+      "file": "screen_2026-10-04_20-51-48-405.png"
+    }
+  ],
+  "loaded_air_catalog": {
+    "armaca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armassistdrone": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armatlas": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "armawac": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armblade": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armbrawl": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armcsa": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armdfly": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "1"
+    },
+    "armdrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armdroneold": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armfig": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armhaca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armhawk": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armhvytrans": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "armkam": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armlance": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armliche": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armpeep": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armpnix": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armsaber": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armsat": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armsb": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armseap": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armsehak": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "armsfig": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armsfig2": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armstil": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armtdrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "armthund": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "coraca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corape": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corassistdrone": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corawac": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corbw": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corcrwh": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "6"
+    },
+    "corcsa": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corcut": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "cordrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "cordroneold": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corfink": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corhaca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corhunt": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corhurc": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corhvytrans": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "corsat": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "corsb": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corseah": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "corseap": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corsfig": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corsfig2": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "2"
+    },
+    "corshad": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "cortdrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "cortitan": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corvalk": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "corvamp": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "corveng": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legaca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legafigdef": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legassistdrone": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legatorpbomber": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "2"
+    },
+    "legatrans": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "legca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legcib": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legdrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legfig": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legfort": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "6"
+    },
+    "leghaca": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legheavydrone": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legheavydronesmall": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legionnaire": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legkam": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "3"
+    },
+    "leglts": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "0"
+    },
+    "legmineb": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legmos": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legnap": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legphoenix": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "3"
+    },
+    "legspbomber": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legspcarrier": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legspcon": {
+      "builder": "1",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legspfighter": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legspradarsonarplane": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    },
+    "legspsurfacegunship": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legsptorpgunship": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legstronghold": {
+      "builder": "0",
+      "transport": "1",
+      "weapons": "1"
+    },
+    "legvenator": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "1"
+    },
+    "legwhisper": {
+      "builder": "0",
+      "transport": "0",
+      "weapons": "0"
+    }
+  },
+  "unit_classes": [
+    {
+      "team": 1,
+      "unit": "armafus",
+      "spawned": 4,
+      "deaths": 3,
+      "metal_lost": 29100.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "target"
+    },
+    {
+      "team": 1,
+      "unit": "armmmkr",
+      "spawned": 15,
+      "deaths": 11,
+      "metal_lost": 4180.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "target"
+    },
+    {
+      "team": 0,
+      "unit": "armwin",
+      "spawned": 6,
+      "deaths": 6,
+      "metal_lost": 240.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "target"
+    },
+    {
+      "team": 1,
+      "unit": "armrl",
+      "spawned": 4,
+      "deaths": 3,
+      "metal_lost": 240.0,
+      "health_damage": 12790.550000000003,
+      "paralysis": 0.0,
+      "kills": 47,
+      "kill_value": 3940.0,
+      "kind": "defense"
+    },
+    {
+      "team": 0,
+      "unit": "armrad",
+      "spawned": 8,
+      "deaths": 0,
+      "metal_lost": 0.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "radar"
+    },
+    {
+      "team": 1,
+      "unit": "armrad",
+      "spawned": 8,
+      "deaths": 0,
+      "metal_lost": 0.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "radar"
+    },
+    {
+      "team": 0,
+      "unit": "armpeep",
+      "spawned": 42,
+      "deaths": 40,
+      "metal_lost": 2080.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "recon"
+    },
+    {
+      "team": 0,
+      "unit": "armpnix",
+      "spawned": 32,
+      "deaths": 25,
+      "metal_lost": 5750.0,
+      "health_damage": 64963.42999999999,
+      "paralysis": 0.0,
+      "kills": 13,
+      "kill_value": 35840.0,
+      "kind": "aircraft"
+    },
+    {
+      "team": 0,
+      "unit": "armhawk",
+      "spawned": 24,
+      "deaths": 23,
+      "metal_lost": 3450.0,
+      "health_damage": 9001.45,
+      "paralysis": 0.0,
+      "kills": 12,
+      "kill_value": 1800.0,
+      "kind": "aircraft"
+    },
+    {
+      "team": 1,
+      "unit": "armmar",
+      "spawned": 6,
+      "deaths": 6,
+      "metal_lost": 5820.0,
+      "health_damage": 6492.710000000001,
+      "paralysis": 0.0,
+      "kills": 11,
+      "kill_value": 1212.0,
+      "kind": "target"
+    },
+    {
+      "team": 1,
+      "unit": "corshad",
+      "spawned": 12,
+      "deaths": 12,
+      "metal_lost": 1800.0,
+      "health_damage": 0.0,
+      "paralysis": 0.0,
+      "kills": 0,
+      "kill_value": 0.0,
+      "kind": "aircraft"
+    }
+  ],
+  "attacker_health_damage": 73964.87999999999,
+  "attacker_paralysis": 0.0,
+  "attacker_metal_lost": 9200.0,
+  "attacker_kill_value": 37640.0,
+  "note": "Supplied-force capability measurements. Launches are real AI cohorts. Target kill value excludes collateral; raw damage can include overkill. Class kills use the last observed damaging unit, not strategic credit. Screen response toggles may concern scouts, so fighter-hit latency is the interception measure. Loaded aircraft are a catalog, not behavior coverage.",
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\base-response-commitment\\supreme-isthmus-v1-7\\20261004T205008Z-db50a419\\runs\\20261004T205154Z-ffa1adfe\\infolog.txt",
+  "auditor_sha256": "e446cffb55795af90458d3526ead663f9f5c2e1ef5b2c08f1f2d5f12b2e0a59e"
+}

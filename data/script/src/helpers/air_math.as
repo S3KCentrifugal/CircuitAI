@@ -1,5 +1,20 @@
 // Deterministic AIR decisions. No engine state or hidden policy constants.
 namespace AirMath {
+    // Full waves respect assembly; the deadline must also break assembly stalls.
+    bool ReconRelease(int available, int ready, int wanted, int elapsed, int maximumWait) {
+        return available > 0 && ((wanted > 0 && ready >= wanted)
+            || (maximumWait > 0 && elapsed >= maximumWait));
+    }
+    bool BaseContact(float distanceSquared, float radius) {
+        return distanceSquared >= 0 && radius > 0 && distanceSquared <= radius*radius;
+    }
+    int DefenceDeficit(int target, int available, int frames, int pending) {
+        const int missing = target-available-frames-pending;
+        return missing > 0 ? missing : 0;
+    }
+    bool DefensiveBomberTarget(bool advancedBomber, bool mobile, bool heavy) {
+        return !advancedBomber || !mobile || heavy;
+    }
     bool T1OpeningReady(int crew, int requiredCrew, int nanos, int requiredNanos, bool recovering)
     {
         return !recovering && requiredCrew > 0 && requiredNanos >= 0
@@ -182,5 +197,24 @@ namespace AirMath {
             if (supported < float(count)) count = int(supported);
         }
         return count >= minimum ? count : 0;
+    }
+
+    float NavalDeficit(float enemy, float friendly, float submerged, float antiSub) {
+        if (!Valid(enemy) || !Valid(friendly) || !Valid(submerged) || !Valid(antiSub)) return 0;
+        const float surfaceGap = enemy > friendly ? enemy-friendly : 0;
+        const float subGap = submerged > antiSub ? submerged-antiSub : 0;
+        return surfaceGap > subGap ? surfaceGap : subGap;
+    }
+    bool NavalSectorContains(float distanceSquared,float radius) {
+        return Valid(distanceSquared) && Valid(radius) && radius>0 && distanceSquared<=radius*radius;
+    }
+    int NavalWave(float deficit, float minimumDeficit, float reserve, float cost, int low, int high) {
+        if (!Valid(deficit) || !Valid(minimumDeficit) || deficit <= 0 || deficit < minimumDeficit
+            || !Valid(reserve) || reserve < 1 || !Valid(cost) || cost <= 0 || low <= 0 || high < low) return 0;
+        const int raw = Missing(deficit*reserve,0,cost);
+        return raw < low ? low : raw > high ? high : raw;
+    }
+    bool NavalRelease(int ready, int target, int age, int deadline, bool routeReady) {
+        return routeReady && ready > 0 && target > 0 && (ready >= target || (deadline > 0 && age >= deadline));
     }
 }

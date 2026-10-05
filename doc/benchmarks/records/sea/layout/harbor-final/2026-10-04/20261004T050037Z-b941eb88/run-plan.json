@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "harbor-final"
+  },
+  "id": "20261004T045756Z-cda824de",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

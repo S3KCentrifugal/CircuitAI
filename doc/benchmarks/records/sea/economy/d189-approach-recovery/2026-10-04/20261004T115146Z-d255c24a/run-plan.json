@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "d189-approach-recovery"
+  },
+  "id": "20261004T114747Z-a3de87e8",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

@@ -1,5 +1,32 @@
 # SEA Role
 
+## Experimental layout migration (D-188)
+
+`LayoutPlanHandler` now calls `SeaLayout::Init`. With
+`Sea::ExperimentalBuild=false` the legacy production/combat flow is retained.
+D191 adds default-on `Sea::CompactEconomy`: `Sea_BuilderAiMakeTask` dispatches
+through `SeaBuild::LegacyTask`, which wraps `Sea_LegacyBuilderTask` and routes
+naval economy orders to compact blocks. Coastal land work stays native.
+`SeaLayout::Enabled` gates placement/census, while `SeaLayout::Active` also
+requires ExperimentalBuild and still gates the broader production/combat migration.
+See the [economy-block plan](../sea-economy-block-plan.md).
+When enabled, `Sea_MainUpdate` ticks the planner before the legacy six-minute
+military-quota gate; builder and factory dispatch use
+[SeaBuild](sea_build.md) and [SeaFactories](sea_factories.md).
+The income-limit hook gives funded T2 admission room for replacement overlap,
+then reapplies explicit map limits. Reservations share AIR/TECH's native layout
+ownership. The migration is opt-in pending the full acceptance matrix; see
+[results](../sea-layout-migration-results.md).
+
+The D-189 candidate adds `SeaCombat`, gated by both SEA migration and
+`AdaptiveFleet`. It samples current known contacts once per second and selects
+capability-checked counters at each factory decision, then skips the legacy
+global army/per-player quota recalculation. Native movement, weapon firing,
+retreat and formations are unchanged after rejected order-reuse experiments.
+See the [combat plan](../sea-combat-enhancement-plan.md) and
+[unit controls](../sea-unit-controls.md). The default migration flag remains
+off until the broader acceptance gates pass.
+
 Reference for the `SEA` AngelScript role: naval production and water expansion.
 How it is registered, what it installs at init, how its objective system drives
 construction, and where it is currently wrong.
@@ -313,10 +340,31 @@ it is config-driven per def.
 
 ## Related
 
+The opt-in combat migration installs `SeaCombat::MilitaryTask` as
+`MilitaryAiMakeTaskHandler`. Ordinary hulls retain native task selection.
+`HybridScoutAirResponse` assigns Armada scout/AA boats to native AA tasks
+while hostile strike aircraft are observed, and the one-second census transfers
+existing scouting boats once. It does not reset already-correct AA tasks.
+`SeaCombat::MilitaryRemoved`, wired through `MilitaryAiUnitRemoved`, clears
+tracked responder IDs on death/transfer. Role exit restores native selection
+for surviving tracked AA responders.
+With `RespectCarrierControl`, attached carrier drones use a passive native
+task until their game-owned host rule disappears; a one-second census also
+handles the rule arriving after creation. Role exit releases this ownership.
+See the [complete source trace](../sea-native-trace.md) and
+[combat acceptance plan](../sea-combat-enhancement-plan.md).
+
+`Sea_Init` registers missing Legion advanced-yard native metadata through
+`RegisterScriptFactory`, gated by `Sea::ExperimentalBuild`. Existing profile
+entries are preserved; missing entries use the actual build options and the
+Cortex advanced yard's generic lifecycle handlers. This runs before layout
+activation. Supplied terrible/balanced fixtures check physical constructor and
+combat-ship completion, not merely a finished factory frame.
+
 - [README.md](README.md) - the role contract and cross-role findings.
 - [tactical.md](tactical.md) - the other objective-driven role, and the one SEA's
   settings block was copy-pasted into.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 1de3da6a8ff4ecd1c64ec21fcf8793cbeab3eddc; lines: 798 -->
+<!-- source: data/script/src/roles/sea.as; blob: f57792960264e21d871ba63b7017309f7d2a2d23; lines: 829 -->

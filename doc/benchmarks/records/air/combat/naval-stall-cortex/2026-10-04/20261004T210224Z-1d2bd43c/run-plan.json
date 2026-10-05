@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "naval-stall-cortex"
+  },
+  "id": "20261004T210051Z-9cf17f3e",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1
+}

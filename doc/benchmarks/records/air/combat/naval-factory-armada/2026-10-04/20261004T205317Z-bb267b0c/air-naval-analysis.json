@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-factory-armada\\glacial\\20261004T205147Z-b4829bff\\runs\\20261004T205317Z-bb267b0c\\infolog.txt",
+  "naval_launches": [
+    {
+      "frame": 1830,
+      "event": "17 wanted=17 target=5034 reason=full ingress=2947,3915"
+    },
+    {
+      "frame": 2580,
+      "event": "11 wanted=11 target=10044 reason=full ingress=3058,3622"
+    },
+    {
+      "frame": 3030,
+      "event": "9 wanted=9 target=20009 reason=full ingress=3186,3622"
+    },
+    {
+      "frame": 3330,
+      "event": "9 wanted=9 target=20009 reason=full ingress=3166,3656"
+    },
+    {
+      "frame": 3630,
+      "event": "9 wanted=9 target=20009 reason=full ingress=3183,3689"
+    },
+    {
+      "frame": 3930,
+      "event": "9 wanted=9 target=20009 reason=full ingress=3172,3678"
+    },
+    {
+      "frame": 4380,
+      "event": "9 wanted=9 target=20009 reason=full ingress=3159,3663"
+    }
+  ],
+  "recon_launches": [],
+  "patrol_assignments": 0,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 20,
+  "first_damage_frame": 2388,
+  "damage": 14658,
+  "naval_kills": 3,
+  "peak_air_apm": 1289,
+  "peak_all_apm": 1303,
+  "max_patrols": 0,
+  "max_patrol_span": [
+    0,
+    0
+  ],
+  "return_survivors": [],
+  "invariants": [
+    "[t=00:00:44.867485][f=0001801] Skirmish AI <BARb playtest-test>: :::AI LOG:S:2:T:2:F:1801:L::[INVARIANT] INV-010 combat unit armroy 20167 produced at +2 metal under the gate 500",
+    "[t=00:01:10.919376][f=0009003] Skirmish AI <BARb playtest-test>: :::AI LOG:S:2:T:2:F:9003:L::[INVARIANT] INV-050 no factory 300 s into the game (layout planned)"
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "scenario": "resp-defense-armada",
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\resp-defense-armada\\supreme\\20261004T192843Z-061c9c13\\runs\\20261004T193028Z-5dc7a251",
+  "verdict": "PASS",
+  "contact_frame": 2730,
+  "dispatch_frame": 2730,
+  "production_frame": 2853,
+  "first_damage": {
+    "armpnix": {
+      "frame": 3126,
+      "damage": 335.750946,
+      "emp": "false"
+    },
+    "armbrawl": {
+      "frame": 3366,
+      "damage": 21.2518864,
+      "emp": "false"
+    }
+  },
+  "marauders_killed": 24,
+  "peak_air_apm": 671,
+  "peak_all_apm": 1327,
+  "air_apm_samples": [
+    [
+      1800,
+      868,
+      299,
+      18
+    ],
+    [
+      3600,
+      1103,
+      427,
+      62
+    ],
+    [
+      5400,
+      1186,
+      519,
+      181
+    ],
+    [
+      7200,
+      1244,
+      547,
+      111
+    ],
+    [
+      9000,
+      1327,
+      671,
+      280
+    ],
+    [
+      10800,
+      1001,
+      352,
+      27
+    ],
+    [
+      12600,
+      1001,
+      347,
+      15
+    ]
+  ],
+  "invariants": [],
+  "interpretation": "One-minute engine command callbacks, not packets or CPU/FPS measurements. First damage is per aircraft definition. Supplied T1 damage does not imply victory."
+}

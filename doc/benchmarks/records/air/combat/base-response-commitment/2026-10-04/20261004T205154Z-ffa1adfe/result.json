@@ -1,0 +1,131 @@
+{
+  "artifacts": {
+    "arena-manifest.json": {
+      "bytes": 38329,
+      "sha256": "de343dad3160528e71a61ec00e286f5e9bdee8ed338775e4fd10114f79972cee"
+    },
+    "arena-starts.as": {
+      "bytes": 117,
+      "sha256": "9ddcac01380ccb38880ff7ba649765fa96fd23754a5f982871a6eacd91d58dce"
+    },
+    "checks.json": {
+      "bytes": 941,
+      "sha256": "37b2564dd26cc8422bb3310690964dde232805065002cdb111aaa4810c57629f"
+    },
+    "infolog.txt": {
+      "bytes": 750202,
+      "sha256": "e2f67b12416f79d2d3067beaf2c4f7c46926d2aaefb8428d189ad0fc17e921b5"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "89b7dc62d876f057baefd195c7d20010f871effa906c764e870be32cc9a84954"
+    },
+    "report.md": {
+      "bytes": 33052,
+      "sha256": "77ca77b97ce7cd595e387fb0bd6e80c4c2550a902720ce0f8077e8d5613ec081"
+    },
+    "run-inputs.json": {
+      "bytes": 36212,
+      "sha256": "a2e9ac7bb1c698a4fcbfdd918f57c3de88137355bd15bc7fca444081042c3b8b"
+    },
+    "run-plan.json": {
+      "bytes": 480,
+      "sha256": "635492facf7f4e3e3cfe1fd76ea62f8c2bd3eadee64cb500bc03634ac875e62b"
+    },
+    "screen_2026-10-04_20-51-02-273.png": {
+      "bytes": 1629916,
+      "sha256": "a30ca3f6f65940203219960472704e045397c85c01e85eaea6f067719439da05"
+    },
+    "screen_2026-10-04_20-51-04-828.png": {
+      "bytes": 1650439,
+      "sha256": "b22355475445358be527a1a8a83982800bdb38246fc7d97a5ed4f7ce53d6a20a"
+    },
+    "screen_2026-10-04_20-51-16-825.png": {
+      "bytes": 1850807,
+      "sha256": "e632e4a19f494cd049a3770fc000c58ad1db01e33822ff2e5a820c332bc85ad0"
+    },
+    "screen_2026-10-04_20-51-18-195.png": {
+      "bytes": 1947852,
+      "sha256": "a78a8d6f5f5376267f30870cc44c255438fcea83b4fb7edb1c98a8c164bed067"
+    },
+    "screen_2026-10-04_20-51-19-461.png": {
+      "bytes": 1909819,
+      "sha256": "d8be91aa197e6a64a9c29ad60d743c63e653d505f51fc90068b873c902352306"
+    },
+    "screen_2026-10-04_20-51-20-689.png": {
+      "bytes": 1981735,
+      "sha256": "58241d6df69cbb8fcc4d24b920dd7fd38b76610861e67a34bb53dd5ebfa982f6"
+    },
+    "screen_2026-10-04_20-51-31-946.png": {
+      "bytes": 1533266,
+      "sha256": "d34ddd78ce4fac33fb54d66c577be5b2df02121a69888f2eff5e6dc11aa306a1"
+    },
+    "screen_2026-10-04_20-51-46-658.png": {
+      "bytes": 1935156,
+      "sha256": "cbdbe444fe757cc18350533edfbf3bdb9dc6940705babaea9081c52ea35c5545"
+    },
+    "screen_2026-10-04_20-51-48-405.png": {
+      "bytes": 1955193,
+      "sha256": "7a4743e47df254c10dccee5579daf48963310604b274aa71a5fad9e281ece008"
+    },
+    "script.txt": {
+      "bytes": 6178,
+      "sha256": "65b552ac9ffa9f178338402e2fd31b78515d6deaa9c924d1caf25ccd462ef704"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "9cd9f65112e90902177758a6a88bc09c591459d2ce351d9397cd6f9298de8a45"
+    },
+    "teams.json": {
+      "bytes": 460,
+      "sha256": "264cab5d285af156a3ced7848e08df27d823f40f3d4f0236e501243aa19599e8"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme-isthmus-v1-7",
+    "scenario": "base-response-commitment"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T205154Z-ffa1adfe",
+  "last_frame": 14551,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\base-response-commitment\\supreme-isthmus-v1-7\\20261004T205008Z-db50a419\\runs\\20261004T205154Z-ffa1adfe",
+  "reason": "reached 8 min",
+  "recorded_at_utc": "2026-10-04T20:51:54.623865+00:00",
+  "requested": {
+    "case": "C:\\bardev\\s3k-CircuitAI\\tools\\playtest\\cases\\air\\combat\\base-response-commitment.json",
+    "map": "Supreme Isthmus v1.7",
+    "profile": "experimental_hard",
+    "seed": 1651,
+    "side": "armada"
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 2,
+      "team": 1,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "PASS"
+}

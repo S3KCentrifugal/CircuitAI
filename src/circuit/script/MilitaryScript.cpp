@@ -64,7 +64,8 @@ static bool CMilitaryManager_TransferUnit(CMilitaryManager* mgr, CCircuitUnit* u
 {
     if (unit == nullptr || task == nullptr || mgr->GetCircuit()->GetTeamUnit(unit->GetId()) != unit
         || task->IsDead() || task->GetManager() != mgr || unit->GetTask() == nullptr
-        || unit->GetTask()->GetManager() != mgr || dynamic_cast<IFighterTask*>(task) == nullptr) return false;
+        || unit->GetTask()->GetManager() != mgr
+        || (dynamic_cast<IFighterTask*>(task) == nullptr && !task->IsExternalControlled())) return false;
     if (unit->GetTask() != task) mgr->AssignTask(unit, task);
     return true;
 }
@@ -90,6 +91,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CMilitaryManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CMilitaryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueExternalControl(const string& in)", asMETHOD(CMilitaryManager, EnqueueExternalControl), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool TransferUnit(CCircuitUnit@, IUnitTask@)", asFUNCTION(CMilitaryManager_TransferUnit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void DefaultMakeDefence(int, const AIFloat3& in)", asMETHOD(CMilitaryManager, DefaultMakeDefence), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetCombatFocusPos() const", asMETHOD(CMilitaryManager, GetCombatFocusPos), asCALL_THISCALL); ASSERT(r >= 0);

@@ -1,0 +1,45 @@
+{
+  "stop_minute": 7,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "AirNavalWatch.*loaded",
+      "scope": "any",
+      "by_minute": 7
+    },
+    {
+      "key": "patrol",
+      "pattern": "AIR.*Recon.*patrol plane=",
+      "scope": "any",
+      "by_minute": 7
+    },
+    {
+      "key": "launch",
+      "pattern": "AIR.*Recon.*synchronized sweep=.*reason=deadline",
+      "scope": "any",
+      "by_minute": 7
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT|AirOrders.*ERROR",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "widget",
+      "pattern": "Error in.*air_naval_support_watch|Removed widget: AIR naval support fixture",
+      "scope": "any"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "d189-legion-registration"
+  },
+  "id": "20261004T110836Z-86a31aaf",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

@@ -1,0 +1,38 @@
+{
+  "stop_minute": 7,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[AirResponseWatch\\] loaded",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT|AirOrders.*ERROR",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "widget",
+      "pattern": "Error in.*air_response_watch|Removed widget: AIR response fixture",
+      "scope": "any"
+    },
+    {
+      "key": "false_emergency",
+      "pattern": "\\[AIR\\]\\[BaseResponse\\] contact=true",
+      "scope": "any"
+    }
+  ]
+}

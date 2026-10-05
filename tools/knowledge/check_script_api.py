@@ -66,10 +66,10 @@ def registrations():
     return members, global_types, global_funcs
 
 
-def script_uses():
+def script_uses(script_dir=SCRIPT_DIR):
     """(file, line, global, member) for every aiXxx.member in the policy scripts."""
     uses = []
-    for dirpath, _, files in os.walk(SCRIPT_DIR):
+    for dirpath, _, files in os.walk(script_dir):
         for name in files:
             if not name.endswith(".as"):
                 continue
@@ -84,10 +84,14 @@ def script_uses():
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--dll", help="SkirmishAI.dll to check the used declarations against")
+    ap.add_argument("--scripts", default=SCRIPT_DIR, help="Exact staged script tree; defaults to active repository data/script")
     args = ap.parse_args(argv)
 
     members, global_types, _ = registrations()
-    uses = script_uses()
+    if not os.path.isdir(args.scripts):
+        print("Script directory not found: %s" % args.scripts)
+        return 1
+    uses = script_uses(args.scripts)
     findings = 0
     needed_decls = {}
     for path, lineno, g, m in uses:

@@ -18,6 +18,7 @@
 #include "setup/DefenceData.h"
 #include "task/NilTask.h"
 #include "task/IdleTask.h"
+#include "task/common/ExternalControlTask.h"
 #include "task/RetreatTask.h"
 #include "task/builder/DefenceTask.h"
 #include "task/fighter/RallyTask.h"
@@ -864,6 +865,15 @@ IFighterTask* CMilitaryManager::Enqueue(const TaskF::SFightTask& ti)
 	updateTasks.push_back(task);
 	TaskAdded(task);
 	return task;
+}
+
+IUnitTask* CMilitaryManager::EnqueueExternalControl(const std::string& ownerRule)
+{
+    if (ownerRule.empty()) return nullptr;
+    IUnitTask* task = new CExternalControlTask(this, ownerRule);
+    updateTasks.push_back(task);
+    TaskAdded(task);
+    return task;
 }
 
 CRetreatTask* CMilitaryManager::EnqueueRetreat()

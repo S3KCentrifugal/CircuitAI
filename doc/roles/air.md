@@ -1,5 +1,41 @@
 # AIR Role
 
+D-194 adds [safe waiting radar patrols and deterministic naval relief](../air-patrol-naval-support-plan.md).
+`AirRecon::Patrols` gives waiting radar planes separate triangular patrols in
+friendly space. It checks padded corridors every two seconds, keeps safe routes,
+and reassigns only affected aircraft. Unknown AA remains unknown; a physical
+weapon-envelope floor catches known AA with zero profile threat weight. Existing
+full-cohort and 90-second fallback launches remain independent of replanning.
+
+`AirNavalSupport` requests real T2 torpedo aircraft for nearby allied fleets or
+naval factories in the same water body. Demand is
+`ceil(1.25 * max(0, enemyMetal-friendlyMetal, submergedMetal-friendlyASWMetal) / aircraftCost)`.
+Defaults: minimum deficit 300 metal, wave 2-60, sector radius 2400, friendly
+support radius factor 1.25, assessment five seconds, partial release 90 seconds.
+It checks open-water ingress and known air threat before recruiting/launching;
+the timeout never overrides those checks. Available fighters escort through
+the shared operation ledger. Defensive survivors return when the local gap
+is resolved. Base emergencies, interception, transport and required workforce
+retain precedence. Production base-defense eligibility is unchanged.
+All tuning is in `Global::RoleSettings::Air`; see [played evidence and limits](../air-patrol-naval-support-results.md).
+
+D-193 adds [timed reconnaissance and immediate allied-base defense](../air-recon-base-defense-plan.md).
+`RadarMaxWaitSeconds=90` releases an incomplete/unassembled available cohort;
+full cohorts retain their normal early launch and ten-minute recruitment cycle.
+T1 scouts loop over enemy starts. `AirBaseResponse` observes current land
+contacts inside `BaseResponseRadius=1800` of participating allied/human starts.
+It dispatches free gunships and held bombers immediately, independently of
+strike sizing, while preserving PLAYER/RETREAT/FERRY and live wave ownership.
+T2 bombers retain the heavy-mobile/structure target filter. Fighters escort or
+answer simultaneous aircraft through the existing interceptor controller.
+`BaseResponseGunships=20` is a shared live/frame/order reserve target; Cortex T1
+uses lethal bombers plus up to `BaseResponseEmpSupport=4` Shurikens. Transport
+and workforce recovery retain priority. Optional raids pause during contact;
+`BaseResponseSearchSeconds=20` bounds last-seen search. Normal task assignment
+resumes after the incident. Shared stable-target tasks avoid repeated attack
+orders for unchanged visible enemies; no command rate limiter is added.
+
+
 D-181 replaces independent constructor income ratios with `AirWorkforce`'s
 once-per-second own-resource and workload snapshot. A full/refilling bank may
 fund growth despite an own-income deficit; future donations are never assumed.
@@ -700,7 +736,7 @@ own porc still owns the ground defence.
 - [front.md](front.md) - the land counterpart, and the other opener-driven role.
 - `doc/bomber-targeting.md` - air target selection below the role layer.
 
-<!-- source: data/script/src/roles/air.as; blob: bbd3141a3c6f9d9b5f93e5eda14780e582293010; lines: 1280 -->
+<!-- source: data/script/src/roles/air.as; blob: 826425a69608d98cfbfa2a54a297c0e1a7ec2ed2; lines: 1284 -->
 
 ## D-152 expansion and access
 
@@ -767,3 +803,9 @@ The first eligible T2 lab precedes shared reactor growth; `SavingForFirstLab`
 reserves capital after the existing preparation time and energy threshold
 while preserving recovery, mex upgrades, transport and immediate defense.
 See [repair plan](../air-workforce-repair-plan.md).
+
+AIR advanced converter banks now use zero footprint gaps in both axes. The
+AFUS/support-bank separation, independent factory campus, and T1 economy
+spacing are unchanged. Native snapped positions are checked by INV-136 at
+reservation time. See the [compact economy plan](../dense-economy-plan.md)
+and [physical verification](../dense-economy-results.md).

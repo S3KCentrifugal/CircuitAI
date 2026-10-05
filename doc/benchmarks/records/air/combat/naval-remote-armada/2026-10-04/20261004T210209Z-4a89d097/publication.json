@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "8eaab3908af841e628816759439f0d3e7868ff242cba5177dcd603377bfe05ca",
+    "air-naval-analysis.json": "1c94954d8ea48593adc40bc186a52eb8bf68a20f488ed3959011df9b94c5284f",
+    "checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "launched.json": "e334840573acbb9cffff70dfee8f053eef2ccd2a883ed7817c084a86d5f50096",
+    "naval-checks.json": "d8c23d052b3989899883dffcab123b1d8a6f44c024991e34af42a23a82dc3cb4",
+    "naval-manifest.json": "ae1a636896ceb758826448316dfc7c4a77373f75dc3439cd32d2fe77ae506883",
+    "report.md": "1d0ce3d1cd1b3720ce0a3bbb105fc77cf7d99732398ad358c0c68e66c09a4612",
+    "result.json": "fbd1b3072a01ad35e279c2072f2caa505e8a0925b40881d67815b0ffcdc2468b",
+    "run-inputs.json": "0d3dbc6c0d9ab7c40c861cb211377ef098a2227f622c11effb73187b3480a5d1",
+    "run-plan.json": "55cfe2c2724c2a62f17a1439d3882f8c3f9384e12ea41277a9a3c8199a5c18db",
+    "script.txt": "61028f7897d79e58c8e87f85cad2b08b61e791f00d3f4f53122131656ef473c0",
+    "staged.json": "75f597f45550790ed18a0f7930a4ff6b4938bca3d35d5638bb3d20debae5e75e",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-remote-armada\\supreme\\20261004T210038Z-b35df26b\\runs\\20261004T210209Z-4a89d097",
+  "schema": 1
+}

@@ -157,17 +157,17 @@ row to see how consistently a slot is used.
 | `FactoryAiMakeTaskHandler` | yes | yes | yes | yes | **no** | yes |
 | `FactoryAiUnitAdded` | yes | no | yes | no | yes | no |
 | `FactoryAiUnitRemoved` | yes | no | yes | no | yes | no |
-| `MilitaryAiMakeTaskHandler` | no | yes | yes | no | no | no |
+| `MilitaryAiMakeTaskHandler` | no | yes | yes | yes | no | no |
 | `MilitaryAiUnitAdded` | yes | no | yes | no | no | no |
-| `MilitaryAiUnitRemoved` | no | yes | no | no | no | no |
+| `MilitaryAiUnitRemoved` | no | yes | no | yes | no | no |
 | `MilitaryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `MilitaryAiTaskRemovedHandler` | no | yes | yes | no | no | no |
 | `AiMakeDefenceHandler` | no | yes | yes | no | no | no |
 | `PorcChainHandler` | no | yes | no | no | yes | no |
-| `LayoutPlanHandler` | no | yes | yes | no | no | no |
+| `LayoutPlanHandler` | no | yes | yes | yes | no | no |
 | `FactoryAiTaskAddedHandler` | no | no | no | no | no | no |
 | `FactoryAiTaskRemovedHandler` | no | no | no | no | no | no |
-| **Slots filled** | **17** | **19** | **19** | **14** | **16** | **14** |
+| **Slots filled** | **17** | **19** | **19** | **15** | **16** | **14** |
 
 Thirteen slots are filled by every role. That common set is the de-facto role
 interface; everything below it in the table is an exception worth understanding
@@ -182,7 +182,7 @@ Four parts of the contract have no implementation anywhere in the tree:
 | `FactoryAiTaskAddedHandler` | never assigned by any role |
 | `FactoryAiTaskRemovedHandler` | never assigned by any role |
 | `MilitaryAiTaskAddedHandler` | never assigned by any role |
-| `MilitaryAiUnitRemoved` | only AIR assigns it; FRONT assigns `MilitaryAiUnitAdded` with no matching removal |
+| `MilitaryAiUnitRemoved` | AIR and SEA assign it; FRONT assigns `MilitaryAiUnitAdded` with no matching removal |
 | `UnitMaxOverrides` | declared on `RoleConfig`, never written and never read |
 
 They are live plumbing with no consumer. Either a role should use them or they

@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "09bed7b5bd1a5feefb968b4a26aad0e03d48c0ff0c4cdf9152d4b437d82dcc56",
+    "checks.json": "ba7792a6db61640df8b83df5c54f2b13cb6a6ca4f345f174454ea76e46393f82",
+    "dense-checks.json": "ba7792a6db61640df8b83df5c54f2b13cb6a6ca4f345f174454ea76e46393f82",
+    "dense-fixture.json": "ba24aa5994576b7c33f9e6f7931e130e27395d79cfc2b6b467e815b7a60b736e",
+    "launched.json": "d046de209ccaea6b9c9115f8e06877f180551bd8ddf29c7a8f2e46cb8c3be4d8",
+    "report.md": "bcb45f70e39c9906ae3aa2587ae608881189f42c96028a2fed9ca3d6df0472f4",
+    "result.json": "7d4a9f5466bc6b4f76ab37427721aeeb92d4017e9faa8ec4c3441174a367bc09",
+    "run-inputs.json": "092ce25ef5cd04ce23794319a00e33f2e454340bad3f43505a25c639544e4b73",
+    "run-plan.json": "3bc79e872a01bec6c58f7e4d036bde7412b39fa73671d3b206677020b6a6d267",
+    "script.txt": "658808e23d8e6e467b7288071ce05623de974aa378d9b817a955bfee526dc973",
+    "staged.json": "ae8ea1932eb1c870bdf0e19151ab484b2e59037837c1f2bbbd2984567b2dfd90",
+    "starts.as": "8be1122107275762a736b14d7fcce3434b8fb1b3b82539754fa3c89d9b17fe2f",
+    "teams.json": "2486ee4e3e987347dbcff65806890fb52287a3593a28d81cb8562137858487da"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\layout\\dense-air\\glacial\\20261004T141440Z-f1b087fa\\runs\\20261004T141558Z-59f6dc34",
+  "schema": 1
+}

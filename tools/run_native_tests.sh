@@ -16,7 +16,7 @@ if [ -z "$IMAGE" ]; then
 	echo "run_native_tests: the recoil-build-amd64-windows image is not present (run a docker build once)" >&2
 	exit 2
 fi
-tests=(layout_ranking_test base_layout_geometry_test local_reservations_test lane_solver_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test)
+tests=(layout_ranking_test base_layout_geometry_test allied_reservations_test local_reservations_test lane_solver_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test naval_geometry_test air_safety_test)
 cmd=""
 for t in "${tests[@]}"; do
     extra=""
@@ -39,6 +39,7 @@ done
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/build_power_math.as" "$REPO/tests/build_power_math_tests.as" || rc=1
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/metal_math.as" "$REPO/tests/metal_math_tests.as" || rc=1
 "$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/team_share_math.as" "$REPO/tests/team_share_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/sea_math.as" "$REPO/tests/sea_math_tests.as" || rc=1
 "${PYTHON:-python}" "$REPO/tools/knowledge/check_performance_policy.py" --runner "$OUT/production_math_test.exe" --output "$OUT/performance-policy" || rc=1
 "${PYTHON:-python}" "$REPO/tools/knowledge/check_weapon_work.py" --runner "$OUT/production_math_test.exe" --output "$OUT/weapon-policy" || rc=1
 exit $rc

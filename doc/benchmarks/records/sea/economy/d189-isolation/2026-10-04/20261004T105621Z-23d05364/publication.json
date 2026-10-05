@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "507637c77b33e99aa15099a20df21fa2d80faa5615dd854ff59acb018c2044f9",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "eco-score-v3.json": "507731c9325a8746fb0ee2c6d384b4a5552e9f0742cc75c903ca75c147ee4ace",
+    "launched.json": "47938f2f76301962295af09f76d09b5d4b8c7257819479b50e85de72d7358336",
+    "report.md": "cc06e7e84cb31f3d557b4bc581749a329f5c4fc23937d4c95551debcf0f340ca",
+    "result.json": "7a6cb46642fa18af907a113b3a9d23517007471e55d5e1f80c56b95841073125",
+    "run-inputs.json": "c8095690ff1751830cf0724a537f1d655e3dcf7e78656586c056dc7e51b5e9b6",
+    "run-plan.json": "5c0af3193389e1836b5582460e3024c53bcf5b8238f8bf9566b18355b526ed70",
+    "script.txt": "afe70ec9bbbadf5cd3f1b61e76e8b637fc9f293085f453383e2df01865c951f5",
+    "sea-fixture.json": "9ceea9805cafc21cb1cd654c493fbbb42621e43d6830cf68b763a72a38892102",
+    "staged.json": "e1a8dff78ebddfad4573f03791479af2b19bbbde822134a2e883a37dab713bcc",
+    "teams.json": "72e9639836413d86ade6a4093d4fe9bb47034265fa4bce1b1193cdd9a37110f2"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d189-isolation\\glacial\\20261004T105512Z-06ecaa7c\\runs\\20261004T105621Z-23d05364",
+  "schema": 1
+}

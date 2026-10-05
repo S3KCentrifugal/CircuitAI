@@ -111,3 +111,37 @@ void test_air_low_income_full_store_can_fund_transition_capacity() { Check(AirMa
 void test_air_transition_storage_stops_at_lab_capacity() { Check(!AirMath::TransitionStorage(false,2900,2900,2900)); }
 void test_air_transition_storage_does_not_spend_an_empty_bank() { Check(!AirMath::TransitionStorage(false,200,1350,2900)); }
 void test_air_transition_storage_does_not_expand_after_t2() { Check(!AirMath::TransitionStorage(true,1340,1350,2900)); }
+
+void test_recon_partial_waits_until_deadline() { Check(!AirMath::ReconRelease(3,3,20,89,90)); }
+void test_recon_partial_releases_at_deadline() { Check(AirMath::ReconRelease(3,3,20,90,90)); }
+void test_recon_deadline_breaks_assembly_stall() { Check(AirMath::ReconRelease(1,0,20,90,90)); }
+void test_recon_full_wave_launches_early() { Check(AirMath::ReconRelease(20,20,20,1,90)); }
+void test_recon_never_launches_empty() { Check(!AirMath::ReconRelease(0,0,20,999,90)); }
+void test_recon_full_unassembled_wave_waits() { Check(!AirMath::ReconRelease(20,19,20,89,90)); }
+void test_defense_radius_includes_boundary() { Check(AirMath::BaseContact(1800*1800,1800)); }
+void test_defense_does_not_claim_frontline() { Check(!AirMath::BaseContact(1801*1801,1800)); }
+void test_defense_counts_frames_and_orders_once() { Check(AirMath::DefenceDeficit(20,7,5,3)==5); }
+void test_defense_stops_at_shared_target() { Check(AirMath::DefenceDeficit(20,18,2,1)==0); }
+void test_advanced_defense_bombers_skip_t1_mobiles() { Check(!AirMath::DefensiveBomberTarget(true,true,false)); }
+void test_advanced_defense_bombers_accept_heavy() { Check(AirMath::DefensiveBomberTarget(true,true,true)); }
+void test_advanced_defense_bombers_accept_foothold() { Check(AirMath::DefensiveBomberTarget(true,false,false)); }
+void test_t1_defense_bombers_accept_light_intruders() { Check(AirMath::DefensiveBomberTarget(false,true,false)); }
+
+void test_naval_parity_needs_no_air_spending() { Check(AirMath::NavalDeficit(4000,4000,0,0)==0); }
+void test_naval_deficit_matches_local_gap() { Check(AirMath::NavalDeficit(8000,4000,2000,3000)==4000); }
+void test_naval_subs_need_asw_despite_surface_parity() { Check(AirMath::NavalDeficit(3000,6000,2500,0)==2500); }
+void test_naval_invalid_force_values_do_not_trigger() { Check(AirMath::NavalDeficit(3000,-1,0,0)==0); }
+void test_naval_runtime_costs_round_up() { Check(AirMath::NavalWave(4000,300,1.25f,400,2,60)==13 && AirMath::NavalWave(4000,300,1.25f,480,2,60)==11); }
+void test_naval_wave_is_bounded() { Check(AirMath::NavalWave(1000000,300,1.25f,400,2,60)==60); }
+void test_naval_trivial_gap_does_not_make_a_wave() { Check(AirMath::NavalWave(299,300,1.25f,400,2,60)==0); }
+void test_naval_zero_cost_is_not_infinite_aircraft() { Check(AirMath::NavalWave(4000,300,1.25f,0,2,60)==0); }
+void test_naval_partial_releases_at_deadline() { Check(AirMath::NavalRelease(2,13,90,90,true)); }
+void test_naval_partial_does_not_release_early() { Check(!AirMath::NavalRelease(2,13,89,90,true)); }
+void test_naval_full_releases_without_timer() { Check(AirMath::NavalRelease(13,13,0,90,true)); }
+void test_naval_deadline_preserves_route_safety() { Check(!AirMath::NavalRelease(2,13,1000,90,false)); }
+void test_naval_no_contact_does_not_launch() { Check(!AirMath::NavalRelease(2,0,1000,90,true)); }
+void test_naval_empty_reserve_never_launches() { Check(!AirMath::NavalRelease(0,13,1000,90,true)); }
+void test_naval_sector_halo_keeps_nearby_friendly_formation() { Check(AirMath::NavalSectorContains(2530.0f*2530,2400*1.25f) && !AirMath::NavalSectorContains(2530.0f*2530,2400)); }
+void test_naval_sector_excludes_remote_support() { Check(!AirMath::NavalSectorContains(3100.0f*3100,3000)); }
+void test_naval_sector_includes_boundary() { Check(AirMath::NavalSectorContains(9000000,3000)); }
+void test_naval_sector_rejects_invalid_distance() { Check(!AirMath::NavalSectorContains(-1,3000)); }

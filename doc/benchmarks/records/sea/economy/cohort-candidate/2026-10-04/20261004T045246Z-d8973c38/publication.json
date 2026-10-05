@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "a42fd692baf91062fec9340183a12bc36c0e9f2d9b36c1da0d7c5531cfb6f6e3",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "launched.json": "9c579a514e51ad6377feeeac9593f5b3f08717ef03209af7701827bdb5a69f17",
+    "report.md": "5bbc90af67ee7af0180a9709f40ad75eedf038922bcb0ad112707d20e2aab419",
+    "result.json": "05b55737a938553d15180eb11f801c147042ec090cc389d8b51774b6600339ad",
+    "run-inputs.json": "b4b3549712f9567924ec31ffc4190f8abcf5ca065884939096a13b915c81b096",
+    "run-plan.json": "a39ec8ad946a5949e5bdca4172587e5d70f32f2b657fc86ee720db8f59c63179",
+    "screen_2026-10-04_04-49-45-827.png": "a8fa5d733b8d3e65c965c31bac901029a40912a131914857ba7a59760546f8cb",
+    "script.txt": "9b12920b7a4432456d09f2c05e78586a236c6a414167e0f209b151b25875d51f",
+    "sea-fixture.json": "39a40f7fa3dbc849deb00af1d465c88c5d427fe08b0c580c4231c98735978458",
+    "sea-score.json": "2c06cd1bad291bc1183ebb708168739674e01ab1c47ab2f96da183c21520f9c0",
+    "staged.json": "e5ac4fcb3c65ea14adc73d40029f5c6c9f3444c19f1d05a6666a5f01ddf36678",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\cohort-candidate\\supreme\\20261004T044828Z-2b55a26f\\runs\\20261004T045246Z-d8973c38",
+  "schema": 1
+}

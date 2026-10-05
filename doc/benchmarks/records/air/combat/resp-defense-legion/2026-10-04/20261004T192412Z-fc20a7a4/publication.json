@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "1da926cc7a04844ee620270da0784cdcdfded54776093cf08ba52b10d03d49fc",
+    "checks.json": "a06a3a89c08cc38755f7edf944ba389d7d111c265610c436d5503a08a775a27f",
+    "launched.json": "512829cf2b53d3d431456063e660579341965157bf0df12acdd0fb51804f17e0",
+    "report.md": "6b1c022825aeca9efa60a7ae81ff676e19152409bcae1b5aa5a586bc7dded9f4",
+    "response-checks.json": "a06a3a89c08cc38755f7edf944ba389d7d111c265610c436d5503a08a775a27f",
+    "response-manifest.json": "c9e29cf925fc3a4bc403815a3756bb46c195d88987619ca9be808373e52e3975",
+    "response-observations.json": "b86dd70786ea79a53be29e87b8f739c8dcc45d5bd449654bfa89b3c94205e445",
+    "result.json": "cf8d1702b4710bba0f84f512bf9499bf34bb2f937320703c9a23815d4a00fd2f",
+    "run-inputs.json": "039a4c931a34fdc25341e617ac2455d28d9e24b81a1eaebfb0bff4f65cb7b556",
+    "run-plan.json": "f68e4335a4fbf636f53cbdfa36b1d48f3e36ca7d0ee21102f04c1fccd67548dd",
+    "script.txt": "7efc391619df7de54e3297df3073542b2ca6bb754c25fb09d05834497b20c8ec",
+    "staged.json": "28f7ef23e59bf6c86f9276b1d05687bae477558e8756ac559503e8d771a406d9",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "e126ecbb3dae24c36eac51865b5982e8591e0606c09621acf0f2b4c6b50bfefd"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\resp-defense-legion\\supreme\\20261004T192213Z-7815052a\\runs\\20261004T192412Z-fc20a7a4",
+  "schema": 1
+}

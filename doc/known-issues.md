@@ -1117,6 +1117,16 @@ energy cost, and take the best. The ordered gate above is the cheap correct
 step; the scoring rewrite is the one that generalises.
 
 **Status: implemented for TECH, AIR, SEA and SUPPORT.**
+
+**2026-10-03 SEA review correction.** The historical status overstates SEA's
+coverage. Its explicit call is in `SeaConstructor::T1Ladder`, but
+`ShouldUpgradeMexFirst` rejects T1 constructors and resolves the land T2 mex,
+not the inspected Armada T2 sub's `armuwmme` build option. The current shared
+builder dispatcher has no universal pre-role upgrade gate. Native MEXUP can
+still occur; it does not prove this ordering. The
+[SEA plan](sea-layout-migration-plan.md) proposes capability- and terrain-aware
+admission. Source verified; no implementation or new match.
+
 `EconomyHelpers::ShouldUpgradeMexFirst` / `EnqueueMexUpgradeIfFirst` added, the
 gate inserted ahead of each role's first converter, and the `MexTracker`
 bookkeeping moved from TECH's handlers into `Builder::AiTaskAdded` /
@@ -1468,7 +1478,142 @@ throughput and identify the appropriate support/new-bay crossover. See
 [D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
 and [measurement limits](benchmarks/air-management.md).
 
+### KI-221 - SEA T2 shipyard admission has contradictory gates
+
+**Severity:** High. **Location:** `Sea_IncomeLabLimits`,
+`SeaConstructor::T1Ladder`, `ShouldBuildT2Shipyard`, `EnqueueT2Shipyard`.
+
+**Problem.** The ladder admits a first yard at 40 M/s and 800 E/s, but its
+UnitDef cap is floor(income / 75), zero below 75 absent a later map override.
+The configured 800-metal reserve is ignored by `mcOk = true`. The ladder's
+one-yard maximum also disagrees with the later income-scaled cap.
+
+**Proposed solution.** One enabled-SEA admission decision should own the funded
+T2 package, allowed count and temporary replacement overlap. Preserve explicit
+map/profile prohibitions and legacy TECH/TACTICAL helper behavior. See the
+[SEA migration plan](sea-layout-migration-plan.md).
+
+**Verification.** Source traced; unimplemented/unplayed. Test 39/40/74/75 income,
+energy/bank boundaries, gifts, map veto and replacement at cap; observe completed
+yards and useful output rather than enqueue logs.
+
+
+**D-188 update (2026-10-04).** Enabled SEA now owns rolling-income, reserve and tech-package admission and separate replacement overlap. Pure boundaries and real Glacial T2 production pass. Legacy/shared helpers are deliberately unchanged; full map/faction/metal-map acceptance remains open. See [results](sea-layout-migration-results.md).
+
+### KI-222 - SEA requests Cortex units for Legion T2 production
+
+**Severity:** High. **Location:** `Sea_FactoryAiMakeTask`,
+`Donate::IsT2SeaConstructor`, `Sea_BuilderAiUnitAdded`.
+
+**Problem.** Legion's guaranteed T2 constructor resolves to `coracsub` and its
+flagship to `corblackhy`. Its actual yard builds `leganavyconsub` and
+`leganavyflagship`. Availability does not prove this yard can build a def.
+Donation recognition excludes Legion's sub and locks the one-shot flag before
+checking transfer success. Native fallback may mask omissions; the runtime
+stall duration has not been measured.
+
+**Proposed solution.** Use verified faction catalogs, actual `CanBuild`, pending
+counts and successful-transfer acknowledgement. See the
+[SEA plan](sea-layout-migration-plan.md).
+
+**Verification.** Source/build-option comparison only. Test three factions,
+optional content, captured yards, three completed subs and failed/retried
+transfer; observe actual valid production and gifts.
+
+
+**D-188 update (2026-10-04).** Enabled SEA selects the actual Legion construction sub/flagship and checks CanBuild. Legacy selection and donation recognition/transfer acknowledgement remain unfixed. All three factions load, but the full physical Legion T2 donation case has not been played. See [results](sea-layout-migration-results.md).
+
+### KI-223 - SEA has no complete naval layout or exit-space owner
+
+**Severity:** High. **Location:** `Sea_BuilderAiMakeTask`, `SeaConstructor`,
+SEA objectives, `CBFactoryTask::Activate`, `WaterTheatres::ExitClear`.
+
+**Problem.** SEA has no layout hook. Native resource tasks precede specialized
+policy; other structures follow a constructor or primary yard. There is no
+reserved SEA transit network or forward-yard handover. Automatic factory
+cluster acquisition is land-only, and advisory water-body checks do not certify
+individual hulls. A layout toggle alone would leave uncontrolled placement
+paths. The reported congestion has not been replay-reproduced here.
+
+**Proposed solution.** SEA-only placement ownership over shared reservations,
+explicit naval pins, product-aware exit/route checks and operational replacement
+before retirement. Preserve AIR/TECH geometry and TECH's exact lab rules. See
+[D-187's plan](sea-layout-migration-plan.md).
+
+**Verification.** Source traced, no fix. Test dense economy, large ships/subs,
+shallow necks, ally obstructions, reload, role changes and front reversals.
+Watch ships physically leave both old and replacement yards.
+
+
+**D-188 update (2026-10-04).** The opt-in implementation now reserves ordinary shipyards, straight hull-tested exits and dense support/economy groups. Independent supplied Glacial tests prove first-use blocker replan, named-state adoption, replacement ship departure and old-yard reclaim. Broad transit, auxiliary factories, true save/load and reversal/loss cases remain open (KI-227/KI-230). See [results](sea-layout-migration-results.md).
+
+### KI-224 - SEA economy and assistance do not scale by useful work
+
+**Severity:** Medium. **Location:** `SeaConstructor::T2Ladder/AssistPrimary`,
+`Sea_Commander_AiMakeTask`, `Sea_IncomeBuilderLimits`, constructor registration.
+
+**Problem.** The primary T2 ladder explicitly requests only its first naval
+fusion. Other builders/native defaults can build more, so this is not a global
+fusion cap. Guard admission checks income and target presence, not funded
+progress. The first T2 sub is freelance, second primary; the empty builder-income
+hook supplies no SEA workforce policy. Nano loss accounting is KI-217.
+
+**Proposed solution.** Enabled SEA uses a local-work snapshot, funding and bank
+pressure, reachable project assignments, expiring productive assists and
+repeated energy modules. Preserve shared legacy consumers. See the
+[SEA plan](sea-layout-migration-plan.md).
+
+**Verification.** Source only. Test idle/dead primary, energy stall, finished
+project, donated metal during deficit, lost support and useful late growth
+beyond one fusion. Measure real spending and productive BP.
+
+
+**D-188 update (2026-10-04).** Enabled SEA now samples useful mobile/local power, requires two-resource discretionary funding, releases empty guards and builds repeated fusions. Natural benchmarks remain inconsistent (KI-228). Same-tick conservative accounting remains KI-229; this is not a blanket workforce-resolution claim. See [results](sea-layout-migration-results.md).
+
+### KI-225 - SEA fleet batches ignore outstanding recruits
+
+**Severity:** Medium. **Location:** `Sea_FactoryAiMakeTask`.
+
+**Problem.** Cruiser/AA/missile branches compare observed count to a target,
+then enqueue a full fixed batch. Four cruisers can request five instead of the
+one-unit deficit. Pending recruits are not deducted; multiple yards can multiply
+requests before completion. Expansion beyond one managed yard magnifies this.
+
+**Proposed solution.** One role-level owner snapshots live/frame/pending units
+without double counting and queues only funded remaining quotas. Preserve the
+initial combat priority order. See the [SEA plan](sea-layout-migration-plan.md).
+
+**Verification.** Source only. Test four live/one pending, simultaneous yards,
+cancellation and loss; assert bounded pending orders and completed output.
+
+
+**D-188 update (2026-10-04).** Enabled SEA uses completed/frame counts plus pending recruits and enqueues only one remaining combat-quota unit per decision. Boundary tests pass and supplied multi-yard output is observed. Legacy batching remains unchanged; cancellation/transfer/faction matrix still pending. See [results](sea-layout-migration-results.md).
+
+### KI-226 - SEA switch settings and strategic signals have inconsistent semantics
+
+**Severity:** Medium. **Location:** `Sea_AiIsSwitchTime`,
+`Sea_MakeSwitchInterval`, `Sea_UpdateDynamicMilitaryQuotas`, SEA role reference.
+
+**Problem.** Switch-time predicate uses literal 30 s; interval generation uses
+configured 20-60 s. Quotas compare all own army metal with enemy water cost per
+player, not local naval forces. Raising attack quota from 1 to 100 raises the
+dispatch floor despite a comment describing a low threshold. These signals
+cannot certify forward harbor safety. Existing role documentation also misstates
+mex-first dispatch and donation scope; asymmetric start caps/wrong-role log
+strings are already indexed by the role-layer review.
+
+**Proposed solution.** Document/test the switch contract, use independent local
+naval safety evidence and defer combat quota retuning to a separate comparison.
+Refresh role docs during implementation. See the
+[SEA plan](sea-layout-migration-plan.md).
+
+**Verification.** Source review only. Test switch boundaries and identical sea
+situations with unrelated air/land army added; placement safety must remain local.
+
 ## Configuration and data (KI-3xx)
+
+
+**D-188 update (2026-10-04).** The new harbor owner uses local naval combat-role value plus local threat and does not reuse the global attack-quota ratio. Existing combat/switch policy remains deliberately unchanged. The role reference now separates experimental and legacy dispatch. See [results](sea-layout-migration-results.md).
 
 ### KI-301 — Two Legion mobile EW units cannot be classified
 
@@ -1738,6 +1883,13 @@ infer a factory edge from two defs existing.
 deliberately renamed id in a scratch copy is reported.
 
 ### KI-308 — Legion production coverage is incomplete
+
+**2026-10-03 SEA review correction.** `factory_configs_sea.as` now has a
+populated `legadvshipyard` table; that part of the original placeholder finding
+is stale. SEA's dynamic flag remains false by default and its dynamic call is
+only inside the T1-yard branch. The T2 sequence's wrong-faction requests are
+KI-222. This does not assert all dynamic AIR/SEA coverage has been verified.
+
 
 **Severity**: Low
 **Location**: `data/script/src/manager/factory_production/factory_configs_air.as`,
@@ -2604,6 +2756,9 @@ verification. See [D-153](allied-layout-air-income-results.md).
 A fix should rerun that fixture at the default 120-second limit and demonstrate
 either a valid cluster or a bounded, explained exhausted-search state. Follow-up
 tactical-only tests extend `InvariantForwardSeconds` in their staged data only.
+
+
+**D-188 update (2026-10-04).** Both D-188 Glacial mixed runs (SEA enabled and disabled) reproduce INV-013 at about two minutes. Original FAIL archives are retained. This confirms the mixed-role acceptance block without attributing it to new SEA reservations; see the SEA migration results. See [results](sea-layout-migration-results.md).
 
 ### KI-424 — Experimental surface/water threat multipliers can hide armed enemies
 
@@ -4230,33 +4385,37 @@ save/load and natural-game efficacy remain outside this repair. See
 [decision D-173](decisions.md#d-173---committed-air-cleanup-after-strategic-target-exhaustion).
 
 
-### KI-482 - AIR lacks a coordinated response to ordinary ground infiltration at allied bases
+### KI-482 - AIR base response still lacks multi-AIR election and live-campus routing
 
-**Problem.** AirScreen::IntrusionCost reads only armed aircraft contacts.
-AirWaves' explicit defensive selection is limited to nearby gantry-exclusive
-ground units, while optional T1 support follows global strike/economy gates.
-Gunships otherwise fall through generic military assignment; there is no shared
-incident that owns allied-base ground targeting and a defensive recruitment
-deficit. A constructor/lab/jammer foothold therefore has no equivalent emergency
-response contract. This is verified in source, not a reconstruction of the
-owner's screenshot's visibility history.
+**Problem.** D-193 implements immediate current-visible land defense around
+participating allied/human starts, with held bomber dispatch and a shared
+per-AIR twenty-unit production deficit. The broader D-174 plan is not complete:
+multiple AIR owners can each recruit a reserve; relocated economy campuses
+outside start radii are not protected by this controller, and an abandoned
+start can still trigger defense. Direct approach tasks do not select AA-safe
+incident routes. These are explicit source-level limits, not observed failures
+in the new northwest-Marauder acceptance fixtures.
 
-**Proposed solution.** Add an experimental AIR base-response controller over
-the existing BattleAnalysis ground snapshot and allied-start/asset caches.
-Extend snapshot value fields with target identity and capability flags. Dispatch
-available gunships immediately and share one configurable twenty-unit force
-deficit across factories. Separate EMP support, stocked damage gunships and
-transport ownership; do not reuse the T1 strike helper as a gunship classifier.
-Retain scouting/memory under jamming, finite chase limits and changed-mission
-group commands. Preserve transport requests, workforce recovery, committed
-bomber escorts and TECH policy. Details and counter-bait refinements are in
-[the proposed response plan](air-allied-base-response-plan.md).
+**Proposed solution.** Extend `AirBaseResponse` with expiring incident ownership
+over the existing team protocol and live allied-asset/start caches, then add
+AA-aware approach selection without recalling committed offensive escorts.
+Keep start-based early-game coverage, short legitimate last-seen searches,
+shared completed/frame/order accounting, and transport/player/carrier task
+ownership. D-174's [full plan](air-allied-base-response-plan.md) describes the
+cliff foothold/jammer and multi-AIR cases.
 
-**Verification.** Source-reviewed only; not implemented or played. The plan
-specifies normal-vision cliff factory/jammer fixtures for all three factions,
-human-allied bases, multi-AIR accounting, AA/air raids, ownership regressions,
-economy comparisons and screenshot/latency/APM evidence. See
-[D-174](decisions.md#d-174---proposed-air-defense-of-allied-bases-against-ground-infiltration).
+**Verification.** D-193's [results](air-recon-base-defense-results.md) verify
+radar deadlines, idle bombers, all factions' recruitment/damage, radius and
+committed-escort controls under normal vision. They do not verify live-campus
+relocation, abandoned-start bait, multiple AIR incident election, save/load,
+manual takeover or transport/cargo transitions. Extend the isolated fixtures
+for these paths before claiming them. See [D-193](decisions.md#d-193---timed-air-reconnaissance-and-immediate-allied-base-defense).
+
+**D-193 follow-up to KI-427.** The matched Glacial natural games both retain
+strict FAIL reports: candidate TECH INV-008/010; saved pre-D193 baseline
+INV-008/010/019/021/090. The candidate has no AIR invariant or script error.
+This comparison confirms pre-existing categories, not every instance's root
+cause. Exact archives are linked in the D-193 results; do not weaken the checks.
 
 
 ### KI-483 - Legacy profiles do not run the experimental metal-sharing policy
@@ -4509,6 +4668,238 @@ hidden-economy fixture must produce a real reconnaissance dispatch, discover
 a target and physically launch the funded wave without repeated orders or
 bypassing its damage/AA/escort checks.
 
+
+### KI-227 - SEA staged layout does not yet own the complete naval district
+
+**Problem.** The opt-in D-188 controller reserves ordinary shipyards and their
+straight exits. Auxiliary yards/seaplane platforms still use native placement;
+advanced economy groups are allocated on demand. Broad transit/turning networks,
+separate pond ownership, true save/load and explicit AIR/TACTICAL cooperation
+have not met the approved migration acceptance matrix.
+
+**Proposed solution.** Extend SeaLayout with capability-specific auxiliary
+berths and preplanned advanced economy districts. Reuse native reservations,
+validate actual product movement classes, and add physical large-hull/turning,
+pond, metal-map and role-transition fixtures before enabling the default.
+
+**Verification.** Ordinary Glacial handover, physical blocker and named-state
+reinitialization passed. Those are not proof of the missing cases. D-188 and
+[results](sea-layout-migration-results.md) retain scope and evidence.
+
+### KI-228 - SEA natural migration timing and recovery are not stable
+
+**Problem.** The intermediate Glacial candidate improved T2/fusion, but its
+later paired repeat regressed to 16:29/22:47 versus 12:25/15:54. The latter
+opening has a roughly 105-second no-completion gap after its first mex. Erebos
+lost its yard and did not recover naval output in the cohort pinned before the
+canceled-berth fix. These are observed regressions, not proof of walking delay.
+
+**Proposed solution.** Instrument actual opening task/command ownership and
+progress at the idle interval; distinguish inherited waits, blocked pins,
+movement failure and resource starvation. Retest Erebos loss with final claim
+recovery. Keep economic tuning separate from geometric/task fixes; use paired
+seeds and side swaps, including censored survival, before default rollout.
+
+**Verification.** Retained original raw games, scores and screenshots in D-188
+[results](sea-layout-migration-results.md). Default remains false. Single-run
+best timings and smoke PASS verdicts do not close this issue.
+
+### KI-229 - SEA same-tick funding can reserve accepted capital twice
+
+**Problem.** SeaEconomy::Fund sums queued unframed SEA projects and admitted
+costs. A successfully pinned project created in the same snapshot interval can
+appear in both until the next census. This is conservative (can reject useful
+parallel growth), not unfunded overspending. Its gameplay impact is unmeasured.
+
+**Proposed solution.** Track accepted tasks by stable identity for the current
+budget epoch, and deduct their committed cost exactly once. Include recruit
+orders and cancellations without retaining unsafe native inactive chain tasks.
+Reuse the shared pure funding arithmetic; test two simultaneous workers,
+creation/failure/cancel and frame transition, then physical workforce scaling.
+
+**Verification.** D-189 separates pinned project reservations from same-epoch recruit admissions, removing the diagnosed double count. Pure funding boundaries and natural games pass their smoke checks; simultaneous recruit/cancel/frame-transition budget ownership is still not comprehensively verified. This entry remains open for that lifecycle matrix. See [SEA combat plan](sea-combat-enhancement-plan.md).
+
+### KI-230 - SEA lacks explicit replacement-loss recovery after retirement
+
+**Problem.** Once Lifecycle::Retire is entered, the old yard is intentionally
+one-way reclaim. If the replacement dies at that point, current SEA code does
+not create an explicit recovery operation before finishing reclaim. Pre-retire
+safety and physical egress work, but cannot guarantee future survival.
+
+**Proposed solution.** Add a SEA recovery state that preserves the shared
+one-way lifecycle contract: pause further discretionary expansion and immediately
+fund/rebuild required capability at a safe berth. Do not unretire a partly
+reclaimed yard or change TECH's lifecycle. Exercise replacement loss before
+construction, during drain and after reclaim starts with independent output
+and reservation observations.
+
+**Verification.** Source-confirmed missing recovery state; normal supplied
+handover passed. Destruction/reversal acceptance is pending; default remains off.
+See D-188 [results](sea-layout-migration-results.md).
+
+
+### KI-231 - SEA combat migration has not passed economic and fleet non-regression
+
+**Problem.** The D-189 five-map cohort improved Tundra but regressed Glacial/Caldera timings and lost its Glacial base. Surface/sub/hover supplied fixtures matched losses; air cover and 64-hull combat regressed, and the overwhelm submarine raid destroyed the harbor before the counter completed. A later capital-assistance revision reached Glacial T2 11:38/fusion 16:33, still slower than the historical 10:27/15:31 bests, then lost all productive assets. Surviving mexes do not constitute an operational base.
+
+**Proposed solution.** Keep ExperimentalBuild disabled by default. Separate production latency, group assembly, local naval force balance and economic spending. Retest supported harbors and multiple seeded/side-swapped natural matches; use operational-base survival rather than merely nonempty unit lists. Do not replace native movement with the rejected order-suppression experiments.
+
+**Verification.** Immutable runs and original FAIL/PASS verdicts are in the [SEA benchmark index](benchmarks/index/sea.md). [Acceptance plan](sea-combat-enhancement-plan.md) and [source trace](sea-native-trace.md) define remaining gates. No all-benchmark-win claim.
+
+### KI-232 - SEA large fleets still exceed the desired command budget
+
+**Problem.** The 64-vs-64 destroyer fixture recorded 4,409 peak per-team commands/minute for its control and 3,514 for the candidate. Both Armada fleets lost; the lower-order candidate inflicted fewer losses. Callback totals include Lua gadget orders and are not network byte counts. Smaller Legion fleets additionally reveal game and AI orders contending on attached drones.
+
+**Proposed solution.** Measure command sources and unchanged orders with equal live populations in serial runs. Use persistent task ownership and a separate carrier-gadget handover; do not rate-limit urgent responses. Profile native formation/route replacement without reintroducing suppression that lost the surface fixtures. Batch APIs must be traced to actual engine synchronization before claiming one command per group.
+
+**Verification.** Three attempted move/attack suppression policies were rejected and removed. D-189 instruments command types/sources and tests passive carrier ownership separately. Large-hull APM and independent CPU/latency acceptance remain open; concurrent games do not establish FPS improvements.
+
+### KI-233 - SEA specialty mechanics remain incompletely automated and tested
+
+**Problem.** The 304-definition roster review includes mines, engineers, nuclear subs, anti-nuke coverage, seaplane underwater landing, weapon modes and optional units. Enumeration does not prove effective use. SEA currently delegates most specialty controls to native tasks/game gadgets; there are no completed end-to-end fixtures for every specialty, fog/sonar loss, transfer and all disconnected ponds. Current contact production also omits dry-shore static targets.
+
+**Proposed solution.** Implement the explicit mechanic fixture matrix in the [plan](sea-combat-enhancement-plan.md), using actual weapon capability/build edges from the running game. Extend shore threat/firing-water evaluation under SEA's opt-in, add independent fired/hit/intercept/reclaim observations, and test reachable water/shore transitions. Avoid changing AIR/TECH or global profiles for a SEA-specific finding.
+
+**Verification.** Ordinary surface/sub/hover/air/static combat and response/large-fleet fixtures were run. See [unit controls](sea-unit-controls.md) and [native trace](sea-native-trace.md) for what is source-confirmed versus unverified.
+
+
+### KI-234 - SEA late role entry cannot yet adopt an already-existing unregistered Legion yard
+
+**Problem.** D-189 registers missing hard/terrible Legion advanced-yard metadata before construction. Existing factory entries are preserved, and completed/created events then work. A yard created before a runtime switch into migrated SEA has already missed those native events; registration alone does not replay them. Named layout adoption is not native manager adoption.
+
+**Proposed solution.** Add an explicit native factory adoption mechanism that validates owned completed units, installs factory/task membership once, and respects existing player/task ownership; invoke only from SEA role entry after registration. Test capture, donation, role entry/exit and save/load with pre-existing yards. Do not replay engine callbacks blindly or globally register all factories.
+
+**Verification.** Startup missing-metadata and existing-metadata paths are physically verified by the Legion T2 production fixtures. Late entry/adoption is not. See [trace](sea-native-trace.md) and D-189 in [decisions](decisions.md).
+
+
+### KI-235 - SEA dense tidal expansion can stall on unstarted approaches
+
+**Problem.** The D-189 final Tundra repeat held 42 tidals and roughly +702 energy through several minutes of full banks, while native logs repeatedly switched approaches to two unframed tidal sites. The original path/obstruction cause has not been isolated. Switching off experimental builder movement globally within SEA regressed the opening and was rejected.
+
+**Proposed solution.** Test the narrow unstarted-economy progress watch in [SeaBuild](../data/script/src/roles/sea_build.as): preserve frames/factories, cancel only stalled unframed pins, defer their slots, and verify actual energy growth and workload recovery. Add a reproducible mobile-blocker/approach fixture before claiming the underlying navigation problem fixed.
+
+**Verification.** The progress-timeout and service-lane experiments regressed natural tests and were removed. Timeout-only Tundra T2 was 28:16; wider-lane Tundra/Glacial games lost their bases without T2. See [combat results](sea-combat-results.md). The underlying access cause is still unresolved; default migration remains disabled.
+
+
+### KI-236 - SEA selected recruits can start late in supplied harbor fixtures
+
+**Problem.** A diagnostic supported-air-raid run selected armpt at frame 961, but physical creation occurred at 3607 (88.2 seconds later), despite available resources. With the new yard-queue observer, a repeat selected at 945 and created at 946. Freezing recovery submarines was removed from supported fixtures and initial factory admission is delayed until supplied constructors exist; the intermittent delay still needs isolation. It is not the same as contact-to-policy response latency.
+
+**Proposed solution.** Reproduce with independent factory queue/current-command, product progress, nearby hull/constructor positions and slipway clearance. Test idle recovery units and collision blockers explicitly, then fix the SEA-selected mechanism rather than canceling/reissuing every fleet order. Separately gate tech saving on an actually available T2 yard and local surface-force safety; current saving only checks local harbor threat plus air/sub deficits.
+
+**Verification.** Four-minute diagnostic copies and eight-minute corrected-harness comparisons are retained in the [SEA index](benchmarks/index/sea.md). [Arena observer](../tools/playtest/widgets/sea_arena.lua) now records yard_wait observations. Neither the physical cause nor the broader tech-saving refinements are marked fixed.
+
+
+D-190 follow-up to KI-231/KI-235: touching SEA economy patches, strip expansion and factory support were tested separately; this does not close broad SEA rollout or all-terrain approach issues. See [compact economy results](dense-economy-results.md).
+
+
+D-190 final KI-231 verification: six paired 20-minute games compile and run
+without script/invariant failures, but gameplay non-regression is unproven.
+Tundra seed 1881001 loses the updated economy while control survives; seed 1902
+instead reaches T2 at 13:47 and exceeds the control's income/build power. Both
+sides change policy within each game, so these are small self-play cohorts,
+not causal attribution or a strength win. Preserve the default-off migration
+gate and use fixed-opponent, repeated-seed comparisons before broad rollout.
+The narrow spacing/support acceptance passes independently. Full paired
+evidence is in [compact economy results](dense-economy-results.md).
+
+
+### KI-237 - Native dormant build-chain task lifetime cannot support a global script task ledger
+
+**Problem.** `IBuilderTask::~IBuilderTask` directly deletes `nextTask`. Dormant
+chain links may therefore be destroyed without a task-removed hook and without
+respecting a retained AngelScript reference. A D191 all-added ledger reproduced
+an invalid handle at 19:18 in the ordinary Supreme test; it was removed.
+
+**Proposed solution.** Audit chain ownership and refcounted destruction natively,
+then test parent cancellation, chain activation and save/load before exposing
+all queued links as persistable handles. Until then inspect live unit task
+ownership and retain only explicitly enqueued/pinned tasks with normal lifetime.
+
+**Verification.** The SEA workaround is in place; no native lifecycle change is
+claimed. Original crash evidence and subsequent runs are retained in
+[economy-block results](sea-economy-block-results.md).
+
+
+### KI-238 - Occasional unfinished SEA converter frames disappear in supplied economy tests
+
+**Problem.** Two unfinished T1 converter frames disappeared in the strict D191
+Supreme fixture; one recurred in the final compact fixture. No completed T1
+converter was removed. The uncontested test excludes enemy combat, but the
+exact task/reclaim actor has not been isolated.
+
+**Proposed solution.** Record builder task ownership, reclaim commands and frame
+health/progress around UnitDestroyed; distinguish native cancellation cleanup
+from reclaim policy before changing either. Preserve finished cheap converters
+and avoid global cancellation or navigation changes.
+
+**Verification.** The original strict FAIL is preserved; final checks separately
+log unfinished losses and forbid completed losses. See [results](sea-economy-block-results.md).
+This observation remains unresolved. D191 natural games also retain long-tail
+departure delays and slower early economy; follow up under KI-231/KI-235 with
+fixed opponents and repeated seeds before claiming non-regression.
+
+
+### KI-239 - D192 naval-layout lifecycle edge cases lack runtime coverage
+
+**Problem.** Ordinary and supplied games exercise private reservations and
+later-yard geometry, but this change has not replayed save/load, role switching,
+opening-yard destruction or a physical obstruction of an unused whole cluster.
+The new persisted `sea.hadFactory` flag must keep the opening exception closed
+after loss/load; retained cluster activation logic must release only unused
+claims. Pure predicate/index tests alone do not certify those engine paths.
+
+**Proposed solution.** Extend `run_sea_allied_base.py` with separate lifecycle
+cases: block an unused cluster using a human-owned structure and assert complete
+release/replan before first construction; destroy an opening after a valid
+later-yard reservation; save/load and verify no foreign slot is claimable and
+no replacement gets the opening exception. Exercise compact and experimental
+modes, preserving active frames and native task ownership. Do not relax shared
+blocking or add a global native-task handle ledger (KI-237).
+
+**Verification.** D192's played placement and ordinary economy evidence is in
+[allied-base results](sea-allied-base-results.md); these lifecycle scenarios
+remain unplayed. The mixed-role rerun also reproduced previously tracked TECH
+INV-001/019; its reservation probes passed, but its FAIL report is preserved.
+Broader SEA throughput remains KI-231/KI-235, not a closed issue here.
+
+
+### KI-495 - Naval AIR relief does not coordinate budgets between multiple AIR players
+
+**Problem.** D-194 owns one local reserve/wave per AIR instance. Two AIR allies
+can independently calculate the same fleet deficit and both recruit. Mixed
+faction donations are counted as aircraft rather than exact combined metal;
+fleet metal/ASW totals do not model health, reload, maneuvering or counter DPS.
+The physical-AA floor protects zero-tolerance radar patrols but does not assign
+calibrated damage to zero-weight naval AA for the torpedo risk threshold.
+
+**Proposed solution.** Add expiring ally-visible sector claims and pledged
+aircraft metal, elect a deterministic responder, and subtract confirmed support
+without assuming future production. Test responder loss, split water bodies,
+mixed donations and heavy naval AA before calibrating force multipliers.
+Preserve current per-role funding, visibility and offensive commitments.
+
+**Verification.** Single-AIR supplied combat, negative controls and natural
+smoke evidence are in [D-194 results](air-patrol-naval-support-results.md).
+These tests do not certify multi-AIR coordination or a PvP win probability.
+
+### KI-496 - Recon formation planning still assumes separable allied/enemy starts
+
+**Problem.** Source review finds the inherited `AirRecon::Plan` returns false
+for coincident team centroids or after all candidate formations fail. Admission
+and Tick still require that plan before patrol/deadline dispatch. D-194's two
+maps provide valid formations; pathological tiny/shared-start maps can still
+bypass the timed controller. This is not a reproduced failure on tested maps.
+
+**Proposed solution.** Separate patrol admission from sweep geometry, and add
+an independently bounded per-unit destination fallback for failed formations.
+Test coincident starts, tiny maps, full-map enemy pressure and excess donations;
+retain distinct routes when space exists and never call an exposed route safe.
+
+**Verification.** Source-only edge case. The ordinary full/partial/AA-relocation
+recon cases pass; see [results](air-patrol-naval-support-results.md).
+
+
 ### KI-497 - Late-game layout reservation queries dominate identified Shore AI work
 
 **Problem.** D-195's forty-minute 8v8 Shore discovery records 255 of 1,304
@@ -4535,6 +4926,7 @@ This updates the remaining layout/query portions of KI-464; current AIR group
 and route-version guards already address parts of the older KI-462 discussion.
 
 
+
 **D-197 follow-up.** The allied index now uses exact direct-addressed paged
 occupancy; fixed-footprint checks are independent of claim count. Randomized
 old/new/oracle checks, the complete native suite and twelve in-game mixed-role
@@ -4551,7 +4943,6 @@ regression coverage remain open. The original D-195 proposal-only statement
 above describes its historical review, not the current implementation.
 
 
-
 **D-198 attribution.** Reanalysis of the already recorded per-AI timers
 localizes 84.88% of final-minute aggregate AI time to TECH team 1 (87.41% to
 both TECHs; AIR is 2.30%). The same minute records 647 failed T1-converter
@@ -4563,6 +4954,7 @@ The [updated ranked review](reviews/2026-10-04-skirmishai-performance-rerank.md)
 links exact derived counts and the input hashes, source paths, behavior-safe
 reuse/index proposals and required validation. No new fix or simulation is
 claimed; retain the original FAIL and the still-unresolved function attribution.
+
 
 ### KI-498 - Elapsed-frame performance runs can outlast competitive play
 
@@ -4606,6 +4998,7 @@ explosion centers inside the map; the first records disappearance, not impact.
 Both reports PASS, with zero script/runtime invariant failures, but neither
 reproduces the user's original match. No production fix is applied. See the
 [full investigation and retained evidence](reviews/2026-10-04-juno-map-edge-investigation.md).
+
 
 ### D-199 follow-up to KI-497 / KI-498 - measured partial performance remediation
 

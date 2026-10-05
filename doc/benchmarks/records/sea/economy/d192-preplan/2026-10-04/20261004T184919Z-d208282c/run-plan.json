@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "d192-preplan"
+  },
+  "id": "20261004T184526Z-9d7331a8",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

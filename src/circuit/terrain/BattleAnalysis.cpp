@@ -5,6 +5,7 @@
  */
 
 #include "terrain/BattleAnalysis.h"
+#include "terrain/AirSafety.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/TerrainData.h"
 #include "map/ThreatMap.h"
@@ -568,7 +569,7 @@ void CBattleAnalysis::Update(int frame)
         if (!d->IsAbleToFly() && observed && Height(e->GetPos()) >= 0.f) {
             const bool economy = !d->IsMobile() && (d->IsMex() || d->IsBuilder() || d->IsWind()
                 || d->GetMaxRange() <= 0.f);
-            groundContacts.push_back({e->GetPos(), m, economy});
+            groundContacts.push_back({e->GetPos(), m, economy, e->GetId(), d->GetId()});
         }
         if (observed && !d->IsAbleToFly() && d->IsMobile()
             && (d->IsFloater() || d->IsSubmarine()) && Height(e->GetPos()) < 0.f) {
@@ -643,12 +644,42 @@ void CBattleAnalysis::Update(int frame)
 	}
 }
 
+void CBattleAnalysis::SampleNavalThreat(const AIFloat3& origin, float radius)
+{
+	std::fill(std::begin(navalThreatCost), std::end(navalThreatCost), 0.f);
+	if (!std::isfinite(origin.x) || !std::isfinite(origin.z) || !std::isfinite(radius) || radius <= 0.f) return;
+	PrepareWater();
+	const int basin = WaterBody(origin, false);
+	for (const auto& entry : circuit->GetEnemyManager()->GetEnemyUnits()) {
+		const CEnemyUnit* enemy = entry.second;
+		CCircuitDef* def = enemy->GetCircuitDef();
+		if (def == nullptr || !enemy->IsInRadarOrLOS() || enemy->IsHidden()
+			|| (enemy->GetData().losStatus & (SEnemyData::LosMask::NEUTRAL | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))) continue;
+		if (enemy->IsIgnore() && (!def->IsIgnore() || enemy->GetUnit()->GetRulesParamFloat("ignoredByAI", 0.f) > 0.f)) continue;
+		const AIFloat3& pos = enemy->GetPos();
+		if (origin.SqDistance2D(pos) > radius * radius) continue;
+		if (def->IsAbleToFly()) {
+			if (def->HasSurfToLand() || def->HasSurfToWater()) navalThreatCost[2] += def->GetCostM();
+			continue;
+		}
+		if (Height(pos) >= 0.f || (basin >= 0 && WaterBody(pos, false) != basin)) continue;
+		const int kind = !def->IsMobile() ? 3 : def->IsInWater(Height(pos), pos.y) ? 1 : 0;
+		navalThreatCost[kind] += def->GetCostM();
+	}
+}
+
 float CBattleAnalysis::AmphThreat(const AIFloat3& pos) const {
     const float coverage = observedWaterWeapons.empty() ? 0.f : observedWaterWeapons[Cell(pos)];
     return std::max(coverage, circuit->GetThreatMap()->GetAmphThreatAtPos(pos));
 }
 AIFloat3 CBattleAnalysis::GetGroundContactPos(int i) const {
     return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].pos : AIFloat3(-1.f, 0.f, -1.f);
+}
+int CBattleAnalysis::GetGroundContactId(int i) const {
+    return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].id : -1;
+}
+int CBattleAnalysis::GetGroundContactDefId(int i) const {
+    return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].defId : -1;
 }
 float CBattleAnalysis::GetGroundContactCost(int i) const {
     return i >= 0 && i < int(groundContacts.size()) ? groundContacts[i].cost : 0.f;
@@ -724,6 +755,79 @@ int CBattleAnalysis::EnemyCount(int kind) const { return ((kind >= 0) && (kind <
 
 float CBattleAnalysis::SurfThreat(const AIFloat3& pos) const { return circuit->GetThreatMap()->GetSurfThreatAtPos(pos); }
 float CBattleAnalysis::AirThreat(const AIFloat3& pos) const { return circuit->GetThreatMap()->GetAirThreatAtPos(pos); }
+float CBattleAnalysis::AirThreatAlong(const AIFloat3& from, const AIFloat3& to, float padding) const {
+    const auto* threat = circuit->GetThreatMap();
+    float result = air::CorridorThreat(from.x, from.z, to.x, to.z, padding,
+        CTerrainManager::GetTerrainWidth(), CTerrainManager::GetTerrainHeight(), threat->GetSquareSize(),
+        [threat](float x, float z) { return threat->GetAirThreatAtPos(AIFloat3(x,0.f,z)); });
+    if (!std::isfinite(result) || result >= 1.f) return result;
+    RefreshAirWeapons();
+    for (const auto& weapon : airWeapons) {
+        if (air::IntersectsCircle(from.x,from.z,to.x,to.z,weapon.pos.x,weapon.pos.z,
+            weapon.range+padding+2.f*threat->GetSquareSize())) return std::max(1.f,result);
+    }
+    return result;
+}
+void CBattleAnalysis::RefreshAirWeapons() const {
+    const int frame=circuit->GetLastFrame();
+    if (frame<airWeaponFrame+FRAMES_PER_SEC) return;
+    airWeaponFrame=frame;airWeapons.clear();
+    for (const auto& kv:circuit->GetEnemyManager()->GetEnemyUnits()) {
+        const auto* e=kv.second;const auto* d=e->GetCircuitDef();
+        if (d==nullptr || !d->HasSurfToAir() || !e->IsInRadarOrLOS() || e->IsBeingBuilt()
+            || (e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL
+                | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))) continue;
+        if (e->IsIgnore() && (!d->IsIgnore() || e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
+        const float range=d->GetMaxRange(CCircuitDef::RangeType::AIR);
+        if (range>0.f) airWeapons.push_back({e->GetPos(),range});
+    }
+}
+
+int CBattleAnalysis::GetNavalForceCount() {
+    const int frame = circuit->GetLastFrame();
+    if (frame < navalForceFrame + 5 * FRAMES_PER_SEC) return int(navalForces.size());
+    navalForceFrame = frame;
+    navalForces.clear(); PrepareWater();
+    auto add = [this](int id, CCircuitDef* d, const AIFloat3& p, bool allied) {
+        if (d == nullptr || d->IsAbleToFly() || d->IsSurfer() || Height(p) >= -8.f) return;
+        const bool factory = !d->IsMobile() && d->IsBuilder();
+        const bool submerged = d->IsInWater(Height(p), p.y);
+        const bool antiSub = submerged ? d->HasSubToWater() : d->HasSurfToWater();
+        const bool armed = antiSub || d->HasSurfToLand() || d->HasSurfToAir();
+        // Builders/hovercraft are not a combat fleet. Include naval factories
+        // as friendly support anchors only; their metal is never fleet strength.
+        if (!factory && (!d->IsMobile() || d->IsBuilder() || !armed
+            || !(d->IsFloater() || d->IsSubmarine() || (d->IsAmphibious() && submerged)))) return;
+        const int body = WaterBody(p,false);
+        if (body < 0) return;
+        navalForces.push_back({p, d->GetCostM(), id, d->GetId(),
+            (allied ? 1 : 0) | (submerged ? 2 : 0) | (antiSub ? 4 : 0) | (factory ? 8 : 0), body});
+    };
+    circuit->UpdateFriendlyUnits();
+    for (const auto& kv : circuit->GetFriendlyUnits()) {
+        if (kv.second->GetUnit()->IsBeingBuilt()) continue;
+        auto* d = circuit->GetCircuitDefSafe(circuit->GetCallback()->Unit_GetDefId(kv.first));
+        add(kv.first, d, kv.second->GetPos(frame), true);
+    }
+    for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+        const auto* e = kv.second;
+        auto* d = e->GetCircuitDef();
+        if (d == nullptr || !e->IsInRadarOrLOS() || e->IsBeingBuilt()
+            || (e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL
+                | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))) continue;
+        if (e->IsIgnore() && (!d->IsIgnore() || e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
+        add(e->GetId(),d,e->GetPos(),false);
+    }
+    // Reproducible ties independent of native unordered containers.
+    std::sort(navalForces.begin(),navalForces.end(),[](const NavalForce& a,const NavalForce& b) { return a.id<b.id; });
+    return int(navalForces.size());
+}
+int CBattleAnalysis::GetNavalForceId(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].id : -1; }
+int CBattleAnalysis::GetNavalForceDefId(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].defId : -1; }
+int CBattleAnalysis::GetNavalForceFlags(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].flags : 0; }
+int CBattleAnalysis::GetNavalForceBody(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].body : -1; }
+float CBattleAnalysis::GetNavalForceCost(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].cost : 0.f; }
+AIFloat3 CBattleAnalysis::GetNavalForcePos(int i) const { return i>=0 && i<int(navalForces.size()) ? navalForces[i].pos : AIFloat3(-1.f,0.f,-1.f); }
 
 // ---------------------------------------------------------------- water
 

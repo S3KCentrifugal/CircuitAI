@@ -1,0 +1,349 @@
+{
+  "schema": 1,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\hover-screen-ctrl\\glacial\\20261004T102125Z-a3753dd6\\runs\\20261004T102307Z-38675beb\\infolog.txt",
+  "fixture_errors": [],
+  "raw_weapon_damage_by_team": [
+    14490.499999999996,
+    3809.0000000000005
+  ],
+  "metal_lost_by_team": [
+    130.0,
+    3600.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    3600.0,
+    130.0
+  ],
+  "minute_apm_by_team": [
+    [
+      2393,
+      12,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1078,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      103,
+      12,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      17,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "peak_apm_by_team": [
+    2393,
+    1078
+  ],
+  "detection_to_first_attack_order_seconds": [
+    23.6,
+    24.766666666666666,
+    28.433333333333334,
+    30.566666666666666,
+    31.266666666666666,
+    33.06666666666667,
+    34.8
+  ],
+  "median_detection_to_order": 30.566666666666666,
+  "response_decisions": [],
+  "threat_observations": [],
+  "decisions": [],
+  "produced": [],
+  "finished": [
+    {
+      "frame": 301,
+      "id": "24620",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 303,
+      "id": "10560",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 307,
+      "id": "12834",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 317,
+      "id": "29006",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 321,
+      "id": "17971",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 324,
+      "id": "124",
+      "team": "0",
+      "unit": "legnavydestro"
+    },
+    {
+      "frame": 328,
+      "id": "22326",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 331,
+      "id": "15500",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 334,
+      "id": "6519",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 336,
+      "id": "22959",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 339,
+      "id": "11235",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 342,
+      "id": "27380",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 346,
+      "id": "596",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 348,
+      "id": "20517",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 353,
+      "id": "1602",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 355,
+      "id": "207",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 357,
+      "id": "23411",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 361,
+      "id": "23745",
+      "team": "1",
+      "unit": "corsnap"
+    },
+    {
+      "frame": 364,
+      "id": "23943",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 367,
+      "id": "16218",
+      "team": "1",
+      "unit": "corfrad"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 3600,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 5400,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 7200,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 9000,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 10800,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 12600,
+      "live0": 5250.0,
+      "live1": 130.0
+    },
+    {
+      "frame": 14400,
+      "live0": 5250.0,
+      "live1": 130.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.043945,
+      "ai_all_p95_ms": 0.75061,
+      "ai_all_max_ms": 8.622925,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.814941,
+      "ai_all_mean_ms": 0.140126
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.025391,
+      "ai_all_p95_ms": 0.640381,
+      "ai_all_max_ms": 3.043213,
+      "sim_speed": 10.0,
+      "ai_all_p99_ms": 1.462646,
+      "ai_all_mean_ms": 0.113867
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.026611,
+      "ai_all_p95_ms": 0.626953,
+      "ai_all_max_ms": 3.480713,
+      "sim_speed": 9.997,
+      "ai_all_p99_ms": 1.494873,
+      "ai_all_mean_ms": 0.119402
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.026367,
+      "ai_all_p95_ms": 0.724121,
+      "ai_all_max_ms": 3.037598,
+      "sim_speed": 8.594,
+      "ai_all_p99_ms": 1.641846,
+      "ai_all_mean_ms": 0.120021
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.027588,
+      "ai_all_p95_ms": 0.789551,
+      "ai_all_max_ms": 3.765625,
+      "sim_speed": 10.002,
+      "ai_all_p99_ms": 1.744141,
+      "ai_all_mean_ms": 0.135663
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.025146,
+      "ai_all_p95_ms": 0.699219,
+      "ai_all_max_ms": 2.28418,
+      "sim_speed": 10.0,
+      "ai_all_p99_ms": 1.581055,
+      "ai_all_mean_ms": 0.113517
+    },
+    {
+      "t": 0.0,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.026611,
+      "ai_all_p95_ms": 0.671143,
+      "ai_all_max_ms": 2.67749,
+      "sim_speed": 10.005,
+      "ai_all_p99_ms": 1.594727,
+      "ai_all_mean_ms": 0.116663
+    },
+    {
+      "t": 0.0,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.0271,
+      "ai_all_p95_ms": 0.781738,
+      "ai_all_max_ms": 4.435059,
+      "sim_speed": 8.598,
+      "ai_all_p99_ms": 1.790039,
+      "ai_all_mean_ms": 0.128126
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit synchronized callbacks, not player UI actions or network packet bytes.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "scenario": "resp-defense-cortex",
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\resp-defense-cortex\\supreme\\20261004T192213Z-57a9886f\\runs\\20261004T192413Z-52046375",
+  "verdict": "FAIL",
+  "contact_frame": 2730,
+  "dispatch_frame": 2730,
+  "production_frame": 2761,
+  "first_damage": {
+    "corhurc": {
+      "frame": 3186,
+      "damage": 291.726593,
+      "emp": "false"
+    },
+    "corape": {
+      "frame": 3368,
+      "damage": 138.754257,
+      "emp": "false"
+    }
+  },
+  "marauders_killed": 24,
+  "peak_air_apm": 443,
+  "peak_all_apm": 1042,
+  "air_apm_samples": [
+    [
+      1800,
+      807,
+      299,
+      18
+    ],
+    [
+      3600,
+      907,
+      303,
+      25
+    ],
+    [
+      5400,
+      980,
+      360,
+      133
+    ],
+    [
+      7200,
+      1042,
+      422,
+      76
+    ],
+    [
+      9000,
+      1003,
+      443,
+      168
+    ],
+    [
+      10800,
+      760,
+      211,
+      17
+    ],
+    [
+      12600,
+      808,
+      241,
+      8
+    ]
+  ],
+  "invariants": [
+    "INV-050"
+  ],
+  "interpretation": "One-minute engine command callbacks, not packets or CPU/FPS measurements. First damage is per aircraft definition. Supplied T1 damage does not imply victory."
+}

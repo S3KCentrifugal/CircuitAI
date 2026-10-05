@@ -1,0 +1,1405 @@
+{
+  "schema": 2,
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\response-sub-limite-ctrl\\glacial\\20261004T111813Z-77b89d0b\\runs\\20261004T111950Z-f151d54a\\infolog.txt",
+  "fixture_errors": [],
+  "order_sources": [
+    {
+      "frame": 1800,
+      "team": 1,
+      "armcom_nonlua": 6,
+      "corason_nonlua": 4,
+      "nonlua": 10
+    },
+    {
+      "frame": 1800,
+      "team": 2,
+      "armcom_nonlua": 2,
+      "nonlua": 2
+    },
+    {
+      "frame": 1800,
+      "team": 0,
+      "armason_nonlua": 4,
+      "armcom_nonlua": 6,
+      "armcs_nonlua": 23,
+      "armfrad_nonlua": 4,
+      "armnanotcplat_nonlua": 153,
+      "armroy_nonlua": 69,
+      "armsub_nonlua": 56,
+      "armsy_nonlua": 25,
+      "armuwfus_nonlua": 16,
+      "armuwmmm_nonlua": 32,
+      "armuwms_nonlua": 16,
+      "nonlua": 404
+    },
+    {
+      "frame": 3600,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "corsub_nonlua": 127,
+      "nonlua": 128
+    },
+    {
+      "frame": 3600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 24,
+      "armdecade_nonlua": 28,
+      "armnanotcplat_nonlua": 133,
+      "armroy_nonlua": 109,
+      "armsub_nonlua": 188,
+      "armsy_nonlua": 28,
+      "nonlua": 511
+    },
+    {
+      "frame": 5400,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 5400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 6,
+      "armnanotcplat_nonlua": 139,
+      "armroy_nonlua": 68,
+      "armsy_nonlua": 17,
+      "nonlua": 231
+    },
+    {
+      "frame": 7200,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 7200,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 5,
+      "armnanotcplat_nonlua": 169,
+      "armpship_nonlua": 85,
+      "armroy_nonlua": 20,
+      "armsy_nonlua": 27,
+      "nonlua": 307
+    },
+    {
+      "frame": 9000,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 9000,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 6,
+      "armdecade_nonlua": 32,
+      "armnanotcplat_nonlua": 183,
+      "armpship_nonlua": 37,
+      "armsub_nonlua": 71,
+      "armsy_nonlua": 33,
+      "nonlua": 363
+    },
+    {
+      "frame": 10800,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 10800,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 6,
+      "armdecade_nonlua": 42,
+      "armnanotcplat_nonlua": 148,
+      "armroy_nonlua": 57,
+      "armsub_nonlua": 4,
+      "armsy_nonlua": 21,
+      "nonlua": 279
+    },
+    {
+      "frame": 12600,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 12600,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 6,
+      "armdecade_nonlua": 26,
+      "armnanotcplat_nonlua": 186,
+      "armroy_nonlua": 29,
+      "armsub_nonlua": 55,
+      "armsy_nonlua": 21,
+      "nonlua": 324
+    },
+    {
+      "frame": 14400,
+      "team": 1,
+      "armcom_nonlua": 1,
+      "nonlua": 1
+    },
+    {
+      "frame": 14400,
+      "team": 0,
+      "armcom_nonlua": 1,
+      "armcs_nonlua": 6,
+      "armdecade_nonlua": 138,
+      "armnanotcplat_nonlua": 166,
+      "armroy_nonlua": 34,
+      "armsub_nonlua": 26,
+      "armsy_nonlua": 30,
+      "nonlua": 401
+    }
+  ],
+  "carrier_ownership": [],
+  "raw_weapon_damage_by_team": [
+    7347.999999999999,
+    3837.5999999999995
+  ],
+  "metal_lost_by_team": [
+    440.0,
+    2480.0
+  ],
+  "last_hit_kill_metal_by_team": [
+    2480.0,
+    440.0
+  ],
+  "minute_apm_by_team": [
+    [
+      404,
+      511,
+      231,
+      307,
+      363,
+      279,
+      324,
+      401
+    ],
+    [
+      10,
+      128,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "minute_identical_order_signatures_by_team": [
+    [
+      62,
+      78,
+      48,
+      61,
+      85,
+      46,
+      70,
+      81
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "peak_apm_by_team": [
+    511,
+    128
+  ],
+  "detection_to_first_attack_order_seconds": [
+    7.166666666666667,
+    4.233333333333333,
+    9.733333333333333,
+    11.733333333333333,
+    19.066666666666666
+  ],
+  "median_detection_to_order": 9.733333333333333,
+  "response_decisions": [],
+  "threat_observations": [],
+  "decisions": [],
+  "produced": [
+    {
+      "frame": 360,
+      "id": "1602",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1057,
+      "id": "28374",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1226,
+      "id": "10155",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1406,
+      "id": "28301",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1616,
+      "id": "14996",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 1752,
+      "id": "31764",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 1887,
+      "id": "7986",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 2024,
+      "id": "6218",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2204,
+      "id": "17119",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 2323,
+      "id": "5597",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2428,
+      "id": "18818",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2549,
+      "id": "29845",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2639,
+      "id": "17431",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3014,
+      "id": "28362",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3341,
+      "id": "31702",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3716,
+      "id": "15212",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4016,
+      "id": "15398",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4346,
+      "id": "15944",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4647,
+      "id": "25694",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4962,
+      "id": "379",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5247,
+      "id": "30878",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5562,
+      "id": "7596",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5938,
+      "id": "12903",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6118,
+      "id": "6306",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6283,
+      "id": "1003",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6463,
+      "id": "15696",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6644,
+      "id": "31050",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6824,
+      "id": "20357",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6974,
+      "id": "3311",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7121,
+      "id": "12893",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7272,
+      "id": "26926",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7422,
+      "id": "2473",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7572,
+      "id": "5925",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 7812,
+      "id": "22507",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 7992,
+      "id": "29302",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8278,
+      "id": "23540",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8518,
+      "id": "7300",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8728,
+      "id": "12183",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 8818,
+      "id": "13953",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 8908,
+      "id": "12437",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9014,
+      "id": "30930",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9104,
+      "id": "22152",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9194,
+      "id": "26311",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9524,
+      "id": "25589",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9837,
+      "id": "15789",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10152,
+      "id": "13626",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10437,
+      "id": "26768",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10722,
+      "id": "11580",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 10918,
+      "id": "6790",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11113,
+      "id": "26278",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11323,
+      "id": "22485",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11548,
+      "id": "16708",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11728,
+      "id": "14295",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12013,
+      "id": "2829",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12419,
+      "id": "27743",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12734,
+      "id": "18291",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13094,
+      "id": "16814",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13394,
+      "id": "774",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13484,
+      "id": "30242",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13572,
+      "id": "14541",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13662,
+      "id": "8777",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13783,
+      "id": "19750",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13873,
+      "id": "8283",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14068,
+      "id": "30966",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14323,
+      "id": "5072",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14503,
+      "id": "29330",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14683,
+      "id": "7991",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14863,
+      "id": "9568",
+      "team": "0",
+      "unit": "armpt"
+    }
+  ],
+  "finished": [
+    {
+      "frame": 302,
+      "id": "24620",
+      "team": "0",
+      "unit": "armsy"
+    },
+    {
+      "frame": 304,
+      "id": "10560",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 308,
+      "id": "12834",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 310,
+      "id": "29006",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 312,
+      "id": "5984",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 317,
+      "id": "17971",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 319,
+      "id": "10684",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 322,
+      "id": "124",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 325,
+      "id": "10994",
+      "team": "0",
+      "unit": "armuwfus"
+    },
+    {
+      "frame": 328,
+      "id": "22326",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 330,
+      "id": "30373",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 333,
+      "id": "18885",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 336,
+      "id": "15500",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 339,
+      "id": "15236",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 342,
+      "id": "6519",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 345,
+      "id": "22959",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 349,
+      "id": "11235",
+      "team": "0",
+      "unit": "armuwmmm"
+    },
+    {
+      "frame": 352,
+      "id": "27380",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 354,
+      "id": "596",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 357,
+      "id": "20517",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 360,
+      "id": "207",
+      "team": "0",
+      "unit": "armuwms"
+    },
+    {
+      "frame": 363,
+      "id": "23411",
+      "team": "0",
+      "unit": "armfrad"
+    },
+    {
+      "frame": 368,
+      "id": "23745",
+      "team": "0",
+      "unit": "armason"
+    },
+    {
+      "frame": 371,
+      "id": "23943",
+      "team": "1",
+      "unit": "corason"
+    },
+    {
+      "frame": 372,
+      "id": "16218",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 377,
+      "id": "4690",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 378,
+      "id": "8691",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 381,
+      "id": "22392",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 385,
+      "id": "26627",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 388,
+      "id": "26186",
+      "team": "0",
+      "unit": "armnanotcplat"
+    },
+    {
+      "frame": 978,
+      "id": "1602",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1188,
+      "id": "28374",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1366,
+      "id": "10155",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1546,
+      "id": "28301",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 1704,
+      "id": "14996",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 1804,
+      "id": "11472",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1806,
+      "id": "27000",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1811,
+      "id": "21302",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1813,
+      "id": "6833",
+      "team": "1",
+      "unit": "corsub"
+    },
+    {
+      "frame": 1840,
+      "id": "31764",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 1975,
+      "id": "7986",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 2162,
+      "id": "6218",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 2288,
+      "id": "17119",
+      "team": "0",
+      "unit": "armcs"
+    },
+    {
+      "frame": 2397,
+      "id": "5597",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2496,
+      "id": "18818",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2615,
+      "id": "29845",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 2878,
+      "id": "17431",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3253,
+      "id": "28362",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3588,
+      "id": "31702",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 3958,
+      "id": "15212",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4268,
+      "id": "15398",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4595,
+      "id": "15944",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 4882,
+      "id": "25694",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5197,
+      "id": "379",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5482,
+      "id": "30878",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 5797,
+      "id": "7596",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 6040,
+      "id": "12903",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6220,
+      "id": "6306",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6385,
+      "id": "1003",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6565,
+      "id": "15696",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6745,
+      "id": "31050",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 6925,
+      "id": "20357",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7074,
+      "id": "3311",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7223,
+      "id": "12893",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7374,
+      "id": "26926",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7524,
+      "id": "2473",
+      "team": "0",
+      "unit": "armpship"
+    },
+    {
+      "frame": 7708,
+      "id": "5925",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 7948,
+      "id": "22507",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8128,
+      "id": "29302",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8414,
+      "id": "23540",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8655,
+      "id": "7300",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 8789,
+      "id": "12183",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 8883,
+      "id": "13953",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 8969,
+      "id": "12437",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9074,
+      "id": "30930",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9164,
+      "id": "22152",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 9430,
+      "id": "26311",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 9755,
+      "id": "25589",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10070,
+      "id": "15789",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10385,
+      "id": "13626",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10670,
+      "id": "26768",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 10857,
+      "id": "11580",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11052,
+      "id": "6790",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11247,
+      "id": "26278",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11457,
+      "id": "22485",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11682,
+      "id": "16708",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 11960,
+      "id": "14295",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12245,
+      "id": "2829",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12652,
+      "id": "27743",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 12965,
+      "id": "18291",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13325,
+      "id": "16814",
+      "team": "0",
+      "unit": "armroy"
+    },
+    {
+      "frame": 13453,
+      "id": "774",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13546,
+      "id": "30242",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13632,
+      "id": "14541",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13726,
+      "id": "8777",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 13846,
+      "id": "19750",
+      "team": "0",
+      "unit": "armdecade"
+    },
+    {
+      "frame": 14009,
+      "id": "8283",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14228,
+      "id": "30966",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14457,
+      "id": "5072",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14637,
+      "id": "29330",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14817,
+      "id": "7991",
+      "team": "0",
+      "unit": "armsub"
+    },
+    {
+      "frame": 14928,
+      "id": "9568",
+      "team": "0",
+      "unit": "arm"
+    }
+  ],
+  "samples": [
+    {
+      "frame": 1800,
+      "live0": 31610.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 3600,
+      "live0": 35175.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 5400,
+      "live0": 40455.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 7200,
+      "live0": 44375.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 9000,
+      "live0": 47860.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 10800,
+      "live0": 53050.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 12600,
+      "live0": 57450.0,
+      "live1": 0.0
+    },
+    {
+      "frame": 14400,
+      "live0": 61405.0,
+      "live1": 0.0
+    }
+  ],
+  "engine_ai_timings": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.032837,
+      "ai_all_p95_ms": 0.570801,
+      "ai_all_max_ms": 9.058228,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.783813,
+      "ai_all_mean_ms": 0.12901
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.038086,
+      "ai_all_p95_ms": 0.623779,
+      "ai_all_max_ms": 3.578613,
+      "sim_speed": 9.834,
+      "ai_all_p99_ms": 1.651855,
+      "ai_all_mean_ms": 0.134723
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036133,
+      "ai_all_p95_ms": 0.592041,
+      "ai_all_max_ms": 2.456055,
+      "sim_speed": 9.997,
+      "ai_all_p99_ms": 1.682373,
+      "ai_all_mean_ms": 0.134445
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.037842,
+      "ai_all_p95_ms": 0.630127,
+      "ai_all_max_ms": 2.738525,
+      "sim_speed": 8.598,
+      "ai_all_p99_ms": 2.092529,
+      "ai_all_mean_ms": 0.150714
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036865,
+      "ai_all_p95_ms": 0.59375,
+      "ai_all_max_ms": 3.105225,
+      "sim_speed": 10.002,
+      "ai_all_p99_ms": 2.041992,
+      "ai_all_mean_ms": 0.14894
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.032959,
+      "ai_all_p95_ms": 0.5896,
+      "ai_all_max_ms": 3.030762,
+      "sim_speed": 9.997,
+      "ai_all_p99_ms": 2.243408,
+      "ai_all_mean_ms": 0.152145
+    },
+    {
+      "t": 0.0,
+      "f": 12600.0,
+      "frame": 12600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.033203,
+      "ai_all_p95_ms": 0.628418,
+      "ai_all_max_ms": 3.208496,
+      "sim_speed": 10.002,
+      "ai_all_p99_ms": 2.383789,
+      "ai_all_mean_ms": 0.159872
+    },
+    {
+      "t": 0.0,
+      "f": 14400.0,
+      "frame": 14400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.03418,
+      "ai_all_p95_ms": 0.662598,
+      "ai_all_max_ms": 3.687256,
+      "sim_speed": 8.597,
+      "ai_all_p99_ms": 2.669922,
+      "ai_all_mean_ms": 0.169265
+    }
+  ],
+  "target_category_mismatches": [],
+  "limitations": [
+    "Raw damage includes overkill; last-hit credit is not proportional damage credit.",
+    "Commands count per-unit engine callbacks, not player UI actions or network packet bytes. Lua gadget commands are included in legacy totals; use order_sources where available. Non-Lua is a proxy, not a packet measurement.",
+    "Older observers omit carrier-child damage and losses; updated child records expand accounting and cannot be compared silently with old totals.",
+    "Profiler covers all engine AI callbacks, not this policy alone; concurrent games and changing live populations invalidate CPU comparisons.",
+    "A fixed matchup is a regression fixture, not proof of human PvP superiority.",
+    "Both AIs use the selected policy; not a candidate-vs-baseline tournament."
+  ]
+}

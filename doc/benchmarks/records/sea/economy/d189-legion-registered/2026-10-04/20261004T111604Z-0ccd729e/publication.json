@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "c7c63b67657906420e2ac4c6adb967649493778669f751060a98522fb3a30227",
+    "checks.json": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d",
+    "eco-score-v3.json": "795bb4453d9ba2866993030f9a4ed516ce6d4617434958cc3a1170d3403ee23f",
+    "launched.json": "f23812b75d34a611ff25e23ef7b7e512ec7a3aa85a20d7cd225ba87dce75dd9a",
+    "report.md": "5718ebad82b82b5813898d2413947f3ad2f8f215de9dc736095f0169a4728867",
+    "result.json": "29e1fb718c48ef237f9c4409cc457d270e70d1f5456f891e8777bfb51aaf6bb6",
+    "run-inputs.json": "aebc7db02a70eec3ca177ce8d771c400b5dcfdb5c41ce47bd557e7fdb813dd4a",
+    "run-plan.json": "fccf9d94eecb18f66f243ebe1085477427975937abe75afa456636a0ef6f208b",
+    "screen_2026-10-04_11-15-55-232.png": "8d25c7affceec0baa48bfd3512b71910ae86347059eab6c8fe5581952d8b74be",
+    "script.txt": "b2a7d58837addb3a5bc28e3f4c9cab50e17cb16e5650580995ccb45747328571",
+    "sea-fixture.json": "11829761ca8c825041596bd630fe8b991ef513d555de286c58089a0622816beb",
+    "staged.json": "6963e8bb0423afcff2d952d7b9c79d9dd076f4904e88b17a794694685de86b59",
+    "teams.json": "e5987966ca88cbb496e43f55fc37a8f2045cf31b979a7c09ac338a194754387b"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d189-legion-registered\\glacial\\20261004T111140Z-93a49113\\runs\\20261004T111604Z-0ccd729e",
+  "schema": 1
+}

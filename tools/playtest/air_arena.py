@@ -180,7 +180,8 @@ def prepare(args):
             if group.get('team', 0) == 1:
                 group['count'] = args.fighters
     base.mkdir(parents=True, exist_ok=True)
-    subprocess.run([sys.executable, str(ROOT/'tools/knowledge/check_script_api.py'), '--dll', str(args.dll)], check=True)
+    subprocess.run([sys.executable, str(ROOT/'tools/knowledge/check_script_api.py'), '--dll', str(args.dll),
+        '--scripts', str((args.data or ROOT/'data')/'script')], check=True)
     # All standard start sites, not just the two AI home locations, supply sensors.
     import playtest
     spots = playtest.map_spots(args.map, args.map_file)

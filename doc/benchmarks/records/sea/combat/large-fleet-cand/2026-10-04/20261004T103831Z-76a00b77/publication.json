@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "b57ac8876aa7637123dbacad1041d84184eb124adac3f56469084fd45b3a1daa",
+    "checks.json": "94dedf93ff5dc43628a5a1f7fbbfd99054631d7b3998248cb9922e1ead89d7d7",
+    "combat-score-v2.json": "7ab7e8a5d7aad5361ca779f944cbcc4ebe99296250511c88637472ecf9ee7331",
+    "combat-scorecard.json": "a89a210b9580c8d3bb714bd15cb9c27164e71ad58c103316f96c8d87f09d28b6",
+    "launched.json": "041656930e7c710f2dade6e349718982365c4625883ecbcfac69fac6cf1c8852",
+    "report.md": "d62a63044606a08e34d73add11aeb60e130d32df6ecd41567972bd535c7a164c",
+    "result.json": "bcca4fc92ddf2d0d0a19136f4c95c36ce09dc2199469114967e1cfb33131e0a0",
+    "run-inputs.json": "052c6c75f7e60af154dd7ce1793fd8333d8f836fbd77383198bac7a103096e81",
+    "run-plan.json": "69ba435e777562b4634136a7c655fdcbcd2ba2ab206df61d5e643eb23967055e",
+    "screen_2026-10-04_10-37-43-429.png": "484eb144b19aa6da663549fd520917f6dd4ca17adbf5e06474747de92e26d24a",
+    "script.txt": "34e25fae190527eebcb24c053e231278011d867c9d4a93ef76884b06005a7cdd",
+    "sea-arena-pins.json": "ed09a2d8d09c7eed2505a5973e02a1ea2275bedfc198ba2ee171e65c5f73ec8d",
+    "sea-arena.json": "c981bd8d246f2b462f9456e4a7741202bb7bb5b0e9dbb7fa1391c74bbc54c73b",
+    "staged.json": "ce4b6fa66002b37d269f86e4af15af5532aa7ca733ed8640228f25dc124e6f0e",
+    "starts.as": "de2c5147e08c07cdc819c9666b7f971f4707be7961c90c835852983b8b958b61",
+    "teams.json": "a815f9fc6425ef9a33cb7a23d0bcc47f49aae9c3244e9a169a23a380fb2cdbaf"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\large-fleet-cand\\glacial\\20261004T103646Z-b2f903e0\\runs\\20261004T103831Z-76a00b77",
+  "schema": 1
+}

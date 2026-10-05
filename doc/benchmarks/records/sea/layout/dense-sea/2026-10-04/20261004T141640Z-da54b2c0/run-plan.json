@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "layout",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "dense-sea"
+  },
+  "id": "20261004T141518Z-d3a97d7d",
+  "requested": {
+    "seed": 1901
+  },
+  "schema": 1
+}

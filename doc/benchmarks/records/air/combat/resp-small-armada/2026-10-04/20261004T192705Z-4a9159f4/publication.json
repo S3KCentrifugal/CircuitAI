@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "82485ceea913e6403bec116784c08f240d59fead8bdec166d5b6bbcf7619b44b",
+    "checks.json": "2a67fefab15b3eb1bff7dcecacdb49b367181383ebddaacf989f0c317bee7418",
+    "launched.json": "053785dccd7188ff06c598033ca6369ce8941b9f643dc1bfd7328fbe1ed88165",
+    "report.md": "278713b6bb473c1ce77f1da64d7ae6c45a44453fd109db5e83e8f2cceebae498",
+    "response-checks.json": "2a67fefab15b3eb1bff7dcecacdb49b367181383ebddaacf989f0c317bee7418",
+    "response-manifest.json": "41e8673241db921c4065e355d3ae252f40fa27f931bdb55643d40829d0d316b4",
+    "response-observations.json": "9e9ca867e7a11caa1e4d373074f214fe4885d2d6b824c6301daaf2d62523ba22",
+    "result.json": "650924a9063dd24fe3d3c1b69a82d93290d55eb7f769c2809987ff3daec5ee68",
+    "run-inputs.json": "b631ea18ca441418863552569190ad8faec4ee348071f3274d4b877ddaad1b6f",
+    "run-plan.json": "fa2a48f27c8c3b2e4181a3227fea05bce9019f7e4ad12f664573b857b4a1a3ab",
+    "screen_2026-10-04_19-26-29-753.png": "1512a1a44395bc033e42bbcf308018fd3b123b87af2f48cfd7612f3c8f6b4c17",
+    "script.txt": "2062b3a5285a8d55fc49540154ef8a6e8f8a3d39383eaf4b117105dc15b4e771",
+    "staged.json": "26e6a500feb54e55f6fab55cdde700e1695d9e43c08cdb640c91993446596b6c",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\resp-small-armada\\supreme\\20261004T192505Z-68ed5547\\runs\\20261004T192705Z-4a9159f4",
+  "schema": 1
+}

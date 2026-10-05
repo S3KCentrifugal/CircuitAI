@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "2f9da2b819fadfef1dcbe70bc9232b60d11e7b4f9d0cda7a5454affffcf53f10",
+    "base-source.json": "fddd9f9e94da77e043c2a94338cdd5094b476a429aa14650c4c34c27d9fd0fad",
+    "checks.json": "5ee86b18e4973535d4285d2f53fca7650fb777f789468a9a42e4335e47f17b2f",
+    "launched.json": "872b6af2dad0581f960bc5b6cc1802c6dd8773e41756f9304a381f1bda26e06d",
+    "report.md": "d6aab98689b5099887d98e64005dda5fc26fc92f6b0cfcc87e8ab78f2758b676",
+    "result.json": "0bc62658040a6707e0e7c59aa5357b046ab54e479d7f14dc44d250f2754f4f3a",
+    "run-inputs.json": "98959be72f1a32cf5a6753548b8295358bcda6dc864366b241c1c5681746aff4",
+    "run-plan.json": "58f06a3e5e6197bdf07410e370360890b59b121e6784fed0aa7a7891a9a36bfd",
+    "screen_2026-10-04_18-26-12-621.png": "7e913b086c9e648c406f1aec8a399282cdf4b5e3d88448ba5a5d5ed0cc636dfd",
+    "script.txt": "80a6ca2e6809e34049936cef968da7b275fb6529371996f377eee595c1fb667a",
+    "source-manifest.json": "fddd9f9e94da77e043c2a94338cdd5094b476a429aa14650c4c34c27d9fd0fad",
+    "staged.json": "6b4274995f101a0f1118afd61486433643b886f50b9aecab1c4f89542f437aea",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\allied-bases-supplied\\glacial\\20261004T182429Z-9e639925\\runs\\20261004T182617Z-fadefac3",
+  "schema": 1
+}

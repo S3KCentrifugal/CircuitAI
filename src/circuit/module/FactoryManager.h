@@ -136,6 +136,7 @@ public:
 	virtual ~CFactoryManager();
 
 	void InitHandlers();
+	bool RegisterScriptFactory(CCircuitDef* def, const CCircuitDef* prototype);
 private:
 	void ReadConfig();
 	void Init();

@@ -1,0 +1,14 @@
+{
+  "case": "air",
+  "supplied_resources": true,
+  "overrides": [
+    "builders run fixture work",
+    "factories recruit fixed products in support case",
+    "role forced",
+    "SEA experimental enabled"
+  ],
+  "counts": {
+    "armmmkr": 8
+  },
+  "support": false
+}

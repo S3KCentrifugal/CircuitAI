@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "cohort-candidate"
+  },
+  "id": "20261004T101840Z-7f158cb6",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

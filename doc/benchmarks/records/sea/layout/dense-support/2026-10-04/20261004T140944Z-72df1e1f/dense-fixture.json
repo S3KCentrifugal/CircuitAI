@@ -1,0 +1,12 @@
+{
+  "case": "support",
+  "supplied_resources": true,
+  "overrides": [
+    "builders run fixture work",
+    "factories recruit fixed products in support case",
+    "role forced",
+    "SEA experimental enabled"
+  ],
+  "counts": {},
+  "support": true
+}

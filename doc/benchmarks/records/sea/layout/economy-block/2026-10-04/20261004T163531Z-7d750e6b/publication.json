@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "2dac70cc174e4943c80734f529d8a0b9a4f8f2448a86d82b6b58bf19d4903201",
+    "checks.json": "161e4b8904b1e7502a56200109c6837bd499531449289bb1fb7ad5659f3701bb",
+    "d191-source.json": "46cf941c781fad317c441c53c3c09ed61db984357a05c042bb2408156ace322d",
+    "launched.json": "d00c64faecc8b457cc8f36b017a1308bfd68615ef547654281da3262feebb689",
+    "report.md": "96786c0f7e58f3ae0075ef35dec9832fbf04013e03d39f4d872eeb18887da0b4",
+    "result.json": "4b703358cc5c4548079faf541a29997ff5eb9bbf634a95ae46d7b79a86d87ae3",
+    "run-inputs.json": "1cb9a879ae305ca0aac30d917627bc0b399ca3cb6f40834da866ea2af5b4af4f",
+    "run-plan.json": "59007189c9a2a48725d573fd533d75230fa9f1002386d0cfeaa6bbb7aee4da25",
+    "script.txt": "ed92589befa96231f1b08d785a4c9e52c63926727b5e00b378ec9b497bf1af27",
+    "sea-block-pins.json": "18053ead2d0639debf9791ca865690fdd476576d8a3dbd6e001cf3c94819f067",
+    "staged.json": "d22cf65e7c52b74c1517bbaa27359ca8e5086e9b05660b2fe9b0c52c04a72b72",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\layout\\economy-block\\supreme\\20261004T163347Z-b8e41e38\\runs\\20261004T163531Z-7d750e6b",
+  "schema": 1
+}

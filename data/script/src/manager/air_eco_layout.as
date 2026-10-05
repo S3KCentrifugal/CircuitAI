@@ -132,7 +132,7 @@ namespace AirEcoLayout {
         const float rd = float(reactor.GetFootprintZ()) * SQUARE_SIZE;
         const float cw = float(converter.GetFootprintX()) * SQUARE_SIZE;
         const float cd = float(converter.GetFootprintZ()) * SQUARE_SIZE;
-        const float pitch = 2.0f * cw + 16.0f;
+        const float pitch = 2.0f * cw; // advanced converters touch footprint edges
         CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(side));
         const float nanoSize = nano is null ? 0.0f : float(AiMax(nano.GetFootprintX(), nano.GetFootprintZ())) * SQUARE_SIZE * 2.0f;
         const int supportRows = (AiMax(0, AiMin(20, Global::RoleSettings::Air::EcoSupportSlots)) + 5) / 6;
@@ -140,7 +140,7 @@ namespace AirEcoLayout {
             3.0f * nanoSize) + 16.0f;
         const float bankZ = rd + AiMax(Global::RoleSettings::Air::EcoConverterClearance,
             float(supportRows) * nanoSize + 32.0f) + cd;
-        const float front = ConverterSlots() == 0 ? rd + float(supportRows) * nanoSize + 32.0f : bankZ + 3.0f * cd + 16.0f;
+        const float front = ConverterSlots() == 0 ? rd + float(supportRows) * nanoSize + 32.0f : bankZ + 3.0f * cd;
         const float along = (front + rd) * 0.5f + 16.0f;
         const float shift = (front - rd) * 0.5f;
         // Fine candidate spacing can move an unused module around one blocker
@@ -177,12 +177,13 @@ namespace AirEcoLayout {
                 at = aiTerrainMgr.GetReservationPos(first);
                 for (int s = 0; s < ConverterSlots(); ++s) {
                     const AIFloat3 p = AirLayout::Offset(at, f, (float(s % 4) - 1.5f) * pitch,
-                        bankZ + float(s / 4) * (2.0f * cd + 16.0f));
+                        bankZ + float(s / 4) * (2.0f * cd));
                     const int id = aiTerrainMgr.ReservePersistentBuilding(converter, p, f);
                     if (id < 0) break;
                     slots.insertLast(id);
                 }
-                if (slots.length() != uint(1 + ConverterSlots())) {
+                if (slots.length() != uint(1 + ConverterSlots()) || (ConverterSlots()>0
+                    && !LayoutHelpers::CheckGrid(slots,1,4,f,pitch,2.0f*cd))) {
                     for (uint s = 0; s < slots.length(); ++s) aiTerrainMgr.ReleasePersistentBuilding(slots[s]);
                     continue;
                 }

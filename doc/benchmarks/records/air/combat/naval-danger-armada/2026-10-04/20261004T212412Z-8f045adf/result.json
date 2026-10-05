@@ -1,0 +1,105 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 999,
+      "sha256": "1ece40cc3cf621e4c246788e267b7c443730451188f416f84ab0f6caf0e79f6e"
+    },
+    "infolog.txt": {
+      "bytes": 719744,
+      "sha256": "1e816fb40492fb3db47be83f29408983d31acfbdedca807334274be738699b1e"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "f018dbdc849babed136bae7f70ef52d8a9f48bebcf34b89ef81bf69a4180e984"
+    },
+    "naval-checks.json": {
+      "bytes": 999,
+      "sha256": "1ece40cc3cf621e4c246788e267b7c443730451188f416f84ab0f6caf0e79f6e"
+    },
+    "naval-manifest.json": {
+      "bytes": 37323,
+      "sha256": "f84ca403d7dfc7adffaa0cc3d1e956a5fcd95061ba6fdede979244e5fc4f618f"
+    },
+    "report.md": {
+      "bytes": 43006,
+      "sha256": "9909bb0fb5e6c7fd0dcd4c426d2be4a5ba7e5267b3538bea41325ca8637c4e19"
+    },
+    "run-inputs.json": {
+      "bytes": 36243,
+      "sha256": "87f8d028238eb8871552089aa86022dfee3743b46a3b3509381c48a680e3c07c"
+    },
+    "run-plan.json": {
+      "bytes": 256,
+      "sha256": "a580c07fd84c59b7a92245ba9d6893609d4133ba9227fcf6190b5bf6e98f04f0"
+    },
+    "script.txt": {
+      "bytes": 6514,
+      "sha256": "20f7b7635ff4708ba0035c2c1dc35509269ac641de3e5c746559fbd3d9f4c69f"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "9ebf7b0b101abe61ff3c1d4b22c47d035f7b290c2595d172756d3f31b18b23f3"
+    },
+    "starts.as": {
+      "bytes": 170,
+      "sha256": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162"
+    },
+    "teams.json": {
+      "bytes": 640,
+      "sha256": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "naval-danger-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T212412Z-8f045adf",
+  "last_frame": 12810,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-danger-armada\\supreme\\20261004T212253Z-9ce504f3\\runs\\20261004T212412Z-8f045adf",
+  "reason": "reached 7 min",
+  "recorded_at_utc": "2026-10-04T21:24:12.791299+00:00",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "PASS"
+}

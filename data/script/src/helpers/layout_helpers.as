@@ -26,6 +26,20 @@ side vectors as Side() here, so a grid and an offset agree on left and right.
 
 namespace LayoutHelpers {
     int alliedCheckFrame = -100000;
+    // Validate snapped sites once at reservation time, not every simulation tick.
+    bool CheckGrid(const array<int> &in slots, uint first, int columns, int facing, float width, float depth) {
+        if (columns<=0 || first>=slots.length()) return false;
+        const AIFloat3 origin=aiTerrainMgr.GetReservationPos(slots[first]);
+        for (uint i=first+1; i<slots.length(); ++i) {
+            const int cell=int(i-first);
+            const AIFloat3 expected=Offset(origin,facing,float(cell%columns)*width,float(cell/columns)*depth);
+            if (MapHelpers::SqDist(expected,aiTerrainMgr.GetReservationPos(slots[i]))>1.0f) {
+                Invariants::Violation("INV-136",""+slots[i],"dense economy grid pitch changed after engine snapping");
+                return false;
+            }
+        }
+        return true;
+    }
     void CheckAlliedPlacements()
     {
         if (ai.frame - alliedCheckFrame < SECOND) return;

@@ -1,0 +1,143 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 622,
+      "sha256": "25538e906bc917cd543cbe6fb141bff596b3b6759a8d1e5df70889d2df64f49d"
+    },
+    "infolog.txt": {
+      "bytes": 3095302,
+      "sha256": "6df33de285d9f2799ca1355b799a03d5313d528c33c3db9c6f5f318d9e8c5877"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "f23812b75d34a611ff25e23ef7b7e512ec7a3aa85a20d7cd225ba87dce75dd9a"
+    },
+    "report.md": {
+      "bytes": 25346,
+      "sha256": "5718ebad82b82b5813898d2413947f3ad2f8f215de9dc736095f0169a4728867"
+    },
+    "run-inputs.json": {
+      "bytes": 35652,
+      "sha256": "aebc7db02a70eec3ca177ce8d771c400b5dcfdb5c41ce47bd557e7fdb813dd4a"
+    },
+    "run-plan.json": {
+      "bytes": 264,
+      "sha256": "fccf9d94eecb18f66f243ebe1085477427975937abe75afa456636a0ef6f208b"
+    },
+    "screen_2026-10-04_11-12-51-832.png": {
+      "bytes": 1789026,
+      "sha256": "bb1375d5f74fd2598eb4d278bd41cffcd110f87b68e72585392ff2eb21ab8444"
+    },
+    "screen_2026-10-04_11-13-12-832.png": {
+      "bytes": 1818590,
+      "sha256": "90741170812db9cec2450d75d340960543ed2da8079905b88087cff49091224b"
+    },
+    "screen_2026-10-04_11-14-18-833.png": {
+      "bytes": 1818280,
+      "sha256": "eb17cbd38a594e511da593176b5fadb706f1e46ba545b45d4a8addbf408bd0b4"
+    },
+    "screen_2026-10-04_11-15-55-232.png": {
+      "bytes": 1789785,
+      "sha256": "8d25c7affceec0baa48bfd3512b71910ae86347059eab6c8fe5581952d8b74be"
+    },
+    "script.txt": {
+      "bytes": 7500,
+      "sha256": "b2a7d58837addb3a5bc28e3f4c9cab50e17cb16e5650580995ccb45747328571"
+    },
+    "sea-fixture.json": {
+      "bytes": 294,
+      "sha256": "11829761ca8c825041596bd630fe8b991ef513d555de286c58089a0622816beb"
+    },
+    "staged.json": {
+      "bytes": 234,
+      "sha256": "6963e8bb0423afcff2d952d7b9c79d9dd076f4904e88b17a794694685de86b59"
+    },
+    "teams.json": {
+      "bytes": 1164,
+      "sha256": "e5987966ca88cbb496e43f55fc37a8f2045cf31b979a7c09ac338a194754387b"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "d189-legion-registered"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T111604Z-0ccd729e",
+  "last_frame": 54042,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d189-legion-registered\\glacial\\20261004T111140Z-93a49113\\runs\\20261004T111604Z-0ccd729e",
+  "reason": "reached 30 min",
+  "recorded_at_utc": "2026-10-04T11:16:04.695305+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 5,
+      "team": 0,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 6,
+      "team": 1,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 7,
+      "team": 2,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 3,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 4,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 5,
+      "x": 12618.0,
+      "z": 5800.0
+    }
+  ],
+  "verdict": "PASS"
+}

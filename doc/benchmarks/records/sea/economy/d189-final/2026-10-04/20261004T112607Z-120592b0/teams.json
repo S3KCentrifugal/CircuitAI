@@ -1,0 +1,146 @@
+{
+  "game": "Beyond All Reason test-31479-433a460",
+  "map": "Serene Caldera v1.3",
+  "teams": [
+    {
+      "team": 0,
+      "spot": 1,
+      "x": 2800.0,
+      "z": 2900.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 1,
+      "spot": 2,
+      "x": 4500.0,
+      "z": 1600.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 2,
+      "spot": 3,
+      "x": 6600.0,
+      "z": 1000.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "cortex"
+    },
+    {
+      "team": 3,
+      "spot": 4,
+      "x": 8000.0,
+      "z": 2900.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "legion"
+    },
+    {
+      "team": 4,
+      "spot": 6,
+      "x": 10100.0,
+      "z": 3200.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 5,
+      "spot": 7,
+      "x": 11000.0,
+      "z": 1600.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "cortex"
+    },
+    {
+      "team": 6,
+      "spot": 8,
+      "x": 12800.0,
+      "z": 2700.0,
+      "role": "SEA",
+      "ally": 0,
+      "ai": "test",
+      "side": "legion"
+    },
+    {
+      "team": 7,
+      "spot": 9,
+      "x": 2800.0,
+      "z": 12600.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 8,
+      "spot": 10,
+      "x": 4500.0,
+      "z": 13800.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "cortex"
+    },
+    {
+      "team": 9,
+      "spot": 12,
+      "x": 8000.0,
+      "z": 13000.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "legion"
+    },
+    {
+      "team": 10,
+      "spot": 13,
+      "x": 8800.0,
+      "z": 14300.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 11,
+      "spot": 14,
+      "x": 10100.0,
+      "z": 13000.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "cortex"
+    },
+    {
+      "team": 12,
+      "spot": 15,
+      "x": 11000.0,
+      "z": 14200.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "legion"
+    },
+    {
+      "team": 13,
+      "spot": 16,
+      "x": 12800.0,
+      "z": 12500.0,
+      "role": "SEA",
+      "ally": 1,
+      "ai": "test",
+      "side": "armada"
+    }
+  ]
+}

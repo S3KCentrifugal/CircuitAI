@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "weapon-work-hard"
+  },
+  "id": "20261005T023609Z-eff7662d",
+  "requested": {
+    "seed": 1991
+  },
+  "schema": 1
+}

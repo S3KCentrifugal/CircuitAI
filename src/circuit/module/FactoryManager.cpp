@@ -329,6 +329,43 @@ void CFactoryManager::InitHandlers()
 	}
 }
 
+bool CFactoryManager::RegisterScriptFactory(CCircuitDef* def, const CCircuitDef* prototype)
+{
+    if (def == nullptr || prototype == nullptr || def->IsMobile() || !def->IsBuilder()
+        || def->GetImmobileId() < 0) return false;
+    if (factoryDefs.find(def->GetId()) != factoryDefs.end()) return true;
+    auto source = factoryDefs.find(prototype->GetId());
+    if (source == factoryDefs.end() || createdHandler.find(prototype->GetId()) == createdHandler.end()) return false;
+    // Explicit opt-in only, before construction. Existing definitions are never
+    // replaced. Script owns procurement; these uniform weights are a fallback.
+    SFactoryDef result = source->second;
+    result.startImp = result.switchImp = 0.f;
+    result.buildDefs.clear(); result.landDef = result.waterDef = nullptr;
+    std::vector<CCircuitDef::Id> options(def->GetBuildOptions().begin(), def->GetBuildOptions().end());
+    std::sort(options.begin(), options.end());
+    for (auto id : options) {
+        CCircuitDef* product = circuit->GetCircuitDef(id);
+        if (product == nullptr || !product->IsMobile()) continue;
+        result.buildDefs.push_back(product);
+        if (result.waterDef == nullptr || product->GetDef()->GetXSize() * product->GetDef()->GetZSize()
+            > result.waterDef->GetDef()->GetXSize() * result.waterDef->GetDef()->GetZSize()) result.waterDef = product;
+    }
+    if (result.buildDefs.empty()) return false;
+    result.landDef = result.waterDef;
+    const std::vector<float> weights(result.buildDefs.size(), 1.f / result.buildDefs.size());
+    for (auto* tiers : {&result.airTiers, &result.landTiers, &result.waterTiers}) {
+        tiers->clear(); (*tiers)[0] = weights;
+    }
+    result.incomes.assign(1, std::numeric_limits<float>::max());
+    factoryDefs[def->GetId()] = std::move(result);
+    createdHandler[def->GetId()] = createdHandler.at(prototype->GetId());
+    finishedHandler[def->GetId()] = finishedHandler.at(prototype->GetId());
+    idleHandler[def->GetId()] = idleHandler.at(prototype->GetId());
+    destroyedHandler[def->GetId()] = destroyedHandler.at(prototype->GetId());
+    circuit->GetEconomyManager()->AddFactoryDef(def);
+    return true;
+}
+
 void CFactoryManager::ReadConfig()
 {
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();

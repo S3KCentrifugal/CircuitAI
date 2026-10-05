@@ -1,0 +1,134 @@
+{
+  "checkpoints": {},
+  "egress": {
+    "departures": 2,
+    "limitation": "Includes constructors. Older observers can miss delayed departures. Destroyed and still-pending products have no successful departure record; their denominator was not captured.",
+    "median_seconds": 4.5,
+    "over_60s_observations": 1,
+    "p95_seconds": 4.6
+  },
+  "failures": [
+    "Runtime errors/invariants present"
+  ],
+  "log": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\mixed-legacy-control\\glacial\\20261004T045153Z-b96b3051\\runs\\20261004T045300Z-e05c8858\\infolog.txt",
+  "milestones_minutes": {
+    "first_nano": null,
+    "naval_fusion": null,
+    "t1_yard": 0.8872222222222222,
+    "t2_constructor": null,
+    "t2_yard": null
+  },
+  "runtime_violations": 1,
+  "samples": [
+    {
+      "build_power": 300.0,
+      "busy_yards": 0.0,
+      "energy": 1000.0,
+      "energy_income": 0.0,
+      "energy_storage": 1000.0,
+      "energy_use": 0.0,
+      "frame": 0.0,
+      "idle_power": 300.0,
+      "metal": 1000.0,
+      "metal_income": 0.0,
+      "metal_storage": 1000.0,
+      "metal_use": 0.0,
+      "units": {
+        "armcom": 1
+      },
+      "yards": 0.0
+    },
+    {
+      "build_power": 300.0,
+      "busy_yards": 0.0,
+      "energy": 496.7,
+      "energy_income": 53.0,
+      "energy_storage": 1050.0,
+      "energy_use": 33.4,
+      "frame": 900.0,
+      "idle_power": 0.0,
+      "metal": 895.2,
+      "metal_income": 6.0,
+      "metal_storage": 1100.0,
+      "metal_use": 12.3,
+      "units": {
+        "armcom": 1,
+        "armmex": 2,
+        "armtide": 1
+      },
+      "yards": 0.0
+    },
+    {
+      "build_power": 450.0,
+      "busy_yards": 1.0,
+      "energy": 898.5,
+      "energy_income": 76.0,
+      "energy_storage": 1200.0,
+      "energy_use": 92.7,
+      "frame": 1800.0,
+      "idle_power": 0.0,
+      "metal": 515.3,
+      "metal_income": 6.0,
+      "metal_storage": 1200.0,
+      "metal_use": 8.7,
+      "units": {
+        "armcom": 1,
+        "armmex": 2,
+        "armsy": 1,
+        "armtide": 2
+      },
+      "yards": 1.0
+    },
+    {
+      "build_power": 575.0,
+      "busy_yards": 1.0,
+      "energy": 164.2,
+      "energy_income": 106.0,
+      "energy_storage": 1300.0,
+      "energy_use": 134.9,
+      "frame": 2700.0,
+      "idle_power": 0.0,
+      "metal": 358.5,
+      "metal_income": 10.0,
+      "metal_storage": 1300.0,
+      "metal_use": 24.9,
+      "units": {
+        "armcom": 1,
+        "armcs": 1,
+        "armmex": 4,
+        "armsy": 1,
+        "armtide": 3
+      },
+      "yards": 1.0
+    },
+    {
+      "build_power": 700.0,
+      "busy_yards": 0.0,
+      "energy": 1028.0,
+      "energy_income": 182.0,
+      "energy_storage": 1500.0,
+      "energy_use": 138.5,
+      "frame": 3600.0,
+      "idle_power": 0.0,
+      "metal": 69.7,
+      "metal_income": 10.0,
+      "metal_storage": 1300.0,
+      "metal_use": 25.8,
+      "units": {
+        "armcom": 1,
+        "armcs": 2,
+        "armmex": 4,
+        "armpt": 1,
+        "armsy": 1,
+        "armtide": 6
+      },
+      "yards": 1.0
+    }
+  ],
+  "schema": 2,
+  "survival": {
+    "first_empty_minute": null,
+    "last_live_sample_minute": 2.0,
+    "status": "alive_at_last_sample"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-factory-armada\\glacial\\20261004T205807Z-94189ef0\\runs\\20261004T205938Z-9e70d26b\\infolog.txt",
+  "naval_launches": [
+    {
+      "frame": 1830,
+      "event": "17 wanted=17 target=5034 reason=full ingress=2947,3915"
+    },
+    {
+      "frame": 2580,
+      "event": "9 wanted=9 target=10044 reason=full ingress=3058,3622"
+    },
+    {
+      "frame": 3480,
+      "event": "6 wanted=6 target=20009 reason=full ingress=3186,3622"
+    }
+  ],
+  "recon_launches": [],
+  "patrol_assignments": 0,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 20,
+  "first_damage_frame": 2387,
+  "damage": 18828,
+  "naval_kills": 5,
+  "peak_air_apm": 964,
+  "peak_all_apm": 978,
+  "max_patrols": 0,
+  "max_patrol_span": [
+    0,
+    0
+  ],
+  "return_survivors": [],
+  "invariants": []
+}

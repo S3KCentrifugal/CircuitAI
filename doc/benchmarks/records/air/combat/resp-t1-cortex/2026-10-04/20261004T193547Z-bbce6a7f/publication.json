@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "91cd60fa8fa087c2e95a99992b48d279c9adfd00ecafa9452d559edd59113b77",
+    "checks.json": "edd71ec20971e4c075bcc7153c4fe39a61b86a2214036761ed188661a85637ce",
+    "launched.json": "612d83772ce3c8721463866d2fa0570d29a77499263b1a9c84b66c0a7e01fc0e",
+    "report.md": "4e1401a1e67d817b42a213773027b9fae14561abed7a04b1d4ed684a3fc4f383",
+    "response-checks.json": "edd71ec20971e4c075bcc7153c4fe39a61b86a2214036761ed188661a85637ce",
+    "response-manifest.json": "c021a02c83305e935ab2a9e9bc63faf2aa1efd9f981020207710b2c56a44f122",
+    "response-observations.json": "9752e26480fe4d0f6111c789f863179774731ff8b9e814f99510570c76cf1464",
+    "result.json": "59ba075869fb903f9efaf16cff2d8850b2395cfb0b31b7838c6313c46e03d1b9",
+    "run-inputs.json": "cf3ac073d0490c454d8a87cbb3d787775c839e95d0a8f17938a671d4222ccacc",
+    "run-plan.json": "2f1b9be75deeb3fb6138ffd8ae43d808c712c6de79363c34fad653106f4f73da",
+    "screen_2026-10-04_19-35-18-861.png": "f4b76a3f40ec933892998703e7c6c19566183d76f65afb47388ca15f2ed715e2",
+    "script.txt": "ea7efab96fcba861a5fb34f81b0439eaafcea83c25fc7f33a932b9d30e5ea8b5",
+    "staged.json": "3e7561de08e8cb8413025bda81b07f870255c78fce6ea64dfde3eb784e1b0559",
+    "starts.as": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162",
+    "teams.json": "e9aee302fac12520db4a32d18b4ca2df8d4c0d6fefb81e326c896579c7e7f7b0"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\resp-t1-cortex\\supreme\\20261004T193405Z-5ae1f991\\runs\\20261004T193547Z-bbce6a7f",
+  "schema": 1
+}

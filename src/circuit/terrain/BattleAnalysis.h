@@ -91,9 +91,22 @@ public:
 	float AirHeat(const springai::AIFloat3& pos, float radius) const;
 	springai::AIFloat3 AirCentre(const springai::AIFloat3& pos, float radius) const;   // -1 x when none
 	float EnemyCost(int kind) const;
+	// Explicitly requested local, visible naval composition. No role policy here.
+	void SampleNavalThreat(const springai::AIFloat3& origin, float radius);
+	float GetNavalThreatCost(int kind) const { return kind >= 0 && kind < 4 ? navalThreatCost[kind] : 0.f; }
 	int EnemyCount(int kind) const;
 	float SurfThreat(const springai::AIFloat3& pos) const;
 	float AirThreat(const springai::AIFloat3& pos) const;
+    float AirThreatAlong(const springai::AIFloat3& from, const springai::AIFloat3& to, float padding) const;
+    // Opt-in completed combat navy/factory snapshot. Flags: allied=1,
+    // submerged=2, anti-sub weapon=4, factory=8. No role decisions here.
+    int GetNavalForceCount();
+    int GetNavalForceId(int index) const;
+    int GetNavalForceDefId(int index) const;
+    int GetNavalForceFlags(int index) const;
+    int GetNavalForceBody(int index) const;
+    float GetNavalForceCost(int index) const;
+    springai::AIFloat3 GetNavalForcePos(int index) const;
 	int GetAirContactCount() const { return static_cast<int>(airContacts.size()); }
     int GetAirContactId(int index) const { return index >= 0 && static_cast<size_t>(index) < airContacts.size() ? airContacts[index].id : -1; }
 	springai::AIFloat3 GetAirContactPos(int index) const;
@@ -102,6 +115,8 @@ public:
     float GetArmedAirCost() const;
     float AmphThreat(const springai::AIFloat3& pos) const;
     int GetGroundContactCount() const { return static_cast<int>(groundContacts.size()); }
+    int GetGroundContactId(int index) const;
+    int GetGroundContactDefId(int index) const;
     springai::AIFloat3 GetGroundContactPos(int index) const;
     float GetGroundContactCost(int index) const;
     bool IsGroundContactEconomy(int index) const;
@@ -120,6 +135,7 @@ public:
         float landCost, float waterCost, float threatWeight, float maxWaterThreat);
 
 	// --- water
+	void PrepareWater() { BuildWater(); }  // idempotent, without lane/beach policy side effects
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
 	bool IsHostileWater(int body, bool subDepth) const;
 	void MarkHostileWater(const springai::AIFloat3& pos, float radius);
@@ -168,6 +184,16 @@ public:
 	std::vector<springai::AIFloat3> GetLaneRoute(int lane, const springai::AIFloat3& from, int cls) const;
 
 private:
+	float navalThreatCost[4] = {}; // surface mobile, submerged, strike aircraft, water static
+    struct NavalForce { springai::AIFloat3 pos; float cost; int id, defId, flags, body; };
+    std::vector<NavalForce> navalForces;
+    int navalForceFrame = -100000;
+    // Lazily requested by the AIR safety query only. Real weapon envelopes
+    // remain hazardous when a role profile intentionally assigns zero threat.
+    struct AirWeapon { springai::AIFloat3 pos; float range; };
+    mutable std::vector<AirWeapon> airWeapons;
+    mutable int airWeaponFrame = -100000;
+    void RefreshAirWeapons() const;
 	// Value snapshots, refreshed each second from current ally-visible contacts.
 	struct AirContact {
 		springai::AIFloat3 pos;
@@ -176,7 +202,7 @@ private:
         int id = -1;
 	};
 	std::vector<AirContact> airContacts;
-    struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; };
+    struct GroundContact { springai::AIFloat3 pos; float cost; bool economy; int id; int defId; };
     std::vector<GroundContact> groundContacts;
     std::vector<springai::AIFloat3> navalContacts;
     std::vector<AirContact> allyAssets;

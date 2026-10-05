@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "8393d6771fa78416e53517c2fe5f45a665736bd830d002f7ef61a288e2bff858",
+    "air-fixture.json": "436d3849cf425fcb2867a46d633bcfa742a43edf975aa93679bb8c3b632f3ba8",
+    "checks.json": "51e9aca8e8f7891de20fdbb2c42bad645f25a26068cff00b0fca037d181496b2",
+    "launched.json": "ac8220011d03b752c078aa801a35ea2dbe268e4ada2a9a969803517008dac1a6",
+    "natural-fixture.json": "fa8533f8a9f4a3208d2009efdb66326809c9a9a34bf197b30c3ddf2db168d2c8",
+    "report.md": "85c7e74280f9fa398f06b884816c3044ff835f25f017f2730bf4dbe8a0d9c39a",
+    "response-observations.json": "c5b16e723292bba48aad067d9325793ed76f35a1bb0017b5bc4f7ce2aa222401",
+    "result.json": "ee4ef3dfccba5664592f46cb811db7297465e34a7fde50e2fd4159274ad24f19",
+    "run-inputs.json": "5103a4cab2dc6b1dc38d4b2ddb6c65c636d64cfdb43252140541cae73c7b042b",
+    "run-plan.json": "83ebd8f7c5045b0867925c29bef9a462d365359bbf80a481528d04da83ee0cc6",
+    "script.txt": "607b94f4b427794a385f3d8f0a7bfb5a3cd1d3ee73a0ff34ef486e62da74ecfa",
+    "staged.json": "28e1251d1c64376bdbd8642d25b0685494f7ef86d0858abc040f0d03093782c9",
+    "starts.as": "4b80c8bbefb1c38095d41a7fb4b411c7b0e7cb9345551a3945c69d02bb17c900",
+    "teams.json": "4843696113edde6712ad8ff665ee9e5a0b420ae21f8a93ab1ae0dc9339996863"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\economy\\old-resp-natural\\glacial\\20261004T193912Z-b1ce0c7b\\glacial\\runs\\20261004T194205Z-9a60c772",
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "tundra",
+    "scenario": "cohort-baseline"
+  },
+  "id": "20261004T143120Z-e4c91d14",
+  "requested": {
+    "seed": 1902
+  },
+  "schema": 1
+}

@@ -1,0 +1,18 @@
+{
+  "files": {
+    "README.md": "2f3d597f181d06b59b349579cda32fbf537b5c7a7c4aa764f302e91466e019e0",
+    "air-naval-analysis.json": "14b2189ad61262a99d599e594ed27360fbb55afc9df6f4de48b68ee280d4aeac",
+    "checks.json": "51e9aca8e8f7891de20fdbb2c42bad645f25a26068cff00b0fca037d181496b2",
+    "launched.json": "89c1b1f0914b1fe990b6ced5851d169ed79e3a45667048225384927ce21e3d57",
+    "report.md": "66d7b25faddce9510da8ff4da3c4c6f015a616ca47a79f10d8e1d49dc0a7c38a",
+    "result.json": "14e0184c9bcef6b300e0ad49fff597562a9894d20eff81c13ca8a00d56f229fa",
+    "run-inputs.json": "e88d386dc3b3725d70d87d7714f98517b09fa773154c34d38ebc19432f116c88",
+    "run-plan.json": "53df5272be714d2115522e591390b735e5c6c86757d74f9fb0c6b670602dceb3",
+    "script.txt": "edeb31999465b4c5412493fbc350916e577ca1ac2accd1ed2c4731333e332fcc",
+    "staged.json": "41ee3f595f707e45bcac5f9528759c1dc172e2cdf9980f46c0cda66d4f484e70",
+    "teams.json": "908bb5999e5ebac3dab885f7587e3e7f45e28ba33af736fd22c819d0ff5ffbd9"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\naval-natural\\supreme\\20261004T204953Z-7e1add8e\\runs\\20261004T205254Z-b0090b40",
+  "schema": 1
+}

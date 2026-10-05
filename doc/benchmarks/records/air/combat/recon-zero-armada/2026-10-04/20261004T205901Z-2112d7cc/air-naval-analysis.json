@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "source": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\recon-zero-armada\\supreme\\20261004T205730Z-b0821859\\runs\\20261004T205901Z-2112d7cc\\infolog.txt",
+  "naval_launches": [],
+  "recon_launches": [
+    {
+      "frame": 7230,
+      "event": "8 formed=8 spacing=1275 reason=deadline"
+    }
+  ],
+  "patrol_assignments": 9,
+  "fallback_assignments": 0,
+  "aa_escape_frames": [
+    3600
+  ],
+  "aa_escape_failures": 0,
+  "torpedo_finished": 0,
+  "first_damage_frame": null,
+  "damage": 0,
+  "naval_kills": 0,
+  "peak_air_apm": 103,
+  "peak_all_apm": 104,
+  "max_patrols": 8,
+  "max_patrol_span": [
+    11703,
+    8869
+  ],
+  "return_survivors": [],
+  "invariants": []
+}

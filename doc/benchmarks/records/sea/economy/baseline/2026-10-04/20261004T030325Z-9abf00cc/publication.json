@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "01067b3a3f6f85f31fa164f722b45cd436668557b41abcf229ef416d5a67fe72",
+    "checks.json": "a2704f21ea179f8da03b1b225a73b9bc3073968336ce8b2b361d568b5fcee979",
+    "launched.json": "08a57052f05905f3f8ac1d371ef66f8d8196f45259bd5719d19e9eb8a5c30195",
+    "report.md": "15fee24e43b0fe4865c8582ce1dd32c7195b913df053c44b8fa8334c6d996e04",
+    "result.json": "212ede2947b63883aac8c8d8fa474da4d6e9daca7ab408d615c520683a705596",
+    "run-inputs.json": "5fc018c1572c3338c2622e2c9104a318560006ab28b8f92db3dd4df9efc6c16a",
+    "run-plan.json": "da06773c34622a63b1d9d05a47e0296320462240ad2824eb45ed20647e068fc2",
+    "screen_2026-10-04_03-01-21-563.png": "ef89b327340fdc928d367be6677cf83d18b52856769188663af113136254b754",
+    "script.txt": "b7ee839e1ae764190b11e0055031b1c27a8c11d9a151145b8a4a04e0a0c3852b",
+    "sea-score-v2.json": "72c9d54ab89264e9da71f4a7a44abb20a364542c085d118ed72b3bb773e49c96",
+    "staged.json": "e546d35f96e6675d730d548d522f23fb6260c31e08a5dc2a92449d7d3f5d7ccc",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\baseline\\glacial\\20261004T025944Z-71a6b8e9\\runs\\20261004T030325Z-9abf00cc",
+  "schema": 1
+}

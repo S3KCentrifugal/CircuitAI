@@ -1,0 +1,142 @@
+{
+  "scenario": "old-resp-natural",
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\economy\\old-resp-natural\\glacial\\20261004T193912Z-b1ce0c7b\\glacial\\runs\\20261004T194205Z-9a60c772",
+  "verdict": "FAIL",
+  "contact_frame": null,
+  "dispatch_frame": null,
+  "production_frame": null,
+  "first_damage": {},
+  "marauders_killed": 0,
+  "peak_air_apm": 331,
+  "peak_all_apm": 864,
+  "air_apm_samples": [
+    [
+      1800,
+      60,
+      0,
+      0
+    ],
+    [
+      3600,
+      76,
+      31,
+      0
+    ],
+    [
+      5400,
+      159,
+      105,
+      29
+    ],
+    [
+      7200,
+      176,
+      126,
+      66
+    ],
+    [
+      9000,
+      141,
+      76,
+      53
+    ],
+    [
+      10800,
+      243,
+      142,
+      52
+    ],
+    [
+      12600,
+      285,
+      127,
+      67
+    ],
+    [
+      14400,
+      519,
+      286,
+      46
+    ],
+    [
+      16200,
+      451,
+      225,
+      44
+    ],
+    [
+      18000,
+      314,
+      179,
+      66
+    ],
+    [
+      19800,
+      202,
+      93,
+      89
+    ],
+    [
+      21600,
+      210,
+      105,
+      105
+    ],
+    [
+      23400,
+      206,
+      90,
+      77
+    ],
+    [
+      25200,
+      133,
+      44,
+      44
+    ],
+    [
+      27000,
+      264,
+      83,
+      42
+    ],
+    [
+      28800,
+      415,
+      129,
+      41
+    ],
+    [
+      30600,
+      543,
+      212,
+      66
+    ],
+    [
+      32400,
+      669,
+      291,
+      41
+    ],
+    [
+      34200,
+      864,
+      331,
+      45
+    ],
+    [
+      36000,
+      765,
+      206,
+      56
+    ]
+  ],
+  "invariants": [
+    "INV-008",
+    "INV-010",
+    "INV-019",
+    "INV-021",
+    "INV-090"
+  ],
+  "interpretation": "One-minute engine command callbacks, not packets or CPU/FPS measurements. First damage is per aircraft definition. Supplied T1 damage does not imply victory."
+}

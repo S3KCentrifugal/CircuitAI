@@ -43,6 +43,7 @@ namespace AirRaids {
     {
         if (!AirEconomy::Active() || ai.frame - lastTry < 10 * SECOND) return;
         lastTry = ai.frame;
+        if (AirBaseResponse::Emergency()) return;
         if (wave !is null && !wave.IsDead()) return;
         if (wave !is null) {
             int survivors = 0;

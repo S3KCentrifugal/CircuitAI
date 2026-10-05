@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "resp-t1-armada"
+  },
+  "id": "20261004T193405Z-fdc468c2",
+  "requested": {
+    "seed": 1931
+  },
+  "schema": 1
+}

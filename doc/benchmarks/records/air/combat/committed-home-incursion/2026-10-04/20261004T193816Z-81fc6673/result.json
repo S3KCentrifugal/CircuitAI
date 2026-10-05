@@ -1,0 +1,123 @@
+{
+  "artifacts": {
+    "arena-manifest.json": {
+      "bytes": 37996,
+      "sha256": "fe044545b7efcf1e1b0466b3c564987c2ad8b6f79f85e7ba6973b6e93fcfb6fd"
+    },
+    "arena-starts.as": {
+      "bytes": 117,
+      "sha256": "9ddcac01380ccb38880ff7ba649765fa96fd23754a5f982871a6eacd91d58dce"
+    },
+    "checks.json": {
+      "bytes": 922,
+      "sha256": "0c5c2a96d36ba7bea010b43e831bb8cdc14b4e4c08b7beed6bf56f0556c21854"
+    },
+    "infolog.txt": {
+      "bytes": 691866,
+      "sha256": "73bd570b55b0f30abeadb03c895acf295eca524050c09510b2128553ee4f8007"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "bd054c3c08510a8439ebe6de740f482e25916a6fdb54b412605546ac9eb3b3b4"
+    },
+    "report.md": {
+      "bytes": 32081,
+      "sha256": "d1cc2ec15bed96191716e96be2fb9d4ac7f83b28b186e71bba1c0004dc5c571a"
+    },
+    "run-inputs.json": {
+      "bytes": 36096,
+      "sha256": "6f5a48cf03e71eab4a7bfb8858882e2b42001fa5adb4e74d32327df7e5330e5b"
+    },
+    "run-plan.json": {
+      "bytes": 480,
+      "sha256": "175bc90d74307b29c538e930e01673e60814dcc32b4d5ff23f4318b5874a9d7a"
+    },
+    "screen_2026-10-04_19-37-25-419.png": {
+      "bytes": 1663298,
+      "sha256": "f40e3a4dbe09765f8af3f6ea651825f999f2646a0bcee4a7e1bc0c30ea92e5c7"
+    },
+    "screen_2026-10-04_19-37-27-980.png": {
+      "bytes": 1744702,
+      "sha256": "58cb898f012dfcd31e47aa4ae29d74851f75c6a9f4cce0ed21edaf8aea6e2b1b"
+    },
+    "screen_2026-10-04_19-37-40-116.png": {
+      "bytes": 1940418,
+      "sha256": "ba8df6409d5d20832483bada183053817e820f247b4963192deb010ed24e7f71"
+    },
+    "screen_2026-10-04_19-37-41-325.png": {
+      "bytes": 1922565,
+      "sha256": "31dded1fbfc564cd7a4430cc987deb7d1594a6c44f75b5bddfabab16a2699733"
+    },
+    "screen_2026-10-04_19-37-43-474.png": {
+      "bytes": 1980200,
+      "sha256": "97e8791f741ef542280f1ead93555b12ea669e15462c0c861c67fbf2836fbf86"
+    },
+    "screen_2026-10-04_19-37-48-982.png": {
+      "bytes": 1946388,
+      "sha256": "d65010d3a2d6a77cd8718aaf1118c749601bb46f86b9bdb7cb843db818d20c56"
+    },
+    "screen_2026-10-04_19-38-04-425.png": {
+      "bytes": 1580214,
+      "sha256": "3ab4eadb2c038140c19caffd2c8e619748992df18b530b21b343a4c6bfeea575"
+    },
+    "script.txt": {
+      "bytes": 6178,
+      "sha256": "3a651cfae765b2a9abb5e64707220caa149593180e9a388206cb3fa8afcb97ec"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "9cf623d56e9de5ae8be8ea2d5771ef39eebd5a106fe3205e381fb50039a01869"
+    },
+    "teams.json": {
+      "bytes": 460,
+      "sha256": "264cab5d285af156a3ced7848e08df27d823f40f3d4f0236e501243aa19599e8"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme-isthmus-v1-7",
+    "scenario": "committed-home-incursion"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T193816Z-81fc6673",
+  "last_frame": 14506,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\committed-home-incursion\\supreme-isthmus-v1-7\\20261004T193619Z-325d2c96\\runs\\20261004T193816Z-81fc6673",
+  "reason": "reached 8 min",
+  "recorded_at_utc": "2026-10-04T19:38:16.261952+00:00",
+  "requested": {
+    "case": "C:\\bardev\\s3k-CircuitAI\\tools\\playtest\\cases\\air\\combat\\committed-home-incursion.json",
+    "map": "Supreme Isthmus v1.7",
+    "profile": "experimental_hard",
+    "seed": 1651,
+    "side": "armada"
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 2,
+      "team": 1,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "PASS"
+}

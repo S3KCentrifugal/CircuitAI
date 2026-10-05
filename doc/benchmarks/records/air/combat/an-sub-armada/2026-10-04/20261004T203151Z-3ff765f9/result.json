@@ -1,0 +1,105 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1084,
+      "sha256": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf"
+    },
+    "infolog.txt": {
+      "bytes": 793499,
+      "sha256": "ebd59af9f350aa9ceffe84966d50f856a780fdd66ce35c1de4de23dd636d4f31"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "f1ee1bcaabab2093db22649940f47849b4ab15a5bb27fc292d13b60b81c01037"
+    },
+    "naval-checks.json": {
+      "bytes": 1084,
+      "sha256": "6cf8ed4bc898f42cd89035edf622d5051608aa83b9d3f65d83eada35d8af7aaf"
+    },
+    "naval-manifest.json": {
+      "bytes": 37213,
+      "sha256": "d4f084a9bfc5a6104e2fabf2292efd5b6fbf72691ca03c0a269f8e7810ad705f"
+    },
+    "report.md": {
+      "bytes": 43056,
+      "sha256": "157edd3928453595ce22f684526d044b815479b33e7bab6f080ac7ffc7308372"
+    },
+    "run-inputs.json": {
+      "bytes": 36234,
+      "sha256": "d2962c92f1fa6cda4504817f39f63e57cfa30334b4ebb4fa825722e68ad999fb"
+    },
+    "run-plan.json": {
+      "bytes": 250,
+      "sha256": "1aa65b2b85d4be949da5fae3ae1fc7246764e794667f9aba45a39c473f9ff2eb"
+    },
+    "script.txt": {
+      "bytes": 6493,
+      "sha256": "cd68d4ef61b8431b3bc4faa810bc95af91e874863a1eddde280ca1857e42e77a"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "073191b32a065a68d337150353e55efe06ef2d5d26ba7e8e1acbc878b7bcb0d2"
+    },
+    "starts.as": {
+      "bytes": 170,
+      "sha256": "1989d33fa19ceedc8096f85d2930f6acc3065ed43a3796fa94ef7d1a9cd70162"
+    },
+    "teams.json": {
+      "bytes": 640,
+      "sha256": "bc139a8a4bb0983346257a0357cd3c0c6630c5e8a51e33f5d0fce1d30b8588ca"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "air",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "an-sub-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261004T203151Z-3ff765f9",
+  "last_frame": 12600,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\an-sub-armada\\supreme\\20261004T203013Z-d995845a\\runs\\20261004T203151Z-3ff765f9",
+  "reason": "reached 7 min",
+  "recorded_at_utc": "2026-10-04T20:31:51.304177+00:00",
+  "requested": {
+    "seed": 1941
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 10129.0,
+      "z": 541.0
+    }
+  ],
+  "verdict": "PASS"
+}

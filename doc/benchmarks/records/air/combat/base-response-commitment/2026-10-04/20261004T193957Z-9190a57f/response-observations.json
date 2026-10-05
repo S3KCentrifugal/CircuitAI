@@ -1,0 +1,64 @@
+{
+  "scenario": "base-response-commitment",
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\base-response-commitment\\supreme-isthmus-v1-7\\20261004T193814Z-160eb0bf\\runs\\20261004T193957Z-9190a57f",
+  "verdict": "FAIL",
+  "contact_frame": null,
+  "dispatch_frame": null,
+  "production_frame": null,
+  "first_damage": {},
+  "marauders_killed": 0,
+  "peak_air_apm": 1239,
+  "peak_all_apm": 1240,
+  "air_apm_samples": [
+    [
+      1800,
+      98,
+      36,
+      0
+    ],
+    [
+      3600,
+      1240,
+      1239,
+      58
+    ],
+    [
+      5400,
+      549,
+      548,
+      12
+    ],
+    [
+      7200,
+      165,
+      164,
+      3
+    ],
+    [
+      9000,
+      46,
+      45,
+      0
+    ],
+    [
+      10800,
+      43,
+      42,
+      0
+    ],
+    [
+      12600,
+      43,
+      42,
+      0
+    ],
+    [
+      14400,
+      43,
+      42,
+      0
+    ]
+  ],
+  "invariants": [],
+  "interpretation": "One-minute engine command callbacks, not packets or CPU/FPS measurements. First damage is per aircraft definition. Supplied T1 damage does not imply victory."
+}

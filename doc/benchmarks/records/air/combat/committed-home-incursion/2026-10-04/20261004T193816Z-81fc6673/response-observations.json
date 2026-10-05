@@ -1,0 +1,64 @@
+{
+  "scenario": "committed-home-incursion",
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\air\\combat\\committed-home-incursion\\supreme-isthmus-v1-7\\20261004T193619Z-325d2c96\\runs\\20261004T193816Z-81fc6673",
+  "verdict": "PASS",
+  "contact_frame": null,
+  "dispatch_frame": null,
+  "production_frame": null,
+  "first_damage": {},
+  "marauders_killed": 0,
+  "peak_air_apm": 1212,
+  "peak_all_apm": 1213,
+  "air_apm_samples": [
+    [
+      1800,
+      93,
+      31,
+      0
+    ],
+    [
+      3600,
+      1213,
+      1212,
+      60
+    ],
+    [
+      5400,
+      601,
+      600,
+      12
+    ],
+    [
+      7200,
+      146,
+      145,
+      4
+    ],
+    [
+      9000,
+      165,
+      164,
+      1
+    ],
+    [
+      10800,
+      106,
+      105,
+      0
+    ],
+    [
+      12600,
+      93,
+      92,
+      0
+    ],
+    [
+      14400,
+      133,
+      132,
+      0
+    ]
+  ],
+  "invariants": [],
+  "interpretation": "One-minute engine command callbacks, not packets or CPU/FPS measurements. First damage is per aircraft definition. Supplied T1 damage does not imply victory."
+}

@@ -1,0 +1,8 @@
+{
+  "staged": "2026-10-04T11:23:44",
+  "dll": "build-theatres\\d190-baseline\\SkirmishAI.dll",
+  "dll_sha256_16": "a293daae515d9f77",
+  "dll_bytes": 7805113,
+  "data": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\migration-cohort\\multi\\20261004T142341Z-170ef9a7\\baseline",
+  "ai": "BARbTest/test"
+}
