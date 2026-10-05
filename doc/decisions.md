@@ -12343,3 +12343,40 @@ adds KI-503 for the already-existing experimental Sheldon mismatch. Checked by
 source/data inspection and primary-source research; no simulation or measured
 performance improvement is claimed for this proposed change. This decision
 file is the third and final documentation surface changed by the review.
+
+
+**D-203 reconsidered after user feedback.** Its source findings remain valid,
+but its emphasis on retaining anti-heavy specialization was too strong relative
+to reported bait-induced mass losses. D-204 supersedes that recommendation
+priority; no historical finding or decision has been deleted.
+
+## D-204 - Safe range outranks heavy-target preference for ranged support
+
+**Call.** Treat the user/Cal Fatboy-bait report as the primary gameplay failure.
+Ranged units, including Sharpshooter and Starlight, must not abandon a safe
+firing position to chase a preferred target into repaired static coverage.
+Heavy-target preference is subordinate to safe in-range useful fire. Accept
+less target specialization if that prevents materially greater losses.
+
+**Reasoning and alternatives.** Source tracing confirms that anti-heavy path
+goals can approach within a path cell, normal attack can queue FIGHT at the
+target, and squad attack deliberately compresses range/uses a first-row LOS
+scout. Existing aggregate threat gates are not a hard per-unit safety contract.
+Reject preserving current task labels as an acceptance criterion. Also reject
+claiming that adding standoff alone is sufficient: its radial goal is not checked
+against other hostile weapons. The exact artillery/siege request remains a
+credible conservative experimental candidate, alongside explicit no-pursuit
+range control; no winner is claimed without the bait/repair fixture.
+
+**Invariant.** Proposed acceptance: target preference never authorizes pursuit
+across the selected ranged unit's safe firing boundary; mobile targets may be
+shot from safety. Advancement must still make useful progress. Review-only at
+this point, so no new runtime invariant/log or implementation is claimed.
+
+**Files and verification.** Updated the
+[review](reviews/2026-10-05-siege-classification-request.md) with the revised
+ranking, concrete native paths and baseline/config/no-pursuit comparison plan;
+added KI-504 and a KI-503 priority clarification in
+[known issues](known-issues.md). This decision records the correction. Checked
+against source and official unit guides; the user's battle is reported evidence,
+not a reproduced simulation. Runtime/config/deployed files are unchanged.

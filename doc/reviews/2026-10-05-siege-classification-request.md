@@ -1,10 +1,13 @@
 # Review: proposed Cent / legion-sea artillery normalization
 
-Reviewed 2026-10-05 against CircuitAI `ff1925d0`. **Recommendation: revise before
-implementation.** Preserving range is a good objective, but forcing all ten
-units to `role: ["artillery"]`, `attribute: ["siege"]` changes their target
-selection, fire state, task ownership and threat classification. It does not
-simply add range discipline. No runtime code or profile was changed for this review.
+Reviewed 2026-10-05 against CircuitAI `ff1925d0`; revised after the user's
+Fatboy-bait/static-defense example at `5dcf78bc`. **Current recommendation:
+make safe firing range and refusal to pursue bait the primary acceptance
+criteria.** Loss of heavy-target preference is an acceptable tradeoff if it
+prevents the reported mass losses. The initial review below over-weighted
+preserving existing combat roles and under-weighted their observed failure.
+Its source findings remain valid; its risk ranking is superseded by the
+revision below. No runtime code or profile was changed for this review.
 
 No `legion-sea` ref is present in the local repository and no new Cent package
 was supplied. This verifies the proposed rule against this fork, not byte-for-byte
@@ -12,7 +15,82 @@ parity with an unavailable distribution. Another distribution's native semantics
 must be checked independently. The official unit pages below were consulted on
 the review date; numerical balance can differ from the locally pinned game.
 
-## Findings, ranked
+## Revised priority: survival and useful fire before target preference
+
+The user relayed Cal's match observation: a Fatboy inside a repaired static line
+can bait hundreds of ranged units into fatal exposure. This is user-supplied
+runtime evidence, not a fixture reproduced during this review. Against that
+failure, preserving an anti-heavy label is not a sufficient reason to keep the
+existing behavior. Sharpshooters and Starlights must not be exempt from the
+range/no-pursuit requirement merely because they have an anti-heavy niche.
+
+Additional source tracing identified paths consistent with the report:
+
+- [AntiHeavyTask::FindTarget](../../src/circuit/task/fighter/AntiHeavyTask.cpp)
+  filters for HEAVY/COMM and compares aggregate squad power with threat at the
+  target position. This is not a hard guarantee that each shooter's firing
+  position and approach stay outside hostile static coverage.
+- Its out-of-range target path query in `Update` uses pathfinder square size
+  as the goal radius, not weapon range. A strong target preference can therefore
+  request an approach far closer than the weapon requires.
+- Its engagement calls [CircuitUnit::Attack](../../src/circuit/unit/CircuitUnit.cpp),
+  whose ordinary path sends an attack and, by default, a queued FIGHT at the
+  target position. That is not a persistent non-pursuit firing contract.
+- Separately, [SquadTask::Attack](../../src/circuit/task/fighter/SquadTask.cpp)
+  uses `RANGE_MOD` = 0.8 from
+  [FighterTask.h](../../src/circuit/task/fighter/FighterTask.h). Against static
+  or unseen targets it deliberately moves one unit of the first range row to
+  80% of the smaller of weapon range and LOS radius. This sacrifices range for
+  spotting and must not be inherited by protected ranged support.
+- `CircuitUnit::KeepWeaponRange` already offers an opt-in no-chase mechanism,
+  but Sharpshooter/Starlight do not enable it in the inspected experimental
+  profiles. It also maintains distance from the selected enemy rather than
+  proving the proposed position/path is outside other enemy weapons. Simply
+  adding a standoff number is not a verified fix for the static bait case.
+
+The revised engagement contract, in order, is:
+
+1. Establish a reachable firing position near the usable maximum range, with
+   line of fire and clearance from known hostile static coverage. A higher-value
+   target cannot override that safety boundary. Do not move a ranged unit into
+   LOS solely to spot its own target; use allied vision/radar where available.
+2. Fire on useful targets already reachable from that safe position. Allow
+   mobile targets without granting pursuit. Anti-heavy preference is a tie-break
+   among safe firing opportunities, not permission to advance through defenses.
+3. If bait retreats into protection, clear pursuit and attack an accessible
+   static or another target in range. Account for repair/regen and exposure when
+   estimating useful damage; do not fixate indefinitely on an unkillable tank.
+4. Advance deliberately after the covering defenses are removed and the next
+   firing position is safe. A motionless army that survives but never attacks
+   is not a passing result.
+
+Maximum range can reduce exposure and preserve separation; it does not itself
+guarantee invisibility against enemy spotters/radar or safety against longer-range
+weapons. Starlight's beam falloff does not justify charging into static coverage:
+survival takes precedence over theoretical close-range DPS. The
+[official Starlight guide](https://www.beyondallreason.info/unit/armmanni)
+likewise recommends a protected, spread-out position; the
+[Sharpshooter guide](https://www.beyondallreason.info/unit/armsnipe) emphasizes
+vision support.
+
+**Revised experiment.** Compare (A) current profiles, (B) the exact requested
+artillery/siege patch, including Sharpshooter and Starlight, and (C) an explicit
+safe-range/no-pursuit implementation. B is a credible conservative workaround,
+not rejected solely because it deprioritizes heavy units. Its structure-only
+selection/return-fire restrictions still require measurement. If B is materially
+safer and useful against the defense line, reduced mobile-target specialization
+is acceptable; preserve useful in-range fire in C without restoring bait pursuit.
+Carrier and counter-classification effects remain independent checks.
+
+The first mandatory fixture is a mobile Fatboy behind repair-supported turrets,
+with targets visible to allied spotters. Move the bait forward/back, change its
+target value and let it retreat out of range. Measure ranged-unit metal lost,
+time spent under static fire, actual shot distance, damage to the defensive line,
+target switches, and orders. Repeat without spotters, with mixed weapon ranges,
+and after the static line dies. Require **both survival and useful progress**.
+This diagnostic is recorded as KI-504; no comparative simulation has yet run.
+
+## Original findings (source facts retained; priority superseded above)
 
 ### High: artillery plus siege suppresses proactive anti-army targeting
 
