@@ -12415,3 +12415,52 @@ record explains the planned architecture. Checked against native/script source,
 local BAR target/carrier gadgets and official unit guides. No native, profile,
 script, deployment or simulated behavior changed. Unit tradeoffs and CPU/APM
 benefits remain unmeasured until the specified A/B/C fixtures are played.
+
+
+**D-205 refined by D-206.** Its native component and safety-before-value design
+remain. D-206 replaces the separate enable boolean with one attribute and
+corrects the proposed precedence over specialist missions; it also adds the
+missing sensor-anchor and withdrawal-capability work.
+
+## D-206 - One ranged attribute with capability-aware withdrawal and mission ownership
+
+**Call.** Propose one new `ranged` attribute and four target presets: precision,
+skirmish, bombardment and carrier. Preserve existing role/attribute entries,
+using the new attribute as the only enable switch. Review every balanced siege
+entry, but pilot the ten proposed land units; keep naval/air/static and optional
+content on their existing owners. Sharpshooter also reuses `ret_hold` for an
+emergency cloaked escape after its fire-state conflict is fixed.
+
+**Reasoning.** Weapon arc, independent aiming, cloak, turning, reverse speed,
+reload and explosion geometry are capabilities, not a reason to create many
+unit-specific tags. Sharpshooter can aim while moving away; Starlight's frontal
+arc and slow turn require earlier committed withdrawal and safe reorientation.
+Tactical withdrawal may keep firing, while emergency repair escape has a
+different owner and fire policy. Own LOS does not cap a shot supported by legal
+allied observations; trajectory clearance still matters. Sensor support needs
+cohort anchors because ARTY tasks are not ISquadTask instances. Specialist
+routes such as TECH's Recluse/Arquebus flank must retain mission ownership.
+
+**Alternatives rejected.** Do not redefine existing siege globally, replace all
+role lists, add sniper/beam/kite/fragile bits, or use ret_fight as kiting. Do not
+silently replace a specialist mission with default ranged admission. Do not
+claim turret=true proves unrestricted aiming or raw death AoE is its radius.
+No exact spacing/retreat percentage is declared optimal without physical tests.
+
+**Invariant and scope.** Proposed only: one command owner, safe useful fire
+before value, feasible escape based on real capabilities, stable dispersed
+slots, and useful progress rather than permanent idling. No gameplay/config
+change or new runtime invariant is claimed. Existing bits and non-opted paths
+must remain equivalent when implementation begins.
+
+**Files and verification.** Added the [complete inventory and proposal](reviews/2026-10-05-balanced-siege-attributes.md),
+updated the [implementation plan](ranged-support-implementation-plan.md) and
+[original review](reviews/2026-10-05-siege-classification-request.md), and recorded
+KI-505 through KI-507 in [known issues](known-issues.md). Game mechanics are
+recorded in [the shared withdrawal note](../../rjm.bar.docs/knowledge/60-tactics/69-ranged-fire-and-withdrawal.md).
+This decision records the refinement. Source checked against CircuitAI
+62ff92b2, BAR 1d267c20d1, Recoil 92efda5e60 and official unit/command guides.
+Inventory: 46 base/Legion siege entries, five optional Scavenger entries, plus
+five new proposal entries. No candidate simulation, damage improvement or
+performance gain is claimed. Fixtures cover moving fire, cloak, arcs, blast
+spacing, sensors, missions, full salvos, carriers and CPU/APM.

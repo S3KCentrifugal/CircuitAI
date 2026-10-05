@@ -8,6 +8,13 @@ into code changes. It addresses KI-503 and KI-504 in the
 are design sketches, not existing callable interfaces. Numbers are initial test
 values, not benchmarked tuning.
 
+D-206 refines this plan after the [complete balanced-profile inventory](reviews/2026-10-05-balanced-siege-attributes.md):
+use one new `ranged` attribute as the enable switch, four target presets,
+capability-aware withdrawal, and explicit sensor/mission-owner integration.
+That review contains the exact proposed lists and per-unit disposition. The
+older independent `ranged.enabled` switch and precedence over specialist
+missions are superseded, not additional controls to implement.
+
 The required outcome is useful fire from safe positions, followed by deliberate
 advancement. A preferred heavy target must never authorize pursuit into known
 static coverage. This intentionally changes combat behavior for the ten opted-in
@@ -22,20 +29,25 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
    [configuration tree](../data/config/). Parse it in
    [FactoryManager::ReadConfig](../src/circuit/module/FactoryManager.cpp),
    store the validated values on [CircuitDef](../src/circuit/unit/CircuitDef.h),
-   and keep absence/disabled equivalent to today's behavior. Suggested policy
+   and keep absence of the new attribute equivalent to today's behavior. Suggested policy
    value type: new `src/circuit/unit/RangedPolicy.h`.
 
-   Preserve each profile's existing `role` and `attribute` arrays. They also
+   Preserve each profile's existing roles and attribute entries, then append
+   `ranged` for opted-in definitions. They also
    affect counter accounting and factory eligibility, so they are not merely
    movement labels. The intended final implementation does not need to turn
    Sharpshooter into structure-only artillery to prevent pursuit.
 
-   Example addition to an existing Sharpshooter object, with its other fields
-   left intact:
+   Append `RANGED` to the native enum, mask and name table in
+   [CircuitDef.cpp](../src/circuit/unit/CircuitDef.cpp), preserving existing
+   bit values. Expose the matching `Unit::Attr::RANGED` in
+   [unit.as](../data/script/src/unit.as). There is no second enable boolean.
+
+   Example proposed Sharpshooter fields, with unrelated fields left intact:
 
    ```json
+   "attribute": ["ranged", "ret_hold"],
    "ranged": {
-     "enabled": true,
      "target_mode": "precision",
      "allow_mobile": true,
      "allow_static": true,
@@ -44,7 +56,10 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
      "range_hysteresis": 32,
      "safety_margin": 64,
      "avoid_static_coverage": true,
-     "preserve_cloak": true,
+     "cloak_on_reload": true,
+     "spacing": 96,
+     "screen": "prefer",
+     "withdraw": "capability",
      "preserve_volley": true
    }
    ```
@@ -70,7 +85,7 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
    ```cpp
    // Proposed branch; the component and accessor must be implemented first.
    void CArtilleryTask::Execute(CCircuitUnit* unit) {
-       if (unit->GetCircuitDef()->GetRangedPolicy().enabled) {
+       if (unit->GetCircuitDef()->IsAttrRanged()) {
            ranged->Update(unit); // Sole owner of protected movement and firing.
            return;
        }
@@ -100,15 +115,15 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
    Bind it in [MilitaryScript.cpp](../src/circuit/script/MilitaryScript.cpp)
    using the existing task-return ownership convention. In experimental
    [military.as](../data/script/src/manager/military.as), insert the following
-   **after ferry and super-static guards, before generic/specialized combat
-   dispatch**, reusing the existing `t` variable in the remainder:
+   **after ferry, super-static and specialist-owner guards, before generic
+   combat dispatch**, reusing the existing `t` variable in the remainder:
 
    ```cpp
    // AngelScript; proposed native binding.
+   // Existing specialist mission admission precedes this ordinary combat path.
    IUnitTask@ t = aiMilitaryMgr.TryMakeRangedTask(u);
    if (t !is null) return t;
-   @t = AmphibiousOps::MilitaryTask(u);
-   // Existing flank, spam and role dispatch follows for all other definitions.
+   // Existing generic role dispatch follows for all other definitions.
    ```
 
    The native method must not steal a unit from player/external control,
@@ -119,9 +134,11 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
    below its income threshold. Production is unaffected.
 
    The default amphibious and flank rosters do not include these ten units;
-   spam admission is attribute-driven. The explicit ranged policy takes
-   precedence if a future/custom configuration overlaps them. Report that
-   overlap once rather than silently mixing two order owners. Update
+   spam admission is attribute-driven. Other existing siege units do overlap:
+   Recluse/Arquebus are TECH flank candidates. Preserve a specialist mission's
+   objective and route, and integrate the ranged component through an adapter
+   before enabling such overlaps. Report unsupported combinations once and
+   refuse conflicting admission; never silently steal mission ownership. Update
    [angelscript-references.md](angelscript-references.md) for the new binding.
    No per-frame targeting loop or unit list is required in `air.as`, `sea.as`,
    `tech.as`, `front.as`, `support.as` or `tactical.as`.
@@ -233,6 +250,31 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
    do not collapse mixed-range units onto one target point. Avoid an all-pairs
    unit-distance pass by querying local spatial cells.
 
+   Read mounted weapon arcs, turn/acceleration, real damage barrels, beam/burst
+   timing, cloak and death-blast geometry from the loaded game. Cache capability
+   metadata; expose explicit overrides for restrictions hidden in unit scripts.
+   Sharpshooter can aim independently while moving away, whereas Starlight
+   cannot fire at a pursuer outside its forward arc. Do not assume reverse
+   driving when loaded reverse speed is zero. Predict closure versus turn plus
+   acceleration plus escape time, and use hysteresis for committed withdrawal.
+
+   Tactical withdrawal remains in this component and may fire without canceling
+   MOVE. Emergency escape uses existing retreat/repair ownership. In
+   [RetreatTask.cpp](../src/circuit/task/RetreatTask.cpp), honor `ret_hold` for
+   opted-in cloaked units instead of overwriting HOLD with RETURN. Never add
+   `ret_fight` as a substitute for moving while firing: FIGHT may stop to engage.
+   The balanced Starlight's `retreat:0` also needs a meaningful health fallback;
+   0.65 is a test candidate, while predictive withdrawal can act earlier.
+
+   Extend [SupportTask](../src/circuit/task/fighter/SupportTask.cpp) and
+   MilitaryManager with ranged-cohort escort anchors. Current support selection
+   searches ATTACK/DEFEND and casts to `ISquadTask`; individual artillery tasks
+   are not squads. Do not add ARTY to that cast path. Keep sensor task ownership,
+   coverage-aware quotas, and safe offset positions; publish value anchors with
+   ID/generation cleanup on membership, death, transfer and release. Repair
+   support stays behind exits. Preserve commander task ownership rather than
+   drawing it forward to spot for shooters.
+
    The controller needs distinct approach, fire, reload/hold, reposition and
    await-safe-route states. During reload it holds when safe and withdraws only
    for a concrete threat or an improved validated position. Completing a beam
@@ -248,24 +290,26 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
 
 8. **JSON: enable appropriate modes for all ten units, preserving profile bytes.**
 
-   Apply the new policy to the 77 existing unit objects across the 15 active
+   Pilot the exact proposed lists in experimental_balanced first. The subsequent
+   explicit profile migration would cover the 77 existing unit objects across the 15 active
    behavior files inventoried in the [review](reviews/2026-10-05-siege-classification-request.md#exact-current-configuration-inventory).
    These comprise root `behaviour.json` and the base/Legion files in all seven
    difficulty folders. There is no root `behaviour_leg.json`.
 
    | UnitDef | Proposed mode | Important difference |
    | --- | --- | --- |
-   | `armfboy` | splash support | Mobile groups and statics; avoid friendly splash; preserve HEAVY counter category. |
+   | `armfboy` | skirmish | Anti-swarm support; avoid friendly splash; preserve HEAVY counter category. |
    | `armfido` | skirmish | Proactive mobile fire, spacing and safe repositioning. |
    | `armsnipe` | precision | Useful heavy/commander shots preferred within safety; cloak, reload, energy and overkill checks. |
-   | `armmanni` | precision beam | Useful heavy/static shots; stable beam, facing and spacing; safety before close-range damage. |
+   | `armmanni` | precision | Useful heavy/static shots; stable beam, facing and spacing; safety before close-range damage. |
    | `cormort` | skirmish | Restore proactive mobile fire while preventing pursuit into static coverage. |
-   | `corban` | burst support | Finish salvos, preserve legal opportunistic AA, reposition safely on reload. |
+   | `corban` | skirmish | First-strike/reload safety, preserve legal opportunistic AA, shorten escape turns. |
    | `cortrem` | bombardment | Mobile concentrations or statics; safe area fire, friendly splash; retain HEAVY category. |
    | `legamcluster` | bombardment | Cluster-weapon targeting and splash safety. |
-   | `legmed` | burst support | Safe static/mobile fire without continually resetting salvos. |
+   | `legmed` | bombardment | Safe static/mobile fire without continually resetting salvos. |
    | `legvcarry` | carrier | Safe carrier position, genuine drone engagement and gadget-controlled drones. |
 
+   These are four target-policy presets, not additional attribute bits.
    Carrier mode is a required adapter/fixture, not a renamed direct-fire mode.
    Mantis has a zero-damage targeting weapon: never reject all targets for zero
    fake-weapon DPS, or treat its target-designation range as guaranteed safety.
@@ -353,7 +397,7 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
     checks and corresponding forbidden log markers in the case checks. Update
     role references that describe affected units and regenerate
     [barb-unit-config.md](knowledge/barb-unit-config.md) after profile changes.
-    Leave KI-503/KI-504 open until physical verification is attached.
+    Leave KI-503 through KI-507 open until their physical verification is attached.
 
     Run native tests, configuration validation, script API checks, all affected
     profile loads and the combat matrix. Build/package DLL and data together
@@ -361,7 +405,7 @@ economy, aircraft control, naval combat or existing non-opted-in artillery.
     [test-storage structure](test-storage.md). Roll out precision units first,
     then skirmish/bombardment and carrier modes once their fixtures pass;
     completing the request still requires all ten definitions. Per-definition
-    `enabled:false` is the rollback lever. The original artillery/siege-only
+    removal of `ranged` from its attributes is the rollback lever. The original artillery/siege-only
     variant remains a measured comparison, not an untested declared loser.
 
 ## Sharpshooter and Starlight impact

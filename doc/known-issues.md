@@ -5158,3 +5158,63 @@ and [D-205](decisions.md#d-205---plan-an-opt-in-ranged-controller-without-erasin
 specify native mechanisms, per-definition JSON, experimental task admission,
 carrier handling, lifecycle/command safety and comparative fixtures. Both issues
 remain open; the plan does not represent an implemented or played fix.
+
+
+### KI-505 - Balanced Starlight health-retreat override prevents ordinary early escape
+
+**Problem.** experimental_balanced gives armmanni retreat:0. In
+IFighterTask::OnUnitDamaged, positive health normally passes the early-return
+condition before later health-based retreat checks, unless a condition such
+as disarm applies. Other retreat mechanisms can still act. For a slow-turning,
+forward-arc unit this is an unsuitable fallback; health alone also cannot
+predict whether an approaching enemy will intercept its escape.
+
+**Proposed solution.** Opt-in ranged control should predict closure versus turn,
+acceleration and escape time. Give Starlight a meaningful JSON health fallback
+(0.65 is a provisional test value). Commit to leaving instead of turning back
+for rearward targets; safely reorient behind cover. Preserve non-opted policies.
+
+**Verification.** Source checked only. Compare ready/reloading Starlights,
+frontal/rear pursuers, screen loss and terrain exits. Require real escape and
+continued useful fire after rejoining, not indefinite retreat. See the
+[complete review](reviews/2026-10-05-balanced-siege-attributes.md) and
+[D-206](decisions.md#d-206---one-ranged-attribute-with-capability-aware-withdrawal-and-mission-ownership).
+
+### KI-506 - Sensor escort selection has no anti-heavy/artillery cohort anchor
+
+**Problem.** SupportTask selects ATTACK or DEFEND candidates and its helper
+casts them to ISquadTask. AH/ARTY owners are not included. ArtilleryTask is an
+individual IFighterTask, not ISquadTask, so adding ARTY to that candidate set
+would be unsafe. The proposed ranged reuse of artillery lifecycle therefore
+needs an explicit sensor-following integration; proximity by chance is not
+reliable assigned radar/jammer support.
+
+**Proposed solution.** Publish typed value anchors for local ranged cohorts,
+with generation/lifecycle validation. Keep support task ownership and existing
+ATTACK/DEFEND paths; use marginal coverage, safe offsets and quotas to avoid
+sensor piles. Do not increase artillery membership or conscript commanders.
+
+**Verification.** Source checked only, not a new in-game failure measurement.
+Test mixed AH/ARTY cohorts, multiple sensors, existing radar coverage, moving
+firing lines, destruction, transfer and save/load. See the
+[implementation plan](ranged-support-implementation-plan.md) and
+[review](reviews/2026-10-05-balanced-siege-attributes.md).
+
+### KI-507 - Cloak initialization overrides retreat hold-fire policy
+
+**Problem.** RetreatTask::AssignTo first sets HOLD for ret_hold, then the
+able-to-cloak branch requests cloak and unconditionally sets RETURN. Thus
+ret_hold does not reliably mean hold fire on a cloaked emergency retreat.
+Balanced Sharpshooter does not currently have ret_hold; this blocks the proposed
+reuse of that existing attribute and may affect configurations combining it
+with cloak. No frequency or battle loss has been measured.
+
+**Proposed solution.** Respect explicit hold-fire during opted-in emergency
+escape while preserving cloak intent. Keep tactical withdrawal in the ranged
+owner so it can still take safe shots. Do not replace MOVE with ret_fight,
+which may stop to engage. Test before broadening the fix to legacy units.
+
+**Verification.** Source checked only. A fixture must observe actual fire,
+cloak/recloak delay, retaliation, low energy and near-enemy decloak, then repair
+and rejoin. Verify fire-state ownership on release/player handover. See the
+[review](reviews/2026-10-05-balanced-siege-attributes.md).

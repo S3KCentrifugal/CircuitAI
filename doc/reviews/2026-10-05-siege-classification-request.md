@@ -11,6 +11,11 @@ these findings to numbered C++, configuration and AngelScript changes, with
 proposed code samples and explicit Sharpshooter/Starlight behavior. It remains
 a plan; the comparison candidates have not been implemented or simulated.
 
+The [complete experimental-balanced inventory and attribute proposal](2026-10-05-balanced-siege-attributes.md)
+extends this review to every existing siege entry. It proposes one `ranged`
+attribute, capability-aware withdrawal, sensor support and exact per-unit lists;
+it also refines specialist mission ownership and the earlier enable schema.
+
 This document records source-confirmed mechanisms, reported gameplay failures,
 and solutions grounded in the official PvP unit guidance linked below. The
 proposed changes still require comparative combat tests. Numerical balance can
