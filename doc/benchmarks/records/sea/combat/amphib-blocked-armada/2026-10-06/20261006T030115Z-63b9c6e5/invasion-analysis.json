@@ -1,0 +1,11 @@
+{
+  "kind": "supplied component test; not a natural economy or match-strength benchmark",
+  "milestone_frames": {},
+  "invalid_fixture": false,
+  "note": "",
+  "protection_samples": [],
+  "failure_markers": [
+    "[t=00:00:26.273089][f=-000001] Error: Failed to allocate memory",
+    "[t=00:00:26.348380][f=-000001] Fatal: [ExitSpringProcess] errorMsg=\"Failed to allocate memory\" msgCaption=\"Spring: Fatal Error\" mainThread=0"
+  ]
+}

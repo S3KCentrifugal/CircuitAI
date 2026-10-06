@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "a2addfca0f6c45d3ff13804d59453e2b37cf9ee7211667ebe971a520a0963a21",
+    "checks.json": "5956d4174992f4fd3b10c822504bf8e0f1d4dc10402d71b5f0d25d0343408441",
+    "invasion-analysis.json": "8e91bc63f90cc153bf19a37eafe51a5f08fb8942aecab1321bd3f86b4bb6fb9e",
+    "invasion-pins.json": "ea19f6032a15945e3aa8b006e665a7c4ab391f84fe92831fa8d729d07f606b8c",
+    "launched.json": "e049f884b5a364a5f1481e272fee10b786bd78eb57597f4b3fe89ac485cefdb1",
+    "report.md": "634640d6dca410387fa05bb0a098c7f8ba98b4b728810417f989f8e6c6750ca6",
+    "result.json": "187c74f8d056ca74844571d23361baa955e810f5c2b4177f6f32a1861b7e1520",
+    "run-inputs.json": "447ee9adb2bd31223946ac5aef407f3c570db3c8ebc33f2efe5b746b4c5739ad",
+    "run-plan.json": "96b6cf6d79308340eb84a1c0923f4229af7f6d1e925d1694732e76720118505b",
+    "screen_2026-10-06_03-33-22-457.png": "6f5ff75e13046dc18f89f60bc07645b94eeb9ac768cc091e676652fadea551b5",
+    "screen_2026-10-06_03-35-06-202.png": "3f0e9bbaf4925981379a39d862b41caed287ef26b77ddeb1d3b7ceb5c8dff0dd",
+    "script.txt": "7ad32217dbe157ca26b4107cfb44452ee7353f04da4caaaa429a88afce59720d",
+    "staged.json": "53c2edca63a5f970332647b9f68affd02f027ca3e5111238ac189d1c3cdfc504",
+    "starts.as": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f",
+    "teams.json": "68d5f49092c84ce199a85f54d8bb9ab1e8176f0ec88ac77f6e68829b452fdccc"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-transition-cortex\\supreme\\20261006T033053Z-612b7bab\\runs\\20261006T033742Z-f915a230",
+  "schema": 1
+}

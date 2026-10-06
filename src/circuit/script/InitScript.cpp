@@ -1254,6 +1254,9 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectType("CBattleAnalysis", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CBattleAnalysis aiBattle", battle); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float Height(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, Height), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetWaterSurveyCoverage(int, int)", asMETHOD(CBattleAnalysis, GetWaterSurveyCoverage), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetWaterScoutGoal(int, int, const AIFloat3& in, int)", asMETHOD(CBattleAnalysis, GetWaterScoutGoal), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "int GetWaterEnemyCount(int)", asMETHOD(CBattleAnalysis, GetWaterEnemyCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float Depth(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, Depth), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float HeightAbove(const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, HeightAbove), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float EffectiveRange(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asMETHOD(CBattleAnalysis, EffectiveRange), asCALL_THISCALL); ASSERT(r >= 0);

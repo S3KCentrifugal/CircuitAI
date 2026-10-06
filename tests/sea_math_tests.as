@@ -1,7 +1,34 @@
+void test_invasion_replans_only_uncommitted_or_dead_slots() {
+    Check(SeaMath::ReplanInvasionSlot(-1,false,false));
+    Check(SeaMath::ReplanInvasionSlot(4,true,true));
+    Check(SeaMath::ReplanInvasionSlot(0,false,true));
+    Check(SeaMath::ReplanInvasionSlot(0,true,false));
+    Check(!SeaMath::ReplanInvasionSlot(0,true,true));
+    for (int state=1;state<=3;++state)
+        Check(!SeaMath::ReplanInvasionSlot(state,false,false));
+}
 void test_seaplane_requires_sustained_income_even_with_gifted_bank() {
     Check(!SeaMath::SeaplaneEconomyReady(false,80,1500,100000,100000,1450,5000,80,1500,500,1000));
     Check(!SeaMath::SeaplaneEconomyReady(true,79.9f,1500,100000,100000,1450,5000,80,1500,500,1000));
     Check(!SeaMath::SeaplaneEconomyReady(true,80,1499,100000,100000,1450,5000,80,1500,500,1000));
+}
+void test_sea_control_requires_complete_recent_coverage_and_quiet() {
+    Check(SeaMath::SeaSecured(0,1,0,900,900));
+    Check(!SeaMath::SeaSecured(-1,1,0,900,900));
+    Check(!SeaMath::SeaSecured(0,.999f,0,900,900));
+    Check(!SeaMath::SeaSecured(0,1,1,900,900));
+    Check(!SeaMath::SeaSecured(0,1,-1,900,900));
+    Check(!SeaMath::SeaSecured(0,1,0,899,900));
+    Check(!SeaMath::SeaSecured(0,1,0,-1,900));
+}
+void test_invasion_admission_needs_escort_predecessor_and_both_resources() {
+    Check(SeaMath::InvasionFactoryReady(true,true,true,true,150,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(false,true,true,true,150,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(true,false,true,true,150,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(true,true,false,true,150,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(true,true,true,false,150,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(true,true,true,true,149,5000,150,5000));
+    Check(!SeaMath::InvasionFactoryReady(true,true,true,true,150,4999,150,5000));
 }
 void test_seaplane_preserves_full_cost_and_reserve_after_commitments() {
     Check(SeaMath::SeaplaneEconomyReady(true,80,1500,1950,6000,1450,5000,80,1500,500,1000));

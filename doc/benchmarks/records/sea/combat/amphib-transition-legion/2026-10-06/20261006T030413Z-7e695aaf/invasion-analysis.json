@@ -1,0 +1,19 @@
+{
+  "kind": "supplied component test; not a natural economy or match-strength benchmark",
+  "milestone_frames": {
+    "partial-survey-blocked": 3300,
+    "complex-started": 8734,
+    "factory-escorted": 8734,
+    "complex-finished": 9916,
+    "complex-produced": 10508,
+    "landfall": 14100,
+    "backline-reached": 14400,
+    "enemy-economy-destroyed": 17482
+  },
+  "invalid_fixture": false,
+  "note": "",
+  "protection_samples": [
+    "factory=9023 escortMetal=21000 completedTurrets=0"
+  ],
+  "failure_markers": []
+}

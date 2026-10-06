@@ -935,3 +935,21 @@ These hooks were added after the control's awards overlay exposed a missing
 lifecycle observation. Do not call an elapsed forty-minute log a competitive
 forty-minute match without checking these events and active-team state. The
 original D-195 late control is explicitly excluded, not retroactively repaired.
+
+## SEA secured-water invasion fixtures (D-212)
+
+`python tools/playtest/run_sea_invasion.py --dll <pinned DLL> --side armada`
+runs the supplied Supreme Isthmus transition for 24 game minutes. Repeat with
+`--side cortex` and `--side legion`; run these rendered cases serially. The
+`--blocked --minutes 5` variant holds a live hostile submarine to verify the
+control gate. Definitions and assertions live under `cases/sea/combat/` and
+`checks/sea/combat/` as `amphibious-transition` and `amphibious-blocked`.
+
+The AI must build both forward factories with real escort, produce both unit
+types, land, reach the backline and damage enemy economy. Economy/navy/sensors
+are supplied; factory and opponent freezes are recorded in `invasion-pins.json`,
+including hashes of the staged scripts after overrides. This is component
+verification, not a natural economy or win-rate benchmark. The observer uses
+spectator information solely for assertions and screenshots; AI sensing remains
+ordinary LOS/sonar. Preserve failed fixtures and their exact checks. See
+[design and evidence](../../doc/sea-amphibious-transition.md).

@@ -43,7 +43,7 @@ movement-area connectivity are not a guarantee of an unobstructed full route.
 See the [plan](../sea-layout-migration-plan.md) and
 [runtime results](../sea-layout-migration-results.md).
 
-<!-- source: data/script/src/roles/sea_factories.as; blob: 81753c9202c439abe4f0e2264f3a1528f4a7c832; lines: 227 -->
+<!-- source: data/script/src/roles/sea_factories.as; blob: 1cbed943bb3467a6e0a455d4d31616219980e745; lines: 229 -->
 
 ## D-209 follow-up
 
@@ -60,3 +60,10 @@ D-211: SEA passes KeepFactoriesQueued to the optional third native argument.
 This removes pre-enqueue resource admission waits while native recruit tasks
 retain low-metal spending priority and empty-energy control. It does not
 guarantee progress without resources or an open physical exit.
+
+D-212: while the SEA invasion controller is enabled, FactoryAllowed rejects
+ordinary native factory-switch requests for amphibious complexes and underwater
+gantries. SeaInvasion alone admits those factories after verified water control,
+protection and funding; SEA's factory callback then recruits the validated
+faction amphibian. This restriction is instance/role scoped and does not change
+shared factory JSON or TECH/AIR production.

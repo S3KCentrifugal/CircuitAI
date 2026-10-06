@@ -6,6 +6,8 @@
 
 #include "terrain/BattleAnalysis.h"
 #include "terrain/AirSafety.h"
+#include "terrain/WaterSurvey.h"
+#include "map/MapManager.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/TerrainData.h"
 #include "map/ThreatMap.h"
@@ -911,6 +913,83 @@ void CBattleAnalysis::BuildWater()
 	hostile8.assign(n8, 0);
 	hostile15.assign(n15, 0);
 	waterBuilt = true;
+}
+
+void CBattleAnalysis::UpdateWaterSurvey(int body)
+{
+    BuildWater();
+    // Pay history allocation/indexing only for a caller requesting a survey;
+    // ordinary AIR/TECH water analysis retains its previous memory/work cost.
+    if (surveySeen.empty()) {
+        surveyCells.resize(hostile8.size());
+        surveySeen.assign(body8.size(), -1);
+        surveyFrame.assign(hostile8.size(), -100000);
+        for (size_t i=0; i<body8.size(); ++i)
+            if (body8[i]>=0) surveyCells[body8[i]].push_back(static_cast<int>(i));
+    }
+    const int frame = circuit->GetLastFrame();
+    if (body < 0 || body >= static_cast<int>(surveyCells.size()) || frame-surveyFrame[body] < 5*FRAMES_PER_SEC) return;
+    surveyFrame[body] = frame;
+    const auto* sensors = circuit->GetMapManager();
+    // O(W_body), independent of unit/scout count. Read the already updated
+    // ally sensor maps, not engine wrappers, once per five seconds per basin.
+    // A 64-elmo grid proves sampled coverage, not omniscience between samples.
+    for (int c : surveyCells[body]) {
+        const AIFloat3 surface((c%gw+.5f)*cellSize, 0.f, (c/gw+.5f)*cellSize);
+        const AIFloat3 submerged(surface.x, -64.f, surface.z);
+        surveySeen[c] = survey::Observe(surveySeen[c], frame,
+            sensors->IsInLOS(surface), sensors->IsInRadar(submerged));
+    }
+}
+
+float CBattleAnalysis::GetWaterSurveyCoverage(int body, int maxAgeFrames)
+{
+    UpdateWaterSurvey(body);
+    if (body < 0 || body >= static_cast<int>(surveyCells.size()) || surveyCells[body].empty()) return 0.f;
+    int fresh = 0;
+    for (int c : surveyCells[body]) fresh += survey::Fresh(surveySeen[c], circuit->GetLastFrame(), maxAgeFrames);
+    return static_cast<float>(fresh)/static_cast<float>(surveyCells[body].size());
+}
+
+AIFloat3 CBattleAnalysis::GetWaterScoutGoal(int body, int maxAgeFrames, const AIFloat3& from, int seed)
+{
+    UpdateWaterSurvey(body);
+    AIFloat3 best(-1.f, 0.f, -1.f);
+    if (body < 0 || body >= static_cast<int>(surveyCells.size())) return best;
+    float score = std::numeric_limits<float>::max();
+    for (int c : surveyCells[body]) {
+        if (survey::Fresh(surveySeen[c], circuit->GetLastFrame(), maxAgeFrames)) continue;
+        const AIFloat3 p((c%gw+.5f)*cellSize, 0.f, (c/gw+.5f)*cellSize);
+        const float dx=p.x-from.x, dz=p.z-from.z;
+        // Stable scout-specific tie/sector bias without consuming random draws.
+        const unsigned hash=static_cast<unsigned>(c/16)*2654435761u ^ static_cast<unsigned>(seed)*2246822519u;
+        const float rank=dx*dx+dz*dz+static_cast<float>(hash%16u)*65536.f;
+        if (rank < score) { score=rank; best=p; }
+    }
+    return best;
+}
+
+int CBattleAnalysis::GetWaterEnemyCount(int body)
+{
+    BuildWater();
+    if (body < 0 || body >= static_cast<int>(hostile8.size())) return -1;
+    int count=0;
+    // O(E), called by SEA's five-second decision only. Include unfinished
+    // factories/builders and unresolved static sightings omitted by combat
+    // snapshots. Never query hidden engine positions or definitions.
+    for (const auto& item : circuit->GetEnemyManager()->GetEnemyUnits()) {
+        const auto* enemy=item.second;
+        if (enemy->GetData().losStatus & (SEnemyData::LosMask::NEUTRAL|SEnemyData::LosMask::DYING|SEnemyData::LosMask::DEAD)) continue;
+        const auto* def=enemy->GetCircuitDef();
+        if (def != nullptr && def->GetDef()->IsAbleToFly()) continue;
+        const auto& p=enemy->GetPos();
+        if (WaterBody(p,false)!=body) continue;
+        // A profile's IGNORE preference is not proof that a remembered enemy
+        // structure vanished. HIDDEN marks invalidated positional memory.
+        if (enemy->IsInRadarOrLOS() || (def != nullptr && !def->IsMobile()
+            && !(enemy->GetData().losStatus & SEnemyData::LosMask::HIDDEN))) ++count;
+    }
+    return count;
 }
 
 int CBattleAnalysis::WaterBody(const AIFloat3& pos, bool subDepth) const

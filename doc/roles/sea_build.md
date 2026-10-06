@@ -98,7 +98,7 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: 2b7e47d00f98b0e7c230baca4623ce5b9102fbc1; lines: 478 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: d5c24d306d5128d4cb7373df0b0688bd58fdafdb; lines: 493 -->
 
 ## D-209 follow-up
 
@@ -117,3 +117,18 @@ ReservedSupportPerFactory slots in range before admission. Existing valid slots
 count; only the shortfall is reserved. A support-starved unclaimed platform site
 continues its bounded placement search after ten seconds. Ordinary shipyards
 retain product-aware ship exits; flying factories reserve no hull corridor.
+
+## D-212: forward amphibious construction
+
+SEA checks its secured-water invasion after first-ship mex work and before
+optional economic work. SeaInvasion owns admission; NativeTask and LayoutTask
+redirect new amphibious factory requests through that same gate. Existing
+frames and player/retreat/enemy-reclaim work remain owned by their current
+tasks. The complex and gantry use persistent factory/exit reservations with
+terrain-validated amphibious paths; ordinary ship-only berth validation is
+not appropriate for their ground movement definitions. See the
+[design and evidence](../sea-amphibious-transition.md).
+The periodic generic turret-footprint search skips factories whose persistent
+reservation is owned by SeaInvasion. That controller plans the smaller coastal
+footprint; Support still adds income-justified build power as before. Ordinary
+or donated amphibious factories retain generic support planning.

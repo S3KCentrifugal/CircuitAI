@@ -1,0 +1,26 @@
+{
+  "kind": "supplied component test; not a natural economy or match-strength benchmark",
+  "milestone_frames": {
+    "partial-survey-blocked": 3300,
+    "complex-started": 8854,
+    "factory-escorted": 8854,
+    "complex-finished": 9523,
+    "complex-produced": 10116,
+    "landfall": 13800,
+    "backline-reached": 14100,
+    "gantry-started": 15124,
+    "amphibian-damaged-economy": 17061,
+    "enemy-economy-destroyed": 17387,
+    "gantry-finished": 19540,
+    "gantry-produced": 20332,
+    "gantry-landfall": 22800,
+    "gantry-backline": 24000
+  },
+  "invalid_fixture": false,
+  "note": "",
+  "protection_samples": [
+    "factory=1210 escortMetal=21000 completedTurrets=0",
+    "factory=30057 escortMetal=21000 completedTurrets=6"
+  ],
+  "failure_markers": []
+}

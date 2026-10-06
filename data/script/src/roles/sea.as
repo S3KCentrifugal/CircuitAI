@@ -10,6 +10,7 @@
 #include "../helpers/sea_constructor_helpers.as"
 #include "sea_build.as"
 #include "../manager/sea_recovery.as"
+#include "../manager/sea_invasion.as"
 
 namespace RoleSea {
 
@@ -51,6 +52,7 @@ namespace RoleSea {
     ******************************************************************************/
 
     void Sea_Init() {
+        SeaInvasion::Init();
         SeaRecovery::Reset();
         GenericHelpers::LogUtil("Sea role initialization logic executed", 2);
 
@@ -117,8 +119,12 @@ namespace RoleSea {
         dictionary startLimits; 
 
         startLimits.set("armbanth", 0);
-        startLimits.set("armmar", 0);
-        startLimits.set("armcroc", 0);
+        // D-212's SEA-owned amphibious factories need their invasion products.
+        // Map-specific restrictions are still applied by the shared setup.
+        if (!Global::RoleSettings::Sea::AmphibiousInvasion) {
+            startLimits.set("armmar", 0);
+            startLimits.set("armcroc", 0);
+        }
 
         startLimits.set("armsilo", 0);
         startLimits.set("corsilo", 0);
@@ -207,6 +213,7 @@ namespace RoleSea {
         SeaRecovery::Tick();
         if (SeaLayout::Enabled()) SeaBuild::Tick();
         SeaCombat::Tick();
+        SeaInvasion::Tick();
         if (SeaCombat::Active()) return;
         // Delay dynamic quota adjustments until configured time into the game
         if (ai.frame < (Global::RoleSettings::Sea::DynamicQuotaDelaySeconds * SECOND)) {
@@ -234,6 +241,8 @@ namespace RoleSea {
 
     IUnitTask@ Sea_FactoryAiMakeTask(CCircuitUnit@ u)
     {
+        IUnitTask@ invasion=SeaInvasion::Produce(u);
+        if (invasion !is null) return invasion;
         if (u !is null && Global::RoleSettings::Sea::SeaplanesAfterT2 && UnitHelpers::IsSeaplanePlatform(u.circuitDef.GetName()))
             return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (SeaLayout::Active()) return SeaFactories::Produce(u);
@@ -500,6 +509,13 @@ namespace RoleSea {
         // converters/guards even when the first ship has free reachable metal.
         IUnitTask@ mex=SeaBuild::OpeningMex(builder);
         if (mex !is null) return mex;
+        if (builder !is null && (builder.task is null || (!builder.task.IsEnemyReclaim()
+            && builder.task.GetType()!=int(Task::Type::PLAYER) && builder.task.GetType()!=int(Task::Type::RETREAT)))) {
+            IBuilderTask@ current=cast<IBuilderTask>(builder.task);
+            if (current is null || current.IsDead() || current.GetBuildType()>=int(Task::BuildType::REPAIR)) {
+                IUnitTask@ invasion=SeaInvasion::Build(builder); if (invasion !is null) return invasion;
+            }
+        }
         if (SeaLayout::Active()) return SeaBuild::MakeTask(builder);
         if (SeaLayout::Enabled()) return SeaBuild::LegacyTask(builder);
         if (builder !is null && (builder.task is null || (!builder.task.IsEnemyReclaim()

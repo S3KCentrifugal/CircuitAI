@@ -78,6 +78,7 @@ namespace SeaBuild {
             || name==UnitHelpers::GetT1NavalNanoNameForSide(side);
     }
     void Leave() {
+        SeaInvasion::Leave();
         SeaRecovery::Leave();
         SeaCombat::Leave();
         SeaEconomy::projects.resize(0); SeaFactories::draining.deleteAll();
@@ -135,6 +136,11 @@ namespace SeaBuild {
         for (uint i=0; i<SeaEconomy::productionFactories.length(); ++i) {
             CCircuitUnit@ factory=ai.GetTeamUnit(SeaEconomy::productionFactories[i]);
             if (factory is null) continue;
+            // D-212 owns the coastal 6/12-pad footprint. Retrying the generic
+            // 24-pad rectangle here every second duplicates that search and
+            // often cannot fit the same coast. Income-based Support() below
+            // remains available to add real build power above the initial pad.
+            if (SeaInvasion::OwnsSupport(factory)) continue;
             if (ReserveSupport(nano,factory.GetPos(ai.frame),aiTerrainMgr.GetBuildingFacing(factory))) break;
         }
         SeaEcoLayout::Tick();
@@ -309,6 +315,7 @@ namespace SeaBuild {
         if (build.GetUnits().length()>0) return task;
         aiBuilderMgr.AbortTask(task);
         if (kind==Task::BuildType::FACTORY) {
+            if (SeaInvasion::Active() && SeaInvasion::Factory(def)) return SeaInvasion::Build(u);
             if (UnitHelpers::IsT2Shipyard(def.GetName()) && !SeaEconomy::TechReady(def)) return null;
             return SeaLayout::Factory(u,def.GetName());
         }
@@ -348,6 +355,14 @@ namespace SeaBuild {
         IBuilderTask@ build=cast<IBuilderTask>(task);
         if (build is null || build.buildDef is null || build.target !is null || SeaEconomy::OwnsTask(task)) return task;
         const Task::BuildType kind=PlacementKind(build.buildDef,build.GetBuildType());
+        if (kind==Task::BuildType::FACTORY && SeaInvasion::Active() && SeaInvasion::Factory(build.buildDef)) {
+            // The invasion controller is the only admission/placement owner.
+            // Its pinned tasks returned above are already accounted for.
+            if (build.GetUnits().length()>0) return task;
+            aiBuilderMgr.AbortTask(task);
+            IUnitTask@ invasion=SeaInvasion::Build(u);
+            return invasion is null ? Wait() : invasion;
+        }
         if (kind==Task::BuildType::FACTORY && !SeaFactories::FactoryAllowed(build.buildDef)) {
             // Do not cancel a structure that another builder already started.
             array<CCircuitUnit@>@ workers=build.GetUnits();

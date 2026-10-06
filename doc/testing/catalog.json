@@ -646,11 +646,14 @@
         "test_canceled_unframed_berth_is_retryable",
         "test_counter_admission_and_time_to_coverage",
         "test_interception_respects_speed_weapon_reach_and_horizon",
+        "test_invasion_admission_needs_escort_predecessor_and_both_resources",
+        "test_invasion_replans_only_uncommitted_or_dead_slots",
         "test_opening_exception_does_not_return_after_factory_loss",
         "test_rear_fusion_footprint_keeps_protected_margin",
         "test_recovery_fleet_and_income_both_scale_capacity",
         "test_recovery_low_metal_hysteresis",
         "test_safety_interruption_restarts_unchanged_site_timer",
+        "test_sea_control_requires_complete_recent_coverage_and_quiet",
         "test_sea_policy_boundaries",
         "test_seaplane_preserves_full_cost_and_reserve_after_commitments",
         "test_seaplane_requires_sustained_income_even_with_gifted_bank",
@@ -659,7 +662,7 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "6bc168836f8d6609cf55a3da45077fc695ba28100731bf3a73a5f8f3cf0bba47",
+      "sha256": "08eb75ad5abbda903e61e3a65e3eccf788f89e6f5b95b29d5659a5763a3e3af3",
       "execution": "not inferred"
     },
     {
@@ -707,6 +710,17 @@
       "definitions": [],
       "detail": "Native executable; unnamed assertions remain inside the linked suite.",
       "sha256": "968869c61e979c7ffc796b42f1329e42d5d1aef704f66bba102e7389a50211b6",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tests/water_survey_test.cpp",
+      "domain": "shared",
+      "area": "native",
+      "kind": "suite",
+      "title": "water_survey_test",
+      "definitions": [],
+      "detail": "Native executable; unnamed assertions remain inside the linked suite.",
+      "sha256": "9757f650c1aea908b83d894265cebbfaad4127b6154e9244eb4c7b8b459ab221",
       "execution": "not inferred"
     },
     {
@@ -1444,6 +1458,28 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "a9741844bb2bd4b21302e3003ff2a231b83279388ae4d24d8a97e27dbee9a697",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/amphibious-blocked.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "amphibious-blocked",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "3afa3b2fba5500ffe11d630681ad919eb1e43b52ff7219e575a320180d0515ba",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/combat/amphibious-transition.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "amphibious-transition",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "8e9ffb38c2952985df6c9047c4d70ed2a7c985bf5e72a4e5f83f91763b50f9d5",
       "execution": "not inferred"
     },
     {
@@ -3008,6 +3044,46 @@
       ],
       "detail": "",
       "sha256": "978ddecc742189c0a8617674c8aeb95100ab32d4d137b295565d2013419cbc99",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/amphibious-blocked.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "amphibious-blocked",
+      "definitions": [
+        "expect: occupied",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "ae8c515a2de18f364160f88782be0a2d042ff6560a33cd2a67952238dbeb90a2",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/combat/amphibious-transition.json",
+      "domain": "sea",
+      "area": "combat",
+      "kind": "checks",
+      "title": "amphibious-transition",
+      "definitions": [
+        "expect: backline",
+        "expect: combat",
+        "expect: complex",
+        "expect: complex-production",
+        "expect: complex-support",
+        "expect: escort",
+        "expect: gantry",
+        "expect: gantry-backline",
+        "expect: gantry-landing",
+        "expect: gantry-production",
+        "expect: gantry-support",
+        "expect: landfall",
+        "expect: partial-survey",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "386912b327f399e57b4143b4f351be6ffe5292ffe4c318fe7973b66b0465e6a8",
       "execution": "not inferred"
     },
     {
@@ -5066,6 +5142,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/run_sea_invasion.py",
+      "domain": "sea",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_sea_invasion",
+      "definitions": [],
+      "detail": "Supplied SEA transition fixtures. Actual AI builds, escorts and invades.",
+      "sha256": "c15ca27ad98ea63d7e9d1bda681b29e4698291ec28a5dc9d76bb73865a97206b",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/run_sea_recovery.py",
       "domain": "sea",
       "area": "runners",
@@ -5981,6 +6068,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/widgets/sea_invasion_watch.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_invasion_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "4e7ac917237e4e6769bba962607392b916a821b0d89412e7fe2f62e74b7a1d6e",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/widgets/sea_recovery_watch.lua",
       "domain": "sea",
       "area": "fixtures",
@@ -6219,7 +6317,7 @@
       "title": "run_native_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "85edb6892229b9ba97bbceb48cf9cf834268257573e6b1e587e9c80ed3f9ffd6",
+      "sha256": "d76abbb6320c245dd0fa547ca704c8fdb5759397dc200304fd35d6de6d896396",
       "execution": "not inferred"
     },
     {

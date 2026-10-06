@@ -12,6 +12,8 @@ namespace SeaFactories {
             T2Finished(side),d.count,aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY),d));
     }
     bool FactoryAllowed(const CCircuitDef@ d) {
+        // Native switching must not bypass SEA's surveyed forward staging.
+        if (SeaInvasion::Active() && SeaInvasion::Factory(d)) return false;
         if (d is null || !Global::RoleSettings::Sea::SeaplanesAfterT2) return true;
         const string side=UnitHelpers::GetSideForUnitName(d.GetName());
         if (UnitHelpers::IsSeaplanePlatform(d.GetName())) return T2Finished(side) && SeaEconomy::SeaplaneReady(d);

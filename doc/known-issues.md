@@ -5463,3 +5463,36 @@ changing the agreed 95%/20% donation settings.
 **Verification.** Source trace and the preserved single failure in the supplied
 [8v8 evidence](sea-recovery-production.md). No invariant code change in D-211;
 the original run remains FAIL despite passing its production/recovery checks.
+
+
+### KI-517 - Concurrent rendered fixtures can exhaust host commit memory
+
+**Severity:** Medium (test infrastructure).
+
+**Problem.** During D-212, three supplied rendered games plus build tooling ran concurrently. One engine reported Failed to allocate memory during startup; another failed in msvcrt/libIL image handling at frame 3783, with no CircuitAI frame in the stack. Free disk fell below 300 MB while processes were active and recovered above 30 GB after they exited. The allocation failure is established; attributing the separate image-library crash to memory pressure remains an inference.
+
+**Proposed solution.** Add host commit-memory and disk-headroom admission checks to the playtest runner and serialize large rendered fixtures. Until then run these fixtures serially; retain and losslessly compress old symbols rather than deleting evidence. No engine or live-installation change was made.
+
+**Verification.** Original failures and serial repeats are retained in the [D-212 evidence](sea-amphibious-transition.md). The runner still lacks a shared memory-budget admission mechanism, so mitigation is not a permanent fix.
+
+
+### KI-518 - Intermittent assertion in the standalone TECH differential test
+
+**Severity:** Medium (regression-test reliability).
+
+**Problem.** D-212's full native runner passed its geometry and SEA policy tests, then the unchanged TECH weapon-work fixture aborted in AngelScript as_atomic.cpp:68 (`value < 1000000`). Running the same generated fixture again with the same executable passed both tests. The runner, TECH policy and fixture sources are unchanged from HEAD; the cause of the intermittent assertion is unresolved. This does not demonstrate a SEA runtime failure.
+
+**Proposed solution.** Capture a symbolized assertion stack and GC/type reference-count statistics in the standalone runner across repeated weapon-work runs, including the 20,000-case loop, before modifying ownership or collection cadence. Preserve the full old/new equivalence workload and do not disable assertions to obtain a pass. Touch tests/production_math_test.cpp and tools/knowledge/check_weapon_work.py only after identifying the offending lifetime.
+
+**Verification.** The original full-suite failure, isolated passing repeat, and final full-suite result are retained with the [D-212 evidence](sea-amphibious-transition.md). No vendor runtime or TECH gameplay change was made.
+
+
+### KI-519 - Unserved coastal turret reservations remain after owner separation
+
+**Severity:** Low (bounded placement-work observation; FPS impact unmeasured).
+
+**Problem.** Two D-212 supplied Legion games each created 120 coastal turret reservations and served none during minutes 18-24 after initial support was complete. Removing generic preplanning ownership of the two invasion factories did not change this aggregate counter. It combines multiple placement callers, so the dominant source is not established.
+
+**Proposed solution.** Add caller-scoped counters around SeaInvasion::PlanSupport, SeaBuild::ReserveSupport/Support and SeaLayout::PlanPatch. Compare identical serial windows and terrain/footprint invalidations before caching unsuccessful searches. Preserve immediate retries when occupancy, factory location or required build power changes; do not introduce an arbitrary command rate limit.
+
+**Verification.** Both exact counts and gameplay passes are preserved in the [D-212 report](sea-amphibious-transition.md). The required six/twelve completed in-range turrets and invasion passed; no measured whole-game performance gain or regression is established.

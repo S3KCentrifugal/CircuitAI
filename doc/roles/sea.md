@@ -1,5 +1,19 @@
 # SEA Role
 
+## Secured-water invasion (D-212)
+
+Default-on `Sea::AmphibiousInvasion` requires AdaptiveFleet and compact/layout
+support. `SeaInvasion` verifies recent LOS+sonar across the connected water body,
+checks current/remembered threats, and waits a quiet interval. It reserves an
+enemy-coast amphibious complex, exit and turret bank, dispatches a navy screen,
+then builds only with actual nearby protection and two-resource funding. A
+completed complex and its support turrets precede a separately income-gated
+underwater gantry. Normal seaplane admission retains precedence.
+
+Factory products assemble in movement-specific cohorts, cross a validated
+landing, then use dry routes toward backline economy. No TECH/AIR controller or
+shared JSON classification is changed. See [plan and evidence](../sea-amphibious-transition.md).
+
 ## Recovery submarines and factory continuity (D-211)
 
 SEA recovery runs in compact and experimental economic modes. Native queries
@@ -452,7 +466,7 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: cefea96c5911cf069f90943766604829eae1b5ca; lines: 874 -->
+<!-- source: data/script/src/roles/sea.as; blob: 100f482a8caee2608476a5603f7f9bf2c02c7dc4; lines: 890 -->
 
 
 ## Water-control investigation (2026-10-05)

@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "e093afe69672e5ff93dced3d22658ef4db78ceb5632d036a9341c528b835da68",
+    "checks.json": "ae8c515a2de18f364160f88782be0a2d042ff6560a33cd2a67952238dbeb90a2",
+    "invasion-analysis.json": "f506ec539d86b5cc3a60cd0997e1b34d87c459b40a5fd71ae574cd1dd267ae59",
+    "invasion-pins.json": "61482cb4cb6aca5381b8db6c38c492f7a4adbcfed330d3673c7a1880006cfff5",
+    "launched.json": "e22bff2943cb2adde2e089f4d167db7433dd9575bf8ce1eca4e1081bbe20585e",
+    "report.md": "d10fb09343ad515b05c9423a2679c9bac39885009d6355e00f889574ea23301c",
+    "result.json": "a9f3e129e0ce85ebc6cc37333ee2fb281bbf501f3d7a9d351b71ccb509402e31",
+    "run-inputs.json": "77ca93ebe8bc2cba96b829899d6c615b0a4320d4a4db10a836a67c4b340f5497",
+    "run-plan.json": "999138fa653385387b5e50f6767244ee7c9c66d01f5c92042185a9c7750e989b",
+    "script.txt": "1390ebb5cacc1d2ce7f597dbede2674a122eb77e687ee66fe3a0cbe2c8a92fc1",
+    "staged.json": "fadc1380a448145432e2a534e1d3f6c44a2f78e380aa17599029d5854bc80aec",
+    "starts.as": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f",
+    "teams.json": "ee4592c5bb6fbdefcb18e4149ca1eb6c2692da398eb1ec23e1a5038ce96b8a8b"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-blocked-armada\\supreme\\20261006T024608Z-ce226d4a\\runs\\20261006T024804Z-dbebb807",
+  "schema": 1
+}

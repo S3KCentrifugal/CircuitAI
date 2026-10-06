@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "9ace43ae2969f7e31cebc1fcd967e253312579ec4b00e7f778e1fc085ca73441",
+    "checks.json": "5956d4174992f4fd3b10c822504bf8e0f1d4dc10402d71b5f0d25d0343408441",
+    "invasion-analysis.json": "c06c53f420353924635cea85154393cdeea84a16cc5d1ad556b47d75c8453806",
+    "invasion-pins.json": "0c638ad335cc889f9d028545708260d5b6f24002dcf715d8434e6c27610b93c2",
+    "launched.json": "6db45bb91457375303e6b82f035b20aed8a83cdf8c3e06f3fe0d0a52b0ee0f13",
+    "report.md": "5c00cdad61a60d090889f3e82679c1ae4c0c07812b92b8eb675584cbd95625a7",
+    "result.json": "bc1e9732b5295a004a571578dd97e18508e8d65b4c1d3201a08cfff45c753e0c",
+    "run-inputs.json": "d8a65063db6e4d335eb55fc63598238e883a0ef6b0205658399c1d7b737b76d3",
+    "run-plan.json": "0d129d2bdd9963abb43f29f3442d409ff01fdadf36855a813e0c83820bde67f9",
+    "screen_2026-10-06_03-09-42-185.png": "e63faab32f91d7ee21f576d91b0a927fd9320a0392c6ef176d380b516b0985d8",
+    "screen_2026-10-06_03-09-53-886.png": "9a50aa6ec13f2c76d6682d9db0b2d231fe5f699b3fe6ce932b98056ab45b26ce",
+    "script.txt": "c7a74dcec6fd8391ba8032d39a3965f0e0d6991274ae9a722e0b654c7ba474c7",
+    "staged.json": "eeddd6715473cc24a5d9c928c3ca875c786b3b879b227e4c8c2d96c686e57cb8",
+    "starts.as": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f",
+    "teams.json": "af73065af55ae34f93eea35984b9f2ea79f7359e9a0a9d4761bda2e58581e744"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-transition-legion\\supreme\\20261006T030724Z-211681ba\\runs\\20261006T031432Z-edbf1d89",
+  "schema": 1
+}

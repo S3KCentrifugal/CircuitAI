@@ -4,6 +4,28 @@ Generated source inventory. Execution is not inferred.
 
 ## Combat / Checks
 
+### [amphibious-blocked](../../../tools/playtest/checks/sea/combat/amphibious-blocked.json)
+
+- `expect: occupied`
+- `forbid: errors`
+
+### [amphibious-transition](../../../tools/playtest/checks/sea/combat/amphibious-transition.json)
+
+- `expect: backline`
+- `expect: combat`
+- `expect: complex`
+- `expect: complex-production`
+- `expect: complex-support`
+- `expect: escort`
+- `expect: gantry`
+- `expect: gantry-backline`
+- `expect: gantry-landing`
+- `expect: gantry-production`
+- `expect: gantry-support`
+- `expect: landfall`
+- `expect: partial-survey`
+- `forbid: errors`
+
 ### [legion-t2-production](../../../tools/playtest/checks/sea/combat/legion-t2-production.json)
 
 - `expect: observer`
@@ -141,6 +163,14 @@ Generated source inventory. Execution is not inferred.
 - `forbid: script`
 
 ## Combat / Scenario
+
+### [amphibious-blocked](../../../tools/playtest/cases/sea/combat/amphibious-blocked.json)
+
+Map: Supreme Isthmus v1.7
+
+### [amphibious-transition](../../../tools/playtest/cases/sea/combat/amphibious-transition.json)
+
+Map: Supreme Isthmus v1.7
 
 ### [armada-aa-screen](../../../tools/playtest/cases/sea/combat/armada-air-screen-supreme.json)
 
@@ -398,6 +428,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
+### [sea_invasion_watch](../../../tools/playtest/widgets/sea_invasion_watch.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
 ### [sea_recovery_watch](../../../tools/playtest/widgets/sea_recovery_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
@@ -511,11 +545,14 @@ Map: glacial
 - `test_canceled_unframed_berth_is_retryable`
 - `test_counter_admission_and_time_to_coverage`
 - `test_interception_respects_speed_weapon_reach_and_horizon`
+- `test_invasion_admission_needs_escort_predecessor_and_both_resources`
+- `test_invasion_replans_only_uncommitted_or_dead_slots`
 - `test_opening_exception_does_not_return_after_factory_loss`
 - `test_rear_fusion_footprint_keeps_protected_margin`
 - `test_recovery_fleet_and_income_both_scale_capacity`
 - `test_recovery_low_metal_hysteresis`
 - `test_safety_interruption_restarts_unchanged_site_timer`
+- `test_sea_control_requires_complete_recent_coverage_and_quiet`
 - `test_sea_policy_boundaries`
 - `test_seaplane_preserves_full_cost_and_reserve_after_commitments`
 - `test_seaplane_requires_sustained_income_even_with_gifted_bank`
@@ -551,6 +588,10 @@ Serial paired naval fixtures with pinned controls and independent scorecards.
 ### [run_sea_economy_block](../../../tools/playtest/run_sea_economy_block.py)
 
 Supreme Isthmus physical economy-block acceptance, using real placement tasks.
+
+### [run_sea_invasion](../../../tools/playtest/run_sea_invasion.py)
+
+Supplied SEA transition fixtures. Actual AI builds, escorts and invades.
 
 ### [run_sea_recovery](../../../tools/playtest/run_sea_recovery.py)
 

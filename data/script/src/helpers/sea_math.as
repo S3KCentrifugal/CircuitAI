@@ -1,5 +1,17 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    bool ReplanInvasionSlot(int state, bool footprintClear, bool exitClear) {
+        // Missing/exhausted slots have no live frame. Claimed or started slots
+        // remain owned by their task even if the buildability probe says no.
+        return state<0 || state==4 || (state==0 && (!footprintClear || !exitClear));
+    }
+    bool SeaSecured(int body, float coverage, int enemies, int quietAge, int requiredQuiet) {
+        return body>=0 && coverage>=1.0f && enemies==0 && requiredQuiet>=0 && quietAge>=requiredQuiet;
+    }
+    bool InvasionFactoryReady(bool secured, bool protectedSite, bool predecessor, bool windowReady,
+        float incomeM, float incomeE, float minM, float minE) {
+        return secured && protectedSite && predecessor && windowReady && incomeM>=minM && incomeE>=minE;
+    }
     bool RecoveryLowMetal(bool wasLow,float metal,float storage,float low,float resume) {
         return storage>0 && metal<storage*(wasLow ? resume : low);
     }

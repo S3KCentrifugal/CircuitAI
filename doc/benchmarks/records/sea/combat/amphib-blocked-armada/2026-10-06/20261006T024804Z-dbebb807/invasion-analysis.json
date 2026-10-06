@@ -1,0 +1,11 @@
+{
+  "kind": "supplied component test; not a natural economy or match-strength benchmark",
+  "milestone_frames": {
+    "partial-survey-blocked": 3300,
+    "enemy-blocked": 8700
+  },
+  "invalid_fixture": true,
+  "note": "Original PASS is invalid: the enemy submarine had been destroyed and the observer accepted nil liveness. Preserved unchanged.",
+  "protection_samples": [],
+  "failure_markers": []
+}

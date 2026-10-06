@@ -214,3 +214,5 @@ step.
 | INV-152 | A new SEA seaplane platform admission retains its configured sustained-income eligibility and uncommitted cost plus reserves. | SeaLayout::Factory checks readiness before committing the pin; pure funding boundaries and the low-income supplied fixture verify rejection and later release. | D-210 |
 
 | INV-153 | SEA recovery sub selection yields reclaim, repair, resurrection or standby; never construction or factory assistance. | SeaRecovery::Tick checks the assigned builder kind. | D-211 |
+
+| INV-154 | SEA amphibious factory admission requires fresh sampled LOS/sonar coverage of its sea, no known water enemies, the quiet interval and actual nearby combat-ship protection. | SeaInvasion::Build audits admission; supplied transition and blocked fixtures independently observe construction and escort. | D-212 |

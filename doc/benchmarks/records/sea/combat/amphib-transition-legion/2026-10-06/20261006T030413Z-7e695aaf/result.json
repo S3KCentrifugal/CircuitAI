@@ -1,0 +1,115 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1413,
+      "sha256": "5956d4174992f4fd3b10c822504bf8e0f1d4dc10402d71b5f0d25d0343408441"
+    },
+    "infolog.txt": {
+      "bytes": 6411781,
+      "sha256": "2a697825eea26c04db62f6057be4992b51cde443d7ef52722e1e3b5ac107711b"
+    },
+    "invasion-pins.json": {
+      "bytes": 22990,
+      "sha256": "0520787876742598a7c179c05fa6a05e77128abfc238aeb6a04c1f91c600336f"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "70b655cb45ed8834ee5da8285ece37452deb0ac3f0fd9648fb2a556ce332dfad"
+    },
+    "report.md": {
+      "bytes": 23944,
+      "sha256": "29b0387ccb69b849e11d44efcd47ae5a78791a7e0d2e0fd173fa19b0e8e21b78"
+    },
+    "run-inputs.json": {
+      "bytes": 36668,
+      "sha256": "af6b8d005cd2665886ccf07b7026606cf4884b9f1e06657baefaa2f946a49369"
+    },
+    "run-plan.json": {
+      "bytes": 261,
+      "sha256": "3062f5d21d90f5a2da6dbf75b6cdd3f84f88135b318ad87db739fb7d7c9d4182"
+    },
+    "screen_2026-10-06_02-58-07-083.png": {
+      "bytes": 1850586,
+      "sha256": "9c412b5b0ccc6f6a578817ebd21b52c22a395dc17b6af4d503cbdf4d1576c442"
+    },
+    "screen_2026-10-06_02-58-44-570.png": {
+      "bytes": 1835140,
+      "sha256": "8a2d91e310e98de968f63fe15337c6fa9f41597d5cde7b34976d6596e71a65ad"
+    },
+    "screen_2026-10-06_02-58-47-831.png": {
+      "bytes": 1784348,
+      "sha256": "62d3b32db8ef7257406c9792a53c883557cb42c2ad04690aa220606d4986a2df"
+    },
+    "screen_2026-10-06_02-59-31-709.png": {
+      "bytes": 1813230,
+      "sha256": "a7f3f59efb30ba3a918922084788ea73504299ab73ca05940084bd38fb1bcff0"
+    },
+    "screen_2026-10-06_03-00-15-316.png": {
+      "bytes": 1806115,
+      "sha256": "2f2b07e78e7516aa5833210104be819680f1c8d8857dd5156bd9a0fd93932a5a"
+    },
+    "screen_2026-10-06_03-01-52-152.png": {
+      "bytes": 1785140,
+      "sha256": "b8fbd5277ad4822a9c6ebcc3f70cc63fef2fbb06640f6463f5ffade711eda2c8"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "82a1a184274b5de4cf4b8fdaf3b2cffae838ce8cf7e9d48faaa669df069e1620"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "164dec361a6851ad3345f51eb0312f6eb0548c9c7d0d1fe223bcf1516b3c2f3b"
+    },
+    "starts.as": {
+      "bytes": 109,
+      "sha256": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "af73065af55ae34f93eea35984b9f2ea79f7359e9a0a9d4761bda2e58581e744"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-transition-legion"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T030413Z-7e695aaf",
+  "last_frame": 43320,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-transition-legion\\supreme\\20261006T025705Z-a987c843\\runs\\20261006T030413Z-7e695aaf",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-06T03:04:14.128838+00:00",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 1,
+      "team": 0,
+      "x": 5800.0,
+      "z": 10500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 11456.0,
+      "z": 1901.0
+    }
+  ],
+  "verdict": "FAIL"
+}

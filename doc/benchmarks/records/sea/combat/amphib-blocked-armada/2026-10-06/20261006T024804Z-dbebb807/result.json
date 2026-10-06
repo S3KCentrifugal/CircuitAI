@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 336,
+      "sha256": "ae8c515a2de18f364160f88782be0a2d042ff6560a33cd2a67952238dbeb90a2"
+    },
+    "infolog.txt": {
+      "bytes": 1430457,
+      "sha256": "ddf1499e9558f7517c1af2cddd6965951785b7bd8f94bf6c83c677f4dc081fb7"
+    },
+    "invasion-pins.json": {
+      "bytes": 22988,
+      "sha256": "61482cb4cb6aca5381b8db6c38c492f7a4adbcfed330d3673c7a1880006cfff5"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "e22bff2943cb2adde2e089f4d167db7433dd9575bf8ce1eca4e1081bbe20585e"
+    },
+    "report.md": {
+      "bytes": 16730,
+      "sha256": "d10fb09343ad515b05c9423a2679c9bac39885009d6355e00f889574ea23301c"
+    },
+    "run-inputs.json": {
+      "bytes": 36668,
+      "sha256": "77ca93ebe8bc2cba96b829899d6c615b0a4320d4a4db10a836a67c4b340f5497"
+    },
+    "run-plan.json": {
+      "bytes": 258,
+      "sha256": "999138fa653385387b5e50f6767244ee7c9c66d01f5c92042185a9c7750e989b"
+    },
+    "screen_2026-10-06_02-47-16-464.png": {
+      "bytes": 1833455,
+      "sha256": "eaee081b580f36afd1c8e9e3ae70f4d6a1a2626ff6c34bea5ee654b98cdbb706"
+    },
+    "screen_2026-10-06_02-48-03-032.png": {
+      "bytes": 1778559,
+      "sha256": "c07b3139601a078c93415d21532f16dbc370e61f3b5dcf6841dc0c3f2d7bddd2"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "1390ebb5cacc1d2ce7f597dbede2674a122eb77e687ee66fe3a0cbe2c8a92fc1"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "fadc1380a448145432e2a534e1d3f6c44a2f78e380aa17599029d5854bc80aec"
+    },
+    "starts.as": {
+      "bytes": 109,
+      "sha256": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "ee4592c5bb6fbdefcb18e4149ca1eb6c2692da398eb1ec23e1a5038ce96b8a8b"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-blocked-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T024804Z-dbebb807",
+  "last_frame": 9000,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-blocked-armada\\supreme\\20261006T024608Z-ce226d4a\\runs\\20261006T024804Z-dbebb807",
+  "reason": "reached 5 min",
+  "recorded_at_utc": "2026-10-06T02:48:05.029582+00:00",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 5800.0,
+      "z": 10500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 11456.0,
+      "z": 1901.0
+    }
+  ],
+  "verdict": "PASS"
+}

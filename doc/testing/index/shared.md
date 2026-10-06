@@ -727,6 +727,10 @@ Native executable; unnamed assertions remain inside the linked suite.
 
 Native executable; unnamed assertions remain inside the linked suite.
 
+### [water_survey_test](../../../tests/water_survey_test.cpp)
+
+Native executable; unnamed assertions remain inside the linked suite.
+
 ## Performance / Checks
 
 ### [lane_ui_memory](../../../tools/playtest/checks/shared/performance/lane_ui_memory.json)

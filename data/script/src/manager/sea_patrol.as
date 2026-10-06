@@ -191,15 +191,21 @@ namespace SeaPatrol {
         }
         if (best<0) { b.retry=ai.frame+5*SECOND; return; }
         Sector@ s=sectors[best]; s.owner=b.id; s.visited=ai.frame; b.sector=best; b.goal=s.pos;
+        if (SeaInvasion::Active() && Scout(u.circuitDef)) {
+            // Arriving matters, not assigning a sector. Fill actual legal
+            // LOS/sonar holes; this native O(W_body) scan runs only at renewal.
+            AIFloat3 hole=aiBattle.GetWaterScoutGoal(b.body,Global::RoleSettings::Sea::InvasionSurveySeconds*SECOND,here,b.id);
+            if (hole.x>=0 && Safe(u,hole,b.body)) b.goal=hole;
+        }
         // MOVE to the sector before queuing its patrol. Including the current
         // base position in that loop would make every scout revisit the yard.
         array<AIFloat3> points;
         for (int i=0;i<3;++i) {
             const float a=float(i)*2.094395f;
-            AIFloat3 p(s.pos.x+cos(a)*cell*.3f,0,s.pos.z+sin(a)*cell*.3f);
+            AIFloat3 p(b.goal.x+cos(a)*cell*.3f,0,b.goal.z+sin(a)*cell*.3f);
             if (Safe(u,p,b.body)) points.insertLast(p);
         }
-        if (points.length()<2) { points.resize(0); points.insertLast(here); points.insertLast(s.pos); }
+        if (points.length()<2) { points.resize(0); points.insertLast(here); points.insertLast(b.goal); }
         if (Order(b,u,points,true)) {
             b.route.SetSeaTarget(-1); b.mode=0; b.target=-1;
             b.until=ai.frame+Global::RoleSettings::Sea::ScoutPatrolSeconds*SECOND;

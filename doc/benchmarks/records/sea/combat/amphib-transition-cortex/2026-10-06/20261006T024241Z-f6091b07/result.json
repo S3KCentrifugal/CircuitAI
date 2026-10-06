@@ -1,0 +1,119 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 973,
+      "sha256": "c02aa63343e47d188519b8964df3fcf97fb0d5cdd01d267dea8a42a703781c59"
+    },
+    "infolog.txt": {
+      "bytes": 697843,
+      "sha256": "3b85c7d975cecd48fe9cc62b986f2cfa38fc2222f99cb165a52ecc5cb973813b"
+    },
+    "invasion-pins.json": {
+      "bytes": 22990,
+      "sha256": "6d3bcac2acc7968eb43f25de1026465d3c48106ca419506b273db185aeddf474"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "52b83a23f539febb1f0a07ffd7ead48aae6f16d52b5c3aa8aa30800bc129214b"
+    },
+    "report.md": {
+      "bytes": 24068,
+      "sha256": "20ae1fa5c74963af1cd41531e017c5eb6b62efd175206b9a5b4999f9cadfee13"
+    },
+    "run-inputs.json": {
+      "bytes": 36668,
+      "sha256": "55a0ace6c52d4d712473070b0d7a2e55b574b34d2c8428d65c4f8d477f9ff15f"
+    },
+    "run-plan.json": {
+      "bytes": 261,
+      "sha256": "ce1e0b3202b6384b73e610801cd6c75f9aa135cca9bf21616c05ed85e8a8bd59"
+    },
+    "screen_2026-10-06_02-38-40-712.png": {
+      "bytes": 1818629,
+      "sha256": "c0a4a2c690f2a20fbd9fc3e8c7158a5965ec9b4c87f0477e935cfe1e188a34c8"
+    },
+    "screen_2026-10-06_02-39-26-095.png": {
+      "bytes": 1783756,
+      "sha256": "0885f8c9a4af5189912c139b70d7fe3b43ea2e5c6373079ef45b163e5b6afe24"
+    },
+    "screen_2026-10-06_02-39-30-221.png": {
+      "bytes": 1759011,
+      "sha256": "bf6d10ee107754406ae0f20778f5024548f1e97fe06e00e528f8d15059edab6b"
+    },
+    "screen_2026-10-06_02-40-19-029.png": {
+      "bytes": 1797008,
+      "sha256": "2207f3f48bdba2c9aefd5f10eebd134bb72968f4bd6b9ed07d0860eb57d1f2a5"
+    },
+    "screen_2026-10-06_02-40-29-582.png": {
+      "bytes": 1798670,
+      "sha256": "65740acd51ccddb3fd07a58d50704485cbdf66502581baa4bfdf838bf3609b6a"
+    },
+    "screen_2026-10-06_02-40-52-103.png": {
+      "bytes": 1696506,
+      "sha256": "42b5ef73d2f35c11da7cdc5a452136c0dc2ae4c8a14f4870cbdc5acdff2f58b5"
+    },
+    "screen_2026-10-06_02-42-07-798.png": {
+      "bytes": 1783059,
+      "sha256": "3b0d501473cc3d413a7ea2cd42b9c6d4189516e5c7d61cef0c215a98b8946992"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "3e2efeac53acba408749b7b055607d3756c93a6bbf6307a9548878b209337c0d"
+    },
+    "staged.json": {
+      "bytes": 233,
+      "sha256": "1a6a22c7930b366e9ca8bc1eca5f85b2cff6b4af4efa4f2ef21c0ca14860f084"
+    },
+    "starts.as": {
+      "bytes": 109,
+      "sha256": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "68d5f49092c84ce199a85f54d8bb9ab1e8176f0ec88ac77f6e68829b452fdccc"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-transition-cortex"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T024241Z-f6091b07",
+  "last_frame": 32428,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-transition-cortex\\supreme\\20261006T023734Z-380e3378\\runs\\20261006T024241Z-f6091b07",
+  "reason": "reached 18 min",
+  "recorded_at_utc": "2026-10-06T02:42:41.725196+00:00",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 1,
+      "team": 0,
+      "x": 5800.0,
+      "z": 10500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 11456.0,
+      "z": 1901.0
+    }
+  ],
+  "verdict": "PASS"
+}

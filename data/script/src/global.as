@@ -1571,6 +1571,16 @@ namespace Global {
         }
 
         namespace Sea {
+            bool AmphibiousInvasion = true;
+            int InvasionSurveySeconds = 600; // all 64-elmo water samples need LOS AND sonar
+            int InvasionQuietSeconds = 30;
+            float InvasionEscortMetal = 1500;
+            float InvasionOffshoreDistance = 640;
+            float InvasionWeaponMargin = 256;
+            float InvasionMinMetal = 60, InvasionMinEnergy = 1200;
+            float InvasionGantryMetal = 150, InvasionGantryEnergy = 5000;
+            int InvasionLabTurrets = 6, InvasionGantryTurrets = 12;
+            int InvasionWaveSize = 6, InvasionWaveSeconds = 90;
             bool CompactEconomy = true; // placement only, independent of experimental fleet/production
             int EconomyTurretSide = 4;
             int TidalClusterSites = 48;

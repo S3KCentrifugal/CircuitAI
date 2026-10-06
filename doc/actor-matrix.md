@@ -601,3 +601,14 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Resurrection submarine | SeaRecovery::Added/Removed/Reset/Leave/Make/Tick, native task manager | Own IDs reacquired per callback; player/retreat/enemy-reclaim preserved; 20/40-percent metal hysteresis; explicit ordered queries. |
 | Recovery wreck | FindRecoveryTask, CBReclaimTask/CBResurrectTask, feature callback | One-second feature value snapshot; actual resurrection UnitDef; safe reach; existing task claims; same-job reuse; controlled reclaim releases claim when last worker leaves. |
 | Damaged naval ally | FindRecoveryTask, CBRepairTask | Completed naval hull, current health, no friendly reclaim; priority UnitDefs from SEA policy. Existing target repair task reused rather than aborted; allied targets are reacquired by ID on idle, with missing-target cancellation. |
+
+## D-212: secured-water invasion
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Survey history | BattleAnalysis, MapManager sensor maps, SeaInvasion::Survey, SeaPatrol::Patrol | Lazy 64-elmo per-body history; actual simultaneous LOS/sonar observations, ten-minute expiry, five-second refresh; no spectator or hidden positions. History restarts after load. |
+| Amphibious complex/gantry | SeaInvasion::Plan/PlanGantry/Build, SeaBuild::LayoutTask/NativeTask, SeaFactories::FactoryAllowed, native reservation lifecycle | Persistent allied-aware footprint and output corridor; untouched blocked sites replan; script alone admits new factories after survey, escort, income and funding gates. Started frames remain investments. |
+| Offshore turret bank | SeaInvasion::PlanSupport/OwnsSupport/Build, SeaBuild::SupportFootprint/Support, SeaLayout::Place | Reserve after factory footprints; actual build distance; six completed initial turrets before gantry admission, twelve gantry support target. Generic preplanning skips only the two actual pinned invasion factories; income-based support construction remains available. |
+| Protective ships | SeaOperations::Tick/Route, SeaInvasion::Screen/Protected | Ordinary eligible naval cohorts screen the site when no compatible naval target; live ship presence gates construction. Existing threat response, scout/AA, carrier, player and retreat ownership take precedence. |
+| Amphibious cohort | SeaInvasion::Produce/Member/Waves/Order, native RouteTask | Actual faction factory edges; copied IDs; separate UnitDef cohorts; six units or 90-second release; validated beach routes, dry backline routes after landing. Player/retreat/external task owners remain protected. |
+| Evidence | run_sea_invasion.py, sea_invasion_watch.lua | Supplied resources, workers, ships and legitimate sensors; AI alone places factories and issues invasion routes. Observer positions never feed policy. |

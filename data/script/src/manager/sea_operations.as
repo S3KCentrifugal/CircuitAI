@@ -118,7 +118,7 @@ namespace SeaOperations {
         p=Spam::_Clamp(AIFloat3(g.centre.x+cos(angle)*1200,0,g.centre.z+sin(angle)*1200));
         return aiBattle.WaterBody(p,false)==g.body ? p : g.centre;
     }
-    bool Route(Cohort@ g, const AIFloat3 &in goal, bool withdrawing, bool scout) {
+    bool Route(Cohort@ g, const AIFloat3 &in goal, bool withdrawing, bool scout, bool hold=false) {
         CCircuitUnit@ lead=ai.GetTeamUnit(g.ids[0]); if (lead is null) return false;
         // GetUnitTerrainRoute is explicitly a ground/amphibious MoveDef API.
         // The naval lane graph supplies water waypoints; the engine executes
@@ -140,6 +140,9 @@ namespace SeaOperations {
         }
         // MOVE for scouting/withdrawal prevents engine FIGHT from chasing a
         // contact into the very sub field that caused the withdrawal.
+        // A previous invasion screen may have requested HOLD. Other goals
+        // retain their original movement state when that screen is interrupted.
+        g.route.SetHoldPosition(hold);
         g.route.SetTraversal(true,96,!withdrawing && !scout);
         g.route.SetRoute(points);
         for (uint i=0;i<g.ids.length();++i) {
@@ -292,6 +295,20 @@ namespace SeaOperations {
                 const float slack=AiMax(80.0f,range*.8f);
                 goal=AIFloat3(goal.x+(g.centre.x-goal.x)*slack/dist,0,goal.z+(g.centre.z-goal.z)*slack/dist);
             } else {
+                AIFloat3 screen;
+                if (!scout && SeaInvasion::Screen(g.body,g.defId,screen)) {
+                    // A blocked untouched factory can move its reservation.
+                    // Escort follows the new site once, not an obsolete anchor.
+                    if (g.target!=-4 || g.route is null || g.route.IsDead() || MapHelpers::SqDist(g.goal,screen)>SQUARE_SIZE*SQUARE_SIZE) {
+                        if (Route(g,screen,false,true,true)) g.target=-4;
+                        else g.retry=ai.frame+10*SECOND;
+                    }
+                    if (g.route !is null && !g.route.IsDead()) for (uint member=0;member<g.ids.length();++member) {
+                        CCircuitUnit@ reinforcement=ai.GetTeamUnit(g.ids[member]);
+                        if (Eligible(reinforcement) && reinforcement.task !is g.route) aiMilitaryMgr.TransferUnit(reinforcement,g.route);
+                    }
+                    continue;
+                }
                 target=-1;
                 if (ai.frame-g.ordered<Global::RoleSettings::Sea::FleetSearchSeconds*SECOND
                     && g.route !is null && !g.route.IsDead() && !g.route.IsAtEnd(ai.GetTeamUnit(g.ids[0]))) continue;

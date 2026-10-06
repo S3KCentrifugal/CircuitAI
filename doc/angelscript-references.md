@@ -1890,3 +1890,24 @@ spending priority under metal pressure. Availability, pending-task limits,
 air viability and normal roster selection remain. Two-argument/native default
 callers retain prior behavior. This option does not guarantee build progress
 when resources or physical exits are unavailable.
+
+
+## D-212: observed water coverage
+
+`aiBattle.GetWaterSurveyCoverage(int body, int maxAgeFrames)` returns the
+fraction of that connected water body's 64-elmo samples observed through both
+legal allied surface LOS and sonar within the requested age. Invalid bodies
+return zero. Five-second lazy sampling uses cached sensor maps, never hidden
+unit positions. Observation history is rebuilt after load.
+
+`aiBattle.GetWaterScoutGoal(int body, int maxAgeFrames, const AIFloat3&in from,
+int seed)` returns a stale sample with deterministic distance/tie bias, or
+(-1,0,-1). The caller checks route and threat. It does not claim a destination
+has been observed. Both calls scan O(W_body), with samples indexed by body.
+
+`aiBattle.GetWaterEnemyCount(int body)` counts current legal contacts and
+unresolved remembered immobile contacts in the connected sea, including
+unfinished factories and constructors. Aircraft/neutral/dead entries are
+excluded; an invalid body returns -1. O(E) once per SEA decision, no engine
+callbacks to hidden enemies. Native provides observations; SEA script owns
+freshness, quiet time, economic gates, escorts and invasion policy.

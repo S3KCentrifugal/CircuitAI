@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-transition-legion"
+  },
+  "id": "20261006T034555Z-6a426aa3",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1
+}

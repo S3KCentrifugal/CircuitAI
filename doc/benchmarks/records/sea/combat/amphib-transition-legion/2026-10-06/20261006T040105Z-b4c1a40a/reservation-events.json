@@ -1,0 +1,22 @@
+[
+  {
+    "source": "build-theatres\\games\\sea\\combat\\amphib-transition-legion\\supreme\\20261006T034555Z-6a426aa3\\infolog.txt",
+    "frame_interval": "[32400,43200) / game minutes [18,24)",
+    "coastal_rectangle": "x=[7600,9600], z=[4800,6600]",
+    "events": {
+      "created": 120,
+      "served": 0,
+      "completed_nanos_total": 0
+    }
+  },
+  {
+    "source": "build-theatres\\games\\sea\\combat\\amphib-transition-legion\\supreme\\20261006T035428Z-fec16459\\infolog.txt",
+    "frame_interval": "[32400,43200) / game minutes [18,24)",
+    "coastal_rectangle": "x=[7600,9600], z=[4800,6600]",
+    "events": {
+      "created": 120,
+      "served": 0,
+      "completed_nanos_total": 0
+    }
+  }
+]

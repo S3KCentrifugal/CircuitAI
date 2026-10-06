@@ -1,0 +1,13 @@
+{
+  "stop_minute": 18,
+  "expect": [
+    {"key":"partial-survey","pattern":"SeaInvasionTest\\] PASS partial-survey-blocked","by_minute":2,"scope":"any"},
+    {"key":"complex","pattern":"SeaInvasionTest\\] PASS complex-finished","by_minute":18,"scope":"any"},
+    {"key":"gantry","pattern":"SeaInvasionTest\\] PASS gantry-finished","by_minute":18,"scope":"any"},
+    {"key":"complex-production","pattern":"SeaInvasionTest\\] PASS complex-produced","by_minute":18,"scope":"any"},
+    {"key":"gantry-production","pattern":"SeaInvasionTest\\] PASS gantry-produced","by_minute":18,"scope":"any"},
+    {"key":"landfall","pattern":"SeaInvasionTest\\] PASS landfall","by_minute":18,"scope":"any"},
+    {"key":"backline","pattern":"SeaInvasionTest\\] PASS backline-reached","by_minute":18,"scope":"any"}
+  ],
+  "forbid":[{"key":"errors","pattern":"INVARIANT|SCRIPT CRASH|: ERR\\s+:|has crashed|Lib exception|SeaInvasionTest\\] FAIL|Exception:|Null pointer access","scope":"any"}]
+}

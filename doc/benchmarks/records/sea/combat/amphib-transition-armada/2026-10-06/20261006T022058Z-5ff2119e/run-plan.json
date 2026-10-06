@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-transition-armada"
+  },
+  "id": "20261006T021903Z-09b858d6",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1
+}

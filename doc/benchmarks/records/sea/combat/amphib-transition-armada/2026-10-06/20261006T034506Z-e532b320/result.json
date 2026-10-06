@@ -1,0 +1,127 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1413,
+      "sha256": "5956d4174992f4fd3b10c822504bf8e0f1d4dc10402d71b5f0d25d0343408441"
+    },
+    "infolog.txt": {
+      "bytes": 2293568,
+      "sha256": "258060a9e70588e0a79fd014d081c71797c7ac9c2843c9c26db6a17e90ad32c9"
+    },
+    "invasion-pins.json": {
+      "bytes": 22990,
+      "sha256": "7cecc2e68d60e0950456ce7e5f9950ef5fe510a47d1b51c2a9b91815d3e9df1f"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "aaafa3c018db717d9f7a209b907bc6cd560c19efb251a0a720a16a012384df47"
+    },
+    "report.md": {
+      "bytes": 24401,
+      "sha256": "f143c1596a9195eefca59eaaf536b8912bae81a5bf1baf1eb440c168ba2137c2"
+    },
+    "run-inputs.json": {
+      "bytes": 36668,
+      "sha256": "e8982c0ae3552fac436d9092aca3680ec2c1555e350242aebe208066b72973b3"
+    },
+    "run-plan.json": {
+      "bytes": 261,
+      "sha256": "c459a49e6fc2b719475e3f3bb43d4965ab6bb369bc1a26e30618defafd0648af"
+    },
+    "screen_2026-10-06_03-39-06-905.png": {
+      "bytes": 1818539,
+      "sha256": "2feb5bd0c7bdf7f23bd05265c94be53b29de70dcf401cd29bc18f361ac1999d0"
+    },
+    "screen_2026-10-06_03-39-48-651.png": {
+      "bytes": 1783787,
+      "sha256": "3b1bd62a82e48aa86f49fab3098a65525c81ebdd14fd62f653f0b7862ac885f1"
+    },
+    "screen_2026-10-06_03-39-49-483.png": {
+      "bytes": 1875833,
+      "sha256": "73762cf1a0a99c1659ced8bb83db5c26b7e69bbba86bd5b677365b497317e66c"
+    },
+    "screen_2026-10-06_03-40-53-691.png": {
+      "bytes": 1871468,
+      "sha256": "f1e2cba3c2b08b918c964596f39f826a2da2b0f28e4bfb8f75f996d33278c94d"
+    },
+    "screen_2026-10-06_03-40-55-356.png": {
+      "bytes": 1784387,
+      "sha256": "4aea78dfdc3d79a47df6f294d41b74b76e687287dcdd5897ebb043aa04a7c618"
+    },
+    "screen_2026-10-06_03-40-57-067.png": {
+      "bytes": 1804971,
+      "sha256": "59e5cbb64fadfe582a2403937e8f12cf4e03851af7bf67f106f92db1d8d1235b"
+    },
+    "screen_2026-10-06_03-42-17-771.png": {
+      "bytes": 1922089,
+      "sha256": "e061cf18cb7327d8f62f475fb5b803789ea4b96a54bad4fa58791b49d23f6ed7"
+    },
+    "screen_2026-10-06_03-42-36-740.png": {
+      "bytes": 1785134,
+      "sha256": "6c8d73a8d6e8dbd9f6db34ee3269cde7673b25680cc5a871522697662a7dd380"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "242defa605856ab2773facaa9170d6fb8d29ced93e33695c177a6c44f5f0295d"
+    },
+    "selected-shots.json": {
+      "bytes": 76,
+      "sha256": "c2532785d0bb5c6201c7d070e550c46767bf9a325631e9a811e9d242ce367a18"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "a6e4556076be452f1e72c76d62c4802f2b429c6becb83b05031dc15d2e936017"
+    },
+    "starts.as": {
+      "bytes": 109,
+      "sha256": "3ee4df8a81b295204ca078a878c9979209c1efc7b7f7f2e427fbd30df9656b1f"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "ee4592c5bb6fbdefcb18e4149ca1eb6c2692da398eb1ec23e1a5038ce96b8a8b"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "amphib-transition-armada"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T034506Z-e532b320",
+  "last_frame": 43260,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\amphib-transition-armada\\supreme\\20261006T033805Z-86e6a22b\\runs\\20261006T034506Z-e532b320",
+  "reason": "reached 24 min",
+  "recorded_at_utc": "2026-10-06T03:45:06.400658+00:00",
+  "requested": {
+    "seed": 2121
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 5800.0,
+      "z": 10500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 11456.0,
+      "z": 1901.0
+    }
+  ],
+  "verdict": "PASS"
+}

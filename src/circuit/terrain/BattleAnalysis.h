@@ -145,6 +145,9 @@ public:
 
 	// --- water
 	void PrepareWater() { BuildWater(); }  // idempotent, without lane/beach policy side effects
+	float GetWaterSurveyCoverage(int body, int maxAgeFrames);
+	springai::AIFloat3 GetWaterScoutGoal(int body, int maxAgeFrames, const springai::AIFloat3& from, int seed);
+	int GetWaterEnemyCount(int body);
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
 	bool IsHostileWater(int body, bool subDepth) const;
 	void MarkHostileWater(const springai::AIFloat3& pos, float radius);
@@ -282,6 +285,11 @@ private:
 	std::vector<int> body8, body15;
 	std::vector<char> hostile8, hostile15;
 	bool waterBuilt;
+	// Lazily sampled legal ally sensor maps. Reset on load/reconstruction: a
+	// saved claim of control must never substitute for renewed reconnaissance.
+	void UpdateWaterSurvey(int body);
+	std::vector<std::vector<int>> surveyCells;
+	std::vector<int> surveySeen, surveyFrame;
 	std::vector<SBeach> beaches;
 
 	std::vector<char> pass[_LANE_CLASSES_];
