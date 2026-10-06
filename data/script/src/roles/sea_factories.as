@@ -41,8 +41,21 @@ namespace SeaFactories {
         const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
         const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
         array<string> names;
-        if (!advanced && SeaCombat::fleet>=1500)
-            names.insertLast(side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub");
+        if (!advanced && Global::RoleSettings::Sea::EnableEarlyRezSub) {
+            CCircuitDef@ rez=ai.GetCircuitDef(side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub");
+            const int target=SeaMath::RecoveryCount(aiEconomyMgr.metal.income,SeaCombat::fleet,
+                Global::RoleSettings::Sea::MetalIncomePerRezSub,Global::RoleSettings::Sea::FleetMetalPerRezSub);
+            if (rez !is null && rez.count+aiFactoryMgr.GetPendingRecruitCount(rez)<target
+                && aiFactoryMgr.GetPendingRecruitCount(rez)==0) {
+                // A free requesting yard is available capacity. Fund both the
+                // hull and energy before allocating this discretionary support.
+                SeaEconomy::Tick();
+                if (SeaEconomy::Fund(rez,AiMax(yard.circuitDef.GetBuildSpeed(),SeaEconomy::LocalPower(yard)))) {
+                    IUnitTask@ t=Recruit(yard,rez,Task::RecruitType::BUILDPOWER,true);
+                    if (t !is null) { GenericHelpers::LogUtil("[SEA][Recovery] recruit "+rez.GetName()+" target="+target,1); return t; }
+                }
+            }
+        }
         if (advanced && SeaCombat::fleet>=5000) {
             names.insertLast(UnitHelpers::GetNavalAntiNukeShipNameForSide(side));
             names.insertLast(UnitHelpers::GetNavalJammerShipNameForSide(side));
@@ -57,7 +70,7 @@ namespace SeaFactories {
         return null;
     }
     IUnitTask@ Produce(CCircuitUnit@ yard) {
-        if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.DefaultMakeTask(yard);
+        if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.MakeFactoryTask(yard,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (Hold(yard)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
         SeaEconomy::Tick();
         const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
@@ -66,16 +79,6 @@ namespace SeaFactories {
         if (con !is null && con.count+aiFactoryMgr.GetPendingRecruitCount(con)>=1) {
             CCircuitDef@ counter=SeaCombat::Select(yard,true);
             if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER); if (response !is null) return response; }
-            // A safe, established fleet can briefly reserve income for its T2
-            // package. Otherwise continuous T1 recruits consume the bank that
-            // the builder's two-resource admission gate requires. Counter
-            // deficits above always interrupt this saving state.
-            CCircuitDef@ t2=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
-            if (!advanced && SeaCombat::Active() && SeaEconomy::Have(t2)==0
-                && SeaCombat::fleet>=Global::RoleSettings::Sea::TechScreenMetal
-                && SeaEconomy::TechReady(t2,true)
-                && aiBattle.AmphThreat(yard.GetPos(ai.frame))<=Global::RoleSettings::Sea::HarborMaxThreat)
-                return aiFactoryMgr.Enqueue(TaskS::Wait(false,2*SECOND));
         }
         if (con !is null && yard.circuitDef.CanBuild(con)) {
             const int have=con.count+aiFactoryMgr.GetPendingRecruitCount(con);
@@ -123,7 +126,7 @@ namespace SeaFactories {
                 }
             }
         }
-        return aiFactoryMgr.DefaultMakeTask(yard);
+        return aiFactoryMgr.MakeFactoryTask(yard,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
     }
     bool Safe(const AIFloat3 &in p) {
         if (aiBattle.AmphThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat || aiBattle.AirThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat) return false;

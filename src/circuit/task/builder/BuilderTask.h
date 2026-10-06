@@ -115,6 +115,9 @@ public:
 
 	virtual bool IsGeneric() const { return false; }
 	BuildType GetBuildType() const { return buildType; }
+	// D-211: opt-in, transient recovery selection. Script re-adopts after load.
+	// Prevent legacy feature-area reevaluation from silently changing the job.
+	bool recoveryControlled = false;
 	float GetBuildPowerM() const { return buildPower.metal; }
 	float GetBuildPowerE() const { return buildPower.energy; }
 	float GetCostM() const { return cost.metal; }

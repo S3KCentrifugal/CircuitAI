@@ -288,6 +288,14 @@ public:
 	// script pulls them when its sequence says so; nothing else assigns them
 	// in the experimental system.
 	IUnitTask* FindQueuedTask(CCircuitUnit* builder, IBuilderTask::BuildType type);
+	// mode 0: metal features, 1: completed naval repair (optional def filter),
+	// 2: naval wreck resurrection. Script orders the independent queries.
+	IBuilderTask* FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred);
+private:
+	struct SRecoveryFeature { int id; springai::AIFloat3 pos; float metal; bool resurrect; };
+	std::vector<SRecoveryFeature> recoveryFeatures;
+	int recoveryFrame = -100000;
+public:
 	// Turret assist (D-065): the own unit being reclaimed that this builder
 	// can reach without moving (nearest), and the unfinished structure of
 	// `def` it can reach (nearest); null when none.

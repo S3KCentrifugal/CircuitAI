@@ -4727,6 +4727,15 @@ limitation, not evidence of a broken release gate. Calibrate with paired games
 and explicit spending/gate telemetry before adding savings or lowering reserves;
 retain urgent naval responses. See [D-210 evidence](sea-seaplane-transition.md).
 
+
+D-211 evidence for KI-228/KI-231/KI-235: the 30-minute natural Shore to Shore
+8v8 completed 516 products from 16 T1 yards, but no T2 yard and no recovery
+fleet above one sub per player. None of 2,762 sampled queues was empty for
+15 seconds. Continuous low-income production does not prove adequate tech
+accumulation or support funding. Keep the economic-progression investigation
+open; do not relabel this original missing-scaling FAIL as a pass.
+[Evidence and follow-up capacity tests](sea-recovery-production.md).
+
 ### KI-229 - SEA same-tick funding can reserve accepted capital twice
 
 **Problem.** SeaEconomy::Fund sums queued unframed SEA projects and admitted
@@ -5435,3 +5444,22 @@ contact changes and bounded retry expiry.
 
 **Verification.** Control flow traced; blocked-nearest/reachable-second and
 coastal geometry cases still required. [Investigation](sea-control-investigation.md).
+
+### KI-516 - Metal-sharing invariant can count time without an eligible recipient
+
+**Severity:** Low (diagnostic; donation policy still ran).
+
+**Problem.** CheckTeamShare starts its 60-second clock whenever the donor bank
+is high, even when every ally is full. It checks recipient space only at the
+end. In D-211's supplied 8v8, team 13 donated at frame 3524 when team 8 was
+98% full; frame 3584 reported INV-033 after team 8 gained storage and suddenly
+had 9729 free. This does not establish 60 seconds of missed donation opportunity.
+
+**Proposed solution.** Track continuous eligible recipient room as part of the
+invariant clock, and account for the five-second donation cadence. Test full
+teams, newly completed storage and actual prolonged missed sharing without
+changing the agreed 95%/20% donation settings.
+
+**Verification.** Source trace and the preserved single failure in the supplied
+[8v8 evidence](sea-recovery-production.md). No invariant code change in D-211;
+the original run remains FAIL despite passing its production/recovery checks.

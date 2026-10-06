@@ -248,6 +248,82 @@ Map: selected by runner
 
 ## Economy / Checks
 
+### [sea-capacity-8v8](../../../tools/playtest/checks/sea/economy/sea-capacity-8v8.json)
+
+- `expect: allied-repair`
+- `expect: observer`
+- `expect: start-count`
+- `expect: sub-scaling`
+- `expect: team-0-factory-1`
+- `expect: team-0-factory-2`
+- `expect: team-0-factory-3`
+- `expect: team-1-factory-1`
+- `expect: team-1-factory-2`
+- `expect: team-1-factory-3`
+- `expect: team-10-factory-1`
+- `expect: team-10-factory-2`
+- `expect: team-10-factory-3`
+- `expect: team-11-factory-1`
+- `expect: team-11-factory-2`
+- `expect: team-11-factory-3`
+- `expect: team-12-factory-1`
+- `expect: team-12-factory-2`
+- `expect: team-12-factory-3`
+- `expect: team-13-factory-1`
+- `expect: team-13-factory-2`
+- `expect: team-13-factory-3`
+- `expect: team-14-factory-1`
+- `expect: team-14-factory-2`
+- `expect: team-14-factory-3`
+- `expect: team-15-factory-1`
+- `expect: team-15-factory-2`
+- `expect: team-15-factory-3`
+- `expect: team-2-factory-1`
+- `expect: team-2-factory-2`
+- `expect: team-2-factory-3`
+- `expect: team-3-factory-1`
+- `expect: team-3-factory-2`
+- `expect: team-3-factory-3`
+- `expect: team-4-factory-1`
+- `expect: team-4-factory-2`
+- `expect: team-4-factory-3`
+- `expect: team-5-factory-1`
+- `expect: team-5-factory-2`
+- `expect: team-5-factory-3`
+- `expect: team-6-factory-1`
+- `expect: team-6-factory-2`
+- `expect: team-6-factory-3`
+- `expect: team-7-factory-1`
+- `expect: team-7-factory-2`
+- `expect: team-7-factory-3`
+- `expect: team-8-factory-1`
+- `expect: team-8-factory-2`
+- `expect: team-8-factory-3`
+- `expect: team-9-factory-1`
+- `expect: team-9-factory-2`
+- `expect: team-9-factory-3`
+- `forbid: errors`
+
+### [sea-production-8v8](../../../tools/playtest/checks/sea/economy/sea-production-8v8.json)
+
+- `expect: observer`
+- `expect: start-count`
+- `expect: sub-scaling`
+- `forbid: errors`
+
+### [sea-recovery-priorities](../../../tools/playtest/checks/sea/economy/sea-recovery-priorities.json)
+
+- `expect: flagship-repair`
+- `expect: observer`
+- `expect: ordinary-repair`
+- `expect: platform-producing`
+- `expect: reclaim`
+- `expect: resurrect`
+- `expect: sub-scaling`
+- `expect: t1-producing`
+- `expect: t2-producing`
+- `forbid: errors`
+
 ### [seaplane-natural](../../../tools/playtest/checks/sea/economy/seaplane-natural.json)
 
 - `expect: aircraft`
@@ -271,6 +347,18 @@ Map: selected by runner
 ### [migration-natural](../../../tools/playtest/cases/sea/economy/migration-natural.json)
 
 Map: selected by runner
+
+### [sea-capacity-8v8](../../../tools/playtest/cases/sea/economy/sea-capacity-8v8.json)
+
+Map: Shore_to_Shore_V3
+
+### [sea-production-8v8](../../../tools/playtest/cases/sea/economy/sea-production-8v8.json)
+
+Map: Shore_to_Shore_V3
+
+### [sea-recovery-priorities](../../../tools/playtest/cases/sea/economy/sea-recovery-priorities.json)
+
+Map: Supreme Isthmus v1.7
 
 ### [seaplane-natural](../../../tools/playtest/cases/sea/economy/seaplane-natural.json)
 
@@ -307,6 +395,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [sea_harbor_fixture](../../../tools/playtest/widgets/sea_harbor_fixture.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [sea_recovery_watch](../../../tools/playtest/widgets/sea_recovery_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -421,6 +513,8 @@ Map: glacial
 - `test_interception_respects_speed_weapon_reach_and_horizon`
 - `test_opening_exception_does_not_return_after_factory_loss`
 - `test_rear_fusion_footprint_keeps_protected_margin`
+- `test_recovery_fleet_and_income_both_scale_capacity`
+- `test_recovery_low_metal_hysteresis`
 - `test_safety_interruption_restarts_unchanged_site_timer`
 - `test_sea_policy_boundaries`
 - `test_seaplane_preserves_full_cost_and_reserve_after_commitments`
@@ -457,6 +551,10 @@ Serial paired naval fixtures with pinned controls and independent scorecards.
 ### [run_sea_economy_block](../../../tools/playtest/run_sea_economy_block.py)
 
 Supreme Isthmus physical economy-block acceptance, using real placement tasks.
+
+### [run_sea_recovery](../../../tools/playtest/run_sea_recovery.py)
+
+SEA recovery fixture or 8v8 natural production benchmark, with immutable pins.
 
 ### [run_sea_transition](../../../tools/playtest/run_sea_transition.py)
 

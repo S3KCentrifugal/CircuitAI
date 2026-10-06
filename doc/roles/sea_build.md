@@ -98,7 +98,7 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: 3162dcfbfbd3f6869172009131203366f7147dac; lines: 477 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: 2b7e47d00f98b0e7c230baca4623ce5b9102fbc1; lines: 478 -->
 
 ## D-209 follow-up
 

@@ -1,0 +1,307 @@
+{
+  "teams": {
+    "0": {
+      "factories": {
+        "14589": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 5
+        }
+      },
+      "products": 6,
+      "peak_subs": 0
+    },
+    "1": {
+      "factories": {},
+      "products": 0,
+      "peak_subs": 0
+    },
+    "2": {
+      "factories": {
+        "8563": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 8
+        }
+      },
+      "products": 8,
+      "peak_subs": 0
+    },
+    "3": {
+      "factories": {
+        "30323": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 2,
+      "peak_subs": 0
+    },
+    "4": {
+      "factories": {
+        "30419": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 2
+        },
+        "15704": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 6
+        },
+        "28095": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "867": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 5
+        }
+      },
+      "products": 16,
+      "peak_subs": 3
+    },
+    "5": {
+      "factories": {
+        "22983": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 6
+        },
+        "28546": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "12567": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 2
+        }
+      },
+      "products": 11,
+      "peak_subs": 0
+    },
+    "6": {
+      "factories": {
+        "8474": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 10
+        },
+        "27909": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 2
+        },
+        "16192": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 15,
+      "peak_subs": 3
+    },
+    "7": {
+      "factories": {
+        "27482": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 5
+        },
+        "22451": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 2
+        },
+        "30128": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "18628": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 11,
+      "peak_subs": 2
+    },
+    "8": {
+      "factories": {},
+      "products": 0,
+      "peak_subs": 0
+    },
+    "9": {
+      "factories": {
+        "23834": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 3,
+      "peak_subs": 0
+    },
+    "10": {
+      "factories": {},
+      "products": 0,
+      "peak_subs": 0
+    },
+    "11": {
+      "factories": {},
+      "products": 0,
+      "peak_subs": 0
+    },
+    "12": {
+      "factories": {
+        "19712": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 4
+        },
+        "9295": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 3
+        },
+        "5876": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 2
+        },
+        "10790": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 9
+        }
+      },
+      "products": 18,
+      "peak_subs": 2
+    },
+    "13": {
+      "factories": {
+        "8069": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 6
+        },
+        "5257": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "24503": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 2
+        },
+        "1748": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 4
+        }
+      },
+      "products": 15,
+      "peak_subs": 2
+    },
+    "14": {
+      "factories": {
+        "18686": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "19285": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 4
+        }
+      },
+      "products": 6,
+      "peak_subs": 0
+    },
+    "15": {
+      "factories": {
+        "7407": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 4
+        }
+      },
+      "products": 5,
+      "peak_subs": 1
+    }
+  },
+  "checks_seen": [
+    "platform-producing",
+    "sub-scaling",
+    "t1-producing",
+    "t2-producing",
+    "team-0-factory-1",
+    "team-12-factory-1",
+    "team-12-factory-2",
+    "team-12-factory-3",
+    "team-13-factory-1",
+    "team-13-factory-2",
+    "team-13-factory-3",
+    "team-14-factory-1",
+    "team-14-factory-3",
+    "team-15-factory-1",
+    "team-2-factory-1",
+    "team-3-factory-1",
+    "team-4-factory-1",
+    "team-4-factory-2",
+    "team-4-factory-3",
+    "team-5-factory-1",
+    "team-5-factory-2",
+    "team-5-factory-3",
+    "team-6-factory-1",
+    "team-6-factory-2",
+    "team-6-factory-3",
+    "team-7-factory-1",
+    "team-7-factory-2",
+    "team-7-factory-3",
+    "team-9-factory-1"
+  ],
+  "factory_samples": 242,
+  "empty_at_least_15_seconds": [],
+  "no_progress_samples": [],
+  "empty_interval_count": 136,
+  "longest_completed_empty_interval": 2.0,
+  "completed_empty_seconds": 203.0,
+  "engine_ai_minute_samples": [
+    {
+      "t": "00:00:56.798034][f=0001800]",
+      "frame": "1800",
+      "samples": "1800",
+      "ai_all_p50_ms": "0.566406",
+      "ai_all_p95_ms": "2.141602",
+      "ai_all_max_ms": "16.546875",
+      "sim_speed": "0.000",
+      "ai_all_p99_ms": "8.640625",
+      "ai_all_mean_ms": "0.838791"
+    },
+    {
+      "t": "00:01:05.758017][f=0003600]",
+      "frame": "3600",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.147461",
+      "ai_all_p95_ms": "5.326172",
+      "ai_all_max_ms": "12.865234",
+      "sim_speed": "6.696",
+      "ai_all_p99_ms": "7.509766",
+      "ai_all_mean_ms": "2.304282"
+    }
+  ],
+  "limitations": [
+    "10-second factory observations and 1-second empty-queue sampling; not every engine frame",
+    "No-progress samples can include resource stalls, obstruction, or waiting; diagnose separately",
+    "AI timing covers all AI callbacks; no baseline or internet APM comparison"
+  ]
+}

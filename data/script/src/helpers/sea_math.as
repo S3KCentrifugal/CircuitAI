@@ -1,5 +1,13 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    bool RecoveryLowMetal(bool wasLow,float metal,float storage,float low,float resume) {
+        return storage>0 && metal<storage*(wasLow ? resume : low);
+    }
+    int RecoveryCount(float income,float fleet,float perIncome,float perFleet) {
+        if (fleet<1500 || perIncome<=0 || perFleet<=0) return 0;
+        const int economy=int(income/perIncome), navy=int(fleet/perFleet);
+        return 1+(economy<navy ? economy : navy);
+    }
     bool SeaplaneNext(bool enabled, bool t2Finished, int platforms, int queued) {
         return enabled && t2Finished && platforms==0 && queued==0;
     }

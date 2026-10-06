@@ -648,6 +648,8 @@
         "test_interception_respects_speed_weapon_reach_and_horizon",
         "test_opening_exception_does_not_return_after_factory_loss",
         "test_rear_fusion_footprint_keeps_protected_margin",
+        "test_recovery_fleet_and_income_both_scale_capacity",
+        "test_recovery_low_metal_hysteresis",
         "test_safety_interruption_restarts_unchanged_site_timer",
         "test_sea_policy_boundaries",
         "test_seaplane_preserves_full_cost_and_reserve_after_commitments",
@@ -657,7 +659,7 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "e0bfee088554bb435e595f9fc97ef327ff443d54de45654340e2996510370a96",
+      "sha256": "6bc168836f8d6609cf55a3da45077fc695ba28100731bf3a73a5f8f3cf0bba47",
       "execution": "not inferred"
     },
     {
@@ -999,6 +1001,17 @@
       "definitions": [],
       "detail": "Summarize physical SEA patrol/AA evidence without rewriting a run verdict.",
       "sha256": "6217d45f654e2c4ddf2acf38b8003e2bf124216f1458ec9830d9ab7ccd03d83f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_sea_recovery.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_sea_recovery",
+      "definitions": [],
+      "detail": "Summarize observed production/recovery evidence, never rewrite check verdicts.",
+      "sha256": "56d63c3b684e16e13a029e20967d6d4d4999e6111101753605bcbe1d18c17f31",
       "execution": "not inferred"
     },
     {
@@ -1728,6 +1741,39 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "2de8120fce1ffc1b89ff02cc83da8d7110417fbc20cf9b035d57ab877a68fa8f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/sea-capacity-8v8.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "sea-capacity-8v8",
+      "definitions": [],
+      "detail": "Map: Shore_to_Shore_V3",
+      "sha256": "57e6cbbc39afacf944241ab6959d86e3b0ecf3443b143822397ac827221f6fad",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/sea-production-8v8.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "sea-production-8v8",
+      "definitions": [],
+      "detail": "Map: Shore_to_Shore_V3",
+      "sha256": "4dac9afd57814cbcfe4185e246b759abecb9d21d34d935be4fc721535bd166c3",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/sea-recovery-priorities.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "sea-recovery-priorities",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "48586005d57465bd5b13e2fc42e4ae436dc8d602cd09cbf7f994bbd8adb106d0",
       "execution": "not inferred"
     },
     {
@@ -3206,6 +3252,109 @@
       ],
       "detail": "",
       "sha256": "44eb775df808cb1e225cacf9b3ed6ce89e456313456bc59e861393f65a401807",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/sea-capacity-8v8.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "sea-capacity-8v8",
+      "definitions": [
+        "expect: allied-repair",
+        "expect: observer",
+        "expect: start-count",
+        "expect: sub-scaling",
+        "expect: team-0-factory-1",
+        "expect: team-0-factory-2",
+        "expect: team-0-factory-3",
+        "expect: team-1-factory-1",
+        "expect: team-1-factory-2",
+        "expect: team-1-factory-3",
+        "expect: team-10-factory-1",
+        "expect: team-10-factory-2",
+        "expect: team-10-factory-3",
+        "expect: team-11-factory-1",
+        "expect: team-11-factory-2",
+        "expect: team-11-factory-3",
+        "expect: team-12-factory-1",
+        "expect: team-12-factory-2",
+        "expect: team-12-factory-3",
+        "expect: team-13-factory-1",
+        "expect: team-13-factory-2",
+        "expect: team-13-factory-3",
+        "expect: team-14-factory-1",
+        "expect: team-14-factory-2",
+        "expect: team-14-factory-3",
+        "expect: team-15-factory-1",
+        "expect: team-15-factory-2",
+        "expect: team-15-factory-3",
+        "expect: team-2-factory-1",
+        "expect: team-2-factory-2",
+        "expect: team-2-factory-3",
+        "expect: team-3-factory-1",
+        "expect: team-3-factory-2",
+        "expect: team-3-factory-3",
+        "expect: team-4-factory-1",
+        "expect: team-4-factory-2",
+        "expect: team-4-factory-3",
+        "expect: team-5-factory-1",
+        "expect: team-5-factory-2",
+        "expect: team-5-factory-3",
+        "expect: team-6-factory-1",
+        "expect: team-6-factory-2",
+        "expect: team-6-factory-3",
+        "expect: team-7-factory-1",
+        "expect: team-7-factory-2",
+        "expect: team-7-factory-3",
+        "expect: team-8-factory-1",
+        "expect: team-8-factory-2",
+        "expect: team-8-factory-3",
+        "expect: team-9-factory-1",
+        "expect: team-9-factory-2",
+        "expect: team-9-factory-3",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "985a91e911f72e047cd34f054f1899d12c04d40f4003cb9e52b99acdb890486f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/sea-production-8v8.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "sea-production-8v8",
+      "definitions": [
+        "expect: observer",
+        "expect: start-count",
+        "expect: sub-scaling",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "b7fa6fc3a58690fe5b6f4be98974129ef08c21b87e2106a4b5db148ee0e347e9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/sea-recovery-priorities.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "sea-recovery-priorities",
+      "definitions": [
+        "expect: flagship-repair",
+        "expect: observer",
+        "expect: ordinary-repair",
+        "expect: platform-producing",
+        "expect: reclaim",
+        "expect: resurrect",
+        "expect: sub-scaling",
+        "expect: t1-producing",
+        "expect: t2-producing",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "a45d621d5792e528a1a46914c3fd2885c4e9f25a1c70052bd4f0bad438e283d0",
       "execution": "not inferred"
     },
     {
@@ -4917,6 +5066,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/run_sea_recovery.py",
+      "domain": "sea",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_sea_recovery",
+      "definitions": [],
+      "detail": "SEA recovery fixture or 8v8 natural production benchmark, with immutable pins.",
+      "sha256": "7269f9a4ff14a432800254150d5c14e8c207df156d8a3ff103f1530809f291db",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/run_sea_transition.py",
       "domain": "sea",
       "area": "runners",
@@ -5173,6 +5333,19 @@
       ],
       "detail": "",
       "sha256": "715ee8c20ed57ae998cf5727f930f28e6787af722384bd66cde22c758ea621b7",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/test_analyze_sea_recovery.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_analyze_sea_recovery",
+      "definitions": [
+        "test_progress_and_partial_logs_are_not_empty_queue_failures"
+      ],
+      "detail": "Evidence must distinguish an empty queue, a stalled product and a new hull.",
+      "sha256": "43f0743abf44b759af6cf63eca0be39822141e1ea4fd11f8566b9c20c75db972",
       "execution": "not inferred"
     },
     {
@@ -5805,6 +5978,17 @@
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
       "sha256": "16c5c3bed8e46c871410141c298470a7a75cc4ed432caa04341650cd06dc35c4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/widgets/sea_recovery_watch.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_recovery_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "0c27c862906980bfd803e1c60eeafd2322766fe902d37e1492d50e8b3e96d1f4",
       "execution": "not inferred"
     },
     {

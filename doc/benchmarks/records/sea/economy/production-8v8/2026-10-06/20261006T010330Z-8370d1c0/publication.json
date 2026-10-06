@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "bb744eda536014aa3fe7acd0d4a7135d82b3ccad40ad009fb7680177fd21eceb",
+    "checks.json": "ca85c30c6431ace2cc00f2ed20c12b9a4aca8bc9770187bca96660897f9b99af",
+    "launched.json": "08e3dff14e6ff316f0dd7636be92f1d6c2691885bcd7440ce9b96318636b14f2",
+    "recovery-pins.json": "7abec67ab58b03daa299b49d53713f395651ec0432e46f5bcf690992d88ba7de",
+    "report.md": "b3151b617fc92f25c43c8fb931f536e8736ebc6c68b5a89522f1d84bd0feed13",
+    "result.json": "23b48d578d440235f2049499833e3913dcac0fc9c74b0ade810e90ddfbf5f1e6",
+    "run-inputs.json": "481d062f609fde35e509d8cace2e84178cdf8db6d9f3571631f03763b4539f6a",
+    "run-plan.json": "532491ed1ead762ad14ae82f72331802e43bac98600187f3e4bed233af1f5e6e",
+    "script.txt": "0cea097fe53eeb28221b12bb15e9f0669d65349605b7ec759eeee653c18f9d04",
+    "staged.json": "8401aed434695ed2b59ef8b44f0faf011330ac28b7830349700bdc09310541d8",
+    "starts.as": "d071f23adda88eb481e93e51ca3fa152fb8c9db0cf8ecec5fa6c3b4fbd6e0223",
+    "teams.json": "51585e462105b71d53044f53d9045455b964626cfff67bc9d7556ea3c6df09d2"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\production-8v8\\shore\\20261006T005803Z-c4f5560d\\runs\\20261006T010330Z-8370d1c0",
+  "schema": 1
+}

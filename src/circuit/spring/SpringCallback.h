@@ -69,6 +69,7 @@ public:
 	bool Unit_HasCommands(int unitId) const;
 
 	bool Feature_IsResurrectable(int featureId) const;
+	int Feature_ResurrectDef(int featureId) const;
 
 	bool UnitDef_HasYardMap(int unitDefId) const;
 

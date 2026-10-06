@@ -1,0 +1,86 @@
+// SEA policy only. Native queries own legality/reachability and task lifetimes.
+#include "../helpers/sea_math.as"
+namespace SeaRecovery {
+    array<int> subs;
+    int nextUpdate=0;
+    bool lowMetal=false;
+    bool IsSub(const CCircuitDef@ d) {
+        if (d is null) return false;
+        const string n=d.GetName();
+        return n=="armrecl" || n=="correcl" || n=="legnavyrezsub";
+    }
+    bool Protected(CCircuitUnit@ u) {
+        return u is null || u.task !is null && (u.task.GetType()==int(Task::Type::PLAYER)
+            || u.task.GetType()==int(Task::Type::RETREAT) || u.task.IsEnemyReclaim());
+    }
+    IUnitTask@ Make(CCircuitUnit@ u) {
+        if (Protected(u)) return u is null ? null : u.task;
+        const float radius=Global::RoleSettings::Sea::RecoverySearchRadius;
+        IUnitTask@ t=null;
+        if (lowMetal) @t=aiBuilderMgr.FindRecoveryTask(u,0,radius,null);
+        if (t !is null) return t;
+        const array<string> flagships={"armepoch","corblackhy","leganavyflagship"};
+        for (uint i=0;i<flagships.length();++i) {
+            CCircuitDef@ d=ai.GetCircuitDef(flagships[i]);
+            if (d is null) continue;
+            @t=aiBuilderMgr.FindRecoveryTask(u,1,radius,d);
+            if (t !is null) return t;
+        }
+        @t=aiBuilderMgr.FindRecoveryTask(u,2,radius,null);
+        if (t !is null) return t;
+        @t=aiBuilderMgr.FindRecoveryTask(u,1,radius,null);
+        if (t !is null) return t;
+        // A short wait is recovery standby, never factory assistance (these
+        // subs cannot assist construction). New opportunities interrupt it.
+        if (u.task !is null && u.task.GetType()==int(Task::Type::WAIT)) return u.task;
+        if (u.task !is null && u.task.GetType()==int(Task::Type::BUILDER)) {
+            IBuilderTask@ old=cast<IBuilderTask>(u.task);
+            if (old !is null && old.GetBuildType()==int(Task::BuildType::WAIT)) return old;
+        }
+        return aiBuilderMgr.Enqueue(TaskB::Wait(5*SECOND));
+    }
+    void Added(CCircuitUnit@ u) {
+        if (u !is null && IsSub(u.circuitDef) && subs.find(u.id)<0) subs.insertLast(u.id);
+    }
+    void Removed(CCircuitUnit@ u) {
+        if (u is null) return;
+        const int i=subs.find(u.id); if (i>=0) subs.removeAt(i);
+    }
+    void Reset() {
+        subs.resize(0); nextUpdate=0; lowMetal=false;
+        array<Id>@ ids=ai.GetOwnedUnitIds();
+        for (uint i=0;i<ids.length();++i) Added(ai.GetTeamUnit(ids[i]));
+    }
+    void Leave() {
+        for (uint i=0;i<subs.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(subs[i]);
+            if (!Protected(u)) aiBuilderMgr.AssignTask(u,aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)));
+        }
+        subs.resize(0);
+    }
+    void Tick() {
+        if (Global::AISettings::Role!=AiRole::SEA || ai.frame<nextUpdate) return;
+        nextUpdate=ai.frame+2*SECOND;
+        lowMetal=SeaMath::RecoveryLowMetal(lowMetal,aiEconomyMgr.metal.current,aiEconomyMgr.metal.storage,
+            Global::RoleSettings::Sea::RecoveryMetalLowFraction,Global::RoleSettings::Sea::RecoveryMetalResumeFraction);
+        // IDs survive callbacks; borrowed units/tasks are resolved only while
+        // this AI owns the callback. O(S) calls reuse native feature snapshots.
+        for (int i=int(subs.length())-1;i>=0;--i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(subs[i]);
+            if (u is null) { subs.removeAt(i); continue; }
+            if (Protected(u) || u.GetBuildProgress()<1) continue;
+            IUnitTask@ selected=Make(u);
+            if (selected !is null && selected !is u.task) {
+                aiBuilderMgr.AssignTask(u,selected);
+                IBuilderTask@ b=cast<IBuilderTask>(selected);
+                if (b !is null) {
+                    const int kind=b.GetBuildType();
+                    GenericHelpers::LogUtil("[SEA][Recovery] sub="+u.id+" task="+kind+" lowMetal="+lowMetal,1);
+                    if (kind!=int(Task::BuildType::RECLAIM) && kind!=int(Task::BuildType::RESURRECT)
+                        && kind!=int(Task::BuildType::REPAIR) && kind!=int(Task::BuildType::WAIT))
+                        Invariants::Violation("INV-153",""+u.id,"SEA recovery selected construction/assist instead of recovery");
+                }
+            }
+        }
+    }
+}

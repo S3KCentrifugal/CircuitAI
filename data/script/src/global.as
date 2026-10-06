@@ -1668,8 +1668,13 @@ namespace Global {
 
             // Early resurrection-sub policy toggle and tuning
             // When enabled, T1 shipyards may produce resurrection submarines early based on income scaling
-            bool EnableEarlyRezSub = false;
-            // Income scaling: allowed rez-sub count = floor(metalIncome / MetalIncomePerRezSub)
+            bool KeepFactoriesQueued = true; // D-211: recruit tasks retain shortage priority/energy control.
+            bool EnableEarlyRezSub = true;
+            float FleetMetalPerRezSub = 6000.0f;
+            float RecoveryMetalLowFraction = 0.20f;
+            float RecoveryMetalResumeFraction = 0.40f;
+            float RecoverySearchRadius = 24000.0f;
+            // Target = 1 + min(income / MetalIncomePerRezSub, fleet / FleetMetalPerRezSub), rounded down.
             float MetalIncomePerRezSub = 60.0f;
 
             // Consider energy storage "low" when current < storage * percent (SEA scope)

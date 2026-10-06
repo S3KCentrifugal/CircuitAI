@@ -96,6 +96,7 @@ bool CBResurrectTask::Execute(CCircuitUnit* unit)
 
 bool CBResurrectTask::Reevaluate(CCircuitUnit* unit)
 {
+	if (recoveryControlled) return true; // SEA selector owns target changes.
 	CCircuitAI* circuit = manager->GetCircuit();
 	if (units.empty()) {
 		return true;

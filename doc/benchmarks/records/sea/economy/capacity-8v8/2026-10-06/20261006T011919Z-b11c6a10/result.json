@@ -1,0 +1,231 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 8574,
+      "sha256": "985a91e911f72e047cd34f054f1899d12c04d40f4003cb9e52b99acdb890486f"
+    },
+    "infolog.txt": {
+      "bytes": 22859,
+      "sha256": "4e38069e97c6f85463e4517aff8da6ae67606d0bafe771ad3efaaeb4e1502a99"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "cd93a74a72c825fe57edbd6bca97261b3da5a4b57e0a24c53319bfd6a0cd5d35"
+    },
+    "recovery-pins.json": {
+      "bytes": 39567,
+      "sha256": "20b4be361ed7a6c350f4896e9d97fd20a1d414a73c2768aa0f720394ff09b333"
+    },
+    "report.md": {
+      "bytes": 4236,
+      "sha256": "4c15b41064fd4fd43739ef36d4392cda23b89147a29e818b456baf5c811e9f56"
+    },
+    "run-inputs.json": {
+      "bytes": 36672,
+      "sha256": "84bdfa8f24d1cb099409492e45d5d3ef5359d2c49d61931de9cac08e57b6dd45"
+    },
+    "run-plan.json": {
+      "bytes": 248,
+      "sha256": "20ffbe4f2e7e6e531a78edca504862264d29c0c18f53c63f6f47c8b2fbe777b7"
+    },
+    "script.txt": {
+      "bytes": 10798,
+      "sha256": "da9256a7ad00af7a03596c558f5fd55200babdf62dcfb08211ba5a26f417a45a"
+    },
+    "staged.json": {
+      "bytes": 292,
+      "sha256": "c5716d2d83eff68c2a9290b7fca6d44a819dd3382d6b542db44c8da9b7c946e3"
+    },
+    "starts.as": {
+      "bytes": 881,
+      "sha256": "927f0edaa6b6c562a10f2841ef4ecc63825c33cb4aaa45d4ef54248f919469e5"
+    },
+    "teams.json": {
+      "bytes": 2937,
+      "sha256": "51585e462105b71d53044f53d9045455b964626cfff67bc9d7556ea3c6df09d2"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "shore",
+    "scenario": "capacity-8v8"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T011919Z-b11c6a10",
+  "last_frame": 0,
+  "map": "Shore_to_Shore_V3",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\capacity-8v8\\shore\\20261006T011738Z-e8db0998\\runs\\20261006T011919Z-b11c6a10",
+  "reason": "engine exited before the game started",
+  "recorded_at_utc": "2026-10-06T01:19:19.883156+00:00",
+  "requested": {
+    "seed": 2111
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 1600.0,
+      "z": 600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 1600.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 1600.0,
+      "z": 1800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 4,
+      "team": 3,
+      "x": 1600.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 4,
+      "x": 2800.0,
+      "z": 600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 6,
+      "team": 5,
+      "x": 2800.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 7,
+      "team": 6,
+      "x": 2800.0,
+      "z": 1800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 7,
+      "x": 2800.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 9,
+      "team": 8,
+      "x": 13750.0,
+      "z": 600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 10,
+      "team": 9,
+      "x": 13750.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 11,
+      "team": 10,
+      "x": 13750.0,
+      "z": 1800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 12,
+      "team": 11,
+      "x": 13750.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 12,
+      "x": 12550.0,
+      "z": 600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 13,
+      "x": 12550.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 14,
+      "x": 12550.0,
+      "z": 1800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 16,
+      "team": 15,
+      "x": 12550.0,
+      "z": 2400.0
+    }
+  ],
+  "verdict": "FAIL"
+}

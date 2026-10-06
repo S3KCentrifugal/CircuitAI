@@ -54,6 +54,8 @@
 #include "spring/SpringCallback.h"
 
 #include "Log.h"
+#include "Feature.h"
+#include "FeatureDef.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1714,6 +1716,110 @@ IBuilderTask* CBuilderManager::MakeEnergizerTask(CCircuitUnit* unit, const CQuer
 	}
 
 	return const_cast<IBuilderTask*>(task);
+}
+
+// D-211: query mechanism, opt-in from role script. Modes do not impose an
+// order: SEA chooses reclaim/flagship/resurrection/repair in its own policy.
+// One feature snapshot per simulation second per AI avoids engine wrapper
+// creation per sub. Feature selection is O(F * (1 + R)) in the worst case:
+// eligible improving candidates query the existing R reclaim/rez task claims.
+// Repair selection scans U friendly units. Reach tests run only for improving
+// candidates or the current job. Cache holds values/IDs, never borrowed wrappers.
+IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred)
+{
+    if (unit == nullptr || !unit->GetCircuitDef()->IsAbleToResurrect()
+        || !std::isfinite(radius) || radius <= 0 || mode < 0 || mode > 2) return nullptr;
+    IUnitTask* current = unit->GetTask();
+    if (current != nullptr && (current->GetType() == IUnitTask::Type::PLAYER
+        || current->GetType() == IUnitTask::Type::RETREAT || current->IsEnemyReclaim())) return nullptr;
+    const int frame = circuit->GetLastFrame();
+    const AIFloat3 pos = unit->GetPos(frame);
+    const float reach = unit->GetCircuitDef()->GetBuildDistance();
+    auto* terrain = circuit->GetTerrainManager();
+    circuit->GetThreatMap()->SetThreatType(unit);
+    auto* clb = circuit->GetCallback();
+    IBuilderTask* old = (current != nullptr && current->GetType() == IUnitTask::Type::BUILDER)
+        ? static_cast<IBuilderTask*>(current) : nullptr;
+    const auto type = mode == 0 ? IBuilderTask::BuildType::RECLAIM
+        : mode == 1 ? IBuilderTask::BuildType::REPAIR : IBuilderTask::BuildType::RESURRECT;
+    float best = radius * radius;
+    if (mode == 1) {
+        CAllyUnit* selected = nullptr;
+        // Callback wrapper storage is borrowed for this loop only. Reuse the
+        // existing repair task for a target; never abort another worker's job.
+        for (Unit* candidate : clb->GetFriendlyUnits()) {
+            const int id = candidate->GetUnitId();
+            CCircuitDef* def = circuit->GetCircuitDef(clb->Unit_GetDefId(id));
+            if (id == unit->GetId() || def == nullptr || !def->IsMobile() || def->IsAbleToFly()
+                || def->GetDef()->GetMinWaterDepth() <= 0 || (preferred != nullptr && def != preferred)
+                || candidate->IsBeingBuilt() || candidate->GetHealth() >= candidate->GetMaxHealth() * .995f) continue;
+            CAllyUnit* ally = circuit->GetFriendlyUnit(candidate);
+            if (ally == nullptr || IsReclaimUnit(ally)) continue;
+            const AIFloat3 at = candidate->GetPos();
+            const float distance = pos.SqDistance2D(at);
+            const bool continuing = old != nullptr && old->GetBuildType() == type
+                && static_cast<CBRepairTask*>(old)->GetTargetId() == id;
+            if (distance > radius * radius || (!continuing && distance > best)
+                || !terrain->CanReachAtSafe2(unit, at, reach)) continue;
+            // A still-valid selected repair is sticky within its priority.
+            if (old != nullptr && old->GetBuildType() == type
+                && static_cast<CBRepairTask*>(old)->GetTargetId() == id) return old;
+            best = distance;
+            selected = ally;
+        }
+        if (selected == nullptr) return nullptr;
+        IBuilderTask* task = GetRepairTask(selected->GetId());
+        if (task == nullptr) {
+            task = new CBRepairTask(this, IBuilderTask::Priority::HIGH, selected, FRAMES_PER_SEC * 300);
+            ActivateTask(task);
+            lastEnqueued = task;
+            TaskAdded(task);
+        }
+        return task;
+    }
+    if (frame - recoveryFrame >= FRAMES_PER_SEC || frame < recoveryFrame) {
+        recoveryFrame = frame;
+        recoveryFeatures.clear(); // capacity retained across snapshots
+        auto features = clb->GetFeatures();
+        for (Feature* f : features) {
+            FeatureDef* def = f->GetDef();
+            const float metal = def->GetContainedResource(circuit->GetEconomyManager()->GetMetalRes()) * f->GetReclaimLeft();
+            const int rezId = clb->Feature_ResurrectDef(f->GetFeatureId());
+            CCircuitDef* rez = rezId > 0 ? circuit->GetCircuitDef(rezId) : nullptr;
+            if (def->IsReclaimable() && metal > 0) {
+                const bool ship = rez != nullptr && rez->IsMobile() && !rez->IsAbleToFly()
+                    && rez->GetDef()->GetMinWaterDepth() > 0;
+                recoveryFeatures.push_back({f->GetFeatureId(), f->GetPosition(), metal, ship});
+            }
+            delete def;
+        }
+        utils::free_clear(features);
+    }
+    const SRecoveryFeature* selected = nullptr;
+    for (const auto& f : recoveryFeatures) {
+        if (mode == 2 && (!f.resurrect || clb->Feature_ResurrectDef(f.id) <= 0)) continue;
+        const float distance = pos.SqDistance2D(f.pos);
+        const bool continuing = old != nullptr && old->GetBuildType() == type
+            && old->GetPosition().SqDistance2D(f.pos) < 64.f;
+        if (distance > radius * radius || (!continuing && distance > best)) continue;
+        // Don't fight a different reclaim/resurrection order over one wreck.
+        IBuilderTask* reclaim = GetReclaimFeatureTask(f.pos, 8.f);
+        IBuilderTask* resurrect = GetResurrectTask(f.pos, 8.f);
+        if ((reclaim != nullptr && reclaim != old) || (resurrect != nullptr && resurrect != old)) continue;
+        if (!terrain->CanReachAtSafe2(unit, f.pos, reach)) continue;
+        if (continuing) {
+            old->recoveryControlled = true; // re-adopt a restored native task after load
+            return old;
+        }
+        best = distance;
+        selected = &f;
+    }
+    if (selected == nullptr) return nullptr;
+    IBuilderTask* task = mode == 0
+        ? Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH, selected->pos, selected->metal, FRAMES_PER_SEC * 300, 8.f))
+        : Enqueue(TaskB::Resurrect(IBuilderTask::Priority::HIGH, selected->pos, selected->metal, FRAMES_PER_SEC * 300, 8.f));
+    task->recoveryControlled = true;
+    return task;
 }
 
 IBuilderTask* CBuilderManager::MakeCommTask(CCircuitUnit* unit, const CQueryCostMap* query, float sqMaxBaseRange)

@@ -12676,3 +12676,88 @@ threshold. Retain that failed deadline and the conservative gate, rather than
 infer a universal timing goal from one unpaired run; KI-228 records the timing
 limitation. No claim of a no-stall guarantee under later attacks/income loss.
 Details: [plan/results](sea-seaplane-transition.md). D-209 timings remain historical.
+
+
+## D-211 - Continuous SEA production and dedicated recovery submarines
+
+**Decision.** SEA no longer pauses its T1 yard deliberately to save for T2.
+Its native fallback uses the existing per-request keepActive lever for every
+factory tier. Retiring/draining yards, player control, availability and native
+resource checks still apply. A resurrection-sub target grows with both fleet
+metal and income, with one pending support purchase at a time and the existing
+two-resource funding check. Emergency counters retain precedence.
+
+**Reason.** The user requested active labs at every tier, scalable recovery
+support, and reclaim during low metal before flagship repair, resurrection,
+and ordinary naval repair. The former utility branch requested only one sub;
+native recovery inferred resurrection from capability regardless of metal.
+
+**Implementation.** [SEA recovery policy](../data/script/src/manager/sea_recovery.as),
+[role dispatch](../data/script/src/roles/sea.as),
+[role exit](../data/script/src/roles/sea_build.as),
+[production](../data/script/src/roles/sea_factories.as),
+[settings](../data/script/src/global.as),
+[pure decisions](../data/script/src/helpers/sea_math.as) and their
+[VM tests](../tests/sea_math_tests.as). The new optional
+[builder query](../src/circuit/module/BuilderManager.cpp) and
+[declaration](../src/circuit/module/BuilderManager.h),
+[binding](../src/circuit/script/BuilderScript.cpp),
+[feature callback](../src/circuit/spring/SpringCallback.cpp) and
+[declaration](../src/circuit/spring/SpringCallback.h) select legal safe reachable
+work. A transient [task flag](../src/circuit/task/builder/BuilderTask.h) prevents
+[resurrection](../src/circuit/task/builder/ResurrectTask.cpp) and
+[reclaim](../src/circuit/task/builder/ReclaimTask.cpp) from changing a selected
+feature behind the policy. [Reclaim removal](../src/circuit/task/builder/ReclaimTask.h)
+releases an empty recovery task immediately. Ordinary tasks keep old behavior.
+
+**Alternatives rejected.** Raising a global UnitDef cap or changing native
+recovery defaults would affect other roles. Polling every sub's entire world
+through engine wrappers each frame would add unnecessary CPU work. A fixed
+sub count would not scale; filling yards with arbitrary units would hide
+resource stalls rather than prove productivity. Keeping the old deliberate
+T1 saving WAIT conflicts with the updated user requirement.
+
+**Invariant.** INV-153: a SEA recovery sub's dedicated selector assigns only
+reclaim, repair, resurrection or standby. Player/retreat/enemy-reclaim ownership
+is preserved. Task identity survives normal rechecks; role exit detaches only
+that worker. Post-load queries re-adopt current feature work; save/load has
+not been played. No new serialized fields are introduced.
+
+**Verification.** Fifteen actual-VM policy tests passed. The Supreme supplied
+fixture exercised all four priorities, three recovery subs, and producing T1,
+T2 and seaplane factories. Two earlier fixture failures are retained. Full
+8v8 results and precise limitations are recorded in the
+[design and evidence](sea-recovery-production.md). The
+[runner](../tools/playtest/run_sea_recovery.py),
+[observer](../tools/playtest/widgets/sea_recovery_watch.lua),
+[fixture case](../tools/playtest/cases/sea/economy/sea-recovery-priorities.json),
+[fixture checks](../tools/playtest/checks/sea/economy/sea-recovery-priorities.json),
+[8v8 case](../tools/playtest/cases/sea/economy/sea-production-8v8.json) and
+[8v8 checks](../tools/playtest/checks/sea/economy/sea-production-8v8.json)
+are reusable definitions. No win-rate, network APM or old/new FPS claim.
+
+D-211 follow-up: the supplied 8v8 exposed an existing allied-target null dereference
+in [repair idle handling](../src/circuit/task/builder/RepairTask.cpp). Resolve
+the ally ID just as Execute/Reevaluate already do; abort a missing target.
+The [capacity case](../tools/playtest/cases/sea/economy/sea-capacity-8v8.json),
+[checks](../tools/playtest/checks/sea/economy/sea-capacity-8v8.json) and
+[independent evidence analyzer](../tools/playtest/analyze_sea_recovery.py)
+separate injected capacity, natural economy and crash results. See the evidence
+document for the exact pins and limitations.
+
+D-211 final admission follow-up: the supplied run left corplat 23071 empty
+for 58 seconds as metal income fell to 10/s (initial observed bank 1019).
+Expose keepQueued=false in [FactoryManager](../src/circuit/module/FactoryManager.cpp),
+[header](../src/circuit/module/FactoryManager.h) and
+[script binding](../src/circuit/script/FactoryScript.cpp). SEA opts in through
+KeepFactoriesQueued: skip the pre-enqueue resource WAIT, while the existing
+recruit task retains energy and metal-priority safeguards. Other roles keep
+the default. This matches the requested continuous queue without inventing
+resource throughput. Rejected: forcing high priority or removing shared
+resource protection. Final repeated evidence is in the D-211 report.
+
+The [analysis regression](../tools/playtest/test_analyze_sea_recovery.py) guards
+partial records and differentiates new products, stalls and empty queues.
+The final supplied repeat has 950 completions, 2,898 samples, no 15-second
+empty queue and a three-second longest observed completed gap. Its strict
+FAIL for KI-516 and a destroyed-before-first-product platform is retained.

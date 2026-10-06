@@ -1173,6 +1173,12 @@ Catalog tests protect definition discovery and evidence separation.
 - `test_production_start_is_not_completion`
 - `test_truncated_log_tail_is_reported_without_inventing_damage`
 
+### [test_analyze_sea_recovery](../../../tools/playtest/test_analyze_sea_recovery.py)
+
+Evidence must distinguish an empty queue, a stalled product and a new hull.
+
+- `test_progress_and_partial_logs_are_not_empty_queue_failures`
+
 ### [test_lane_ui_memory](../../../tools/playtest/test_lane_ui_memory.py)
 
 Run with lupa==2.8 (Lua 5.1); install into build-theatres/widget-test-deps.
@@ -1284,6 +1290,10 @@ Independent SEA economy/egress scorecard; never rewrites original reports.
 ### [analyze_sea_patrol](../../../tools/playtest/analyze_sea_patrol.py)
 
 Summarize physical SEA patrol/AA evidence without rewriting a run verdict.
+
+### [analyze_sea_recovery](../../../tools/playtest/analyze_sea_recovery.py)
+
+Summarize observed production/recovery evidence, never rewrite check verdicts.
 
 ### [analyze_skirmish_performance](../../../tools/playtest/analyze_skirmish_performance.py)
 

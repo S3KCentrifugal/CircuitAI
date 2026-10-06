@@ -1869,3 +1869,24 @@ uses the same pending recruit, availability, air-viability and resource checks a
 combat production after a higher-tier factory exists. It does not alter factory
 metadata, tier counts, weights or other factories. SEA uses it for seaplane
 platforms; all existing callers retain `DefaultMakeTask` with false semantics.
+
+
+## Ordered recovery queries (D-211)
+
+`aiBuilderMgr.FindRecoveryTask(unit, mode, radius, preferredDef)` returns an
+owned task handle or null: 0 selects metal features, 1 selects damaged complete
+naval allies (optional definition filter), 2 selects naval ship/sub wrecks.
+Script orders these independent queries and decides whether metal is low.
+Queries preserve eligible current work and share native feature snapshots for
+one simulation second. Returns do not assign or command the worker. Call
+`AssignTask` only on a different selected task; native movement and idle events
+continue to handle traversal and completion. Player/retreat workers are rejected.
+The only production caller is SEA; other roles retain native defaults.
+
+D-211 extends MakeFactoryTask with optional third bool `keepQueued=false`.
+SEA passes its KeepFactoriesQueued setting. True skips only the pre-recruit
+resource-admission WAIT; CRecruitTask still gates empty energy and reduces
+spending priority under metal pressure. Availability, pending-task limits,
+air viability and normal roster selection remain. Two-argument/native default
+callers retain prior behavior. This option does not guarantee build progress
+when resources or physical exits are unavailable.

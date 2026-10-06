@@ -78,6 +78,7 @@ namespace SeaBuild {
             || name==UnitHelpers::GetT1NavalNanoNameForSide(side);
     }
     void Leave() {
+        SeaRecovery::Leave();
         SeaCombat::Leave();
         SeaEconomy::projects.resize(0); SeaFactories::draining.deleteAll();
         supportRetry.deleteAll();

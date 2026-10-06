@@ -1,0 +1,665 @@
+{
+  "teams": {
+    "0": {
+      "factories": {
+        "31709": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 33
+        },
+        "4112": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 19
+        },
+        "8388": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 23
+        },
+        "9519": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 16
+        },
+        "29037": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 8
+        }
+      },
+      "products": 100,
+      "peak_subs": 2
+    },
+    "1": {
+      "factories": {
+        "23012": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 33
+        },
+        "5145": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 29
+        },
+        "30858": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 16
+        },
+        "12440": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 18
+        },
+        "23353": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 12
+        },
+        "29009": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 0
+        }
+      },
+      "products": 110,
+      "peak_subs": 0
+    },
+    "2": {
+      "factories": {
+        "4737": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 12
+        },
+        "12985": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 42
+        },
+        "10790": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 16
+        },
+        "28774": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 20
+        },
+        "20167": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 3
+        }
+      },
+      "products": 95,
+      "peak_subs": 3
+    },
+    "3": {
+      "factories": {
+        "867": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 23
+        },
+        "23378": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 13
+        },
+        "23071": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 23
+        },
+        "23363": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 46
+        },
+        "27487": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 15
+        },
+        "27831": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 9
+        }
+      },
+      "products": 130,
+      "peak_subs": 3
+    },
+    "4": {
+      "factories": {
+        "9570": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 4
+        },
+        "23834": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 3
+        },
+        "22773": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 3
+        },
+        "21995": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 14,
+      "peak_subs": 0
+    },
+    "5": {
+      "factories": {
+        "27791": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 3
+        },
+        "22818": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 3
+        },
+        "14148": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 3
+        },
+        "1713": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 20
+        }
+      },
+      "products": 30,
+      "peak_subs": 0
+    },
+    "6": {
+      "factories": {
+        "2314": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 4
+        },
+        "14589": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 2
+        },
+        "14460": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 4
+        }
+      },
+      "products": 10,
+      "peak_subs": 0
+    },
+    "7": {
+      "factories": {
+        "19589": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 3
+        },
+        "31997": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 0
+        },
+        "11777": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 1
+        },
+        "12395": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 10
+        }
+      },
+      "products": 14,
+      "peak_subs": 0
+    },
+    "8": {
+      "factories": {
+        "22963": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 21
+        },
+        "7883": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 23
+        },
+        "23633": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 24
+        },
+        "110": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 13
+        }
+      },
+      "products": 81,
+      "peak_subs": 0
+    },
+    "9": {
+      "factories": {
+        "24100": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 22
+        },
+        "24926": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 24
+        },
+        "17400": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 30
+        },
+        "30313": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 19
+        },
+        "12069": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 8
+        }
+      },
+      "products": 104,
+      "peak_subs": 2
+    },
+    "10": {
+      "factories": {
+        "31319": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 23
+        },
+        "19801": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 23
+        },
+        "18897": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 24
+        },
+        "22756": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 16
+        },
+        "3737": {
+          "name": "armshltxuw",
+          "tier": 3,
+          "produced": 5
+        },
+        "25936": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 1
+        }
+      },
+      "products": 94,
+      "peak_subs": 2
+    },
+    "11": {
+      "factories": {
+        "9421": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 28
+        },
+        "24556": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 21
+        },
+        "19572": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 24
+        },
+        "23807": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 13
+        }
+      },
+      "products": 87,
+      "peak_subs": 0
+    },
+    "12": {
+      "factories": {
+        "21837": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 0
+        },
+        "14517": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 3
+        },
+        "25121": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 8
+        },
+        "25051": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 19
+        }
+      },
+      "products": 31,
+      "peak_subs": 0
+    },
+    "13": {
+      "factories": {
+        "21768": {
+          "name": "armplat",
+          "tier": 1,
+          "produced": 3
+        },
+        "10371": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 4
+        },
+        "22511": {
+          "name": "armasy",
+          "tier": 2,
+          "produced": 1
+        },
+        "14445": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 0
+        },
+        "19268": {
+          "name": "armsy",
+          "tier": 1,
+          "produced": 2
+        }
+      },
+      "products": 11,
+      "peak_subs": 0
+    },
+    "14": {
+      "factories": {
+        "11079": {
+          "name": "corasy",
+          "tier": 2,
+          "produced": 2
+        },
+        "20620": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 4
+        },
+        "15771": {
+          "name": "corplat",
+          "tier": 1,
+          "produced": 2
+        },
+        "19427": {
+          "name": "corsy",
+          "tier": 1,
+          "produced": 0
+        }
+      },
+      "products": 8,
+      "peak_subs": 0
+    },
+    "15": {
+      "factories": {
+        "13901": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 6
+        },
+        "719": {
+          "name": "legadvshipyard",
+          "tier": 2,
+          "produced": 0
+        },
+        "15": {
+          "name": "legsplab",
+          "tier": 1,
+          "produced": 1
+        },
+        "23813": {
+          "name": "legsy",
+          "tier": 1,
+          "produced": 22
+        }
+      },
+      "products": 31,
+      "peak_subs": 0
+    }
+  },
+  "checks_seen": [
+    "allied-repair",
+    "platform-producing",
+    "sub-scaling",
+    "t1-producing",
+    "t2-producing",
+    "team-0-factory-1",
+    "team-0-factory-2",
+    "team-0-factory-3",
+    "team-1-factory-1",
+    "team-1-factory-2",
+    "team-1-factory-3",
+    "team-10-factory-1",
+    "team-10-factory-2",
+    "team-10-factory-3",
+    "team-11-factory-1",
+    "team-11-factory-2",
+    "team-11-factory-3",
+    "team-12-factory-1",
+    "team-12-factory-2",
+    "team-12-factory-3",
+    "team-13-factory-1",
+    "team-13-factory-2",
+    "team-13-factory-3",
+    "team-14-factory-1",
+    "team-14-factory-2",
+    "team-14-factory-3",
+    "team-15-factory-1",
+    "team-15-factory-2",
+    "team-15-factory-3",
+    "team-2-factory-1",
+    "team-2-factory-2",
+    "team-2-factory-3",
+    "team-3-factory-1",
+    "team-3-factory-2",
+    "team-3-factory-3",
+    "team-4-factory-1",
+    "team-4-factory-2",
+    "team-4-factory-3",
+    "team-5-factory-1",
+    "team-5-factory-2",
+    "team-5-factory-3",
+    "team-6-factory-1",
+    "team-6-factory-2",
+    "team-6-factory-3",
+    "team-7-factory-1",
+    "team-7-factory-2",
+    "team-8-factory-1",
+    "team-8-factory-2",
+    "team-8-factory-3",
+    "team-9-factory-1",
+    "team-9-factory-2",
+    "team-9-factory-3"
+  ],
+  "factory_samples": 2898,
+  "empty_at_least_15_seconds": [],
+  "no_progress_samples": [],
+  "empty_interval_count": 1042,
+  "longest_completed_empty_interval": 3.0,
+  "completed_empty_seconds": 1680.0,
+  "incomplete_factory_records": [],
+  "engine_ai_minute_samples": [
+    {
+      "t": "00:00:51.816264][f=0001800]",
+      "frame": "1800",
+      "samples": "1800",
+      "ai_all_p50_ms": "0.542969",
+      "ai_all_p95_ms": "2.523438",
+      "ai_all_max_ms": "17.135742",
+      "sim_speed": "0.000",
+      "ai_all_p99_ms": "8.525391",
+      "ai_all_mean_ms": "0.866947"
+    },
+    {
+      "t": "00:01:06.944542][f=0003600]",
+      "frame": "3600",
+      "samples": "1800",
+      "ai_all_p50_ms": "3.179688",
+      "ai_all_p95_ms": "7.027344",
+      "ai_all_max_ms": "20.628906",
+      "sim_speed": "3.966",
+      "ai_all_p99_ms": "9.683594",
+      "ai_all_mean_ms": "3.166029"
+    },
+    {
+      "t": "00:01:21.881413][f=0005400]",
+      "frame": "5400",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.703125",
+      "ai_all_p95_ms": "7.496094",
+      "ai_all_max_ms": "19.525391",
+      "sim_speed": "4.017",
+      "ai_all_p99_ms": "11.333984",
+      "ai_all_mean_ms": "3.189660"
+    },
+    {
+      "t": "00:01:38.252882][f=0007200]",
+      "frame": "7200",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.478516",
+      "ai_all_p95_ms": "8.992188",
+      "ai_all_max_ms": "30.710938",
+      "sim_speed": "3.665",
+      "ai_all_p99_ms": "14.531250",
+      "ai_all_mean_ms": "3.361907"
+    },
+    {
+      "t": "00:01:54.808150][f=0009000]",
+      "frame": "9000",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.523438",
+      "ai_all_p95_ms": "10.316406",
+      "ai_all_max_ms": "24.082031",
+      "sim_speed": "3.624",
+      "ai_all_p99_ms": "15.765625",
+      "ai_all_mean_ms": "3.755067"
+    },
+    {
+      "t": "00:02:13.249783][f=0010800]",
+      "frame": "10800",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.589844",
+      "ai_all_p95_ms": "11.738281",
+      "ai_all_max_ms": "34.875000",
+      "sim_speed": "3.253",
+      "ai_all_p99_ms": "19.238281",
+      "ai_all_mean_ms": "4.130378"
+    },
+    {
+      "t": "00:02:29.418655][f=0012600]",
+      "frame": "12600",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.394531",
+      "ai_all_p95_ms": "10.136719",
+      "ai_all_max_ms": "26.742188",
+      "sim_speed": "3.711",
+      "ai_all_p99_ms": "18.300781",
+      "ai_all_mean_ms": "3.647276"
+    },
+    {
+      "t": "00:02:47.024941][f=0014400]",
+      "frame": "14400",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.671875",
+      "ai_all_p95_ms": "11.882813",
+      "ai_all_max_ms": "30.164063",
+      "sim_speed": "3.408",
+      "ai_all_p99_ms": "19.167969",
+      "ai_all_mean_ms": "4.110990"
+    },
+    {
+      "t": "00:03:04.715185][f=0016200]",
+      "frame": "16200",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.691406",
+      "ai_all_p95_ms": "12.351563",
+      "ai_all_max_ms": "28.476563",
+      "sim_speed": "3.392",
+      "ai_all_p99_ms": "19.867188",
+      "ai_all_mean_ms": "4.123416"
+    },
+    {
+      "t": "00:03:24.006372][f=0018000]",
+      "frame": "18000",
+      "samples": "1800",
+      "ai_all_p50_ms": "3.093750",
+      "ai_all_p95_ms": "13.757813",
+      "ai_all_max_ms": "34.273438",
+      "sim_speed": "3.110",
+      "ai_all_p99_ms": "20.531250",
+      "ai_all_mean_ms": "4.644761"
+    },
+    {
+      "t": "00:03:42.597473][f=0019800]",
+      "frame": "19800",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.812500",
+      "ai_all_p95_ms": "10.093750",
+      "ai_all_max_ms": "25.906250",
+      "sim_speed": "3.227",
+      "ai_all_p99_ms": "16.406250",
+      "ai_all_mean_ms": "3.927166"
+    },
+    {
+      "t": "00:04:00.587861][f=0021600]",
+      "frame": "21600",
+      "samples": "1800",
+      "ai_all_p50_ms": "2.687500",
+      "ai_all_p95_ms": "9.976563",
+      "ai_all_max_ms": "24.046875",
+      "sim_speed": "3.335",
+      "ai_all_p99_ms": "17.984375",
+      "ai_all_mean_ms": "3.886259"
+    }
+  ],
+  "limitations": [
+    "10-second factory observations and 1-second empty-queue sampling; not every engine frame",
+    "No-progress samples can include resource stalls, obstruction, or waiting; diagnose separately",
+    "AI timing covers all AI callbacks; no baseline or internet APM comparison"
+  ]
+}

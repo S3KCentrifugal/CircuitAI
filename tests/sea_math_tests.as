@@ -136,3 +136,20 @@ void test_interception_respects_speed_weapon_reach_and_horizon() {
     Check(SeaMath::InterceptLead(5000,0,750,12)==0);
     Check(SeaMath::InterceptLead(5000,60,750,0)==0);
 }
+
+void test_recovery_low_metal_hysteresis() {
+    Check(SeaMath::RecoveryLowMetal(false,199,1000,.2f,.4f));
+    Check(!SeaMath::RecoveryLowMetal(false,200,1000,.2f,.4f));
+    Check(SeaMath::RecoveryLowMetal(true,399,1000,.2f,.4f));
+    Check(!SeaMath::RecoveryLowMetal(true,400,1000,.2f,.4f));
+    Check(!SeaMath::RecoveryLowMetal(true,0,0,.2f,.4f));
+}
+void test_recovery_fleet_and_income_both_scale_capacity() {
+    Check(SeaMath::RecoveryCount(1000,1499,60,6000)==0);
+    Check(SeaMath::RecoveryCount(20,1500,60,6000)==1);
+    Check(SeaMath::RecoveryCount(60,6000,60,6000)==2);
+    Check(SeaMath::RecoveryCount(600,6000,60,6000)==2);
+    Check(SeaMath::RecoveryCount(120,60000,60,6000)==3);
+    Check(SeaMath::RecoveryCount(600,60000,60,6000)==11);
+    Check(SeaMath::RecoveryCount(60,6000,0,6000)==0);
+}

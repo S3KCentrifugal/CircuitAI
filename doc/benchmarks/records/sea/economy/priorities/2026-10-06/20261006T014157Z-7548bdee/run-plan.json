@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "priorities"
+  },
+  "id": "20261006T014036Z-6b42348a",
+  "requested": {
+    "seed": 2111
+  },
+  "schema": 1
+}

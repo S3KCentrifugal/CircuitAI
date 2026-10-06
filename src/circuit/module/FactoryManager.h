@@ -218,8 +218,8 @@ private:
 	void EnableFactory(CCircuitUnit* unit);
 	void DisableFactory(CCircuitUnit* unit);
 	virtual IUnitTask* DefaultMakeTask(CCircuitUnit* unit) override;
-	IUnitTask* MakeFactoryTask(CCircuitUnit* unit, bool keepActive);
-	IUnitTask* CreateFactoryTask(CCircuitUnit* unit, bool keepActive = false);
+	IUnitTask* MakeFactoryTask(CCircuitUnit* unit, bool keepActive, bool keepQueued = false);
+	IUnitTask* CreateFactoryTask(CCircuitUnit* unit, bool keepActive = false, bool keepQueued = false);
 	IUnitTask* CreateAssistTask(CCircuitUnit* unit);
 
 	void Watchdog();

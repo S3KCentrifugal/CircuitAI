@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "natural",
+    "map": "shore",
+    "scenario": "production-8v8"
+  },
+  "id": "20261006T005803Z-c4f5560d",
+  "requested": {
+    "seed": 2111
+  },
+  "schema": 1
+}

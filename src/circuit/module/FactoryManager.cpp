@@ -1563,7 +1563,7 @@ IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
 	return MakeFactoryTask(unit, false);
 }
 
-IUnitTask* CFactoryManager::MakeFactoryTask(CCircuitUnit* unit, bool keepActive)
+IUnitTask* CFactoryManager::MakeFactoryTask(CCircuitUnit* unit, bool keepActive, bool keepQueued)
 {
 	const IUnitTask* task = nullptr;
 
@@ -1580,14 +1580,14 @@ IUnitTask* CFactoryManager::MakeFactoryTask(CCircuitUnit* unit, bool keepActive)
 		}
 
 		if (task == nullptr) {
-			task = CreateFactoryTask(unit, keepActive);
+			task = CreateFactoryTask(unit, keepActive, keepQueued);
 		}
 	}
 
 	return const_cast<IUnitTask*>(task);  // if nullptr then continue to Wait (or Idle)
 }
 
-IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActive)
+IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActive, bool keepQueued)
 {
 	if (unit->GetCircuitDef()->GetMobileId() < 0) {
 		if (circuit->GetEnemyManager()->IsAirValid()) {
@@ -1618,7 +1618,11 @@ IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActiv
 							(economyMgr->GetAvgMetalIncome() * 1.2f < economyMgr->GetMetalPull()) &&
 							(metalPull * economyMgr->GetPullMtoS() > circuit->GetBuilderManager()->GetMetalPull());
 	const bool isNotReady = !economyMgr->IsExcessed() || isStalling;
-	if (isNotReady) {
+	// D-211: script can keep one valid recruit queued through a resource dip.
+	// The existing recruit task still gates energy and lowers spending priority
+	// under metal pressure. Other roles retain admission waits by default.
+	// O(1) extra policy input; no polling, extra recruit, or repeated command.
+	if (isNotReady && !keepQueued) {
 		return Enqueue(TaskS::Wait(false, FRAMES_PER_SEC * 3));
 	}
 

@@ -9,6 +9,7 @@
 #include "../manager/factory_production.as"
 #include "../helpers/sea_constructor_helpers.as"
 #include "sea_build.as"
+#include "../manager/sea_recovery.as"
 
 namespace RoleSea {
 
@@ -50,6 +51,7 @@ namespace RoleSea {
     ******************************************************************************/
 
     void Sea_Init() {
+        SeaRecovery::Reset();
         GenericHelpers::LogUtil("Sea role initialization logic executed", 2);
 
         // Apply SEA role settings
@@ -202,6 +204,7 @@ namespace RoleSea {
     }
 
     void Sea_MainUpdate() {
+        SeaRecovery::Tick();
         if (SeaLayout::Enabled()) SeaBuild::Tick();
         SeaCombat::Tick();
         if (SeaCombat::Active()) return;
@@ -232,11 +235,11 @@ namespace RoleSea {
     IUnitTask@ Sea_FactoryAiMakeTask(CCircuitUnit@ u)
     {
         if (u !is null && Global::RoleSettings::Sea::SeaplanesAfterT2 && UnitHelpers::IsSeaplanePlatform(u.circuitDef.GetName()))
-            return aiFactoryMgr.MakeFactoryTask(u,true);
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (SeaLayout::Active()) return SeaFactories::Produce(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
-            return aiFactoryMgr.DefaultMakeTask(u);
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         }
 
         const string fname = facDef.GetName();
@@ -244,7 +247,7 @@ namespace RoleSea {
         bool isT1Shipyard = UnitHelpers::IsT1Shipyard(fname);
         bool isT2Shipyard = (!isT1Shipyard && UnitHelpers::IsT2Shipyard(fname));
         if (!isT1Shipyard && !isT2Shipyard) {
-            return aiFactoryMgr.DefaultMakeTask(u);
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         }
 
         const AIFloat3 pos = u.GetPos(ai.frame);
@@ -445,7 +448,7 @@ namespace RoleSea {
         }
 
         // Fallback to default when nothing triggers
-        return aiFactoryMgr.DefaultMakeTask(u);
+        return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
     }
 
     string Sea_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
@@ -492,6 +495,7 @@ namespace RoleSea {
     ******************************************************************************/ 
 
     IUnitTask@ Sea_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        if (builder !is null && SeaRecovery::IsSub(builder.circuitDef)) return SeaRecovery::Make(builder);
         // Run before native default-task creation: it may enqueue discretionary
         // converters/guards even when the first ship has free reachable metal.
         IUnitTask@ mex=SeaBuild::OpeningMex(builder);
@@ -611,7 +615,7 @@ namespace RoleSea {
 	CCircuitUnit@ energizer2 = null;
     void Sea_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
-		//LogUtil("BUILDER::AiUnitAdded:" + unit.circuitDef, 2);
+		SeaRecovery::Added(unit);
 		const CCircuitDef@ cdef = unit.circuitDef;
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
 			return;
@@ -645,6 +649,7 @@ namespace RoleSea {
 
     void Sea_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+		SeaRecovery::Removed(unit);
 		if (energizer1 is unit)
 			@energizer1 = null;
 		else if (energizer2 is unit)

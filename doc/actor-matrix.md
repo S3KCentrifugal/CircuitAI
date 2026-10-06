@@ -591,3 +591,13 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Platform support | SeaBuild::ReserveSupport/Support, SeaEconomy::SupportedFactory/SupportTarget, SeaLayout::PlanPatch | Share valid nearby pads, reserve only missing capacity, reject unreachable slots; purchase follows actual two-resource workload. |
 | Aircraft production | RoleSea::Sea_FactoryAiMakeTask, native MakeFactoryTask | Per-request keepActive for SEA platforms only; preserve normal roster, viability, resource and task lifecycle checks. |
 | Platform economic admission (D-210) | SeaEconomy::SeaplaneReady/UnframedCosts/Fund, SeaFactories::FactoryAllowed, SeaBuild::Seaplane, SeaLayout::Factory | Shared mature ten-second income window; live unframed commitments; full platform cost plus retained reserves. Existing admitted construction is resumed without re-gating. |
+
+
+## D-211: SEA recovery and continuous production
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| SEA active factory | Sea_FactoryAiMakeTask, SeaFactories::Produce/Utility/Hold, native MakeFactoryTask | Completed/pending counts; retirement/draining precedes production; keepActive retains lower tiers; SEA keepQueued bypasses admission WAIT while recruit tasks govern shortage spending. Funding and emergency counters precede extra recovery subs. |
+| Resurrection submarine | SeaRecovery::Added/Removed/Reset/Leave/Make/Tick, native task manager | Own IDs reacquired per callback; player/retreat/enemy-reclaim preserved; 20/40-percent metal hysteresis; explicit ordered queries. |
+| Recovery wreck | FindRecoveryTask, CBReclaimTask/CBResurrectTask, feature callback | One-second feature value snapshot; actual resurrection UnitDef; safe reach; existing task claims; same-job reuse; controlled reclaim releases claim when last worker leaves. |
+| Damaged naval ally | FindRecoveryTask, CBRepairTask | Completed naval hull, current health, no friendly reclaim; priority UnitDefs from SEA policy. Existing target repair task reused rather than aborted; allied targets are reacquired by ID on idle, with missing-target cancellation. |

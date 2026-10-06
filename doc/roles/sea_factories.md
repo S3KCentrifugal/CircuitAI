@@ -13,9 +13,10 @@ production. Candidates must be buildable and have a weapon for that layer
 second and discounts an oversized response to a small deficit. These are
 heuristics to test, not calibrated combat power or guaranteed optimal counters.
 
-Urgent counters follow the initial two constructors and precede discretionary
-workers. A safe established fleet can pause T1 recruits to accumulate the
-funded T2 package; counters interrupt the saving state. T1 recovery subs and
+Urgent counters follow the first recovery constructor and precede discretionary
+workers. D-211 removes the deliberate T1 tech-saving pause and keeps SEA
+T1 factories active after T2. Recovery submarines scale with fleet value and
+income, with one pending hull at a time and a two-resource funding check.
 T2 jammer/anti-nuke escorts remain capped to one. `AdaptiveFleet=false` retains
 the previous dynamic T1 and fixed T2 mixes. See the
 [combat plan](../sea-combat-enhancement-plan.md).
@@ -42,7 +43,7 @@ movement-area connectivity are not a guarantee of an unobstructed full route.
 See the [plan](../sea-layout-migration-plan.md) and
 [runtime results](../sea-layout-migration-results.md).
 
-<!-- source: data/script/src/roles/sea_factories.as; blob: 2b5e3b53179c558418a72302b6d8e4751ecbff8d; lines: 224 -->
+<!-- source: data/script/src/roles/sea_factories.as; blob: 81753c9202c439abe4f0e2264f3a1528f4a7c832; lines: 227 -->
 
 ## D-209 follow-up
 
@@ -54,3 +55,8 @@ its bank while SEA is waiting for adequate income.
 RoleSea calls native MakeFactoryTask(platform,true), preserving configured
 aircraft weights while bypassing the T1 shutdown that otherwise leaves a new
 platform idle after a T2 shipyard. No other role opts into this lever.
+
+D-211: SEA passes KeepFactoriesQueued to the optional third native argument.
+This removes pre-enqueue resource admission waits while native recruit tasks
+retain low-metal spending priority and empty-energy control. It does not
+guarantee progress without resources or an open physical exit.

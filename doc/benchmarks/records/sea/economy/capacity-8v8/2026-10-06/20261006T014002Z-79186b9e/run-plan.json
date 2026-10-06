@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "shore",
+    "scenario": "capacity-8v8"
+  },
+  "id": "20261006T013550Z-55fff867",
+  "requested": {
+    "seed": 2111
+  },
+  "schema": 1
+}

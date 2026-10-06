@@ -1,5 +1,32 @@
 # SEA Role
 
+## Recovery submarines and factory continuity (D-211)
+
+SEA recovery runs in compact and experimental economic modes. Native queries
+supply legal reachable wrecks and damaged naval allies; script orders them:
+low-metal reclaim, flagship repair, ship resurrection, other ship repair.
+Submarines cannot assist construction and are kept out of factory guards.
+An empty recovery queue waits briefly and is interrupted by new work.
+
+T1 tech-saving WAIT was removed at the user's request. SEA native fallbacks
+keep every factory tier active; retirement and resource safety still apply.
+The [design and simulation evidence](../sea-recovery-production.md) distinguishes
+an empty queue from resource stalls and obstructed output.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `KeepFactoriesQueued` | true | Keep valid recruits queued through income dips; native recruit spending priority still responds to shortages. |
+| `EnableEarlyRezSub` | true | Enables SEA recovery-sub procurement. |
+| `MetalIncomePerRezSub` | 60 metal/s | Income allowance for each additional sub. |
+| `FleetMetalPerRezSub` | 6000 metal | Fleet allowance for each additional sub. |
+| `RecoveryMetalLowFraction` | 0.20 | Enter reclaim-first state below this storage fraction. |
+| `RecoveryMetalResumeFraction` | 0.40 | Leave reclaim-first state at this fraction. |
+| `RecoverySearchRadius` | 24000 elmos | Maximum recovery query distance; native checks safe reachability. |
+
+Target after 1500 fleet metal is `1 + min(floor(income/60), floor(fleet/6000))`.
+Pending recruits count toward it; one additional funded hull is queued at a time.
+
+
 ## Independent fleet operations (D-201)
 
 `SeaCombat::Active` now requires SEA plus AdaptiveFleet, independently of
@@ -171,7 +198,7 @@ The shared legacy helper currently ignores the stored-metal threshold
 | `MaxSupportPerBerth` | 40 | Upper bound used by support scaling and the reserved-capacity requirement. |
 
 **Naval production** - `MinT2DestroyerCount` 5, `T2DestroyerBatchSize` 5,
-`EnableEarlyRezSub` **false**, `MetalIncomePerRezSub` 60.0.
+`EnableEarlyRezSub` **true**, `MetalIncomePerRezSub` 60.0.
 
 **Commander assist** - `CommanderFactoryAssistDeadlineSeconds` 3 min,
 `CommanderFactoryAssistGuardTimeoutSeconds` 10.
@@ -308,8 +335,8 @@ than idling.
    production.** AIR, FRONT and TACTICAL all log "disabled; using legacy"; SEA
    logs nothing, so its factory-production mode is invisible in the log.
 
-6. **`EnableEarlyRezSub = false` makes `MetalIncomePerRezSub = 60.0` dead** while
-   the flag stays off.
+6. **Resolved by D-211:** recovery procurement is enabled and scales with fleet
+   and income; the flag still allows opting out.
 
 7. **`MaxEnergyIncomeForFUS = 999999.0`** is a sentinel standing in for "no
    cap". FRONT uses 4000.0 and TECH 2000.0 for the same setting, so SEA's FUS
@@ -425,7 +452,7 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 926c04913f78c5987a48849770c32a7dccc0268a; lines: 869 -->
+<!-- source: data/script/src/roles/sea.as; blob: cefea96c5911cf069f90943766604829eae1b5ca; lines: 874 -->
 
 
 ## Water-control investigation (2026-10-05)
