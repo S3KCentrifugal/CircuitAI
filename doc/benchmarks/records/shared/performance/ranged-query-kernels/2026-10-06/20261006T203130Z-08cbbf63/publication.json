@@ -1,0 +1,14 @@
+{
+  "files": {
+    "README.md": "3c076c4c531d14a2d202baf5b4f293870b8897fb8c69798148cc2989988d1ec6",
+    "checks.json": "e747889318e7f47c8a6d806ab522a0fe22f1934810eef9475b4861713b2f4a50",
+    "kernel-measurements.json": "6b38ce79032d7fe25d6bae6cd86b7fc47013c366f15fd9d43aebd40dac21196f",
+    "report.md": "2ba1277b28b0482a3601ad2c36456d374dff1e88ff8cafccdf7cc0d8eedddf16",
+    "result.json": "186051ea483b1d8576cd421d3787a9b8b31bae88489937f351d7997b5eb04ba5",
+    "run-plan.json": "045a162935f4f26b54439c9a280ef8c076f8f3f0821f8a8d081948fcf4daf7f2",
+    "validation-output.json": "39aec420745c4d0ac133ef44221e248176cc8deb3051793338be38bfe3432588"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\ranged-query-kernels\\native-host\\20261006T203130Z-8ceb258e\\runs\\20261006T203130Z-08cbbf63",
+  "schema": 1
+}

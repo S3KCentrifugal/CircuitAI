@@ -137,7 +137,12 @@ Seven-batch medians, MinGW GCC 13 C++20 `-O2`, assertions enabled; all games
 and compiler processes stopped. Numbers below are microseconds per operation
 at 10,000 input points/IDs, fixed seed 221. The
 [kernel bundle](../benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T193006Z-458183a0/README.md)
-contains 2,000/5,000/10,000-point results and source/compiler pins.
+records the original verdict. Its [evidence supplement](../benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T203130Z-08cbbf63/kernel-measurements.json)
+contains all 2,000/5,000/10,000-point results and source/compiler pins. This is
+the same measurement, not a second benchmark: the first archive omitted the
+results file through its intentional `*-results.json` input exclusion. The
+supplement preserves its bytes and original validation logs; no old record
+or measured value was rewritten.
 
 | Kernel | Old us | New us | Speedup | Interpretation |
 | --- | ---: | ---: | ---: | --- |

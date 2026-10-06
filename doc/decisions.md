@@ -13315,3 +13315,10 @@ remain FAIL with 49/412 invariant events. The report records mixed whole-AI
 results and population/call-count confounds. Published DLL, matching symbols
 and data pass output parity. All three performance skills validate. Rank one
 and residual KI-527 remain open; no engine or multiplayer improvement is claimed.
+
+**Evidence publication correction.** The first component archive omitted the
+`*-results.json` measurement file under its input exclusion rule. Preserve the
+original immutable record and publish a labelled supplement with byte-identical
+measurements and hashed validation output. The implementation report links
+both; this is not a rerun or a revised measurement. See the
+[evidence changelog](../changelog/2026/10/06/2026-10-06T173131-0300-ranged-evidence-supplement.md).

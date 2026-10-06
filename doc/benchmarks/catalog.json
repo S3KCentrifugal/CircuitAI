@@ -7478,6 +7478,19 @@
     {
       "area": "performance",
       "domain": "shared",
+      "experiment_kind": "benchmark",
+      "id": "20261006T203130Z-08cbbf63",
+      "kind": "run-record",
+      "map": "native-host",
+      "map_name": null,
+      "path": "records/shared/performance/ranged-query-kernels/2026-10-06/20261006T203130Z-08cbbf63/result.json",
+      "scenario": "ranged-query-kernels",
+      "sha256": "186051ea483b1d8576cd421d3787a9b8b31bae88489937f351d7997b5eb04ba5",
+      "verdict": "PASS"
+    },
+    {
+      "area": "performance",
+      "domain": "shared",
       "experiment_kind": "regression",
       "id": "20261004T234203Z-870e40cb",
       "kind": "run-record",

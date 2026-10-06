@@ -1,0 +1,13 @@
+{
+  "full-regression-output.txt": {
+    "sha256": "f8359b2598783ce60436a5f12666646ae1035114529b33e75a0085f240af08e3",
+    "text": "target preference: 9 checks passed\nlayout ranking: 76 checks passed\nbase-layout geometry tests passed\n200159 allied reservation tests; 0 failures\nlocal reservations: 200038 checks, 0 failures\nlane_solver_test: 8 suites passed (including 8 concurrent solvers)\nstrategic targeting: six suites passed\n18 terrain route scenarios passed\nair geometry: 300 unique bounded slots and loss thresholds passed\nmetal field: yield, budgets, overlap, cancellation, upgrade ownership and restored keys passed\n20 enemy reclaim policy checks; 0 failures\nnaval geometry tests passed\nair_safety_test: PASS (capsule reference, bounds, 4090 diagonal probes)\nranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow and ID sort PASS\nwater survey: 9 checks passed\n133 production policy tests; 0 failures\n20 production policy tests; 0 failures\n22 production policy tests; 0 failures\n145 production policy tests; 0 failures\n20 production policy tests; 0 failures\n12 production policy tests; 0 failures\n6 production policy tests; 0 failures\n20 production policy tests; 0 failures\n6 production policy tests; 0 failures\n6 production policy tests; 0 failures\n3 production policy tests; 0 failures\n3 production policy tests; 0 failures\n2 production policy tests; 0 failures\n2 production policy tests; 0 failures\n1 production policy tests; 0 failures\n"
+  },
+  "native-output.txt": {
+    "sha256": "c489357ce77216c3bfad9a81d620f814a2ca01e01755652f799f975453280081",
+    "text": "ranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow and ID sort PASS\n"
+  },
+  "original_kernel_results_sha256": "6b38ce79032d7fe25d6bae6cd86b7fc47013c366f15fd9d43aebd40dac21196f",
+  "original_record": "20261006T193006Z-458183a0",
+  "rerun": false
+}

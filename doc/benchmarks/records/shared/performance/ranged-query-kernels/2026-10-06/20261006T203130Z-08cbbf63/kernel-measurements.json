@@ -1,0 +1,135 @@
+{
+  "rows": [
+    {
+      "kernel": "rebuild-and-ordered-enumeration",
+      "units": 2000,
+      "iterations": 100,
+      "old_us": 14.415,
+      "new_us": 12.384,
+      "speedup": 1.164
+    },
+    {
+      "kernel": "existence-hit",
+      "units": 2000,
+      "iterations": 3000,
+      "old_us": 2.26713,
+      "new_us": 0.01207,
+      "speedup": 187.88398
+    },
+    {
+      "kernel": "local-existence-miss",
+      "units": 2000,
+      "iterations": 3000,
+      "old_us": 0.04733,
+      "new_us": 0.03657,
+      "speedup": 1.29444
+    },
+    {
+      "kernel": "empty-bounds-query",
+      "units": 2000,
+      "iterations": 1000,
+      "old_us": 6.6976,
+      "new_us": 0.0011,
+      "speedup": 6088.72727
+    },
+    {
+      "kernel": "ascending-id-order",
+      "units": 2000,
+      "iterations": 500,
+      "old_us": 30.4862,
+      "new_us": 2.4094,
+      "speedup": 12.65303
+    },
+    {
+      "kernel": "rebuild-and-ordered-enumeration",
+      "units": 5000,
+      "iterations": 100,
+      "old_us": 35.683,
+      "new_us": 29.592,
+      "speedup": 1.20583
+    },
+    {
+      "kernel": "existence-hit",
+      "units": 5000,
+      "iterations": 3000,
+      "old_us": 3.525,
+      "new_us": 0.00993,
+      "speedup": 354.86577
+    },
+    {
+      "kernel": "local-existence-miss",
+      "units": 5000,
+      "iterations": 3000,
+      "old_us": 0.07833,
+      "new_us": 0.0526,
+      "speedup": 1.48923
+    },
+    {
+      "kernel": "empty-bounds-query",
+      "units": 5000,
+      "iterations": 1000,
+      "old_us": 6.6726,
+      "new_us": 0.0014,
+      "speedup": 4766.14286
+    },
+    {
+      "kernel": "ascending-id-order",
+      "units": 5000,
+      "iterations": 500,
+      "old_us": 129.5114,
+      "new_us": 5.897,
+      "speedup": 21.96225
+    },
+    {
+      "kernel": "rebuild-and-ordered-enumeration",
+      "units": 10000,
+      "iterations": 100,
+      "old_us": 84.439,
+      "new_us": 58.416,
+      "speedup": 1.44548
+    },
+    {
+      "kernel": "existence-hit",
+      "units": 10000,
+      "iterations": 3000,
+      "old_us": 7.681,
+      "new_us": 0.02107,
+      "speedup": 364.60443
+    },
+    {
+      "kernel": "local-existence-miss",
+      "units": 10000,
+      "iterations": 3000,
+      "old_us": 0.13093,
+      "new_us": 0.0921,
+      "speedup": 1.42164
+    },
+    {
+      "kernel": "empty-bounds-query",
+      "units": 10000,
+      "iterations": 1000,
+      "old_us": 6.753,
+      "new_us": 0.0013,
+      "speedup": 5194.61538
+    },
+    {
+      "kernel": "ascending-id-order",
+      "units": 10000,
+      "iterations": 500,
+      "old_us": 305.1862,
+      "new_us": 11.9576,
+      "speedup": 25.52236
+    }
+  ],
+  "source_hashes": {
+    "tests/ranged_performance_benchmark.cpp": "99812add312ad76b74079a6ce618896b4a6ae5e2ec04ef1e98e5459dd51d6a65",
+    "tests/ranged_geometry_test.cpp": "bec107a7793250f971697a3f6d6691d4d68bedcb3c289017c0251261db8f1a6a",
+    "tests/ranged_legacy_index.h": "2728668f98165f11aa847084e61f51fbeeafd48b35cfa03e62ea284c9e6f6068",
+    "src/circuit/terrain/RangedGeometry.h": "0911bfdcb3e462d5aadfa9a5a580ffaf16f58e0598d7280d3e9f0e143e445d1e"
+  },
+  "compiler": "MinGW GCC 13, C++20 -O2 -Wall -Wextra -static; assertions enabled",
+  "sampling": "median of seven batches, serial, games and builds stopped",
+  "limits": "Pure container/query kernels; excludes engine callbacks, full decision cost, FPS and network traffic",
+  "baseline_commit": "f8fc38eb",
+  "seed": 221
+}
