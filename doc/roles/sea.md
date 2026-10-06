@@ -127,7 +127,7 @@ hooks, `AiMakeDefenceHandler`.
 
 ## Settings
 
-`Global::RoleSettings::Sea` (`global.as:609`), 58 references.
+`Global::RoleSettings::Sea` in `data/script/src/global.as`.
 
 **Posture**
 
@@ -154,6 +154,17 @@ vary"), `AssistPrimaryWorkerEnergyIncomeMinimum` 500.0,
 **T2 shipyard** - `MinimumMetalIncomeForT2Shipyard` 40.0,
 `MinimumEnergyIncomeForT2Shipyard` 800.0,
 `RequiredMetalCurrentForT2Shipyard` 800.0, `MaxT2Shipyards` 1.
+The shared legacy helper currently ignores the stored-metal threshold
+(`mcOk=true`); it still checks metal/energy income and the yard count.
+
+**Opening metal and seaplanes**
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `NearbyMexRadius` | 2400 elmos | First construction ship claims safe reachable metal within this radius of its home yard before discretionary work. |
+| `SeaplanesAfterT2` | true | Make a seaplane platform the next discretionary factory after a completed T2 yard, retaining its aircraft production. |
+| `ReservedSupportPerFactory` | 20 | Reserve reachable naval construction-turret capacity before admitting the platform; actual purchases remain income/workload driven. |
+| `MaxSupportPerBerth` | 40 | Upper bound used by support scaling and the reserved-capacity requirement. |
 
 **Naval production** - `MinT2DestroyerCount` 5, `T2DestroyerBatchSize` 5,
 `EnableEarlyRezSub` **false**, `MetalIncomePerRezSub` 60.0.
