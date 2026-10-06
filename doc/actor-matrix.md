@@ -1,5 +1,14 @@
 # Actor matrix
 
+## D-221: ranged performance equivalence
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Ranged snapshot | CRangedWorld::Refresh, legal engine callbacks, metadata authority | Fresh IDs/definitions/positions, same ascending order, private per-AI history; allocation reuse does not extend observation lifetime. |
+| Spatial cells | Refresh, SetSlot, Leave, queries | Callback-owned touched cells, stable overflow addresses, unchanged z/x/insertion ordering; removals may conservatively retain empty bounds until refresh. |
+| Boolean safety | Engagement, escort, opt-in legacy oracle | Same predicates and margins; Any may stop only once a pure boolean result is determined; INV-161. |
+| Performance evidence | Phase timers, test runner, analysis | Oracles disabled for timing; nested snapshot children belong to the inclusive snapshot parent, never independent additive savings. |
+
 ## AIR compact lab clusters and early energy retirement (D-167)
 
 | Object | Actor | State read or changed |

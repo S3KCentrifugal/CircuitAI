@@ -15,10 +15,10 @@ class CCircuitDef;
 class CCircuitUnit;
 class CWeaponDef;
 
-// Per-AI, callback-thread service. No wrappers or mutable indexes escape to a
-// worker. Each observed frame builds at most one O(E+F log F+U+B) snapshot;
-// B is retained spatial buckets. Sorted friendly IDs preserve legacy ties; shooters
-// query local cells. Unit IDs, not borrowed unit pointers, survive callbacks.
+// Per-AI callback-thread service: fresh legal data; buffers retain allocation.
+// Inventory O(N+E+F+C+I/64): world scan N, enemies E, friends F, touched cells C,
+// engine ID bound I. Same ascending order/ties; no cross-frame observation cache.
+// Member/history/shot/escort bookkeeping retains its separate map lookup costs.
 class CRangedWorld {
 public:
     struct Weapon {
@@ -54,7 +54,7 @@ public:
     };
     struct Slot { springai::AIFloat3 pos; float spacing, value; };
 
-    explicit CRangedWorld(CCircuitAI* circuit): circuit(circuit) {}
+    explicit CRangedWorld(CCircuitAI* circuit);
     ~CRangedWorld();
     const Capabilities& CapabilitiesFor(CCircuitDef* def);
     void Refresh();
@@ -67,6 +67,7 @@ public:
     const std::vector<int>& Objectives() const { return objectives; }
     bool Safe(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping=false) const;
     float Danger(const springai::AIFloat3& pos, float margin) const;
+    int DangerSign(const springai::AIFloat3& pos, float margin) const;
     bool FriendlySplash(int id, const springai::AIFloat3& target, float radius) const;
     bool FriendlyLine(const Weapon& weapon, int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
     bool HasScreen(int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
@@ -84,7 +85,9 @@ public:
 private:
     CCircuitAI* circuit;
     int frame = -1;
-    float largestRange = 0.f, largestSpacing = 0.f, largestFriendRadius = 0.f;
+    float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f, largestFriendRadius = 0.f;
+    bool nonnegativeHazardCosts = true;
+    bool finiteStaticHazards = true;
     struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; };
     std::unordered_map<int,Metadata> metadata;
     const Metadata& MetadataFor(CCircuitDef* def);
@@ -92,9 +95,10 @@ private:
     std::vector<Contact> contacts;
     std::vector<Friend> friends;
     std::vector<int> friendlyIds;
+    ranged::OrderedIds friendlyOrder;
     std::vector<int> objectives;
-    ranged::SpatialIndex enemies, allies, formations;
-    std::unordered_map<std::uint64_t,float> clusterValues;
+    ranged::SpatialIndex enemies, staticHazards, allies, formations;
+    ranged::CellStore<float> clusterValues;
     std::map<int,Slot> slots;
     struct Shot { int target, until; float damage; };
     std::unordered_map<int,Shot> shots;

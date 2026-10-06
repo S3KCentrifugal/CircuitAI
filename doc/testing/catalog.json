@@ -647,7 +647,7 @@
       "title": "ranged_geometry_test",
       "definitions": [],
       "detail": "Native executable; unnamed assertions remain inside the linked suite.",
-      "sha256": "1fd23f22bc67fe853c7d3215e9c17d848d39cd97ac544a78edc46ed8442af57e",
+      "sha256": "bec107a7793250f971697a3f6d6691d4d68bedcb3c289017c0251261db8f1a6a",
       "execution": "not inferred"
     },
     {
@@ -5655,7 +5655,7 @@
       "title": "ranged_arena",
       "definitions": [],
       "detail": "Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.",
-      "sha256": "350bc9c7278f769dec5d6f0c00d45d510ecd676013e3f485a98cadb9e68f7d14",
+      "sha256": "5f65d3ca85b877fc34c2b06531a3b13a320845bdb581a9505c6743f8c5286fec",
       "execution": "not inferred"
     },
     {
@@ -5785,7 +5785,7 @@
       "title": "run_full_match_performance",
       "definitions": [],
       "detail": "Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.",
-      "sha256": "790589aaadbf165fd782c788724dd55a1f7b4b3faa70ffd53627adc9277b4975",
+      "sha256": "7e41f068d70b57c5ee7837b8c49ef59857f528b1f2160c02ffd67a5171b7074d",
       "execution": "not inferred"
     },
     {
@@ -6064,7 +6064,7 @@
       "title": "summarize_full_match_performance",
       "definitions": [],
       "detail": "Reduce recorded 8v8 intervals without double-counting nested timers.",
-      "sha256": "a8ca1665722ec657bb06cfee70c2a9555893fdaf9f1deae20a0d34eb86010969",
+      "sha256": "b69aaf68f37ddd4cafda52c81db2e56f4460ae765e5fef0031fea1ef07132fa3",
       "execution": "not inferred"
     },
     {
@@ -6221,7 +6221,7 @@
         "test_profiler_off_keeps_progress_but_has_no_measured_ai_peak"
       ],
       "detail": "Protect the distinctions used to rank costs, not the runtime AI policy.",
-      "sha256": "963b6a04cd0298f65e4394fbade0e592daeffbed61113c259f3e671951dcf6c4",
+      "sha256": "0732839fc762536a648c0e551afc13cee389bf939498c7e64aded20f6e63e241",
       "execution": "not inferred"
     },
     {
@@ -7176,6 +7176,17 @@
       "definitions": [],
       "detail": "",
       "sha256": "84f00fe49847ff69a4f09c4c7726e3434e7a97d4b63bce63c546b308dee5000a",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/run_ranged_performance_tests.sh",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_ranged_performance_tests",
+      "definitions": [],
+      "detail": "",
+      "sha256": "9891dccd9ed5cde6a6616fdd2792b501871e75f84248ca951b38a2bc471db115",
       "execution": "not inferred"
     }
   ]

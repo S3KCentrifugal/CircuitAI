@@ -5737,3 +5737,21 @@ are observations, not newly diagnosed physical causes. No script crash occurred.
 Full per-code counts and original reports are linked from the investigation;
 these failures must be handled as separate gameplay fixes, not removed from
 acceptance or silently credited to timing instrumentation.
+
+**D-221 first-round remediation addendum to KI-527/KI-530 (2026-10-06).**
+The [implementation report](reviews/2026-10-06-extra-high-performance-remediation.md)
+records exact early-stop predicates, static-hazard bounds, touched-cell storage
+and bounded ascending-ID ordering. Full native/VM suites and five live combat
+oracle fixtures pass. Both 8v8 horizons complete; KI-527 remains open because
+Metal minute 30 still spends 4.001 ms/frame in the inclusive snapshot, with
+2.806 ms in friendly observation/indexing (individual callback costs are not
+yet split). Fresh engine world scans and position/definition callbacks are
+deliberately retained, and no cross-AI cache freshness proof exists. Preserve
+callback-time freshness before sharing census data across AIs; first split
+GetFriendlyUnitIds, UnitDef/position reads, ordering and index insertion in a
+separate attribution capture. D-221 strict games retain 49/412 invariant events
+on Metal/Glacial, recorded against existing gameplay categories; no script
+errors or oracle-fixture predicate mismatches occurred.
+KI-530 remains upstream: the repository explicitly prohibits changes to the
+Recoil reference. No native query speedup closes engine animation/movement or
+multiplayer packet attribution. See the report for current verification status.

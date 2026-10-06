@@ -2,7 +2,7 @@
 name: convention-cpp
 description: 'Write or review CircuitAI native C++ mechanisms, Recoil callback and script bindings, task ownership, spatial indexes and performance-sensitive code. Use for native AI changes; verify behavior preservation, callback threading, resource lifetime and measured costs against the deployed BAR/Recoil pins.'
 metadata:
-  version: '1.0.0'
+  version: '1.1.0'
 ---
 
 # CircuitAI C++ conventions
@@ -39,6 +39,27 @@ changing a shared UnitDef to fix one role.
    Compile all supported experimental profiles when bindings change. Publish
    the matched stripped DLL, debug symbols and data to the development output
    required by AGENTS.md; keep the live installation untouched.
+
+## Exact spatial optimization
+
+- Preserve candidate **order**, not only membership: ties and floating-point
+  sums observe z/x/insertion order. Compare to a frozen old implementation over
+  mutation, clear/rebuild, overflow coordinates and reused IDs.
+- Early exit belongs only in a pure existence query. A callback returning early
+  does not stop its outer iterator. Preserve full traversal for scoring, sums,
+  RNG and observable side effects. Sign-only numeric shortcuts require proven
+  contribution domains and an exact exceptional-value fallback.
+- Allocation reuse is not observation caching. Fresh legal friendly callbacks
+  remain necessary without a lifecycle/version contract, including mutations
+  between asks in the same frame. Bounded-ID ordering must retain duplicate and
+  out-of-bound fallback behavior.
+- Touched-cell storage must track all mutations and retain stable addresses.
+  Include sparse overflow and allocation bounds; never clamp coordinates to fit
+  an optimization. State average and worst-case complexity separately.
+- Use `tools/run_ranged_performance_tests.sh` for D-221's ordered oracle.
+  Enable `CIRCUIT_VERIFY_RANGED_QUERIES` / `CIRCUIT_VERIFY_RANGED_SNAPSHOT` in
+  correctness games only, never timing games. See the maintenance guide for
+  measurement limits and results; speedup figures are not timeless guarantees.
 
 ## Threading and callbacks
 

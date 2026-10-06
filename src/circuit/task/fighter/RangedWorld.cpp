@@ -22,7 +22,15 @@
 namespace circuit {
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
-static std::uint64_t ClusterKey(int x,int z) { return (std::uint64_t(std::uint32_t(x))<<32)|std::uint32_t(z); }
+static const bool verifyRangedQueries=std::getenv("CIRCUIT_VERIFY_RANGED_QUERIES")!=nullptr;
+CRangedWorld::CRangedWorld(CCircuitAI* circuit): circuit(circuit), friendlyOrder(MAX_UNITS)
+{
+    const float width=float(circuit->GetMap()->GetWidth()*SQUARE_SIZE);
+    const float height=float(circuit->GetMap()->GetHeight()*SQUARE_SIZE);
+    enemies.Configure(width,height); staticHazards.Configure(width,height);
+    allies.Configure(width,height); formations.Configure(width,height);
+    clusterValues.Configure(int(width/128.f)+1,int(height/128.f)+1);
+}
 CRangedWorld::Weapon::Weapon() = default;
 CRangedWorld::Weapon::~Weapon() = default;
 CRangedWorld::Weapon::Weapon(Weapon&&) noexcept = default;
@@ -92,11 +100,14 @@ void CRangedWorld::Refresh()
     if (frame==now) return;
     performance::Scope measured(circuit,performance::RANGED_SNAPSHOT);
     frame=now; contacts.clear(); friends.clear(); objectives.clear();
-    clusterValues.clear();
-    enemies.Clear(); allies.Clear(); formations.Clear(); largestRange=0.f;
+    clusterValues.Clear();
+    enemies.Clear(); staticHazards.Clear(); allies.Clear(); formations.Clear();
+    largestRange=largestStaticRange=0.f; nonnegativeHazardCosts=finiteStaticHazards=true;
     largestSpacing=0.f; largestFriendRadius=0.f;
     // Profile threat suppression must not erase an actual weapon's coverage.
     // Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
+    {
+    performance::Scope enemyPhase(circuit,performance::RANGED_ENEMIES);
     for (const auto& [id,e]:circuit->GetEnemyManager()->GetEnemyUnits()) {
         if (!e || !e->IsInRadarOrLOS()) continue;
         const auto& data=e->GetData();
@@ -134,10 +145,18 @@ void CRangedWorld::Refresh()
         c.armor=meta.armor; c.explosionRadius=meta.explosionRadius;
         c.hazardRadius=std::max(c.armed ? c.groundRange+c.radius : 0.f,c.explosionRadius);
         largestRange=std::max(largestRange,c.hazardRadius);
+        if(!(c.hazardRadius<=0.f)) {
+            nonnegativeHazardCosts=nonnegativeHazardCosts && std::isfinite(c.cost) && c.cost>=0.f;
+            if(!c.mobile) {
+                staticHazards.Add(P(c.pos),int(contacts.size()));
+                largestStaticRange=std::max(largestStaticRange,c.hazardRadius);
+                finiteStaticHazards=finiteStaticHazards && std::isfinite(c.hazardRadius);
+            }
+        }
         enemies.Add(P(c.pos),int(contacts.size()));
         if (!c.def->IsAbleToFly()) objectives.push_back(int(contacts.size()));
         contacts.push_back(c);
-        clusterValues[ClusterKey(int(c.pos.x/128.f),int(c.pos.z/128.f))]+=c.cost;
+        clusterValues.Get(int(c.pos.x/128.f),int(c.pos.z/128.f))+=c.cost;
         auto& h=history[id];
         if (c.los) {
             if (now-h.frame>=300) {
@@ -160,14 +179,20 @@ void CRangedWorld::Refresh()
     // Fixed shortlist: O(E log 16), rather than sorting every enemy per frame.
     std::partial_sort(objectives.begin(),objectives.begin()+std::min(size_t(16),objectives.size()),objectives.end(),order);
     if (objectives.size()>16) objectives.resize(16);
+    }
     // UpdateFriendlyUnits rebuilds CAllyUnit + engine wrappers + map nodes for
     // every ally. Calling it every ranged frame dominated measured snapshot
     // cost. Read the same legal IDs/defs/positions into owned reusable storage.
-    // Sort IDs to retain the old std::map traversal/tie order. No borrowed
+    // Order fresh IDs with reusable bits to retain old std::map traversal/ties.
+    // Every definition/position is still read at this observation instant: a
+    // unit ID can be reused between asks, even within one simulation frame.
+    // No borrowed
     // wrapper survives and no global ally cache is invalidated by this reader.
+    {
+    performance::Scope friendlyPhase(circuit,performance::RANGED_FRIENDS);
     auto* api=circuit->GetUnitAPI();
     const int friendCount=api->GetFriendlyUnitIds(friendlyIds);
-    std::sort(friendlyIds.begin(),friendlyIds.begin()+friendCount);
+    friendlyOrder.Sort(friendlyIds,friendCount);
     auto* authority=circuit->GetAllyTeam()->GetAuthority();
     for (int i=0;i<friendCount;++i) {
         const int id=friendlyIds[i];
@@ -190,11 +215,17 @@ void CRangedWorld::Refresh()
             auto* d=u->GetCircuitDef(); if(!d || d->IsAbleToFly()) continue;
             const auto p=u->GetPos(now);
             if(index>=friends.size() || friends[index].id!=id || friends[index].pos!=p
-                || friends[index].radius!=d->GetRadius()) equal=false;
+                || friends[index].radius!=d->GetRadius()
+                || friends[index].screen!=(d->IsAttacker() && !d->IsAttrRanged())
+                || friends[index].radar!=MetadataFor(d).radar
+                || friends[index].jammer!=MetadataFor(d).jammer
+                || friends[index].los!=MetadataFor(d).los) equal=false;
             ++index;
         }
         if(!equal || index!=friends.size()) circuit->LOG("[INVARIANT] INV-148 ranged friendly snapshot differs from legacy view");
     }
+    }
+    performance::Scope statePhase(circuit,performance::RANGED_STATE);
     for (auto it=slots.begin();it!=slots.end();) {
         auto* u=circuit->GetTeamUnit(it->first);
         if (!u || u->IsDead() || !u->GetCircuitDef()->IsAttrRanged()) { it=slots.erase(it); continue; }
@@ -235,13 +266,11 @@ void CRangedWorld::SetSlot(int id,const AIFloat3& pos,float spacing,float value)
 }
 bool CRangedWorld::FreeSlot(int id,const AIFloat3& pos,float spacing) const
 {
-    bool free=true;
-    formations.Query(P(pos),std::max(spacing,largestSpacing),[&](int other) {
-        const auto it=slots.find(other); if(other==id || it==slots.end()) return;
+    return !formations.Any(P(pos),std::max(spacing,largestSpacing),[&](int other) {
+        const auto it=slots.find(other); if(other==id || it==slots.end()) return false;
         const float separation=std::max(spacing,it->second.spacing);
-        if(pos.SqDistance2D(it->second.pos)<separation*separation) free=false;
+        return pos.SqDistance2D(it->second.pos)<separation*separation;
     });
-    return free;
 }
 void CRangedWorld::Nearby(const AIFloat3& pos,float radius,std::vector<int>& result) const
 {
@@ -251,15 +280,30 @@ void CRangedWorld::Nearby(const AIFloat3& pos,float radius,std::vector<int>& res
 }
 bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping) const
 {
-    bool safe=true;
     const AIFloat3 center=(from+to)*.5f;
-    const float query=largestRange+margin+std::sqrt(from.SqDistance2D(to))*.5f;
-    enemies.Query(P(center),query,[&](int i) {
-        const auto& c=contacts[i]; if(!safe || c.hazardRadius<=0.f || c.mobile) return;
+    // Only static hazards can reject this predicate. Preserve the old bounds
+    // for unusual negative margins; for ordinary nonnegative margins the
+    // static maximum remains a conservative bound for the same exact test.
+    const float query=(margin>=0.f && finiteStaticHazards?largestStaticRange:largestRange)+margin+std::sqrt(from.SqDistance2D(to))*.5f;
+    const bool safe=!staticHazards.Any(P(center),query,[&](int i) {
+        const auto& c=contacts[i];
         const float radius=c.hazardRadius+margin;
-        if(escaping) safe=ranged::SafeSegment(P(from),P(to),P(c.pos),radius);
-        else safe=ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius;
+        if(escaping) return !ranged::SafeSegment(P(from),P(to),P(c.pos),radius);
+        return !(ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius);
     });
+    if(verifyRangedQueries) {
+        // Same live observation, old full-contact bounds/predicate. No commands
+        // or RNG calls. Run separately from timing: this deliberately repeats
+        // the old expensive query and checks static-bound reduction in-engine.
+        bool legacy=true;
+        enemies.Query(P(center),largestRange+margin+std::sqrt(from.SqDistance2D(to))*.5f,[&](int i) {
+            const auto& c=contacts[i]; if(!legacy || c.hazardRadius<=0.f || c.mobile) return;
+            const float radius=c.hazardRadius+margin;
+            legacy=escaping ? ranged::SafeSegment(P(from),P(to),P(c.pos),radius)
+                : ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius;
+        });
+        if(legacy!=safe) circuit->LOG("[INVARIANT] INV-161 ranged safety query differs from legacy predicate");
+    }
     return safe;
 }
 float CRangedWorld::Danger(const AIFloat3& pos,float margin) const
@@ -271,24 +315,43 @@ float CRangedWorld::Danger(const AIFloat3& pos,float margin) const
     });
     return danger;
 }
+int CRangedWorld::DangerSign(const AIFloat3& pos,float margin) const
+{
+    // Callers ask ==0 or >0, not a magnitude. Nonnegative finite contributions
+    // permit existence short-circuiting without changing either comparison.
+    // Keep ordered accumulation for exceptional/negative values; -1 also
+    // represents NaN, for which both original comparisons are false.
+    int result;
+    if(!nonnegativeHazardCosts) {
+        const float value=Danger(pos,margin);
+        result=value>0.f?1:value==0.f?0:-1;
+    } else result=enemies.Any(P(pos),largestRange+margin,[&](int i) {
+        const auto& c=contacts[i];
+        return c.hazardRadius>0.f && c.cost>0.f
+            && pos.SqDistance2D(c.pos)<std::pow(c.hazardRadius+margin,2.f);
+    }) ? 1 : 0;
+    if(verifyRangedQueries) {
+        const float value=Danger(pos,margin);
+        const int expected=value>0.f?1:value==0.f?0:-1;
+        if(result!=expected) circuit->LOG("[INVARIANT] INV-161 ranged danger sign differs from ordered sum");
+    }
+    return result;
+}
 bool CRangedWorld::FriendlySplash(int id,const AIFloat3& target,float radius) const
 {
     if(radius<=16.f) return false;
-    bool blocked=false;
-    allies.Query(P(target),radius+largestFriendRadius,[&](int i) {
-        const auto& f=friends[i]; if(f.id==id) return;
-        if(target.SqDistance2D(f.pos)<std::pow(radius+f.radius,2.f)) blocked=true;
+    return allies.Any(P(target),radius+largestFriendRadius,[&](int i) {
+        const auto& f=friends[i];
+        return f.id!=id && target.SqDistance2D(f.pos)<std::pow(radius+f.radius,2.f);
     });
-    return blocked;
 }
 bool CRangedWorld::HasScreen(int id,const AIFloat3& from,const AIFloat3& target) const
 {
-    bool found=false; const float distance=from.SqDistance2D(target);
-    allies.Query(P(from),700.f,[&](int i) {
+    const float distance=from.SqDistance2D(target);
+    return allies.Any(P(from),700.f,[&](int i) {
         const auto& f=friends[i];
-        if(f.id!=id && f.screen && f.pos.SqDistance2D(target)<distance && f.pos.SqDistance2D(from)<490000.f) found=true;
+        return f.id!=id && f.screen && f.pos.SqDistance2D(target)<distance && f.pos.SqDistance2D(from)<490000.f;
     });
-    return found;
 }
 bool CRangedWorld::FriendlyLine(const Weapon& w,int id,const AIFloat3& from,const AIFloat3& target) const
 {
@@ -300,24 +363,22 @@ bool CRangedWorld::FriendlyLine(const Weapon& w,int id,const AIFloat3& from,cons
     const AIFloat3 delta=target-from;
     const float length=delta.SqLength2D();
     if(length<1.f) return false;
-    bool blocked=false;
     // Guided rockets curve in height and may descend after losing a target.
     // A straight-line height exemption let Medusa hit a radar on a hillside
     // after its target died. Require a clear 2-D corridor for guided weapons,
     // including their splash padding. Direct beams retain the height test.
     // The Medusa fixture requires zero allied damage as well as target kills.
     const float padding=w.guided ? std::max(8.f,w.splash) : 8.f;
-    allies.Query(P((from+target)*.5f),std::sqrt(length)*.5f+largestFriendRadius+padding,[&](int i) {
+    return allies.Any(P((from+target)*.5f),std::sqrt(length)*.5f+largestFriendRadius+padding,[&](int i) {
         const auto& f=friends[i];
-        if(f.id==id) return;
+        if(f.id==id) return false;
         const float t=((f.pos.x-from.x)*delta.x+(f.pos.z-from.z)*delta.z)/length;
-        if(t<=0.f || t>=1.f) return;
+        if(t<=0.f || t>=1.f) return false;
         const auto p=from+delta*t;
         const float radius=f.radius+padding;
-        if(f.pos.SqDistance2D(p)<radius*radius
-            && (w.guided || std::fabs(f.pos.y-(p.y+24.f))<radius+24.f)) blocked=true;
+        return f.pos.SqDistance2D(p)<radius*radius
+            && (w.guided || std::fabs(f.pos.y-(p.y+24.f))<radius+24.f);
     });
-    return blocked;
 }
 float CRangedWorld::Range(const Weapon& w,const AIFloat3& from,const AIFloat3& to) const
 {
@@ -383,8 +444,8 @@ float CRangedWorld::ClusterValue(const AIFloat3& target,float radius) const
     const int x=int(target.x/128.f),z=int(target.z/128.f);
     for(int dz=-cells;dz<=cells;++dz) for(int dx=-cells;dx<=cells;++dx) {
         if(dx*dx+dz*dz>cells*cells) continue;
-        const auto it=clusterValues.find(ClusterKey(x+dx,z+dz));
-        if(it!=clusterValues.end()) value+=it->second;
+        const auto* cell=clusterValues.Find(x+dx,z+dz);
+        if(cell) value+=*cell;
     }
     return value;
 }
@@ -440,7 +501,7 @@ bool CRangedWorld::Escort(CCircuitUnit* sensor,AIFloat3& position)
             CTerrainManager::CorrectPosition(candidate);
             candidate.y=circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(candidate.x,candidate.z);
             safe=circuit->GetTerrainManager()->CanMoveToPos(sensor->GetArea(),candidate)
-                && Safe(pos,candidate,32.f,true) && Danger(candidate,32.f)==0.f;
+                && Safe(pos,candidate,32.f,true) && DangerSign(candidate,32.f)==0;
             if(safe) break;
             candidate=slot.pos;
         }

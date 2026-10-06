@@ -79,14 +79,40 @@ engine with matched DLL/data, not just regex/API checks.
 ally objects and map nodes for the whole ally army. The direct `CUnitAPI`
 reader retains its ID buffer, uses the same legal callback and authority
 definitions, and sorts IDs to preserve ordered-map traversal. This is
-O(F log F), not constant time. The optional
+O(F + I/64) for normal large inventories after D-221, where I is the engine ID
+bound; small or duplicate/out-of-bound inputs retain O(F log F) comparison sort.
+This reorders freshly read IDs and does not cache observations. The optional
 `CIRCUIT_VERIFY_RANGED_SNAPSHOT` oracle compares positions, IDs, counts and
-radii against the old view; enable it for correctness, never for timing.
+radii and sensor/screen metadata against the old view; enable it for correctness,
+never for timing.
 
 Definition metadata is immutable within the AI lifetime. Frame snapshots are
-borrowed only during the owning callback. Spatial bucket storage is retained,
-so clearing also visits historical bucket count B. Do not describe local
-queries as unconditional O(1), or move engine callbacks onto path workers.
+borrowed only during the owning callback. D-221 retains spatial bucket storage,
+but clears only cells touched in the last generation. Dense map cells have
+sparse overflow for legal off-map coordinates and a bounded-allocation fallback.
+Pointers in the touched list must remain stable until clearing. Configure only
+before use. Query traversal remains ordered z/x/insertion; clipping may skip
+only provably empty cells. The [ordered legacy oracle](../../tests/ranged_geometry_test.cpp)
+checks mutation, overflow, generation boundaries and sorting fallback.
+
+`SpatialIndex::Any` is for pure existence predicates only. Do not use it for
+ordered score accumulation or observable side effects. `DangerSign` relies on
+nonnegative finite contributions and otherwise uses the original numeric sum;
+its sentinel retains NaN comparison behavior. Static safety uses a separate
+static index and conservative bounds, not a changed threat threshold. Run
+`CIRCUIT_VERIFY_RANGED_QUERIES` against live old predicates separately from
+timing. Do not describe local queries as unconditional O(1), or move engine
+callbacks onto path workers.
+
+After nested `ranged-enemies`, `ranged-friends` and `ranged-state` timers were
+added, compare **inclusive** `ranged-snapshot` time across builds. Comparing its
+new exclusive residual to the former unsplit parent manufactures a gain.
+The [D-221 report](../reviews/2026-10-06-extra-high-performance-remediation.md)
+records component measurements separately from natural-game evidence and the
+unresolved upstream engine finding. The [focused runner](../../tools/run_ranged_performance_tests.sh)
+compiles its tests and optional same-input kernels; run timing with games and
+compilers stopped. Storage reuse does not remove the engine world scan or
+justify cross-AI snapshot sharing without mutation/authority versions.
 The [ranged report](../benchmarks/ranged-combat.md) separates behavior changes,
 allocation savings, local command counts and the limits of FPS evidence.
 

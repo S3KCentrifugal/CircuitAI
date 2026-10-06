@@ -13266,3 +13266,52 @@ invariant-practice and scoped whitespace checks pass. Eight missing hover doc
 links remain pre-existing KI-404 debt. No old/new speedup, network improvement,
 full victory or behavior-equivalence result is claimed. KI-527--531 record the
 remaining work and precise validation requirements.
+
+
+## D-221 - Preserve ranged decisions while reducing query and snapshot work
+
+**Decision.** Replace pure boolean traversals with true early-exit queries;
+index static hazards separately; retain dense touched-cell storage with sparse
+overflow and stable ascending friendly IDs. Continue observing fresh legal
+positions/definitions in each requesting AI's snapshot. Keep numeric danger
+accumulation for exceptional inputs and unchanged magnitude consumers. Add
+opt-in runtime old-predicate checks and nested attribution scopes.
+
+**Reasoning and alternatives.** D-220 identifies ranged queries/snapshots as
+extra-high native costs. Skipping response ticks, suppressing orders, changing
+safety margins, caching positions across frames or sharing observations without
+mutation versions would change behavior. Do not apply those alternatives.
+Map-sized storage trades bounded memory for fewer hashes/allocations. Only pure
+existence queries may stop early; ordered scoring and floating sums must not.
+
+**Scope decision.** The rank-one animation/movement finding belongs to Recoil.
+AGENTS.md prohibits modifications to that reference even when a request appears
+to belong there. Retain KI-530 and identify upstream targets, without pretending
+that CircuitAI query savings remediate engine animation cost. High/medium/low
+findings are outside this first round.
+
+**Invariant.** INV-161 compares safety and danger-sign results with original
+predicates on the same live snapshot; INV-148 checks friendly observations.
+Exact ordered-index tests include mutations, empty generations, overflow, ID
+reuse and fallback sorting. No cadence, policy, command or RNG change is allowed.
+
+**Files and evidence.** The [implementation report](reviews/2026-10-06-extra-high-performance-remediation.md)
+links each native mechanism, test, benchmark and maintenance contract.
+[Invariant register](invariants.md), [actor matrix](actor-matrix.md),
+[known issues](known-issues.md), [C++ skill](../skills/convention-cpp/SKILL.md),
+[AngelScript skill](../skills/convention-angelscript/SKILL.md),
+[performance guidance](../skills/convention-angelscript/references/performance-and-safety.md),
+[playtest skill](../.claude/skills/playtest/SKILL.md),
+[ranged runner](../tools/playtest/ranged_arena.py),
+[focused test runner](../tools/run_ranged_performance_tests.sh),
+[test catalog](testing/README.md) and [benchmark catalog](benchmarks/README.md).
+
+**Verification.** Native integration and full standalone native/AngelScript
+regressions pass; 310-member DLL/API parity passes. Ordered geometry oracles
+pass. Component timings are recorded separately from game/FPS results. Five
+live combat fixtures pass both old-predicate/snapshot oracles. Full 8v8
+horizons complete (Metal 30 minutes, Glacial 60); their strict gameplay verdicts
+remain FAIL with 49/412 invariant events. The report records mixed whole-AI
+results and population/call-count confounds. Published DLL, matching symbols
+and data pass output parity. All three performance skills validate. Rank one
+and residual KI-527 remain open; no engine or multiplayer improvement is claimed.

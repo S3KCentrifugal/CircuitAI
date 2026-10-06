@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-starlight-closing"
+  },
+  "id": "20261006T192507Z-58de252a",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

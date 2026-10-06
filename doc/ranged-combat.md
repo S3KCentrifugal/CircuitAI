@@ -101,10 +101,24 @@ benchmark record; restricting idle movement is not claimed as a final fix.
 ## Performance contracts
 
 The world builds at most one contact/friendly/slot snapshot per AI frame in which
-it is needed: O(E + F log F + U), plus a fixed-size strategic shortlist. Friendly
-IDs are sorted once to preserve the old ordered-map tie order. Shooters query
-local spatial cells. This is not a universal constant-time claim: crowded cells,
-large ranges and long routes still cost work. Formation buckets retain storage; clearing currently visits all historically allocated buckets (B), so refresh also costs O(B). Formation membership uses an ordered ID map, with O(log U) updates.
+it is needed. D-221 retains fresh engine observations and the fixed-size
+strategic shortlist. Friendly-ID ordering is O(F + I/64) for normal large inputs
+(I is the engine ID bound), with comparison-sort fallback for small, duplicate
+or out-of-bound inputs. It produces the same ascending IDs. The engine world
+scan and position/definition callbacks remain; this is not a shared ally cache.
+
+Map-sized dense spatial cells have sparse overflow and bounded allocation.
+Clearing visits the preceding generation's touched cells, retaining capacity;
+enumeration preserves z/x/insertion order. Queries cost intersecting occupied
+bounds plus visited candidates, not universally O(1). Formation membership
+retains its ordered ID map and O(log U) updates. History, claims and escort
+bookkeeping retain their original ownership and costs.
+
+Pure existence checks stop at the first decisive result. Static path safety
+uses only static hazards and conservative bounds, retaining the exact segment
+predicate. Sign-only danger tests short-circuit nonnegative finite costs and
+fall back to the numeric ordered sum for exceptional values. Scored sums,
+target ties, RNG draws, firing positions and response cadence are unchanged.
 Coarse splash-density totals are built once, then queried by bounded weapon
 footprint instead of doing a nested enemy scan for each shooter.
 
@@ -112,7 +126,13 @@ Unchanged live movement and targeting intent are retained. Missing queues and
 lost BAR priority targets are repaired; threat response has no APM ceiling.
 Optional `CIRCUIT_PERF_PHASES` phases separate shared snapshots, decisions and
 escort work. `CIRCUIT_RANGED_TRACE` adds detailed diagnostics only when requested.
-Neither diagnostic is enabled for comparative performance measurements.
+Detailed trace and expensive `CIRCUIT_VERIFY_RANGED_QUERIES` /
+`CIRCUIT_VERIFY_RANGED_SNAPSHOT` oracles remain off for timing. Opt-in phase
+timing may be enabled for attribution and must be recorded in the run pins.
+After D-221 adds snapshot children, compare the inclusive snapshot parent
+across builds; its exclusive residual is not a total-cost comparison. See
+[maintenance contracts](performance/engineering-guide.md) and the
+[D-221 implementation/evidence report](reviews/2026-10-06-extra-high-performance-remediation.md).
 
 ## Reproducible tests
 

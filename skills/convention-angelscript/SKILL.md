@@ -3,7 +3,7 @@ name: convention-angelscript
 description: 'Apply AngelScript 2.39.0 WIP-compatible best practices when writing or reviewing scripts. Use for AngelScript APIs, handles, arrays, dictionaries, callbacks, functional-style policy code, memory safety, and performance-sensitive game logic. Targets CircuitAI commit-compatible behavior while distinguishing host APIs from language features.'
 metadata:
   compatibility: 'AngelScript 2.39.0 WIP as pinned by CircuitAI at upstream commit 365b8fb; Windows or cross-platform source editing. Host-registered APIs must be verified separately.'
-  version: '1.1.0'
+  version: '1.2.0'
   angelscript-baseline: '2.39.0-wip-365b8fb'
 ---
 
@@ -330,6 +330,10 @@ host-specific effects.
 - [ ] No destructor is relied on for prompt cleanup.
 - [ ] No shared mutable state is accessed from parallel script execution.
 - [ ] Hot callbacks avoid unnecessary allocations, copies, and logging.
+- [ ] Boolean queries stop the outer search only when predicates have no effects.
+- [ ] Cache freshness covers same-frame enqueues, transfers and callback re-entry.
+- [ ] Ordered decisions and RNG draws match the original; equal sets are insufficient.
+- [ ] New nested timers are compared using equivalent inclusive/exclusive scopes.
 - [ ] Code remains correct without JIT optimization.
 - [ ] CircuitAI code compiles with warnings treated as errors.
 

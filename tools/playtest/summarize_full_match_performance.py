@@ -29,6 +29,7 @@ def reduce(data):
         frame = row['frame']
         scopes = {r['name']: r['interval_ms'] / 1800 for r in at_frame(data['scopes'], frame)}
         phases = totals(at_frame(data['phases'], frame), 'phase', 'exclusive_ms')
+        inclusive = totals(at_frame(data['phases'], frame), 'phase', 'inclusive_ms')
         labels = totals(at_frame(data['labels'], frame), 'label', 'exclusive_ms')
         orders = list(at_frame(data['orders'], frame))
         origins = list(at_frame(data['origins'], frame))
@@ -42,6 +43,10 @@ def reduce(data):
             active_ais=next((r['active'] for r in at_frame(data['roster'], frame)), None),
             engine_scope_ms_per_frame=scopes,
             native_exclusive_ms_per_frame={k: v / 1800 for k, v in phases.most_common()},
+            # D-221 adds snapshot children. Comparing the old parent to its
+            # new exclusive residual would incorrectly count instrumentation
+            # boundaries as savings. Keep inclusive parents separately.
+            native_inclusive_ms_per_frame={k: v / 1800 for k, v in inclusive.most_common()},
             label_exclusive_ms_per_frame={k: v / 1800 for k, v in labels.most_common()},
             team_ai_ms_per_frame=teams,
             all_team_orders=sum(r.get('all_apm', 0) for r in orders),
@@ -63,7 +68,7 @@ def main():
     data = analyze(args.directory) if args.live else json.loads(source.read_text())
     result = reduce(data)
     if not args.live:
-        path = args.directory / 'full-match-summary-v1.json'
+        path = args.directory / 'full-match-summary-v2.json'
         if path.exists() and json.loads(path.read_text()) != result:
             raise ValueError('Refusing to replace immutable summary')
         if not path.exists():

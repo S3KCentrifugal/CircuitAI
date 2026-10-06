@@ -1,0 +1,29 @@
+{
+  "files": {
+    "README.md": "3301e1d23321b672d487599796ded84f72851b3cc2eb3fba0a3b2b4d379187c9",
+    "checks.json": "422314349d0b585fa17e0d0044f133091008a9ea5c00470955c09364f6b13072",
+    "full-match-checks.json": "422314349d0b585fa17e0d0044f133091008a9ea5c00470955c09364f6b13072",
+    "full-match-manifest.json": "50afbd7a58d8fbb41210205a2b125550cd92c362fdf5c170657e5effa84d75ba",
+    "full-match-performance-v1.json": "70153e9e68a044fba22bc1d2eb0c20e32eaa23ac38f32adb260084f1d31358a0",
+    "full-match-summary-v2.json": "666cdde93dabb46b19cdfa5897fb2705f2b8c228d2a03dca7f6fdd4e876afcdf",
+    "launched.json": "a236479b6959ec1e7f8167dd722959657122c6119076f60624a716dd8dbddccf",
+    "report.md": "b44b2f1e9c9b38514798b3f431ec93a202c91a7f5ece46ae6316ecb0b5160fce",
+    "result.json": "be4eee267caeacf59cd3833c0627d71a86ac5a9a2b1b03060ee0cd965b82cc4b",
+    "run-inputs.json": "5c5bc5b176dfbb9f8ec782c94967647cebfc130f6239c3c00fa3198768a72f43",
+    "run-plan.json": "425ab0758ba1a05b78e9459de06cb961a8d30d4a5a643f279777921d5ccc643a",
+    "screen_2026-10-06_19-32-45-079.png": "1835951f7a6cf833600121ff2381fc437edc2408483cbcf9f6c9ee60cc1b14e2",
+    "screen_2026-10-06_19-33-37-469.png": "50845da658b6129100a05794ad1fbe0a7e6d8490406ea8a65e40415422f92728",
+    "screen_2026-10-06_19-34-36-003.png": "f14bfb1e74a1839ef2a2b6741f0f1e0a7ed00e2a0bd0507c46f185ca52188a9c",
+    "screen_2026-10-06_19-36-22-274.png": "1e651700913ddac0d59016c3cb57128c1fc358ac012f67bad144f81b93b7996f",
+    "screen_2026-10-06_19-39-49-142.png": "d99bd862372a322c780b0f10676c72b4d62508107821207098084a34218bd234",
+    "screen_2026-10-06_19-47-29-457.png": "5a1e9cce7a68b15bbbd37019008368d1928a1d71d7e47e1da26695cd51b9ffe0",
+    "screen_2026-10-06_19-53-56-454.png": "a9fdbd1ab989b4c7caab320322d2ea21d1241014795de1cfc625ebb41e8ff41c",
+    "screen_2026-10-06_20-01-44-239.png": "07502cdd82d8d257489051529f17d913953cb2ac28be0254e48e6544877862e6",
+    "script.txt": "56a3b519b369f5921adefea7f30b26bc62a3ab1588d228c199c3120fe9d22041",
+    "staged.json": "99293d710b7c40f7478d4803ee1dd8659d6f6e3633e8336f52da96f018cae8dc",
+    "teams.json": "f0be9f58ee119530827519dd09d3ba9a205381508ee2a1e43a08244509f3e17c"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\glacial\\20261006T193031Z-f36750fa\\runs\\20261006T200145Z-d1685f1c",
+  "schema": 1
+}

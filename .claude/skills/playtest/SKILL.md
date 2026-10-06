@@ -14,6 +14,18 @@ from Lua orders and network packets, and report compilation failures separately
 from played behavior. A static script API check does not compile all object
 methods; the actual embedded VM load remains mandatory.
 
+For ranged-query changes, run `tools/run_ranged_performance_tests.sh`, then
+rendered fixtures with `CIRCUIT_VERIFY_RANGED_QUERIES=1` and
+`CIRCUIT_VERIFY_RANGED_SNAPSHOT=1`. Both variables must be absent for timing;
+the oracles intentionally repeat expensive legacy work. The ranged runner
+records their presence in its pins. Compare the inclusive ranged-snapshot
+parent after D-221's child phases were added; `full-match-summary-v2.json`
+retains both inclusive and exclusive tables without overwriting v1 evidence.
+Natural games with different surviving populations are integration evidence,
+not exact same-state FPS comparisons. Keep camera/focus and speed-window limits
+visible in the report. Do not close an upstream engine bottleneck because an
+AI-only component benchmark improved.
+
 Tool: `tools/playtest/playtest.py` (reference: `tools/playtest/README.md`).
 It stages a DLL plus the repo's `data/` as `BARbTest/test` into its own
 engine write dir, never the install, and stops only its own engine.

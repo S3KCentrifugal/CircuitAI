@@ -1,0 +1,255 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1085,
+      "sha256": "cfc7ebc2db2541fec5a5c6421c9a9378cf56875f30d1f66a8cb9d1a7164faec4"
+    },
+    "full-match-checks.json": {
+      "bytes": 1085,
+      "sha256": "cfc7ebc2db2541fec5a5c6421c9a9378cf56875f30d1f66a8cb9d1a7164faec4"
+    },
+    "full-match-manifest.json": {
+      "bytes": 38753,
+      "sha256": "0f1a85522028320050b9ce978a245dba9eb61cb3842228fc427ee1c965119ff8"
+    },
+    "infolog.txt": {
+      "bytes": 12405015,
+      "sha256": "ae1b4d7e011266e15bc90f457e74eb13ba0590bc462da28ca2fc6f83ba2dfdae"
+    },
+    "launched.json": {
+      "bytes": 150,
+      "sha256": "11d6e310c72826382c29d376a7bf5631728be5832310b42be5d49b623ec4dd9f"
+    },
+    "metal-plate-eight.as": {
+      "bytes": 1032,
+      "sha256": "fa949310e3d1ed4c261a3f544b9d469b2d217de012d466c5586bceb5e7b2502f"
+    },
+    "report.md": {
+      "bytes": 50843,
+      "sha256": "0f3f544e0da38aea959849442eed622b8970f900bc99de4e259800ff313d3bc6"
+    },
+    "run-inputs.json": {
+      "bytes": 38121,
+      "sha256": "89d52de591d57096643188f264acd20b04a00afaf165afdeb699e1e409cafbd5"
+    },
+    "run-plan.json": {
+      "bytes": 268,
+      "sha256": "805ebb23375012be7d344a244e903634396bc66c998aa49df6684910fc3832b9"
+    },
+    "screen_2026-10-06_20-05-15-703.png": {
+      "bytes": 1801146,
+      "sha256": "28c3a6e2c4fff955ef21678976449c16929881d66559652316b10771584cc325"
+    },
+    "screen_2026-10-06_20-06-15-749.png": {
+      "bytes": 1842715,
+      "sha256": "991b6a8321b8c9f55f589d15a9a79c9bdeb147c94e06651fb2b9dace6010d44a"
+    },
+    "screen_2026-10-06_20-08-22-795.png": {
+      "bytes": 1895476,
+      "sha256": "eef768c04cd40abcb82124fe67992ae5773151c0975537f93be42ad58c823958"
+    },
+    "screen_2026-10-06_20-13-02-033.png": {
+      "bytes": 1914210,
+      "sha256": "6960e993c7fb62c23fdddf15fc1d8320450e7f07c32720970982542c46687825"
+    },
+    "screen_2026-10-06_20-24-08-717.png": {
+      "bytes": 1958170,
+      "sha256": "031f5f27efbd4d069a1234d6b05b03489a14a21c6034a35e4570cef62b469117"
+    },
+    "script.txt": {
+      "bytes": 10808,
+      "sha256": "a21815700b46ff2539b714bbf6c5424a3ca87be713b2c6c0c6eb20dbacbce9a2"
+    },
+    "staged.json": {
+      "bytes": 238,
+      "sha256": "a1f7b3b2a7a57cc2e55b4ef97b67d562e749ed0c4ef9425414d6992f68556fb3"
+    },
+    "teams.json": {
+      "bytes": 2977,
+      "sha256": "0d67ad75c49c3c64820d0cb8cb7a537afcd0a07aecfcc0f1d6bd2318ea49ebca"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "natural",
+    "map": "metal-plate",
+    "scenario": "full-match-profile"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T202409Z-c088e2bb",
+  "last_frame": 54004,
+  "map": "Full Metal Plate 1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\metal-plate\\20261006T200302Z-fb4b67d2\\runs\\20261006T202409Z-c088e2bb",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-06T20:24:09.430425+00:00",
+  "requested": {
+    "seed": 220001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 2,
+      "team": 0,
+      "x": 3400.0,
+      "z": 900.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 1,
+      "team": 1,
+      "x": 1400.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SUPPORT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 800.0,
+      "z": 3400.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TACTICAL",
+      "side": "legion",
+      "spot": 4,
+      "team": 3,
+      "x": 2100.0,
+      "z": 2500.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 5,
+      "team": 4,
+      "x": 4600.0,
+      "z": 1600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 6,
+      "team": 5,
+      "x": 3600.0,
+      "z": 3000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 7,
+      "team": 6,
+      "x": 2200.0,
+      "z": 4300.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 8,
+      "team": 7,
+      "x": 800.0,
+      "z": 5100.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "cortex",
+      "spot": 9,
+      "team": 8,
+      "x": 10888.0,
+      "z": 11088.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "legion",
+      "spot": 10,
+      "team": 9,
+      "x": 8888.0,
+      "z": 11388.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SUPPORT",
+      "side": "armada",
+      "spot": 11,
+      "team": 10,
+      "x": 11488.0,
+      "z": 8888.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TACTICAL",
+      "side": "cortex",
+      "spot": 12,
+      "team": 11,
+      "x": 10188.0,
+      "z": 9788.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 13,
+      "team": 12,
+      "x": 7688.0,
+      "z": 10688.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 14,
+      "team": 13,
+      "x": 8688.0,
+      "z": 9288.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 15,
+      "team": 14,
+      "x": 10088.0,
+      "z": 7988.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 16,
+      "team": 15,
+      "x": 11488.0,
+      "z": 7188.0
+    }
+  ],
+  "verdict": "FAIL"
+}

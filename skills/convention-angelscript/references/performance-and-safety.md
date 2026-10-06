@@ -287,6 +287,25 @@ void Walk(Node@ root)
 
 ## Profiling and Optimization Order
 
+For CircuitAI, apparent script cost can include native spatial queries and
+engine callbacks. Measure the registered call as well as the script wrapper.
+Reducing native container work can preserve all role policies; a longer script
+tick interval or fewer emitted orders changes behavior and needs separate
+authorization. D-221's ranged work is an example of the former.
+
+An early `return` in a visitor/function does not necessarily stop the native
+iterator that invoked it. Use a supported existence-query API only when later
+visits have no meaningful effects. Preserve candidate order for scoring ties,
+floating-point accumulation and RNG. If an enqueue/transfer occurs during a
+decision, a census taken earlier in the same frame may already be stale.
+
+Run expensive differential oracles separately from timing captures. Adding
+nested phases reduces their parent's **exclusive** time even when total work
+does not improve; compare its inclusive time across that instrumentation
+change. Never sum a parent with its children. Keep unavailable profiler-off
+readings distinct from zero cost. See the
+[engineering guide](../../../doc/performance/engineering-guide.md).
+
 1. Verify correctness under the interpreter.
 2. Measure the actual hot callback.
 3. Reduce algorithmic complexity.

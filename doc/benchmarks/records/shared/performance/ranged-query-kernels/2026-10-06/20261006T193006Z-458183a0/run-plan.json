@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "benchmark",
+    "map": "native-host",
+    "scenario": "ranged-query-kernels"
+  },
+  "id": "20261006T193006Z-564806cd",
+  "requested": {
+    "seed": 221
+  },
+  "schema": 1
+}

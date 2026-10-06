@@ -34,6 +34,11 @@ def main():
     p.add_argument('--stage-only',action='store_true')
     p.add_argument('--detail-sea',action='store_true',help='Additional staged SEA subphase labels; use in a separate attribution run')
     a=p.parse_args()
+    # Native oracles deliberately repeat old work (and snapshot verification
+    # rebuilds the legacy ally view). Presence, even value "0", enables them.
+    # Reject contaminated timing rather than silently unsetting user intent.
+    if any(name in os.environ for name in ('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT')):
+        p.error('Unset CIRCUIT_VERIFY_RANGED_QUERIES and CIRCUIT_VERIFY_RANGED_SNAPSHOT for timing runs')
     d=storage.allocate('shared','performance','full-match-profile',a.map,'natural',seed=220001)
     print('FULL_MATCH_DIRECTORY='+str(d),flush=True)
     (playtest.REPO/'build-theatres/perf-current.txt').write_text(str(d))
@@ -98,6 +103,7 @@ def main():
     (d/'full-match-checks.json').write_text(json.dumps(checks,indent=2))
     (d/'full-match-manifest.json').write_text(json.dumps({
         'map':name,'seed':220001,'profile':'experimental_hard','native_phases':True,'engine_profiler':True,
+        'ranged_verification_oracles':False,
         'labels':'staged wrappers only; no policy/cadence/command changes','camera':focus,'safety_horizon':a.minutes,
         'ordinary_resources':True,'deathmode':'com','spectator_cleanup':True,'engine_profiler_plan':profiler,'sea_subphases':a.detail_sea,
         'data_hashes':{str(x.relative_to(scripts.parent)):storage.file_hash(x) for x in scripts.parent.rglob('*') if x.is_file() and x.suffix!='.dbg'}},indent=2))

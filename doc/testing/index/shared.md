@@ -1326,6 +1326,8 @@ Fixed idle-constructor populations: isolate census scaling from diverging battle
 
 ### [run_performance_tests](../../../tools/run_performance_tests.sh)
 
+### [run_ranged_performance_tests](../../../tools/run_ranged_performance_tests.sh)
+
 ## Terrain / Checks
 
 ### [mountain_startup](../../../tools/playtest/checks/shared/terrain/mountain_startup.json)

@@ -31,6 +31,7 @@ class FullMatchEvidenceTests(unittest.TestCase):
         self.assertEqual(window['engine_scope_ms_per_frame']['Sim'], 50)
         self.assertEqual(window['engine_scope_ms_per_frame']['Sim::Script'], 10)
         self.assertEqual(window['native_exclusive_ms_per_frame']['script'], .75)
+        self.assertEqual(window['native_inclusive_ms_per_frame']['script'], 5)
         self.assertEqual(window['label_exclusive_ms_per_frame']['builder-dispatch'], 1)
         self.assertEqual(window['all_team_orders'], 200)
         self.assertEqual(window['air_unit_orders'], 60)

@@ -135,7 +135,7 @@ void CRangedEngagement::Disperse(CCircuitUnit* unit)
         CTerrainManager::CorrectPosition(point);
         point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
         if (world.FreeSlot(id,point,policy.spacing) && world.Safe(pos,point,policy.safetyMargin,true)
-            && world.Danger(point,policy.safetyMargin)==0.f
+            && world.DangerSign(point,policy.safetyMargin)==0.f
             && ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) {
             Move(unit,point,true); return;
         }
@@ -366,7 +366,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
             if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) { ++terrainRejected; continue; }
             if(!world.FreeSlot(id,point,spacing)) { ++slotRejected; continue; }
-            if(!world.Safe(pos,point,policy.safetyMargin,true) || world.Danger(point,policy.safetyMargin)>0.f) { ++coverageRejected; continue; }
+            if(!world.Safe(pos,point,policy.safetyMargin,true) || world.DangerSign(point,policy.safetyMargin)>0.f) { ++coverageRejected; continue; }
             if(!world.Trajectory(w,point,c.pos)) { ++fireRejected; continue; }
             if(world.FriendlyLine(w,id,point,c.pos)) { ++fireRejected; continue; }
             const float move=pos.SqDistance2D(point);
@@ -394,7 +394,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Advance, never replace an already closer position with rearward
             // staging. Slot reservations preserve spacing between the hulls.
             if (point.SqDistance2D(c.pos) >= pos.SqDistance2D(c.pos)
-                || !world.FreeSlot(id, point, spacing) || world.Danger(point, policy.safetyMargin) > 0.f
+                || !world.FreeSlot(id, point, spacing) || world.DangerSign(point, policy.safetyMargin) > 0.f
                 || !world.Safe(pos, point, policy.safetyMargin, true)
                 || !ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(), point)) continue;
             const float score = pos.SqDistance2D(point);

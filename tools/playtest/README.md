@@ -972,3 +972,20 @@ verification, not a natural economy or win-rate benchmark. The observer uses
 spectator information solely for assertions and screenshots; AI sensing remains
 ordinary LOS/sonar. Preserve failed fixtures and their exact checks. See
 [design and evidence](../../doc/sea-amphibious-transition.md).
+
+## Ranged optimization verification (D-221)
+
+`bash tools/run_ranged_performance_tests.sh` compares exact ordered geometry
+against the frozen old index. `PERF_BENCH=1` also runs component timings; stop
+games and builds first. These kernels exclude engine callbacks and are not FPS
+benchmarks. Rendered combat fixtures can enable
+`CIRCUIT_VERIFY_RANGED_QUERIES=1` and `CIRCUIT_VERIFY_RANGED_SNAPSHOT=1`; the
+ranged runner records these diagnostics in its pins. Absence of the variables,
+not a value of zero, disables the native oracles.
+
+The full-match performance runner rejects those expensive oracles for timing.
+Its summary now writes `full-match-summary-v2.json`, retaining v1 evidence,
+and reports native inclusive parents separately from exclusive costs. Compare
+inclusive `ranged-snapshot` across the addition of its three child timers.
+The [round-one report](../../doc/reviews/2026-10-06-extra-high-performance-remediation.md)
+links exact tests, played fixtures and natural-game measurement limits.

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-cortrem"
+  },
+  "id": "20261006T192736Z-c18d0659",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}
