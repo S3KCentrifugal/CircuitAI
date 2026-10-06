@@ -410,7 +410,7 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 8a6e6b4efd622c9bf5446786d99351a0728c9f2f; lines: 847 -->
+<!-- source: data/script/src/roles/sea.as; blob: 926c04913f78c5987a48849770c32a7dccc0268a; lines: 869 -->
 
 
 ## Water-control investigation (2026-10-05)
@@ -421,3 +421,19 @@ production-denial and surplus coastal-support mission lifecycle. See the
 source gaps, two played Supreme yard tests, unresolved KI-512 through KI-515,
 and the SEA-only implementation/acceptance plan. This investigation changes
 no gameplay policy; the improved D-202 scout and AA ownership is retained.
+
+## D-209: first-ship mex priority and seaplanes
+
+The first construction ship (Builder's primary identity, not minimum unit ID)
+tries free safe reachable mexes within NearbyMexRadius (2400 elmos from its home
+yard) before native discretionary work. Current construction is completed; once
+local claims are exhausted it returns to the existing converter/economy ladder.
+This applies to both compact and experimental SEA builder paths.
+
+SeaplanesAfterT2 defaults true: a completed T2 yard enables the next platform
+purchase, subject to resource funding. Other new factories wait until a platform
+exists or is queued; a lost T1 yard can be recovered. Platforms reserve reachable
+naval turret capacity, participate in production support scaling, and use native
+production with keepActive so the T2 yard does not suppress their aircraft.
+Missing Legion platform metadata is registered on this SEA instance only.
+See [plan and results](../sea-seaplane-transition.md).

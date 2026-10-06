@@ -208,3 +208,6 @@ step.
 | INV-148 | Ranged friendly snapshot preserves sorted legal IDs, positions and radii from the legacy view. | Optional CIRCUIT_VERIFY_RANGED_SNAPSHOT compares both paths in engine fixtures; disabled in timing runs. | D-207 |
 
 | INV-149 | A ranged policy that forbids advancing on unknown radar never selects such a movement objective. | RangedEngagement checks the chosen objective before generating firing slots; precision closing fixtures forbid the diagnostic. | D-207 |
+
+| INV-150 | SEA's first-ship mex priority returns a mex task; existing construction/player/enemy-reclaim ownership is preserved. | SeaBuild::OpeningMex audits new task type; Supreme observer checks actual first-ship construction. | D-209 |
+| INV-151 | With SeaplanesAfterT2 enabled, SEA admits a planned seaplane platform only after its T2 shipyard finishes, with the configured reachable turret footprint reserved. | SeaLayout::Factory gates completion and support capacity; Supreme observer checks platform completion, aircraft and assistance. | D-209 |

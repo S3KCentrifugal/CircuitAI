@@ -1631,6 +1631,8 @@ namespace Global {
             int ForwardRecheckSeconds = 120;
             int MaxSupportPerBerth = 40;
             int ReservedSupportPerFactory = 20; // compact rear bank, expand as funded demand grows
+            bool SeaplanesAfterT2 = true;
+            float NearbyMexRadius = 2400.0f; // fixed home harbor radius, not an ever-moving expansion centre
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;

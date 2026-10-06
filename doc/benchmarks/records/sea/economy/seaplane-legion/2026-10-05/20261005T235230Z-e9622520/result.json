@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 756,
+      "sha256": "bf730baa6f59dbca6895f8ff67e4eeb93f926f104ab050dacb3e5e48fe6a09b3"
+    },
+    "infolog.txt": {
+      "bytes": 869378,
+      "sha256": "ee2026f623ed0d989f2858acc5f256e9085c95773957a33523b143fc292ebe06"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "5974d4060044455d907f6c08f0677d2a57a11969661e23b1b8377193206a947f"
+    },
+    "report.md": {
+      "bytes": 16323,
+      "sha256": "31e25b3c56678378aed32c333897b0f403ecb02fea3b775ea8616b6f366cd7d4"
+    },
+    "run-inputs.json": {
+      "bytes": 36442,
+      "sha256": "79057b71488b610e195b80f26f257dbd17bb7ffbddcbbeceb7c90767bb855299"
+    },
+    "run-plan.json": {
+      "bytes": 253,
+      "sha256": "c59d5e2b1d6347ab759748822c80ad2ad055e752beedc81a9b370369c72ba955"
+    },
+    "screen_2026-10-05_23-51-31-619.png": {
+      "bytes": 1632725,
+      "sha256": "6f5a34cbea5b989817f5af51e8bcd9bb807504e25e2d5e8b53d39cbd21af264a"
+    },
+    "screen_2026-10-05_23-51-44-904.png": {
+      "bytes": 1656610,
+      "sha256": "eb3aafff6f7f0133dfafcbc42a24dbafd5f663a8af282229b5cc5d8772e85768"
+    },
+    "screen_2026-10-05_23-52-15-892.png": {
+      "bytes": 1680771,
+      "sha256": "1c6ed04db8459c5b266bc2541f16432031f29c404c4af642c94128e8cd891e35"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "3969e14a395390d8005fe673f47a47f4f158fc4ddc90276c11d339975dcfd5d8"
+    },
+    "sea-transition-pins.json": {
+      "bytes": 37095,
+      "sha256": "b15d2ea275a5ff6ec2276a46bc29c1f1a06fdc4edb0103cf93a8b3c637e8ec72"
+    },
+    "staged.json": {
+      "bytes": 292,
+      "sha256": "1fee49f1c4fc9e597bcb51b18a8ab89dbd34b6d5d22e1bb7f2c16311c626cdde"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "0f168cf56d828eab8f44c784871bcc937c93a389b13047e06381221038ca13da"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "seaplane-legion"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T235230Z-e9622520",
+  "last_frame": 18229,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\seaplane-legion\\supreme\\20261005T235034Z-2c733f66\\runs\\20261005T235230Z-e9622520",
+  "reason": "reached 10 min",
+  "recorded_at_utc": "2026-10-05T23:52:30.362500+00:00",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

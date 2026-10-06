@@ -12571,3 +12571,60 @@ complete reattached observation is the same fog game, not another independent
 replicate. API parity checks 303 members with zero findings. These runs do not
 establish the original PvP incident, front-support correctness, FPS improvement
 or a completed SEA fix. No `data/`, native code or profile file was changed.
+
+
+## D-209 - SEA first-ship mex opening and post-T2 seaplane platform
+
+**Decision.** Use Builder's actual first construction ship identity in both SEA
+build paths, attempting native allied-aware reachable mex claims before creating
+optional work. Keep the shared SEA/TACTICAL ladder unchanged. After a completed
+T2 yard, require a seaplane platform before discretionary further factories.
+Reserve its footprint and at least the configured reachable turret capacity.
+Share existing valid support slots and reserve only missing capacity. Retry an
+uncommitted support-starved platform site, not an active building.
+
+**Why / alternatives.** The normal compact path never ran the experimental
+mex-priority branch, and its census selected minimum engine ID rather than the
+first ship. Global ladder changes would affect TACTICAL. A ship exit corridor
+rejects flying-only factories, so platforms use common footprint reservations.
+The first supplied test exposed a permanently short support footprint; requiring
+a second whole twenty-slot bank was rejected. The second test completed the
+platform but produced no aircraft: native switch importance classifies platforms
+as T1 and suppresses their normal combat production after T2. A per-request
+keepActive mechanism retains native weights and resource/viability checks without
+changing shared JSON, metadata or other roles.
+
+**Invariant.** INV-150 preserves mex task identity and existing ownership. INV-151
+requires T2 completion and reachable reserved support at platform admission.
+Existing INV-135 checks actual turret assist reach; INV-138 preserves forward
+factory separation and INV-088 protects allied reservations.
+
+**Files.** [SEA](../data/script/src/roles/sea.as),
+[builder](../data/script/src/roles/sea_build.as),
+[factory policy](../data/script/src/roles/sea_factories.as),
+[economy](../data/script/src/manager/sea_economy.as),
+[layout](../data/script/src/manager/sea_layout.as),
+[settings](../data/script/src/global.as),
+[math](../data/script/src/helpers/sea_math.as),
+[tests](../tests/sea_math_tests.as),
+[native manager](../src/circuit/module/FactoryManager.cpp),
+[header](../src/circuit/module/FactoryManager.h),
+[binding](../src/circuit/script/FactoryScript.cpp),
+[API](angelscript-references.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [SEA reference](roles/sea.md),
+[builder reference](roles/sea_build.md), [factory reference](roles/sea_factories.md),
+[plan/results](sea-seaplane-transition.md),
+[runner](../tools/playtest/run_sea_transition.py),
+[observer](../tools/playtest/widgets/sea_transition_watch.lua),
+[case](../tools/playtest/cases/sea/economy/seaplane-transition.json),
+[checks](../tools/playtest/checks/sea/economy/seaplane-transition.json).
+
+**Verification.** Native DLL built; 304 script API members checked with zero
+findings; ten real-VM SEA policy tests pass. Supreme supplied acceptance passes
+for Armada/Legion compact and Cortex experimental. Ordinary-resource Armada
+experimental passes through aircraft output at 17:47; the compact game never
+reached T2 by thirty minutes (KI-228). Both original supplied failures and the
+failed natural run are retained. This is not an FPS or cross-role gameplay
+benchmark. Evidence and limitations: [plan/results](sea-seaplane-transition.md);
+[natural case](../tools/playtest/cases/sea/economy/seaplane-natural.json),
+[natural checks](../tools/playtest/checks/sea/economy/seaplane-natural.json).

@@ -2,6 +2,23 @@
 #include "../manager/sea_combat.as"
 
 namespace SeaFactories {
+    bool T2Finished(const string &in side) {
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
+        return d !is null && d.count>aiBuilderMgr.GetUnfinishedCount(d);
+    }
+    bool NeedSeaplane(const string &in side) {
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        return d !is null && d.IsAvailable(ai.frame) && SeaMath::SeaplaneNext(Global::RoleSettings::Sea::SeaplanesAfterT2,
+            T2Finished(side),d.count,aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY),d));
+    }
+    bool FactoryAllowed(const CCircuitDef@ d) {
+        if (d is null || !Global::RoleSettings::Sea::SeaplanesAfterT2) return true;
+        const string side=UnitHelpers::GetSideForUnitName(d.GetName());
+        if (UnitHelpers::IsSeaplanePlatform(d.GetName())) return T2Finished(side);
+        // A lost opening yard must remain recoverable. Other discretionary
+        // factory purchases wait for the post-T2 platform commitment.
+        return (UnitHelpers::IsT1Shipyard(d.GetName()) && d.count==0) || !NeedSeaplane(side);
+    }
     int nextForward=0, stableSince=-1;
     AIFloat3 forwardSite(-1,0,-1);
     dictionary draining;

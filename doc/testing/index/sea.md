@@ -246,11 +246,38 @@ Map: selected by runner
 
 Map: selected by runner
 
+## Economy / Checks
+
+### [seaplane-natural](../../../tools/playtest/checks/sea/economy/seaplane-natural.json)
+
+- `expect: aircraft`
+- `expect: mex`
+- `expect: platform`
+- `expect: support`
+- `forbid: errors`
+
+### [seaplane-transition](../../../tools/playtest/checks/sea/economy/seaplane-transition.json)
+
+- `expect: aircraft`
+- `expect: footprint`
+- `expect: mex`
+- `expect: platform`
+- `expect: support`
+- `forbid: errors`
+
 ## Economy / Scenario
 
 ### [migration-natural](../../../tools/playtest/cases/sea/economy/migration-natural.json)
 
 Map: selected by runner
+
+### [seaplane-natural](../../../tools/playtest/cases/sea/economy/seaplane-natural.json)
+
+Map: Supreme Isthmus v1.7
+
+### [seaplane-transition](../../../tools/playtest/cases/sea/economy/seaplane-transition.json)
+
+Map: Supreme Isthmus v1.7
 
 ## Fixtures / Fixture/Observer
 
@@ -279,6 +306,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [sea_harbor_fixture](../../../tools/playtest/widgets/sea_harbor_fixture.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [sea_transition_watch](../../../tools/playtest/widgets/sea_transition_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -422,6 +453,10 @@ Serial paired naval fixtures with pinned controls and independent scorecards.
 ### [run_sea_economy_block](../../../tools/playtest/run_sea_economy_block.py)
 
 Supreme Isthmus physical economy-block acceptance, using real placement tasks.
+
+### [run_sea_transition](../../../tools/playtest/run_sea_transition.py)
+
+Supreme SEA mex/seaplane acceptance with real role decisions (supplied capital).
 
 ### [sea_arena](../../../tools/playtest/sea_arena.py)
 

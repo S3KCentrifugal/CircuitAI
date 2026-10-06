@@ -1859,3 +1859,13 @@ so another priority is preserved. SEA hold-position routes bypass shared
 standoff micro; all other route behavior is unchanged. See
 [SEA patrol policy](../data/script/src/manager/sea_patrol.as) and
 [design and tests](sea-patrol-air-defense.md).
+
+
+### D-209: retain complementary factory production
+
+`IUnitTask@+ aiFactoryMgr.MakeFactoryTask(CCircuitUnit@ factory, bool keepActive)`
+uses the same pending recruit, availability, air-viability and resource checks as
+`DefaultMakeTask`. `keepActive=true` only bypasses suppression of ordinary T1
+combat production after a higher-tier factory exists. It does not alter factory
+metadata, tier counts, weights or other factories. SEA uses it for seaplane
+platforms; all existing callers retain `DefaultMakeTask` with false semantics.

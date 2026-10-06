@@ -6,6 +6,59 @@ namespace SeaBuild {
     dictionary supportRetry;
     int placementLog=-100000;
     IUnitTask@ Wait() { return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)); }
+    IUnitTask@ OpeningMex(CCircuitUnit@ u) {
+        if (u is null || u !is Builder::primaryT1SeaConstructor || !SeaConstructor::IsT1(u.circuitDef)) return null;
+        if (u.task !is null && (u.task.IsEnemyReclaim() || u.task.GetType()==int(Task::Type::PLAYER))) return u.task;
+        IBuilderTask@ current=cast<IBuilderTask>(u.task);
+        if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
+        // A ship's safe reachability query rejects routes across land/other
+        // ponds and accepts reachable coastal mexes. Native owns spot claims,
+        // allied occupancy and duplicate orders; do not duplicate its scan.
+        const AIFloat3 home=Factory::primaryT1Shipyard is null ? Global::Map::StartPos : Factory::primaryT1Shipyard.GetPos(ai.frame);
+        IUnitTask@ task=aiEconomyMgr.EnqueueMexWithin(u,home,Global::RoleSettings::Sea::NearbyMexRadius,0,true);
+        if (task !is null) {
+            IBuilderTask@ mex=cast<IBuilderTask>(task);
+            if (mex is null || mex.GetBuildType()!=int(Task::BuildType::MEX))
+                Invariants::Violation("INV-150",""+u.id,"SEA opening mex priority returned non-mex work");
+            GenericHelpers::LogUtil("[SEA][Mex] first ship="+u.id+" takes nearby metal",1);
+        }
+        return task;
+    }
+    IUnitTask@ Seaplane(CCircuitUnit@ u) {
+        if (u is null || !u.circuitDef.IsMobile()) return null;
+        const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        if (!SeaFactories::NeedSeaplane(side)) return null;
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        if (!u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed())) return null;
+        IUnitTask@ task=SeaLayout::Enabled() ? SeaLayout::Factory(u,d.GetName())
+            : Builder::EnqueueSeaplanePlatform(side,Factory::GetT2ShipyardPos(),SQUARE_SIZE*24,600*SECOND);
+        if (task !is null) {
+            // The compact census resets admissions; with layouts explicitly
+            // disabled native owns the order and its commitment accounting.
+            if (SeaLayout::Enabled()) SeaEconomy::Admit(d,false,true);
+            GenericHelpers::LogUtil("[SEA][Factory] post-T2 seaplane admitted "+d.GetName(),1);
+        }
+        return task;
+    }
+    int SupportFootprint(CCircuitDef@ nano, const AIFloat3 &in centre, int stopAt=0) {
+        if (nano is null) return 0;
+        int count=0;
+        // Placement-only query over reserved slots, never per-unit micro.
+        // Include valid consumed slots: completed turrets still own footprint.
+        for (uint p=0;p<SeaLayout::patches.length();++p) {
+            SeaLayout::Patch@ patch=SeaLayout::patches[p];
+            if (patch.name!=nano.GetName()) continue;
+            for (uint s=0;s<patch.slots.length();++s) {
+                const int state=aiTerrainMgr.GetReservationState(patch.slots[s]);
+                if (state>=0 && state<4 && MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(patch.slots[s]),centre)
+                    <=nano.GetBuildDistance()*nano.GetBuildDistance()) {
+                    ++count;
+                    if (stopAt>0 && count>=stopAt) return count;
+                }
+            }
+        }
+        return count;
+    }
     Task::BuildType PlacementKind(CCircuitDef@ d, int kind) {
         if (d is null) return Task::BuildType(kind);
         const string name=d.GetName(), side=UnitHelpers::GetSideForUnitName(name);
@@ -29,23 +82,12 @@ namespace SeaBuild {
     }
     bool ReserveSupport(CCircuitDef@ nano, const AIFloat3 &in centre, int facing) {
         if (nano is null) return false;
-        const AIFloat3 rear=LayoutHelpers::Offset(centre,facing,0,-224.0f);
-        for (uint p=0; p<SeaLayout::patches.length(); ++p) {
-            SeaLayout::Patch@ patch=SeaLayout::patches[p];
-            if (patch.name==nano.GetName() && patch.slots.length()>0
-                && MapHelpers::SqDist(patch.centre,rear)<300.0f*300.0f) {
-                // A neighbour's bank only satisfies this reservation if every
-                // slot can actually help this factory.
-                bool covers=true;
-                for (uint s=0; s<patch.slots.length(); ++s)
-                    if (MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(patch.slots[s]),centre)
-                        >nano.GetBuildDistance()*nano.GetBuildDistance()) covers=false;
-                if (covers) return false;
-            }
-        }
         const int count=AiMax(1,AiMin(Global::RoleSettings::Sea::MaxSupportPerBerth,
             Global::RoleSettings::Sea::ReservedSupportPerFactory));
-        SeaLayout::PlanPatch(nano,rear,count,300.0f,centre);
+        const int have=SupportFootprint(nano,centre,count);
+        if (have>=count) return false;
+        const AIFloat3 rear=LayoutHelpers::Offset(centre,facing,0,-224.0f);
+        SeaLayout::PlanPatch(nano,rear,count-have,300.0f,centre);
         return true; // one bounded search per tick, including failed attempts
     }
     void Tick() {
@@ -53,11 +95,14 @@ namespace SeaBuild {
         lastTick=ai.frame; SeaEconomy::Tick(); SeaLayout::RefreshGeometry();
         if (SeaLayout::Active()) { SeaCombat::Tick(); SeaFactories::Tick(); }
         const string side=Global::AISettings::Side;
+        CCircuitDef@ platform=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        const bool planAir=Global::RoleSettings::Sea::SeaplanesAfterT2 && platform !is null && platform.IsAvailable(ai.frame);
         if (SeaLayout::Active()) {
-        if (SeaLayout::berths.length()==0) SeaLayout::Add(UnitHelpers::GetT1ShipyardForSide(side),Global::Map::StartPos);
-        if (SeaLayout::berths[0].slot>=0 && int(SeaLayout::berths.length())<Global::RoleSettings::Sea::PreplannedYards) {
-            SeaLayout::Add(UnitHelpers::GetT2ShipyardForSide(side),LayoutHelpers::Offset(SeaLayout::berths[0].centre,SeaLayout::facing,400.0f*float(SeaLayout::berths.length()),0));
-        }
+            if (SeaLayout::berths.length()==0) SeaLayout::Add(UnitHelpers::GetT1ShipyardForSide(side),Global::Map::StartPos);
+            if (SeaLayout::berths[0].slot>=0 && int(SeaLayout::berths.length())<Global::RoleSettings::Sea::PreplannedYards) {
+                const string next=planAir && SeaLayout::berths.length()==2 ? platform.GetName() : UnitHelpers::GetT2ShipyardForSide(side);
+                SeaLayout::Add(next,LayoutHelpers::Offset(SeaLayout::berths[0].centre,SeaLayout::facing,400.0f*float(SeaLayout::berths.length()),0));
+            }
         } else if (SeaLayout::hadFactory && int(SeaLayout::berths.length())<AiMax(1,Global::RoleSettings::Sea::PreplannedYards-1)) {
             // Compact placement needs future harbors too. An unconstrained
             // opening can hug the map edge, leaving no rear capital-eco space.
@@ -67,7 +112,7 @@ namespace SeaBuild {
                 const AIFloat3 anchor=SeaLayout::berths.length()==0
                     ? LayoutHelpers::Offset(harbor,SeaLayout::facing,0,Global::RoleSettings::Sea::FirstPlannedHarborAdvance)
                     : LayoutHelpers::Offset(SeaLayout::berths[0].anchor,SeaLayout::facing,400.0f*float(SeaLayout::berths.length()),0);
-                SeaLayout::Add(UnitHelpers::GetT2ShipyardForSide(side),anchor);
+                SeaLayout::Add(planAir && SeaLayout::berths.length()==1 ? platform.GetName() : UnitHelpers::GetT2ShipyardForSide(side),anchor);
             }
         }
         for (uint i=0; i<SeaLayout::berths.length(); ++i) {
@@ -95,7 +140,7 @@ namespace SeaBuild {
             // Native dormant chain links are deleted without a removed hook.
             // Inspect live unit ownership instead of retaining those pointers.
             if (t !is null && t.buildDef !is null && t.target is null && !SeaEconomy::OwnsTask(t)) {
-                if (ControlledEconomy(t.buildDef) || (SeaLayout::hadFactory && SeaEconomy::Yard(t.buildDef))) {
+                if (ControlledEconomy(t.buildDef) || UnitHelpers::IsSeaplanePlatform(t.buildDef.GetName()) || (SeaLayout::hadFactory && SeaEconomy::Yard(t.buildDef))) {
                     u.CmdStop(); aiBuilderMgr.AbortTask(t); continue;
                 }
             }
@@ -252,7 +297,7 @@ namespace SeaBuild {
         const Task::BuildType kind=PlacementKind(build.buildDef,build.GetBuildType());
         CCircuitDef@ def=build.buildDef;
         const bool controlled=kind==Task::BuildType::ENERGY || kind==Task::BuildType::CONVERT || kind==Task::BuildType::NANO
-            || (kind==Task::BuildType::FACTORY && SeaEconomy::Yard(def));
+            || (kind==Task::BuildType::FACTORY && (SeaEconomy::Yard(def) || UnitHelpers::IsSeaplanePlatform(def.GetName()) || !SeaFactories::FactoryAllowed(def)));
         if (!controlled) return task;
         // Never abandon another worker's order. Native queued work is adopted
         // only when this call is its sole prospective assignee.
@@ -283,7 +328,8 @@ namespace SeaBuild {
         if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)
             && (current.target !is null || SeaEconomy::OwnsTask(current))) return current;
         if (!u.circuitDef.IsMobile()) { IUnitTask@ help=Assist(u); return help is null ? Wait() : help; }
-        IUnitTask@ task=SeaEcoLayout::Support(u); if (task !is null) return task;
+        IUnitTask@ task=Seaplane(u); if (task !is null) return task;
+        @task=SeaEcoLayout::Support(u); if (task !is null) return task;
         // Leave the commander and one construction ship on native expansion.
         // Other T1 ships can spend funded surplus on useful factory power.
         if (SeaConstructor::IsT1(u.circuitDef) && u.id!=SeaEconomy::mexWorker) {
@@ -297,11 +343,18 @@ namespace SeaBuild {
         IBuilderTask@ build=cast<IBuilderTask>(task);
         if (build is null || build.buildDef is null || build.target !is null || SeaEconomy::OwnsTask(task)) return task;
         const Task::BuildType kind=PlacementKind(build.buildDef,build.GetBuildType());
+        if (kind==Task::BuildType::FACTORY && !SeaFactories::FactoryAllowed(build.buildDef)) {
+            // Do not cancel a structure that another builder already started.
+            array<CCircuitUnit@>@ workers=build.GetUnits();
+            for (uint i=0;i<workers.length();++i) if (workers[i] !is null) workers[i].CmdStop();
+            aiBuilderMgr.AbortTask(task);
+            IUnitTask@ platform=Seaplane(u); return platform is null ? Wait() : platform;
+        }
         // Coastal commanders still need land energy and normal mex expansion.
         // Only naval buildings belong to this water layout.
-        const bool yard=SeaEconomy::Yard(build.buildDef);
+        const bool yard=SeaEconomy::Yard(build.buildDef) || UnitHelpers::IsSeaplanePlatform(build.buildDef.GetName());
         SeaLayout::RefreshGeometry();
-        if (yard && !SeaLayout::hadFactory) return task; // opening exception, still honors allied native reservations
+        if (SeaEconomy::Yard(build.buildDef) && !SeaLayout::hadFactory) return task; // opening exception, still honors allied native reservations
         if (!ControlledEconomy(build.buildDef) && !yard) return task;
         const string name=build.buildDef.GetName();
         array<CCircuitUnit@>@ workers=build.GetUnits();
@@ -324,6 +377,7 @@ namespace SeaBuild {
         if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
         if (!u.circuitDef.IsMobile()) { IUnitTask@ t=Assist(u); return t is null ? Wait() : t; }
         IUnitTask@ queued=Resume(u); if (queued !is null) return queued;
+        @queued=Seaplane(u); if (queued !is null) return queued;
         @queued=SeaEcoLayout::Support(u); if (queued !is null) return queued;
         @queued=CapitalAssist(u); if (queued !is null) return queued;
         const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());

@@ -653,7 +653,7 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "95d80fe9d28a51b905b549f61f1870a1fc5d5fd0babde724b2a3d166bf853fc4",
+      "sha256": "9adeaececc7bc4e6fd72178ba658ab76b7383db345ab10bbb54f0533cf6bca3c",
       "execution": "not inferred"
     },
     {
@@ -1724,6 +1724,28 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "2de8120fce1ffc1b89ff02cc83da8d7110417fbc20cf9b035d57ab877a68fa8f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/seaplane-natural.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "seaplane-natural",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "ed5b877a80accaaf966e87bfe5e92ee8eb2070d9fb014ed3bcae0b698b7db257",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/seaplane-transition.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "seaplane-transition",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "71c8e17a82423dbb2fa8526bc9abc0f95a801b337be756ba9f4a226a8096c9c2",
       "execution": "not inferred"
     },
     {
@@ -3180,6 +3202,41 @@
       ],
       "detail": "",
       "sha256": "44eb775df808cb1e225cacf9b3ed6ce89e456313456bc59e861393f65a401807",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/seaplane-natural.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "seaplane-natural",
+      "definitions": [
+        "expect: aircraft",
+        "expect: mex",
+        "expect: platform",
+        "expect: support",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "1df505a7c853190aaabe1a2b32550954d83c1bb67e8084ba357c3f9f9c400834",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/seaplane-transition.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "seaplane-transition",
+      "definitions": [
+        "expect: aircraft",
+        "expect: footprint",
+        "expect: mex",
+        "expect: platform",
+        "expect: support",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "bf730baa6f59dbca6895f8ff67e4eeb93f926f104ab050dacb3e5e48fe6a09b3",
       "execution": "not inferred"
     },
     {
@@ -4855,6 +4912,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/run_sea_transition.py",
+      "domain": "sea",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_sea_transition",
+      "definitions": [],
+      "detail": "Supreme SEA mex/seaplane acceptance with real role decisions (supplied capital).",
+      "sha256": "ac5f06402ecd6b5c4bdf7639b6470e35e181b63d6a20d0d60a8517f453302e6e",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/run_weapon_performance.py",
       "domain": "shared",
       "area": "runners",
@@ -5732,6 +5800,17 @@
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
       "sha256": "16c5c3bed8e46c871410141c298470a7a75cc4ed432caa04341650cd06dc35c4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/widgets/sea_transition_watch.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_transition_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "e7673bee561a2a5cf74cc488e31740d4893b5b8a255b8dbc3f9fc50703cbfe2b",
       "execution": "not inferred"
     },
     {

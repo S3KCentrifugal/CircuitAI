@@ -1,4 +1,9 @@
 void test_sea_policy_boundaries() {
+    Check(!SeaMath::SeaplaneNext(false,true,0,0));
+    Check(!SeaMath::SeaplaneNext(true,false,0,0));
+    Check(SeaMath::SeaplaneNext(true,true,0,0));
+    Check(!SeaMath::SeaplaneNext(true,true,1,0));
+    Check(!SeaMath::SeaplaneNext(true,true,0,1));
     Check(SeaMath::RememberThreat(1000,800,0,900)==800);
     Check(SeaMath::RememberThreat(1000,0,899,900)==1000);
     Check(SeaMath::RememberThreat(1000,0,900,900)==0);

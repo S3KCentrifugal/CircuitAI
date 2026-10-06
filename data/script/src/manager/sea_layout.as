@@ -5,7 +5,7 @@ namespace SeaLayout {
     class Berth {
         string key, name;
         int slot = -1, exitZone = 0, facing = 0, unit = -1;
-        int cursor = 0, nextSearch = 0, oldUnit = -1;
+        int cursor = 0, nextSearch = 0, oldUnit = -1, supportSince = -1;
         bool active = false, exited = false, retired = false;
         AIFloat3 centre, anchor;
     }
@@ -37,6 +37,8 @@ namespace SeaLayout {
         aiTerrainMgr.SetLayoutInt(b.key + ".ax", int(b.anchor.x));
         aiTerrainMgr.SetLayoutInt(b.key + ".az", int(b.anchor.z));
         aiTerrainMgr.SetLayoutInt(b.key + ".tier", UnitHelpers::IsT2Shipyard(b.name) ? 2 : 1);
+        CCircuitDef@ definition=ai.GetCircuitDef(b.name);
+        aiTerrainMgr.SetLayoutInt(b.key + ".def", definition is null ? -1 : int(definition.id));
         aiTerrainMgr.SetLayoutInt("sea.berths", int(berths.length()));
     }
     void SavePatch(uint i) {
@@ -85,6 +87,9 @@ namespace SeaLayout {
         for (int i=0; i<aiTerrainMgr.GetLayoutInt("sea.berths",0); ++i) {
             Berth b; b.key="sea.berth."+i;
             b.name=aiTerrainMgr.GetLayoutInt(b.key+".tier",1)==2 ? UnitHelpers::GetT2ShipyardForSide(side) : UnitHelpers::GetT1ShipyardForSide(side);
+            const int defId=aiTerrainMgr.GetLayoutInt(b.key+".def",-1);
+            CCircuitDef@ saved=defId<0 ? null : ai.GetCircuitDef(defId);
+            if (saved !is null) b.name=saved.GetName(); // old named state retains tier fallback
             b.slot=aiTerrainMgr.GetLayoutInt(b.key+".slot",-1); b.exitZone=aiTerrainMgr.GetLayoutInt(b.key+".exit",0);
             b.facing=aiTerrainMgr.GetLayoutInt(b.key+".facing",facing);
             b.centre=AIFloat3(float(aiTerrainMgr.GetLayoutInt(b.key+".x",0)),0,float(aiTerrainMgr.GetLayoutInt(b.key+".z",0)));
@@ -197,8 +202,18 @@ namespace SeaLayout {
             if (aiBattle.SurfThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat || aiBattle.AirThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat) continue;
             if (b.oldUnit>=0 && !SeaFactories::Safe(p)) continue;
             ++geometryQueries;
-            if (!aiTerrainMgr.PlanNavalBerth(b.key,d,p,f,Global::RoleSettings::Sea::ExitLength,Global::RoleSettings::Sea::ExitMargin)) continue;
-            b.slot=aiTerrainMgr.GetLayoutInt(b.key+".slot",-1); b.exitZone=aiTerrainMgr.GetLayoutInt(b.key+".exit",0);
+            if (UnitHelpers::IsSeaplanePlatform(b.name)) {
+                // Flying products do not require a deep-water ship corridor.
+                // The common reservation still protects allies and yard exits.
+                b.slot=aiTerrainMgr.ReservePersistentBuilding(d,p,f); b.exitZone=0;
+                if (b.slot<0) continue;
+                aiTerrainMgr.SetLayoutInt(b.key+".facing",f);
+                const AIFloat3 snapped=aiTerrainMgr.GetReservationPos(b.slot);
+                aiTerrainMgr.SetLayoutInt(b.key+".x",int(snapped.x)); aiTerrainMgr.SetLayoutInt(b.key+".z",int(snapped.z));
+            } else {
+                if (!aiTerrainMgr.PlanNavalBerth(b.key,d,p,f,Global::RoleSettings::Sea::ExitLength,Global::RoleSettings::Sea::ExitMargin)) continue;
+                b.slot=aiTerrainMgr.GetLayoutInt(b.key+".slot",-1); b.exitZone=aiTerrainMgr.GetLayoutInt(b.key+".exit",0);
+            }
             b.facing=f; b.centre=aiTerrainMgr.GetReservationPos(b.slot);
             if (!opening && !ForwardSite(d,b.centre,f)) {
                 aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
@@ -234,7 +249,7 @@ namespace SeaLayout {
         if (b.active || b.slot<0) return;
         const int state=aiTerrainMgr.GetReservationState(b.slot);
         if (state>=1 && state<=3) { b.active=true; Save(b); return; }
-        if (aiTerrainMgr.IsReservationBuildable(b.slot) && aiTerrainMgr.IsZoneClear(b.exitZone)) return;
+        if (aiTerrainMgr.IsReservationBuildable(b.slot) && (b.exitZone==0 || aiTerrainMgr.IsZoneClear(b.exitZone))) return;
         aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
         b.slot=-1; b.exitZone=0; Save(b);
         GenericHelpers::LogUtil("[SEA][Layout] replan unused berth "+b.key,1);
@@ -242,6 +257,7 @@ namespace SeaLayout {
     IUnitTask@ Factory(CCircuitUnit@ u, const string &in name, int oldUnit=-1, const AIFloat3 &in anchor=AIFloat3(-1,0,-1)) {
         CCircuitDef@ d=ai.GetCircuitDef(name);
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
+        if (!SeaFactories::FactoryAllowed(d)) return null;
         Berth@ b=null;
         for (uint i=0; i<berths.length(); ++i) if (berths[i].name==name && !berths[i].active && !berths[i].retired && berths[i].oldUnit==oldUnit) { @b=berths[i]; break; }
         if (b is null) {
@@ -254,6 +270,26 @@ namespace SeaLayout {
             b.slot=-1; b.exitZone=0; b.cursor=0; Save(b);
         }
         if (!Search(b) || !aiTerrainMgr.CanReachAt(u,b.centre,u.circuitDef.GetBuildDistance())) return null;
+        if (UnitHelpers::IsSeaplanePlatform(name)) {
+            CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(UnitHelpers::GetSideForUnitName(name)));
+            const int required=AiMax(1,AiMin(Global::RoleSettings::Sea::MaxSupportPerBerth,Global::RoleSettings::Sea::ReservedSupportPerFactory));
+            SeaBuild::ReserveSupport(nano,b.centre,b.facing);
+            if (SeaBuild::SupportFootprint(nano,b.centre,required)<required) {
+                if (b.supportSince<0) b.supportSince=ai.frame;
+                // A footprint-only fit is insufficient. Continue the bounded
+                // candidate search if the support bank cannot fit; never move
+                // a committed/active platform or release another factory's pad.
+                if (ai.frame-b.supportSince>=10*SECOND && aiTerrainMgr.GetReservationState(b.slot)==0) {
+                    aiTerrainMgr.ReleasePersistentBuilding(b.slot);
+                    b.slot=-1; b.supportSince=-1; Save(b);
+                }
+                return null;
+            }
+            b.supportSince=-1;
+            if (Global::RoleSettings::Sea::SeaplanesAfterT2 && !SeaFactories::T2Finished(UnitHelpers::GetSideForUnitName(name))) {
+                Invariants::Violation("INV-151",b.key,"SEA seaplane admitted before completed T2 shipyard"); return null;
+            }
+        }
         if (!Opening(b) && !ForwardSite(d,b.centre,b.facing)) {
             Invariants::Violation("INV-138",b.key,"later shipyard is behind economy or faces away from enemy"); return null;
         }

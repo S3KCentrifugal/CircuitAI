@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "7c2a1e33ac84e7821b587da2c5a3f340e9b510cb8fbc05870b7db1e74016bd96",
+    "checks.json": "bf730baa6f59dbca6895f8ff67e4eeb93f926f104ab050dacb3e5e48fe6a09b3",
+    "launched.json": "46796bc5e4bddbbf6316b1f1e89a581aefacf5b9339ff4ce64bef9db7bf7b7f6",
+    "report.md": "835639df349db0049a3b8b14ce370ea62683639f84f6951ef8578527413f99d7",
+    "result.json": "ec00e03ae1a92cada6a1d5c019eeaeb15abbcf244278fb1008f42a0f3a175005",
+    "run-inputs.json": "cad80492863b5eff1b791d009bfc327594644b6a7b975d0fff863c024b48ed10",
+    "run-plan.json": "cb10450c597d7982ec29c892c9fba076c768e3a3f3698407eb00e7f95778f9b9",
+    "screen_2026-10-05_23-36-41-784.png": "f915c34c99db941cfda5ff6cd58d37b58e7b52b56a3641bb05b5d035da26731c",
+    "script.txt": "c1007175a7a0c636beff2608899fb09fd9cbaa53d369aad75e221a3f0c457146",
+    "sea-transition-pins.json": "e8108363289d4c98d3e53ade92beba6665cdee9d1c1701e5bdddbaa03b37ed4d",
+    "staged.json": "74e938be566cf8a010f0131427bb4da5be8ef21e97c697bc089334f5c5ef7285",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\seaplane-armada\\supreme\\20261005T233459Z-a43d4bd7\\runs\\20261005T233655Z-c427166b",
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "seaplane-legion"
+  },
+  "id": "20261005T235034Z-2c733f66",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1
+}

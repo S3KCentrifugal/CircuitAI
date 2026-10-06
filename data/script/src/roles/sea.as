@@ -70,6 +70,13 @@ namespace RoleSea {
 
         Sea_ApplyStartLimits();
 
+        // Missing factory metadata must be registered on this SEA instance,
+        // not by changing shared profiles used by other roles.
+        if (Global::RoleSettings::Sea::SeaplanesAfterT2) {
+            CCircuitDef@ platform=ai.GetCircuitDef("legsplab");
+            if (platform !is null) aiFactoryMgr.RegisterScriptFactory(platform,ai.GetCircuitDef("corplat"));
+        }
+
         // Some experimental profiles omit the Legion advanced shipyard from
         // native factory metadata. SEA's opt-in must register it before a
         // frame exists; otherwise the finished yard never receives a task.
@@ -224,6 +231,8 @@ namespace RoleSea {
 
     IUnitTask@ Sea_FactoryAiMakeTask(CCircuitUnit@ u)
     {
+        if (u !is null && Global::RoleSettings::Sea::SeaplanesAfterT2 && UnitHelpers::IsSeaplanePlatform(u.circuitDef.GetName()))
+            return aiFactoryMgr.MakeFactoryTask(u,true);
         if (SeaLayout::Active()) return SeaFactories::Produce(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
@@ -459,6 +468,7 @@ namespace RoleSea {
     }
 
     bool Sea_AiIsSwitchAllowed(const CCircuitDef@ facDef, float armyCost, int factoryCount, float metalCurrent, bool &out assistRequired) {
+        if (!SeaFactories::FactoryAllowed(facDef)) { assistRequired=false; return false; }
         const bool isOK = (armyCost > 1.2f * facDef.costM * float(factoryCount)) || (metalCurrent > facDef.costM);
         assistRequired = !isOK;
         return isOK;
@@ -482,8 +492,19 @@ namespace RoleSea {
     ******************************************************************************/ 
 
     IUnitTask@ Sea_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        // Run before native default-task creation: it may enqueue discretionary
+        // converters/guards even when the first ship has free reachable metal.
+        IUnitTask@ mex=SeaBuild::OpeningMex(builder);
+        if (mex !is null) return mex;
         if (SeaLayout::Active()) return SeaBuild::MakeTask(builder);
         if (SeaLayout::Enabled()) return SeaBuild::LegacyTask(builder);
+        if (builder !is null && (builder.task is null || (!builder.task.IsEnemyReclaim()
+            && builder.task.GetType()!=int(Task::Type::PLAYER)))) {
+            IBuilderTask@ current=cast<IBuilderTask>(builder.task);
+            if (current is null || current.IsDead() || current.GetBuildType()>=int(Task::BuildType::REPAIR)) {
+                IUnitTask@ platform=SeaBuild::Seaplane(builder); if (platform !is null) return platform;
+            }
+        }
         return Sea_LegacyBuilderTask(builder);
     }
 
@@ -759,14 +780,15 @@ namespace RoleSea {
         }
 
         // If seaplane is desired and not yet queued for this objective, build one when metal income gate is met
-        if (wantsSeaplane && mi >= 30.0f) {
+        if (wantsSeaplane && mi >= 30.0f && (!Global::RoleSettings::Sea::SeaplanesAfterT2 || SeaFactories::T2Finished(unitSide))) {
             string platName = UnitHelpers::GetSeaplanePlatformNameForSide(unitSide);
             int alreadyQueued = ObjectiveHelpers::GetObjectiveBuildingsQueuedCount(currentObjective.id, platName);
             if (alreadyQueued <= 0) {
                 // Attempt to assign and build platform
                 if (!ObjectiveHelpers::TryAssign(currentObjective.id, "SEA_" + label)) return null;
                 AIFloat3 pos = Sea_GetObjectiveBuildPos(currentObjective, Factory::GetPreferredFactoryPos());
-                IUnitTask@ tFac = Builder::EnqueueSeaplanePlatform(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
+                IUnitTask@ tFac = Global::RoleSettings::Sea::SeaplanesAfterT2 ? SeaBuild::Seaplane(builder)
+                    : Builder::EnqueueSeaplanePlatform(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
                 if (tFac is null) { ObjectiveHelpers::Unassign(currentObjective.id); return null; }
                 ObjectiveHelpers::IncrementDefenseQueued(currentObjective.id, platName, 1);
                 // Release assignment so follow-up stages (tidals) can proceed later

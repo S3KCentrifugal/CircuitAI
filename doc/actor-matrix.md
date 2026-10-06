@@ -581,3 +581,12 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Sensor escort | MilitaryManager, SupportTask, RangedWorld | Typed anchor/lease; radar vision ahead and jammer behind; existing fighting squads keep their sensors; no ARTY-to-squad cast. |
 | Carrier child | BAR carrier gadget | Parent controller does not own drone orders, spawning or docking. |
 | Combat evidence | ranged_arena.lua, ranged_benchmark.py | Observer measures actual shots/damage/orders; staged fixture alone owns supplied enemy movement and economic freeze. |
+
+## D-209: SEA opening metal and complementary factories
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| First construction ship | Builder creation/removal/promotion, SeaBuild::OpeningMex, SeaEconomy::Tick, CapitalAssist | Existing primaryT1SeaConstructor identity; current construction/player/enemy reclaim retained; native safe reachable spot claims before optional work. |
+| Seaplane platform | SeaFactories::FactoryAllowed/NeedSeaplane, SeaBuild::Seaplane/LayoutTask/NativeTask, SEA objective handler, SeaLayout::Factory | Completed T2 yard, actual frames plus native queued count; reserved footprint and reachable turret capacity before admission. |
+| Platform support | SeaBuild::ReserveSupport/Support, SeaEconomy::SupportedFactory/SupportTarget, SeaLayout::PlanPatch | Share valid nearby pads, reserve only missing capacity, reject unreachable slots; purchase follows actual two-resource workload. |
+| Aircraft production | RoleSea::Sea_FactoryAiMakeTask, native MakeFactoryTask | Per-request keepActive for SEA platforms only; preserve normal roster, viability, resource and task lifecycle checks. |

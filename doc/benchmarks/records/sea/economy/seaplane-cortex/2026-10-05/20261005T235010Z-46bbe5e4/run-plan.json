@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "seaplane-cortex"
+  },
+  "id": "20261005T234815Z-223643fa",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1
+}

@@ -98,4 +98,19 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: 44681c11a012e0f2d58d31e74d3ad29d0e773e76; lines: 419 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: 1a2adc5ba84836673a1a0962355f2817e9dd6257; lines: 473 -->
+
+## D-209 follow-up
+
+OpeningMex now runs before either builder path creates a native fallback. Its
+worker is the actual first construction ship tracked by Builder lifecycle. This
+corrects the compact path's converter-before-mex decision and the experimental
+census's minimum-ID selection. Native allied-aware spot claims and ship-area
+reachability remain authoritative; the 2400-elmo home radius is configurable.
+
+Seaplane transitions precede optional economic jobs once a T2 yard finishes.
+Platforms now use SeaLayout persistent footprints and require the configured
+ReservedSupportPerFactory slots in range before admission. Existing valid slots
+count; only the shortfall is reserved. A support-starved unclaimed platform site
+continues its bounded placement search after ten seconds. Ordinary shipyards
+retain product-aware ship exits; flying factories reserve no hull corridor.

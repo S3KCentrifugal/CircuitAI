@@ -4672,7 +4672,8 @@ bypassing its damage/AA/escort checks.
 ### KI-227 - SEA staged layout does not yet own the complete naval district
 
 **Problem.** The opt-in D-188 controller reserves ordinary shipyards and their
-straight exits. Auxiliary yards/seaplane platforms still use native placement;
+straight exits. Auxiliary yards still use native placement; D-209 now reserves
+seaplane footprints and reachable support capacity (see sea-seaplane-transition.md);
 advanced economy groups are allocated on demand. Broad transit/turning networks,
 separate pond ownership, true save/load and explicit AIR/TACTICAL cooperation
 have not met the approved migration acceptance matrix.
@@ -4703,6 +4704,17 @@ seeds and side swaps, including censored survival, before default rollout.
 **Verification.** Retained original raw games, scores and screenshots in D-188
 [results](sea-layout-migration-results.md). Default remains false. Single-run
 best timings and smoke PASS verdicts do not close this issue.
+
+**D-209 observation (2026-10-05).** The ordinary-resource compact Supreme
+run reached 19 mexes but no T2 yard by thirty minutes, so the new post-T2
+platform transition was not exercised. At 29:00, +56.4 metal income coexisted
+with only 42/5050 stored metal. Although the shared ladder accepts an 800-metal
+setting, its helper disables that bank check (mcOk=true); low storage alone
+cannot explain the missing T2 order. Native MEX/GEO/ENERGY tasks precede that
+ladder. The run does not isolate task precedence, downstream admission or
+construction access and is not a regression comparison.
+Keep the failed natural check and resolve timing with explicit gate/task
+telemetry and paired controls; see [seaplane results](sea-seaplane-transition.md).
 
 ### KI-229 - SEA same-tick funding can reserve accepted capital twice
 

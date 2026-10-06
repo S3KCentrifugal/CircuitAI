@@ -55,7 +55,7 @@ namespace SeaEconomy {
     bool SupportedFactory(const CCircuitDef@ d) {
         if (d is null) return false;
         const string name=d.GetName();
-        return Yard(d) || name=="armamsub" || name=="coramsub" || name=="legamphlab"
+        return Yard(d) || UnitHelpers::IsSeaplanePlatform(name) || name=="armamsub" || name=="coramsub" || name=="legamphlab"
             || UnitHelpers::IsFloatingHoverPlant(name) || UnitHelpers::IsWaterGantry(name);
     }
     CCircuitDef@ Product(int factoryId) {
@@ -85,7 +85,9 @@ namespace SeaEconomy {
             // framed work only through the currently owned, validated units.
             if (progress<1.0f) { committedM+=d.costM*(1-progress); committedE+=d.costE*(1-progress); }
             if (progress>=1.0f) Increment(finished,d.GetName());
-            if (progress>=1 && SeaConstructor::IsT1(d) && (mexWorker<0 || u.id<mexWorker)) mexWorker=u.id;
+            // Engine unit IDs are not creation order. Share the role's first
+            // construction ship identity; builder lifecycle promotes on loss.
+            if (progress>=1 && u is Builder::primaryT1SeaConstructor) mexWorker=u.id;
             if (u.GetProducerId()>=0 && progress<1.0f) {
                 busy.set(""+u.GetProducerId(),true);
                 products.set(""+u.GetProducerId(),int(d.id));
@@ -102,7 +104,7 @@ namespace SeaEconomy {
             }
             // Re-associate completed yards after reload, transfer or frame creation.
             int64 berthIndex=-1;
-            if (Yard(d) && berthSites.get(SiteKey(d.GetName(),u.GetPos(ai.frame)),berthIndex)) {
+            if ((Yard(d) || UnitHelpers::IsSeaplanePlatform(d.GetName())) && berthSites.get(SiteKey(d.GetName(),u.GetPos(ai.frame)),berthIndex)) {
                 SeaLayout::Berth@ berth=SeaLayout::berths[uint(berthIndex)];
                 if (berth.unit!=u.id) { berth.unit=u.id; berth.active=true; SeaLayout::Save(berth); }
                 berthProducers.set(""+u.id,berthIndex);

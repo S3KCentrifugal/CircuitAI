@@ -1,5 +1,8 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    bool SeaplaneNext(bool enabled, bool t2Finished, int platforms, int queued) {
+        return enabled && t2Finished && platforms==0 && queued==0;
+    }
     // Centre-out columns keep existing members' slots when reinforcements
     // arrive. Fixed columns avoid a sqrt(N) grid reshuffle at every birth/death.
     int SpreadIndex(int index) { return index==0 ? 0 : (index%2==1 ? (index+1)/2 : -index/2); }

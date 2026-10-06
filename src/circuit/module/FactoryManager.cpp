@@ -1560,6 +1560,11 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 
 IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
 {
+	return MakeFactoryTask(unit, false);
+}
+
+IUnitTask* CFactoryManager::MakeFactoryTask(CCircuitUnit* unit, bool keepActive)
+{
 	const IUnitTask* task = nullptr;
 
 	if (unit->GetCircuitDef()->IsAssist()) {
@@ -1575,14 +1580,14 @@ IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
 		}
 
 		if (task == nullptr) {
-			task = CreateFactoryTask(unit);
+			task = CreateFactoryTask(unit, keepActive);
 		}
 	}
 
 	return const_cast<IUnitTask*>(task);  // if nullptr then continue to Wait (or Idle)
 }
 
-IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit)
+IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActive)
 {
 	if (unit->GetCircuitDef()->GetMobileId() < 0) {
 		if (circuit->GetEnemyManager()->IsAirValid()) {
@@ -1597,7 +1602,11 @@ IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit)
 		}
 	}
 
-	const bool isActive = (noT1FacCount <= 0) || !IsT1Factory(unit->GetCircuitDef());
+	// Script may retain a complementary low-tier factory after teching.
+	// This per-request lever changes no metadata or global tier counts. Keep
+	// normal availability, AA viability, resource and pending-task checks.
+	// O(1) policy input: no extra unit scan, cache or engine command.
+	const bool isActive = keepActive || (noT1FacCount <= 0) || !IsT1Factory(unit->GetCircuitDef());
 
 	IUnitTask* task = UpdateBuildPower(unit, isActive);
 	if (task != nullptr) {
