@@ -512,6 +512,7 @@ void CFactoryManager::ReadConfig()
 			boolean("prefer_screen", policy.preferScreen);
 			boolean("allow_radar", policy.allowRadar);
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
+			boolean("stage_when_blocked", policy.stageWhenBlocked);
 			if (valid) cdef->SetRangedPolicy(policy);
 			else {
 				circuit->LOG("CONFIG %s: %s has invalid ranged policy; ranged disabled", cfgName.c_str(), defName.c_str());
@@ -537,6 +538,14 @@ void CFactoryManager::ReadConfig()
 		cdef->SetOn(behaviour.get("on", true).asBool());
 		cdef->SetBuildAllowed(behaviour.get("build", true).asBool());
 		cdef->SetStandoff(std::clamp(behaviour.get("standoff", 0.f).asFloat(), 0.f, 0.95f));
+        const auto& targetCost = behaviour["target_min_cost"];
+        // Validate once at profile load. The zero default preserves every
+        // unconfigured unit, including other aircraft and all land units.
+        if (!targetCost.isNull()) {
+            if (targetCost.isNumeric() && std::isfinite(targetCost.asFloat()) && targetCost.asFloat() >= 0.f)
+                cdef->SetTargetMinCost(targetCost.asFloat());
+            else circuit->LOG("CONFIG %s: %s invalid target_min_cost", cfgName.c_str(), defName.c_str());
+        }
 
 		const Json::Value& reload = behaviour["reload"];
 		if (!reload.isNull()) {
@@ -887,7 +896,17 @@ int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 {
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
-		DoneTask(iter->second);
+		CRecruitTask* task = static_cast<CRecruitTask*>(iter->second);
+		if (task->IsRepeat()) {
+			// One persistent owner, one engine repeat queue. Finishing an offspring
+			// must not call Cancel(), which clears that queue (D-119/D-216).
+			// Erase before changing the borrowed target: the next UnitCreated
+			// installs its own mapping. Ordinary recruits keep their old lifecycle.
+			unfinishedUnits.erase(iter);
+			task->SetTarget(nullptr);
+		} else {
+			DoneTask(task);
+		}
 	}
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
@@ -934,6 +953,7 @@ int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 CRecruitTask* CFactoryManager::Enqueue(const TaskS::SRecruitTask& ti)
 {
 	CRecruitTask* task = new CRecruitTask(this, ti.priority, ti.buildDef, ti.position, ti.type, ti.radius);
+	task->SetRepeat(ti.repeat);
 	factoryTasks.push_back(task);
 	updateTasks.push_back(task);
 	TaskAdded(task);

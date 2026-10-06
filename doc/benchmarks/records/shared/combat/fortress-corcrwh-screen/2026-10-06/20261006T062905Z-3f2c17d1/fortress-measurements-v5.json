@@ -1,0 +1,107 @@
+{
+  "case": "fortress-corcrwh-screen",
+  "variant": "ranged",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-corcrwh-screen\\glitters\\20261006T062801Z-58a2bbde",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armstump:weapon=422": 10347.0,
+    "armstump:weapon=420": 3709.0,
+    "corgol:weapon=422": 10177.0,
+    "corgol:weapon=420": 4983.0
+  },
+  "first_damage_seconds": {
+    "armstump": 12.333333333333334,
+    "corgol": 15.5
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "none": 32,
+    "corgol": 6,
+    "armstump": 6
+  },
+  "sampled_shot_targets": {
+    "3:armstump": 30,
+    "4:armstump": 34,
+    "5:armstump": 36,
+    "6:armstump": 33,
+    "1:armstump": 22,
+    "3:corgol": 27,
+    "4:corgol": 30,
+    "5:corgol": 16,
+    "6:corgol": 27,
+    "1:corgol": 25,
+    "5:none": 3,
+    "6:none": 1,
+    "3:none": 1
+  },
+  "damage_first_30_seconds": {
+    "armstump:weapon=422": 2439.0,
+    "armstump:weapon=420": 1513.0,
+    "corgol:weapon=422": 8535.0,
+    "corgol:weapon=420": 3966.0
+  },
+  "deaths": [
+    {
+      "seconds": 16.733333333333334,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 21.9,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 26.866666666666667,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 32.8,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 36.13333333333333,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 38.2,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 40.63333333333333,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 42.5,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 45.166666666666664,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 48.166666666666664,
+      "unit": "armstump",
+      "team": 1
+    }
+  ],
+  "first_active_priority": "corgol",
+  "criteria": {
+    "enemy_damage": true,
+    "survival": true,
+    "heavy_damage": true,
+    "active_heavy_priority": true,
+    "first_priority_heavy": true
+  },
+  "defense_group_targets": [],
+  "first_defense_assignment": "none",
+  "enemy_damage": 29216.0,
+  "passed": true
+}

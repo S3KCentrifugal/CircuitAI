@@ -1,5 +1,16 @@
 # SEA construction migration
 
+D-217 routes `OpeningMex` through the SEA-only `SeaExpansion` controller by
+default. This runs before either economic path and before optional factory,
+converter or assistance work. The old fixed-home opening is retained when
+`ExpandMexClusters` is disabled and on metal maps. `Leave` resets frontier
+state. Existing construction remains owned until completion unless the periodic
+danger response detaches an exposed worker; unfinished frames stay recoverable.
+Near home, the old 2400-elmo opening query runs before the wider frontier query:
+native task adoption otherwise puts distant pending mex work ahead of unclaimed
+nearby metal. Fortification follows the local opening.
+See [design and evidence](../reviews/2026-10-06-sea-mex-expansion.md).
+
 `SeaBuild::MakeTask` is enabled by `Sea::ExperimentalBuild`, still default off.
 Default-on `Sea::CompactEconomy` uses `LegacyTask` around the old role decisions
 with the same layout owner. `PlacementKind` recognizes naval definitions even
@@ -98,7 +109,7 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: d5c24d306d5128d4cb7373df0b0688bd58fdafdb; lines: 493 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: ca58e1a12168f54e5ea88865582c6be87d256104; lines: 497 -->
 
 ## D-209 follow-up
 
@@ -132,3 +143,9 @@ The periodic generic turret-footprint search skips factories whose persistent
 reservation is owned by SeaInvasion. That controller plans the smaller coastal
 footprint; Support still adds income-justified build power as before. Ordinary
 or donated amphibious factories retain generic support planning.
+
+`Leave` also releases SEA's coastal fallback ownership. During a lost-sea
+episode the shared builder dispatch asks `SeaCoast::Build` before spam and this
+naval builder ladder. Pinned coastal projects retain the native task lifecycle;
+land nanos use a local unfinished-product assist path because naval factory
+support lists intentionally exclude bot labs. See [D-219](../reviews/2026-10-06-sea-coastal-fallback.md).

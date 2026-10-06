@@ -1,5 +1,15 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    bool ExpansionNeedsEscort(float ownDistanceSq,float enemyDistanceSq) {
+        return ownDistanceSq>enemyDistanceSq*.36f; // beyond the safe homeward part of the sea
+    }
+    bool ExpansionThreatSafe(float threat,float maximum) {
+        return threat>=0 && maximum>=0 && threat<=maximum; // NaN fails closed
+    }
+    bool ExpansionFortFunded(float metal,float incomeM,float energy,float incomeE,float costM,float costE) {
+        return costM>0 && costE>=0 && incomeM>0 && incomeE>0
+            && metal+incomeM*10>=costM+50 && energy+incomeE*10>=costE;
+    }
     bool ReplanInvasionSlot(int state, bool footprintClear, bool exitClear) {
         // Missing/exhausted slots have no live frame. Claimed or started slots
         // remain owned by their task even if the buildability probe says no.

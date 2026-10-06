@@ -1,0 +1,9 @@
+{
+  "dll": "build-theatres\\d216-final\\SkirmishAI.dll",
+  "map": "glacial",
+  "side": "legion",
+  "mode": "lost",
+  "profile": "experimental_terrible",
+  "minutes": 25.0,
+  "stage_only": false
+}

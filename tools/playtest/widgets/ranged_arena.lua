@@ -8,7 +8,9 @@ local occupied={}
 local function site(g,x,z)
     local def=UnitDefNames[g.unit]
     if not def then log("ERROR missing_unit="..g.unit);return end
-    local mobile=UnitDefs[def.id].canMove
+    -- BAR factories expose canMove for their command queue, but are immobile.
+    -- A movement test always rejects them; validate their building footprint.
+    local mobile=UnitDefs[def.id].canMove and not UnitDefs[def.id].isFactory and (UnitDefs[def.id].speed or 0)>0
     local reference=Spring.GetGroundHeight(g.position[1],g.position[2])
     -- Supplied units must not begin on isolated mountain tops. Validate the
     -- loaded movement footprint and same-height approach before spawning;
@@ -63,16 +65,30 @@ end
 function widget:UnitCreated(id,def,team,builder)
     if pending and team==pending.g.team and UnitDefs[def].name==pending.g.unit then
         tracked[id]={team=team,def=def};log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name.." x="..math.floor(pending.x).." z="..math.floor(pending.z));pending=nil
-    elseif builder and tracked[builder] then
-        tracked[id]={team=team,def=def,child=true};log("child id="..id.." parent="..builder.." unit="..UnitDefs[def].name)
+    elseif builder and (tracked[builder] or (cfg.builders and team==0)) then
+        tracked[id]={team=team,def=def,child=true,parent=builder};log("child id="..id.." parent="..builder.." unit="..UnitDefs[def].name)
     end
 end
 function widget:UnitDestroyed(id,def,team)
     if tracked[id] then log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil end
 end
+function widget:UnitFinished(id,def,team)
+    if cfg.production and tracked[id] then
+        log("finished id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost)
+    end
+end
 function widget:GameFrame(f)
     if f==150 then Spring.SendCommands("cheat 1");log("ready") end
     if f<300 then return end
+    if cfg.drop_energy_after_seconds and not cfg.energy_dropped and f>=cfg.drop_energy_after_seconds*30 then
+        cfg.energy_dropped=true
+        local ids={}
+        for id,u in pairs(tracked) do
+            if u.team==0 and (UnitDefs[u.def].name=="armafus" or UnitDefs[u.def].name=="armmmkr") then ids[#ids+1]=id end
+        end
+        Spring.SelectUnitArray(ids,false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
+        log("fixture_energy_removed count="..#ids)
+    end
     for _,g in ipairs(cfg.groups) do
         if not g.queued and f>=(g.after_seconds or 10)*30 then
             g.queued=true
@@ -97,7 +113,14 @@ function widget:GameFrame(f)
                 local visibility=Spring.GetUnitLosState(id,0,false)
                 if visibility and (visibility.los or visibility.radar) then seen[id]=f;log("detected id="..id.." unit="..d.name) end
             end
-            if u.team==0 and d.canMove and not u.child then
+            if cfg.trace_spam and u.team==0 and d.isFactory then
+                local states=Spring.GetUnitStates(id) or {}
+                local commands=Spring.GetFactoryCommands(id,-1) or {}
+                local builds=0
+                for _,c in ipairs(commands) do if c.id<0 then builds=builds+1 end end
+                log("factory id="..id.." unit="..d.name.." repeat="..tostring(states["repeat"] or false).." builds="..builds.." building="..tostring(Spring.GetUnitIsBuilding(id) or -1))
+            end
+            if u.team==0 and d.canMove and (not u.child or cfg.observe_children) then
                 for index,w in ipairs(d.weapons or {}) do
                     local reload=Spring.GetUnitWeaponState(id,index,"reloadFrame")
                     local key=id..":"..index
@@ -117,11 +140,21 @@ function widget:GameFrame(f)
                     local health=Spring.GetUnitHealth(id)
                     local host=Spring.GetUnitRulesParam(id,"carrier_host_unit_id") or -1
                     log("unit id="..id.." unit="..d.name.." x="..math.floor(x).." z="..math.floor(z).." hp="..math.floor(health).." cloak="..tostring(Spring.GetUnitIsCloaked(id) or false).." target="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1).." command="..tostring(Spring.GetUnitCurrentCommand(id) or -1).." host="..host)
+                    if cfg.trace_spam and u.parent then
+                        local commands=Spring.GetUnitCommands(id,-1) or {}
+                        local last=commands[#commands]
+                        log("lane id="..id.." parent="..u.parent.." count="..#commands.." endcmd="..tostring(last and last.id or -1).." endx="..tostring(last and last.params[1] or -1).." endz="..tostring(last and last.params[3] or -1))
+                    end
                 end
             end
         end
     end
     if f%300==0 then
+        if cfg.trace_spam then
+            local m,ms,mp,mi,me=Spring.GetTeamResources(0,"metal")
+            local e,es,ep,ei,ee=Spring.GetTeamResources(0,"energy")
+            log(string.format("economy metal=%.1f storage=%.1f income=%.1f expense=%.1f energy=%.1f eincome=%.1f eexpense=%.1f",m,ms,mi,me,e,ei,ee))
+        end
         for team,c in pairs(orders) do log("orders team="..team.." total="..c.all.." nonlua="..c.nonlua.." lua="..c.lua) end
         log("render fps="..Spring.GetFPS())
     end

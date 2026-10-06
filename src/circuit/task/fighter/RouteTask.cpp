@@ -131,8 +131,10 @@ AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 	AIFloat3 out(p.x + (-dir.z / len) * off, p.y, p.z + (dir.x / len) * off);
 	CTerrainManager::CorrectPosition(out);
 	// Formation offsets can cross a coast even when the centre route is legal.
-	// SEA collapses that member to the route, rather than issuing a cliff order.
-	if (seaControl && !manager->GetCircuit()->GetTerrainManager()->CanMoveToPos(unit->GetArea(), out)) return p;
+	// Both land spam and SEA collapse that member to the route instead of
+	// issuing an unreachable cliff/coast order. This uses the existing movement
+	// area lookup, not a new path query; aircraft have no restricted area.
+	if (!manager->GetCircuit()->GetTerrainManager()->CanMoveToPos(unit->GetArea(), out)) return p;
 	return out;
 }
 

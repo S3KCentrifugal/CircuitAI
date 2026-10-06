@@ -34,6 +34,25 @@ the match is running (owner instruction, 2026-10-01). Headless runs remain usefu
 for automated checks, but cannot provide visual evidence. Preserve screenshots
 with the report and distinguish observations from log-derived conclusions.
 
+For the Metal Plate / Glacial 8v8 performance workload, run **serially**:
+
+```powershell
+python tools/playtest/run_full_match_performance.py --map metal-plate --dll <pinned-dll>
+python tools/playtest/run_full_match_performance.py --map glacial --dll <pinned-dll>
+python tools/playtest/analyze_full_match_performance.py <completed-game-dir>
+python tools/playtest/summarize_full_match_performance.py <completed-game-dir>
+```
+
+The runner stages ordinary-resource games and timing wrappers without editing
+production policy. It records real GameOver separately from the safety horizon
+or an explicitly stopped stress observation. Glacial has normal-speed engine
+profiler-on/off/on windows at minutes 29-34; native labels remain enabled.
+Engine AI/scope values during profiler-off windows are invalid, not zero CPU.
+Use `--detail-sea` only for a separate attribution run, and `--live` on the
+analyzers for unpublished progress. Preserve the original checks/verdict and
+copy completed analysis JSON into its archive before the first immutable
+`storage.py publish`. See the [investigation and limitations](../../doc/reviews/2026-10-06-metal-plate-glacial-performance.md).
+
 D-179 radar/compact-factory fixture: allocate an AIR/combat supplied directory,
 then `prepare_air_recon_check.py --dir <dir> --dll <pinned-dll> --map glacial`
 (or `supreme --clusters`). Launch rendered and watch with

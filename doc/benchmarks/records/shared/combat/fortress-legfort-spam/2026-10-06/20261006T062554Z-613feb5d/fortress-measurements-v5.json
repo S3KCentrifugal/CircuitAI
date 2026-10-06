@@ -1,0 +1,109 @@
+{
+  "case": "fortress-legfort-spam",
+  "variant": "ranged",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-legfort-spam\\glitters\\20261006T062450Z-89ecc95e",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armflea:weapon=948": 593.0,
+    "armflea:weapon=947": 680.0,
+    "legfort:weapon=948": 108.0,
+    "legfort:weapon=947": 30.0
+  },
+  "first_damage_seconds": {
+    "armflea": 12.266666666666667,
+    "legfort": 19.566666666666666
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "none": 44
+  },
+  "sampled_shot_targets": {
+    "3:armflea": 10,
+    "4:armflea": 7,
+    "5:armflea": 10,
+    "1:armflea": 7,
+    "2:armflea": 7,
+    "1:none": 1,
+    "2:none": 2,
+    "4:none": 2,
+    "3:none": 1,
+    "5:none": 1
+  },
+  "damage_first_30_seconds": {
+    "armflea:weapon=948": 593.0,
+    "armflea:weapon=947": 680.0,
+    "legfort:weapon=948": 108.0,
+    "legfort:weapon=947": 30.0
+  },
+  "deaths": [
+    {
+      "seconds": 12.366666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 12.733333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.5,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.033333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.333333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.5,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.633333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.566666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 16.9,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 17.6,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 18.5,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 19.9,
+      "unit": "armflea",
+      "team": 1
+    }
+  ],
+  "first_active_priority": null,
+  "criteria": {
+    "enemy_damage": true,
+    "survival": true
+  },
+  "defense_group_targets": [],
+  "first_defense_assignment": "none",
+  "enemy_damage": 1273.0,
+  "passed": true
+}

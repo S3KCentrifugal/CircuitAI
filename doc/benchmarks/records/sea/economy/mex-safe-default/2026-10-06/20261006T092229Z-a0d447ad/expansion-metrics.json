@@ -1,0 +1,113 @@
+{
+  "teams": {
+    "0": {
+      "frame": 27900,
+      "mexes": 15,
+      "beyond2400": 3,
+      "furthest": 2861
+    },
+    "1": {
+      "frame": 27900,
+      "mexes": 7,
+      "beyond2400": 2,
+      "furthest": 3684
+    },
+    "2": {
+      "frame": 27900,
+      "mexes": 17,
+      "beyond2400": 11,
+      "furthest": 4505
+    },
+    "3": {
+      "frame": 27900,
+      "mexes": 20,
+      "beyond2400": 9,
+      "furthest": 3159
+    },
+    "4": {
+      "frame": 27900,
+      "mexes": 5,
+      "beyond2400": 0,
+      "furthest": 2192
+    },
+    "5": {
+      "frame": 27900,
+      "mexes": 17,
+      "beyond2400": 9,
+      "furthest": 4646
+    },
+    "6": {
+      "frame": 27900,
+      "mexes": 0,
+      "beyond2400": 0,
+      "furthest": 0
+    }
+  },
+  "constructor_losses": 0,
+  "loss_evidence": [],
+  "completed_naval_defenses": 11,
+  "defense_evidence": [
+    "[t=00:01:00.916571][f=0007760] [SeaExpansionWatch] finished team=5 id=16523 def=cortl builder=nil x=9944 z=4504",
+    "[t=00:01:03.427003][f=0008663] [SeaExpansionWatch] finished team=3 id=30757 def=legtl builder=nil x=9912 z=4408",
+    "[t=00:01:04.292774][f=0008975] [SeaExpansionWatch] finished team=2 id=20133 def=cortl builder=nil x=4632 z=4760",
+    "[t=00:01:09.315482][f=0010429] [SeaExpansionWatch] finished team=5 id=7388 def=cortl builder=nil x=9448 z=5864",
+    "[t=00:01:12.191481][f=0011456] [SeaExpansionWatch] finished team=2 id=2003 def=cortl builder=nil x=4840 z=5656",
+    "[t=00:01:15.417980][f=0012582] [SeaExpansionWatch] finished team=2 id=20549 def=corfrt builder=nil x=4688 z=5808",
+    "[t=00:01:40.329539][f=0020941] [SeaExpansionWatch] finished team=2 id=2206 def=cortl builder=nil x=6264 z=4792",
+    "[t=00:01:41.434304][f=0021321] [SeaExpansionWatch] finished team=2 id=20531 def=corfrt builder=nil x=6048 z=4736",
+    "[t=00:01:48.899525][f=0023944] [SeaExpansionWatch] finished team=0 id=31908 def=armtl builder=nil x=1432 z=3928",
+    "[t=00:01:50.712113][f=0024547] [SeaExpansionWatch] finished team=2 id=15628 def=corfhlt builder=nil x=6176 z=4656",
+    "[t=00:01:57.357910][f=0026345] [SeaExpansionWatch] finished team=4 id=31623 def=armtl builder=nil x=12824 z=4040"
+  ],
+  "completed_forward_forts": 9,
+  "forward_fort_evidence": [
+    "[t=00:01:00.916571][f=0007760] [SeaExpansionWatch] finished team=5 id=16523 def=cortl builder=nil x=9944 z=4504",
+    "[t=00:01:03.427003][f=0008663] [SeaExpansionWatch] finished team=3 id=30757 def=legtl builder=nil x=9912 z=4408",
+    "[t=00:01:04.292774][f=0008975] [SeaExpansionWatch] finished team=2 id=20133 def=cortl builder=nil x=4632 z=4760",
+    "[t=00:01:09.315482][f=0010429] [SeaExpansionWatch] finished team=5 id=7388 def=cortl builder=nil x=9448 z=5864",
+    "[t=00:01:12.191481][f=0011456] [SeaExpansionWatch] finished team=2 id=2003 def=cortl builder=nil x=4840 z=5656",
+    "[t=00:01:15.417980][f=0012582] [SeaExpansionWatch] finished team=2 id=20549 def=corfrt builder=nil x=4688 z=5808",
+    "[t=00:01:40.329539][f=0020941] [SeaExpansionWatch] finished team=2 id=2206 def=cortl builder=nil x=6264 z=4792",
+    "[t=00:01:41.434304][f=0021321] [SeaExpansionWatch] finished team=2 id=20531 def=corfrt builder=nil x=6048 z=4736",
+    "[t=00:01:50.712113][f=0024547] [SeaExpansionWatch] finished team=2 id=15628 def=corfhlt builder=nil x=6176 z=4656"
+  ],
+  "withdrawal_orders": 7,
+  "measured_withdrawals": [
+    {
+      "frame": 15935,
+      "unit": 2817,
+      "homeward_elmos": 1509,
+      "end_frame": 16800
+    },
+    {
+      "frame": 15935,
+      "unit": 3682,
+      "homeward_elmos": 1428,
+      "end_frame": 16800
+    },
+    {
+      "frame": 17852,
+      "unit": 13026,
+      "homeward_elmos": 1717,
+      "end_frame": 18750
+    },
+    {
+      "frame": 21335,
+      "unit": 2817,
+      "homeward_elmos": 1494,
+      "end_frame": 22200
+    },
+    {
+      "frame": 21635,
+      "unit": 3682,
+      "homeward_elmos": 1755,
+      "end_frame": 22500
+    },
+    {
+      "frame": 24035,
+      "unit": 2817,
+      "homeward_elmos": 1247,
+      "end_frame": 24900
+    }
+  ]
+}

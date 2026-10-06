@@ -1,0 +1,89 @@
+{
+  "case": "fortress-legfort-mixed",
+  "variant": "baseline",
+  "directory": "build-theatres\\games\\shared\\combat\\fortress-legfort-mixed\\glitters\\20261006T060308Z-8092b960",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armflea:weapon=948": 739.0,
+    "armflea:weapon=947": 463.0,
+    "corgol:weapon=947": 6018.0,
+    "corgol:weapon=948": 9521.0
+  },
+  "first_damage_seconds": {
+    "armflea": 13.033333333333333,
+    "corgol": 15.366666666666667
+  },
+  "priority_commands": {},
+  "deaths": [
+    {
+      "seconds": 13.7,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.9,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.466666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.566666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.5,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 17.0,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 17.633333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 19.466666666666665,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 22.866666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 23.2,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 23.233333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 24.233333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 32.36666666666667,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 36.233333333333334,
+      "unit": "corgol",
+      "team": 1
+    }
+  ]
+}

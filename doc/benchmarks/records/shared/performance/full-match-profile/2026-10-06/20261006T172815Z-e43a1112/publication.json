@@ -1,0 +1,32 @@
+{
+  "files": {
+    "README.md": "ee5f8b0c5bcadfb32cef61121a7657f349fbaf64a751052b048c6e4469768479",
+    "checks.json": "502adc7efafb1c11be665dc3066ec732f094ffc9ba7ff8b087568cea6c631aaa",
+    "full-match-checks.json": "502adc7efafb1c11be665dc3066ec732f094ffc9ba7ff8b087568cea6c631aaa",
+    "full-match-manifest.json": "303b06b1917fabe643e45b01acc6c52a3f46e78c4d134342bd6f5ab9847485f0",
+    "full-match-performance-v1.json": "8d1dfc1a498d5a8dbb47d89673ce1afa091f715d86348bbceeb0541e2ea8b46f",
+    "full-match-summary-v1.json": "a16120a1dafc1d5641491c33d09504f65ad965589a24eff17cb0653b2b910a6a",
+    "launched.json": "e81478280dc41079ed484facebe80d3a415ca0b623d4a55ffcff88be0b0534c1",
+    "metal-plate-eight.as": "fa949310e3d1ed4c261a3f544b9d469b2d217de012d466c5586bceb5e7b2502f",
+    "report.md": "f2a623f5b8efb4b43a8d660d8b6fc725f5b66094b3c91266361b4d7b9ca7717d",
+    "result.json": "2dc106b5ff3e0d22fc1fdcb83ecd9e48ffb51099e3f34e58c5bd76b3ca9a0d9e",
+    "run-inputs.json": "707bc5fbb6a19353d1f965db82248790b1bf33b0ef59726f2df17c5f91def3b6",
+    "run-plan.json": "ded99cc1d3e797349f22f6a22a0bae9a898e369af18232995864b2ea63f1ab61",
+    "sample-metal-20m.modules.json": "816cfdb98cfde287fc4b9215faa43322ff347726f14bc50a7b8470328c48af03",
+    "sample-metal-20m.resolved.json": "ec4138dc77971a6549ec029197c68ed4cc802e7172e8fe15ac55d06bbe609e4b",
+    "sample-metal-20m.threads-after.json": "ac27915391645a5ff66f5b6758ce43b0cca6b1024c9fc2601ad57a954ef8dd90",
+    "sample-metal-20m.threads-before.json": "f7e78709b70b8d2b40d4892f42df94faf2927283ef10beefd654c2f0263164be",
+    "sample-metal-26m.modules.json": "a8e2da9a53c6069bc8a82a88c5813aee5637a4679084a585473ffbd828cc0919",
+    "sample-metal-26m.resolved.json": "30b6d902c4399d2e4990a7f5c9e105f4138856eeb47c8a813738da594e3439c2",
+    "sample-metal-26m.threads-after.json": "6a9d2f8eafeb91b9183ca1e60efb2adfb8f1b7b1e1125552f8402966370fff5c",
+    "sample-metal-26m.threads-before.json": "4a3ea3023baeaaa2d44a8b5809958833ab2d6f0c651ed73ab8519e304ece1344",
+    "screen_2026-10-06_16-41-35-103.png": "357a4e8ad50e53e5c82a43633824a738efa7f6a93186aae61ed5aa47b43c9645",
+    "screen_2026-10-06_17-28-02-157.png": "f276618ba07d887eb9e9e008eeb084bf4636df85127f5cec8ad6b293d7cbd47b",
+    "script.txt": "70f10672c68c2a87c5f120e2315d1ca66fec931901bcb4d2732244de4402424d",
+    "staged.json": "92afa6f005cdec76d15169dafffe9984a1d2ce15b4ce96ec644b70ae9cb77975",
+    "teams.json": "0d67ad75c49c3c64820d0cb8cb7a537afcd0a07aecfcc0f1d6bd2318ea49ebca"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\metal-plate\\20261006T163130Z-5805fe36\\runs\\20261006T172815Z-e43a1112",
+  "schema": 1
+}

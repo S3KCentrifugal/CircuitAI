@@ -1,0 +1,43 @@
+{
+  "repeating_factories": [
+    "13180",
+    "23479"
+  ],
+  "completed": {
+    "13180": 13,
+    "23479": 13
+  },
+  "move_progress_units": {
+    "13180": 11,
+    "23479": 11
+  },
+  "maximum_repeat_queue": {
+    "23479": 1,
+    "13180": 1
+  },
+  "last_lane_endpoints": {
+    "4089": [
+      4074.94531,
+      8992.13086
+    ],
+    "23479": [
+      4506.0,
+      10040.0
+    ],
+    "13180": [
+      3248.04834,
+      9691.55859
+    ],
+    "8355": [
+      4661.61084,
+      3587.21875
+    ]
+  },
+  "failures": [],
+  "passed": true,
+  "case": "spam-repeat-tactical",
+  "variant": "ranged",
+  "deadline_frame": 5400,
+  "watch_verdict": "PASS",
+  "last_observed_frame": 5760
+}

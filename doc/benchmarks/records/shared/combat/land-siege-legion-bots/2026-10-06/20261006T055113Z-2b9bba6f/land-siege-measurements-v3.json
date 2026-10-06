@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "case": "land-siege-legion-bots",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-legion-bots\\glitters\\20261006T054952Z-5e729ffc",
+  "minutes": 5,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 9450,
+  "produced": {
+    "legaceb": 7,
+    "legack": 3,
+    "legaradk": 1,
+    "leghrk": 15,
+    "legajamk": 1,
+    "legsrail": 3,
+    "leginc": 2,
+    "legbart": 10,
+    "legstr": 15
+  },
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [
+    "[t=00:00:38.284608][f=0000793] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:793:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=2553 committed=0 income=98",
+    "[t=00:00:38.636038][f=0000877] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:877:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=2922 committed=750 income=126",
+    "[t=00:00:39.584903][f=0001105] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1105:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=3447 committed=1500 income=126",
+    "[t=00:00:39.735808][f=0001141] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1141:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=3447 committed=2250 income=126",
+    "[t=00:00:40.725151][f=0001377] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1377:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=3972 committed=3000 income=126",
+    "[t=00:00:44.372476][f=0002105] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2105:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=4523 committed=3750 income=126",
+    "[t=00:00:46.324183][f=0002573] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2573:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=5310 committed=4500 income=126",
+    "[t=00:00:56.242261][f=0004837] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:4837:L::[LandSiege] factory=legalab unit=leghrk static=4840 budget=6008 committed=5250 income=74"
+  ],
+  "passed": true,
+  "failures": []
+}

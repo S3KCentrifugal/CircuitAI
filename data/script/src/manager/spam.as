@@ -6,6 +6,7 @@
 #include "../helpers/generic_helpers.as"
 #include "../helpers/unit_helpers.as"
 #include "../helpers/map_helpers.as"
+#include "../helpers/spam_math.as"
 #include "roster.as"
 #include "widget_link.as"
 
@@ -13,12 +14,12 @@
 
 SPAM
 
-Units carrying the "spam" attribute (behaviour.json "attribute": ["spam"],
-read as Unit::Attr::SPAM) get a behaviour of their own once the economy
+Units listed as products in Global::Spam::UnitByFactory get their own
+behaviour once the economy
 clears Global::Spam::MinMetalIncome and MinEnergyIncome (both, sliding 10 s
 minimum; deactivation at ReleaseFraction of each so a dip does not flap):
 
-  factories   Every T1 factory with an entry in Global::Spam::UnitByFactory
+  factories   Income-budgeted T1 factories in Global::Spam::UnitByFactory
               produces that unit on repeat and nothing else while spam is
               active (Factory::AiMakeTask asks here first).
   routes      Each spam factory owns one native CRouteTask (TaskF::Route)
@@ -28,16 +29,16 @@ minimum; deactivation at ReleaseFraction of each so a dip does not flap):
               from the direct line, with two intermediate waypoints so the
               lane is held, not just the end point.
   units       A finished spam unit is assigned to its factory's route task
-              from Military::AiMakeTask (nearest spam factory, units spawn at
-              their factory). CRouteTask issues plain move orders only, so
+              from Military::AiMakeTask using the real producer ID (nearest
+              live pump only for gifts or a lost producer). Plain move orders
               nothing on the way interrupts the run; the units hold at the
               destination and fire at whatever comes into range.
   focus       The destination is BehindEnemyDistance beyond the current focus
               along the line from our start through it, clamped to the map:
               behind the enemy line and past its radar and LOS when the map
-              allows. The focus is an enemy start spot (map start spots minus
-              our own and our allies' from the roster; with no map spots the
-              mirror of our start through the map centre). It rotates through
+              allows. Actual enemy lobby starts take precedence; map slots
+              exclude allied starts/boxes, with a mirrored-start fallback.
+              It rotates through
               the enemy spots nearest-first every RefocusMinutes, and
               SetFocus(pos) retargets on demand. Every refocus rebuilds every
               factory route and the route task re-issues it to all units
@@ -65,13 +66,11 @@ namespace Spam {
     // factory only decides at its first sight (it spawns at its factory)
     dictionary producerOf;         // unit id string -> factory id
     int routesVersion = 0;         // bumped whenever any route changes (a role re-applies factory routes)
-    // D-111: factories a role put on repeat: their queue cycles by itself, so a
-    // factory that asks again is given a wait, not another build (the queue would
-    // grow by one every unit); the build is re-issued only once it stopped producing
-    dictionary repeatFactory;      // factory id string -> frame of the last build issued
-    dictionary lastProduced;       // factory id string -> frame its last spam unit was seen
+    dictionary repeatTask;         // factory id -> owned persistent recruit handle
+    dictionary factoryVersion;     // route version last installed on factory
     dictionary routedUnits;        // unit id string -> factory id (INV-043)
     int routeCheckFrame = -1;
+    int adoptFrame = -100000;
     // Two different points, previously conflated:
     //   focus  - WHERE THE RUN ENDS. An enemy start spot; the destination is
     //            BehindEnemyDistance past it. Rotates on the refocus timer.
@@ -98,6 +97,7 @@ namespace Spam {
 
     bool IsEnabled()
     {
+        if (SeaCoast::Active()) return false; // lost-sea labs/land army defend their coast
         if (!Global::Spam::Enabled) return false;
         if (Global::Map::LandLocked && !Global::Spam::AllowLandLocked) {
             if (!landLockedReported) {
@@ -111,9 +111,26 @@ namespace Spam {
     bool landLockedReported = false;
     bool IsActive() { return active; }
 
+    dictionary spamProducts;
+    bool productsReady = false;
     bool IsSpamDef(const CCircuitDef@ d)
     {
-        return d !is null && d.IsAttrAny(Unit::Attr::SPAM.mask);
+        if (d is null) return false;
+        if (!productsReady) {
+            // Configuration is fixed for this AI instance. Resolve once, then
+            // O(1) membership without allocating a factory-key list per unit.
+            // JSON "spam" is also a role: the native loader treats colliding
+            // attribute names as roles, so testing Attr::SPAM never enrolled
+            // Pawns. Use the explicit pump roster; do not capture rezzers that
+            // happen to carry the broad combat-role label "spam".
+            array<string>@ keys = Global::Spam::UnitByFactory.getKeys();
+            for (uint i=0; i<keys.length(); ++i) {
+                string name;
+                if (Global::Spam::UnitByFactory.get(keys[i],name)) spamProducts.set(name,true);
+            }
+            productsReady = true;
+        }
+        return spamProducts.exists(d.GetName());
     }
 
     // The spam unit a factory produces, "" when the factory is not a spam factory.
@@ -130,14 +147,22 @@ namespace Spam {
      **************************************************************************/
     void Update()
     {
-        if (!IsEnabled()) return;
         const float mi = Economy::GetMinMetalIncomeLast10s();
         const float ei = Economy::GetMinEnergyIncomeLast10s();
+        const bool funded = IsEnabled() && SpamMath::Funded(mi, ei, aiEconomyMgr.isEnergyEmpty,
+            aiEconomyMgr.isMetalFull, aiEconomyMgr.metal.current, Global::Spam::MinMetalIncome,
+            Global::Spam::MinEnergyIncome, Global::Spam::FloatMetalIncome, Global::Spam::MinMetalBank,
+            active, Global::Spam::ReleaseFraction);
+        // Persistent repeats do not re-ask the factory hook on every offspring.
+        // The once-a-second policy census owns cancellation; ongoing units keep
+        // their MOVE route. Only abort a task still owned by this controller.
+        MaintainFactories(funded && aiBuilderMgr.GetWorkerCount() >= Global::Spam::MinWorkers);
+        if (!IsEnabled()) { active = false; return; }
         if (!active) {
             if (mi < Global::Spam::MinMetalIncome || ei < Global::Spam::MinEnergyIncome) {
-                // Spam is a fusion-era behaviour by design: below this the same
-                // units are ordinary front-line combat units and the roles should
-                // keep using them as such. Report the shortfall occasionally so
+                // Dedicated pressure needs a mature, funded economy; no fusion
+                // building is required. Below the gate these units remain normal
+                // early raiders. Report the shortfall occasionally so
                 // "never activated" is distinguishable from "never evaluated".
                 // Level 1, every two minutes: LOG_LEVEL is 1, and "never activated"
                 // has to be tellable from "never evaluated" in a game log.
@@ -147,7 +172,7 @@ namespace Spam {
                         + " ei=" + int(ei) + "/" + int(Global::Spam::MinEnergyIncome), 1);
                 }
             }
-            if (mi >= Global::Spam::MinMetalIncome && ei >= Global::Spam::MinEnergyIncome) {
+            if (funded) {
                 active = true;
                 activeSinceFrame = ai.frame;
                 _EnsureFocus();
@@ -156,18 +181,131 @@ namespace Spam {
             }
             return;
         }
-        const float rel = Global::Spam::ReleaseFraction;
-        if (mi < Global::Spam::MinMetalIncome * rel || ei < Global::Spam::MinEnergyIncome * rel) {
+        if (!funded) {
             active = false;
             GenericHelpers::LogUtil("[Spam] Deactivated: mi=" + mi + " ei=" + ei + "; units on the field keep their routes", 1);
             WidgetLink::Send("spam", "off|" + int(mi) + "|" + int(ei));
             return;
         }
         CheckRoutedUnits();   // D-111: INV-043
+        if (repeatTask.getSize() == 0 && ai.frame % (30 * SECOND) == 0)
+            GenericHelpers::LogUtil("[Spam] waiting for eligible pump; workers=" + aiBuilderMgr.GetWorkerCount(), 1);
+        AdoptProducedUnits();
         if (lastFocusFrame >= 0 && (ai.frame - lastFocusFrame) >= Global::Spam::RefocusMinutes * MINUTE) {
             NextFocus();
         }
         UpdateFront();
+    }
+
+    void AdoptProducedUnits()
+    {
+        if (routeByFactory.getSize() == 0 || ai.frame - adoptFrame < 5 * SECOND) return;
+        adoptFrame = ai.frame;
+        // An already-finished raider can be sitting in an ordinary assembling
+        // squad when its factory becomes a spam pump. Make the transition once;
+        // steady-state routes get no orders from this O(U) census.
+        array<int>@ ids = ai.GetOwnedUnitIds();
+        int joined = 0;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !IsSpamDef(u.circuitDef) || u.GetBuildProgress() < 1.0f) continue;
+            if (u.task !is null && (u.task.GetType() == int(Task::Type::PLAYER)
+                || u.task.GetType() == int(Task::Type::RETREAT) || u.task.IsExternalControlled())) continue;
+            IFighterTask@ fight = u.task is null ? null : cast<IFighterTask>(u.task);
+            if (fight !is null && cast<CRouteTask>(fight) !is null) continue;
+            IUnitTask@ route = MilitaryMakeTask(u);
+            if (route !is null && aiMilitaryMgr.TransferUnit(u, route)) ++joined;
+        }
+        if (joined > 0) GenericHelpers::LogUtil("[Spam] released " + joined + " existing units onto producer lanes", 1);
+    }
+
+    int LabsWanted()
+    {
+        const float income = Economy::GetMinMetalIncomeLast10s();
+        return SpamMath::Labs(AiMax(income, active ? Global::Spam::MinMetalIncome : 0.0f),
+            Global::Spam::MinMetalIncome, Global::Spam::LabMetalStep, Global::Spam::MaxLabs);
+    }
+
+    int lastLabAttempt = -100000;
+    IUnitTask@ BuilderMakeTask(CCircuitUnit@ u)
+    {
+        if (!active || u is null || !u.circuitDef.IsMobile() || UnitHelpers::IsCommander(u.circuitDef)
+            || aiBuilderMgr.GetWorkerCount() < Global::Spam::MinWorkers
+            || aiEconomyMgr.isEnergyEmpty || aiEconomyMgr.metal.current < Global::Spam::MinMetalBank) return null;
+        // Native re-asks while a constructor walks to a pinned site, before a
+        // frame exists. Do not enqueue the next turret and abandon that walk.
+        // The role's existing keep-current rule still owns the current job.
+        IBuilderTask@ current = u.task is null ? null : cast<IBuilderTask>(u.task);
+        if (current !is null && Task::BuildType(current.GetBuildType()) < Task::BuildType::REPAIR) return null;
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side));
+        if (lab is null || !u.circuitDef.CanBuild(lab) || TechForward::Recalled(u)) return null;
+        const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab);
+        if (Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::ExperimentalBuild) {
+            // Keep TECH's reserved clusters and exact advanced-lab-before-T1
+            // rebuild lifecycle; only remove the unrelated +200/air-worker gate.
+            if (!TechFactories::AdvancedLabUp()) return null;
+            array<TechFactories::Cluster@> clusters = TechForward::SpamClusters();
+            IUnitTask@ task = TechFactories::Work(lab, u, int(clusters.length()) < LabsWanted() && queued == 0);
+            if (task !is null) TechForward::lastOrderT1 = ai.frame;
+            return task;
+        }
+        // Other roles get one dedicated land pump before their own planner.
+        // Existing mapped factories can provide the remaining income-scaled
+        // pumps. Never repurpose an aircraft lab or shipyard.
+        if (lab.count + queued > 0 || ai.frame - lastLabAttempt < 30 * SECOND) return null;
+        CCircuitDef@ product = ai.GetCircuitDef(SpamUnitFor(lab));
+        if (product is null) return null;
+        lastLabAttempt = ai.frame;
+        _EnsureFocus();
+        const AIFloat3 home = Global::Map::StartPos;
+        // Search a bounded ring outside the core. Native factory placement
+        // respects all allied layout reservations; connectivity uses the spam
+        // unit's movement area, not the flying constructor's movement area.
+        for (int ring = 1; ring <= 3; ++ring) for (int k = 0; k < 8; ++k) {
+            const float angle = float(k) * 0.785398f;
+            const AIFloat3 p = _Clamp(AIFloat3(home.x + cos(angle) * float(ring) * 600.0f, 0,
+                home.z + sin(angle) * float(ring) * 600.0f));
+            if (!aiBattle.IsPassable(p, Lanes::BOT) || !aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())
+                || aiTerrainMgr.IsAllyLayoutBlocked(lab, p, 0) || ReachableNear(product, p, focus).x < 0.0f) continue;
+            if (lab.maxThisUnit <= lab.count) lab.maxThisUnit = lab.count + 1;
+            if (!lab.IsAvailable(ai.frame)) return null;
+            GenericHelpers::LogUtil("[Spam] dedicated land lab at " + int(p.x) + "," + int(p.z), 1);
+            return aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NORMAL, lab, p, product, 128.0f));
+        }
+        return null;
+    }
+
+    void MaintainFactories(bool enabled)
+    {
+        array<string>@ keys = repeatTask.getKeys();
+        array<CCircuitUnit@> labs;
+        for (uint i = 0; i < keys.length(); ++i) {
+            CCircuitUnit@ f = ai.GetTeamUnit(int(parseInt(keys[i])));
+            IUnitTask@ task;
+            if (!repeatTask.get(keys[i], @task)) continue;
+            if (f is null || task is null || task.IsDead() || f.task !is task) { repeatTask.delete(keys[i]); continue; }
+            if (!enabled || Lifecycle::IsRetiring(f) || Team::Recovery::WantsFactory(f) || int(labs.length()) >= LabsWanted()) {
+                repeatTask.delete(keys[i]); task.Abort(); continue;
+            }
+            CRouteTask@ route;
+            if (!routeByFactory.get(keys[i], @route) || route is null || route.GetRouteSize() == 0)
+                Invariants::Violation("INV-157", keys[i], "repeating spam factory lacks a reachable MOVE route");
+            CCircuitDef@ d = ai.GetCircuitDef(SpamUnitFor(f.circuitDef));
+            if (d !is null && d.maxThisUnit < d.count + 50) d.maxThisUnit = d.count + 50;
+            labs.insertLast(f);
+        }
+        // O(F^2) stable ordering is bounded by MaxLabs (6), never unit count.
+        // Geometry only changes on new labs/front displacement; equality in
+        // SetSpreadLanes prevents repeated unit orders for unchanged positions.
+        SetSpreadLanes(labs);
+        for (uint i = 0; i < labs.length(); ++i) {
+            const string key = "" + labs[i].id;
+            int previous = -1;
+            if (!factoryVersion.get(key, previous) || previous != routesVersion) {
+                labs[i].CmdFactoryRoute(RouteOf(labs[i]));
+                factoryVersion.set(key, routesVersion);
+            }
+        }
     }
 
     // Poll the AI's combat focus and rebuild every lane when it has moved far
@@ -198,6 +336,11 @@ namespace Spam {
     array<AIFloat3> EnemyStartSpots()
     {
         array<AIFloat3> result;
+        // Lobby starts are authoritative. Unoccupied friendly map slots are
+        // not enemies: selecting the nearest unused slot sent spam backwards.
+        for (int i = 0; i < aiSetupMgr.GetScriptStartCount(); ++i)
+            if (aiSetupMgr.IsScriptStartEnemy(i)) result.insertLast(aiSetupMgr.GetScriptStart(i));
+        if (result.length() > 0) return result;
         StartSpot@[]@ spots = Global::Map::Config.StartSpots;
         if (spots is null || spots.length() == 0) return result;
         dictionary taken;
@@ -210,6 +353,7 @@ namespace Spam {
         array<float> dist;
         for (uint i = 0; i < spots.length(); ++i) {
             if (taken.exists("" + i)) continue;
+            if (aiSetupMgr.EnemyStartBoxAt(spots[i].pos) == 0) continue;
             const float d = MapHelpers::SqDist(Global::Map::StartPos, spots[i].pos);
             uint pos = 0;
             while (pos < dist.length() && dist[pos] <= d) ++pos;
@@ -396,7 +540,8 @@ namespace Spam {
             spreadByFactory.set(k, side);
             changed = true;
             CRouteTask@ task = null;
-            if (routeByFactory.get(k, @task) && task !is null) task.SetRoute(BuildSpreadRoute(order[i].GetPos(ai.frame), side));
+            array<AIFloat3> points = _RouteOfKey(k, order[i].GetPos(ai.frame));
+            if (routeByFactory.get(k, @task) && task !is null && points.length() > 0) task.SetRoute(points);
             GenericHelpers::LogUtil("[Spam] factory " + order[i].id + " runs spread lane " + (i + 1) + " of " + order.length()
                 + " at " + int(side) + " elmos sideways (front at " + int(centre) + ", lanes " + int(step) + " apart) (D-119)", 1);
         }
@@ -405,10 +550,40 @@ namespace Spam {
     array<AIFloat3> _RouteOfKey(const string &in key, const AIFloat3 &in from)
     {
         float side = 0.0f;
-        if (spreadByFactory.get(key, side)) return BuildSpreadRoute(from, side);
         int lane = 0;
-        laneByFactory.get(key, lane);
-        return BuildRoute(from, lane);
+        if (!laneByFactory.get(key, lane)) lane = 0;
+        array<AIFloat3> raw = spreadByFactory.get(key, side) ? BuildSpreadRoute(from, side) : BuildRoute(from, lane);
+        array<AIFloat3> valid;
+        CCircuitUnit@ f = ai.GetTeamUnit(int(parseInt(key)));
+        CCircuitDef@ d = f is null ? null : ai.GetCircuitDef(SpamUnitFor(f.circuitDef));
+        if (d is null) return valid;
+        for (uint i = 0; i < raw.length(); ++i)
+            if (aiTerrainMgr.CanTraverse(d, from, raw[i])) valid.insertLast(raw[i]);
+        // A lane offset/behind-start extension can fall into water or a cliff.
+        // Use the reachable enemy start as the endpoint, never a mid-map stop.
+        if (valid.length() == 0 || MapHelpers::SqDist(valid[valid.length()-1], raw[raw.length()-1]) > 1.0f) {
+            AIFloat3 end = ReachableNear(d, from, raw[raw.length()-1]);
+            if (end.x < 0.0f) end = ReachableNear(d, from, focus);
+            if (end.x < 0.0f) { valid.resize(0); return valid; }
+            valid.insertLast(end);
+        }
+        return valid;
+    }
+
+    AIFloat3 ReachableNear(CCircuitDef@ def, const AIFloat3 &in from, const AIFloat3 &in desired)
+    {
+        if (aiTerrainMgr.CanTraverse(def, from, desired)) return desired;
+        // A legal commander start can sit on a rim which ordinary bots cannot
+        // reach. Find nearby ground in the SAME connected movement area, not
+        // merely any dry cell. At most 64 cached area lookups, only on route
+        // creation/retarget or bounded factory-site admission, never per unit.
+        for (int ring=1; ring<=4; ++ring) for (int k=0; k<16; ++k) {
+            const float a=float(k)*0.392699f;
+            const AIFloat3 p=_Clamp(AIFloat3(desired.x+cos(a)*float(ring)*256.0f,0,
+                desired.z+sin(a)*float(ring)*256.0f));
+            if (aiTerrainMgr.CanTraverse(def,from,p)) return p;
+        }
+        return AIFloat3(-1,0,-1);
     }
 
     // D-111: a role fixes a factory's lane (TECH: the lab's place in its row)
@@ -421,7 +596,8 @@ namespace Spam {
         laneByFactory.set(key, lane);
         CRouteTask@ task = null;
         if (routeByFactory.get(key, @task) && task !is null) {
-            task.SetRoute(_RouteOfKey(key, factory.GetPos(ai.frame)));
+            array<AIFloat3> points = _RouteOfKey(key, factory.GetPos(ai.frame));
+            if (points.length() > 0) task.SetRoute(points);
             ++routesVersion;
         }
         GenericHelpers::LogUtil("[Spam] factory " + factory.id + " runs lane " + lane + " (D-111)", 1);
@@ -432,14 +608,6 @@ namespace Spam {
         _EnsureFocus();
         return _RouteOfKey("" + factory.id, factory.GetPos(ai.frame));
     }
-    void SetRepeatFactory(CCircuitUnit@ factory)
-    {
-        if (factory is null) return;
-        const string key = "" + factory.id;
-        int f;
-        if (!repeatFactory.get(key, f)) repeatFactory.set(key, -100000);
-    }
-
     int _NextLane()
     {
         // 0, +1, -1, +2, -2, ...
@@ -457,17 +625,22 @@ namespace Spam {
         CRouteTask@ task = null;
         if (routeByFactory.get(key, @task) && task !is null) return task;
 
-        IUnitTask@ t = aiMilitaryMgr.Enqueue(TaskF::Route());
-        IFighterTask@ ft = cast<IFighterTask>(t);
-        @task = (ft is null) ? null : cast<CRouteTask>(ft);
-        if (task is null) return null;
+        _EnsureFocus();
+        array<AIFloat3> points = _RouteOfKey(key, factory.GetPos(ai.frame));
+        if (points.length() == 0) return null;
+
         int lane = 0;
         if (!laneByFactory.get(key, lane)) {
             lane = _NextLane();
             laneByFactory.set(key, lane);
         }
-        _EnsureFocus();
-        task.SetRoute(_RouteOfKey(key, factory.GetPos(ai.frame)));
+        points = _RouteOfKey(key, factory.GetPos(ai.frame));
+        if (points.length() == 0) return null;
+        IUnitTask@ t = aiMilitaryMgr.Enqueue(TaskF::Route());
+        IFighterTask@ ft = cast<IFighterTask>(t);
+        @task = (ft is null) ? null : cast<CRouteTask>(ft);
+        if (task is null) return null;
+        task.SetRoute(points);
         // Spread WITHIN the factory's line: each unit is dealt its own lane
         // across a band, so the stream crosses the map as a broad front that
         // one shell cannot erase and that sees a band's width, then focuses
@@ -490,7 +663,10 @@ namespace Spam {
             if (!routeByFactory.get(keys[i], @task) || task is null) continue;
             CCircuitUnit@ factory = ai.GetTeamUnit(int(parseInt(keys[i])));
             if (factory is null) { task.Abort(); routeByFactory.delete(keys[i]); continue; }
-            task.SetRoute(_RouteOfKey(keys[i], factory.GetPos(ai.frame)));
+            // A focus can move to another island. Keep the last reachable
+            // backline route until a reachable focus is available.
+            array<AIFloat3> points = _RouteOfKey(keys[i], factory.GetPos(ai.frame));
+            if (points.length() > 0) task.SetRoute(points);
         }
         ++routesVersion;
     }
@@ -536,11 +712,17 @@ namespace Spam {
             // this is the one rejection worth keeping quiet.
             return null;
         }
+        if (Lifecycle::IsRetiring(factory)) { _Reject(factory, "retiring"); return null; }
+        if (aiBuilderMgr.GetWorkerCount() < Global::Spam::MinWorkers) {
+            _Reject(factory, "recovering workers (" + aiBuilderMgr.GetWorkerCount() + ")"); return null;
+        }
         CCircuitDef@ d = ai.GetCircuitDef(unitName);
         if (d is null) {
             _Reject(factory, "unit '" + unitName + "' is not a loaded def");
             return null;
         }
+        if (int(repeatTask.getSize()) >= LabsWanted()) return null;
+        if (d.maxThisUnit < d.count + 50) d.maxThisUnit = d.count + 50;
         if (!d.IsAvailable(ai.frame)) {
             // The likely cause when a listed T1 factory still exists and still
             // produces nothing: a role start limit or a reached unit cap makes
@@ -548,25 +730,13 @@ namespace Spam {
             _Reject(factory, "'" + unitName + "' unavailable (tech gate or unit limit)");
             return null;
         }
-        _Reject(factory, "");   // clears the memo so a later rejection logs again
-        RouteFor(factory);   // make sure the lane exists before the first unit pops
-        {
-            const string key = "" + factory.id;
-            int issued;
-            // D-119: nothing calls SetRepeatFactory any more (TECH's spam labs
-            // take one build per ask; a repeat queue did not survive a recruit)
-            if (repeatFactory.get(key, issued)) {
-                int seen = -100000;
-                lastProduced.get(key, seen);
-                const int since = (seen > issued) ? seen : issued;
-                if (ai.frame - since < Global::Spam::RepeatStallSeconds * SECOND) {
-                    return aiFactoryMgr.Enqueue(TaskS::Wait(false, 20 * SECOND));   // the repeat queue carries on
-                }
-                repeatFactory.set(key, ai.frame);
-                GenericHelpers::LogUtil("[Spam] " + factory.circuitDef.GetName() + " (" + factory.id + ") on repeat: " + unitName + " queued (D-111)", 1);
-            }
-        }
-        return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NOW, d, factory.GetPos(ai.frame), 64.f));
+        if (RouteFor(factory) is null) { _Reject(factory, "no reachable enemy land route"); return null; }
+        _Reject(factory, "");   // clear only after admission, not on every failed retry
+        IUnitTask@ task = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER,
+            Task::Priority::NORMAL, d, factory.GetPos(ai.frame), 64.f, true));
+        repeatTask.set("" + factory.id, @task);
+        GenericHelpers::LogUtil("[Spam] repeat factory=" + factory.id + " unit=" + unitName, 1);
+        return task;
     }
 
     // Military::AiMakeTask asks here first. Spam units join their factory's route
@@ -577,15 +747,18 @@ namespace Spam {
         if (!IsEnabled() || u is null || !IsSpamDef(u.circuitDef)) return null;
         if (routeByFactory.getSize() == 0) return null;
         const string ukey = "" + u.id;
-        int fid = -1;
+        int fid = u.GetProducerId();
         CCircuitUnit@ factory = null;
-        if (producerOf.get(ukey, fid)) @factory = ai.GetTeamUnit(fid);
+        int saved = -1;
+        if (producerOf.get(ukey, saved)) fid = saved;
+        if (routeByFactory.exists("" + fid)) @factory = ai.GetTeamUnit(fid);
         if (factory is null) {
-            const bool first = (fid < 0);
+            // A known non-spam producer's raiders remain ordinary combat.
+            // Only transferred/resurrected units or a destroyed pump fall back.
+            if (fid >= 0 && ai.GetTeamUnit(fid) !is null) return null;
             @factory = _NearestSpamFactory(u.GetPos(ai.frame));
             if (factory is null) return null;
             producerOf.set(ukey, factory.id);
-            if (first) lastProduced.set("" + factory.id, ai.frame);
         }
         CRouteTask@ task = RouteFor(factory);
         if (task is null) return null;
@@ -606,6 +779,7 @@ namespace Spam {
             CCircuitUnit@ u = ai.GetTeamUnit(int(parseInt(keys[i])));
             if (u is null) { routedUnits.delete(keys[i]); producerOf.delete(keys[i]); continue; }
             IFighterTask@ ft = (u.task is null) ? null : cast<IFighterTask>(u.task);
+            if (u.task !is null && u.task.GetType() == Task::Type::PLAYER) { routedUnits.delete(keys[i]); continue; }
             CRouteTask@ rt = (ft is null) ? null : cast<CRouteTask>(ft);
             if (rt !is null) continue;
             ++moved;
@@ -626,8 +800,8 @@ namespace Spam {
         routeByFactory.delete(key);
         laneByFactory.delete(key);
         spreadByFactory.delete(key);
-        repeatFactory.delete(key);
-        lastProduced.delete(key);
+        repeatTask.delete(key);
+        factoryVersion.delete(key);
     }
 
     void OnTaskRemoved(IUnitTask@ task)

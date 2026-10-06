@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "6839af04f8d179fa0b8a1b0e8f6be566f23a517c19672b280551904a7648f98e",
+    "checks.json": "8527ad8dbe92670969f4ff0e800e8df4c5caf27cf0a23569701edcfc42c9d332",
+    "coast-checks.json": "8527ad8dbe92670969f4ff0e800e8df4c5caf27cf0a23569701edcfc42c9d332",
+    "coast-observations-v1.json": "8080219561391e19099ec49000c42f2d9eaa374471770a083c7d91767d3f3d80",
+    "fixture.json": "213619e369c07eb45445e5a0a0f3a953cac7071d7bef77b04747222ab3e33df1",
+    "launched.json": "486bcdf9d22523e1236580d1ccb1aa84c94c8eab3788cdc5017fb75a755e0ffd",
+    "report.md": "69464deba9d1eaf64bc9aa94919b97f581ece995338e7b151a46d408cb56428d",
+    "result.json": "f76e944eace9540b82f5ef331188fec4b7af5846ffcdcea5e57b28184038e475",
+    "run-inputs.json": "e0985f3ea12f8720a5fd3cd7f4fb4b5a3ddd60992733b82c2ebe766e69915366",
+    "run-plan.json": "746c52908d661c3b583ed8174520b47ad71e02855b1c9a1b8e36a9b5667b8b11",
+    "screen_2026-10-06_14-39-02-661.png": "0d53d797e8ff25d0c109450ef601ed3de2c6fd3a11a93c25f01cb0e7423325ac",
+    "screen_2026-10-06_14-39-14-196.png": "00e1dfcbb631cf32c8e495c77b1fcc6b0d2fe48581b8cd07347394896677e50f",
+    "script.txt": "713ee164fcae38449843c7414964b94fcff4a38467cc763a31b2f06c4c283038",
+    "staged.json": "e670f468d6476fdf233d10b14073953a233c50157dbf6142beae65f808574132",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\strategy\\coast-lost-armada\\supreme\\20261006T143438Z-eba024f5\\runs\\20261006T143916Z-2f68d264",
+  "schema": 1
+}

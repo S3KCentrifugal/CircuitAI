@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "case": "land-siege-legion",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-legion\\glitters\\20261006T053233Z-41c30df9",
+  "minutes": 5,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 9300,
+  "produced": {
+    "legvflak": 9,
+    "legacv": 1,
+    "legavroc": 6,
+    "legavrad": 13,
+    "legafcv": 1,
+    "legmed": 2,
+    "legaskirmtank": 12,
+    "legavjam": 10
+  },
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [
+    "[t=00:00:38.948197][f=0000829] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:829:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=3052 committed=0 income=120",
+    "[t=00:00:39.231146][f=0000897] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:897:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=3052 committed=920 income=126",
+    "[t=00:00:40.568443][f=0001217] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1217:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=3374 committed=1840 income=126",
+    "[t=00:00:41.250785][f=0001381] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1381:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=3696 committed=2760 income=126",
+    "[t=00:00:46.725044][f=0002545] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2545:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=4602 committed=3680 income=126",
+    "[t=00:00:59.995225][f=0005613] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:5613:L::[LandSiege] factory=legavp unit=legavroc static=4840 budget=5545 committed=4600 income=67"
+  ],
+  "passed": true,
+  "failures": []
+}

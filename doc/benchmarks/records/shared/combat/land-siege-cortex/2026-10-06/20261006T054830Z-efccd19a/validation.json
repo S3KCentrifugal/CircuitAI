@@ -1,0 +1,9 @@
+{
+  "native_runner_exit": 0,
+  "native_output": "layout ranking: 76 checks passed\nbase-layout geometry tests passed\n200159 allied reservation tests; 0 failures\nlocal reservations: 200038 checks, 0 failures\nlane_solver_test: 8 suites passed (including 8 concurrent solvers)\nstrategic targeting: six suites passed\n18 terrain route scenarios passed\nair geometry: 300 unique bounded slots and loss thresholds passed\nmetal field: yield, budgets, overlap, cancellation, upgrade ownership and restored keys passed\n20 enemy reclaim policy checks; 0 failures\nnaval geometry tests passed\nair_safety_test: PASS (capsule reference, bounds, 4090 diagonal probes)\nranged geometry: coverage, retreat, scoring and 1000 spatial oracle mutations PASS\nwater survey: 9 checks passed\n133 production policy tests; 0 failures\n20 production policy tests; 0 failures\n22 production policy tests; 0 failures\n145 production policy tests; 0 failures\n20 production policy tests; 0 failures\n12 production policy tests; 0 failures\n6 production policy tests; 0 failures\n18 production policy tests; 0 failures\n3 production policy tests; 0 failures\n2 production policy tests; 0 failures\n2 production policy tests; 0 failures\n1 production policy tests; 0 failures\n",
+  "script_api_findings": 0,
+  "invariant_findings": 0,
+  "role_doc_findings": 0,
+  "known_unit_helper_findings": 170,
+  "known_broken_hover_links": 8
+}

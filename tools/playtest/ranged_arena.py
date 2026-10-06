@@ -47,12 +47,14 @@ def pool_symbols(staged):
 
 def prepare(args):
     case = json.loads(storage.resolve_definition(args.case, 'cases').read_text())
+    role = case.get('role', 'FRONT')
+    if role not in ('FRONT', 'TECH', 'AIR', 'SEA', 'SUPPORT', 'TACTICAL'): raise ValueError('Unsupported arena role: '+role)
     directory = storage.allocate('shared', 'combat', case['name'], case['map_key'], 'supplied', seed=args.seed)
     starts = directory / 'starts.as'
-    starts.write_text(''.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::FRONT, false),\n' for x,z in case['starts']))
+    starts.write_text(''.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::{role}, false),\n' for x,z in case['starts']))
     command = [sys.executable, str(HERE / 'playtest.py')]
     stage = command + ['stage','--dir',str(directory),'--dll',str(args.dll),'--data',str(args.data),
-        '--map',case['map'],'--map-file',str(starts),'--role','FRONT','--roles','all','--ally-spots','1',
+        '--map',case['map'],'--map-file',str(starts),'--role',role,'--roles','all','--ally-spots','1',
         '--side',case.get('side','armada'),'--game','Beyond All Reason test-31479-433a460',
         '--engine','recoil_2026.07.04','--speed',str(args.speed),'--minutes',str(args.minutes),
         '--shots','','--width','1280','--height','720','--lean-render','--bonus','0',
@@ -71,16 +73,21 @@ def prepare(args):
     pool_symbols(staged)
     setup=staged/'script/src/setup.as'
     setup.write_text(setup.read_text().replace('Global::AISettings::Role = derivedRole;',
-        'derivedRole=AiRole::FRONT; Global::AISettings::Role = derivedRole;'))
+        'derivedRole=AiRole::'+role+'; Global::AISettings::Role = derivedRole;'))
     for name,manager,wait in [('builder','aiBuilderMgr','TaskB::Wait(60*SECOND)'),('factory','aiFactoryMgr','TaskS::Wait(false,60*SECOND)')]:
         path = staged/'script/src/manager'/(name+'.as')
         source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
         repair='\n if (ai.teamId==1 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);' if name=='builder' and case.get('enemy_repair') else ''
-        path.write_text(source[:start]+repair+'\n if (ai.frame>=0) return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
+        condition = 'ai.teamId==1' if name=='factory' and case.get('production') else 'ai.frame>=0'
+        if name=='builder' and case.get('builders'): condition = 'ai.teamId==1'
+        if name=='builder' and case.get('production'):
+            repair += '\n if (ai.teamId==0 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);'
+        path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
-    # No commands to friendly combat units. The enemy follows a declared path
-    # or holds its supplied position, with normal engine weapon firing.
+    # Normal combat cases leave friendly commands to the AI. Production-only
+    # cases can explicitly hold them to retain the supplied enemy demand.
+    # The enemy follows a declared path or holds, with normal weapon firing.
     destination = case.get('enemy_destination')
     point = f'AIFloat3({destination[0]},0,{destination[1]})' if destination else 'u.GetPos(ai.frame)'
     override = '''
@@ -90,7 +97,36 @@ def prepare(args):
             route.SetTraversal(true,48,false); route.SetRoute(points); return route;
         } // enemy fixture only
 '''
+    if case.get('hold_friendly'):
+        override += '''
+        if (ai.teamId==0 && u.circuitDef.IsMobile()) {
+            CRouteTask@ route=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+            array<AIFloat3> points={u.GetPos(ai.frame)};
+            route.SetTraversal(true,48,false); route.SetRoute(points); return route;
+        } // production-only fixture: retain army investment without clearing opponents
+'''
     path.write_text(source[:start]+override+source[start:])
+    if case.get('trace_spam'):
+        # Supplied buildings did not come through TECH's reserved layout.
+        # Its geometry/economy Tick cannot judge this isolated production
+        # fixture. Lifecycle OnUnitAdded and Spam's own invariants stay active.
+        path=staged/'script/src/manager/invariants.as'
+        source=path.read_text(); start=source.index('{',source.index('void Tick()'))+1
+        path.write_text(source[:start]+'\n if (ai.frame>=0) return; // supplied-layout fixture only\n'+source[start:])
+        path=staged/'script/src/manager/spam.as'
+        source=path.read_text(); start=source.index('{',source.index('void Update()'))+1
+        probe='''
+        if (ai.teamId==0 && ai.frame % (10*SECOND)==0) {
+            GenericHelpers::LogUtil("[SpamProbe] workers="+aiBuilderMgr.GetWorkerCount(),1);
+            array<int>@ ids=ai.GetOwnedUnitIds();
+            for (uint i=0;i<ids.length();++i) {
+                CCircuitUnit@ u=ai.GetTeamUnit(ids[i]);
+                if (u is null || SpamUnitFor(u.circuitDef).length()==0) continue;
+                GenericHelpers::LogUtil("[SpamProbe] factory="+u.id+" task="+(u.task is null ? -1 : int(u.task.GetType()))+" retiring="+Lifecycle::IsRetiring(u),1);
+            }
+        }
+'''
+        path.write_text(source[:start]+probe+source[start:])
     if args.variant=='siege':
         for path in (staged/'config').rglob('behaviour*.json'):
             data=path.read_bytes()
@@ -111,8 +147,15 @@ def prepare(args):
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),
           'overrides':['supplied forces','fixed seed','startup energy'] +
-              (['frozen economic builders/factories','scripted enemy path']
+              ((['enemy factories and mobile builders frozen','scripted enemy path'] if case.get('production')
+                else ['frozen economic builders/factories','scripted enemy path'])
                if args.profile.startswith('experimental_') else ['native legacy economy remains active'])}
+    if case.get('production'):
+        pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
+    if case.get('trace_spam'):
+        pins['overrides'] += ['TECH layout/economy invariant Tick disabled for supplied buildings; production/lifecycle and spam invariants retained', 'read-only factory task census every 10 seconds']
+    if case.get('hold_friendly'):
+        pins['overrides'] += ['friendly combat held for production measurement']
     (directory/'ranged-arena-pins.json').write_text(json.dumps(pins,indent=2)+'\n')
     subprocess.run([sys.executable,str(ROOT/'tools/knowledge/check_script_api.py'),'--dll',str(args.dll),'--scripts',str(staged/'script')],check=True)
     print('RANGED_ARENA='+str(directory),flush=True)
@@ -137,7 +180,9 @@ def main():
     if args.headless: launch+=['--headless']
     subprocess.run(launch,check=True)
     case=json.loads((directory/'ranged-arena.json').read_text())
-    return subprocess.run(command+['watch','--dir',str(directory),'--role','FRONT','--checks',case.get('checks','ranged-arena'),
-        '--minutes',str(args.minutes),'--wall-minutes','8'],check=False).returncode
+    watch=command+['watch','--dir',str(directory),'--role',case.get('role','FRONT'),'--checks',case.get('checks','ranged-arena'),
+        '--minutes',str(args.minutes),'--wall-minutes','8']
+    if args.variant=='baseline': watch+=['--keep-going']
+    return subprocess.run(watch,check=False).returncode
 
 if __name__=='__main__':sys.exit(main())

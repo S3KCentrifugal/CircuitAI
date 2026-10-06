@@ -767,6 +767,7 @@
 				"role": ["assault", "air"]
 			},
 			"legfort": {
+				"target_min_cost": 300,
 				"role": ["heavy", "air"]
 			},
 			"legatorpbomber": {

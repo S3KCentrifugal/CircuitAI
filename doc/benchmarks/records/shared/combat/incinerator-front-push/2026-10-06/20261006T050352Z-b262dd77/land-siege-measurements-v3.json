@@ -1,0 +1,65 @@
+{
+  "schema": 3,
+  "case": "incinerator-front-push",
+  "directory": "build-theatres\\games\\shared\\combat\\incinerator-front-push\\glitters\\20261006T050221Z-5035783b",
+  "minutes": 4,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 7650,
+  "produced": {},
+  "damaging_primary_units": 3,
+  "primary_damage_including_overkill": 9475,
+  "deaths": [
+    {
+      "t": "00:00:53.692907][f=0000649]",
+      "frame": "649",
+      "id": "7270",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    },
+    {
+      "t": "00:00:53.977695][f=0000701]",
+      "frame": "701",
+      "id": "15598",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    },
+    {
+      "t": "00:00:54.320658][f=0000775]",
+      "frame": "775",
+      "id": "25497",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    },
+    {
+      "t": "00:00:59.976362][f=0001926]",
+      "frame": "1926",
+      "id": "6003",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:01:00.290822][f=0002006]",
+      "frame": "2006",
+      "id": "20443",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:01:00.817759][f=0002132]",
+      "frame": "2132",
+      "id": "29947",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    }
+  ],
+  "siege_choices": [],
+  "passed": true,
+  "failures": []
+}

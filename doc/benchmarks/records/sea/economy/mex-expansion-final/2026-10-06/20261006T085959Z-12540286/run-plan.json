@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "mex-expansion-final"
+  },
+  "id": "20261006T084239Z-420c4a95",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

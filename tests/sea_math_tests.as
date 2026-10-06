@@ -180,3 +180,18 @@ void test_recovery_fleet_and_income_both_scale_capacity() {
     Check(SeaMath::RecoveryCount(600,60000,60,6000)==11);
     Check(SeaMath::RecoveryCount(60,6000,0,6000)==0);
 }
+void test_expansion_rejects_hostile_coverage_and_invalid_thresholds() {
+    Check(!SeaMath::ExpansionNeedsEscort(3600,10000));
+    Check(SeaMath::ExpansionNeedsEscort(3601,10000));
+    Check(SeaMath::ExpansionThreatSafe(0,.1f));
+    Check(SeaMath::ExpansionThreatSafe(.1f,.1f));
+    Check(!SeaMath::ExpansionThreatSafe(.1001f,.1f));
+    Check(!SeaMath::ExpansionThreatSafe(-1,.1f));
+    Check(!SeaMath::ExpansionThreatSafe(0,-1));
+}
+void test_cluster_fortification_preserves_metal_reserve_and_energy_funding() {
+    Check(SeaMath::ExpansionFortFunded(120,10,0,50,170,500));
+    Check(!SeaMath::ExpansionFortFunded(119,10,0,50,170,500));
+    Check(!SeaMath::ExpansionFortFunded(120,10,0,49,170,500));
+    Check(!SeaMath::ExpansionFortFunded(1000,0,10000,50,170,500));
+}

@@ -167,6 +167,16 @@ namespace Global {
         float SeedShake = 256.0f;
     }
 
+    namespace BuilderRecovery {
+        bool Enabled = true;
+        // Losing the last mobile constructor merits help even with a commander.
+        bool CommanderCounts = false;
+        int OpeningGraceSeconds = 60;
+        int RetrySeconds = 20;
+        int LeaseSeconds = 120; // heartbeats retain a request through missing labs
+        float DropRadius = 2400.0f; // coastal roles may need the nearest dry shore
+    }
+
     namespace ConstructorRequest {
         // T2 constructors from TECH on request (Team::Donation, D-041). TECH
         // always answers a request: one extra constructor from its advanced
@@ -196,20 +206,30 @@ namespace Global {
     namespace Military {
         float AttackWaitSeconds = 180.0f;
         float AttackScale = 0.8f;
+        // D-214: funded land siege before ordinary FRONT combat selection.
+        // Shares limit dedicated bombardment investment, leaving a mobile screen.
+        bool LandSiegeEnabled = true;
+        float LandSiegeMinMetal = 40.0f;
+        float LandSiegeMinEnergy = 800.0f;
+        float LandSiegeFullMetal = 120.0f;
+        float LandSiegeResponseRatio = 1.25f;
+        float LandSiegeEarlyShare = 0.20f;
+        float LandSiegeLateShare = 0.35f;
     }
 
     namespace Spam {
         bool Enabled = true;
-        // Both sliding-minimum incomes must clear these to activate ...
-        //
-        // These are deliberately fusion-era. Below this economy the units spam
-        // produces - Pawn, Grunt, Goblin, Blitz - are ordinary front-line
-        // combat units and the roles should go on spending them as such. Spam
-        // is what a mature economy does with the T1 factories it no longer
-        // needs for the front line, which is why UnitByFactory lists only T1
-        // factories. Do not lower these to "make spam happen sooner": that
-        // takes combat units away from the roles that still need them.
+        // D-216: dedicated pressure uses mature, sustained income, while
+        // ordinary early raiding stays role-owned. These defaults are tuning,
+        // not a required fusion building or a universal PvP timing. A full
+        // metal bank admits one pump at FloatMetalIncome (donations included),
+        // but never bypasses the energy gate. See doc/spam-routes.md.
         float MinMetalIncome = 60.0f;
+        float FloatMetalIncome = 30.0f;
+        float MinMetalBank = 1000.0f;
+        float LabMetalStep = 100.0f;
+        int MaxLabs = 6;
+        uint MinWorkers = 4;  // commander plus at least three workers before conversion
         // A start the land army cannot leave (Global::Map::LandLocked, from the
         // map config's start spots) never spams: the units would walk to the
         // shore and stand there. TECH on Tundra Continents was making Grunts
@@ -228,7 +248,6 @@ namespace Global {
         // final waypoint - 0 converges every lane on the same endpoint, 1 keeps
         // full width; the run is aimed at one backline, so keep it small.
         int UnitLanes = 5;
-        int RepeatStallSeconds = 45;         // D-111: a factory on repeat that produced no spam unit for this long gets its build again
         float UnitLaneSpacing = 160.0f;
         float EndSpread = 0.35f;
         // Waypoints stay this far from the map edge
@@ -1571,6 +1590,13 @@ namespace Global {
         }
 
         namespace Sea {
+            // Lost-water recovery only; ordinary naval economy/combat is unchanged.
+            bool CoastalFallback = true;
+            int CoastLossSeconds = 30;
+            int CoastRetakeSeconds = 60;
+            float CoastDepotDistance = 800.0f;
+            float CoastT2MetalIncome = 25.0f;
+            float CoastT2EnergyIncome = 600.0f;
             bool AmphibiousInvasion = true;
             int InvasionSurveySeconds = 600; // all 64-elmo water samples need LOS AND sonar
             int InvasionQuietSeconds = 30;
@@ -1647,6 +1673,14 @@ namespace Global {
             float SeaplaneMetalReserve = 500.0f; // retained in addition to the full platform cost
             float SeaplaneEnergyReserve = 1000.0f;
             float NearbyMexRadius = 2400.0f; // fixed home harbor radius, not an ever-moving expansion centre
+            bool ExpandMexClusters = true; // SEA only, independent of experimental economy/layouts
+            float ExpansionMexRadius = 3600.0f; // follows the constructor; no home-radius or income ceiling
+            float ExpansionClusterRadius = 600.0f;
+            float ExpansionMaxThreat = 0.1f; // unarmed workers wait for navy to clear known weapon coverage
+            float ExpansionThreatBuffer = 256.0f;
+            float ExpansionEscortMetal = 600.0f; // nearby combat ships required toward the contested frontier
+            int ExpansionRetrySeconds = 10;
+            float ExpansionSurfaceIncome = 30.0f; // torpedoes first; funded surface towers later
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;

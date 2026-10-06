@@ -1,0 +1,105 @@
+{
+  "case": "fortress-legfort-screen",
+  "variant": "baseline",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-legfort-screen\\glitters\\20261006T062136Z-98dc96c8",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armstump:weapon=948": 10016.0,
+    "corgol:weapon=947": 7175.0,
+    "armstump:weapon=947": 4780.0,
+    "corgol:weapon=948": 8388.0
+  },
+  "first_damage_seconds": {
+    "armstump": 12.166666666666666,
+    "corgol": 14.966666666666667
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "none": 44
+  },
+  "sampled_shot_targets": {
+    "1:corgol": 23,
+    "3:armstump": 41,
+    "4:armstump": 26,
+    "5:armstump": 43,
+    "2:corgol": 22,
+    "1:armstump": 12,
+    "1:none": 5,
+    "2:armstump": 19,
+    "3:corgol": 37,
+    "5:corgol": 22,
+    "2:none": 2,
+    "3:none": 6,
+    "4:none": 5,
+    "5:none": 3,
+    "4:corgol": 31
+  },
+  "damage_first_30_seconds": {
+    "armstump:weapon=948": 5979.0,
+    "corgol:weapon=947": 2230.0,
+    "armstump:weapon=947": 2159.0,
+    "corgol:weapon=948": 504.0
+  },
+  "deaths": [
+    {
+      "seconds": 21.0,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 23.1,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 28.266666666666666,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 29.9,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 34.93333333333333,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 37.93333333333333,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 43.7,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 48.833333333333336,
+      "unit": "armstump",
+      "team": 1
+    },
+    {
+      "seconds": 51.9,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 58.266666666666666,
+      "unit": "corgol",
+      "team": 1
+    }
+  ],
+  "first_active_priority": null,
+  "criteria": {
+    "enemy_damage": true,
+    "survival": true,
+    "heavy_damage": true
+  },
+  "defense_group_targets": [],
+  "first_defense_assignment": "none",
+  "enemy_damage": 30359.0,
+  "passed": true
+}

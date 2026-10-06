@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-armmanni"
+  },
+  "id": "20261006T052849Z-4fa930f2",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

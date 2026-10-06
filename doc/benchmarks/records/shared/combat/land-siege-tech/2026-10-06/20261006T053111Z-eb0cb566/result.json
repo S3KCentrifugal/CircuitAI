@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 529,
+      "sha256": "ce324792f4cae8e52fb8fb75701db59b228e70d9a1a81b4b994ea0ef7adf1303"
+    },
+    "infolog.txt": {
+      "bytes": 496920,
+      "sha256": "014a5d1d50c7e406421a601c69bb0e3126276ea0ce678af0d223fa1c4729d77c"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "25ecf3b23aed8aeb68c5951b8bc971cb4a6a7b8884d66aabe681758c08c6f886"
+    },
+    "ranged-arena-pins.json": {
+      "bytes": 37206,
+      "sha256": "e598d439f96aa0fd239ed3f49c96b30d662b296fc6cc37e50f4bbb92f299487c"
+    },
+    "ranged-arena.json": {
+      "bytes": 2564,
+      "sha256": "ea026ef479821f013cb01e9bf81030ff1a67a244e0d11f57991097e8c3029e48"
+    },
+    "report.md": {
+      "bytes": 17833,
+      "sha256": "9b0f50ce058bbb19eb2370474ef72f70b90172ef92bfac5c0313ed18eb16a052"
+    },
+    "run-inputs.json": {
+      "bytes": 37000,
+      "sha256": "31805f0e0ae10fd51a97326d4ecd6647ee4c02f34e1939cd3854569aafc01a49"
+    },
+    "run-plan.json": {
+      "bytes": 256,
+      "sha256": "070e6f1eb02088e226cf567143430c3aecff2c2f91c67a4a83d44fb6249a2125"
+    },
+    "script.txt": {
+      "bytes": 6188,
+      "sha256": "b0efc17645a09d7cc4ebc1a47e535ea7d92ca4c908f79b356ec6c0e1f4abb210"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "1cb0cedd091c85cac3d6ddeae7f4c89889eb30dad5d3162e24ea42212e00914f"
+    },
+    "starts.as": {
+      "bytes": 112,
+      "sha256": "f2a32d2e961b7d18e32a89793b8951107667593bbcc7a78ad298445618d55ec5"
+    },
+    "teams.json": {
+      "bytes": 465,
+      "sha256": "da889aaa54c1c9a8bd0df4a7d1994c2318217377f8154b695355b77a01b1f90d"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "land-siege-tech"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T053111Z-eb0cb566",
+  "last_frame": 693,
+  "map": "All That Glitters v2.2.3",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\land-siege-tech\\glitters\\20261006T053027Z-d90f8cec\\runs\\20261006T053111Z-eb0cb566",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-06T05:31:11.523355+00:00",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "cortex",
+      "spot": 1,
+      "team": 0,
+      "x": 4000.0,
+      "z": 2400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 4000.0,
+      "z": 9800.0
+    }
+  ],
+  "verdict": "FAIL"
+}

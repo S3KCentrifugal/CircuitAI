@@ -1,5 +1,6 @@
 #include "sea_factories.as"
 #include "../manager/sea_eco_layout.as"
+#include "../manager/sea_expansion.as"
 
 namespace SeaBuild {
     int lastTick=-1;
@@ -7,6 +8,7 @@ namespace SeaBuild {
     int placementLog=-100000;
     IUnitTask@ Wait() { return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)); }
     IUnitTask@ OpeningMex(CCircuitUnit@ u) {
+        if (SeaExpansion::Active()) return SeaExpansion::Make(u);
         if (u is null || u !is Builder::primaryT1SeaConstructor || !SeaConstructor::IsT1(u.circuitDef)) return null;
         if (u.task !is null && (u.task.IsEnemyReclaim() || u.task.GetType()==int(Task::Type::PLAYER))) return u.task;
         IBuilderTask@ current=cast<IBuilderTask>(u.task);
@@ -78,6 +80,8 @@ namespace SeaBuild {
             || name==UnitHelpers::GetT1NavalNanoNameForSide(side);
     }
     void Leave() {
+        SeaCoast::Leave();
+        SeaExpansion::Reset();
         SeaInvasion::Leave();
         SeaRecovery::Leave();
         SeaCombat::Leave();

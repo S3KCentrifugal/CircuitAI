@@ -91,7 +91,7 @@ turrets, D-119). See [`../invariants.md`](../invariants.md).
 | `FrontClusterStallSeconds` | 300 | a factory order with no frame this long gives its cluster up (ground released) |
 | `FrontClusterOpenSeconds` | 600 | INV-046 |
 
-<!-- source: data/script/src/roles/tech_factories.as; blob: 33f932ea31eeb7915a98bdc9457bce021c832840; lines: 975 -->
+<!-- source: data/script/src/roles/tech_factories.as; blob: 7be913f7e2d81b3ba090220be953ae01ad566bc5; lines: 981 -->
 
 ## D-152 reserve before spending
 
@@ -110,3 +110,11 @@ exit/lateral corridors before searching again. A claimed or previously started
 cluster stays fixed. `NewCluster` protects gaps with a native envelope; normal
 defense searches cannot fill them. Allied reservations are visible natively,
 including during every candidate check and exact task placement.
+
+
+## D-216 retirement ownership
+
+`ReclaimBaseFactory` cancels the factory's real recruit/wait task before
+`Lifecycle::Retire` sends STOP. STOP alone allowed a recruit idle callback to
+restart production after retirement (INV-001, played in the supplied TECH
+construction test). Factory count, placement and reclaim thresholds are unchanged.

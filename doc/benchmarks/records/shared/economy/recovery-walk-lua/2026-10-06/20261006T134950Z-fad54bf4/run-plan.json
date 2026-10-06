@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "recovery-walk-lua"
+  },
+  "id": "20261006T134652Z-6d9a6516",
+  "requested": {
+    "seed": 218001
+  },
+  "schema": 1
+}

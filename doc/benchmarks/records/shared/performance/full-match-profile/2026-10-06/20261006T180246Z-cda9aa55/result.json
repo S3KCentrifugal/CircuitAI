@@ -1,0 +1,311 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1085,
+      "sha256": "422314349d0b585fa17e0d0044f133091008a9ea5c00470955c09364f6b13072"
+    },
+    "full-match-checks.json": {
+      "bytes": 1085,
+      "sha256": "422314349d0b585fa17e0d0044f133091008a9ea5c00470955c09364f6b13072"
+    },
+    "full-match-manifest.json": {
+      "bytes": 38726,
+      "sha256": "3d9765593bba07ce416777a0e27f15f9b9acc970237db594741a262aee89539b"
+    },
+    "infolog.txt": {
+      "bytes": 77228628,
+      "sha256": "f120a3c402c8bb0ae5b844e223cef7eccc89bc99af966bd874026baa74bf0af9"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "4179cd5f414b3e0be62f77aafa2c6284160d0904ab29d584c471efab86ce3ad4"
+    },
+    "report.md": {
+      "bytes": 139976,
+      "sha256": "e00051cc65ac1984f659728dd5f683954b74586aebd36267fd5115f308e86f2b"
+    },
+    "run-inputs.json": {
+      "bytes": 38009,
+      "sha256": "3385c9c6feca2ffe012d79bccf4520e7af074a6cee37fe01768c67535a96eb3e"
+    },
+    "run-plan.json": {
+      "bytes": 264,
+      "sha256": "26da5250659b4435c24f8b96b5a556fda497c60e89a024c509aa0371e06adf3a"
+    },
+    "sample-glacial-17m.modules.json": {
+      "bytes": 16717,
+      "sha256": "f26c7da9ea6abdfd94e067bd969e5b20ad9bd33c81543ef759c09527b74f64a4"
+    },
+    "sample-glacial-17m.resolved.json": {
+      "bytes": 57718,
+      "sha256": "2a21bb8111b6c4f3c75ed31cffb398f66d02fb054518f99117cb8556a7450261"
+    },
+    "sample-glacial-17m.threads-after.json": {
+      "bytes": 1897,
+      "sha256": "51b70882d4132f928c0b350189d6ee5741513c174c87d33f6712730291df269f"
+    },
+    "sample-glacial-17m.threads-before.json": {
+      "bytes": 1850,
+      "sha256": "4ea35fb64f93748eec2043355a60d2c7419965e6ea5597ba15a55130ea1be14a"
+    },
+    "sample-glacial-35m.modules.json": {
+      "bytes": 16717,
+      "sha256": "96a796194fc8811c3692021cf9a6704113127b33e9ef86ca72a3327a832bd792"
+    },
+    "sample-glacial-35m.resolved.json": {
+      "bytes": 118110,
+      "sha256": "66e29004d65be3d5ab1fe614d3959f2e24558e617d355e6de3fbee04be494970"
+    },
+    "sample-glacial-35m.threads-after.json": {
+      "bytes": 1851,
+      "sha256": "00656b674272b3b3bf9e9f1ce657edb2be957fe9935a50384079ffea441ae144"
+    },
+    "sample-glacial-35m.threads-before.json": {
+      "bytes": 1860,
+      "sha256": "a88f8ac394327e244c80a5d8af3442ec6032de49ba6f0e824586837103649b21"
+    },
+    "sample-glacial-50m.modules.json": {
+      "bytes": 16717,
+      "sha256": "49ac97c6db7d55a6db280f019efba4be3cf3b8e7944d7e4b2549752e5506331c"
+    },
+    "sample-glacial-50m.resolved.json": {
+      "bytes": 150493,
+      "sha256": "4e83819ac7f9dee0f3ba0a67038fdfd6c6de44b27e246f3b425a08c23129d1dc"
+    },
+    "sample-glacial-50m.threads-after.json": {
+      "bytes": 1874,
+      "sha256": "a8f869bdbd74e4a73b832444fa7c0a199a441077c5b148c2aebf3c314f3a717d"
+    },
+    "sample-glacial-50m.threads-before.json": {
+      "bytes": 1871,
+      "sha256": "14fc98cf6e87688358a29afb5ed6c83cb7d02a689219bafb5e5377fbb6274e8c"
+    },
+    "screen_2026-10-06_17-30-33-799.png": {
+      "bytes": 1803483,
+      "sha256": "215bc81c7036a88f499403afa08dea0002d2404da81377e6ff44d79ae598ad3a"
+    },
+    "screen_2026-10-06_17-31-25-978.png": {
+      "bytes": 1825541,
+      "sha256": "2a1c1a1b0a58e680a7ed0c12c8be63fd9dd012b2aa7618922d04ef267187e24f"
+    },
+    "screen_2026-10-06_17-32-23-142.png": {
+      "bytes": 1816904,
+      "sha256": "83ca6d6031274a8c0adcffe98f81f6e8b4cf84920ec74af70ad3e663157f54df"
+    },
+    "screen_2026-10-06_17-34-15-130.png": {
+      "bytes": 1848691,
+      "sha256": "c7b62c7e8e33b0fb85037f5b64c75ef711d8d22c66c23d7ffbc389102d8d19dc"
+    },
+    "screen_2026-10-06_17-37-40-980.png": {
+      "bytes": 1877246,
+      "sha256": "306d1b151e815bbdcc0af38f11b3c427b4848ac4b5ff1d3a6c90369ec18a41fd"
+    },
+    "screen_2026-10-06_17-45-34-023.png": {
+      "bytes": 1891600,
+      "sha256": "eec8e24262c017fc3187d5b2760f7ab41d8ca66682e08df7e59d3e48480d9c7d"
+    },
+    "screen_2026-10-06_17-53-06-324.png": {
+      "bytes": 1885537,
+      "sha256": "63c132e8f02794badcc62f65ffa4d7d7af938625936295bf976286bfc2a387ad"
+    },
+    "screen_2026-10-06_18-02-45-354.png": {
+      "bytes": 1939460,
+      "sha256": "2c3362191d65a25fc40fcb01fe0c42de2a0bb9d192bf5d5641fff102fe867c65"
+    },
+    "script.txt": {
+      "bytes": 10787,
+      "sha256": "937d34d452fb1d1e178ef5194ba90ec976f4adcf81691614b76d733137334cb2"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "e4c7f3ad4498cf7977614d2d083a450887f6bc436e114f5de7adeb8c7bc9b113"
+    },
+    "teams.json": {
+      "bytes": 2956,
+      "sha256": "f0be9f58ee119530827519dd09d3ba9a205381508ee2a1e43a08244509f3e17c"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "natural",
+    "map": "glacial",
+    "scenario": "full-match-profile"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T180246Z-cda9aa55",
+  "last_frame": 108002,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\glacial\\20261006T172811Z-7d8d246d\\runs\\20261006T180246Z-cda9aa55",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-06T18:02:46.731650+00:00",
+  "requested": {
+    "seed": 220001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 3,
+      "team": 0,
+      "x": 430.0,
+      "z": 2300.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 1,
+      "team": 1,
+      "x": 490.0,
+      "z": 1140.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 2,
+      "team": 2,
+      "x": 1800.0,
+      "z": 1400.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 4,
+      "team": 3,
+      "x": 1800.0,
+      "z": 2550.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 4,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 6,
+      "team": 5,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 7,
+      "team": 6,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TACTICAL",
+      "side": "armada",
+      "spot": 8,
+      "team": 7,
+      "x": 880.0,
+      "z": 6850.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 9,
+      "team": 8,
+      "x": 12572.0,
+      "z": 1400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "legion",
+      "spot": 10,
+      "team": 9,
+      "x": 14000.0,
+      "z": 1100.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 11,
+      "team": 10,
+      "x": 12640.0,
+      "z": 2500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 12,
+      "team": 11,
+      "x": 13890.0,
+      "z": 2246.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 12,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 13,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 14,
+      "x": 12618.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TACTICAL",
+      "side": "legion",
+      "spot": 16,
+      "team": 15,
+      "x": 13454.0,
+      "z": 6850.0
+    }
+  ],
+  "verdict": "FAIL"
+}

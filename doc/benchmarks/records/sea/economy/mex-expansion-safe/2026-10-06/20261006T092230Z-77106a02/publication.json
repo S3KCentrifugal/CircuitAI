@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "80996a226aec41286907e9183711ed6f362fa71df6b2e5c6b02f762c1aed1742",
+    "checks.json": "d37923a76169893781c65150011e4d57aa440fdeae64bab8c31080aa8dbd14e1",
+    "expansion-metrics.json": "eab6551eff128a344362229bc93ababded9be3127e2c2b0eb16429b09a875d49",
+    "launched.json": "2b8d392f6545fb28ca90127c7a9069e95d02c23fcedf5f3e18f65d264c323b79",
+    "report.md": "09a069e3e29218c4b9d20707adf40e7a1f386e6a489bd7ee545885e87779e298",
+    "result.json": "afa71e717943deb1be993ae3818ab6fccaf78305ab1e1f81ebd165de63741c2e",
+    "run-inputs.json": "ebd6dc020ed78202394a878fd19196dc8577002abf2537e9b1074f2f0bd26de5",
+    "run-plan.json": "d54faaf1bac0b135d56bf9710ac8ef002cb6ad50ae7d8adb7de496d3aba040b3",
+    "screen_2026-10-06_09-17-27-090.png": "6aed6afdc31991ace2c8009c713ee0de1f2194fd6d8bb10c607c31a2954641e5",
+    "script.txt": "7f5dd5f1d1d27d8df171d036cea156238b13df238459e17b6bf490c4612a7633",
+    "sea-fixture.json": "9eb149241d7bbf9b4fe61915290186d596e8053b7560de1b4335ef00ccb0181c",
+    "staged.json": "a85dc69ed882326c621f2a69d16caa3f692b77f39bb340cb3c5dae9896fa51aa",
+    "teams.json": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\mex-expansion-safe\\glacial\\20261006T091405Z-58a37df6\\runs\\20261006T092230Z-77106a02",
+  "schema": 1
+}

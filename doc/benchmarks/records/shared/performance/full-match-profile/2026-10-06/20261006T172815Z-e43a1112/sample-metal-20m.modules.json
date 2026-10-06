@@ -1,0 +1,602 @@
+[
+  {
+    "name": "spring.exe",
+    "base": 140698207715328,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\spring.exe",
+    "size": 1203695616
+  },
+  {
+    "name": "ntdll.dll",
+    "base": 140718733131776,
+    "path": "C:\\WINDOWS\\SYSTEM32\\ntdll.dll",
+    "size": 2519040
+  },
+  {
+    "name": "KERNEL32.DLL",
+    "base": 140718726709248,
+    "path": "C:\\WINDOWS\\System32\\KERNEL32.DLL",
+    "size": 831488
+  },
+  {
+    "name": "KERNELBASE.dll",
+    "base": 140718690271232,
+    "path": "C:\\WINDOWS\\System32\\KERNELBASE.dll",
+    "size": 4202496
+  },
+  {
+    "name": "ADVAPI32.dll",
+    "base": 140718731296768,
+    "path": "C:\\WINDOWS\\System32\\ADVAPI32.dll",
+    "size": 770048
+  },
+  {
+    "name": "msvcrt.dll",
+    "base": 140718722908160,
+    "path": "C:\\WINDOWS\\System32\\msvcrt.dll",
+    "size": 692224
+  },
+  {
+    "name": "sechost.dll",
+    "base": 140718723629056,
+    "path": "C:\\WINDOWS\\System32\\sechost.dll",
+    "size": 692224
+  },
+  {
+    "name": "RPCRT4.dll",
+    "base": 140718719303680,
+    "path": "C:\\WINDOWS\\System32\\RPCRT4.dll",
+    "size": 1146880
+  },
+  {
+    "name": "SDL2.dll",
+    "base": 140714411884544,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\SDL2.dll",
+    "size": 1437696
+  },
+  {
+    "name": "imagehlp.dll",
+    "base": 140718713339904,
+    "path": "C:\\WINDOWS\\System32\\imagehlp.dll",
+    "size": 131072
+  },
+  {
+    "name": "ucrtbase.dll",
+    "base": 140718688239616,
+    "path": "C:\\WINDOWS\\System32\\ucrtbase.dll",
+    "size": 1359872
+  },
+  {
+    "name": "SHELL32.dll",
+    "base": 140718700298240,
+    "path": "C:\\WINDOWS\\System32\\SHELL32.dll",
+    "size": 7962624
+  },
+  {
+    "name": "msvcp_win.dll",
+    "base": 140718684897280,
+    "path": "C:\\WINDOWS\\System32\\msvcp_win.dll",
+    "size": 667648
+  },
+  {
+    "name": "USER32.dll",
+    "base": 140718727757824,
+    "path": "C:\\WINDOWS\\System32\\USER32.dll",
+    "size": 1896448
+  },
+  {
+    "name": "win32u.dll",
+    "base": 140718686404608,
+    "path": "C:\\WINDOWS\\System32\\win32u.dll",
+    "size": 159744
+  },
+  {
+    "name": "GDI32.dll",
+    "base": 140718727561216,
+    "path": "C:\\WINDOWS\\System32\\GDI32.dll",
+    "size": 176128
+  },
+  {
+    "name": "IPHLPAPI.DLL",
+    "base": 140718657503232,
+    "path": "C:\\WINDOWS\\SYSTEM32\\IPHLPAPI.DLL",
+    "size": 208896
+  },
+  {
+    "name": "gdi32full.dll",
+    "base": 140718694531072,
+    "path": "C:\\WINDOWS\\System32\\gdi32full.dll",
+    "size": 1216512
+  },
+  {
+    "name": "IMM32.dll",
+    "base": 140718713077760,
+    "path": "C:\\WINDOWS\\System32\\IMM32.dll",
+    "size": 200704
+  },
+  {
+    "name": "SHLWAPI.dll",
+    "base": 140718720942080,
+    "path": "C:\\WINDOWS\\System32\\SHLWAPI.dll",
+    "size": 417792
+  },
+  {
+    "name": "ole32.dll",
+    "base": 140718713602048,
+    "path": "C:\\WINDOWS\\System32\\ole32.dll",
+    "size": 1679360
+  },
+  {
+    "name": "WS2_32.dll",
+    "base": 140718732148736,
+    "path": "C:\\WINDOWS\\System32\\WS2_32.dll",
+    "size": 524288
+  },
+  {
+    "name": "WINMM.dll",
+    "base": 140718539669504,
+    "path": "C:\\WINDOWS\\SYSTEM32\\WINMM.dll",
+    "size": 221184
+  },
+  {
+    "name": "combase.dll",
+    "base": 140718696562688,
+    "path": "C:\\WINDOWS\\System32\\combase.dll",
+    "size": 3690496
+  },
+  {
+    "name": "OLEAUT32.dll",
+    "base": 140718724349952,
+    "path": "C:\\WINDOWS\\System32\\OLEAUT32.dll",
+    "size": 888832
+  },
+  {
+    "name": "SETUPAPI.dll",
+    "base": 140718708293632,
+    "path": "C:\\WINDOWS\\System32\\SETUPAPI.dll",
+    "size": 4747264
+  },
+  {
+    "name": "OpenAL32.dll",
+    "base": 1801453568,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\OpenAL32.dll",
+    "size": 2629632
+  },
+  {
+    "name": "libIL.dll",
+    "base": 1780219904,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libIL.dll",
+    "size": 2887680
+  },
+  {
+    "name": "libcurl.dll",
+    "base": 140714288807936,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libcurl.dll",
+    "size": 4743168
+  },
+  {
+    "name": "libfontconfig-1.dll",
+    "base": 140716806373376,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libfontconfig-1.dll",
+    "size": 331776
+  },
+  {
+    "name": "CRYPT32.dll",
+    "base": 140718686601216,
+    "path": "C:\\WINDOWS\\System32\\CRYPT32.dll",
+    "size": 1564672
+  },
+  {
+    "name": "Normaliz.dll",
+    "base": 140718713536512,
+    "path": "C:\\WINDOWS\\System32\\Normaliz.dll",
+    "size": 32768
+  },
+  {
+    "name": "libfreetype-6.dll",
+    "base": 140715999363072,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libfreetype-6.dll",
+    "size": 700416
+  },
+  {
+    "name": "WLDAP32.dll",
+    "base": 140718730772480,
+    "path": "C:\\WINDOWS\\System32\\WLDAP32.dll",
+    "size": 475136
+  },
+  {
+    "name": "libvorbisfile-3.dll",
+    "base": 1799094272,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libvorbisfile-3.dll",
+    "size": 81920
+  },
+  {
+    "name": "zlib1.dll",
+    "base": 140717811040256,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\zlib1.dll",
+    "size": 167936
+  },
+  {
+    "name": "VERSION.dll",
+    "base": 140718563196928,
+    "path": "C:\\WINDOWS\\SYSTEM32\\VERSION.dll",
+    "size": 45056
+  },
+  {
+    "name": "bcrypt.dll",
+    "base": 140718683783168,
+    "path": "C:\\WINDOWS\\SYSTEM32\\bcrypt.dll",
+    "size": 172032
+  },
+  {
+    "name": "libexpat-1.dll",
+    "base": 140717531398144,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libexpat-1.dll",
+    "size": 233472
+  },
+  {
+    "name": "libgcc_s_seh-1.dll",
+    "base": 140717659455488,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libgcc_s_seh-1.dll",
+    "size": 114688
+  },
+  {
+    "name": "libintl-8.dll",
+    "base": 140717602308096,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libintl-8.dll",
+    "size": 126976
+  },
+  {
+    "name": "libbz2.dll",
+    "base": 140717600276480,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libbz2.dll",
+    "size": 131072
+  },
+  {
+    "name": "libharfbuzz-0.dll",
+    "base": 140714099933184,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libharfbuzz-0.dll",
+    "size": 2920448
+  },
+  {
+    "name": "libpng16-16.dll",
+    "base": 140716831735808,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libpng16-16.dll",
+    "size": 266240
+  },
+  {
+    "name": "libvorbis-0.dll",
+    "base": 1834221568,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libvorbis-0.dll",
+    "size": 266240
+  },
+  {
+    "name": "libogg-0.dll",
+    "base": 1885863936,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libogg-0.dll",
+    "size": 61440
+  },
+  {
+    "name": "libwinpthread-1.dll",
+    "base": 140717553156096,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libwinpthread-1.dll",
+    "size": 114688
+  },
+  {
+    "name": "libiconv-2.dll",
+    "base": 140714858184704,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libiconv-2.dll",
+    "size": 1011712
+  },
+  {
+    "name": "libglib-2.0-0.dll",
+    "base": 140714287431680,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libglib-2.0-0.dll",
+    "size": 1327104
+  },
+  {
+    "name": "cfgmgr32.DLL",
+    "base": 140718680965120,
+    "path": "C:\\WINDOWS\\SYSTEM32\\cfgmgr32.DLL",
+    "size": 335872
+  },
+  {
+    "name": "libpcre-1.dll",
+    "base": 140716806045696,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\libpcre-1.dll",
+    "size": 311296
+  },
+  {
+    "name": "shcore.dll",
+    "base": 140718715699200,
+    "path": "C:\\WINDOWS\\System32\\shcore.dll",
+    "size": 1028096
+  },
+  {
+    "name": "nvapi64.dll",
+    "base": 140718160936960,
+    "path": "C:\\WINDOWS\\SYSTEM32\\nvapi64.dll",
+    "size": 561152
+  },
+  {
+    "name": "msasn1.dll",
+    "base": 140718675197952,
+    "path": "C:\\WINDOWS\\SYSTEM32\\msasn1.dll",
+    "size": 77824
+  },
+  {
+    "name": "cryptnet.dll",
+    "base": 140718542553088,
+    "path": "C:\\WINDOWS\\SYSTEM32\\cryptnet.dll",
+    "size": 241664
+  },
+  {
+    "name": "cryptbase.dll",
+    "base": 140718672904192,
+    "path": "C:\\WINDOWS\\SYSTEM32\\cryptbase.dll",
+    "size": 49152
+  },
+  {
+    "name": "wldp.dll",
+    "base": 140718673690624,
+    "path": "C:\\WINDOWS\\SYSTEM32\\wldp.dll",
+    "size": 434176
+  },
+  {
+    "name": "drvstore.dll",
+    "base": 140718540980224,
+    "path": "C:\\WINDOWS\\SYSTEM32\\drvstore.dll",
+    "size": 1548288
+  },
+  {
+    "name": "devobj.dll",
+    "base": 140718681358336,
+    "path": "C:\\WINDOWS\\SYSTEM32\\devobj.dll",
+    "size": 192512
+  },
+  {
+    "name": "dxcore.dll",
+    "base": 140718632730624,
+    "path": "C:\\WINDOWS\\SYSTEM32\\dxcore.dll",
+    "size": 278528
+  },
+  {
+    "name": "windows.storage.dll",
+    "base": 140718645313536,
+    "path": "C:\\WINDOWS\\SYSTEM32\\windows.storage.dll",
+    "size": 9101312
+  },
+  {
+    "name": "nvapi64_impl.dll",
+    "base": 140718155038720,
+    "path": "C:\\WINDOWS\\system32\\DriverStore\\FileRepository\\nv_dispi.inf_amd64_436833bbb0f00476\\nvapi64_impl.dll",
+    "size": 5840896
+  },
+  {
+    "name": "profapi.dll",
+    "base": 140718683979776,
+    "path": "C:\\WINDOWS\\SYSTEM32\\profapi.dll",
+    "size": 167936
+  },
+  {
+    "name": "dwmapi.DLL",
+    "base": 140718634631168,
+    "path": "C:\\WINDOWS\\SYSTEM32\\dwmapi.DLL",
+    "size": 192512
+  },
+  {
+    "name": "uxtheme.dll",
+    "base": 140718631682048,
+    "path": "C:\\WINDOWS\\system32\\uxtheme.dll",
+    "size": 688128
+  },
+  {
+    "name": "mscms.dll",
+    "base": 140717992509440,
+    "path": "C:\\WINDOWS\\SYSTEM32\\mscms.dll",
+    "size": 782336
+  },
+  {
+    "name": "icm32.dll",
+    "base": 140716804538368,
+    "path": "C:\\WINDOWS\\SYSTEM32\\icm32.dll",
+    "size": 307200
+  },
+  {
+    "name": "OPENGL32.DLL",
+    "base": 140715205591040,
+    "path": "C:\\WINDOWS\\SYSTEM32\\OPENGL32.DLL",
+    "size": 1097728
+  },
+  {
+    "name": "GLU32.dll",
+    "base": 140717589594112,
+    "path": "C:\\WINDOWS\\SYSTEM32\\GLU32.dll",
+    "size": 184320
+  },
+  {
+    "name": "MSCTF.dll",
+    "base": 140718721400832,
+    "path": "C:\\WINDOWS\\System32\\MSCTF.dll",
+    "size": 1421312
+  },
+  {
+    "name": "windows.staterepositorycore.dll",
+    "base": 140718065582080,
+    "path": "C:\\WINDOWS\\SYSTEM32\\windows.staterepositorycore.dll",
+    "size": 122880
+  },
+  {
+    "name": "nvoglv64.dll",
+    "base": 140714806673408,
+    "path": "C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\nv_dispi.inf_amd64_436833bbb0f00476\\nvoglv64.dll",
+    "size": 48857088
+  },
+  {
+    "name": "WTSAPI32.dll",
+    "base": 140718630109184,
+    "path": "C:\\WINDOWS\\SYSTEM32\\WTSAPI32.dll",
+    "size": 172032
+  },
+  {
+    "name": "SspiCli.dll",
+    "base": 140718667399168,
+    "path": "C:\\WINDOWS\\SYSTEM32\\SspiCli.dll",
+    "size": 299008
+  },
+  {
+    "name": "ntmarta.dll",
+    "base": 140718665760768,
+    "path": "C:\\WINDOWS\\SYSTEM32\\ntmarta.dll",
+    "size": 221184
+  },
+  {
+    "name": "WINTRUST.dll",
+    "base": 140718689681408,
+    "path": "C:\\WINDOWS\\System32\\WINTRUST.dll",
+    "size": 532480
+  },
+  {
+    "name": "CRYPTSP.dll",
+    "base": 140718674739200,
+    "path": "C:\\WINDOWS\\SYSTEM32\\CRYPTSP.dll",
+    "size": 110592
+  },
+  {
+    "name": "rsaenh.dll",
+    "base": 140718663860224,
+    "path": "C:\\WINDOWS\\system32\\rsaenh.dll",
+    "size": 233472
+  },
+  {
+    "name": "bcryptPrimitives.dll",
+    "base": 140718685618176,
+    "path": "C:\\WINDOWS\\System32\\bcryptPrimitives.dll",
+    "size": 704512
+  },
+  {
+    "name": "nvgpucomp64.dll",
+    "base": 140718377467904,
+    "path": "C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\nv_dispi.inf_amd64_436833bbb0f00476\\nvgpucomp64.dll",
+    "size": 110784512
+  },
+  {
+    "name": "nvspcap64.dll",
+    "base": 140716282740736,
+    "path": "C:\\WINDOWS\\system32\\nvspcap64.dll",
+    "size": 1495040
+  },
+  {
+    "name": "powrprof.dll",
+    "base": 140718677229568,
+    "path": "C:\\WINDOWS\\SYSTEM32\\powrprof.dll",
+    "size": 385024
+  },
+  {
+    "name": "UMPDC.dll",
+    "base": 140718677098496,
+    "path": "C:\\WINDOWS\\SYSTEM32\\UMPDC.dll",
+    "size": 86016
+  },
+  {
+    "name": "WINSTA.dll",
+    "base": 140718675918848,
+    "path": "C:\\WINDOWS\\SYSTEM32\\WINSTA.dll",
+    "size": 409600
+  },
+  {
+    "name": "kernel.appcore.dll",
+    "base": 140718664515584,
+    "path": "C:\\WINDOWS\\SYSTEM32\\kernel.appcore.dll",
+    "size": 110592
+  },
+  {
+    "name": "clbcatq.dll",
+    "base": 140718725922816,
+    "path": "C:\\WINDOWS\\System32\\clbcatq.dll",
+    "size": 712704
+  },
+  {
+    "name": "textinputframework.dll",
+    "base": 140717881360384,
+    "path": "C:\\WINDOWS\\SYSTEM32\\textinputframework.dll",
+    "size": 1318912
+  },
+  {
+    "name": "CoreMessaging.dll",
+    "base": 140718625062912,
+    "path": "C:\\WINDOWS\\SYSTEM32\\CoreMessaging.dll",
+    "size": 1224704
+  },
+  {
+    "name": "CoreUIComponents.dll",
+    "base": 140718552711168,
+    "path": "C:\\WINDOWS\\SYSTEM32\\CoreUIComponents.dll",
+    "size": 3031040
+  },
+  {
+    "name": "wintypes.dll",
+    "base": 140718575517696,
+    "path": "C:\\WINDOWS\\SYSTEM32\\wintypes.dll",
+    "size": 1482752
+  },
+  {
+    "name": "MMDevApi.dll",
+    "base": 140718564114432,
+    "path": "C:\\WINDOWS\\System32\\MMDevApi.dll",
+    "size": 675840
+  },
+  {
+    "name": "avrt.dll",
+    "base": 140718561361920,
+    "path": "C:\\WINDOWS\\SYSTEM32\\avrt.dll",
+    "size": 45056
+  },
+  {
+    "name": "AUDIOSES.DLL",
+    "base": 140718329888768,
+    "path": "C:\\WINDOWS\\SYSTEM32\\AUDIOSES.DLL",
+    "size": 1798144
+  },
+  {
+    "name": "resourcepolicyclient.dll",
+    "base": 140718638301184,
+    "path": "C:\\WINDOWS\\SYSTEM32\\resourcepolicyclient.dll",
+    "size": 81920
+  },
+  {
+    "name": "secur32.dll",
+    "base": 140718629978112,
+    "path": "C:\\WINDOWS\\SYSTEM32\\secur32.dll",
+    "size": 53248
+  },
+  {
+    "name": "mswsock.dll",
+    "base": 140718670413824,
+    "path": "C:\\WINDOWS\\system32\\mswsock.dll",
+    "size": 442368
+  },
+  {
+    "name": "NSI.dll",
+    "base": 140718722842624,
+    "path": "C:\\WINDOWS\\System32\\NSI.dll",
+    "size": 40960
+  },
+  {
+    "name": "dhcpcsvc.DLL",
+    "base": 140718544846848,
+    "path": "C:\\WINDOWS\\SYSTEM32\\dhcpcsvc.DLL",
+    "size": 151552
+  },
+  {
+    "name": "AIInterface.dll",
+    "base": 140717998735360,
+    "path": "C:\\Users\\robmc\\AppData\\Local\\Programs\\Beyond-All-Reason\\data\\engine\\recoil_2026.07.04\\AI\\Interfaces\\C\\0.1\\AIInterface.dll",
+    "size": 253952
+  },
+  {
+    "name": "SkirmishAI.dll",
+    "base": 140714279370752,
+    "path": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\metal-plate\\20261006T163130Z-5805fe36\\AI\\Skirmish\\BARbTest\\test\\SkirmishAI.dll",
+    "size": 8056832
+  }
+]

@@ -369,6 +369,16 @@ value, and `IsRoleAny` on a custom role matches the defs the config tags.
 
 Decision: [D-007](decisions.md#d-007--spams-fusion-era-gate-is-deliberate-and-stays).
 
+**D-216 status (2026-10-06): corrected and played.** The current-code
+supplied TECH baseline reproduced activation without production. The fixes
+cover shared-idle cancellation, persistent repeat ownership, role/attribute
+collision, unit caps, reachable enemy lanes and construction admission. All
+six experimental roles passed supplied production tests; TECH and FRONT also
+built their own pumps. Income-loss and factory-retirement checks passed.
+See the [full diagnosis and immutable evidence](reviews/2026-10-06-spam-and-fatboy.md).
+The original Eight Horses game was not replayed; the historical diagnosis below
+is retained rather than retrospectively attributing its unseen guard.
+
 **Severity**: Medium
 **Location**: `Spam::FactoryMakeTask`, `Spam::Update`
 (`data/script/src/manager/spam.as`)
@@ -415,7 +425,7 @@ a minute while inactive. Both are memoised — a factory that asks every few
 seconds logs one line per change of answer, not hundreds. The "not a spam
 factory" case stays silent because it is the normal answer for most factories.
 
-**Still open: the underlying cause.** The diagnostics do not fix anything; they
+**Historical follow-up before D-216: the underlying cause.** The diagnostics do not fix anything; they
 make the next game name the guard. Once it does:
 
 - if it is `IsAvailable`, find which limit zeroes the spam unit and decide
@@ -5509,3 +5519,221 @@ the original run remains FAIL despite passing its production/recovery checks.
 **Proposed solution.** Use the explicit idle-time [compression utility](../tools/playtest/compress_symbols.py) after batches of simulations. A future permanent solution can add opt-in compression after staging, or a content-addressed immutable symbol archive with an explicit restore/lookup manifest. Do not hard-link reusable staged destinations: later copy2 writes could modify symbols retained for another run. Do not prune raw game folders without verified backups and artifact-location records.
 
 **Verification.** The [audit and preservation results](storage-cleanup-2026-10-06.md) and [D-213](decisions.md#d-213--reclaim-playtest-disk-space-with-verified-symbol-compression) document current mitigation. Automatic staging/storage changes remain unimplemented; benchmark content and original evidence are retained.
+
+
+### KI-521 - Reported Incinerator front-line stall not reproduced in supplied forces
+
+**Severity:** Medium (reported combat effectiveness; cause unconfirmed).
+
+**Problem.** The user reports reduced front-line pushing after the ranged changes. Current leginc has main role heavy, no ranged attribute and no standoff override; D-207 did not migrate it. Four isolated Incinerators advanced through six lasers with three confirmed beam damage sources, no loss and final kill at 71 seconds. In a mixed force they advanced roughly 1,200 elmos, but allied Arquebuses/Medusas cleared eight HLTs first, so they dealt no damage. These fixtures do not reproduce the reported crowded-front stall or establish that it is resolved.
+
+**Proposed solution.** Recreate the reported map/profile and force composition from a replay or saved scenario; record task type, leader, chosen target, firing slot, actual weapon range/LOS and position progress across a stalled interval. Trace Military::AiMakeTask, CAttackTask, ISquadTask::Attack and MoveAction for the affected heavy squad, including friendly congestion and target invalidation. Only then change the confirmed approach/ownership mechanism and preserve D-207 precision/splash tests. Do not apply ranged attributes to leginc or globally disable safe firing positions as a speculative fix.
+
+**Verification.** [D-214 design and evidence](reviews/2026-10-06-land-siege-response.md) retains both rendered cases, damage attribution and screenshots. Production is addressed separately. The exact reported condition remains unverified.
+
+
+### KI-522 - Legacy Cortex profiles still describe the archaic Dragon
+
+**Severity:** Low (legacy-profile coverage; custom AIR uses experimental profiles).
+
+**Problem.** Root/easy/medium/hard behaviour.json contain corcrw entries but no
+current corcrwh entry. D-215 opts the reviewed corcrwh and legfort definitions
+into valuable-target preference wherever those definitions already exist;
+it does not migrate the older Cortex roster or change its fallback classification.
+This is a pre-existing coverage gap, not a candidate regression.
+
+**Proposed solution.** Audit current factory edges and native auto-classification
+for those legacy profiles, introduce current Dragon entries that preserve their
+difficulty/retreat policy, and run supplied production/targeting fixtures per
+profile. Do not blindly rename the archaic unit because both IDs have distinct
+game definitions.
+
+**Verification.** Source/profile inspection only for the gap. All three custom
+AIR experimental profiles contain corcrwh and were loaded in the
+[D-215 combat matrix](reviews/2026-10-06-fortress-targeting.md).
+
+### KI-523 - SEA frontier admission screens one nearest proposal and a direct corridor
+
+**Problem.** D-217 rejects a proposed mex when its direct corridor contains known
+weapon coverage or the contested destination lacks allied navy. Native terrain
+movement can detour and a farther candidate may be safe, but this screen does not
+enumerate alternatives in the same request. It can defer a useful alternative
+until later. Fortification counts own standing/frame/pending defenses, so allied
+SEA players may duplicate optional protection. These are source-level limits,
+not an observed expansion deadlock in the accepted Glacial games.
+
+**Proposed solution.** Add an opt-in native filtered candidate/route query with
+bounded alternatives and the existing path workers, plus allied static coverage
+in the shared legal snapshot. Preserve other roles' existing queries and avoid
+rebuilding a terrain graph at every builder decision.
+
+**Verification.** The [D-217 report](reviews/2026-10-06-sea-mex-expansion.md)
+records natural forward claims, defense completion, losses and physical homeward
+withdrawals. Blocked-nearest/safe-detour, shared fortification and save/load
+frontier acceptance remain future work.
+
+### KI-524 - Live watcher can report an early engine exit despite a complete log
+
+**Problem.** The D-217 Supreme observation reported exit at frame 22681, but its
+archived log contains the normal observer quit at frame 27900 and no crash.
+Re-evaluating the completed log passed the unchanged smoke checks. The exact
+process-detection/buffer timing cause has not been isolated; this was a watcher
+verdict failure, not evidence that the game stopped at 12.6 minutes.
+
+**Proposed solution.** Instrument `running_pids` and final-tail reads in
+`tools/playtest/playtest.py`; require a stable exited process and drained log
+before an early-exit verdict. Add a fake-process/buffered-tail regression test.
+Do not turn a real early exit into a pass or rewrite an original observation.
+
+**Verification.** Both original and post-completion assessments are preserved in
+the [D-217 report](reviews/2026-10-06-sea-mex-expansion.md).
+
+
+### KI-525 - Constructor recovery cannot guarantee gifts with unit sharing disabled
+
+**Problem.** `CCircuitAI::GiveUnits` unregisters donor units before the engine
+accepts `EconomyManager::SendUnits`. A game disabling sharing can refuse a gift,
+so donor tracking and physical ownership may diverge. D-218 uses this existing
+mechanism; its tests allow sharing and do not establish behavior when refused.
+
+**Proposed solution.** Add a native transfer-pending state, retain ownership until
+unit-given/taken confirmation, and expose transfer status to script. Audit all
+constructor, combat and transport donations; do not retry an unconfirmed gift
+by manufacturing unbounded replacements. Check actual game sharing options
+where the engine makes them available.
+
+**Verification.** Requires explicit disable_unit_sharing on/off simulations and
+ownership assertions. See the [recovery report](reviews/2026-10-06-builder-recovery.md).
+
+
+### KI-526 - Coastal fallback uses conservative sampled control and placement
+
+**Problem.** D-219 identifies a foothold through own live combat hulls and safe
+yards/constructors. A remote surviving combat hull can delay fallback even if a
+human would concede the sea. Beach samples and known gun envelopes do not prove
+that all landing paths are covered, that hidden artillery cannot hit an inland
+site, or that isolated/narrow land can host a safe bot lab. Constructor capability
+also limits coastal depth charges, advanced jammers and optional medium mines.
+
+**Proposed solution.** Add a policy-controlled local fleet-strength/retreat
+assessment and a bounded alternative dry-base query with path-worker snapshots.
+Test narrow coasts, separated islands, hostile artillery return and save/load;
+retain native allied footprint reservations and avoid another per-unit map scan.
+Do not bypass a failed safety check to force a factory onto an exposed beach.
+
+**Verification.** The [D-219 report](reviews/2026-10-06-sea-coastal-fallback.md)
+separates supplied faction/retake/control checks from these unverified cases.
+
+
+**D-219 final verification addendum (2026-10-06).** Supplied Armada and Legion
+loss/attack cases, held-water negative control and Cortex stable-retake pass.
+Their reports do not establish a natural-income recovery win rate, exhaustive
+coast coverage or save/load equivalence. The normal 8v8 Glacial smoke run
+remains FAIL on TECH INV-013/019/029, matching the issue categories already
+recorded under KI-423/KI-427; no coastal activation or script errors occurred.
+Keep these strict failures until their own layout/capacity causes are resolved,
+rather than loosening the shared checks. See the
+[final evidence](reviews/2026-10-06-sea-coastal-fallback.md#final-results).
+
+
+### KI-527 - Ranged snapshot and engagement costs scale poorly in large 8v8 games
+
+**Problem.** In the D-220 captures, ranged snapshots consume 8.02 ms/frame at
+Metal Plate minute 30; ranged decisions consume 12.14 ms/frame at Glacial 57.
+Per-AI friendly refresh repeats world scans/sorts/index rebuilds, and several
+boolean spatial predicates keep traversing after their answer is known. These
+are measured phase costs; no single proposed replacement is credited with the
+whole duration. This extends the unresolved performance-parity work in KI-510.
+
+**Proposed solution.** Preserve ordered observations with touched-cell storage,
+ascending-ID inventory and lifecycle-validated metadata. Add exact early-stop
+boolean queries and static-hazard bounds. Sharing snapshots requires observation
+versions, including same-frame mutations; never share private target history or
+lower engagement cadence to claim a gain.
+
+**Verification.** See the [ranked investigation](reviews/2026-10-06-metal-plate-glacial-performance.md).
+Pending: brute-force/old-path oracles, mutation/save-load cases, fixed-population
+benchmarks and matched natural games. No optimization implemented in D-220.
+
+### KI-528 - Builder and factory dispatch repeatedly census units and tasks
+
+**Problem.** Metal Plate dispatch costs reach 3.87 ms/frame for builders and
+3.43 for factories (including static construction turrets). Glacial samples hit
+FindOwnNear/GetUnfinishedCount and ally wrapper rebuilding repeatedly. Script
+paths also reconstruct immutable rosters and format disabled diagnostics.
+AIR still scans owned units after starter retirement, and metal-map AIR computes
+a nearest factory for constructors whose decision never uses it.
+
+**Proposed solution.** Exact owned/type/spatial and pending-task indexes,
+persistent friendly wrapper storage, terminal-state guards, and immutable
+roster reuse. Preserve ownership, freshness, radius/tie ordering, live-frame
+accounting, RNG draws and ally history pruning. Separate local factory power
+queries from full-array scans without changing admission decisions.
+
+**Verification.** [D-220](reviews/2026-10-06-metal-plate-glacial-performance.md)
+records measured envelopes and source candidates separately. Ledger mutation
+oracles and subphase timings are required before numerical gain claims.
+
+### KI-529 - SEA reservation rollback still scans every reservation
+
+**Problem.** ReleaseZone discovers a zone's slots by scanning all reservations.
+SEA's failed multi-slot patch trials amplify that work, allocation and logging;
+Glacial records 433,177 reservation trace lines. The existing occupancy index
+solves collision-query scaling, not this release path. The SEA opening detail
+run attributes 80.7% of measured nested SEA time to economy/build/geometry,
+not patrol/combat. Individual rollback and logging cost remains unisolated.
+
+**Proposed solution.** Maintain exact zone-to-slot membership and ordered removal,
+then reuse transaction scratch and local support indexes. Preserve failed-candidate
+cursor progression, retry cadence, buildability, public reservation identities
+and allied exclusion. Make detailed trace formatting optional while retaining
+warnings and a full diagnostic mode; do not cut candidate counts or support pads.
+
+**Verification.** Native/script source and [three captured workloads](reviews/2026-10-06-metal-plate-glacial-performance.md).
+Pending: release/mutation and full reservation-journal equivalence tests, including
+mobile blockers, partial failure, allied plans and save/load.
+
+### KI-530 - Dense-game engine cost and command workload need deeper attribution
+
+**Problem.** Metal Plate reaches 9,250 units and 0.109x average game speed.
+Engine script/animation and movement parents dominate the inclusive engine
+profile. Metal records 108,463 orders/game-minute; Glacial one SEA team reaches
+20,011. This establishes load, not the fraction that is waste. Matching engine
+debug symbols and actual internet packet traces were unavailable. Existing
+KI-477's multiplayer verification gap remains open.
+
+**Proposed solution.** Profile COB, animation traversal allocation, path retries
+and waits with matching symbols. Preserve synced transforms/callback order when
+reusing buffers. Attribute commands by task/reason/options/queue before removing
+any. An engine batching ABI must retain identical frame/order/result semantics.
+No APM rate limit, lower unit cap, reduced scouting or blanket worker-thread VM.
+
+**Verification.** [D-220 evidence and gates](reviews/2026-10-06-metal-plate-glacial-performance.md).
+No engine optimization or measured multiplayer improvement is claimed.
+
+### KI-531 - Natural-game FPS controls are not fully isolated
+
+**Problem.** D-220 resets the camera but does not lock out mouse-edge panning or
+focus changes. Fast-forward, profiling and changing populations also affect
+render FPS. Glacial's profiler-off controls occur at a different combat state;
+Metal has no accepted late profiler-off control. Timer AddTime includes worker
+lock wait, so its elapsed total cannot simply be subtracted from main-thread CPU.
+
+**Proposed solution.** Add explicit recorded camera/input/focus controls and
+matched fixed-population profiler-on/off fixtures before an exact FPS or profiler
+overhead comparison. Retain source-log hashes, invalid-off markers, capture
+cost and original failures. Native component timing remains useful evidence;
+it is not a controlled GPU benchmark or a before/after implementation result.
+
+**Verification.** Documented in [measurement limitations](reviews/2026-10-06-metal-plate-glacial-performance.md#evidence-limitations-and-reproducibility).
+Future harness/control verification is required; no retrospective correction of
+published measurements is allowed.
+
+**D-220 gameplay observation addendum to KI-423/KI-427 (2026-10-06).**
+Strict performance fixtures retain gameplay FAIL: 15 Metal invariant events;
+679 in the drained Glacial log, including 553 INV-053 dedicated TECH T2 air
+constructor idle reports. The short SEA detail run reports INV-013/029. These
+are observations, not newly diagnosed physical causes. No script crash occurred.
+Full per-code counts and original reports are linked from the investigation;
+these failures must be handled as separate gameplay fixes, not removed from
+acceptance or silently credited to timing instrumentation.

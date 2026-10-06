@@ -114,6 +114,7 @@ void CCircuitUnit::SetTask(IUnitTask* task)
 
 void CCircuitUnit::ClearAct()
 {
+	ClearPriorityTarget(); // ClearAct covers reassignment, retreat, player control and task stop.
 	CActionList::Clear();
 	dgunAct = nullptr;
 	travelAct = nullptr;
@@ -327,11 +328,34 @@ void CCircuitUnit::CmdWantedSpeed(float speed)
 void CCircuitUnit::CmdStop(short options, int timeout)
 {
 	unit->Stop(options, timeout);
+	priorityTarget = -1; // BAR STOP cancels the priority list; allow a new intent.
 }
 
 void CCircuitUnit::CmdSetTarget(CEnemyInfo* enemy)
 {
-//	unit->ExecuteCustomCommand(CMD_UNIT_SET_TARGET, {(float)target->GetId()});
+    if (circuitDef->GetTargetMinCost() <= 0.f) return;
+    const int next = enemy != nullptr && !enemy->IsHidden() && enemy->IsInRadarOrLOS() ? enemy->GetId() : -1;
+    if (next == priorityTarget) return;
+    ClearPriorityTarget();
+    if (next < 0) return;
+    // Unlike queued ATTACK, BAR priority fire also applies during the preceding
+    // MOVE. OPEN fire is retained so incompatible mounts (dedicated AA) keep
+    // choosing their own targets. Never enable the old global stub for all units.
+    float params[] = {float(next)};
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
+    priorityTarget = next;
+}
+
+void CCircuitUnit::ClearPriorityTarget()
+{
+    if (priorityTarget < 0) return;
+    if (!isDead && manager != nullptr) {
+        TRY_UNIT(manager->GetCircuit(), this,
+            float params[] = {float(priorityTarget)};
+            SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_CANCEL_TARGET, params);
+        )
+    }
+    priorityTarget = -1;
 }
 
 void CCircuitUnit::CmdCloak(bool state)
@@ -591,7 +615,7 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool qu
 		// redundant follow-up order when they request a persistent target only.
 		if (queueFight) CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
 		CmdWantedSpeed(NO_SPEED_LIMIT);
-		CmdSetTarget(target);
+		CmdSetTarget(enemy);
 	)
 }
 
@@ -616,7 +640,7 @@ void CCircuitUnit::Attack(const AIFloat3& pos, CEnemyInfo* enemy, bool isGround,
 		}
 		CmdFightTo(enemy->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);  // los-cheat related
 		CmdWantedSpeed(NO_SPEED_LIMIT);
-		CmdSetTarget(target);
+		CmdSetTarget(enemy);
 		if (circuitDef->IsAttrOnOff()) {
 			unit->SetOn(isStatic == circuitDef->IsOnSlow());
 		}

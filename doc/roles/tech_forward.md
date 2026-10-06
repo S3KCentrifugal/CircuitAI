@@ -21,7 +21,7 @@ clusters), the land constructors go out. The owner's rules:
   outside the base: a long-range AA at each, then a flak at each, nearest first.
 - **T1** (bots): released while more than `T1AirReleaseAbove` (5) T1 air
   constructors stand (the T1 air plant keeps `T1AirConstructorTarget`, 6). They
-  build the **spam cluster** forward: one T1 bot lab per +100 metal, each a T1
+  build the **spam cluster** forward: an income-budgeted number of T1 bot labs, each a T1
   front factory cluster of D-114 (its two turrets first, then the lab), its AA, and
   small turret pads; else help a structure going up there. A spam lab is never
   guarded or assisted by a constructor, and its production is not helped (D-119).
@@ -41,9 +41,9 @@ clusters), the land constructors go out. The owner's rules:
 | `SpamClusters` | `ForwardT1`, `TickSpam`, INV-039 | the T1 clusters of `TechFactories` (D-114): the spam labs |
 | `ForwardT1` | `fwd.t1` | a spam cluster's turrets then its lab (`TechFactories::Work`, a new cluster while income asks for one), a standing spam lab's lost turret (`TechFactories::Refill`), one heavy AA behind each lab, a pad turret, help a structure going up at a spam cluster (never a spam lab or its units, D-119) |
 | `PadTurret` | `ForwardT1` | a 2x2 turret pad behind an end lab's turrets, a cell of walking room between (`SpamPadsMax`) |
-| `SpamLabsWanted` | `ForwardT1`, INV-039 | one spam lab per `SpamLabMetalStep` of income, at most `SpamLabsMax` |
+| `SpamLabsWanted` | `ForwardT1`, INV-039 | delegates to active `Spam::LabsWanted`, shared by construction and production (D-216) |
 | `OrderPinned`, `OrderDefence`, `Buildable`, `Stands`, order bookkeeping | internal | pinned orders on reservations; a defence's cap lifted (TECH's start caps pin defences at 0) |
-| `TickSpam` | `Tick` (D-111, D-119) | while spam runs: each spam lab off repeat (D-119: native clears the queue when a recruit finishes; each ask gets the next unit); every standing spam lab its own spread lane across the active front (`Spam::SetSpreadLanes`: `LaneSpacing` apart, sorted by the labs' sideways places, straight on to the enemy backline; re-spread when the count changes and every 30 s), that lane set as its factory route (`CmdFactoryRoute`, re-applied when `Spam::routesVersion` changes), the spam unit's cap kept open |
+| `TickSpam` | `Tick` | compatibility no-op; shared `Spam::Update` owns repeat, caps and stable producer lanes for every role (D-216) |
 
 ## Invariants
 
@@ -68,12 +68,23 @@ constructor drops its forward job within 60 s); D-111's INV-043 lives in
 | `SpamClusterRadius` | 600 | forward constructors assist what goes up within this |
 | `SpamPadsMax` | 2 | forward turret pads |
 
-`Global::Spam::RepeatStallSeconds` (45): a factory on repeat that produced no spam
-unit for this long gets its build again (D-111).
+`RepeatStallSeconds` is retained as a legacy setting; D-216 uses the native
+empty-queue idle recovery instead of repeatedly appending builds.
 
-<!-- source: data/script/src/roles/tech_forward.as; blob: e2e9c8ee7c34c8dccc941e95d6ecdc6395666e38; lines: 410 -->
+<!-- source: data/script/src/roles/tech_forward.as; blob: 65b3697c2b6bc298ad5f55bbd673d21e72a5194e; lines: 360 -->
 
 ## D-152 future clusters
 
 `SpamClusters` excludes `Cluster::ahead`: reserving a future lab does not
 count as a spam-production commitment or start its construction.
+
+
+## D-216 shared production budget
+
+The general release/recall rules above still govern forward defense work.
+Funded spam construction can also enter through `Spam::BuilderMakeTask` before
+those release gates, after TECH has an advanced lab. It respects recall and
+existing construction, and reuses the same reserved clusters and turret-first
+sequence. `ForwardT1` uses the same active spam gate and lab budget. The old
+TECH repeat watchdog is superseded by persistent native recruitment; ordinary
+engine idle events only reseed an empty repeat queue.

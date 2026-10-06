@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "fatboy-hlt-front"
+  },
+  "id": "20261006T080220Z-6ceb5e4b",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

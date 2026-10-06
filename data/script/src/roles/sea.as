@@ -11,6 +11,7 @@
 #include "sea_build.as"
 #include "../manager/sea_recovery.as"
 #include "../manager/sea_invasion.as"
+#include "../manager/sea_coast.as"
 
 namespace RoleSea {
 
@@ -213,6 +214,8 @@ namespace RoleSea {
         SeaRecovery::Tick();
         if (SeaLayout::Enabled()) SeaBuild::Tick();
         SeaCombat::Tick();
+        SeaCoast::Tick();
+        SeaExpansion::Tick();
         SeaInvasion::Tick();
         if (SeaCombat::Active()) return;
         // Delay dynamic quota adjustments until configured time into the game
@@ -504,6 +507,8 @@ namespace RoleSea {
     ******************************************************************************/ 
 
     IUnitTask@ Sea_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        IUnitTask@ coastal=SeaCoast::Build(builder);
+        if (coastal !is null) return coastal;
         if (builder !is null && SeaRecovery::IsSub(builder.circuitDef)) return SeaRecovery::Make(builder);
         // Run before native default-task creation: it may enqueue discretionary
         // converters/guards even when the first ship has free reachable metal.
@@ -632,6 +637,7 @@ namespace RoleSea {
     void Sea_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
 		SeaRecovery::Added(unit);
+		SeaExpansion::Added(unit);
 		const CCircuitDef@ cdef = unit.circuitDef;
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
 			return;
@@ -666,6 +672,7 @@ namespace RoleSea {
     void Sea_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
 		SeaRecovery::Removed(unit);
+        SeaExpansion::Removed(unit);
 		if (energizer1 is unit)
 			@energizer1 = null;
 		else if (energizer2 is unit)

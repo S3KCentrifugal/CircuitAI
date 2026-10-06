@@ -1,0 +1,397 @@
+{
+  "schema": 5,
+  "case": "spam-repeat-drain",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\spam-repeat-drain\\glitters\\20261006T074742Z-9ce653c6",
+  "measurement_deadline_frame": 5400,
+  "first_damage_seconds": null,
+  "raw_damage_including_overkill": 0,
+  "shooters_fired": 4,
+  "shots": 17,
+  "enemy_kills": 1,
+  "friendly_losses": 6,
+  "enemy_metal_destroyed": 170.0,
+  "nonlua_commands": 3581,
+  "commands_per_game_minute": 1193.6666666666667,
+  "command_window_frame": 5400,
+  "last_observed_frame": 5850,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfido"
+  ],
+  "minimum_sampled_spacing_after_60s": 56.0,
+  "render_fps_after_60s": [
+    60.0,
+    63.0,
+    239.0,
+    264.0,
+    224.0,
+    266.0,
+    289.0,
+    196.0,
+    253.0,
+    238.0,
+    194.0,
+    195.0,
+    234.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 44,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:46.908993][f=0002701]",
+      "frame": "2701",
+      "id": "10562",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.909410][f=0002701]",
+      "frame": "2701",
+      "id": "10821",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.909641][f=0002701]",
+      "frame": "2701",
+      "id": "31054",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.909876][f=0002701]",
+      "frame": "2701",
+      "id": "29202",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.910177][f=0002701]",
+      "frame": "2701",
+      "id": "7383",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.910709][f=0002701]",
+      "frame": "2701",
+      "id": "3031",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.910962][f=0002701]",
+      "frame": "2701",
+      "id": "25497",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.911493][f=0002701]",
+      "frame": "2701",
+      "id": "20443",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.911968][f=0002701]",
+      "frame": "2701",
+      "id": "6108",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.912158][f=0002701]",
+      "frame": "2701",
+      "id": "24732",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.912336][f=0002701]",
+      "frame": "2701",
+      "id": "18782",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.912530][f=0002701]",
+      "frame": "2701",
+      "id": "3874",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.912715][f=0002701]",
+      "frame": "2701",
+      "id": "26019",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.912914][f=0002701]",
+      "frame": "2701",
+      "id": "11300",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.913099][f=0002701]",
+      "frame": "2701",
+      "id": "10085",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.913283][f=0002701]",
+      "frame": "2701",
+      "id": "15398",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.913462][f=0002701]",
+      "frame": "2701",
+      "id": "679",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.913661][f=0002701]",
+      "frame": "2701",
+      "id": "14370",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.913848][f=0002701]",
+      "frame": "2701",
+      "id": "14057",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.914025][f=0002701]",
+      "frame": "2701",
+      "id": "15146",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.914239][f=0002701]",
+      "frame": "2701",
+      "id": "7270",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.914735][f=0002701]",
+      "frame": "2701",
+      "id": "15598",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.915214][f=0002701]",
+      "frame": "2701",
+      "id": "20848",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.915426][f=0002701]",
+      "frame": "2701",
+      "id": "6003",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.915935][f=0002701]",
+      "frame": "2701",
+      "id": "22963",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.916208][f=0002701]",
+      "frame": "2701",
+      "id": "14262",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:46.916711][f=0002701]",
+      "frame": "2701",
+      "id": "21050",
+      "team": "0",
+      "unit": "armmmkr",
+      "cost": "380"
+    },
+    {
+      "t": "00:00:46.916960][f=0002701]",
+      "frame": "2701",
+      "id": "29947",
+      "team": "0",
+      "unit": "armafus",
+      "cost": "9700"
+    },
+    {
+      "t": "00:00:47.327185][f=0002705]",
+      "frame": "2705",
+      "id": "14646",
+      "team": "0",
+      "unit": "armck",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:47.327899][f=0002705]",
+      "frame": "2705",
+      "id": "30293",
+      "team": "0",
+      "unit": "armck",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:47.421527][f=0002708]",
+      "frame": "2708",
+      "id": "4097",
+      "team": "0",
+      "unit": "armck",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:47.444138][f=0002712]",
+      "frame": "2712",
+      "id": "25829",
+      "team": "0",
+      "unit": "armck",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:47.518091][f=0002730]",
+      "frame": "2730",
+      "id": "11358",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:00:47.518459][f=0002730]",
+      "frame": "2730",
+      "id": "27839",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:00:51.543830][f=0003696]",
+      "frame": "3696",
+      "id": "17428",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:00:53.953038][f=0004275]",
+      "frame": "4275",
+      "id": "17430",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:54.047005][f=0004298]",
+      "frame": "4298",
+      "id": "9898",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:00:54.085018][f=0004307]",
+      "frame": "4307",
+      "id": "22288",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:00:57.870797][f=0005098]",
+      "frame": "5098",
+      "id": "22763",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.028076,
+      "ai_all_p95_ms": 0.362671,
+      "ai_all_max_ms": 7.631836,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.965088,
+      "ai_all_mean_ms": 0.084532
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.023682,
+      "ai_all_p95_ms": 0.36438,
+      "ai_all_max_ms": 1.743408,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.611938,
+      "ai_all_mean_ms": 0.073544
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.0354,
+      "ai_all_p95_ms": 0.348633,
+      "ai_all_max_ms": 1.813477,
+      "sim_speed": 7.512,
+      "ai_all_p99_ms": 0.568604,
+      "ai_all_mean_ms": 0.084792
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

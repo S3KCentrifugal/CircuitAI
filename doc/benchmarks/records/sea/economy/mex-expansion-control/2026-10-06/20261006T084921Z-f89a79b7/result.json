@@ -1,0 +1,139 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 663,
+      "sha256": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808"
+    },
+    "infolog.txt": {
+      "bytes": 11359200,
+      "sha256": "c8e638d6d8d42a2c4ac61bbf9add3543d3f0e558b1b552bb3379b7ea5a6be620"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "955e0642b584c3b65bfa2841202522e95eb281cd564fd9cbcb7d205ba5b0f391"
+    },
+    "report.md": {
+      "bytes": 17839,
+      "sha256": "7eaf0995eaf7bcaf3a9cb6aa45f08c3ede4b2b95ddfa106918f9e94661803b08"
+    },
+    "run-inputs.json": {
+      "bytes": 36998,
+      "sha256": "f84ed3333aa144ec14a5c54c9fbf0c8e63f55589573c58cd7a7a2eece194b3f9"
+    },
+    "run-plan.json": {
+      "bytes": 263,
+      "sha256": "1abe9fd844c0ed54e623755fb2bcc158129e89774fbc93b5c9eae21f00229a56"
+    },
+    "screen_2026-10-06_08-48-25-617.png": {
+      "bytes": 1742190,
+      "sha256": "3966b27254b5935acadc2acb40c08c616046838fc18f7df94a709cc539b6da7b"
+    },
+    "screen_2026-10-06_08-48-51-785.png": {
+      "bytes": 1767164,
+      "sha256": "75e0dc147a1f387423b5a8da1f4a8f503c2a7fae3ef85c0705ea1fbfbfb27d0a"
+    },
+    "screen_2026-10-06_08-49-14-808.png": {
+      "bytes": 1898570,
+      "sha256": "abaffc0ed95832e779836326d0e993668149e54fb6e7c60761af8e4b407e9011"
+    },
+    "script.txt": {
+      "bytes": 7500,
+      "sha256": "ab1ea212e1c54ced159d15a54087426e5df04638b3da10a8943e9e6ee907be1f"
+    },
+    "sea-fixture.json": {
+      "bytes": 295,
+      "sha256": "5a5786b7f5900f2720844b184896f164a19b056266bfcd5a9fb8d7c3e9c7d27b"
+    },
+    "staged.json": {
+      "bytes": 324,
+      "sha256": "593e078ff19418fe80a094a15a8c042dbc85a80a2a22af4b5c4662503f208c87"
+    },
+    "teams.json": {
+      "bytes": 1164,
+      "sha256": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "mex-expansion-control"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T084921Z-f89a79b7",
+  "last_frame": 27035,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\mex-expansion-control\\glacial\\20261006T084623Z-f3461ab0\\runs\\20261006T084921Z-f89a79b7",
+  "reason": "reached 15 min",
+  "recorded_at_utc": "2026-10-06T08:49:21.268450+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 0,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 6,
+      "team": 1,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 7,
+      "team": 2,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 3,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 4,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 5,
+      "x": 12618.0,
+      "z": 5800.0
+    }
+  ],
+  "verdict": "PASS"
+}

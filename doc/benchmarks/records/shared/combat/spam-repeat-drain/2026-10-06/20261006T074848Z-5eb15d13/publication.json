@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "348b0d2befee13453183bf20966bd5a447b2698154669d1e0d0b7e8b85980fa9",
+    "checks.json": "33a05ade5336cb1425da08c3ca79219821fd8317ccff066b399ab5ac0bd509eb",
+    "launched.json": "aa801bdb4289f38be3fbe8d87d202f09f2e4a55a8c3bebee7f86a2e4506c359e",
+    "ranged-arena-pins.json": "1d5599dd9577ecfe47e5532156700c5d5a001d438863cc5e5f04f16f3971dd10",
+    "ranged-arena.json": "75cd8913fa5be17ee082d88a3f7e1c52026adf8fce2cf96a5d89ff20c0cec27c",
+    "ranged-measurements-v5.json": "4a63b2ffc5f62e554ee220df2ba0d700081d2b6e455d657a36769e8ed62fb6f0",
+    "report.md": "3f5376bb005585e010f9fcdce1e132b3e8696503ce4e00cc069ca4ddc50e542f",
+    "result.json": "fa8e8744cb0bb66afd7184b132023e7d106d2dfcc1d4372c56f2dbf884886e38",
+    "run-inputs.json": "b7061a6b2ea99413e91f62008fcb75a660baf566c72dbf9ed0c857d3205974eb",
+    "run-plan.json": "1c4c89c3248b478494dba35a196c1ad29ff6cb5ef947d8edf0a54930470c9383",
+    "screen_2026-10-06_07-48-42-661.png": "55c9a960c1426ee36d6ac2119b8e0c9848ab6f43800f1dc4c7bb1f91a97db463",
+    "script.txt": "76f10aebb1a212e4a1b01ce2375a744a6f5fc23e308c347a79a850404de88213",
+    "spam-measurements-v3.json": "11e70814490372f81a4c65bc4d0969d011d51759c8e5fe4b2796a447c626caff",
+    "staged.json": "4294e7734ca3d54aeabeb601f492cb52f14c396f0d68c58efd65f1361ca3f0e6",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "9f089a5bd7a370205239ed0079f565391c907d1b2ff0014f49b81d8812e304c8"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\spam-repeat-drain\\glitters\\20261006T074742Z-9ce653c6\\runs\\20261006T074848Z-5eb15d13",
+  "schema": 1
+}

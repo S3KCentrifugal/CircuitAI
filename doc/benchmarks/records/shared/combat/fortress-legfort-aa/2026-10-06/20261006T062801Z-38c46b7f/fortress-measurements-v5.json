@@ -1,0 +1,150 @@
+{
+  "case": "fortress-legfort-aa",
+  "variant": "ranged",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-legfort-aa\\glitters\\20261006T062658Z-c77eba6a",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armflea:weapon=948": 673.0,
+    "armfig:weapon=946": 690.0,
+    "armflea:weapon=947": 750.0,
+    "corgol:weapon=947": 6307.0,
+    "corgol:weapon=948": 9206.0,
+    "legfort:weapon=946": 98.0
+  },
+  "first_damage_seconds": {
+    "armflea": 12.866666666666667,
+    "armfig": 13.666666666666666,
+    "corgol": 15.666666666666666,
+    "legfort": 18.966666666666665
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "corgol": 10,
+    "none": 34
+  },
+  "sampled_shot_targets": {
+    "3:armflea": 7,
+    "4:armflea": 7,
+    "5:armflea": 7,
+    "6:armfig": 12,
+    "1:corgol": 21,
+    "2:corgol": 19,
+    "3:none": 6,
+    "5:none": 7,
+    "3:corgol": 38,
+    "4:corgol": 26,
+    "5:corgol": 22,
+    "4:none": 3,
+    "2:none": 3,
+    "1:armflea": 2,
+    "2:armflea": 1,
+    "1:none": 2
+  },
+  "damage_first_30_seconds": {
+    "armflea:weapon=948": 599.0,
+    "armfig:weapon=946": 690.0,
+    "armflea:weapon=947": 588.0,
+    "corgol:weapon=947": 4281.0,
+    "corgol:weapon=948": 5192.0,
+    "legfort:weapon=946": 98.0
+  },
+  "deaths": [
+    {
+      "seconds": 12.966666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.466666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.8,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.066666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.3,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.633333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.933333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 17.4,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 19.5,
+      "unit": "armfig",
+      "team": 1
+    },
+    {
+      "seconds": 21.833333333333332,
+      "unit": "armfig",
+      "team": 1
+    },
+    {
+      "seconds": 22.566666666666666,
+      "unit": "armfig",
+      "team": 1
+    },
+    {
+      "seconds": 23.433333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 24.166666666666668,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 35.0,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 37.86666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 39.4,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 39.833333333333336,
+      "unit": "armflea",
+      "team": 1
+    }
+  ],
+  "first_active_priority": "corgol",
+  "criteria": {
+    "enemy_damage": true,
+    "survival": true,
+    "heavy_damage": true,
+    "active_heavy_priority": true,
+    "anti_air_damage": true
+  },
+  "defense_group_targets": [],
+  "first_defense_assignment": "none",
+  "enemy_damage": 17626.0,
+  "passed": true
+}

@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "3fba9b5a72e3c2676c2894fd5a81069e786856dfc6660d52d23ded65ce5ba123",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "fortress-measurements-v2.json": "8f0afa4900d33452a3613a1c582446f9851f1783cb6620add3847360dfe6f8b2",
+    "fortress-measurements-v5.json": "6c08f0a5963425acdb834f4b19cf8d94819f3f7a5f13af6ae1cbb42d79c1caba",
+    "launched.json": "e3c932ed1b206a96d689f49d6a4b2244eaa2dc2284ec01acc6cfe46a708cca11",
+    "ranged-arena-pins.json": "77d205a43873b200f6965f9b3e959ac58ad17a1e34410cc8471e4aa7b05e591d",
+    "ranged-arena.json": "3a142136ee7639fb20167cdadb4b7a0fe983cb1a29c7c8b3cf65e224c48b1cdf",
+    "report.md": "2e37baecdf123de1e063f654741e956f7d6db593f65633c55febc217916a8e05",
+    "result.json": "86df1d6d8ff04432e470a4a8bb5d1d18fcbff803e5eacc44317b89656de06d66",
+    "run-inputs.json": "a764fdd91542f6fd72fb089c32726c02d982f4e3ee6075f1845f68028a3a582a",
+    "run-plan.json": "76241349ff28dc3fbedc9540d79a6638c5ed1ebe58557b8b0877b1a765f7ddf8",
+    "screen_2026-10-06_06-33-01-759.png": "9ca94f841fe8d9347b3deef19d03d11d73abf43915d18ef94e84f8198c83382f",
+    "script.txt": "b5eec9228e2e28fd4850d9b860d386dad3f0b3923771ec64d7e40e1f3ece3cda",
+    "staged.json": "381100168839cca8774642cf709a2022626368b6f8feb8fd18853119090fb993",
+    "starts.as": "b50d178b784dcc0dcac9181aa6be50295281954b6165b1a72b80614aae066361",
+    "teams.json": "b20b9183d62696ea433cd10c854be3f2e6d3159a90400ba74e2ce686b16e43b4"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-legfort-defense\\glitters\\20261006T063216Z-99421512\\runs\\20261006T063319Z-fb3df314",
+  "schema": 1
+}

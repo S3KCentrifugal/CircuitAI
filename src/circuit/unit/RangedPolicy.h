@@ -24,6 +24,7 @@ struct RangedPolicy {
     bool preferScreen = true;
     bool allowRadar = true;
     bool advanceUnknownRadar = true;
+    bool stageWhenBlocked = false; // opt-in: deploy outside coverage if no firing band fits
 };
 }
 #endif

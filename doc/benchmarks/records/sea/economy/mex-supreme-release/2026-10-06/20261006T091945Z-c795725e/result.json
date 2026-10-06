@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 663,
+      "sha256": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808"
+    },
+    "infolog.txt": {
+      "bytes": 982733,
+      "sha256": "ae45e5bac8f26ccca1a1cee12530e1985af6df9fc3d3f6293382bba0bf0a7116"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "22ccab37befab2e21ad740fae4a167cd3b815b47fce358c008661f7b45ca8c3a"
+    },
+    "report.md": {
+      "bytes": 16868,
+      "sha256": "5acc5f01c4167127304df1bc3f776e359c278e5f115c15bf9907c3b943ae0812"
+    },
+    "run-inputs.json": {
+      "bytes": 37110,
+      "sha256": "4c1ac499a1999b2bfb39a6a588f695b3779d9a19227724c2f2327860c3baae8c"
+    },
+    "run-plan.json": {
+      "bytes": 261,
+      "sha256": "8b5ce695413ed29ecf6c2785eb390c410db310fb8ccf8502a9a9460507d8bb14"
+    },
+    "screen_2026-10-06_09-13-03-718.png": {
+      "bytes": 1921097,
+      "sha256": "97b3916fadaff1c396b7a3c953a2060540195e7a8681500f72c4b6e5c922fe2e"
+    },
+    "screen_2026-10-06_09-13-29-709.png": {
+      "bytes": 1937423,
+      "sha256": "b3eb4c44f2583be4f380fc43f01c71abe37d86ce754e36c7a7306dbb881a1cbf"
+    },
+    "script.txt": {
+      "bytes": 6175,
+      "sha256": "5b9bdb5a4a757ece5f10fa42d4c307ff81dd8471301ffc47791e28ba43b0e483"
+    },
+    "sea-fixture.json": {
+      "bytes": 299,
+      "sha256": "d6d3b9f4343b7a881e3884c5e2de0577e937df8ae761ca396dcebf764da843da"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "ec889e6c5b32de0e42911c2f11869af0c863437ca4df6f4803b4aab41268578a"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "mex-supreme-release"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T091945Z-c795725e",
+  "last_frame": 27901,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\mex-supreme-release\\supreme\\20261006T090956Z-4f53ee48\\runs\\20261006T091945Z-c795725e",
+  "reason": "reached 15 min",
+  "recorded_at_utc": "2026-10-06T09:19:45.995485+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

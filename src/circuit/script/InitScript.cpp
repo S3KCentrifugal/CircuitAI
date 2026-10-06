@@ -530,6 +530,18 @@ static int CTerrainManager_GetTerrainHeight(CTerrainManager* terrainMgr)
 	return CTerrainManager::GetTerrainHeight();
 }
 
+static bool CTerrainManager_CanTraverse(CTerrainManager* mgr, CCircuitDef* def,
+        const AIFloat3& from, const AIFloat3& to)
+{
+    const auto valid = [](const AIFloat3& p) {
+        return std::isfinite(p.x) && std::isfinite(p.z) && p.x >= 0.f && p.z >= 0.f
+            && p.x < CTerrainManager::GetTerrainWidth() && p.z < CTerrainManager::GetTerrainHeight();
+    };
+    if (!def || def->GetMobileId() < 0 || !valid(from) || !valid(to)) return false;
+    const auto area = mgr->GetCurrentMapArea(def, from);
+    return area.second && area.first && mgr->CanMoveToPos(area.first, to);
+}
+
 static void CCircuitAI_GiveUnits(CCircuitAI* circuit, const CScriptArray* array, int newTeamId)
 {
 	std::vector<CCircuitUnit*> units;
@@ -1063,6 +1075,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float losRadius", asOFFSET(CCircuitDef, losRadius)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float sonarRadius", asOFFSET(CCircuitDef, sonarRadius)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float costM", asOFFSET(CCircuitDef, costM)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitDef", "float GetTargetMinCost() const", asMETHOD(CCircuitDef, GetTargetMinCost), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float costE", asOFFSET(CCircuitDef, costE)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float threat", asOFFSET(CCircuitDef, defThreat)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CCircuitDef", "const float power", asOFFSET(CCircuitDef, power)); ASSERT(r >= 0);
@@ -1143,6 +1156,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "float SetAllyZoneRange(float)", asMETHOD(CTerrainManager, SetAllyZoneRange), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainWidth() const", asFUNCTION(CTerrainManager_GetTerrainWidth), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "bool CanMoveTo(CCircuitUnit@, const AIFloat3& in) const", asFUNCTION(CTerrainManager_CanMoveTo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "bool CanTraverse(CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asFUNCTION(CTerrainManager_CanTraverse), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 FindSafeDropSpot(CCircuitUnit@, const AIFloat3& in, float radius, float surfaceThreat, float airThreat)", asFUNCTION(CTerrainManager_FindSafeDropSpot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	// Reservations: doc/base-layout.md
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveBuilding(const CCircuitDef@, const AIFloat3& in, int facing, int ttlFrames = 0)", asFUNCTION(CTerrainManager_ReserveBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

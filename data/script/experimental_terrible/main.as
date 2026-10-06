@@ -106,7 +106,7 @@ namespace Main {
 		Team::Ferry::Update();   // transport ferry: hand-over on arrival, run polling
 		Team::SeaAssist::Update();  // SEA seeds a TACTICAL ally with a construction ship
 		Team::Donation::Update();   // a teammate without T2 asks TECH for a constructor
-		Team::CheckOrphaned();   // ask allies for a T1 constructor if we lost commander and all builders
+		Team::CheckOrphaned();   // recover lost mobile constructors through TECH
 	}
 
 	void AiMessage(const string& in msg, int fromTeamId)  // AiSendMessage from an allied BARb instance
@@ -116,7 +116,7 @@ namespace Main {
 
 	void AiLuaMessage(const string& in data)  // Spring.SendSkirmishAIMessage(teamID, msg) from the local LuaUI
 	{
-		if (!Commands::Handle(data)) {
+		if (!Team::Recovery::HandleLua(data) && !Commands::Handle(data)) {
 			GenericHelpers::LogUtil("[AI][LuaMessage] ignored: " + data, 3);
 		}
 	}

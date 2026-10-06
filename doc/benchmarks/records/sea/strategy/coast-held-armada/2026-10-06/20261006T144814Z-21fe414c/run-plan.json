@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "strategy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "coast-held-armada"
+  },
+  "id": "20261006T144620Z-3f7abd57",
+  "requested": {
+    "seed": 219001
+  },
+  "schema": 1
+}

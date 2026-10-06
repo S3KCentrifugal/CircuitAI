@@ -186,6 +186,16 @@ Note `armyCost` includes static defences, so base fortification counts toward
 "army strength" in this comparison. That is deliberate per the comment, but it
 means a turtling FRONT reads as stronger than its mobile force is.
 
+## Dedicated land siege response
+
+D-214 adds `LandSiege::Produce` after `Front_FactoryAiMakeTask`'s constructor
+guarantees and before its normal dynamic/native combat selection. Supported T2
+land factories respond to observed static metal only when sustained income and
+a bounded siege-investment deficit justify another unit. Existing and unframed
+queued recruits count together; water-isolated starts keep their amphibious
+policy. `Global::Military::LandSiege*` owns the tuning. See the
+[design and supplied-game evidence](../reviews/2026-10-06-land-siege-response.md).
+
 ## Known defects
 
 1. **Four settings are declared and never read.**
@@ -222,4 +232,4 @@ means a turtling FRONT reads as stronger than its mobile force is.
 - [air.md](air.md), [tech.md](tech.md) - the other fully-wired roles.
 - `doc/angelscript-references.md` - callback contracts and registered API.
 
-<!-- source: data/script/src/roles/front.as; blob: 2fadb6465491a651b312c4e742012f828aec9a8c; lines: 1029 -->
+<!-- source: data/script/src/roles/front.as; blob: a36dce7be6ff5f860c8d905c9845eb25c5ab5595; lines: 1033 -->

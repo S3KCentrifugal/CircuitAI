@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "fortress-corcrwh-aa"
+  },
+  "id": "20261006T063112Z-07d1968e",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

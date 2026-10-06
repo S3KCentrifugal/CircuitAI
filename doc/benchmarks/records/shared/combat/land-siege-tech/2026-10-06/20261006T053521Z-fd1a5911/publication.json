@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "f52610440fb7c513710149ecc889eab675c1f67bcc97ab6b20ffb02be9987509",
+    "checks.json": "336d08ab5f079b0ea1487e58203c8555a3f52f3e1310a2fd55f207c862da5b12",
+    "land-siege-measurements-v3.json": "72683b6552e2f057856c4c31b2c4448f18a54e758478621e735f57ce54b51bee",
+    "launched.json": "f63d91df9852e2e6335d193e5f71df51af3b018dbba3ca9fdd06149cba013168",
+    "ranged-arena-pins.json": "e598d439f96aa0fd239ed3f49c96b30d662b296fc6cc37e50f4bbb92f299487c",
+    "ranged-arena.json": "21a39d012c863b92ee6dde73300c8d7d4b1b700c12e204c6fd252cccac2cc2f5",
+    "ranged-measurements-v5.json": "1bc30803e6d741d9c4469b671816a29a1084729180307520f5d799c625bc058c",
+    "report.md": "766c6d91a7f4c51d92aa819b21bd3eb419a4b5286da4f43571538ae22fe48aa4",
+    "result.json": "801475037ec061a0fc378bf82b3c39fad0ccc315bc6226c136df1f28c442626f",
+    "run-inputs.json": "8692bf3374e32179c97b27f6b08dc50af01328dccdb3cadf50bff467ac1d02d1",
+    "run-plan.json": "7fa2fe93b07a253541bbee553e19f1d298c9e1177d3fe902717ac86e08a4de56",
+    "script.txt": "b0efc17645a09d7cc4ebc1a47e535ea7d92ca4c908f79b356ec6c0e1f4abb210",
+    "staged.json": "f6d9bcc8aa57ceaae71261cdda4547a8edd67dc0fba0a6713f921a2201ee9ff2",
+    "starts.as": "f2a32d2e961b7d18e32a89793b8951107667593bbcc7a78ad298445618d55ec5",
+    "teams.json": "da889aaa54c1c9a8bd0df4a7d1994c2318217377f8154b695355b77a01b1f90d"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\land-siege-tech\\glitters\\20261006T053432Z-b007ff41\\runs\\20261006T053521Z-fd1a5911",
+  "schema": 1
+}

@@ -1,0 +1,109 @@
+{
+  "schema": 5,
+  "case": "fatboy-hlt-front",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fatboy-hlt-front\\glitters\\20261006T080220Z-6ceb5e4b",
+  "measurement_deadline_frame": 5400,
+  "first_damage_seconds": 90.4,
+  "raw_damage_including_overkill": 6537,
+  "shooters_fired": 4,
+  "shots": 9,
+  "enemy_kills": 1,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 440.0,
+  "nonlua_commands": 573,
+  "commands_per_game_minute": 191.0,
+  "command_window_frame": 5400,
+  "last_observed_frame": 5550,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfboy"
+  ],
+  "minimum_sampled_spacing_after_60s": 57.982756057296896,
+  "render_fps_after_60s": [
+    66.0,
+    53.0,
+    271.0,
+    293.0,
+    326.0,
+    229.0,
+    263.0,
+    236.0,
+    286.0,
+    271.0,
+    339.0,
+    257.0,
+    281.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 4,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:48.342182][f=0002973]",
+      "frame": "2973",
+      "id": "20443",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:49.326985][f=0003198]",
+      "frame": "3198",
+      "id": "25497",
+      "team": "0",
+      "unit": "armarad",
+      "cost": "400"
+    },
+    {
+      "t": "00:00:49.843099][f=0003322]",
+      "frame": "3322",
+      "id": "7270",
+      "team": "0",
+      "unit": "armeyes",
+      "cost": "32"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036102,
+      "ai_all_p95_ms": 0.127594,
+      "ai_all_max_ms": 1.598511,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.418091,
+      "ai_all_mean_ms": 0.057849
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036804,
+      "ai_all_p95_ms": 0.136292,
+      "ai_all_max_ms": 1.880981,
+      "sim_speed": 7.483,
+      "ai_all_p99_ms": 0.544617,
+      "ai_all_mean_ms": 0.060276
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.030029,
+      "ai_all_p95_ms": 0.133545,
+      "ai_all_max_ms": 1.643494,
+      "sim_speed": 7.516,
+      "ai_all_p99_ms": 0.242615,
+      "ai_all_mean_ms": 0.055934
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

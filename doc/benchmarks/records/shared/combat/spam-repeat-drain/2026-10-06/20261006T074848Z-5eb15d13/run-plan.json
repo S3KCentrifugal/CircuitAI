@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "spam-repeat-drain"
+  },
+  "id": "20261006T074742Z-9ce653c6",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

@@ -263,12 +263,12 @@ namespace TechForward {
     int padTryFrame = -100000;   // the last pad reservation attempt
     array<AIFloat3> padCentres;
 
-    // Owner's rule: one T1 spam bot lab per SpamLabMetalStep (100) of metal
-    // income, up to SpamLabsMax
+    // D-216: construction and production share one sustained-income budget.
+    // Keeping a second TECH formula here could build idle, unfunded pumps.
+    // The argument remains for existing rule/invariant callers.
     int SpamLabsWanted(float mi)
     {
-        int n = int(mi / Global::RoleSettings::Tech::SpamLabMetalStep);
-        return (n > Global::RoleSettings::Tech::SpamLabsMax) ? Global::RoleSettings::Tech::SpamLabsMax : n;
+        return Spam::IsActive() ? Spam::LabsWanted() : 0;
     }
 
     // The released T1 land constructor's work, in order: the spam clusters (an
@@ -284,7 +284,7 @@ namespace TechForward {
         array<TechFactories::Cluster@> spam = SpamClusters();
 
         // 1. the spam clusters: turrets first, then the lab (TechFactories::Work)
-        const bool gate = Global::Spam::Enabled && TechBuild::EcoOnline();
+        const bool gate = Spam::IsActive();
         if (gate && u.circuitDef.CanBuild(lab)) {
             const bool more = int(spam.length()) < SpamLabsWanted(mi) && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) == 0
                 && TechFactories::AdvancedLabUp();   // D-102: the advanced lab first
@@ -353,58 +353,8 @@ namespace TechForward {
         return TechFactories::OrderPinned(u, Task::BuildType::NANO, nano, id, "a turret on forward pad " + padGroups.length());
     }
 
-    // D-111 (owner: the route from the factory is never set, repeat is not put
-    // on, each factory correlates directly to a lane): while spam runs, every
-    // spam lab of ours is on repeat, runs the lane of its place among the spam
-    // clusters (0, +1, -1, ...), and carries that lane as its factory route, so
-    // each unit leaves on it before any task is given; the spam unit is kept
-    // buildable (TECH's start caps pin T1 combat at 0)
-    dictionary factoryRouteVersion;   // factory id -> Spam::routesVersion its route was set at
-    uint spreadCount = 0;
-    int spreadFrame = -100000;
-    void TickSpam()
-    {
-        if (!Spam::active) return;
-        const string side = Global::AISettings::Side;
-        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
-        if (lab is null) return;
-        const string unitName = Spam::SpamUnitFor(lab);
-        CCircuitDef@ su = (unitName.length() == 0) ? null : ai.GetCircuitDef(unitName);
-        if (su !is null && su.maxThisUnit <= su.count + 5) su.maxThisUnit = su.count + 50;
-        array<TechFactories::Cluster@> spam = SpamClusters();
-        // D-119 (owner): each spam lab runs its own lane, the lanes spread across
-        // the active front, apart, straight on to the enemy backline
-        array<CCircuitUnit@> labs;
-        for (uint i = 0; i < spam.length(); ++i) {
-            CCircuitUnit@ f = TechFactories::LabAt(spam[i]);
-            if (f !is null && f.GetBuildProgress() >= 1.0f) labs.insertLast(f);
-        }
-        if (labs.length() != spreadCount || ai.frame - spreadFrame >= 30 * SECOND) {
-            Spam::SetSpreadLanes(labs);
-            spreadCount = labs.length();
-            spreadFrame = ai.frame;
-        }
-        for (uint i = 0; i < spam.length(); ++i) {
-            CCircuitUnit@ f = TechFactories::LabAt(spam[i]);
-            if (f is null || f.GetBuildProgress() < 1.0f) continue;
-            const string key = "" + f.id;
-            const int lane = (i == 0) ? 0 : ((i % 2 == 1) ? int((i + 1) / 2) : -int(i / 2));
-            Spam::SetFactoryLane(f, lane);
-            int64 v = -1;
-            if (!factoryRouteVersion.get(key, v)) {
-                // D-119: no repeat: native clears a factory's build queue whenever a
-                // recruit task finishes (CRecruitTask::Cancel), so a repeat queue
-                // lasted one unit and the lab then waited out RepeatStallSeconds.
-                // Each ask now gets the next unit (Spam::FactoryMakeTask)
-                f.CmdRepeat(false);
-                GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " (" + f.id + ") producing, lane " + lane + " (D-111, D-119)", 1);
-            }
-            if (v != Spam::routesVersion) {
-                array<AIFloat3> route = Spam::RouteOf(f);
-                f.CmdFactoryRoute(route);
-                factoryRouteVersion.set(key, Spam::routesVersion);
-                GenericHelpers::LogUtil("[TECH][Spam] spam lab " + (i + 1) + " factory route set: " + route.length() + " waypoints on lane " + lane + " (D-111)", 2);
-            }
-        }
-    }
+    // D-216: repeat ownership and lanes are shared across roles. Native repeat
+    // recruitment now survives UnitFinished; the D-119 repeat-off workaround
+    // must not overwrite that state.
+    void TickSpam() {}
 }

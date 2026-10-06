@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "recovery-ferry-native"
+  },
+  "id": "20261006T133418Z-65076b1c",
+  "requested": {
+    "seed": 218001
+  },
+  "schema": 1
+}

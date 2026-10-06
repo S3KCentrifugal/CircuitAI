@@ -1,0 +1,26 @@
+{
+  "game": "Beyond All Reason test-31479-433a460",
+  "map": "All That Glitters v2.2.3",
+  "teams": [
+    {
+      "team": 0,
+      "spot": 1,
+      "x": 4000.0,
+      "z": 2400.0,
+      "role": "TACTICAL",
+      "ally": 0,
+      "ai": "test",
+      "side": "armada"
+    },
+    {
+      "team": 1,
+      "spot": 2,
+      "x": 4000.0,
+      "z": 9800.0,
+      "role": "TACTICAL",
+      "ally": 1,
+      "ai": "test",
+      "side": "armada"
+    }
+  ]
+}

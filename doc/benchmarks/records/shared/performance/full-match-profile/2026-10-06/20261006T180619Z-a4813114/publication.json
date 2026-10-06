@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "b0cec1a4e1cfb06f8e67bf26655d504fd38ed486be6da2939699c7ff44a4d651",
+    "checks.json": "b2d9ec3621835949f26100ae59bd6a3732cc7979b7b0a2390dad970f787035b7",
+    "full-match-checks.json": "b2d9ec3621835949f26100ae59bd6a3732cc7979b7b0a2390dad970f787035b7",
+    "full-match-manifest.json": "3ff83ed4d3b9477c034b8c6407b4da84811c5be3a11c1f0a9af8a3ec73c770f9",
+    "full-match-performance-v1.json": "faeee8f76cd62688c0f467d11dfa7539d4d0aa06daacb1894811370494a862de",
+    "full-match-summary-v1.json": "207b61c97f81bab6d556780a69b6cd1997cb8955aab5722cb430c092a5ff6c72",
+    "launched.json": "cb2d401ec16c3d9ddce09e59a1484139899669a86744da4fd9f87a7f4ed7cb86",
+    "report.md": "bf7e78d0a9acea4cd379688136037e6d20ed6b5a6653b8838ff4a88ddfc8d5ef",
+    "result.json": "70180ebe042b78e6bd6bac843e54b4f39cf4597bfa00720f30851248af82ab78",
+    "run-inputs.json": "8447ee2e7732cacc2aa2a5494c36111f8c6ee9e6104c4bf6f127929058690b47",
+    "run-plan.json": "7fa9ec499a200a46150d776983e759430cde9c8c9e8534cbff5a7099cd1976a6",
+    "screen_2026-10-06_18-05-56-173.png": "76ccbb7507d4bf19b1e1f50f5609ddedc2068a5654176cdb9e5251cbe490b691",
+    "script.txt": "251752f8ebce5577ff639b27c6be03ed23b193eb1d376eb98a75fc9f7ebd7553",
+    "staged.json": "928c8f01f35edfe5d493c8b4b90d3aae2d72b21f69683afdfd1bf696ace14da2",
+    "teams.json": "f0be9f58ee119530827519dd09d3ba9a205381508ee2a1e43a08244509f3e17c"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\glacial\\20261006T180249Z-6b21e4bb\\runs\\20261006T180619Z-a4813114",
+  "schema": 1
+}

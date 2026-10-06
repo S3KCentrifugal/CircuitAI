@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "b7b6c834689328d4e600fb1230264c7f6c493784b1df57a5d4387750230788cc",
+    "checks.json": "731a883206a22c5610759f80b8d8e3052d649182a7ae2e2f95d5ae92d9c1db64",
+    "coast-checks.json": "731a883206a22c5610759f80b8d8e3052d649182a7ae2e2f95d5ae92d9c1db64",
+    "coast-observations-v1.json": "3cb3b4cf53664c6cb82c5f6fbf478e0324db1c3203ae93c4d360d4a8422e1472",
+    "fixture.json": "c279ead25a15c5703407b656b0917e3e049ace4ba2355e8b4d9b67500a3a7e8b",
+    "launched.json": "e9762700e1334398df4131fe9fa6424ff83a04ed7fc4c71af3ebfbf6398f3430",
+    "report.md": "9ccc55b3bc9e67fb3ac6dc97b6845bf44605885dddf77a6048d90b0848aa6ba1",
+    "result.json": "7ae58b12a90f1614a1e572473db858294b56f5bb5bdcb894ab73db65fe53f497",
+    "run-inputs.json": "055cdcb0d6a9053ce237ba2e38ecfe591dcd5e8541eaaf26a21bc8598e2b90b2",
+    "run-plan.json": "32e343d33e51ae81c016a1c75888ace949036e6b572f071cc43c672790930743",
+    "screen_2026-10-06_15-07-48-498.png": "fe831dd5eae9ed6463dea14cd63bae40a89a82e3bd49582bbf669cc0b8135553",
+    "screen_2026-10-06_15-07-53-443.png": "bb04256c11f94aa314351f504ef0782734c69882aa4d392ad130e266895acf45",
+    "script.txt": "a2445fc71e4d4c0366614599ea5338da914487cf24b9e43c2597bd7d7a52670c",
+    "staged.json": "f666ab5168097c831befc80aedc4fd9e26e26207c5ce2f699bba3e3ba471a58e",
+    "teams.json": "3802059231a8dd1d2e9780c06e8e271958378a68842c18812cc77789648c9d94"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\strategy\\coast-retake-cortex\\supreme\\20261006T150535Z-1dda3af0\\runs\\20261006T150754Z-063c8c6c",
+  "schema": 1
+}

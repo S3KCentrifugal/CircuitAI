@@ -1,0 +1,26 @@
+{
+  "schema": 3,
+  "case": "land-siege-tech",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-tech\\glitters\\20261006T053432Z-b007ff41",
+  "minutes": 5,
+  "watch_verdict": "FAIL",
+  "errors": [
+    "[t=00:00:42.607611][f=0001801] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1801:L::[INVARIANT] INV-047 a structure stands on a T3 lane of spam row 2",
+    "[t=00:00:43.698227][f=0001921] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1921:L::[INVARIANT] INV-029 coravp 12162 stands 37 cells from the turrets, not tight",
+    "[t=00:00:43.698319][f=0001921] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1921:L::[INVARIANT] INV-029 coravp 15559 stands 3 cells from the turrets, not tight"
+  ],
+  "observed_frame": 1955,
+  "produced": {},
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [],
+  "passed": false,
+  "failures": [
+    "Original watch verdict: FAIL",
+    "Runtime/fixture error",
+    "Insufficient completed cortrem",
+    "Missing siege decisions",
+    "Incomplete observation"
+  ]
+}

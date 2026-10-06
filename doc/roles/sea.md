@@ -1,5 +1,25 @@
 # SEA Role
 
+## Forward mex clusters (D-217)
+
+Default-on `ExpandMexClusters` runs independently of the economy/layout switch.
+The first T1 construction ship claims nearby home mexes first, then keeps claiming
+reachable safe mexes within 3600 elmos of its current position. A second
+expander is admitted once three T1 construction ships exist. Native occupancy,
+allied territory and terrain checks remain authoritative; metal maps retain the
+existing opening. Two nearby remote mexes earn a funded torpedo defense, then a
+surface tower at +30 metal and AA when SEA observes air pressure. See
+[implementation and validation](../reviews/2026-10-06-sea-mex-expansion.md).
+
+`Sea_MainUpdate` checks known enemy weapon coverage plus a 256-elmo buffer once
+per second. Any exposed T1 construction ship withdraws toward its safe starting
+yard; player, retreat, enemy reclaim and external ownership are respected.
+Advances into the contested part of the sea need 600 metal of nearby combat
+ships. Defenses supplement those ships; they do not replace naval control.
+`Sea_BuilderAiUnitAdded/Removed` maintain the safety roster by ID and clear
+removed workers' retry/withdrawal state. Only the designated workers expand;
+native support ships also receive the danger response.
+
 ## Secured-water invasion (D-212)
 
 Default-on `Sea::AmphibiousInvasion` requires AdaptiveFleet and compact/layout
@@ -466,7 +486,7 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 100f482a8caee2608476a5603f7f9bf2c02c7dc4; lines: 890 -->
+<!-- source: data/script/src/roles/sea.as; blob: 966dcbfc31794a7ef4058e23d5bda8ae6a67faae; lines: 897 -->
 
 
 ## Water-control investigation (2026-10-05)
@@ -494,3 +514,13 @@ naval turret capacity, participate in production support scaling, and use native
 production with keepActive so the T2 yard does not suppress their aircraft.
 Missing Legion platform metadata is registered on this SEA instance only.
 See [plan and results](../sea-seaplane-transition.md).
+
+### Lost-water coastal fallback (D-219)
+
+`SeaCoast::Tick` follows the fleet census. After a previously held water body
+has no viable own foothold for 30 seconds, land-capable workers (including gifts)
+rebuild a safe inland bot base and fortify assigned friendly beaches. The shared
+builder/factory hooks place this SEA-only recovery ahead of optional spam.
+Storage, energy, inland mexes, land-lab build power, T1/T2 turrets, sensors,
+wall flanks and available medium mines are covered. A stable 60-second naval
+return releases this policy. See the [design and simulation evidence](../reviews/2026-10-06-sea-coastal-fallback.md).

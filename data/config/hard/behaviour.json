@@ -1014,7 +1014,7 @@
 		"armfboy": {
 			"role": ["heavy"],
 			"attribute": ["ranged"],
-			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
 			"threat":{"air": 0.0, "water": 0.0, "surf": 1.5,
 				"vs":{"artillery": 2.0, "anti_air": 2.0, "vy": 0.7}
 			}

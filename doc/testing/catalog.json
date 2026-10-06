@@ -329,6 +329,21 @@
       "execution": "not inferred"
     },
     {
+      "id": "tests/land_siege_math_tests.as",
+      "domain": "shared",
+      "area": "policy",
+      "kind": "suite",
+      "title": "land_siege_math_tests",
+      "definitions": [
+        "test_income_ramp_preserves_a_screen_and_is_bounded",
+        "test_no_static_no_army_or_low_income_has_no_siege_budget",
+        "test_response_stops_when_threat_or_projected_shortage_is_gone"
+      ],
+      "detail": "",
+      "sha256": "40c200404dba5534ffc9a51b302f891493be63c09e0aa8ae6f95954d662b581f",
+      "execution": "not inferred"
+    },
+    {
       "id": "tests/lane_solver_test.cpp",
       "domain": "shared",
       "area": "native",
@@ -636,6 +651,42 @@
       "execution": "not inferred"
     },
     {
+      "id": "tests/recovery_math_tests.as",
+      "domain": "shared",
+      "area": "policy",
+      "kind": "suite",
+      "title": "recovery_math_tests",
+      "definitions": [
+        "test_any_role_can_recover_while_commander_survives",
+        "test_commander_lost_before_first_constructor_recovers_after_grace",
+        "test_heartbeat_does_not_poll_every_frame",
+        "test_last_constructor_of_either_tier_prevents_request",
+        "test_late_heartbeat_cannot_resurrect_cancelled_episode",
+        "test_opening_is_not_a_loss"
+      ],
+      "detail": "",
+      "sha256": "0e6a3b73c96ed049b88c2f13b3f128d2f73686ca4b20e2da6baaa12d1262c032",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tests/sea_coast_math_tests.as",
+      "domain": "sea",
+      "area": "policy",
+      "kind": "suite",
+      "title": "sea_coast_math_tests",
+      "definitions": [
+        "test_beach_ownership_is_nearest_and_ties_are_deterministic",
+        "test_loss_requires_continuous_absence",
+        "test_opening_is_never_a_defeat",
+        "test_retake_has_its_own_hysteresis",
+        "test_shipyard_loss_with_surviving_navy_is_not_defeat",
+        "test_tech_requires_both_resources_or_whole_purchase_banked"
+      ],
+      "detail": "",
+      "sha256": "a988546d351a5bf18dc9cb560290a2fc61f9155758824fd990a522d2cce14eef",
+      "execution": "not inferred"
+    },
+    {
       "id": "tests/sea_math_tests.as",
       "domain": "sea",
       "area": "policy",
@@ -644,7 +695,9 @@
       "definitions": [
         "test_aa_screen_slots_stay_separate_and_overlap",
         "test_canceled_unframed_berth_is_retryable",
+        "test_cluster_fortification_preserves_metal_reserve_and_energy_funding",
         "test_counter_admission_and_time_to_coverage",
+        "test_expansion_rejects_hostile_coverage_and_invalid_thresholds",
         "test_interception_respects_speed_weapon_reach_and_horizon",
         "test_invasion_admission_needs_escort_predecessor_and_both_resources",
         "test_invasion_replans_only_uncommitted_or_dead_slots",
@@ -662,7 +715,22 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "08eb75ad5abbda903e61e3a65e3eccf788f89e6f5b95b29d5659a5763a3e3af3",
+      "sha256": "6f2c35c986d040aee92deb4579e9effd604c5a43954ffc9d7326b613e89d5fd1",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tests/spam_math_tests.as",
+      "domain": "shared",
+      "area": "policy",
+      "kind": "suite",
+      "title": "spam_math_tests",
+      "definitions": [
+        "test_donations_do_not_require_positive_net_income",
+        "test_hysteresis_and_factory_scaling_boundaries",
+        "test_sustained_income_is_required_and_energy_stall_blocks"
+      ],
+      "detail": "",
+      "sha256": "4931ae18a4efa066048e541e9577185e7fde78b2d9095aa6d5bede04be347701",
       "execution": "not inferred"
     },
     {
@@ -681,6 +749,17 @@
       ],
       "detail": "Native executable; unnamed assertions remain inside the linked suite.",
       "sha256": "1a746dde1112b365671077fe6f8e427f4816b4dec8f39138c2586f05245abfa3",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tests/target_preference_test.cpp",
+      "domain": "shared",
+      "area": "native",
+      "kind": "suite",
+      "title": "target_preference_test",
+      "definitions": [],
+      "detail": "Native executable; unnamed assertions remain inside the linked suite.",
+      "sha256": "c4a4143ff5328f9036b10d340fd07737ceec44657adc207f8d839aa2925354ce",
       "execution": "not inferred"
     },
     {
@@ -974,6 +1053,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/analyze_full_match_performance.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_full_match_performance",
+      "definitions": [],
+      "detail": "Stream full-match diagnostic logs; inclusive timers are never added to children.",
+      "sha256": "5b0f2325e1d2fc26710ff6cdf1dbd1502aa0bd8f5a4970d733e05947e0b9fd28",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/analyze_performance_phases.py",
       "domain": "shared",
       "area": "tooling",
@@ -1004,6 +1094,28 @@
       "definitions": [],
       "detail": "Independent SEA combat/order scorecard; never overwrites evidence.",
       "sha256": "f2a256e134f96ed07e8035c27ec1d91bfe5729b9d2b498f202fd57b6de74a281",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_sea_coast.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_sea_coast",
+      "definitions": [],
+      "detail": "Add immutable coastal observations without changing original acceptance verdicts.",
+      "sha256": "ffd8a11367167a44186143056fb76b6ffd87fd0154ed634ad7455e65721a5f8c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_sea_expansion.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_sea_expansion",
+      "definitions": [],
+      "detail": "Read-only SEA frontier metrics; never reinterpret the original smoke verdict.",
+      "sha256": "560b6ff9867d561d722e2e041c16421b14fe69abcdcb02e4e89f853988b38451",
       "execution": "not inferred"
     },
     {
@@ -1769,6 +1881,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/cases/sea/economy/mex-expansion-glacial.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "mex-expansion-glacial",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "5a5b51bac4d94ac5910d4064e263ecb81ae713577cacda8d3cc0685ca4e1e952",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/cases/sea/economy/migration-natural.json",
       "domain": "sea",
       "area": "economy",
@@ -1898,6 +2021,237 @@
       "definitions": [],
       "detail": "Map: glacial",
       "sha256": "57198ad80421fb03d5aa9e1c7b338d2df49db01f1a5b5d5c356bd5b7183a8cc4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/strategy/coastal-fallback.json",
+      "domain": "sea",
+      "area": "strategy",
+      "kind": "scenario",
+      "title": "coastal-fallback",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "420c53245610f522e25bfe9d66dded346ba65c0cfcf49fc3b61fd3949eb75e0f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fatboy-blocked-front.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fatboy-blocked-front",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "e074a70885998c699bcb12d50de18462e0c12789756363c93885dbcb352498f6",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fatboy-hlt-front.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fatboy-hlt-front",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "fe1307048f948b56023b7008e9ccececf309f349da431ed9166ce8d2a8fb722c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-corcrwh-aa.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-corcrwh-aa",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "3f7857ce574410a59683983b9eb8c275aece3b9b30e357fbc4746020900ed5e4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-corcrwh-defense.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-corcrwh-defense",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "ef5db749ce12816ef95c53fe33b36488b5ef160c4092f012aa5eb47518546498",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-corcrwh-mixed.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-corcrwh-mixed",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "acde2f27fa2cee642a2c1f5fad991df9357e16752c0cbff15d35243d0b7b4c15",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-corcrwh-screen.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-corcrwh-screen",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "da55304db6efd77e1b71d768e42710cd81183e99d55c4265009cb5ee2a27d9c5",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-corcrwh-spam.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-corcrwh-spam",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "4eef5ddc66c89d58d1eac5b929e43f167ad65a6430d81e1c2c8a18e1170fc581",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-legfort-aa.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-legfort-aa",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "4c7365646c825ce9472a0b1fdf13b2fb104d22df4b48d1c98cbb45c7fdc7bc3c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-legfort-defense.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-legfort-defense",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "df9cf690e46d0e021ad3b21e4bb5693e8c56b9b7d18082171086b1406dd66f04",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-legfort-mixed.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-legfort-mixed",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "af0aef51aefbe6a01b5093278d00f15c31f275c3db888ce1261c1baca1d06491",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-legfort-screen.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-legfort-screen",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "4f909aad360c4a37697fe815ba23a119cba50f8e2572574235693bac56faf788",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/fortress-legfort-spam.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "fortress-legfort-spam",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "a392c7d325c8f6d9b6bfbb7ab583c2b1557b97378781f2a8fb93e43d2defa0eb",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/incinerator-front-push.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "incinerator-front-push",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "8235f857ef7c84add8d860e413a822a57cfc11148fbfdd587da4c5252f068f35",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/incinerator-mixed-front.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "incinerator-mixed-front",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "ab3dda2afa519c0beeb779353a2c3f67dbd39274d9bc2e61aa69a51399b276f5",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-no-static.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-no-static",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "ec63e4c8d133c3a5adbc2622963b3dd9cb9a9e4e5d839f2af73703d72a97e64b",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-production-armada.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-armada",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "affd7a1014ee851ef557a0bb662e20797d0174548657a09ce802e6063d0f8224",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-production-cortex-bots.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-cortex-bots",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "d847bc0e6db7084fc9911405834ea6651d88d46c2a169ed2f6b667fc4214326e",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-production-cortex.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-cortex",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "e420115256c51666a1cba4d980b726f2a045327399a2536f6510b346e1694aae",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-production-legion-bots.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-legion-bots",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "e322c4df468bc37c4fd3d11ea267cec5209c808be97140f1df7b24ad420b8973",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/land-siege-production-legion.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "land-siege-legion",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "2dcf34cf90d736a50f3f73869af236327bafaca3adf79ddce8fc6817f9a3d168",
       "execution": "not inferred"
     },
     {
@@ -2151,6 +2505,160 @@
       "definitions": [],
       "detail": "Map: All That Glitters v2.2.3",
       "sha256": "801db0d0b3d08077af131f6e6797686bde9abf7f9c741d9106b3d2d5a23cc875",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-build-front.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-build-front",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "f82e64d487a479acba776afae057f99a90c8c0c963c935a1f7c2f1e64ccb7f8d",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-build-tech.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-build-tech",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "4fe0f662f66ea0607bbc5126106138f762214a463ec630c6c394e38beb95fc66",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-air.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-air",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "57ecfca350384beb60264ec30eaa4f5eb41e9a4cdb7c58b717f2c841e3a9bfdf",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-dense.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-dense",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "7afac2d0fe5d22d345da70fd30aea5d42c636a41fe682a68b780b817f47076a3",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-drain.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-drain",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "c7642ff2b00ea18594db9c65008c83718b80e20dda22ee81e951d058161eed0b",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-front.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-front",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "8bd42c4132fe2eaffbe9069ce22776ebd339108696964c2242ac248bbae56634",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-sea.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-sea",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "bd535caba5dba37f0174ecd3b19173d1742b89093afe0755e5608248f42d5dad",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-support.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-support",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "2a778dbae8f0f73a01add52d565742cd49d2fccf35f5610dc1342baed818023b",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-tactical.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-tactical",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "d1a0c8affd6256fc44496c022c784d45841761096cda5c7fa4206cd20c7863e6",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/spam-repeat-tech.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "spam-repeat-tech",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "90c94173292413aae392a01ed33e5f3b297d867ac092eb18e8f97a82c5f4ae16",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/economy/recovery-ferry-lua.json",
+      "domain": "shared",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "recovery-ferry-lua",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "27577a1dc97bb78f91ce3e144312f365fd885b573c25aa8b696d6b7ff832c1a8",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/economy/recovery-lab-loss.json",
+      "domain": "shared",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "recovery-lab-loss",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "f540a2addbc5a3a1d30dd4dbe3d3d05cddee495fc292de531804321ec3fcfff5",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/economy/recovery-legion.json",
+      "domain": "shared",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "recovery-legion",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "e78ec9935835e0bed10dd51b9343a6e1ec3351691098cf748c6e4684eae2bc1a",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/performance/full-match-profile.json",
+      "domain": "shared",
+      "area": "performance",
+      "kind": "scenario",
+      "title": "full-match-profile",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "4a7d2d047ba455bb8015f752e3c35b36a263fd31dbdbca8095287adb27f264b9",
       "execution": "not inferred"
     },
     {
@@ -3331,6 +3839,25 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/sea/economy/mex-expansion.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "mex-expansion",
+      "definitions": [
+        "expect: cluster-fort-order",
+        "expect: fortify",
+        "expect: frontier",
+        "expect: observer",
+        "forbid: crash",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "d37923a76169893781c65150011e4d57aa440fdeae64bab8c31080aa8dbd14e1",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/sea/economy/sea-capacity-8v8.json",
       "domain": "sea",
       "area": "economy",
@@ -3607,6 +4134,29 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/sea/strategy/coastal-fallback.json",
+      "domain": "sea",
+      "area": "strategy",
+      "kind": "checks",
+      "title": "coastal-fallback",
+      "definitions": [
+        "expect: donation",
+        "expect: energy-storage",
+        "expect: lab",
+        "expect: loss",
+        "expect: metal-storage",
+        "expect: t1-defense",
+        "expect: t2-defense",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "2b1e8c4ce0682d1f7667b76999ce41bf4126df7817172869cf8e879583d107ff",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/shared/combat/amphibious.json",
       "domain": "shared",
       "area": "combat",
@@ -3707,6 +4257,24 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/shared/combat/land-siege-production.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "land-siege-production",
+      "definitions": [
+        "expect: loaded",
+        "expect: orders",
+        "expect: spawn",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "275995b2ef0473bc43a1fa0443a04ef3ee909cc9c18a98acb44fb2a67a1ef796",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/shared/combat/ranged-arena.json",
       "domain": "shared",
       "area": "combat",
@@ -3763,6 +4331,42 @@
       ],
       "detail": "",
       "sha256": "7af929d4994a3a5707179728982ec07f4954a80cda619c54f9e430917344da2c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/combat/spam-build.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "spam-build",
+      "definitions": [
+        "expect: offspring",
+        "expect: repeat",
+        "expect: spawn",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "2f8b5b8e9d1acd3c078bd0bc51e1874d6e9b35985bdf7d9d53302cce3291e7f9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/combat/spam-repeat.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "spam-repeat",
+      "definitions": [
+        "expect: offspring",
+        "expect: repeat",
+        "expect: spawn",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "33a05ade5336cb1425da08c3ca79219821fd8317ccff066b399ab5ac0bd509eb",
       "execution": "not inferred"
     },
     {
@@ -4009,6 +4613,31 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/shared/economy/builder-recovery.json",
+      "domain": "shared",
+      "area": "economy",
+      "kind": "checks",
+      "title": "builder-recovery",
+      "definitions": [
+        "expect: air",
+        "expect: delayed-lab",
+        "expect: front",
+        "expect: sea",
+        "expect: support-self",
+        "expect: tactical",
+        "expect: tech",
+        "forbid: cancelled-request",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: healthy-team",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "8affa8099bf9baa0092d65ed028b5462e7975f93ec5ecdd2079008b21a53bdbd",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/shared/economy/expansion.json",
       "domain": "shared",
       "area": "economy",
@@ -4191,6 +4820,24 @@
       ],
       "detail": "",
       "sha256": "e6724ed2dc038c326de70c932637cb4f1ff15f78dbfaf49995d9eb78ad422a44",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/performance/full-match-profile.json",
+      "domain": "shared",
+      "area": "performance",
+      "kind": "checks",
+      "title": "full-match-profile",
+      "definitions": [
+        "expect: commands",
+        "expect: competitive-roster",
+        "expect: timing",
+        "forbid: instrumentation",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "8b5abf34b0621c3f0dcbdb8f796487feedc428a99469474c6d00f7e4906864b0",
       "execution": "not inferred"
     },
     {
@@ -4695,6 +5342,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/compress_symbols.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "compress_symbols",
+      "definitions": [],
+      "detail": "Losslessly compress idle playtest symbols on Windows; default is a dry run.",
+      "sha256": "3260dff092d880923cae9e0d568eba7ac25753ae4bb915306162713844c75a8e",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/dense_economy_probe.as",
       "domain": "shared",
       "area": "fixtures",
@@ -4703,6 +5361,39 @@
       "definitions": [],
       "detail": "Scripted test probe; inspect the linked source for stages and assertions.",
       "sha256": "4982811908062e3291dc9abf56605fc9dcb7aaea5f7c128318c04d3f4bce1929",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/deployment_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "deployment_report",
+      "definitions": [],
+      "detail": "Check every supplied primary unit advances toward the enemy by a deadline.",
+      "sha256": "315034f149e501a8ee4d9bdebdbf0ea9275b7bbdafffd9d1edc3cfaae4308de2",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/fortress_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "fortress_report",
+      "definitions": [],
+      "detail": "Damage/priority evidence from supplied fortress combat; never rewrite a verdict.",
+      "sha256": "871769aef417ac9f438b28c94b29c27966d0be3d90897996e0f837b6f6cb4b94",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/land_siege_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "land_siege_report",
+      "definitions": [],
+      "detail": "Read-only evidence extraction for supplied land-siege/Incinerator cases.",
+      "sha256": "c68ee8a3f4ca17ee40269ab8b749ceba6d8543bd16966e65caec6ed78f3b7bb9",
       "execution": "not inferred"
     },
     {
@@ -4964,7 +5655,7 @@
       "title": "ranged_arena",
       "definitions": [],
       "detail": "Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.",
-      "sha256": "9b1ec5a9d8e2fa41c37affb13135a504d44e99e0c6f45f62c9860ade47924c8f",
+      "sha256": "350bc9c7278f769dec5d6f0c00d45d510ecd676013e3f485a98cadb9e68f7d14",
       "execution": "not inferred"
     },
     {
@@ -4975,7 +5666,7 @@
       "title": "ranged_benchmark",
       "definitions": [],
       "detail": "Summarize immutable ranged fixtures, or run a serial supplied-force matrix.",
-      "sha256": "b30cde51f4513885c90b485964d3b618d9dc669102d994a62fced979d17e1ce1",
+      "sha256": "c51db6e2fc93b621aef613be9ec8fcce4fdc13f7b084f06ed2ca3b072075f9e3",
       "execution": "not inferred"
     },
     {
@@ -5061,6 +5752,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/run_builder_recovery.py",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_builder_recovery",
+      "definitions": [],
+      "detail": "Controlled all-role constructor loss with delayed TECH lab; optional Lua/ferry.",
+      "sha256": "ee81bf2c6494aa6b6f2006672dca3b69efbaaf512c25be470e7a74424c03def6",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/run_dense_economy.py",
       "domain": "shared",
       "area": "runners",
@@ -5073,6 +5775,17 @@
       ],
       "detail": "Physical dense economy / naval support acceptance, in isolated staged data.",
       "sha256": "c4e8967dae8771a0c849ea8c2a3f1b29c5e721e22ee07b9a8fa8f1115c33b5ba",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/run_full_match_performance.py",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_full_match_performance",
+      "definitions": [],
+      "detail": "Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.",
+      "sha256": "790589aaadbf165fd782c788724dd55a1f7b4b3faa70ffd53627adc9277b4975",
       "execution": "not inferred"
     },
     {
@@ -5094,7 +5807,7 @@
       "title": "run_sea",
       "definitions": [],
       "detail": "Pin, run and archive an isolated SEA migration comparison (ordinary resources).",
-      "sha256": "f21c87a870d57314ccae09cf0e4336e10b6cf77dcdd79b7d0b76ba240fae263c",
+      "sha256": "f8defbe4472bceb433d974d0df572595233f8d627bc4c80fcc25966b86296f39",
       "execution": "not inferred"
     },
     {
@@ -5106,6 +5819,17 @@
       "definitions": [],
       "detail": "Cross-role reservation probes or supplied three-SEA placement on Glacial.",
       "sha256": "ac9c1c0eb1ce51c0f7af421fc97a9edaea58da6a3d17728d502f53213ad9ab7e",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/run_sea_coast.py",
+      "domain": "sea",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_sea_coast",
+      "definitions": [],
+      "detail": "Supplied SEA loss/constructor-transfer/coastal-recovery acceptance arena.",
+      "sha256": "b1ae5d31803c6e3aee57d466eeb69e80011823639580c93cf63f6b620377a695",
       "execution": "not inferred"
     },
     {
@@ -5289,6 +6013,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/spam_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "spam_report",
+      "definitions": [],
+      "detail": "Audit real factory repeat, completed offspring and per-producer MOVE travel.",
+      "sha256": "64b011b2281b16a8b1fa2aa57d15b94aeb172e75dedf62386c32ccb9fcffd7d6",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/stop_game.py",
       "domain": "shared",
       "area": "tooling",
@@ -5319,6 +6054,28 @@
       "definitions": [],
       "detail": "Summarize observed AIR outcomes without changing the playtest verdict.",
       "sha256": "e7cb7c4b3c341ff5a20ceb254e66f12c4bf990ea8c80fb84d1facc84ae6674f7",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/summarize_full_match_performance.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "summarize_full_match_performance",
+      "definitions": [],
+      "detail": "Reduce recorded 8v8 intervals without double-counting nested timers.",
+      "sha256": "a8ca1665722ec657bb06cfee70c2a9555893fdaf9f1deae20a0d34eb86010969",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/symbolize_instruction_samples.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "symbolize_instruction_samples",
+      "definitions": [],
+      "detail": "Resolve conditional AI instruction samples against the exact pinned PE symbols.",
+      "sha256": "5cb9b58c786d6493b6635d19c2e32ce524fc7f53caf15792548dfce0515a1ed4",
       "execution": "not inferred"
     },
     {
@@ -5436,6 +6193,38 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/test_fortress_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_fortress_report",
+      "definitions": [
+        "test_air_control_requires_actual_anti_air_damage",
+        "test_direct_defense_attack_does_not_need_priority_rules_param",
+        "test_friendly_damage_is_not_enemy_engagement",
+        "test_post_cutoff_assignment_cannot_rescue_failure",
+        "test_priority_evidence_must_prefer_heavy"
+      ],
+      "detail": "",
+      "sha256": "376929c3379fe7d2146a727f622a0addf3ba18c1f2d840eb04eb95932ca11b47",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/test_full_match_performance.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_full_match_performance",
+      "definitions": [
+        "test_nested_costs_multiple_ais_and_orders_stay_separate",
+        "test_partial_last_minute_and_invariant_do_not_become_victory",
+        "test_profiler_off_keeps_progress_but_has_no_measured_ai_peak"
+      ],
+      "detail": "Protect the distinctions used to rank costs, not the runtime AI policy.",
+      "sha256": "963b6a04cd0298f65e4394fbade0e592daeffbed61113c259f3e671951dcf6c4",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/test_lane_ui_memory.py",
       "domain": "shared",
       "area": "tooling",
@@ -5514,6 +6303,20 @@
       ],
       "detail": "Boundary tests: mismatched conditions and censored games must not contaminate ratings.",
       "sha256": "836a121653aa89d003a1ecd653389ab5980151abe47914d56c311ee716f2d11f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/test_spam_report.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_spam_report",
+      "definitions": [
+        "test_offspring_must_finish_and_move_inside_window",
+        "test_repeat_alone_is_not_production"
+      ],
+      "detail": "",
+      "sha256": "ead22905896eb6a4c76dcf99e0af5186d2b9a24d5c06ff772a953b9a95601601",
       "execution": "not inferred"
     },
     {
@@ -5804,6 +6607,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/widgets/builder_recovery.lua",
+      "domain": "shared",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "builder_recovery",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "55faf2bef874b0b542314c8eb6e3b202e934a572b3e9503c6c79b74ea670f488",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/widgets/dense_economy_watch.lua",
       "domain": "shared",
       "area": "fixtures",
@@ -5878,6 +6692,17 @@
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
       "sha256": "4890c3541c5435814cc5ef43537d9a67c708f6194956aea914128b0f0bbf88e8",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/widgets/full_match_perf.lua",
+      "domain": "shared",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "full_match_perf",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "7a279eaa7d12c2066fdf7e77b26cc45c37b3d6d1124c4ad8dc62a234b8911c56",
       "execution": "not inferred"
     },
     {
@@ -5998,7 +6823,7 @@
       "title": "ranged_arena",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "2163596f1c116e6433753a34201f8b9b7f7c871ea920c44edb828ce2da7111ba",
+      "sha256": "e860c8026e361ed876ecb241955a0a1ac3fa64a625330e760edae6ed75457c60",
       "execution": "not inferred"
     },
     {
@@ -6046,6 +6871,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/widgets/sea_coast.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_coast",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "df5cf3ea172eb3b1885e6b5a1361bdd7464ddb8117ca3b84fefa2db57c62661f",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/widgets/sea_economy_block_watch.lua",
       "domain": "sea",
       "area": "fixtures",
@@ -6054,6 +6890,17 @@
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
       "sha256": "05371858c645165c11d51baea698732bd0bb4bf17bb32c204c16fff7af618931",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/widgets/sea_expansion_watch.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_expansion_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "7747b9669a2b61e330142bb1702a3cc716f57581cf0f4d71a6f1340a62292889",
       "execution": "not inferred"
     },
     {
@@ -6317,7 +7164,7 @@
       "title": "run_native_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "d76abbb6320c245dd0fa547ca704c8fdb5759397dc200304fd35d6de6d896396",
+      "sha256": "d88717baa223feb7b0d99155d4c40e016a9ff8b8f59c03cfc06b1d812f147dd2",
       "execution": "not inferred"
     },
     {

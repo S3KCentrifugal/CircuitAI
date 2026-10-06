@@ -1,0 +1,36 @@
+{
+  "teams": {
+    "0": {
+      "frame": 27900,
+      "mexes": 16,
+      "beyond2400": 5,
+      "furthest": 3082
+    },
+    "1": {
+      "frame": 27900,
+      "mexes": 16,
+      "beyond2400": 5,
+      "furthest": 3090
+    },
+    "2": {
+      "frame": 27900,
+      "mexes": 0,
+      "beyond2400": 0,
+      "furthest": 0
+    }
+  },
+  "constructor_losses": 0,
+  "loss_evidence": [],
+  "completed_naval_defenses": 5,
+  "defense_evidence": [
+    "[t=00:01:37.185237][f=0019758] [SeaExpansionWatch] finished team=1 id=26473 def=armtl builder=nil x=5384 z=1160",
+    "[t=00:01:41.947700][f=0021471] [SeaExpansionWatch] finished team=1 id=5496 def=armtl builder=nil x=5768 z=1880",
+    "[t=00:01:46.851255][f=0023238] [SeaExpansionWatch] finished team=0 id=1896 def=armtl builder=nil x=6808 z=11032",
+    "[t=00:01:51.411963][f=0024879] [SeaExpansionWatch] finished team=0 id=29318 def=armtl builder=nil x=7512 z=11688",
+    "[t=00:01:56.105177][f=0026568] [SeaExpansionWatch] finished team=1 id=5394 def=armtl builder=nil x=4776 z=408"
+  ],
+  "completed_forward_forts": 0,
+  "forward_fort_evidence": [],
+  "withdrawal_orders": 0,
+  "measured_withdrawals": []
+}

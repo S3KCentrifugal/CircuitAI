@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "9d8cdb075866b186f2b1a0b53343a70eca4475522d7d4e5c223e421b3764ae3f",
+    "checks.json": "ce324792f4cae8e52fb8fb75701db59b228e70d9a1a81b4b994ea0ef7adf1303",
+    "land-siege-measurements-v3.json": "ad0c64c16d2e416de4edae894a39be81b026aab8c2737ce161c5e1bbb54c8472",
+    "launched.json": "6e97537d331850e7495016f00dcbaac695c0fe7381ba183f5c709c3550b4c6c9",
+    "ranged-arena-pins.json": "1931088318354653f9a1264bda6bcdea5f20bc14d5f80cb3088165bb27461ba8",
+    "ranged-arena.json": "f9d97e3fcf6106baeeec6c9970892014e7392673c08be41a0a89a266ad9d357f",
+    "report.md": "327a9b1082464256193e5944df44eab68cf06bf1c454cdffc6b87fdd125f1924",
+    "result.json": "89a5f3d30ec0cef4a7f6f0fb5d841a2d6f702f66a2637434121a3bcddac07265",
+    "run-inputs.json": "4f3322677d7da9aecd3eabaf1c3eaa9f65696b8b0f9fec9f53aa1c9671824d7e",
+    "run-plan.json": "d2cefebc2b80af36d32ebb2e2fc2df074029b363fe92b23a8bd503d2d33c5a30",
+    "script.txt": "4d7ab95207aa75bd386bee393a6fda68c6417e9a71ca1a2771ee325221b8d706",
+    "staged.json": "5b2eade0e3f243b845e4c799ed8f85ff398e77d659339cb0686119d8757eaf40",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "99b95035e5e56357a76da25fbf38e8202bc0be7c17cd2c8129d4f12d27c1341a"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\land-siege-cortex\\glitters\\20261006T051836Z-5e893307\\runs\\20261006T051956Z-8d789d70",
+  "schema": 1
+}

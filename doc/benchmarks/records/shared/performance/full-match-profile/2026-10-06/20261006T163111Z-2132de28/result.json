@@ -1,0 +1,251 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1085,
+      "sha256": "502adc7efafb1c11be665dc3066ec732f094ffc9ba7ff8b087568cea6c631aaa"
+    },
+    "full-match-checks.json": {
+      "bytes": 1085,
+      "sha256": "502adc7efafb1c11be665dc3066ec732f094ffc9ba7ff8b087568cea6c631aaa"
+    },
+    "full-match-manifest.json": {
+      "bytes": 38627,
+      "sha256": "303b06b1917fabe643e45b01acc6c52a3f46e78c4d134342bd6f5ab9847485f0"
+    },
+    "infolog.txt": {
+      "bytes": 2664840,
+      "sha256": "56b71cb1e1523f68bba674c6451c28a9109b082afbbc1a5878987f5532e66dc4"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "e0f766051315276db0ca032255aa6cd50d5dc11b7e8ce98726a80f21b89149b3"
+    },
+    "metal-plate-eight.as": {
+      "bytes": 1032,
+      "sha256": "fa949310e3d1ed4c261a3f544b9d469b2d217de012d466c5586bceb5e7b2502f"
+    },
+    "report.md": {
+      "bytes": 42809,
+      "sha256": "030dac2deda5809c601be8d24e68ca97c0d47296697f5237d9f9eb8c413b7547"
+    },
+    "run-inputs.json": {
+      "bytes": 38121,
+      "sha256": "cb63c14a0f8b26e46e7d736c114c676154bd3a551ceced844a4656406789d0de"
+    },
+    "run-plan.json": {
+      "bytes": 268,
+      "sha256": "00cf9822eeaf30d73bbcd4aa83253a13e59ac0fad44d1105749b9447155cfa69"
+    },
+    "sample-opening.modules.json": {
+      "bytes": 15814,
+      "sha256": "d5627929a6d60e5d737b9f93b05c684933b9b4c9b1155272a5532836058ee4d3"
+    },
+    "sample-opening.threads-after.json": {
+      "bytes": 1745,
+      "sha256": "f123df37923dc07846b5b084b736578d353f0871cf7516225681a8affbf1fb56"
+    },
+    "sample-opening.threads-before.json": {
+      "bytes": 1748,
+      "sha256": "bf1d1ea7bff5cd226992679ff1ee7bc753eb9340fbd363a55d3ac0c174ac795d"
+    },
+    "screen_2026-10-06_16-28-30-280.png": {
+      "bytes": 1798129,
+      "sha256": "505eac95bcf3ca33a68cff1a9ed3d3500ef0e340e9f756c374f17eb339aefacd"
+    },
+    "script.txt": {
+      "bytes": 10808,
+      "sha256": "70f10672c68c2a87c5f120e2315d1ca66fec931901bcb4d2732244de4402424d"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "941ff59bd5bf8b0321a8868e641b45fa64958ca0568081d034ae57567b97740a"
+    },
+    "teams.json": {
+      "bytes": 2977,
+      "sha256": "0d67ad75c49c3c64820d0cb8cb7a537afcd0a07aecfcc0f1d6bd2318ea49ebca"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "natural",
+    "map": "metal-plate",
+    "scenario": "full-match-profile"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T163111Z-2132de28",
+  "last_frame": 13689,
+  "map": "Full Metal Plate 1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\full-match-profile\\metal-plate\\20261006T162613Z-c2a85e34\\runs\\20261006T163111Z-2132de28",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-06T16:31:11.171372+00:00",
+  "requested": {
+    "seed": 220001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 2,
+      "team": 0,
+      "x": 3400.0,
+      "z": 900.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 1,
+      "team": 1,
+      "x": 1400.0,
+      "z": 1200.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SUPPORT",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 800.0,
+      "z": 3400.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TACTICAL",
+      "side": "legion",
+      "spot": 4,
+      "team": 3,
+      "x": 2100.0,
+      "z": 2500.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 5,
+      "team": 4,
+      "x": 4600.0,
+      "z": 1600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 6,
+      "team": 5,
+      "x": 3600.0,
+      "z": 3000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 7,
+      "team": 6,
+      "x": 2200.0,
+      "z": 4300.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 8,
+      "team": 7,
+      "x": 800.0,
+      "z": 5100.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "cortex",
+      "spot": 9,
+      "team": 8,
+      "x": 10888.0,
+      "z": 11088.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "legion",
+      "spot": 10,
+      "team": 9,
+      "x": 8888.0,
+      "z": 11388.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SUPPORT",
+      "side": "armada",
+      "spot": 11,
+      "team": 10,
+      "x": 11488.0,
+      "z": 8888.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TACTICAL",
+      "side": "cortex",
+      "spot": 12,
+      "team": 11,
+      "x": 10188.0,
+      "z": 9788.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 13,
+      "team": 12,
+      "x": 7688.0,
+      "z": 10688.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 14,
+      "team": 13,
+      "x": 8688.0,
+      "z": 9288.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 15,
+      "team": 14,
+      "x": 10088.0,
+      "z": 7988.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "legion",
+      "spot": 16,
+      "team": 15,
+      "x": 11488.0,
+      "z": 7188.0
+    }
+  ],
+  "verdict": "FAIL"
+}

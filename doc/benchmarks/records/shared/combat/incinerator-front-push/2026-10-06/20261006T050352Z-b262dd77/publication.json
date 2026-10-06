@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "4dc3e83ab9328ac3f3f0c4731c2682167881b9a65426c69ec70e82288e1468aa",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "land-siege-measurements-v3.json": "bb9f93a84d6e5f1328913c84bf6d6674886afdf1d18de0117ed02ab428c30f43",
+    "launched.json": "a8c6b87938424994aea6110cdcd5505cf9b5cee98cd1c151d9fea659268802c6",
+    "ranged-arena-pins.json": "2fc7bf7a14a9717abface4c6e8fd43acebdbe6e9fbab05e1d3786775b4026aac",
+    "ranged-arena.json": "f8a634fcd27fcc39984bb5f3411a9ea0b6b6bca20063cbf4bf5bd8b8c0e86ed0",
+    "report.md": "5dc89fb0839987383485f43b8a9d5bacbdf3e60f17654a7eca6b6b8d2cd3df94",
+    "result.json": "209d0ed69b465469ef2a9f548fd5c08255cd3bf78221d889baa002e08f01a93a",
+    "run-inputs.json": "ab078411a29558a63729e6213a7648e5a18226eb88cb80d95f5bed5ee95342d3",
+    "run-plan.json": "ab3f69b534884a4734335e3e67b058c91539473380afa37ae0e67b21c4b31784",
+    "screen_2026-10-06_05-03-25-112.png": "57a4c6576c02f912e6ed51882bf2fad93d30e7c4645ca5b92ce7b9c9e93216e0",
+    "script.txt": "4708c2cc21576669654427e33d10ca741b548f33b02981185ca545b2ce3d3d0b",
+    "staged.json": "aedf0bd0034a58ea93b790b8c2fb62395504fc979036201bd8c134bcd4fb3e1d",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "719845caf1e0dad2ff63f420cc947919f80d66a4befc7301d1ea3cc432017840"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\incinerator-front-push\\glitters\\20261006T050221Z-5035783b\\runs\\20261006T050352Z-b262dd77",
+  "schema": 1
+}

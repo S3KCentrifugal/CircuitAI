@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "dcbec25a8aff3ede846cbdf019025fbd50691ac52a782a17f58e60f41b14198e",
+    "checks.json": "8affa8099bf9baa0092d65ed028b5462e7975f93ec5ecdd2079008b21a53bdbd",
+    "fixture.json": "3bf5d6df21e50561e580982429d49a3916029a265a85e4c15b8a2272e6bcb863",
+    "launched.json": "a698878cb777c3b101b18a757b33e43b6ec29f40bc98cb6afe69dc6345a6231e",
+    "report.md": "304e005dfb47b029cb55dfb83fbd1f613242eb6edd4c5c7ef58acc84a086d7a1",
+    "result.json": "115c0dba87525325fdb32078f4803fe242793692e8da306aebb5eb506c5ef3fa",
+    "run-inputs.json": "dbac68b83f1eae2f8edd3c43700f368f938288158f13f76a4e1c06111490c798",
+    "run-plan.json": "fc43b536945e903ca4fb386d7151396859124cfa2ac89c4cd3059572bb6ed1bb",
+    "screen_2026-10-06_13-35-39-071.png": "dbabc4b170bf57f83175e335d386c56bbfbf396d766a98ef7c53f9ad5d65c14f",
+    "script.txt": "4452a6148cd4b91e9d3a20ad72bed0e53d471b33310625ef14941db1d781ebfb",
+    "staged.json": "54e74a3ce16234fdcbe0271dc7989ffae4a7e23ffe1f7aadef249a467f951dd3",
+    "teams.json": "b765c41de650dece325b63fe42a94b6d0311eb8cb3518ba62428d178a03acb60"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\economy\\recovery-ferry-native\\glacial\\20261006T133418Z-65076b1c\\runs\\20261006T133654Z-2a8280db",
+  "schema": 1
+}

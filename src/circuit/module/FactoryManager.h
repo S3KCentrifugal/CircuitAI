@@ -27,6 +27,7 @@ namespace TaskS {
 		CCircuitDef* buildDef;
 		springai::AIFloat3 position;
 		float radius;
+		bool repeat = false;  // opt-in persistent factory recruitment, owned by script
 	};
 
 	struct SServSTask {

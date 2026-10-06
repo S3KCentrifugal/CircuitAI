@@ -1,0 +1,289 @@
+{
+  "teams": {
+    "0": {
+      "frame": 27900,
+      "mexes": 11,
+      "beyond2400": 4,
+      "furthest": 4792
+    },
+    "1": {
+      "frame": 27900,
+      "mexes": 12,
+      "beyond2400": 6,
+      "furthest": 5947
+    },
+    "2": {
+      "frame": 27900,
+      "mexes": 14,
+      "beyond2400": 6,
+      "furthest": 3142
+    },
+    "3": {
+      "frame": 27900,
+      "mexes": 21,
+      "beyond2400": 9,
+      "furthest": 3159
+    },
+    "4": {
+      "frame": 27900,
+      "mexes": 6,
+      "beyond2400": 2,
+      "furthest": 4052
+    },
+    "5": {
+      "frame": 27900,
+      "mexes": 13,
+      "beyond2400": 6,
+      "furthest": 3308
+    },
+    "6": {
+      "frame": 27900,
+      "mexes": 0,
+      "beyond2400": 0,
+      "furthest": 0
+    }
+  },
+  "constructor_losses": 0,
+  "loss_evidence": [],
+  "completed_naval_defenses": 17,
+  "defense_evidence": [
+    "[t=00:00:57.373551][f=0006515] [SeaExpansionWatch] finished team=0 id=4199 def=armtl builder=nil x=1336 z=3800",
+    "[t=00:01:00.858390][f=0007770] [SeaExpansionWatch] finished team=0 id=7904 def=armtl builder=nil x=808 z=4792",
+    "[t=00:01:08.375630][f=0010117] [SeaExpansionWatch] finished team=5 id=16202 def=cortl builder=nil x=12808 z=3832",
+    "[t=00:01:08.965072][f=0010334] [SeaExpansionWatch] finished team=5 id=20361 def=cortl builder=nil x=9704 z=4760",
+    "[t=00:01:12.150320][f=0011481] [SeaExpansionWatch] finished team=5 id=31849 def=cortl builder=nil x=13528 z=4392",
+    "[t=00:01:13.535472][f=0011976] [SeaExpansionWatch] finished team=3 id=29539 def=legtl builder=nil x=9800 z=4600",
+    "[t=00:01:15.213116][f=0012584] [SeaExpansionWatch] finished team=2 id=5496 def=cortl builder=nil x=4984 z=6040",
+    "[t=00:01:15.915674][f=0012836] [SeaExpansionWatch] finished team=5 id=18609 def=cortl builder=nil x=9576 z=5720",
+    "[t=00:01:16.270770][f=0012963] [SeaExpansionWatch] finished team=3 id=25123 def=legtl builder=nil x=9912 z=4744",
+    "[t=00:01:21.060675][f=0014689] [SeaExpansionWatch] finished team=0 id=31382 def=armtl builder=nil x=6152 z=4920",
+    "[t=00:01:21.060959][f=0014689] [SeaExpansionWatch] finished team=5 id=24419 def=cortl builder=nil x=9464 z=5912",
+    "[t=00:01:24.561869][f=0015933] [SeaExpansionWatch] finished team=2 id=27138 def=corfrt builder=nil x=4768 z=6080",
+    "[t=00:01:36.649311][f=0019789] [SeaExpansionWatch] finished team=0 id=24120 def=armtl builder=nil x=600 z=4392",
+    "[t=00:01:37.821482][f=0020175] [SeaExpansionWatch] finished team=2 id=26077 def=cortl builder=nil x=4632 z=4712",
+    "[t=00:01:41.521037][f=0021307] [SeaExpansionWatch] finished team=2 id=26040 def=corfhlt builder=nil x=4928 z=6192",
+    "[t=00:01:43.804470][f=0021926] [SeaExpansionWatch] finished team=1 id=6273 def=armtl builder=nil x=6152 z=6536",
+    "[t=00:01:51.465931][f=0024123] [SeaExpansionWatch] finished team=0 id=5556 def=armtl builder=nil x=4872 z=5896"
+  ],
+  "completed_forward_forts": 5,
+  "forward_fort_evidence": [
+    "[t=00:01:08.965072][f=0010334] [SeaExpansionWatch] finished team=5 id=20361 def=cortl builder=nil x=9704 z=4760",
+    "[t=00:01:15.213116][f=0012584] [SeaExpansionWatch] finished team=2 id=5496 def=cortl builder=nil x=4984 z=6040",
+    "[t=00:01:15.915674][f=0012836] [SeaExpansionWatch] finished team=5 id=18609 def=cortl builder=nil x=9576 z=5720",
+    "[t=00:01:24.561869][f=0015933] [SeaExpansionWatch] finished team=2 id=27138 def=corfrt builder=nil x=4768 z=6080",
+    "[t=00:01:41.521037][f=0021307] [SeaExpansionWatch] finished team=2 id=26040 def=corfhlt builder=nil x=4928 z=6192"
+  ],
+  "withdrawal_orders": 35,
+  "measured_withdrawals": [
+    {
+      "frame": 17075,
+      "unit": 31019,
+      "homeward_elmos": 1268,
+      "end_frame": 17850
+    },
+    {
+      "frame": 19085,
+      "unit": 31019,
+      "homeward_elmos": 1351,
+      "end_frame": 19950
+    },
+    {
+      "frame": 19534,
+      "unit": 16637,
+      "homeward_elmos": 1494,
+      "end_frame": 20400
+    },
+    {
+      "frame": 19594,
+      "unit": 27897,
+      "homeward_elmos": 1257,
+      "end_frame": 20400
+    },
+    {
+      "frame": 19685,
+      "unit": 4850,
+      "homeward_elmos": 1323,
+      "end_frame": 20550
+    },
+    {
+      "frame": 20374,
+      "unit": 2817,
+      "homeward_elmos": 1096,
+      "end_frame": 21150
+    },
+    {
+      "frame": 21185,
+      "unit": 31019,
+      "homeward_elmos": 1483,
+      "end_frame": 22050
+    },
+    {
+      "frame": 21331,
+      "unit": 994,
+      "homeward_elmos": 1555,
+      "end_frame": 22200
+    },
+    {
+      "frame": 22054,
+      "unit": 16637,
+      "homeward_elmos": 1688,
+      "end_frame": 22950
+    },
+    {
+      "frame": 22084,
+      "unit": 27897,
+      "homeward_elmos": 1631,
+      "end_frame": 22950
+    },
+    {
+      "frame": 22234,
+      "unit": 8662,
+      "homeward_elmos": 1354,
+      "end_frame": 23100
+    },
+    {
+      "frame": 22593,
+      "unit": 9050,
+      "homeward_elmos": 1266,
+      "end_frame": 23400
+    },
+    {
+      "frame": 22801,
+      "unit": 20746,
+      "homeward_elmos": 1695,
+      "end_frame": 23700
+    },
+    {
+      "frame": 23131,
+      "unit": 19451,
+      "homeward_elmos": 1588,
+      "end_frame": 24000
+    },
+    {
+      "frame": 23131,
+      "unit": 830,
+      "homeward_elmos": 1551,
+      "end_frame": 24000
+    },
+    {
+      "frame": 23285,
+      "unit": 31019,
+      "homeward_elmos": 1478,
+      "end_frame": 24150
+    },
+    {
+      "frame": 23431,
+      "unit": 994,
+      "homeward_elmos": 1426,
+      "end_frame": 24300
+    },
+    {
+      "frame": 23854,
+      "unit": 16637,
+      "homeward_elmos": 1564,
+      "end_frame": 24750
+    },
+    {
+      "frame": 23974,
+      "unit": 27897,
+      "homeward_elmos": 1042,
+      "end_frame": 24750
+    },
+    {
+      "frame": 24154,
+      "unit": 8662,
+      "homeward_elmos": 1578,
+      "end_frame": 25050
+    },
+    {
+      "frame": 24334,
+      "unit": 20323,
+      "homeward_elmos": 1597,
+      "end_frame": 25200
+    },
+    {
+      "frame": 24931,
+      "unit": 19451,
+      "homeward_elmos": 1448,
+      "end_frame": 25800
+    },
+    {
+      "frame": 25115,
+      "unit": 31019,
+      "homeward_elmos": 1183,
+      "end_frame": 25950
+    },
+    {
+      "frame": 25171,
+      "unit": 994,
+      "homeward_elmos": 1030,
+      "end_frame": 25950
+    },
+    {
+      "frame": 25321,
+      "unit": 830,
+      "homeward_elmos": 1035,
+      "end_frame": 26100
+    },
+    {
+      "frame": 25834,
+      "unit": 27897,
+      "homeward_elmos": 1424,
+      "end_frame": 26700
+    },
+    {
+      "frame": 25834,
+      "unit": 16637,
+      "homeward_elmos": 1607,
+      "end_frame": 26700
+    },
+    {
+      "frame": 26284,
+      "unit": 20323,
+      "homeward_elmos": 1413,
+      "end_frame": 27150
+    },
+    {
+      "frame": 26284,
+      "unit": 8662,
+      "homeward_elmos": 1673,
+      "end_frame": 27150
+    },
+    {
+      "frame": 26434,
+      "unit": 2817,
+      "homeward_elmos": 1600,
+      "end_frame": 27300
+    },
+    {
+      "frame": 26581,
+      "unit": 10240,
+      "homeward_elmos": 1590,
+      "end_frame": 27450
+    },
+    {
+      "frame": 26761,
+      "unit": 830,
+      "homeward_elmos": 1398,
+      "end_frame": 27600
+    },
+    {
+      "frame": 26851,
+      "unit": 19451,
+      "homeward_elmos": 1540,
+      "end_frame": 27750
+    },
+    {
+      "frame": 27065,
+      "unit": 31019,
+      "homeward_elmos": 1136,
+      "end_frame": 27900
+    },
+    {
+      "frame": 27331,
+      "unit": 994,
+      "homeward_elmos": 788,
+      "end_frame": 27900
+    }
+  ]
+}

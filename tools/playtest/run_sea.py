@@ -29,6 +29,8 @@ def main():
     p.add_argument('--stage-only',action='store_true')
     p.add_argument('--keep-going',action='store_true',help='Preserve failed checks but continue to the requested horizon')
     p.add_argument('--base-observer',action='store_true',help='Observe completed later-yard facing and economy separation')
+    p.add_argument('--expansion-observer',action='store_true',help='Record mex advance, naval defenses and worker losses')
+    p.add_argument('--checks',help='Explicit categorized gameplay assertions; default is the existing SEA smoke suite')
     p.add_argument('--fixture',choices=['harbor'])
     a=p.parse_args()
     if a.fixture and (a.map!='glacial' or a.side!='armada' or a.legacy):
@@ -50,6 +52,9 @@ def main():
         cmd += ['--map-file',str(playtest.REPO/'data/script/src/maps/shore_to_shore.as')]
     if a.base_observer:
         cmd += ['--extra-widget',str(playtest.HERE/'widgets/sea_allied_base_watch.lua')]
+    if a.expansion_observer:
+        cmd += ['--extra-widget',str(playtest.HERE/'widgets/sea_expansion_watch.lua')]
+        if a.map=='glacial': cmd[cmd.index('--shots')+1]='5@5000@2800:4800,10@5500@4000:4800,14@7000@6500:4800'
     if a.fixture:
         cmd += ['--extra-widget',str(playtest.HERE/'widgets/sea_harbor_fixture.lua'),'--modoption','deathmode=neverend']
     subprocess.run(cmd,check=True)
@@ -85,6 +90,6 @@ def main():
     subprocess.run([sys.executable,str(playtest.REPO/'tools/knowledge/check_script_api.py'),'--dll',str(a.dll),'--scripts',str(globals_file.parent.parent)],check=True)
     if a.stage_only: return 0
     subprocess.run(call+['launch','--dir',str(d),'--engine','recoil_2026.07.04']+(['--headless'] if a.headless else []),check=True)
-    return subprocess.run(call+['watch','--dir',str(d),'--role','SEA','--checks','harbor-lifecycle' if a.fixture else 'sea_compile','--minutes',str(a.minutes),'--wall-minutes','30']+(['--keep-going'] if a.keep_going else [])).returncode
+    return subprocess.run(call+['watch','--dir',str(d),'--role','SEA','--checks',a.checks or ('harbor-lifecycle' if a.fixture else 'sea_compile'),'--minutes',str(a.minutes),'--wall-minutes','30']+(['--keep-going'] if a.keep_going else [])).returncode
 
 if __name__=='__main__': sys.exit(main())

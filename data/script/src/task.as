@@ -254,7 +254,7 @@ namespace TaskS {
 
 	SRecruitTask Recruit(Task::RecruitType type,
 			Task::Priority priority, CCircuitDef@ buildDef,
-			const AIFloat3& in position, float radius)
+			const AIFloat3& in position, float radius, bool repeat = false)
 	{
 		SRecruitTask ti;
 		ti.type = type;
@@ -262,6 +262,7 @@ namespace TaskS {
 		@ti.buildDef = buildDef;
 		ti.position = position;
 		ti.radius = radius;
+		ti.repeat = repeat;
 		return ti;
 	}
 

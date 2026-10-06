@@ -1,0 +1,47 @@
+{
+  "repeating_factories": [
+    "17428",
+    "27235"
+  ],
+  "completed": {
+    "17428": 26,
+    "27235": 25
+  },
+  "move_progress_units": {
+    "17428": 25,
+    "27235": 25
+  },
+  "maximum_repeat_queue": {
+    "27235": 1,
+    "17428": 1
+  },
+  "last_lane_endpoints": {
+    "28429": [
+      2814.93652,
+      10040.0
+    ],
+    "27235": [
+      2814.93652,
+      10040.0
+    ],
+    "4089": [
+      3812.90332,
+      10040.0
+    ],
+    "17428": [
+      3812.90332,
+      10040.0
+    ],
+    "13180": [
+      3872.0,
+      7584.0
+    ]
+  },
+  "failures": [],
+  "passed": true,
+  "case": "spam-build-front",
+  "variant": "ranged",
+  "deadline_frame": 10800,
+  "watch_verdict": "PASS",
+  "last_observed_frame": 11130
+}

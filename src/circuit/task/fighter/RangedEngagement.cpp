@@ -377,6 +377,31 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if(score<chosenScore) { chosenScore=score; chosen=point; found=true; }
         }
     }
+    if (!found && policy.stageWhenBlocked && c.def) {
+        // D-216: a mid-range support hull must not wait at its spawn merely
+        // because the observed static line outranges it. Stage on our side of
+        // that line, outside every known weapon/death-blast disc. This does not
+        // invent a safe firing solution or relax path/splash/retreat checks.
+        // Bounded 3x9 sites, only after the normal 17-site search fails.
+        const float radius = std::max(maxRange, c.hazardRadius + policy.safetyMargin) + policy.spacing;
+        for (int ring = 0; ring < 3; ++ring) for (int k = 0; k < 9; ++k) {
+            const int side = k == 0 ? 0 : ((k % 2) ? (k + 1) / 2 : -k / 2);
+            const float angle = baseAngle + side * .16f;
+            const float band = radius + ring * policy.spacing;
+            AIFloat3 point(c.pos.x + std::cos(angle) * band, 0.f, c.pos.z + std::sin(angle) * band);
+            CTerrainManager::CorrectPosition(point);
+            point.y = ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x, point.z);
+            // Advance, never replace an already closer position with rearward
+            // staging. Slot reservations preserve spacing between the hulls.
+            if (point.SqDistance2D(c.pos) >= pos.SqDistance2D(c.pos)
+                || !world.FreeSlot(id, point, spacing) || world.Danger(point, policy.safetyMargin) > 0.f
+                || !world.Safe(pos, point, policy.safetyMargin, true)
+                || !ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(), point)) continue;
+            const float score = pos.SqDistance2D(point);
+            if (score < chosenScore) { chosenScore = score; chosen = point; found = true; }
+        }
+        if (report && found) ai->LOG("RANGED: staging unit=%d outside target=%d coverage", id, c.id);
+    }
     if(found) {
         world.SetSlot(id,chosen,spacing,def->GetCostM());
         Move(unit,chosen,true);

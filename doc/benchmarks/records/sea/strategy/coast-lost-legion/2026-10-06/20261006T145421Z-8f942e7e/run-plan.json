@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "strategy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "glacial",
+    "scenario": "coast-lost-legion"
+  },
+  "id": "20261006T144840Z-a881b9dd",
+  "requested": {
+    "seed": 219001
+  },
+  "schema": 1
+}

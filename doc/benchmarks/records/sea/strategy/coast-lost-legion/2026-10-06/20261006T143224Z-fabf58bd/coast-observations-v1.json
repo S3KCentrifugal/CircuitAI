@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "original_id": "20261006T143224Z-fabf58bd",
+  "original_verdict": "PASS",
+  "log_sha256": "ea09ac441c1a38b24163f19532b34f5b106d3925c801d2f7acaad4f30f8eb4e3",
+  "last_frame": 45281,
+  "fallback_transitions": [
+    {
+      "frame": 4530,
+      "active": true
+    }
+  ],
+  "completed": {
+    "legapopupdef": 15,
+    "legbal": 32,
+    "legcen": 33,
+    "legck": 2,
+    "legcom": 1,
+    "legestor": 1,
+    "legforti": 34,
+    "leglab": 1,
+    "legmex": 1,
+    "legmg": 1,
+    "legmoho": 2,
+    "legmstor": 1,
+    "legnavyconship": 1,
+    "legsolar": 9,
+    "legsy": 1
+  },
+  "first_completion_frame": {
+    "legapopupdef": 12993,
+    "legbal": 9470,
+    "legcen": 8966,
+    "legck": 7709,
+    "legcom": 0,
+    "legestor": 11574,
+    "legforti": 29645,
+    "leglab": 7034,
+    "legmex": 9339,
+    "legmg": 14581,
+    "legmoho": 12141,
+    "legmstor": 10622,
+    "legnavyconship": 600,
+    "legsolar": 8508,
+    "legsy": 600
+  },
+  "coastal_build_orders": {
+    "legapopupdef": 15,
+    "legestor": 1,
+    "legforti": 35,
+    "leglab": 1,
+    "legmg": 1,
+    "legmstor": 1,
+    "legsolar": 9
+  },
+  "first_observed_invader_damage_frame": null,
+  "invariants": [],
+  "limits": "Fixture completion counts include supplied seed assets; damage is not proof of invasion defeat. This supplements and never replaces the original check verdict."
+}

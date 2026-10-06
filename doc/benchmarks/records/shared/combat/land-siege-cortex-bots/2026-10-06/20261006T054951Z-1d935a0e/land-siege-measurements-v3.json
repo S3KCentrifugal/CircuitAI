@@ -1,0 +1,42 @@
+{
+  "schema": 3,
+  "case": "land-siege-cortex-bots",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-cortex-bots\\glitters\\20261006T054831Z-82bf5b89",
+  "minutes": 5,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 9300,
+  "produced": {
+    "corvoyr": 1,
+    "corpyro": 10,
+    "cormort": 15,
+    "corfast": 5,
+    "corack": 3,
+    "corsktl": 9,
+    "cormando": 2,
+    "corsumo": 2,
+    "corcan": 5
+  },
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [
+    "[t=00:00:38.567157][f=0000725] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:725:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=1850 committed=0 income=48",
+    "[t=00:00:39.001075][f=0000829] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:829:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3062 committed=400 income=120",
+    "[t=00:00:39.265486][f=0000893] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:893:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3202 committed=800 income=126",
+    "[t=00:00:39.799810][f=0001021] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1021:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3342 committed=1200 income=126",
+    "[t=00:00:39.998670][f=0001069] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1069:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3482 committed=1600 income=126",
+    "[t=00:00:40.553359][f=0001201] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1201:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3622 committed=2000 income=126",
+    "[t=00:00:40.738451][f=0001245] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1245:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3762 committed=2400 income=126",
+    "[t=00:00:41.167228][f=0001349] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1349:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=3902 committed=2800 income=126",
+    "[t=00:00:41.454136][f=0001417] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1417:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=4042 committed=3200 income=126",
+    "[t=00:00:41.798838][f=0001501] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1501:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=4182 committed=3600 income=126",
+    "[t=00:00:42.385286][f=0001641] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1641:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=4462 committed=4000 income=126",
+    "[t=00:00:46.594004][f=0002505] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:2505:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=4812 committed=4400 income=126",
+    "[t=00:00:48.977578][f=0003077] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:3077:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=5480 committed=4800 income=126",
+    "[t=00:01:04.334775][f=0006645] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:6645:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=6050 committed=5200 income=75",
+    "[t=00:01:05.252522][f=0006865] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:6865:L::[LandSiege] factory=coralab unit=cormort static=4840 budget=6050 committed=5600 income=75"
+  ],
+  "passed": true,
+  "failures": []
+}

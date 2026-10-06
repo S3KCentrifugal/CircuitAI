@@ -228,6 +228,8 @@ public:
 	void AdjustSinceFrame(int frame) { sinceFrame = frame + cooldown; }
 	bool IsAvailable() const { return buildAllowed && maxThisUnit > count; }
 	bool IsBuildAllowed() const { return buildAllowed; }
+	float GetTargetMinCost() const { return targetMinCost; }
+	void SetTargetMinCost(float value) { targetMinCost = value; }
 	float GetStandoff() const { return standoff; }
 	void SetStandoff(float value) { standoff = value; }
 	void SetBuildAllowed(bool value) { buildAllowed = value; }
@@ -447,6 +449,7 @@ private:
 
 	// ---- Bit fields ---- BEGIN
 	bool buildAllowed = true;  // JSON construction veto, independent of temporary role caps
+	float targetMinCost = 0.f; // Opt-in valuable-contact preference; zero is legacy.
 	float standoff = 0.f;  // Fraction of weapon range to hold; zero keeps legacy micro.
 	bool isIgnore : 1;
 

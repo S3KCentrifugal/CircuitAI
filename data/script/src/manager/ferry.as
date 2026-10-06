@@ -370,6 +370,7 @@ namespace Ferry {
     void OnUnitRemoved(CCircuitUnit@ unit)
     {
         if (unit is null) return;
+        dropOverrides.delete("" + unit.id);
         if (unit.id == buildingId) {
             buildingId = -1;
             buildingHoldApplied = false;
@@ -450,10 +451,14 @@ namespace Ferry {
         return false;
     }
 
-    bool TryCarry(CCircuitUnit@ cargo, int recipient, const AIFloat3 &in dropPos)
+    // Optional caller-selected safe anchor. Preserve it while a busy ferry
+    // queues the cargo; ordinary T2 donations retain the first-mex policy.
+    dictionary dropOverrides;
+    bool TryCarry(CCircuitUnit@ cargo, int recipient, const AIFloat3 &in dropPos, bool useProvidedDrop = false)
     {
         if (!IsEnabled()) return _Refuse("ferry disabled");
         if (cargo is null || recipient < 0) return _Refuse("no cargo or no recipient");
+        if (useProvidedDrop) dropOverrides.set("" + cargo.id, dropPos);
         CCircuitUnit@ t = Transport();
         CFerryTask@ task = TaskOf(t);
         if (task is null) {
@@ -485,9 +490,11 @@ namespace Ferry {
         // D-110 (played: no unload ever took at a teammate's start, their busiest
         // ground): the drop is FerryDropPullback short of it, toward our base
         Team::Roster::Entry@ ally = Team::Roster::Get(recipient);
-        const bool mexAnchor = ally !is null && ally.firstMex.x >= 0.0f;
+        const bool explicitAnchor = dropOverrides.exists("" + cargo.id);
+        const bool mexAnchor = !explicitAnchor && ally !is null && ally.firstMex.x >= 0.0f;
         AIFloat3 drop = mexAnchor ? ally.firstMex : dropPos;
-        if (!mexAnchor) {
+        if (explicitAnchor) dropOverrides.get("" + cargo.id, drop);
+        if (!mexAnchor && !explicitAnchor) {
             const float dx = Global::Map::StartPos.x - dropPos.x, dz = Global::Map::StartPos.z - dropPos.z;
             const float len = sqrt(dx * dx + dz * dz);
             const float pull = Global::Ferry::DropPullback;

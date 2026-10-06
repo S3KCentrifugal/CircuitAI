@@ -1,0 +1,235 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 663,
+      "sha256": "9267d5def930ccc809231d83d9830bdf0ddf8b5888f8065fceb8eb2803154808"
+    },
+    "infolog.txt": {
+      "bytes": 6623203,
+      "sha256": "221eb8d838e3b99d82c962450959015bd78992f6bc9d98a191ea75a1da86fb15"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "62229a9fd59fc71bbad22dd6791567fefc65ab5ae7de47dbc04a1f2243035e81"
+    },
+    "report.md": {
+      "bytes": 21230,
+      "sha256": "9784afc662a81ad44d7464cb61c630ef25f01bd189344a8be1bc71b740f12e2c"
+    },
+    "run-inputs.json": {
+      "bytes": 37444,
+      "sha256": "3d74b2a05267c7abe03bd895288a95194660e89c577f0649926b904317523d86"
+    },
+    "run-plan.json": {
+      "bytes": 258,
+      "sha256": "11ebe79110013faf0d3b5aeebb25b0da851399b543c5b62caedffd3f4ce3f2fe"
+    },
+    "screen_2026-10-06_14-58-22-665.png": {
+      "bytes": 1798314,
+      "sha256": "07be7cba12bc5efb0966b1cf8eec36992b403e2d5bd6a43c8cecba6b6330ab89"
+    },
+    "screen_2026-10-06_14-58-58-615.png": {
+      "bytes": 1807186,
+      "sha256": "3390d7a6128eadf289a07e6f11bb590f22e398f63b0d3a380a9b82645cdd222e"
+    },
+    "script.txt": {
+      "bytes": 10804,
+      "sha256": "93277fde3e9902ba6db9b4feba40a9ce222f9a25d83134cbe9e4b47fc4e5e54e"
+    },
+    "sea-fixture.json": {
+      "bytes": 290,
+      "sha256": "210f1d62faa2300039b1e027d2356c70ce148e01ef9754da485a73f3d7265a1e"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "4f43748128f0cdaa8d862e81023a04e8b111469094639e8ee5c5dc635903dcfa"
+    },
+    "teams.json": {
+      "bytes": 2956,
+      "sha256": "d0548d37b92c0bbf2406d436d69374767826af25faf8afa0c414876f5acf3c8d"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "coast-regression"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T145859Z-56caa74d",
+  "last_frame": 18014,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\coast-regression\\glacial\\20261006T145708Z-d7572154\\runs\\20261006T145859Z-56caa74d",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-06T14:58:59.207120+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 0,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 1,
+      "team": 1,
+      "x": 490.0,
+      "z": 1140.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 2,
+      "team": 2,
+      "x": 1800.0,
+      "z": 1400.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "legion",
+      "spot": 3,
+      "team": 3,
+      "x": 430.0,
+      "z": 2300.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 4,
+      "team": 4,
+      "x": 1800.0,
+      "z": 2550.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 6,
+      "team": 5,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 7,
+      "team": 6,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TACTICAL",
+      "side": "armada",
+      "spot": 8,
+      "team": 7,
+      "x": 880.0,
+      "z": 6850.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "cortex",
+      "spot": 9,
+      "team": 8,
+      "x": 12572.0,
+      "z": 1400.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "legion",
+      "spot": 10,
+      "team": 9,
+      "x": 14000.0,
+      "z": 1100.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 11,
+      "team": 10,
+      "x": 12640.0,
+      "z": 2500.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 12,
+      "team": 11,
+      "x": 13890.0,
+      "z": 2246.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 12,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 13,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 14,
+      "x": 12618.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TACTICAL",
+      "side": "legion",
+      "spot": 16,
+      "team": 15,
+      "x": 13454.0,
+      "z": 6850.0
+    }
+  ],
+  "verdict": "FAIL"
+}

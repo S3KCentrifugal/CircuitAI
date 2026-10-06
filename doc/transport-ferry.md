@@ -442,3 +442,18 @@ initialized. `AwaitTransportSeconds` (120) bounds this wait; missing providers
 and arrival timeouts retain the existing walking fallback. This closes the
 observed donation-before-request race without making AIR transport service
 TECH-specific.
+
+
+### D-218: T1 constructor recovery cargo
+
+`Team::Recovery` uses the existing ferry for a lost-constructor request only
+when TECH already owns one. It preflights a wider, safe dry-ground search near
+the recipient and passes `TryCarry(cargo, recipient, safe, true)`. The optional
+fourth argument retains that caller-selected anchor while cargo waits in the
+queue. Existing three-argument T2 calls retain first-mex/start selection.
+Recovery gives directly when no transport or usable landing is available.
+
+Recovery request coordination can use the optional host Lua relay, with native
+allied messaging as fallback. This is separate from the older ferry transport
+request protocol described above, which still uses `AiSendMessage`. See the
+[recovery report](reviews/2026-10-06-builder-recovery.md).

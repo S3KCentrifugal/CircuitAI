@@ -1,0 +1,2107 @@
+{
+  "module_samples": [
+    [
+      "spring.exe",
+      1209
+    ],
+    [
+      "ntdll.dll",
+      303
+    ],
+    [
+      "SkirmishAI.dll",
+      281
+    ],
+    [
+      "nvoglv64.dll",
+      66
+    ],
+    [
+      "msvcrt.dll",
+      30
+    ],
+    [
+      "win32u.dll",
+      26
+    ],
+    [
+      "zlib1.dll",
+      2
+    ],
+    [
+      "SDL2.dll",
+      1
+    ],
+    [
+      "KERNEL32.DLL",
+      1
+    ]
+  ],
+  "thread_samples": [
+    [
+      76496,
+      1919
+    ]
+  ],
+  "thread_cpu_ms": [
+    [
+      76496,
+      29890.625
+    ],
+    [
+      21476,
+      3750.0
+    ],
+    [
+      47844,
+      3296.875
+    ],
+    [
+      102524,
+      3234.375
+    ],
+    [
+      99064,
+      3203.125
+    ],
+    [
+      105328,
+      3046.875
+    ],
+    [
+      44996,
+      3000.0
+    ],
+    [
+      93852,
+      2968.75
+    ],
+    [
+      45824,
+      2078.125
+    ],
+    [
+      108876,
+      359.375
+    ],
+    [
+      94904,
+      250.0
+    ],
+    [
+      112100,
+      203.125
+    ],
+    [
+      38660,
+      171.875
+    ],
+    [
+      49996,
+      171.875
+    ],
+    [
+      16056,
+      156.25
+    ],
+    [
+      69964,
+      125.0
+    ],
+    [
+      67308,
+      93.75
+    ],
+    [
+      107160,
+      78.125
+    ],
+    [
+      53192,
+      15.625
+    ],
+    [
+      93832,
+      15.625
+    ],
+    [
+      90056,
+      15.625
+    ],
+    [
+      97312,
+      0.0
+    ],
+    [
+      71372,
+      0.0
+    ],
+    [
+      68264,
+      0.0
+    ],
+    [
+      43580,
+      0.0
+    ],
+    [
+      115460,
+      0.0
+    ],
+    [
+      63492,
+      0.0
+    ],
+    [
+      30520,
+      0.0
+    ],
+    [
+      44128,
+      0.0
+    ],
+    [
+      85904,
+      0.0
+    ],
+    [
+      12844,
+      0.0
+    ],
+    [
+      105172,
+      0.0
+    ],
+    [
+      105968,
+      0.0
+    ],
+    [
+      81768,
+      0.0
+    ],
+    [
+      40364,
+      0.0
+    ]
+  ],
+  "ai_locations": [
+    {
+      "rva": "0x6448e7",
+      "samples": 14,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x1fd188",
+      "samples": 9,
+      "inline": [
+        "circuit::CAllyTeam::UpdateFriendlyUnits()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyTeam.cpp:169"
+      ]
+    },
+    {
+      "rva": "0x14b4a4",
+      "samples": 7,
+      "inline": [
+        "std::vector<int, std::allocator<int> >::_M_erase_at_end(int*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1932",
+        "std::vector<int, std::allocator<int> >::clear()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1603",
+        "circuit::ranged::SpatialIndex::Clear()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:58",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:96"
+      ]
+    },
+    {
+      "rva": "0x230b0",
+      "samples": 6,
+      "inline": [
+        "circuit::CBuilderManager::FindOwnNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:769"
+      ]
+    },
+    {
+      "rva": "0x22fb8",
+      "samples": 5,
+      "inline": [
+        "circuit::CBuilderManager::GetUnfinishedCount(circuit::CCircuitDef const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:752"
+      ]
+    },
+    {
+      "rva": "0x334062",
+      "samples": 4,
+      "inline": [
+        "asCContext::PrepareScriptFunction()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2134"
+      ]
+    },
+    {
+      "rva": "0x33451c",
+      "samples": 3,
+      "inline": [
+        "asCArray<unsigned long>::AddressOf()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_array.h:102",
+        "asCContext::CallScriptFunction(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2094",
+        "asCContext::CallScriptFunction(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2083"
+      ]
+    },
+    {
+      "rva": "0x1b40bf",
+      "samples": 3,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_S_right(std::_Rb_tree_node_base*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<int, terrain::SAreaSector*, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CTerrainManager::CanReachAt(circuit::CCircuitUnit*, springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5283",
+        "circuit::CTerrainManager::CanReachAt(circuit::CCircuitUnit*, springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5273"
+      ]
+    },
+    {
+      "rva": "0x1b124f",
+      "samples": 3,
+      "inline": [
+        "float3::SqDistance2D(float3 const&) const",
+        "/build/src/rts/System/float3.h:557",
+        "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5065"
+      ]
+    },
+    {
+      "rva": "0x52f7",
+      "samples": 3,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_S_right(std::_Rb_tree_node_base const*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:794",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CCircuitUnit*> > const*, std::_Rb_tree_node_base const*, int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1971",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitUnit*>, std::_Select1st<std::pair<int const, circuit::CCircuitUnit*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::find(int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2545",
+        "std::map<int, circuit::CCircuitUnit*, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitUnit*> > >::find(int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1245",
+        "circuit::CCircuitAI::GetTeamUnit(int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.cpp:1673"
+      ]
+    },
+    {
+      "rva": "0x2ddf68",
+      "samples": 3,
+      "inline": [
+        "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc_x64_mingw.cpp:191"
+      ]
+    },
+    {
+      "rva": "0x14b4d4",
+      "samples": 3,
+      "inline": [
+        "std::vector<int, std::allocator<int> >::_M_erase_at_end(int*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1932",
+        "std::vector<int, std::allocator<int> >::clear()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1603",
+        "circuit::ranged::SpatialIndex::Clear()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:58",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:96"
+      ]
+    },
+    {
+      "rva": "0x1ba83a",
+      "samples": 3,
+      "inline": [
+        "float const& std::min<float>(float const&, float const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algobase.h:239",
+        "operator()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:3311"
+      ]
+    },
+    {
+      "rva": "0x14b564",
+      "samples": 3,
+      "inline": [
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:101"
+      ]
+    },
+    {
+      "rva": "0x14b554",
+      "samples": 3,
+      "inline": [
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:101"
+      ]
+    },
+    {
+      "rva": "0x23255",
+      "samples": 3,
+      "inline": [
+        "circuit::CBuilderManager::FindUnfinishedNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:793"
+      ]
+    },
+    {
+      "rva": "0x2b7669",
+      "samples": 3,
+      "inline": [
+        "_InterlockedIncrement",
+        "/usr/share/mingw-w64/include/psdk_inc/intrin-impl.h:1671",
+        "asAtomicInc",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_atomic.cpp:122"
+      ]
+    },
+    {
+      "rva": "0x334065",
+      "samples": 3,
+      "inline": [
+        "asCContext::PrepareScriptFunction()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2134"
+      ]
+    },
+    {
+      "rva": "0x230bf",
+      "samples": 3,
+      "inline": [
+        "circuit::CBuilderManager::FindOwnNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:772"
+      ]
+    },
+    {
+      "rva": "0x2dd22c",
+      "samples": 2,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:633"
+      ]
+    },
+    {
+      "rva": "0x33651a",
+      "samples": 2,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3445"
+      ]
+    },
+    {
+      "rva": "0x14c1bd",
+      "samples": 2,
+      "inline": [
+        "decltype (::new ((void*)(0)) circuit::CRangedWorld::Friend((declval<circuit::CRangedWorld::Friend const&>)())) std::construct_at<circuit::CRangedWorld::Friend, circuit::CRangedWorld::Friend const&>(circuit::CRangedWorld::Friend*, circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_construct.h:97",
+        "void std::allocator_traits<std::allocator<circuit::CRangedWorld::Friend> >::construct<circuit::CRangedWorld::Friend, circuit::CRangedWorld::Friend const&>(std::allocator<circuit::CRangedWorld::Friend>&, circuit::CRangedWorld::Friend*, circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/alloc_traits.h:539",
+        "std::vector<circuit::CRangedWorld::Friend, std::allocator<circuit::CRangedWorld::Friend> >::push_back(circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1283",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:181"
+      ]
+    },
+    {
+      "rva": "0x20091c",
+      "samples": 2,
+      "inline": [
+        "circuit::CEnemyManager::UpdateEnemyDatas(circuit::CQuadField&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyManager.cpp:152"
+      ]
+    },
+    {
+      "rva": "0x334f3c",
+      "samples": 2,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:4598"
+      ]
+    },
+    {
+      "rva": "0x336d09",
+      "samples": 2,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2335"
+      ]
+    },
+    {
+      "rva": "0x338e23",
+      "samples": 2,
+      "inline": [
+        "asCDataType::IsEnumType() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:746",
+        "asCDataType::IsPrimitive() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:550",
+        "asCDataType::IsObject() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:636"
+      ]
+    },
+    {
+      "rva": "0x6448d0",
+      "samples": 2,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x1fd301",
+      "samples": 2,
+      "inline": [
+        "std::__detail::_Hash_node_base* std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_find_before_node_tr<int>(unsigned long long, int const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1994",
+        "std::__detail::_Hash_node<int, false>* std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_find_node_tr<int>(unsigned long long, int const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:826",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique<int, int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2268",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_aux<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:904",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:916",
+        "std::__detail::_Insert<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true>, true>::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1075",
+        "std::unordered_set<int, std::hash<int>, std::equal_to<int>, std::allocator<int> >::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_set.h:433",
+        "circuit::CAllyTeam::UpdateFriendlyUnits()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyTeam.cpp:178"
+      ]
+    },
+    {
+      "rva": "0xaf131",
+      "samples": 2,
+      "inline": [
+        "CCircuitUnit_GetBuildProgress",
+        "/build/src/AI/Skirmish/BARb/src/circuit/script/InitScript.cpp:353"
+      ]
+    },
+    {
+      "rva": "0x2b7649",
+      "samples": 2,
+      "inline": [
+        "_InterlockedIncrement",
+        "/usr/share/mingw-w64/include/psdk_inc/intrin-impl.h:1671",
+        "asAtomicInc",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_atomic.cpp:122",
+        "asCAtomic::atomicInc()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_atomic.cpp:70"
+      ]
+    },
+    {
+      "rva": "0x6327",
+      "samples": 2,
+      "inline": [
+        "cmp_str::operator()(char const*, char const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/util/Defines.h:69",
+        "std::_Rb_tree<char const*, std::pair<char const* const, circuit::CCircuitDef*>, std::_Select1st<std::pair<char const* const, circuit::CCircuitDef*> >, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<char const* const, circuit::CCircuitDef*> >*, std::_Rb_tree_node_base*, char const* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1952",
+        "std::_Rb_tree<char const*, std::pair<char const* const, circuit::CCircuitDef*>, std::_Select1st<std::pair<char const* const, circuit::CCircuitDef*> >, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::find(char const* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<char const*, circuit::CCircuitDef*, cmp_str, std::allocator<std::pair<char const* const, circuit::CCircuitDef*> > >::find(char const* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CCircuitAI::GetCircuitDef(char const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.cpp:1863"
+      ]
+    },
+    {
+      "rva": "0x1b44f7",
+      "samples": 2,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_S_right(std::_Rb_tree_node_base*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<int, terrain::SAreaSector*, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CTerrainManager::CanMobileReachAt(terrain::SArea*, springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5311"
+      ]
+    },
+    {
+      "rva": "0xc9c5f",
+      "samples": 2,
+      "inline": [
+        "circuit::CScriptManager::PrepareContext(asIScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/script/ScriptManager.cpp:312"
+      ]
+    },
+    {
+      "rva": "0x173ec0",
+      "samples": 2,
+      "inline": [
+        "circuit::CEnemyUnit::GetCircuitDef() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyUnit.h:106",
+        "circuit::CBattleAnalysis::Update(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BattleAnalysis.cpp:558"
+      ]
+    },
+    {
+      "rva": "0x336c9a",
+      "samples": 2,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2466"
+      ]
+    },
+    {
+      "rva": "0x85f8",
+      "samples": 2,
+      "inline": [
+        "circuit::CCircuitAI::UpdateActions()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.cpp:1819"
+      ]
+    },
+    {
+      "rva": "0x208b3c",
+      "samples": 2,
+      "inline": [
+        "_S_right",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "_M_lower_bound",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "lower_bound",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1271",
+        "lower_bound",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1309",
+        "operator[]",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:529",
+        "circuit::performance::Begin(circuit::CCircuitAI*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/util/Performance.cpp:45"
+      ]
+    },
+    {
+      "rva": "0x1fe7e1",
+      "samples": 2,
+      "inline": [
+        "circuit::CAllyUnit::GetPos(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyUnit.cpp:33"
+      ]
+    },
+    {
+      "rva": "0x2a3d95",
+      "samples": 2,
+      "inline": [
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_data() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:223",
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:541",
+        "CopyConstructString",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptstdstring/scriptstdstring.cpp:161"
+      ]
+    },
+    {
+      "rva": "0x336e95",
+      "samples": 2,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2435"
+      ]
+    },
+    {
+      "rva": "0x33451f",
+      "samples": 2,
+      "inline": [
+        "asCContext::CallScriptFunction(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2094",
+        "asCContext::CallScriptFunction(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2083"
+      ]
+    },
+    {
+      "rva": "0x14c13e",
+      "samples": 2,
+      "inline": [
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_before_node(unsigned long long, unsigned long long const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1964",
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_node(unsigned long long, unsigned long long const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:815",
+        "std::__detail::_Map_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:842",
+        "std::unordered_map<unsigned long long, std::vector<int, std::allocator<int> >, std::hash<unsigned long long>, std::equal_to<unsigned long long>, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > > >::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_map.h:991",
+        "circuit::ranged::SpatialIndex::Add(circuit::ranged::Point, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:59",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:181"
+      ]
+    },
+    {
+      "rva": "0x644937",
+      "samples": 2,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x146b8e",
+      "samples": 2,
+      "inline": [
+        "circuit::CRangedWorld::Safe(springai::AIFloat3 const&, springai::AIFloat3 const&, float, bool) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1964"
+      ]
+    },
+    {
+      "rva": "0x146f77",
+      "samples": 2,
+      "inline": [
+        "circuit::CRangedWorld::Danger(springai::AIFloat3 const&, float) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1954"
+      ]
+    },
+    {
+      "rva": "0x23090",
+      "samples": 2,
+      "inline": [
+        "std::_Rb_tree_const_iterator<std::pair<int const, circuit::CCircuitUnit*> >::operator++()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:368",
+        "circuit::CBuilderManager::FindOwnNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:767"
+      ]
+    },
+    {
+      "rva": "0x5c2510",
+      "samples": 1,
+      "inline": [
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_is_local() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:264",
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::capacity() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:1161",
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_assign(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.tcc:283"
+      ]
+    },
+    {
+      "rva": "0x2dd240",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:634"
+      ]
+    },
+    {
+      "rva": "0x14c103",
+      "samples": 1,
+      "inline": [
+        "std::__detail::_Mod_range_hashing::operator()(unsigned long long, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:528",
+        "std::__detail::_Hash_code_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::__detail::_Select1st, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false>::_M_bucket_index(unsigned long long, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1332",
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_bucket_index(unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:797",
+        "std::__detail::_Map_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:841",
+        "std::unordered_map<unsigned long long, std::vector<int, std::allocator<int> >, std::hash<unsigned long long>, std::equal_to<unsigned long long>, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > > >::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_map.h:991",
+        "circuit::ranged::SpatialIndex::Add(circuit::ranged::Point, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:59",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:181"
+      ]
+    },
+    {
+      "rva": "0x14c7cf",
+      "samples": 1,
+      "inline": [
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:215"
+      ]
+    },
+    {
+      "rva": "0x176336",
+      "samples": 1,
+      "inline": [
+        "operator()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BattleAnalysis.cpp:807",
+        "circuit::CBattleAnalysis::GetNavalForceCount()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BattleAnalysis.cpp:815"
+      ]
+    },
+    {
+      "rva": "0x1b124c",
+      "samples": 1,
+      "inline": [
+        "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5065"
+      ]
+    },
+    {
+      "rva": "0x1904c",
+      "samples": 1,
+      "inline": [
+        "circuit::CInfluenceMap::Apply()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/InfluenceMap.cpp:141"
+      ]
+    },
+    {
+      "rva": "0x1fe6fe",
+      "samples": 1,
+      "inline": [
+        "circuit::ICoreUnit::~ICoreUnit()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/CoreUnit.h:32",
+        "circuit::CAllyUnit::~CAllyUnit()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyUnit.cpp:27",
+        "circuit::CAllyUnit::~CAllyUnit()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyUnit.cpp:27"
+      ]
+    },
+    {
+      "rva": "0x147ba0",
+      "samples": 1,
+      "inline": [
+        "operator()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:314",
+        "Query<circuit::CRangedWorld::FriendlyLine(const Weapon&, int, const springai::AIFloat3&, const springai::AIFloat3&) const::<lambda(int)> >",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:69",
+        "circuit::CRangedWorld::FriendlyLine(circuit::CRangedWorld::Weapon const&, int, springai::AIFloat3 const&, springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:310"
+      ]
+    },
+    {
+      "rva": "0x338e10",
+      "samples": 1,
+      "inline": [
+        "asCDataType::IsObject() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:635"
+      ]
+    },
+    {
+      "rva": "0x3365d4",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3420"
+      ]
+    },
+    {
+      "rva": "0x14533a",
+      "samples": 1,
+      "inline": [
+        "__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > > std::__unguarded_partition<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1880",
+        "__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > > std::__unguarded_partition_pivot<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1899",
+        "void std::__introsort_loop<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, long long, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, long long, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1931"
+      ]
+    },
+    {
+      "rva": "0x33a533",
+      "samples": 1,
+      "inline": [
+        "asCGarbageCollector::DestroyNewGarbage()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_gc.cpp:362"
+      ]
+    },
+    {
+      "rva": "0x3363ba",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3504"
+      ]
+    },
+    {
+      "rva": "0x232c6",
+      "samples": 1,
+      "inline": [
+        "circuit::ICoreUnit::GetUnit() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/CoreUnit.h:26",
+        "circuit::CBuilderManager::FindUnfinishedNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:794"
+      ]
+    },
+    {
+      "rva": "0x2300c",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::_S_right(std::_Rb_tree_node_base const*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:794",
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > const*, std::_Rb_tree_node_base const*, circuit::CAllyUnit* const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1971",
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2545",
+        "std::map<circuit::CAllyUnit*, circuit::IBuilderTask*, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1245",
+        "circuit::CBuilderManager::GetUnfinishedCount(circuit::CCircuitDef const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:753"
+      ]
+    },
+    {
+      "rva": "0x336335",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3525"
+      ]
+    },
+    {
+      "rva": "0x334fb1",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:4587"
+      ]
+    },
+    {
+      "rva": "0x2329c",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >*, std::_Rb_tree_node_base*, circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1951",
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<circuit::CAllyUnit*, circuit::IBuilderTask*, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CBuilderManager::FindUnfinishedNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:794"
+      ]
+    },
+    {
+      "rva": "0x336ca3",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2356"
+      ]
+    },
+    {
+      "rva": "0x1fe7d2",
+      "samples": 1,
+      "inline": [
+        "circuit::CAllyUnit::GetPos(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyUnit.cpp:32"
+      ]
+    },
+    {
+      "rva": "0x1ae873",
+      "samples": 1,
+      "inline": [
+        "circuit::SBlockingMap::IsZoneAlly(int, int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BlockingMap.hpp:163",
+        "circuit::CTerrainManager::IsZoneAlly(springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:4068"
+      ]
+    },
+    {
+      "rva": "0x4d7090",
+      "samples": 1,
+      "inline": [
+        "std::vector<lemon::SmartGraphBase::ArcT, std::allocator<lemon::SmartGraphBase::ArcT> >::operator[](unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1145",
+        "lemon::SmartGraphBase::target(lemon::SmartGraphBase::Arc) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/lemon/smart_graph.h:483",
+        "lemon::GraphAdaptorBase<lemon::SmartGraph const>::target(lemon::SmartGraphBase::Arc const&) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/lemon/adaptors.h:197",
+        "lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true>::firstOut(lemon::SmartGraphBase::Arc&, lemon::SmartGraphBase::Node const&) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/lemon/adaptors.h:932",
+        "lemon::GraphAdaptorExtender<lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true> >::OutArcIt::OutArcIt(lemon::GraphAdaptorExtender<lemon::SubGraphBase<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, lemon::ConstMap<lemon::SmartGraphBase::Edge, lemon::Const<bool, true> >, true> > const&, lemon::SmartGraphBase::Node const&)",
+        "/build/src/AI/Skirmish/BARb/src/lib/lemon/bits/graph_adaptor_extender.h:315",
+        "lemon::Dijkstra<lemon::FilterNodes<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, void>, lemon::GraphExtender<lemon::SmartGraphBase>::EdgeMap<float>, lemon::DijkstraDefaultTraits<lemon::FilterNodes<lemon::SmartGraph const, circuit::CMetalManager::SafeCluster, void>, lemon::GraphExtender<lemon::SmartGraphBase>::EdgeMap<float> > >::processNextNode()",
+        "/build/src/AI/Skirmish/BARb/src/lib/lemon/dijkstra.h:650"
+      ]
+    },
+    {
+      "rva": "0x1b126e",
+      "samples": 1,
+      "inline": [
+        "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5066"
+      ]
+    },
+    {
+      "rva": "0x334a94",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2228"
+      ]
+    },
+    {
+      "rva": "0x3345c4",
+      "samples": 1,
+      "inline": [
+        "asCContext::CallInterfaceMethod(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2167"
+      ]
+    },
+    {
+      "rva": "0x5c0d20",
+      "samples": 1,
+      "inline": [
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.tcc:417",
+        "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(char const*, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:1449"
+      ]
+    },
+    {
+      "rva": "0x1de8ac",
+      "samples": 1,
+      "inline": [
+        "std::vector<float, std::allocator<float> >::data()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1258",
+        "circuit::CThreatMap::GetAirThreatArray(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/ThreatMap.h:54",
+        "circuit::CPathFinder::GetThreatFun(circuit::CPathFinder::MoveType, circuit::CCircuitDef const*, circuit::CThreatMap*, float*&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/path/PathFinder.cpp:491"
+      ]
+    },
+    {
+      "rva": "0x33670c",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3325"
+      ]
+    },
+    {
+      "rva": "0x573d10",
+      "samples": 1,
+      "inline": [
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_rehash_aux(unsigned long long, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2597",
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_rehash(unsigned long long, unsigned long long const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2565"
+      ]
+    },
+    {
+      "rva": "0x26a1d4",
+      "samples": 1,
+      "inline": [
+        "CScriptArray::GetSize() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptarray/scriptarray.cpp:665"
+      ]
+    },
+    {
+      "rva": "0x1b11c4",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_S_right(std::_Rb_tree_node_base*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<int, terrain::SAreaSector*, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5050"
+      ]
+    },
+    {
+      "rva": "0x334fbe",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:4592"
+      ]
+    },
+    {
+      "rva": "0x383dd5",
+      "samples": 1,
+      "inline": [
+        "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4389",
+        "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4365",
+        "asCScriptEngine::CallObjectMethod(void*, int) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4362"
+      ]
+    },
+    {
+      "rva": "0xb1a16",
+      "samples": 1,
+      "inline": [
+        "CCircuitDef_GetName",
+        "/build/src/AI/Skirmish/BARb/src/circuit/script/InitScript.cpp:587"
+      ]
+    },
+    {
+      "rva": "0x197358",
+      "samples": 1,
+      "inline": [
+        "terrain::CTerrainData::CorrectPosition(springai::AIFloat3&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainData.cpp:608"
+      ]
+    },
+    {
+      "rva": "0x18f36",
+      "samples": 1,
+      "inline": [
+        "circuit::CInfluenceMap::AddUnarmed(circuit::CAllyUnit*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/InfluenceMap.cpp:357"
+      ]
+    },
+    {
+      "rva": "0x6448aa",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x33657c",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3430"
+      ]
+    },
+    {
+      "rva": "0x16d645",
+      "samples": 1,
+      "inline": [
+        "std::vector<float, std::allocator<float> >::size() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:990",
+        "circuit::CBattleAnalysis::CombatNear(springai::AIFloat3 const&, float) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BattleAnalysis.cpp:728"
+      ]
+    },
+    {
+      "rva": "0x64e638",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x32dcf0",
+      "samples": 1,
+      "inline": [
+        "asCContext::SetArgObject(unsigned int, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:1346"
+      ]
+    },
+    {
+      "rva": "0x2dd208",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:628"
+      ]
+    },
+    {
+      "rva": "0x2dfbc",
+      "samples": 1,
+      "inline": [
+        "circuit::CBuilderManager::Enqueue(circuit::TaskB::SBuildTask const&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:1012"
+      ]
+    },
+    {
+      "rva": "0x184908",
+      "samples": 1,
+      "inline": [
+        "circuit::lane::Solver::DijkstraMulti(std::vector<int, std::allocator<int> > const&, std::vector<float, std::allocator<float> > const&, int, std::vector<float, std::allocator<float> > const*, std::vector<float, std::allocator<float> >&, std::vector<int, std::allocator<int> >&, bool, float, std::vector<char, std::allocator<char> > const*, float, bool, std::vector<float, std::allocator<float> > const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LaneSolver.cpp:173"
+      ]
+    },
+    {
+      "rva": "0x378fd0",
+      "samples": 1,
+      "inline": [
+        "asCScriptEngine::GarbageCollect(unsigned long, unsigned int)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:5010"
+      ]
+    },
+    {
+      "rva": "0x383dbe",
+      "samples": 1,
+      "inline": [
+        "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4368",
+        "asCScriptEngine::CallObjectMethod(void*, int) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4362"
+      ]
+    },
+    {
+      "rva": "0x3f2e40",
+      "samples": 1,
+      "inline": [
+        "??",
+        "mbrtowc.c:?"
+      ]
+    },
+    {
+      "rva": "0x2b7679",
+      "samples": 1,
+      "inline": [
+        "_InterlockedDecrement",
+        "/usr/share/mingw-w64/include/psdk_inc/intrin-impl.h:1682",
+        "asAtomicDec",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_atomic.cpp:128"
+      ]
+    },
+    {
+      "rva": "0x37e0ce",
+      "samples": 1,
+      "inline": [
+        "asCScriptEngine::CallObjectMethodRetInt(void*, int) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4525"
+      ]
+    },
+    {
+      "rva": "0x38ab2f",
+      "samples": 1,
+      "inline": [
+        "asCScriptObject::AddRef() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptobject.cpp:592"
+      ]
+    },
+    {
+      "rva": "0x334526",
+      "samples": 1,
+      "inline": [
+        "asCContext::CallScriptFunction(asCScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2097"
+      ]
+    },
+    {
+      "rva": "0x338e30",
+      "samples": 1,
+      "inline": [
+        "asCDataType::IsObject() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:644"
+      ]
+    },
+    {
+      "rva": "0xef510",
+      "samples": 1,
+      "inline": [
+        "circuit::COOAICallback::Unit_GetDefId(int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/spring/SpringCallback.cpp:186"
+      ]
+    },
+    {
+      "rva": "0x85e5b",
+      "samples": 1,
+      "inline": [
+        "circuit::ITaskModule::Update()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/TaskModule.cpp:188"
+      ]
+    },
+    {
+      "rva": "0x33a263",
+      "samples": 1,
+      "inline": [
+        "asCMap<void*, asCGarbageCollector::asSIntTypePair>::MoveTo(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>**, void* const&) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_map.h:379",
+        "asCGarbageCollector::GCEnumCallback(void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_gc.cpp:978"
+      ]
+    },
+    {
+      "rva": "0x335f3c",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3681"
+      ]
+    },
+    {
+      "rva": "0x149dfd",
+      "samples": 1,
+      "inline": [
+        "std::_Hashtable<int, std::pair<int const, circuit::CRangedWorld::Metadata>, std::allocator<std::pair<int const, circuit::CRangedWorld::Metadata> >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_bucket_index(unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:797",
+        "std::pair<std::__detail::_Node_iterator<std::pair<int const, circuit::CRangedWorld::Metadata>, false, false>, bool> std::__detail::_Insert_base<int, std::pair<int const, circuit::CRangedWorld::Metadata>, std::allocator<std::pair<int const, circuit::CRangedWorld::Metadata> >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::try_emplace<int>(std::__detail::_Node_const_iterator<std::pair<int const, circuit::CRangedWorld::Metadata>, false, false>, int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:950",
+        "std::pair<std::__detail::_Node_iterator<std::pair<int const, circuit::CRangedWorld::Metadata>, false, false>, bool> std::unordered_map<int, circuit::CRangedWorld::Metadata, std::hash<int>, std::equal_to<int>, std::allocator<std::pair<int const, circuit::CRangedWorld::Metadata> > >::try_emplace<>(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_map.h:488",
+        "circuit::CRangedWorld::MetadataFor(circuit::CCircuitDef*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:34"
+      ]
+    },
+    {
+      "rva": "0x33729d",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2895"
+      ]
+    },
+    {
+      "rva": "0x1fd9e5",
+      "samples": 1,
+      "inline": [
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_bucket_begin(unsigned long long, std::__detail::_Hash_node<int, false>*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2011",
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_node(unsigned long long, unsigned long long, std::__detail::_Hash_node<int, false>*, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2186",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique<int, int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2278",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_aux<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:904",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:916",
+        "std::__detail::_Insert<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true>, true>::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1075",
+        "std::unordered_set<int, std::hash<int>, std::equal_to<int>, std::allocator<int> >::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_set.h:433",
+        "circuit::CAllyTeam::UpdateFriendlyUnits()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyTeam.cpp:178"
+      ]
+    },
+    {
+      "rva": "0xa93d9",
+      "samples": 1,
+      "inline": [
+        "std::__cxx11::list<circuit::CScheduler::OnceTask, std::allocator<circuit::CScheduler::OnceTask> >::begin()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_list.h:1023",
+        "circuit::CScheduler::ProcessJobs(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/scheduler/Scheduler.cpp:135"
+      ]
+    },
+    {
+      "rva": "0x336c9e",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2356"
+      ]
+    },
+    {
+      "rva": "0x230b2",
+      "samples": 1,
+      "inline": [
+        "circuit::CBuilderManager::FindOwnNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:769"
+      ]
+    },
+    {
+      "rva": "0x6608b0",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x2ddf40",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc_x64_mingw.cpp:176"
+      ]
+    },
+    {
+      "rva": "0x33aed6",
+      "samples": 1,
+      "inline": [
+        "asCMap<void*, asCGarbageCollector::asSIntTypePair>::Insert(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_map.h:238",
+        "asCGarbageCollector::IdentifyGarbageWithCyclicRefs()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_gc.cpp:691"
+      ]
+    },
+    {
+      "rva": "0x334f62",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:4576"
+      ]
+    },
+    {
+      "rva": "0x23e78",
+      "samples": 1,
+      "inline": [
+        "circuit::CBuilderManager::GetQueuedBuildCount(circuit::IBuilderTask::BuildType, circuit::CCircuitDef const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:973"
+      ]
+    },
+    {
+      "rva": "0x18f3a",
+      "samples": 1,
+      "inline": [
+        "circuit::CInfluenceMap::AddUnarmed(circuit::CAllyUnit*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/InfluenceMap.cpp:357"
+      ]
+    },
+    {
+      "rva": "0x1ce49",
+      "samples": 1,
+      "inline": [
+        "circuit::CThreatMap::GetSurfThreatAtPos(springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/ThreatMap.cpp:264"
+      ]
+    },
+    {
+      "rva": "0x1ff7a4",
+      "samples": 1,
+      "inline": [
+        "circuit::CEnemyManager::PrepareUpdate()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyManager.cpp:223"
+      ]
+    },
+    {
+      "rva": "0x5fe240",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0xef51e",
+      "samples": 1,
+      "inline": [
+        "circuit::COOAICallback::Unit_GetDefId(int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/spring/SpringCallback.cpp:186"
+      ]
+    },
+    {
+      "rva": "0x2ddf10",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc_x64_mingw.cpp:171"
+      ]
+    },
+    {
+      "rva": "0x15473f",
+      "samples": 1,
+      "inline": [
+        "circuit::CScoutTask::FindTarget(circuit::CCircuitUnit*, springai::AIFloat3 const&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/ScoutTask.cpp:190"
+      ]
+    },
+    {
+      "rva": "0x336577",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3430"
+      ]
+    },
+    {
+      "rva": "0x334f52",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:4569"
+      ]
+    },
+    {
+      "rva": "0x4fb1a0",
+      "samples": 1,
+      "inline": [
+        "asCArray<asSMapNode<void*, asCGarbageCollector::asSIntTypePair>*>::PushLast(asSMapNode<void*, asCGarbageCollector::asSIntTypePair>* const&)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_gc.cpp:169"
+      ]
+    },
+    {
+      "rva": "0x146b8b",
+      "samples": 1,
+      "inline": [
+        "circuit::CRangedWorld::Safe(springai::AIFloat3 const&, springai::AIFloat3 const&, float, bool) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:528"
+      ]
+    },
+    {
+      "rva": "0x284dfc",
+      "samples": 1,
+      "inline": [
+        "std::pair<std::__detail::_Node_iterator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, false, true>, bool> std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_emplace<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue> >(std::integral_constant<bool, true>, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2105",
+        "std::pair<std::__detail::_Node_iterator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, false, true>, bool> std::__detail::_Insert<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true>, false>::insert<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>, void>(std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1125",
+        "std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, CScriptDictValue, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue> > >::insert(std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, CScriptDictValue>&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_map.h:565",
+        "CScriptDictionary::Set(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, void*, int)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptdictionary/scriptdictionary.cpp:316"
+      ]
+    },
+    {
+      "rva": "0x391500",
+      "samples": 1,
+      "inline": [
+        "CastToObjectType(asCTypeInfo*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_typeinfo.cpp:274"
+      ]
+    },
+    {
+      "rva": "0x1b125e",
+      "samples": 1,
+      "inline": [
+        "float3::SqDistance2D(float3 const&) const",
+        "/build/src/rts/System/float3.h:558",
+        "circuit::CTerrainManager::GetClosestSector(terrain::SArea*, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5065"
+      ]
+    },
+    {
+      "rva": "0x2b7622",
+      "samples": 1,
+      "inline": [
+        "asCAtomic::get() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_atomic.cpp:53"
+      ]
+    },
+    {
+      "rva": "0x383df2",
+      "samples": 1,
+      "inline": [
+        "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4396",
+        "asCScriptEngine::CallObjectMethod(void*, asSSystemFunctionInterface*, asCScriptFunction*) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4365",
+        "asCScriptEngine::CallObjectMethod(void*, int) const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptengine.cpp:4362"
+      ]
+    },
+    {
+      "rva": "0x184adc",
+      "samples": 1,
+      "inline": [
+        "circuit::lane::Solver::DijkstraMulti(std::vector<int, std::allocator<int> > const&, std::vector<float, std::allocator<float> > const&, int, std::vector<float, std::allocator<float> > const*, std::vector<float, std::allocator<float> >&, std::vector<int, std::allocator<int> >&, bool, float, std::vector<char, std::allocator<char> > const*, float, bool, std::vector<float, std::allocator<float> > const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LaneSolver.cpp:202"
+      ]
+    },
+    {
+      "rva": "0x272c80",
+      "samples": 1,
+      "inline": [
+        "CScriptArray::InsertLast(void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptarray/scriptarray.cpp:927"
+      ]
+    },
+    {
+      "rva": "0x175ea4",
+      "samples": 1,
+      "inline": [
+        "circuit::CEnemyUnit::GetCircuitDef() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyUnit.h:106",
+        "circuit::CBattleAnalysis::SampleNavalThreat(springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/BattleAnalysis.cpp:657"
+      ]
+    },
+    {
+      "rva": "0x338df0",
+      "samples": 1,
+      "inline": [
+        "asCDataType::IsDoubleType() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_datatype.cpp:620"
+      ]
+    },
+    {
+      "rva": "0xaa69e",
+      "samples": 1,
+      "inline": [
+        "std::__shared_ptr<circuit::IThreadJob, (__gnu_cxx::_Lock_policy)2>::__shared_ptr(std::__shared_ptr<circuit::IThreadJob, (__gnu_cxx::_Lock_policy)2> const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/shared_ptr_base.h:1522",
+        "std::shared_ptr<circuit::IThreadJob>::shared_ptr(std::shared_ptr<circuit::IThreadJob> const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/shared_ptr.h:204",
+        "circuit::CScheduler::WorkTask::WorkTask(std::weak_ptr<circuit::CScheduler> const&, std::shared_ptr<circuit::IThreadJob> const&, bool)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/scheduler/Scheduler.h:151",
+        "circuit::CScheduler::RunPriorityJob(std::shared_ptr<circuit::IThreadJob> const&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/scheduler/Scheduler.cpp:183"
+      ]
+    },
+    {
+      "rva": "0x26c2e0",
+      "samples": 1,
+      "inline": [
+        "CScriptArray::At(unsigned int)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptarray/scriptarray.cpp:969"
+      ]
+    },
+    {
+      "rva": "0x205e79",
+      "samples": 1,
+      "inline": [
+        "circuit::IAction::IsActive() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/util/Action.h:37",
+        "circuit::CActionList::Update(circuit::CCircuitAI*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/util/ActionList.cpp:35"
+      ]
+    },
+    {
+      "rva": "0x13d25c",
+      "samples": 1,
+      "inline": [
+        "circuit::CRaidTask::FindTarget()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RaidTask.cpp:282"
+      ]
+    },
+    {
+      "rva": "0x333cb1",
+      "samples": 1,
+      "inline": [
+        "asCContext::Prepare(asIScriptFunction*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:767"
+      ]
+    },
+    {
+      "rva": "0x573d00",
+      "samples": 1,
+      "inline": [
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_rehash_aux(unsigned long long, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2595",
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_rehash(unsigned long long, unsigned long long const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2565"
+      ]
+    },
+    {
+      "rva": "0x5b4de6",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x386276",
+      "samples": 1,
+      "inline": [
+        "asCScriptFunction::DoesReturnOnStack() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_scriptfunction.cpp:675"
+      ]
+    },
+    {
+      "rva": "0x14bf6e",
+      "samples": 1,
+      "inline": [
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:178"
+      ]
+    },
+    {
+      "rva": "0x14bf77",
+      "samples": 1,
+      "inline": [
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:178"
+      ]
+    },
+    {
+      "rva": "0x1b4530",
+      "samples": 1,
+      "inline": [
+        "float3::SqDistance2D(float3 const&) const",
+        "/build/src/rts/System/float3.h:558",
+        "circuit::CTerrainManager::CanMobileReachAt(terrain::SArea*, springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5314"
+      ]
+    },
+    {
+      "rva": "0x2327c",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::_S_right(std::_Rb_tree_node_base*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >*, std::_Rb_tree_node_base*, circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "std::_Rb_tree<circuit::CAllyUnit*, std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*>, std::_Select1st<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> >, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<circuit::CAllyUnit*, circuit::IBuilderTask*, std::less<circuit::CAllyUnit*>, std::allocator<std::pair<circuit::CAllyUnit* const, circuit::IBuilderTask*> > >::find(circuit::CAllyUnit* const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CBuilderManager::FindUnfinishedNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:794"
+      ]
+    },
+    {
+      "rva": "0x1fd9f8",
+      "samples": 1,
+      "inline": [
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_bucket_begin(unsigned long long, std::__detail::_Hash_node<int, false>*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2011",
+        "std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_node(unsigned long long, unsigned long long, std::__detail::_Hash_node<int, false>*, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2186",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique<int, int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2278",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_aux<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:904",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:916",
+        "std::__detail::_Insert<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true>, true>::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1075",
+        "std::unordered_set<int, std::hash<int>, std::equal_to<int>, std::allocator<int> >::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_set.h:433",
+        "circuit::CAllyTeam::UpdateFriendlyUnits()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyTeam.cpp:178"
+      ]
+    },
+    {
+      "rva": "0x14c12f",
+      "samples": 1,
+      "inline": [
+        "std::__detail::_Hash_code_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::__detail::_Select1st, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false>::_M_hash_code(unsigned long long const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1310",
+        "std::__detail::_Hash_code_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::__detail::_Select1st, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false>::_M_bucket_index(std::__detail::_Hash_node_value<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, false> const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1341",
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_bucket_index(std::__detail::_Hash_node_value<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, false> const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:793",
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_before_node(unsigned long long, unsigned long long const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1964",
+        "std::_Hashtable<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_node(unsigned long long, unsigned long long const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:815",
+        "std::__detail::_Map_base<unsigned long long, std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > >, std::__detail::_Select1st, std::equal_to<unsigned long long>, std::hash<unsigned long long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:842",
+        "std::unordered_map<unsigned long long, std::vector<int, std::allocator<int> >, std::hash<unsigned long long>, std::equal_to<unsigned long long>, std::allocator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > > > >::operator[](unsigned long long&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_map.h:991",
+        "circuit::ranged::SpatialIndex::Add(circuit::ranged::Point, int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:59",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:181"
+      ]
+    },
+    {
+      "rva": "0x147ae6",
+      "samples": 1,
+      "inline": [
+        "Query<circuit::CRangedWorld::FriendlyLine(const Weapon&, int, const springai::AIFloat3&, const springai::AIFloat3&) const::<lambda(int)> >",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:67",
+        "circuit::CRangedWorld::FriendlyLine(circuit::CRangedWorld::Weapon const&, int, springai::AIFloat3 const&, springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:310"
+      ]
+    },
+    {
+      "rva": "0xffbb8",
+      "samples": 1,
+      "inline": [
+        "std::__shared_ptr<circuit::CFactoryManager, (__gnu_cxx::_Lock_policy)2>::get() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/shared_ptr_base.h:1666",
+        "circuit::CCircuitAI::GetFactoryManager() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.h:336",
+        "circuit::CBDefenceTask::CanAssignTo(circuit::CCircuitUnit*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/builder/DefenceTask.cpp:48"
+      ]
+    },
+    {
+      "rva": "0x38f6d3",
+      "samples": 1,
+      "inline": [
+        "asCThreadManager::GetLocalData()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_thread.cpp:339"
+      ]
+    },
+    {
+      "rva": "0x18f5c",
+      "samples": 1,
+      "inline": [
+        "circuit::CInfluenceMap::AddUnarmed(circuit::CAllyUnit*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/InfluenceMap.cpp:357"
+      ]
+    },
+    {
+      "rva": "0x239a",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitAI*>, std::_Select1st<std::pair<int const, circuit::CCircuitAI*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitAI*> > >::_S_right(std::_Rb_tree_node_base*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:790",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitAI*>, std::_Select1st<std::pair<int const, circuit::CCircuitAI*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitAI*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CCircuitAI*> >*, std::_Rb_tree_node_base*, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1955",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CCircuitAI*>, std::_Select1st<std::pair<int const, circuit::CCircuitAI*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitAI*> > >::lower_bound(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1271",
+        "std::map<int, circuit::CCircuitAI*, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitAI*> > >::lower_bound(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1309",
+        "std::map<int, circuit::CCircuitAI*, std::less<int>, std::allocator<std::pair<int const, circuit::CCircuitAI*> > >::operator[](int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:509",
+        "handleEvent",
+        "/build/src/AI/Skirmish/BARb/src/AIExport.cpp:80"
+      ]
+    },
+    {
+      "rva": "0x1fd984",
+      "samples": 1,
+      "inline": [
+        "std::__new_allocator<std::__detail::_Hash_node<int, false> >::allocate(unsigned long long, void const*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/new_allocator.h:147",
+        "std::allocator<std::__detail::_Hash_node<int, false> >::allocate(unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/allocator.h:198",
+        "std::allocator_traits<std::allocator<std::__detail::_Hash_node<int, false> > >::allocate(std::allocator<std::__detail::_Hash_node<int, false> >&, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/alloc_traits.h:482",
+        "std::__detail::_Hash_node<int, false>* std::__detail::_Hashtable_alloc<std::allocator<std::__detail::_Hash_node<int, false> > >::_M_allocate_node<int>(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1990",
+        "std::__detail::_Hash_node<int, false>* std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > >::operator()<int>(int&&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:248",
+        "std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > >::__node_type* std::__detail::_NodeBuilder<std::__detail::_Identity>::_S_build<int, int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:173",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique<int, int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:2271",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_aux<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:904",
+        "std::pair<std::__detail::_Node_iterator<int, true, false>, bool> std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<int, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > >(int&&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<int, false> > > const&, std::integral_constant<bool, true>)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:916",
+        "std::__detail::_Insert<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true>, true>::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1075",
+        "std::unordered_set<int, std::hash<int>, std::equal_to<int>, std::allocator<int> >::insert(int&&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/unordered_set.h:433",
+        "circuit::CAllyTeam::UpdateFriendlyUnits()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/ally/AllyTeam.cpp:178"
+      ]
+    },
+    {
+      "rva": "0x2a3252",
+      "samples": 1,
+      "inline": [
+        "std::char_traits<char>::compare(char const*, char const*, unsigned long long)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/char_traits.h:399",
+        "bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/basic_string.h:3705",
+        "StringEquals",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptstdstring/scriptstdstring.cpp:976"
+      ]
+    },
+    {
+      "rva": "0x3365c8",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3420"
+      ]
+    },
+    {
+      "rva": "0x14c1e3",
+      "samples": 1,
+      "inline": [
+        "decltype (::new ((void*)(0)) circuit::CRangedWorld::Friend((declval<circuit::CRangedWorld::Friend const&>)())) std::construct_at<circuit::CRangedWorld::Friend, circuit::CRangedWorld::Friend const&>(circuit::CRangedWorld::Friend*, circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_construct.h:97",
+        "void std::allocator_traits<std::allocator<circuit::CRangedWorld::Friend> >::construct<circuit::CRangedWorld::Friend, circuit::CRangedWorld::Friend const&>(std::allocator<circuit::CRangedWorld::Friend>&, circuit::CRangedWorld::Friend*, circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/alloc_traits.h:539",
+        "std::vector<circuit::CRangedWorld::Friend, std::allocator<circuit::CRangedWorld::Friend> >::push_back(circuit::CRangedWorld::Friend const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_vector.h:1283",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:181"
+      ]
+    },
+    {
+      "rva": "0x2008cc",
+      "samples": 1,
+      "inline": [
+        "circuit::CEnemyManager::UpdateEnemyDatas(circuit::CQuadField&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyManager.cpp:152"
+      ]
+    },
+    {
+      "rva": "0x33641e",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:3486"
+      ]
+    },
+    {
+      "rva": "0x146b52",
+      "samples": 1,
+      "inline": [
+        "circuit::CRangedWorld::Safe(springai::AIFloat3 const&, springai::AIFloat3 const&, float, bool) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:528"
+      ]
+    },
+    {
+      "rva": "0x2008ee",
+      "samples": 1,
+      "inline": [
+        "circuit::CEnemyManager::UpdateEnemyDatas(circuit::CQuadField&)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/enemy/EnemyManager.cpp:134"
+      ]
+    },
+    {
+      "rva": "0x230f3",
+      "samples": 1,
+      "inline": [
+        "circuit::CBuilderManager::FindOwnNear(springai::AIFloat3 const&, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:776"
+      ]
+    },
+    {
+      "rva": "0x503cc8",
+      "samples": 1,
+      "inline": [
+        "circuit::CCircuitDef::GetWorkerTime() const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/unit/CircuitDef.h:205"
+      ]
+    },
+    {
+      "rva": "0x6448a4",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x3f4a68",
+      "samples": 1,
+      "inline": [
+        "pthread_spin_lock",
+        "/usr/src/mingw-w64-11.0.1-3build1/mingw-w64-libraries/winpthreads/src/spinlock.c:54"
+      ]
+    },
+    {
+      "rva": "0x337425",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2990"
+      ]
+    },
+    {
+      "rva": "0x18a15",
+      "samples": 1,
+      "inline": [
+        "circuit::CInfluenceMap::GetInfluenceAt(springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/InfluenceMap.cpp:224"
+      ]
+    },
+    {
+      "rva": "0x5f663e",
+      "samples": 1,
+      "inline": [
+        "std::equal_to<int>::operator()(int const&, int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_function.h:378",
+        "std::__detail::_Hashtable_base<int, std::pair<int const, circuit::CRangedWorld::History>, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Hashtable_traits<false, false, true> >::_M_key_equals(int const&, std::__detail::_Hash_node_value<std::pair<int const, circuit::CRangedWorld::History>, false> const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1715",
+        "std::__detail::_Hashtable_base<int, std::pair<int const, circuit::CRangedWorld::History>, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Hashtable_traits<false, false, true> >::_M_equals(int const&, unsigned long long, std::__detail::_Hash_node_value<std::pair<int const, circuit::CRangedWorld::History>, false> const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:1734",
+        "std::_Hashtable<int, std::pair<int const, circuit::CRangedWorld::History>, std::allocator<std::pair<int const, circuit::CRangedWorld::History> >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_before_node(unsigned long long, int const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:1961",
+        "std::_Hashtable<int, std::pair<int const, circuit::CRangedWorld::History>, std::allocator<std::pair<int const, circuit::CRangedWorld::History> >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::_M_find_node(unsigned long long, int const&, unsigned long long) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable.h:815",
+        "std::__detail::_Map_base<int, std::pair<int const, circuit::CRangedWorld::History>, std::allocator<std::pair<int const, circuit::CRangedWorld::History> >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:815"
+      ]
+    },
+    {
+      "rva": "0x14beb3",
+      "samples": 1,
+      "inline": [
+        "__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >::operator--()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_iterator.h:1123",
+        "void std::__unguarded_linear_insert<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Val_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Val_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1803",
+        "void std::__unguarded_insertion_sort<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1840",
+        "void std::__final_insertion_sort<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1860",
+        "void std::__sort<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__ops::_Iter_less_iter)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:1950",
+        "void std::sort<__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > > >(__gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >, __gnu_cxx::__normal_iterator<int*, std::vector<int, std::allocator<int> > >)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algo.h:4861",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:170"
+      ]
+    },
+    {
+      "rva": "0x184d44",
+      "samples": 1,
+      "inline": [
+        "auto std::__detail::_Synth3way::operator()<float, float>(float const&, float const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_heap.h:229",
+        "std::common_comparison_category<decltype (std::__detail::__synth3way((declval<float&>)(), (declval<float&>)())), decltype (std::__detail::__synth3way((declval<int&>)(), (declval<int&>)()))>::type std::operator<=><float, int>(std::pair<float, int> const&, std::pair<float, int> const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_pair.h:821",
+        "std::greater<std::pair<float, int> >::operator()(std::pair<float, int> const&, std::pair<float, int> const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_function.h:398",
+        "bool __gnu_cxx::__ops::_Iter_comp_iter<std::greater<std::pair<float, int> > >::operator()<__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > > >(__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/predefined_ops.h:158",
+        "void std::__adjust_heap<__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, long long, std::pair<float, int>, __gnu_cxx::__ops::_Iter_comp_iter<std::greater<std::pair<float, int> > > >(__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, long long, long long, std::pair<float, int>, __gnu_cxx::__ops::_Iter_comp_iter<std::greater<std::pair<float, int> > >)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_heap.h:232",
+        "void std::__pop_heap<__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__ops::_Iter_comp_iter<std::greater<std::pair<float, int> > > >(__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__ops::_Iter_comp_iter<std::greater<std::pair<float, int> > >&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_heap.h:264",
+        "void std::pop_heap<__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, std::greater<std::pair<float, int> > >(__gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, __gnu_cxx::__normal_iterator<std::pair<float, int>*, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > > >, std::greater<std::pair<float, int> >)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_heap.h:333",
+        "std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>, std::allocator<std::pair<float, int> > >, std::greater<std::pair<float, int> > >::pop()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_queue.h:776",
+        "circuit::lane::Solver::DijkstraMulti(std::vector<int, std::allocator<int> > const&, std::vector<float, std::allocator<float> > const&, int, std::vector<float, std::allocator<float> > const*, std::vector<float, std::allocator<float> >&, std::vector<int, std::allocator<int> >&, bool, float, std::vector<char, std::allocator<char> > const*, float, bool, std::vector<float, std::allocator<float> > const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LaneSolver.cpp:160"
+      ]
+    },
+    {
+      "rva": "0x2de226",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc_x64_mingw.cpp:329"
+      ]
+    },
+    {
+      "rva": "0x2dd2ed",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:777"
+      ]
+    },
+    {
+      "rva": "0x336e6e",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2424"
+      ]
+    },
+    {
+      "rva": "0x1ab02c",
+      "samples": 1,
+      "inline": [
+        "int const& std::min<int>(int const&, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_algobase.h:238",
+        "bool circuit::local_layout::Reservations::Any<circuit::local_layout::Reservations::OverlapsSlot(circuit::local_layout::Reservations::Rect const&, int) const::{lambda(circuit::local_layout::Reservations::Cell const&)#1}>(circuit::local_layout::Reservations::Rect const&, circuit::local_layout::Reservations::OverlapsSlot(circuit::local_layout::Reservations::Rect const&, int) const::{lambda(circuit::local_layout::Reservations::Cell const&)#1}) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LocalReservations.h:113",
+        "circuit::local_layout::Reservations::OverlapsSlot(circuit::local_layout::Reservations::Rect const&, int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LocalReservations.h:37",
+        "circuit::CTerrainManager::IsSlotFreeIndexed(type2<int> const&, type2<int> const&, int, int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:2344"
+      ]
+    },
+    {
+      "rva": "0x613620",
+      "samples": 1,
+      "inline": [
+        "??",
+        "crt_handler.c:?"
+      ]
+    },
+    {
+      "rva": "0x26a1d7",
+      "samples": 1,
+      "inline": [
+        "CScriptArray::GetSize() const",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/add_on/scriptarray/scriptarray.cpp:666"
+      ]
+    },
+    {
+      "rva": "0x151507",
+      "samples": 1,
+      "inline": [
+        "circuit::CRouteTask::SetSeaTarget(int)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RouteTask.cpp:225"
+      ]
+    },
+    {
+      "rva": "0x2fab7",
+      "samples": 1,
+      "inline": [
+        "circuit::CBuilderManager::FindRecoveryTask(circuit::CCircuitUnit*, int, float, circuit::CCircuitDef const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/module/BuilderManager.cpp:1753"
+      ]
+    },
+    {
+      "rva": "0xe74c",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, circuit::CEnemyInfo*>, std::_Select1st<std::pair<int const, circuit::CEnemyInfo*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CEnemyInfo*> > >::_S_right(std::_Rb_tree_node_base const*)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:794",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CEnemyInfo*>, std::_Select1st<std::pair<int const, circuit::CEnemyInfo*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CEnemyInfo*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, circuit::CEnemyInfo*> > const*, std::_Rb_tree_node_base const*, int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1971",
+        "std::_Rb_tree<int, std::pair<int const, circuit::CEnemyInfo*>, std::_Select1st<std::pair<int const, circuit::CEnemyInfo*> >, std::less<int>, std::allocator<std::pair<int const, circuit::CEnemyInfo*> > >::find(int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2545",
+        "std::map<int, circuit::CEnemyInfo*, std::less<int>, std::allocator<std::pair<int const, circuit::CEnemyInfo*> > >::find(int const&) const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1245",
+        "circuit::CCircuitAI::GetEnemyInfo(int) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.cpp:1782",
+        "circuit::CCircuitAI::HandleGameEvent(int, void const*)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/CircuitAI.cpp:351"
+      ]
+    },
+    {
+      "rva": "0x334004",
+      "samples": 1,
+      "inline": [
+        "asCContext::PrepareScriptFunction()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2108"
+      ]
+    },
+    {
+      "rva": "0x2dd225",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:631"
+      ]
+    },
+    {
+      "rva": "0x1b44e8",
+      "samples": 1,
+      "inline": [
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::_M_lower_bound(std::_Rb_tree_node<std::pair<int const, terrain::SAreaSector*> >*, std::_Rb_tree_node_base*, int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:1953",
+        "std::_Rb_tree<int, std::pair<int const, terrain::SAreaSector*>, std::_Select1st<std::pair<int const, terrain::SAreaSector*> >, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_tree.h:2532",
+        "std::map<int, terrain::SAreaSector*, std::less<int>, std::allocator<std::pair<int const, terrain::SAreaSector*> > >::find(int const&)",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/stl_map.h:1220",
+        "circuit::CTerrainManager::CanMobileReachAt(terrain::SArea*, springai::AIFloat3 const&, float)",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/TerrainManager.cpp:5311"
+      ]
+    },
+    {
+      "rva": "0x1ce94",
+      "samples": 1,
+      "inline": [
+        "circuit::CThreatMap::GetSurfThreatAtPos(springai::AIFloat3 const&) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/map/ThreatMap.cpp:266"
+      ]
+    },
+    {
+      "rva": "0x33733f",
+      "samples": 1,
+      "inline": [
+        "asCContext::ExecuteNext()",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_context.cpp:2876"
+      ]
+    },
+    {
+      "rva": "0x2dd2c6",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:773"
+      ]
+    },
+    {
+      "rva": "0x2de019",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunctionNative(asCContext*, asCScriptFunction*, void*, unsigned long*, void*, unsigned long long&, void*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc_x64_mingw.cpp:246"
+      ]
+    },
+    {
+      "rva": "0x2dd22f",
+      "samples": 1,
+      "inline": [
+        "CallSystemFunction(int, asCContext*)",
+        "/build/src/AI/Skirmish/BARb/src/lib/angelscript/source/as_callfunc.cpp:634"
+      ]
+    },
+    {
+      "rva": "0x184bb8",
+      "samples": 1,
+      "inline": [
+        "circuit::lane::Solver::DijkstraMulti(std::vector<int, std::allocator<int> > const&, std::vector<float, std::allocator<float> > const&, int, std::vector<float, std::allocator<float> > const*, std::vector<float, std::allocator<float> >&, std::vector<int, std::allocator<int> >&, bool, float, std::vector<char, std::allocator<char> > const*, float, bool, std::vector<float, std::allocator<float> > const*) const",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/LaneSolver.cpp:167"
+      ]
+    },
+    {
+      "rva": "0x14b4e2",
+      "samples": 1,
+      "inline": [
+        "std::__detail::_Hash_node<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, false>::_M_next() const",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:381",
+        "std::__detail::_Node_iterator_base<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, false>::_M_incr()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:398",
+        "std::__detail::_Node_iterator<std::pair<unsigned long long const, std::vector<int, std::allocator<int> > >, false, false>::operator++()",
+        "/usr/lib/gcc/x86_64-w64-mingw32/13-posix/include/c++/bits/hashtable_policy.h:450",
+        "circuit::ranged::SpatialIndex::Clear()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/terrain/RangedGeometry.h:58",
+        "circuit::CRangedWorld::Refresh()",
+        "/build/src/AI/Skirmish/BARb/src/circuit/task/fighter/RangedWorld.cpp:96"
+      ]
+    }
+  ],
+  "limitations": "Randomized conditional wall-clock instruction samples; inline symbols are not runtime stacks. Capture pauses perturb timing."
+}

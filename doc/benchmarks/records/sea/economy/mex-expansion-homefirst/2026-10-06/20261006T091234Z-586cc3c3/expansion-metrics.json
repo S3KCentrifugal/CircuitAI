@@ -1,0 +1,161 @@
+{
+  "teams": {
+    "0": {
+      "frame": 27900,
+      "mexes": 17,
+      "beyond2400": 10,
+      "furthest": 3873
+    },
+    "1": {
+      "frame": 27900,
+      "mexes": 13,
+      "beyond2400": 8,
+      "furthest": 5947
+    },
+    "2": {
+      "frame": 27900,
+      "mexes": 14,
+      "beyond2400": 6,
+      "furthest": 3142
+    },
+    "3": {
+      "frame": 27900,
+      "mexes": 22,
+      "beyond2400": 10,
+      "furthest": 5451
+    },
+    "4": {
+      "frame": 27900,
+      "mexes": 4,
+      "beyond2400": 0,
+      "furthest": 229
+    },
+    "5": {
+      "frame": 27900,
+      "mexes": 18,
+      "beyond2400": 10,
+      "furthest": 4646
+    },
+    "6": {
+      "frame": 27900,
+      "mexes": 0,
+      "beyond2400": 0,
+      "furthest": 0
+    }
+  },
+  "constructor_losses": 4,
+  "loss_evidence": [
+    "[t=00:01:46.051786][f=0022592] [SeaExpansionWatch] destroyed team=1 id=23995 def=armcs builder=nil x=7897 z=5000",
+    "[t=00:01:47.438363][f=0022994] [SeaExpansionWatch] destroyed team=1 id=31245 def=armcs builder=nil x=8037 z=5067",
+    "[t=00:01:54.012099][f=0024684] [SeaExpansionWatch] destroyed team=0 id=31019 def=armcs builder=nil x=7899 z=6518",
+    "[t=00:02:00.248325][f=0026034] [SeaExpansionWatch] destroyed team=1 id=2500 def=armcs builder=nil x=7898 z=6506"
+  ],
+  "completed_naval_defenses": 23,
+  "defense_evidence": [
+    "[t=00:00:57.136139][f=0006320] [SeaExpansionWatch] finished team=1 id=27341 def=armtl builder=nil x=552 z=4504",
+    "[t=00:00:58.809218][f=0006922] [SeaExpansionWatch] finished team=4 id=10465 def=armtl builder=nil x=13768 z=4392",
+    "[t=00:01:00.845114][f=0007653] [SeaExpansionWatch] finished team=4 id=27124 def=armtl builder=nil x=12808 z=3832",
+    "[t=00:01:02.651427][f=0008293] [SeaExpansionWatch] finished team=3 id=21014 def=legtl builder=nil x=9800 z=4600",
+    "[t=00:01:06.419958][f=0009306] [SeaExpansionWatch] finished team=0 id=13753 def=armtl builder=nil x=1448 z=4200",
+    "[t=00:01:06.534886][f=0009350] [SeaExpansionWatch] finished team=5 id=4209 def=cortl builder=nil x=10024 z=4504",
+    "[t=00:01:12.486722][f=0011492] [SeaExpansionWatch] finished team=2 id=26465 def=cortl builder=nil x=4280 z=4536",
+    "[t=00:01:13.201911][f=0011750] [SeaExpansionWatch] finished team=5 id=6984 def=cortl builder=nil x=9496 z=5864",
+    "[t=00:01:16.877801][f=0013073] [SeaExpansionWatch] finished team=5 id=12278 def=cortl builder=nil x=9352 z=5816",
+    "[t=00:01:17.601690][f=0013330] [SeaExpansionWatch] finished team=0 id=25087 def=armtl builder=nil x=4824 z=5896",
+    "[t=00:01:20.147810][f=0014248] [SeaExpansionWatch] finished team=2 id=22480 def=cortl builder=nil x=5144 z=5928",
+    "[t=00:01:21.900419][f=0014871] [SeaExpansionWatch] finished team=5 id=21000 def=cortl builder=nil x=8184 z=4920",
+    "[t=00:01:26.146750][f=0016395] [SeaExpansionWatch] finished team=1 id=19451 def=armtl builder=nil x=5896 z=4936",
+    "[t=00:01:26.238085][f=0016426] [SeaExpansionWatch] finished team=2 id=10271 def=corfrt builder=nil x=4992 z=5808",
+    "[t=00:01:33.099721][f=0018500] [SeaExpansionWatch] finished team=5 id=11723 def=cortl builder=nil x=8184 z=6536",
+    "[t=00:01:34.855159][f=0019112] [SeaExpansionWatch] finished team=1 id=22201 def=armtl builder=nil x=6200 z=4872",
+    "[t=00:01:35.446543][f=0019291] [SeaExpansionWatch] finished team=1 id=29741 def=armfhlt builder=nil x=6048 z=4816",
+    "[t=00:01:38.942639][f=0020390] [SeaExpansionWatch] finished team=0 id=28110 def=armtl builder=nil x=4984 z=6024",
+    "[t=00:01:39.942566][f=0020719] [SeaExpansionWatch] finished team=5 id=31623 def=cortl builder=nil x=8184 z=4888",
+    "[t=00:01:40.175197][f=0020775] [SeaExpansionWatch] finished team=2 id=30009 def=cortl builder=nil x=4536 z=4600",
+    "[t=00:01:41.575090][f=0021232] [SeaExpansionWatch] finished team=2 id=12338 def=corfhlt builder=nil x=5152 z=5776",
+    "[t=00:01:42.055177][f=0021371] [SeaExpansionWatch] finished team=1 id=4612 def=armtl builder=nil x=6152 z=6536",
+    "[t=00:01:46.894626][f=0022857] [SeaExpansionWatch] finished team=0 id=27639 def=armfhlt builder=nil x=4672 z=5808"
+  ],
+  "completed_forward_forts": 10,
+  "forward_fort_evidence": [
+    "[t=00:01:06.534886][f=0009350] [SeaExpansionWatch] finished team=5 id=4209 def=cortl builder=nil x=10024 z=4504",
+    "[t=00:01:12.486722][f=0011492] [SeaExpansionWatch] finished team=2 id=26465 def=cortl builder=nil x=4280 z=4536",
+    "[t=00:01:13.201911][f=0011750] [SeaExpansionWatch] finished team=5 id=6984 def=cortl builder=nil x=9496 z=5864",
+    "[t=00:01:17.601690][f=0013330] [SeaExpansionWatch] finished team=0 id=25087 def=armtl builder=nil x=4824 z=5896",
+    "[t=00:01:20.147810][f=0014248] [SeaExpansionWatch] finished team=2 id=22480 def=cortl builder=nil x=5144 z=5928",
+    "[t=00:01:26.146750][f=0016395] [SeaExpansionWatch] finished team=1 id=19451 def=armtl builder=nil x=5896 z=4936",
+    "[t=00:01:26.238085][f=0016426] [SeaExpansionWatch] finished team=2 id=10271 def=corfrt builder=nil x=4992 z=5808",
+    "[t=00:01:35.446543][f=0019291] [SeaExpansionWatch] finished team=1 id=29741 def=armfhlt builder=nil x=6048 z=4816",
+    "[t=00:01:41.575090][f=0021232] [SeaExpansionWatch] finished team=2 id=12338 def=corfhlt builder=nil x=5152 z=5776",
+    "[t=00:01:46.894626][f=0022857] [SeaExpansionWatch] finished team=0 id=27639 def=armfhlt builder=nil x=4672 z=5808"
+  ],
+  "withdrawal_orders": 11,
+  "measured_withdrawals": [
+    {
+      "frame": 14585,
+      "unit": 15771,
+      "homeward_elmos": 1538,
+      "end_frame": 15450
+    },
+    {
+      "frame": 19084,
+      "unit": 22058,
+      "homeward_elmos": 1470,
+      "end_frame": 19950
+    },
+    {
+      "frame": 19981,
+      "unit": 1973,
+      "homeward_elmos": 1641,
+      "end_frame": 20850
+    },
+    {
+      "frame": 20131,
+      "unit": 24564,
+      "homeward_elmos": 1599,
+      "end_frame": 21000
+    },
+    {
+      "frame": 21875,
+      "unit": 4850,
+      "homeward_elmos": 1076,
+      "end_frame": 22650
+    },
+    {
+      "frame": 22235,
+      "unit": 15771,
+      "homeward_elmos": 1418,
+      "end_frame": 23100
+    },
+    {
+      "frame": 22383,
+      "unit": 4199,
+      "homeward_elmos": 1384,
+      "end_frame": 23250
+    },
+    {
+      "frame": 25383,
+      "unit": 4199,
+      "homeward_elmos": 1685,
+      "end_frame": 26250
+    },
+    {
+      "frame": 26585,
+      "unit": 4850,
+      "homeward_elmos": 1493,
+      "end_frame": 27450
+    },
+    {
+      "frame": 26885,
+      "unit": 15771,
+      "homeward_elmos": 1347,
+      "end_frame": 27750
+    },
+    {
+      "frame": 27333,
+      "unit": 4199,
+      "homeward_elmos": 823,
+      "end_frame": 27900
+    }
+  ]
+}

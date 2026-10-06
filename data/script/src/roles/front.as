@@ -11,6 +11,7 @@
 #include "../global.as"
 #include "../types/terrain.as"
 #include "../manager/factory_production.as"
+#include "../manager/land_siege.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../manager/builder.as"
 #include "../manager/economy.as"
@@ -427,6 +428,9 @@ namespace RoleFront {
                 }
             }
         }
+
+        IUnitTask@ siege = LandSiege::Produce(u);
+        if (siege !is null) return siege;
 
         // After constructor guarantees (T1/T2) and optional scout rushes, prefer dynamic factory
         // production for all factories (T1/T2 labs, air, gantries, etc.) when enabled.

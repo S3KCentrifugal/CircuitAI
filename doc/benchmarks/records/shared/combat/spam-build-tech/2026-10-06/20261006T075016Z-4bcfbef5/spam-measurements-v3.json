@@ -1,0 +1,35 @@
+{
+  "repeating_factories": [
+    "15165"
+  ],
+  "completed": {
+    "15165": 61
+  },
+  "move_progress_units": {
+    "15165": 56
+  },
+  "maximum_repeat_queue": {
+    "15165": 1
+  },
+  "last_lane_endpoints": {
+    "13180": [
+      3296.0,
+      6880.0
+    ],
+    "5644": [
+      3810.53516,
+      10040.0
+    ],
+    "15165": [
+      3859.32642,
+      10067.4844
+    ]
+  },
+  "failures": [],
+  "passed": true,
+  "case": "spam-build-tech",
+  "variant": "ranged",
+  "deadline_frame": 10800,
+  "watch_verdict": "PASS",
+  "last_observed_frame": 11095
+}

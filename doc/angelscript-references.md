@@ -1911,3 +1911,36 @@ unfinished factories and constructors. Aircraft/neutral/dead entries are
 excluded; an invalid body returns -1. O(E) once per SEA decision, no engine
 callbacks to hidden enemies. Native provides observations; SEA script owns
 freshness, quiet time, economic gates, escorts and invasion policy.
+
+### D-215: optional valuable-target preference
+
+`CCircuitDef.GetTargetMinCost() const` returns the validated per-unit JSON
+`target_min_cost` threshold (zero disables the preference). Native attack/defend
+scans prefer eligible contacts meeting that cost, or commander/AA contacts,
+within a bounded local detour. AIR reads the same opt-in to give fortresses a
+distinct base-defense target group. It does not change weapon stats or fog
+access. [Design and tests](reviews/2026-10-06-fortress-targeting.md).
+
+
+### D-216: persistent recruitment and reachability
+
+`TaskS::Recruit(..., bool repeat=false)` initializes `SRecruitTask.repeat`.
+True keeps the owner across completed offspring and enables engine factory
+repeat. Script owns economic/lifecycle cancellation; ordinary recruits retain
+their one-unit lifecycle. `CTerrainManager.CanTraverse(CCircuitDef@, from, to)`
+checks bounds and connected movement areas without requesting a path; it does
+not assess threats or expose hidden enemies. Native abort protects shared
+idle/nil/player states from individual cancellation. See [pressure routes](spam-routes.md)
+and the [D-216 investigation](reviews/2026-10-06-spam-and-fatboy.md).
+
+
+### D-218: local Lua constructor-recovery relay
+
+The experimental profiles pass `barbrescue-lua|sender|recipient|verb|episode`
+from `Main::AiLuaMessage` to `Team::Recovery::HandleLua` before normal widget
+commands. The optional `gui_barb_builder_recovery.lua` host widget authenticates
+the `ai.CallUI` sender against the engine callback, checks allied identity and
+queues `Spring.SendSkirmishAIMessage` until its next GameFrame. This avoids
+re-entering a running script context. No relay acknowledgement means the script
+uses `AiSendMessage` instead. Neither route is cross-host. See the
+[recovery report](reviews/2026-10-06-builder-recovery.md).

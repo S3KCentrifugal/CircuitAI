@@ -1,0 +1,97 @@
+{
+  "teams": {
+    "0": {
+      "frame": 27900,
+      "mexes": 16,
+      "beyond2400": 5,
+      "furthest": 4854
+    },
+    "1": {
+      "frame": 27900,
+      "mexes": 8,
+      "beyond2400": 4,
+      "furthest": 4434
+    },
+    "2": {
+      "frame": 27900,
+      "mexes": 15,
+      "beyond2400": 6,
+      "furthest": 4505
+    },
+    "3": {
+      "frame": 27900,
+      "mexes": 21,
+      "beyond2400": 10,
+      "furthest": 4666
+    },
+    "4": {
+      "frame": 27900,
+      "mexes": 8,
+      "beyond2400": 3,
+      "furthest": 3541
+    },
+    "5": {
+      "frame": 27900,
+      "mexes": 13,
+      "beyond2400": 5,
+      "furthest": 4483
+    },
+    "6": {
+      "frame": 27900,
+      "mexes": 0,
+      "beyond2400": 0,
+      "furthest": 0
+    }
+  },
+  "constructor_losses": 0,
+  "loss_evidence": [],
+  "completed_naval_defenses": 13,
+  "defense_evidence": [
+    "[t=00:01:00.524891][f=0007362] [SeaExpansionWatch] finished team=5 id=7702 def=cortl builder=nil x=9704 z=4792",
+    "[t=00:01:07.493316][f=0009513] [SeaExpansionWatch] finished team=3 id=15322 def=legtl builder=nil x=9640 z=6024",
+    "[t=00:01:08.542573][f=0009895] [SeaExpansionWatch] finished team=1 id=26289 def=armtl builder=nil x=4872 z=5976",
+    "[t=00:01:14.203151][f=0011919] [SeaExpansionWatch] finished team=1 id=15965 def=armtl builder=nil x=712 z=4600",
+    "[t=00:01:15.508605][f=0012395] [SeaExpansionWatch] finished team=3 id=6984 def=legtl builder=nil x=8376 z=4824",
+    "[t=00:01:17.991858][f=0013293] [SeaExpansionWatch] finished team=1 id=22162 def=armfrt builder=nil x=4992 z=6032",
+    "[t=00:01:27.270115][f=0016481] [SeaExpansionWatch] finished team=5 id=14791 def=cortl builder=nil x=8296 z=5096",
+    "[t=00:01:38.296971][f=0019968] [SeaExpansionWatch] finished team=0 id=14873 def=armtl builder=nil x=6168 z=4984",
+    "[t=00:01:40.059859][f=0020564] [SeaExpansionWatch] finished team=0 id=27627 def=armfrt builder=nil x=6272 z=5056",
+    "[t=00:01:40.090732][f=0020579] [SeaExpansionWatch] finished team=2 id=30692 def=cortl builder=nil x=6184 z=4872",
+    "[t=00:01:52.787823][f=0024618] [SeaExpansionWatch] finished team=2 id=12338 def=corfrt builder=nil x=6432 z=4912",
+    "[t=00:01:58.258480][f=0025825] [SeaExpansionWatch] finished team=4 id=24550 def=armtl builder=nil x=13800 z=4712",
+    "[t=00:02:04.515637][f=0027379] [SeaExpansionWatch] finished team=4 id=7333 def=armtl builder=nil x=12920 z=3944"
+  ],
+  "withdrawal_orders": 5,
+  "measured_withdrawals": [
+    {
+      "frame": 14400,
+      "unit": 28410,
+      "homeward_elmos": 1818,
+      "end_frame": 15300
+    },
+    {
+      "frame": 14582,
+      "unit": 24564,
+      "homeward_elmos": 1522,
+      "end_frame": 15450
+    },
+    {
+      "frame": 16230,
+      "unit": 28410,
+      "homeward_elmos": 1512,
+      "end_frame": 17100
+    },
+    {
+      "frame": 16322,
+      "unit": 24564,
+      "homeward_elmos": 1029,
+      "end_frame": 17100
+    },
+    {
+      "frame": 16685,
+      "unit": 26482,
+      "homeward_elmos": 1576,
+      "end_frame": 17550
+    }
+  ]
+}

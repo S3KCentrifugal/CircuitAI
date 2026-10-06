@@ -1,0 +1,115 @@
+{
+  "case": "fortress-legfort-defense",
+  "variant": "ranged",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-legfort-defense\\glitters\\20261006T063216Z-99421512",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armflea:weapon=948": 835.0,
+    "corgol:weapon=947": 6999.0,
+    "corgol:weapon=948": 8568.0,
+    "armflea:weapon=947": 141.0,
+    "legfort:weapon=948": 18.0
+  },
+  "first_damage_seconds": {
+    "armflea": 12.9,
+    "corgol": 15.366666666666667,
+    "legfort": 28.733333333333334
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "none": 44
+  },
+  "sampled_shot_targets": {
+    "3:armflea": 10,
+    "4:armflea": 12,
+    "5:armflea": 12,
+    "1:corgol": 26,
+    "2:corgol": 25,
+    "3:corgol": 34,
+    "4:corgol": 33,
+    "5:corgol": 34,
+    "2:armflea": 3,
+    "4:none": 1,
+    "5:none": 1,
+    "1:armflea": 2
+  },
+  "damage_first_30_seconds": {
+    "armflea:weapon=948": 694.0,
+    "corgol:weapon=947": 4950.0,
+    "corgol:weapon=948": 6400.0,
+    "armflea:weapon=947": 141.0,
+    "legfort:weapon=948": 18.0
+  },
+  "deaths": [
+    {
+      "seconds": 13.266666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.133333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.233333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.3,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.966666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.066666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 16.1,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 24.033333333333335,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 24.566666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 24.7,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 25.933333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 34.7,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 35.233333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 36.2,
+      "unit": "armflea",
+      "team": 1
+    }
+  ]
+}

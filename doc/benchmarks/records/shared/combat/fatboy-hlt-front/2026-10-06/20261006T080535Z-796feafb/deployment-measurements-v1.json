@@ -1,0 +1,13 @@
+{
+  "case": "fatboy-hlt-front",
+  "variant": "ranged",
+  "by_seconds": 100,
+  "required_forward_elmos": 500,
+  "progress_by_unit": {
+    "6003": 1881.0,
+    "7383": 1734.0,
+    "29202": 2195.0,
+    "22963": 2189.0
+  },
+  "passed": true
+}

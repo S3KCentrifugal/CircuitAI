@@ -15,7 +15,13 @@ namespace SeaInvasion {
     bool secured=false, restored=false;
     float coverage=0;
     AIFloat3 site(-1,0,-1), landing(-1,0,-1), seaward;
-    bool Active() { return Global::AISettings::Role==AiRole::SEA && Global::RoleSettings::Sea::AmphibiousInvasion && SeaCombat::Active() && SeaLayout::Enabled(); }
+    bool Active() { return Global::AISettings::Role==AiRole::SEA && Global::RoleSettings::Sea::AmphibiousInvasion && SeaCombat::Active() && SeaLayout::Enabled() && !SeaCoast::Active(); }
+    void SuspendWaves() {
+        // D-219: losing the sea yields surviving land units to coastal defense.
+        // Keep factory reservations/frames intact for a later naval recovery.
+        for (uint i=0;i<waves.length();++i) if (waves[i].route !is null && !waves[i].route.IsDead()) waves[i].route.Abort();
+        waves.resize(0);
+    }
     string Lab(const string &in side) { return side=="armada" ? "armamsub" : side=="cortex" ? "coramsub" : "legamphlab"; }
     string Gantry(const string &in side) { return side=="armada" ? "armshltxuw" : side=="cortex" ? "corgantuw" : "leggantuw"; }
     string Product(const string &in side,bool advanced) {

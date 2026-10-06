@@ -1,0 +1,153 @@
+{
+  "schema": 5,
+  "case": "ranged-armmanni",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-armmanni\\glitters\\20261006T052849Z-4fa930f2",
+  "measurement_deadline_frame": 9000,
+  "first_damage_seconds": 18.266666666666666,
+  "raw_damage_including_overkill": 5041,
+  "shooters_fired": 4,
+  "shots": 6,
+  "enemy_kills": 4,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 510.0,
+  "nonlua_commands": 252,
+  "commands_per_game_minute": 50.4,
+  "command_window_frame": 9000,
+  "last_observed_frame": 9300,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armmanni"
+  ],
+  "minimum_sampled_spacing_after_60s": 263.46346995361614,
+  "render_fps_after_60s": [
+    67.0,
+    89.0,
+    255.0,
+    331.0,
+    324.0,
+    304.0,
+    273.0,
+    265.0,
+    284.0,
+    254.0,
+    324.0,
+    280.0,
+    303.0,
+    329.0,
+    325.0,
+    273.0,
+    373.0,
+    319.0,
+    283.0,
+    305.0,
+    278.0,
+    341.0,
+    293.0,
+    305.0,
+    283.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:38.335643][f=0000692]",
+      "frame": "692",
+      "id": "15598",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:38.732882][f=0000776]",
+      "frame": "776",
+      "id": "29947",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:39.867814][f=0001049]",
+      "frame": "1049",
+      "id": "20443",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    },
+    {
+      "t": "00:00:39.883216][f=0001053]",
+      "frame": "1053",
+      "id": "6003",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.028442,
+      "ai_all_p95_ms": 0.28894,
+      "ai_all_max_ms": 7.540283,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.668335,
+      "ai_all_mean_ms": 0.077476
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.017334,
+      "ai_all_p95_ms": 0.281494,
+      "ai_all_max_ms": 1.678467,
+      "sim_speed": 8.018,
+      "ai_all_p99_ms": 0.49585,
+      "ai_all_mean_ms": 0.059849
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.018311,
+      "ai_all_p95_ms": 0.306152,
+      "ai_all_max_ms": 1.725098,
+      "sim_speed": 7.51,
+      "ai_all_p99_ms": 0.51001,
+      "ai_all_mean_ms": 0.062822
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.01709,
+      "ai_all_p95_ms": 0.303955,
+      "ai_all_max_ms": 1.741455,
+      "sim_speed": 7.51,
+      "ai_all_p99_ms": 0.486572,
+      "ai_all_mean_ms": 0.060033
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.01709,
+      "ai_all_p95_ms": 0.29834,
+      "ai_all_max_ms": 1.69165,
+      "sim_speed": 8.002,
+      "ai_all_p99_ms": 0.490234,
+      "ai_all_mean_ms": 0.060173
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

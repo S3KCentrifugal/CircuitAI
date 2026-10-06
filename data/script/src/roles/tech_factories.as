@@ -948,6 +948,12 @@ namespace TechFactories {
         if (f is null || f is u) return null;
         if (!Lifecycle::IsRetiring(f)) {
             baseRetired.set("" + f.id, ai.frame);
+            // D-216: STOP alone lets a live recruit restart on the resulting
+            // idle event. End production ownership before retiring the lab,
+            // just as the opening T1/T2 reclaim path does. Shared idle state
+            // is not a cancellable job; the reclaim threshold stays unchanged.
+            if (f.task !is null && (f.task.GetType() == Task::Type::FACTORY || f.task.GetType() == Task::Type::WAIT))
+                aiFactoryMgr.AbortTask(f.task);
             Lifecycle::Retire(f, LandFactoryCount() + " land factories on the map: the base's land factories go back to the economy (D-114)");
             ReleaseBaseFactoryGround();
         }

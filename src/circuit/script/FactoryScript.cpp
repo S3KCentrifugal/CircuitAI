@@ -41,6 +41,7 @@ CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 	r = engine->RegisterObjectProperty("SRecruitTask", "CCircuitDef@ buildDef", asOFFSET(TaskS::SRecruitTask, buildDef)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SRecruitTask", "AIFloat3 position", asOFFSET(TaskS::SRecruitTask, position)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("SRecruitTask", "float radius", asOFFSET(TaskS::SRecruitTask, radius)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("SRecruitTask", "bool repeat", asOFFSET(TaskS::SRecruitTask, repeat)); ASSERT(r >= 0);
 
 	r = engine->RegisterObjectType("SServSTask", sizeof(TaskS::SServSTask), asOBJ_VALUE | asOBJ_POD); ASSERT(r >= 0);
 	static_assert(sizeof(TaskS::SServSTask::type) == sizeof(char), "IBuilderTask::BuildType is not uint8!");

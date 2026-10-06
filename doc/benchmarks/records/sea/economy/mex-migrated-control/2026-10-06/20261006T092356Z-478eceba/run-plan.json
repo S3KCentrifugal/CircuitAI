@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "mex-migrated-control"
+  },
+  "id": "20261006T090037Z-00fb6091",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

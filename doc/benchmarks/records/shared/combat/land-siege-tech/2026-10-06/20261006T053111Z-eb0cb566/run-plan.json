@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "land-siege-tech"
+  },
+  "id": "20261006T053027Z-d90f8cec",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

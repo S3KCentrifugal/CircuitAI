@@ -278,6 +278,16 @@ Map: selected by runner
 
 ## Economy / Checks
 
+### [mex-expansion](../../../tools/playtest/checks/sea/economy/mex-expansion.json)
+
+- `expect: cluster-fort-order`
+- `expect: fortify`
+- `expect: frontier`
+- `expect: observer`
+- `forbid: crash`
+- `forbid: invariant`
+- `forbid: script`
+
 ### [sea-capacity-8v8](../../../tools/playtest/checks/sea/economy/sea-capacity-8v8.json)
 
 - `expect: allied-repair`
@@ -374,6 +384,10 @@ Map: selected by runner
 
 ## Economy / Scenario
 
+### [mex-expansion-glacial](../../../tools/playtest/cases/sea/economy/mex-expansion-glacial.json)
+
+Map: selected by runner
+
 ### [migration-natural](../../../tools/playtest/cases/sea/economy/migration-natural.json)
 
 Map: selected by runner
@@ -420,7 +434,15 @@ In-game fixture/observer; source inventory, not a claim of execution.
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
+### [sea_coast](../../../tools/playtest/widgets/sea_coast.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
 ### [sea_economy_block_watch](../../../tools/playtest/widgets/sea_economy_block_watch.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [sea_expansion_watch](../../../tools/playtest/widgets/sea_expansion_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -539,11 +561,22 @@ Map: glacial
 
 ## Policy / Suite
 
+### [sea_coast_math_tests](../../../tests/sea_coast_math_tests.as)
+
+- `test_beach_ownership_is_nearest_and_ties_are_deterministic`
+- `test_loss_requires_continuous_absence`
+- `test_opening_is_never_a_defeat`
+- `test_retake_has_its_own_hysteresis`
+- `test_shipyard_loss_with_surviving_navy_is_not_defeat`
+- `test_tech_requires_both_resources_or_whole_purchase_banked`
+
 ### [sea_math_tests](../../../tests/sea_math_tests.as)
 
 - `test_aa_screen_slots_stay_separate_and_overlap`
 - `test_canceled_unframed_berth_is_retryable`
+- `test_cluster_fortification_preserves_metal_reserve_and_energy_funding`
 - `test_counter_admission_and_time_to_coverage`
+- `test_expansion_rejects_hostile_coverage_and_invalid_thresholds`
 - `test_interception_respects_speed_weapon_reach_and_horizon`
 - `test_invasion_admission_needs_escort_predecessor_and_both_resources`
 - `test_invasion_replans_only_uncommitted_or_dead_slots`
@@ -577,6 +610,10 @@ Map: glacial
 
 Cross-role reservation probes or supplied three-SEA placement on Glacial.
 
+### [run_sea_coast](../../../tools/playtest/run_sea_coast.py)
+
+Supplied SEA loss/constructor-transfer/coastal-recovery acceptance arena.
+
 ### [run_sea_cohort](../../../tools/playtest/run_sea_cohort.py)
 
 Paired, immutable SEA layout smoke benchmarks; not a win-rate experiment.
@@ -604,3 +641,25 @@ Supreme SEA mex/seaplane acceptance with real role decisions (supplied capital).
 ### [sea_arena](../../../tools/playtest/sea_arena.py)
 
 Isolated SEA combat fixtures. Assets are supplied; AI alone commands combat.
+
+## Strategy / Checks
+
+### [coastal-fallback](../../../tools/playtest/checks/sea/strategy/coastal-fallback.json)
+
+- `expect: donation`
+- `expect: energy-storage`
+- `expect: lab`
+- `expect: loss`
+- `expect: metal-storage`
+- `expect: t1-defense`
+- `expect: t2-defense`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+## Strategy / Scenario
+
+### [coastal-fallback](../../../tools/playtest/cases/sea/strategy/coastal-fallback.json)
+
+Map: selected by runner

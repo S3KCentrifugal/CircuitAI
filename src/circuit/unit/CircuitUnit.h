@@ -142,6 +142,7 @@ public:
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);
+	void ClearPriorityTarget();
 	void CmdCloak(bool state);
 	void CmdFireAtRadar(bool state);
 	void CmdFindPad(int timeout = INT_MAX);
@@ -250,6 +251,7 @@ private:
 
 	CEnemyInfo* target;
 	int targetTile;
+	int priorityTarget = -1; // ID only: never retain a dead enemy wrapper.
 
 	CCircuitDef::AttrM attr;
 

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "land-siege-legion-bots"
+  },
+  "id": "20261006T054952Z-5e729ffc",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

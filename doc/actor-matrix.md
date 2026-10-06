@@ -612,3 +612,62 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Protective ships | SeaOperations::Tick/Route, SeaInvasion::Screen/Protected | Ordinary eligible naval cohorts screen the site when no compatible naval target; live ship presence gates construction. Existing threat response, scout/AA, carrier, player and retreat ownership take precedence. |
 | Amphibious cohort | SeaInvasion::Produce/Member/Waves/Order, native RouteTask | Actual faction factory edges; copied IDs; separate UnitDef cohorts; six units or 90-second release; validated beach routes, dry backline routes after landing. Player/retreat/external task owners remain protected. |
 | Evidence | run_sea_invasion.py, sea_invasion_watch.lua | Supplied resources, workers, ships and legitimate sensors; AI alone places factories and issues invasion routes. Observer positions never feed policy. |
+
+## D-214: land siege demand
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| FRONT T2 land factory | Front_FactoryAiMakeTask, LandSiege::Produce, native/dynamic fallback | Constructor obligations precede siege. Only supported land factories on connected starts participate. TECH, AIR, SEA and other roles retain their existing production. |
+| Siege investment | LandSiege::Produce, native recruit lifecycle | UnitDef count includes frames; pending callback adds only orders without frames. Count the entire counter roster across factories, enqueue one within the funded budget, audit visibility with INV-155. No private queue or periodic micro. |
+| Known static investment | CEnemyManager, LandSiegeMath::Budget | Existing legal-observation aggregate, native team factor and income-dependent army share. No static evidence means no dedicated siege order; ordinary production still operates. |
+
+## D-215: fortress targets
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Valuable-target opt-in | Active behavior JSON, FactoryManager, CCircuitDef | `target_min_cost`, validated once; zero preserves legacy. Only Dragon/Tyrannus entries opt in. |
+| Ordinary fortress squad | AttackTask, DefendTask, squad merge | Same-policy grouping; existing legal/threat eligibility; preferred-contact scan plus bounded detour; cheap targets remain fallback. |
+| AIR defensive fortress | AirBaseResponse::Kind/Tick/TaskFor, RouteTask | Separate group 3, cost/AA weighted target with proportional retention; other groups and production unchanged; INV-156 checks policy ownership. |
+| Priority fire | CircuitUnit::CmdSetTarget/ClearPriorityTarget/ClearAct/CmdStop, BAR target gadget | Opt-in target IDs on changes, retained automatic AA, ID-specific cancellation at task handover; no new periodic controller or per-frame order. |
+| Evidence | ranged_arena.py, ranged_arena.lua, fortress_report.py | Supplied units and legal sensors; friendly combat commands stay AI-owned; actual weapon damage and rendered screenshots. |
+
+
+## D-216: persistent pressure lanes and Fatboy staging
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Spam pump | Spam::Update/FactoryMakeTask/MaintainFactories, factory lifecycle | Funded admission, workers, income-scaled count, retirement; one persistent recruit and reachable route per producer; INV-157. |
+| Repeat queue | RecruitTask, FactoryManager::UnitCreated/UnitFinished/DequeueTask | Engine repeat owns the next copy; completion clears only its target; cancellation/handover ends repeat. |
+| Shared idle state | TaskModule::AbortTask, TechBuild retirement | Idle/nil/player cannot be cancelled as individual work; retiring one idle lab must not orphan other idle factories. |
+| Factory construction | Spam::BuilderMakeTask, TechFactories::Work, builder hooks | TECH uses reserved forward clusters after its advanced lab; other roles may add a funded reachable land pump; commanders retain opening work. |
+| Offspring | MilitaryMakeTask, adoption census, RouteTask | Actual producer ID, MOVE lanes, no retreat; respect player control; connected terrain endpoints/offsets; routes survive funding loss. |
+| Fatboy firing/staging | ranged JSON, RangedEngagement, RangedWorld | Opt-in safe staging after firing sites fail; existing terrain/path, coverage and spacing checks remain. |
+
+## D-217: SEA frontier mexes
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Expansion worker | Builder identities, SeaExpansion::Worker/Make/Tick/Removed | Primary ship, secondary after three ships; preserve player/retreat/external/reclaim ownership; per-ID failed-search and withdrawal state clears on removal. |
+| Mex spot | SeaExpansion, EconomyManager::EnqueueMexWithin, MexTask | Native allied occupancy, claim, terrain and task lifecycle; moving radius and script danger/escort admission; INV-158. |
+| Remote defenses | MexTracker, SeaExpansion::Fortify, native builder/layout placement | Shared coverage within each cluster; completed/frame/pending accounting; two-resource funding; allied layout reservations remain authoritative. |
+| Threat response | Builder add/remove hooks, BattleAnalysis, SeaExpansion::Tick, BuilderManager::AssignTask | ID roster of all T1 construction ships, including native support; one adoption census; legal observed forces and torpedo threat; one withdrawal MOVE per danger transition, native WAIT/damage-retreat lifecycle, no per-frame movement micro. |
+
+## D-218: constructor recovery
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Constructor population | Builder add/remove, Recovery | Finished mobile T1/T2 constructor IDs; commander opening excluded; gifted cargo does not count as donor workforce. |
+| Request | Recovery, Lua relay, Team allied dispatch | Episode token, sticky TECH donor, 20-second heartbeat, 120-second lease, cancellation tombstone; no role-specific loss gate. |
+| T1 bot recruit | Factory dispatch, Spam::MaintainFactories, native RecruitTask | Recovery precedes normal production; pause repeating spam, match actual factory build menu, one temporary cap lease; retiring labs stay retiring. |
+| Gift | Builder callback, Recovery::Update, Ferry | Exact producer/definition match; no primary-constructor claim; native idle setup finishes before transfer; existing ferry task owns queued/in-flight cargo. |
+
+## D-219: SEA coastal fallback
+
+| Object | Actors | Shared state / contract |
+| --- | --- | --- |
+| Naval foothold | SeaCombat census, SeaCoast::Tick | Actual home-water units, safe shipyard/constructor or live combat hull, 30-second loss and 60-second retake hysteresis; no opening false defeat. |
+| Beach responsibility | BattleAnalysis, allied Roster, SeaCoast::Survey | Copied legal geometry; nearest allied SEA spawn with team-ID tie break; cliffs/enemy shore excluded. |
+| Land project | Shared Builder, SEA role, SeaCoast, native reservation/task lifecycle | Loss gate precedes spam; actual build menu, dry/reachable/safe pinned site, completed/frame/pending duplicate accounting; INV-160. |
+| Bot lab | Shared Factory, recovery requests, SeaCoast, Spam | Existing constructor donations retain priority; fallback recruits land workers/defenders; repeating spam disabled only during SEA fallback. |
+| Coastal garrison | SeaCoast, native RouteTask, native retreat/player ownership | Stable dispersed positions, per-sector legal contact goals, dry paths, no repeated unchanged route orders; release on retake/role exit. |
+| Land nano | SeaCoast::Build, native repair/guard | Assist only in-range frames or a factory with an actual unfinished product; leave enemy-reclaim/player/retreat ownership intact. |

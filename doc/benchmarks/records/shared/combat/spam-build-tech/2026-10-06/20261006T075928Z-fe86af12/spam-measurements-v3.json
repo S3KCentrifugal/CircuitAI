@@ -1,0 +1,47 @@
+{
+  "repeating_factories": [
+    "18335",
+    "4077"
+  ],
+  "completed": {
+    "18335": 55,
+    "4077": 85
+  },
+  "move_progress_units": {
+    "18335": 52,
+    "4077": 80
+  },
+  "maximum_repeat_queue": {
+    "4077": 1,
+    "18335": 1
+  },
+  "last_lane_endpoints": {
+    "13180": [
+      4316.52246,
+      3721.43506
+    ],
+    "8806": [
+      4506.97852,
+      10040.0
+    ],
+    "4077": [
+      4396.93311,
+      10060.833
+    ],
+    "18335": [
+      3251.10107,
+      9747.51953
+    ],
+    "7059": [
+      3253.01147,
+      9803.4873
+    ]
+  },
+  "failures": [],
+  "passed": true,
+  "case": "spam-build-tech",
+  "variant": "ranged",
+  "deadline_frame": 10800,
+  "watch_verdict": "PASS",
+  "last_observed_frame": 11160
+}

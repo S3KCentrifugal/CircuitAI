@@ -1506,7 +1506,7 @@
 			"armfboy": {
 				"role": ["assault", "heavy"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2416,6 +2416,7 @@
 				"power": 1.0
 			},
 			"corcrwh": {
+				"target_min_cost": 300,
 				"role": ["heavy", "air"],
 				"attribute": ["anti_heavy"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},

@@ -124,7 +124,7 @@ are welcome). The state is read from `Lifecycle`, never kept here. See
 - [`../eco-planner.md`](../eco-planner.md) - rung 6.
 - [`../layout-design.md`](../layout-design.md) - where the planner's structures go.
 
-<!-- source: data/script/src/roles/tech_build.as; blob: 36642ff337ebd203c35fbd988c745eca7a9ecf00; lines: 855 -->
+<!-- source: data/script/src/roles/tech_build.as; blob: d60aaefaceb8cc2f5ab60392d3fa8233eb3c061f; lines: 857 -->
 
 ## D-152 defense ownership
 
@@ -141,3 +141,11 @@ sharing now runs once from the shared economy callback as
 `TeamEconomy::ShareOverflow`, with the original TECH opening gate, threshold,
 budget and cooldown. All six roles use the same settings. See
 [shared metal donations](../team-metal-sharing.md).
+
+
+## D-216 retirement and shared scheduling
+
+The T1/T2 retirement paths abort only actual FACTORY or WAIT work. Aborting
+the manager's shared idle task previously erased all other idle labs from its
+scheduler. Native `AbortTask` now also rejects shared idle/nil/player states.
+Reclaim timing and replacement order remain unchanged.

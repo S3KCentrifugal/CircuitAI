@@ -1,0 +1,159 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 1707,
+      "sha256": "731a883206a22c5610759f80b8d8e3052d649182a7ae2e2f95d5ae92d9c1db64"
+    },
+    "coast-checks.json": {
+      "bytes": 1707,
+      "sha256": "731a883206a22c5610759f80b8d8e3052d649182a7ae2e2f95d5ae92d9c1db64"
+    },
+    "fixture.json": {
+      "bytes": 205,
+      "sha256": "c279ead25a15c5703407b656b0917e3e049ace4ba2355e8b4d9b67500a3a7e8b"
+    },
+    "infolog.txt": {
+      "bytes": 562123,
+      "sha256": "2a2f263254c3ea3698d96a54f95a323959fe78d4e3937ccf55b92a1b3eff41ae"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "e9762700e1334398df4131fe9fa6424ff83a04ed7fc4c71af3ebfbf6398f3430"
+    },
+    "report.md": {
+      "bytes": 18999,
+      "sha256": "9ccc55b3bc9e67fb3ac6dc97b6845bf44605885dddf77a6048d90b0848aa6ba1"
+    },
+    "run-inputs.json": {
+      "bytes": 37547,
+      "sha256": "055cdcb0d6a9053ce237ba2e38ecfe591dcd5e8541eaaf26a21bc8598e2b90b2"
+    },
+    "run-plan.json": {
+      "bytes": 260,
+      "sha256": "32e343d33e51ae81c016a1c75888ace949036e6b572f071cc43c672790930743"
+    },
+    "screen_2026-10-06_15-06-31-843.png": {
+      "bytes": 1249791,
+      "sha256": "ac0f37365e312fd08da9da39b752f64ebd36188083fda25ae2196893e2c09c39"
+    },
+    "screen_2026-10-06_15-06-32-454.png": {
+      "bytes": 1862767,
+      "sha256": "9659bdc986e15e35d4ac2b35714ff1bcc061c73295e4b16221e48b8cd3d9bc6e"
+    },
+    "screen_2026-10-06_15-06-37-381.png": {
+      "bytes": 1160259,
+      "sha256": "afb9600e85a78ac5107e3a2dfa61d309655ed0f670adb97e42737a0a9031b653"
+    },
+    "screen_2026-10-06_15-06-42-469.png": {
+      "bytes": 1262878,
+      "sha256": "31ea58b2c7dc93def71c5a46da63c41b159c4e4b46b8e1d5ae8172bd64e7a2c3"
+    },
+    "screen_2026-10-06_15-06-48-263.png": {
+      "bytes": 1877811,
+      "sha256": "41e3c3383e0de0ef87a9d6df6db5c3e07dee8e6415268b3e00b52a6763757596"
+    },
+    "screen_2026-10-06_15-06-48-566.png": {
+      "bytes": 1262931,
+      "sha256": "ebcaabe66ac20f7acf1e7ee8d55def4bea7b0eb721673c47cab755a98c3d0d62"
+    },
+    "screen_2026-10-06_15-06-58-420.png": {
+      "bytes": 1204909,
+      "sha256": "09d2a797d8e73937ab5844eb3e65a32ddf211724c5b4603f3d87978d87744d06"
+    },
+    "screen_2026-10-06_15-07-10-012.png": {
+      "bytes": 1167785,
+      "sha256": "61b4c230d6a61371cbbef3aaeea660fd80401843ec2e3be851bb41f69c38ebda"
+    },
+    "screen_2026-10-06_15-07-18-294.png": {
+      "bytes": 1202532,
+      "sha256": "21cf15b25aabe998ab22c6c5f9c78e77983b4493236e648c655225f2107a2cea"
+    },
+    "screen_2026-10-06_15-07-24-201.png": {
+      "bytes": 1268461,
+      "sha256": "f5be4a50db33da2b400a261f0fe3b7eb6c2791d8263ad659c45ac090ff962886"
+    },
+    "screen_2026-10-06_15-07-24-798.png": {
+      "bytes": 1891367,
+      "sha256": "a248b91df987b6b5c05d40b7021d546866c47f00a8eecfcbbdb088caf51445ae"
+    },
+    "screen_2026-10-06_15-07-30-703.png": {
+      "bytes": 1277834,
+      "sha256": "3a75be5ef706a5c6a8f14935a0c7116cc7f53bb8170c3beabb3d8595ec2e19a6"
+    },
+    "screen_2026-10-06_15-07-36-856.png": {
+      "bytes": 1185623,
+      "sha256": "9904ce255053290dc9dc9366fbf2e91a8cbfb6aaaffeb7101f8c34c521281e08"
+    },
+    "screen_2026-10-06_15-07-42-976.png": {
+      "bytes": 1284328,
+      "sha256": "42527a40ddbd0102dbc812fc2d57c88cbff4302ecddebbb1c3730f0f743ffd86"
+    },
+    "screen_2026-10-06_15-07-43-572.png": {
+      "bytes": 1905403,
+      "sha256": "b637aa2b20972670c964480e2c1ae565bfc5559e79fc379c3fc849d0d9dc9757"
+    },
+    "screen_2026-10-06_15-07-48-498.png": {
+      "bytes": 1288389,
+      "sha256": "fe831dd5eae9ed6463dea14cd63bae40a89a82e3bd49582bbf669cc0b8135553"
+    },
+    "screen_2026-10-06_15-07-53-443.png": {
+      "bytes": 1231260,
+      "sha256": "bb04256c11f94aa314351f504ef0782734c69882aa4d392ad130e266895acf45"
+    },
+    "script.txt": {
+      "bytes": 6114,
+      "sha256": "a2445fc71e4d4c0366614599ea5338da914487cf24b9e43c2597bd7d7a52670c"
+    },
+    "staged.json": {
+      "bytes": 232,
+      "sha256": "f666ab5168097c831befc80aedc4fd9e26e26207c5ce2f699bba3e3ba471a58e"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "3802059231a8dd1d2e9780c06e8e271958378a68842c18812cc77789648c9d94"
+    }
+  },
+  "category": {
+    "area": "strategy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "coast-retake-cortex"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261006T150754Z-063c8c6c",
+  "last_frame": 27000,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\strategy\\coast-retake-cortex\\supreme\\20261006T150535Z-1dda3af0\\runs\\20261006T150754Z-063c8c6c",
+  "reason": "reached 15 min",
+  "recorded_at_utc": "2026-10-06T15:07:54.692178+00:00",
+  "requested": {
+    "seed": 219001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

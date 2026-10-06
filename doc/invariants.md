@@ -216,3 +216,13 @@ step.
 | INV-153 | SEA recovery sub selection yields reclaim, repair, resurrection or standby; never construction or factory assistance. | SeaRecovery::Tick checks the assigned builder kind. | D-211 |
 
 | INV-154 | SEA amphibious factory admission requires fresh sampled LOS/sonar coverage of its sea, no known water enemies, the quiet interval and actual nearby combat-ship protection. | SeaInvasion::Build audits admission; supplied transition and blocked fixtures independently observe construction and escort. | D-212 |
+
+| INV-155 | Each dedicated land-siege admission increases its existing-plus-pending native recruit count by exactly one before another factory can decide. | LandSiege::Produce audits synchronous enqueue visibility; supplied multi-factory production checks forbid the diagnostic. | D-214 |
+
+| INV-156 | AIR base-defense aircraft remain in the group matching their target policy; opted-in fortresses cannot inherit the cheap-gunship incumbent target. | AirBaseResponse::Tick audits each enrolled aircraft against Kind; supplied combat compares weapon damage and priority targets. | D-215 |
+
+| INV-157 | Every script-owned repeating spam factory has a nonempty reachable MOVE route. | Spam::MaintainFactories checks route ownership; supplied observers verify repeat state, bounded queues and offspring progress. | D-216 |
+| INV-158 | SEA frontier expansion returns a native mex task after safety admission; spot claims remain native-owned. | SeaExpansion::Make audits the admitted type; Glacial observer checks completed forward mexes and physical constructor withdrawals. | D-217 |
+
+| INV-159 | Each TECH donor has at most one recovery obligation per requesting team. | Recovery::Update checks duplicate team entries; controlled losses check production, cancellation and ferry transfer. | D-218 |
+| INV-160 | Coastal recovery orders are SEA-only, loss-gated and placed on dry buildable terrain. | SeaCoast::Order audits state and height after native pin placement; loss/held/retake fixtures check admission. | D-219 |

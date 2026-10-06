@@ -53,7 +53,10 @@ namespace Invariants {
         // time. Completion may occur after income falls; ordinary combat keeps
         // its existing gate and Marauders are not exempted.
         const bool coastal = AmphibiousOps::Active() && AmphibiousOps::Kind(u.circuitDef)==0;
-        if (!builder && !coastal && mi < TechPlan::CombatGate())
+        // Dedicated pressure pumps have their own funded admission policy;
+        // TECH's heavy-army gate must not contradict that shared T1 policy.
+        const bool pressure = Spam::IsSpamDef(u.circuitDef) && Spam::repeatTask.exists("" + u.GetProducerId());
+        if (!builder && !coastal && !pressure && mi < TechPlan::CombatGate())
             Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
 

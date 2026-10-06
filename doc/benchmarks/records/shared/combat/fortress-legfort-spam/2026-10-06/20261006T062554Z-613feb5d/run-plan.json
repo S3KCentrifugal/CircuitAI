@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "fortress-legfort-spam"
+  },
+  "id": "20261006T062450Z-89ecc95e",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

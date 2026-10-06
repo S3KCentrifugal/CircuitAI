@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "9ee913a720956197f55b22b4ad74f5754baa6a47da367ff61187ea488363e33d",
+    "checks.json": "33a05ade5336cb1425da08c3ca79219821fd8317ccff066b399ab5ac0bd509eb",
+    "launched.json": "e5a6932a872a07b7d8810f2cd56f01082801c40e6c2a310146ad88cf977adbfd",
+    "ranged-arena-pins.json": "21e4f9b2708ca2b04b202ae7a7e6726d8e5811baccbaed1098f6f638d6d016fa",
+    "ranged-arena.json": "d94b843f9488e74e4441759f1a393c27e741821ab43e679ac4be1e3c62615372",
+    "ranged-measurements-v5.json": "5db39bcd24c955142dbdce53610920c710fcbc5e6e49f6124a19a0638d546e2a",
+    "report.md": "66a25775835eaed6c705580303ba3db74cb2e60c1c7e44524778f2b96d8ae7a2",
+    "result.json": "e46570bc7cbbfcf4b0706df60e799dd27ef9bc1ce454405ae840d26b85eac4ec",
+    "run-inputs.json": "95e2de3ecb2118a1214174372cb21a4b1df5206cdaab26be3224f90230e4201b",
+    "run-plan.json": "e62ca9fadadbb2b75849937ae6c7b2e48362bcaf502931f42bcebb09ff181e9d",
+    "screen_2026-10-06_07-43-10-840.png": "a6d52a770fdcb643f0d12ba80e75711e9ad00773a9b9ec51754e75dc85e6f7ed",
+    "script.txt": "a7d67f247ec70c36e2c8a7c9411dae6f512372a312293f9b446826e27ef0bc1b",
+    "spam-measurements-v3.json": "11bfee134107749c63cd83969ce1103f19a8fd6e95e9af9815430e6c450e76f9",
+    "staged.json": "9d6fa68e295e13e2ac413a4e9270adcf08415af43999cf409242838dc8c5b3c6",
+    "starts.as": "bf12d460232d77ff1b812f868be1d981b66ffe49930e62c00e13b8850279e045",
+    "teams.json": "53c30697e513fa80623302bcfc194b72b12b080b65d702ece7d6c8b957affbc6"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\spam-repeat-support\\glitters\\20261006T074209Z-1d8850df\\runs\\20261006T074315Z-cc7f6bc7",
+  "schema": 1
+}

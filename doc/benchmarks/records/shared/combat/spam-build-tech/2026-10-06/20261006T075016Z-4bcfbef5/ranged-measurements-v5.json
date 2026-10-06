@@ -1,0 +1,321 @@
+{
+  "schema": 5,
+  "case": "spam-build-tech",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\spam-build-tech\\glitters\\20261006T074848Z-2cff1ca7",
+  "measurement_deadline_frame": 10800,
+  "first_damage_seconds": null,
+  "raw_damage_including_overkill": 0,
+  "shooters_fired": 12,
+  "shots": 27,
+  "enemy_kills": 1,
+  "friendly_losses": 19,
+  "enemy_metal_destroyed": 170.0,
+  "nonlua_commands": 5007,
+  "commands_per_game_minute": 834.5,
+  "command_window_frame": 10800,
+  "last_observed_frame": 11095,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [],
+  "minimum_sampled_spacing_after_60s": 19.924858845171276,
+  "render_fps_after_60s": [
+    46.0,
+    99.0,
+    274.0,
+    261.0,
+    275.0,
+    241.0,
+    249.0,
+    319.0,
+    297.0,
+    314.0,
+    315.0,
+    225.0,
+    274.0,
+    286.0,
+    275.0,
+    276.0,
+    225.0,
+    278.0,
+    258.0,
+    257.0,
+    167.0,
+    208.0,
+    205.0,
+    201.0,
+    219.0,
+    195.0,
+    195.0,
+    183.0,
+    168.0,
+    159.0,
+    165.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 164,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:57.697433][f=0005036]",
+      "frame": "5036",
+      "id": "8982",
+      "team": "0",
+      "unit": "armmex",
+      "cost": "50"
+    },
+    {
+      "t": "00:01:02.201218][f=0006117]",
+      "frame": "6117",
+      "id": "14262",
+      "team": "0",
+      "unit": "armmex",
+      "cost": "50"
+    },
+    {
+      "t": "00:01:05.387282][f=0006882]",
+      "frame": "6882",
+      "id": "27235",
+      "team": "0",
+      "unit": "armmex",
+      "cost": "50"
+    },
+    {
+      "t": "00:01:18.909776][f=0010127]",
+      "frame": "10127",
+      "id": "23479",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:01:18.970658][f=0010142]",
+      "frame": "10142",
+      "id": "11528",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.982683][f=0010145]",
+      "frame": "10145",
+      "id": "8580",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.987466][f=0010146]",
+      "frame": "10146",
+      "id": "17585",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.995255][f=0010148]",
+      "frame": "10148",
+      "id": "28759",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.005409][f=0010150]",
+      "frame": "10150",
+      "id": "31539",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.005819][f=0010150]",
+      "frame": "10150",
+      "id": "27182",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.006143][f=0010150]",
+      "frame": "10150",
+      "id": "30821",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.014659][f=0010152]",
+      "frame": "10152",
+      "id": "10131",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.059063][f=0010163]",
+      "frame": "10163",
+      "id": "18895",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.106006][f=0010174]",
+      "frame": "10174",
+      "id": "92",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.110994][f=0010175]",
+      "frame": "10175",
+      "id": "28234",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.193804][f=0010195]",
+      "frame": "10195",
+      "id": "18699",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.402306][f=0010245]",
+      "frame": "10245",
+      "id": "13819",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.585509][f=0010289]",
+      "frame": "10289",
+      "id": "2203",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:19.720546][f=0010321]",
+      "frame": "10321",
+      "id": "2415",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:20.784380][f=0010577]",
+      "frame": "10577",
+      "id": "28687",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:20.964480][f=0010620]",
+      "frame": "10620",
+      "id": "3536",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:21.235269][f=0010685]",
+      "frame": "10685",
+      "id": "1145",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:21.418963][f=0010729]",
+      "frame": "10729",
+      "id": "31031",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.037598,
+      "ai_all_p95_ms": 0.591797,
+      "ai_all_max_ms": 53.936035,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 1.941406,
+      "ai_all_mean_ms": 0.264385
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.033203,
+      "ai_all_p95_ms": 0.786133,
+      "ai_all_max_ms": 5.575195,
+      "sim_speed": 7.511,
+      "ai_all_p99_ms": 2.584473,
+      "ai_all_mean_ms": 0.183795
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.032471,
+      "ai_all_p95_ms": 0.795654,
+      "ai_all_max_ms": 6.21167,
+      "sim_speed": 7.511,
+      "ai_all_p99_ms": 2.740723,
+      "ai_all_mean_ms": 0.202773
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.055176,
+      "ai_all_p95_ms": 0.952881,
+      "ai_all_max_ms": 7.072754,
+      "sim_speed": 8.0,
+      "ai_all_p99_ms": 2.966064,
+      "ai_all_mean_ms": 0.267089
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.137695,
+      "ai_all_p95_ms": 0.980225,
+      "ai_all_max_ms": 6.079834,
+      "sim_speed": 7.995,
+      "ai_all_p99_ms": 3.078369,
+      "ai_all_mean_ms": 0.305593
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.323242,
+      "ai_all_p95_ms": 1.186035,
+      "ai_all_max_ms": 8.074219,
+      "sim_speed": 8.001,
+      "ai_all_p99_ms": 3.589355,
+      "ai_all_mean_ms": 0.418305
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

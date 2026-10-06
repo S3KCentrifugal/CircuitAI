@@ -925,6 +925,16 @@ lane-side teeth and, after advanced construction access, a second wall line
 and owned geo/advanced-mex perimeters with access gaps. See
 [design](../air-tech-expansion-plan.md).
 
+## D-214 land siege response
+
+D-214 keeps TECH's existing production rules intact. Its start caps disable
+T2 vehicle factories and general T2 combat; only the named rush/amphibious
+products are deliberately released later. The FRONT siege response does not
+lift these restrictions or replace TECH's batches. The attempted supplied
+TECH production test demonstrated that a hook alone cannot enable capped
+products. See the
+[design and supplied-game evidence](../reviews/2026-10-06-land-siege-response.md).
+
 ## D-158 amphibious units
 
 `Tech_FactoryAiMakeTask` offers a bounded `AmphibiousOps::Produce` wave from an
@@ -958,3 +968,13 @@ duplicate coverage. See [implementation and tests](../telchine-beachhead-results
 D-161 gives Telchines land-first, footprint-checked routes and distinct dry
 shore perimeter or land assault slots. Marauder travel and TECH's exact lab
 cycle stay unchanged. See the [formation plan](../telchine-perimeter-plan.md).
+
+
+### D-216: shared pressure production
+
+TECH keeps its opening T1 reclaim and advanced-lab-before-T1-rebuild sequence.
+Retirement now cancels only real work, never the shared idle task. Once funded,
+the shared spam controller can request reserved forward clusters without the
+unrelated +200 income/air-constructor-release gates. Repeat recruitment owns
+the queue; the old repeat-off workaround is removed. Heavy combat retains its
+separate gate. See [policy and verification](../reviews/2026-10-06-spam-and-fatboy.md).

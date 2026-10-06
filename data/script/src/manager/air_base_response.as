@@ -3,9 +3,9 @@
 
 // AIR's immediate reserve: shared tasks and target identities, no per-frame orders.
 namespace AirBaseResponse {
-    array<CRouteTask@> groups(3);
-    array<int> targets(3, -1);
-    array<AIFloat3> aims(3);
+    array<CRouteTask@> groups(4);
+    array<int> targets(4, -1);
+    array<AIFloat3> aims(4);
     dictionary members;
     int updated = -100000, lastSeen = -100000;
     bool contact = false;
@@ -33,6 +33,7 @@ namespace AirBaseResponse {
     int Kind(const CCircuitDef@ d) {
         if (AirScreen::IsFighter(d)) return 2;
         if (!d.HasSurfToLand()) return -1;
+        if (d.GetTargetMinCost() > 0) return 3; // JSON-opted fortress, separate from cheap gunships
         return AirWaves::IsWaveBomber(d) ? 1 : 0;
     }
     bool Heavy(const CCircuitDef@ d) {
@@ -63,15 +64,15 @@ namespace AirBaseResponse {
     }
     void Reset() {
         contact = false;
-        for (int i = 0; i < 3; ++i) ClearGroup(i);
+        for (int i = 0; i < 4; ++i) ClearGroup(i);
         members.deleteAll(); updated = -100000; lastSeen = -100000;
     }
     void Tick() {
         if (!Active() || ai.frame-updated < SECOND) return;
         updated = ai.frame;
         AirHome::Refresh(); AirOperations::InitHeavyRoster();
-        array<int> selected(2, -1);
-        array<float> scores(2, -1.0f);
+        array<int> selected(3, -1);
+        array<float> scores(3, -1.0f);
         const int contacts = aiBattle.GetGroundContactCount();
         for (int i = 0; i < contacts; ++i) {
             const AIFloat3 p = aiBattle.GetGroundContactPos(i);
@@ -81,10 +82,16 @@ namespace AirBaseResponse {
             const int id = aiBattle.GetGroundContactId(i);
             const float score = (d.HasSurfToLand() || d.HasSurfToAir() ? 100000.0f : 0.0f)
                 + (d.GetBuildSpeed() > 0 ? 50000.0f : 0.0f) + d.costM;
-            for (int k = 0; k < 2; ++k) {
+            for (int k = 0; k < 3; ++k) {
                 if (!AirMath::DefensiveBomberTarget(k == 1, d.IsMobile(), Heavy(d))) continue;
                 // Stable targets avoid churning orders as a formation moves.
-                const float rank = score + (targets[k] == id ? 25000.0f : 0.0f);
+                // Fortress guns must not be held on a cheap raider by the
+                // ordinary gunship group's 25k retention bonus. Value/AA and a
+                // proportional 15% hysteresis permit immediate heavy response.
+                const float rank = k == 2
+                    ? d.costM * (d.IsRoleAny(Unit::Role::AA.mask | Unit::Role::COMM.mask) ? 2.0f : 1.0f)
+                        * (targets[3] == id ? 1.15f : 1.0f)
+                    : score + (targets[k] == id ? 25000.0f : 0.0f);
                 if (rank > scores[k]) { scores[k] = rank; selected[k] = i; }
             }
         }
@@ -93,12 +100,12 @@ namespace AirBaseResponse {
         if (contact) lastSeen = ai.frame;
         if (contact != previous) GenericHelpers::LogUtil("[AIR][BaseResponse] contact=" + contact, 1);
         if (!contact && ai.frame-lastSeen >= AiMax(1, Global::RoleSettings::Air::BaseResponseSearchSeconds)*SECOND) {
-            for (int k = 0; k < 3; ++k) ClearGroup(k);
+            for (int k = 0; k < 4; ++k) ClearGroup(k);
             members.deleteAll(); return;
         }
-        for (int k = 0; k < 3; ++k) {
+        for (int k = 0; k < 4; ++k) {
             if (k == 2 && AirScreen::IntrusionCost() > 0) { ClearGroup(k); continue; }
-            const int index = selected[k == 2 ? 0 : k];
+            const int index = selected[k == 2 ? 0 : (k == 3 ? 2 : k)];
             const int next = index < 0 ? -1 : aiBattle.GetGroundContactId(index);
             if (index >= 0) aims[k] = aiBattle.GetGroundContactPos(index);
             if (k == 1 && contact && index < 0) { ClearGroup(k); continue; }
@@ -120,8 +127,9 @@ namespace AirBaseResponse {
         array<string>@ enrolled = members.getKeys();
         for (uint i = 0; i < enrolled.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(enrolled[i])); int k = -1;
-            if (!members.get(enrolled[i], k) || k < 0 || k >= 3 || u is null || u.task !is groups[k]) members.delete(enrolled[i]);
+            if (!members.get(enrolled[i], k) || k < 0 || k >= 4 || u is null || u.task !is groups[k]) members.delete(enrolled[i]);
             else if (!Free(u)) Invariants::Violation("INV-140", enrolled[i], "protected aircraft acquired by base response");
+            else if (Kind(u.circuitDef) != k) Invariants::Violation("INV-156", enrolled[i], "base defense target policy differs from aircraft group");
         }
         if (!contact) return;
         array<Id>@ ids = ai.GetOwnedUnitIds();

@@ -1,0 +1,22 @@
+{
+  "schema": 3,
+  "case": "land-siege-cortex",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-cortex\\glitters\\20261006T051648Z-283140fa",
+  "minutes": 5,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 9450,
+  "produced": {
+    "corvrad": 7,
+    "coracv": 10,
+    "correap": 12,
+    "corvroc": 5,
+    "corban": 6
+  },
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [],
+  "passed": true,
+  "failures": []
+}

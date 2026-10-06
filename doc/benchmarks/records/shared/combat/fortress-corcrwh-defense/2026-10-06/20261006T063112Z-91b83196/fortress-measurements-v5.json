@@ -1,0 +1,134 @@
+{
+  "case": "fortress-corcrwh-defense",
+  "variant": "ranged",
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-corcrwh-defense\\glitters\\20261006T063008Z-b4b88058",
+  "window_seconds": 120,
+  "damage_by_target_and_weapon": {
+    "armflea:weapon=422": 829.0,
+    "armflea:weapon=420": 18.0,
+    "corgol:weapon=422": 10233.0,
+    "corgol:weapon=420": 4918.0,
+    "corcrwh:weapon=420": 42.0
+  },
+  "first_damage_seconds": {
+    "armflea": 12.633333333333333,
+    "corgol": 15.366666666666667,
+    "corcrwh": 28.166666666666668
+  },
+  "priority_commands": {},
+  "active_priority_samples": {
+    "none": 44
+  },
+  "sampled_shot_targets": {
+    "1:none": 3,
+    "3:armflea": 4,
+    "4:armflea": 4,
+    "5:none": 6,
+    "6:none": 7,
+    "1:armflea": 3,
+    "3:none": 4,
+    "4:none": 3,
+    "6:armflea": 2,
+    "5:armflea": 1,
+    "3:corgol": 28,
+    "4:corgol": 30,
+    "5:corgol": 27,
+    "6:corgol": 27,
+    "1:corgol": 20
+  },
+  "damage_first_30_seconds": {
+    "armflea:weapon=422": 829.0,
+    "armflea:weapon=420": 18.0,
+    "corgol:weapon=422": 9102.0,
+    "corgol:weapon=420": 4315.0,
+    "corcrwh:weapon=420": 42.0
+  },
+  "deaths": [
+    {
+      "seconds": 12.666666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 12.733333333333333,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 12.9,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.0,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.566666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.833333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 13.866666666666667,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.7,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 14.833333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.0,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 15.666666666666666,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 16.233333333333334,
+      "unit": "armflea",
+      "team": 1
+    },
+    {
+      "seconds": 23.533333333333335,
+      "unit": "corgol",
+      "team": 1
+    },
+    {
+      "seconds": 31.833333333333332,
+      "unit": "corgol",
+      "team": 1
+    }
+  ],
+  "first_active_priority": null,
+  "criteria": {
+    "enemy_damage": true,
+    "survival": true,
+    "heavy_damage": true,
+    "defense_heavy_assignment": true
+  },
+  "defense_group_targets": [
+    "armflea",
+    "corgol",
+    "corgol",
+    "none"
+  ],
+  "first_defense_assignment": "corgol",
+  "enemy_damage": 15998.0,
+  "passed": true
+}

@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "43ee7615b9eafea64c6ed2a0bd9e35049218fd26520c00995d0a01eb60cd05fd",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "fortress-measurements-v2.json": "d1903a78646ff4c5d460cbb1dac3eba3471574993797c4084c2cfbbd35780df1",
+    "fortress-measurements-v5.json": "2549a123626a7e49a5428729a6b6d79c356dffed0725e8a6e1dcd5182691c92c",
+    "launched.json": "7f2475494ab3b94a19ecacce30a01b5df08e88868c7ba5b780a907cca4571638",
+    "ranged-arena-pins.json": "152fa8631ba5f652e1a8bfb75b92b0355924871781d2ee4ac7397aad8794c828",
+    "ranged-arena.json": "fc9018984622c9dfec7ec2944cf0d9bb5d1e77a58389a07d5b6f0005b8a73a47",
+    "report.md": "1e12cdb802002474ad275063f96ba8f887f03da88d944254fa7e755fcbd1bc0b",
+    "result.json": "8fcbd767d2d46c1fa0443c483efeae18306bb14f8aaec4489a332291cd1ae6d9",
+    "run-inputs.json": "716eb87c4f9a9ef2764f480d3e7c0f562ffe17e8b2ad911924822278c3f27a7d",
+    "run-plan.json": "1bea05b90596f4570b04b6325a82bfd542a7a4458ef857b974900b0fa22f0a92",
+    "screen_2026-10-06_06-23-27-875.png": "7da41b53a2d972c8105a1f3cbd6123059d702af0cbb4a1255948fdbc61db2384",
+    "script.txt": "ce543392cb5dd918829572f66dca59a577b9f2410fcd2b60b4fc4f9740337885",
+    "staged.json": "6fd875236c00c4a98eeb600e5ed8778576800fafa81e54dc9007c87821cb8945",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "99b95035e5e56357a76da25fbf38e8202bc0be7c17cd2c8129d4f12d27c1341a"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fortress-corcrwh-screen\\glitters\\20261006T062241Z-1dc5116a\\runs\\20261006T062346Z-eb7043ed",
+  "schema": 1
+}

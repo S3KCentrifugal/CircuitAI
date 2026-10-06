@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "beb0ed6cdc08b189bc6ccb7f82fed4655bb1446be5f3ed01cdad7559a354cb8e",
+    "checks.json": "8affa8099bf9baa0092d65ed028b5462e7975f93ec5ecdd2079008b21a53bdbd",
+    "fixture.json": "af440ea6840c3d6fbf3c4655e14b4d723b38cc9c2f79cafc9cc681aef10ce610",
+    "launched.json": "3539bf238a512502aa2b58e8f3349afbcdb3412a552951f12e389017799320c0",
+    "report.md": "eecd90e6c9c8602dbcce1721cf29cd0da7285923eaab2040eae3fe8f463e6aac",
+    "result.json": "a678fd03c05d92b8e7e3bd6f27fcc8b34b5df6871d18130e53599c9e640e4532",
+    "run-inputs.json": "98ffdcc18d794fbcf4d5ff75790e347647146aea6b0a95b8379c8665abb2a1d9",
+    "run-plan.json": "532a5a1d6b537a17a49411a18f1bdef9b0cce8a8963241f679bea04a74fa1e7d",
+    "screen_2026-10-06_13-30-25-934.png": "28ab0f0c14bc3c735fd832ee3dad7c8be5ebe65465772110a8ec7af84f2e2d68",
+    "script.txt": "0c554bed955ea704ddce1a7d572a8cf02dbe1343b1ee1db1bae0c8f568fbba90",
+    "staged.json": "35c33982d6cf127049dafdeb26e6de9461afa1a114993ccbbea170115c4389e5",
+    "teams.json": "b765c41de650dece325b63fe42a94b6d0311eb8cb3518ba62428d178a03acb60"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\economy\\recovery-walk-lua\\glacial\\20261006T132910Z-fd4a8122\\runs\\20261006T133100Z-f1a7ba8e",
+  "schema": 1
+}

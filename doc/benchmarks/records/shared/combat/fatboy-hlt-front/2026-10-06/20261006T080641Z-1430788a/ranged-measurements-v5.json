@@ -1,0 +1,117 @@
+{
+  "schema": 5,
+  "case": "fatboy-hlt-front",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fatboy-hlt-front\\glitters\\20261006T080535Z-2183c945",
+  "measurement_deadline_frame": 5400,
+  "first_damage_seconds": 91.63333333333334,
+  "raw_damage_including_overkill": 6930,
+  "shooters_fired": 4,
+  "shots": 8,
+  "enemy_kills": 3,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 890.0,
+  "nonlua_commands": 533,
+  "commands_per_game_minute": 177.66666666666666,
+  "command_window_frame": 5400,
+  "last_observed_frame": 5700,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfboy"
+  ],
+  "minimum_sampled_spacing_after_60s": 55.362442142665635,
+  "render_fps_after_60s": [
+    63.0,
+    52.0,
+    244.0,
+    291.0,
+    212.0,
+    203.0,
+    232.0,
+    233.0,
+    283.0,
+    281.0,
+    322.0,
+    200.0,
+    187.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 5,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:48.715983][f=0002956]",
+      "frame": "2956",
+      "id": "20443",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:49.563770][f=0003148]",
+      "frame": "3148",
+      "id": "30293",
+      "team": "1",
+      "unit": "armstump",
+      "cost": "225"
+    },
+    {
+      "t": "00:00:49.624502][f=0003162]",
+      "frame": "3162",
+      "id": "14646",
+      "team": "1",
+      "unit": "armstump",
+      "cost": "225"
+    },
+    {
+      "t": "00:00:49.947561][f=0003240]",
+      "frame": "3240",
+      "id": "25497",
+      "team": "0",
+      "unit": "armarad",
+      "cost": "400"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.036621,
+      "ai_all_p95_ms": 0.132477,
+      "ai_all_max_ms": 1.664398,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.479218,
+      "ai_all_mean_ms": 0.058827
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.04068,
+      "ai_all_p95_ms": 0.14801,
+      "ai_all_max_ms": 1.860016,
+      "sim_speed": 7.468,
+      "ai_all_p99_ms": 0.510406,
+      "ai_all_mean_ms": 0.065392
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.052612,
+      "ai_all_p95_ms": 0.188904,
+      "ai_all_max_ms": 2.032837,
+      "sim_speed": 7.511,
+      "ai_all_p99_ms": 0.51825,
+      "ai_all_mean_ms": 0.081194
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

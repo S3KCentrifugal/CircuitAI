@@ -1,0 +1,356 @@
+{
+  "schema": 5,
+  "case": "spam-build-front",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\spam-build-front\\glitters\\20261006T080050Z-028e1243",
+  "measurement_deadline_frame": 10800,
+  "first_damage_seconds": null,
+  "raw_damage_including_overkill": 0,
+  "shooters_fired": 9,
+  "shots": 14,
+  "enemy_kills": 3,
+  "friendly_losses": 11,
+  "enemy_metal_destroyed": 510.0,
+  "nonlua_commands": 10076,
+  "commands_per_game_minute": 1679.3333333333333,
+  "command_window_frame": 10800,
+  "last_observed_frame": 11130,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfido",
+    "armsnipe"
+  ],
+  "minimum_sampled_spacing_after_60s": 11.0,
+  "render_fps_after_60s": [
+    59.0,
+    52.0,
+    281.0,
+    276.0,
+    245.0,
+    203.0,
+    240.0,
+    236.0,
+    229.0,
+    245.0,
+    211.0,
+    172.0,
+    204.0,
+    212.0,
+    185.0,
+    179.0,
+    205.0,
+    212.0,
+    187.0,
+    230.0,
+    230.0,
+    224.0,
+    210.0,
+    158.0,
+    198.0,
+    174.0,
+    202.0,
+    193.0,
+    206.0,
+    228.0,
+    203.0
+  ],
+  "cloaked_units_observed": 5,
+  "carrier_children_observed": 147,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:51.989465][f=0003329]",
+      "frame": "3329",
+      "id": "14262",
+      "team": "0",
+      "unit": "armmex",
+      "cost": "50"
+    },
+    {
+      "t": "00:00:58.628688][f=0004803]",
+      "frame": "4803",
+      "id": "7059",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:58.937353][f=0004879]",
+      "frame": "4879",
+      "id": "23479",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:58.995852][f=0004893]",
+      "frame": "4893",
+      "id": "9898",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:59.127394][f=0004924]",
+      "frame": "4924",
+      "id": "27839",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:59.169940][f=0004935]",
+      "frame": "4935",
+      "id": "3624",
+      "team": "0",
+      "unit": "armmex",
+      "cost": "50"
+    },
+    {
+      "t": "00:00:59.400012][f=0004990]",
+      "frame": "4990",
+      "id": "23452",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:59.729628][f=0005069]",
+      "frame": "5069",
+      "id": "7961",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:02.253867][f=0005675]",
+      "frame": "5675",
+      "id": "21205",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:03.406670][f=0005952]",
+      "frame": "5952",
+      "id": "20401",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:04.028069][f=0006101]",
+      "frame": "6101",
+      "id": "3744",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:10.854332][f=0007739]",
+      "frame": "7739",
+      "id": "17430",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:01:12.954676][f=0008243]",
+      "frame": "8243",
+      "id": "8355",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:01:13.214493][f=0008305]",
+      "frame": "8305",
+      "id": "28759",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:13.531862][f=0008381]",
+      "frame": "8381",
+      "id": "18699",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:14.140472][f=0008527]",
+      "frame": "8527",
+      "id": "11528",
+      "team": "0",
+      "unit": "armflash",
+      "cost": "110"
+    },
+    {
+      "t": "00:01:16.066453][f=0008990]",
+      "frame": "8990",
+      "id": "11141",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:16.204712][f=0009023]",
+      "frame": "9023",
+      "id": "12424",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.099669][f=0009477]",
+      "frame": "9477",
+      "id": "2415",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.100146][f=0009477]",
+      "frame": "9477",
+      "id": "14242",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.100483][f=0009477]",
+      "frame": "9477",
+      "id": "30821",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.100805][f=0009477]",
+      "frame": "9477",
+      "id": "25277",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.101101][f=0009477]",
+      "frame": "9477",
+      "id": "28234",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.101382][f=0009477]",
+      "frame": "9477",
+      "id": "19176",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.101673][f=0009477]",
+      "frame": "9477",
+      "id": "6555",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.101959][f=0009477]",
+      "frame": "9477",
+      "id": "17037",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    },
+    {
+      "t": "00:01:18.102243][f=0009477]",
+      "frame": "9477",
+      "id": "7074",
+      "team": "0",
+      "unit": "armpw",
+      "cost": "54"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.041382,
+      "ai_all_p95_ms": 0.409668,
+      "ai_all_max_ms": 7.27417,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.89978,
+      "ai_all_mean_ms": 0.110086
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.064941,
+      "ai_all_p95_ms": 0.532959,
+      "ai_all_max_ms": 1.751465,
+      "sim_speed": 7.518,
+      "ai_all_p99_ms": 0.997559,
+      "ai_all_mean_ms": 0.140659
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.083984,
+      "ai_all_p95_ms": 0.519043,
+      "ai_all_max_ms": 2.066895,
+      "sim_speed": 7.51,
+      "ai_all_p99_ms": 0.904053,
+      "ai_all_mean_ms": 0.151632
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.125977,
+      "ai_all_p95_ms": 0.546143,
+      "ai_all_max_ms": 1.986572,
+      "sim_speed": 7.998,
+      "ai_all_p99_ms": 0.97583,
+      "ai_all_mean_ms": 0.182715
+    },
+    {
+      "t": 0.0,
+      "f": 9000.0,
+      "frame": 9000.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.133301,
+      "ai_all_p95_ms": 0.562012,
+      "ai_all_max_ms": 2.159424,
+      "sim_speed": 7.998,
+      "ai_all_p99_ms": 1.001221,
+      "ai_all_mean_ms": 0.186119
+    },
+    {
+      "t": 0.0,
+      "f": 10800.0,
+      "frame": 10800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.137451,
+      "ai_all_p95_ms": 0.616211,
+      "ai_all_max_ms": 2.468262,
+      "sim_speed": 8.001,
+      "ai_all_p99_ms": 1.13916,
+      "ai_all_mean_ms": 0.19786
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

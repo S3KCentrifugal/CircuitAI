@@ -1,0 +1,20 @@
+{
+  "files": {
+    "README.md": "83a9d20428c404345ef65a1fd697ebdb26c8d1ada975c9426c3c3a0639e741cb",
+    "checks.json": "24b85c16948ed018bee387dae05b1902ee28f3f3e907c41faf9505a9641041e1",
+    "fixture.json": "889acd0204ee4e85b6f852fc2569c06789ee27ba9c3be9f71b891fce53fb38d5",
+    "launched.json": "538b3f08803998799dda790665a939c1d327027e0e4f3a8209c94c7d6c305ef7",
+    "recovery-checks.json": "24b85c16948ed018bee387dae05b1902ee28f3f3e907c41faf9505a9641041e1",
+    "report.md": "147f6dae308cf687586ae58b9c7b3634264f934439a170f220bd0c37700f5e0e",
+    "result.json": "81f01ef67214834b88da3ae4dc3c51d67b04d43a8725147fa15c1a59ef45fca5",
+    "run-inputs.json": "fd04a3b7a92e18f458b0b36fc25cd3989b84f6dfe395d64f4917bd2be1a1ccfe",
+    "run-plan.json": "7fbc42aba0ae5910087f7cec390b4042754d47eb7246b97ecede3052d30cd775",
+    "screen_2026-10-06_13-44-51-061.png": "40f2d6ebedc41157d6b5a3bffa3c49a7c48def1eaaa14e3499f5fd477f5a863b",
+    "script.txt": "4452a6148cd4b91e9d3a20ad72bed0e53d471b33310625ef14941db1d781ebfb",
+    "staged.json": "13068d9a188d702fbaa7167e1b8648ab327f56a2cd0983e69f7eb64e17a304b6",
+    "teams.json": "b765c41de650dece325b63fe42a94b6d0311eb8cb3518ba62428d178a03acb60"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\economy\\recovery-walk-native\\glacial\\20261006T134334Z-39e86863\\runs\\20261006T134649Z-eea9988f",
+  "schema": 1
+}

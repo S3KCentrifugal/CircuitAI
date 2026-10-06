@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "11791c064edd1a9a80b877f60bcaf42c7ec00242e0200d0197c3690acd1f9e05",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "deployment-measurements-v1.json": "b5a00edc00bbc203b1cdb824520f8848a774c244035f6c3f4c1aff513132692d",
+    "launched.json": "a07e5f44c623013092e1930c4f147dc10fc111ebf49d49c96524fcd8f14019f1",
+    "ranged-arena-pins.json": "486a374b7e9485c52c7e4012e3670b79d474c94ce350cb0938ac98dff2eb8a78",
+    "ranged-arena.json": "f4af1ed121356269aef5db14b8e01553c220e73a45767a2725bc31a11c3bc6fc",
+    "ranged-measurements-v5.json": "ffaa727c29ec8de93e3726e84d342d96cfb318ac73b0d0389251708254fed0d2",
+    "report.md": "e7e9417c79b5606c4c2a11a1015bdc6ecaaa72bd048271e51f6a89e459ed721f",
+    "result.json": "7fb4c11b4301152e448cf86e9995b5fc6162106a711bd5f587fb319eb1ddb275",
+    "run-inputs.json": "9385dc63201b0b4abe5656639bceea22ea4a98e37e6d5c8a3e9b91c78e65c4e1",
+    "run-plan.json": "1134d7226afd3c8b5cb3681de383c9ade306892a51d63e193145a928ca03ca26",
+    "screen_2026-10-06_08-06-35-797.png": "31f15bf0dbc494117eaffbee54105257c32ba1ddff26e0ca8aa12f87f71abc45",
+    "script.txt": "5f40a014fade107ea7a9ec57b58a989a856b2e5327fb6e5adbf49e404e79036c",
+    "staged.json": "7f7f493571c2354e2c1b24009e1fbcf2e6f4f4e1d07a4ffc4872fdbb442308ad",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "9f089a5bd7a370205239ed0079f565391c907d1b2ff0014f49b81d8812e304c8"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\fatboy-hlt-front\\glitters\\20261006T080535Z-2183c945\\runs\\20261006T080641Z-1430788a",
+  "schema": 1
+}

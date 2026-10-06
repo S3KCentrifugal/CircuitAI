@@ -532,7 +532,8 @@ namespace TechBuild {
         CCircuitUnit@ tlab = Factory::primaryT1BotLab;
         // D-102: not once the economy is online (reclaiming a lab for metal is pointless late)
         if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab) && !EcoOnline()) {
-            if (tlab.task !is null) aiFactoryMgr.AbortTask(tlab.task);   // native's recruit task would re-issue the build on idle
+            if (tlab.task !is null && (tlab.task.GetType() == int(Task::Type::FACTORY)
+                || tlab.task.GetType() == int(Task::Type::WAIT))) aiFactoryMgr.AbortTask(tlab.task); // never abort a shared idle state
             Lifecycle::Retire(tlab, "the advanced lab is under way; the throwaway T1 lab is reclaimed (D-066)");
         }
         // D-078 (owner's rule): the advanced lab retires the moment an advanced
@@ -547,7 +548,8 @@ namespace TechBuild {
             }
             const bool due = (t2 !is null) && AfusUnderWay() && BankHasRoomFor(t2, 2500.0f) && !EcoOnline() && !funded;   // D-102, D-105
             if (due && !Lifecycle::IsRetiring(t2)) {
-                if (t2.task !is null) aiFactoryMgr.AbortTask(t2.task);
+                if (t2.task !is null && (t2.task.GetType() == int(Task::Type::FACTORY)
+                    || t2.task.GetType() == int(Task::Type::WAIT))) aiFactoryMgr.AbortTask(t2.task);
                 Lifecycle::Retire(t2, "an advanced fusion is under construction and the bank has room for the lab's metal (D-078)");
             }
             // INV-007: it never stays active while that holds

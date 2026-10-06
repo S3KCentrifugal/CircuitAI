@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "8d83478adedd1a98e076170ac0d2bcf6d98a7fdf5c3ec1b183cd22b88795a7c8",
+    "checks.json": "8affa8099bf9baa0092d65ed028b5462e7975f93ec5ecdd2079008b21a53bdbd",
+    "fixture.json": "bfe95077bf5e1e71cbb56a510706a6ad62abe391777bc01e2920ca12062b22e5",
+    "launched.json": "e07141cec15d0a156ca0767469edd229b8442306358458753db622e2d933af8e",
+    "report.md": "a9d7af860817de70cd87d3231d361a545681a91af5ca72c24d995fa578243bf6",
+    "result.json": "a0d79aa745f0230036970a0fb8ee14ef30a48b7ae84b75e57ef3f29ec8854989",
+    "run-inputs.json": "0eba2b72c6e2723c2285d8828c4aa2fdf8e04fabc9a3be36b41ade43f7642b13",
+    "run-plan.json": "2985c6dacbd4fe891f817876af298fac8aa862303cb7a554d9c9254cbfa7c05b",
+    "screen_2026-10-06_13-38-12-186.png": "a35520dc0d85145a00916b0fd405256fbdec8977f3cc4b56d3d2f899366a199d",
+    "script.txt": "d835c4c73c3cc926c03c13deee7327b5b6d9931ff3fa5403ad9379b2efc5d64e",
+    "staged.json": "c98470e09f6571f7b25277801792a552ac5dbaa942e4c5db090758946b2b92b7",
+    "teams.json": "b765c41de650dece325b63fe42a94b6d0311eb8cb3518ba62428d178a03acb60"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\economy\\recovery-ferry-lua\\glacial\\20261006T133656Z-e750c6c0\\runs\\20261006T134052Z-f79cbca8",
+  "schema": 1
+}

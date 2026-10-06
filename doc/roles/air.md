@@ -809,3 +809,10 @@ AFUS/support-bank separation, independent factory campus, and T1 economy
 spacing are unchanged. Native snapped positions are checked by INV-136 at
 reservation time. See the [compact economy plan](../dense-economy-plan.md)
 and [physical verification](../dense-economy-results.md).
+
+Dragon and Tyrannus opt into `target_min_cost` in behavior JSON (D-215).
+Ordinary native squads favor eligible nearby valuable targets, retaining cheap
+fallback. AIR base defense places these aircraft in a separate group with
+cost-weighted, proportional target retention, so a cheap raider cannot keep
+their guns off an expensive attacker. The former gunship/bomber/fighter groups
+and production policy remain intact. See [design and evidence](../reviews/2026-10-06-fortress-targeting.md).

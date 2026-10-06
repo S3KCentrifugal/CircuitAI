@@ -1,0 +1,29 @@
+{
+  "schema": 3,
+  "case": "land-siege-cortex",
+  "directory": "build-theatres\\games\\shared\\combat\\land-siege-cortex\\glitters\\20261006T052138Z-730aff64",
+  "minutes": 5,
+  "watch_verdict": "PASS",
+  "errors": [],
+  "observed_frame": 9450,
+  "produced": {
+    "corvrad": 3,
+    "coracv": 8,
+    "corvroc": 2,
+    "cortrem": 2,
+    "corban": 4,
+    "correap": 9,
+    "corgol": 4
+  },
+  "damaging_primary_units": 0,
+  "primary_damage_including_overkill": 0,
+  "deaths": [],
+  "siege_choices": [
+    "[t=00:00:38.854931][f=0000929] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:929:L::[LandSiege] factory=coravp unit=corvroc static=4840 budget=2922 committed=0 income=126",
+    "[t=00:00:39.302766][f=0001037] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1037:L::[LandSiege] factory=coravp unit=cortrem static=4840 budget=2922 committed=880 income=126",
+    "[t=00:00:42.353683][f=0001769] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:1769:L::[LandSiege] factory=coravp unit=corvroc static=4840 budget=3878 committed=2730 income=126",
+    "[t=00:01:01.995534][f=0006217] Skirmish AI <BARb playtest-test>: :::AI LOG:S:0:T:0:F:6217:L::[LandSiege] factory=coravp unit=cortrem static=4840 budget=5626 committed=3610 income=71"
+  ],
+  "passed": true,
+  "failures": []
+}

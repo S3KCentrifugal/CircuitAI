@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "strategy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "coast-retake-cortex"
+  },
+  "id": "20261006T150535Z-1dda3af0",
+  "requested": {
+    "seed": 219001
+  },
+  "schema": 1
+}

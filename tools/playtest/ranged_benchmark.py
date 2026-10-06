@@ -161,6 +161,21 @@ def main():
             result = summarize(directory)
             print('MEASUREMENTS='+json.dumps(result), flush=True)
             failures += bool(code or not result['passed'])
+            # Reaching the observation deadline is not proof of production.
+            # Keep the original combat/watch result immutable, and require the
+            # separate completed-unit/queue analysis for production scenarios.
+            cfg = json.loads((directory/'ranged-arena.json').read_text())
+            if cfg.get('production_assertions'):
+                analysis = subprocess.run([sys.executable, str(HERE/'land_siege_report.py'), str(directory)])
+                failures += bool(analysis.returncode)
+            if cfg.get('trace_spam'):
+                analysis = subprocess.run([sys.executable, str(HERE/'spam_report.py'), str(directory)])
+                failures += bool(analysis.returncode)
+            if cfg.get('deployment_assertions'):
+                criteria = cfg['deployment_assertions']
+                analysis = subprocess.run([sys.executable, str(HERE/'deployment_report.py'), str(directory),
+                    '--seconds', str(criteria['seconds']), '--minimum', str(criteria['minimum'])])
+                failures += bool(analysis.returncode)
         else: failures += 1
     return bool(failures)
 

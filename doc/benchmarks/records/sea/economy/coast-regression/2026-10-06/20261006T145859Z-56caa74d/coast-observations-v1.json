@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "original_id": "20261006T145859Z-56caa74d",
+  "original_verdict": "FAIL",
+  "log_sha256": "221eb8d838e3b99d82c962450959015bd78992f6bc9d98a191ea75a1da86fb15",
+  "last_frame": 18014,
+  "fallback_transitions": [],
+  "completed": {},
+  "first_completion_frame": {},
+  "coastal_build_orders": {},
+  "first_observed_invader_damage_frame": null,
+  "invariants": [
+    "[t=00:00:55.799698][f=0003760] Skirmish AI <BARb playtest-test>: :::AI LOG:S:9:T:9:F:3760:L::[INVARIANT] INV-013 the main turret cluster has had no forward cluster planned for 120 s",
+    "[t=00:01:05.500092][f=0007472] Skirmish AI <BARb playtest-test>: :::AI LOG:S:1:T:1:F:7472:L::[INVARIANT] INV-019 2 turret frames under construction, 1 allowed (build power 840 (3 by power), bank 0 + 12/s (0 by metal))",
+    "[t=00:01:11.740816][f=0009272] Skirmish AI <BARb playtest-test>: :::AI LOG:S:1:T:1:F:9272:L::[INVARIANT] INV-019 2 turret frames under construction, 1 allowed (build power 840 (3 by power), bank 0 + 12/s (0 by metal))",
+    "[t=00:01:15.964616][f=0010480] Skirmish AI <BARb playtest-test>: :::AI LOG:S:9:T:9:F:10480:L::[INVARIANT] INV-029 legalab 614 stands 3 cells from the turrets, not tight"
+  ],
+  "limits": "Fixture completion counts include supplied seed assets; damage is not proof of invasion defeat. This supplements and never replaces the original check verdict."
+}

@@ -2119,6 +2119,8 @@ namespace Builder {
 	}
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u) {
+		if (Team::Recovery::IsGift(u.id) && !Team::Ferry::IsGift(u.id))
+			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
 		IUnitTask@ t = null;
 		GenericHelpers::LogUtil("[BUILDER] AiMakeTask called for builder id=" + u.id, 4);
 		// Finish what you started (D-050). Native re-evaluates a builder's task
@@ -2154,7 +2156,9 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		if (MetalEconomy::Active() && !SeaLayout::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
+		@t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
+		if (t is null) @t = Spam::BuilderMakeTask(u);
+		if (t is null && MetalEconomy::Active() && !SeaLayout::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
 			&& !UnitHelpers::IsCommander(u.circuitDef) && u.circuitDef.IsMobile()) @t = MetalEconomy::EconomyTask(u);
 		if (t is null && cfg !is null && cfg.BuilderAiMakeTaskHandler !is null) {
 			@t = cfg.BuilderAiMakeTaskHandler(u);
@@ -2509,6 +2513,8 @@ namespace Builder {
 		GenericHelpers::LogUtil("[BUILDER] Enter AiUnitAdded", 4);
 		if (unit is null) return;
 
+		if (Team::Recovery::OnUnitAdded(unit)) return;
+
 		// Role-independent, like the mex bookkeeping in AiTaskAdded: SEA counts
 		// its construction ships here, TACTICAL unlocks its shipyard caps the
 		// moment it owns one. Each branch checks its own AiRole.
@@ -2540,9 +2546,6 @@ namespace Builder {
 		// Handle constructor-specific registration
 		int ctorTier = UnitHelpers::GetConstructorTier(cdef);
 		string uname = (cdef is null ? "" : cdef.GetName());
-		if (ctorTier == 1 || uname == "legnavyconship") {
-			Team::RegisterT1Constructor(unit);   // orphan-rescue donor pool
-		}
 		int ctorCat = 0; // 1=bot, 2=veh, 3=air, 4=sea, 5=hover
 
 		// TODO: Consider moving constructor category/tier detection into UnitHelpers
@@ -2901,7 +2904,7 @@ namespace Builder {
 		ClearBuilderTaskByUnit(unit);
 		// Also clear any tracked pending task for this unit
 		ClearTrackByBuilder(unit);
-		Team::UnregisterT1Constructor(unit);
+		Team::Recovery::OnUnitRemoved(unit);
 
 		// Clear tracked references
 		if (Builder::commander is unit)                 {

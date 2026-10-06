@@ -59,6 +59,15 @@ Generated source inventory. Execution is not inferred.
 - `forbid: invariant`
 - `forbid: script`
 
+### [land-siege-production](../../../tools/playtest/checks/shared/combat/land-siege-production.json)
+
+- `expect: loaded`
+- `expect: orders`
+- `expect: spawn`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
 ### [ranged-arena](../../../tools/playtest/checks/shared/combat/ranged-arena.json)
 
 - `expect: damage`
@@ -89,6 +98,24 @@ Generated source inventory. Execution is not inferred.
 - `forbid: fixture`
 - `forbid: invariant`
 - `forbid: policy`
+- `forbid: script`
+
+### [spam-build](../../../tools/playtest/checks/shared/combat/spam-build.json)
+
+- `expect: offspring`
+- `expect: repeat`
+- `expect: spawn`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [spam-repeat](../../../tools/playtest/checks/shared/combat/spam-repeat.json)
+
+- `expect: offspring`
+- `expect: repeat`
+- `expect: spawn`
+- `forbid: fixture`
+- `forbid: invariant`
 - `forbid: script`
 
 ### [strategic_juno](../../../tools/playtest/checks/shared/combat/strategic_juno.json)
@@ -224,6 +251,86 @@ Generated source inventory. Execution is not inferred.
 
 ## Combat / Scenario
 
+### [fatboy-blocked-front](../../../tools/playtest/cases/shared/combat/fatboy-blocked-front.json)
+
+Map: All That Glitters v2.2.3
+
+### [fatboy-hlt-front](../../../tools/playtest/cases/shared/combat/fatboy-hlt-front.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-corcrwh-aa](../../../tools/playtest/cases/shared/combat/fortress-corcrwh-aa.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-corcrwh-defense](../../../tools/playtest/cases/shared/combat/fortress-corcrwh-defense.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-corcrwh-mixed](../../../tools/playtest/cases/shared/combat/fortress-corcrwh-mixed.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-corcrwh-screen](../../../tools/playtest/cases/shared/combat/fortress-corcrwh-screen.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-corcrwh-spam](../../../tools/playtest/cases/shared/combat/fortress-corcrwh-spam.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-legfort-aa](../../../tools/playtest/cases/shared/combat/fortress-legfort-aa.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-legfort-defense](../../../tools/playtest/cases/shared/combat/fortress-legfort-defense.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-legfort-mixed](../../../tools/playtest/cases/shared/combat/fortress-legfort-mixed.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-legfort-screen](../../../tools/playtest/cases/shared/combat/fortress-legfort-screen.json)
+
+Map: All That Glitters v2.2.3
+
+### [fortress-legfort-spam](../../../tools/playtest/cases/shared/combat/fortress-legfort-spam.json)
+
+Map: All That Glitters v2.2.3
+
+### [incinerator-front-push](../../../tools/playtest/cases/shared/combat/incinerator-front-push.json)
+
+Map: All That Glitters v2.2.3
+
+### [incinerator-mixed-front](../../../tools/playtest/cases/shared/combat/incinerator-mixed-front.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-no-static](../../../tools/playtest/cases/shared/combat/land-siege-no-static.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-armada](../../../tools/playtest/cases/shared/combat/land-siege-production-armada.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-cortex-bots](../../../tools/playtest/cases/shared/combat/land-siege-production-cortex-bots.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-cortex](../../../tools/playtest/cases/shared/combat/land-siege-production-cortex.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-legion-bots](../../../tools/playtest/cases/shared/combat/land-siege-production-legion-bots.json)
+
+Map: All That Glitters v2.2.3
+
+### [land-siege-legion](../../../tools/playtest/cases/shared/combat/land-siege-production-legion.json)
+
+Map: All That Glitters v2.2.3
+
 ### [ranged-armfboy](../../../tools/playtest/cases/shared/combat/ranged-armfboy.json)
 
 Map: All That Glitters v2.2.3
@@ -316,6 +423,46 @@ Map: All That Glitters v2.2.3
 
 Map: All That Glitters v2.2.3
 
+### [spam-build-front](../../../tools/playtest/cases/shared/combat/spam-build-front.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-build-tech](../../../tools/playtest/cases/shared/combat/spam-build-tech.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-air](../../../tools/playtest/cases/shared/combat/spam-repeat-air.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-dense](../../../tools/playtest/cases/shared/combat/spam-repeat-dense.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-drain](../../../tools/playtest/cases/shared/combat/spam-repeat-drain.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-front](../../../tools/playtest/cases/shared/combat/spam-repeat-front.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-sea](../../../tools/playtest/cases/shared/combat/spam-repeat-sea.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-support](../../../tools/playtest/cases/shared/combat/spam-repeat-support.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-tactical](../../../tools/playtest/cases/shared/combat/spam-repeat-tactical.json)
+
+Map: All That Glitters v2.2.3
+
+### [spam-repeat-tech](../../../tools/playtest/cases/shared/combat/spam-repeat-tech.json)
+
+Map: All That Glitters v2.2.3
+
 ## Cooperation / Checks
 
 ### [team_share](../../../tools/playtest/checks/shared/cooperation/team_share.json)
@@ -332,6 +479,22 @@ Map: All That Glitters v2.2.3
 - `forbid: script error`
 
 ## Economy / Checks
+
+### [builder-recovery](../../../tools/playtest/checks/shared/economy/builder-recovery.json)
+
+- `expect: air`
+- `expect: delayed-lab`
+- `expect: front`
+- `expect: sea`
+- `expect: support-self`
+- `expect: tactical`
+- `expect: tech`
+- `forbid: cancelled-request`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: healthy-team`
+- `forbid: invariant`
+- `forbid: script`
 
 ### [expansion](../../../tools/playtest/checks/shared/economy/expansion.json)
 
@@ -400,6 +563,20 @@ Map: All That Glitters v2.2.3
 - `forbid: native`
 - `forbid: script`
 
+## Economy / Scenario
+
+### [recovery-ferry-lua](../../../tools/playtest/cases/shared/economy/recovery-ferry-lua.json)
+
+Map: selected by runner
+
+### [recovery-lab-loss](../../../tools/playtest/cases/shared/economy/recovery-lab-loss.json)
+
+Map: selected by runner
+
+### [recovery-legion](../../../tools/playtest/cases/shared/economy/recovery-legion.json)
+
+Map: selected by runner
+
 ## Fixtures / Fixture/Observer
 
 ### [allied_layout_probe](../../../tools/playtest/allied_layout_probe.as)
@@ -438,6 +615,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
+### [builder_recovery](../../../tools/playtest/widgets/builder_recovery.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
 ### [dense_economy_watch](../../../tools/playtest/widgets/dense_economy_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
@@ -463,6 +644,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [fortification_fixture](../../../tools/playtest/widgets/fortification_fixture.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [full_match_perf](../../../tools/playtest/widgets/full_match_perf.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -723,6 +908,10 @@ Native executable; unnamed assertions remain inside the linked suite.
 - `test_sensors_towers_outrank_mobile_and_radar`
 - `test_silo_history_is_local_and_expires_at_five_minutes`
 
+### [target_preference_test](../../../tests/target_preference_test.cpp)
+
+Native executable; unnamed assertions remain inside the linked suite.
+
 ### [terrain_route_test](../../../tests/terrain_route_test.cpp)
 
 Native executable; unnamed assertions remain inside the linked suite.
@@ -732,6 +921,15 @@ Native executable; unnamed assertions remain inside the linked suite.
 Native executable; unnamed assertions remain inside the linked suite.
 
 ## Performance / Checks
+
+### [full-match-profile](../../../tools/playtest/checks/shared/performance/full-match-profile.json)
+
+- `expect: commands`
+- `expect: competitive-roster`
+- `expect: timing`
+- `forbid: instrumentation`
+- `forbid: invariant`
+- `forbid: script`
 
 ### [lane_ui_memory](../../../tools/playtest/checks/shared/performance/lane_ui_memory.json)
 
@@ -777,6 +975,12 @@ Native executable; unnamed assertions remain inside the linked suite.
 - `forbid: invariant`
 - `forbid: probe-failed`
 - `forbid: script`
+
+## Performance / Scenario
+
+### [full-match-profile](../../../tools/playtest/cases/shared/performance/full-match-profile.json)
+
+Map: selected by runner
 
 ## Policy / Suite
 
@@ -831,6 +1035,12 @@ Native executable; unnamed assertions remain inside the linked suite.
 ### [collection_helpers_tests](../../../tests/collection_helpers_tests.as)
 
 - `test_dictionary_integer_miss_and_conversion_do_not_invent_coverage`
+
+### [land_siege_math_tests](../../../tests/land_siege_math_tests.as)
+
+- `test_income_ramp_preserves_a_screen_and_is_bounded`
+- `test_no_static_no_army_or_low_income_has_no_siege_budget`
+- `test_response_stops_when_threat_or_projected_shortage_is_gone`
 
 ### [metal_math_tests](../../../tests/metal_math_tests.as)
 
@@ -1006,6 +1216,21 @@ Native executable; unnamed assertions remain inside the linked suite.
 - `test_workforce_keeps_t1_floor_after_transition`
 - `test_workforce_rounds_up_shortage`
 
+### [recovery_math_tests](../../../tests/recovery_math_tests.as)
+
+- `test_any_role_can_recover_while_commander_survives`
+- `test_commander_lost_before_first_constructor_recovers_after_grace`
+- `test_heartbeat_does_not_poll_every_frame`
+- `test_last_constructor_of_either_tier_prevents_request`
+- `test_late_heartbeat_cannot_resurrect_cancelled_episode`
+- `test_opening_is_not_a_loss`
+
+### [spam_math_tests](../../../tests/spam_math_tests.as)
+
+- `test_donations_do_not_require_positive_net_income`
+- `test_hysteresis_and_factory_scaling_boundaries`
+- `test_sustained_income_is_required_and_energy_stall_blocks`
+
 ### [team_share_math_tests](../../../tests/team_share_math_tests.as)
 
 - `test_budget_is_shared_between_recipients`
@@ -1053,6 +1278,10 @@ Playtest: launch a BAR skirmish with the freshly built BARb, watch its log, stop
 
 Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.
 
+### [run_builder_recovery](../../../tools/playtest/run_builder_recovery.py)
+
+Controlled all-role constructor loss with delayed TECH lab; optional Lua/ferry.
+
 ### [run_dense_economy](../../../tools/playtest/run_dense_economy.py)
 
 Physical dense economy / naval support acceptance, in isolated staged data.
@@ -1060,6 +1289,10 @@ Physical dense economy / naval support acceptance, in isolated staged data.
 - `scenario: air`
 - `scenario: sea`
 - `scenario: support`
+
+### [run_full_match_performance](../../../tools/playtest/run_full_match_performance.py)
+
+Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.
 
 ### [run_reservation_performance](../../../tools/playtest/run_reservation_performance.py)
 
@@ -1183,6 +1416,22 @@ Evidence must distinguish an empty queue, a stalled product and a new hull.
 
 - `test_progress_and_partial_logs_are_not_empty_queue_failures`
 
+### [test_fortress_report](../../../tools/playtest/test_fortress_report.py)
+
+- `test_air_control_requires_actual_anti_air_damage`
+- `test_direct_defense_attack_does_not_need_priority_rules_param`
+- `test_friendly_damage_is_not_enemy_engagement`
+- `test_post_cutoff_assignment_cannot_rescue_failure`
+- `test_priority_evidence_must_prefer_heavy`
+
+### [test_full_match_performance](../../../tools/playtest/test_full_match_performance.py)
+
+Protect the distinctions used to rank costs, not the runtime AI policy.
+
+- `test_nested_costs_multiple_ais_and_orders_stay_separate`
+- `test_partial_last_minute_and_invariant_do_not_become_victory`
+- `test_profiler_off_keeps_progress_but_has_no_measured_ai_peak`
+
 ### [test_lane_ui_memory](../../../tools/playtest/test_lane_ui_memory.py)
 
 Run with lupa==2.8 (Lua 5.1); install into build-theatres/widget-test-deps.
@@ -1234,6 +1483,11 @@ Boundary tests: mismatched conditions and censored games must not contaminate ra
 - `test_small_actual_start_rounding_remains_comparable`
 - `test_team_without_opponent_never_rated`
 
+### [test_spam_report](../../../tools/playtest/test_spam_report.py)
+
+- `test_offspring_must_finish_and_move_inside_window`
+- `test_repeat_alone_is_not_production`
+
 ### [test_storage](../../../tools/playtest/test_storage.py)
 
 Storage boundaries: preserve history, resolve old commands, refuse collisions.
@@ -1283,6 +1537,10 @@ Read independent arena damage/death events and synchronized command counts.
 
 Compare matched workforce games over the same observed simulation interval.
 
+### [analyze_full_match_performance](../../../tools/playtest/analyze_full_match_performance.py)
+
+Stream full-match diagnostic logs; inclusive timers are never added to children.
+
 ### [analyze_performance_phases](../../../tools/playtest/analyze_performance_phases.py)
 
 Summarize opt-in D-199 phases without double-counting nested scopes.
@@ -1290,6 +1548,14 @@ Summarize opt-in D-199 phases without double-counting nested scopes.
 ### [analyze_sea](../../../tools/playtest/analyze_sea.py)
 
 Independent SEA economy/egress scorecard; never rewrites original reports.
+
+### [analyze_sea_coast](../../../tools/playtest/analyze_sea_coast.py)
+
+Add immutable coastal observations without changing original acceptance verdicts.
+
+### [analyze_sea_expansion](../../../tools/playtest/analyze_sea_expansion.py)
+
+Read-only SEA frontier metrics; never reinterpret the original smoke verdict.
 
 ### [analyze_sea_patrol](../../../tools/playtest/analyze_sea_patrol.py)
 
@@ -1361,6 +1627,22 @@ Render and measure a map's buildable ground from the build_area widget's survey.
 ### [compare_air_runs](../../../tools/playtest/compare_air_runs.py)
 
 Compare observed AIR economy/combat windows; never changes check verdicts.
+
+### [compress_symbols](../../../tools/playtest/compress_symbols.py)
+
+Losslessly compress idle playtest symbols on Windows; default is a dry run.
+
+### [deployment_report](../../../tools/playtest/deployment_report.py)
+
+Check every supplied primary unit advances toward the enemy by a deadline.
+
+### [fortress_report](../../../tools/playtest/fortress_report.py)
+
+Damage/priority evidence from supplied fortress combat; never rewrite a verdict.
+
+### [land_siege_report](../../../tools/playtest/land_siege_report.py)
+
+Read-only evidence extraction for supplied land-siege/Incinerator cases.
 
 ### [lane_benchmark](../../../tools/playtest/lane_benchmark.py)
 
@@ -1474,6 +1756,10 @@ Immutable match evidence, strict comparison cohorts and a private OpenSkill ladd
 
 Run a reproducible TECH duel and archive its scorecard without touching BAR's install.
 
+### [spam_report](../../../tools/playtest/spam_report.py)
+
+Audit real factory repeat, completed offspring and per-producer MOVE travel.
+
 ### [stop_game](../../../tools/playtest/stop_game.py)
 
 Stop the playtest engine (and only it): python tools/playtest/stop_game.py [--dir C:\bardev\barb-playtest]
@@ -1485,6 +1771,14 @@ Organize game tests without replacing historical evidence.
 ### [summarize_air](../../../tools/playtest/summarize_air.py)
 
 Summarize observed AIR outcomes without changing the playtest verdict.
+
+### [summarize_full_match_performance](../../../tools/playtest/summarize_full_match_performance.py)
+
+Reduce recorded 8v8 intervals without double-counting nested timers.
+
+### [symbolize_instruction_samples](../../../tools/playtest/symbolize_instruction_samples.py)
+
+Resolve conditional AI instruction samples against the exact pinned PE symbols.
 
 ### [verify_mountain_regression](../../../tools/playtest/verify_mountain_regression.py)
 

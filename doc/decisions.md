@@ -12797,3 +12797,472 @@ D-212 performance qualification: the serial Legion counter stayed at 120 coastal
 **Invariant.** This is storage maintenance, not gameplay policy: each compressed file retains its path, SHA-256, logical length, identity and last-write timestamp; no original observation or published verdict is removed. Verification failures stop further batches. Existing runtime invariants are unchanged.
 
 **Files and verification.** [Maintenance utility](../tools/playtest/compress_symbols.py), [storage contract](test-storage.md#reducing-windows-disk-usage-without-discarding-evidence), [audit/results](storage-cleanup-2026-10-06.md) and [per-file verification manifest](storage-cleanup-2026-10-06.json). Path-boundary/shared-link checks, 830 real content/identity checks and 7,322 protected benchmark/definition hashes passed; all 379,035 inventoried evidence files retain their identities, lengths and timestamps. Approximately 211.02 GiB was reclaimed without deleting files. The final dry run found zero remaining eligible symbols. Future copy growth remains [KI-520](known-issues.md#ki-520---simulation-staging-replicates-large-uncompressed-symbol-files). No AI implementation, benchmark verdict or live installation is changed.
+
+
+## D-214 — Fund a bounded land-siege response before ordinary combat batches
+
+**Decision.** Add a shared AngelScript budget helper and a FRONT-only producer for T2 land factories. Known static-defense metal, sustained ten-second income and current military investment determine a budget. Existing units, frames and unframed native recruit tasks all count against it. Constructor production retains precedence; TECH's existing production and caps remain unchanged; landlocked starts retain their amphibious policy. The supported roster is Tremor, Negotiator, Ambassador, Boreas, Sheldon and Thanatos. Incinerator movement, native ranged control and behavior JSON are unchanged.
+
+**Reasoning.** FRONT's usual native response strongly favors assault/heavy investment over artillery. The initial TECH hook proved insufficient: its intentional T2 siege-unit and vehicle-factory caps remain closed. Remove that hook instead of silently lifting those restrictions. A bounded explicit admission fixes that missing response without relying on tiny factory-probability adjustments. Income ramps the dedicated siege share from 20% to 35%; the other bound is 1.25 times observed static metal divided by the native artillery team factor. Military armyCost includes static defenses: this limits investment but does not prove a nearby mobile screen exists. Native fallback can still recruit other artillery, so this is not a hard cap on all artillery production.
+
+**Alternatives rejected.** Do not globally reclassify assault units, loosen fragile ranged-unit approach rules or alter TECH's factory cycle. Isolated and mixed Incinerator fixtures advanced and cleared their targets; they do not establish the cause of the user's reported stall. Picking any affordable siege unit first let cheap rockets consume every small budget increase. Instead select the desired investment mix before checking affordability, allowing ordinary production while saving room in the siege budget for a Tremor. No new periodic scan, timer or combat command is introduced; six pending-recruit lookups cost O(K*Q), K=6 and Q=pending recruit tasks, only at eligible factory decisions.
+
+**Invariant.** INV-155 checks that each successful enqueue is immediately visible as exactly one more live-plus-pending recruit, before a second factory can admit another. No independent script queue or save-state counter is maintained.
+
+**Files.** [Producer](../data/script/src/manager/land_siege.as), [pure budget](../data/script/src/helpers/land_siege_math.as), [settings](../data/script/src/global.as), [FRONT hook](../data/script/src/roles/front.as), [VM tests](../tests/land_siege_math_tests.as), [CMake registration](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [arena staging](../tools/playtest/ranged_arena.py), [suite acceptance](../tools/playtest/ranged_benchmark.py), [observer](../tools/playtest/widgets/ranged_arena.lua), [damage/production measurements](../tools/playtest/land_siege_report.py), [acceptance checks](../tools/playtest/checks/shared/combat/land-siege-production.json), [Incinerator case](../tools/playtest/cases/shared/combat/incinerator-front-push.json), [mixed case](../tools/playtest/cases/shared/combat/incinerator-mixed-front.json), [Cortex case](../tools/playtest/cases/shared/combat/land-siege-production-cortex.json), [Armada case](../tools/playtest/cases/shared/combat/land-siege-production-armada.json), [Legion case](../tools/playtest/cases/shared/combat/land-siege-production-legion.json), [Cortex bot case](../tools/playtest/cases/shared/combat/land-siege-production-cortex-bots.json), [Legion bot case](../tools/playtest/cases/shared/combat/land-siege-production-legion-bots.json), [no-static control](../tools/playtest/cases/shared/combat/land-siege-no-static.json). [Invariants](invariants.md), [actor ownership](actor-matrix.md), [FRONT reference](roles/front.md), [TECH reference](roles/tech.md), [test inventory](testing/README.md) and [benchmark catalog](benchmarks/README.md) record the contracts and evidence.
+
+**Verification.** Checked in the actual AngelScript VM and Played with the unchanged D-212 binary. The [design/results report](reviews/2026-10-06-land-siege-response.md) records exact runs, baseline comparison, failures and scope. Supplied economy/held-army production is distinct from natural mid/late-game economy, victory rate or multiplayer performance. The unreproduced Incinerator report is tracked in KI-521; no movement fix is claimed.
+
+
+## D-215 — Prefer valuable nearby targets for flying fortresses
+
+**Decision.** Add a per-UnitDef JSON `target_min_cost` opt-in, set to 300 for
+the reviewed Dragon/Tyrannus definitions in active profiles. Ordinary attack
+and defense scans retain eligibility/threat filters and cheap fallback, but
+prefer substantial contacts or commanders/AA within firing reach or twice the
+ordinary target distance. Keep unlike targeting policies in separate squads.
+Enable the formerly inert priority-fire hook only for opted-in definitions;
+cancel its owned ID on task handover and invalidate it on STOP. AIR gives these
+units a distinct defensive target group, using metal cost, AA/commander weight
+and 15% incumbent retention instead of the ordinary group's 25,000 bonus.
+
+**Reasoning.** Proximity selection and queued movement can waste surface fire
+on cheap bait. These units have multiple surface mounts plus dedicated AA, so
+hold-fire or a blanket ban on cheap targets would suppress useful damage and
+self-defense. BAR priority fire leaves movement intact and incompatible
+weapons free to acquire targets. The target priority is AI policy, not a game
+weapon-stat modification. Research and inference are distinguished in the report.
+
+**Alternatives rejected.** Do not globally change the shared fire stub,
+reclassify all aircraft as anti-heavy, suppress all automatic fire, hardcode
+unit names in C++, or add per-fortress whole-map/per-frame scans. Do not change
+range, retreat, factory production or bomber-wave policy for this targeting fix.
+
+**Invariant.** INV-156 audits that an enrolled AIR defender's target-policy
+group matches its definition; the existing player/retreat/commitment invariant
+remains. Supplied combat checks valuable-target damage, priority commands,
+cheap-only fallback and simultaneous AA, with engine errors/invariants forbidden.
+
+**Files.** [Preference helper](../src/circuit/task/fighter/TargetPreference.h),
+[attack](../src/circuit/task/fighter/AttackTask.cpp),
+[defense](../src/circuit/task/fighter/DefendTask.cpp),
+[definition](../src/circuit/unit/CircuitDef.h),
+[config loading](../src/circuit/module/FactoryManager.cpp),
+[binding](../src/circuit/script/InitScript.cpp),
+[unit fire](../src/circuit/unit/CircuitUnit.cpp),
+[unit state](../src/circuit/unit/CircuitUnit.h),
+[AIR defense](../data/script/src/manager/air_base_response.as),
+[native tests](../tests/target_preference_test.cpp),
+[test registration](../tests/CMakeLists.txt),
+[runner](../tools/run_native_tests.sh),
+[arena](../tools/playtest/ranged_arena.py),
+[measurements](../tools/playtest/fortress_report.py).
+Opt-ins are in the existing `corcrwh`/`legfort` entries of
+[balanced](../data/config/experimental_balanced/behaviour.json),
+[balanced Legion](../data/config/experimental_balanced/behaviour_leg.json),
+[hard experiment](../data/config/experimental_hard/behaviour.json),
+[hard experiment Legion](../data/config/experimental_hard/behaviour_leg.json),
+[terrible](../data/config/experimental_terrible/behaviour.json),
+[terrible Legion](../data/config/experimental_terrible/behaviour_leg.json),
+[aggressive](../data/config/hard_aggressive/behaviour.json),
+[aggressive Legion](../data/config/hard_aggressive/behaviour_leg.json),
+[easy Legion](../data/config/easy/behaviour_leg.json),
+[medium Legion](../data/config/medium/behaviour_leg.json) and
+[hard Legion](../data/config/hard/behaviour_leg.json).
+[API](angelscript-references.md), [AIR](roles/air.md),
+[actors](actor-matrix.md), [invariants](invariants.md),
+[unit report](knowledge/barb-unit-config.md), [test inventory](testing/README.md)
+and [benchmark catalog](benchmarks/README.md) document the contract.
+
+**Verification.** Evidence and exact limitations are retained in the
+[fortress targeting report](reviews/2026-10-06-fortress-targeting.md), including
+every supplied case and build identity. No full-game win-rate, late-game FPS
+or network-performance claim follows from these controlled combat tests.
+
+D-215 observation detail: BAR consumes priority commands before UnitCommand;
+the analyzer therefore uses replicated target IDs while moving and the explicit
+AIR defense target/actual damage for direct ATTACK, whose priority rules param
+can legitimately be nil. [Analyzer regressions](../tools/playtest/test_fortress_report.py)
+guard this distinction and exclude friendly damage from the success criteria.
+Ten [case definitions](testing/index/shared.md) produce 17 rendered observations;
+all final semantic checks pass. Native tests passed on repeat after KI-518;
+the root/easy/medium/hard archaic Dragon coverage gap is recorded as KI-522,
+not silently reclassified. This is a deliberate scope limit, not a claim of
+all-profile migration. Validation and immutable run links are in the report.
+
+
+## D-216 — Preserve factory scheduling and give funded T1 pressure one owner
+
+**Decision.** Repeating production owns a persistent native recruit task,
+exposed by a default-off script argument. All experimental roles use the shared
+economic admission, pump cap, actual producer and MOVE lanes. TECH retains its
+opening lab retirement and advanced-lab-before-rebuild sequence, but retiring
+an idle lab cannot abort the manager's shared idle state. The spam roster owns
+eligibility: JSON's colliding role/attribute name made the old attribute test
+miss Pawns. Use actual lobby enemy starts before unused map slots and choose
+nearby connected terrain when an endpoint sits on a cliff. Fatboy alone opts
+into safe forward staging when no safe firing band exists.
+
+**Reasoning.** The corrected supplied TECH baseline produced no Pawns while
+floating about 200 M/s. Cancelling its first idle lab cleared the shared idle
+assignee set. Fixing scheduling and queue lifetime yielded production, but
+the units still scouted because of the role/attribute collision. Direct
+engine observations now verify repeat and enemy-directed MOVE progression.
+The Fatboy baseline independently reproduced a known-static coverage rejection
+that held one hull at spawn. Moving it to a safe forward staging position
+retains the reason for ranged control: no target chasing into static fire.
+
+**Alternatives rejected.** Reissuing build commands every tick hides broken
+ownership and adds synchronized commands. Raising only unit caps does not fix
+idle scheduling or route assignment. Treating every broad spam-role unit as
+disposable would also capture resurrection/support units. Globally relaxing
+static avoidance would reintroduce ranged-unit diving. Requiring every SEA
+start to build land spam would strand units on water-only starts.
+
+**Invariant.** INV-157: every owned repeating pump has a nonempty reachable
+MOVE route. INV-043 retains route ownership; INV-001 retains retirement.
+Native abort rejects shared idle/nil/player state and already-dead tasks.
+The economic boundaries are pure tested policy; thresholds remain tunable
+engineering defaults, not a claimed universal PvP build order.
+
+**Implementation files.**
+
+- [src/circuit/module/TaskModule.h](../src/circuit/module/TaskModule.h)
+- [src/circuit/module/TaskModule.cpp](../src/circuit/module/TaskModule.cpp)
+- [src/circuit/module/FactoryManager.h](../src/circuit/module/FactoryManager.h)
+- [src/circuit/module/FactoryManager.cpp](../src/circuit/module/FactoryManager.cpp)
+- [src/circuit/script/FactoryScript.cpp](../src/circuit/script/FactoryScript.cpp)
+- [src/circuit/script/InitScript.cpp](../src/circuit/script/InitScript.cpp)
+- [src/circuit/task/static/RecruitTask.h](../src/circuit/task/static/RecruitTask.h)
+- [src/circuit/task/static/RecruitTask.cpp](../src/circuit/task/static/RecruitTask.cpp)
+- [src/circuit/task/fighter/RouteTask.cpp](../src/circuit/task/fighter/RouteTask.cpp)
+- [src/circuit/task/fighter/RangedEngagement.cpp](../src/circuit/task/fighter/RangedEngagement.cpp)
+- [src/circuit/unit/RangedPolicy.h](../src/circuit/unit/RangedPolicy.h)
+- [data/script/src/manager/spam.as](../data/script/src/manager/spam.as)
+- [data/script/src/helpers/spam_math.as](../data/script/src/helpers/spam_math.as)
+- [data/script/src/manager/builder.as](../data/script/src/manager/builder.as)
+- [data/script/src/manager/invariants.as](../data/script/src/manager/invariants.as)
+- [data/script/src/roles/tech_build.as](../data/script/src/roles/tech_build.as)
+- [data/script/src/roles/tech_forward.as](../data/script/src/roles/tech_forward.as)
+- [data/script/src/global.as](../data/script/src/global.as)
+- [data/script/src/task.as](../data/script/src/task.as)
+- [tools/playtest/ranged_arena.py](../tools/playtest/ranged_arena.py)
+- [tools/playtest/widgets/ranged_arena.lua](../tools/playtest/widgets/ranged_arena.lua)
+- [tools/playtest/spam_report.py](../tools/playtest/spam_report.py)
+- [tools/playtest/test_spam_report.py](../tools/playtest/test_spam_report.py)
+- [tests/spam_math_tests.as](../tests/spam_math_tests.as)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
+- [tools/run_native_tests.sh](../tools/run_native_tests.sh)
+- [data/config/behaviour.json](../data/config/behaviour.json)
+- [data/config/easy/behaviour.json](../data/config/easy/behaviour.json)
+- [data/config/medium/behaviour.json](../data/config/medium/behaviour.json)
+- [data/config/hard/behaviour.json](../data/config/hard/behaviour.json)
+- [data/config/hard_aggressive/behaviour.json](../data/config/hard_aggressive/behaviour.json)
+- [data/config/experimental_balanced/behaviour.json](../data/config/experimental_balanced/behaviour.json)
+- [data/config/experimental_hard/behaviour.json](../data/config/experimental_hard/behaviour.json)
+- [data/config/experimental_terrible/behaviour.json](../data/config/experimental_terrible/behaviour.json)
+
+**Documentation and verification.** [Investigation and measured results](reviews/2026-10-06-spam-and-fatboy.md),
+[spam contract](spam-routes.md), [API](angelscript-references.md),
+[TECH](roles/tech.md), [actors](actor-matrix.md), [invariants](invariants.md),
+[test index](testing/README.md), [benchmarks](benchmarks/README.md) and the
+[unit report](knowledge/barb-unit-config.md) carry the implementation contract.
+The investigation records exact pinned runs and outstanding verification
+limits. Supplied fixtures are not full-game win-rate or network-FPS evidence.
+
+
+**Follow-through from construction tests.** `Spam::BuilderMakeTask` defers to
+existing construction even before a frame exists: the native builder re-asks
+while walking. This prevents abandoning pinned turret work. The older forward
+constructor path now uses the same spam budget. Once those labs stood, the
+test exposed a separate STOP-only retirement path in
+[tech_factories.as](../data/script/src/roles/tech_factories.as); it now cancels
+the real recruit/wait first, preserving the original three-factory reclaim
+threshold. Updated contracts: [tech_forward](roles/tech_forward.md),
+[tech_build](roles/tech_build.md), [tech_factories](roles/tech_factories.md).
+
+The [deployment analyzer](../tools/playtest/deployment_report.py) requires
+every supplied Fatboy to advance, and the
+[benchmark runner](../tools/playtest/ranged_benchmark.py) invokes the explicit
+deployment/production criteria. [Case definitions](testing/index/shared.md)
+include all six roles, income loss, TECH construction and the blocked static
+line. Original failed observations and revised analyzers are retained; v3
+spam analysis requires enemy-directed movement, a complete window and clean
+runtime checks. [KI-109](known-issues.md#ki-109--spam-activates-and-then-produces-nothing-and-the-log-cannot-say-why)
+links the historical symptom to this diagnosis.
+
+**Final verification.** Seven selectable profiles loaded successfully. All six
+experimental roles passed repeat/MOVE tests; final TECH construction tests
+passed in balanced and hard, and FRONT construction in terrible. Fatboy
+deployment passed in balanced plus easy, medium, hard and hard_aggressive.
+The native suite, API/invariant/role-doc checks and output parity passed; the
+review records existing unrelated validator findings and full-game limits.
+
+**Persistent owner guard.** `CRecruitTask::CanAssignTo` rejects a second
+factory while a repeat task already has an assignee. Clearing its target at
+offspring completion must not expose the still-running task as adoptable
+work; it has one target pointer and one script owner. The final native build
+passed adjacent-lab repeat/lane and TECH construction/retirement regressions.
+
+## D-217 - SEA advances and fortifies mex clusters behind the navy
+
+**Decision.** Give SEA a default-on moving-radius expansion policy before both
+its economic paths. Retain native claims/terrain/ally checks and the metal-map
+path. One ship expands, a second is eligible after three T1 ships. Other builders
+retain economy/upgrades. Fortify remote mex groups with funded torpedo, surface
+and observed-air defenses; require naval cover toward the contested front and
+withdraw exposed expansion ships.
+
+**Reasoning / alternatives.** The normal path stopped prioritizing mexes beyond
+its home radius. Changing the shared constructor ladder would change TACTICAL.
+Blindly extending the radius lost workers in the first rendered Glacial candidate,
+so it was rejected. Legal weapon buffers, escort admission and an explicit
+withdrawal were added. No new global path solver or per-frame MOVE loop is needed.
+The conservative corridor screen leaves terrain detours to native movement;
+alternate-candidate routing is tracked rather than claimed complete.
+
+**Invariant.** INV-158 requires a native mex task after frontier admission.
+Native task claims and ally layouts retain ownership. Player/retreat/external/
+enemy-reclaim owners are excluded from handover; unfinished frames remain
+recoverable after a threatened worker leaves.
+
+**Files.** [policy](../data/script/src/manager/sea_expansion.as),
+[SEA](../data/script/src/roles/sea.as), [builder](../data/script/src/roles/sea_build.as),
+[settings](../data/script/src/global.as), [math](../data/script/src/helpers/sea_math.as),
+[tests](../tests/sea_math_tests.as), [SEA reference](roles/sea.md),
+[builder reference](roles/sea_build.md), [invariants](invariants.md),
+[actors](actor-matrix.md), [issues](known-issues.md),
+[runner](../tools/playtest/run_sea.py),
+[observer](../tools/playtest/widgets/sea_expansion_watch.lua),
+[analyzer](../tools/playtest/analyze_sea_expansion.py),
+[case](../tools/playtest/cases/sea/economy/mex-expansion-glacial.json),
+[checks](../tools/playtest/checks/sea/economy/mex-expansion.json),
+[report](reviews/2026-10-06-sea-mex-expansion.md).
+
+**Verification.** Actual embedded-VM loads and rendered natural games; the report
+records exact results, immutable evidence and validation limits. The rejected
+candidate's worker losses are retained. No whole-game FPS/APM claim is made.
+
+**D-217 follow-up: preserve the local opening.** The first full ExperimentalBuild
+run of the wider search missed team 0's ten-minute expansion target, whereas the
+preserved old experimental path passed. Native `EnqueueMexWithin` returns pending
+work before opening fresh spots. The final policy therefore keeps the old home
+query first while the worker is near home, then tries fortification and the
+moving frontier. This restores the local-order contract without changing native
+selection or other roles. The unchanged acceptance suite then passed at 6.5
+minutes. Both failed and passing observations are preserved in the D-217 report;
+constructor losses remain reported rather than treating the smoke verdict as
+proof that all workers survived.
+
+**D-217 follow-up: protect support ships too.** The corrected full experimental
+run passed expansion but lost four extra native-controlled construction ships
+beyond the protected workers. Safety monitoring now uses an event-maintained
+roster of all SEA T1 ship IDs, seeded once on activation. Expansion allocation
+still uses only primary/secondary workers. The alternative of periodically
+rescanning every owned unit was rejected; the roster avoids that callback and
+retains no borrowed unit handles. This adds O(B*C) safety work once per second
+for B construction ships and C legal sea contacts, not per-frame orders.
+
+## D-218 - Recover lost mobile constructors through a queued TECH request
+
+**Decision.** All six experimental roles request a T1 construction bot after
+losing their last finished mobile constructor, even with a commander alive.
+The normal commander-only opener is exempt. A team losing its commander before
+its first constructor may request after 60 seconds. Thresholds and the optional
+commander exemption are in `Global::BuilderRecovery`.
+
+The request selects one TECH and stays there until cancellation or refusal.
+TECH retains heartbeats while its T1 bot lab is absent; its existing reclaim
+and rebuild sequence is unchanged. Production precedes optional T1 spam and
+leases exactly one additional constructor slot. Only that factory's matching
+finished product becomes a gift. An existing ferry delivers it to the existing
+safe first-mex/start drop; otherwise ownership transfers immediately. No new
+transport order is required for recovery. Repeated requests are idempotent;
+a recipient that rebuilds independently cancels; cancelled episodes reject
+late heartbeats. A TECH needing rescue refuses donor selection temporarily.
+
+**Alternatives rejected.** Reusing the old spare-only orphan donor cannot
+serve a missing lab and counted static nanos/commanders as recovery. Broadcasting
+to every TECH would overproduce. Re-electing the nearest TECH every heartbeat
+was found wrong in the first ferry fixture: recovering TECH drew requests away
+from the active donor before building a lab. Sticky selection corrects it.
+Changing TECH's lab sequence would violate its existing contract.
+
+**Mechanism and performance.** A small optional host LuaUI widget relays
+`CallUI` requests into `SendSkirmishAIMessage` on the next GameFrame. This is
+actual Lua messaging, distinct from the same-process `AiSendMessage` fallback
+used when the widget is absent. Both paths validate allied identity. Neither
+reaches an AI hosted on another computer. Constructor availability uses add/remove
+callbacks and stable IDs, O(1) count queries; retries occur every 20 seconds.
+The once-per-second queue is bounded by allied team count, not army size.
+Native tasks still own recruit/ferry unit orders; no per-frame micro was added.
+
+**Invariant.** INV-159: each donor has at most one recovery obligation per
+requesting team. A gift has one native owner (recruit/idle preparation/ferry),
+and cannot be claimed as the donor's constructor leader.
+
+**Files.** [Controller](../data/script/src/manager/builder_recovery.as),
+[pure rules](../data/script/src/helpers/recovery_math.as),
+[team dispatch](../data/script/src/manager/team.as),
+[builder callbacks](../data/script/src/manager/builder.as),
+[factory dispatch](../data/script/src/manager/factory.as),
+[repeat spam](../data/script/src/manager/spam.as),
+[settings](../data/script/src/global.as), and the Lua hooks in
+[balanced](../data/script/experimental_balanced/main.as),
+[hard](../data/script/experimental_hard/main.as),
+[terrible](../data/script/experimental_terrible/main.as).
+[Relay](../tools/widgets/gui_barb_builder_recovery.lua),
+[math tests](../tests/recovery_math_tests.as),
+[native runner](../tools/run_native_tests.sh), [CMake](../tests/CMakeLists.txt),
+[scenario runner](../tools/playtest/run_builder_recovery.py),
+[fixture](../tools/playtest/widgets/builder_recovery.lua),
+[checks](../tools/playtest/checks/shared/economy/builder-recovery.json),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[report](reviews/2026-10-06-builder-recovery.md).
+
+**Verification.** See the report for pinned runs and their exact limitations.
+The original failed fixtures and compilation error are retained. Save/load and
+cross-host coordination are not claimed.
+
+
+**D-218 verified follow-up.** Three final 8v8 supplied Glacial fixtures pass:
+17 real gifts, all six requesting roles, Armada/Cortex/Legion bot menus,
+Lua and native messaging, missing/replaced donor lab, cancellation and coastal
+ferry delivery. The recovery-only wider landing anchor is retained by
+[ferry.as](../data/script/src/manager/ferry.as); existing T2 default anchors are
+unchanged. Failed fixtures exposed and corrected donor re-election and the
+coastal search radius. Six math tests and the complete native suite pass.
+See the report for timing, fixture overrides and immutable evidence links.
+[Case: ferry](../tools/playtest/cases/shared/economy/recovery-ferry-lua.json),
+[case: lab loss](../tools/playtest/cases/shared/economy/recovery-lab-loss.json),
+[case: Legion](../tools/playtest/cases/shared/economy/recovery-legion.json),
+[script guide](../data/script/README.md). Unit-sharing refusal remains KI-525;
+save/load coverage remains within the existing KI-209 limitation.
+
+
+## D-219 - SEA rebuilds inland and guards its coast only after losing water
+
+**Decision.** Treat the user's final loss-only condition as the trigger. A gifted
+land constructor joins coastal recovery after a previously held home sea loses
+its viable own foothold for 30 seconds. A live navy remains naval-first. Require
+60 stable seconds to return to naval strategy. Nearest allied SEA starts divide
+friendly beaches, including edge approaches. Use a safe inland bot lab, storage,
+working energy/mex economy, useful nanos and layered T1/T2 defenses/sensors.
+
+**Reasoning and rejected alternatives.** A timer-only loss or constructor-gift
+trigger would divert healthy naval players. Full walls in front of Pit Bulls
+would block their shots: preserve central firing/traffic gaps and use staggered
+flanks. Ordinary bot constructors cannot lay medium mines; use actual capable
+workers instead of inventing that build edge. Storage alone cannot restart an
+economy: retain inland mex/energy growth and one dedicated economic worker.
+
+**Invariant.** INV-160: coastal recovery orders are SEA-only, loss-gated and dry;
+native reservation/engine checks enforce legal footprints. Existing frames and
+player/external/retreat/enemy-reclaim ownership are preserved. Other roles retain
+their decisions. Explicit state gating precedes optional spam on this role only.
+
+**Files.** [Controller](../data/script/src/manager/sea_coast.as),
+[pure decisions](../data/script/src/helpers/sea_coast_math.as),
+[settings](../data/script/src/global.as), [SEA hooks](../data/script/src/roles/sea.as),
+[role exit](../data/script/src/roles/sea_build.as),
+[builder dispatch](../data/script/src/manager/builder.as),
+[factory dispatch](../data/script/src/manager/factory.as),
+[spam gate](../data/script/src/manager/spam.as),
+[unit tests](../tests/sea_coast_math_tests.as), [test registration](../tests/CMakeLists.txt),
+[native runner](../tools/run_native_tests.sh),
+[simulation runner](../tools/playtest/run_sea_coast.py),
+[fixture](../tools/playtest/widgets/sea_coast.lua),
+[case](../tools/playtest/cases/sea/strategy/coastal-fallback.json),
+[checks](../tools/playtest/checks/sea/strategy/coastal-fallback.json),
+[actor matrix](actor-matrix.md), [invariants](invariants.md),
+[role references](roles/sea.md), [build reference](roles/sea_build.md),
+[script guide](../data/script/README.md),
+[design and results](reviews/2026-10-06-sea-coastal-fallback.md).
+
+**Verification.** Built with the existing matched D-216 binary; six pure state
+tests pass. Rendered supplied loss/constructor transfer/retake games and their
+immutable original failures are listed in the results report. No natural win-rate,
+network performance or complete save/load equivalence claim. KI-526 records the
+remaining sea-control/placement limits rather than silently treating them as solved.
+
+
+**D-219 final ownership and evidence (2026-10-06).** The
+[invasion controller](../data/script/src/manager/sea_invasion.as) now suspends
+its land waves during fallback; factory plans and existing frames remain.
+Competing invasion/coast orders were rejected because a single owner must
+command each survivor. On stable naval recovery, cancel only unstarted coastal
+proposals. Nanos explicitly assist unfinished land-factory products. The first
+T1 coastal turret precedes sensor expansion after an Armada run exposed starvation.
+
+Played: final Armada Supreme and Legion Glacial 25-minute loss arenas, Armada
+held-water negative control, and Cortex Supreme retake pass. Invaders take real
+defensive damage; this is not proof of complete invasion denial. The natural
+10-minute 8v8 Glacial run keeps naval priorities but remains FAIL on TECH
+INV-013/019/029 (KI-423/KI-427). Full native/pure-script regression passes.
+
+[Observation analyzer](../tools/playtest/analyze_sea_coast.py) adds immutable
+measurements without replacing original verdicts. The
+[test catalog](testing/README.md), [SEA test index](testing/index/sea.md),
+[machine catalog](testing/catalog.json), [shared test index](testing/index/shared.md),
+[benchmark catalog](benchmarks/catalog.json) and [SEA benchmark index](benchmarks/index/sea.md)
+index the cases and retained original evidence. The
+[result report](reviews/2026-10-06-sea-coastal-fallback.md) links each final
+bundle and its screenshots, checks and source-log hashes. KI-526 retains the
+remaining control/placement and save/load limits. No native implementation,
+global unit classification or non-SEA priority change belongs to D-219.
+
+
+## D-220 - Measure Metal Plate and Glacial 8v8 costs before changing behavior
+
+**Decision.** Run serial, rendered, natural-resource 16-AI games with a pinned
+D-216 DLL/current source data, staged read-only timing wrappers, lifecycle and
+command observations, screenshots and matching AI-symbol instruction samples.
+Use Metal Plate as dense land stress and Glacial's registered naval mix. Publish
+original failures and pin each staged data file. Propose optimizations only;
+production behavior is not changed by this investigation.
+
+**Reasoning and rejected alternatives.** Aggregate APM is not proof of redundant
+orders, engine parent timers are not individually avoidable CPU, and profiler-off
+zeros are unavailable measurements. Do not promise a gain by summing nested
+scopes. Unit caps, longer response intervals, fewer scouting runs and global APM
+limits would violate the requested equivalence. Moving the VM or engine wrappers
+wholesale onto workers would violate ownership/ordering. Keep already optimized
+reservation collision lookup; investigate global release scans separately.
+
+**Scope decision.** Metal was explicitly stopped after 30:01 at severe slowdown;
+Glacial reached a 60-minute horizon, followed by a 12-minute SEA attribution run.
+All 16 teams remained active at the last complete intervals. Neither main game
+reached GameOver, so these are not matches completed to victory. A short initial
+Metal fixture with a speed-restoration problem is retained and excluded. Camera
+and profiler controls limit FPS conclusions; exact native phase measurements
+and ordered source analysis drive the ranking instead.
+
+**Invariant.** Every existing gameplay invariant remains forbidden in the
+checks. Staged timers do not change policy order, RNG draws or competing-unit
+commands. Retain original failed verdicts; a horizon stop is never a victory,
+disabled profiler readings are unavailable, and nested scopes are not summed
+as independent cost. Telemetry tests enforce these reporting distinctions.
+
+**Files.** [Report and ordered remedies](reviews/2026-10-06-metal-plate-glacial-performance.md),
+[runner](../tools/playtest/run_full_match_performance.py),
+[read-only observer](../tools/playtest/widgets/full_match_perf.lua),
+[analysis](../tools/playtest/analyze_full_match_performance.py),
+[interval summary](../tools/playtest/summarize_full_match_performance.py),
+[symbol reader](../tools/playtest/symbolize_instruction_samples.py),
+[telemetry tests](../tools/playtest/test_full_match_performance.py),
+[scenario](../tools/playtest/cases/shared/performance/full-match-profile.json),
+[checks](../tools/playtest/checks/shared/performance/full-match-profile.json),
+[playtest guide](../tools/playtest/README.md), [known issues](known-issues.md),
+[test guide](testing/README.md), [test catalog](testing/catalog.json),
+[shared test index](testing/index/shared.md),
+[benchmark catalog](benchmarks/catalog.json),
+[shared benchmark index](benchmarks/index/shared.md).
+The report links all four immutable evidence bundles and their original hashes.
+
+**Verification.** Three accepted diagnostic captures loaded all 16 scripts with
+310-member API parity and no script errors. They still FAIL strict gameplay
+invariants; retain that verdict. Three analysis tests, Python compilation,
+invariant-practice and scoped whitespace checks pass. Eight missing hover doc
+links remain pre-existing KI-404 debt. No old/new speedup, network improvement,
+full victory or behavior-equivalence result is claimed. KI-527--531 record the
+remaining work and precise validation requirements.
