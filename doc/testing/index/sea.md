@@ -260,6 +260,7 @@ Map: selected by runner
 
 - `expect: aircraft`
 - `expect: footprint`
+- `expect: income_hold`
 - `expect: mex`
 - `expect: platform`
 - `expect: support`
@@ -422,6 +423,9 @@ Map: glacial
 - `test_rear_fusion_footprint_keeps_protected_margin`
 - `test_safety_interruption_restarts_unchanged_site_timer`
 - `test_sea_policy_boundaries`
+- `test_seaplane_preserves_full_cost_and_reserve_after_commitments`
+- `test_seaplane_requires_sustained_income_even_with_gifted_bank`
+- `test_seaplane_uses_actual_faction_and_modified_costs`
 - `test_shared_factory_support_budget_and_pending_power`
 - `test_yard_whole_footprint_stays_forward_of_economy`
 

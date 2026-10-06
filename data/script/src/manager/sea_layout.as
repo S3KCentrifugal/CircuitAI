@@ -258,6 +258,11 @@ namespace SeaLayout {
         CCircuitDef@ d=ai.GetCircuitDef(name);
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         if (!SeaFactories::FactoryAllowed(d)) return null;
+        // Native/default and objective placement must use the same economic
+        // gate as the direct role request. Existing tasks resume elsewhere.
+        const bool gatedPlatform=UnitHelpers::IsSeaplanePlatform(name) && Global::RoleSettings::Sea::SeaplanesAfterT2;
+        if (gatedPlatform && !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed(),0,0,
+            Global::RoleSettings::Sea::SeaplaneMetalReserve,Global::RoleSettings::Sea::SeaplaneEnergyReserve)) return null;
         Berth@ b=null;
         for (uint i=0; i<berths.length(); ++i) if (berths[i].name==name && !berths[i].active && !berths[i].retired && berths[i].oldUnit==oldUnit) { @b=berths[i]; break; }
         if (b is null) {
@@ -292,6 +297,9 @@ namespace SeaLayout {
         }
         if (!Opening(b) && !ForwardSite(d,b.centre,b.facing)) {
             Invariants::Violation("INV-138",b.key,"later shipyard is behind economy or faces away from enemy"); return null;
+        }
+        if (gatedPlatform && !SeaEconomy::SeaplaneReady(d)) {
+            Invariants::Violation("INV-152",b.key,"SEA platform admission lost its economic eligibility"); return null;
         }
         return Pinned(d,b.slot,Task::BuildType::FACTORY,Task::Priority::HIGH);
     }

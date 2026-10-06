@@ -1632,6 +1632,10 @@ namespace Global {
             int MaxSupportPerBerth = 40;
             int ReservedSupportPerFactory = 20; // compact rear bank, expand as funded demand grows
             bool SeaplanesAfterT2 = true;
+            float SeaplaneMinimumMetalIncome = 80.0f; // minimum over the shared last-ten-second window
+            float SeaplaneMinimumEnergyIncome = 1500.0f;
+            float SeaplaneMetalReserve = 500.0f; // retained in addition to the full platform cost
+            float SeaplaneEnergyReserve = 1000.0f;
             float NearbyMexRadius = 2400.0f; // fixed home harbor radius, not an ever-moving expansion centre
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;

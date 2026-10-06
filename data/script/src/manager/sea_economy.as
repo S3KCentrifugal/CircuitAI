@@ -150,19 +150,35 @@ namespace SeaEconomy {
             Global::RoleSettings::Sea::RequiredMetalCurrentForT2Shipyard,yard.costM+con.costM+800.0f,yard.costE+con.costE+8000.0f,
             Global::RoleSettings::Sea::TechPackageSeconds,Global::RoleSettings::Sea::TechPackageIncomeShare);
     }
-    bool Fund(CCircuitDef@ d, float buildPower, float extraM=0, float extraE=0) {
-        fundedFrame=-1; fundedName="";
-        if (d is null || buildPower<=0) return false;
-        const float seconds=AiMax(1.0f,d.GetBuildTime()/buildPower);
+    void UnframedCosts(float &out queuedM, float &out queuedE) {
         // Existing usage already pays framed work. Unframed commitments reserve bank.
-        float queuedM=0, queuedE=0;
+        queuedM=0; queuedE=0;
         for (uint i=0; i<projects.length(); ++i) {
             IBuilderTask@ t=cast<IBuilderTask>(projects[i]);
             if (t !is null && !t.IsDead() && t.target is null) { queuedM+=t.buildDef.costM; queuedE+=t.buildDef.costE; }
         }
-        const bool funded=BuildPowerMath::Funded(aiEconomyMgr.metal.current,0,aiEconomyMgr.metal.income,TeamEconomy::OwnMetal(TeamEconomy::USAGE),
+    }
+    bool SeaplaneReady(const CCircuitDef@ d) {
+        if (d is null || !Economy::IncomeWindowReady()) return false;
+        const float mi=Economy::GetMinMetalIncomeLast10s(), ei=Economy::GetMinEnergyIncomeLast10s();
+        if (mi<Global::RoleSettings::Sea::SeaplaneMinimumMetalIncome || ei<Global::RoleSettings::Sea::SeaplaneMinimumEnergyIncome) return false;
+        // Reuse the income window (amortized O(1)); inspect queued projects
+        // only on factory decisions after the cheap gate passes, never scan
+        // owned units here. Read live commitments so same-frame work counts.
+        float queuedM=0, queuedE=0; UnframedCosts(queuedM,queuedE);
+        return SeaMath::SeaplaneEconomyReady(true,mi,ei,
+            aiEconomyMgr.metal.current-queuedM-recruitAdmittedM,aiEconomyMgr.energy.current-queuedE-recruitAdmittedE,
+            d.costM,d.costE,Global::RoleSettings::Sea::SeaplaneMinimumMetalIncome,Global::RoleSettings::Sea::SeaplaneMinimumEnergyIncome,
+            Global::RoleSettings::Sea::SeaplaneMetalReserve,Global::RoleSettings::Sea::SeaplaneEnergyReserve);
+    }
+    bool Fund(CCircuitDef@ d, float buildPower, float extraM=0, float extraE=0, float reserveM=0, float reserveE=0) {
+        fundedFrame=-1; fundedName="";
+        if (d is null || buildPower<=0) return false;
+        const float seconds=AiMax(1.0f,d.GetBuildTime()/buildPower);
+        float queuedM=0, queuedE=0; UnframedCosts(queuedM,queuedE);
+        const bool funded=BuildPowerMath::Funded(aiEconomyMgr.metal.current,reserveM,aiEconomyMgr.metal.income,TeamEconomy::OwnMetal(TeamEconomy::USAGE),
             queuedM+recruitAdmittedM,d.costM,seconds,extraM,Global::RoleSettings::Sea::WorkforceHorizon)
-            && BuildPowerMath::Funded(aiEconomyMgr.energy.current,0,aiEconomyMgr.energy.income,TeamEconomy::OwnEnergy(TeamEconomy::USAGE),
+            && BuildPowerMath::Funded(aiEconomyMgr.energy.current,reserveE,aiEconomyMgr.energy.income,TeamEconomy::OwnEnergy(TeamEconomy::USAGE),
             queuedE+recruitAdmittedE,d.costE,seconds,extraE,Global::RoleSettings::Sea::WorkforceHorizon);
         if (funded) { fundedFrame=ai.frame; fundedName=d.GetName(); }
         return funded;

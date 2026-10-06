@@ -285,11 +285,12 @@
         "test_queue_and_arrivals_are_capacity",
         "test_repeated_refills_survive_overflow_sharing",
         "test_reserve_before_completion_not_just_end",
+        "test_seaplane_reserve_blocks_a_deficit_that_old_funding_admitted",
         "test_second_callback_cannot_reuse_first_cost_or_spending",
         "test_unaffordable_opening_turret_does_not_veto_constructor"
       ],
       "detail": "",
-      "sha256": "d9dc80a26f8d10a087655aa0009744e5299635d6dbbcf0efa9e1a504abd29bf9",
+      "sha256": "3c717f33328e3a39010296347cf037c8046f8e8d46359bf3de778b72776d17d9",
       "execution": "not inferred"
     },
     {
@@ -649,11 +650,14 @@
         "test_rear_fusion_footprint_keeps_protected_margin",
         "test_safety_interruption_restarts_unchanged_site_timer",
         "test_sea_policy_boundaries",
+        "test_seaplane_preserves_full_cost_and_reserve_after_commitments",
+        "test_seaplane_requires_sustained_income_even_with_gifted_bank",
+        "test_seaplane_uses_actual_faction_and_modified_costs",
         "test_shared_factory_support_budget_and_pending_power",
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "9adeaececc7bc4e6fd72178ba658ab76b7383db345ab10bbb54f0533cf6bca3c",
+      "sha256": "e0bfee088554bb435e595f9fc97ef327ff443d54de45654340e2996510370a96",
       "execution": "not inferred"
     },
     {
@@ -1745,7 +1749,7 @@
       "title": "seaplane-transition",
       "definitions": [],
       "detail": "Map: Supreme Isthmus v1.7",
-      "sha256": "71c8e17a82423dbb2fa8526bc9abc0f95a801b337be756ba9f4a226a8096c9c2",
+      "sha256": "82931d2bad159be483e7560c4a98847db6c18306c00e4ef1211366cf83e8aea4",
       "execution": "not inferred"
     },
     {
@@ -3230,13 +3234,14 @@
       "definitions": [
         "expect: aircraft",
         "expect: footprint",
+        "expect: income_hold",
         "expect: mex",
         "expect: platform",
         "expect: support",
         "forbid: errors"
       ],
       "detail": "",
-      "sha256": "bf730baa6f59dbca6895f8ff67e4eeb93f926f104ab050dacb3e5e48fe6a09b3",
+      "sha256": "a6469688faf8ce483b8fbd047182160be32b0d5918141d9454edec6cf9f757bf",
       "execution": "not inferred"
     },
     {
@@ -5810,7 +5815,7 @@
       "title": "sea_transition_watch",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "e7673bee561a2a5cf74cc488e31740d4893b5b8a255b8dbc3f9fc50703cbfe2b",
+      "sha256": "e7af2ba9169e3c655e27f543a77bd1eed307dae359248d33f55418fb2fcaaf60",
       "execution": "not inferred"
     },
     {

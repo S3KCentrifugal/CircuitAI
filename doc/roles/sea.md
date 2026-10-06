@@ -163,6 +163,10 @@ The shared legacy helper currently ignores the stored-metal threshold
 | --- | --- | --- |
 | `NearbyMexRadius` | 2400 elmos | First construction ship claims safe reachable metal within this radius of its home yard before discretionary work. |
 | `SeaplanesAfterT2` | true | Make a seaplane platform the next discretionary factory after a completed T2 yard, retaining its aircraft production. |
+| `SeaplaneMinimumMetalIncome` | 80 metal/s | Minimum throughout the shared mature ten-second income window. |
+| `SeaplaneMinimumEnergyIncome` | 1500 energy/s | Minimum throughout the same window. |
+| `SeaplaneMetalReserve` | 500 metal | Uncommitted bank must cover the platform plus this reserve; spending forecast preserves the reserve. |
+| `SeaplaneEnergyReserve` | 1000 energy | Equivalent energy bank and forecast reserve. |
 | `ReservedSupportPerFactory` | 20 | Reserve reachable naval construction-turret capacity before admitting the platform; actual purchases remain income/workload driven. |
 | `MaxSupportPerBerth` | 40 | Upper bound used by support scaling and the reserved-capacity requirement. |
 
@@ -442,7 +446,8 @@ local claims are exhausted it returns to the existing converter/economy ladder.
 This applies to both compact and experimental SEA builder paths.
 
 SeaplanesAfterT2 defaults true: a completed T2 yard enables the next platform
-purchase, subject to resource funding. Other new factories wait until a platform
+purchase, subject to sustained income, full uncommitted cost plus reserves and
+the resource spending forecast (D-210). Other new factories wait until a platform
 exists or is queued; a lost T1 yard can be recovered. Platforms reserve reachable
 naval turret capacity, participate in production support scaling, and use native
 production with keepActive so the T2 yard does not suppress their aircraft.

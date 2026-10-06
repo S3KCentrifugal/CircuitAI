@@ -85,3 +85,9 @@ void test_project_arrivals_and_queued_support_count_once() {
     Check(BuildPowerMath::ProjectShortage(600, 700, 6000, 6, 1000, 0) == 0);
     Check(BuildPowerMath::ProjectShortage(600, 700, 300000, 0, 1000, 0) == 0);
 }
+void test_seaplane_reserve_blocks_a_deficit_that_old_funding_admitted() {
+    Check(BuildPowerMath::Funded(1950,0,80,90,0,1450,60,0,45));
+    Check(!BuildPowerMath::Funded(1950,500,80,90,0,1450,60,0,45));
+    Check(BuildPowerMath::Funded(1950,500,80,80,0,1450,60,0,45));
+    Check(!BuildPowerMath::Funded(1950,500,80,80,1,1450,60,0,45));
+}

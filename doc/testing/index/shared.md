@@ -820,6 +820,7 @@ Native executable; unnamed assertions remain inside the linked suite.
 - `test_queue_and_arrivals_are_capacity`
 - `test_repeated_refills_survive_overflow_sharing`
 - `test_reserve_before_completion_not_just_end`
+- `test_seaplane_reserve_blocks_a_deficit_that_old_funding_admitted`
 - `test_second_callback_cannot_reuse_first_cost_or_spending`
 - `test_unaffordable_opening_turret_does_not_veto_constructor`
 

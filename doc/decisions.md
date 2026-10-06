@@ -12628,3 +12628,51 @@ failed natural run are retained. This is not an FPS or cross-role gameplay
 benchmark. Evidence and limitations: [plan/results](sea-seaplane-transition.md);
 [natural case](../tools/playtest/cases/sea/economy/seaplane-natural.json),
 [natural checks](../tools/playtest/checks/sea/economy/seaplane-natural.json).
+
+
+## D-210 - Require a funded economy before the SEA seaplane transition
+
+**Decision.** Refine D-209 per the user's correction: a completed T2 yard selects
+the next factory type but no longer suffices to admit it. Require minimum income
+of 80 metal/s and 1500 energy/s over the shared mature ten-second window, then
+uncommitted banks for the full platform cost plus 500 metal/1000 energy. Apply
+the existing spending forecast with those reserves protected. Settings remain
+SEA-owned; no native or other-role policy changes. Do not cancel existing work.
+
+**Why / alternatives.** A bank gift cannot sustain another production line on
+low income. A timer after T2 or another bank-only bypass does not fix that.
+Full current-cost funding protects early T2 construction; a sustained income
+floor also supports subsequent production. This is conservative tuning, not a
+claim of universally optimal PvP timings. The existing unframed-cost scan is
+shared by both bank eligibility and funding; other funding callers retain zero
+reserves. Keep factory preference separate from affordability and cover native
+switch, role and pinned-layout paths.
+
+**Invariant.** INV-152 requires economic eligibility at platform commitment.
+INV-150/151 continue to cover first-ship metal, T2 completion and turret capacity.
+
+**Files.** [settings](../data/script/src/global.as),
+[math](../data/script/src/helpers/sea_math.as),
+[economy](../data/script/src/manager/sea_economy.as),
+[layout](../data/script/src/manager/sea_layout.as),
+[builder](../data/script/src/roles/sea_build.as),
+[factory](../data/script/src/roles/sea_factories.as),
+[SEA math tests](../tests/sea_math_tests.as),
+[funding tests](../tests/build_power_math_tests.as),
+[observer](../tools/playtest/widgets/sea_transition_watch.lua),
+[case](../tools/playtest/cases/sea/economy/seaplane-transition.json),
+[checks](../tools/playtest/checks/sea/economy/seaplane-transition.json),
+[invariants](invariants.md), [actors](actor-matrix.md),
+[SEA reference](roles/sea.md), [builder reference](roles/sea_build.md),
+[factory reference](roles/sea_factories.md), [known issues](known-issues.md),
+[plan/results](sea-seaplane-transition.md), [benchmark catalog](benchmarks/catalog.json),
+[test catalog](testing/catalog.json).
+
+**Verification.** Thirteen SEA and twenty funding actual-VM test functions pass.
+Supplied Supreme verifies low-income rejection with abundant bank, then funded
+admission, aircraft and turret assistance. The natural experimental run has no
+platform by thirty minutes; the sampled post-T2 bank never reaches the new
+threshold. Retain that failed deadline and the conservative gate, rather than
+infer a universal timing goal from one unpaired run; KI-228 records the timing
+limitation. No claim of a no-stall guarantee under later attacks/income loss.
+Details: [plan/results](sea-seaplane-transition.md). D-209 timings remain historical.

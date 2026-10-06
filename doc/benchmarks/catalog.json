@@ -4176,6 +4176,19 @@
     {
       "area": "economy",
       "domain": "sea",
+      "experiment_kind": "supplied",
+      "id": "20261006T001837Z-0cd7a576",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/economy/seaplane-armada/2026-10-06/20261006T001837Z-0cd7a576/result.json",
+      "scenario": "seaplane-armada",
+      "sha256": "b6219710c0ace1f4abf1ffddc3b2e6deda880354bd8bde9294b95496d436920a",
+      "verdict": "PASS"
+    },
+    {
+      "area": "economy",
+      "domain": "sea",
       "experiment_kind": "benchmark",
       "id": "20261005T235701Z-9cc771f4",
       "kind": "run-record",
@@ -4198,6 +4211,19 @@
       "scenario": "seaplane-armada-eco",
       "sha256": "c170e93daa56573aa8c80178d3ca63efd57aea81a23aa4ccb29f8552cf16e92c",
       "verdict": "PASS"
+    },
+    {
+      "area": "economy",
+      "domain": "sea",
+      "experiment_kind": "benchmark",
+      "id": "20261006T002307Z-31832977",
+      "kind": "run-record",
+      "map": "supreme",
+      "map_name": "Supreme Isthmus v1.7",
+      "path": "records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T002307Z-31832977/result.json",
+      "scenario": "seaplane-armada-eco",
+      "sha256": "a041e93e66998f8115ea5829f09e36059b807a4fab1de0565a4ff6b26ec88017",
+      "verdict": "FAIL"
     },
     {
       "area": "economy",

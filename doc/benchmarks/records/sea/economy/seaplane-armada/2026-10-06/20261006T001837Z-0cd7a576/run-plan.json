@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "seaplane-armada"
+  },
+  "id": "20261006T001630Z-4fb702b0",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1
+}

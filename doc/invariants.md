@@ -211,3 +211,4 @@ step.
 
 | INV-150 | SEA's first-ship mex priority returns a mex task; existing construction/player/enemy-reclaim ownership is preserved. | SeaBuild::OpeningMex audits new task type; Supreme observer checks actual first-ship construction. | D-209 |
 | INV-151 | With SeaplanesAfterT2 enabled, SEA admits a planned seaplane platform only after its T2 shipyard finishes, with the configured reachable turret footprint reserved. | SeaLayout::Factory gates completion and support capacity; Supreme observer checks platform completion, aircraft and assistance. | D-209 |
+| INV-152 | A new SEA seaplane platform admission retains its configured sustained-income eligibility and uncommitted cost plus reserves. | SeaLayout::Factory checks readiness before committing the pin; pure funding boundaries and the low-income supplied fixture verify rejection and later release. | D-210 |

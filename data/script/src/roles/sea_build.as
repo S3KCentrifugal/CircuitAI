@@ -29,14 +29,18 @@ namespace SeaBuild {
         const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         if (!SeaFactories::NeedSeaplane(side)) return null;
         CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
-        if (!u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed())) return null;
+        if (!u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || !SeaEconomy::SeaplaneReady(d)
+            || !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed(),0,0,
+                Global::RoleSettings::Sea::SeaplaneMetalReserve,Global::RoleSettings::Sea::SeaplaneEnergyReserve)) return null;
         IUnitTask@ task=SeaLayout::Enabled() ? SeaLayout::Factory(u,d.GetName())
             : Builder::EnqueueSeaplanePlatform(side,Factory::GetT2ShipyardPos(),SQUARE_SIZE*24,600*SECOND);
         if (task !is null) {
             // The compact census resets admissions; with layouts explicitly
             // disabled native owns the order and its commitment accounting.
             if (SeaLayout::Enabled()) SeaEconomy::Admit(d,false,true);
-            GenericHelpers::LogUtil("[SEA][Factory] post-T2 seaplane admitted "+d.GetName(),1);
+            GenericHelpers::LogUtil("[SEA][Factory] post-T2 seaplane admitted "+d.GetName()
+                +" minM="+Economy::GetMinMetalIncomeLast10s()+" minE="+Economy::GetMinEnergyIncomeLast10s()
+                +" bankM="+aiEconomyMgr.metal.current+" bankE="+aiEconomyMgr.energy.current,1);
         }
         return task;
     }

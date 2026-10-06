@@ -4716,6 +4716,17 @@ construction access and is not a regression comparison.
 Keep the failed natural check and resolve timing with explicit gate/task
 telemetry and paired controls; see [seaplane results](sea-seaplane-transition.md).
 
+**D-210 observation (2026-10-05).** The new deliberate sustained-income and
+full-cost-plus-reserve gate passed supplied rejection/recovery. In the natural
+Supreme experimental run, T2 finished at 15:12 and fusion at 21:11; no platform
+completed by thirty minutes. Post-T2 thirty-second samples peaked at only
+1412 banked metal, below Armada's 1950 admission requirement even before
+commitments. SEA has no dedicated platform saving phase: continuous naval and
+economic spending can postpone this conservative transition. This is a timing
+limitation, not evidence of a broken release gate. Calibrate with paired games
+and explicit spending/gate telemetry before adding savings or lowering reserves;
+retain urgent naval responses. See [D-210 evidence](sea-seaplane-transition.md).
+
 ### KI-229 - SEA same-tick funding can reserve accepted capital twice
 
 **Problem.** SeaEconomy::Fund sums queued unframed SEA projects and admitted

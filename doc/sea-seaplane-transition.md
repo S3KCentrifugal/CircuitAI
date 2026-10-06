@@ -9,7 +9,7 @@ there is no eligible local spot, resume the normal economy ladder, including
 converters. Keep the shared SEA/TACTICAL ladder unchanged.
 
 After a completed T2 shipyard, SEA's next new factory is its faction's seaplane
-platform. Preserve resource funding, availability and recovery of a lost T1
+platform, once its economy meets the transition target below. Preserve resource funding, availability and recovery of a lost T1
 yard. Block discretionary alternative factories until the platform exists or
 is committed. Older map objectives must use this same admission path.
 
@@ -30,7 +30,41 @@ builder paths and all three faction definitions. Follow with an ordinary-resourc
 Supreme opening. Preserve failed runs and distinguish supplied acceptance tests
 from natural economy benchmarks.
 
+## Economic admission revision (D-210)
+
+The platform is the next factory choice, not an immediate purchase on T2
+completion. Require a mature ten-second income window whose minimum is at
+least 80 metal/s and 1500 energy/s. Require uncommitted banks covering the
+entire platform plus 500 metal and 1000 energy, then run the existing spending
+forecast with those reserves protected. Keep construction already admitted;
+falling income does not cancel/reissue it. There is no timer or gifted-bank
+bypass of the sustained income target.
+
+This is a conservative AI tuning choice, not a claimed universal PvP rule.
+Official [Armada](https://www.beyondallreason.info/unit/armplat),
+[Cortex](https://www.beyondallreason.info/unit/corplat) and
+[Legion](https://www.beyondallreason.info/unit/legsplab) definitions list
+1400-1450 metal and 5000-5500 energy for the platform. Runtime UnitDef costs,
+including game modifiers, determine the required bank. The income target
+leaves room for naval production and economic work as aircraft are introduced.
+
+Implement admission in SeaEconomy using the existing shared income window;
+factor its unframed commitment calculation so funding and bank availability
+agree. Gate the builder, native factory switch and pinned layout paths. Keep
+the missing-platform factory preference separate from economic readiness so
+another optional factory cannot consume the money while SEA is waiting.
+Retain ordinary economy work, first-ship mex priority and T1 recovery.
+
+Verify pure boundary cases (immature history, either low income, insufficient
+uncommitted bank, exact threshold, changed platform cost, protected reserves),
+then a supplied T2/low-income rejection followed by funded-income acceptance,
+and an ordinary-resource Supreme run. Preserve the earlier D-209 evidence as
+historical: those platform timings predate this added admission requirement.
+
 ## Supplied acceptance results
+
+The following table records D-209, before the D-210 economic gate. Updated
+economic-gate evidence follows at the end of this document.
 
 All runs use Supreme Isthmus v1.7, experimental_balanced and the pinned BAR
 test-31479-433a460 content. The final native build is
@@ -107,3 +141,33 @@ for supplied acceptance. Use `--side cortex --experimental` or `--side legion`
 for the other tested variants. Add `--natural --minutes 30` for ordinary resources;
 add `--experimental` to exercise the opt-in economic migration. Scenarios and
 checks are indexed under SEA/economy in the [test catalog](testing/index/sea.md).
+
+## D-210 verification
+
+Thirteen SEA policy test functions and twenty funding test functions pass in
+the real AngelScript VM. Cases cover both income floors, immature history,
+full cost and reserve boundaries, prior commitments, faction/modified costs,
+and a deficit that the earlier zero-reserve forecast would have accepted.
+The current DLL remains `aff90f713fc9746a`; this revision changes scripts only.
+
+The Armada compact [supplied economy test passed](benchmarks/records/sea/economy/seaplane-armada/2026-10-06/20261006T001837Z-0cd7a576/report.md).
+With T2 complete, the platform was still absent at 3:30; the 3:00 observer
+recorded +13.5 metal/s and 93,332 metal banked. After supplied naval economy
+at 4:00, admission occurred at 4:45 with ten-second minimum incomes +158.1
+metal/s and +16,004 energy/s. The platform completed at 5:01, three nearby
+turrets assisted at 5:15, and its first bomber completed at 5:21. This proves
+the income floor rejects a rich bank and permits production after recovery;
+these are supplied acceptance timings, not a natural economy benchmark.
+
+The ordinary-resource experimental [Supreme run missed its thirty-minute
+platform deadline](benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T002307Z-31832977/report.md).
+T2 completed 15:12 and naval fusion 21:11. The thirty-second post-T2 economy
+samples peaked at 1411.53 metal stored (23:36), below the 1950 Armada requirement
+before queued commitments; at 29:36 income was +93.47 metal/s but bank only
+401.94. No seaplane was admitted. The original FAIL is preserved. This does
+not prove a natural transition timing, or identify every rejected callback;
+it demonstrates ongoing resource pressure and a conservative hold while SEA
+continues economy/fleet work. KI-228 records the absence of a dedicated
+platform saving phase. Paired timing calibration remains future work; this
+change adds admission protection, not a guaranteed release deadline or immunity
+to later income loss and new emergency spending.

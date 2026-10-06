@@ -98,7 +98,7 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: 1a2adc5ba84836673a1a0962355f2817e9dd6257; lines: 473 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: 3162dcfbfbd3f6869172009131203366f7147dac; lines: 477 -->
 
 ## D-209 follow-up
 
@@ -108,7 +108,10 @@ corrects the compact path's converter-before-mex decision and the experimental
 census's minimum-ID selection. Native allied-aware spot claims and ship-area
 reachability remain authoritative; the 2400-elmo home radius is configurable.
 
-Seaplane transitions precede optional economic jobs once a T2 yard finishes.
+Seaplane transitions precede optional economic jobs once a T2 yard finishes
+and D-210's sustained-income, uncommitted-bank and protected-reserve forecast
+checks pass. Otherwise normal economy work continues. Admitted projects finish
+without cancellation on income fluctuations.
 Platforms now use SeaLayout persistent footprints and require the configured
 ReservedSupportPerFactory slots in range before admission. Existing valid slots
 count; only the shortfall is reserved. A support-starved unclaimed platform site

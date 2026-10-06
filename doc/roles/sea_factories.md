@@ -42,12 +42,15 @@ movement-area connectivity are not a guarantee of an unobstructed full route.
 See the [plan](../sea-layout-migration-plan.md) and
 [runtime results](../sea-layout-migration-results.md).
 
-<!-- source: data/script/src/roles/sea_factories.as; blob: 3e001aa4310053f2ccfbc27a52761e6b650aef98; lines: 224 -->
+<!-- source: data/script/src/roles/sea_factories.as; blob: 2b5e3b53179c558418a72302b6d8e4751ecbff8d; lines: 224 -->
 
 ## D-209 follow-up
 
 FactoryAllowed and NeedSeaplane enforce the SEA-only post-T2 platform transition.
 Frames and queued orders prevent duplicates; T1 recovery is still allowed.
+Platform purchases additionally require D-210 economic readiness; the missing
+platform preference remains distinct so another optional factory cannot spend
+its bank while SEA is waiting for adequate income.
 RoleSea calls native MakeFactoryTask(platform,true), preserving configured
 aircraft weights while bypassing the T1 shutdown that otherwise leaves a new
 platform idle after a T2 shipyard. No other role opts into this lever.

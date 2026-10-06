@@ -14,7 +14,7 @@ namespace SeaFactories {
     bool FactoryAllowed(const CCircuitDef@ d) {
         if (d is null || !Global::RoleSettings::Sea::SeaplanesAfterT2) return true;
         const string side=UnitHelpers::GetSideForUnitName(d.GetName());
-        if (UnitHelpers::IsSeaplanePlatform(d.GetName())) return T2Finished(side);
+        if (UnitHelpers::IsSeaplanePlatform(d.GetName())) return T2Finished(side) && SeaEconomy::SeaplaneReady(d);
         // A lost opening yard must remain recoverable. Other discretionary
         // factory purchases wait for the post-T2 platform commitment.
         return (UnitHelpers::IsT1Shipyard(d.GetName()) && d.count==0) || !NeedSeaplane(side);

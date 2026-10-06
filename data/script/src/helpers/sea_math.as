@@ -3,6 +3,12 @@ namespace SeaMath {
     bool SeaplaneNext(bool enabled, bool t2Finished, int platforms, int queued) {
         return enabled && t2Finished && platforms==0 && queued==0;
     }
+    bool SeaplaneEconomyReady(bool windowReady, float incomeM, float incomeE,
+        float availableM, float availableE, float costM, float costE,
+        float minM, float minE, float reserveM, float reserveE) {
+        return windowReady && costM>=0 && costE>=0 && minM>=0 && minE>=0 && reserveM>=0 && reserveE>=0
+            && incomeM>=minM && incomeE>=minE && availableM>=costM+reserveM && availableE>=costE+reserveE;
+    }
     // Centre-out columns keep existing members' slots when reinforcements
     // arrive. Fixed columns avoid a sqrt(N) grid reshuffle at every birth/death.
     int SpreadIndex(int index) { return index==0 ? 0 : (index%2==1 ? (index+1)/2 : -index/2); }

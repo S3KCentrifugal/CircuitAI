@@ -5,6 +5,7 @@ local names={armada={"armsy","armasy","armplat","armcs","armuwfus","armnanotcpla
  legion={"legsy","legadvshipyard","legsplab","legnavyconship","leganavalfusion","legnanotcplat"}}
 local n=names[cfg.side]
 local first,t2,platform
+local platformCreated=false
 local builtBy={}
 local passed={}
 local function log(s) Spring.Echo("[SeaTransition] "..s) end
@@ -25,6 +26,22 @@ function widget:GameFrame(f)
   if f==300 then give(n[1],5824,10736) end
   if f==330 then give(n[5],6400,11400) end
   if f==3600 then give(n[2],6600,10736) end
+  if f==6300 then
+   local _,_,_,mi=Spring.GetTeamResources(0,"metal")
+   if t2 and not platformCreated and mi<80 then pass("income_hold","low-income T2 holds platform despite supplied bank")
+   else log("FAIL low-income hold fixture not established mi="..mi) end
+  end
+  -- Establish real sustained income, not a one-frame resource injection or
+  -- an override of the role's economic thresholds. Naval fixtures are kept
+  -- away from the tested home berth and still require water at each site.
+  if f==7200 then
+   local converter=({armada="armuwmmm",cortex="coruwmmm",legion="leganavaleconv"})[cfg.side]
+   for i=0,11 do
+    give(n[5],8000+(i%4)*192,10800+math.floor(i/4)*192)
+    give(converter,8000+(i%4)*192,11500+math.floor(i/4)*128)
+   end
+   log("supplied sustained-income economy at 4 minutes")
+  end
  end
  if f%150==0 and platform then
   local x,_,z=Spring.GetUnitPosition(platform)
@@ -49,6 +66,7 @@ function widget:UnitCreated(id,def,team,builder)
  local d=UnitDefs[def]
  builtBy[id]=builder
  if d.name==n[3] then
+  platformCreated=true
   if not t2 then log("FAIL platform before T2") end
   log("platform frame at="..Spring.GetGameSeconds())
  end

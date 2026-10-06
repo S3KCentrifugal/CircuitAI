@@ -1,3 +1,22 @@
+void test_seaplane_requires_sustained_income_even_with_gifted_bank() {
+    Check(!SeaMath::SeaplaneEconomyReady(false,80,1500,100000,100000,1450,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,79.9f,1500,100000,100000,1450,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1499,100000,100000,1450,5000,80,1500,500,1000));
+}
+void test_seaplane_preserves_full_cost_and_reserve_after_commitments() {
+    Check(SeaMath::SeaplaneEconomyReady(true,80,1500,1950,6000,1450,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1500,1949,6000,1450,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1500,1950,5999,1450,5000,80,1500,500,1000));
+    // A 400-metal queued commitment is unavailable even with 2300 banked.
+    Check(!SeaMath::SeaplaneEconomyReady(true,100,2000,2300-400,10000,1450,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,100,2000,-100,10000,1450,5000,80,1500,500,1000));
+}
+void test_seaplane_uses_actual_faction_and_modified_costs() {
+    Check(SeaMath::SeaplaneEconomyReady(true,80,1500,1900,6500,1400,5500,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1500,1950,6000,2900,10000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1500,1950,6000,-1,5000,80,1500,500,1000));
+    Check(!SeaMath::SeaplaneEconomyReady(true,80,1500,1950,6000,1450,5000,80,1500,-1,1000));
+}
 void test_sea_policy_boundaries() {
     Check(!SeaMath::SeaplaneNext(false,true,0,0));
     Check(!SeaMath::SeaplaneNext(true,false,0,0));
