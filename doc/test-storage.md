@@ -135,3 +135,38 @@ log hash and path but does not put the log, replay, DLL or cache into Git. Repla
 remain in the engine write directory, separate from the report snapshot.
 Back up those directories before any future cleanup. Generated indices are
 disposable; published bundles, failures and scorecard revisions are not.
+
+## Reducing Windows disk usage without discarding evidence
+
+First distinguish file **Size** from **Size on disk**. The October 6 audit found
+that most space was staged `SkirmishAI.dbg` debug symbols, not replays. Symbols
+must match the tested DLL to investigate historical crashes; do not remove them
+merely because they are not committed to Git.
+
+With simulations stopped, use the narrowly scoped maintenance utility:
+
+```powershell
+python tools/playtest/compress_symbols.py
+python tools/playtest/compress_symbols.py --apply --workers 4
+```
+
+The first command only lists the eligible count and allocated file-data size.
+The second applies transparent Windows LZX compression to uncompressed `.dbg`
+files of at least 32 MiB under this checkout's `build-theatres/`. Ordinary file
+access and symbolisation keep the same paths and bytes. It skips existing
+compression, shared hard links and reparse points, checks for running game
+processes between bounded batches, and records before/after SHA-256, sizes and
+timestamps under `build-theatres/storage-audit/<UTC-id>/`. Verification failure
+stops new batches; existing files are never deleted by this utility.
+
+Run it after a batch of simulations when disk usage grows. It does not change
+the playtest staging path, so later runs can create more uncompressed copies.
+Compression adds decompression work when reading symbols; runtime DLLs, scripts,
+engine caches and gameplay commands are untouched.
+
+Do not replace staged symbols with shared hard links: `stage()` copies into the
+existing destination, which could then overwrite historical symbols belonging
+to another run. Do not delete an entire game folder on the strength of a
+published summary; the full log and replay are usually only in that local
+folder. Moving those originals to another drive requires a verified backup and
+an updated artifact-location record. See the [disk cleanup audit](storage-cleanup-2026-10-06.md).

@@ -5496,3 +5496,16 @@ the original run remains FAIL despite passing its production/recovery checks.
 **Proposed solution.** Add caller-scoped counters around SeaInvasion::PlanSupport, SeaBuild::ReserveSupport/Support and SeaLayout::PlanPatch. Compare identical serial windows and terrain/footprint invalidations before caching unsuccessful searches. Preserve immediate retries when occupancy, factory location or required build power changes; do not introduce an arbitrary command rate limit.
 
 **Verification.** Both exact counts and gameplay passes are preserved in the [D-212 report](sea-amphibious-transition.md). The required six/twelve completed in-range turrets and invasion passed; no measured whole-game performance gain or regression is established.
+
+
+### KI-520 - Simulation staging replicates large uncompressed symbol files
+
+**Severity:** Medium (local test storage).
+
+**Location:** tools/playtest/playtest.py, stage(), and historical build-theatres directories.
+
+**Problem.** Each staged game copies SkirmishAI.dbg, typically 300–360 MiB. The October 6 audit found 1,043 symbol files accounting for 278.74 GiB of allocated file data. The new maintenance utility compresses existing copies without losing evidence, but future stages still create independent copies, so storage can grow again.
+
+**Proposed solution.** Use the explicit idle-time [compression utility](../tools/playtest/compress_symbols.py) after batches of simulations. A future permanent solution can add opt-in compression after staging, or a content-addressed immutable symbol archive with an explicit restore/lookup manifest. Do not hard-link reusable staged destinations: later copy2 writes could modify symbols retained for another run. Do not prune raw game folders without verified backups and artifact-location records.
+
+**Verification.** The [audit and preservation results](storage-cleanup-2026-10-06.md) and [D-213](decisions.md#d-213--reclaim-playtest-disk-space-with-verified-symbol-compression) document current mitigation. Automatic staging/storage changes remain unimplemented; benchmark content and original evidence are retained.
