@@ -229,3 +229,5 @@ step.
 | INV-161 | Optimized ranged safety and danger-sign queries return the legacy result on the same live snapshot. | Opt-in CIRCUIT_VERIFY_RANGED_QUERIES repeats the original predicate; ordered spatial mutation tests independently compare the frozen legacy index. | D-221 |
 
 | INV-162 | SEA commander economy handoff requires a completed T2 yard and four completed in-range construction turrets. | SeaBuild::Commander admission and independent SeaCapacity runtime observer. | D-222 |
+
+| INV-163 | A suppressed builder GUARD has a matching live engine guard target under the current task, with valid prefix, options and expiry. | Opt-in CIRCUIT_VERIFY_GUARD wrapper observation at each suppression; native predicate/real callback adapter tests and rendered recovery fixtures. | D-223 |

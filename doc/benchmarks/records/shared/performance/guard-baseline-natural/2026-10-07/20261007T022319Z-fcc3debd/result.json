@@ -1,0 +1,139 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 418,
+      "sha256": "8444029188d09438c3bbc26b9e1c8816f09d076bfa647a6b061b963752af329d"
+    },
+    "guard-pins.json": {
+      "bytes": 37745,
+      "sha256": "3a0b5490149adc55fb95495004ca211d612366dc3bfac9e48ab8c4c6f7275d8c"
+    },
+    "infolog.txt": {
+      "bytes": 1762160,
+      "sha256": "978e09983f21db62d78c45f743d4ec0c9bdc9b8b6f805c17f705b9a92198a4f5"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "30129632e4c083666a8eb6ca25eed662d26f7d2c7b40f66bdfa44c4db31dcb16"
+    },
+    "report.md": {
+      "bytes": 15006,
+      "sha256": "0295da47c91c468970a0444bb16bbaf5102ba9ad4e902a16c5dec160b8ed8e53"
+    },
+    "run-inputs.json": {
+      "bytes": 37550,
+      "sha256": "95f03ddd893d15d351af151a47196d001516a3f85387121ceb816f9586460146"
+    },
+    "run-plan.json": {
+      "bytes": 268,
+      "sha256": "aba8934accd2d63f446fe5322980032df1e105941b4257702cdb8f79290ad3b6"
+    },
+    "screen_2026-10-07_02-22-33-071.png": {
+      "bytes": 1800534,
+      "sha256": "e51d7b3660e960759c10041523d0f5325668522a21ef66c6c11e8a92d239d5e0"
+    },
+    "screen_2026-10-07_02-22-52-059.png": {
+      "bytes": 1803925,
+      "sha256": "593afd02a055aafc547fc06bd0d6a0323aca6f066f473de149c28283e5887490"
+    },
+    "screen_2026-10-07_02-23-11-043.png": {
+      "bytes": 1803926,
+      "sha256": "5863ec037bcb6308183e60e2c7fc75d96483b5c69633f67dab9fdd01ac0cd9be"
+    },
+    "script.txt": {
+      "bytes": 7479,
+      "sha256": "21b09c192d7992581d8937954f9ce83f10f91691208066ca14ba24a9bf538f33"
+    },
+    "staged.json": {
+      "bytes": 236,
+      "sha256": "92693cd72ef3c945e24fa0aed0f360d2368b6951b8b1f20050e3c62e4f532e4c"
+    },
+    "teams.json": {
+      "bytes": 1164,
+      "sha256": "773d2800d36f6bf860909d141df41de269c3110fba6a1e05b4d11ec56c5403ec"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "guard-baseline-natural"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T022319Z-fcc3debd",
+  "last_frame": 18273,
+  "map": "Glacial Gap v1.1",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-baseline-natural\\glacial\\20261007T022111Z-bdf42f47\\runs\\20261007T022319Z-fcc3debd",
+  "reason": "reached 10 min",
+  "recorded_at_utc": "2026-10-07T02:23:19.684952+00:00",
+  "requested": {
+    "seed": 2231
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 5,
+      "team": 0,
+      "x": 1430.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 6,
+      "team": 1,
+      "x": 700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 7,
+      "team": 2,
+      "x": 1900.0,
+      "z": 5800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 13,
+      "team": 3,
+      "x": 12925.0,
+      "z": 4000.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 14,
+      "team": 4,
+      "x": 13700.0,
+      "z": 4600.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 15,
+      "team": 5,
+      "x": 12618.0,
+      "z": 5800.0
+    }
+  ],
+  "verdict": "PASS"
+}

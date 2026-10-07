@@ -1,0 +1,1116 @@
+{
+  "schema": 1,
+  "runs": [
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-base-recovery-v2\\supreme\\20261007T023817Z-5f07efa8\\runs\\20261007T023943Z-7eb34e0c",
+      "raw_log_sha256": "c57c0da8f7ef52d862fe43fd8d7e982dc436fd22928be719d82562ac0a367325",
+      "verdict": "FAIL",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1455,
+        "guards": 101,
+        "repeated_targets": 97,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 93,
+          "guards": 5,
+          "repeated_targets": 4,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 209,
+          "guards": 20,
+          "repeated_targets": 19,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 332,
+          "guards": 35,
+          "repeated_targets": 34,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 429,
+          "guards": 50,
+          "repeated_targets": 49,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 568,
+          "guards": 65,
+          "repeated_targets": 63,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 752,
+          "guards": 80,
+          "repeated_targets": 78,
+          "finished_mobile": 12
+        },
+        {
+          "frame": 6300,
+          "commands": 977,
+          "guards": 95,
+          "repeated_targets": 92,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 7200,
+          "commands": 1116,
+          "guards": 100,
+          "repeated_targets": 97,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 8100,
+          "commands": 1240,
+          "guards": 101,
+          "repeated_targets": 97,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1455,
+          "guards": 101,
+          "repeated_targets": 97,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {},
+      "fixture_passes": [
+        "moving_target",
+        "production_assist",
+        "production_continues",
+        "target_change",
+        "target_loss_recovery"
+      ],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-base-recovery-v4\\supreme\\20261007T024513Z-f5f47624\\runs\\20261007T024642Z-c2f4c053",
+      "raw_log_sha256": "79d7884510ca75abcee21ace09a667dba076fc0914fc2a39c79184df3aa00b32",
+      "verdict": "PASS",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1451,
+        "guards": 102,
+        "repeated_targets": 98,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 93,
+          "guards": 5,
+          "repeated_targets": 4,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 216,
+          "guards": 20,
+          "repeated_targets": 19,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 346,
+          "guards": 36,
+          "repeated_targets": 35,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 440,
+          "guards": 51,
+          "repeated_targets": 50,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 579,
+          "guards": 66,
+          "repeated_targets": 64,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 756,
+          "guards": 81,
+          "repeated_targets": 79,
+          "finished_mobile": 12
+        },
+        {
+          "frame": 6300,
+          "commands": 971,
+          "guards": 96,
+          "repeated_targets": 93,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 7200,
+          "commands": 1128,
+          "guards": 101,
+          "repeated_targets": 98,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 8100,
+          "commands": 1283,
+          "guards": 102,
+          "repeated_targets": 98,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1451,
+          "guards": 102,
+          "repeated_targets": 98,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {},
+      "fixture_passes": [
+        "moving_target",
+        "production_assist",
+        "production_continues",
+        "stop_recovery",
+        "target_change",
+        "target_loss_recovery"
+      ],
+      "stop_recovery_frames": [
+        2
+      ],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-baseline-fixture\\supreme\\20261007T022354Z-641b6134\\runs\\20261007T022528Z-938cc47c",
+      "raw_log_sha256": "aa04e702727db7394e50f77061f87e2ee8ff4dd730aaf26bbbb80d5b67c3a0af",
+      "verdict": "FAIL",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1617,
+        "guards": 105,
+        "repeated_targets": 101,
+        "finished_mobile": 17
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 93,
+          "guards": 5,
+          "repeated_targets": 4,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 217,
+          "guards": 22,
+          "repeated_targets": 21,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 353,
+          "guards": 38,
+          "repeated_targets": 37,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 457,
+          "guards": 53,
+          "repeated_targets": 52,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 657,
+          "guards": 69,
+          "repeated_targets": 67,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 812,
+          "guards": 84,
+          "repeated_targets": 82,
+          "finished_mobile": 12
+        },
+        {
+          "frame": 6300,
+          "commands": 1067,
+          "guards": 99,
+          "repeated_targets": 96,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 7200,
+          "commands": 1255,
+          "guards": 104,
+          "repeated_targets": 101,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 8100,
+          "commands": 1390,
+          "guards": 105,
+          "repeated_targets": 101,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1617,
+          "guards": 105,
+          "repeated_targets": 101,
+          "finished_mobile": 17
+        }
+      ],
+      "native_all_teams": {},
+      "fixture_passes": [
+        "production_assist",
+        "production_continues",
+        "stop_recovery",
+        "target_loss_recovery"
+      ],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-baseline-natural\\glacial\\20261007T022111Z-bdf42f47\\runs\\20261007T022319Z-fcc3debd",
+      "raw_log_sha256": "978e09983f21db62d78c45f743d4ec0c9bdc9b8b6f805c17f705b9a92198a4f5",
+      "verdict": "PASS",
+      "last_sample": {
+        "frame": 18000,
+        "commands": 1565,
+        "guards": 42,
+        "repeated_targets": 40,
+        "finished_mobile": 10
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 22,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 1800,
+          "commands": 34,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 2700,
+          "commands": 46,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 3600,
+          "commands": 66,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 4500,
+          "commands": 85,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 5400,
+          "commands": 111,
+          "guards": 3,
+          "repeated_targets": 2,
+          "finished_mobile": 2
+        },
+        {
+          "frame": 6300,
+          "commands": 161,
+          "guards": 6,
+          "repeated_targets": 5,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 7200,
+          "commands": 190,
+          "guards": 9,
+          "repeated_targets": 8,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 8100,
+          "commands": 229,
+          "guards": 11,
+          "repeated_targets": 10,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 9000,
+          "commands": 263,
+          "guards": 14,
+          "repeated_targets": 13,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 9900,
+          "commands": 355,
+          "guards": 17,
+          "repeated_targets": 16,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 10800,
+          "commands": 401,
+          "guards": 20,
+          "repeated_targets": 19,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 11700,
+          "commands": 613,
+          "guards": 22,
+          "repeated_targets": 21,
+          "finished_mobile": 7
+        },
+        {
+          "frame": 12600,
+          "commands": 729,
+          "guards": 25,
+          "repeated_targets": 24,
+          "finished_mobile": 8
+        },
+        {
+          "frame": 13500,
+          "commands": 870,
+          "guards": 28,
+          "repeated_targets": 27,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 14400,
+          "commands": 1100,
+          "guards": 30,
+          "repeated_targets": 29,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 15300,
+          "commands": 1218,
+          "guards": 33,
+          "repeated_targets": 32,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 16200,
+          "commands": 1327,
+          "guards": 37,
+          "repeated_targets": 35,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 17100,
+          "commands": 1423,
+          "guards": 39,
+          "repeated_targets": 37,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 18000,
+          "commands": 1565,
+          "guards": 42,
+          "repeated_targets": 40,
+          "finished_mobile": 10
+        }
+      ],
+      "native_all_teams": {},
+      "fixture_passes": [],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-candidate-fixture\\supreme\\20261007T023050Z-ab376161\\runs\\20261007T023216Z-f4436479",
+      "raw_log_sha256": "f31d1b0f854a7e033af7cd1ba0e1aed3a41a7fb22eba834a870bdaea72c3b43b",
+      "verdict": "FAIL",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1397,
+        "guards": 31,
+        "repeated_targets": 27,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 102,
+          "guards": 2,
+          "repeated_targets": 1,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 190,
+          "guards": 3,
+          "repeated_targets": 2,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 305,
+          "guards": 5,
+          "repeated_targets": 4,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 391,
+          "guards": 6,
+          "repeated_targets": 5,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 4500,
+          "commands": 546,
+          "guards": 7,
+          "repeated_targets": 5,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 715,
+          "guards": 10,
+          "repeated_targets": 8,
+          "finished_mobile": 12
+        },
+        {
+          "frame": 6300,
+          "commands": 944,
+          "guards": 25,
+          "repeated_targets": 22,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 7200,
+          "commands": 1117,
+          "guards": 30,
+          "repeated_targets": 27,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 8100,
+          "commands": 1226,
+          "guards": 31,
+          "repeated_targets": 27,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1397,
+          "guards": 31,
+          "repeated_targets": 27,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {
+        "execute/send": 30,
+        "execute/keep": 71,
+        "idle/send": 1
+      },
+      "fixture_passes": [
+        "production_assist",
+        "production_continues",
+        "target_change"
+      ],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-candidate-natural\\glacial\\20261007T022801Z-7a701b75\\runs\\20261007T023003Z-453bb819",
+      "raw_log_sha256": "ab39918012d5d11d220d9d450f9f6c3500856f836d58d93ea66da8bc61828fbb",
+      "verdict": "PASS",
+      "last_sample": {
+        "frame": 18000,
+        "commands": 1908,
+        "guards": 1,
+        "repeated_targets": 0,
+        "finished_mobile": 10
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 22,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 1800,
+          "commands": 34,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 2700,
+          "commands": 53,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 3600,
+          "commands": 63,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 4500,
+          "commands": 87,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 5400,
+          "commands": 118,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 2
+        },
+        {
+          "frame": 6300,
+          "commands": 143,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 3
+        },
+        {
+          "frame": 7200,
+          "commands": 177,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 8100,
+          "commands": 224,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 9000,
+          "commands": 241,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 9900,
+          "commands": 283,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 5
+        },
+        {
+          "frame": 10800,
+          "commands": 392,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 7
+        },
+        {
+          "frame": 11700,
+          "commands": 530,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 8
+        },
+        {
+          "frame": 12600,
+          "commands": 584,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 8
+        },
+        {
+          "frame": 13500,
+          "commands": 927,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 8
+        },
+        {
+          "frame": 14400,
+          "commands": 1085,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 15300,
+          "commands": 1365,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 16200,
+          "commands": 1564,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 17100,
+          "commands": 1851,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 18000,
+          "commands": 1908,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 10
+        }
+      ],
+      "native_all_teams": {
+        "execute/send": 11,
+        "execute/keep": 233,
+        "idle/send": 35
+      },
+      "fixture_passes": [],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-fixed-recovery-v3\\supreme\\20261007T024020Z-01d09692\\runs\\20261007T024146Z-113049c7",
+      "raw_log_sha256": "1e1dff8800b7e60756c5bb224cbafc8a8b71d56e906d77da35b4c327916647e4",
+      "verdict": "FAIL",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1308,
+        "guards": 4,
+        "repeated_targets": 0,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 87,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 188,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 299,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 378,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 510,
+          "guards": 2,
+          "repeated_targets": 0,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 640,
+          "guards": 2,
+          "repeated_targets": 0,
+          "finished_mobile": 12
+        },
+        {
+          "frame": 6300,
+          "commands": 850,
+          "guards": 3,
+          "repeated_targets": 0,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 7200,
+          "commands": 1030,
+          "guards": 3,
+          "repeated_targets": 0,
+          "finished_mobile": 15
+        },
+        {
+          "frame": 8100,
+          "commands": 1163,
+          "guards": 4,
+          "repeated_targets": 0,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1308,
+          "guards": 4,
+          "repeated_targets": 0,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {
+        "execute/send": 4,
+        "execute/keep": 97
+      },
+      "fixture_passes": [
+        "moving_target",
+        "production_assist",
+        "production_continues",
+        "target_change",
+        "target_loss_recovery"
+      ],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-fixed-recovery-v4\\supreme\\20261007T024312Z-9dd95138\\runs\\20261007T024442Z-0b83606f",
+      "raw_log_sha256": "40306a06aad098983717c8ccb7c7d63d3f5a82efeb3b14fc3cb0bd08e77fbf38",
+      "verdict": "PASS",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1294,
+        "guards": 5,
+        "repeated_targets": 1,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 99,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 184,
+          "guards": 1,
+          "repeated_targets": 0,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 296,
+          "guards": 2,
+          "repeated_targets": 1,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 373,
+          "guards": 2,
+          "repeated_targets": 1,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 530,
+          "guards": 3,
+          "repeated_targets": 1,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 684,
+          "guards": 3,
+          "repeated_targets": 1,
+          "finished_mobile": 13
+        },
+        {
+          "frame": 6300,
+          "commands": 831,
+          "guards": 4,
+          "repeated_targets": 1,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 7200,
+          "commands": 1033,
+          "guards": 4,
+          "repeated_targets": 1,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 8100,
+          "commands": 1129,
+          "guards": 5,
+          "repeated_targets": 1,
+          "finished_mobile": 17
+        },
+        {
+          "frame": 9000,
+          "commands": 1294,
+          "guards": 5,
+          "repeated_targets": 1,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {
+        "execute/send": 4,
+        "execute/keep": 97,
+        "idle/send": 1
+      },
+      "fixture_passes": [
+        "moving_target",
+        "production_assist",
+        "production_continues",
+        "stop_recovery",
+        "target_change",
+        "target_loss_recovery"
+      ],
+      "stop_recovery_frames": [
+        3
+      ],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    },
+    {
+      "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-queue-trace\\supreme\\20261007T023413Z-2fc43eae\\runs\\20261007T023538Z-490ff165",
+      "raw_log_sha256": "ca138778bdef686af475ab43984b36b4cc3530d858c9d25cc1acf95972e699f3",
+      "verdict": "FAIL",
+      "last_sample": {
+        "frame": 9000,
+        "commands": 1376,
+        "guards": 30,
+        "repeated_targets": 26,
+        "finished_mobile": 18
+      },
+      "team0_cumulative_samples": [
+        {
+          "frame": 0,
+          "commands": 2,
+          "guards": 0,
+          "repeated_targets": 0,
+          "finished_mobile": 1
+        },
+        {
+          "frame": 900,
+          "commands": 100,
+          "guards": 2,
+          "repeated_targets": 1,
+          "finished_mobile": 4
+        },
+        {
+          "frame": 1800,
+          "commands": 188,
+          "guards": 3,
+          "repeated_targets": 2,
+          "finished_mobile": 6
+        },
+        {
+          "frame": 2700,
+          "commands": 304,
+          "guards": 5,
+          "repeated_targets": 4,
+          "finished_mobile": 9
+        },
+        {
+          "frame": 3600,
+          "commands": 386,
+          "guards": 6,
+          "repeated_targets": 5,
+          "finished_mobile": 10
+        },
+        {
+          "frame": 4500,
+          "commands": 544,
+          "guards": 9,
+          "repeated_targets": 7,
+          "finished_mobile": 11
+        },
+        {
+          "frame": 5400,
+          "commands": 698,
+          "guards": 9,
+          "repeated_targets": 7,
+          "finished_mobile": 13
+        },
+        {
+          "frame": 6300,
+          "commands": 919,
+          "guards": 24,
+          "repeated_targets": 21,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 7200,
+          "commands": 1090,
+          "guards": 29,
+          "repeated_targets": 26,
+          "finished_mobile": 14
+        },
+        {
+          "frame": 8100,
+          "commands": 1183,
+          "guards": 30,
+          "repeated_targets": 26,
+          "finished_mobile": 16
+        },
+        {
+          "frame": 9000,
+          "commands": 1376,
+          "guards": 30,
+          "repeated_targets": 26,
+          "finished_mobile": 18
+        }
+      ],
+      "native_all_teams": {
+        "execute/send": 29,
+        "execute/keep": 72,
+        "idle/send": 1
+      },
+      "fixture_passes": [
+        "production_assist",
+        "production_continues",
+        "target_change"
+      ],
+      "stop_recovery_frames": [],
+      "invariant_events": 0,
+      "limitations": [
+        "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+        "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+        "natural games can diverge; total commands and population are reported without an FPS claim",
+        "supplied fixture repeats task admission; natural games retain normal role decisions"
+      ]
+    }
+  ]
+}

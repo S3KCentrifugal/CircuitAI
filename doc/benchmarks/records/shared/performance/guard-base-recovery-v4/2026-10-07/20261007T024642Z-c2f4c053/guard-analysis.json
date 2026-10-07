@@ -1,0 +1,110 @@
+{
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-base-recovery-v4\\supreme\\20261007T024513Z-f5f47624\\runs\\20261007T024642Z-c2f4c053",
+  "raw_log_sha256": "79d7884510ca75abcee21ace09a667dba076fc0914fc2a39c79184df3aa00b32",
+  "verdict": "PASS",
+  "last_sample": {
+    "frame": 9000,
+    "commands": 1451,
+    "guards": 102,
+    "repeated_targets": 98,
+    "finished_mobile": 18
+  },
+  "team0_cumulative_samples": [
+    {
+      "frame": 0,
+      "commands": 2,
+      "guards": 0,
+      "repeated_targets": 0,
+      "finished_mobile": 1
+    },
+    {
+      "frame": 900,
+      "commands": 93,
+      "guards": 5,
+      "repeated_targets": 4,
+      "finished_mobile": 4
+    },
+    {
+      "frame": 1800,
+      "commands": 216,
+      "guards": 20,
+      "repeated_targets": 19,
+      "finished_mobile": 6
+    },
+    {
+      "frame": 2700,
+      "commands": 346,
+      "guards": 36,
+      "repeated_targets": 35,
+      "finished_mobile": 9
+    },
+    {
+      "frame": 3600,
+      "commands": 440,
+      "guards": 51,
+      "repeated_targets": 50,
+      "finished_mobile": 10
+    },
+    {
+      "frame": 4500,
+      "commands": 579,
+      "guards": 66,
+      "repeated_targets": 64,
+      "finished_mobile": 11
+    },
+    {
+      "frame": 5400,
+      "commands": 756,
+      "guards": 81,
+      "repeated_targets": 79,
+      "finished_mobile": 12
+    },
+    {
+      "frame": 6300,
+      "commands": 971,
+      "guards": 96,
+      "repeated_targets": 93,
+      "finished_mobile": 14
+    },
+    {
+      "frame": 7200,
+      "commands": 1128,
+      "guards": 101,
+      "repeated_targets": 98,
+      "finished_mobile": 15
+    },
+    {
+      "frame": 8100,
+      "commands": 1283,
+      "guards": 102,
+      "repeated_targets": 98,
+      "finished_mobile": 17
+    },
+    {
+      "frame": 9000,
+      "commands": 1451,
+      "guards": 102,
+      "repeated_targets": 98,
+      "finished_mobile": 18
+    }
+  ],
+  "native_all_teams": {},
+  "fixture_passes": [
+    "moving_target",
+    "production_assist",
+    "production_continues",
+    "stop_recovery",
+    "target_change",
+    "target_loss_recovery"
+  ],
+  "stop_recovery_frames": [
+    2
+  ],
+  "invariant_events": 0,
+  "limitations": [
+    "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+    "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+    "natural games can diverge; total commands and population are reported without an FPS claim",
+    "supplied fixture repeats task admission; natural games retain normal role decisions"
+  ]
+}

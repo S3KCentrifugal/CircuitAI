@@ -5806,3 +5806,44 @@ four SEA growth checks pass, which is insufficient to certify later economy.
 The optional experimental economy remains disabled by default. The new support
 and four-turret commander policy is separately exercised by supplied faction
 fixtures and the compact normal-fog Glacial test.
+
+### KI-533 - Native builder guard tasks can resend an unchanged GUARD order
+
+**Problem.** Review of commit `ca28258a` confirms that `CBGuardTask::Execute`
+and `CBGuardTask::OnUnitIdle` still issue GUARD without checking whether the
+same target is already represented by a valid live engine command. See
+[GuardTask.cpp](../src/circuit/task/builder/GuardTask.cpp). SEA's recent
+[task reuse](../data/script/src/roles/sea_build.as) and native target-ID accessor
+avoid unnecessary task creation, but do not suppress these command sends.
+SEA currently uses guard tasks, so a historical script-setting workaround
+must not be treated as a current blanket fix.
+
+The reported historical 40,000-63,000 orders per game and 1,070 orders for one
+constructor have not been remeasured in this review. Duplicate commands are a
+potential engine/command-synchronization cost; those totals alone do not prove
+a current FPS or network bottleneck. This is a CircuitAI command producer issue
+and can be corrected here without changing Recoil; it complements the broader
+command attribution gap in KI-530.
+
+**Proposed solution.** Add native queue-aware suppression of an equivalent,
+still-valid guard intent. Preserve the close-range move followed by SHIFT GUARD,
+internal assist work, immediate target changes, and recovery after interruption,
+queue loss, expiry or ownership changes. Do not substitute a blind last-target
+cache or a rate limit. Retain existing task priorities and script policy.
+
+**Verification.** Static source review only; no new simulation or timing claim.
+Before closing, test moving and stationary targets, factory production changes,
+idle recovery, STOP/player takeover, target loss/transfer and threat preemption.
+Compare issued GUARD commands per unit per minute and construction progress in
+matched games; verify that commands fall without delaying genuine recovery.
+
+**KI-533 resolution (D-223, 2026-10-06 local).** Fixed in the native builder
+guard task; both send paths inspect live engine intent and retain valid repair
+assistance/pending clearance. The native/VM suite and 30 real callback adapter
+checks pass. Matched ten-minute Glacial games reduce team 0 GUARD orders from
+42 to 1, with ten completed mobile units in both. The corrected supplied
+Supreme fixture passes STOP (same-frame native resend, visible after three
+frames), target changes, physically moving target, destruction/reassignment
+and continued production. Original fixture failures remain documented rather
+than rewritten. See [implementation and evidence](performance/guard-orders.md).
+This closes KI-533; aggregate CPU/network attribution in KI-530 remains open.

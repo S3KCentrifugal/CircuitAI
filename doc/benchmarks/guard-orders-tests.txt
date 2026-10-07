@@ -1,0 +1,106 @@
+Full native and AngelScript suite
+
+guard_command_test: 27 checks PASS
+target preference: 9 checks passed
+layout ranking: 76 checks passed
+base-layout geometry tests passed
+200159 allied reservation tests; 0 failures
+local reservations: 200038 checks, 0 failures
+lane_solver_test: 8 suites passed (including 8 concurrent solvers)
+strategic targeting: six suites passed
+18 terrain route scenarios passed
+air geometry: 300 unique bounded slots and loss thresholds passed
+metal field: yield, budgets, overlap, cancellation, upgrade ownership and restored keys passed
+20 enemy reclaim policy checks; 0 failures
+naval geometry tests passed
+air_safety_test: PASS (capsule reference, bounds, 4090 diagonal probes)
+ranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow and ID sort PASS
+water survey: 9 checks passed
+133 production policy tests; 0 failures
+20 production policy tests; 0 failures
+22 production policy tests; 0 failures
+145 production policy tests; 0 failures
+20 production policy tests; 0 failures
+12 production policy tests; 0 failures
+6 production policy tests; 0 failures
+21 production policy tests; 0 failures
+6 production policy tests; 0 failures
+6 production policy tests; 0 failures
+3 production policy tests; 0 failures
+3 production policy tests; 0 failures
+2 production policy tests; 0 failures
+2 production policy tests; 0 failures
+1 production policy tests; 0 failures
+
+C callback adapter
+
+In file included from /engine/rts/System/creg/creg.h:204,
+                 from /engine/rts/System/creg/creg_cond.h:17,
+                 from /engine/rts/Sim/Units/CommandAI/Command.h:10,
+                 from /src/tests/guard_callback_test.cpp:5:
+/engine/rts/System/creg/BasicTypes.h: In member function 'virtual void creg::IgnoredType::Serialize(creg::ISerializer*, void*)':
+/engine/rts/System/creg/BasicTypes.h:51:39: warning: comparison of integer expressions of different signedness: 'int' and 'size_t' {aka 'long long unsigned int'} [-Wsign-compare]
+   51 |                         for (int a=0;a<size;a++) {
+      |                                      ~^~~~~
+/engine/rts/System/creg/BasicTypes.h:49:54: warning: unused parameter 'instance' [-Wunused-parameter]
+   49 |                 void Serialize(ISerializer* s, void* instance)
+      |                                                ~~~~~~^~~~~~~~
+/engine/rts/System/creg/BasicTypes.h: In member function 'virtual void creg::FakeType::Serialize(creg::ISerializer*, void*)':
+/engine/rts/System/creg/BasicTypes.h:70:45: warning: unused parameter 's' [-Wunused-parameter]
+   70 |                 void Serialize(ISerializer* s, void* instance)
+      |                                ~~~~~~~~~~~~~^
+/engine/rts/System/creg/BasicTypes.h:70:54: warning: unused parameter 'instance' [-Wunused-parameter]
+   70 |                 void Serialize(ISerializer* s, void* instance)
+      |                                                ~~~~~~^~~~~~~~
+In file included from /engine/rts/System/float3.h:13,
+                 from /engine/rts/Sim/Units/CommandAI/Command.h:11:
+/engine/rts/System/FastMath.h: In function 'float fastmath::isqrt_nosse(float)':
+/engine/rts/System/FastMath.h:74:35: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   74 |                 std::int32_t i = *(std::int32_t*) &x;
+      |                                   ^~~~~~~~~~~~~~~~~~
+/engine/rts/System/FastMath.h:77:22: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   77 |                 x = *(float*) &i;
+      |                      ^~~~~~~~~~~
+/engine/rts/System/FastMath.h: In function 'float fastmath::isqrt2_nosse(float)':
+/engine/rts/System/FastMath.h:94:35: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   94 |                 std::int32_t i = *(std::int32_t*) &x;
+      |                                   ^~~~~~~~~~~~~~~~~~
+/engine/rts/System/FastMath.h:97:22: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   97 |                 x = *(float*) &i;
+      |                      ^~~~~~~~~~~
+In file included from /engine/rts/System/creg/creg.h:204,
+                 from /engine/rts/System/creg/creg_cond.h:17,
+                 from /engine/rts/System/float3.h:12,
+                 from /engine/AI/Wrappers/Cpp/src/AIFloat3.h:8,
+                 from /src/src/circuit/util/Defines.h:12,
+                 from /src/src/circuit/spring/SpringUnit.cpp:10:
+/engine/rts/System/creg/BasicTypes.h: In member function 'virtual void creg::IgnoredType::Serialize(creg::ISerializer*, void*)':
+/engine/rts/System/creg/BasicTypes.h:51:39: warning: comparison of integer expressions of different signedness: 'int' and 'size_t' {aka 'long long unsigned int'} [-Wsign-compare]
+   51 |                         for (int a=0;a<size;a++) {
+      |                                      ~^~~~~
+/engine/rts/System/creg/BasicTypes.h:49:54: warning: unused parameter 'instance' [-Wunused-parameter]
+   49 |                 void Serialize(ISerializer* s, void* instance)
+      |                                                ~~~~~~^~~~~~~~
+/engine/rts/System/creg/BasicTypes.h: In member function 'virtual void creg::FakeType::Serialize(creg::ISerializer*, void*)':
+/engine/rts/System/creg/BasicTypes.h:70:45: warning: unused parameter 's' [-Wunused-parameter]
+   70 |                 void Serialize(ISerializer* s, void* instance)
+      |                                ~~~~~~~~~~~~~^
+/engine/rts/System/creg/BasicTypes.h:70:54: warning: unused parameter 'instance' [-Wunused-parameter]
+   70 |                 void Serialize(ISerializer* s, void* instance)
+      |                                                ~~~~~~^~~~~~~~
+In file included from /engine/rts/System/float3.h:13:
+/engine/rts/System/FastMath.h: In function 'float fastmath::isqrt_nosse(float)':
+/engine/rts/System/FastMath.h:74:35: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   74 |                 std::int32_t i = *(std::int32_t*) &x;
+      |                                   ^~~~~~~~~~~~~~~~~~
+/engine/rts/System/FastMath.h:77:22: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   77 |                 x = *(float*) &i;
+      |                      ^~~~~~~~~~~
+/engine/rts/System/FastMath.h: In function 'float fastmath::isqrt2_nosse(float)':
+/engine/rts/System/FastMath.h:94:35: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   94 |                 std::int32_t i = *(std::int32_t*) &x;
+      |                                   ^~~~~~~~~~~~~~~~~~
+/engine/rts/System/FastMath.h:97:22: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+   97 |                 x = *(float*) &i;
+      |                      ^~~~~~~~~~~
+guard_callback_test: 30 checks + 100000 live reads PASS

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "guard-candidate-natural"
+  },
+  "id": "20261007T022801Z-7a701b75",
+  "requested": {
+    "seed": 2231
+  },
+  "schema": 1
+}

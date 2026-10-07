@@ -123,3 +123,19 @@ allocation savings, local command counts and the limits of FPS evidence.
 - [Test catalog](../testing/README.md)
 - [Native tests](../../tools/run_native_tests.sh)
 - [Performance tests](../../tools/run_performance_tests.sh)
+
+## Builder GUARD queue preservation (D-223)
+
+[GuardCommand](../../src/circuit/spring/GuardCommand.h) and the direct C callback
+adapter suppress equivalent live builder guard intent, not all repeated target
+IDs. Recoil's BuilderCAI prepends unflagged single-unit REPAIR while assisting;
+internal MOVE and the task's finite right-mouse clearance MOVE may precede it.
+A conflicting order, changed option/target or expired prefix must still recover.
+No frame cache or rate limit is safe here: same-frame STOP and ownership changes
+must remain observable. Read only on the callback thread. Complexity is O(Q) in
+the inspected prefix, normally one/two commands, with O(1) stack storage and no
+wrapper allocations. Keep predicate tests, real C-ABI adapter tests and supplied
+recovery games when extending the accepted prefix. See [evidence](guard-orders.md).
+CIRCUIT_VERIFY_GUARD intentionally adds wrapper reads and per-event logs; leave it
+disabled for CPU timing. Command-count reductions do not establish FPS or peer
+network savings. Other combat/support guard implementations are outside D-223.

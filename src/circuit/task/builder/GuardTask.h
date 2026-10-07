@@ -37,6 +37,7 @@ protected:
 
 private:
 	bool IsTargetBuilder() const;
+	bool KeepGuard(CCircuitUnit* unit, const char* source) const;
 
 	ICoreUnit::Id vipId;
 	bool isInterrupt;

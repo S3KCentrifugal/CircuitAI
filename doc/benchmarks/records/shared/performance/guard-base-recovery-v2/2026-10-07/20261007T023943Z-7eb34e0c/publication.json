@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "3c48b6747b4bdba2489603cb7f9a0586adf802a9a857914e6f6c584b2cabafe1",
+    "checks.json": "9c1b767399c9e5a7ae715f86bd090e8376269f3b0ba766938cc05d6c3020c9c3",
+    "guard-analysis.json": "db16294348dd6de2f94af2c696af96f2a18c623f23c22636252634700f0c2720",
+    "guard-pins.json": "d4cd9c6dc5eddbcb3676d0d8e3693460678a6728bfca39e0dddfc31cee01245a",
+    "launched.json": "c13f744d734b96cdfc2022aa86e43e5c9b7e1447022fbf5efe509da0232aa27b",
+    "report.md": "582789a6902d1a987c6aed75580fc80511eac5861a71f228d8b7b90280553615",
+    "result.json": "15aede0acd7e342fbc5bfb256ade35ecfe8ee41adf04e22ffb46c54bafda7e93",
+    "run-inputs.json": "e8c801211f93ecd673488e9a2f20fa284018d835a20bde50192efaf4609b99a2",
+    "run-plan.json": "3c70c75293e36938dae6904ed57b973259e4ea1a541a8c9eae460ab1c13e7840",
+    "script.txt": "7f159b7b2dde128edd5f81c2e5ad54d51fd7e689cd28334f286a6a006ffbf5a3",
+    "staged.json": "e3451fdd17ead1b0fc72c7ea355b71e17a4480002b7795f7a4cb99e658254015",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-base-recovery-v2\\supreme\\20261007T023817Z-5f07efa8\\runs\\20261007T023943Z-7eb34e0c",
+  "schema": 1
+}

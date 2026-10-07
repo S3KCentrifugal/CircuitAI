@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 896,
+      "sha256": "9c1b767399c9e5a7ae715f86bd090e8376269f3b0ba766938cc05d6c3020c9c3"
+    },
+    "guard-pins.json": {
+      "bytes": 37847,
+      "sha256": "d4cd9c6dc5eddbcb3676d0d8e3693460678a6728bfca39e0dddfc31cee01245a"
+    },
+    "infolog.txt": {
+      "bytes": 520634,
+      "sha256": "c57c0da8f7ef52d862fe43fd8d7e982dc436fd22928be719d82562ac0a367325"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "c13f744d734b96cdfc2022aa86e43e5c9b7e1447022fbf5efe509da0232aa27b"
+    },
+    "report.md": {
+      "bytes": 13396,
+      "sha256": "582789a6902d1a987c6aed75580fc80511eac5861a71f228d8b7b90280553615"
+    },
+    "run-inputs.json": {
+      "bytes": 37652,
+      "sha256": "e8c801211f93ecd673488e9a2f20fa284018d835a20bde50192efaf4609b99a2"
+    },
+    "run-plan.json": {
+      "bytes": 267,
+      "sha256": "3c70c75293e36938dae6904ed57b973259e4ea1a541a8c9eae460ab1c13e7840"
+    },
+    "screen_2026-10-07_02-39-14-881.png": {
+      "bytes": 1664663,
+      "sha256": "78e7f31e2cca1b4a5c2a485f030972ed6494d59133671ef455b50a02de43ca8f"
+    },
+    "screen_2026-10-07_02-39-28-144.png": {
+      "bytes": 1703471,
+      "sha256": "f5d7457a84c4ab36aecb84e54c511fc3b93cddf560c020484c85d03ca0f36369"
+    },
+    "screen_2026-10-07_02-39-35-122.png": {
+      "bytes": 1715298,
+      "sha256": "a508a7e69c9ebe6ba07017eada406c3c86aa04ae124565834892ad89be3d84fe"
+    },
+    "script.txt": {
+      "bytes": 6181,
+      "sha256": "7f159b7b2dde128edd5f81c2e5ad54d51fd7e689cd28334f286a6a006ffbf5a3"
+    },
+    "staged.json": {
+      "bytes": 236,
+      "sha256": "e3451fdd17ead1b0fc72c7ea355b71e17a4480002b7795f7a4cb99e658254015"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "guard-base-recovery-v2"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T023943Z-7eb34e0c",
+  "last_frame": 9060,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-base-recovery-v2\\supreme\\20261007T023817Z-5f07efa8\\runs\\20261007T023943Z-7eb34e0c",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-07T02:39:43.794096+00:00",
+  "requested": {
+    "seed": 2231
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

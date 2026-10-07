@@ -693,3 +693,13 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Provisional gantry | SeaBuild::Preplan / SeaInvasion::PlanGantry | Early private home footprint; release untouched placeholder after protected enemy-shore admission |
 | Resource priority | SeaBuild::ResourcePriority / CCircuitUnit native task requests | SEA economic construction active; commander routine combat assistance passive; constructor/urgent products active; restore native policy on release |
 | Home energy ship | SeaBuild::HomeEnergy / SeaExpansion::Worker | Keep expansion worker ownership; second ship grows needed energy; dense six-site fallback respects the same allied reservations |
+
+## Native builder guard intent (D-223)
+
+| Object | Actor | State read and action |
+| --- | --- | --- |
+| Guard task | CBGuardTask::Execute / OnUnitIdle | Current task owner and living same-team target; preserve priority and movement clearance on genuine admission |
+| Engine command queue | CUnitAPI::HasGuardIntent | Fresh callback-thread prefix, GUARD target, allowed options, parameter shape and expiry; no retained cache |
+| Factory/constructor assistance | Recoil's existing BuilderCAI (read-only reference) | May prepend an unflagged REPAIR or internal movement; retaining the guard also retains this work |
+| Recovery/control | TaskModule, player task, target lifecycle | Empty/expired/conflicting queues immediately allow recovery; released tasks cannot submit stale orders |
+| Validation | CIRCUIT_VERIFY_GUARD and guard_watch fixture | Independent command presence audit; native sends counted separately from Lua fixture orders |

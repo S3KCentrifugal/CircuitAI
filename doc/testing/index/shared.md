@@ -587,6 +587,10 @@ Scripted test probe; inspect the linked source for stages and assertions.
 
 Scripted test probe; inspect the linked source for stages and assertions.
 
+### [guard_probe](../../../tools/playtest/guard_probe.as)
+
+Scripted test probe; inspect the linked source for stages and assertions.
+
 ### [weapon_performance_probe](../../../tools/playtest/weapon_performance_probe.as)
 
 Scripted test probe; inspect the linked source for stages and assertions.
@@ -652,6 +656,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [gantry_watch](../../../tools/playtest/widgets/gantry_watch.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [guard_watch](../../../tools/playtest/widgets/guard_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -840,6 +848,14 @@ Native executable; unnamed assertions remain inside the linked suite.
 
 Native executable; unnamed assertions remain inside the linked suite.
 
+### [guard_callback_test](../../../tests/guard_callback_test.cpp)
+
+Native executable; unnamed assertions remain inside the linked suite.
+
+### [guard_command_test](../../../tests/guard_command_test.cpp)
+
+Native executable; unnamed assertions remain inside the linked suite.
+
 ### [lane_solver_test](../../../tests/lane_solver_test.cpp)
 
 Native executable; unnamed assertions remain inside the linked suite.
@@ -931,6 +947,23 @@ Native executable; unnamed assertions remain inside the linked suite.
 - `forbid: invariant`
 - `forbid: script`
 
+### [guard-fixture](../../../tools/playtest/checks/shared/performance/guard-fixture.json)
+
+- `expect: assist`
+- `expect: change`
+- `expect: loaded`
+- `expect: loss`
+- `expect: moving`
+- `expect: production`
+- `expect: stop`
+- `forbid: errors`
+
+### [guard-natural](../../../tools/playtest/checks/shared/performance/guard-natural.json)
+
+- `expect: complete`
+- `expect: loaded`
+- `forbid: errors`
+
 ### [lane_ui_memory](../../../tools/playtest/checks/shared/performance/lane_ui_memory.json)
 
 - `expect: render stress`
@@ -979,6 +1012,10 @@ Native executable; unnamed assertions remain inside the linked suite.
 ## Performance / Scenario
 
 ### [full-match-profile](../../../tools/playtest/cases/shared/performance/full-match-profile.json)
+
+Map: selected by runner
+
+### [guard-orders](../../../tools/playtest/cases/shared/performance/guard-orders.json)
 
 Map: selected by runner
 
@@ -1294,6 +1331,10 @@ Physical dense economy / naval support acceptance, in isolated staged data.
 
 Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.
 
+### [run_guard_regression](../../../tools/playtest/run_guard_regression.py)
+
+Serial native GUARD regression: supplied recovery fixture or ordinary SEA.
+
 ### [run_reservation_performance](../../../tools/playtest/run_reservation_performance.py)
 
 Rendered Shore 8v8 regression for the shared reservation index (D-197).
@@ -1321,6 +1362,8 @@ Metal-map and unchanged TECH sequence controls for the AIR workforce change.
 ### [run_workforce_scaling](../../../tools/playtest/run_workforce_scaling.py)
 
 Fixed idle-constructor populations: isolate census scaling from diverging battles.
+
+### [run_guard_tests](../../../tools/run_guard_tests.sh)
 
 ### [run_native_tests](../../../tools/run_native_tests.sh)
 
@@ -1542,6 +1585,10 @@ Compare matched workforce games over the same observed simulation interval.
 ### [analyze_full_match_performance](../../../tools/playtest/analyze_full_match_performance.py)
 
 Stream full-match diagnostic logs; inclusive timers are never added to children.
+
+### [analyze_guard_orders](../../../tools/playtest/analyze_guard_orders.py)
+
+Extract guard counts from immutable game logs; never equate counts with FPS.
 
 ### [analyze_performance_phases](../../../tools/playtest/analyze_performance_phases.py)
 

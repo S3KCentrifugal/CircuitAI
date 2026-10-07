@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 896,
+      "sha256": "9c1b767399c9e5a7ae715f86bd090e8376269f3b0ba766938cc05d6c3020c9c3"
+    },
+    "guard-pins.json": {
+      "bytes": 37848,
+      "sha256": "c2f0a5270e34653c83f8a2e615da9e24898f302eebc02d24880aa85481cfdc51"
+    },
+    "infolog.txt": {
+      "bytes": 503271,
+      "sha256": "f31d1b0f854a7e033af7cd1ba0e1aed3a41a7fb22eba834a870bdaea72c3b43b"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "4e1194a7e922db490e6bbd668c3a262a27414853fd7c3123ae31ff86f55672f8"
+    },
+    "report.md": {
+      "bytes": 13342,
+      "sha256": "535f0c977abf4ee31700cb3124a4af4f52a1cf7281ea4f78d19f1a4ef5ddd528"
+    },
+    "run-inputs.json": {
+      "bytes": 37652,
+      "sha256": "6c02a568f25d563ad84090acbdbc5fb2529cdf657a5d49bacd695d9331c686d9"
+    },
+    "run-plan.json": {
+      "bytes": 268,
+      "sha256": "474ea85392b31867b0d43c6840d36e4c8c2aed83a78a08ceb609c6f7f92541ed"
+    },
+    "screen_2026-10-07_02-31-47-898.png": {
+      "bytes": 1689267,
+      "sha256": "3243fdd2754a0414fed967c9ef7d3f4b7ee0ef0f72465e29ca670c520923cee4"
+    },
+    "screen_2026-10-07_02-32-01-151.png": {
+      "bytes": 1711584,
+      "sha256": "fc8f56f3b1d75b8d52c36ad5b01d21417c1da604266c2a481396eb40baa8d6a2"
+    },
+    "screen_2026-10-07_02-32-08-133.png": {
+      "bytes": 1709117,
+      "sha256": "a1e59ac2831e94fac694ea6fe64e459cd24d00cee26d1c83df1326a6737c5cd3"
+    },
+    "script.txt": {
+      "bytes": 6181,
+      "sha256": "7f159b7b2dde128edd5f81c2e5ad54d51fd7e689cd28334f286a6a006ffbf5a3"
+    },
+    "staged.json": {
+      "bytes": 237,
+      "sha256": "d1620c90cdaae69128465e2818a9190838d749bf5ec7bde28978bcbc948d870c"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+    }
+  },
+  "category": {
+    "area": "performance",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "guard-candidate-fixture"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T023216Z-f4436479",
+  "last_frame": 9090,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-candidate-fixture\\supreme\\20261007T023050Z-ab376161\\runs\\20261007T023216Z-f4436479",
+  "reason": "deadline",
+  "recorded_at_utc": "2026-10-07T02:32:16.903223+00:00",
+  "requested": {
+    "seed": 2231
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

@@ -1,0 +1,19 @@
+{
+  "files": {
+    "README.md": "b4048debf1bab7ae5b79422a546ee22686523d573efe1c7bb4d4fd09f55381e2",
+    "checks.json": "9c1b767399c9e5a7ae715f86bd090e8376269f3b0ba766938cc05d6c3020c9c3",
+    "guard-analysis.json": "2e7d16e66772365b8906a4b7ebfdc6195c99f94c82142ed76a8ba63b8ad1962c",
+    "guard-pins.json": "c2f0a5270e34653c83f8a2e615da9e24898f302eebc02d24880aa85481cfdc51",
+    "launched.json": "4e1194a7e922db490e6bbd668c3a262a27414853fd7c3123ae31ff86f55672f8",
+    "report.md": "535f0c977abf4ee31700cb3124a4af4f52a1cf7281ea4f78d19f1a4ef5ddd528",
+    "result.json": "96ec0e3b2c4d58dc5ad5f61584860324f8b63f8aaa8580114e3a5117fc3692da",
+    "run-inputs.json": "6c02a568f25d563ad84090acbdbc5fb2529cdf657a5d49bacd695d9331c686d9",
+    "run-plan.json": "474ea85392b31867b0d43c6840d36e4c8c2aed83a78a08ceb609c6f7f92541ed",
+    "script.txt": "7f159b7b2dde128edd5f81c2e5ad54d51fd7e689cd28334f286a6a006ffbf5a3",
+    "staged.json": "d1620c90cdaae69128465e2818a9190838d749bf5ec7bde28978bcbc948d870c",
+    "teams.json": "7d8f6c65785ac3ea3d694df03519ab7292367bfd89bc729b468c14fc22fa2ffb"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-candidate-fixture\\supreme\\20261007T023050Z-ab376161\\runs\\20261007T023216Z-f4436479",
+  "schema": 1
+}

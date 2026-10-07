@@ -11,7 +11,7 @@ runner families. A listed definition does **not** mean it passed or was played.
 | [air](index/air.md) | 98 |
 | [front](index/front.md) | 0 |
 | [sea](index/sea.md) | 99 |
-| [shared](index/shared.md) | 273 |
+| [shared](index/shared.md) | 283 |
 | [support](index/support.md) | 0 |
 | [tactical](index/tactical.md) | 4 |
 | [tech](index/tech.md) | 13 |

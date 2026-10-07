@@ -329,6 +329,28 @@
       "execution": "not inferred"
     },
     {
+      "id": "tests/guard_callback_test.cpp",
+      "domain": "shared",
+      "area": "native",
+      "kind": "suite",
+      "title": "guard_callback_test",
+      "definitions": [],
+      "detail": "Native executable; unnamed assertions remain inside the linked suite.",
+      "sha256": "730c6003dc5e36cad499515fd34f9e513bb5ceb312ec3f1cc8f399e11ec992e5",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tests/guard_command_test.cpp",
+      "domain": "shared",
+      "area": "native",
+      "kind": "suite",
+      "title": "guard_command_test",
+      "definitions": [],
+      "detail": "Native executable; unnamed assertions remain inside the linked suite.",
+      "sha256": "4575fe422ff58f8c841a3e73868654a15cbd62b142146cf73b29307b91826451",
+      "execution": "not inferred"
+    },
+    {
       "id": "tests/land_siege_math_tests.as",
       "domain": "shared",
       "area": "policy",
@@ -1062,6 +1084,17 @@
       "definitions": [],
       "detail": "Stream full-match diagnostic logs; inclusive timers are never added to children.",
       "sha256": "5b0f2325e1d2fc26710ff6cdf1dbd1502aa0bd8f5a4970d733e05947e0b9fd28",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_guard_orders.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_guard_orders",
+      "definitions": [],
+      "detail": "Extract guard counts from immutable game logs; never equate counts with FPS.",
+      "sha256": "9584bd607e9cd42caaa182ad241d14e43d8649293b7a0d7acb22dfa882ea1198",
       "execution": "not inferred"
     },
     {
@@ -2682,6 +2715,17 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "4a7d2d047ba455bb8015f752e3c35b36a263fd31dbdbca8095287adb27f264b9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/performance/guard-orders.json",
+      "domain": "shared",
+      "area": "performance",
+      "kind": "scenario",
+      "title": "guard-orders",
+      "definitions": [],
+      "detail": "Map: selected by runner",
+      "sha256": "cdeaab5da0b07ada60aef1f7d9e50834109c9ca3ced2daceb9d0ed2e81dd42f2",
       "execution": "not inferred"
     },
     {
@@ -4898,6 +4942,41 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/shared/performance/guard-fixture.json",
+      "domain": "shared",
+      "area": "performance",
+      "kind": "checks",
+      "title": "guard-fixture",
+      "definitions": [
+        "expect: assist",
+        "expect: change",
+        "expect: loaded",
+        "expect: loss",
+        "expect: moving",
+        "expect: production",
+        "expect: stop",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "9c1b767399c9e5a7ae715f86bd090e8376269f3b0ba766938cc05d6c3020c9c3",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/performance/guard-natural.json",
+      "domain": "shared",
+      "area": "performance",
+      "kind": "checks",
+      "title": "guard-natural",
+      "definitions": [
+        "expect: complete",
+        "expect: loaded",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "8444029188d09438c3bbc26b9e1c8816f09d076bfa647a6b061b963752af329d",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/shared/performance/lane_ui_memory.json",
       "domain": "shared",
       "area": "performance",
@@ -5443,6 +5522,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/guard_probe.as",
+      "domain": "shared",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "guard_probe",
+      "definitions": [],
+      "detail": "Scripted test probe; inspect the linked source for stages and assertions.",
+      "sha256": "b99185e1680c6a50220abec865f4f6211b29e3da39ac30541f51a5a8d5426e8f",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/land_siege_report.py",
       "domain": "shared",
       "area": "tooling",
@@ -5843,6 +5933,17 @@
       "definitions": [],
       "detail": "Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.",
       "sha256": "7e41f068d70b57c5ee7837b8c49ef59857f528b1f2160c02ffd67a5171b7074d",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/run_guard_regression.py",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_guard_regression",
+      "definitions": [],
+      "detail": "Serial native GUARD regression: supplied recovery fixture or ordinary SEA.",
+      "sha256": "4ca358481481cb28d2dbe5244c308e05bb7b67e2d3909bc41c7914ca3b1587ea",
       "execution": "not inferred"
     },
     {
@@ -6785,6 +6886,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/widgets/guard_watch.lua",
+      "domain": "shared",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "guard_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "23ece686dbcf916dbb8ac3eff0989260400000a2216ef56622edf2b331b43171",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/widgets/intro_test.lua",
       "domain": "shared",
       "area": "fixtures",
@@ -7236,6 +7348,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/run_guard_tests.sh",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "run_guard_tests",
+      "definitions": [],
+      "detail": "",
+      "sha256": "742ac00b41442de985378c4b1642f8c0553d96e15c550640e6f7033685e4a38e",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/run_native_tests.sh",
       "domain": "shared",
       "area": "runners",
@@ -7243,7 +7366,7 @@
       "title": "run_native_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "d88717baa223feb7b0d99155d4c40e016a9ff8b8f59c03cfc06b1d812f147dd2",
+      "sha256": "415fc4d772a58430dc9cb322729c4d5d1e342b4f1a6ed078e1b4e4b3f254cc00",
       "execution": "not inferred"
     },
     {

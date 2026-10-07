@@ -13422,3 +13422,64 @@ complete, but energy remains at twelve tidals/+310 E with repeated inland-geo
 approaches (KI-235/KI-532). Preserve the overall FAIL and the existing default
 ExperimentalBuild=false; do not claim the optional economy migration complete.
 No changes to TECH policy or Recoil are included.
+
+## D-223 - Preserve a valid native builder GUARD instead of resending it
+
+2026-10-06. KI-533's native command path still resends guards after SEA's task
+reuse changes. This correction belongs in CircuitAI; no Recoil change or role
+build-order change is needed. Both Execute and OnUnitIdle inspect the live queue
+before sending. Task ownership and target validity are checked first; Execute
+still applies resource priority before considering command suppression.
+
+**Decision.** Accept an equivalent GUARD at the head or behind valid single-unit
+REPAIR, engine-internal MOVE, or the finite right-mouse clearance MOVE. The
+engine can put REPAIR ahead of GUARD without INTERNAL_ORDER, so checking just
+the head or that flag would still interrupt factory assistance. Reject expired,
+malformed, option-changing or conflicting intent; a different GUARD, WAIT,
+ATTACK or ordinary external MOVE is a barrier. SHIFT only records enqueueing
+and does not change an already queued guard target. Use Recoil's strict-less-than
+expiry boundary. No last-target cache, delay or command rate limit is introduced.
+The callback adapter makes bounded stack copies, takes O(Q) time in the examined
+queue prefix and O(1) storage; it does not allocate wrapper lists in normal play.
+
+**Invariant.** INV-163: suppressing a builder GUARD requires a matching live
+engine guard target, valid queue prefix/options/expiry and current task ownership.
+The optional CIRCUIT_VERIFY_GUARD observer independently reads wrapper commands
+for each suppression and logs a violation if the target has disappeared; native
+unit tests exercise stricter prefix/options rejection and same-frame mutation.
+No new script policy or profile default is introduced. Other guard task families
+and unrelated order paths are deliberately unchanged.
+
+**Files and verification.** [Report](performance/guard-orders.md),
+[task](../src/circuit/task/builder/GuardTask.cpp), [task interface](../src/circuit/task/builder/GuardTask.h),
+[queue predicate](../src/circuit/spring/GuardCommand.h),
+[callback adapter](../src/circuit/spring/SpringUnit.cpp), [adapter interface](../src/circuit/spring/SpringUnit.h),
+[predicate tests](../tests/guard_command_test.cpp), [callback tests](../tests/guard_callback_test.cpp),
+[test targets](../tests/CMakeLists.txt), [native runner](../tools/run_native_tests.sh),
+[callback runner](../tools/run_guard_tests.sh), [game runner](../tools/playtest/run_guard_regression.py),
+[test-only script](../tools/playtest/guard_probe.as), [observer](../tools/playtest/widgets/guard_watch.lua),
+[fixture checks](../tools/playtest/checks/shared/performance/guard-fixture.json),
+[natural checks](../tools/playtest/checks/shared/performance/guard-natural.json),
+[case](../tools/playtest/cases/shared/performance/guard-orders.json),
+[invariants](invariants.md), [actors](actor-matrix.md), [maintenance guide](performance/engineering-guide.md).
+Unit/adapter checks pass; rendered baseline and candidate verification is ongoing.
+
+D-223 verification update: full native/VM and real C-callback tests pass.
+Natural Glacial baseline `20261007T022319Z-fcc3debd` and candidate
+`20261007T023003Z-453bb819` pass. The final supplied Supreme candidate
+`20261007T024442Z-0b83606f` passes all recovery/production assertions; native
+STOP response occurs in the same frame, observed three frames later. Earlier
+fixture failures were traced to active SEA guard cleanup and rejected spectator
+STOP/MOVE calls; isolate only test-owned guards and require synchronized command
+acknowledgement plus physical displacement. Preserve the original verdicts.
+The [analyzer](../tools/playtest/analyze_guard_orders.py) retains counts, source
+log hashes and limitations; the [test index](testing/README.md) is regenerated.
+No FPS or internet-network claim follows from the measured command reduction.
+
+D-223 final matched recovery baseline `20261007T024642Z-c2f4c053` also passes.
+Both final supplied runs finish 18 mobile units; GUARD counts are 102 before
+and 5 after. [Trial measurements](benchmarks/guard-orders.json),
+[test output](benchmarks/guard-orders-tests.txt) and immutable records linked
+from the implementation report preserve successful and failed evidence.
+The stripped DLL, matching symbols and all 336 production data files are
+verified in the required development output; the live install is untouched.

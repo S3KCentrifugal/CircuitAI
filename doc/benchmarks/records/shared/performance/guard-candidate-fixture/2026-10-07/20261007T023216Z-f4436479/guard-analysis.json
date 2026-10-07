@@ -1,0 +1,109 @@
+{
+  "archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\performance\\guard-candidate-fixture\\supreme\\20261007T023050Z-ab376161\\runs\\20261007T023216Z-f4436479",
+  "raw_log_sha256": "f31d1b0f854a7e033af7cd1ba0e1aed3a41a7fb22eba834a870bdaea72c3b43b",
+  "verdict": "FAIL",
+  "last_sample": {
+    "frame": 9000,
+    "commands": 1397,
+    "guards": 31,
+    "repeated_targets": 27,
+    "finished_mobile": 18
+  },
+  "team0_cumulative_samples": [
+    {
+      "frame": 0,
+      "commands": 2,
+      "guards": 0,
+      "repeated_targets": 0,
+      "finished_mobile": 1
+    },
+    {
+      "frame": 900,
+      "commands": 102,
+      "guards": 2,
+      "repeated_targets": 1,
+      "finished_mobile": 4
+    },
+    {
+      "frame": 1800,
+      "commands": 190,
+      "guards": 3,
+      "repeated_targets": 2,
+      "finished_mobile": 6
+    },
+    {
+      "frame": 2700,
+      "commands": 305,
+      "guards": 5,
+      "repeated_targets": 4,
+      "finished_mobile": 9
+    },
+    {
+      "frame": 3600,
+      "commands": 391,
+      "guards": 6,
+      "repeated_targets": 5,
+      "finished_mobile": 11
+    },
+    {
+      "frame": 4500,
+      "commands": 546,
+      "guards": 7,
+      "repeated_targets": 5,
+      "finished_mobile": 11
+    },
+    {
+      "frame": 5400,
+      "commands": 715,
+      "guards": 10,
+      "repeated_targets": 8,
+      "finished_mobile": 12
+    },
+    {
+      "frame": 6300,
+      "commands": 944,
+      "guards": 25,
+      "repeated_targets": 22,
+      "finished_mobile": 14
+    },
+    {
+      "frame": 7200,
+      "commands": 1117,
+      "guards": 30,
+      "repeated_targets": 27,
+      "finished_mobile": 14
+    },
+    {
+      "frame": 8100,
+      "commands": 1226,
+      "guards": 31,
+      "repeated_targets": 27,
+      "finished_mobile": 17
+    },
+    {
+      "frame": 9000,
+      "commands": 1397,
+      "guards": 31,
+      "repeated_targets": 27,
+      "finished_mobile": 18
+    }
+  ],
+  "native_all_teams": {
+    "execute/send": 30,
+    "execute/keep": 71,
+    "idle/send": 1
+  },
+  "fixture_passes": [
+    "production_assist",
+    "production_continues",
+    "target_change"
+  ],
+  "stop_recovery_frames": [],
+  "invariant_events": 0,
+  "limitations": [
+    "repeated_targets includes required recovery and is not an exact duplicate-queue count",
+    "native trace includes all AI teams; synchronized observer counts only team 0 non-Lua commands",
+    "natural games can diverge; total commands and population are reported without an FPS claim",
+    "supplied fixture repeats task admission; natural games retain normal role decisions"
+  ]
+}
