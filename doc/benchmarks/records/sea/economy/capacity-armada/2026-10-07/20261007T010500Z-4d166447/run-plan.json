@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "capacity-armada"
+  },
+  "id": "20261007T010246Z-00354975",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1
+}

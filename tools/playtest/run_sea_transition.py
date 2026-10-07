@@ -18,8 +18,9 @@ def main():
     p.add_argument('--experimental', action='store_true')
     p.add_argument('--natural', action='store_true', help='Ordinary resources, no supplied units, active opponent')
     p.add_argument('--minutes', type=int, default=10)
+    p.add_argument('--capacity', action='store_true', help='Observe commander handoff and constructed factory support')
     a = p.parse_args()
-    d = storage.allocate('sea', 'economy', 'seaplane-' + a.side + ('-eco' if a.natural else ''), 'supreme', 'benchmark' if a.natural else 'supplied', seed=2091)
+    d = storage.allocate('sea', 'economy', ('capacity-' if a.capacity else 'seaplane-') + a.side + ('-eco' if a.natural else ''), 'supreme', 'benchmark' if a.natural else 'supplied', seed=2091)
     print('SEA_TRANSITION_DIRECTORY=' + str(d), flush=True)
     call = [sys.executable, str(playtest.HERE / 'playtest.py')]
     stage = call + ['stage', '--dir', str(d), '--dll', str(a.dll), '--data', str(playtest.REPO / 'data'),
@@ -36,6 +37,8 @@ def main():
         for option in ['startmetal=100000', 'startmetalstorage=100000', 'startenergy=1000000', 'startenergystorage=1000000']:
             at = stage.index(option); del stage[at-1:at+1]
         stage[stage.index('--shots')+1] = '5@3800@6200:11000,10@4200@6200:11000,20@4800@6200:11000,29@4800@6200:11000'
+    if a.capacity:
+        stage += ['--extra-widget',str(playtest.HERE/'widgets/sea_capacity_watch.lua')]
     subprocess.run(stage, check=True)
     src = d / 'AI/Skirmish/BARbTest/test/script/src'
     g = src / 'global.as'
@@ -77,7 +80,8 @@ def main():
     subprocess.run(['compact.exe', '/C', '/EXE:LZX', '/I', '/Q', str(src.parent.parent / 'SkirmishAI.dbg')], check=False)
     subprocess.run([sys.executable, str(playtest.REPO / 'tools/knowledge/check_script_api.py'), '--dll', str(a.dll), '--scripts', str(src.parent)], check=True)
     subprocess.run(call + ['launch', '--dir', str(d), '--engine', 'recoil_2026.07.04'], check=True)
-    return subprocess.run(call + ['watch', '--dir', str(d), '--role', 'SEA', '--checks', 'sea/economy/seaplane-natural.json' if a.natural else 'sea/economy/seaplane-transition.json',
+    checks='sea/economy/production-capacity.json' if a.capacity and not a.natural else 'sea/economy/seaplane-natural.json' if a.natural else 'sea/economy/seaplane-transition.json'
+    return subprocess.run(call + ['watch', '--dir', str(d), '--role', 'SEA', '--checks', checks,
         '--minutes', str(a.minutes), '--wall-minutes', '15', '--keep-going']).returncode
 
 

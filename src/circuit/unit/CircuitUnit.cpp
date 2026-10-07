@@ -16,9 +16,7 @@
 #include "spring/CustomCommand.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
-#ifdef DEBUG_VIS
 #include "task/UnitTask.h"
-#endif
 
 #include "AISCommands.h"
 #include "Sim/Units/CommandAI/Command.h"
@@ -404,12 +402,33 @@ void CCircuitUnit::CmdAirStrafe(float value)
 
 void CCircuitUnit::CmdBARPriority(float value)
 {
+	requestedPriority = value;
+	if (buildPriorityOverride >= 0) value = float(buildPriorityOverride);
 	if (priority == value) {
 		return;
 	}
 	priority = value;
 	float params[] = {value};
 	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_BAR_PRIORITY, params);
+}
+
+void CCircuitUnit::SetBuildPriorityOverride(int value)
+{
+	// Opt-in script policy, -1 restores native task decisions. Keep the last
+	// native request so ending an override restores it immediately. The existing
+	// effective-value cache suppresses duplicate synchronized commands, including
+	// native re-evaluation while an override holds. Default units are unchanged.
+	if (value < -1 || value > 1 || value == buildPriorityOverride) return;
+	buildPriorityOverride = value;
+	IUnitTask* currentTask = GetTask();
+	if (value < 0 && currentTask != nullptr && (currentTask->IsExternalControlled()
+	    || currentTask->GetType() == IUnitTask::Type::PLAYER)) {
+		// Manual ownership may already have changed the game's priority. Drop
+		// our cached belief without overwriting the player's setting on release.
+		priority = -1.f;
+		return;
+	}
+	CmdBARPriority(requestedPriority >= 0 ? requestedPriority : 1.f);
 }
 
 void CCircuitUnit::CmdTerraform(std::vector<float>&& params)

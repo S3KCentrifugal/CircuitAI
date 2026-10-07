@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 695,
+      "sha256": "191bd0114b66964dae4bb7b44ea9934c444c0fa42bdb6c3c9aa7afd7681bc382"
+    },
+    "infolog.txt": {
+      "bytes": 1482250,
+      "sha256": "6e1e566a8eac73c569dce132078cbb4cdd43699d9b401ea3f8e31a0fc3fd9df7"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "85186816ad151cd21ab4250397f58202c5d72601b52963efecc35b172990ddff"
+    },
+    "report.md": {
+      "bytes": 24677,
+      "sha256": "203b5810ce6c9f0b127ebe762939c73c08a1d752af43a791c8ca0ff749452e37"
+    },
+    "run-inputs.json": {
+      "bytes": 37780,
+      "sha256": "d39b4512e692602b275004d40cc0bf36b9a3da665d6f62dbd629e63af3b95b7d"
+    },
+    "run-plan.json": {
+      "bytes": 253,
+      "sha256": "61249481c116f1f1508f3d34c2caf04315dba7e567895f671c8cadf9e78c9881"
+    },
+    "screen_2026-10-07_01-36-27-595.png": {
+      "bytes": 1654723,
+      "sha256": "082bafb6c828d7c0de0a0812efbc21073071d28a5ed5a254b66e74cb1d7b309c"
+    },
+    "screen_2026-10-07_01-36-40-908.png": {
+      "bytes": 1667323,
+      "sha256": "9140cf5a1fff8df35f6f8e4a4f3ccc5ce9a7c627f191ed2dc7c3f78c19cd8a07"
+    },
+    "screen_2026-10-07_01-37-13-371.png": {
+      "bytes": 1728902,
+      "sha256": "f56d5edb23c67fe8125dff741881fb541230b77516bbeca2d84e2d0f55383883"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "88020df6606bb9929b1c358343e6dfcd143bdc856f26c0e3bff1f07500ac3298"
+    },
+    "sea-transition-pins.json": {
+      "bytes": 38353,
+      "sha256": "4f290e979c4e64bd4c8f2cb39f74b53834aa798a46455d0166beeebbb8cea33f"
+    },
+    "staged.json": {
+      "bytes": 238,
+      "sha256": "21296956bf09a23e6e478d683be75ee9d1c8a5f3d849ad65b60aaac281deec75"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "0f168cf56d828eab8f44c784871bcc937c93a389b13047e06381221038ca13da"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "capacity-legion"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T013750Z-aea63c2b",
+  "last_frame": 21660,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\capacity-legion\\supreme\\20261007T013524Z-075fa849\\runs\\20261007T013750Z-aea63c2b",
+  "reason": "reached 12 min",
+  "recorded_at_utc": "2026-10-07T01:37:50.868324+00:00",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "legion",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

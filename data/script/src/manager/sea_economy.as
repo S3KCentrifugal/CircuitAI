@@ -8,7 +8,10 @@ namespace SeaEconomy {
     array<int> owned;
     array<int> productionFactories;
     array<IUnitTask@> projects;
-    dictionary counts, finished, busy, support, products;
+    dictionary counts, finished, busy, support, products, lastProducts;
+    array<float> capacityBanks;
+    int capacityFrame=-1, capacityFull=0;
+    bool capacityPressure=false;
     float productionBasePower=0;
     int frame=-1, logFrame=-100000, mexWorker=-1;
     float mobilePower=0, pendingPower=0, idlePower=0, committedM=0, committedE=0;
@@ -60,13 +63,32 @@ namespace SeaEconomy {
     }
     CCircuitDef@ Product(int factoryId) {
         int id=-1;
-        return products.get(""+factoryId,id) ? ai.GetCircuitDef(id) : null;
+        if (products.get(""+factoryId,id) || lastProducts.get(""+factoryId,id)) return ai.GetCircuitDef(id);
+        CCircuitUnit@ yard=ai.GetTeamUnit(factoryId);
+        if (yard is null) return null;
+        const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
+        CCircuitDef@ fallback=ai.GetCircuitDef(Yard(yard.circuitDef) ? Constructor(side,UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName()))
+            : SeaInvasion::Factory(yard.circuitDef) ? SeaInvasion::Product(side,UnitHelpers::IsWaterGantry(yard.circuitDef.GetName())) : "");
+        return fallback !is null && yard.circuitDef.CanBuild(fallback) ? fallback : null;
     }
     bool ConstructorDef(const CCircuitDef@ d) { return d !is null && (SeaConstructor::IsT1(d) || SeaConstructor::IsT2(d)); }
     string SiteKey(const string &in name, const AIFloat3 &in p) { return name+":"+int(p.x)+":"+int(p.z); }
     bool Busy(int id) { return busy.exists(""+id); }
     void Tick() {
         if (!SeaLayout::Enabled() || ai.frame-frame<SECOND) return;
+        const int window=AiMax(2,Global::RoleSettings::Sea::CapacityObservationSeconds);
+        if (capacityFrame<0 || ai.frame-capacityFrame>2*SECOND) { capacityBanks.resize(0); capacityFull=0; }
+        capacityFrame=ai.frame;
+        const float bank=aiEconomyMgr.metal.current, storage=aiEconomyMgr.metal.storage;
+        capacityBanks.insertLast(bank);
+        if (int(capacityBanks.length())>window) capacityBanks.removeAt(0);
+        capacityFull=storage>0 && bank>=storage*Global::RoleSettings::Sea::CapacityHighMetal ? AiMin(window,capacityFull+1) : 0;
+        // Bounded 10-value observation, once per second. Gifts are already in
+        // bank; a received-metal rate is not added to income a second time.
+        const bool pressure=BuildPowerMath::Pressure(bank,storage,capacityBanks[0],int(capacityBanks.length()),window,
+            capacityFull,Global::RoleSettings::Sea::CapacityHighMetal,AiMax(100.0f,storage*.1f))
+            || BuildPowerMath::Refilling(capacityBanks,storage,.60f,Global::RoleSettings::Sea::CapacityHighMetal);
+        capacityPressure=SeaMath::CapacityPressure(aiEconomyMgr.metal.income,TeamEconomy::OwnMetal(TeamEconomy::USAGE),bank,storage,pressure);
         frame=ai.frame; owned.resize(0); counts.deleteAll(); finished.deleteAll(); busy.deleteAll(); support.deleteAll(); mexWorker=-1;
         productionFactories.resize(0); products.deleteAll(); productionBasePower=0;
         mobilePower=0; pendingPower=0; idlePower=0; committedM=0; committedE=0; admittedM=0; admittedE=0; recruitAdmittedM=0; recruitAdmittedE=0;
@@ -119,10 +141,19 @@ namespace SeaEconomy {
                 }
             }
         }
+        dictionary remembered;
         for (uint i=0; i<productionFactories.length(); ++i) {
             CCircuitUnit@ factory=ai.GetTeamUnit(productionFactories[i]);
-            if (factory !is null && Busy(factory.id)) productionBasePower+=factory.circuitDef.GetBuildSpeed();
+            if (factory is null) continue;
+            productionBasePower+=factory.circuitDef.GetBuildSpeed();
+            int defId=-1;
+            const string key=""+factory.id;
+            if (products.get(key,defId) || lastProducts.get(key,defId)) remembered.set(key,defId);
         }
+        lastProducts=remembered; // prune dead/transferred factories, retain gaps between products
+        const array<string> urgentKeys=SeaFactories::urgentProducts.getKeys();
+        for (uint i=0;i<urgentKeys.length();++i)
+            if (ai.GetTeamUnit(int(parseInt(urgentKeys[i]))) is null) SeaFactories::urgentProducts.delete(urgentKeys[i]);
         for (int i=int(projects.length())-1; i>=0; --i) {
             IBuilderTask@ t=cast<IBuilderTask>(projects[i]);
             if (t is null || t.IsDead()) { projects.removeAt(i); continue; }
@@ -171,13 +202,14 @@ namespace SeaEconomy {
             d.costM,d.costE,Global::RoleSettings::Sea::SeaplaneMinimumMetalIncome,Global::RoleSettings::Sea::SeaplaneMinimumEnergyIncome,
             Global::RoleSettings::Sea::SeaplaneMetalReserve,Global::RoleSettings::Sea::SeaplaneEnergyReserve);
     }
-    bool Fund(CCircuitDef@ d, float buildPower, float extraM=0, float extraE=0, float reserveM=0, float reserveE=0) {
+    bool Fund(CCircuitDef@ d, float buildPower, float extraM=0, float extraE=0, float reserveM=0, float reserveE=0, float horizon=0) {
         fundedFrame=-1; fundedName="";
         if (d is null || buildPower<=0) return false;
         const float seconds=AiMax(1.0f,d.GetBuildTime()/buildPower);
+        const float budgetHorizon=horizon>0 ? horizon : Global::RoleSettings::Sea::WorkforceHorizon;
         float queuedM=0, queuedE=0; UnframedCosts(queuedM,queuedE);
         const bool funded=BuildPowerMath::Funded(aiEconomyMgr.metal.current,reserveM,aiEconomyMgr.metal.income,TeamEconomy::OwnMetal(TeamEconomy::USAGE),
-            queuedM+recruitAdmittedM,d.costM,seconds,extraM,Global::RoleSettings::Sea::WorkforceHorizon)
+            queuedM+recruitAdmittedM,d.costM,seconds,extraM,budgetHorizon)
             && BuildPowerMath::Funded(aiEconomyMgr.energy.current,reserveE,aiEconomyMgr.energy.income,TeamEconomy::OwnEnergy(TeamEconomy::USAGE),
             queuedE+recruitAdmittedE,d.costE,seconds,extraE,Global::RoleSettings::Sea::WorkforceHorizon);
         if (funded) { fundedFrame=ai.frame; fundedName=d.GetName(); }
@@ -209,7 +241,7 @@ namespace SeaEconomy {
             if (u.circuitDef.IsMobile()) {
                 if (u.GetBuildProgress()<1) continue;
                 IBuilderTask@ assist=cast<IBuilderTask>(u.task);
-                if (assist is null || assist.target !is yard) continue;
+                if (assist is null || (assist.target !is yard && assist.GetGuardTargetId()!=yard.id)) continue;
             }
             const float reach=u.circuitDef.GetBuildDistance();
             if (MapHelpers::SqDist(u.GetPos(ai.frame),p)<=reach*reach) {

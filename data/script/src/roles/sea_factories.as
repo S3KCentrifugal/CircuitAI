@@ -24,6 +24,7 @@ namespace SeaFactories {
     int nextForward=0, stableSince=-1;
     AIFloat3 forwardSite(-1,0,-1);
     dictionary draining;
+    dictionary urgentProducts;
     bool CombatHull(const CCircuitDef@ d) {
         // Profiles intentionally zero naval threat weights. Combat role masks
         // remain valid for friendly cover; threat weights are enemy valuation.
@@ -32,9 +33,12 @@ namespace SeaFactories {
                 | Unit::Role::RIOT.mask | Unit::Role::ARTY.mask | Unit::Role::AS.mask);
     }
     bool Hold(CCircuitUnit@ u) { return SeaLayout::Active() && u !is null && (Lifecycle::IsRetiring(u) || draining.exists(""+u.id)); }
-    IUnitTask@ Recruit(CCircuitUnit@ yard, CCircuitDef@ d, Task::RecruitType type, bool funded=false) {
+    IUnitTask@ Recruit(CCircuitUnit@ yard, CCircuitDef@ d, Task::RecruitType type, bool funded=false, bool urgent=false) {
         if (d is null || !d.IsAvailable(ai.frame) || !yard.circuitDef.CanBuild(d)) return null;
         IUnitTask@ t=aiFactoryMgr.Enqueue(TaskS::Recruit(type,Task::Priority::HIGH,d,yard.GetPos(ai.frame),64.0f));
+        if (t !is null) {
+            if (urgent) urgentProducts.set(""+yard.id,int(d.id)); else urgentProducts.delete(""+yard.id);
+        }
         if (t !is null && funded) SeaEconomy::Admit(d,true);
         return t;
     }
@@ -71,6 +75,23 @@ namespace SeaFactories {
         }
         return null;
     }
+    IUnitTask@ Workforce(CCircuitUnit@ yard) {
+        if (!SeaLayout::Enabled() || yard is null || !SeaEconomy::Yard(yard.circuitDef)) return null;
+        SeaEconomy::Tick();
+        const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
+        const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
+        CCircuitDef@ con=ai.GetCircuitDef(SeaEconomy::Constructor(side,advanced));
+        if (con is null || !yard.circuitDef.CanBuild(con)) return null;
+        const int pending=aiFactoryMgr.GetPendingRecruitCount(con), have=con.count+pending;
+        if (have<2) return Recruit(yard,con,Task::RecruitType::BUILDPOWER);
+        CCircuitDef@ project=ai.GetCircuitDef(advanced ? UnitHelpers::GetNavalFusionNameForSide(side) : UnitHelpers::GetTidalNameForSide(side));
+        const float shortage=BuildPowerMath::Shortage(SeaEconomy::UsefulPower(project,Global::RoleSettings::Sea::EconomyIncomeShare),SeaEconomy::mobilePower,SeaEconomy::pendingPower);
+        if (shortage<con.GetBuildSpeed()*.5f || SeaEconomy::idlePower>=con.GetBuildSpeed() || pending>0 || project is null) return null;
+        if (!SeaEconomy::Fund(con,SeaEconomy::LocalPower(yard),con.GetBuildSpeed()*project.costM/project.GetBuildTime(),con.GetBuildSpeed()*project.costE/project.GetBuildTime())) return null;
+        IUnitTask@ task=Recruit(yard,con,Task::RecruitType::BUILDPOWER,true);
+        if (task !is null) GenericHelpers::LogUtil("[SEA][Workforce] recruit "+con.GetName()+" shortage="+shortage,1);
+        return task;
+    }
     IUnitTask@ Produce(CCircuitUnit@ yard) {
         if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.MakeFactoryTask(yard,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (Hold(yard)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
@@ -80,20 +101,9 @@ namespace SeaFactories {
         CCircuitDef@ con=ai.GetCircuitDef(SeaEconomy::Constructor(side,advanced));
         if (con !is null && con.count+aiFactoryMgr.GetPendingRecruitCount(con)>=1) {
             CCircuitDef@ counter=SeaCombat::Select(yard,true);
-            if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER); if (response !is null) return response; }
+            if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER,false,true); if (response !is null) return response; }
         }
-        if (con !is null && yard.circuitDef.CanBuild(con)) {
-            const int have=con.count+aiFactoryMgr.GetPendingRecruitCount(con);
-            CCircuitDef@ project=ai.GetCircuitDef(advanced ? UnitHelpers::GetNavalFusionNameForSide(side) : UnitHelpers::GetTidalNameForSide(side));
-            const float shortage=BuildPowerMath::Shortage(SeaEconomy::UsefulPower(project,Global::RoleSettings::Sea::EconomyIncomeShare),SeaEconomy::mobilePower,SeaEconomy::pendingPower);
-            if (have<2) { IUnitTask@ t=Recruit(yard,con,Task::RecruitType::BUILDPOWER); if (t !is null) return t; }
-            else if (shortage>=con.GetBuildSpeed()*.5f && SeaEconomy::idlePower<con.GetBuildSpeed()
-                && aiFactoryMgr.GetPendingRecruitCount(con)==0 && project !is null
-                && SeaEconomy::Fund(con,SeaEconomy::LocalPower(yard),con.GetBuildSpeed()*project.costM/project.GetBuildTime(),con.GetBuildSpeed()*project.costE/project.GetBuildTime())) {
-                IUnitTask@ t=Recruit(yard,con,Task::RecruitType::BUILDPOWER,true);
-                if (t !is null) { GenericHelpers::LogUtil("[SEA][Workforce] recruit "+con.GetName()+" shortage="+shortage,1); return t; }
-            }
-        }
+        IUnitTask@ workforce=Workforce(yard); if (workforce !is null) return workforce;
         if (SeaCombat::Active()) {
             // Shared by both economic implementations; counter emergencies
             // above retain precedence over discretionary utility hulls.

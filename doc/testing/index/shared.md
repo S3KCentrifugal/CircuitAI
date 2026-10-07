@@ -1551,6 +1551,10 @@ Summarize opt-in D-199 phases without double-counting nested scopes.
 
 Independent SEA economy/egress scorecard; never rewrites original reports.
 
+### [analyze_sea_capacity](../../../tools/playtest/analyze_sea_capacity.py)
+
+Reproduce the D-222 trial index without changing any original verdict.
+
 ### [analyze_sea_coast](../../../tools/playtest/analyze_sea_coast.py)
 
 Add immutable coastal observations without changing original acceptance verdicts.

@@ -227,3 +227,5 @@ step.
 | INV-159 | Each TECH donor has at most one recovery obligation per requesting team. | Recovery::Update checks duplicate team entries; controlled losses check production, cancellation and ferry transfer. | D-218 |
 | INV-160 | Coastal recovery orders are SEA-only, loss-gated and placed on dry buildable terrain. | SeaCoast::Order audits state and height after native pin placement; loss/held/retake fixtures check admission. | D-219 |
 | INV-161 | Optimized ranged safety and danger-sign queries return the legacy result on the same live snapshot. | Opt-in CIRCUIT_VERIFY_RANGED_QUERIES repeats the original predicate; ordered spatial mutation tests independently compare the frozen legacy index. | D-221 |
+
+| INV-162 | SEA commander economy handoff requires a completed T2 yard and four completed in-range construction turrets. | SeaBuild::Commander admission and independent SeaCapacity runtime observer. | D-222 |

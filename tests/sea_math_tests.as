@@ -195,3 +195,22 @@ void test_cluster_fortification_preserves_metal_reserve_and_energy_funding() {
     Check(!SeaMath::ExpansionFortFunded(120,10,0,49,170,500));
     Check(!SeaMath::ExpansionFortFunded(1000,0,10000,50,170,500));
 }
+void test_capacity_and_commander_boundaries() {
+    Check(SeaMath::AssistPriority(true,false,false)==-1);
+    Check(SeaMath::AssistPriority(false,true,false)==1);
+    Check(SeaMath::AssistPriority(false,false,true)==1);
+    Check(SeaMath::AssistPriority(false,false,false)==0);
+    Check(!SeaMath::CommanderHandoff(false,10,4));
+    Check(!SeaMath::CommanderHandoff(true,3,4));
+    Check(SeaMath::CommanderHandoff(true,4,4));
+    Check(!SeaMath::CommanderHandoff(true,4,0));
+    Check(SeaMath::CapacityPressure(51,50,200,1000,false));
+    Check(!SeaMath::CapacityPressure(51,50,199,1000,false));
+    Check(!SeaMath::CapacityPressure(50,60,990,1000,false));
+    Check(SeaMath::CapacityPressure(50,60,990,1000,true));
+    Check(!SeaMath::CapacityPressure(50,60,990,0,true));
+    Check(SeaMath::HarborAdmission(true,false,false));
+    Check(!SeaMath::HarborAdmission(false,true,false));
+    Check(!SeaMath::HarborAdmission(false,false,true));
+    Check(SeaMath::HarborAdmission(false,true,true));
+}

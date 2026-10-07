@@ -486,7 +486,7 @@ combat-ship completion, not merely a finished factory frame.
 - [hover.md](hover.md) - hover plants are reachable on water-ish maps and are not
   a role.
 
-<!-- source: data/script/src/roles/sea.as; blob: 966dcbfc31794a7ef4058e23d5bda8ae6a67faae; lines: 897 -->
+<!-- source: data/script/src/roles/sea.as; blob: 071af51c4c9fcf5465301f2b44855d6348c17d66; lines: 901 -->
 
 
 ## Water-control investigation (2026-10-05)
@@ -524,3 +524,28 @@ builder/factory hooks place this SEA-only recovery ahead of optional spam.
 Storage, energy, inland mexes, land-lab build power, T1/T2 turrets, sensors,
 wall flanks and available medium mines are covered. A stable 60-second naval
 return releases this policy. See the [design and simulation evidence](../reviews/2026-10-06-sea-coastal-fallback.md).
+
+### D-222 production capacity
+
+Both compact and experimental builders use the common commander handoff: assist
+shipyards until a completed T2 shipyard has CommanderHandoffTurrets (default 4)
+completed construction turrets within build distance. Afterwards economic frames
+are assisted by urgency. Active construction, retreat and player control retain
+ownership. A gap between products no longer sends the commander off to a mex.
+
+SEA workforce growth also runs before discretionary combat in compact mode.
+Capacity uses current/last factory products, all completed production factories,
+queued capacity, live commitments and a bounded bank-pressure window. One funded
+support project at a time preserves expansion/energy workers. Native support
+geometry reserves up to 64 reachable rear/side pads with clear forward exits;
+actual construction remains income/energy funded. Later-yard admission needs a
+visible forward buffer. See [design and evidence](../sea-production-capacity.md)
+for recovery exceptions, provisional gantries and verification limits.
+
+The second T1 construction ship builds needed home energy instead of following
+the expansion ship. Tight coasts can use dense six-tidal rows. SEA overrides
+economic builders to BAR's active priority and ordinary commander/turret combat-product
+assistance to passive priority; constructor products and urgent counters retain
+active assistance. This prevents continuous assisted production from starving
+economic frames. The opt-in native override restores the latest native request
+when released; no other role enables it.

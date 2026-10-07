@@ -10,7 +10,7 @@ namespace SeaLayout {
         AIFloat3 centre, anchor;
     }
     class Patch {
-        string name;
+        string name, owner;
         int facing = 0, zone = 0;
         bool active = false;
         AIFloat3 centre;
@@ -22,6 +22,8 @@ namespace SeaLayout {
     int facing = 0, tickFrame = -1;
     int geometryFrame = -1;
     float economyFront = 0;
+    float factoryFront=-100000.0f;
+    int survivingYards=0;
     bool hadFactory = false;
     dictionary patchCursor, patchRetry;
     bool Enabled() { return enabled && Global::AISettings::Role == AiRole::SEA; }
@@ -51,6 +53,10 @@ namespace SeaLayout {
         aiTerrainMgr.SetLayoutInt(key + ".active", p.active ? 1 : 0);
         aiTerrainMgr.SetLayoutInt(key + ".x", int(p.centre.x)); aiTerrainMgr.SetLayoutInt(key + ".z", int(p.centre.z));
         aiTerrainMgr.SetLayoutInt(key + ".n", int(p.slots.length()));
+        // Owner keys are either a berth index or a real unit id; persist the
+        // index separately because the native named store intentionally holds ints.
+        aiTerrainMgr.SetLayoutInt(key + ".ownerBerth", p.owner.findFirst("sea.berth.")==0 ? parseInt(p.owner.substr(10)) : -1);
+        aiTerrainMgr.SetLayoutInt(key + ".ownerUnit", p.owner.findFirst("unit.")==0 ? parseInt(p.owner.substr(5)) : -1);
         for (uint j=0; j<p.slots.length(); ++j) aiTerrainMgr.SetLayoutInt(key + ".slot." + j, p.slots[j]);
         aiTerrainMgr.SetLayoutInt("sea.patches", int(patches.length()));
     }
@@ -108,6 +114,8 @@ namespace SeaLayout {
             Patch p; p.name=d.GetName(); p.zone=aiTerrainMgr.GetLayoutInt(key+".zone",0);
             p.facing=aiTerrainMgr.GetLayoutInt(key+".facing",facing); p.active=aiTerrainMgr.GetLayoutInt(key+".active",0)!=0;
             p.centre=AIFloat3(float(aiTerrainMgr.GetLayoutInt(key+".x",0)),0,float(aiTerrainMgr.GetLayoutInt(key+".z",0)));
+            const int ownerBerth=aiTerrainMgr.GetLayoutInt(key+".ownerBerth",-1), ownerUnit=aiTerrainMgr.GetLayoutInt(key+".ownerUnit",-1);
+            p.owner=ownerBerth>=0 ? "sea.berth."+ownerBerth : ownerUnit>=0 ? "unit."+ownerUnit : "";
             for (int j=0; j<aiTerrainMgr.GetLayoutInt(key+".n",0); ++j) p.slots.insertLast(aiTerrainMgr.GetLayoutInt(key+".slot."+j,-1));
             patches.insertLast(p);
         }
@@ -135,10 +143,13 @@ namespace SeaLayout {
     }
     void RefreshGeometry() {
         if (ai.frame-geometryFrame<SECOND && geometryFrame>=0) return;
-        geometryFrame=ai.frame; economyFront=-100000.0f;
+        geometryFrame=ai.frame; economyFront=-100000.0f; factoryFront=-100000.0f; survivingYards=0;
         for (uint i=0;i<SeaEconomy::owned.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]); if (u is null) continue;
-            if (SeaEconomy::Yard(u.circuitDef)) hadFactory=true;
+            if (SeaEconomy::Yard(u.circuitDef)) {
+                hadFactory=true; ++survivingYards;
+                factoryFront=AiMax(factoryFront,Along(u.GetPos(ai.frame)));
+            }
             if (!EconomyDef(u.circuitDef)) continue;
             const int f=aiTerrainMgr.GetBuildingFacing(u);
             const float half=float(((f-facing)%2==0) ? u.circuitDef.GetFootprintZ() : u.circuitDef.GetFootprintX())*8.0f;
@@ -159,10 +170,33 @@ namespace SeaLayout {
         if (hadFactory) aiTerrainMgr.SetLayoutInt("sea.hadFactory",1);
     }
     bool Opening(Berth@ b) {
-        return SeaMath::OpeningFactory(!hadFactory,UnitHelpers::IsT1Shipyard(b.name),b.oldUnit<0,b.key=="sea.berth.0");
+        // Recovery exception is live-state based; a queued/started replacement
+        // prevents several builders from each treating themselves as first.
+        if (survivingYards>0 || !UnitHelpers::IsT1Shipyard(b.name) || b.oldUnit>=0) return false;
+        for (uint i=0;i<SeaEconomy::projects.length();++i) {
+            IBuilderTask@ t=cast<IBuilderTask>(SeaEconomy::projects[i]);
+            if (t !is null && !t.IsDead() && SeaEconomy::Yard(t.buildDef)) return false;
+        }
+        return true;
+    }
+    bool VisibleBuffer(CCircuitDef@ d,const AIFloat3 &in p,int f) {
+        // Reserve geometry before it is scouted, but buy only inside current
+        // allied LOS with a buffer beyond the factory's nose.
+        const float buffer=Global::RoleSettings::Sea::HarborFogBuffer;
+        return aiTerrainMgr.IsAreaVisible(LayoutHelpers::Offset(p,f,0,float(d.GetFootprintZ())*8.0f+buffer),buffer);
+    }
+    void ReleaseSupport(const string &in owner) {
+        for (uint i=0;i<patches.length();++i) {
+            Patch@ p=patches[i]; if (p.owner!=owner) continue;
+            for (int s=int(p.slots.length())-1;s>=0;--s) {
+                const int state=aiTerrainMgr.GetReservationState(p.slots[uint(s)]);
+                if (state<=0 || state==4) { aiTerrainMgr.ReleasePersistentBuilding(p.slots[uint(s)]); p.slots.removeAt(uint(s)); }
+            }
+            p.owner=""; SavePatch(i); // never release a claimed or built pad
+        }
     }
     bool ForwardSite(CCircuitDef@ d, const AIFloat3 &in p, int f) {
-        return f==facing && SeaMath::ForwardFootprint(Along(p),float(d.GetFootprintZ())*8.0f,economyFront,
+        return f==facing && Along(p)>=factoryFront && SeaMath::ForwardFootprint(Along(p),float(d.GetFootprintZ())*8.0f,economyFront,
             Global::RoleSettings::Sea::FactoryEconomyClearance);
     }
     bool RearEconomy(const AIFloat3 &in p, float halfDepth) {
@@ -202,7 +236,18 @@ namespace SeaLayout {
             if (aiBattle.SurfThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat || aiBattle.AirThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat) continue;
             if (b.oldUnit>=0 && !SeaFactories::Safe(p)) continue;
             ++geometryQueries;
-            if (UnitHelpers::IsSeaplanePlatform(b.name)) {
+            if (UnitHelpers::IsWaterGantry(b.name)) {
+                CCircuitDef@ product=ai.GetCircuitDef(SeaInvasion::Product(UnitHelpers::GetSideForUnitName(b.name),true));
+                const float half=float(d.GetFootprintZ())*8.0f;
+                const AIFloat3 mouth=LayoutHelpers::Offset(p,f,0,half+Global::RoleSettings::Sea::ExitLength);
+                if (product is null || !aiTerrainMgr.CanNavalRoute(product,p,mouth)
+                    || !aiTerrainMgr.IsExitClear(d,p,f,Global::RoleSettings::Sea::ExitLength,Global::RoleSettings::Sea::ExitMargin)) continue;
+                b.slot=aiTerrainMgr.ReservePersistentBuilding(d,p,f);
+                if (b.slot<0) continue;
+                b.exitZone=aiTerrainMgr.ReserveZone(LayoutHelpers::Offset(aiTerrainMgr.GetReservationPos(b.slot),f,0,half+Global::RoleSettings::Sea::ExitLength*.5f),
+                    f,AiMax(160.0f,float(d.GetFootprintX())*8.0f+Global::RoleSettings::Sea::ExitMargin),Global::RoleSettings::Sea::ExitLength*.5f,true);
+                if (b.exitZone<=0) { aiTerrainMgr.ReleasePersistentBuilding(b.slot); b.slot=-1; continue; }
+            } else if (UnitHelpers::IsSeaplanePlatform(b.name)) {
                 // Flying products do not require a deep-water ship corridor.
                 // The common reservation still protects allies and yard exits.
                 b.slot=aiTerrainMgr.ReservePersistentBuilding(d,p,f); b.exitZone=0;
@@ -251,6 +296,7 @@ namespace SeaLayout {
         if (state>=1 && state<=3) { b.active=true; Save(b); return; }
         if (aiTerrainMgr.IsReservationBuildable(b.slot) && (b.exitZone==0 || aiTerrainMgr.IsZoneClear(b.exitZone))) return;
         aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
+        ReleaseSupport(b.key);
         b.slot=-1; b.exitZone=0; Save(b);
         GenericHelpers::LogUtil("[SEA][Layout] replan unused berth "+b.key,1);
     }
@@ -271,20 +317,34 @@ namespace SeaLayout {
         }
         Validate(b); RefreshGeometry();
         if (!Opening(b) && b.slot>=0 && aiTerrainMgr.GetReservationState(b.slot)==0 && !ForwardSite(d,b.centre,b.facing)) {
+            ReleaseSupport(b.key);
             aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
             b.slot=-1; b.exitZone=0; b.cursor=0; Save(b);
         }
         if (!Search(b) || !aiTerrainMgr.CanReachAt(u,b.centre,u.circuitDef.GetBuildDistance())) return null;
+        const bool opening=Opening(b);
+        if (SeaEconomy::Yard(d) && !SeaMath::HarborAdmission(opening,ForwardSite(d,b.centre,b.facing),
+            opening || VisibleBuffer(d,b.centre,b.facing))) {
+            // Preserve a preplan briefly for the scouts; if vision does not
+            // arrive, continue bounded site search instead of buying in fog.
+            if (b.supportSince<0) b.supportSince=ai.frame;
+            if (ai.frame-b.supportSince>=10*SECOND && aiTerrainMgr.GetReservationState(b.slot)==0) {
+                ReleaseSupport(b.key); aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
+                b.slot=-1; b.exitZone=0; b.supportSince=-1; Save(b);
+            }
+            return null;
+        }
         if (UnitHelpers::IsSeaplanePlatform(name)) {
             CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(UnitHelpers::GetSideForUnitName(name)));
-            const int required=AiMax(1,AiMin(Global::RoleSettings::Sea::MaxSupportPerBerth,Global::RoleSettings::Sea::ReservedSupportPerFactory));
-            SeaBuild::ReserveSupport(nano,b.centre,b.facing);
+            const int required=AiMax(4,AiMin(20,Global::RoleSettings::Sea::MaxSupportPerBerth));
+            SeaBuild::ReserveSupport(nano,b.centre,b.facing,d,b.key);
             if (SeaBuild::SupportFootprint(nano,b.centre,required)<required) {
                 if (b.supportSince<0) b.supportSince=ai.frame;
                 // A footprint-only fit is insufficient. Continue the bounded
                 // candidate search if the support bank cannot fit; never move
                 // a committed/active platform or release another factory's pad.
                 if (ai.frame-b.supportSince>=10*SECOND && aiTerrainMgr.GetReservationState(b.slot)==0) {
+                    ReleaseSupport(b.key);
                     aiTerrainMgr.ReleasePersistentBuilding(b.slot);
                     b.slot=-1; b.supportSince=-1; Save(b);
                 }
@@ -307,15 +367,15 @@ namespace SeaLayout {
         for (uint j=0; j<p.slots.length(); ++j) aiTerrainMgr.ReleasePersistentBuilding(p.slots[j]);
         aiTerrainMgr.ReleaseZone(p.zone); p.slots.resize(0); p.zone=0;
     }
-    bool PlanPatch(CCircuitDef@ d, const AIFloat3 &in anchor, int count, float maxRadius, const AIFloat3 &in assist=AIFloat3(-1,0,-1)) {
+    bool PlanPatch(CCircuitDef@ d, const AIFloat3 &in anchor, int count, float maxRadius, const AIFloat3 &in assist=AIFloat3(-1,0,-1), bool narrow=false) {
         const string key=d.GetName(); int64 cursor=0, retry=0;
         // Different harbors must not consume each other's search attempts.
-        const string searchKey=key+":"+int(anchor.x/8)+":"+int(anchor.z/8)+":"+count;
+        const string searchKey=key+":"+int(anchor.x/8)+":"+int(anchor.z/8)+":"+count+":"+narrow;
         if (patchRetry.get(searchKey,retry) && ai.frame<retry) return false;
         patchCursor.get(searchKey,cursor); patchRetry.set(searchKey,int64(ai.frame+SECOND));
         if (count<=0) return false;
         const bool tidal=d.GetName()==UnitHelpers::GetTidalNameForSide(UnitHelpers::GetSideForUnitName(d.GetName()));
-        if (tidal) count=AiMax(6,Global::RoleSettings::Sea::TidalClusterSites);
+        if (tidal) count=narrow ? 6 : AiMax(6,Global::RoleSettings::Sea::TidalClusterSites);
         const int cols=tidal ? 6 : count<=2 ? count : count>6 ? 5 : 3;
         const int rows=(count+cols-1)/cols;
         // Small T1/converter patches are edge-to-edge. Keep the existing fusion
@@ -385,7 +445,14 @@ namespace SeaLayout {
                     if (t !is null) { p.active=true; SavePatch(i); return t; }
                 }
             }
-            if (pass==0 && !PlanPatch(d,anchor,count,radius,assist)) break;
+            if (pass==0 && !PlanPatch(d,anchor,count,radius,assist)) {
+                // A 6x6 tidal block cannot fit every shoreline or allied base
+                // boundary. Keep edge-to-edge density in a six-site row, using
+                // its own persistent cursor/backoff. At most eight extra site
+                // candidates per failed placement ask; no map-wide scan.
+                const bool tidal=d.GetName()==UnitHelpers::GetTidalNameForSide(UnitHelpers::GetSideForUnitName(d.GetName()));
+                if (!tidal || !PlanPatch(d,anchor,6,radius,assist,true)) break;
+            }
         }
         return null;
     }

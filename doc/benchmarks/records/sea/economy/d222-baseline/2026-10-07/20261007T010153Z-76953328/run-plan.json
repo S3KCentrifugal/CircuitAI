@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "glacial",
+    "scenario": "d222-baseline"
+  },
+  "id": "20261007T005857Z-21563808",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

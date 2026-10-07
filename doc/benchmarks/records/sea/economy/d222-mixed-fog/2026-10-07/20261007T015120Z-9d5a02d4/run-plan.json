@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "d222-mixed-fog"
+  },
+  "id": "20261007T014735Z-39a89200",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1
+}

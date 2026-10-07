@@ -278,6 +278,14 @@ Map: selected by runner
 
 ## Economy / Checks
 
+### [capacity-natural](../../../tools/playtest/checks/sea/economy/capacity-natural.json)
+
+- `expect: commander-assist`
+- `expect: energy-growth`
+- `expect: mex-growth`
+- `expect: support-growth`
+- `forbid: errors`
+
 ### [mex-expansion](../../../tools/playtest/checks/sea/economy/mex-expansion.json)
 
 - `expect: cluster-fort-order`
@@ -287,6 +295,14 @@ Map: selected by runner
 - `forbid: crash`
 - `forbid: invariant`
 - `forbid: script`
+
+### [production-capacity](../../../tools/playtest/checks/sea/economy/production-capacity.json)
+
+- `expect: assist`
+- `expect: four`
+- `expect: handoff`
+- `expect: support`
+- `forbid: errors`
 
 ### [sea-capacity-8v8](../../../tools/playtest/checks/sea/economy/sea-capacity-8v8.json)
 
@@ -392,6 +408,10 @@ Map: selected by runner
 
 Map: selected by runner
 
+### [production-capacity](../../../tools/playtest/cases/sea/economy/production-capacity.json)
+
+Map: Supreme Isthmus v1.7
+
 ### [sea-capacity-8v8](../../../tools/playtest/cases/sea/economy/sea-capacity-8v8.json)
 
 Map: Shore_to_Shore_V3
@@ -418,6 +438,10 @@ Map: Supreme Isthmus v1.7
 
 Scripted test probe; inspect the linked source for stages and assertions.
 
+### [sea_capacity_probe](../../../tools/playtest/sea_capacity_probe.as)
+
+Scripted test probe; inspect the linked source for stages and assertions.
+
 ### [sea_economy_block_probe](../../../tools/playtest/sea_economy_block_probe.as)
 
 Scripted test probe; inspect the linked source for stages and assertions.
@@ -431,6 +455,10 @@ Scripted test probe; inspect the linked source for stages and assertions.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [sea_arena](../../../tools/playtest/widgets/sea_arena.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [sea_capacity_watch](../../../tools/playtest/widgets/sea_capacity_watch.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -574,6 +602,7 @@ Map: glacial
 
 - `test_aa_screen_slots_stay_separate_and_overlap`
 - `test_canceled_unframed_berth_is_retryable`
+- `test_capacity_and_commander_boundaries`
 - `test_cluster_fortification_preserves_metal_reserve_and_energy_funding`
 - `test_counter_admission_and_time_to_coverage`
 - `test_expansion_rejects_hostile_coverage_and_invalid_thresholds`

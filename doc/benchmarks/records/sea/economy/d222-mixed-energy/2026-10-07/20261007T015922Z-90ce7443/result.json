@@ -1,0 +1,139 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 737,
+      "sha256": "b86a4baf42d0d0b6ec28f2dc1545f43796bdb921b03466a8e10cb0606c9d278f"
+    },
+    "infolog.txt": {
+      "bytes": 5715010,
+      "sha256": "6439162cb60f4676f4d8cda193629f9b2c2130a90dda91f52306fda6ee88a4db"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "7fbd1392e3b47c06d891801d44166c77fa854683cdf525b4cb14f550806834b9"
+    },
+    "report.md": {
+      "bytes": 21600,
+      "sha256": "f40fd79f4fba773a807dc6ce6c88783906527f780feceee7c7712f3aa9c78bb1"
+    },
+    "run-inputs.json": {
+      "bytes": 37890,
+      "sha256": "8e22e78ca8af136ab071838982b9785bd716e23cd1e4e171dbcc7c5ae59e3f18"
+    },
+    "run-plan.json": {
+      "bytes": 259,
+      "sha256": "187ecc0fec99adaccd9ab21963e3bde658ce5b3ea02c47a61cec65f7250f05bb"
+    },
+    "screen_2026-10-07_01-56-54-752.png": {
+      "bytes": 1658121,
+      "sha256": "b3fb8c329b86c606668ecf416bbd0216b5f9889c49e872e736a834dda1cb5e16"
+    },
+    "screen_2026-10-07_01-57-20-676.png": {
+      "bytes": 1667416,
+      "sha256": "127d59c86b9711bc514c4ebfbd51d891dabea208abf10c3f6eac30277f29c91d"
+    },
+    "screen_2026-10-07_01-58-31-042.png": {
+      "bytes": 1690152,
+      "sha256": "1bc48383c0050e6587d4364fa596a58ff8939b7aa2e81ff0cc9b3252b5e54c46"
+    },
+    "script.txt": {
+      "bytes": 7507,
+      "sha256": "d4f6ab21f73921f7844c806a90875096f1c151c013f7cff0864d499a28bef7c0"
+    },
+    "sea-fixture.json": {
+      "bytes": 298,
+      "sha256": "19cc8f9fff1f3363ae6a6d0c87a79cc9d9365ff265d43eca3cab6918244d44b9"
+    },
+    "staged.json": {
+      "bytes": 238,
+      "sha256": "900e7693b840c5a5384695eb9df1d162cb05d1877da9af1abb6a44d73beed25d"
+    },
+    "teams.json": {
+      "bytes": 1171,
+      "sha256": "8a534418890e4b1937a2d553e270d111b496dadbe7d5aa5212d5e65416b81f5e"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "benchmark",
+    "map": "supreme",
+    "scenario": "d222-mixed-energy"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T015922Z-90ce7443",
+  "last_frame": 45099,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\d222-mixed-energy\\supreme\\20261007T015540Z-b123f4ce\\runs\\20261007T015922Z-90ce7443",
+  "reason": "forbidden line",
+  "recorded_at_utc": "2026-10-07T01:59:22.718529+00:00",
+  "requested": {
+    "seed": 1881001
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "TECH",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 837.0,
+      "z": 10407.0
+    },
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "AIR",
+      "side": "cortex",
+      "spot": 3,
+      "team": 2,
+      "x": 2155.0,
+      "z": 11747.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "TECH",
+      "side": "legion",
+      "spot": 10,
+      "team": 3,
+      "x": 11456.0,
+      "z": 1901.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "AIR",
+      "side": "armada",
+      "spot": 11,
+      "team": 4,
+      "x": 10129.0,
+      "z": 541.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 16,
+      "team": 5,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "FAIL"
+}

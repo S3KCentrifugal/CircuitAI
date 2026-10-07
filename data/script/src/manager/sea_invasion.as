@@ -244,7 +244,20 @@ namespace SeaInvasion {
             if (route.length()<2) { aiTerrainMgr.ReleasePersistentBuilding(slot); continue; }
             const int zone=aiTerrainMgr.ReserveZone(LayoutHelpers::Offset(snapped,facing,0,float(d.GetFootprintZ())*8+160),facing,160,160,true);
             if (zone<=0) { aiTerrainMgr.ReleasePersistentBuilding(slot); continue; }
-            gantrySlot=slot; gantryExit=zone; Save(); return;
+            gantrySlot=slot; gantryExit=zone; Save();
+            // The home reservation guaranteed early space without committing
+            // to a backline invasion factory. Replace only untouched home
+            // plans once the protected enemy-shore site actually exists.
+            for (uint b=0;b<SeaLayout::berths.length();++b) {
+                SeaLayout::Berth@ provisional=SeaLayout::berths[b];
+                if (provisional.name!=d.GetName() || provisional.active || provisional.retired) continue;
+                const int state=aiTerrainMgr.GetReservationState(provisional.slot);
+                if (state>=1 && state<=3) continue; // a claim/frame can precede the next census
+                SeaLayout::ReleaseSupport(provisional.key);
+                aiTerrainMgr.ReleasePersistentBuilding(provisional.slot); aiTerrainMgr.ReleaseZone(provisional.exitZone);
+                provisional.slot=-1; provisional.exitZone=0; provisional.retired=true; SeaLayout::Save(provisional);
+            }
+            return;
         }
     }
     bool Screen(int basin,int defId,AIFloat3 &out goal) {

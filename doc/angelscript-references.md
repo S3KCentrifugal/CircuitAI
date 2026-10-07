@@ -1944,3 +1944,23 @@ queues `Spring.SendSkirmishAIMessage` until its next GameFrame. This avoids
 re-entering a running script context. No relay acknowledgement means the script
 uses `AiSendMessage` instead. Neither route is cross-host. See the
 [recovery report](reviews/2026-10-06-builder-recovery.md).
+
+## SEA capacity mechanisms (D-222)
+
+- `IBuilderTask.GetGuardTargetId()` returns the guarded unit ID, or -1 for
+  other builder tasks. The existing `target` property still means the build or
+  repair target; a guard does not populate it. Reacquire IDs before using them.
+- `CCircuitUnit.SetBuildPriorityOverride(int)` accepts -1 (restore native),
+  0 (BAR passive) or 1 (BAR active). Invalid values are ignored. Native task
+  requests are retained under the override. Only effective changes send a
+  command; manual/external ownership release does not overwrite player priority.
+  SEA owns enabling/releasing this policy, including role exit. Other roles
+  remain on the default -1 path. This does not alter task-queue priority.
+- `aiTerrainMgr.PlanNavalSupport(key, nano, factory, pos, facing, maximum,
+  minimum, margin)` reserves native private footprint pads in build reach,
+  writes successful IDs to `key.slot.N`, and returns their count. Fewer than
+  minimum rolls back every new pad. The caller owns lifecycle and retry policy.
+- `aiTerrainMgr.IsAreaVisible(pos, radius)` checks the entire bounded LOS-cell
+  rectangle from the cached allied LOS map. Off-map/nonfinite areas return
+  false. It neither queries hidden enemies nor changes vision. SEA uses it at
+  later-shipyard admission, not during speculative preplanning.

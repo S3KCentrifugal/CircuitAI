@@ -21,7 +21,8 @@ function widget:UnitDestroyed(id)
  builtBy[id]=nil
 end
 function widget:GameFrame(f)
- if f==150 then Spring.SendCommands({"cheat 1","globallos"}) end
+ -- GlobalLOS reveals enemies to the AI too; preserve fog in natural runs.
+ if cfg.supplied and f==150 then Spring.SendCommands({"cheat 1","globallos"}) end
  if cfg.supplied~=false then
   if f==300 then give(n[1],5824,10736) end
   if f==330 then give(n[5],6400,11400) end

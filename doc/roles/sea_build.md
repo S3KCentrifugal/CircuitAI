@@ -21,19 +21,21 @@ work. See the
 `LayoutTask` also filters the shared builder manager's native fallback. Later
 ordinary shipyards are replaced with reserved berths; the first shipyard keeps
 its opening exception. Null still permits native resource expansion. D192
-reserves complete 48-site tidal blocks, keeps economy behind the harbor, and
+prefers complete configured tidal blocks (36 sites by default), with six-site
+dense fallback rows on constrained shores, keeps economy behind the harbor, and
 requires later shipyards' whole footprints to clear the economy frontier by
 `FactoryEconomyClearance` (128 elmos) while facing the enemy. The later-yard
 search uses `ForwardHarborSearchRadius` (2400), anchored to a harbor rather
 than a potentially inland start. See the [allied-base plan](../sea-allied-base-plan.md).
-Compact mode preplans `PreplannedYards - 1` future T2 berths (at least one)
-after the opening; `FirstPlannedHarborAdvance` starts their search 768 elmos
+Both paths preplan the first T2 berth, seaplane footprint and provisional
+water gantry after the opening; `FirstPlannedHarborAdvance` starts their search 768 elmos
 forward. This lets the rear economy planner find space before converters are
 needed, without changing factory purchase gates.
 
 `Tick` refreshes the live economy snapshot, reconciles berth lifecycle and
 productive guards, and preplans dense rear pads of `ReservedSupportPerFactory`
-turrets (20 by default, capped by `MaxSupportPerBerth`). `ReserveSupport` covers
+turrets (64 by default, capped by `MaxSupportPerBerth`). The finite native
+rear/side plan admits a minimum of four usable pads and leaves the nose open. `ReserveSupport` covers
 both planned berths and acquired shipyards/amphibious production. `MakeTask` preserves
 PLAYER/enemy-reclaim/current construction ownership, resumes abandoned pinned
 orders, opens a nearby shipyard and assigns economic work. `Leave` clears owned
@@ -45,14 +47,15 @@ Native creation runs early for the commander/mex expansion worker, and only
 after SEA's economy/harbor priorities for the others. Returned unstarted energy, converter, nano and ordinary shipyard orders are
 replaced with required layout pins. Its native return is created at most once
 per request. `Resume` recovers unassigned pinned orders before admitting more.
-Auxiliary ship factories/seaplane platforms retain their existing native
-placement; they are not yet certified product-aware naval berths.
+Seaplane platforms use reserved forward footprints and dedicated support; flying
+products need no ship corridor. Other auxiliary factories retain their existing
+placement contracts and are not all certified product-aware naval berths.
 
 `Place` packs economy groups; `Upgrade` considers only owned weaker extractors
 that the requesting builder can reach and whose terrain admits its actual
 naval mex. Metal fields use the shared field-upgrade mechanism. `Support`
 funds turret expansion using current resource usage and the actual product's
-cost/build time. `SupportTarget` shares the production allocation across busy
+cost/build time. `SupportTarget` shares the production allocation across completed production
 factories by their native build power; banked capital can fund growth even at a
 current deficit. Purchase and subsequent consumption must both be funded.
 Finished, framed and queued turrets count once, including frames created since
@@ -90,7 +93,8 @@ One construction ship prioritizes mex expansion. Other T1 ships grow energy
 toward `min(TidalEnergyIncomeMinimum, metalIncome * EnergyPerMetal)`.
 T2 builders upgrade reachable mexes and repeat naval fusions when that energy
 target remains unmet. Converter admission retains the native metal-map veto.
-The commander retains native resource-expansion behavior after the first crew.
+The commander stays on yard assistance until a completed T2 yard has four
+completed in-range turrets, then helps priority economic frames.
 The designated expansion ship tries reachable, allied-aware safe mexes before
 native discretionary jobs. An idle shore commander no longer blocks recruiting
 naval economic workers; actual commander factory assistance still counts locally.
@@ -98,7 +102,8 @@ naval economic workers; actual commander factory assistance still counts locally
 Task ownership is deliberately narrower than a global task-added observer:
 only successfully pinned SEA orders enter `SeaEconomy::projects`.
 `LegacyTask` preserves null/native fallback and ordinary guard policy; extra
-factory support leaves the commander and one construction ship on expansion.
+factory support leaves one construction ship on expansion and another on home
+energy; commander factory assistance uses surplus for ordinary combat products.
 `SeaEconomy::OwnsTask` recognizes those claims before native serves their slot;
 the served reservation ID alone is insufficient during approach. Native
 inactive build-chain tasks can be destroyed with their parent; retaining them
@@ -109,7 +114,7 @@ Verification and remaining rollout gates are recorded in the
 [migration results](../sea-layout-migration-results.md). TECH, AIR and the
 shared SEA/TACTICAL constructor ladder are unchanged.
 
-<!-- source: data/script/src/roles/sea_build.as; blob: ca58e1a12168f54e5ea88865582c6be87d256104; lines: 497 -->
+<!-- source: data/script/src/roles/sea_build.as; blob: cd9f97018db27d30adb05f437ebe23a7c7c2f5f9; lines: 724 -->
 
 ## D-209 follow-up
 
@@ -123,8 +128,8 @@ Seaplane transitions precede optional economic jobs once a T2 yard finishes
 and D-210's sustained-income, uncommitted-bank and protected-reserve forecast
 checks pass. Otherwise normal economy work continues. Admitted projects finish
 without cancellation on income fluctuations.
-Platforms now use SeaLayout persistent footprints and require the configured
-ReservedSupportPerFactory slots in range before admission. Existing valid slots
+Platforms now use SeaLayout persistent footprints and require twenty support
+slots (or the lower configured maximum, with a floor of four) before admission. Existing valid slots
 count; only the shortfall is reserved. A support-starved unclaimed platform site
 continues its bounded placement search after ten seconds. Ordinary shipyards
 retain product-aware ship exits; flying factories reserve no hull corridor.
@@ -149,3 +154,8 @@ episode the shared builder dispatch asks `SeaCoast::Build` before spam and this
 naval builder ladder. Pinned coastal projects retain the native task lifecycle;
 land nanos use a local unfinished-product assist path because naval factory
 support lists intentionally exclude bot labs. See [D-219](../reviews/2026-10-06-sea-coastal-fallback.md).
+
+D-222 adds the shared commander, bank-pressure support, home energy and opt-in
+resource-priority policy described in the [capacity plan](../sea-production-capacity.md).
+Only SEA opts in. Native task requests remain recoverable on release, including
+role exit, and manual control is never overwritten on release.

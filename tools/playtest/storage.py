@@ -220,6 +220,8 @@ def publish(archive, screenshots=(), *, store=ROOT/'doc/benchmarks/records'):
 
 def historical_category(path):
     name = path.name
+    if name == 'sea-production-capacity.json':
+        return 'sea', 'economy'
     if name.startswith('ranged-'):
         return 'shared', 'combat'
     if 'scorecards' in path.parts or name == 'scorecard-design.md':

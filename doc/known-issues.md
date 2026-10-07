@@ -5755,3 +5755,54 @@ errors or oracle-fixture predicate mismatches occurred.
 KI-530 remains upstream: the repository explicitly prohibits changes to the
 Recoil reference. No native query speedup closes engine animation/movement or
 multiplayer packet attribution. See the report for current verification status.
+
+**D-222 observation addendum to KI-427/KI-524/KI-531 (2026-10-06).**
+The normal-fog mixed Supreme game `20261007T014735Z-39a89200` satisfies SEA's
+commander/mex/energy/support checks but retains 17 TECH invariant events. Their
+codes include INV-008/009/015/019; preserve the overall FAIL rather than weaken
+the shared invariant check. This SEA task does not remediate TECH policy.
+
+The existing allied-base/transition observers enabled synced GlobalLOS in
+natural games. This task corrects both observers and forbids the engine marker
+in natural capacity/transition checks; historical visibility-confounded records
+remain intact and explicitly identified by the [trial index](benchmarks/sea-production-capacity.json).
+Historical FPS, normal scouting and fog-buffer conclusions cannot be recovered
+from those runs. The Cortex supplied test's first truncated archive is a watcher
+inspection failure, followed by a full observation of the same continuing game;
+it must not be counted as a separate completed match (KI-524).
+
+The [capacity results](sea-production-capacity.md) distinguish supplied handoff
+proof from natural tech timing. Normal Glacial did not reach the T2 economic
+gate in twenty minutes, and neither whole-game FPS nor full-map flagship routing
+is established by these tests. Further controlled coverage is needed before
+claiming those outcomes.
+
+### KI-532 - Experimental SEA can retry an inaccessible inland geothermal approach
+
+**Problem.** The final D-222 normal-fog Supreme mixed run
+`20261007T015540Z-b123f4ce` reaches ten completed nanos but stays at twelve tidals
+and about +310 energy through minute 25. At frames 35280-36001 construction ship
+30870 repeatedly approaches an unframed `armgeo` at (5112,9624), stops near
+(5700,9913), exhausts three movement failures and reacquires work without starting
+that frame. Tidal patch attempts also roll back when a full dense row does not
+fit. The home-energy ordering fix does not resolve physical site admission or
+access. This is an experimental-path finding, not proof of the same failure in
+the passing compact Glacial run; it overlaps KI-235 but its exact cause is not
+established.
+
+**Proposed solution.** Add an isolated shore-geo and blocked-tidal fixture.
+Verify the native approach goal against the construction ship's navigable water
+and real build reach before accepting a SEA geothermal task. Inspect partial
+patch feasibility separately from movement. Reject/temporarily exclude an
+unreachable unframed site through SEA policy without aborting another worker's
+frame or changing other roles' native selection. Do not globally disable the
+experimental builder or bypass private reservations to hide the failure.
+
+**Verification.** Raw log hashes, final samples and original overall FAIL remain
+in the [capacity trial index](benchmarks/sea-production-capacity.json). The final
+mixed log has seven TECH invariant events, with six seen by the live watcher
+before its final drain; no SEA reservation/commander invariant occurred. All
+four SEA growth checks pass, which is insufficient to certify later economy.
+The optional experimental economy remains disabled by default. The new support
+and four-turret commander policy is separately exercised by supplied faction
+fixtures and the compact normal-fog Glacial test.

@@ -133,6 +133,11 @@ public:
 	int ReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames = 0, int group = 0);
 	// A single reusable slot. Its private zone preserves frame/unit identity after completion.
 	int ReservePersistentBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	// Opt-in finite support geometry. Stores slot IDs under key + ".slot.N";
+	// rolls back every new slot if the minimum useful footprint cannot fit.
+	int PlanNavalSupport(const std::string& key, CCircuitDef* nano, CCircuitDef* factory,
+		const springai::AIFloat3& pos, int facing, int maximum, int minimum, float margin);
+	bool IsAreaVisible(const springai::AIFloat3& pos, float radius) const;
 	bool PlanNavalBerth(const std::string& key, CCircuitDef* cdef, const springai::AIFloat3& pos,
 	                    int facing, float length, float margin);
 	bool CanNavalRoute(CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to);

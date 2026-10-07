@@ -1652,8 +1652,12 @@ namespace Global {
             float ForwardHarborSearchRadius = 2400.0f; // crowded allied coasts can exhaust the opening-radius search
             float FirstPlannedHarborAdvance = 768.0f; // leave rear economy room when the native opening yard hugs shore/map edge
             float EnergyPerMetal = 25.0f;
-            float ExitLength = 480.0f;
+            float ExitLength = 800.0f; // protected departure lane beyond densely packed support
             float ExitMargin = 48.0f;
+            float HarborFogBuffer = 192.0f; // current allied LOS beyond the factory nose, admission only
+            int CommanderHandoffTurrets = 4; // completed, in range; frames/reservations never count
+            int CapacityObservationSeconds = 10;
+            float CapacityHighMetal = 0.85f;
             float HarborMaxThreat = 1.0f;
             int PreplannedYards = 3;
             int MaxProductionYards = 8;
@@ -1665,8 +1669,8 @@ namespace Global {
             float ForwardStep = 900.0f;
             int ForwardStableSeconds = 30;
             int ForwardRecheckSeconds = 120;
-            int MaxSupportPerBerth = 40;
-            int ReservedSupportPerFactory = 20; // compact rear bank, expand as funded demand grows
+            int MaxSupportPerBerth = 64; // finite useful local footprint, not a construction quota
+            int ReservedSupportPerFactory = 64; // dense rear/sides; terrain can yield a smaller footprint
             bool SeaplanesAfterT2 = true;
             float SeaplaneMinimumMetalIncome = 80.0f; // minimum over the shared last-ten-second window
             float SeaplaneMinimumEnergyIncome = 1500.0f;

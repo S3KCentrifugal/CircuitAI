@@ -276,9 +276,11 @@ namespace RoleSea {
             const int workers=con is null ? 0 : con.count+aiFactoryMgr.GetPendingRecruitCount(con);
             if (workers>=1) {
                 CCircuitDef@ counter=SeaCombat::Select(u,true);
-                if (counter !is null) return SeaFactories::Recruit(u,counter,Task::RecruitType::FIREPOWER);
+                if (counter !is null) return SeaFactories::Recruit(u,counter,Task::RecruitType::FIREPOWER,false,true);
             }
             if (workers>=2) {
+                IUnitTask@ workforce=SeaFactories::Workforce(u);
+                if (workforce !is null) return workforce;
                 IUnitTask@ utility=SeaFactories::Utility(u);
                 if (utility !is null) return utility;
                 CCircuitDef@ combat=SeaCombat::Select(u);
@@ -510,6 +512,8 @@ namespace RoleSea {
         IUnitTask@ coastal=SeaCoast::Build(builder);
         if (coastal !is null) return coastal;
         if (builder !is null && SeaRecovery::IsSub(builder.circuitDef)) return SeaRecovery::Make(builder);
+        IUnitTask@ commander=SeaBuild::Commander(builder);
+        if (commander !is null) return commander;
         // Run before native default-task creation: it may enqueue discretionary
         // converters/guards even when the first ship has free reachable metal.
         IUnitTask@ mex=SeaBuild::OpeningMex(builder);

@@ -20,6 +20,7 @@
 #include "json/json.h"
 #include "UnitDef.h"
 #include "task/builder/BuilderTask.h"
+#include "task/builder/GuardTask.h"
 #include "task/static/SuperTask.h"
 #include "task/fighter/RouteTask.h"
 #include "task/fighter/FerryTask.h"
@@ -1131,6 +1132,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetMoveState(int)", asMETHOD(CCircuitUnit, TrySetMoveState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SelfDestruct(bool)", asMETHOD(CCircuitUnit, CmdSelfD), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdStop()", asFUNCTION(CCircuitUnit_CmdStop), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetBuildPriorityOverride(int)", asMETHOD(CCircuitUnit, SetBuildPriorityOverride), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdMoveTo(const AIFloat3& in)", asFUNCTION(CCircuitUnit_CmdMoveTo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-112
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdRepeat(bool)", asFUNCTION(CCircuitUnit_CmdRepeat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdFactoryRoute(const array<AIFloat3>@+)", asFUNCTION(CCircuitUnit_CmdFactoryRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
@@ -1186,6 +1188,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutEnabled() const", asMETHOD(CTerrainManager, IsLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutConfigured() const", asMETHOD(CTerrainManager, IsLayoutConfigured), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanNavalBerth(const string& in, CCircuitDef@, const AIFloat3& in, int, float, float)", asMETHOD(CTerrainManager, PlanNavalBerth), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PlanNavalSupport(const string& in, CCircuitDef@, CCircuitDef@, const AIFloat3& in, int, int, int, float)", asMETHOD(CTerrainManager, PlanNavalSupport), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsAreaVisible(const AIFloat3& in, float) const", asMETHOD(CTerrainManager, IsAreaVisible), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanNavalRoute(CCircuitDef@, const AIFloat3& in, const AIFloat3& in)", asMETHOD(CTerrainManager, CanNavalRoute), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanUpgradeTerrain(CCircuitDef@, const AIFloat3& in)", asFUNCTION(CTerrainManager_CanUpgradeTerrain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanFactoryPair(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int facing, int sideOffsetCells, int forwardOffsetCells)", asFUNCTION(CTerrainManager_PlanFactoryPair), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
@@ -1493,6 +1497,14 @@ void CInitScript::RegisterIUnitTask(asIScriptEngine* engine, const char* cls)
 	r = engine->RegisterObjectMethod(cls, "bool IsDead() const", asMETHODPR(T, IsDead, () const, bool), asCALL_THISCALL); ASSERT(r >= 0);  // D-114: a kept task handle is checked before reuse
 }
 
+static int IBuilderTask_GuardTargetId(const IBuilderTask* task)
+{
+	// Guard uses an ID-owned VIP, not BuilderTask::target (which is null).
+	// Expose observation without changing that ownership or any task behavior.
+	const auto* guard=dynamic_cast<const CBGuardTask*>(task);
+	return guard ? guard->GetGuardTargetId() : -1;
+}
+
 template <class T>
 void CInitScript::RegisterIBuilderTask(asIScriptEngine* engine, const char* cls)
 {
@@ -1504,6 +1516,7 @@ void CInitScript::RegisterIBuilderTask(asIScriptEngine* engine, const char* cls)
 	r = engine->RegisterObjectProperty(cls, "CCircuitDef@ const buildDef", asOFFSET(T, buildDef)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "CCircuitUnit@ const target", asOFFSET(T, target)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "bool canAutoAbort", asOFFSET(T, canAutoAbort)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod(cls, "int GetGuardTargetId() const", asFUNCTION(IBuilderTask_GuardTargetId), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 }
 
 template <class T>

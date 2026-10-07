@@ -43,7 +43,7 @@ movement-area connectivity are not a guarantee of an unobstructed full route.
 See the [plan](../sea-layout-migration-plan.md) and
 [runtime results](../sea-layout-migration-results.md).
 
-<!-- source: data/script/src/roles/sea_factories.as; blob: 1cbed943bb3467a6e0a455d4d31616219980e745; lines: 229 -->
+<!-- source: data/script/src/roles/sea_factories.as; blob: d49503b0e98be88c26f718103082f0f72fa3e76c; lines: 239 -->
 
 ## D-209 follow-up
 
@@ -67,3 +67,10 @@ gantries. SeaInvasion alone admits those factories after verified water control,
 protection and funding; SEA's factory callback then recruits the validated
 faction amphibian. This restriction is instance/role scoped and does not change
 shared factory JSON or TECH/AIR production.
+
+D-222 extracts `Workforce` so compact and experimental production can both grow
+economic workers before discretionary combat. `Recruit` records an urgent
+product for the commander resource-priority policy; ordinary combat assistance
+uses surplus, while workers and emergency counters retain active assistance.
+The per-factory record is cleared by nonurgent recruitment, pruned on loss, and
+reset on role exit. See [capacity design/results](../sea-production-capacity.md).

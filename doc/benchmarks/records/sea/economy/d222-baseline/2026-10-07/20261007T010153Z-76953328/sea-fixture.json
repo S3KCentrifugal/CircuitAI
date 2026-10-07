@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "supplied_assets": false,
+  "map": "Glacial Gap v1.1",
+  "seed": 1881001,
+  "engine_seed": 1881001,
+  "minutes": 20.0,
+  "profile": "experimental_hard",
+  "side": "armada",
+  "dll_sha256": "eca9d0229482cc8ef335588a32d6c47365917ccf18e34845ecc58c5bb444b5f4"
+}

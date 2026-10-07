@@ -14,6 +14,7 @@
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathWide.h"
 #include "map/ThreatMap.h"
+#include "map/MapManager.h"
 #include "map/InfluenceMap.h"
 #include "module/EconomyManager.h"
 #include "module/BuilderManager.h"  // Only for UpdateAreaUsers
@@ -2066,6 +2067,40 @@ bool CTerrainManager::PlanNavalBerth(const std::string& key, CCircuitDef* cdef,
 	SetLayoutInt(key+".facing",facing);
 	SetLayoutInt(key+".x",int(p.x)); SetLayoutInt(key+".z",int(p.z));
 	return true;
+}
+
+bool CTerrainManager::IsAreaVisible(const AIFloat3& pos, float radius) const
+{
+	return circuit->GetMapManager()->IsAreaInLOS(pos,radius);
+}
+
+int CTerrainManager::PlanNavalSupport(const std::string& key, CCircuitDef* nano, CCircuitDef* factory,
+        const AIFloat3& pos, int facing, int maximum, int minimum, float margin)
+{
+	SSlowCall slow("PlanNavalSupport", circuit);
+	if (!layoutEnabled || nano==nullptr || factory==nullptr || facing<0 || facing>3
+	    || minimum<1 || maximum<minimum || maximum>128 || margin<0 || margin>256) return 0;
+	const float reach=nano->GetBuildDistance();
+	const auto sites=naval::SupportSites(nano->GetDef()->GetXSize()*SQUARE_SIZE,
+	    nano->GetDef()->GetZSize()*SQUARE_SIZE, factory->GetDef()->GetXSize()*SQUARE_SIZE,
+	    factory->GetDef()->GetZSize()*SQUARE_SIZE,reach,margin);
+	const AIFloat3 forward(facing==1 ? 1.f : facing==3 ? -1.f : 0.f,0.f,facing==0 ? 1.f : facing==2 ? -1.f : 0.f);
+	const AIFloat3 across(forward.z,0.f,-forward.x);
+	std::vector<int> slots; slots.reserve(maximum);
+	// Native private footprint reservations consult the existing allied index.
+	// A single owner-thread call reserves the usable cluster before any ally or
+	// economy callback can interleave. Partial terrain fits are intentional;
+	// an unsuccessful minimum is rolled back, never left as an orphan bank.
+	for (const auto& site: sites) {
+		const auto p=Pos2BuildPos(nano,pos+across*site.across+forward*site.along,facing);
+		if (p.SqDistance2D(pos)>reach*reach) continue;
+		const int id=ReservePersistentBuilding(nano,p,facing);
+		if (id>=0) slots.push_back(id);
+		if (int(slots.size())>=maximum) break;
+	}
+	if (int(slots.size())<minimum) { for (int id:slots) ReleasePersistentBuilding(id); return 0; }
+	for (size_t i=0;i<slots.size();++i) SetLayoutInt(key+".slot."+std::to_string(i),slots[i]);
+	return int(slots.size());
 }
 
 int CTerrainManager::ReservePersistentBuilding(CCircuitDef* cdef, const AIFloat3& pos, int facing)

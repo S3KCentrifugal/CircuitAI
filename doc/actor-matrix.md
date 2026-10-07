@@ -680,3 +680,16 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Bot lab | Shared Factory, recovery requests, SeaCoast, Spam | Existing constructor donations retain priority; fallback recruits land workers/defenders; repeating spam disabled only during SEA fallback. |
 | Coastal garrison | SeaCoast, native RouteTask, native retreat/player ownership | Stable dispersed positions, per-sector legal contact goals, dry paths, no repeated unchanged route orders; release on retake/role exit. |
 | Land nano | SeaCoast::Build, native repair/guard | Assist only in-range frames or a factory with an actual unfinished product; leave enemy-reclaim/player/retreat ownership intact. |
+
+## SEA production capacity (D-222)
+
+| Object | Actor | State read and action |
+| --- | --- | --- |
+| Commander | SeaBuild::Commander before legacy/experimental tasks | Player/retreat/enemy-reclaim/current construction; completed T2 and completed in-range turrets; priority economic frames; productive yard |
+| Support pad | SeaBuild::ReserveSupport / SupportSlot | Native private allied footprint; factory reach/exit; pin state; bounded native plan and one live support order |
+| Unused harbor | SeaLayout::Validate / ReleaseSupport | Replan blocked untouched factory and release only unclaimed pads; keep frames/claims |
+| Factory capacity | SeaEconomy census / SeaFactories::Workforce | Current/last product, all completed yards, pending workers, live committed costs and measured bank pressure |
+| Next yard | SeaBuild::PlanCapacityExpansion / CapacityFactory | No free support pads, max factory count, economy gate, visibility buffer and enemy-facing forward site |
+| Provisional gantry | SeaBuild::Preplan / SeaInvasion::PlanGantry | Early private home footprint; release untouched placeholder after protected enemy-shore admission |
+| Resource priority | SeaBuild::ResourcePriority / CCircuitUnit native task requests | SEA economic construction active; commander routine combat assistance passive; constructor/urgent products active; restore native policy on release |
+| Home energy ship | SeaBuild::HomeEnergy / SeaExpansion::Worker | Keep expansion worker ownership; second ship grows needed energy; dense six-site fallback respects the same allied reservations |

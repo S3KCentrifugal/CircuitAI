@@ -448,7 +448,7 @@
       "title": "naval_geometry_test",
       "definitions": [],
       "detail": "Native executable; unnamed assertions remain inside the linked suite.",
-      "sha256": "5b042af08eb37e4da4a9521914410fb552a213b938c6bb548d9bbfb810a13fe7",
+      "sha256": "6473555470e061c6a63091d326b906831b94ec864021a0969ea82c4c49b77b7b",
       "execution": "not inferred"
     },
     {
@@ -695,6 +695,7 @@
       "definitions": [
         "test_aa_screen_slots_stay_separate_and_overlap",
         "test_canceled_unframed_berth_is_retryable",
+        "test_capacity_and_commander_boundaries",
         "test_cluster_fortification_preserves_metal_reserve_and_energy_funding",
         "test_counter_admission_and_time_to_coverage",
         "test_expansion_rejects_hostile_coverage_and_invalid_thresholds",
@@ -715,7 +716,7 @@
         "test_yard_whole_footprint_stays_forward_of_economy"
       ],
       "detail": "",
-      "sha256": "6f2c35c986d040aee92deb4579e9effd604c5a43954ffc9d7326b613e89d5fd1",
+      "sha256": "7d4c1dcdef5ef9ac5cad6b9aedb12bc75d927911aefbe99e4d66b4a7aae339a7",
       "execution": "not inferred"
     },
     {
@@ -1094,6 +1095,17 @@
       "definitions": [],
       "detail": "Independent SEA combat/order scorecard; never overwrites evidence.",
       "sha256": "f2a256e134f96ed07e8035c27ec1d91bfe5729b9d2b498f202fd57b6de74a281",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/analyze_sea_capacity.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "analyze_sea_capacity",
+      "definitions": [],
+      "detail": "Reproduce the D-222 trial index without changing any original verdict.",
+      "sha256": "f22d7e15fa0a69392a47e3e8e38e97f3b52dc96704b5639c7934205632f2bc28",
       "execution": "not inferred"
     },
     {
@@ -1900,6 +1912,17 @@
       "definitions": [],
       "detail": "Map: selected by runner",
       "sha256": "2de8120fce1ffc1b89ff02cc83da8d7110417fbc20cf9b035d57ab877a68fa8f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/sea/economy/production-capacity.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "scenario",
+      "title": "production-capacity",
+      "definitions": [],
+      "detail": "Map: Supreme Isthmus v1.7",
+      "sha256": "efbcb22f2aae0a736294c206c5f262dba6755e45c96248eeb233d3dd432dd120",
       "execution": "not inferred"
     },
     {
@@ -3839,6 +3862,23 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/sea/economy/capacity-natural.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "capacity-natural",
+      "definitions": [
+        "expect: commander-assist",
+        "expect: energy-growth",
+        "expect: mex-growth",
+        "expect: support-growth",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "b86a4baf42d0d0b6ec28f2dc1545f43796bdb921b03466a8e10cb0606c9d278f",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/sea/economy/mex-expansion.json",
       "domain": "sea",
       "area": "economy",
@@ -3855,6 +3895,23 @@
       ],
       "detail": "",
       "sha256": "d37923a76169893781c65150011e4d57aa440fdeae64bab8c31080aa8dbd14e1",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/sea/economy/production-capacity.json",
+      "domain": "sea",
+      "area": "economy",
+      "kind": "checks",
+      "title": "production-capacity",
+      "definitions": [
+        "expect: assist",
+        "expect: four",
+        "expect: handoff",
+        "expect: support",
+        "forbid: errors"
+      ],
+      "detail": "",
+      "sha256": "191bd0114b66964dae4bb7b44ea9934c444c0fa42bdb6c3c9aa7afd7681bc382",
       "execution": "not inferred"
     },
     {
@@ -3974,7 +4031,7 @@
         "forbid: errors"
       ],
       "detail": "",
-      "sha256": "1df505a7c853190aaabe1a2b32550954d83c1bb67e8084ba357c3f9f9c400834",
+      "sha256": "3ae55c250f8228aacb2c8bb0e59558cbb4c7aad7da3a788b6825ce7b406f4a06",
       "execution": "not inferred"
     },
     {
@@ -5807,7 +5864,7 @@
       "title": "run_sea",
       "definitions": [],
       "detail": "Pin, run and archive an isolated SEA migration comparison (ordinary resources).",
-      "sha256": "f8defbe4472bceb433d974d0df572595233f8d627bc4c80fcc25966b86296f39",
+      "sha256": "208cdbbf8014fab108994ce55d3c46d91c17b43580d1120286a24d916e628c71",
       "execution": "not inferred"
     },
     {
@@ -5895,7 +5952,7 @@
       "title": "run_sea_transition",
       "definitions": [],
       "detail": "Supreme SEA mex/seaplane acceptance with real role decisions (supplied capital).",
-      "sha256": "ac5f06402ecd6b5c4bdf7639b6470e35e181b63d6a20d0d60a8517f453302e6e",
+      "sha256": "e5fb8a5b22031dbb7dbd3581cd3ab6ab0feffdccc4a996d79460013e566f360b",
       "execution": "not inferred"
     },
     {
@@ -5991,6 +6048,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/sea_capacity_probe.as",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_capacity_probe",
+      "definitions": [],
+      "detail": "Scripted test probe; inspect the linked source for stages and assertions.",
+      "sha256": "c0a3ccd706767c611a242fce0aadd80fd952d8a86aea1c8d8802e378d894e066",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/sea_economy_block_probe.as",
       "domain": "sea",
       "area": "fixtures",
@@ -6042,7 +6110,7 @@
       "title": "storage",
       "definitions": [],
       "detail": "Organize game tests without replacing historical evidence.",
-      "sha256": "0620c89c9b82ec59cafc15c6fc3fc3bd480201f57b22b7bc78252ddcf9e04395",
+      "sha256": "6d1b22c8d808d5079b55038ede06074d2e5932bc689ec3c95b9fd5aceb904644",
       "execution": "not inferred"
     },
     {
@@ -6856,7 +6924,7 @@
       "title": "sea_allied_base_watch",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "04c4543a8010af82deeb97ae88f76046b51f9ef7ee4307349779f77e8d88faef",
+      "sha256": "9bf6dd2d4c8b9d04b80d87665af2ffbdf5f9cbc7144257d8fa331f104dcfc1e3",
       "execution": "not inferred"
     },
     {
@@ -6868,6 +6936,17 @@
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
       "sha256": "ffd9d787f6b1135923a5f07faf16cdadcd850402b585bdbd8c81b18f3476288d",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/widgets/sea_capacity_watch.lua",
+      "domain": "sea",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "sea_capacity_watch",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "1b7d55c9cfbb6e54886b5cd88bb68c6f1eb90156f86b87a5ce2249c7885dafef",
       "execution": "not inferred"
     },
     {
@@ -6944,7 +7023,7 @@
       "title": "sea_transition_watch",
       "definitions": [],
       "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
-      "sha256": "e7af2ba9169e3c655e27f543a77bd1eed307dae359248d33f55418fb2fcaaf60",
+      "sha256": "a37c7cfcca99cb35534d191ecca3207a5cae7d0124d43f8d628a8181e73bbc3d",
       "execution": "not inferred"
     },
     {

@@ -24,6 +24,7 @@ public:
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
 
 	virtual void Stop(bool done) override;
+	int GetGuardTargetId() const { return vipId; } // opt-in script observation; no ownership change
 
 protected:
 	virtual bool Execute(CCircuitUnit* unit) override;

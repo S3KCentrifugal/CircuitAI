@@ -1,0 +1,99 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 695,
+      "sha256": "191bd0114b66964dae4bb7b44ea9934c444c0fa42bdb6c3c9aa7afd7681bc382"
+    },
+    "infolog.txt": {
+      "bytes": 1198626,
+      "sha256": "2a74730ea4fe85c4b3655a3cd19ad45124fc54170319cb12f3969f0c0c65b3bf"
+    },
+    "launched.json": {
+      "bytes": 151,
+      "sha256": "64ffc630305fb41714a52707eeac37a4f1f8b57587f5d1bf4b614ce073f0ffbe"
+    },
+    "report.md": {
+      "bytes": 22797,
+      "sha256": "edf4c29b33c01d784f3c6c1d87d803e6304854b9f40345684c8412d1c71b8c42"
+    },
+    "run-inputs.json": {
+      "bytes": 37780,
+      "sha256": "83d7dd537fc0df70134af00a94f0720c63c14fff5961d3887ecfe44ec2369070"
+    },
+    "run-plan.json": {
+      "bytes": 253,
+      "sha256": "6841ffc6e7e39ca2cbc8d4e59ffbd4e9854249359cf4ddb1155faceb3f9c8b5c"
+    },
+    "screen_2026-10-07_01-41-42-723.png": {
+      "bytes": 1664178,
+      "sha256": "ec2d7aa6d8e7a03912648cb8e31158680ad0bbadf19644f17239930fabba3ae9"
+    },
+    "screen_2026-10-07_01-41-56-044.png": {
+      "bytes": 1671458,
+      "sha256": "bb924803bee8dce5c3ec5773730aa52a34ab71724cae5171cc8da210a2f96f48"
+    },
+    "screen_2026-10-07_01-42-27-043.png": {
+      "bytes": 1716202,
+      "sha256": "50ff163a42b2217c56c879a8ac1f756f4e43eb274059d4ae66140f86ae1d8381"
+    },
+    "script.txt": {
+      "bytes": 6160,
+      "sha256": "535b5f88d3f6a1df1044111b85d97639c9d9b326abebd60d2006f019e6a06293"
+    },
+    "sea-transition-pins.json": {
+      "bytes": 38352,
+      "sha256": "4536c856e2187d3a45c3822abd49d1c1f97e1e911f5ec7384889a18ec26a85bf"
+    },
+    "staged.json": {
+      "bytes": 238,
+      "sha256": "81eb04e51edbb88da15f275660a9fed084a6d699364eea682bb5b44baf5e5c3a"
+    },
+    "teams.json": {
+      "bytes": 461,
+      "sha256": "3802059231a8dd1d2e9780c06e8e271958378a68842c18812cc77789648c9d94"
+    }
+  },
+  "category": {
+    "area": "economy",
+    "domain": "sea",
+    "kind": "supplied",
+    "map": "supreme",
+    "scenario": "capacity-cortex"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261007T014255Z-f5c016ff",
+  "last_frame": 21777,
+  "map": "Supreme Isthmus v1.7",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\economy\\capacity-cortex\\supreme\\20261007T014022Z-a4337ad3\\runs\\20261007T014255Z-f5c016ff",
+  "reason": "reached 12 min",
+  "recorded_at_utc": "2026-10-07T01:42:55.944129+00:00",
+  "requested": {
+    "seed": 2091
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "SEA",
+      "side": "cortex",
+      "spot": 8,
+      "team": 0,
+      "x": 4814.0,
+      "z": 11077.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "SEA",
+      "side": "armada",
+      "spot": 16,
+      "team": 1,
+      "x": 7492.0,
+      "z": 1220.0
+    }
+  ],
+  "verdict": "PASS"
+}

@@ -1,5 +1,18 @@
 // Deterministic SEA admission and handover decisions, independent of engine state.
 namespace SeaMath {
+    int AssistPriority(bool noProduct, bool workerProduct, bool urgent) {
+        return noProduct ? -1 : workerProduct || urgent ? 1 : 0;
+    }
+    bool CommanderHandoff(bool t2Complete,int completedInRange,int required) {
+        return t2Complete && required>0 && completedInRange>=required;
+    }
+    bool CapacityPressure(float income,float usage,float bank,float storage,bool bankPressure) {
+        // RECEIVED is deliberately absent: bank/income already include gifts.
+        return storage>0 && bank>=0 && ((income>usage && bank>=storage*.2f) || bankPressure);
+    }
+    bool HarborAdmission(bool noYards,bool forward,bool visible) {
+        return noYards || (forward && visible);
+    }
     bool ExpansionNeedsEscort(float ownDistanceSq,float enemyDistanceSq) {
         return ownDistanceSq>enemyDistanceSq*.36f; // beyond the safe homeward part of the sea
     }

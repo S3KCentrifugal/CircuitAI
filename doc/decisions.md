@@ -13322,3 +13322,103 @@ original immutable record and publish a labelled supplement with byte-identical
 measurements and hashed validation output. The implementation report links
 both; this is not a rerun or a revised measurement. See the
 [evidence changelog](../changelog/2026/10/06/2026-10-06T173131-0300-ranged-evidence-supplement.md).
+
+## D-222 - SEA grows local production capacity and hands its commander to economy after four turrets
+
+2026-10-06. The user's four-turret clarification is authoritative. Both compact
+(default) and experimental SEA paths use the same commander/capacity policy.
+The commander guard no longer expires merely because three minutes passed.
+Four completed, in-range static builders at a completed T2 yard permit economic
+assist; reservations and incomplete frames do not count. Emergency resource
+recovery remains possible when no productive factory/workforce can restart it.
+
+**Decision.** Preserve SEA's first mex ship and emergency naval counters. Run a
+funded workforce decision before discretionary combat production in both paths.
+Recognize observed surplus/high-bank pressure; reserve full new costs and live
+commitments, never add received metal to income twice. For a sustained high bank
+at nominal deficit, use one observation window for metal's discretionary support
+purchase while retaining the normal energy funding horizon. This budgets one
+existing-bank purchase and does not forecast future gifts. Reject an arbitrary
+constructor count increase or enabling the entire experimental economy path.
+
+Use native, opt-in finite rear/side support geometry with actual footprints and
+reach, shared allied reservations, minimum-four rollback, and a configurable
+64-pad maximum. Full support reservation is not an instruction to build 64
+immediately. Reserve T2/seaplane/provisional gantry sites early, preserve wide
+forward departure corridors and place capital economy behind them. The existing
+surveyed enemy-shore invasion still owns actual gantry construction; discard the
+untouched home placeholder when its forward site is reserved. Later factories
+must clear existing/planned economy and current factory progress, face the enemy,
+and have a visible forward buffer. The newly requested no-yard recovery exception
+supersedes D-192's historical no-recovery exception, but does not bypass allied
+ownership or terrain legality. Do not change the Recoil engine.
+
+**Invariant.** INV-162: SEA's commander economic handoff requires a completed T2
+shipyard and four completed construction turrets in reach. INV-135 continues to
+require support to reach its factory; INV-138 guards later factory placement;
+INV-129 checks same-frame funding. Actor state and test scope are recorded in the
+[capacity plan/results](sea-production-capacity.md).
+
+**Files and verification.** [Plan](sea-production-capacity.md),
+[SEA delegate](../data/script/src/roles/sea.as), [builder](../data/script/src/roles/sea_build.as),
+[factory](../data/script/src/roles/sea_factories.as), [economy](../data/script/src/manager/sea_economy.as),
+[layout](../data/script/src/manager/sea_layout.as), [invasion](../data/script/src/manager/sea_invasion.as),
+[settings](../data/script/src/global.as), [math](../data/script/src/helpers/sea_math.as),
+[geometry](../src/circuit/terrain/NavalGeometry.h), [terrain implementation](../src/circuit/terrain/TerrainManager.cpp),
+[terrain interface](../src/circuit/terrain/TerrainManager.h), [visibility](../src/circuit/map/MapManager.cpp),
+[visibility interface](../src/circuit/map/MapManager.h), [bindings](../src/circuit/script/InitScript.cpp),
+[native tests](../tests/naval_geometry_test.cpp), [VM tests](../tests/sea_math_tests.as),
+[runner](../tools/playtest/run_sea_transition.py), [observer](../tools/playtest/widgets/sea_capacity_watch.lua),
+[case](../tools/playtest/cases/sea/economy/production-capacity.json),
+[checks](../tools/playtest/checks/sea/economy/production-capacity.json),
+[role](roles/sea.md), [actors](actor-matrix.md), [invariants](invariants.md).
+Built native DLL and focused VM/geometry tests pass. Actual runtime verification
+is in progress; no completed gameplay or performance claim yet.
+
+D-222 natural-game correction: supplied capital hid an opening deadlock. The
+commander no longer incidentally builds energy; the secondary ship followed the
+expander, and native ENERGY priority became passive with full energy/empty metal
+while commander factory assistance remained active. Keep a home energy worker,
+permit six-site dense tidal fallback rows, and expose an opt-in unit resource
+priority override retaining/restoring native requests. SEA alone enables it;
+ordinary assisted combat uses surplus, constructors and urgent counters remain
+active. Rejected changing shared task priorities or the game priority gadget.
+Native effective-value caching prevents re-evaluation command oscillation.
+Additional files: [unit mechanism](../src/circuit/unit/CircuitUnit.cpp),
+[unit interface](../src/circuit/unit/CircuitUnit.h),
+[natural runner](../tools/playtest/run_sea.py),
+[read-only task probe](../tools/playtest/sea_capacity_probe.as),
+[natural growth checks](../tools/playtest/checks/sea/economy/capacity-natural.json).
+Final resource-priority gameplay verification remains pending.
+
+D-222 verification update (2026-10-06 local / 2026-10-07 UTC): the full native
+and VM suite passes, including 21 SEA policy tests. Supplied Armada, Legion
+and Cortex games exercise the four-turret handoff; the latter two run the final
+native DLL. Normal-fog compact Glacial passes growth checks through 20 minutes
+with five construction ships, three nanos, ten mexes and twenty tidals. The
+baseline has stronger mex income; this is not a measured overall opening win.
+
+The first mixed normal-fog Supreme game passes SEA growth assertions but keeps
+TECH invariant failures under KI-427. It also exposed experimental support
+buying ahead of needed home energy. Both builder paths now ask HomeEnergy before
+discretionary support, preserving expansion workers and existing frames. The
+final repeat and all failed trials are indexed in the [results](sea-production-capacity.md).
+
+The existing allied-base and transition observers used synced GlobalLOS even
+for natural games. Restrict that command to supplied fixtures and reject its
+log marker in natural checks. Original observations remain immutable and are
+labelled with their visibility state; do not use them to claim normal scouting
+or fog safety. The first Cortex watcher falsely inferred an engine exit due to
+sandboxed process inspection (KI-524); the same game subsequently completed.
+Further files: [guard identity](../src/circuit/task/builder/GuardTask.h),
+[base observer](../tools/playtest/widgets/sea_allied_base_watch.lua),
+[transition observer](../tools/playtest/widgets/sea_transition_watch.lua),
+[analysis](../tools/playtest/analyze_sea_capacity.py),
+[natural transition checks](../tools/playtest/checks/sea/economy/seaplane-natural.json),
+[benchmark categorization](../tools/playtest/storage.py).
+
+D-222 final experimental repeat: all four SEA growth checks pass, ten nanos
+complete, but energy remains at twelve tidals/+310 E with repeated inland-geo
+approaches (KI-235/KI-532). Preserve the overall FAIL and the existing default
+ExperimentalBuild=false; do not claim the optional economy migration complete.
+No changes to TECH policy or Recoil are included.
