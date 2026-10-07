@@ -21,7 +21,7 @@ import re
 import sys
 
 DIRS = ['doc', 'data/script', 'skills']
-ROOT_FILES = ['AGENTS.md', 'README.md', 'CONVENTIONS.md']
+ROOT_FILES = ['AGENTS.md', 'README.md']
 LINK = re.compile(r'\[[^\]]*\]\(([^)\s]+)\)')
 SKIP_PREFIX = ('http://', 'https://', '#', 'mailto:')
 

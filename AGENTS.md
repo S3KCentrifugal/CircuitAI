@@ -1,6 +1,6 @@
 # CircuitAI Agent Instructions
 
-These instructions apply to the entire repository. This is the canonical agent guidance for Codex, Claude, Copilot, Cursor, Windsurf, Gemini CLI, Grok, Qwen Code, Cline, Zed, Aider, Junie, and any other coding agent. Vendor-specific instruction files exist only to route here; they must not duplicate or override this file. "Repository Map" below lists every one of those router files, and describes every other file and folder this document names.
+These instructions apply to the entire repository. `AGENTS.md` is the sole repository instruction entry point for every coding agent. Keep repository guidance in this open, harness-neutral format; do not add vendor-specific instruction routers, coding-agent settings, hooks, or discovery files. Reusable runbooks remain in the open Agent Skills format under `skills/`, with vendor-neutral discovery links under `.agents/skills/`. "Repository Map" below describes the files and folders this document names.
 
 ## Project Context
 
@@ -51,18 +51,7 @@ reference-only material.
 
 | Path | Description |
 | --- | --- |
-| `AGENTS.md` | This file. Canonical, harness-neutral agent guidance for the whole repository. Every other instruction file routes here and must not duplicate or override it. |
-| `CLAUDE.md` | Router for Claude Code and other Claude agents. |
-| `GEMINI.md` | Router for Gemini CLI. |
-| `GROK.md` | Router for Grok CLI. |
-| `QWEN.md` | Router for Qwen Code. |
-| `CONVENTIONS.md` | Router for Aider (`aider --read CONVENTIONS.md`). |
-| `.rules` | Router for Zed's agent panel. |
-| `.github/copilot-instructions.md` | Router for GitHub Copilot repository custom instructions. |
-| `.cursor/rules/circuitai.mdc` | Router for Cursor, as an always-applied project rule. |
-| `.windsurf/rules/circuitai.md` | Router for Windsurf and Cascade. |
-| `.clinerules/circuitai.md` | Router for Cline. |
-| `.junie/guidelines.md` | Router for JetBrains Junie. |
+| `AGENTS.md` | This file. The sole, harness-neutral repository instruction entry point; links to shared documentation and reusable skills. |
 | `skills/` | Repository skills in the Agent Skills format; one subdirectory per skill, each with a `SKILL.md`. |
 | `skills/convention-angelscript/SKILL.md` | AngelScript conventions: version-compatible language subset, ownership, functional style, safety, performance. Apply when writing or reviewing AngelScript. |
 | `skills/convention-cpp/SKILL.md` | Native CircuitAI/Recoil C++ conventions: task ownership, bindings, callback threading, exact optimization and evidence. Apply when writing or reviewing native AI code. |
@@ -71,7 +60,7 @@ reference-only material.
 | `skills/convention-angelscript/references/` | Supporting detail for that skill: `idioms.md`, `performance-and-safety.md`, `version-compatibility.md`. |
 | `skills/maintain-changelog/SKILL.md` | Changelog entry format, timestamping, and file layout. Opt-in: invoke only when the user explicitly asks for a changelog. |
 | `skills/troubleshoot-bar-logs/SKILL.md` | BAR runtime log investigation: size discipline, crash-marker search, AI log filtering, and symbolising `SkirmishAI.dll` stack offsets. |
-| `.agents/skills/` | Symlinks that expose `skills/` to harnesses which discover skills under `.agents/` (`convention-angelscript`, `convention-cpp`, `maintain-changelog`, `troubleshoot-bar-logs`). Add a symlink here when adding a skill. |
+| `.agents/skills/` | Symlinks that expose `skills/` to harnesses which discover skills under `.agents/` (`ai-not-moving`, `convention-angelscript`, `convention-cpp`, `maintain-changelog`, `playtest`, `troubleshoot-bar-logs`). Add a symlink here when adding a skill. |
 
 ### Active implementation - `data/`
 
@@ -208,7 +197,7 @@ This is the implementation target for every AngelScript and profile change.
 | `tools/knowledge/check_unit_helpers.py` | Validates every quoted unit id in `data/script/src` against the shared game cache (unknown, unreachable, wrong faction or tier, per-side branches) and reports combat-list coverage. Exit 1 on findings. |
 | `tools/knowledge/check_doc_links.py` | Verifies that every relative Markdown link under `doc/`, `data/script/`, `skills/` and the root instruction files resolves to a file that exists. Exit 1 on findings. Run before finishing any documentation change. |
 | `tools/knowledge/check_script_api.py` | Verifies every `aiXxx.Member` the AngelScript policy uses is registered in `src/circuit/script/*.cpp`, and with `--dll <installed SkirmishAI.dll>` that the registration strings are inside that binary and the file is a stripped ~7 MB build. Run before every launch; a script deployed ahead of its DLL leaves every AI standing at frame 0. |
-| `.claude/skills/ai-not-moving/SKILL.md` | The runbook for "the commander does not move at game start": find the last game's `ERR` lines in `infolog.txt`, the message-to-cause table, script/DLL parity with the checker, the deploy rules (ship script and DLL together; never copy from the Recoil install dir mid-build), what to do when there are no `ERR` lines, where to record the case. |
+| `skills/ai-not-moving/SKILL.md` | The runbook for "the commander does not move at game start": find the last game's `ERR` lines in `infolog.txt`, the message-to-cause table, script/DLL parity with the checker, the deploy rules (ship script and DLL together; never copy from the Recoil install dir mid-build), what to do when there are no `ERR` lines, where to record the case. |
 | `tools/playtest/` | The playtest loop: stage a pinned DLL/data into an isolated write directory, launch, watch, archive the original checks/log/report and screenshots under `runs/<UTC-id>/`. Cases and checks are categorized by domain and area; old short names and explicit paths still resolve. AIR and scorecard runners allocate unique categorized directories by default. Doc: `tools/playtest/README.md`. |
 | `tools/playtest/storage.py`, `tools/playtest/storage-aliases.json` | D-178: canonical case/check resolution with legacy aliases, unique game allocation, immutable result publication and benchmark indexing. New raw games use `build-theatres/games/<domain>/<area>/<scenario>/<map>/<UTC-id>/`; existing raw directories are retained. |
 | `tools/playtest/cases/`, `tools/playtest/checks/` | Reusable scenario/check definitions under `<domain>/<area>/`. Never mix raw engine outputs with definitions. Naming rules are in each directory's README. |
@@ -218,15 +207,13 @@ This is the implementation target for every AngelScript and profile change.
 | `tools/playtest/bench_loop.sh` | `SPEED=8 NOTE=... bash tools/playtest/bench_loop.sh t2 fusion afus nuke gantry titan`: one headless tech-versus-tech run per objective with `--set RushObjective`, each recorded by the tracker; `DLL=<path>` tests a specific DLL. |
 | `tools/playtest/benchmark.py` | Turns a playtest run into a row of `doc/benchmarks/tech-rush.md` (milestone times from the widget's `[Playtest] finished` lines, income, best-so-far table). |
 | `doc/benchmarks/tech-rush.md` | Generated by the tracker: the rush benchmark targets, floors, the best run per objective and every recorded run. |
-| `.claude/skills/playtest/SKILL.md` | Running local simulations: pin the build, the compile check, launching (write dirs, flags, maps, teams, settings), fast-forwarding with speed plans, screenshots, test widgets, judging and reading the logs (handed to `skills/troubleshoot-bar-logs`), stopping, checks files, benchmarks, and the traps met in past runs. |
-| `.claude/skills/playtest/references/widgets.md` | Writing a test widget for playtests: skeleton, tags, error detection, camera, cheats for targets, stroke counting, AI-to-widget messages, persisted widget config. |
-| `.claude/skills/troubleshoot-bar-logs` | Symlink to `skills/troubleshoot-bar-logs/`, so Claude Code lists the log skill. |
+| `skills/playtest/SKILL.md` | Running local simulations: pin the build, the compile check, launching (write dirs, flags, maps, teams, settings), fast-forwarding with speed plans, screenshots, test widgets, judging and reading the logs (handed to `skills/troubleshoot-bar-logs`), stopping, checks files, benchmarks, and the traps met in past runs. |
+| `skills/playtest/references/widgets.md` | Writing a test widget for playtests: skeleton, tags, error detection, camera, cheats for targets, stroke counting, AI-to-widget messages, persisted widget config. |
 | `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |
 | `doc/spam-routes.md` | The economy-gated spam feature: `spam` attribute, `Global::Spam` settings, `Spam::` manager, native `CRouteTask`, focus and lane geometry. |
 | `tools/widgets/gui_barb_team_link.lua` | LuaUI widget for the host machine, docked as a "Player / AI" tab strip on top of the bottom-right player-list stack; the AI tab opens a panel of the list's width above the strip, adding to the stack (D-061): Team and AI dropdown menus, then the selected AI's status, the runtime role selector, Query / Overlay / Query all, the event log. Displays what allied BARb instances mirror through `ai.CallUI` (`data/script/src/manager/widget_link.as`), including the team roster, orphan-rescue events, and `/barblayout` rendering of native layout zones and slot states. Copy into the BAR `LuaUI/Widgets` folder. |
 | `tools/widgets/deploy_widgets.py` | Copies every `tools/widgets/*.lua` into the local BAR install. **For the owner to run**: the assistant never writes to the game install (2026-09-21). |
 | `tools/playtest/checks/shared/terrain/theatres_supreme.json`, `tools/playtest/widgets/theatres_watch.lua` | D-128: Supreme Isthmus topology, no pond shipyard, friendly-pond opportunities, integrated player/all/off controls and strategic-site checks; stage the control widget plus watcher. |
-| `.claude/settings.json` | Claude Code project settings. The PostToolUse widget-deploy hook was removed on 2026-09-21: nothing may write to the live game folder. |
 | `.githooks/pre-commit` | Refuses a commit that stages a role script without its document, and runs `check_role_docs.py` when either is staged. Enable with `git config core.hooksPath .githooks`. |
 | `CMakeLists.txt` | Native build definition. Building requires integration into an engine checkout and Recoil's generated C++ AI wrapper. |
 | `tests/CMakeLists.txt`, `tests/base_layout_geometry_test.cpp` | Standalone C++20 tests for dependency-free base-layout geometry; configure with `cmake -S tests -B build-layout-tests`. The root `CIRCUIT_BUILD_TESTS` option adds the same target when CircuitAI is configured by its engine parent. |
@@ -588,7 +575,7 @@ Use the cheapest focused validation available in this repository, then broaden a
 - For configuration changes, parse the changed JSON and check referenced UnitDef names/build edges against the effective BAR data pipeline.
 - Use `git diff --check` before finishing.
 - **Always publish completed builds to `C:\bardev\bar-RecoilEngine\build-amd64-windows\install\AI\Skirmish\BARb\stable`.** This is the required build output, not the live game installation. Stage the stripped `SkirmishAI.dll`, its matching `SkirmishAI.dbg`, and the current `data/` contents together. A scratch build, pinned playtest DLL or update archive does not replace this step. Verify script/DLL API parity there before reporting completion.
-- The assistant never writes to the live BAR install (`%LOCALAPPDATA%\Programs\Beyond-All-Reason`): change and build only; the owner deploys the required build output above (script and DLL together). Before a launch the owner can run `python tools/knowledge/check_script_api.py --dll "<installed SkirmishAI.dll>"` (it only reads the DLL); see `.claude/skills/ai-not-moving/SKILL.md`.
+- The assistant never writes to the live BAR install (`%LOCALAPPDATA%\Programs\Beyond-All-Reason`): change and build only; the owner deploys the required build output above (script and DLL together). Before a launch the owner can run `python tools/knowledge/check_script_api.py --dll "<installed SkirmishAI.dll>"` (it only reads the DLL); see `skills/ai-not-moving/SKILL.md`.
 - After touching `data/script/src/`, `tools/playtest/checks/`, `doc/invariants.md`, `doc/actor-matrix.md` or `doc/decisions.md`, run `python tools/knowledge/check_invariants.py`; it must exit 0.
 - After touching `src/circuit/terrain/` layout code or `tests/`, run `bash tools/run_native_tests.sh` (the engine-free layout rules in `LayoutRanking.h` and `BaseLayoutGeometry.h`, compiled in the build container); it must exit 0. A new layout rule goes into `LayoutRanking.h` with a test named after the rule it guards (D-094).
 - After touching any Markdown, run `python tools/knowledge/check_doc_links.py`; a link to a document that does not exist asserts an answer that is not there.

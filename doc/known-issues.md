@@ -2032,7 +2032,7 @@ native member the script uses against the source registrations and, with
 `--dll`, against the installed binary (plus a size sanity check for an
 unstripped or mid-build copy). It does not compile the script; it catches
 the script/DLL mismatch class, which caused two of the three game-start
-failures of 2026-09-20. The runbook is `.claude/skills/ai-not-moving/SKILL.md`.
+failures of 2026-09-20. The runbook is `skills/ai-not-moving/SKILL.md`.
 History of "does not move at start": 2026-09-20 `out` used as an
 identifier (`eco_planner.as`); 2026-09-20 `const CCircuitDef@` passed to a
 non-const parameter; 2026-09-20 script deployed ahead of the DLL that

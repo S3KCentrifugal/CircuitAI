@@ -7265,7 +7265,7 @@ the completed build must always be published to
 The matched stripped DLL, debug symbols and current active data have now been
 staged there; API parity checks 214 members with zero findings. The live game
 installation remains separate. This requirement is explicit in
-[AGENTS.md](../AGENTS.md) and the [playtest skill](../.claude/skills/playtest/SKILL.md).
+[AGENTS.md](../AGENTS.md) and the [playtest skill](../skills/playtest/SKILL.md).
 
 ## D-131 — AI-owned tactical surveys with a controllable teaching overlay
 
@@ -10769,7 +10769,7 @@ changes. Historical missing-hover-document links remain KI-404.
 [case naming](../tools/playtest/cases/README.md),
 [check naming](../tools/playtest/checks/README.md),
 [runner guide](../tools/playtest/README.md),
-[playtest skill](../.claude/skills/playtest/SKILL.md),
+[playtest skill](../skills/playtest/SKILL.md),
 [repository map](../AGENTS.md), [byte-preservation attributes](../.gitattributes),
 [benchmark guide](benchmarks/README.md), [catalog](benchmarks/catalog.json),
 [AIR index](benchmarks/index/air.md), [TECH index](benchmarks/index/tech.md),
@@ -13301,7 +13301,7 @@ links each native mechanism, test, benchmark and maintenance contract.
 [known issues](known-issues.md), [C++ skill](../skills/convention-cpp/SKILL.md),
 [AngelScript skill](../skills/convention-angelscript/SKILL.md),
 [performance guidance](../skills/convention-angelscript/references/performance-and-safety.md),
-[playtest skill](../.claude/skills/playtest/SKILL.md),
+[playtest skill](../skills/playtest/SKILL.md),
 [ranged runner](../tools/playtest/ranged_arena.py),
 [focused test runner](../tools/run_ranged_performance_tests.sh),
 [test catalog](testing/README.md) and [benchmark catalog](benchmarks/README.md).
@@ -13483,3 +13483,59 @@ and 5 after. [Trial measurements](benchmarks/guard-orders.json),
 from the implementation report preserve successful and failed evidence.
 The stripped DLL, matching symbols and all 336 production data files are
 verified in the required development output; the live install is untouched.
+
+## D-224 - Use AGENTS.md as the sole repository instruction entry point
+
+2026-10-07. The owner requested removal of proprietary coding-harness
+configuration. This supersedes the former AGENTS.md rule that kept a separate
+router for each vendor. Even empty settings and instruction-only redirects
+still require vendor-specific maintenance; keeping them was rejected.
+
+**Decision.** Remove the eleven vendor instruction routers, the empty
+`.claude/settings.json`, and the vendor-specific log-skill discovery link.
+Move the playtest and startup-diagnosis runbooks from `.claude/skills/` into
+`skills/` and expose them through the existing vendor-neutral `.agents/skills/`
+links. Preserve their operational guidance, repair relative links, and replace
+proprietary tool names in the screenshot instructions with capability wording.
+AGENTS.md owns repository instructions; the open Agent Skills runbooks remain
+reusable supporting material. No vendor metadata is introduced.
+
+The removed routers are `CLAUDE.md`, `CONVENTIONS.md`, `GEMINI.md`, `GROK.md`,
+`QWEN.md`, `.rules`, `.github/copilot-instructions.md`,
+`.cursor/rules/circuitai.mdc`, `.windsurf/rules/circuitai.md`,
+`.clinerules/circuitai.md`, and `.junie/guidelines.md`. GitHub CI, ordinary
+editor/build configuration, and global user configuration are outside this
+cleanup. The ignored `.claude/scheduled_tasks.lock` belongs to a still-running
+process: retain that runtime lock and do not terminate its owner. It is not
+repository configuration.
+
+**Invariant.** No tracked proprietary coding-harness configuration remains in
+the working tree. All six portable skills retain valid discovery links;
+playtest/startup guidance and historical decision links remain accessible.
+No production C++, AngelScript, profiles, CI behavior, or benchmark evidence
+is changed, so no game simulation or DLL build is required for this migration.
+
+**Files.** [Instructions](../AGENTS.md), [README](../README.md),
+[playtest skill](../skills/playtest/SKILL.md),
+[widget guide](../skills/playtest/references/widgets.md),
+[startup skill](../skills/ai-not-moving/SKILL.md),
+[playtest discovery](../.agents/skills/playtest),
+[startup discovery](../.agents/skills/ai-not-moving),
+[log skill](../skills/troubleshoot-bar-logs/SKILL.md),
+[known-issue locations](known-issues.md),
+[link checker](../tools/knowledge/check_doc_links.py),
+[API-checker documentation](../tools/knowledge/check_script_api.py),
+[playtest documentation](../tools/playtest/README.md),
+[runner documentation](../tools/playtest/playtest.py),
+[deployment-tool documentation](../tools/widgets/deploy_widgets.py).
+Earlier entries here keep their content with links redirected to the moved
+runbooks. Deleted files are listed above rather than linked to missing paths.
+
+**Verification: Checked.** Repository inventory finds no remaining tracked
+vendor configuration files. Startup and widget runbooks compare equal to their
+originals after newline normalization; playtest changes are limited to paths
+and tool-neutral wording. All six skill links resolve, and the modified Python
+files parse. The generic skill validator cannot start in the bundled Python
+because PyYAML is absent; the unchanged frontmatter is checked directly instead.
+Documentation links introduce no new failures: the same eight pre-existing
+links to the missing hover-role document remain (KI-404).

@@ -15,7 +15,7 @@ Usage:
   python tools/knowledge/check_script_api.py
   python tools/knowledge/check_script_api.py --dll "%LOCALAPPDATA%/Programs/Beyond-All-Reason/data/engine/recoil_2026.07.04/AI/Skirmish/SMRTBARb/stable/SkirmishAI.dll"
 
-Exit code 1 on any finding. See .claude/skills/ai-not-moving/SKILL.md.
+Exit code 1 on any finding. See skills/ai-not-moving/SKILL.md.
 """
 import argparse
 import os

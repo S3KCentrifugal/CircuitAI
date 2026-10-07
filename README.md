@@ -2,6 +2,10 @@ Circuit AI (requires info update)
 =========
 C++ Skirmish AI for Recoil RTS engine.
 
+Coding agents: start with [AGENTS.md](AGENTS.md), the sole repository
+instruction entry point. Shared runbooks use the open Agent Skills format
+under `skills/`; no vendor-specific coding-agent configuration is required.
+
 ### SMRTBARb
 This fork ships as **SMRTBARb** (an alias of BARb). Every push to `smrt-test` (test builds, pre-releases)
 or `smrt-prod` (production, Latest) builds it in GitHub Actions with BAR's Recoil docker harness and

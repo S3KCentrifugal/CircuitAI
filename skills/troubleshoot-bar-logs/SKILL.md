@@ -32,7 +32,7 @@ strip its backslashes):
 BAR="$(cygpath -u "$LOCALAPPDATA")/Programs/Beyond-All-Reason/data"
 ```
 
-Local playtests (`.claude/skills/playtest`) log in their own write dir, not
+Local playtests (`skills/playtest`) log in their own write dir, not
 the install: the live game in `<dir>/infolog.txt` (deleted at each launch),
 one game per `<dir>/runs/<stamp>/infolog.txt`. Their AI is
 `Skirmish AI <BARb playtest-test>`; the installed build is

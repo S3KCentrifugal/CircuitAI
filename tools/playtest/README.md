@@ -195,7 +195,7 @@ autonomous targeting or natural builds.
 `tools/playtest/playtest.py` runs a BAR skirmish with the freshly built BARb,
 follows its log against a checks file, takes screenshots of the AI under
 test, and stops the engine. It is the loop "change, build, play, read the
-log, repeat" as a command. Skill: [`.claude/skills/playtest/SKILL.md`](../../.claude/skills/playtest/SKILL.md).
+log, repeat" as a command. Skill: [`skills/playtest/SKILL.md`](../../skills/playtest/SKILL.md).
 
 ```
 python tools/playtest/playtest.py run  --roles TECH,FRONT --speed 3            # stage + launch + watch + stop
@@ -269,7 +269,7 @@ started from the lobby.
    The first failure stops the game (`--keep-going` to collect all); script
    errors (`: ERR  :`, two spaces: match `: ERR\s+:`) always fail. Wall-clock
    limit `--wall-minutes`. A crash is never named as the reason: grep the run's
-   infolog for `Access violation`. The skill `.claude/skills/playtest` has the
+   infolog for `Access violation`. The skill `skills/playtest` has the
    full list of traps.
 6. **report**: `<dir>/report.md` and `<dir>/runs/<timestamp>/` with the
    report, the infolog and the screenshots: verdict, each check with the
@@ -329,7 +329,7 @@ patterns (they are the sequence's vocabulary, `doc/roles/tech_rules.md`).
 - Screenshots are PNGs in the run folder; the camera looks straight down on
   the AI's start position from `--cam-height` (2200) elmos.
 - The full `infolog.txt` of the run sits beside them; the runbook for a
-  commander that does not move is `.claude/skills/ai-not-moving/SKILL.md`.
+  commander that does not move is `skills/ai-not-moving/SKILL.md`.
 
 ## Two findings the design rests on
 

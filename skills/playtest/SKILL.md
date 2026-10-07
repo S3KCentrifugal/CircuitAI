@@ -6,8 +6,8 @@ description: 'Run a local BAR simulation with a fresh BARb build: stage, launch 
 # Playtest: local simulations
 
 For optimization work, apply the
-[performance contracts](../../../doc/performance/engineering-guide.md) and
-use the [test definition index](../../../doc/testing/README.md). Compare pinned
+[performance contracts](../../doc/performance/engineering-guide.md) and
+use the [test definition index](../../doc/testing/README.md). Compare pinned
 old/new inputs in serial games; changing populations or concurrent games cannot
 establish a CPU/FPS gain. Keep raw verdicts, distinguish per-unit engine orders
 from Lua orders and network packets, and report compilation failures separately
@@ -30,8 +30,8 @@ Tool: `tools/playtest/playtest.py` (reference: `tools/playtest/README.md`).
 It stages a DLL plus the repo's `data/` as `BARbTest/test` into its own
 engine write dir, never the install, and stops only its own engine.
 Widgets: [references/widgets.md](references/widgets.md). Reading logs and
-crashes: [`skills/troubleshoot-bar-logs/SKILL.md`](../../../skills/troubleshoot-bar-logs/SKILL.md)
-(and `.claude/skills/ai-not-moving` when commanders stand still: apply it to
+crashes: [`skills/troubleshoot-bar-logs/SKILL.md`](../troubleshoot-bar-logs/SKILL.md)
+(and `skills/ai-not-moving` when commanders stand still: apply it to
 `<dir>/runs/<stamp>/infolog.txt`, prefix `Skirmish AI <BARb playtest-test>`;
 a compile failure shows as `being removed from team 0` at f=59).
 
@@ -85,7 +85,7 @@ Recurring AngelScript errors:
 
 ## 3. Launch
 
-For new experiments follow [storage conventions](../../../doc/test-storage.md).
+For new experiments follow [storage conventions](../../doc/test-storage.md).
 AIR arenas and scorecard runs allocate a unique categorized write directory
 when `--dir` is omitted. For the generic runner or a specialised preparer,
 allocate one first and pass the returned path to every stage/run/watch/stop:
@@ -224,7 +224,7 @@ python tools/playtest/playtest.py run --dir C:/bardev/barb-playtest-simN --dll <
   AI's map strokes render white.
 - The windowed game is live: tell the user not to click it. `requested by
   widget` or `Speed set to` lines they cause are user input.
-- Look with Read; send the telling one with SendUserFile.
+- Inspect screenshots with the available image viewer and include the useful ones in updates to the user.
 
 ## 6. Widgets
 
@@ -280,7 +280,7 @@ Writing one: [references/widgets.md](references/widgets.md).
      share `SMRTBARb/stable`, and `using dir` names the wrong one.)
    - **Noise** to ignore: `AdvSky`, `corfast_dead`, `gui_pip ... CreateShader`,
      `Failed to load: tf_*.lua`, `Game-side script ... is missing`.
-   - **Size:** logs reach 25 MB. Use `grep -c`, `-m`, `head`; never Read a
+   - **Size:** logs reach 25 MB. Use `grep -c`, `-m`, `head`; never read a
      whole infolog.
 
 ## 8. Stop and clean up
