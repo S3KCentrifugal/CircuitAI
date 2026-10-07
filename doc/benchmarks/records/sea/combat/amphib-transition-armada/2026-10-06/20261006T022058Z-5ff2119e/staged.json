@@ -1,8 +1,0 @@
-{
-  "staged": "2026-10-05T23:19:03",
-  "dll": "build-theatres\\d212-build\\SkirmishAI.dll",
-  "dll_sha256_16": "f20faeb36c0d227b",
-  "dll_bytes": 7953672,
-  "data": "C:\\bardev\\s3k-CircuitAI\\data",
-  "ai": "BARbTest/test"
-}

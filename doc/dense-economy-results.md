@@ -16,9 +16,9 @@ Baseline data and matching symbols are pinned under `build-theatres/d190-baselin
 | Naval factory support | Amphibious complex: five completed turrets actively assisting at 1:40. Shipyard: fifteen completed turrets actively assisting at 2:50. |
 
 Immutable records, original checks and screenshots:
-[AIR converters](benchmarks/records/air/layout/dense-air/2026-10-04/20261004T142025Z-d633f435/README.md),
-[SEA economy](benchmarks/records/sea/layout/dense-sea/2026-10-04/20261004T142414Z-7e46ba2c/README.md),
-[shipyard/amphibious support](benchmarks/records/sea/layout/dense-support/2026-10-04/20261004T142300Z-2319eff6/README.md).
+[AIR converters](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/layout/dense-air/2026-10-04/20261004T142025Z-d633f435/README.md),
+[SEA economy](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/dense-sea/2026-10-04/20261004T142414Z-7e46ba2c/README.md),
+[shipyard/amphibious support](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/dense-support/2026-10-04/20261004T142300Z-2319eff6/README.md).
 
 Fixtures supply constructors, capital and (for support) factories and fixed
 products. Real layout reservations, constructor movement, workforce admission
@@ -60,9 +60,9 @@ comparisons.
 
 Original paired evidence:
 
-- Glacial seed 1881001: [control](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T142605Z-6ddb1ba4/README.md), [D190](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T142623Z-f9b63e2e/README.md).
-- Tundra seed 1881001: [control](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T142857Z-3efb4dd1/README.md), [D190](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T142926Z-328aee2f/README.md).
-- Tundra seed 1902: [control](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T143418Z-d9955086/README.md), [D190](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T143429Z-7353dd69/README.md).
+- Glacial seed 1881001: [control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T142605Z-6ddb1ba4/README.md), [D190](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T142623Z-f9b63e2e/README.md).
+- Tundra seed 1881001: [control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T142857Z-3efb4dd1/README.md), [D190](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T142926Z-328aee2f/README.md).
+- Tundra seed 1902: [control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T143418Z-d9955086/README.md), [D190](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T143429Z-7353dd69/README.md).
 
 ## Static verification and provenance
 

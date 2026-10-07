@@ -63,19 +63,19 @@ small supplied-force tests do not establish a large-match FPS/APM bound.
 
 Supreme's western edge, followed by the backline strike:
 
-![Supreme wave on the western boundary](images/d177/supreme-edge.png)
+![Supreme wave on the western boundary](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d177/supreme-edge.png)
 
-![Supreme AFUS strike](images/d177/supreme-afus.png)
+![Supreme AFUS strike](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d177/supreme-afus.png)
 
 Glitters' eastern flank bypasses the central flak:
 
-![Cortex bombers and escorts on Glitters' eastern flank](images/d177/glitters-edge.png)
+![Cortex bombers and escorts on Glitters' eastern flank](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d177/glitters-edge.png)
 
-![Glitters AFUS taking bomber damage](images/d177/glitters-afus.png)
+![Glitters AFUS taking bomber damage](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d177/glitters-afus.png)
 
 The clear-corridor control flies through the centre:
 
-![Glitters direct route](images/d177/glitters-direct.png)
+![Glitters direct route](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d177/glitters-direct.png)
 
 ## Control-fixture correction
 
@@ -114,7 +114,7 @@ Screenshots and target damage/death complement the centre-position evidence.
 
 ## Reproduction and evidence
 
-[Run manifest](benchmarks/d177-air-routes.json) preserves effective case
+[Run manifest](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d177-air-routes.json) preserves effective case
 settings, build identity, log/report hashes, actual crossing positions, AFUS
 handoff timings, escort observations and command counts, including both failed
 control designs. Local full logs and replays remain under each named

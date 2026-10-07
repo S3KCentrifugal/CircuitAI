@@ -47,12 +47,12 @@ different native/experimental builder movement settings.
 | Completed T1 converter removals / orphan turrets | 0 / 0 | 0 / 0 |
 | Unfinished T1 converter frame losses | 1 | 0 |
 
-Original reports: [compact](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/report.md)
-and [experimental](benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T171719Z-4a7ca5ff/report.md).
+Original reports: [compact](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/report.md)
+and [experimental](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T171719Z-4a7ca5ff/report.md).
 Each immutable bundle includes staged source hashes, DLL hash, inputs, checks
 and screenshots. The raw log location remains in its report/publication.
 
-![Supreme supplied layout at 11 minutes: separate factory support and rear economy block](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/screen_2026-10-04_17-18-12-180.png)
+![Supreme supplied layout at 11 minutes: separate factory support and rear economy block](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/screen_2026-10-04_17-18-12-180.png)
 
 The screenshot shows the two factories above the rear economy block. Converter
 footprints form touching groups around the reserved square turret grid; the
@@ -93,10 +93,10 @@ The long tail and idle build power remain follow-up concerns, not fixed claims.
 Self-play changes both sides; repeat fixed-opponent seeds before judging
 strength. FPS/APM were not benchmarked by these acceptance cases.
 
-Evidence: [Supreme control](benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T165401Z-cc9781a9/sea-score.json),
-[Supreme candidate](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171713Z-8c419c58/sea-score.json),
-[Glacial control](benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T170832Z-584d883a/sea-score.json),
-[Glacial candidate](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171909Z-c1733636/sea-score.json).
+Evidence: [Supreme control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T165401Z-cc9781a9/sea-score.json),
+[Supreme candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171713Z-8c419c58/sea-score.json),
+[Glacial control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T170832Z-584d883a/sea-score.json),
+[Glacial candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171909Z-c1733636/sea-score.json).
 
 ## Corrections and retained failures
 
@@ -109,7 +109,7 @@ PASS. The earlier scenario names `final` and `release` are historical labels;
 the final accepted run IDs are the ones linked above.
 
 The strict earlier fixture rejected every T1 converter destruction. Its
-[original FAIL](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171420Z-dc1fa905/report.md)
+[original FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171420Z-dc1fa905/report.md)
 is preserved: two unfinished frames disappeared before completion. The final
 observer distinguishes unfinished frame loss from completed-converter removal
 using UnitFinished. It still rejects any completed-converter loss in this
@@ -121,33 +121,33 @@ never rewritten to match the later diagnosis.
 
 | Run/report | Scenario/map | Original verdict | Interpretation |
 | --- | --- | --- | --- |
-| [20261004T162552Z-9940fa19](benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T162552Z-9940fa19/report.md) | d191-compact / supreme | FAIL | Rejected: naval task label/placement path incomplete. |
-| [20261004T163046Z-af2c6ce0](benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T163046Z-af2c6ce0/report.md) | d191-compact / supreme | FAIL | Rejected: dormant-chain handle crash at 19:18. |
-| [20261004T163729Z-6eda5a58](benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T163729Z-6eda5a58/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: tidal/expansion regression. |
-| [20261004T164006Z-368ab930](benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T164006Z-368ab930/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: tidal/expansion regression. |
-| [20261004T164840Z-2fd14b7d](benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T164840Z-2fd14b7d/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: expansion suppressed. |
-| [20261004T170832Z-584d883a](benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T170832Z-584d883a/report.md) | d191-control / glacial | PASS | Pre-D191 Glacial control (20 minutes). |
-| [20261004T165401Z-cc9781a9](benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T165401Z-cc9781a9/report.md) | d191-control / supreme | PASS | Pre-D191 Supreme control (25 minutes). |
-| [20261004T170117Z-cb35c282](benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T170117Z-cb35c282/report.md) | d191-final / glacial | PASS | Rejected despite runtime PASS: expansion suppressed. |
-| [20261004T165546Z-f4060972](benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T165546Z-f4060972/report.md) | d191-final / supreme | FAIL | Rejected: no first departure by deadline; expansion suppressed. |
-| [20261004T165932Z-d71c3895](benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T165932Z-d71c3895/report.md) | d191-final / supreme | PASS | Rejected despite runtime PASS: expansion suppressed. |
-| [20261004T170732Z-983f7095](benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T170732Z-983f7095/report.md) | d191-final / supreme | PASS | Expansion restored; factory-support space still obstructed. |
-| [20261004T171109Z-59f8c98c](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171109Z-59f8c98c/report.md) | d191-release / glacial | PASS | T2 reached; before final support-disc separation. |
-| [20261004T171909Z-c1733636](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171909Z-c1733636/report.md) | d191-release / glacial | PASS | Final ordinary Glacial observation (20 minutes). |
-| [20261004T171028Z-d8ee4b23](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171028Z-d8ee4b23/report.md) | d191-release / supreme | PASS | Rejected support geometry: no factory turrets. |
-| [20261004T171713Z-8c419c58](benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171713Z-8c419c58/report.md) | d191-release / supreme | PASS | Final ordinary Supreme observation (30 minutes). |
-| [20261004T170252Z-89504213](benchmarks/records/sea/economy/d191-workers/2026-10-04/20261004T170252Z-89504213/report.md) | d191-workers / supreme | PASS | Diagnostic worker-task snapshots; not release acceptance. |
-| [20261004T163255Z-fe6ea1e1](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163255Z-fe6ea1e1/report.md) | economy-block / supreme | FAIL | Fixture compile failure; conditional injection corrected. |
-| [20261004T163531Z-7d750e6b](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163531Z-7d750e6b/report.md) | economy-block / supreme | FAIL | Unbounded supplied production consumed economy budget. |
-| [20261004T163800Z-912ccc56](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163800Z-912ccc56/report.md) | economy-block / supreme | FAIL | No fusion: T2 sub cannot build initial T1 turrets. |
-| [20261004T164720Z-b5abb934](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T164720Z-b5abb934/report.md) | economy-block / supreme | FAIL | Claimed travelling pins incorrectly cancelled. |
-| [20261004T165358Z-47772981](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T165358Z-47772981/report.md) | economy-block / supreme | FAIL | Factory demand ended before support; added second finite wave. |
-| [20261004T165959Z-9e3b4d88](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T165959Z-9e3b4d88/report.md) | economy-block / supreme | PASS | Earlier supplied acceptance, before final support-disc separation. |
-| [20261004T171420Z-dc1fa905](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171420Z-dc1fa905/report.md) | economy-block / supreme | FAIL | Original strict FAIL: two unfinished converter frame losses. |
-| [20261004T171817Z-9ae5216e](benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/report.md) | economy-block / supreme | PASS | Final compact physical acceptance; one unfinished frame loss. |
-| [20261004T164148Z-89c69f9c](benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T164148Z-89c69f9c/report.md) | economy-block-exp / supreme | FAIL | No fusion: T2/T1 support handoff incomplete. |
-| [20261004T165639Z-e6cfcb0f](benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T165639Z-e6cfcb0f/report.md) | economy-block-exp / supreme | PASS | Earlier supplied acceptance, before final support-disc separation. |
-| [20261004T171719Z-4a7ca5ff](benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T171719Z-4a7ca5ff/report.md) | economy-block-exp / supreme | PASS | Final experimental physical acceptance. |
+| [20261004T162552Z-9940fa19](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T162552Z-9940fa19/report.md) | d191-compact / supreme | FAIL | Rejected: naval task label/placement path incomplete. |
+| [20261004T163046Z-af2c6ce0](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T163046Z-af2c6ce0/report.md) | d191-compact / supreme | FAIL | Rejected: dormant-chain handle crash at 19:18. |
+| [20261004T163729Z-6eda5a58](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T163729Z-6eda5a58/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: tidal/expansion regression. |
+| [20261004T164006Z-368ab930](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T164006Z-368ab930/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: tidal/expansion regression. |
+| [20261004T164840Z-2fd14b7d](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-compact/2026-10-04/20261004T164840Z-2fd14b7d/report.md) | d191-compact / supreme | PASS | Rejected despite runtime PASS: expansion suppressed. |
+| [20261004T170832Z-584d883a](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T170832Z-584d883a/report.md) | d191-control / glacial | PASS | Pre-D191 Glacial control (20 minutes). |
+| [20261004T165401Z-cc9781a9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-control/2026-10-04/20261004T165401Z-cc9781a9/report.md) | d191-control / supreme | PASS | Pre-D191 Supreme control (25 minutes). |
+| [20261004T170117Z-cb35c282](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T170117Z-cb35c282/report.md) | d191-final / glacial | PASS | Rejected despite runtime PASS: expansion suppressed. |
+| [20261004T165546Z-f4060972](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T165546Z-f4060972/report.md) | d191-final / supreme | FAIL | Rejected: no first departure by deadline; expansion suppressed. |
+| [20261004T165932Z-d71c3895](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T165932Z-d71c3895/report.md) | d191-final / supreme | PASS | Rejected despite runtime PASS: expansion suppressed. |
+| [20261004T170732Z-983f7095](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-final/2026-10-04/20261004T170732Z-983f7095/report.md) | d191-final / supreme | PASS | Expansion restored; factory-support space still obstructed. |
+| [20261004T171109Z-59f8c98c](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171109Z-59f8c98c/report.md) | d191-release / glacial | PASS | T2 reached; before final support-disc separation. |
+| [20261004T171909Z-c1733636](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171909Z-c1733636/report.md) | d191-release / glacial | PASS | Final ordinary Glacial observation (20 minutes). |
+| [20261004T171028Z-d8ee4b23](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171028Z-d8ee4b23/report.md) | d191-release / supreme | PASS | Rejected support geometry: no factory turrets. |
+| [20261004T171713Z-8c419c58](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-release/2026-10-04/20261004T171713Z-8c419c58/report.md) | d191-release / supreme | PASS | Final ordinary Supreme observation (30 minutes). |
+| [20261004T170252Z-89504213](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d191-workers/2026-10-04/20261004T170252Z-89504213/report.md) | d191-workers / supreme | PASS | Diagnostic worker-task snapshots; not release acceptance. |
+| [20261004T163255Z-fe6ea1e1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163255Z-fe6ea1e1/report.md) | economy-block / supreme | FAIL | Fixture compile failure; conditional injection corrected. |
+| [20261004T163531Z-7d750e6b](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163531Z-7d750e6b/report.md) | economy-block / supreme | FAIL | Unbounded supplied production consumed economy budget. |
+| [20261004T163800Z-912ccc56](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T163800Z-912ccc56/report.md) | economy-block / supreme | FAIL | No fusion: T2 sub cannot build initial T1 turrets. |
+| [20261004T164720Z-b5abb934](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T164720Z-b5abb934/report.md) | economy-block / supreme | FAIL | Claimed travelling pins incorrectly cancelled. |
+| [20261004T165358Z-47772981](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T165358Z-47772981/report.md) | economy-block / supreme | FAIL | Factory demand ended before support; added second finite wave. |
+| [20261004T165959Z-9e3b4d88](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T165959Z-9e3b4d88/report.md) | economy-block / supreme | PASS | Earlier supplied acceptance, before final support-disc separation. |
+| [20261004T171420Z-dc1fa905](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171420Z-dc1fa905/report.md) | economy-block / supreme | FAIL | Original strict FAIL: two unfinished converter frame losses. |
+| [20261004T171817Z-9ae5216e](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block/2026-10-04/20261004T171817Z-9ae5216e/report.md) | economy-block / supreme | PASS | Final compact physical acceptance; one unfinished frame loss. |
+| [20261004T164148Z-89c69f9c](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T164148Z-89c69f9c/report.md) | economy-block-exp / supreme | FAIL | No fusion: T2/T1 support handoff incomplete. |
+| [20261004T165639Z-e6cfcb0f](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T165639Z-e6cfcb0f/report.md) | economy-block-exp / supreme | PASS | Earlier supplied acceptance, before final support-disc separation. |
+| [20261004T171719Z-4a7ca5ff](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/economy-block-exp/2026-10-04/20261004T171719Z-4a7ca5ff/report.md) | economy-block-exp / supreme | PASS | Final experimental physical acceptance. |
 
 ## Verification scope and remaining work
 

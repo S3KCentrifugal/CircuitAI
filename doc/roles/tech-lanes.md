@@ -35,7 +35,7 @@ validation, teaching, water/sites and optional overlay serialization together.
 The main-thread total is snapshot + publication + postprocess, plus solver time
 in synchronous mode. It is not a whole-frame profiler or a CPU-time counter.
 The pure solver is unit tested with concurrent jobs and synthetic terrain;
-[benchmark evidence](../benchmarks/lane-workers/README.md) records actual games.
+[benchmark evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/lane-workers/README.md) records actual games.
 
 ## The owner's request
 

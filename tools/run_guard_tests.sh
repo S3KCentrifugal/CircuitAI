@@ -3,7 +3,8 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd -W)"
 ENGINE="${ENGINE_ROOT:-$REPO/../bar-RecoilEngine}"
-OUT="${GUARD_OUT:-$REPO/build-theatres/d223/tests}"
+BENCHMARKS="${CIRCUIT_BENCHMARK_REPO:-$REPO/../CircuitAI.benchmarks}"
+OUT="${GUARD_OUT:-$BENCHMARKS/build-theatres/d223/tests}"
 mkdir -p "$OUT"
 MSYS2_ARG_CONV_EXCL='*' docker run --rm -v "$REPO:/src:ro" -v "$ENGINE:/engine:ro" -v "$OUT:/out" --entrypoint sh ghcr.io/beyond-all-reason/recoil-build-amd64-windows:latest -c '
 set -eu

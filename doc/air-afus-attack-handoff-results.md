@@ -42,13 +42,13 @@ raid. Fixed tests record exactly one AFUS attack transition per observed
 target. Seeded games are not asserted bit-for-bit deterministic across
 asynchronous scheduling, game speed or binary changes.
 
-![Baseline AFUS visible while the raid continued to another building](images/d176/baseline-visible.png)
+![Baseline AFUS visible while the raid continued to another building](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d176/baseline-visible.png)
 
-![Legion Phoenixes firing on approach](images/d176/legion-afus.png)
+![Legion Phoenixes firing on approach](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d176/legion-afus.png)
 
-![Armada hitting the newly revealed AFUS with its escorts](images/d176/armada-afus.png)
+![Armada hitting the newly revealed AFUS with its escorts](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d176/armada-afus.png)
 
-![Cortex striking under normal LOS/radar](images/d176/cortex-afus.png)
+![Cortex striking under normal LOS/radar](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d176/cortex-afus.png)
 
 Supreme Isthmus `d176-defense` uses the final DLL with Legion/balanced and
 normal LOS. The five-bomber defensive wave received ATTACK at frame 2504
@@ -60,7 +60,7 @@ The strict eight-minute defensive report passed with no invariant, script,
 fixture or crash failures. All four fixed rendered runs passed their complete
 checks; the baseline deliberately fails the new handoff invariant.
 
-![Defensive Phoenixes attacking the Shiva](images/d176/defensive-shiva.png)
+![Defensive Phoenixes attacking the Shiva](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d176/defensive-shiva.png)
 
 ## Cost and regression scope
 
@@ -87,7 +87,7 @@ with [the arena runner](../tools/playtest/air_arena.py). The
 [engine observer](../tools/playtest/widgets/air_arena.lua),
 [strict checks](../tools/playtest/checks/air/combat/air_afus_handoff.json) and
 [timing auditor](../tools/playtest/audit_afus_handoff.py) are checked in.
-The [evidence manifest](benchmarks/d176-afus-handoff.json) records full DLL,
+The [evidence manifest](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d176-afus-handoff.json) records full DLL,
 debug, data and log hashes, overrides, measured contacts, command counts and
 key log excerpts for all five runs.
 

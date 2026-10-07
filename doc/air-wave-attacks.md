@@ -58,7 +58,7 @@ wave holds. `WaveAvoidHomeFocus` selects the nearest participating enemy start
 when no ground opposition is observed or the combat focus is absent/near home.
 An explicit STRIKE/DEEP target still overrides that fallback. This avoids
 carpeting the home runway in an AIR duel without changing TECH or the six wave
-methods. The [controlled sortie](benchmarks/air-management.md) launched 24
+methods. The [controlled sortie](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md) launched 24
 bombers and independently observed their damage to enemy targets.
 
 How an AIR-role T2 bomber wave is sized, how it forms up, and the six

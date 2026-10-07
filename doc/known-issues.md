@@ -1486,7 +1486,7 @@ a gap polluted by policy waits. Keep all parameters AIR-only.
 **Verification.** Repeated fixed-queue measurements predict held-out observed
 throughput and identify the appropriate support/new-bay crossover. See
 [D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
-and [measurement limits](benchmarks/air-management.md).
+and [measurement limits](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md).
 
 ### KI-221 - SEA T2 shipyard admission has contradictory gates
 
@@ -2866,7 +2866,7 @@ No AIR or independent observer invariant lines occur. See the
 **D-144 sample evidence.** The natural-income September 29 lane-worker samples
 also report TECH invariants: Supreme INV-001/008/019, Glacial INV-013/019/029,
 and Ascendancy INV-004/008/013/015. Their overall checks remain FAIL despite
-successful lane publication/refresh. See the [timings and exact manifests](benchmarks/lane-workers/README.md).
+successful lane publication/refresh. See the [timings and exact manifests](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/lane-workers/README.md).
 The synchronous Supreme sample is clean; this small experiment does not assign
 causality or exclude worker adoption timing as a contributor.
 
@@ -3006,7 +3006,7 @@ on all six faction/side combinations, each sustaining production and reaching
 the mountain. The separate 8v8 ended with west TECH defeated below the gate
 and east TECH still below +200. It does not resolve the reported high-income
 full-team failure. See the [faction validation](reviews/2026-09-29-glacial-faction-validation.md).
-The initial [scorecards](benchmarks/scorecards/README.md) separately capture
+The initial [scorecards](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecards/README.md) separately capture
 high-income zero-combat observations on Supreme Isthmus and Glacial Gap. The
 staged TECH Ascendancy duel completed zero combat units at 45 minutes on both
 sides, but neither had a sampled income at +200; this is not evidence of failure
@@ -3082,7 +3082,7 @@ move any dominant pure calculations to owned snapshots or budget their work
 across ticks. Preserve per-team threat visibility and main-thread script/engine
 access; do not move AngelScript execution to the worker pool.
 
-**Verification.** Repeat the [map/settings benchmarks](benchmarks/lane-workers/README.md)
+**Verification.** Repeat the [map/settings benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/lane-workers/README.md)
 with separate subphase timings, unchanged advisory outputs, completed refreshes
 and no publication invariant failures. Full-game TECH invariant failures remain
 tracked separately under KI-427.
@@ -3192,7 +3192,7 @@ The all-owned-mex gate and exact deadline remain enforced. See the
 result below is retained. The proposed lane after only initial upgrades is
 superseded: AIR now checks every owned mex and pending upgrade before any
 reactor admission, with earlier T2 access and bounded initial expansion.
-Current results are in [AIR benchmarks](benchmarks/air-management.md).
+Current results are in [AIR benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md).
 
 **D-148 verification.** Final Supreme games complete fusion at Armada 18:41,
 Cortex 19:16 and Legion 20:02.5, always after all six owned mex upgrades.
@@ -3229,7 +3229,7 @@ rejected by D-148.
 **Verification.** Repeated final-code games meet the unchanged transition
 milestones without starving interception or showing invariant violations.
 [D-147](decisions.md#d-147--air-owns-t1-economy-production-bays-and-transport-first-recruitment)
-and [evidence](benchmarks/air-management.md) preserve the failed scorecard.
+and [evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md) preserve the failed scorecard.
 
 ### KI-437 — Legacy AIR does not use the new wind clusters or workforce targets
 
@@ -3373,7 +3373,7 @@ T2 labs, eighty turrets and twenty flying constructors completing in that
 window. No energy-stall seconds were recorded there. Allied donations are not
 included in the reported mean +160.41 income, so bank occupancy does not by
 itself measure wasted production capacity. The spending/calibration issue
-remains open; see [D-163 measurements](benchmarks/air-d163.json).
+remains open; see [D-163 measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163.json).
 
 **D-164 update.** Removing advanced-aircraft factory guards and reserving a
 separate economic district restores continued reactor growth. The final
@@ -3961,7 +3961,7 @@ seven T2 labs completed. No new compound/reclaim invariant fired. The strict
 report remains FAIL: the lab and bomber deadlines were missed and idle-guard
 plus TECH invariant failures persist. This repeat improves on earlier timings
 but does not prove consistent PvP readiness or the remaining lifecycle edges.
-See [final audit](benchmarks/d167-natural-final.json).
+See [final audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-final.json).
 
 
 
@@ -4786,7 +4786,7 @@ See D-188 [results](sea-layout-migration-results.md).
 
 **Proposed solution.** Keep ExperimentalBuild disabled by default. Separate production latency, group assembly, local naval force balance and economic spending. Retest supported harbors and multiple seeded/side-swapped natural matches; use operational-base survival rather than merely nonempty unit lists. Do not replace native movement with the rejected order-suppression experiments.
 
-**Verification.** Immutable runs and original FAIL/PASS verdicts are in the [SEA benchmark index](benchmarks/index/sea.md). [Acceptance plan](sea-combat-enhancement-plan.md) and [source trace](sea-native-trace.md) define remaining gates. No all-benchmark-win claim.
+**Verification.** Immutable runs and original FAIL/PASS verdicts are in the [SEA benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md). [Acceptance plan](sea-combat-enhancement-plan.md) and [source trace](sea-native-trace.md) define remaining gates. No all-benchmark-win claim.
 
 ### KI-232 - SEA large fleets still exceed the desired command budget
 
@@ -4829,7 +4829,7 @@ See D-188 [results](sea-layout-migration-results.md).
 
 **Proposed solution.** Reproduce with independent factory queue/current-command, product progress, nearby hull/constructor positions and slipway clearance. Test idle recovery units and collision blockers explicitly, then fix the SEA-selected mechanism rather than canceling/reissuing every fleet order. Separately gate tech saving on an actually available T2 yard and local surface-force safety; current saving only checks local harbor threat plus air/sub deficits.
 
-**Verification.** Four-minute diagnostic copies and eight-minute corrected-harness comparisons are retained in the [SEA index](benchmarks/index/sea.md). [Arena observer](../tools/playtest/widgets/sea_arena.lua) now records yard_wait observations. Neither the physical cause nor the broader tech-saving refinements are marked fixed.
+**Verification.** Four-minute diagnostic copies and eight-minute corrected-harness comparisons are retained in the [SEA index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md). [Arena observer](../tools/playtest/widgets/sea_arena.lua) now records yard_wait observations. Neither the physical cause nor the broader tech-saving refinements are marked fixed.
 
 
 D-190 follow-up to KI-231/KI-235: touching SEA economy patches, strip expansion and factory support were tested separately; this does not close broad SEA rollout or all-terrain approach issues. See [compact economy results](dense-economy-results.md).
@@ -5160,7 +5160,7 @@ and [D-203](decisions.md#d-203---review-siege-normalization-before-changing-rang
 
 
 
-**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 ### KI-504 - Ranged target pursuit can surrender range to repaired static bait
 
@@ -5206,7 +5206,7 @@ remain open; the plan does not represent an implemented or played fix.
 
 
 
-**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 ### KI-505 - Balanced Starlight health-retreat override prevents ordinary early escape
 
@@ -5229,7 +5229,7 @@ continued useful fire after rejoining, not indefinite retreat. See the
 [D-206](decisions.md#d-206---one-ranged-attribute-with-capability-aware-withdrawal-and-mission-ownership).
 
 
-**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 ### KI-506 - Sensor escort selection has no anti-heavy/artillery cohort anchor
 
@@ -5252,7 +5252,7 @@ firing lines, destruction, transfer and save/load. See the
 [review](reviews/2026-10-05-balanced-siege-attributes.md).
 
 
-**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 ### KI-507 - Cloak initialization overrides retreat hold-fire policy
 
@@ -5274,7 +5274,7 @@ and rejoin. Verify fire-state ownership on release/player handover. See the
 [review](reviews/2026-10-05-balanced-siege-attributes.md).
 
 
-**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
+**D-207 implementation update (2026-10-05).** The opted-in ranged land controller addresses this finding. See [implementation](ranged-combat.md) and [played evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). Native/VM tests and supplied combat fixtures have been exercised; evidence is scoped to their stated cases, not all save/load and network combinations.
 
 
 ### KI-508 - Legacy sensor rebalancing still misses secondary radar/jammer labels
@@ -5324,7 +5324,7 @@ Half-turn timing and unknown-radar advancement were corrected, but did not
 remove the Starlight survival difference. A rear-only idle dispersal trial
 failed to improve survival and reduced bait clearance from nine targets to
 two; that trial was rejected and its evidence retained. See
-[original and revised measurements](benchmarks/ranged-combat.md). The feature
+[original and revised measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md). The feature
 PR remains a review candidate rather than a proven strength upgrade.
 
 ### KI-510 - Ranged rework has not established FPS parity with legacy combat
@@ -5349,7 +5349,7 @@ requirements; no unmeasured extra optimization is claimed.
 **Verification.** Built, phase-profiled and Played; snapshot exclusive time
 fell about 34% in the diagnostic trials. Local AI order counts fell while CPU
 cost increased. Normal-speed and release-build observations are separated in
-[the benchmark report](benchmarks/ranged-combat.md); internet peer behavior
+[the benchmark report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md); internet peer behavior
 and late-game 8v8 acceptance remain unverified. The final same-DLL 1x control
 measured 0.129329 ms/frame and 341 median FPS versus 0.198573 and 282 with
 ranged policy enabled. Orders fell 17.0%, but no-FPS-drop acceptance failed.
@@ -5379,7 +5379,7 @@ stationary covered cohort to verify that no unnecessary advance is required.
 lines (six targets), lost no ranged units, and recorded radar advance 1692
 and jammer advance 975 elmos. That Played result verifies an advancing case;
 it does not prove every coverage/lease interaction. See the original and new
-[benchmark records](benchmarks/ranged-combat.md).
+[benchmark records](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md).
 
 
 ### KI-512 - SEA fleet objectives omit unfinished and remembered hidden shipyards
@@ -5765,7 +5765,7 @@ the shared invariant check. This SEA task does not remediate TECH policy.
 The existing allied-base/transition observers enabled synced GlobalLOS in
 natural games. This task corrects both observers and forbids the engine marker
 in natural capacity/transition checks; historical visibility-confounded records
-remain intact and explicitly identified by the [trial index](benchmarks/sea-production-capacity.json).
+remain intact and explicitly identified by the [trial index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/sea-production-capacity.json).
 Historical FPS, normal scouting and fog-buffer conclusions cannot be recovered
 from those runs. The Cortex supplied test's first truncated archive is a watcher
 inspection failure, followed by a full observation of the same continuing game;
@@ -5799,7 +5799,7 @@ frame or changing other roles' native selection. Do not globally disable the
 experimental builder or bypass private reservations to hide the failure.
 
 **Verification.** Raw log hashes, final samples and original overall FAIL remain
-in the [capacity trial index](benchmarks/sea-production-capacity.json). The final
+in the [capacity trial index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/sea-production-capacity.json). The final
 mixed log has seven TECH invariant events, with six seen by the live watcher
 before its final drain; no SEA reservation/commander invariant occurred. All
 four SEA growth checks pass, which is insufficient to certify later economy.

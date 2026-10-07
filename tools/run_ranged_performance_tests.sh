@@ -3,7 +3,8 @@
 # Run PERF_BENCH=1 only after game and compiler processes have finished.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && { pwd -W 2>/dev/null || pwd; })"
-OUT="${PERF_OUT:-$REPO/build-theatres/d221/validation}"
+BENCHMARKS="${CIRCUIT_BENCHMARK_REPO:-$REPO/../CircuitAI.benchmarks}"
+OUT="${PERF_OUT:-$BENCHMARKS/build-theatres/d221/validation}"
 mkdir -p "$OUT"
 IMAGE=ghcr.io/beyond-all-reason/recoil-build-amd64-windows:latest
 MSYS2_ARG_CONV_EXCL='*' docker run --rm --pull=never \

@@ -3,7 +3,7 @@
 2026-10-05. Historical design baseline: `f65f10db`.
 **Implementation follow-up:** D-207 implements the refined opt-in design on
 `codex/ranged-combat-rework`. See the [current implementation](ranged-combat.md)
-and [played results, regressions and performance costs](benchmarks/ranged-combat.md).
+and [played results, regressions and performance costs](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md).
 The sketches below remain the design history; the current reference identifies
 the actual API names and which verification remains outstanding.
 This breaks down the [siege review](reviews/2026-10-05-siege-classification-request.md)

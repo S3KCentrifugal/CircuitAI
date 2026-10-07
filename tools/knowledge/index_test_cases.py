@@ -147,8 +147,8 @@ runner families. A listed definition does **not** mean it passed or was played.
 - [Machine-readable definitions](catalog.json) include source hashes and named
   assertions where statically identifiable. Native unnamed assertions stay in
   the linked executable suite; this is not assertion-level coverage analysis.
-- [Benchmark index](../benchmarks/README.md) and
-  [evidence catalog](../benchmarks/catalog.json) own recorded results.
+- [Benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md) and
+  [evidence catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) own recorded results.
 - [Storage conventions](../test-storage.md) define immutable raw games and
   compact evidence bundles. [Migration audit](../test-storage-moves.md) preserves
   historical benchmark paths. This index does not move or rewrite evidence.

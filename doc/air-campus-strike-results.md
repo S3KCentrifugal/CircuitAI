@@ -56,13 +56,13 @@ deadline; it does not establish reliable timing across maps or self-funded T2.
 
 The dense Cortex campus at thirty minutes:
 
-![Cortex aircraft campus](images/d163/cortex-campus-30min.png)
+![Cortex aircraft campus](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d163/cortex-campus-30min.png)
 
 Natural twenty-minute base and the supplied obstruction/capacity repeat:
 
-![Natural base](images/d163/natural-base-20min.png)
+![Natural base](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d163/natural-base-20min.png)
 
-![Repaired support campus](images/d163/support-repaired-campus.png)
+![Repaired support campus](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d163/support-repaired-campus.png)
 
 ## Combat outcomes
 
@@ -76,9 +76,9 @@ In the final twenty-minute supplied-force Armada test:
 | Synchronized sixteen bombers | Flak target destroyed at frame 16786; eight returned home. The nominal impact frame was also 16786, but this one event does not prove every bomber arrived simultaneously. |
 | Thirty-four bombers | Two AFUS destroyed at frame 20090; eleven returned home. High-value result with heavy losses, not evidence of low attrition. |
 
-![Edge approach](images/d163/edge-ingress.png)
+![Edge approach](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d163/edge-ingress.png)
 
-![Static attack](images/d163/synchronized-flak-attack.png)
+![Static attack](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d163/synchronized-flak-attack.png)
 
 Local-AA reserve fixed an earlier underfunded eight-bomber flak attack, and
 latched return progress fixed earlier 150-second return timeouts. Corridor
@@ -94,9 +94,9 @@ The next mission selected a different AFUS position with 48 bombers, killed both
 AFUS and returned seventeen. A later eight-bomber sortie returned all eight,
 relaxing resistance from 2.25 to 2.025. This verifies adaptation and alternate
 target selection; the high losses still need cost/egress calibration.
-The [retained feedback audit](benchmarks/air-d163-feedback.json) records the
+The [retained feedback audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163-feedback.json) records the
 observed multipliers, region expiry, later missions and its focused PASS.
-The [natural Legion-side audit](benchmarks/air-d163-natural-feedback.json)
+The [natural Legion-side audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163-natural-feedback.json)
 also records exclusion-respecting alternate missions. Those raids still suffered
 heavy losses. Learned resistance avoids one repeated-failure pattern; it has not
 solved interception, egress or value-based raid economics.
@@ -110,7 +110,7 @@ turrets and twenty flying constructors during that window. Mean metal income
 was 160.41/s. It recorded no energy-stall seconds during that window. Growth is
 active, but this is not optimal spending; production/campus critical-path
 calibration remains acceptance work. Raw early/mid/late summaries are retained
-in [the measurement file](benchmarks/air-d163.json).
+in [the measurement file](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163.json).
 This extends the existing KI-442 overflow evidence; nominal income omits allied
 transfers, so bank occupancy alone is not a measured production efficiency ratio.
 

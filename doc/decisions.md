@@ -3217,7 +3217,7 @@ stand when the advanced lab is ordered all within reach of it.
 ## D-070 — The TECH rush chain: one objective, one computed build order, then the economy
 
 **Date:** 2026-09-21. **Status:** Built (script only); benchmarked by the
-playtest loop, results in [`benchmarks/tech-rush.md`](benchmarks/tech-rush.md).
+playtest loop, results in [`benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md).
 
 **Goal set by the owner.** The TECH role must reach every rush milestone at
 or under the low end of the realistic range of the knowledge base's rush
@@ -3255,7 +3255,7 @@ tracked in markdown.
 [`tech.as`](../data/script/src/roles/tech.as) (include, `Init`, `Tick`),
 [`global.as`](../data/script/src/global.as) (five settings),
 [`roles/tech_chain.md`](roles/tech_chain.md) (new),
-[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md) (new, generated),
+[`benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md) (new, generated),
 [`../tools/playtest/benchmark.py`](../tools/playtest/benchmark.py) (new),
 [`../tools/playtest/playtest.py`](../tools/playtest/playtest.py) (`--set`),
 [`../tools/playtest/widgets/playtest_camera.lua`](../tools/playtest/widgets/playtest_camera.lua),
@@ -3263,7 +3263,7 @@ tracked in markdown.
 
 **Played** (2026-09-21/22, twelve benchmark loops, headless tech versus
 tech on Supreme Isthmus v1.7, speed 8, zero bonus; every run in
-[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md)). Every target met
+[`benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md)). Every target met
 with build19 and the chain as documented in `roles/tech_chain.md`:
 
 | Objective | Target | Achieved | Simulator floor |
@@ -5090,7 +5090,7 @@ lack of room for `InvariantNoRoomSeconds` (120). Unit test
 
 ## D-100 — Every mex near the start is upgraded before the fusion, unless the metal floats
 
-**Date:** 2026-09-23. **Status:** Played (build57's DLL with this script; benchmark A/B recorded in [`tech-rush.md`](benchmarks/tech-rush.md)).
+**Date:** 2026-09-23. **Status:** Played (build57's DLL with this script; benchmark A/B recorded in [`tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md)).
 
 **Owner's report.** The AI started a fusion before the mexes near it were
 upgraded; the fusion would have come sooner with them upgraded.
@@ -5143,7 +5143,7 @@ floats.
 [`global.as`](../data/script/src/global.as),
 [`invariants.md`](invariants.md), [`actor-matrix.md`](actor-matrix.md),
 [`roles/tech_chain.md`](roles/tech_chain.md),
-[`benchmarks/tech-rush.md`](benchmarks/tech-rush.md).
+[`benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md).
 
 ## D-101 — Reclaimed ground is recycled; advanced fusions and converters go in flush sets; a later T1 lab is placed by the layout
 
@@ -7769,8 +7769,8 @@ three requested maps completed 45-minute observations with verified roles, start
 runtime content checksums and error-free telemetry. None produced a confirmed
 outcome, so all three correctly leave OpenSkill priors unchanged. The initial
 batch has not exercised a live completed-match rating update. See the
-[timestamped index](benchmarks/scorecards/README.md) and
-[design/methodology](benchmarks/scorecard-design.md). No AI policy/native code changed.
+[timestamped index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecards/README.md) and
+[design/methodology](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecard-design.md). No AI policy/native code changed.
 
 **Files.** [recorder/model](../tools/playtest/scorecard.py),
 [isolated runner](../tools/playtest/scorecard_run.py),
@@ -7778,9 +7778,9 @@ batch has not exercised a live completed-match rating update. See the
 [tests](../tools/playtest/test_scorecard.py),
 [pinned dependency](../tools/playtest/requirements-scorecard.txt),
 [playtest usage](../tools/playtest/README.md),
-[methodology](benchmarks/scorecard-design.md),
-[scorecard index](benchmarks/scorecards/README.md),
-[rating ledger](benchmarks/scorecards/ratings.json), [issues](known-issues.md).
+[methodology](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecard-design.md),
+[scorecard index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecards/README.md),
+[rating ledger](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecards/ratings.json), [issues](known-issues.md).
 
 ## D-141 — Batch lane rendering to avoid exhausting LuaUI memory
 
@@ -8023,7 +8023,7 @@ identical whole-match outcomes across thread schedules.
 **Verification.** Six standalone lane suites pass, including eight simultaneous
 solvers, alongside existing native tests. Integration build and 231-member API
 check pass. Sample games, timings, exact settings and any unrelated game failures
-are recorded in [lane-worker benchmarks](benchmarks/lane-workers/README.md).
+are recorded in [lane-worker benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/lane-workers/README.md).
 
 **Files.**
 - [LaneSolver.h](../src/circuit/terrain/LaneSolver.h), [LaneSolver.cpp](../src/circuit/terrain/LaneSolver.cpp)
@@ -8129,7 +8129,7 @@ not verify the proposed runtime behaviour.
 `4455871a7febabbc` with matching symbols and current data in the mandatory
 Recoil build output. The live game installation is unchanged. Full results,
 including failed checks and data revisions, are in the
-[AIR evidence report](benchmarks/air-management.md).
+[AIR evidence report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md).
 
 **Decision.** Enable an independent AIR controller in experimental profiles:
 `AirRules` selects ordered actions, `AirBuild` owns tasks, `AirEconomy` observes
@@ -8242,7 +8242,7 @@ limits and superseded diagnostic runs.
 - [doc/air-wave-attacks.md](air-wave-attacks.md)
 - [doc/angelscript-references.md](angelscript-references.md)
 - [doc/base-layout.md](base-layout.md)
-- [doc/benchmarks/air-management.md](benchmarks/air-management.md)
+- [doc/benchmarks/air-management.md](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md)
 - [doc/decisions.md](decisions.md)
 - [doc/invariants.md](invariants.md)
 - [doc/known-issues.md](known-issues.md)
@@ -8333,7 +8333,7 @@ natural first fusions: Armada 18:41, Cortex 19:16, Legion 20:02.5. All six owned
 mexes were upgraded in each case; no script/crash/invariant errors. The
 intermediate gift test completed at 19:09. Legion retains a deadline failure,
 recorded in KI-436; the mex gate is never bypassed. Simulation evidence is in
-[AIR benchmarks](benchmarks/air-management.md). TECH policy/config remains
+[AIR benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md). TECH policy/config remains
 unchanged. An initial host compile rejected a mutable definition argument;
 the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
 
@@ -8356,7 +8356,7 @@ the read-only helper now accepts `const CCircuitDef@` and is rechecked in game.
 [action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
 [API](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [issues](known-issues.md),
-[benchmarks](benchmarks/air-management.md), [decision record](decisions.md).
+[benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md), [decision record](decisions.md).
 
 ## D-149 — AIR packs six-wind groups and scales construction from income
 
@@ -8447,7 +8447,7 @@ save/load remains KI-209; no repeated PvP win-rate claim is made.
 [AIR management](air-management.md), [role settings](roles/air.md),
 [action reference](roles/air_build.md), [rule reference](roles/air_rules.md),
 [invariants](invariants.md), [actors](actor-matrix.md),
-[issues](known-issues.md), [benchmarks](benchmarks/air-management.md),
+[issues](known-issues.md), [benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md),
 [decisions](decisions.md).
 
 ## Process decisions
@@ -9358,11 +9358,11 @@ Tests: [pure cases](../tests/amphibious_math_tests.as),
 Contracts: [API](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [issues](known-issues.md),
 [TECH role](roles/tech.md), [AIR role](roles/air.md), [rules reference](roles/tech_rules.md).
-Screenshots: [TECH guard](images/d160/tech-guards-after-retreat.png),
-[AIR guard](images/d160/air-guards-after-retreat.png),
-[natural landing](images/d160/natural-1601-landfall.png),
-[allied guard](images/d160/allied-guard-after-retreat.png),
-[allied assault](images/d160/allied-assault-final-landfall.png).
+Screenshots: [TECH guard](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d160/tech-guards-after-retreat.png),
+[AIR guard](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d160/air-guards-after-retreat.png),
+[natural landing](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d160/natural-1601-landfall.png),
+[allied guard](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d160/allied-guard-after-retreat.png),
+[allied assault](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d160/allied-assault-final-landfall.png).
 
 
 ### D-161 - Telchine land-first travel and terrain-fitted firing formations
@@ -9443,10 +9443,10 @@ need correction under KI-455. Fixture evidence limits are KI-456. The accurate g
 [inland checks](../tools/playtest/checks/shared/combat/telchine_inland_formation.json),
 [playtest guide](../tools/playtest/README.md),
 [results](telchine-perimeter-results.md),
-[TECH perimeter](images/d161/tech-shore-perimeter.png),
-[AIR landfall](images/d161/air-accessible-landfall.png),
-[AIR formation](images/d161/air-next-island-formation.png),
-[land combat](images/d161/tundra-land-combat.png),
+[TECH perimeter](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d161/tech-shore-perimeter.png),
+[AIR landfall](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d161/air-accessible-landfall.png),
+[AIR formation](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d161/air-next-island-formation.png),
+[land combat](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d161/tundra-land-combat.png),
 [API](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [TECH](roles/tech.md), [AIR](roles/air.md),
 [issues](known-issues.md).
@@ -9559,7 +9559,7 @@ owned-mex completion, recovery and 180-second M/E funding with commitments; the
 repeat natural game completed Armada fusion at 19:03 after all owned upgrades.
 See [results](air-enhancement-results.md), [AIR builder](roles/air_build.md),
 [builder policy](../data/script/src/roles/air_build.as) and
-[measurement data](benchmarks/air-d162-intermediate.json). The latest sizing
+[measurement data](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d162-intermediate.json). The latest sizing
 helpers also bound before integer conversion and avoid reserve-length loops;
 four adversarial tests cover oversized configuration and fractional escorts.
 
@@ -9576,7 +9576,7 @@ Additional touched files:
 [seed preparer](../tools/playtest/prepare_air_check.py),
 [opening observer](../tools/playtest/widgets/air_opening_watch.lua),
 [opening checks](../tools/playtest/checks/air/economy/air_capacity_opening.json),
-[final data](benchmarks/air-d162-final.json),
+[final data](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d162-final.json),
 [results and screenshot evidence](air-enhancement-results.md).
 
 **Final state: Built, Checked, Played (bounded acceptance).** Final seeded
@@ -9705,26 +9705,26 @@ the changes local, without pushing, per the owner's explicit instruction.
 
 Additional verification files: [playtest guide](../tools/playtest/README.md),
 [raid feedback audit](../tools/playtest/audit_air_raid_feedback.py),
-[campus screenshot](images/d163/cortex-campus-30min.png),
-[edge ingress](images/d163/edge-ingress.png),
-[static strike](images/d163/synchronized-flak-attack.png).
+[campus screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d163/cortex-campus-30min.png),
+[edge ingress](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d163/edge-ingress.png),
+[static strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d163/synchronized-flak-attack.png).
 
 Final feedback verification: build 6 Armada combat repeat `d163-strike-feedback/runs/20261002-022342` passed twenty-minute checks.
 The independent audit observed three alternate missions during an active
 failed-region exclusion and increased then relaxed resistance. The forty-two
 minute natural repeat again missed the fusion deadline (21.48 minutes);
 the earlier 18.47 result is not a consistency claim. KI-442 metal overflow
-remains open. [Feedback audit](benchmarks/air-d163-feedback.json),
-[measurements](benchmarks/air-d163.json),
-[natural base](images/d163/natural-base-20min.png),
-[repaired campus](images/d163/support-repaired-campus.png).
+remains open. [Feedback audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163-feedback.json),
+[measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163.json),
+[natural base](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d163/natural-base-20min.png),
+[repaired campus](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d163/support-repaired-campus.png).
 
 Natural feedback evidence: `d163-team-feedback/runs/20261002-022726`
 completed forty-two minutes; both AIR teams logged no role invariants,
 while existing TECH/ferry failures kept the full report FAIL. Cortex
 built its two AFUS at 27.62/33.01 and launched its saved eleven.
 Legion selected four later missions outside active failed regions;
-[natural audit](benchmarks/air-d163-natural-feedback.json) passed its
+[natural audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d163-natural-feedback.json) passed its
 narrow contract. Heavy combat losses remain KI-457, not a solved outcome.
 
 
@@ -9795,16 +9795,16 @@ tracked in [known issues](known-issues.md).
 - Documentation and evidence: [doc/actor-matrix.md](actor-matrix.md),
   [doc/air-economy-zone-plan.md](air-economy-zone-plan.md),
   [doc/air-economy-zone-results.md](air-economy-zone-results.md),
-  [doc/benchmarks/air-d164-capacity.json](benchmarks/air-d164-capacity.json),
-  [doc/benchmarks/air-d164-final-natural.json](benchmarks/air-d164-final-natural.json),
-  [doc/benchmarks/air-d164-final-regression.json](benchmarks/air-d164-final-regression.json),
-  [doc/benchmarks/air-d164-queue-blocker.json](benchmarks/air-d164-queue-blocker.json),
-  [doc/benchmarks/air-d164-regression.json](benchmarks/air-d164-regression.json),
+  [doc/benchmarks/air-d164-capacity.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-capacity.json),
+  [doc/benchmarks/air-d164-final-natural.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-final-natural.json),
+  [doc/benchmarks/air-d164-final-regression.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-final-regression.json),
+  [doc/benchmarks/air-d164-queue-blocker.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-queue-blocker.json),
+  [doc/benchmarks/air-d164-regression.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-regression.json),
   [doc/decisions.md](decisions.md),
-  [doc/images/d164/capacity-19min.png](images/d164/capacity-19min.png),
-  [doc/images/d164/final-growth-24min.png](images/d164/final-growth-24min.png),
-  [doc/images/d164/growth-24min.png](images/d164/growth-24min.png),
-  [doc/images/d164/natural-40min.png](images/d164/natural-40min.png),
+  [doc/images/d164/capacity-19min.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/capacity-19min.png),
+  [doc/images/d164/final-growth-24min.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/final-growth-24min.png),
+  [doc/images/d164/growth-24min.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/growth-24min.png),
+  [doc/images/d164/natural-40min.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/natural-40min.png),
   [doc/invariants.md](invariants.md),
   [doc/known-issues.md](known-issues.md),
   [doc/roles/air.md](roles/air.md),
@@ -9877,14 +9877,14 @@ are unchanged; the mandatory output remains matched to the source data.
   [covered naval](../tools/playtest/cases/air/combat/torpedo-covered.json).
 - Documentation: [plan](air-combat-arena-plan.md),
   [results](air-combat-arena-results.md),
-  [measurements](benchmarks/air-d165-arena.json),
+  [measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d165-arena.json),
   [known issues](known-issues.md), [decision record](decisions.md).
-- Original screenshots: [interception](images/d165/t2-intercept.png),
-  [fusion strike](images/d165/t2-fusion-strike.png),
-  [mex strike](images/d165/t1-mex-strike.png),
-  [layered AA](images/d165/layered-aa-strike.png),
-  [torpedo strike](images/d165/torpedo-strike.png),
-  [Shurikens](images/d165/shuriken-strike.png).
+- Original screenshots: [interception](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/t2-intercept.png),
+  [fusion strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/t2-fusion-strike.png),
+  [mex strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/t1-mex-strike.png),
+  [layered AA](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/layered-aa-strike.png),
+  [torpedo strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/torpedo-strike.png),
+  [Shurikens](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d165/shuriken-strike.png).
 
 
 ## D-166 - AIR performance review before optimization
@@ -9960,16 +9960,16 @@ reclaimed AFUS. The two-AFUS bomber gate remains deliberately unchanged.
 [economy probe](../tools/playtest/air_economy_probe.as),
 [growth check](../tools/playtest/checks/air/economy/air_growth.json),
 [expansion check](../tools/playtest/checks/shared/economy/expansion.json),
-[natural audit 1](benchmarks/d167-natural-1.json),
-[natural audit 2](benchmarks/d167-natural-2.json),
-[capacity audit 1](benchmarks/d167-clusters-1.json),
-[capacity audit final](benchmarks/d167-final-clusters.json),
-[capacity capture 15](images/d167/capacity-15.png),
-[capacity capture 24](images/d167/capacity-24.png),
-[natural capture 20](images/d167/natural-20.png).
+[natural audit 1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-1.json),
+[natural audit 2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-2.json),
+[capacity audit 1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-clusters-1.json),
+[capacity audit final](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-final-clusters.json),
+[capacity capture 15](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d167/capacity-15.png),
+[capacity capture 24](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d167/capacity-24.png),
+[natural capture 20](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d167/natural-20.png).
 
 
-**D-167 final natural repeat.** [Final audit](benchmarks/d167-natural-final.json):
+**D-167 final natural repeat.** [Final audit](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-final.json):
 first fusion 17.48 minutes, AFUS 21.95/26.65, all wind gone at 28.6 and seven T2
 labs by 38.18. First bomber wave 29.72; twenty bombers with zero escorts, then
 zero survivors. Retain the failed timing/efficacy verdict and KI-457/461 rather
@@ -10062,7 +10062,7 @@ runtime performance measurement. Implementation and PvP efficacy remain unverifi
 [original proposal](metal-maps-proposal.md),
 [review disposition](reviews/2026-10-02-metal-maps-proposal-review.md),
 [arithmetic tool](../tools/knowledge/metal_map_economics.py),
-[arithmetic results](benchmarks/metal-map-economics.json),
+[arithmetic results](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/metal-map-economics.json),
 [known issues](known-issues.md),
 [shared gameplay research](../../rjm.bar.docs/knowledge/70-strategy/79-metal-map-pvp.md),
 [corrected extraction mechanics](../../rjm.bar.docs/knowledge/20-game-mechanics/27-metal-maps-and-spots.md).
@@ -10165,8 +10165,8 @@ sibling knowledge repository.
 - [doc/actor-matrix.md](../doc/actor-matrix.md)
 - [doc/angelscript-references.md](../doc/angelscript-references.md)
 - [doc/base-layout.md](../doc/base-layout.md)
-- [doc/benchmarks/metal-map-economics.json](../doc/benchmarks/metal-map-economics.json)
-- [doc/benchmarks/metal-map-simulations.json](../doc/benchmarks/metal-map-simulations.json)
+- [doc/benchmarks/metal-map-economics.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/metal-map-economics.json)
+- [doc/benchmarks/metal-map-simulations.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/metal-map-simulations.json)
 - [doc/decisions.md](../doc/decisions.md)
 - [doc/invariants.md](../doc/invariants.md)
 - [doc/knowledge/barb-unit-config.md](../doc/knowledge/barb-unit-config.md)
@@ -10287,7 +10287,7 @@ unverified.
 
 **References.** [Design and PvP sources](air-committed-operations-plan.md),
 [results and screenshots](air-committed-operations-results.md),
-[machine-readable evidence](benchmarks/d171-air-operations.json).
+[machine-readable evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d171-air-operations.json).
 Escort lead is not an engine speed lock (KI-475); strike scans retain nested
 cost (KI-474), and total command/FPS bounds remain unproven (KI-477). The
 optional CIRCUIT_AS_INTERFACE dump and compile-only checker accelerate type/API
@@ -10313,14 +10313,14 @@ feedback without replacing real initialization and gameplay.
 - [doc/air-committed-operations-results.md](../doc/air-committed-operations-results.md)
 - [doc/air-wave-attacks.md](../doc/air-wave-attacks.md)
 - [doc/angelscript-references.md](../doc/angelscript-references.md)
-- [doc/benchmarks/d171-air-operations.json](../doc/benchmarks/d171-air-operations.json)
+- [doc/benchmarks/d171-air-operations.json](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d171-air-operations.json)
 - [doc/decisions.md](../doc/decisions.md)
-- [doc/images/d171/defensive-return.png](../doc/images/d171/defensive-return.png)
-- [doc/images/d171/frontline-strike.png](../doc/images/d171/frontline-strike.png)
-- [doc/images/d171/glitters-legion-strike.png](../doc/images/d171/glitters-legion-strike.png)
-- [doc/images/d171/tundra-island-strike.png](../doc/images/d171/tundra-island-strike.png)
-- [doc/images/d171/tundra-natural-opening.png](../doc/images/d171/tundra-natural-opening.png)
-- [doc/images/d171/tundra-natural-t2.png](../doc/images/d171/tundra-natural-t2.png)
+- [doc/images/d171/defensive-return.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/defensive-return.png)
+- [doc/images/d171/frontline-strike.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/frontline-strike.png)
+- [doc/images/d171/glitters-legion-strike.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/glitters-legion-strike.png)
+- [doc/images/d171/tundra-island-strike.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/tundra-island-strike.png)
+- [doc/images/d171/tundra-natural-opening.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/tundra-natural-opening.png)
+- [doc/images/d171/tundra-natural-t2.png](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d171/tundra-natural-t2.png)
 - [doc/invariants.md](../doc/invariants.md)
 - [doc/known-issues.md](../doc/known-issues.md)
 - [doc/roles/air.md](../doc/roles/air.md)
@@ -10414,8 +10414,8 @@ matched DLL/debug/data; the live game install was not modified.
 - [Role reference](roles/air.md), [actions reference](roles/air_build.md), [rules reference](roles/air_rules.md)
 - [Invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
 - [Plan](air-workforce-repair-plan.md), [results](air-workforce-repair-results.md)
-- [Evidence](benchmarks/d172-air-workforce.json)
-- [Baseline image](images/d172/glacial-baseline-5.png), [natural image](images/d172/glacial-natural-20.png), [donation image](images/d172/glacial-donation-20.png)
+- [Evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d172-air-workforce.json)
+- [Baseline image](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d172/glacial-baseline-5.png), [natural image](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d172/glacial-natural-20.png), [donation image](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d172/glacial-donation-20.png)
 - [Natural runner](../tools/playtest/run_air_natural.py)
 - [Guard fixture preparer](../tools/playtest/prepare_air_workforce.py)
 - [Workforce observer](../tools/playtest/widgets/air_workforce_watch.lua)
@@ -10472,8 +10472,8 @@ output; live game installation untouched; concurrent map edits excluded.
 - [Glitters case](../tools/playtest/cases/air/combat/cleanup-glitters.json), [cleanup-only case](../tools/playtest/cases/air/combat/cleanup-only-glitters.json), [defensive case](../tools/playtest/cases/air/combat/defensive-t3.json)
 - [Cleanup checks](../tools/playtest/checks/air/combat/air_cleanup.json), [cleanup-only checks](../tools/playtest/checks/air/combat/air_cleanup_only.json), [defensive checks](../tools/playtest/checks/air/combat/air_defensive.json)
 - [AIR reference](roles/air.md), [script API](angelscript-references.md), [invariants](invariants.md), [actor matrix](actor-matrix.md), [known issues](known-issues.md)
-- [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](benchmarks/d173-bomber-cleanup.json)
-- [Phoenix screenshot](images/d173/phoenix-cleanup.png), [Cortex screenshot](images/d173/cortex-cleanup.png)
+- [Plan](air-bomber-cleanup-plan.md), [results](air-bomber-cleanup-results.md), [evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d173-bomber-cleanup.json)
+- [Phoenix screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d173/phoenix-cleanup.png), [Cortex screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d173/cortex-cleanup.png)
 
 
 ## D-174 - Proposed AIR defense of allied bases against ground infiltration
@@ -10574,9 +10574,9 @@ individual rendered runs and transfer audits.
 [invariant register](invariants.md), [actor matrix](actor-matrix.md),
 [known issues](known-issues.md), [plan and results](team-metal-sharing.md).
 
-**D-175 evidence artifacts.** [Audit manifest](benchmarks/d175-team-sharing.json),
-[hard screenshot](images/d175/sharing-hard.png),
-[terrible screenshot](images/d175/sharing-terrible.png). All six roles sent in
+**D-175 evidence artifacts.** [Audit manifest](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d175-team-sharing.json),
+[hard screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d175/sharing-hard.png),
+[terrible screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d175/sharing-terrible.png). All six roles sent in
 all three rendered profiles; balanced strict PASS, hard/terrible strict FAIL
 on KI-427 INV-008. The 196 hard/terrible donation decisions pass their focused
 audit. This makes the donation change Played, without claiming the full-match
@@ -10647,13 +10647,13 @@ recorded in the report rather than inferred from screenshots alone.
 [reveal fixture](../tools/playtest/cases/air/combat/afus-reveal-glitters.json),
 [strict checks](../tools/playtest/checks/air/combat/air_afus_handoff.json),
 [timing audit](../tools/playtest/audit_afus_handoff.py),
-[baseline screenshot](images/d176/baseline-visible.png),
-[Legion screenshot](images/d176/legion-afus.png),
-[Armada screenshot](images/d176/armada-afus.png),
-[Cortex screenshot](images/d176/cortex-afus.png),
-[defense screenshot](images/d176/defensive-shiva.png).
+[baseline screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d176/baseline-visible.png),
+[Legion screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d176/legion-afus.png),
+[Armada screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d176/armada-afus.png),
+[Cortex screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d176/cortex-afus.png),
+[defense screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d176/defensive-shiva.png).
 
-**Evidence.** [Pinned build and run manifest](benchmarks/d176-afus-handoff.json).
+**Evidence.** [Pinned build and run manifest](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d176-afus-handoff.json).
 All four fixed strict reports PASS; the old-DLL baseline fails INV-121 as expected.
 
 ## D-177 - Verify edge routes through actual flight without retuning AIR
@@ -10695,18 +10695,18 @@ KI-474 performance and KI-475 exact escort-speed limitations remain outside
 this verification.
 
 **Files.** [Plan, results and reproduction](air-edge-flank-verification.md),
-[measurement manifest](benchmarks/d177-air-routes.json),
+[measurement manifest](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d177-air-routes.json),
 [read-only route observer](../tools/playtest/widgets/air_arena.lua),
 [Supreme fixture](../tools/playtest/cases/air/combat/edge-supreme.json),
 [Glitters fixture](../tools/playtest/cases/air/combat/edge-glitters.json),
 [clear control](../tools/playtest/cases/air/combat/direct-glitters.json),
 [edge checks](../tools/playtest/checks/air/combat/air_edge.json),
 [direct checks](../tools/playtest/checks/air/combat/air_direct.json),
-[Supreme edge](images/d177/supreme-edge.png),
-[Supreme strike](images/d177/supreme-afus.png),
-[Glitters edge](images/d177/glitters-edge.png),
-[Glitters strike](images/d177/glitters-afus.png),
-[direct control](images/d177/glitters-direct.png).
+[Supreme edge](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d177/supreme-edge.png),
+[Supreme strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d177/supreme-afus.png),
+[Glitters edge](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d177/glitters-edge.png),
+[Glitters strike](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d177/glitters-afus.png),
+[direct control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d177/glitters-direct.png).
 
 
 ## D-178 - Categorize tests and new evidence while preserving benchmark history
@@ -10771,12 +10771,12 @@ changes. Historical missing-hover-document links remain KI-404.
 [runner guide](../tools/playtest/README.md),
 [playtest skill](../skills/playtest/SKILL.md),
 [repository map](../AGENTS.md), [byte-preservation attributes](../.gitattributes),
-[benchmark guide](benchmarks/README.md), [catalog](benchmarks/catalog.json),
-[AIR index](benchmarks/index/air.md), [TECH index](benchmarks/index/tech.md),
-[FRONT index](benchmarks/index/front.md), [SEA index](benchmarks/index/sea.md),
-[TACTICAL index](benchmarks/index/tactical.md), [SUPPORT index](benchmarks/index/support.md),
-[shared index](benchmarks/index/shared.md),
-[rendered integration evidence](benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
+[benchmark guide](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md), [catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
+[AIR index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/air.md), [TECH index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/tech.md),
+[FRONT index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/front.md), [SEA index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md),
+[TACTICAL index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/tactical.md), [SUPPORT index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/support.md),
+[shared index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md),
+[rendered integration evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
 Historical documentation paths were updated in [AFUS results](air-afus-attack-handoff-results.md),
 [edge verification](air-edge-flank-verification.md), [idle-factory investigation](air-idle-factory.md),
 [opening/screen reference](air-opening-and-screen.md), [issue register](known-issues.md),
@@ -10846,7 +10846,7 @@ guarantee. [Plan, settings, times and retained evidence](air-opening-recon-plan.
 [rule reference](roles/air_rules.md), [layout reference](base-layout.md),
 [API reference](angelscript-references.md), [invariants](invariants.md),
 [actors](actor-matrix.md), [verification gaps](known-issues.md),
-[benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [AIR index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/air.md).
 
 
 ## D-180 - Review AIR build-power allocation before replacing its scaling policy
@@ -11032,9 +11032,9 @@ Additional verification files: [fixed-population runner](../tools/playtest/run_w
 [scaling checks](../tools/playtest/checks/air/performance/air_workforce_scaling.json),
 [timer contract test](../tools/playtest/test_workforce_perf_watch.py),
 [performance checks](../tools/playtest/checks/air/performance/air_workforce_performance.json),
-[initial portable cohort](benchmarks/air-workforce-cohort-2026-10-03.json),
-[final portable cohort](benchmarks/air-workforce-final-2026-10-03.json),
-and the generated [evidence catalog](benchmarks/catalog.json).
+[initial portable cohort](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-cohort-2026-10-03.json),
+[final portable cohort](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-final-2026-10-03.json),
+and the generated [evidence catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json).
 
 **Final handoff correction.** The strengthened lifecycle run passed PLAYER
 ownership but exposed an unassigned native nano left by SUPPORT. A walk of
@@ -11049,10 +11049,10 @@ strengthened lifecycle and both supplied-factory population controls pass.
 Natural and TECH whole-game results remain mixed. Serial 8v8 measurements
 retain elimination/population caveats; idle-population p99 shows measurable
 additional observation cost, so no zero-overhead or FPS guarantee is claimed.
-[8v8 evidence](benchmarks/air-workforce-performance-2026-10-03.json),
-[final scaling](benchmarks/air-workforce-scaling-2026-10-03.json),
-[initial scaling failures](benchmarks/air-workforce-scaling-initial-2026-10-03.json),
-and [intermediate control failures](benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
+[8v8 evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-performance-2026-10-03.json),
+[final scaling](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-2026-10-03.json),
+[initial scaling failures](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-initial-2026-10-03.json),
+and [intermediate control failures](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
 retain all interpretations separately from the immutable raw publications.
 
 **Published-byte preservation.** The existing publisher emits a terminal blank
@@ -11097,7 +11097,7 @@ producer. Existing INV-010 continues to enforce the ordinary combat gate.
 [landlocked check](../tools/playtest/checks/tech/combat/t2_landlocked_start.json),
 [TECH reference](roles/tech.md), [actor matrix](actor-matrix.md),
 [invariant register](invariants.md), [known issues](known-issues.md),
-[evidence catalog](benchmarks/catalog.json), [TECH evidence index](benchmarks/index/tech.md)
+[evidence catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [TECH evidence index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/tech.md)
 and [verification report with immutable run records](tech-t2-start-results.md).
 
 **Verification.** Twenty-two pure policy tests and script/DLL API parity pass.
@@ -11207,7 +11207,7 @@ AA exposure. The request fits the existing weighted primary stage.
 from bypassing admission through the economy fallback. No new lifecycle state
 or command path is introduced.
 
-**Verification.** [Rendered Glitters check](benchmarks/records/air/combat/case/2026-10-04/20261004T013840Z-8ec95ae8/README.md)
+**Verification.** [Rendered Glitters check](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/case/2026-10-04/20261004T013840Z-8ec95ae8/README.md)
 passes after eight game minutes on experimental_hard. The real picker selected
 corfus, legfus and armckfus at preference 5; bomber damage destroyed corfus and
 legfus. armfus was supplied but no explicit selection was observed, and armckfus
@@ -11254,7 +11254,7 @@ per-frame command path. T1 mex/wind and defensive heavy-unit selection remain.
 **Files.** [Target roster](../data/script/src/manager/air_operations.as),
 [targeting reference](air-wave-attacks.md), and this record.
 
-**Verification.** [Rendered Supreme combat record](benchmarks/records/air/combat/advanced-geo-naval/2026-10-04/20261004T015226Z-44312432/README.md)
+**Verification.** [Rendered Supreme combat record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/advanced-geo-naval/2026-10-04/20261004T015226Z-44312432/README.md)
 passes ten game minutes on experimental_hard. All three land advanced geos and
 all three floating naval advanced converters were explicitly selected at
 preference 5, took bomber damage and were destroyed. The launched 18-Phoenix
@@ -11416,7 +11416,7 @@ provide no per-role CPU/FPS result. Default remains false until those gates pass
 - [tools/playtest/widgets/sea_watch.lua](../tools/playtest/widgets/sea_watch.lua)
 - [tools/run_native_tests.sh](../tools/run_native_tests.sh)
 
-**Published evidence.** [SEA benchmark index](benchmarks/index/sea.md), [catalog](benchmarks/catalog.json) and the [complete comparative results](sea-layout-migration-results.md) link each immutable bundle, its manifest, original checks/verdict and retained screenshots. Transient Windows directory-rename failures were recovered after hash verification; only a byte-identical interrupted-publication duplicate was removed.
+**Published evidence.** [SEA benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md), [catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) and the [complete comparative results](sea-layout-migration-results.md) link each immutable bundle, its manifest, original checks/verdict and retained screenshots. Transient Windows directory-rename failures were recovered after hash verification; only a byte-identical interrupted-publication duplicate was removed.
 
 
 ## D-189 - SEA capability-based counters, measured migration and carrier ownership (2026-10-04)
@@ -11429,7 +11429,7 @@ provide no per-role CPU/FPS result. Default remains false until those gates pass
 
 **Carrier follow-up.** The corrected observer attributes 1,113 first-minute non-Lua orders to Legion drones in a six-destroyer control; the game carrier gadget also orders those drones. A generic native external-control task is explicitly chosen by SEA using carrier_host_unit_id. It issues no commands, yields on host-rule removal, preserves human ownership and has no default role impact. This replaces competing ownership, not urgent-response throttling. Host death/release and command-source fixtures decide acceptance.
 
-**Invariant.** INV-129 two-resource admission, INV-130 verified replacement egress before retirement, INV-131 actual target-layer capability, and INV-132 successful passive ownership transfer. The independent observer measures engine damage, losses, production completion and command sources. Surviving extractors without builders/shipyards do not count as an operational base. Original reports and data/build hashes are retained in immutable [SEA records](benchmarks/index/sea.md).
+**Invariant.** INV-129 two-resource admission, INV-130 verified replacement egress before retirement, INV-131 actual target-layer capability, and INV-132 successful passive ownership transfer. The independent observer measures engine damage, losses, production completion and command sources. Surviving extractors without builders/shipyards do not count as an operational base. Original reports and data/build hashes are retained in immutable [SEA records](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 
 **Implementation files.** [global settings](../data/script/src/global.as), [SEA delegates](../data/script/src/roles/sea.as), [SeaBuild](../data/script/src/roles/sea_build.as), [SeaFactories](../data/script/src/roles/sea_factories.as), [SeaEconomy](../data/script/src/manager/sea_economy.as), [SeaCombat](../data/script/src/manager/sea_combat.as), [pure math](../data/script/src/helpers/sea_math.as); [BattleAnalysis.cpp](../src/circuit/terrain/BattleAnalysis.cpp)/[header](../src/circuit/terrain/BattleAnalysis.h), [InitScript](../src/circuit/script/InitScript.cpp), [MilitaryScript](../src/circuit/script/MilitaryScript.cpp), [MilitaryManager.cpp](../src/circuit/module/MilitaryManager.cpp)/[header](../src/circuit/module/MilitaryManager.h), [UnitTask](../src/circuit/task/UnitTask.h), [external task.cpp](../src/circuit/task/common/ExternalControlTask.cpp)/[header](../src/circuit/task/common/ExternalControlTask.h).
 
@@ -11587,8 +11587,8 @@ all factions and a broad competitive rollout remain outside this acceptance.
 [runner](../tools/playtest/run_sea_economy_block.py), [natural runner](../tools/playtest/run_sea.py),
 [probe](../tools/playtest/sea_economy_block_probe.as), [observer](../tools/playtest/widgets/sea_economy_block_watch.lua),
 [case](../tools/playtest/cases/sea/layout/economy-block.json), [checks](../tools/playtest/checks/sea/layout/economy-block.json),
-[playtest guide](../tools/playtest/README.md), [benchmark index](benchmarks/index/sea.md),
-[benchmark catalog](benchmarks/catalog.json).
+[playtest guide](../tools/playtest/README.md), [benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md),
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json).
 
 
 D191 final verification and geometry correction: the economy envelope starts
@@ -11654,7 +11654,7 @@ Documentation: [plan](sea-allied-base-plan.md), [results](sea-allied-base-result
 [role reference](roles/sea_build.md), [actors](actor-matrix.md),
 [invariants](invariants.md), [known issues](known-issues.md),
 [playtest usage](../tools/playtest/README.md),
-[benchmark catalog](benchmarks/catalog.json) and [SEA index](benchmarks/index/sea.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) and [SEA index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 The results inventory links every generated immutable evidence bundle.
 
 **Verification.** Checked: full native/policy suite, including 14 shared-index
@@ -11735,7 +11735,7 @@ not an economy/strength improvement claim.
 [results](air-recon-base-defense-results.md), [role reference](roles/air.md),
 [API reference](angelscript-references.md), [actors](actor-matrix.md),
 [invariants](invariants.md), [known issues](known-issues.md),
-[benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [AIR index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/air.md).
 Results link the generated immutable evidence bundles.
 
 **Verification.** Full native/pure suite passes, including 127 AIR math tests
@@ -11828,7 +11828,7 @@ limiter, omniscient enemy lookup, unconditional T2 rush or SEA production rewrit
 [results](air-patrol-naval-support-results.md), [role reference](roles/air.md),
 [API reference](angelscript-references.md), [actors](actor-matrix.md),
 [invariants](invariants.md), [remaining limits](known-issues.md),
-[benchmark catalog](benchmarks/catalog.json), [AIR index](benchmarks/index/air.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [AIR index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/air.md).
 The results link every immutable evidence bundle and selected screenshots.
 
 **Verification.** Native geometry suite and 145 AIR pure policy tests pass.
@@ -11890,7 +11890,7 @@ was unavailable; its failure and the fallback's limitations are disclosed.
 [discovery checks](../tools/playtest/checks/shared/performance/skirmish_cpu.json),
 [clean checks](../tools/playtest/checks/shared/performance/skirmish_cpu_clean.json),
 [playtest usage](../tools/playtest/README.md), [remaining issue](known-issues.md),
-[benchmark catalog](benchmarks/catalog.json), [shared index](benchmarks/index/shared.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [shared index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md).
 The review links immutable evidence bundles and their screenshots/input hashes.
 
 **Verification.** Analyzer sanity cases and byte comparison of all 321 staged
@@ -11940,8 +11940,8 @@ or performance optimization is implemented.
 [performance cross-reference](reviews/2026-10-04-skirmishai-performance-review.md),
 [fixture/observer](../tools/playtest/widgets/juno_edge_probe.lua),
 [acceptance checks](../tools/playtest/checks/shared/combat/juno-edge-probe.json),
-[issue](known-issues.md), [catalog](benchmarks/catalog.json),
-[shared index](benchmarks/index/shared.md). The investigation links both immutable
+[issue](known-issues.md), [catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
+[shared index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md). The investigation links both immutable
 bundles, including observer source, exact tagged log excerpts and screenshots.
 
 **Verification.** Both supplied tests played on Shore with all three factions;
@@ -11990,8 +11990,8 @@ Local TerrainManager scans and the remaining D-195 recommendations are deferred.
 [results and immutable evidence](layout-reservation-performance.md),
 [review follow-up](reviews/2026-10-04-skirmishai-performance-review.md),
 [actor matrix](actor-matrix.md), [invariants](invariants.md),
-[remaining issue KI-497](known-issues.md), [catalog](benchmarks/catalog.json),
-[shared index](benchmarks/index/shared.md), [sea index](benchmarks/index/sea.md).
+[remaining issue KI-497](known-issues.md), [catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
+[shared index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md), [sea index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 
 **Verification.** The complete native suite passes; the current worktree's
 reservation suite reports 200,159 checks without failures. Three optimized
@@ -12291,7 +12291,7 @@ New scenario/check files are individually linked in the generated
 [results](sea-patrol-air-defense-results.md), [SEA reference](roles/sea.md),
 [native trace](sea-native-trace.md), [superseded D-201 boundary](sea-fleet-rework.md),
 [script API](angelscript-references.md), [known residuals](known-issues.md),
-[benchmark catalog](benchmarks/catalog.json), [SEA evidence index](benchmarks/index/sea.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json), [SEA evidence index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 The results link all fifteen immutable evidence bundles, including the original
 Legion prototype PASS rejected after detailed review. No older verdict was rewritten.
 
@@ -12491,7 +12491,7 @@ C++ integration with warnings, 13 native suites, embedded VM policy tests,
 77-entry profile preservation, API parity and measurement/storage regressions.
 Played: per-unit combat, bait, closing assault, sensor escort, AA, friendly splash,
 energy stall, unrelated death, configuration loading and population stress.
-The [benchmark report](benchmarks/ranged-combat.md) is authoritative for exact
+The [benchmark report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md) is authoritative for exact
 builds, passes, retained failures, command/CPU/FPS measurements and limitations.
 A passing small fixture is not proof of multiplayer or long-game FPS parity.
 
@@ -12559,8 +12559,8 @@ matrix, as listed in the plan.
 [fog checks](../tools/playtest/checks/sea/combat/sea-control-lost-yard.json),
 [observer](../tools/playtest/widgets/sea_arena.lua),
 [test inventory](testing/README.md), [test catalog](testing/catalog.json),
-[SEA test index](testing/index/sea.md), [benchmark catalog](benchmarks/catalog.json),
-[SEA evidence index](benchmarks/index/sea.md). The investigation links every
+[SEA test index](testing/index/sea.md), [benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
+[SEA evidence index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md). The investigation links every
 immutable observation bundle, including setup and watcher failures.
 
 **Verification.** Two supplied gameplay cases pass on experimental_balanced,
@@ -12665,7 +12665,7 @@ INV-150/151 continue to cover first-ship metal, T2 completion and turret capacit
 [invariants](invariants.md), [actors](actor-matrix.md),
 [SEA reference](roles/sea.md), [builder reference](roles/sea_build.md),
 [factory reference](roles/sea_factories.md), [known issues](known-issues.md),
-[plan/results](sea-seaplane-transition.md), [benchmark catalog](benchmarks/catalog.json),
+[plan/results](sea-seaplane-transition.md), [benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
 [test catalog](testing/catalog.json).
 
 **Verification.** Thirteen SEA and twenty funding actual-VM test functions pass.
@@ -12809,7 +12809,7 @@ D-212 performance qualification: the serial Legion counter stayed at 120 coastal
 
 **Invariant.** INV-155 checks that each successful enqueue is immediately visible as exactly one more live-plus-pending recruit, before a second factory can admit another. No independent script queue or save-state counter is maintained.
 
-**Files.** [Producer](../data/script/src/manager/land_siege.as), [pure budget](../data/script/src/helpers/land_siege_math.as), [settings](../data/script/src/global.as), [FRONT hook](../data/script/src/roles/front.as), [VM tests](../tests/land_siege_math_tests.as), [CMake registration](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [arena staging](../tools/playtest/ranged_arena.py), [suite acceptance](../tools/playtest/ranged_benchmark.py), [observer](../tools/playtest/widgets/ranged_arena.lua), [damage/production measurements](../tools/playtest/land_siege_report.py), [acceptance checks](../tools/playtest/checks/shared/combat/land-siege-production.json), [Incinerator case](../tools/playtest/cases/shared/combat/incinerator-front-push.json), [mixed case](../tools/playtest/cases/shared/combat/incinerator-mixed-front.json), [Cortex case](../tools/playtest/cases/shared/combat/land-siege-production-cortex.json), [Armada case](../tools/playtest/cases/shared/combat/land-siege-production-armada.json), [Legion case](../tools/playtest/cases/shared/combat/land-siege-production-legion.json), [Cortex bot case](../tools/playtest/cases/shared/combat/land-siege-production-cortex-bots.json), [Legion bot case](../tools/playtest/cases/shared/combat/land-siege-production-legion-bots.json), [no-static control](../tools/playtest/cases/shared/combat/land-siege-no-static.json). [Invariants](invariants.md), [actor ownership](actor-matrix.md), [FRONT reference](roles/front.md), [TECH reference](roles/tech.md), [test inventory](testing/README.md) and [benchmark catalog](benchmarks/README.md) record the contracts and evidence.
+**Files.** [Producer](../data/script/src/manager/land_siege.as), [pure budget](../data/script/src/helpers/land_siege_math.as), [settings](../data/script/src/global.as), [FRONT hook](../data/script/src/roles/front.as), [VM tests](../tests/land_siege_math_tests.as), [CMake registration](../tests/CMakeLists.txt), [test runner](../tools/run_native_tests.sh), [arena staging](../tools/playtest/ranged_arena.py), [suite acceptance](../tools/playtest/ranged_benchmark.py), [observer](../tools/playtest/widgets/ranged_arena.lua), [damage/production measurements](../tools/playtest/land_siege_report.py), [acceptance checks](../tools/playtest/checks/shared/combat/land-siege-production.json), [Incinerator case](../tools/playtest/cases/shared/combat/incinerator-front-push.json), [mixed case](../tools/playtest/cases/shared/combat/incinerator-mixed-front.json), [Cortex case](../tools/playtest/cases/shared/combat/land-siege-production-cortex.json), [Armada case](../tools/playtest/cases/shared/combat/land-siege-production-armada.json), [Legion case](../tools/playtest/cases/shared/combat/land-siege-production-legion.json), [Cortex bot case](../tools/playtest/cases/shared/combat/land-siege-production-cortex-bots.json), [Legion bot case](../tools/playtest/cases/shared/combat/land-siege-production-legion-bots.json), [no-static control](../tools/playtest/cases/shared/combat/land-siege-no-static.json). [Invariants](invariants.md), [actor ownership](actor-matrix.md), [FRONT reference](roles/front.md), [TECH reference](roles/tech.md), [test inventory](testing/README.md) and [benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md) record the contracts and evidence.
 
 **Verification.** Checked in the actual AngelScript VM and Played with the unchanged D-212 binary. The [design/results report](reviews/2026-10-06-land-siege-response.md) records exact runs, baseline comparison, failures and scope. Supplied economy/held-army production is distinct from natural mid/late-game economy, victory rate or multiplayer performance. The unreproduced Incinerator report is tracked in KI-521; no movement fix is claimed.
 
@@ -12872,7 +12872,7 @@ Opt-ins are in the existing `corcrwh`/`legfort` entries of
 [API](angelscript-references.md), [AIR](roles/air.md),
 [actors](actor-matrix.md), [invariants](invariants.md),
 [unit report](knowledge/barb-unit-config.md), [test inventory](testing/README.md)
-and [benchmark catalog](benchmarks/README.md) document the contract.
+and [benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md) document the contract.
 
 **Verification.** Evidence and exact limitations are retained in the
 [fortress targeting report](reviews/2026-10-06-fortress-targeting.md), including
@@ -12965,7 +12965,7 @@ engineering defaults, not a claimed universal PvP build order.
 **Documentation and verification.** [Investigation and measured results](reviews/2026-10-06-spam-and-fatboy.md),
 [spam contract](spam-routes.md), [API](angelscript-references.md),
 [TECH](roles/tech.md), [actors](actor-matrix.md), [invariants](invariants.md),
-[test index](testing/README.md), [benchmarks](benchmarks/README.md) and the
+[test index](testing/README.md), [benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md) and the
 [unit report](knowledge/barb-unit-config.md) carry the implementation contract.
 The investigation records exact pinned runs and outstanding verification
 limits. Supplied fixtures are not full-game win-rate or network-FPS evidence.
@@ -13204,7 +13204,7 @@ INV-013/019/029 (KI-423/KI-427). Full native/pure-script regression passes.
 measurements without replacing original verdicts. The
 [test catalog](testing/README.md), [SEA test index](testing/index/sea.md),
 [machine catalog](testing/catalog.json), [shared test index](testing/index/shared.md),
-[benchmark catalog](benchmarks/catalog.json) and [SEA benchmark index](benchmarks/index/sea.md)
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) and [SEA benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md)
 index the cases and retained original evidence. The
 [result report](reviews/2026-10-06-sea-coastal-fallback.md) links each final
 bundle and its screenshots, checks and source-log hashes. KI-526 retains the
@@ -13255,8 +13255,8 @@ as independent cost. Telemetry tests enforce these reporting distinctions.
 [playtest guide](../tools/playtest/README.md), [known issues](known-issues.md),
 [test guide](testing/README.md), [test catalog](testing/catalog.json),
 [shared test index](testing/index/shared.md),
-[benchmark catalog](benchmarks/catalog.json),
-[shared benchmark index](benchmarks/index/shared.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json),
+[shared benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md).
 The report links all four immutable evidence bundles and their original hashes.
 
 **Verification.** Three accepted diagnostic captures loaded all 16 scripts with
@@ -13304,7 +13304,7 @@ links each native mechanism, test, benchmark and maintenance contract.
 [playtest skill](../skills/playtest/SKILL.md),
 [ranged runner](../tools/playtest/ranged_arena.py),
 [focused test runner](../tools/run_ranged_performance_tests.sh),
-[test catalog](testing/README.md) and [benchmark catalog](benchmarks/README.md).
+[test catalog](testing/README.md) and [benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md).
 
 **Verification.** Native integration and full standalone native/AngelScript
 regressions pass; 310-member DLL/API parity passes. Ordered geometry oracles
@@ -13478,8 +13478,8 @@ No FPS or internet-network claim follows from the measured command reduction.
 
 D-223 final matched recovery baseline `20261007T024642Z-c2f4c053` also passes.
 Both final supplied runs finish 18 mobile units; GUARD counts are 102 before
-and 5 after. [Trial measurements](benchmarks/guard-orders.json),
-[test output](benchmarks/guard-orders-tests.txt) and immutable records linked
+and 5 after. [Trial measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/guard-orders.json),
+[test output](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/guard-orders-tests.txt) and immutable records linked
 from the implementation report preserve successful and failed evidence.
 The stripped DLL, matching symbols and all 336 production data files are
 verified in the required development output; the live install is untouched.
@@ -13539,3 +13539,165 @@ files parse. The generic skill validator cannot start in the bundled Python
 because PyYAML is absent; the unchanged frontmatter is checked directly instead.
 Documentation links introduce no new failures: the same eight pre-existing
 links to the missing hover-role document remain (KI-404).
+
+## D-225 - Move benchmark ownership into CircuitAI.benchmarks
+
+2026-10-07. The owner named the new Git repository and explicitly included both
+published evidence and raw simulation archives. Clone the empty repository at
+`C:/bardev/CircuitAI.benchmarks`; retain its original `doc/benchmarks`,
+`doc/images` and `build-theatres` internal layout. Move rather than copy the raw
+workspace on the same volume to preserve directory identity, compression and
+hard links. Do not rewrite source Git history or claim that this frees space.
+
+**Decision.** Keep production source, test cases, native benchmark programs and
+runners in CircuitAI. Give evidence, scorecards, ledgers, screenshots and raw
+simulation artifacts one external owner. Use `CIRCUIT_BENCHMARK_REPO` with the
+sibling directory as default. Change allocation, publishers, rating dependencies,
+fixture path guards and native-cache mounts together. Keep an ignored local
+`build-theatres` junction so historical absolute paths and old commands still
+resolve. Reject a missing default checkout rather than silently creating another
+unversioned result store. Explicit scratch stores remain available to tests.
+
+Raw logs/replays/binaries/caches remain Git-ignored in the new checkout and
+require separate backup. Uploading hundreds of GB of generated data into ordinary
+Git was rejected. Source implementation and verification writeups remain here,
+with evidence links to the benchmark repository; their measurements and original
+run records live there. Preserve exact imported bytes. Only four navigation and
+catalog files received recorded link/hash adjustments after verification, with
+all originals retained separately; no immutable run record changed.
+
+**Invariant.** Every migrated published file is recoverable with its original
+SHA-256. The same-volume raw move retains original directory identity and every
+recorded entry's path, size, mtime, attributes or link target. Existing original
+verdicts, failed trials, scorecard revisions and comparison conditions survive.
+No production C++, AngelScript, profile, AI behavior or CI configuration changes.
+Raw inventory verification is not represented as full raw-content hashing.
+
+**Verification: Checked.** 9,105 published/image files retain original hashes;
+427,219 raw files moved with all 490,542 workspace entries verified. Four
+post-move navigation/catalog originals and their before/after hashes are retained.
+All 116 playtest tooling tests pass, including external allocation/publication,
+missing checkout, migration tampering, immutable history and rating regressions.
+All 694 rewritten evidence links resolve locally; the new evidence store has no
+broken relative documentation links. Source link checking retains only the eight
+pre-existing missing hover-document links (KI-404). Role-document and invariant
+checks pass; Python parses and shell syntax checks pass. No new gameplay build
+or simulation is needed for this path-only tooling migration.
+
+**Evidence.** [Migration guide](benchmark-repository.md),
+[verified manifests](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/tree/main/migrations/2026-10-07-circuitai),
+[benchmark repository](https://github.com/S3KCentrifugal/CircuitAI.benchmarks).
+Removed source benchmark/image files are inventoried individually in that
+manifest. The following retained source files were changed for path resolution,
+validation, index regeneration or evidence-link maintenance:
+
+- [.gitattributes](../.gitattributes)
+- [.gitignore](../.gitignore)
+- [AGENTS.md](../AGENTS.md)
+- [README.md](../README.md)
+- [doc/air-afus-attack-handoff-results.md](../doc/air-afus-attack-handoff-results.md)
+- [doc/air-bomber-cleanup-results.md](../doc/air-bomber-cleanup-results.md)
+- [doc/air-campus-strike-results.md](../doc/air-campus-strike-results.md)
+- [doc/air-cluster-reclaim-results.md](../doc/air-cluster-reclaim-results.md)
+- [doc/air-combat-arena-results.md](../doc/air-combat-arena-results.md)
+- [doc/air-committed-operations-results.md](../doc/air-committed-operations-results.md)
+- [doc/air-economy-zone-results.md](../doc/air-economy-zone-results.md)
+- [doc/air-edge-flank-verification.md](../doc/air-edge-flank-verification.md)
+- [doc/air-enhancement-results.md](../doc/air-enhancement-results.md)
+- [doc/air-layout-and-priority-plan.md](../doc/air-layout-and-priority-plan.md)
+- [doc/air-management.md](../doc/air-management.md)
+- [doc/air-opening-recon-plan.md](../doc/air-opening-recon-plan.md)
+- [doc/air-patrol-naval-support-results.md](../doc/air-patrol-naval-support-results.md)
+- [doc/air-recon-base-defense-results.md](../doc/air-recon-base-defense-results.md)
+- [doc/air-wave-attacks.md](../doc/air-wave-attacks.md)
+- [doc/air-workforce-repair-results.md](../doc/air-workforce-repair-results.md)
+- [doc/air-workforce-results.md](../doc/air-workforce-results.md)
+- [doc/benchmark-repository.md](../doc/benchmark-repository.md)
+- [doc/dense-economy-results.md](../doc/dense-economy-results.md)
+- [doc/known-issues.md](../doc/known-issues.md)
+- [doc/layout-reservation-performance.md](../doc/layout-reservation-performance.md)
+- [doc/metal-maps-results.md](../doc/metal-maps-results.md)
+- [doc/metal-maps-revised-design.md](../doc/metal-maps-revised-design.md)
+- [doc/performance/engineering-guide.md](../doc/performance/engineering-guide.md)
+- [doc/performance/guard-orders.md](../doc/performance/guard-orders.md)
+- [doc/ranged-combat.md](../doc/ranged-combat.md)
+- [doc/ranged-support-implementation-plan.md](../doc/ranged-support-implementation-plan.md)
+- [doc/reviews/2026-09-29-connected-mountain-lanes.md](../doc/reviews/2026-09-29-connected-mountain-lanes.md)
+- [doc/reviews/2026-10-04-high-severity-performance-implementation.md](../doc/reviews/2026-10-04-high-severity-performance-implementation.md)
+- [doc/reviews/2026-10-04-juno-map-edge-investigation.md](../doc/reviews/2026-10-04-juno-map-edge-investigation.md)
+- [doc/reviews/2026-10-04-skirmishai-performance-review.md](../doc/reviews/2026-10-04-skirmishai-performance-review.md)
+- [doc/reviews/2026-10-06-builder-recovery.md](../doc/reviews/2026-10-06-builder-recovery.md)
+- [doc/reviews/2026-10-06-extra-high-performance-remediation.md](../doc/reviews/2026-10-06-extra-high-performance-remediation.md)
+- [doc/reviews/2026-10-06-fortress-targeting.md](../doc/reviews/2026-10-06-fortress-targeting.md)
+- [doc/reviews/2026-10-06-land-siege-response.md](../doc/reviews/2026-10-06-land-siege-response.md)
+- [doc/reviews/2026-10-06-metal-plate-glacial-performance.md](../doc/reviews/2026-10-06-metal-plate-glacial-performance.md)
+- [doc/reviews/2026-10-06-sea-coastal-fallback.md](../doc/reviews/2026-10-06-sea-coastal-fallback.md)
+- [doc/reviews/2026-10-06-sea-mex-expansion.md](../doc/reviews/2026-10-06-sea-mex-expansion.md)
+- [doc/reviews/2026-10-06-spam-and-fatboy.md](../doc/reviews/2026-10-06-spam-and-fatboy.md)
+- [doc/roles/air.md](../doc/roles/air.md)
+- [doc/roles/tech-lanes.md](../doc/roles/tech-lanes.md)
+- [doc/roles/tech-requirements.md](../doc/roles/tech-requirements.md)
+- [doc/roles/tech_chain.md](../doc/roles/tech_chain.md)
+- [doc/sea-allied-base-results.md](../doc/sea-allied-base-results.md)
+- [doc/sea-amphibious-transition.md](../doc/sea-amphibious-transition.md)
+- [doc/sea-combat-results.md](../doc/sea-combat-results.md)
+- [doc/sea-control-investigation.md](../doc/sea-control-investigation.md)
+- [doc/sea-economy-block-results.md](../doc/sea-economy-block-results.md)
+- [doc/sea-fleet-rework-results.md](../doc/sea-fleet-rework-results.md)
+- [doc/sea-layout-migration-results.md](../doc/sea-layout-migration-results.md)
+- [doc/sea-patrol-air-defense-results.md](../doc/sea-patrol-air-defense-results.md)
+- [doc/sea-production-capacity.md](../doc/sea-production-capacity.md)
+- [doc/sea-recovery-production.md](../doc/sea-recovery-production.md)
+- [doc/sea-seaplane-transition.md](../doc/sea-seaplane-transition.md)
+- [doc/team-metal-sharing.md](../doc/team-metal-sharing.md)
+- [doc/tech-t2-start-results.md](../doc/tech-t2-start-results.md)
+- [doc/telchine-beachhead-results.md](../doc/telchine-beachhead-results.md)
+- [doc/telchine-perimeter-results.md](../doc/telchine-perimeter-results.md)
+- [doc/test-storage.md](../doc/test-storage.md)
+- [doc/testing/README.md](../doc/testing/README.md)
+- [doc/testing/catalog.json](../doc/testing/catalog.json)
+- [doc/testing/index/shared.md](../doc/testing/index/shared.md)
+- [doc/transport-ferry.md](../doc/transport-ferry.md)
+- [doc/turret-enemy-reclaim.md](../doc/turret-enemy-reclaim.md)
+- [tools/knowledge/index_test_cases.py](../tools/knowledge/index_test_cases.py)
+- [tools/playtest/README.md](../tools/playtest/README.md)
+- [tools/playtest/air_arena.py](../tools/playtest/air_arena.py)
+- [tools/playtest/analyze_sea_capacity.py](../tools/playtest/analyze_sea_capacity.py)
+- [tools/playtest/benchmark.py](../tools/playtest/benchmark.py)
+- [tools/playtest/benchmark_store.py](../tools/playtest/benchmark_store.py)
+- [tools/playtest/cases/shared/combat/README.md](../tools/playtest/cases/shared/combat/README.md)
+- [tools/playtest/compress_symbols.py](../tools/playtest/compress_symbols.py)
+- [tools/playtest/lane_benchmark.py](../tools/playtest/lane_benchmark.py)
+- [tools/playtest/migrate_benchmark_repository.py](../tools/playtest/migrate_benchmark_repository.py)
+- [tools/playtest/prepare_air_check.py](../tools/playtest/prepare_air_check.py)
+- [tools/playtest/prepare_air_cluster_check.py](../tools/playtest/prepare_air_cluster_check.py)
+- [tools/playtest/prepare_air_economy_check.py](../tools/playtest/prepare_air_economy_check.py)
+- [tools/playtest/prepare_air_economy_zone_check.py](../tools/playtest/prepare_air_economy_zone_check.py)
+- [tools/playtest/prepare_air_recon_check.py](../tools/playtest/prepare_air_recon_check.py)
+- [tools/playtest/prepare_air_strike_check.py](../tools/playtest/prepare_air_strike_check.py)
+- [tools/playtest/prepare_air_support_check.py](../tools/playtest/prepare_air_support_check.py)
+- [tools/playtest/prepare_air_workforce.py](../tools/playtest/prepare_air_workforce.py)
+- [tools/playtest/prepare_allied_layout_check.py](../tools/playtest/prepare_allied_layout_check.py)
+- [tools/playtest/prepare_amphibious_check.py](../tools/playtest/prepare_amphibious_check.py)
+- [tools/playtest/prepare_artillery_check.py](../tools/playtest/prepare_artillery_check.py)
+- [tools/playtest/prepare_mountain_regression.py](../tools/playtest/prepare_mountain_regression.py)
+- [tools/playtest/prepare_strategic_check.py](../tools/playtest/prepare_strategic_check.py)
+- [tools/playtest/prepare_team_share_check.py](../tools/playtest/prepare_team_share_check.py)
+- [tools/playtest/prepare_telchine_match.py](../tools/playtest/prepare_telchine_match.py)
+- [tools/playtest/prepare_telchine_shore_check.py](../tools/playtest/prepare_telchine_shore_check.py)
+- [tools/playtest/prepare_turret_reclaim.py](../tools/playtest/prepare_turret_reclaim.py)
+- [tools/playtest/ranged_arena.py](../tools/playtest/ranged_arena.py)
+- [tools/playtest/run_air_natural.py](../tools/playtest/run_air_natural.py)
+- [tools/playtest/run_builder_recovery.py](../tools/playtest/run_builder_recovery.py)
+- [tools/playtest/run_full_match_performance.py](../tools/playtest/run_full_match_performance.py)
+- [tools/playtest/run_sea_coast.py](../tools/playtest/run_sea_coast.py)
+- [tools/playtest/run_workforce_performance.py](../tools/playtest/run_workforce_performance.py)
+- [tools/playtest/run_workforce_regressions.py](../tools/playtest/run_workforce_regressions.py)
+- [tools/playtest/run_workforce_scaling.py](../tools/playtest/run_workforce_scaling.py)
+- [tools/playtest/scorecard.py](../tools/playtest/scorecard.py)
+- [tools/playtest/scorecard_run.py](../tools/playtest/scorecard_run.py)
+- [tools/playtest/storage.py](../tools/playtest/storage.py)
+- [tools/playtest/test_benchmark_store.py](../tools/playtest/test_benchmark_store.py)
+- [tools/run_guard_tests.sh](../tools/run_guard_tests.sh)
+- [tools/run_performance_tests.sh](../tools/run_performance_tests.sh)
+- [tools/run_ranged_performance_tests.sh](../tools/run_ranged_performance_tests.sh)

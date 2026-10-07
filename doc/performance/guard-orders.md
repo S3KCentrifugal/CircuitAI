@@ -84,16 +84,16 @@ save/load, direct player takeover and transfer fixtures were not run here.
 
 | Scenario | Baseline GUARD orders | Fixed GUARD orders | Verification |
 | --- | ---: | ---: | --- |
-| Glacial, ordinary economy (10 minutes) | 42 | 1 | [Baseline](../benchmarks/records/shared/performance/guard-baseline-natural/2026-10-07/20261007T022319Z-fcc3debd/report.md), [Fixed](../benchmarks/records/shared/performance/guard-candidate-natural/2026-10-07/20261007T023003Z-453bb819/report.md) |
-| Supreme, final recovery fixture (5 minutes) | 102 | 5 | [Baseline](../benchmarks/records/shared/performance/guard-base-recovery-v4/2026-10-07/20261007T024642Z-c2f4c053/report.md), [Fixed](../benchmarks/records/shared/performance/guard-fixed-recovery-v4/2026-10-07/20261007T024442Z-0b83606f/report.md) |
+| Glacial, ordinary economy (10 minutes) | 42 | 1 | [Baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/guard-baseline-natural/2026-10-07/20261007T022319Z-fcc3debd/report.md), [Fixed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/guard-candidate-natural/2026-10-07/20261007T023003Z-453bb819/report.md) |
+| Supreme, final recovery fixture (5 minutes) | 102 | 5 | [Baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/guard-base-recovery-v4/2026-10-07/20261007T024642Z-c2f4c053/report.md), [Fixed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/guard-fixed-recovery-v4/2026-10-07/20261007T024442Z-0b83606f/report.md) |
 
 The final matched Supreme runs both complete 18 mobile units. Guard orders fall
 from 102 to 5 (95.1%); the repeated same-target order in the fixed run is the
 required STOP recovery. Overall orders in this supplied fixture fall from 1,451
 to 1,294; this is a fixture result, not a whole-match or multiplayer forecast.
 
-[All trials, counts and raw log hashes](../benchmarks/guard-orders.json),
-[native/VM and C-callback output](../benchmarks/guard-orders-tests.txt).
+[All trials, counts and raw log hashes](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/guard-orders.json),
+[native/VM and C-callback output](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/guard-orders-tests.txt).
 Failed fixture iterations retain their original verdicts and pins in the
 benchmark catalog. Setup/build errors occurred before a game in three attempts
 (missing test configuration directory, unstripped candidate rejected by staging,

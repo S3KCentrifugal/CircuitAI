@@ -121,7 +121,7 @@ and has no invariant or script failures. Both runs remain retained.
 The initial frozen candidate and baseline each ran five maps with three paired
 seed/faction combinations: Armada 1811001, Cortex 1811002 and Legion 1811003.
 These are fifteen pairs, not fifteen independent repeats per faction. The
-[portable comparison](benchmarks/air-workforce-cohort-2026-10-03.json) links
+[portable comparison](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-cohort-2026-10-03.json) links
 all thirty immutable reports and records matching inputs and common live
 observation windows. Seeded inputs do not guarantee identical battles.
 
@@ -140,18 +140,18 @@ forty-five minutes, using seed 1811001. Times below are simulation minutes;
 
 | Map | Clock / AIR alive | First T2 lab | First fusion | First T2 bomber | First / second AFUS | Whole game |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| [Supreme](benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T183738Z-c161d1a4/README.md) | 45.20 / 43.22 | 16.74 | 19.81 | 21.16 | 26.41 / 29.57 | FAIL |
-| [Glacial](benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T183449Z-5e3c6d45/README.md) | 45.03 / 33.50 | 16.35 | 19.57 | 21.87 | 28.92 / 31.81 | FAIL |
-| [Glitters](benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T184124Z-3c4dc7ca/README.md) | 45.10 / 43.01 | 17.63 | 22.64 | 25.58 | 25.58 / 30.08 | FAIL |
-| [Tundra](benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T185343Z-bc951b46/README.md) | 45.02 / 45.02 | 14.01 | 22.26 | 30.08 | — / — | FAIL |
-| [Caldera](benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T184529Z-4950273e/README.md) | 45.17 / 45.17 | 17.48 | 23.97 | 24.26 | — / — | PASS |
+| [Supreme](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T183738Z-c161d1a4/README.md) | 45.20 / 43.22 | 16.74 | 19.81 | 21.16 | 26.41 / 29.57 | FAIL |
+| [Glacial](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T183449Z-5e3c6d45/README.md) | 45.03 / 33.50 | 16.35 | 19.57 | 21.87 | 28.92 / 31.81 | FAIL |
+| [Glitters](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T184124Z-3c4dc7ca/README.md) | 45.10 / 43.01 | 17.63 | 22.64 | 25.58 | 25.58 / 30.08 | FAIL |
+| [Tundra](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T185343Z-bc951b46/README.md) | 45.02 / 45.02 | 14.01 | 22.26 | 30.08 | — / — | FAIL |
+| [Caldera](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-verified/2026-10-03/20261003T184529Z-4950273e/README.md) | 45.17 / 45.17 | 17.48 | 23.97 | 24.26 | — / — | PASS |
 
 All five have zero AIR-specific invariant findings. Supreme and Glacial meet
 the twenty-minute first-fusion goal; the other three do not. None establishes
 an effective T2 raid by twenty minutes. Tundra records no T2 wave launch through
 forty-five minutes. First bomber completion is not a wave launch or target kill.
 
-The [final comparison](benchmarks/air-workforce-final-2026-10-03.json) links all
+The [final comparison](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-final-2026-10-03.json) links all
 five reports and compares their common live windows with the Armada baseline.
 Its median deltas are -3.28 percentage points full-bank sampled occupancy,
 -332.6 nominal idle BP and **-19.49 metal/s usage**. These diverging battles do
@@ -166,9 +166,9 @@ mex growth. They are four-player TECH/AIR controls, with teams 0/1 allied and
 
 | Map | TECH 0 | AIR 1 | TECH 2 | AIR 3 | Focused / whole-game verdict |
 | --- | ---: | ---: | ---: | ---: | --- |
-| [Full Metal Plate 1.7](benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T173622Z-98c6ee06/README.md) | 40 | 34 | 48 | 73 | PASS / FAIL |
-| [SpeedMetal BAR V2](benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T174256Z-9ebecc64/README.md) | 9 | 40 | 30 | 24 | PASS / FAIL |
-| [Nine Metal Islands V1](benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T174757Z-5867a381/README.md) | 46 | 92 | 51 | 51 | PASS / FAIL |
+| [Full Metal Plate 1.7](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T173622Z-98c6ee06/README.md) | 40 | 34 | 48 | 73 | PASS / FAIL |
+| [SpeedMetal BAR V2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T174256Z-9ebecc64/README.md) | 9 | 40 | 30 | 24 | PASS / FAIL |
+| [Nine Metal Islands V1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/workforce-control/2026-10-03/20261003T174757Z-5867a381/README.md) | 46 | 92 | 51 | 51 | PASS / FAIL |
 
 Zero converters is verified; forty mexes for every player is not. Combat and
 available buildable area affect those totals. Full Metal ended before the
@@ -192,7 +192,7 @@ time. Concurrent economy games are not wall-time performance benchmarks.
 
 Four serial thirty-minute Supreme 8v8 games used seed 1814001: baseline/revised
 with two AIR players, then baseline/revised with six AIR players. The
-[portable timing evidence](benchmarks/air-workforce-performance-2026-10-03.json)
+[portable timing evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-performance-2026-10-03.json)
 contains cumulative p50/p95/max, minute speed and synchronized orders.
 
 | AIR players | Cumulative window | Baseline / revised p95, ms | Change | Population caveat |
@@ -219,7 +219,7 @@ four whole-game checks failed TECH invariants. Peak AIR-role orders/minute were
 1,112/1,179 for the two-AIR pair and 2,006/1,777 for the six-AIR pair. These
 thirty-minute controls do not erase the later Supreme APM failure below.
 
-The [fixed-population comparison](benchmarks/air-workforce-scaling-2026-10-03.json)
+The [fixed-population comparison](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-2026-10-03.json)
 uses two frozen AIs with supplied factories and 100/500/1,000 idle constructors,
 with no active construction projects. Both final games pass every check. The
 table uses settled minute windows after each spawn; times cover all callbacks.
@@ -237,8 +237,8 @@ zero overhead is made. These idle fixtures cannot measure savings from removing
 project-by-unit rescans in an active economy. Isolated census timing at increasing
 project counts remains a profiling gap.
 
-The [first population trials](benchmarks/air-workforce-scaling-initial-2026-10-03.json)
-and [intermediate control](benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
+The [first population trials](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-initial-2026-10-03.json)
+and [intermediate control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-workforce-scaling-partial-control-2026-10-03.json)
 remain retained as whole-game failures: production was frozen without providing
 a factory to every AI, so INV-050 fired. Their observed counts/timings are
 available, but the final fixture satisfies that invariant by supplying factories.
@@ -284,18 +284,18 @@ The final report distinguishes these limits:
 
 ## Selected immutable evidence
 
-- [Donation control](benchmarks/records/air/economy/workforce-donations/2026-10-03/20261003T171308Z-520f3adf/README.md)
-- [Six-lab control](benchmarks/records/air/economy/workforce-six-labs/2026-10-03/20261003T182546Z-5f1781f1/README.md)
-- [Energy-starved Legion](benchmarks/records/air/economy/workforce-energy-starved/2026-10-03/20261003T173107Z-fbfc435c/README.md)
-- [Initial lifecycle failure](benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T173720Z-6f976a48/README.md)
-- [Initial corrected lifecycle](benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T174844Z-889a51fd/README.md)
-- [Strengthened lifecycle failure](benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T193734Z-2cad4a2b/README.md)
-- [Final ownership and handoff PASS](benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T194437Z-545a16b5/README.md)
-- [Baseline TECH opening](benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T175502Z-47b1f9a7/README.md)
-- [Revised TECH opening](benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T180314Z-9d7ea167/README.md)
-- [Revised TECH rush](benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T180527Z-248e4c28/README.md)
+- [Donation control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-donations/2026-10-03/20261003T171308Z-520f3adf/README.md)
+- [Six-lab control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-six-labs/2026-10-03/20261003T182546Z-5f1781f1/README.md)
+- [Energy-starved Legion](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-energy-starved/2026-10-03/20261003T173107Z-fbfc435c/README.md)
+- [Initial lifecycle failure](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T173720Z-6f976a48/README.md)
+- [Initial corrected lifecycle](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T174844Z-889a51fd/README.md)
+- [Strengthened lifecycle failure](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T193734Z-2cad4a2b/README.md)
+- [Final ownership and handoff PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/workforce-lifecycle/2026-10-03/20261003T194437Z-545a16b5/README.md)
+- [Baseline TECH opening](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T175502Z-47b1f9a7/README.md)
+- [Revised TECH opening](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T180314Z-9d7ea167/README.md)
+- [Revised TECH rush](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/economy/workforce-control/2026-10-03/20261003T180527Z-248e4c28/README.md)
 
 Supplied six-lab fixture: economic support is separate from the factory banks.
 This demonstrates capacity, not a natural economy timing target.
 
-![Supplied six-lab workforce](benchmarks/records/air/economy/workforce-six-labs/2026-10-03/20261003T182546Z-5f1781f1/screen_2026-10-03_18-25-35-205.png)
+![Supplied six-lab workforce](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/air/economy/workforce-six-labs/2026-10-03/20261003T182546Z-5f1781f1/screen_2026-10-03_18-25-35-205.png)

@@ -1,9 +1,0 @@
-{
-  "dll": "build-theatres\\d216-final\\SkirmishAI.dll",
-  "map": "supreme",
-  "side": "cortex",
-  "mode": "retake",
-  "profile": "experimental_hard",
-  "minutes": 14,
-  "stage_only": false
-}

@@ -1,6 +1,0 @@
-{
-  "purpose": "ordinary economy with exact D195 expanded 8v8 start fixture",
-  "profiling": true,
-  "production_data_unchanged": true,
-  "warning": "Do not compare FPS after GameOver; retain original invariant failures."
-}

@@ -195,22 +195,22 @@ staged source trees remain at the locations recorded in each result manifest.
 
 | Scenario / raw run ID | Original watch | Compact evidence |
 | --- | --- | --- |
-| incinerator-front-push / `20261006T050221Z-5035783b` | PASS | [Record](../benchmarks/records/shared/combat/incinerator-front-push/2026-10-06/20261006T050352Z-b262dd77/README.md) |
-| incinerator-mixed-front / `20261006T051217Z-9324362c` | PASS | [Record](../benchmarks/records/shared/combat/incinerator-mixed-front/2026-10-06/20261006T051332Z-17f57361/README.md) |
-| land-siege-cortex / `20261006T051429Z-3cde09a2` | FAIL | [Record](../benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051512Z-7a344f31/README.md) |
-| land-siege-cortex / `20261006T051648Z-283140fa` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051809Z-b1d6c75a/README.md) |
-| land-siege-cortex / `20261006T051836Z-5e893307` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051956Z-8d789d70/README.md) |
-| land-siege-cortex / `20261006T052138Z-730aff64` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T052259Z-040e7cdf/README.md) |
-| land-siege-tech / `20261006T052400Z-790757a5` | FAIL | [Record](../benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T052444Z-79cbd348/README.md) |
-| land-siege-tech / `20261006T053027Z-d90f8cec` | FAIL | [Record](../benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053111Z-eb0cb566/README.md) |
-| land-siege-no-static / `20261006T052444Z-44c46d8d` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-no-static/2026-10-06/20261006T052605Z-13d857bf/README.md) |
-| land-siege-armada / `20261006T053111Z-115504bb` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-armada/2026-10-06/20261006T053233Z-a103be14/README.md) |
-| land-siege-legion / `20261006T053233Z-41c30df9` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-legion/2026-10-06/20261006T053354Z-2d20daf6/README.md) |
-| ranged-cortrem / `20261006T052605Z-9b10cfb2` | PASS | [Record](../benchmarks/records/shared/combat/ranged-cortrem/2026-10-06/20261006T052727Z-0acc55fc/README.md) |
-| ranged-armsnipe / `20261006T052727Z-4fe66265` | PASS | [Record](../benchmarks/records/shared/combat/ranged-armsnipe/2026-10-06/20261006T052849Z-1e3a851a/README.md) |
-| ranged-armmanni / `20261006T052849Z-4fa930f2` | PASS | [Record](../benchmarks/records/shared/combat/ranged-armmanni/2026-10-06/20261006T053010Z-ef40d5dd/README.md) |
-| land-siege-tech / `20261006T053432Z-b007ff41` | FAIL | [Record](../benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053521Z-fd1a5911/README.md) |
-| land-siege-tech / `20261006T053654Z-6ebd090e` | FAIL | [Record](../benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053815Z-21ff0f03/README.md) |
-| land-siege-cortex / `20261006T054710Z-6e11787f` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T054830Z-efccd19a/README.md) |
-| land-siege-cortex-bots / `20261006T054831Z-82bf5b89` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-cortex-bots/2026-10-06/20261006T054951Z-1d935a0e/README.md) |
-| land-siege-legion-bots / `20261006T054952Z-5e729ffc` | PASS | [Record](../benchmarks/records/shared/combat/land-siege-legion-bots/2026-10-06/20261006T055113Z-2b9bba6f/README.md) |
+| incinerator-front-push / `20261006T050221Z-5035783b` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/incinerator-front-push/2026-10-06/20261006T050352Z-b262dd77/README.md) |
+| incinerator-mixed-front / `20261006T051217Z-9324362c` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/incinerator-mixed-front/2026-10-06/20261006T051332Z-17f57361/README.md) |
+| land-siege-cortex / `20261006T051429Z-3cde09a2` | FAIL | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051512Z-7a344f31/README.md) |
+| land-siege-cortex / `20261006T051648Z-283140fa` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051809Z-b1d6c75a/README.md) |
+| land-siege-cortex / `20261006T051836Z-5e893307` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T051956Z-8d789d70/README.md) |
+| land-siege-cortex / `20261006T052138Z-730aff64` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T052259Z-040e7cdf/README.md) |
+| land-siege-tech / `20261006T052400Z-790757a5` | FAIL | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T052444Z-79cbd348/README.md) |
+| land-siege-tech / `20261006T053027Z-d90f8cec` | FAIL | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053111Z-eb0cb566/README.md) |
+| land-siege-no-static / `20261006T052444Z-44c46d8d` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-no-static/2026-10-06/20261006T052605Z-13d857bf/README.md) |
+| land-siege-armada / `20261006T053111Z-115504bb` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-armada/2026-10-06/20261006T053233Z-a103be14/README.md) |
+| land-siege-legion / `20261006T053233Z-41c30df9` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-legion/2026-10-06/20261006T053354Z-2d20daf6/README.md) |
+| ranged-cortrem / `20261006T052605Z-9b10cfb2` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-cortrem/2026-10-06/20261006T052727Z-0acc55fc/README.md) |
+| ranged-armsnipe / `20261006T052727Z-4fe66265` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-armsnipe/2026-10-06/20261006T052849Z-1e3a851a/README.md) |
+| ranged-armmanni / `20261006T052849Z-4fa930f2` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-armmanni/2026-10-06/20261006T053010Z-ef40d5dd/README.md) |
+| land-siege-tech / `20261006T053432Z-b007ff41` | FAIL | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053521Z-fd1a5911/README.md) |
+| land-siege-tech / `20261006T053654Z-6ebd090e` | FAIL | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-tech/2026-10-06/20261006T053815Z-21ff0f03/README.md) |
+| land-siege-cortex / `20261006T054710Z-6e11787f` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex/2026-10-06/20261006T054830Z-efccd19a/README.md) |
+| land-siege-cortex-bots / `20261006T054831Z-82bf5b89` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-cortex-bots/2026-10-06/20261006T054951Z-1d935a0e/README.md) |
+| land-siege-legion-bots / `20261006T054952Z-5e729ffc` | PASS | [Record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/land-siege-legion-bots/2026-10-06/20261006T055113Z-2b9bba6f/README.md) |

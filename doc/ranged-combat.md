@@ -216,7 +216,7 @@ contacts remain uncertain. Terrain firing tests are conservative approximations;
 loaded engine aim and collision remain authoritative. Internet synchronization,
 long-running multiplayer and save/load/transfer combinations need separate
 validation. Do not infer a universal win-rate or FPS guarantee from supplied
-combat arenas. The final [benchmark report](benchmarks/ranged-combat.md) records
+combat arenas. The final [benchmark report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md) records
 pins, results, exclusions and the performance comparison.
 
 ## Configuration migration and maintenance map

@@ -1,8 +1,0 @@
-{
-  "staged": "2026-10-04T00:00:03",
-  "dll": "build-theatres\\sea-baseline-3d8c66d2\\SkirmishAI.dll",
-  "dll_sha256_16": "3ecbc2deecda41e7",
-  "dll_bytes": 7782073,
-  "data": "build-theatres\\sea-baseline-3d8c66d2\\data",
-  "ai": "BARbTest/test"
-}

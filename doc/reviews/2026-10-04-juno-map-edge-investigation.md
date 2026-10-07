@@ -23,7 +23,7 @@ Shore's dimensions in the running game were **15,360 × 3,072 elmos**. The engin
 | Initial supplied edge test | 12 | 0 tracked flights outside; disappearance position is not treated as impact |
 | Supplied repeat with explosion callback | 12 | 0 tracked flights outside; 12/12 explosion centers inside |
 
-The initial [report and retained evidence](../benchmarks/records/shared/combat/juno-edge-d196/2026-10-04/20261004T224559Z-8522f4df/README.md) ran four game minutes. Its checks assert startup, launch and projectile observation, not twelve measured impacts. The [repeat](../benchmarks/records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/README.md) ran 2.2 minutes and requires exactly twelve launches, twelve tracked projectiles, twelve observed explosions and zero outside flight/impact observations. Both original reports are PASS, with no script or runtime invariant failures; neither proves the reported bug absent in general.
+The initial [report and retained evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/juno-edge-d196/2026-10-04/20261004T224559Z-8522f4df/README.md) ran four game minutes. Its checks assert startup, launch and projectile observation, not twelve measured impacts. The [repeat](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/README.md) ran 2.2 minutes and requires exactly twelve launches, twelve tracked projectiles, twelve observed explosions and zero outside flight/impact observations. Both original reports are PASS, with no script or runtime invariant failures; neither proves the reported bug absent in general.
 
 Both use `Shore_to_Shore_V3`, BAR `Beyond All Reason test-31479-433a460`, Recoil `2026.07.04` and DLL SHA256 `d28b4dcb6a319109509202639ac142a919bbae93669a466b5ecab4cc1cc4d450`. Actual scripts, observer hashes, start scripts and pinned build identity are in each bundle. The source tree includes earlier uncommitted AIR/SEA work; HEAD alone does not reconstruct this DLL. No native rebuild or production policy edit was made for this investigation.
 
@@ -31,7 +31,7 @@ The supplied fixture creates twelve Junos on the spectator team and supplies sto
 
 Each compact `juno-observations.json` retains exact tagged log lines and the original infolog hash; `fixture-source.json` retains that run's observer source. Raw logs remain in the categorized local archive. The screenshots show the tested boundaries and timing, but do not independently prove impact coordinates; the explosion callback supplies that evidence.
 
-![East edge just after the three eastern Juno impacts](../benchmarks/records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/screen_2026-10-04_22-50-03-693.png)
+![East edge just after the three eastern Juno impacts](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/shared/combat/juno-edge-impacts/2026-10-04/20261004T225027Z-e148b0f6/screen_2026-10-04_22-50-03-693.png)
 
 ## Reproduction and next verification
 

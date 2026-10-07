@@ -144,16 +144,16 @@ Both loss arenas exercise the final controller including invasion task handover.
 | Mixed 8v8 / Glacial / natural income / 10 min | FAIL overall | SEA yard completes at 0.75 min and first construction ship exits at 3.05; no coastal activation or script errors; TECH INV-013/019/029 keep the complete report failed |
 
 Immutable final reports and screenshots:
-[Armada loss](../benchmarks/records/sea/strategy/coast-lost-armada/2026-10-06/20261006T150451Z-59d7d108/README.md),
-[Legion loss](../benchmarks/records/sea/strategy/coast-lost-legion/2026-10-06/20261006T145421Z-8f942e7e/README.md),
-[held-sea control](../benchmarks/records/sea/strategy/coast-held-armada/2026-10-06/20261006T144814Z-21fe414c/README.md),
-[Cortex retake](../benchmarks/records/sea/strategy/coast-retake-cortex/2026-10-06/20261006T150754Z-063c8c6c/README.md),
-[mixed 8v8](../benchmarks/records/sea/economy/coast-regression/2026-10-06/20261006T145859Z-56caa74d/README.md).
-The [benchmark index](../benchmarks/index/sea.md) also retains the earlier
+[Armada loss](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/strategy/coast-lost-armada/2026-10-06/20261006T150451Z-59d7d108/README.md),
+[Legion loss](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/strategy/coast-lost-legion/2026-10-06/20261006T145421Z-8f942e7e/README.md),
+[held-sea control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/strategy/coast-held-armada/2026-10-06/20261006T144814Z-21fe414c/README.md),
+[Cortex retake](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/strategy/coast-retake-cortex/2026-10-06/20261006T150754Z-063c8c6c/README.md),
+[mixed 8v8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/coast-regression/2026-10-06/20261006T145859Z-56caa74d/README.md).
+The [benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md) also retains the earlier
 iterations and original failed reports. Every bundle links its raw evidence
 hashes and supplemental `coast-observations-v1.json`.
 
-![Final Legion coast with defenses and inland rebuilding](../benchmarks/records/sea/strategy/coast-lost-legion/2026-10-06/20261006T145421Z-8f942e7e/screen_2026-10-06_14-54-06-283.png)
+![Final Legion coast with defenses and inland rebuilding](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/sea/strategy/coast-lost-legion/2026-10-06/20261006T145421Z-8f942e7e/screen_2026-10-06_14-54-06-283.png)
 
 The Legion log records 6 T1 turrets, 14 T2 turrets, 6 radars, 11 coastal sonar
 launchers, 9 jammers, 12 wall segments and 2 medium mines completed. Armada

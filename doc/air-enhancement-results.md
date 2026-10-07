@@ -95,7 +95,7 @@ Build-06's later natural run completed its first fusion at 18:14 and two by
 then failed fusion timing despite completing owned mex upgrades at 15:06. This
 exposed the extra bank gate and prompted a new natural run. The full raw
 window data, including losses and stall estimates, is retained in
-[the intermediate measurements](benchmarks/air-d162-intermediate.json).
+[the intermediate measurements](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d162-intermediate.json).
 
 The revised natural run completed Armada's first fusion at **19:03.1** (frame
 34293), after the observer recorded reactor start at **16:22.7** with zero basic
@@ -119,11 +119,11 @@ an efficiency claim. There were no new launches after 35:37. A known-target
 feasibility gate can hold bombers; this is not proof that every target was
 strategically unavailable. Build-09 uses the earlier 400-elmo assembly setting
 and predates the Phoenix notification fallback. Raw final natural and gift
-measurements are in [the final window data](benchmarks/air-d162-final.json).
+measurements are in [the final window data](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d162-final.json).
 
-![Revised natural AIR base at twenty minutes](images/d162/natural-fusion-20min.png)
+![Revised natural AIR base at twenty minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/natural-fusion-20min.png)
 
-![Natural AIR construction at ten minutes, build 06](images/d162/natural-build06-10min.png)
+![Natural AIR construction at ten minutes, build 06](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/natural-build06-10min.png)
 
 ## Controlled combat
 
@@ -133,7 +133,7 @@ the next twelve-bomber wave destroyed a flak and returned eleven. The late
 sixteen-bomber wave destroyed three flaks and returned eleven. Nominal target
 metal is not a net trade calculation, and the fixture supplies both armies.
 
-![Cortex late strike against flak](images/d162/cortex-late-flak.png)
+![Cortex late strike against flak](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/cortex-late-flak.png)
 
 Legion initially failed every ground-strike stage while its interceptors worked.
 Routing Mosquitos to RAID and inspecting Phoenix's lethal mounts restored ground
@@ -147,7 +147,7 @@ interception in all three stages. Its first eight-aircraft wave returned five;
 the late sixteen-aircraft wave destroyed an AFUS and returned eight. Losses
 remain significant, even when a supplied high-value target is destroyed.
 
-![Legion Phoenix heat-ray impact](images/d162/legion-phoenix-impact.png)
+![Legion Phoenix heat-ray impact](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/legion-phoenix-impact.png)
 
 ## Donated-constructor economy
 
@@ -164,7 +164,7 @@ At 20 minutes the observer reported about 71 metal/s, 3,200 energy/s and a
 metal bank of 837/3,700. The workforce stayed local. This is a controlled economy
 case against a frozen enemy, not a natural or competitive timing claim.
 
-![Donated-constructor case at twenty minutes](images/d162/gift-final-20min.png)
+![Donated-constructor case at twenty minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/gift-final-20min.png)
 
 ## Preserved run history
 
@@ -216,7 +216,7 @@ and archived the full log as `20261002-002440`. The earlier incomplete report
 `20261002-002017` is preserved. Its one-second re-observation wall time is not
 the simulation's runtime (the full engine log covers about 282 seconds).
 
-![Seeded Armada late strike, with attributed impact evidence](images/d162/armada-seeded-impact.png)
+![Seeded Armada late strike, with attributed impact evidence](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/armada-seeded-impact.png)
 
 The supplied capacity case reached six T2 labs at **14:36**, and completed
 support banks logged twenty turrets before subsequent labs. No INV-090 support
@@ -237,9 +237,9 @@ observer and behavior; it does not turn the original capacity report into PASS
 or substitute for its missing soak duration. Its early restricted-watch report
 is retained separately from the full capture.
 
-![Six T2 labs in the supplied capacity case at twenty minutes](images/d162/capacity-six-labs-20min.png)
+![Six T2 labs in the supplied capacity case at twenty minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/capacity-six-labs-20min.png)
 
-![Natural AIR base at forty-eight minutes](images/d162/natural-late-48min.png)
+![Natural AIR base at forty-eight minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/natural-late-48min.png)
 
 The final Cortex/hard and Legion/terrible repeats both passed thirteen minutes
 with the same radius and original strict checks. Engine/AI seeds were 1622 and
@@ -261,7 +261,7 @@ and returned ten; its next twenty-bomber wave destroyed the flaks and returned
 seventeen. Target destruction and nominal value do not by themselves establish
 net advantage, since escorts, repairs, energy, collateral and force timing matter.
 
-![Seeded Legion late heat-ray impact](images/d162/legion-seeded-impact.png)
+![Seeded Legion late heat-ray impact](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d162/legion-seeded-impact.png)
 
 No original check deadlines or invariant forbids were weakened.
 

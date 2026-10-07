@@ -63,19 +63,19 @@ fire occurs after formation deployment and minute one.
 
 TECH retains a spread dry perimeter after the ship retreats (7.52 game minutes):
 
-![TECH dry perimeter](images/d161/tech-shore-perimeter.png)
+![TECH dry perimeter](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d161/tech-shore-perimeter.png)
 
 AIR uses a beach landing on its onward route (8.00 game minutes):
 
-![AIR landfall](images/d161/air-accessible-landfall.png)
+![AIR landfall](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d161/air-accessible-landfall.png)
 
 AIR's advancing force regrouped on the next landmass (9.49 game minutes):
 
-![AIR next-island formation](images/d161/air-next-island-formation.png)
+![AIR next-island formation](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d161/air-next-island-formation.png)
 
 Tundra land contact: heat-ray fire from the dry coastal approach (2.15 game minutes):
 
-![Telchines firing on land](images/d161/tundra-land-combat.png)
+![Telchines firing on land](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d161/tundra-land-combat.png)
 
 ## Inland Supreme check
 

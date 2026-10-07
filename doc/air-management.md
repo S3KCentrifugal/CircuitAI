@@ -199,7 +199,7 @@ the AIR instance. TECH's existing leave/restore sequence remains in place.
 
 ## Verification and limits
 
-See [simulation evidence](benchmarks/air-management.md) for pinned DLLs, settings,
+See [simulation evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md) for pinned DLLs, settings,
 milestones, failures and the difference between natural games and supplied
 late-economy fixtures. Runtime observations are logged as `[AIR][Rule]`,
 `[Economy]`, `[Bay]`, `[Claim]`, `[Produce]`, `[Attack]`, `[Waves]` and `[Ferry]`.

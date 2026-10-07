@@ -22,7 +22,7 @@ is edited in place with the decision that changed it.
 | No commit unless asked for that change. | memory |
 | Only the TECH role's behaviour changes; other roles' placement is untouched (the layout is TECH's only). | D-093 |
 | Every behaviour fix ships an invariant, an `[INVARIANT]` log line, an actor-matrix row and a played run. | D-076, [`practice-invariants.md`](../practice-invariants.md) |
-| Tests at zero bonus, Legion enabled, on Supreme Isthmus. | [`benchmarks/tech-rush.md`](../benchmarks/tech-rush.md) |
+| Tests at zero bonus, Legion enabled, on Supreme Isthmus. | [`benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md) |
 | Documentation and decision traceability; the docs here and in the docs repo are kept current as the understanding of the game, the roles and the theory evolves, and as benchmarks are beaten. | this file |
 
 ## Layout (the TECH base)

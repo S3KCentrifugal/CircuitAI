@@ -4,7 +4,7 @@ Date: 2026-09-30. **Status: proposed design; no implementation changes.**
 
 **Implementation follow-up:** D-147 implements the AIR controller and records
 the tested behavior, scoped differences and remaining calibration limits in
-[AIR management](air-management.md) and [simulation evidence](benchmarks/air-management.md).
+[AIR management](air-management.md) and [simulation evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md).
 The proposal below is retained as the original design and acceptance reference.
 
 ## 1. Decision and scope

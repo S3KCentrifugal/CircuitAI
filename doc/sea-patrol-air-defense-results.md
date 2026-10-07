@@ -52,12 +52,12 @@ the same as making cheap scout boats invulnerable to gunships.
 
 | Case / original report | AA responders | Enemy aircraft killed | Friendly tracked losses | Peak team orders / game minute |
 | --- | ---: | ---: | ---: | ---: |
-| [12 Herrings, no aircraft](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/report.md) | 0 | 0 | 0 | 146 |
-| [12 Herrings vs 6 gunships](benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T142104Z-77715674/report.md) | 12 | 6 | 7 | 146 |
-| [12 Herrings vs 8 flanking bombers](benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/report.md) | 12 | 8 | 0 | 150 |
-| [12 Herrings vs 8 unarmed transports](benchmarks/records/sea/combat/herring-aa-unarmed-cand/2026-10-05/20261005T142239Z-4c01ddbc/report.md) | 12 | 8 | 0 | 150 |
-| [12 Skaters + 6 AA ships vs 6 gunships](benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T143115Z-2898e997/report.md) | 18 | 6 | 3 | 323 |
-| [12 scouts + 6 Iapetus vs 6 gunships](benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141927Z-e769f91c/report.md) | 6 | 6 | 9 | 244 |
+| [12 Herrings, no aircraft](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/report.md) | 0 | 0 | 0 | 146 |
+| [12 Herrings vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T142104Z-77715674/report.md) | 12 | 6 | 7 | 146 |
+| [12 Herrings vs 8 flanking bombers](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/report.md) | 12 | 8 | 0 | 150 |
+| [12 Herrings vs 8 unarmed transports](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-unarmed-cand/2026-10-05/20261005T142239Z-4c01ddbc/report.md) | 12 | 8 | 0 | 150 |
+| [12 Skaters + 6 AA ships vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T143115Z-2898e997/report.md) | 18 | 6 | 3 | 323 |
+| [12 scouts + 6 Iapetus vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141927Z-e769f91c/report.md) | 6 | 6 | 9 | 244 |
 
 All six final cases passed their original checks. Cortex used
 `experimental_hard`, Armada `experimental_balanced`, and Legion
@@ -65,17 +65,17 @@ All six final cases passed their original checks. Cortex used
 twelve Hippocampus scouts retained independent scouting. The AA fixtures
 record actual weapon damage and patrol resumption, not only script intent.
 
-[Final patrol screenshot](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/screen_2026-10-05_14-25-12-750.png): twelve boats occupy separate patrol sectors.
+[Final patrol screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/screen_2026-10-05_14-25-12-750.png): twelve boats occupy separate patrol sectors.
 
-![Herrings spread across their individual Supreme patrols](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/screen_2026-10-05_14-25-12-750.png)
+![Herrings spread across their individual Supreme patrols](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/screen_2026-10-05_14-25-12-750.png)
 
-[Final flank screenshot](benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/screen_2026-10-05_14-23-41-935.png): separate movement destinations and overlapping AA ranges. Physical ships are still maneuvering; queued flags are not counted as physical separation.
+[Final flank screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/screen_2026-10-05_14-23-41-935.png): separate movement destinations and overlapping AA ranges. Physical ships are still maneuvering; queued flags are not counted as physical separation.
 
-![Separated Herring interception destinations with overlapping AA ranges](benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/screen_2026-10-05_14-23-41-935.png)
+![Separated Herring interception destinations with overlapping AA ranges](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/screen_2026-10-05_14-23-41-935.png)
 
 ## Ordinary economy game
 
-[The normal-resource, two-SEA Supreme game](benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/report.md) reached frame 36,000
+[The normal-resource, two-SEA Supreme game](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/report.md) reached frame 36,000
 (20 game minutes) and passed its checks. Factory production and economy
 construction continued alongside independent patrols. This used ordinary
 construction rather than the frozen supplied-force arena. The observed Cortex
@@ -84,7 +84,7 @@ left the yard around 2.2 minutes. At the ten-minute screenshot it had about
 +37.7 metal, +453.7 energy and 59 units. This is compatibility evidence, not a
 new best economy benchmark.
 
-![Ordinary Supreme SEA economy and fleet at ten minutes](benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/screen_2026-10-05_14-27-37-974.png)
+![Ordinary Supreme SEA economy and fleet at ten minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/screen_2026-10-05_14-27-37-974.png)
 
 ## Preserved observations
 
@@ -95,23 +95,23 @@ baseline/candidate identity comes from pinned inputs and the review record.
 
 | Observation | Review |
 | --- | --- |
-| [baseline-run-2](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T134917Z-abee872f/report.md) | Original dry/beach spawn fixture failure; not an AI verdict. |
-| [baseline-run-3](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T135131Z-9073e245/report.md) | Valid f353f926 baseline: reproduced clumping, original patrol FAIL retained. |
-| [patrol-candidate-1](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T135732Z-2d830663/report.md) | First patrol prototype; superseded by final route refinements. |
-| [aa-direct-1](benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T135920Z-7957d909/report.md) | Direct-attack prototype; superseded. |
-| [aa-flank-1](benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T140306Z-b35bba27/report.md) | Flank prototype; superseded. |
-| [aa-armada-1](benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T140538Z-849a5aab/report.md) | Armada prototype; superseded. |
-| [aa-legion-1](benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T140806Z-065eb839/report.md) | Original broad check PASS rejected by detailed review: wrong hull ownership. |
-| [aa-legion-2](benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141255Z-d6326ed1/report.md) | Correct AA ownership, incomplete air engagement; superseded. |
-| [12 Herrings, no aircraft](benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/report.md) | Final PASS; see measured limits above. |
-| [12 Herrings vs 6 gunships](benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T142104Z-77715674/report.md) | Final PASS; see measured limits above. |
-| [12 Herrings vs 8 flanking bombers](benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/report.md) | Final PASS; see measured limits above. |
-| [12 Herrings vs 8 unarmed transports](benchmarks/records/sea/combat/herring-aa-unarmed-cand/2026-10-05/20261005T142239Z-4c01ddbc/report.md) | Final PASS; see measured limits above. |
-| [12 Skaters + 6 AA ships vs 6 gunships](benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T143115Z-2898e997/report.md) | Final PASS; see measured limits above. |
-| [12 scouts + 6 Iapetus vs 6 gunships](benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141927Z-e769f91c/report.md) | Final PASS; see measured limits above. |
-| [Ordinary 20-minute game](benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/report.md) | Final PASS; see measured limits above. |
+| [baseline-run-2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T134917Z-abee872f/report.md) | Original dry/beach spawn fixture failure; not an AI verdict. |
+| [baseline-run-3](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T135131Z-9073e245/report.md) | Valid f353f926 baseline: reproduced clumping, original patrol FAIL retained. |
+| [patrol-candidate-1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T135732Z-2d830663/report.md) | First patrol prototype; superseded by final route refinements. |
+| [aa-direct-1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T135920Z-7957d909/report.md) | Direct-attack prototype; superseded. |
+| [aa-flank-1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T140306Z-b35bba27/report.md) | Flank prototype; superseded. |
+| [aa-armada-1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T140538Z-849a5aab/report.md) | Armada prototype; superseded. |
+| [aa-legion-1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T140806Z-065eb839/report.md) | Original broad check PASS rejected by detailed review: wrong hull ownership. |
+| [aa-legion-2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141255Z-d6326ed1/report.md) | Correct AA ownership, incomplete air engagement; superseded. |
+| [12 Herrings, no aircraft](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-patrol-cand/2026-10-05/20261005T142552Z-707441e8/report.md) | Final PASS; see measured limits above. |
+| [12 Herrings vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-screen-cand/2026-10-05/20261005T142104Z-77715674/report.md) | Final PASS; see measured limits above. |
+| [12 Herrings vs 8 flanking bombers](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-flank-cand/2026-10-05/20261005T142415Z-effde436/report.md) | Final PASS; see measured limits above. |
+| [12 Herrings vs 8 unarmed transports](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/herring-aa-unarmed-cand/2026-10-05/20261005T142239Z-4c01ddbc/report.md) | Final PASS; see measured limits above. |
+| [12 Skaters + 6 AA ships vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/armada-aa-screen-cand/2026-10-05/20261005T143115Z-2898e997/report.md) | Final PASS; see measured limits above. |
+| [12 scouts + 6 Iapetus vs 6 gunships](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/legion-aa-screen-cand/2026-10-05/20261005T141927Z-e769f91c/report.md) | Final PASS; see measured limits above. |
+| [Ordinary 20-minute game](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/patrol-aa-screen/2026-10-05/20261005T142839Z-b06f2c20/report.md) | Final PASS; see measured limits above. |
 
-The [SEA benchmark index](benchmarks/index/sea.md) and [test inventory](testing/index/sea.md) include these cases without moving or overwriting older evidence.
+The [SEA benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md) and [test inventory](testing/index/sea.md) include these cases without moving or overwriting older evidence.
 
 ## Implementation examples
 

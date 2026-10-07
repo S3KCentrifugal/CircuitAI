@@ -72,7 +72,7 @@ All fifteen matrix cases passed the strict runtime checks. Values below
 use the fixed 10-minute window (first matrix) or 8-minute window (covered
 naval matrix), excluding shutdown overrun. Zero damage remains a failure
 to penetrate, even when fixture integrity passes. See the
-[complete per-wave measurements and archive identities](benchmarks/air-d165-arena.json).
+[complete per-wave measurements and archive identities](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d165-arena.json).
 
 | Case | Faction | Health damage / EMP | Attacker metal lost | Credited kill value |
 | --- | --- | --- | --- | --- |
@@ -152,14 +152,14 @@ that old cohort again.
 
 ## Screenshots
 
-![T2 bomber column intercepted before reaching the base](images/d165/t2-intercept.png)
+![T2 bomber column intercepted before reaching the base](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/t2-intercept.png)
 
-![A later, larger wave reaches the fusion](images/d165/t2-fusion-strike.png)
+![A later, larger wave reaches the fusion](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/t2-fusion-strike.png)
 
-![Cortex T1 bombers attack a metal extractor](images/d165/t1-mex-strike.png)
+![Cortex T1 bombers attack a metal extractor](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/t1-mex-strike.png)
 
-![Cortex reaches the air lab under layered AA](images/d165/layered-aa-strike.png)
+![Cortex reaches the air lab under layered AA](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/layered-aa-strike.png)
 
-![Torpedo aircraft strike underwater economy in the sonar-supplied case](images/d165/torpedo-strike.png)
+![Torpedo aircraft strike underwater economy in the sonar-supplied case](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/torpedo-strike.png)
 
-![Shurikens attack exposed radar; paralysis is recorded separately](images/d165/shuriken-strike.png)
+![Shurikens attack exposed radar; paralysis is recorded separately](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d165/shuriken-strike.png)

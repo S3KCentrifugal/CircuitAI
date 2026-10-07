@@ -71,22 +71,22 @@ looked for a filename derived from the map title and did not launch a game.
 
 | Fixture / source candidate | Original verdict | Observed assertions | Peak team-0 commands/min |
 | --- | --- | --- | ---: |
-| [carrier-release-8](benchmarks/records/sea/combat/carrier-release-cand/2026-10-05/20261005T043624Z-ba305efa/README.md) | PASS | combat: seen at 0.3 min | 735 |
-| [escort-search-8](benchmarks/records/sea/combat/escort-search-cand/2026-10-05/20261005T043240Z-9e810f9e/README.md) | PASS | escort: seen at 0.2 min; fleet-search: seen at 0.2 min; combat: seen at 1.4 min | 858 |
-| [legion-t2-production-9](benchmarks/records/sea/combat/legion-t2-productio-cand/2026-10-05/20261005T044003Z-412eacee/README.md) | PASS | registration: seen at 0.1 min; t2-constructor: seen at 0.6 min; t2-combat: seen at 1.0 min | 1631 |
-| [natural-glacial-9](benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T044453Z-5972c2a3/README.md) | PASS | opening-yard: seen at 2.5 min; first-ship-exit: seen at 3.8 min | unmeasured |
-| [natural-shore-9b](benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T045017Z-50a23061/README.md) | PASS | opening-yard: seen at 1.1 min; first-ship-exit: seen at 1.8 min | unmeasured |
-| [natural-supreme-9](benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T044647Z-e71d1268/README.md) | PASS | opening-yard: seen at 1.4 min; first-ship-exit: seen at 2.0 min | unmeasured |
-| [response-air-supported-9](benchmarks/records/sea/combat/response-air-suppor-cand/2026-10-05/20261005T044119Z-dbb8486c/README.md) | PASS | combat: seen at 0.5 min | 1316 |
-| [response-sub-cortex-8](benchmarks/records/sea/combat/response-sub-cortex-cand/2026-10-05/20261005T043125Z-1db2a128/README.md) | FAIL | response: seen at 1.1 min; counter-started: seen at 1.1 min; new-counter-fired: **missing** (by 6 min) | 194 |
-| [response-sub-cortex-supported-9](benchmarks/records/sea/combat/response-sub-cortex-cand/2026-10-05/20261005T043848Z-bdfdc6ac/README.md) | PASS | response: seen at 1.5 min; counter-started: seen at 1.6 min; new-counter-fired: seen at 1.8 min | 302 |
-| [response-sub-legion-8](benchmarks/records/sea/combat/response-sub-legion-cand/2026-10-05/20261005T042854Z-59b770be/README.md) | PASS | response: seen at 0.4 min; counter-started: seen at 0.4 min; new-counter-fired: seen at 1.3 min | 211 |
-| [response-submarine-8](benchmarks/records/sea/combat/response-submarine-cand/2026-10-05/20261005T043009Z-6bbb7889/README.md) | PASS | response: seen at 1.1 min; counter-started: seen at 1.1 min; new-counter-fired: seen at 1.9 min | 258 |
-| [scout-fog-8](benchmarks/records/sea/combat/scout-fog-cand/2026-10-05/20261005T043355Z-6e97e266/README.md) | PASS | search-orders: seen at 0.2 min; contact-damage: seen at 0.8 min | 939 |
-| [shore-siege-8](benchmarks/records/sea/combat/shore-siege-cand/2026-10-05/20261005T043510Z-8e03ee2d/README.md) | PASS | combat: seen at 0.4 min | 547 |
-| [surface-line-9](benchmarks/records/sea/combat/surface-line-cand/2026-10-05/20261005T044232Z-34063b56/README.md) | PASS | combat: seen at 0.5 min | 410 |
-| [surface-sub-danger-7](benchmarks/records/sea/combat/surface-sub-danger-cand/2026-10-05/20261005T042303Z-8367ea27/README.md) | PASS | underwater-screen: seen at 0.3 min | 703 |
-| [surface-sub-danger-9](benchmarks/records/sea/combat/surface-sub-danger-cand/2026-10-05/20261005T045539Z-e8bd3e9b/README.md) | PASS | underwater-screen: seen at 0.2 min | 381 |
+| [carrier-release-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/carrier-release-cand/2026-10-05/20261005T043624Z-ba305efa/README.md) | PASS | combat: seen at 0.3 min | 735 |
+| [escort-search-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/escort-search-cand/2026-10-05/20261005T043240Z-9e810f9e/README.md) | PASS | escort: seen at 0.2 min; fleet-search: seen at 0.2 min; combat: seen at 1.4 min | 858 |
+| [legion-t2-production-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/legion-t2-productio-cand/2026-10-05/20261005T044003Z-412eacee/README.md) | PASS | registration: seen at 0.1 min; t2-constructor: seen at 0.6 min; t2-combat: seen at 1.0 min | 1631 |
+| [natural-glacial-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T044453Z-5972c2a3/README.md) | PASS | opening-yard: seen at 2.5 min; first-ship-exit: seen at 3.8 min | unmeasured |
+| [natural-shore-9b](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T045017Z-50a23061/README.md) | PASS | opening-yard: seen at 1.1 min; first-ship-exit: seen at 1.8 min | unmeasured |
+| [natural-supreme-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/fleet-rework/2026-10-05/20261005T044647Z-e71d1268/README.md) | PASS | opening-yard: seen at 1.4 min; first-ship-exit: seen at 2.0 min | unmeasured |
+| [response-air-supported-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-suppor-cand/2026-10-05/20261005T044119Z-dbb8486c/README.md) | PASS | combat: seen at 0.5 min | 1316 |
+| [response-sub-cortex-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-sub-cortex-cand/2026-10-05/20261005T043125Z-1db2a128/README.md) | FAIL | response: seen at 1.1 min; counter-started: seen at 1.1 min; new-counter-fired: **missing** (by 6 min) | 194 |
+| [response-sub-cortex-supported-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-sub-cortex-cand/2026-10-05/20261005T043848Z-bdfdc6ac/README.md) | PASS | response: seen at 1.5 min; counter-started: seen at 1.6 min; new-counter-fired: seen at 1.8 min | 302 |
+| [response-sub-legion-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-sub-legion-cand/2026-10-05/20261005T042854Z-59b770be/README.md) | PASS | response: seen at 0.4 min; counter-started: seen at 0.4 min; new-counter-fired: seen at 1.3 min | 211 |
+| [response-submarine-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-submarine-cand/2026-10-05/20261005T043009Z-6bbb7889/README.md) | PASS | response: seen at 1.1 min; counter-started: seen at 1.1 min; new-counter-fired: seen at 1.9 min | 258 |
+| [scout-fog-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/scout-fog-cand/2026-10-05/20261005T043355Z-6e97e266/README.md) | PASS | search-orders: seen at 0.2 min; contact-damage: seen at 0.8 min | 939 |
+| [shore-siege-8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/shore-siege-cand/2026-10-05/20261005T043510Z-8e03ee2d/README.md) | PASS | combat: seen at 0.4 min | 547 |
+| [surface-line-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/surface-line-cand/2026-10-05/20261005T044232Z-34063b56/README.md) | PASS | combat: seen at 0.5 min | 410 |
+| [surface-sub-danger-7](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/surface-sub-danger-cand/2026-10-05/20261005T042303Z-8367ea27/README.md) | PASS | underwater-screen: seen at 0.3 min | 703 |
+| [surface-sub-danger-9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/surface-sub-danger-cand/2026-10-05/20261005T045539Z-e8bd3e9b/README.md) | PASS | underwater-screen: seen at 0.2 min | 381 |
 
 The main set contains twelve combat fixtures and three natural games: fourteen
 PASS and one retained FAIL. The additional candidate-7 screen record is an
@@ -189,7 +189,7 @@ remaining gameplay limitation and was not repaired by weakening its assertion.
 
 ### Final linear-cleanup follow-up
 
-[Candidate 10 surface combat](benchmarks/records/sea/combat/surface-line-cand/2026-10-05/20261005T050658Z-fb9160e8/README.md) passed with real ship losses,
+[Candidate 10 surface combat](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/surface-line-cand/2026-10-05/20261005T050658Z-fb9160e8/README.md) passed with real ship losses,
 contact damage at 0.6 minutes, and no script/invariant/fixture errors. Peak
 team-0 engine command rate was 314/minute. Both fleets lost metal
 (5280 / 3170); this exercises teardown but is not

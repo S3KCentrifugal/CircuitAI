@@ -216,14 +216,14 @@ coverage comes from the 8v8 runs.
 
 | Run | Original verdict | Game minutes | Evidence |
 | --- | --- | ---: | --- |
-| Priority fixture: inadequate supply | FAIL | 8.2 | [Original report](benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005013Z-1b234a1e/report.md) |
-| Priority fixture: dry placements | FAIL | 8.0 | [Original report](benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005302Z-2b792f67/report.md) |
-| Corrected priority fixture | PASS | 8.0 | [Original report](benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005544Z-9ed9e41e/report.md) |
-| Invalid 17-start harness | FAIL | 2.7 | [Original report](benchmarks/records/sea/economy/production-8v8/2026-10-06/20261006T010330Z-8370d1c0/report.md) |
-| Natural 8v8 | FAIL | 30.0 | [Original report](benchmarks/records/sea/economy/production-8v8/2026-10-06/20261006T011019Z-cd0a68df/report.md) |
-| Capacity 8v8: allied repair crash | FAIL | 2.5 | [Original report](benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T011335Z-fd71210c/report.md) |
-| Capacity launch: disk space | FAIL | 0.0 | [Original report](benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T011919Z-b11c6a10/report.md) |
-| Capacity 8v8: queue gap | FAIL | 12.0 | [Original report](benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T012422Z-4fec9b21/report.md) |
-| Crash-fixed priority fixture | PASS | 8.0 | [Original report](benchmarks/records/sea/economy/priorities/2026-10-06/20261006T012624Z-9d0e1632/report.md) |
-| Final queue-continuity 8v8 | FAIL | 12.0 | [Original report](benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T014002Z-79186b9e/report.md) |
-| Final priority fixture | PASS | 8.2 | [Original report](benchmarks/records/sea/economy/priorities/2026-10-06/20261006T014157Z-7548bdee/report.md) |
+| Priority fixture: inadequate supply | FAIL | 8.2 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005013Z-1b234a1e/report.md) |
+| Priority fixture: dry placements | FAIL | 8.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005302Z-2b792f67/report.md) |
+| Corrected priority fixture | PASS | 8.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/priorities/2026-10-06/20261006T005544Z-9ed9e41e/report.md) |
+| Invalid 17-start harness | FAIL | 2.7 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/production-8v8/2026-10-06/20261006T010330Z-8370d1c0/report.md) |
+| Natural 8v8 | FAIL | 30.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/production-8v8/2026-10-06/20261006T011019Z-cd0a68df/report.md) |
+| Capacity 8v8: allied repair crash | FAIL | 2.5 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T011335Z-fd71210c/report.md) |
+| Capacity launch: disk space | FAIL | 0.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T011919Z-b11c6a10/report.md) |
+| Capacity 8v8: queue gap | FAIL | 12.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T012422Z-4fec9b21/report.md) |
+| Crash-fixed priority fixture | PASS | 8.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/priorities/2026-10-06/20261006T012624Z-9d0e1632/report.md) |
+| Final queue-continuity 8v8 | FAIL | 12.0 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/capacity-8v8/2026-10-06/20261006T014002Z-79186b9e/report.md) |
+| Final priority fixture | PASS | 8.2 | [Original report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/priorities/2026-10-06/20261006T014157Z-7548bdee/report.md) |

@@ -110,14 +110,14 @@ documents where generalized guide numbers differ from current unit data.
 
 ## Results
 
-The [trial index](benchmarks/sea-production-capacity.json) retains original
+The [trial index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/sea-production-capacity.json) retains original
 verdicts, source-log hashes, 30-second samples and visibility flags. Reproduce it
 with `python tools/playtest/analyze_sea_capacity.py`. Compact immutable records
-and screenshots are linked in the [SEA evidence index](benchmarks/index/sea.md).
+and screenshots are linked in the [SEA evidence index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 
 | Test | Result | What it establishes |
 | --- | --- | --- |
-| Full native/AngelScript suite | PASS | 15 native suites and VM suites, including 21 SEA policy tests; [output](benchmarks/sea-production-capacity-tests.txt) |
+| Full native/AngelScript suite | PASS | 15 native suites and VM suites, including 21 SEA policy tests; [output](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/sea-production-capacity-tests.txt) |
 | Armada supplied, compact, 12 min | PASS | Constructed support and commander handoff at 3:35; earlier native candidate before the resource-priority correction |
 | Legion supplied, compact, 12 min | PASS | Four completed in-range turrets by 3:35, economy handoff at 3:40 on the final native DLL |
 | Cortex supplied, experimental, 12 min | PASS | Four turrets by 3:25, handoff at 3:35 on the final native DLL |

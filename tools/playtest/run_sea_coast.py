@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import subprocess
 import sys
 import playtest
@@ -21,7 +22,7 @@ def main():
     a=p.parse_args()
     d=storage.allocate('sea','strategy','coast-'+a.mode+'-'+a.side,a.map,'supplied',seed=219001)
     print('COAST_DIRECTORY='+str(d),flush=True)
-    Path('build-theatres/coast-current.txt').write_text(str(d))
+    (RAW_ROOT / 'coast-current.txt').write_text(str(d))
     cli=[sys.executable,str(playtest.HERE/'playtest.py')]
     cmd=cli+['stage','--dir',str(d),'--dll',str(a.dll),'--map',MAPS[a.map],
         '--game','Beyond All Reason test-31479-433a460','--engine','recoil_2026.07.04',

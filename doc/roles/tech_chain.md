@@ -8,7 +8,7 @@ Script: [`data/script/src/roles/tech_chain.as`](../../data/script/src/roles/tech
 namespace `TechChain`. Decision:
 [D-070](../decisions.md#d-070--the-tech-rush-chain-one-objective-one-computed-build-order-then-the-economy).
 Rule table row: `chain.next` in [`tech_rules.md`](tech_rules.md). Benchmarks:
-[`../benchmarks/tech-rush.md`](../benchmarks/tech-rush.md). Game knowledge:
+[`../benchmarks/tech-rush.md`](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/tech-rush.md). Game knowledge:
 the rush table in the knowledge base's
 [eco/tech playbook](../../../rjm.bar.docs/knowledge/70-strategy/77-eco-tech-player.md),
 computed by `rjm.bar.docs/tools/knowledge/rush_sim.py`.

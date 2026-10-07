@@ -120,11 +120,11 @@ runs include deliberately expensive legacy work and are excluded from timing.
 
 | Fixture | Verdict | Enemy kills / ranged losses | Original evidence |
 | --- | --- | ---: | --- |
-| ranged-armsnipe | PASS | 4 / 0 | [record](../benchmarks/records/shared/combat/ranged-armsnipe/2026-10-06/20261006T192506Z-86180da9/README.md) |
-| ranged-starlight-closing | PASS | 13 / 1 | [record](../benchmarks/records/shared/combat/ranged-starlight-closing/2026-10-06/20261006T192621Z-0d784d79/README.md) |
-| ranged-legmed | PASS | 4 / 0 | [record](../benchmarks/records/shared/combat/ranged-legmed/2026-10-06/20261006T192736Z-99db7264/README.md) |
-| ranged-cortrem | PASS | 4 / 0 | [record](../benchmarks/records/shared/combat/ranged-cortrem/2026-10-06/20261006T192850Z-76cf2fcd/README.md) |
-| ranged-sensor-advance | PASS | 6 / 0 | [record](../benchmarks/records/shared/combat/ranged-sensor-advance/2026-10-06/20261006T193007Z-942686ec/README.md) |
+| ranged-armsnipe | PASS | 4 / 0 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-armsnipe/2026-10-06/20261006T192506Z-86180da9/README.md) |
+| ranged-starlight-closing | PASS | 13 / 1 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-starlight-closing/2026-10-06/20261006T192621Z-0d784d79/README.md) |
+| ranged-legmed | PASS | 4 / 0 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-legmed/2026-10-06/20261006T192736Z-99db7264/README.md) |
+| ranged-cortrem | PASS | 4 / 0 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-cortrem/2026-10-06/20261006T192850Z-76cf2fcd/README.md) |
+| ranged-sensor-advance | PASS | 6 / 0 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/ranged-sensor-advance/2026-10-06/20261006T193007Z-942686ec/README.md) |
 
 Starlight closing-assault permits casualties in its existing checks; its one
 loss is retained, not rewritten as a zero-loss result. Outcome variation alone
@@ -136,8 +136,8 @@ primitive oracles establish the specific transformations being claimed.
 Seven-batch medians, MinGW GCC 13 C++20 `-O2`, assertions enabled; all games
 and compiler processes stopped. Numbers below are microseconds per operation
 at 10,000 input points/IDs, fixed seed 221. The
-[kernel bundle](../benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T193006Z-458183a0/README.md)
-records the original verdict. Its [evidence supplement](../benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T203130Z-08cbbf63/kernel-measurements.json)
+[kernel bundle](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T193006Z-458183a0/README.md)
+records the original verdict. Its [evidence supplement](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/ranged-query-kernels/2026-10-06/20261006T203130Z-08cbbf63/kernel-measurements.json)
 contains all 2,000/5,000/10,000-point results and source/compiler pins. This is
 the same measurement, not a second benchmark: the first archive omitted the
 results file through its intentional `*-results.json` input exclusion. The
@@ -162,7 +162,7 @@ dominate that tiny result, so its ratio should not guide prioritization.
 Glacial Gap completed the same 60-minute horizon with all 16 AIs alive, no
 GameOver, no script errors and **412 gameplay invariant events** in the drained
 log. Its original strict verdict remains **FAIL**. The
-[candidate record](../benchmarks/records/shared/performance/full-match-profile/2026-10-06/20261006T200145Z-d1685f1c/README.md)
+[candidate record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/full-match-profile/2026-10-06/20261006T200145Z-d1685f1c/README.md)
 contains screenshots, native inclusive/exclusive tables and all input hashes.
 The [D-220 baseline](2026-10-06-metal-plate-glacial-performance.md) remains intact.
 
@@ -194,7 +194,7 @@ was introduced.
 Metal Plate completed the same 30-minute horizon with all 16 AIs active, no
 GameOver, no script errors and **49 gameplay invariant events**. Its original
 strict verdict remains **FAIL**; see the
-[candidate record](../benchmarks/records/shared/performance/full-match-profile/2026-10-06/20261006T202409Z-c088e2bb/README.md).
+[candidate record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/full-match-profile/2026-10-06/20261006T202409Z-c088e2bb/README.md).
 Both natural runs use ordinary economies; no unit caps, production changes or
 supplied economy reduce their workload. These are horizon-complete diagnostic
 runs, not matches played to victory.

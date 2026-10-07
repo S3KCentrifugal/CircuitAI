@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import storage
 from air_arena import lua
 
@@ -29,7 +30,7 @@ def pool_symbols(staged):
     if not path.exists():
         return
     digest = storage.file_hash(path)
-    pool = ROOT / 'build-theatres/ranged-rework/symbols'
+    pool = RAW_ROOT / 'ranged-rework/symbols'
     pool.mkdir(parents=True, exist_ok=True)
     target = pool / (digest + '.dbg')
     if not target.exists():

@@ -1461,6 +1461,21 @@ Evidence must distinguish an empty queue, a stalled product and a new hull.
 
 - `test_progress_and_partial_logs_are_not_empty_queue_failures`
 
+### [test_benchmark_store](../../../tools/playtest/test_benchmark_store.py)
+
+External evidence ownership, path safety and migration preservation.
+
+- `test_default_allocator_uses_external_raw_store`
+- `test_default_publisher_keeps_failure_in_external_evidence_store`
+- `test_environment_override_selects_another_checkout`
+- `test_extra_raw_file_is_detected`
+- `test_historical_evidence_resolves_without_rewriting_old_manifest`
+- `test_historical_path_refuses_traversal`
+- `test_missing_checkout_fails_before_creating_run_directories`
+- `test_missing_raw_file_is_detected`
+- `test_published_content_change_is_detected_even_with_original_size_and_mtime`
+- `test_same_volume_move_preserves_evidence_and_original_directory_identity`
+
 ### [test_fortress_report](../../../tools/playtest/test_fortress_report.py)
 
 - `test_air_control_requires_actual_anti_air_damage`
@@ -1673,6 +1688,10 @@ Summarize natural Telchine evidence, excluding simulation frames after GameOver.
 
 Benchmark tracker: turn a playtest run into a row of doc/benchmarks/tech-rush.md.
 
+### [benchmark_store](../../../tools/playtest/benchmark_store.py)
+
+Locations shared by evidence publishers and isolated simulation runners.
+
 ### [build_area](../../../tools/playtest/build_area.py)
 
 Render and measure a map's buildable ground from the build_area widget's survey.
@@ -1700,6 +1719,10 @@ Read-only evidence extraction for supplied land-siege/Incinerator cases.
 ### [lane_benchmark](../../../tools/playtest/lane_benchmark.py)
 
 Prepare/record isolated, map-and-settings-specific lane worker benchmarks.
+
+### [migrate_benchmark_repository](../../../tools/playtest/migrate_benchmark_repository.py)
+
+Snapshot or verify a same-volume benchmark-repository migration.
 
 ### [prepare_air_check](../../../tools/playtest/prepare_air_check.py)
 

@@ -104,23 +104,23 @@ damage from the engagement acceptance check.
 
 | Case | Build / profile | Behavioral result | Evidence |
 | --- | --- | --- | --- |
-| fortress-corcrwh-mixed | baseline / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-mixed/2026-10-06/20261006T060823Z-f6d39cd9/README.md) |
-| fortress-legfort-defense | baseline / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T061129Z-9b383801/README.md) |
-| fortress-corcrwh-screen | baseline / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-screen/2026-10-06/20261006T062346Z-eb7043ed/README.md) |
-| fortress-legfort-screen | baseline / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-screen/2026-10-06/20261006T062241Z-6f4916e3/README.md) |
-| fortress-legfort-mixed | baseline / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-mixed/2026-10-06/20261006T060423Z-3be039f6/README.md) |
-| fortress-corcrwh-mixed | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-mixed/2026-10-06/20261006T062051Z-ad909fa4/README.md) |
-| fortress-corcrwh-aa | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-aa/2026-10-06/20261006T063216Z-ab92746b/README.md) |
-| fortress-corcrwh-defense | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063112Z-91b83196/README.md) |
-| fortress-corcrwh-defense | ranged / experimental_terrible | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063423Z-29e36613/README.md) |
-| fortress-corcrwh-screen | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-screen/2026-10-06/20261006T062905Z-3f2c17d1/README.md) |
-| fortress-corcrwh-spam | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-corcrwh-spam/2026-10-06/20261006T063008Z-028736d1/README.md) |
-| fortress-legfort-aa | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-aa/2026-10-06/20261006T062801Z-38c46b7f/README.md) |
-| fortress-legfort-defense | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T062657Z-c11997ad/README.md) |
-| fortress-legfort-defense | ranged / experimental_hard | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T063319Z-fb3df314/README.md) |
-| fortress-legfort-screen | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-screen/2026-10-06/20261006T062450Z-3b391d34/README.md) |
-| fortress-legfort-spam | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-spam/2026-10-06/20261006T062554Z-613feb5d/README.md) |
-| fortress-legfort-mixed | ranged / experimental_balanced | PASS | [Original evidence](../benchmarks/records/shared/combat/fortress-legfort-mixed/2026-10-06/20261006T061819Z-b999413e/README.md) |
+| fortress-corcrwh-mixed | baseline / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-mixed/2026-10-06/20261006T060823Z-f6d39cd9/README.md) |
+| fortress-legfort-defense | baseline / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T061129Z-9b383801/README.md) |
+| fortress-corcrwh-screen | baseline / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-screen/2026-10-06/20261006T062346Z-eb7043ed/README.md) |
+| fortress-legfort-screen | baseline / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-screen/2026-10-06/20261006T062241Z-6f4916e3/README.md) |
+| fortress-legfort-mixed | baseline / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-mixed/2026-10-06/20261006T060423Z-3be039f6/README.md) |
+| fortress-corcrwh-mixed | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-mixed/2026-10-06/20261006T062051Z-ad909fa4/README.md) |
+| fortress-corcrwh-aa | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-aa/2026-10-06/20261006T063216Z-ab92746b/README.md) |
+| fortress-corcrwh-defense | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063112Z-91b83196/README.md) |
+| fortress-corcrwh-defense | ranged / experimental_terrible | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063423Z-29e36613/README.md) |
+| fortress-corcrwh-screen | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-screen/2026-10-06/20261006T062905Z-3f2c17d1/README.md) |
+| fortress-corcrwh-spam | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-spam/2026-10-06/20261006T063008Z-028736d1/README.md) |
+| fortress-legfort-aa | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-aa/2026-10-06/20261006T062801Z-38c46b7f/README.md) |
+| fortress-legfort-defense | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T062657Z-c11997ad/README.md) |
+| fortress-legfort-defense | ranged / experimental_hard | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-defense/2026-10-06/20261006T063319Z-fb3df314/README.md) |
+| fortress-legfort-screen | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-screen/2026-10-06/20261006T062450Z-3b391d34/README.md) |
+| fortress-legfort-spam | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-spam/2026-10-06/20261006T062554Z-613feb5d/README.md) |
+| fortress-legfort-mixed | ranged / experimental_balanced | PASS | [Original evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-legfort-mixed/2026-10-06/20261006T061819Z-b999413e/README.md) |
 
 ### Build and checks
 
@@ -140,7 +140,7 @@ the eight KI-404 links to the missing hover reference.
 The required development output contains matching DLL/debug symbols plus all
 330 data files; all 332 hashes were compared. The live game installation was
 not updated. Source/build checks and the first/repeated native results are in
-[validation evidence](../benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063423Z-29e36613/fortress-validation.json).
+[validation evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/fortress-corcrwh-defense/2026-10-06/20261006T063423Z-29e36613/fortress-validation.json).
 
 Selection remains O(E) over the existing eligible contacts, with constant
 extra state and no extra whole-map pass. Opted-in attack squads examine low

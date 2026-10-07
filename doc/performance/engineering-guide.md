@@ -113,7 +113,7 @@ unresolved upstream engine finding. The [focused runner](../../tools/run_ranged_
 compiles its tests and optional same-input kernels; run timing with games and
 compilers stopped. Storage reuse does not remove the engine world scan or
 justify cross-AI snapshot sharing without mutation/authority versions.
-The [ranged report](../benchmarks/ranged-combat.md) separates behavior changes,
+The [ranged report](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/ranged-combat.md) separates behavior changes,
 allocation savings, local command counts and the limits of FPS evidence.
 
 ## Entry points

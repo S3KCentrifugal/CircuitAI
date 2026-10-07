@@ -63,12 +63,12 @@ The original `air_clusters` check file still covers wind packing and natural
 fusion deadlines. The new `air_factory_clusters` file owns these compound
 checks, so older regression expectations are retained.
 
-![Controlled capacity, 15 minutes](images/d167/capacity-15.png)
+![Controlled capacity, 15 minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d167/capacity-15.png)
 
 Tight lab/nano rows at 15 minutes in the first controlled game. The supplied
 AFUS bank is on the right, separate from production.
 
-![Controlled capacity, 24 minutes](images/d167/capacity-24.png)
+![Controlled capacity, 24 minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d167/capacity-24.png)
 
 The first controlled game's later expansion. The growing army and artificial
 income make this unsuitable as a CPU/FPS benchmark.
@@ -119,7 +119,7 @@ success from production counts. The final strict verdict remains FAIL with
 27 INV-081 observer lines and TECH invariant failures; there were no script
 errors, crash markers, or new AIR compound/reclaim invariant reports.
 
-![Natural economy at 20 minutes](images/d167/natural-20.png)
+![Natural economy at 20 minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d167/natural-20.png)
 
 Valid first-run capture: T1/T2 production and compact support banks, retained
 wind clusters and ordinary fusion. It is not the later repeat.
@@ -160,11 +160,11 @@ priority, and measure transition capital and reactor work on the critical path.
 This follows the [meta rationale and sources in the plan](air-cluster-reclaim-plan.md#bomber-timing-and-meta).
 Do not claim that lifting the gate alone proves useful bombers by twenty minutes.
 
-Machine-readable audits: [natural 1](benchmarks/d167-natural-1.json),
-[natural 2](benchmarks/d167-natural-2.json),
-[natural final](benchmarks/d167-natural-final.json),
-[capacity 1](benchmarks/d167-clusters-1.json),
-[capacity final](benchmarks/d167-final-clusters.json).
+Machine-readable audits: [natural 1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-1.json),
+[natural 2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-2.json),
+[natural final](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-natural-final.json),
+[capacity 1](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-clusters-1.json),
+[capacity final](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d167-final-clusters.json).
 Worker assignment counters in these audits are zero because the cluster probe
 does not emit the separate economy-worker probe schema; zero is not a finding
 that no constructors worked. Full reports/logs/screenshots remain in each

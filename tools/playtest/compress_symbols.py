@@ -12,11 +12,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-STORE = ROOT / "build-theatres"
+STORE = RAW_ROOT
 REPARSE = 0x400
 COMPRESSED = 0x800
 SPARSE = 0x200

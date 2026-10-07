@@ -1,5 +1,12 @@
 # Playtest: launch, watch, screenshot, stop
 
+Current storage (2026-10-07): published benchmarks, historical images and raw
+`build-theatres` archives now live in the sibling `CircuitAI.benchmarks`
+checkout. Set `CIRCUIT_BENCHMARK_REPO` for another location. See the
+[migration and current commands](../../doc/benchmark-repository.md). Historical paths below are
+preserved for provenance; this machine retains an ignored raw-path junction.
+
+
 ## Organized storage
 
 The [test definition catalog](../../doc/testing/README.md) indexes scenarios,
@@ -8,7 +15,7 @@ domain. Regenerate with `python tools/knowledge/index_test_cases.py`; use
 `--check` to detect stale documentation. Execution evidence remains separate.
 
 [Storage conventions](../../doc/test-storage.md) define categories, naming,
-immutable publications and history preservation. [Benchmark evidence](../../doc/benchmarks/README.md)
+immutable publications and history preservation. [Benchmark evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md)
 is indexed by domain without rewriting the historical records.
 
 Cases now live under `cases/<domain>/<area>/`, checks under
@@ -284,7 +291,7 @@ settings, factions, starts, DLL/data hashes and timestamps, runs an isolated TEC
 duel, and archives a scorecard. `scorecard.py rebuild` updates the chronological
 index and private OpenSkill ledger; `compare <a.json> <b.json>` rejects mismatched
 cohorts, including Legion on/off. Timed-out matches are censored, not draws.
-See the [design and commands](../../doc/benchmarks/scorecard-design.md).
+See the [design and commands](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/scorecard-design.md).
 
 ## Zero bonus is the baseline
 

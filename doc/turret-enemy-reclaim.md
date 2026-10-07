@@ -103,10 +103,10 @@ Isthmus v1.7. Final stripped DLL SHA-256 prefix: `3ecbc2deecda41e7`.
 
 | Profile | Result | Physical reclaim / return to repair | Evidence |
 | --- | --- | --- | --- |
-| experimental_balanced | PASS, 9 game minutes | 72 / 72 | [Report, hashes and screenshot](benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005115Z-3979c9d5/README.md) |
-| experimental_hard | PASS, 9 game minutes | 72 / 72 | [Report, hashes and screenshot](benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005137Z-0fb8e491/README.md) |
-| experimental_terrible | PASS, 9.5 game minutes | 72 / 72 | [Report, hashes and screenshot](benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005339Z-a7e2a378/README.md) |
-| hard (legacy) | PASS, 9.5 game minutes | 72 / 72 | [Report, hashes and screenshot](benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005926Z-00846d17/README.md) |
+| experimental_balanced | PASS, 9 game minutes | 72 / 72 | [Report, hashes and screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005115Z-3979c9d5/README.md) |
+| experimental_hard | PASS, 9 game minutes | 72 / 72 | [Report, hashes and screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005137Z-0fb8e491/README.md) |
+| experimental_terrible | PASS, 9.5 game minutes | 72 / 72 | [Report, hashes and screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005339Z-a7e2a378/README.md) |
+| hard (legacy) | PASS, 9.5 game minutes | 72 / 72 | [Report, hashes and screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/combat/turret-enemy-reclaim/2026-10-04/20261004T005926Z-00846d17/README.md) |
 
 All 216 experimental responses occurred with metal exactly at storage capacity.
 The command observer saw 18–30 frames (0.6–1.0 seconds) from enemy spawn to
@@ -121,8 +121,8 @@ altering the supplied arena, while turret decisions remain entirely native.
 The first legacy attempt, which allowed that expansion, is retained as FAIL;
 it did not observe one fourth-repetition target being reclaimed. The other
 legacy difficulties were not individually simulated. All four successful
-records are indexed in the [shared benchmark catalog](benchmarks/index/shared.md);
-the [machine-readable catalog](benchmarks/catalog.json) preserves older evidence.
+records are indexed in the [shared benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/shared.md);
+the [machine-readable catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) preserves older evidence.
 
 The complete native test suite passed, including 20 new eligibility/range
 checks. JSON/Python parsing, script/API parity (277 used members), invariant

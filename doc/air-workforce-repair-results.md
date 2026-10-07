@@ -30,7 +30,7 @@ committed data baseline plus these AIR changes.
 Times are team-0 completed units, not orders or frames. Supplied resources
 are excluded from natural timings. Full paths, starts, hashes, per-team checks,
 workforce samples, receipts and guard traces are in the
-[evidence JSON](benchmarks/d172-air-workforce.json).
+[evidence JSON](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d172-air-workforce.json).
 
 | Case | Duration | First T2 lab | First fusion | First T2 bomber | Result |
 | --- | ---: | ---: | ---: | ---: | --- |
@@ -86,15 +86,15 @@ capital-budget and forced-guard repeats were headless.
 
 Baseline opening at five minutes:
 
-![Glacial baseline opening](images/d172/glacial-baseline-5.png)
+![Glacial baseline opening](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d172/glacial-baseline-5.png)
 
 Natural Glacial at twenty minutes, with the advanced factory and local economy:
 
-![Glacial natural economy](images/d172/glacial-natural-20.png)
+![Glacial natural economy](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d172/glacial-natural-20.png)
 
 Coastal donation test at twenty minutes, showing advanced-lab turret support:
 
-![Glacial donation economy](images/d172/glacial-donation-20.png)
+![Glacial donation economy](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d172/glacial-donation-20.png)
 
 ## Checks and reproduction
 

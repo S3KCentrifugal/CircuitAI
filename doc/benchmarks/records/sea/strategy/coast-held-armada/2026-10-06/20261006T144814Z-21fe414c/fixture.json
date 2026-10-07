@@ -1,9 +1,0 @@
-{
-  "dll": "build-theatres\\d216-final\\SkirmishAI.dll",
-  "map": "supreme",
-  "side": "armada",
-  "mode": "held",
-  "profile": "experimental_balanced",
-  "minutes": 14.0,
-  "stage_only": false
-}

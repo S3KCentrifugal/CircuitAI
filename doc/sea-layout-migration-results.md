@@ -178,16 +178,16 @@ by its six-minute deadline; it is not a thirty-minute comparison.
 
 | Map | Variant / original record | First yard | First nano | T2 yard | Fusion | Observed minutes | Check verdict / survival |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| glacial | [baseline](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044516Z-f7cc36d5/README.md) | 1:02 | 5:37 | 12:25 | 15:54 | 30.0 | PASS; alive at last sample |
-| glacial | [candidate](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T044511Z-2a6408b9/README.md) | 2:25 | 11:34 | 16:29 | 22:47 | 30.1 | PASS; alive at last sample |
-| erebos | [baseline](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044827Z-59db53a9/README.md) | 1:21 | 8:24 | 15:18 | 19:53 | 30.0 | PASS; alive at last sample |
-| erebos | [candidate](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T044821Z-cc434d12/README.md) | 0:53 | 7:06 | not observed | not observed | 30.0 | PASS; alive at last sample |
-| supreme | [baseline](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044939Z-a1a36d16/README.md) | 1:19 | 6:04 | not observed | not observed | 6.2 | FAIL; alive at last sample |
-| supreme | [candidate](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T045246Z-d8973c38/README.md) | 1:09 | 8:54 | not observed | not observed | 30.0 | PASS; alive at last sample |
-| tundra | [baseline](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T045504Z-69e87924/README.md) | 1:23 | 6:32 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
-| tundra | [candidate](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T045758Z-edc97564/README.md) | 1:31 | 9:45 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
-| caldera | [baseline](benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T050335Z-a7af7e03/README.md) | 1:11 | 6:42 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
-| caldera | [candidate](benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T050704Z-6cf93e22/README.md) | 1:04 | 9:07 | not observed | not observed | 30.1 | PASS; alive at last sample |
+| glacial | [baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044516Z-f7cc36d5/README.md) | 1:02 | 5:37 | 12:25 | 15:54 | 30.0 | PASS; alive at last sample |
+| glacial | [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T044511Z-2a6408b9/README.md) | 2:25 | 11:34 | 16:29 | 22:47 | 30.1 | PASS; alive at last sample |
+| erebos | [baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044827Z-59db53a9/README.md) | 1:21 | 8:24 | 15:18 | 19:53 | 30.0 | PASS; alive at last sample |
+| erebos | [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T044821Z-cc434d12/README.md) | 0:53 | 7:06 | not observed | not observed | 30.0 | PASS; alive at last sample |
+| supreme | [baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T044939Z-a1a36d16/README.md) | 1:19 | 6:04 | not observed | not observed | 6.2 | FAIL; alive at last sample |
+| supreme | [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T045246Z-d8973c38/README.md) | 1:09 | 8:54 | not observed | not observed | 30.0 | PASS; alive at last sample |
+| tundra | [baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T045504Z-69e87924/README.md) | 1:23 | 6:32 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
+| tundra | [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T045758Z-edc97564/README.md) | 1:31 | 9:45 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
+| caldera | [baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-baseline/2026-10-04/20261004T050335Z-a7af7e03/README.md) | 1:11 | 6:42 | not observed | not observed | 30.0 | PASS; eliminated or no owned units |
+| caldera | [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/cohort-candidate/2026-10-04/20261004T050704Z-6cf93e22/README.md) | 1:04 | 9:07 | not observed | not observed | 30.1 | PASS; alive at last sample |
 
 All five candidate games reached their thirty-minute smoke window. The cohort
 itself fails because the Supreme baseline failed its egress check; the economic
@@ -195,11 +195,11 @@ non-regression gate also remains unmet independently of that check result.
 
 ## Reproducible final harbor and published build
 
-[Final balanced harbor acceptance](benchmarks/records/sea/layout/harbor-final/2026-10-04/20261004T050037Z-b941eb88/README.md)
+[Final balanced harbor acceptance](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/harbor-final/2026-10-04/20261004T050037Z-b941eb88/README.md)
 passes twenty minutes with the final indexed census, canceled-claim recovery,
 and independent physical exit/reclaim observer. The
-[terrible-profile counterpart](benchmarks/records/sea/layout/harbor-observed/2026-10-04/20261004T044800Z-a38be670/README.md)
-also passes. [All published SEA records](benchmarks/index/sea.md) retain original
+[terrible-profile counterpart](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/harbor-observed/2026-10-04/20261004T044800Z-a38be670/README.md)
+also passes. [All published SEA records](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md) retain original
 verdicts and hashes, including the failed opening/crash and mixed controls.
 
 The completed stripped DLL, matching debug symbols and current data were copied

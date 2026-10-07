@@ -11,7 +11,7 @@ runner families. A listed definition does **not** mean it passed or was played.
 | [air](index/air.md) | 98 |
 | [front](index/front.md) | 0 |
 | [sea](index/sea.md) | 99 |
-| [shared](index/shared.md) | 283 |
+| [shared](index/shared.md) | 286 |
 | [support](index/support.md) | 0 |
 | [tactical](index/tactical.md) | 4 |
 | [tech](index/tech.md) | 13 |
@@ -29,8 +29,8 @@ runner families. A listed definition does **not** mean it passed or was played.
 - [Machine-readable definitions](catalog.json) include source hashes and named
   assertions where statically identifiable. Native unnamed assertions stay in
   the linked executable suite; this is not assertion-level coverage analysis.
-- [Benchmark index](../benchmarks/README.md) and
-  [evidence catalog](../benchmarks/catalog.json) own recorded results.
+- [Benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md) and
+  [evidence catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/catalog.json) own recorded results.
 - [Storage conventions](../test-storage.md) define immutable raw games and
   compact evidence bundles. [Migration audit](../test-storage-moves.md) preserves
   historical benchmark paths. This index does not move or rewrite evidence.

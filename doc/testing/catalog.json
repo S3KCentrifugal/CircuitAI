@@ -833,7 +833,7 @@
       "title": "check_doc_links",
       "definitions": [],
       "detail": "Verify that every relative Markdown link in this repository's documentation",
-      "sha256": "d27ff79b1775fdaf3bb6974e8ed0b4297509589683b178a7160d9381fea6ddfb",
+      "sha256": "abe01e8186ae51e22e0c32b79447e26bc216a6b261e4385cd5ede88a1876bd67",
       "execution": "not inferred"
     },
     {
@@ -888,7 +888,7 @@
       "title": "check_script_api",
       "definitions": [],
       "detail": "Check that every native member the AngelScript policy uses is registered.",
-      "sha256": "e7bc4352a9b28dc83921e52d26c2de6592ba107cdbf1a12e78223fac5305bad5",
+      "sha256": "49a1bbb07885c12d62da8995c33e553f3cc5072352118495e67f2c8117f01218",
       "execution": "not inferred"
     },
     {
@@ -951,7 +951,7 @@
       "title": "air_arena",
       "definitions": [],
       "detail": "Prepare, run and compare replenishing AIR combat arenas; no economic build-up.",
-      "sha256": "26ae48aeb868db7dff4764cb36898242c9ace34f350fc925c2a4309169df7bc7",
+      "sha256": "f7583a736d28cd9e01f13a30ee127c6b2e2b2dc3c5c5711edd52ad39382e78b6",
       "execution": "not inferred"
     },
     {
@@ -1138,7 +1138,7 @@
       "title": "analyze_sea_capacity",
       "definitions": [],
       "detail": "Reproduce the D-222 trial index without changing any original verdict.",
-      "sha256": "f22d7e15fa0a69392a47e3e8e38e97f3b52dc96704b5639c7934205632f2bc28",
+      "sha256": "76aeb7d3183513d41dd00f2c3df4593dd33c1ab3182aa6da13d44ef76dc32196",
       "execution": "not inferred"
     },
     {
@@ -1350,7 +1350,18 @@
       "title": "benchmark",
       "definitions": [],
       "detail": "Benchmark tracker: turn a playtest run into a row of doc/benchmarks/tech-rush.md.",
-      "sha256": "ffeafd98fd110bf8582408a1729e44fd6e01dfdef0f5195ab4298912bf8a63a3",
+      "sha256": "84441729b894fff613366807790da03a391c5138db9711555dcdbbe6eb5fffb4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/benchmark_store.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "benchmark_store",
+      "definitions": [],
+      "detail": "Locations shared by evidence publishers and isolated simulation runners.",
+      "sha256": "59accf46d178baa0182385075611c89fd6094963ca53a0b97864ec1528d7b130",
       "execution": "not inferred"
     },
     {
@@ -5485,7 +5496,7 @@
       "title": "compress_symbols",
       "definitions": [],
       "detail": "Losslessly compress idle playtest symbols on Windows; default is a dry run.",
-      "sha256": "3260dff092d880923cae9e0d568eba7ac25753ae4bb915306162713844c75a8e",
+      "sha256": "c0070fecf026cdcc98e41ef5d29b4475a89e3bd14bc9f90bb499ad4d0f8308e5",
       "execution": "not inferred"
     },
     {
@@ -5551,7 +5562,18 @@
       "title": "lane_benchmark",
       "definitions": [],
       "detail": "Prepare/record isolated, map-and-settings-specific lane worker benchmarks.",
-      "sha256": "4cfad1c14668cf1ea181548a1458519b8faebda000f0b95cdee0e6732cb80a47",
+      "sha256": "eb230b88d3d2e3b92819e5fd2f9d4d2ad10158b0d59942e6a129283ae0dc649e",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/migrate_benchmark_repository.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "migrate_benchmark_repository",
+      "definitions": [],
+      "detail": "Snapshot or verify a same-volume benchmark-repository migration.",
+      "sha256": "c3598bf7a9e4336b4607c910b60075ce6d7862b1b70e4af64ea99168e1476db7",
       "execution": "not inferred"
     },
     {
@@ -5562,7 +5584,7 @@
       "title": "playtest",
       "definitions": [],
       "detail": "Playtest: launch a BAR skirmish with the freshly built BARb, watch its log, stop it.",
-      "sha256": "1710316a4d8b4ecf96c38cabef6e95dc765f2410b2db9e4334a90c6dac3cb0df",
+      "sha256": "0c8e208b8313a683052341c1cc910a949189c8152f0ebc5a9b5ca211bccf36bf",
       "execution": "not inferred"
     },
     {
@@ -5587,7 +5609,7 @@
         "scenario: windloss"
       ],
       "detail": "Prepare isolated AIR fixtures after playtest.py stage; never edits production data.",
-      "sha256": "156644f87f93d55bf3ec45fe0e97a1de4f3b42cf8cc0972288009fd34d97e4a9",
+      "sha256": "0dadc6269d80ca2bdb36d2e838bb0c9892866edc1037d8dfcd16d49ac1822b46",
       "execution": "not inferred"
     },
     {
@@ -5598,7 +5620,7 @@
       "title": "prepare_air_cluster_check",
       "definitions": [],
       "detail": "Add a compact-cluster observer to an already staged isolated game.",
-      "sha256": "aeb55be073ad6c11fec56876aad4c0840caa90b52d5e4a1180b740020f78851d",
+      "sha256": "475cb887f0ce6e2452d45784dc346a4baad1d5e7f650177b9e8e36ce47347851",
       "execution": "not inferred"
     },
     {
@@ -5612,7 +5634,7 @@
         "scenario: constructor"
       ],
       "detail": "Isolated AIR gift/capacity scenarios; supplied assets are never natural benchmarks.",
-      "sha256": "c8e4e2f06adb6e955f110b658349993ffa59a001ab288884257859eb37c4004e",
+      "sha256": "74d3ba17507f655b70c69c8fffe2bee7ad279ff1989a59be8979c9c6857e74ff",
       "execution": "not inferred"
     },
     {
@@ -5623,7 +5645,7 @@
       "title": "prepare_air_economy_zone_check",
       "definitions": [],
       "detail": "Inject the economic layout/guard regression probe into an isolated staged game.",
-      "sha256": "2ff414adf7a269792f9a4904607d2684afb8862016ab3b791a3fed4fbfb7906e",
+      "sha256": "65257142d1c953d45c6e3dc2a7c597e6e001b16875ba783468f13da8462a9779",
       "execution": "not inferred"
     },
     {
@@ -5645,7 +5667,7 @@
       "title": "prepare_air_recon_check",
       "definitions": [],
       "detail": "Stage supplied radar/co-located factory checks without changing shipped policy.",
-      "sha256": "14754942d739b13648abf1e5cb421a72531152c843b1bc8d5172964ce1b1ca9e",
+      "sha256": "81ddc2f67c0d163348a640f52c5a256de8a081c195a4335fd192de41ca96e410",
       "execution": "not inferred"
     },
     {
@@ -5656,7 +5678,7 @@
       "title": "prepare_air_strike_check",
       "definitions": [],
       "detail": "Rendered early/mid/late AIR combat capability checks; supplied units, not economy.",
-      "sha256": "0849cdc5998818ba6650ad03602f2683e92d3cce7100f24ddeca43b8d4e46c88",
+      "sha256": "482bd1598b35ce4f91aa0bd0e6f0378b4f236556654527247aca31f3785c77af",
       "execution": "not inferred"
     },
     {
@@ -5667,7 +5689,7 @@
       "title": "prepare_air_support_check",
       "definitions": [],
       "detail": "Add a physical support-pin obstruction to an already staged AIR capacity game.",
-      "sha256": "ef12795dbee3f6f7009cc9d66a099d4b7b9d22a3568a5df937b3fe2cde610572",
+      "sha256": "f7f479b8d9874509aab0219d502d87e8db6cead0aea5b405123d638f311414de",
       "execution": "not inferred"
     },
     {
@@ -5678,7 +5700,7 @@
       "title": "prepare_air_workforce",
       "definitions": [],
       "detail": "Prepare an isolated AIR guard-recovery fixture; never edits deployment data.",
-      "sha256": "460afef2a74094cf43d64f5df20912e198c15b2b9f01ba0479d32d8adfffd12a",
+      "sha256": "8bda111f6e4163cbaa36edeb06b7077f587a3b65169e774165fdb0eafe753a19",
       "execution": "not inferred"
     },
     {
@@ -5689,7 +5711,7 @@
       "title": "prepare_allied_layout_check",
       "definitions": [],
       "detail": "Stage the explicit shared-layout obstruction probe, never production data.",
-      "sha256": "08045a14987f821f54f25ec73c8800d674fd521c989409bc795447aa3829d142",
+      "sha256": "f1db153ed3a77968075535b51dfc3a5cc8d245c256a1623f0111fbc22a848f94",
       "execution": "not inferred"
     },
     {
@@ -5700,7 +5722,7 @@
       "title": "prepare_amphibious_check",
       "definitions": [],
       "detail": "Stage real-terrain amphibious capability fixtures without touching live data.",
-      "sha256": "75cef10ac127281941c2304480ba19d18309b7a6f0aab5744e17e5e35821ffb3",
+      "sha256": "45499c23c5fad53f8fcf9de33808ce868e58066ae5e30171da57bd11fee0fab7",
       "execution": "not inferred"
     },
     {
@@ -5711,7 +5733,7 @@
       "title": "prepare_artillery_check",
       "definitions": [],
       "detail": "Instrument an already-staged, isolated BARbTest artillery regression.",
-      "sha256": "196b39be0b48634f7498086c8409b26f1206b684a675ed21be8c942bd992fecf",
+      "sha256": "6786115cbddd2981396d5c66f4225654b84b32be085ede19bf3167efd8cd3c35",
       "execution": "not inferred"
     },
     {
@@ -5733,7 +5755,7 @@
       "title": "prepare_mountain_regression",
       "definitions": [],
       "detail": "Stage connected-mountain regressions; never changes the live install.",
-      "sha256": "18b9b986316a7106cf84dc6c65797fc6bf532bdd259da7ed90b2aa5a25553c9b",
+      "sha256": "9264c4e914376b3a3208c90424cfe91f74ae0f2d65b1dafce7f0b2e2c195fe34",
       "execution": "not inferred"
     },
     {
@@ -5747,7 +5769,7 @@
         "scenario: nuclear"
       ],
       "detail": "Install a controlled strategic-weapon fixture into an isolated staged playtest.",
-      "sha256": "7dd232150fa171e49965be56bd59f506e977e1f240d5527f3616c7e0b03e46c2",
+      "sha256": "12295e96c711c2f0dc05acab0e043ba802af79c240261a8f4add60afe218013e",
       "execution": "not inferred"
     },
     {
@@ -5758,7 +5780,7 @@
       "title": "prepare_team_share_check",
       "definitions": [],
       "detail": "Stage supplied metal/factory sharing probes in an isolated 16-AI game.",
-      "sha256": "703a6a1faf7b5cf6d3651558681612e8cdb86cb72a6429bd70a7fb89604747bc",
+      "sha256": "2e3d0f5fe46f563677717ccf16e51f382e0c6c5d0f20b971175b0f6f5828bbaf",
       "execution": "not inferred"
     },
     {
@@ -5769,7 +5791,7 @@
       "title": "prepare_telchine_match",
       "definitions": [],
       "detail": "Stage an unboosted Tundra 8v8 with paired role/faction rosters and explicit seeds.",
-      "sha256": "bede5e18c5ab0dfbd2f09487ffb76ea22ccbcb96d4f5cbbe29cbfb1c20fc4eed",
+      "sha256": "bec5a3676060b02167f3c6d2ba1c5edecaec5dddfd5e67cc402864fc95d7b365",
       "execution": "not inferred"
     },
     {
@@ -5780,7 +5802,7 @@
       "title": "prepare_telchine_shore_check",
       "definitions": [],
       "detail": "Reuse the amphibious harness for labelled shoreline and inland-combat probes.",
-      "sha256": "4d7e5bc8b0d3e3a149409c871edbb8530ed928e9d8fe2219a508fb7c41fcbc70",
+      "sha256": "cdcfda74c9bfb0c39670341667932ad858d681d2324e03e24bd058d31cd55a58",
       "execution": "not inferred"
     },
     {
@@ -5791,7 +5813,7 @@
       "title": "prepare_turret_reclaim",
       "definitions": [],
       "detail": "Stage a supplied, isolated turret interruption fixture; never writes the live install.",
-      "sha256": "dceedabcd7e258af9d94f012f3894c1faca1df4f0e0ebed5a738a10965496ba6",
+      "sha256": "ec2f9f3c993dfa9b7f1cd1c70bd68ef3f5a473d20cebf6657befd95b0db5d674",
       "execution": "not inferred"
     },
     {
@@ -5802,7 +5824,7 @@
       "title": "ranged_arena",
       "definitions": [],
       "detail": "Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.",
-      "sha256": "5f65d3ca85b877fc34c2b06531a3b13a320845bdb581a9505c6743f8c5286fec",
+      "sha256": "c9d8fb4746c95e060a7088bdf59198e50e4089436293f621a540d459fc599838",
       "execution": "not inferred"
     },
     {
@@ -5824,7 +5846,7 @@
       "title": "run_air_natural",
       "definitions": [],
       "detail": "Run natural AIR/TECH games on the five standard AIR regression maps.",
-      "sha256": "2dd6a7f19729a2db603ba39f5f38ed442139fe8d8481a746ced0e3cecc6ff97b",
+      "sha256": "aaac1e5c4930f14cc0d243403151aa44d12b9e38c957f42a018d594f11fd57dc",
       "execution": "not inferred"
     },
     {
@@ -5906,7 +5928,7 @@
       "title": "run_builder_recovery",
       "definitions": [],
       "detail": "Controlled all-role constructor loss with delayed TECH lab; optional Lua/ferry.",
-      "sha256": "ee81bf2c6494aa6b6f2006672dca3b69efbaaf512c25be470e7a74424c03def6",
+      "sha256": "2448ed165854fbfd6711d490b8bdf7541b4486075c093e6dbfd29ca83cd27a35",
       "execution": "not inferred"
     },
     {
@@ -5932,7 +5954,7 @@
       "title": "run_full_match_performance",
       "definitions": [],
       "detail": "Serial natural-economy 8v8 diagnostics, ending on GameOver or a safety horizon.",
-      "sha256": "7e41f068d70b57c5ee7837b8c49ef59857f528b1f2160c02ffd67a5171b7074d",
+      "sha256": "ab76a340a3d81e60cb7d1277eda560ad750c663d951522b78c8b18b3c4bbd5b4",
       "execution": "not inferred"
     },
     {
@@ -5987,7 +6009,7 @@
       "title": "run_sea_coast",
       "definitions": [],
       "detail": "Supplied SEA loss/constructor-transfer/coastal-recovery acceptance arena.",
-      "sha256": "b1ae5d31803c6e3aee57d466eeb69e80011823639580c93cf63f6b620377a695",
+      "sha256": "77541f2b5eea9c07e61dbcbd027b52d332f0db0efe9407b2a314f1637f8e6583",
       "execution": "not inferred"
     },
     {
@@ -6075,7 +6097,7 @@
       "title": "run_workforce_performance",
       "definitions": [],
       "detail": "Serial paired 8v8 controls. AI timing scope is engine-wide, not per role.",
-      "sha256": "12a6a37dca1d5e83a1ae9b32340a0f7dab957b4761cd90e5b6954efe5b7d2d97",
+      "sha256": "a778a329d48b13481e6d06e68caed38e74f008764949c81bc865e2e79dce6c31",
       "execution": "not inferred"
     },
     {
@@ -6090,7 +6112,7 @@
         "scenario: tech"
       ],
       "detail": "Metal-map and unchanged TECH sequence controls for the AIR workforce change.",
-      "sha256": "c0342499c96fcc2d9cc4eb1d715a6e7f157713d6c86ce6cc35061b36c629e846",
+      "sha256": "0b515eeca643dd203110c4d628df90ee8e91a2da1b5a736b82fc62ba3e63339d",
       "execution": "not inferred"
     },
     {
@@ -6101,7 +6123,7 @@
       "title": "run_workforce_scaling",
       "definitions": [],
       "detail": "Fixed idle-constructor populations: isolate census scaling from diverging battles.",
-      "sha256": "7aef9c6bdb056854119a6c1160464b95c013bfb2872f9d741b885543d6fd42bc",
+      "sha256": "a88baad52e7b244d2edd60075e2ce5809ff6a25efa6d0f7773474ba8d0ed8984",
       "execution": "not inferred"
     },
     {
@@ -6112,7 +6134,7 @@
       "title": "scorecard",
       "definitions": [],
       "detail": "Immutable match evidence, strict comparison cohorts and a private OpenSkill ladder.",
-      "sha256": "6edbca2f7758ac677fbc20c58a644babfaa309b187afa4e763b6838869b0c852",
+      "sha256": "b604b32b8ee35b1040a3ccb40188071b34156b31fa63517a7fd2c6fb18049b18",
       "execution": "not inferred"
     },
     {
@@ -6123,7 +6145,7 @@
       "title": "scorecard_run",
       "definitions": [],
       "detail": "Run a reproducible TECH duel and archive its scorecard without touching BAR's install.",
-      "sha256": "c4abdabb0503ed2528feb88cd03f9f10bc6c52a597d7c4c395401e9d93dd9f45",
+      "sha256": "7a4464a4277b07cb463562ca5aaed17248c2ac9a8e5aa137ba7cb3339392910f",
       "execution": "not inferred"
     },
     {
@@ -6211,7 +6233,7 @@
       "title": "storage",
       "definitions": [],
       "detail": "Organize game tests without replacing historical evidence.",
-      "sha256": "6d1b22c8d808d5079b55038ede06074d2e5932bc689ec3c95b9fd5aceb904644",
+      "sha256": "21d161510225e57deaed2a818234e5d4fd8a30e4c1f79362d745b7977593dd96",
       "execution": "not inferred"
     },
     {
@@ -6359,6 +6381,28 @@
       ],
       "detail": "Evidence must distinguish an empty queue, a stalled product and a new hull.",
       "sha256": "43f0743abf44b759af6cf63eca0be39822141e1ea4fd11f8566b9c20c75db972",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/test_benchmark_store.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_benchmark_store",
+      "definitions": [
+        "test_default_allocator_uses_external_raw_store",
+        "test_default_publisher_keeps_failure_in_external_evidence_store",
+        "test_environment_override_selects_another_checkout",
+        "test_extra_raw_file_is_detected",
+        "test_historical_evidence_resolves_without_rewriting_old_manifest",
+        "test_historical_path_refuses_traversal",
+        "test_missing_checkout_fails_before_creating_run_directories",
+        "test_missing_raw_file_is_detected",
+        "test_published_content_change_is_detected_even_with_original_size_and_mtime",
+        "test_same_volume_move_preserves_evidence_and_original_directory_identity"
+      ],
+      "detail": "External evidence ownership, path safety and migration preservation.",
+      "sha256": "9eaf02825ce97a175704b594c15fde6024c10ff5a75050b7d6b5132d15f85258",
       "execution": "not inferred"
     },
     {
@@ -7355,7 +7399,7 @@
       "title": "run_guard_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "742ac00b41442de985378c4b1642f8c0553d96e15c550640e6f7033685e4a38e",
+      "sha256": "f1eb051413000b81c59f4a581745c1b91bbfe65adef7893779e09ee0cc8ac544",
       "execution": "not inferred"
     },
     {
@@ -7377,7 +7421,7 @@
       "title": "run_performance_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "84f00fe49847ff69a4f09c4c7726e3434e7a97d4b63bce63c546b308dee5000a",
+      "sha256": "278346e13e5bf755d4423166bf705e48031d290a494c9d604873817ba2a22085",
       "execution": "not inferred"
     },
     {
@@ -7388,7 +7432,7 @@
       "title": "run_ranged_performance_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "9891dccd9ed5cde6a6616fdd2792b501871e75f84248ca951b38a2bc471db115",
+      "sha256": "e553acf6357dccbc27f7c8fcb45461d1910504c2fd87206158e90b440a51ccf1",
       "execution": "not inferred"
     }
   ]

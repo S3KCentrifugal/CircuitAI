@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import subprocess
 import sys
 
@@ -17,8 +18,8 @@ p.add_argument('--seed', type=int, default=1621)
 p.add_argument('--assembly-radius', type=float)
 a = p.parse_args()
 base = a.dir.resolve()
-if not base.is_relative_to(ROOT / 'build-theatres') or a.seed <= 0:
-    p.error('Use repository build-theatres and a positive seed')
+if not base.is_relative_to(RAW_ROOT) or a.seed <= 0:
+    p.error('Use benchmark-repository build-theatres and a positive seed')
 if a.assembly_radius is not None and not 64 <= a.assembly_radius <= 800:
     p.error('Assembly radius must be between 64 and 800')
 base.mkdir(parents=True, exist_ok=True)

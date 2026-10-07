@@ -1,7 +1,0 @@
-{
-  "decision": "D-197",
-  "purpose": "shared reservation occupancy regression",
-  "production_change": "src/circuit/terrain/AlliedReservations.h",
-  "pre_existing_dirty_inputs": true,
-  "note": "Original report and checks are preserved; 12 directed cross-role exclusions pass."
-}

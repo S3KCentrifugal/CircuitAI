@@ -227,7 +227,7 @@ See [handoff validation](../air-idle-factory.md).
 
 See [ordered rules](air_rules.md), [building actions](air_build.md),
 [commander opening and fighter screen](../air-opening-and-screen.md),
-[simulation evidence](../benchmarks/air-management.md) and
+[simulation evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md) and
 [original feature trace](../air-layout-and-priority-plan.md).
 
 Source: `data/script/src/roles/air.as` (1270 lines), namespace `RoleAir`.

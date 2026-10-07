@@ -5,6 +5,7 @@ start/role registration. Production policy, cadence and commands stay intact.
 """
 import argparse,json,os,re,subprocess,sys
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import playtest,storage
 from air_arena import lua
 
@@ -41,7 +42,7 @@ def main():
         p.error('Unset CIRCUIT_VERIFY_RANGED_QUERIES and CIRCUIT_VERIFY_RANGED_SNAPSHOT for timing runs')
     d=storage.allocate('shared','performance','full-match-profile',a.map,'natural',seed=220001)
     print('FULL_MATCH_DIRECTORY='+str(d),flush=True)
-    (playtest.REPO/'build-theatres/perf-current.txt').write_text(str(d))
+    (RAW_ROOT / 'perf-current.txt').write_text(str(d))
     name='Full Metal Plate 1.7' if a.map=='metal-plate' else 'Glacial Gap v1.1'
     extra=[]
     if a.map=='metal-plate':

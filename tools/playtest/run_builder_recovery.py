@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import subprocess
 import sys
 import playtest
@@ -22,7 +23,7 @@ def main():
     scenario='recovery'+('-ferry' if a.ferry else '-walk')+('-lua' if a.relay else '-native')
     d=storage.allocate('shared','economy',scenario,'glacial','supplied',seed=218001)
     print('RECOVERY_DIRECTORY='+str(d),flush=True)
-    Path('build-theatres/recovery-current.txt').write_text(str(d))
+    (RAW_ROOT / 'recovery-current.txt').write_text(str(d))
     cli=[sys.executable,str(playtest.HERE/'playtest.py')]
     cmd=cli+['stage','--dir',str(d),'--dll',str(a.dll),'--map','Glacial Gap v1.1',
         '--game','Beyond All Reason test-31479-433a460','--engine','recoil_2026.07.04',

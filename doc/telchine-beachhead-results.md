@@ -125,24 +125,24 @@ invariant forbid was relaxed.
 
 TECH holds the island after the ship retreats; nine attackers continued:
 
-![TECH retained guards](images/d160/tech-guards-after-retreat.png)
+![TECH retained guards](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d160/tech-guards-after-retreat.png)
 
 AIR repeats the same behavior:
 
-![AIR retained guards](images/d160/air-guards-after-retreat.png)
+![AIR retained guards](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d160/air-guards-after-retreat.png)
 
 Seed 1601's natural landfall at 38:51, before engine GameOver. This is an
 allied-held island and no combat contribution is implied:
 
-![Natural landfall](images/d160/natural-1601-landfall.png)
+![Natural landfall](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d160/natural-1601-landfall.png)
 
 The final combined encounter: three guards and the surviving retreating ship:
 
-![Allied guard after retreat](images/d160/allied-guard-after-retreat.png)
+![Allied guard after retreat](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d160/allied-guard-after-retreat.png)
 
 All twenty-one other TECH/AIR units have reached the onward island:
 
-![Combined assault landing](images/d160/allied-assault-final-landfall.png)
+![Combined assault landing](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d160/allied-assault-final-landfall.png)
 
 ## Other diagnoses and scope
 

@@ -127,14 +127,14 @@ checks and short natural runs, not an 8v8 win-rate or FPS benchmark.
 | Supreme, Cortex, 15-minute natural AIR/TECH game | First two nanos at 6.60/6.82 minutes; saved draw two; two bombers and six escorts dispatched at 7.27 minutes. | FAIL: TECH INV-008 reclaim-assistance reports. |
 | Glacial, Armada, 18-minute natural AIR/TECH game | Nanos at 6.51/6.82; one opening bomber ordered at 6.87; T2 air lab completed 13.90. No T1 dispatch observed before the run ended. | FAIL: TECH INV-028/021/008/010; no AIR/script crash. |
 | Glitters, Legion, 15-minute natural AIR/TECH game | Nanos at 6.76/6.92; one Mosquito opening order at 6.94. | FAIL: existing ferry INV-052. |
-| Glacial supplied recon, final | Twenty at 1,275-elmo pitch (50% overlap), six columns; synchronized MOVE at 1:28; all twenty surveying by 2:36. | [PASS](benchmarks/records/air/combat/recon-d179-centered/2026-10-03/20261003T151752Z-6be08fde/README.md). |
-| Supreme supplied recon and physical cluster, final | Twenty at 1,125-elmo pitch (55% overlap), eleven columns; MOVE at 1:29; all twenty surveying by 2:36. Six T2 labs and 120 nanos, exactly twenty credited to each. | [PASS](benchmarks/records/air/combat/recon-d179-centered/2026-10-03/20261003T151753Z-093b24ce/README.md). |
+| Glacial supplied recon, final | Twenty at 1,275-elmo pitch (50% overlap), six columns; synchronized MOVE at 1:28; all twenty surveying by 2:36. | [PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/recon-d179-centered/2026-10-03/20261003T151752Z-6be08fde/README.md). |
+| Supreme supplied recon and physical cluster, final | Twenty at 1,125-elmo pitch (55% overlap), eleven columns; MOVE at 1:29; all twenty surveying by 2:36. Six T2 labs and 120 nanos, exactly twenty credited to each. | [PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/recon-d179-centered/2026-10-03/20261003T151753Z-093b24ce/README.md). |
 
 Earlier iterations are retained: the fixture's unconditional freeze produced
-an unreachable-code warning and failed compilation ([original FAIL](benchmarks/records/air/combat/recon-d179/2026-10-03/20261003T145857Z-25a42eb3/README.md));
+an unreachable-code warning and failed compilation ([original FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/recon-d179/2026-10-03/20261003T145857Z-25a42eb3/README.md));
 an armed-commander Glacial fixture dispatched all twenty, but losses prevented
 the thirty-second sample from observing all twenty surveying together
-([original FAIL](benchmarks/records/air/combat/recon-d179-final/2026-10-03/20261003T151316Z-5d2874ef/README.md)).
+([original FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/recon-d179-final/2026-10-03/20261003T151316Z-5d2874ef/README.md)).
 Final route fixtures use passive commanders to isolate geometry and task
 transitions. They supply aircraft/factories and do not demonstrate economic
 timings, enemy-AA penetration or combat strength.
@@ -157,7 +157,7 @@ isolated data because their builders/factories are frozen.
 
 The existing Armada `t1-economy` supplied arena was repeated for six minutes:
 three actual bomber launches, two completed sorties and one unfinished sortie;
-the strict script/invariant/fixture checks [passed](benchmarks/records/air/combat/t1-economy/2026-10-03/20261003T152405Z-a76cb112/README.md).
+the strict script/invariant/fixture checks [passed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/t1-economy/2026-10-03/20261003T152405Z-a76cb112/README.md).
 This preserves the earlier combat benchmark's meaning by disabling only the
 new economy-opening gate in the supplied fixture.
 

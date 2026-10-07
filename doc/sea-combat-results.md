@@ -55,7 +55,7 @@ Blanket maximum-range formations, a conditional range variant, broad equivalent
 order reuse and attack-only reuse reduced some orders but lost surface fixtures
 that controls won. All were removed. These results do not justify an APM cap
 or a shared movement change. Original failures remain in the
-[immutable benchmark index](benchmarks/index/sea.md).
+[immutable benchmark index](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/index/sea.md).
 
 ## Supplied combat regression cohort
 
@@ -102,9 +102,9 @@ This is one paired fixture, not a general zero-loss guarantee.
 
 | Repeat | Loss, team 0 / team 1 | Peak team-0 callbacks | First contact to AA-boat hit | Evidence |
 | --- | ---: | ---: | ---: | --- |
-| Hard prototype | 0 / 1,390 | 475 | 13.7 s | [record](benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T113052Z-c07e597f/README.md) |
-| Balanced final lifecycle hooks | 2,640 / 1,390 | 391 | 10.7 s | [record](benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T113610Z-2430aece/README.md) |
-| Terrible final lifecycle hooks | 1,560 / 1,390 | 413 | 32.2 s | [record](benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T114135Z-0407797f/README.md) |
+| Hard prototype | 0 / 1,390 | 475 | 13.7 s | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T113052Z-c07e597f/README.md) |
+| Balanced final lifecycle hooks | 2,640 / 1,390 | 391 | 10.7 s | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T113610Z-2430aece/README.md) |
+| Terrible final lifecycle hooks | 1,560 / 1,390 | 413 | 32.2 s | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-limite-cand/2026-10-04/20261004T114135Z-0407797f/README.md) |
 
 Different-profile rows verify loading/control behavior; they are not
 same-profile effect estimates. The hard eight-bomber follow-up lost
@@ -120,8 +120,8 @@ records remain unchanged; comparisons must use the same harness version.
 With the corrected harness, the eight-bomber control lost **29,330 / 570**,
 and the candidate **29,360 / 2,870**. The candidate killed seven bombers versus
 one in the control; both failed to preserve the harbor. Peak team-0 commands
-were 427 / 368. See [control](benchmarks/records/sea/combat/response-air-suppor-ctrl/2026-10-04/20261004T114529Z-d2838082/README.md)
-and [candidate](benchmarks/records/sea/combat/response-air-suppor-cand/2026-10-04/20261004T114419Z-26f62aba/README.md).
+were 427 / 368. See [control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-suppor-ctrl/2026-10-04/20261004T114529Z-d2838082/README.md)
+and [candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/response-air-suppor-cand/2026-10-04/20261004T114419Z-26f62aba/README.md).
 
 A diagnostic copy selected `armpt` at frame 961, but the unit was not created
 until 3607: **88.2 seconds after selection**. In the repeat with yard-queue
@@ -205,11 +205,11 @@ approach-timeout and service-lane experiments):
 
 | Map | T1 yard | First nano | T2 / fusion | Operational at last sample | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| glacial | 1:03 | 6:24 | 11:04 / 18:08 | yes | [record](benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T111753Z-0edc3c74/README.md) |
-| supreme | 1:09 | 9:45 | absent / absent | yes | [record](benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T111702Z-fe132b52/README.md) |
-| tundra | 0:37 | 7:12 | 20:00 / absent | yes | [record](benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112143Z-b10cce9f/README.md) |
-| caldera | 1:03 | 9:00 | 22:39 / absent | no; eliminated | [record](benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112607Z-120592b0/README.md) |
-| erebos | 0:52 | 10:37 | absent / absent | yes | [record](benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112434Z-cf40e493/README.md) |
+| glacial | 1:03 | 6:24 | 11:04 / 18:08 | yes | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T111753Z-0edc3c74/README.md) |
+| supreme | 1:09 | 9:45 | absent / absent | yes | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T111702Z-fe132b52/README.md) |
+| tundra | 0:37 | 7:12 | 20:00 / absent | yes | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112143Z-b10cce9f/README.md) |
+| caldera | 1:03 | 9:00 | 22:39 / absent | no; eliminated | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112607Z-120592b0/README.md) |
+| erebos | 0:52 | 10:37 | absent / absent | yes | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/d189-final/2026-10-04/20261004T112434Z-cf40e493/README.md) |
 
 All five reached the smoke observation window, but Caldera lost the tested base. None establishes all-map acceptance. Tundra held 42 tidals and roughly +702 energy for several minutes while constructors repeatedly changed approaches to two tidal slots. Turning off experimental builder travel in an isolated data copy delayed the opening yard to 2:35 and lost the base before fifteen minutes; that alternative was rejected. The working-tree candidate retains the prior movement flag. A local stuck-work recovery needs a new fixture; no blanket native travel change is justified.
 <!-- /FINAL_COHORT -->

@@ -56,15 +56,15 @@ category (KI-427). These runs do not isolate its cause and the strict failures
 are retained. The final fixture adds first-factory completion witnesses used
 by the hard/terrible transfer audits; the balanced preliminary fixture lacks
 that full witness stream. Evidence is in
-[the run manifest and audits](benchmarks/d175-team-sharing.json).
+[the run manifest and audits](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d175-team-sharing.json).
 
 The screenshot overlay reports the engine's most recent send sample. That can
 include automatic engine sharing as well as the explicit AI gift; exact policy
 amounts come from the audited `[ROLE][Share]` lines, not the overlay alone.
 
-![Hard profile during the sharing test](images/d175/sharing-hard.png)
+![Hard profile during the sharing test](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d175/sharing-hard.png)
 
-![Terrible profile during the sharing test](images/d175/sharing-terrible.png)
+![Terrible profile during the sharing test](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d175/sharing-terrible.png)
 
 ## Reproducing the controlled test
 

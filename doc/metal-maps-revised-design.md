@@ -266,7 +266,7 @@ loss replacement or factory startup overhead. One 600-BP T2 lab plus twenty
 This is a workload illustration, not the mandated raid composition. It shows
 why +50 raw metal, a lab cost in storage, or two AFUS cannot independently prove
 that another lab or a bomber wave is affordable. Recompute from the chosen units
-and actual cycle delays. [Arithmetic inputs/results](benchmarks/metal-map-economics.json)
+and actual cycle delays. [Arithmetic inputs/results](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/metal-map-economics.json)
 are reproducible with [the analysis calculator](../tools/knowledge/metal_map_economics.py).
 
 ## 7. Opening, midgame, late game and recovery

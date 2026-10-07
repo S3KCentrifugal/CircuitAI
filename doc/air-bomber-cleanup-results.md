@@ -64,13 +64,13 @@ reordering that retains armed static ahead of utility buildings. Their fixtures
 have no armed structures, so that reorder does not change candidate priority in
 those cases. The final-order blocked-route and cleanup-only cases exercise that
 distinction separately. Exact run paths, source/manifest hashes, casualties,
-selected targets and flight samples are in the [evidence](benchmarks/d173-bomber-cleanup.json).
+selected targets and flight samples are in the [evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d173-bomber-cleanup.json).
 
-![Phoenix attacking lower-priority stores](images/d173/phoenix-cleanup.png)
+![Phoenix attacking lower-priority stores](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d173/phoenix-cleanup.png)
 
 At frame 3914, the converter has died and Phoenixes are attacking the energy
 stores. The camera is positioned from the actual damaged unit, not a reconstructed
-diagram. Cortex's [cleanup screenshot](images/d173/cortex-cleanup.png) records the
+diagram. Cortex's [cleanup screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d173/cortex-cleanup.png) records the
 equivalent conventional bombing pass.
 
 ## Failed checks retained

@@ -73,7 +73,7 @@ The order latch is set only after successful enqueue. Retry checks pending
 unframed recruits and owned transport frames, preventing the old timeout from
 ordering duplicates while construction is slow. Destruction leaves the active
 obligation owed. The native cargo-flight protocol is unchanged. See
-[AIR evidence](benchmarks/air-management.md) for simultaneous TECH/SUPPORT
+[AIR evidence](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-management.md) for simultaneous TECH/SUPPORT
 requests and repeated-message verification. Provider arbitration when several
 AIR teammates receive the same broadcast remains a separate limitation.
 

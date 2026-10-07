@@ -62,6 +62,24 @@ reference-only material.
 | `skills/troubleshoot-bar-logs/SKILL.md` | BAR runtime log investigation: size discipline, crash-marker search, AI log filtering, and symbolising `SkirmishAI.dll` stack offsets. |
 | `.agents/skills/` | Symlinks that expose `skills/` to harnesses which discover skills under `.agents/` (`ai-not-moving`, `convention-angelscript`, `convention-cpp`, `maintain-changelog`, `playtest`, `troubleshoot-bar-logs`). Add a symlink here when adding a skill. |
 
+### External benchmark storage
+
+Benchmark evidence and raw simulations belong to the writable sibling checkout
+`../CircuitAI.benchmarks` (or `CIRCUIT_BENCHMARK_REPO`). See
+[benchmark repository and migration](doc/benchmark-repository.md). Keep AI code,
+test definitions and runners here; write new reports, ledgers and raw games to
+the external store via `tools/playtest/benchmark_store.py`. The old local
+`build-theatres` path may be an ignored compatibility junction; do not delete
+it recursively. Raw artifacts remain Git-ignored and require separate backup.
+
+| Path | Description |
+| --- | --- |
+| `doc/benchmark-repository.md` | Ownership, setup, migration counts, preservation checks and raw-archive compatibility. |
+| `tools/playtest/benchmark_store.py` | Configurable benchmark checkout, evidence and raw paths; historical reference resolution. |
+| `tools/playtest/migrate_benchmark_repository.py` | Non-destructive migration inventory and verification utility. |
+| `../CircuitAI.benchmarks/doc/images/` | Historical gameplay screenshots. |
+| `../CircuitAI.benchmarks/build-theatres/` | Raw archives, replays, pinned binaries and local build caches. |
+
 ### Active implementation - `data/`
 
 This is the implementation target for every AngelScript and profile change.
@@ -199,14 +217,14 @@ This is the implementation target for every AngelScript and profile change.
 | `tools/knowledge/check_script_api.py` | Verifies every `aiXxx.Member` the AngelScript policy uses is registered in `src/circuit/script/*.cpp`, and with `--dll <installed SkirmishAI.dll>` that the registration strings are inside that binary and the file is a stripped ~7 MB build. Run before every launch; a script deployed ahead of its DLL leaves every AI standing at frame 0. |
 | `skills/ai-not-moving/SKILL.md` | The runbook for "the commander does not move at game start": find the last game's `ERR` lines in `infolog.txt`, the message-to-cause table, script/DLL parity with the checker, the deploy rules (ship script and DLL together; never copy from the Recoil install dir mid-build), what to do when there are no `ERR` lines, where to record the case. |
 | `tools/playtest/` | The playtest loop: stage a pinned DLL/data into an isolated write directory, launch, watch, archive the original checks/log/report and screenshots under `runs/<UTC-id>/`. Cases and checks are categorized by domain and area; old short names and explicit paths still resolve. AIR and scorecard runners allocate unique categorized directories by default. Doc: `tools/playtest/README.md`. |
-| `tools/playtest/storage.py`, `tools/playtest/storage-aliases.json` | D-178: canonical case/check resolution with legacy aliases, unique game allocation, immutable result publication and benchmark indexing. New raw games use `build-theatres/games/<domain>/<area>/<scenario>/<map>/<UTC-id>/`; existing raw directories are retained. |
+| `tools/playtest/storage.py`, `tools/playtest/storage-aliases.json` | D-178: canonical case/check resolution with legacy aliases, unique game allocation, immutable result publication and benchmark indexing. New raw games use `../CircuitAI.benchmarks/build-theatres/games/<domain>/<area>/<scenario>/<map>/<UTC-id>/`; existing raw directories are retained. |
 | `tools/playtest/cases/`, `tools/playtest/checks/` | Reusable scenario/check definitions under `<domain>/<area>/`. Never mix raw engine outputs with definitions. Naming rules are in each directory's README. |
 | `doc/test-storage.md`, `doc/test-storage-moves.md`, `doc/test-storage-migration.json` | Storage conventions, linked migration inventory and one-time byte-preservation audit for the definition moves and historical benchmarks/images. |
-| `doc/benchmarks/README.md`, `doc/benchmarks/catalog.json`, `doc/benchmarks/index/`, `doc/benchmarks/records/` | Benchmark discovery by gameplay domain; generated indices distinguish original evidence, views and revisions. New compact immutable bundles live under `records/<domain>/<area>/<scenario>/<date>/<UTC-id>/`. Existing ledgers and scorecard paths remain unchanged. |
+| `../CircuitAI.benchmarks/doc/benchmarks/` | Benchmark discovery by gameplay domain; generated indices distinguish original evidence, views and revisions. New compact immutable bundles live under `records/<domain>/<area>/<scenario>/<date>/<UTC-id>/`. Existing ledgers and scorecard paths remain unchanged. |
 | `data/script/src/roles/tech_chain.as` | `TechChain` (D-070): TECH's rush chain - `Tech::RushObjective` (t2/fusion/afus/nuke/gantry/titan/eco/auto) becomes an ordered list of cumulative targets computed from the map's wind (the rush simulator's lines); the `chain.next` row executes it ahead of the economy rows; caps re-asserted in `Tick`. See `doc/roles/tech_chain.md`. |
 | `tools/playtest/bench_loop.sh` | `SPEED=8 NOTE=... bash tools/playtest/bench_loop.sh t2 fusion afus nuke gantry titan`: one headless tech-versus-tech run per objective with `--set RushObjective`, each recorded by the tracker; `DLL=<path>` tests a specific DLL. |
-| `tools/playtest/benchmark.py` | Turns a playtest run into a row of `doc/benchmarks/tech-rush.md` (milestone times from the widget's `[Playtest] finished` lines, income, best-so-far table). |
-| `doc/benchmarks/tech-rush.md` | Generated by the tracker: the rush benchmark targets, floors, the best run per objective and every recorded run. |
+| `tools/playtest/benchmark.py` | Turns a playtest run into a row of `../CircuitAI.benchmarks/doc/benchmarks/tech-rush.md` (milestone times from the widget's `[Playtest] finished` lines, income, best-so-far table). |
+| `../CircuitAI.benchmarks/doc/benchmarks/tech-rush.md` | Generated by the tracker: the rush benchmark targets, floors, the best run per objective and every recorded run. |
 | `skills/playtest/SKILL.md` | Running local simulations: pin the build, the compile check, launching (write dirs, flags, maps, teams, settings), fast-forwarding with speed plans, screenshots, test widgets, judging and reading the logs (handed to `skills/troubleshoot-bar-logs`), stopping, checks files, benchmarks, and the traps met in past runs. |
 | `skills/playtest/references/widgets.md` | Writing a test widget for playtests: skeleton, tags, error detection, camera, cheats for targets, stroke counting, AI-to-widget messages, persisted widget config. |
 | `tools/knowledge/check_role_docs.py` | Verifies `doc/roles/*.md` against `data/script/src/roles/*.as`: source marker (blob hash + line count), every role function and wired slot named, README matrix consistent. `--update` rewrites the markers after review. Exit 1 on findings. |

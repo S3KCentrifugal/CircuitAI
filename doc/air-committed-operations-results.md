@@ -4,7 +4,7 @@ Implemented in the active `data/` tree and opt-in native mechanisms. TECH's
 builder rules and lab reclaim/rebuild sequence are unchanged. The design and
 PvP references are in [the plan](air-committed-operations-plan.md); machine-readable
 evidence, archived log paths and fixture hashes are in
-[the benchmark](benchmarks/d171-air-operations.json).
+[the benchmark](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/d171-air-operations.json).
 
 ## Behavior delivered
 
@@ -102,14 +102,14 @@ and Tundra. They do not establish favorable metal trades or unbeatable PvP play.
 The one-way doctrine is the owner's chosen policy, not a claim that every
 human player should sacrifice surviving aircraft.
 
-![Cortex attacks an island economy on Tundra](images/d171/tundra-island-strike.png)
+![Cortex attacks an island economy on Tundra](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/tundra-island-strike.png)
 
 Tundra, preceding build-8 acceptance run, captured by the wave observer during the attack.
 The blue cohort reaches an island base; the damage/death log attributes twelve
 strategic last hits over the full run. The image alone does not establish those
 counts or prove escort lead on every frame.
 
-![Legion raid on All That Glitters](images/d171/glitters-legion-strike.png)
+![Legion raid on All That Glitters](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/glitters-legion-strike.png)
 
 Legion reaches the backline on All That Glitters under long-range AA coverage.
 This preceding twelve-minute run records five strategic bomber last hits and no
@@ -131,13 +131,13 @@ The stable-interception repeat also passes the home-incursion case: all 24
 escorts remain with the ten-bomber offensive attack while the home intrusion
 is present. Free home groups and committed escorts remain separate owners.
 
-![Frontline bomber assault](images/d171/frontline-strike.png)
+![Frontline bomber assault](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/frontline-strike.png)
 
 The accessible artillery position is attacked after the stronger economic
 route is rejected. The operation continues into enemy resistance after clearing
 the front; its complete loss is consistent with the requested commitment rule.
 
-![Defensive aircraft returned home](images/d171/defensive-return.png)
+![Defensive aircraft returned home](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/defensive-return.png)
 
 The defensive cohort returns after killing the Shiva. Offensive operations use
 a distinct policy and cannot enter the return state.
@@ -205,7 +205,7 @@ capital needed for advanced access when no useful donation arrives. Across
 the matrix, neither first fusion by twenty nor effective T2 raids by twenty is
 reliably established. This change does not advertise an optimal economy.
 
-![Natural Tundra opening at five minutes](images/d171/tundra-natural-opening.png)
+![Natural Tundra opening at five minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/tundra-natural-opening.png)
 
 This is an ordinary, unfunded opening: the blue AIR base occupies the narrow
 shore north of the mountain ridge. The corrected test camera follows the actual
@@ -240,7 +240,7 @@ by the cutoff; neither does fusion. Storage capacity is now sufficient, but
 reserving transition capital alongside ongoing T1 production remains necessary
 for reliable timing on this low-income island start (KI-461).
 
-![Natural Tundra advanced plant at twenty minutes](images/d171/tundra-natural-t2.png)
+![Natural Tundra advanced plant at twenty minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d171/tundra-natural-t2.png)
 
 The advanced aircraft plant and its support occupy usable ground north of the
 ridge. This is the same ordinary economy test, with no gifted resources or units

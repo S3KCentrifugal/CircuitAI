@@ -162,14 +162,14 @@ repeated decision path, without claiming the exact costly function is proven.
 
 ## Retained evidence
 
-- [Supreme mixed-role regression](benchmarks/records/sea/layout/allied-bases-mixed/2026-10-04/20261004T232406Z-f0fcdb18/README.md):
+- [Supreme mixed-role regression](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/allied-bases-mixed/2026-10-04/20261004T232406Z-f0fcdb18/README.md):
   original PASS, all twelve probes, screenshots and build/input hashes.
-- [Shore 8v8](benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/README.md):
+- [Shore 8v8](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/README.md):
   original FAIL, checks, timings, lifecycle markers, screenshots and input hashes.
-- [Native tests and three raw benchmark runs](benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/reservation-measurements.json):
+- [Native tests and three raw benchmark runs](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/reservation-measurements.json):
   complete test log, CSV text and median calculations.
-- [Instruction sample summary](benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-summary.json)
-  and [raw observations/resolved inline chains](benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-raw.json).
+- [Instruction sample summary](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-summary.json)
+  and [raw observations/resolved inline chains](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-04/20261004T234203Z-870e40cb/instruction-sample-raw.json).
 
 All publication bundles are immutable. Original reports, failure counts and raw
 observation hashes remain unchanged; post-run analysis is identified separately.

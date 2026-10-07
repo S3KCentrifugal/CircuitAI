@@ -4,6 +4,9 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from benchmark_store import RAW_ROOT
+
+from benchmark_store import BENCHMARK_REPO, EVIDENCE_ROOT
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,7 +32,7 @@ def analyze(archive):
             slow.append(line.strip())
     with log.open('rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    return {'archive': archive.relative_to(ROOT).as_posix(),
+    return {'archive': archive.resolve().relative_to(BENCHMARK_REPO).as_posix(),
             'verdict': result['verdict'], 'reason': result['reason'],
             'map': result['map'], 'category': result.get('category'),
             'log_sha256': digest, 'global_los_enabled': global_los,
@@ -39,9 +42,9 @@ def analyze(archive):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'doc/benchmarks/sea-production-capacity.json')
+    parser.add_argument('--output', type=Path, default=EVIDENCE_ROOT / 'sea-production-capacity.json')
     args = parser.parse_args()
-    root = ROOT / 'build-theatres/games/sea/economy'
+    root = RAW_ROOT / 'games/sea/economy'
     paths = list(root.glob('d222-*/*/*/runs/*/result.json'))
     paths += list(root.glob('capacity-*/*/20261007*/runs/*/result.json'))
     rows = [analyze(p.parent) for p in sorted(paths)]

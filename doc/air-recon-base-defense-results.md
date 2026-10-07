@@ -151,11 +151,11 @@ is made to reconstruct the user's original match without its replay.
 
 ## Screenshots
 
-![Three-plane deadline scouting](benchmarks/records/air/combat/resp-partial-armada/2026-10-04/20261004T192705Z-4d36f1c2/screen_2026-10-04_19-26-36-092.png)
+![Three-plane deadline scouting](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/air/combat/resp-partial-armada/2026-10-04/20261004T192705Z-4d36f1c2/screen_2026-10-04_19-26-36-092.png)
 
-![Legion engaging the second Marauder push](benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T193027Z-e79c5014/screen_2026-10-04_19-30-05-907.png)
+![Legion engaging the second Marauder push](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T193027Z-e79c5014/screen_2026-10-04_19-30-05-907.png)
 
-![Newly produced Wasp defending the allied base](benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T193029Z-c0f9a127/screen_2026-10-04_19-29-56-932.png)
+![Newly produced Wasp defending the allied base](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T193029Z-c0f9a127/screen_2026-10-04_19-29-56-932.png)
 
 ## Immutable evidence inventory
 
@@ -164,26 +164,26 @@ remain intact. Bundles include response observations and raw-evidence hashes.
 
 | Scenario | Verdict | Observation |
 | --- | --- | --- |
-| base-response-commitment | FAIL | [20261004T193957Z-9190a57f](benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T193957Z-9190a57f/README.md) |
-| base-response-commitment | FAIL | [20261004T194253Z-80308aef](benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T194253Z-80308aef/README.md) |
-| base-response-commitment | PASS | [20261004T194718Z-ef9ddb7b](benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T194718Z-ef9ddb7b/README.md) |
-| committed-home-incursion | PASS | [20261004T193816Z-81fc6673](benchmarks/records/air/combat/committed-home-incursion/2026-10-04/20261004T193816Z-81fc6673/README.md) |
-| old-resp-defense-armada | FAIL | [20261004T192120Z-a5ceedae](benchmarks/records/air/combat/old-resp-defense-armada/2026-10-04/20261004T192120Z-a5ceedae/README.md) |
-| old-resp-small-armada | FAIL | [20261004T192903Z-cad36ee5](benchmarks/records/air/combat/old-resp-small-armada/2026-10-04/20261004T192903Z-cad36ee5/README.md) |
-| resp-defense-armada | FAIL | [20261004T192412Z-2c43e105](benchmarks/records/air/combat/resp-defense-armada/2026-10-04/20261004T192412Z-2c43e105/README.md) |
-| resp-defense-armada | PASS | [20261004T193028Z-5dc7a251](benchmarks/records/air/combat/resp-defense-armada/2026-10-04/20261004T193028Z-5dc7a251/README.md) |
-| resp-defense-cortex | FAIL | [20261004T192413Z-52046375](benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T192413Z-52046375/README.md) |
-| resp-defense-cortex | PASS | [20261004T193029Z-c0f9a127](benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T193029Z-c0f9a127/README.md) |
-| resp-defense-legion | FAIL | [20261004T192412Z-fc20a7a4](benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T192412Z-fc20a7a4/README.md) |
-| resp-defense-legion | PASS | [20261004T193027Z-e79c5014](benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T193027Z-e79c5014/README.md) |
-| resp-full-armada | PASS | [20261004T192706Z-f8d325dc](benchmarks/records/air/combat/resp-full-armada/2026-10-04/20261004T192706Z-f8d325dc/README.md) |
-| resp-outside-armada | PASS | [20261004T193807Z-784aa162](benchmarks/records/air/combat/resp-outside-armada/2026-10-04/20261004T193807Z-784aa162/README.md) |
-| resp-partial-armada | PASS | [20261004T192705Z-4d36f1c2](benchmarks/records/air/combat/resp-partial-armada/2026-10-04/20261004T192705Z-4d36f1c2/README.md) |
-| resp-small-armada | PASS | [20261004T192705Z-4a9159f4](benchmarks/records/air/combat/resp-small-armada/2026-10-04/20261004T192705Z-4a9159f4/README.md) |
-| resp-t1-armada | PASS | [20261004T193548Z-945e62ce](benchmarks/records/air/combat/resp-t1-armada/2026-10-04/20261004T193548Z-945e62ce/README.md) |
-| resp-t1-cortex | PASS | [20261004T193547Z-bbce6a7f](benchmarks/records/air/combat/resp-t1-cortex/2026-10-04/20261004T193547Z-bbce6a7f/README.md) |
-| resp-t1-legion | PASS | [20261004T193550Z-757186c3](benchmarks/records/air/combat/resp-t1-legion/2026-10-04/20261004T193550Z-757186c3/README.md) |
-| response-defense-armada | FAIL | [20261004T192031Z-f4d3ade9](benchmarks/records/air/combat/response-defense-armada/2026-10-04/20261004T192031Z-f4d3ade9/README.md) |
-| response-partial-armada | FAIL | [20261004T191909Z-125e51f5](benchmarks/records/air/combat/response-partial-armada/2026-10-04/20261004T191909Z-125e51f5/README.md) |
-| old-resp-natural | FAIL | [20261004T194205Z-9a60c772](benchmarks/records/air/economy/old-resp-natural/2026-10-04/20261004T194205Z-9a60c772/README.md) |
-| resp-natural | FAIL | [20261004T193845Z-d6b24020](benchmarks/records/air/economy/resp-natural/2026-10-04/20261004T193845Z-d6b24020/README.md) |
+| base-response-commitment | FAIL | [20261004T193957Z-9190a57f](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T193957Z-9190a57f/README.md) |
+| base-response-commitment | FAIL | [20261004T194253Z-80308aef](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T194253Z-80308aef/README.md) |
+| base-response-commitment | PASS | [20261004T194718Z-ef9ddb7b](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/base-response-commitment/2026-10-04/20261004T194718Z-ef9ddb7b/README.md) |
+| committed-home-incursion | PASS | [20261004T193816Z-81fc6673](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/committed-home-incursion/2026-10-04/20261004T193816Z-81fc6673/README.md) |
+| old-resp-defense-armada | FAIL | [20261004T192120Z-a5ceedae](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/old-resp-defense-armada/2026-10-04/20261004T192120Z-a5ceedae/README.md) |
+| old-resp-small-armada | FAIL | [20261004T192903Z-cad36ee5](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/old-resp-small-armada/2026-10-04/20261004T192903Z-cad36ee5/README.md) |
+| resp-defense-armada | FAIL | [20261004T192412Z-2c43e105](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-armada/2026-10-04/20261004T192412Z-2c43e105/README.md) |
+| resp-defense-armada | PASS | [20261004T193028Z-5dc7a251](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-armada/2026-10-04/20261004T193028Z-5dc7a251/README.md) |
+| resp-defense-cortex | FAIL | [20261004T192413Z-52046375](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T192413Z-52046375/README.md) |
+| resp-defense-cortex | PASS | [20261004T193029Z-c0f9a127](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-cortex/2026-10-04/20261004T193029Z-c0f9a127/README.md) |
+| resp-defense-legion | FAIL | [20261004T192412Z-fc20a7a4](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T192412Z-fc20a7a4/README.md) |
+| resp-defense-legion | PASS | [20261004T193027Z-e79c5014](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-defense-legion/2026-10-04/20261004T193027Z-e79c5014/README.md) |
+| resp-full-armada | PASS | [20261004T192706Z-f8d325dc](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-full-armada/2026-10-04/20261004T192706Z-f8d325dc/README.md) |
+| resp-outside-armada | PASS | [20261004T193807Z-784aa162](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-outside-armada/2026-10-04/20261004T193807Z-784aa162/README.md) |
+| resp-partial-armada | PASS | [20261004T192705Z-4d36f1c2](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-partial-armada/2026-10-04/20261004T192705Z-4d36f1c2/README.md) |
+| resp-small-armada | PASS | [20261004T192705Z-4a9159f4](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-small-armada/2026-10-04/20261004T192705Z-4a9159f4/README.md) |
+| resp-t1-armada | PASS | [20261004T193548Z-945e62ce](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-t1-armada/2026-10-04/20261004T193548Z-945e62ce/README.md) |
+| resp-t1-cortex | PASS | [20261004T193547Z-bbce6a7f](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-t1-cortex/2026-10-04/20261004T193547Z-bbce6a7f/README.md) |
+| resp-t1-legion | PASS | [20261004T193550Z-757186c3](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/resp-t1-legion/2026-10-04/20261004T193550Z-757186c3/README.md) |
+| response-defense-armada | FAIL | [20261004T192031Z-f4d3ade9](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/response-defense-armada/2026-10-04/20261004T192031Z-f4d3ade9/README.md) |
+| response-partial-armada | FAIL | [20261004T191909Z-125e51f5](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/response-partial-armada/2026-10-04/20261004T191909Z-125e51f5/README.md) |
+| old-resp-natural | FAIL | [20261004T194205Z-9a60c772](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/old-resp-natural/2026-10-04/20261004T194205Z-9a60c772/README.md) |
+| resp-natural | FAIL | [20261004T193845Z-d6b24020](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/economy/resp-natural/2026-10-04/20261004T193845Z-d6b24020/README.md) |

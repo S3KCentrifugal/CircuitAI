@@ -262,7 +262,7 @@ allocations inside the engine, change APM, or establish a network speedup.
 
 ### Runtime evidence
 
-The [six-minute Supreme AIR/TECH/SEA test](../benchmarks/records/sea/layout/allied-bases-mixed/2026-10-05/20261005T011412Z-a32acf25/README.md)
+The [six-minute Supreme AIR/TECH/SEA test](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/layout/allied-bases-mixed/2026-10-05/20261005T011412Z-a32acf25/README.md)
 passes all twelve directed foreign factory/economy exclusions. The local oracle
 was enabled for all six AIs; no INV-144 mismatch was emitted. Its periodic counts
 are a lower bound, not a fabricated total: this short run did not reach the
@@ -270,13 +270,13 @@ are a lower bound, not a fabricated total: this short run did not reach the
 unit-level differential coverage; targeted engine ownership transfers and a
 real engine save/reload have not been played.
 
-The [rendered Shore baseline](../benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T003731Z-adb18a7b/README.md)
+The [rendered Shore baseline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T003731Z-adb18a7b/README.md)
 reached frame 72,000 but emitted GameOver at frame 60,037 (33.35 minutes).
 Measurements after that event are excluded from competitive performance claims.
 Existing gameplay invariant failures remain FAIL, independent of the
 optimization checks.
 
-The [first optimized forty-minute Shore run](../benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T013102Z-2ac71542/README.md)
+The [first optimized forty-minute Shore run](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T013102Z-2ac71542/README.md)
 completed without GameOver or script errors. Its final minute still hitches:
 17.77 ms mean AI time, 97.03 ms p95, 156.48 ms p99, 173.94 ms maximum,
 39 median FPS and 1,572 units. TECH team 1 uses 20.773 s and TECH team 8
@@ -301,7 +301,7 @@ retains its gameplay FAIL, including INV-017/020/037/053 reports not observed
 in this shorter-lived baseline; absence in a different trajectory does not
 establish that those violations were introduced or fixed by this patch.
 
-The [forty-minute diagnostic rerun](../benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T015059Z-a65805e7/README.md)
+The [forty-minute diagnostic rerun](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T015059Z-a65805e7/README.md)
 reports at least **8,900,012 exact old/new reservation comparisons with zero
 mismatches**, including final teardown frames just past the requested limit.
 At frame 72,000, TECH team 1's script scope is 43.332 s; TECH evaluation is
@@ -323,7 +323,7 @@ hashes are preserved.
 
 ## 5. Measured late-game weapon-work path
 
-The [run with named rule timers](../benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T020650Z-e7b6d9eb/README.md)
+The [run with named rule timers](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T020650Z-e7b6d9eb/README.md)
 identifies TECH team 1's final-minute cost: `air.defend` 17.375 s,
 `weapons.cluster` 9.120 s and `idle-air-defense` 8.689 s. These are distinct
 rule/fallback scopes; the first can call weapon work twice, while the latter
@@ -415,9 +415,9 @@ trajectory or a lower post-victory unit count is not a controlled speedup.
 
 ## 6. Full reruns and controlled engine comparison
 
-The [first weapon-optimized natural run](../benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T021916Z-b271da6f/README.md)
+The [first weapon-optimized natural run](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-occupancy/2026-10-05/20261005T021916Z-b271da6f/README.md)
 ended at frame 51,998 (28.89 minutes). Its post-victory FPS cannot validate a
-late-game fix. The [45-minute never-end soak](../benchmarks/records/shared/performance/reservation-soak/2026-10-05/20261005T023341Z-a75d9adb/README.md)
+late-game fix. The [45-minute never-end soak](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/reservation-soak/2026-10-05/20261005T023341Z-a75d9adb/README.md)
 kept the match open, but combat removed team 1's builder workload before minute
 40 anyway. Its largest one-minute `weapons.cluster` scope was 66.206 ms for
 296 calls at minute 37; at minute 40 team 1 had no TECH evaluation calls.
@@ -454,9 +454,9 @@ It does not establish that every cause of a late-game hitch has been removed.
 
 | Profile | Old: 1,000 asks | New: 1,000 asks | Function throughput | Original check verdict |
 | --- | ---: | ---: | ---: | --- |
-| [hard](../benchmarks/records/shared/performance/weapon-work-hard/2026-10-05/20261005T023830Z-c65baf4f/README.md) | 63.035 s | 2.068 s | 30.49x | FAIL (opening-check mismatch above) |
-| [balanced](../benchmarks/records/shared/performance/weapon-work-balanced/2026-10-05/20261005T024142Z-47d285c7/README.md) | 62.343 s | 2.063 s | 30.22x | PASS |
-| [terrible](../benchmarks/records/shared/performance/weapon-work-terrible/2026-10-05/20261005T024422Z-84019acb/README.md) | 62.811 s | 2.066 s | 30.41x | PASS |
+| [hard](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/weapon-work-hard/2026-10-05/20261005T023830Z-c65baf4f/README.md) | 63.035 s | 2.068 s | 30.49x | FAIL (opening-check mismatch above) |
+| [balanced](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/weapon-work-balanced/2026-10-05/20261005T024142Z-47d285c7/README.md) | 62.343 s | 2.063 s | 30.22x | PASS |
+| [terrible](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/performance/weapon-work-terrible/2026-10-05/20261005T024422Z-84019acb/README.md) | 62.811 s | 2.066 s | 30.41x | PASS |
 
 All three loaded the current production script graph and native bindings. Both
 balanced and terrible runs pass the corrected opening/probe/timer/error/invariant

@@ -90,11 +90,11 @@ allocation. Completed structures are distinguished from orders and supplied
 bootstrap assets throughout. `overflow_reactors` in the audit counts matching
 throttled policy log entries, not every completed reactor.
 
-Measurements: [early growth regression](benchmarks/air-d164-regression.json),
-[capacity](benchmarks/air-d164-capacity.json),
-[reactor queue blocker](benchmarks/air-d164-queue-blocker.json),
-[final growth regression](benchmarks/air-d164-final-regression.json),
-[final natural game](benchmarks/air-d164-final-natural.json).
+Measurements: [early growth regression](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-regression.json),
+[capacity](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-capacity.json),
+[reactor queue blocker](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-queue-blocker.json),
+[final growth regression](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-final-regression.json),
+[final natural game](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/air-d164-final-natural.json).
 
 ## Screenshots
 
@@ -102,13 +102,13 @@ Final controlled growth at 24 minutes: separate factory/turret and advanced
 economy modules, with the fifth self-built AFUS just completed. Ordinary
 reactors and the initial eight converters were supplied by the fixture.
 
-![Controlled growth at 24 minutes](images/d164/final-growth-24min.png)
+![Controlled growth at 24 minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d164/final-growth-24min.png)
 
 Final natural game at 40 minutes: the third T2 lab is nearing completion;
 two AFUS have completed and the advanced aircraft workforce is scaling the
 economic district. The cyan TECH ally remains adjacent.
 
-![Natural economy at 40 minutes](images/d164/natural-40min.png)
+![Natural economy at 40 minutes](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/images/d164/natural-40min.png)
 
-Earlier iteration evidence: [initial growth at 24 minutes](images/d164/growth-24min.png)
-and [capacity fixture at 19 minutes](images/d164/capacity-19min.png).
+Earlier iteration evidence: [initial growth at 24 minutes](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/growth-24min.png)
+and [capacity fixture at 19 minutes](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/images/d164/capacity-19min.png).

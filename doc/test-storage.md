@@ -1,5 +1,12 @@
 # Gameplay test and benchmark storage
 
+Current storage (2026-10-07): published benchmarks, historical images and raw
+`build-theatres` archives now live in the sibling `CircuitAI.benchmarks`
+checkout. Set `CIRCUIT_BENCHMARK_REPO` for another location. See the
+[migration and current commands](benchmark-repository.md). Historical paths below are
+preserved for provenance; this machine retains an ignored raw-path junction.
+
+
 ## Review and migration plan (2026-10-03)
 
 The starting inventory has 81 flat check definitions, 16 AIR arena cases,
@@ -125,7 +132,7 @@ pass; the documentation-link checker reports only the eight pre-existing
 missing `hover.md` links tracked as KI-404. `git diff --check` is clean.
 One rendered four-minute Cortex arena on All That Glitters exercised allocation,
 staging, launch, archive, analysis, publication and indexing end to end:
-[original report and selected screenshot](benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
+[original report and selected screenshot](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/air/combat/direct-glitters/2026-10-03/20261003T130427Z-8c8bf821/README.md).
 The strict direct-route checks passed; the AFUS was destroyed at 2:14 game time.
 This validates the tooling path, not an AI strength improvement or a full-match
 win. No production AI code or binary changed.

@@ -3,7 +3,7 @@
 Definitions belong here; engine output belongs in the uniquely allocated
 `build-theatres/games/shared/combat/<scenario>/<map>/<UTC-id>/` tree.
 Published evidence is indexed separately in the
-[benchmark catalog](../../../../../doc/benchmarks/README.md).
+[benchmark catalog](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/README.md).
 
 Run with [ranged_benchmark.py](../../../ranged_benchmark.py). Use the case file
 stem, not its shortened internal scenario name. Keep seed, game, engine,

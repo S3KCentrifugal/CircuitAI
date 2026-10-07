@@ -95,9 +95,9 @@ request or duplicate gift was observed.
 
 | Profile / delivery | Result | Last gift | Evidence |
 | --- | --- | --- | --- |
-| experimental_terrible / Armada, Lua + ferry | 5 flown gifts; SUPPORT self-recovery cancels | 4:37 | [record](../benchmarks/records/shared/economy/recovery-ferry-lua/2026-10-06/20261006T134230Z-be7e1fb3/README.md) |
-| experimental_hard / Cortex, native + direct | 6 gifts; destroyed lab replaced at 2:30 | 5:02 | [record](../benchmarks/records/shared/economy/recovery-walk-native/2026-10-06/20261006T134649Z-eea9988f/README.md) |
-| experimental_balanced / Legion, Lua + direct | 6 gifts from captured Legion lab | 3:46 | [record](../benchmarks/records/shared/economy/recovery-walk-lua/2026-10-06/20261006T134950Z-fad54bf4/README.md) |
+| experimental_terrible / Armada, Lua + ferry | 5 flown gifts; SUPPORT self-recovery cancels | 4:37 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-ferry-lua/2026-10-06/20261006T134230Z-be7e1fb3/README.md) |
+| experimental_hard / Cortex, native + direct | 6 gifts; destroyed lab replaced at 2:30 | 5:02 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-walk-native/2026-10-06/20261006T134649Z-eea9988f/README.md) |
+| experimental_balanced / Legion, Lua + direct | 6 gifts from captured Legion lab | 3:46 | [record](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-walk-lua/2026-10-06/20261006T134950Z-fad54bf4/README.md) |
 
 
 The table reports game time, not elapsed test wall time. Donor labs were supplied
@@ -116,9 +116,9 @@ behavioral evidence, not a measured FPS comparison.
 
 Previous failed observations are retained:
 
-- [premature role switch and frozen-base deadline](../benchmarks/records/shared/economy/recovery-walk-lua/2026-10-06/20261006T133100Z-f1a7ba8e/README.md).
-- [donor re-election cancelled active orders; frozen-base deadlines](../benchmarks/records/shared/economy/recovery-ferry-native/2026-10-06/20261006T133654Z-2a8280db/README.md).
-- [no dry landing within the original ferry radius](../benchmarks/records/shared/economy/recovery-ferry-lua/2026-10-06/20261006T134052Z-f79cbca8/README.md).
+- [premature role switch and frozen-base deadline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-walk-lua/2026-10-06/20261006T133100Z-f1a7ba8e/README.md).
+- [donor re-election cancelled active orders; frozen-base deadlines](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-ferry-native/2026-10-06/20261006T133654Z-2a8280db/README.md).
+- [no dry landing within the original ferry radius](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/shared/economy/recovery-ferry-lua/2026-10-06/20261006T134052Z-f79cbca8/README.md).
 
 ## Remaining limits
 

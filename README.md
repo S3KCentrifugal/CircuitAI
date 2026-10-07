@@ -13,6 +13,12 @@ publishes it for Windows (`SMRTBARb-v<version>-<channel>-windows.zip`) and Linux
 (`SMRTBARb-v<version>-<channel>-linux.tar.gz`) as one GitHub release with generated notes; see
 [doc/release.md](doc/release.md).
 
+### Benchmarks
+Published evidence and raw simulation archives live in the separate
+[CircuitAI.benchmarks repository](https://github.com/S3KCentrifugal/CircuitAI.benchmarks).
+Keep its checkout beside this one, or set `CIRCUIT_BENCHMARK_REPO`.
+[Setup, ownership and migration details](doc/benchmark-repository.md).
+
 ### Requirements
 * gcc 5.4+
 * spring 104.0-dev

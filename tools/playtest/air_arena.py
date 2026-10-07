@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import re
 import shutil
 import statistics
@@ -149,8 +150,8 @@ def summarize(base):
 
 def prepare(args):
     base = args.dir.resolve()
-    if not base.is_relative_to(ROOT / 'build-theatres') or base == ROOT / 'build-theatres':
-        raise ValueError('Use a child of repository build-theatres')
+    if not base.is_relative_to(RAW_ROOT) or base == RAW_ROOT:
+        raise ValueError('Use a child of benchmark-repository build-theatres')
     if (base / 'playtest.pid').exists():
         # Refuse to restage a potentially live game. The ordinary stop command
         # removes the pid; an unused stale directory can simply be given a new name.

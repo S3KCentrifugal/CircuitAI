@@ -97,7 +97,7 @@ of the planned cluster anchor; this is spatial evidence, not a native task-ID
 join. The main checks independently require forward mex completion, a cluster
 fort order, a completed torpedo defense and no script/invariant/crash markers.
 
-Final [Supreme Isthmus / experimental_terrible regression](../benchmarks/records/sea/economy/mex-safe-supreme/2026-10-06/20261006T092445Z-e07e151d/README.md)
+Final [Supreme Isthmus / experimental_terrible regression](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-safe-supreme/2026-10-06/20261006T092445Z-e07e151d/README.md)
 passed the runtime/ship-egress checks. At 15.5 minutes its two SEA players held
 18 and 19 mexes, seven each beyond 2400 elmos, with no constructor losses. No
 new controller fortification completion was correlated on that map during this
@@ -106,24 +106,24 @@ the final policy in rendered games. No resources or combat units were spawned.
 
 Final comparison evidence:
 
-- [Old compact control](../benchmarks/records/sea/economy/mex-expansion-control/2026-10-06/20261006T084921Z-f89a79b7/README.md)
-  and [final compact policy](../benchmarks/records/sea/economy/mex-safe-default/2026-10-06/20261006T092229Z-a0d447ad/README.md).
-- [Old full-experimental control](../benchmarks/records/sea/economy/mex-migrated-control/2026-10-06/20261006T092356Z-478eceba/README.md)
-  and [final full-experimental policy](../benchmarks/records/sea/economy/mex-expansion-safe/2026-10-06/20261006T092230Z-77106a02/README.md).
+- [Old compact control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-control/2026-10-06/20261006T084921Z-f89a79b7/README.md)
+  and [final compact policy](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-safe-default/2026-10-06/20261006T092229Z-a0d447ad/README.md).
+- [Old full-experimental control](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-migrated-control/2026-10-06/20261006T092356Z-478eceba/README.md)
+  and [final full-experimental policy](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-safe/2026-10-06/20261006T092230Z-77106a02/README.md).
 
 Rejected/intermediate observations are retained, not overwritten:
 
-- [Initial aggressive candidate](../benchmarks/records/sea/economy/mex-expansion-candidate/2026-10-06/20261006T083502Z-cce5165b/README.md)
+- [Initial aggressive candidate](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-candidate/2026-10-06/20261006T083502Z-cce5165b/README.md)
   passed smoke checks but lost four construction ships; escort/withdrawal was added.
-- [Wide-query experimental failure](../benchmarks/records/sea/economy/mex-expansion-migrated/2026-10-06/20261006T090203Z-705e6f0e/README.md)
+- [Wide-query experimental failure](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-migrated/2026-10-06/20261006T090203Z-705e6f0e/README.md)
   missed team 0's ten-minute frontier target. Restoring the local opening ahead
   of native distant-task adoption produced the
-  [passing home-first run](../benchmarks/records/sea/economy/mex-expansion-homefirst/2026-10-06/20261006T091234Z-586cc3c3/README.md).
+  [passing home-first run](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-homefirst/2026-10-06/20261006T091234Z-586cc3c3/README.md).
   Four extra support ships were still lost; safety coverage was then extended
   from two designated expansion workers to all T1 construction ships.
 - An earlier Supreme watcher reported a premature exit despite a complete game
-  log. Its [original failure](../benchmarks/records/sea/economy/mex-expansion-supreme/2026-10-06/20261006T085240Z-2c43b1b8/README.md)
-  and [completed-log assessment](../benchmarks/records/sea/economy/mex-expansion-supreme/2026-10-06/20261006T085706Z-79453cbf/README.md)
+  log. Its [original failure](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-supreme/2026-10-06/20261006T085240Z-2c43b1b8/README.md)
+  and [completed-log assessment](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/mex-expansion-supreme/2026-10-06/20261006T085706Z-79453cbf/README.md)
   are separate records. KI-524 tracks the watcher defect. Reassessments of one
   game are not additional matches.
 

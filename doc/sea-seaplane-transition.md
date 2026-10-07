@@ -74,13 +74,13 @@ The tested SEA's builders and factories retain their production decision paths.
 
 | Test | First ship's mex | Platform complete | First aircraft | Reachable support / actual assistance | Result |
 | --- | --- | --- | --- | --- | --- |
-| Armada, compact | 1:08 | 3:11 | 3:29, armsehak | 31 valid reserved slots; 2 turrets assisting at 3:15 | [PASS](benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T234754Z-d6159754/report.md) |
-| Cortex, experimental | 1:08 | 3:44 | 4:15, corsb | 20 slots; 13 turrets in range, assistance observed at 5:30 | [PASS](benchmarks/records/sea/economy/seaplane-cortex/2026-10-05/20261005T235010Z-46bbe5e4/report.md) |
-| Legion, compact | 1:06 | 2:41 | 3:07, legspbomber | 27 slots; 3 turrets assisting at 3:05 | [PASS](benchmarks/records/sea/economy/seaplane-legion/2026-10-05/20261005T235230Z-e9622520/report.md) |
+| Armada, compact | 1:08 | 3:11 | 3:29, armsehak | 31 valid reserved slots; 2 turrets assisting at 3:15 | [PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T234754Z-d6159754/report.md) |
+| Cortex, experimental | 1:08 | 3:44 | 4:15, corsb | 20 slots; 13 turrets in range, assistance observed at 5:30 | [PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-cortex/2026-10-05/20261005T235010Z-46bbe5e4/report.md) |
+| Legion, compact | 1:06 | 2:41 | 3:07, legspbomber | 27 slots; 3 turrets assisting at 3:05 | [PASS](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-legion/2026-10-05/20261005T235230Z-e9622520/report.md) |
 
 Original failures remain available:
-[incomplete support footprint](benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T233655Z-c427166b/report.md)
-and [native post-T2 production suppression](benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T233946Z-f770abc8/report.md).
+[incomplete support footprint](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T233655Z-c427166b/report.md)
+and [native post-T2 production suppression](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada/2026-10-05/20261005T233946Z-f770abc8/report.md).
 The first failure's observer only required a mex after first-ship completion;
 the subsequent observer ties completed mexes and aircraft to their actual
 creating builder/factory IDs. No failed verdict was overwritten.
@@ -106,7 +106,7 @@ ownership, allied reservations and the TACTICAL constructor ladder are retained.
 The compact/default Armada run completed its first ship's first mex at 3:02,
 reached 17 mexes by about 12:30 and 19 by 20:30, while continuing tidal and
 converter production. It did not reach T2 within thirty minutes, so the
-[natural transition check failed](benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-05/20261005T235701Z-9cc771f4/report.md).
+[natural transition check failed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-05/20261005T235701Z-9cc771f4/report.md).
 There was no platform opportunity; this is not a successful end-to-end natural
 transition. At 29:00 the observer recorded +56.4 metal income but only 42/5050
 stored metal. The shared helper accepts an 800-metal setting but disables its
@@ -116,7 +116,7 @@ is unchanged; this run does not isolate it from downstream admission/access.
 The broader economic-timing issue remains tracked under KI-228.
 
 The thirty-minute ordinary-resource Armada experimental run
-[passed](benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T000505Z-0f0085f6/report.md):
+[passed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T000505Z-0f0085f6/report.md):
 first-ship mex 3:22, T2 yard 13:16, platform admission 16:04, platform completion
 17:22, actual turret assistance 17:30, first platform bomber (`armsb`) 17:47.
 Thirty valid reserved turret slots were within platform reach; three completed
@@ -150,7 +150,7 @@ full cost and reserve boundaries, prior commitments, faction/modified costs,
 and a deficit that the earlier zero-reserve forecast would have accepted.
 The current DLL remains `aff90f713fc9746a`; this revision changes scripts only.
 
-The Armada compact [supplied economy test passed](benchmarks/records/sea/economy/seaplane-armada/2026-10-06/20261006T001837Z-0cd7a576/report.md).
+The Armada compact [supplied economy test passed](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada/2026-10-06/20261006T001837Z-0cd7a576/report.md).
 With T2 complete, the platform was still absent at 3:30; the 3:00 observer
 recorded +13.5 metal/s and 93,332 metal banked. After supplied naval economy
 at 4:00, admission occurred at 4:45 with ten-second minimum incomes +158.1
@@ -160,7 +160,7 @@ the income floor rejects a rich bank and permits production after recovery;
 these are supplied acceptance timings, not a natural economy benchmark.
 
 The ordinary-resource experimental [Supreme run missed its thirty-minute
-platform deadline](benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T002307Z-31832977/report.md).
+platform deadline](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/economy/seaplane-armada-eco/2026-10-06/20261006T002307Z-31832977/report.md).
 T2 completed 15:12 and naval fusion 21:11. The thirty-second post-T2 economy
 samples peaked at 1411.53 metal stored (23:36), below the 1950 Armada requirement
 before queued commitments; at 29:36 income was +93.47 metal/s but bank only

@@ -109,8 +109,8 @@ performance comparison.
 
 | Case | Observation | Evidence |
 | --- | --- | --- |
-| Continuous vision | Yard identified at frame 330 (11 s), damaged at 953 (31.8 s), destroyed at 1187 (39.6 s). PASS. | [Original result](benchmarks/records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T225123Z-7f45ffe7/README.md) |
-| Radar removed at 15 s | Yard absent from LOS/radar at 20, 25, 30 and 35 s. Director logs search at 38 s. Fleet reacquires at 40 s, damages at 41.5 s and destroys at 46.2 s. PASS. | [Complete observation](benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225638Z-42f7b8ed/README.md) |
+| Continuous vision | Yard identified at frame 330 (11 s), damaged at 953 (31.8 s), destroyed at 1187 (39.6 s). PASS. | [Original result](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T225123Z-7f45ffe7/README.md) |
+| Radar removed at 15 s | Yard absent from LOS/radar at 20, 25, 30 and 35 s. Director logs search at 38 s. Fleet reacquires at 40 s, damages at 41.5 s and destroys at 46.2 s. PASS. | [Complete observation](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225638Z-42f7b8ed/README.md) |
 
 The short-fog result limits the diagnosis: forgetting the target in the current
 contact list does not necessarily abandon the approach or prevent a kill. A
@@ -125,9 +125,9 @@ these options retain their observer behavior.
 
 Retained setup/tool failures are separate from gameplay outcomes:
 
-- [Initial visible-yard setup FAIL](benchmarks/records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T224851Z-d64204f7/README.md): several proposed fleet coordinates were dry; corrected before the passing case.
-- [Engine startup FAIL](benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225214Z-b756e48d/README.md): insufficient disk space. Lossless NTFS compression of generated debug files recovered space.
-- [Incomplete watcher FAIL](benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225429Z-dd34499a/README.md): restricted process inspection reported exit at frame 600 while the engine continued. An elevated watcher archived the complete same game separately; this is not a second independent gameplay run.
+- [Initial visible-yard setup FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/control-yard-seen-cand/2026-10-05/20261005T224851Z-d64204f7/README.md): several proposed fleet coordinates were dry; corrected before the passing case.
+- [Engine startup FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225214Z-b756e48d/README.md): insufficient disk space. Lossless NTFS compression of generated debug files recovered space.
+- [Incomplete watcher FAIL](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/sea/combat/control-yard-lost-cand/2026-10-05/20261005T225429Z-dd34499a/README.md): restricted process inspection reported exit at frame 600 while the engine continued. An elevated watcher archived the complete same game separately; this is not a second independent gameplay run.
 
 An earlier overlength storage label failed before allocating/launching a game;
 the case's internal name was shortened. No failed verdict was rewritten.

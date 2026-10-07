@@ -1,7 +1,0 @@
-{
-  "dll": "build-theatres\\d216-final\\SkirmishAI.dll",
-  "ferry": true,
-  "relay": false,
-  "stage_only": true,
-  "profile": "experimental_hard"
-}

@@ -47,19 +47,19 @@ positive Armada island-production control. AIR/Marauder eligibility is covered
 by unchanged call paths and pure scope tests, not new AIR/Marauder games.
 The waves-disabled native fallback is code-reviewed but not separately played.
 
-Immutable evidence: [Supreme](benchmarks/records/tech/combat/t2-ground-start/2026-10-03/20261003T233544Z-ff3c558b/README.md),
-[Tundra](benchmarks/records/tech/combat/t2-landlocked-start/2026-10-03/20261003T233412Z-25a490df/README.md),
-and [compilation run](benchmarks/records/tech/combat/t2-start-compile/2026-10-03/20261003T232706Z-5ea12e39/README.md).
+Immutable evidence: [Supreme](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/combat/t2-ground-start/2026-10-03/20261003T233544Z-ff3c558b/README.md),
+[Tundra](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/combat/t2-landlocked-start/2026-10-03/20261003T233412Z-25a490df/README.md),
+and [compilation run](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/records/tech/combat/t2-start-compile/2026-10-03/20261003T232706Z-5ea12e39/README.md).
 Each natural record includes `start-selection-audit.json`, actual start flags,
 counts, first completion times, invariant counts and the retained log hash.
 
 Supreme's factory and economy at 27 minutes:
 
-![Supreme TECH base](benchmarks/records/tech/combat/t2-ground-start/2026-10-03/20261003T233544Z-ff3c558b/screen_2026-10-03_23-31-49-017.png)
+![Supreme TECH base](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/tech/combat/t2-ground-start/2026-10-03/20261003T233544Z-ff3c558b/screen_2026-10-03_23-31-49-017.png)
 
 Tundra's island base and advanced bot lab at 30 minutes:
 
-![Tundra TECH base](benchmarks/records/tech/combat/t2-landlocked-start/2026-10-03/20261003T233412Z-25a490df/screen_2026-10-03_23-31-30-385.png)
+![Tundra TECH base](https://raw.githubusercontent.com/S3KCentrifugal/CircuitAI.benchmarks/main/doc/benchmarks/records/tech/combat/t2-landlocked-start/2026-10-03/20261003T233412Z-25a490df/screen_2026-10-03_23-31-30-385.png)
 
 The screenshots show the operating bases; production counts come from the
 independent engine observer, not visual inference from unit icons.

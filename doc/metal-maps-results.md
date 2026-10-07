@@ -1,7 +1,7 @@
 # Metal-map implementation: measured results
 
 2026-10-02. Implementation: [metal-maps-implementation.md](metal-maps-implementation.md).
-Machine-readable measurements: [simulation census](benchmarks/metal-map-simulations.json).
+Machine-readable measurements: [simulation census](https://github.com/S3KCentrifugal/CircuitAI.benchmarks/blob/main/doc/benchmarks/metal-map-simulations.json).
 The forty-mex opening is explicit owner policy. These tests establish behavior,
 not optimal competitive timing or an unbeatable AI.
 
