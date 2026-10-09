@@ -5,9 +5,9 @@
 #include "../types/map_config.as"
 #include "../global.as"
 #include "../types/role_config.as"
-#include "../helpers/unit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 #include "builder.as"
-#include "ferry.as"
+#include "../systems/team/ferry.as"
 
 namespace Factory {
 
@@ -108,6 +108,8 @@ namespace Factory {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+		IUnitTask@ recovery = Team::Recovery::FactoryMakeTask(u);
+		if (recovery !is null) return recovery;
 		if (SeaFactories::Hold(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true, SECOND));
 		// Only AIR changes ordering: transport obligations precede optional spam and combat.
 		if (Global::AISettings::Role == AiRole::AIR) {
@@ -119,7 +121,8 @@ namespace Factory {
 		// Emergency AIR production must reach its role before optional spam.
 		if (AirBaseResponse::Emergency() && (UnitHelpers::IsT1AircraftPlant(u.circuitDef.GetName())
 			|| UnitHelpers::IsT2AircraftPlant(u.circuitDef.GetName()))) return AirProduction::MakeTask(u);
-		@t = Spam::FactoryMakeTask(u);   // active spam overrides every T1 factory decision
+		@t = SeaCoast::Produce(u);
+		if (t is null) @t = Spam::FactoryMakeTask(u);   // coastal recovery owns its land labs
 		if (t !is null) return t;
 
 		@t = Team::Ferry::FactoryMakeTask(u);      // AIR owes TECH a transport: build it first

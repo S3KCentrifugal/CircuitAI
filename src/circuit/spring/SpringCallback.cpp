@@ -191,6 +191,11 @@ bool COOAICallback::Unit_HasCommands(int unitId) const
 	return sAICallback->Unit_getCurrentCommands(skirmishAIId, unitId) > 0;
 }
 
+int COOAICallback::Feature_ResurrectDef(int featureId) const
+{
+	return sAICallback->Feature_getResurrectDef(skirmishAIId, featureId);
+}
+
 bool COOAICallback::Feature_IsResurrectable(int featureId) const
 {
 	return sAICallback->Feature_getResurrectDef(skirmishAIId, featureId) != -1;

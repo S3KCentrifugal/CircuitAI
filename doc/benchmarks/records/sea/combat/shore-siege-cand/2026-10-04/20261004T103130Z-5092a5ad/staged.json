@@ -1,8 +1,0 @@
-{
-  "staged": "2026-10-04T07:29:54",
-  "dll": "build-theatres\\d189-build-5\\SkirmishAI.dll",
-  "dll_sha256_16": "1b875078bc2aa763",
-  "dll_bytes": 7790265,
-  "data": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\sea\\combat\\paired-cohort\\glacial\\20261004T101433Z-fcdd274a\\candidate",
-  "ai": "BARbTest/test"
-}

@@ -1,16 +1,17 @@
 // role: FRONT
 #include "../types/role_config.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/factory_helpers.as"
-#include "../helpers/economy_helpers.as"
-#include "../helpers/guard_helpers.as"
-#include "../helpers/unitdef_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/construction/factory_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
+#include "../helpers/construction/guard_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
 // Dynamic factory production + shared helpers
-#include "../helpers/objective_helpers.as"
-#include "../helpers/role_limit_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
+#include "../helpers/roles/role_limit_helpers.as"
 #include "../global.as"
 #include "../types/terrain.as"
-#include "../manager/factory_production.as"
+#include "../systems/production/factory_production.as"
+#include "../systems/combat/land_siege.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../manager/builder.as"
 #include "../manager/economy.as"
@@ -427,6 +428,9 @@ namespace RoleFront {
                 }
             }
         }
+
+        IUnitTask@ siege = LandSiege::Produce(u);
+        if (siege !is null) return siege;
 
         // After constructor guarantees (T1/T2) and optional scout rushes, prefer dynamic factory
         // production for all factories (T1/T2 labs, air, gantries, etc.) when enabled.

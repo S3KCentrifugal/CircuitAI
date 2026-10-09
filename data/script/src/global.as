@@ -167,6 +167,16 @@ namespace Global {
         float SeedShake = 256.0f;
     }
 
+    namespace BuilderRecovery {
+        bool Enabled = true;
+        // Losing the last mobile constructor merits help even with a commander.
+        bool CommanderCounts = false;
+        int OpeningGraceSeconds = 60;
+        int RetrySeconds = 20;
+        int LeaseSeconds = 120; // heartbeats retain a request through missing labs
+        float DropRadius = 2400.0f; // coastal roles may need the nearest dry shore
+    }
+
     namespace ConstructorRequest {
         // T2 constructors from TECH on request (Team::Donation, D-041). TECH
         // always answers a request: one extra constructor from its advanced
@@ -196,20 +206,30 @@ namespace Global {
     namespace Military {
         float AttackWaitSeconds = 180.0f;
         float AttackScale = 0.8f;
+        // D-214: funded land siege before ordinary FRONT combat selection.
+        // Shares limit dedicated bombardment investment, leaving a mobile screen.
+        bool LandSiegeEnabled = true;
+        float LandSiegeMinMetal = 40.0f;
+        float LandSiegeMinEnergy = 800.0f;
+        float LandSiegeFullMetal = 120.0f;
+        float LandSiegeResponseRatio = 1.25f;
+        float LandSiegeEarlyShare = 0.20f;
+        float LandSiegeLateShare = 0.35f;
     }
 
     namespace Spam {
         bool Enabled = true;
-        // Both sliding-minimum incomes must clear these to activate ...
-        //
-        // These are deliberately fusion-era. Below this economy the units spam
-        // produces - Pawn, Grunt, Goblin, Blitz - are ordinary front-line
-        // combat units and the roles should go on spending them as such. Spam
-        // is what a mature economy does with the T1 factories it no longer
-        // needs for the front line, which is why UnitByFactory lists only T1
-        // factories. Do not lower these to "make spam happen sooner": that
-        // takes combat units away from the roles that still need them.
+        // D-216: dedicated pressure uses mature, sustained income, while
+        // ordinary early raiding stays role-owned. These defaults are tuning,
+        // not a required fusion building or a universal PvP timing. A full
+        // metal bank admits one pump at FloatMetalIncome (donations included),
+        // but never bypasses the energy gate. See doc/spam-routes.md.
         float MinMetalIncome = 60.0f;
+        float FloatMetalIncome = 30.0f;
+        float MinMetalBank = 1000.0f;
+        float LabMetalStep = 100.0f;
+        int MaxLabs = 6;
+        uint MinWorkers = 4;  // commander plus at least three workers before conversion
         // A start the land army cannot leave (Global::Map::LandLocked, from the
         // map config's start spots) never spams: the units would walk to the
         // shore and stand there. TECH on Tundra Continents was making Grunts
@@ -228,7 +248,6 @@ namespace Global {
         // final waypoint - 0 converges every lane on the same endpoint, 1 keeps
         // full width; the run is aimed at one backline, so keep it small.
         int UnitLanes = 5;
-        int RepeatStallSeconds = 45;         // D-111: a factory on repeat that produced no spam unit for this long gets its build again
         float UnitLaneSpacing = 160.0f;
         float EndSpread = 0.35f;
         // Waypoints stay this far from the map edge
@@ -509,7 +528,21 @@ namespace Global {
             float InvariantLabReachSeconds = 90.0f;         // D-085 INV-016 / D-088 INV-017 patience         // D-085: INV-016 - the advanced lab standing this long with no static build power within ExpLabBuildPowerReach is a violation
             float InvariantDearOrderSeconds = 45.0f;        // D-084: INV-015 - a dear chain order with no frame this long is a violation
             float InvariantLadderFloatSeconds = 60.0f;      // D-080: INV-011 - the metal bank full this long with an income step unmet is a violation
-            string RushObjective = "auto";                  // D-070: t2 | fusion | afus | nuke | gantry | titan | eco (no chain) | auto (the role picks: afus)
+            string RushObjective = "auto";                  // D-229: auto uses nuke for the existing nuke plan, otherwise afus
+            int NukeRushMexUpgrades = 4;                    // bounded investment before the first fusion/silo, not every distant mex
+            int NukeRushMexBeforeFusion = 3;                // income base before committing the technology builder to fusion
+            float NukeRushBootstrapEnergy = 280.0f;         // expected T1 generation before upgrades; wind/bonus adjusted
+            float NukeRushSiloEnergy = 320.0f;              // completed T1 generation before silo, in addition to the completed fusion
+            float NukeRushStorageLowPercent = 0.10f;       // refund temporary metal storage before a construction stall
+            float NukeRushStorageReclaimMove = 64.0f;     // short local approach beyond build distance + target model radius
+            int NukeRushT1Constructors = 3;                 // expansion, local economy and technology construction
+            int NukeRushT2Constructors = 2;                 // ordinary constructor scaling resumes when the silo stands
+            int NukeRushTurrets = 5;                        // concentrated build power for fusion and silo
+            int NukeRushFusionTurrets = 2;                  // start fusion while T1 workers finish the remaining support
+            int NukeRushEnergyStores = 2;                   // bank fusion surplus during silo construction for stockpile wind lulls
+            int NukeRushStockpileBudgetSeconds = 300;       // spare-energy construction until first missile stocks; bounded recovery if silo stalls
+            int NukeRushScouts = 2;                         // earn enemy-base vision before the first missile is ready
+            int NukeRushScoutSeconds = 20 * 60;             // replenish cheap reconnaissance during the first-shot window
             // D-070: the commander's home mexes are the opening's (OpeningMexRadius / OpeningMexCap: the
             // spots within 700 of the start, at most 3 - three on Supreme Isthmus, one or none elsewhere),
             // the lab follows at once, and the constructors claim the rest within ChainMexFarRadius
@@ -1075,6 +1108,13 @@ namespace Global {
             int BaseResponseSearchSeconds = 20;
             int BaseResponseGunships = 20; // one shared reserve, including frames/orders
             int BaseResponseEmpSupport = 4;
+            int BaseResponseMinWave = 4;
+            int BaseResponseMaxWave = 30;
+            int BaseResponseMaxWaitSeconds = 45;
+            float BaseResponseGroundRatio = 0.35f;
+            float BaseResponseAaRatio = 2.0f;
+            float BaseResponseThreatRadius = 1000.0f;
+            float BaseResponseAssemblyRadius = 700.0f;
             float RadarSightOverlap = 0.5f; // linear overlap of neighbouring ground-LOS diameters
             float RadarAssemblyRadius = 480.0f; // fixed-wing aircraft circle their assigned positions
             float RadarBacklineInset = 256.0f;
@@ -1571,17 +1611,55 @@ namespace Global {
         }
 
         namespace Sea {
-            bool CompactEconomy = true; // placement only, independent of experimental fleet/production
+            // Lost-water recovery only; ordinary naval economy/combat is unchanged.
+            bool CoastalFallback = true;
+            int CoastLossSeconds = 30;
+            int CoastRetakeSeconds = 60;
+            float CoastDepotDistance = 800.0f;
+            float CoastT2MetalIncome = 25.0f;
+            float CoastT2EnergyIncome = 600.0f;
+            bool AmphibiousInvasion = true;
+            int InvasionSurveySeconds = 600; // all 64-elmo water samples need LOS AND sonar
+            int InvasionQuietSeconds = 30;
+            float InvasionEscortMetal = 1500;
+            float InvasionOffshoreDistance = 640;
+            float InvasionWeaponMargin = 256;
+            float InvasionMinMetal = 60, InvasionMinEnergy = 1200;
+            float InvasionGantryMetal = 150, InvasionGantryEnergy = 5000;
+            int InvasionLabTurrets = 6, InvasionGantryTurrets = 12;
+            int InvasionWaveSize = 6, InvasionWaveSeconds = 90;
+            bool CompactEconomy = true; // compact layout/economy policy; independent of experimental fleet/production
             int EconomyTurretSide = 4;
             int TidalClusterSites = 48;
             float FactoryEconomyClearance = 128.0f;
             int FusionMinimumTurrets = 2;
+            // SEA layout economies size conversion from actual surplus, not
+            // the legacy 40 M/s ceiling (still retained for legacy callers).
+            int ConverterParallelProjects = 3;
+            float ConverterEnergyReserve = 100.0f;
+            float FusionBudgetSeconds = 360.0f;
             float EconomyBlockRadius = 1400.0f;
             // D-188: independent policy over the shared native reservation engine.
             bool ExperimentalBuild = false;
             bool ForwardHarbors = true;
             bool AdaptiveFleet = true; // SEA combat is independent of base-layout migration
             bool FleetOperations = true;
+            // Untargeted SEA transit only; combat/withdrawal waypoints stay exact.
+            bool CompactMoveRoutes = true;
+            bool VerifyPowerIndex = false; // correctness games only; duplicates the legacy scan
+            // D-231: SEA-only mission, grouping and economic growth controls.
+            float RecoveryOpportunityMultiple = 3.0f;
+            float FleetRowSpacing = 96.0f;
+            float FleetCohortRadius = 720.0f;
+            int FleetCohortMaximum = 24;
+            float FleetPursuitLeash = 1000.0f;
+            float FleetClosingSeconds = 12.0f;
+            float FleetRepairHealth = .45f;
+            int FleetFailureSeconds = 30;
+            float GrowthHomeRadius = 1600.0f;
+            float GrowthReserveShare = .45f;
+            float EnergyBufferSeconds = 12.0f;
+            int ExpansionCandidates = 5;
             int FleetReleaseCount = 7;
             int FleetReleaseSeconds = 60;
             int FleetSearchSeconds = 45;
@@ -1590,6 +1668,15 @@ namespace Global {
             float FleetScreenRatio = 1.2f;
             float FleetLaneSpacing = 72.0f;
             int FleetScouts = 3;
+            bool T1SubmarinesAfterT2 = true; // constructors and urgent counters retain precedence
+            float FirstT2BankSeconds = 2.0f; // startup buffer; full package still needs sustained M/E funding
+            int HarborSurveySeconds = 90; // keep an untouched site stable long enough for reconnaissance
+            float ShoreSurveyCell = 320.0f;
+            int ShoreSurveySeconds = 45;
+            float AntiNukeBaseRadius = 480.0f;
+            float AntiSubArcRadians = 2.4f; // shallow concave firing line, within underwater weapon range
+            float AntiSubRangeFraction = 0.92f;
+            float AntiSubFrigateRangeFraction = 0.82f; // Legion: 460 torpedo range, only 400 own sonar
             bool RespectCarrierControl = true; // yield attached drones to the game's carrier gadget
             bool HybridScoutAirResponse = true; // SEA scout/dedicated AA interception, all factions
             int ScoutPatrolSeconds = 120;
@@ -1616,8 +1703,12 @@ namespace Global {
             float ForwardHarborSearchRadius = 2400.0f; // crowded allied coasts can exhaust the opening-radius search
             float FirstPlannedHarborAdvance = 768.0f; // leave rear economy room when the native opening yard hugs shore/map edge
             float EnergyPerMetal = 25.0f;
-            float ExitLength = 480.0f;
+            float ExitLength = 800.0f; // protected departure lane beyond densely packed support
             float ExitMargin = 48.0f;
+            float HarborFogBuffer = 192.0f; // current allied LOS beyond the factory nose, admission only
+            int CommanderHandoffTurrets = 4; // completed, in range; frames/reservations never count
+            int CapacityObservationSeconds = 10;
+            float CapacityHighMetal = 0.85f;
             float HarborMaxThreat = 1.0f;
             int PreplannedYards = 3;
             int MaxProductionYards = 8;
@@ -1629,8 +1720,22 @@ namespace Global {
             float ForwardStep = 900.0f;
             int ForwardStableSeconds = 30;
             int ForwardRecheckSeconds = 120;
-            int MaxSupportPerBerth = 40;
-            int ReservedSupportPerFactory = 20; // compact rear bank, expand as funded demand grows
+            int MaxSupportPerBerth = 64; // finite useful local footprint, not a construction quota
+            int ReservedSupportPerFactory = 64; // dense rear/sides; terrain can yield a smaller footprint
+            bool SeaplanesAfterT2 = true;
+            float SeaplaneMinimumMetalIncome = 80.0f; // minimum over the shared last-ten-second window
+            float SeaplaneMinimumEnergyIncome = 1500.0f;
+            float SeaplaneMetalReserve = 500.0f; // retained in addition to the full platform cost
+            float SeaplaneEnergyReserve = 1000.0f;
+            float NearbyMexRadius = 2400.0f; // fixed home harbor radius, not an ever-moving expansion centre
+            bool ExpandMexClusters = true; // SEA only, independent of experimental economy/layouts
+            float ExpansionMexRadius = 3600.0f; // follows the constructor; no home-radius or income ceiling
+            float ExpansionClusterRadius = 600.0f;
+            float ExpansionMaxThreat = 0.1f; // unarmed workers wait for navy to clear known weapon coverage
+            float ExpansionThreatBuffer = 256.0f;
+            float ExpansionEscortMetal = 600.0f; // nearby combat ships required toward the contested frontier
+            int ExpansionRetrySeconds = 10;
+            float ExpansionSurfaceIncome = 30.0f; // torpedoes first; funded surface towers later
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;
@@ -1662,8 +1767,13 @@ namespace Global {
 
             // Early resurrection-sub policy toggle and tuning
             // When enabled, T1 shipyards may produce resurrection submarines early based on income scaling
-            bool EnableEarlyRezSub = false;
-            // Income scaling: allowed rez-sub count = floor(metalIncome / MetalIncomePerRezSub)
+            bool KeepFactoriesQueued = true; // D-211: recruit tasks retain shortage priority/energy control.
+            bool EnableEarlyRezSub = true;
+            float FleetMetalPerRezSub = 6000.0f;
+            float RecoveryMetalLowFraction = 0.20f;
+            float RecoveryMetalResumeFraction = 0.40f;
+            float RecoverySearchRadius = 24000.0f;
+            // Target = 1 + min(income / MetalIncomePerRezSub, fleet / FleetMetalPerRezSub), rounded down.
             float MetalIncomePerRezSub = 60.0f;
 
             // Consider energy storage "low" when current < storage * percent (SEA scope)

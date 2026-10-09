@@ -46,7 +46,7 @@ def main():
         path=scripts/'manager'/(name+'.as');text=path.read_text();at=text.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)');brace=text.index('{',at)
         path.write_text(text[:brace+1]+'\n if (ai.teamId != 0) return '+manager+'.Enqueue('+descriptor+');\n'+text[brace+1:])
     # Hold the donor's grant for the explicit transfer rather than automatic sharing.
-    team=scripts/'manager/team_economy.as';text=team.read_text();needle='void ShareOverflow()\n    {'
+    team=scripts/'systems/team/team_economy.as';text=team.read_text();needle='void ShareOverflow()\n    {'
     assert text.count(needle)==1
     team.write_text(text.replace(needle,needle+'\n        if (ai.teamId != 0) return;'))
     probe='const bool AirWorkforceFixtureSix = '+str(a.scenario=='six-labs').lower()+';\n'

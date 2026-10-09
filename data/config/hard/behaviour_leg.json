@@ -904,6 +904,7 @@
 				"retreat": 0.5
 			},
 			"legfort": {
+				"target_min_cost": 300,
 				"role": ["heavy", "air"],
 				"retreat": 0.4
 			},

@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import subprocess
 import sys
 import playtest
@@ -106,7 +107,7 @@ def main():
     parser.add_argument("--wall-minutes", type=float, default=25)
     parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
-    if not args.dir.resolve().is_relative_to(playtest.REPO/"build-theatres"):
+    if not args.dir.resolve().is_relative_to(RAW_ROOT):
         parser.error("Use an isolated build-theatres output directory")
     chosen = args.maps.split(",")
     if set(chosen)-{m[0] for m in MAPS}:

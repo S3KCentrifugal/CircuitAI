@@ -1,5 +1,5 @@
 
-#include "helpers/generic_helpers.as"
+#include "helpers/common/generic_helpers.as"
 
 //Maps
 #include "maps/default_map_config.as"
@@ -78,6 +78,7 @@
 #include "maps/thermal_shock.as"
 #include "maps/twin_lakes_park_redux.as"
 #include "maps/white_fire_remake.as"
+#include "maps/tropical_assault.as"
 
 namespace Maps {
     MapConfigManager@ mapManager = MapConfigManager(DEFAULT_MAP_CONFIG);
@@ -162,6 +163,7 @@ namespace Maps {
         mapManager.RegisterMapConfig(ThermalShock::config);
         mapManager.RegisterMapConfig(TwinLakesParkRedux::config);
         mapManager.RegisterMapConfig(WhiteFireRemake::config);
+        mapManager.RegisterMapConfig(TropicalAssault::config);
 
         GenericHelpers::LogUtil("Finished registering map configurations: " +
             mapManager.mapConfigs.length() + " map configs available.", 1);

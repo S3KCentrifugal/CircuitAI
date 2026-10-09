@@ -1,6 +1,6 @@
-#include "../manager/air_economy.as"
-#include "../helpers/economy_helpers.as"
-#include "../manager/air_reclaim.as"
+#include "../systems/air/air_economy.as"
+#include "../helpers/construction/economy_helpers.as"
+#include "../systems/air/air_reclaim.as"
 namespace AirBuild {
     IUnitTask@ starterReclaimTask;
     array<IUnitTask@> projects;

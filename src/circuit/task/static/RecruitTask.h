@@ -26,6 +26,7 @@ public:
 
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void AssignTo(CCircuitUnit* unit) override;
+	virtual void RemoveAssignee(CCircuitUnit* unit) override;
 
 	virtual void Start(CCircuitUnit* unit) override;
 	virtual void Update() override;
@@ -41,12 +42,16 @@ public:
 	virtual void OnUnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 
 	virtual void SetTarget(CCircuitUnit* unit) override;
+    void Dead() override;
 
 	RecruitType GetRecruitType() const { return recruitType; }
+	void SetRepeat(bool value) { repeat = value; }
+	bool IsRepeat() const { return repeat; }
 
 private:
 	RecruitType recruitType;
 	float sqradius;
+	bool repeat = false;
 };
 
 } // namespace circuit

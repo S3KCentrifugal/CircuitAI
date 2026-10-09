@@ -1,11 +1,101 @@
 #include "sea_factories.as"
-#include "../manager/sea_eco_layout.as"
+#include "../systems/sea/sea_eco_layout.as"
+#include "../systems/sea/sea_expansion.as"
 
 namespace SeaBuild {
     int lastTick=-1;
-    dictionary supportRetry;
+    dictionary supportRetry, siteRetry;
+    class SiteProgress { string key; AIFloat3 pos; int since=0; }
+    dictionary siteProgress;
+    string SiteKey(IBuilderTask@ task) { const AIFloat3 p=task.GetBuildPos(); return ""+task.buildDef.id+":"+int(p.x/32)+":"+int(p.z/32); }
+    bool RejectSite(CCircuitUnit@ u,IUnitTask@ task) {
+        IBuilderTask@ work=cast<IBuilderTask>(task);
+        if (work is null || work.buildDef is null || work.target !is null || work.IsEnemyReclaim() || work.IsExternalControlled()) return false;
+        const int kind=work.GetBuildType();
+        if (kind!=int(Task::BuildType::GEO) && kind!=int(Task::BuildType::GEOUP)) return false;
+        int64 until=0; const string key=SiteKey(work);
+        const bool blocked=siteRetry.get(key,until) && ai.frame<until;
+        if (!blocked && aiTerrainMgr.CanReachAt(u,work.GetBuildPos(),u.circuitDef.GetBuildDistance())) return false;
+        if (work.GetUnits().length()==0) aiBuilderMgr.AbortTask(task);
+        return true;
+    }
+    void ObserveSiteProgress(CCircuitUnit@ u,IBuilderTask@ work) {
+        const string unitKey=""+u.id;
+        if (work is null || work.buildDef is null || work.target !is null || work.IsExternalControlled()
+            || (work.GetBuildType()!=int(Task::BuildType::GEO) && work.GetBuildType()!=int(Task::BuildType::GEOUP))) { siteProgress.delete(unitKey); return; }
+        const string key=SiteKey(work); const AIFloat3 p=u.GetPos(ai.frame);
+        SiteProgress@ state;
+        if (!siteProgress.get(unitKey,@state) || state is null || state.key!=key) {
+            @state=SiteProgress(); state.key=key; state.pos=p; state.since=ai.frame; siteProgress.set(unitKey,@state); return;
+        }
+        if (MapHelpers::SqDist(p,state.pos)>64.0f*64.0f) { state.pos=p; state.since=ai.frame; return; }
+        if (ai.frame-state.since<60*SECOND) return;
+        siteRetry.set(key,int64(ai.frame+90*SECOND)); siteProgress.delete(unitKey);
+        // Release this stalled worker only; frames/other workers retain their
+        // native claims. The next ask may choose economy instead of the site.
+        aiBuilderMgr.AssignTask(u,Wait());
+        GenericHelpers::LogUtil("[SEA][Economy] blocked geo released worker="+u.id,1);
+    }
     int placementLog=-100000;
     IUnitTask@ Wait() { return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)); }
+    IUnitTask@ OpeningMex(CCircuitUnit@ u) {
+        if (SeaExpansion::Active()) return SeaExpansion::Make(u);
+        if (u is null || u !is Builder::primaryT1SeaConstructor || !SeaConstructor::IsT1(u.circuitDef)) return null;
+        if (u.task !is null && (u.task.IsEnemyReclaim() || u.task.GetType()==int(Task::Type::PLAYER))) return u.task;
+        IBuilderTask@ current=cast<IBuilderTask>(u.task);
+        if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
+        // A ship's safe reachability query rejects routes across land/other
+        // ponds and accepts reachable coastal mexes. Native owns spot claims,
+        // allied occupancy and duplicate orders; do not duplicate its scan.
+        const AIFloat3 home=Factory::primaryT1Shipyard is null ? Global::Map::StartPos : Factory::primaryT1Shipyard.GetPos(ai.frame);
+        IUnitTask@ task=aiEconomyMgr.EnqueueMexWithin(u,home,Global::RoleSettings::Sea::NearbyMexRadius,0,true);
+        if (task !is null) {
+            IBuilderTask@ mex=cast<IBuilderTask>(task);
+            if (mex is null || mex.GetBuildType()!=int(Task::BuildType::MEX))
+                Invariants::Violation("INV-150",""+u.id,"SEA opening mex priority returned non-mex work");
+            GenericHelpers::LogUtil("[SEA][Mex] first ship="+u.id+" takes nearby metal",1);
+        }
+        return task;
+    }
+    IUnitTask@ Seaplane(CCircuitUnit@ u) {
+        if (u is null || !u.circuitDef.IsMobile()) return null;
+        const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        if (!SeaFactories::NeedSeaplane(side)) return null;
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        if (!u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || !SeaEconomy::SeaplaneReady(d)
+            || !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed(),0,0,
+                Global::RoleSettings::Sea::SeaplaneMetalReserve,Global::RoleSettings::Sea::SeaplaneEnergyReserve)) return null;
+        IUnitTask@ task=SeaLayout::Enabled() ? SeaLayout::Factory(u,d.GetName())
+            : Builder::EnqueueSeaplanePlatform(side,Factory::GetT2ShipyardPos(),SQUARE_SIZE*24,600*SECOND);
+        if (task !is null) {
+            // The compact census resets admissions; with layouts explicitly
+            // disabled native owns the order and its commitment accounting.
+            if (SeaLayout::Enabled()) SeaEconomy::Admit(d,false,true);
+            GenericHelpers::LogUtil("[SEA][Factory] post-T2 seaplane admitted "+d.GetName()
+                +" minM="+Economy::GetMinMetalIncomeLast10s()+" minE="+Economy::GetMinEnergyIncomeLast10s()
+                +" bankM="+aiEconomyMgr.metal.current+" bankE="+aiEconomyMgr.energy.current,1);
+        }
+        return task;
+    }
+    int SupportFootprint(CCircuitDef@ nano, const AIFloat3 &in centre, int stopAt=0) {
+        if (nano is null) return 0;
+        int count=0;
+        // Placement-only query over reserved slots, never per-unit micro.
+        // Include valid consumed slots: completed turrets still own footprint.
+        for (uint p=0;p<SeaLayout::patches.length();++p) {
+            SeaLayout::Patch@ patch=SeaLayout::patches[p];
+            if (patch.name!=nano.GetName()) continue;
+            for (uint s=0;s<patch.slots.length();++s) {
+                const int state=aiTerrainMgr.GetReservationState(patch.slots[s]);
+                if (state>=0 && state<4 && MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(patch.slots[s]),centre)
+                    <=nano.GetBuildDistance()*nano.GetBuildDistance()) {
+                    ++count;
+                    if (stopAt>0 && count>=stopAt) return count;
+                }
+            }
+        }
+        return count;
+    }
     Task::BuildType PlacementKind(CCircuitDef@ d, int kind) {
         if (d is null) return Task::BuildType(kind);
         const string name=d.GetName(), side=UnitHelpers::GetSideForUnitName(name);
@@ -21,55 +111,66 @@ namespace SeaBuild {
             || name==UnitHelpers::GetT1NavalNanoNameForSide(side);
     }
     void Leave() {
+        for (uint i=0;i<SeaEconomy::owned.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]);
+            if (u !is null && u.circuitDef.GetBuildSpeed()>0) u.SetBuildPriorityOverride(-1);
+        }
+        SeaFactories::urgentProducts.deleteAll();
+        SeaCoast::Leave();
+        SeaExpansion::Reset();
+        SeaInvasion::Leave();
+        SeaRecovery::Leave();
         SeaCombat::Leave();
+        siteRetry.deleteAll(); siteProgress.deleteAll();
         SeaEconomy::projects.resize(0); SeaFactories::draining.deleteAll();
+        SeaEconomy::lastProducts.deleteAll(); SeaEconomy::capacityBanks.resize(0);
+        SeaEconomy::capacityFrame=-1; SeaEconomy::capacityFull=0; SeaEconomy::capacityPressure=false;
         supportRetry.deleteAll();
         SeaEcoLayout::Reset();
         SeaLayout::Leave();
     }
-    bool ReserveSupport(CCircuitDef@ nano, const AIFloat3 &in centre, int facing) {
-        if (nano is null) return false;
-        const AIFloat3 rear=LayoutHelpers::Offset(centre,facing,0,-224.0f);
-        for (uint p=0; p<SeaLayout::patches.length(); ++p) {
-            SeaLayout::Patch@ patch=SeaLayout::patches[p];
-            if (patch.name==nano.GetName() && patch.slots.length()>0
-                && MapHelpers::SqDist(patch.centre,rear)<300.0f*300.0f) {
-                // A neighbour's bank only satisfies this reservation if every
-                // slot can actually help this factory.
-                bool covers=true;
-                for (uint s=0; s<patch.slots.length(); ++s)
-                    if (MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(patch.slots[s]),centre)
-                        >nano.GetBuildDistance()*nano.GetBuildDistance()) covers=false;
-                if (covers) return false;
+    bool ReserveSupport(CCircuitDef@ nano, const AIFloat3 &in centre, int facing, CCircuitDef@ factory=null, const string &in owner="") {
+        if (nano is null || factory is null || owner=="") return false;
+        for (uint i=0;i<SeaLayout::patches.length();++i) {
+            SeaLayout::Patch@ p=SeaLayout::patches[i];
+            if (p.owner!=owner || p.slots.length()==0) continue;
+            if (!p.active && LayoutHelpers::ActivationState(p.slots)==1) {
+                SeaLayout::ReleaseSupport(owner); break; // untouched blocked bank is replanned
             }
+            return false;
         }
-        const int count=AiMax(1,AiMin(Global::RoleSettings::Sea::MaxSupportPerBerth,
-            Global::RoleSettings::Sea::ReservedSupportPerFactory));
-        SeaLayout::PlanPatch(nano,rear,count,300.0f,centre);
-        return true; // one bounded search per tick, including failed attempts
+        int64 retry=0;
+        if (supportRetry.get(owner,retry) && ai.frame<retry) return false;
+        supportRetry.set(owner,int64(ai.frame+10*SECOND));
+        const int count=AiMax(4,AiMin(128,AiMin(Global::RoleSettings::Sea::MaxSupportPerBerth,Global::RoleSettings::Sea::ReservedSupportPerFactory)));
+        const string key="sea.support."+owner;
+        const int n=aiTerrainMgr.PlanNavalSupport(key,nano,factory,centre,facing,count,4,Global::RoleSettings::Sea::ExitMargin);
+        if (n>0) {
+            SeaLayout::Patch plan; plan.name=nano.GetName(); plan.owner=owner; plan.centre=centre; plan.facing=facing;
+            for (int s=0;s<n;++s) plan.slots.insertLast(aiTerrainMgr.GetLayoutInt(key+".slot."+s,-1));
+            SeaLayout::patches.insertLast(plan); SeaLayout::SavePatch(SeaLayout::patches.length()-1);
+            GenericHelpers::LogUtil("[SEA][Capacity] reserved owner="+owner+" slots="+n+" at="+int(centre.x)+","+int(centre.z),1);
+        }
+        // The caller stops this scan after one transaction. Tick has separate
+        // planned-berth and existing-factory scans: at most two attempts/tick.
+        return true;
     }
     void Tick() {
         if (!SeaLayout::Enabled() || ai.frame-lastTick<SECOND) return;
         lastTick=ai.frame; SeaEconomy::Tick(); SeaLayout::RefreshGeometry();
         if (SeaLayout::Active()) { SeaCombat::Tick(); SeaFactories::Tick(); }
         const string side=Global::AISettings::Side;
-        if (SeaLayout::Active()) {
-        if (SeaLayout::berths.length()==0) SeaLayout::Add(UnitHelpers::GetT1ShipyardForSide(side),Global::Map::StartPos);
-        if (SeaLayout::berths[0].slot>=0 && int(SeaLayout::berths.length())<Global::RoleSettings::Sea::PreplannedYards) {
-            SeaLayout::Add(UnitHelpers::GetT2ShipyardForSide(side),LayoutHelpers::Offset(SeaLayout::berths[0].centre,SeaLayout::facing,400.0f*float(SeaLayout::berths.length()),0));
-        }
-        } else if (SeaLayout::hadFactory && int(SeaLayout::berths.length())<AiMax(1,Global::RoleSettings::Sea::PreplannedYards-1)) {
-            // Compact placement needs future harbors too. An unconstrained
-            // opening can hug the map edge, leaving no rear capital-eco space.
-            // Reserve forward sites now; production/income gates stay intact.
-            const AIFloat3 harbor=SeaEcoLayout::Harbor();
-            if (harbor.x>=0) {
-                const AIFloat3 anchor=SeaLayout::berths.length()==0
-                    ? LayoutHelpers::Offset(harbor,SeaLayout::facing,0,Global::RoleSettings::Sea::FirstPlannedHarborAdvance)
-                    : LayoutHelpers::Offset(SeaLayout::berths[0].anchor,SeaLayout::facing,400.0f*float(SeaLayout::berths.length()),0);
-                SeaLayout::Add(UnitHelpers::GetT2ShipyardForSide(side),anchor);
+        for (uint p=0;p<SeaLayout::patches.length();++p) {
+            const string owner=SeaLayout::patches[p].owner;
+            if (owner.findFirst("unit.")==0 && ai.GetTeamUnit(int(parseInt(owner.substr(5)))) is null) {
+                SeaLayout::ReleaseSupport(owner); break; // one lost-owner cleanup per tick
             }
         }
+        CCircuitDef@ platform=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        const bool planAir=Global::RoleSettings::Sea::SeaplanesAfterT2 && platform !is null && platform.IsAvailable(ai.frame);
+        if (SeaLayout::Active() && SeaLayout::berths.length()==0 && !SeaLayout::hadFactory)
+            SeaLayout::Add(UnitHelpers::GetT1ShipyardForSide(side),Global::Map::StartPos);
+        Preplan(side,planAir);
         for (uint i=0; i<SeaLayout::berths.length(); ++i) {
             SeaLayout::Validate(SeaLayout::berths[i]);
             if (SeaLayout::berths[i].slot<0 && !SeaLayout::berths[i].active && !SeaLayout::berths[i].retired) { SeaLayout::Search(SeaLayout::berths[i]); break; }
@@ -78,38 +179,151 @@ namespace SeaBuild {
         CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(side));
         if (nano !is null) for (uint b=0; b<SeaLayout::berths.length(); ++b) {
             SeaLayout::Berth@ berth=SeaLayout::berths[b]; if (berth.slot<0 || berth.retired) continue;
-            if (ReserveSupport(nano,berth.centre,berth.facing)) break;
+            if (ReserveSupport(nano,berth.centre,berth.facing,ai.GetCircuitDef(berth.name),berth.key)) break;
         }
         // Amphibious complexes and other naval production use the same support
         // banks without entering shipyard tech/replacement bookkeeping.
         for (uint i=0; i<SeaEconomy::productionFactories.length(); ++i) {
             CCircuitUnit@ factory=ai.GetTeamUnit(SeaEconomy::productionFactories[i]);
             if (factory is null) continue;
-            if (ReserveSupport(nano,factory.GetPos(ai.frame),aiTerrainMgr.GetBuildingFacing(factory))) break;
+            // D-212 owns the coastal 6/12-pad footprint. Retrying the generic
+            // 24-pad rectangle here every second duplicates that search and
+            // often cannot fit the same coast. Income-based Support() below
+            // remains available to add real build power above the initial pad.
+            if (SeaInvasion::OwnsSupport(factory)) continue;
+            bool planned=false;
+            for (uint b=0;b<SeaLayout::berths.length();++b) if (SeaLayout::berths[b].unit==factory.id) { planned=true; break; }
+            if (!planned && ReserveSupport(nano,factory.GetPos(ai.frame),aiTerrainMgr.GetBuildingFacing(factory),ai.GetCircuitDef(factory.circuitDef.id),"unit."+factory.id)) break;
         }
+        const array<string> rejectedSites=siteRetry.getKeys();
+        for (uint i=0;i<rejectedSites.length();++i) { int64 until=0; if (!siteRetry.get(rejectedSites[i],until) || ai.frame>=until) siteRetry.delete(rejectedSites[i]); }
+        const array<string> siteWorkers=siteProgress.getKeys();
+        for (uint i=0;i<siteWorkers.length();++i) if (ai.GetTeamUnit(int(parseInt(siteWorkers[i]))) is null) siteProgress.delete(siteWorkers[i]);
         SeaEcoLayout::Tick();
+        PlanCapacityExpansion(side);
         // Preserve claimed pins while their builders approach the reserved site.
         for (uint i=0; i<SeaEconomy::owned.length(); ++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(SeaEconomy::owned[i]); if (u is null) continue;
+            ResourcePriority(u);
             IBuilderTask@ t=cast<IBuilderTask>(u.task);
+            ObserveSiteProgress(u,t);
+            if (u.task !is t) continue;
             // Native dormant chain links are deleted without a removed hook.
             // Inspect live unit ownership instead of retaining those pointers.
             if (t !is null && t.buildDef !is null && t.target is null && !SeaEconomy::OwnsTask(t)) {
-                if (ControlledEconomy(t.buildDef) || (SeaLayout::hadFactory && SeaEconomy::Yard(t.buildDef))) {
+                if (ControlledEconomy(t.buildDef) || UnitHelpers::IsSeaplanePlatform(t.buildDef.GetName()) || (SeaLayout::hadFactory && SeaEconomy::Yard(t.buildDef))) {
                     u.CmdStop(); aiBuilderMgr.AbortTask(t); continue;
                 }
             }
-            if (!SeaLayout::Active() || t is null || t.GetBuildType()!=int(Task::BuildType::GUARD)) continue;
-            CCircuitUnit@ target=t.target;
+            if (t is null || t.GetBuildType()!=int(Task::BuildType::GUARD) || UnitHelpers::IsCommander(u.circuitDef)) continue;
+            CCircuitUnit@ target=ai.GetTeamUnit(t.GetGuardTargetId());
+            IBuilderTask@ targetWork=target is null ? null : cast<IBuilderTask>(target.task);
             const bool productive=target !is null && !Lifecycle::IsRetiring(target)
-                && (target.GetBuildProgress()<1 || SeaEconomy::Busy(target.id));
+                && (target.GetBuildProgress()<1 || SeaEconomy::Busy(target.id)
+                    || (targetWork !is null && !targetWork.IsDead() && targetWork.target !is null
+                        && targetWork.target.GetBuildProgress()<1));
             if (!productive) { aiBuilderMgr.AssignTask(u,Wait()); u.CmdStop(); }
         }
         LayoutHelpers::CheckAlliedPlacements();
     }
+    void ResourcePriority(CCircuitUnit@ u) {
+        if (u.circuitDef.GetBuildSpeed()<=0 || SeaEconomy::SupportedFactory(u.circuitDef)) return;
+        IUnitTask@ task=u.task;
+        int overridePriority=-1;
+        if (task !is null && !task.IsExternalControlled() && !task.IsEnemyReclaim()
+            && task.GetType()!=int(Task::Type::PLAYER) && task.GetType()!=int(Task::Type::RETREAT)) {
+            IBuilderTask@ work=cast<IBuilderTask>(task);
+            if (work !is null) {
+                const int kind=work.GetBuildType();
+                if (kind==int(Task::BuildType::ENERGY) || kind==int(Task::BuildType::MEX)
+                    || kind==int(Task::BuildType::MEXUP) || kind==int(Task::BuildType::NANO)
+                    || kind==int(Task::BuildType::CONVERT)) overridePriority=1;
+                if ((UnitHelpers::IsCommander(u.circuitDef) || !u.circuitDef.IsMobile())
+                    && (kind==int(Task::BuildType::GUARD) || kind==int(Task::BuildType::REPAIR))) {
+                    const int yard=kind==int(Task::BuildType::GUARD) ? work.GetGuardTargetId()
+                        : work.target is null ? -1 : work.target.GetProducerId();
+                    CCircuitDef@ product=SeaEconomy::Product(yard);
+                    int urgent=-1;
+                    const bool emergency=SeaFactories::urgentProducts.get(""+yard,urgent) && product !is null && int(product.id)==urgent;
+                    overridePriority=SeaMath::AssistPriority(product is null,product !is null && product.GetBuildSpeed()>0,emergency);
+                }
+            }
+        }
+        // One pass over the existing census. Native suppresses identical
+        // effective priorities even when an old task re-evaluates between ticks.
+        u.SetBuildPriorityOverride(overridePriority);
+    }
+    SeaLayout::Berth@ Planned(const string &in name) {
+        for (uint i=0;i<SeaLayout::berths.length();++i)
+            if (!SeaLayout::berths[i].retired && SeaLayout::berths[i].name==name) return SeaLayout::berths[i];
+        return null;
+    }
+    void Preplan(const string &in side,bool planAir) {
+        if (!SeaLayout::hadFactory) return;
+        SeaLayout::Berth@ t2=Planned(UnitHelpers::GetT2ShipyardForSide(side));
+        if (t2 is null) {
+            AIFloat3 home=SeaEcoLayout::Harbor(); if (home.x<0) home=Global::Map::StartPos;
+            @t2=SeaLayout::Add(UnitHelpers::GetT2ShipyardForSide(side),LayoutHelpers::Offset(home,SeaLayout::facing,0,Global::RoleSettings::Sea::FirstPlannedHarborAdvance));
+        }
+        if (t2.slot<0) return;
+        // Separate assist discs, preserving a ship-sized cross passage between
+        // clusters. Terrain search may move them; native allied corridors veto
+        // candidate footprints. Preplanning does not bypass purchase gates.
+        if (planAir && Planned(UnitHelpers::GetSeaplanePlatformNameForSide(side)) is null)
+            SeaLayout::Add(UnitHelpers::GetSeaplanePlatformNameForSide(side),LayoutHelpers::Offset(t2.centre,SeaLayout::facing,960,0));
+        if (SeaInvasion::gantrySlot<0 && Planned(SeaInvasion::Gantry(side)) is null)
+            SeaLayout::Add(SeaInvasion::Gantry(side),LayoutHelpers::Offset(t2.centre,SeaLayout::facing,-960,0));
+    }
+    bool FreeSupport(CCircuitUnit@ yard) {
+        for (uint i=0;i<SeaLayout::patches.length();++i) {
+            SeaLayout::Patch@ patch=SeaLayout::patches[i];
+            CCircuitDef@ d=ai.GetCircuitDef(patch.name);
+            if (d is null || d.GetBuildSpeed()<=0) continue;
+            for (uint j=0;j<patch.slots.length();++j) {
+                const int slot=patch.slots[j], state=aiTerrainMgr.GetReservationState(slot);
+                if (state>=0 && state<=2 && (state!=0 || aiTerrainMgr.IsReservationBuildable(slot))
+                    && MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(slot),yard.GetPos(ai.frame))<=d.GetBuildDistance()*d.GetBuildDistance()) return true;
+            }
+        }
+        return false;
+    }
+    void PlanCapacityExpansion(const string &in side) {
+        if (!SeaEconomy::capacityPressure || int(SeaEconomy::productionFactories.length())>=Global::RoleSettings::Sea::MaxProductionYards) return;
+        CCircuitUnit@ last=null;
+        for (uint i=0;i<SeaEconomy::productionFactories.length();++i) {
+            CCircuitUnit@ yard=ai.GetTeamUnit(SeaEconomy::productionFactories[i]);
+            if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) continue;
+            if (FreeSupport(yard)) return;
+            if (last is null || SeaLayout::Along(yard.GetPos(ai.frame))>SeaLayout::Along(last.GetPos(ai.frame))) @last=yard;
+        }
+        if (last is null) return;
+        const string name=UnitHelpers::GetT2ShipyardForSide(side);
+        for (uint i=0;i<SeaLayout::berths.length();++i)
+            if (SeaLayout::berths[i].name==name && !SeaLayout::berths[i].retired && !SeaLayout::berths[i].active) return;
+        SeaLayout::Add(name,LayoutHelpers::Offset(last.GetPos(ai.frame),SeaLayout::facing,960,Global::RoleSettings::Sea::ForwardStep));
+        GenericHelpers::LogUtil("[SEA][Capacity] all support occupied; preplan next forward yard",1);
+    }
+    IUnitTask@ CapacityFactory(CCircuitUnit@ u) {
+        if (!SeaEconomy::capacityPressure || !SeaConstructor::IsT1(u.circuitDef) || u.id==SeaEconomy::mexWorker) return null;
+        const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        if (SeaFactories::NeedSeaplane(side)) return null;
+        for (uint i=0;i<SeaEconomy::productionFactories.length();++i) {
+            CCircuitUnit@ yard=ai.GetTeamUnit(SeaEconomy::productionFactories[i]);
+            if (yard !is null && SeaEconomy::Yard(yard.circuitDef) && FreeSupport(yard)) return null;
+        }
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
+        if (d is null || SeaEconomy::Have(d)==0 || !SeaEconomy::TechReady(d) || !SeaEconomy::Fund(d,u.circuitDef.GetBuildSpeed())) return null;
+        IUnitTask@ t=SeaLayout::Factory(u,d.GetName());
+        if (t !is null) SeaEconomy::Admit(d,false,true);
+        return t;
+    }
     IUnitTask@ Place(CCircuitUnit@ u, const string &in name, Task::BuildType kind, int size=6) {
         CCircuitDef@ d=ai.GetCircuitDef(name);
         if (d is null || SeaEconomy::Pending(d)>=2) return null;
+        // All new converter paths, including a native/legacy fallback, use
+        // the same live budget. Existing frames/owned tasks return before
+        // Place and are never cancelled merely because spending changed.
+        if (kind==Task::BuildType::CONVERT && !SeaEconomy::NeedsConverter(d)) return null;
         if (SeaEcoLayout::Managed(d)) {
             IUnitTask@ packed=SeaEcoLayout::Place(u,d,kind);
             IBuilderTask@ order=cast<IBuilderTask>(packed);
@@ -153,17 +367,26 @@ namespace SeaBuild {
         const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
         CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(side));
         if (nano is null || !u.circuitDef.CanBuild(nano) || !nano.IsAvailable(ai.frame)) return null;
+        // Live projects close the same-callback admission race. Keep one ship
+        // building support while the expansion ship and other workers grow eco.
+        for (uint i=0;i<SeaEconomy::projects.length();++i) {
+            IBuilderTask@ t=cast<IBuilderTask>(SeaEconomy::projects[i]);
+            if (t !is null && !t.IsDead() && t.GetBuildType()==int(Task::BuildType::NANO)) return null;
+        }
         CCircuitUnit@ selected=null;
         float bestFill=1.0f, selectedLocal=0, selectedTarget=0;
         for (uint i=0; i<SeaEconomy::productionFactories.length(); ++i) {
             CCircuitUnit@ yard=ai.GetTeamUnit(SeaEconomy::productionFactories[i]);
-            if (yard is null || yard.GetBuildProgress()<1 || SeaFactories::Hold(yard) || !SeaEconomy::Busy(yard.id)) continue;
+            if (yard is null || yard.GetBuildProgress()<1 || SeaFactories::Hold(yard)) continue;
             int64 retry=0;
             if (supportRetry.get(""+yard.id,retry) && ai.frame<retry) continue;
             CCircuitDef@ product=SeaEconomy::Product(yard.id);
             if (product is null || product.GetBuildTime()<=0) continue;
             const float local=SeaEconomy::LocalPower(yard);
-            const float target=SeaEconomy::SupportTarget(yard,product);
+            float target=SeaEconomy::SupportTarget(yard,product);
+            if (SeaEconomy::capacityPressure) target=AiMax(target,local+nano.GetBuildSpeed());
+            if (UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName()) && CompletedSupport(yard)<Global::RoleSettings::Sea::CommanderHandoffTurrets)
+                target=AiMax(target,local+nano.GetBuildSpeed()); // mobile assist cannot substitute for four turrets
             if (!SeaMath::SupportNeeded(target,local,yard.circuitDef.GetBuildSpeed(),nano.GetBuildSpeed(),
                 Global::RoleSettings::Sea::MaxSupportPerBerth)) continue;
             const float fill=local/target;
@@ -171,11 +394,17 @@ namespace SeaBuild {
         }
         if (selected !is null) {
             CCircuitDef@ product=SeaEconomy::Product(selected.id);
+            // Sustained gifted-bank pressure can fund one complete turret
+            // even at a nominal deficit. Shorten only metal's observation
+            // horizon; reserve the full unpaid cost and keep the normal energy
+            // horizon. No predicted future donation enters either balance.
+            const float horizon=SeaEconomy::capacityPressure && aiEconomyMgr.metal.income<TeamEconomy::OwnMetal(TeamEconomy::USAGE)
+                ? float(Global::RoleSettings::Sea::CapacityObservationSeconds) : Global::RoleSettings::Sea::WorkforceHorizon;
             if (!SeaEconomy::Fund(nano,u.circuitDef.GetBuildSpeed(),nano.GetBuildSpeed()*product.costM/product.GetBuildTime(),
-                nano.GetBuildSpeed()*product.costE/product.GetBuildTime())) return null;
-            const int f=aiTerrainMgr.GetBuildingFacing(selected);
-            const AIFloat3 anchor=LayoutHelpers::Offset(selected.GetPos(ai.frame),f,0,-224.0f);
-            IUnitTask@ t=SeaLayout::Place(u,nano,Task::BuildType::NANO,anchor,6,300.0f,selected.GetPos(ai.frame));
+                nano.GetBuildSpeed()*product.costE/product.GetBuildTime(),0,0,horizon)) return null;
+            // Serve only preplanned pads. The generic six-pad fallback could
+            // strand turrets or keep searching an already saturated harbor.
+            IUnitTask@ t=SupportSlot(u,nano,selected);
             if (t !is null) {
                 SeaEconomy::Admit(nano,true,true);
                 IBuilderTask@ build=cast<IBuilderTask>(t);
@@ -187,6 +416,88 @@ namespace SeaBuild {
             }
             supportRetry.set(""+selected.id,int64(ai.frame+5*SECOND)); // blocked placement must not starve other factories
         }
+        return null;
+    }
+    int CompletedSupport(CCircuitUnit@ yard) {
+        int count=0;
+        for (uint i=0;i<SeaEconomy::owned.length();++i) {
+            CCircuitUnit@ nano=ai.GetTeamUnit(SeaEconomy::owned[i]);
+            if (nano is null || nano.GetBuildProgress()<1 || nano.circuitDef.IsMobile()
+                || SeaEconomy::SupportedFactory(nano.circuitDef) || nano.circuitDef.GetBuildSpeed()<=0
+                || Lifecycle::IsRetiring(nano)) continue;
+            const float reach=nano.circuitDef.GetBuildDistance();
+            if (MapHelpers::SqDist(nano.GetPos(ai.frame),yard.GetPos(ai.frame))<=reach*reach) ++count;
+        }
+        return count;
+    }
+    IUnitTask@ SupportSlot(CCircuitUnit@ u,CCircuitDef@ nano,CCircuitUnit@ yard) {
+        for (uint p=0;p<SeaLayout::patches.length();++p) {
+            SeaLayout::Patch@ patch=SeaLayout::patches[p]; if (patch.name!=nano.GetName()) continue;
+            for (uint s=0;s<patch.slots.length();++s) {
+                const int slot=patch.slots[s];
+                if (aiTerrainMgr.GetReservationState(slot)!=0) continue;
+                const AIFloat3 at=aiTerrainMgr.GetReservationPos(slot);
+                if (MapHelpers::SqDist(at,yard.GetPos(ai.frame))>nano.GetBuildDistance()*nano.GetBuildDistance()
+                    || !aiTerrainMgr.IsReservationBuildable(slot) || !aiTerrainMgr.CanReachAt(u,at,u.circuitDef.GetBuildDistance())) continue;
+                IUnitTask@ task=SeaLayout::Pinned(nano,slot,Task::BuildType::NANO,Task::Priority::HIGH);
+                if (task !is null) { patch.active=true; SeaLayout::SavePatch(p); return task; }
+            }
+        }
+        return null;
+    }
+    IUnitTask@ Commander(CCircuitUnit@ u) {
+        if (!SeaLayout::Enabled() || u is null || !UnitHelpers::IsCommander(u.circuitDef)) return null;
+        if (u.task !is null && (u.task.IsEnemyReclaim() || u.task.GetType()==int(Task::Type::PLAYER)
+            || u.task.GetType()==int(Task::Type::RETREAT))) return u.task;
+        IBuilderTask@ current=cast<IBuilderTask>(u.task);
+        if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
+        SeaEconomy::Tick();
+        CCircuitUnit@ yard=null; CCircuitUnit@ idleYard=null; float distance=1.0e20f, idleDistance=1.0e20f; bool handoff=false; int handoffYard=-1;
+        for (uint i=0;i<SeaEconomy::owned.length();++i) {
+            CCircuitUnit@ candidate=ai.GetTeamUnit(SeaEconomy::owned[i]);
+            if (candidate is null || !SeaEconomy::Yard(candidate.circuitDef) || Lifecycle::IsRetiring(candidate)) continue;
+            const bool t2=UnitHelpers::IsT2Shipyard(candidate.circuitDef.GetName());
+            const int turrets=t2 && candidate.GetBuildProgress()>=1 ? CompletedSupport(candidate) : 0;
+            handoff=handoff || SeaMath::CommanderHandoff(t2 && candidate.GetBuildProgress()>=1,turrets,Global::RoleSettings::Sea::CommanderHandoffTurrets);
+            if (SeaMath::CommanderHandoff(t2 && candidate.GetBuildProgress()>=1,turrets,Global::RoleSettings::Sea::CommanderHandoffTurrets)) handoffYard=candidate.id;
+            const float sq=MapHelpers::SqDist(candidate.GetPos(ai.frame),u.GetPos(ai.frame));
+            if (sq<idleDistance) { @idleYard=candidate; idleDistance=sq; }
+            if ((SeaEconomy::Busy(candidate.id) || candidate.GetBuildProgress()<1) && sq<distance) { @yard=candidate; distance=sq; }
+        }
+        if (handoff) {
+            CCircuitUnit@ target=null; float best=-1;
+            const bool energyLow=aiEconomyMgr.energy.current<aiEconomyMgr.energy.storage*.3f;
+            for (uint i=0;i<SeaEconomy::projects.length();++i) {
+                IBuilderTask@ project=cast<IBuilderTask>(SeaEconomy::projects[i]);
+                if (project is null || project.IsDead() || project.target is null || project.target.GetBuildProgress()>=1) continue;
+                const int kind=project.GetBuildType();
+                const float priority=kind==int(Task::BuildType::ENERGY) ? (energyLow ? 100.0f : 70.0f)
+                    : kind==int(Task::BuildType::MEXUP) || kind==int(Task::BuildType::MEX) ? 90.0f
+                    : kind==int(Task::BuildType::NANO) ? 80.0f : kind==int(Task::BuildType::CONVERT) ? 40.0f : 0.0f;
+                const float sq=MapHelpers::SqDist(project.target.GetPos(ai.frame),u.GetPos(ai.frame));
+                if (priority<=0 || sq>Global::RoleSettings::Sea::CapitalAssistRadius*Global::RoleSettings::Sea::CapitalAssistRadius) continue;
+                const float score=priority-sqrt(sq)/1000.0f;
+                if (score>best && aiTerrainMgr.CanReachAt(u,project.target.GetPos(ai.frame),u.circuitDef.GetBuildDistance())) { best=score; @target=project.target; }
+            }
+            if (target !is null) {
+                CCircuitUnit@ verified=ai.GetTeamUnit(handoffYard);
+                if (verified is null || !SeaMath::CommanderHandoff(verified.GetBuildProgress()>=1,CompletedSupport(verified),Global::RoleSettings::Sea::CommanderHandoffTurrets)) {
+                    Invariants::Violation("INV-162",""+u.id,"SEA commander economy handoff without completed T2 and four usable turrets"); return null;
+                }
+                if (current !is null && !current.IsDead() && current.target is target) return current;
+                GenericHelpers::LogUtil("[SEA][Commander] handoff eco="+target.id+" requiredTurrets="+Global::RoleSettings::Sea::CommanderHandoffTurrets,1);
+                return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH,target,10*SECOND));
+            }
+        }
+        if (yard !is null) {
+            if (current !is null && !current.IsDead() && current.GetGuardTargetId()==yard.id) return current;
+            GenericHelpers::LogUtil("[SEA][Commander] assist yard="+yard.id+" handoff="+handoff,1);
+            return GuardHelpers::AssignWorkerGuard(u,yard,Task::Priority::HIGH,false,Global::RoleSettings::Sea::CommanderFactoryAssistGuardTimeoutSeconds*SECOND);
+        }
+        if (!handoff && idleYard !is null && (SeaEconomy::mobilePower>0 || aiEconomyMgr.energy.current>aiEconomyMgr.energy.storage*.2f))
+            return Wait(); // a product gap is not permission to walk away
+        // No productive yard/workforce/energy: native emergency recovery can
+        // restart production rather than keeping a permanently idle guard.
         return null;
     }
     IUnitTask@ Assist(CCircuitUnit@ u) {
@@ -247,18 +558,20 @@ namespace SeaBuild {
         aiBuilderMgr.experimentalBuild=false;
         IUnitTask@ task=aiBuilderMgr.DefaultMakeTask(u);
         aiBuilderMgr.experimentalBuild=true;
+        if (RejectSite(u,task)) return null;
         IBuilderTask@ build=cast<IBuilderTask>(task);
         if (build is null || build.buildDef is null || build.target !is null || SeaEconomy::OwnsTask(task)) return task;
         const Task::BuildType kind=PlacementKind(build.buildDef,build.GetBuildType());
         CCircuitDef@ def=build.buildDef;
         const bool controlled=kind==Task::BuildType::ENERGY || kind==Task::BuildType::CONVERT || kind==Task::BuildType::NANO
-            || (kind==Task::BuildType::FACTORY && SeaEconomy::Yard(def));
+            || (kind==Task::BuildType::FACTORY && (SeaEconomy::Yard(def) || UnitHelpers::IsSeaplanePlatform(def.GetName()) || !SeaFactories::FactoryAllowed(def)));
         if (!controlled) return task;
         // Never abandon another worker's order. Native queued work is adopted
         // only when this call is its sole prospective assignee.
         if (build.GetUnits().length()>0) return task;
         aiBuilderMgr.AbortTask(task);
         if (kind==Task::BuildType::FACTORY) {
+            if (SeaInvasion::Active() && SeaInvasion::Factory(def)) return SeaInvasion::Build(u);
             if (UnitHelpers::IsT2Shipyard(def.GetName()) && !SeaEconomy::TechReady(def)) return null;
             return SeaLayout::Factory(u,def.GetName());
         }
@@ -274,6 +587,57 @@ namespace SeaBuild {
         }
         return null;
     }
+    IUnitTask@ HomeEnergy(CCircuitUnit@ u) {
+        if (!SeaConstructor::IsT1(u.circuitDef) || (SeaExpansion::Worker(u) && !SeaExpansion::blocked.exists(""+u.id))) return null;
+        // With the commander on production, the second ship must grow home
+        // energy itself. Following the mex ship leaves both ships offshore
+        // and allows factory assistance to consume the entire opening economy.
+        const float target=SeaEconomy::HomeEnergyTarget();
+        if (aiEconomyMgr.energy.income>=target) return null;
+        const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        return Place(u,UnitHelpers::GetTidalNameForSide(side),Task::BuildType::ENERGY);
+    }
+    // Shared only by SEA's compact and experimental builders. Keep the old
+    // helper ladder unchanged for TACTICAL and explicit layout opt-outs.
+    IUnitTask@ EconomyGrowth(CCircuitUnit@ u) {
+        if (!SeaConstructor::IsT1(u.circuitDef) && !SeaConstructor::IsT2(u.circuitDef)) return null;
+        IUnitTask@ task=Upgrade(u); if (task !is null) return task;
+        const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        CCircuitDef@ yard=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
+        if (yard !is null && u.circuitDef.CanBuild(yard) && SeaEconomy::Have(yard)==0 && SeaEconomy::TechReady(yard)) {
+            @task=SeaLayout::Factory(u,yard.GetName());
+            if (task !is null) { SeaEconomy::Admit(yard,false,true); return task; }
+        }
+        int pending=0;
+        const float gap=SeaEconomy::ConversionGap(pending);
+        CCircuitDef@ converter=ai.GetCircuitDef(SeaConstructor::IsT2(u.circuitDef)
+            ? UnitHelpers::GetAdvNavalEnergyConverterNameForSide(side) : UnitHelpers::GetNavalEnergyConverterNameForSide(side));
+        const float draw=aiEconomyMgr.GetEnergyUse(converter);
+        if (converter !is null && u.circuitDef.CanBuild(converter)
+            && SeaMath::ConversionReady(aiEconomyMgr.IsMetalMap(),aiEconomyMgr.energy.current,aiEconomyMgr.energy.storage,
+                ai.GetTeamRulesParam("mmLevel",.75f),aiEconomyMgr.energy.income,
+                Global::RoleSettings::Sea::BuildT1ConvertersMinimumEnergyIncome,gap,draw,pending,
+                Global::RoleSettings::Sea::ConverterParallelProjects)) {
+            @task=Place(u,converter.GetName(),Task::BuildType::CONVERT);
+            if (task !is null) {
+                int after=0; SeaEconomy::ConversionCapacity(after);
+                if (!SeaEconomy::OwnsTask(task) || after!=pending+1)
+                    Invariants::Violation("INV-177",converter.GetName(),"SEA converter admission missing from live capacity ledger");
+                GenericHelpers::LogUtil("[SEA][Conversion] build="+converter.GetName()+" gap="+gap+" draw="+draw+" pending="+pending,1);
+                return task;
+            }
+        }
+        CCircuitDef@ fusion=ai.GetCircuitDef(UnitHelpers::GetNavalFusionNameForSide(side));
+        // One capital-energy project at a time. Convert existing surplus
+        // before growing another reactor; bootstrap the first funded reactor
+        // even when tidals already satisfy the old energy/metal ratio.
+        if (fusion !is null && u.circuitDef.CanBuild(fusion) && SeaEconomy::Pending(fusion)+aiBuilderMgr.GetUnfinishedCount(fusion)==0
+            && (fusion.count==0 || gap<draw*.75f) && SeaEconomy::FusionFunded(fusion) && SeaEconomy::HoldingWater()) {
+            @task=Place(u,fusion.GetName(),Task::BuildType::ENERGY,2);
+            if (task !is null) return task;
+        }
+        return null;
+    }
     // Keep normal SEA decisions, but use one owner for economy placement.
     IUnitTask@ LegacyTask(CCircuitUnit@ u) {
         if (u is null) return null;
@@ -283,25 +647,53 @@ namespace SeaBuild {
         if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)
             && (current.target !is null || SeaEconomy::OwnsTask(current))) return current;
         if (!u.circuitDef.IsMobile()) { IUnitTask@ help=Assist(u); return help is null ? Wait() : help; }
-        IUnitTask@ task=SeaEcoLayout::Support(u); if (task !is null) return task;
-        // Leave the commander and one construction ship on native expansion.
-        // Other T1 ships can spend funded surplus on useful factory power.
+        IUnitTask@ task=null;
+        @task=EconomyGrowth(u); if (task !is null) return task;
+        @task=SeaEcoLayout::Support(u); if (task !is null) return task;
+        @task=HomeEnergy(u); if (task !is null) return task;
         if (SeaConstructor::IsT1(u.circuitDef) && u.id!=SeaEconomy::mexWorker) {
             @task=Support(u); if (task !is null) return task;
         }
+        @task=CapitalAssist(u); if (task !is null) return task;
+        @task=Seaplane(u); if (task !is null) return task;
+        @task=CapacityFactory(u); if (task !is null) return task;
         return LayoutTask(u,RoleSea::Sea_LegacyBuilderTask(u));
     }
     // Also applied to the shared manager's native fallback, which runs after
     // a role returns null. Keep null as null so normal expansion can continue.
     IUnitTask@ LayoutTask(CCircuitUnit@ u, IUnitTask@ task) {
+        if (RejectSite(u,task)) return null;
         IBuilderTask@ build=cast<IBuilderTask>(task);
         if (build is null || build.buildDef is null || build.target !is null || SeaEconomy::OwnsTask(task)) return task;
         const Task::BuildType kind=PlacementKind(build.buildDef,build.GetBuildType());
+        if (kind==Task::BuildType::MEX && SeaExpansion::Active() && SeaExpansion::Worker(u)
+            && (!aiEconomyMgr.IsMexTaskUsable(task) || !SeaExpansion::SafeApproach(u.GetPos(ai.frame),build.GetBuildPos()) || !SeaExpansion::Escorted(build.GetBuildPos()))) {
+            if (build.GetUnits().length()==0) aiBuilderMgr.AbortTask(task);
+            return Wait();
+        }
+        if (kind==Task::BuildType::FACTORY && SeaInvasion::Active() && SeaInvasion::Factory(build.buildDef)) {
+            // The invasion controller is the only admission/placement owner.
+            // Its pinned tasks returned above are already accounted for.
+            if (build.GetUnits().length()>0) return task;
+            aiBuilderMgr.AbortTask(task);
+            IUnitTask@ invasion=SeaInvasion::Build(u);
+            return invasion is null ? Wait() : invasion;
+        }
+        if (kind==Task::BuildType::FACTORY && !SeaFactories::FactoryAllowed(build.buildDef)) {
+            // Do not cancel a structure that another builder already started.
+            array<CCircuitUnit@>@ workers=build.GetUnits();
+            for (uint i=0;i<workers.length();++i) if (workers[i] !is null) workers[i].CmdStop();
+            aiBuilderMgr.AbortTask(task);
+            IUnitTask@ platform=Seaplane(u); return platform is null ? Wait() : platform;
+        }
         // Coastal commanders still need land energy and normal mex expansion.
         // Only naval buildings belong to this water layout.
-        const bool yard=SeaEconomy::Yard(build.buildDef);
+        const bool yard=SeaEconomy::Yard(build.buildDef) || UnitHelpers::IsSeaplanePlatform(build.buildDef.GetName());
         SeaLayout::RefreshGeometry();
-        if (yard && !SeaLayout::hadFactory) return task; // opening exception, still honors allied native reservations
+        if (SeaEconomy::Yard(build.buildDef) && !SeaLayout::hadFactory) {
+            AiPreferFactoryFacing(task,SeaLayout::facing);
+            return task; // single-yard exception; prefer forward, opposite last
+        }
         if (!ControlledEconomy(build.buildDef) && !yard) return task;
         const string name=build.buildDef.GetName();
         array<CCircuitUnit@>@ workers=build.GetUnits();
@@ -323,7 +715,16 @@ namespace SeaBuild {
         IBuilderTask@ current=cast<IBuilderTask>(u.task);
         if (current !is null && !current.IsDead() && current.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
         if (!u.circuitDef.IsMobile()) { IUnitTask@ t=Assist(u); return t is null ? Wait() : t; }
+        // Match compact SEA: keep home energy growing before a full metal
+        // bank can repeatedly buy nanos. The expansion worker remains exempt.
+        IUnitTask@ homeEnergy=EconomyGrowth(u); if (homeEnergy !is null) return homeEnergy;
+        @homeEnergy=SeaEcoLayout::Support(u); if (homeEnergy !is null) return homeEnergy;
+        @homeEnergy=HomeEnergy(u); if (homeEnergy !is null) return homeEnergy;
+        if (SeaConstructor::IsT1(u.circuitDef) && u.id!=SeaEconomy::mexWorker) {
+            IUnitTask@ capacity=Support(u); if (capacity !is null) return capacity;
+        }
         IUnitTask@ queued=Resume(u); if (queued !is null) return queued;
+        @queued=Seaplane(u); if (queued !is null) return queued;
         @queued=SeaEcoLayout::Support(u); if (queued !is null) return queued;
         @queued=CapitalAssist(u); if (queued !is null) return queued;
         const string side=UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
@@ -346,7 +747,7 @@ namespace SeaBuild {
         // Factory pull can greatly exceed available income. Keep one expanding
         // ship while the other workers grow reliable energy toward the T2 gate.
         if (SeaConstructor::IsT1(u.circuitDef) && u.id!=SeaEconomy::mexWorker
-            && ei<AiMin(Global::RoleSettings::Sea::TidalEnergyIncomeMinimum,mi*Global::RoleSettings::Sea::EnergyPerMetal)) {
+            && ei<SeaEconomy::HomeEnergyTarget()) {
             @t=Place(u,UnitHelpers::GetTidalNameForSide(side),Task::BuildType::ENERGY);
             if (t !is null) return t;
         }
@@ -400,17 +801,12 @@ namespace SeaBuild {
             if (t !is null) return t;
         }
         @t=Support(u); if (t !is null) return t;
+        @t=CapacityFactory(u); if (t !is null) return t;
         // Existing threat-driven tasks retain native placement, which observes
         // the same allied reservations and exit corridors as the new planner.
         const array<int> kinds={int(Task::BuildType::DEFENCE),int(Task::BuildType::SONAR),int(Task::BuildType::RADAR),
             int(Task::BuildType::BUNKER),int(Task::BuildType::GEO),int(Task::BuildType::GEOUP),int(Task::BuildType::REPAIR)};
-        for (uint i=0; i<kinds.length(); ++i) { @t=aiBuilderMgr.FindQueuedTask(u,kinds[i]); if (t !is null) return t; }
-        if (!aiEconomyMgr.IsMetalMap() && !energyLow && aiEconomyMgr.energy.current>aiEconomyMgr.energy.storage*.85f) {
-            const string convert=SeaConstructor::IsT2(u.circuitDef) ? UnitHelpers::GetAdvNavalEnergyConverterNameForSide(side) : UnitHelpers::GetNavalEnergyConverterNameForSide(side);
-            CCircuitDef@ d=ai.GetCircuitDef(convert);
-            if (d !is null && ei>aiEconomyMgr.energy.pull+aiEconomyMgr.GetEnergyUse(d)*.75f) @t=Place(u,convert,Task::BuildType::CONVERT,6);
-            if (t !is null) return t;
-        }
+        for (uint i=0; i<kinds.length(); ++i) { @t=aiBuilderMgr.FindQueuedTask(u,kinds[i]); if (t !is null && !RejectSite(u,t)) return t; }
         @t=NativeTask(u); if (t !is null) return t;
         @t=Place(u,UnitHelpers::GetTidalNameForSide(side),Task::BuildType::ENERGY);
         if (t !is null) return t;

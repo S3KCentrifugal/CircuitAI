@@ -1,13 +1,31 @@
 #include "terrain/RangedGeometry.h"
+#include "ranged_legacy_index.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <numeric>
 #include <random>
 #include <set>
 
 using namespace circuit::ranged;
 int main()
 {
+    // Queue the exact formation slot without toggling off a nearby grid
+    // endpoint. Recoil uses a strict 17-elmo positional cancellation radius.
+    std::vector<Point> route;
+    AppendExactGoal(route,Point{100,100});
+    assert(route.size()==1 && route.back().x==100);
+    AppendExactGoal(route,Point{116,100});
+    assert(route.size()==1 && route.back().x==116);
+    AppendExactGoal(route,Point{133,100});
+    assert(route.size()==2 && route.front().x==116);
+    AppendExactGoal(route,Point{133,100});
+    assert(route.size()==2);
+    AppendExactGoal(route,Point{143,110});
+    assert(route.size()==2 && route.back().x==143 && route.back().z==110);
+    route={{100,100},{132,100}};
+    AppendExactGoal(route,Point{116,100});
+    assert(route.size()==1 && route.back().x==116);
     // Safe endpoints alone must not permit a path through a defended area.
     assert(!SafeSegment({-200,0},{200,0},{0,0},100));
     assert(SafeSegment({-200,150},{200,150},{0,0},100));
@@ -30,17 +48,55 @@ int main()
     std::uniform_real_distribution<float> coordinate(-8192,8192);
     std::vector<Point> points(4096);
     SpatialIndex index;
-    for(size_t i=0;i<points.size();++i) { points[i]={coordinate(rng),coordinate(rng)}; index.Add(points[i],int(i)); }
+    index.Configure(12288,12288);
+    ranged_reference::SpatialIndex old;
+    for(size_t i=0;i<points.size();++i) { points[i]={coordinate(rng),coordinate(rng)}; index.Add(points[i],int(i)); old.Add(points[i],int(i)); }
     for(int query=0;query<1000;++query) {
         Point p{coordinate(rng),coordinate(rng)}; float radius=64+(rng()%1500);
         std::set<int> expected,actual;
         for(size_t i=0;i<points.size();++i) if(DistanceSq(p,points[i])<=radius*radius) expected.insert(int(i));
         index.Query(p,radius,[&](int i) { if(DistanceSq(p,points[i])<=radius*radius) actual.insert(i); });
         assert(expected==actual);
+        // Preserve ordered cell/insertion traversal, not only a set of hits:
+        // equal target scores and floating sums depend on this exact sequence.
+        std::vector<int> before,after;
+        old.Query(p,radius,[&](int i){before.push_back(i);});
+        index.Query(p,radius,[&](int i){after.push_back(i);});
+        assert(before==after);
+        int calls=0;
+        const bool any=index.Any(p,radius,[&](int i){++calls;return DistanceSq(p,points[i])<=radius*radius;});
+        assert(any==!expected.empty());
+        assert(calls<=int(before.size()));
         const int changed=rng()%points.size();
-        index.Remove(points[changed],changed); points[changed]={coordinate(rng),coordinate(rng)};
-        index.Add(points[changed],changed);
+        index.Remove(points[changed],changed); old.Remove(points[changed],changed);
+        points[changed]={coordinate(rng),coordinate(rng)};
+        index.Add(points[changed],changed); old.Add(points[changed],changed);
     }
     index.Clear(); int count=0; index.Query({0,0},20000,[&](int){++count;}); assert(count==0);
-    std::cout << "ranged geometry: coverage, retreat, scoring and 1000 spatial oracle mutations PASS\n";
+    // Empty/remove/re-add must not duplicate touched buckets or reorder IDs.
+    for(int generation=0;generation<100;++generation) {
+        index.Add({-1,-1},7); index.Remove({-1,-1},7); index.Add({-1,-1},8);
+        index.Add({12288,12288},9); index.Add({16000,16000},10);
+        std::vector<int> ids; index.Query({0,0},20000,[&](int i){ids.push_back(i);});
+        assert((ids==std::vector<int>{8,9,10}));
+        int visits=0; assert(index.Any({0,0},20000,[&](int){++visits;return true;})); assert(visits==1);
+        index.Clear(); assert(!index.Any({0,0},20000,[](int){return true;}));
+    }
+    CellStore<float> sums; sums.Configure(96,96);
+    sums.Get(-1,-1)+=3; sums.Get(95,95)+=4; sums.Get(95,95)+=5;
+    assert(*sums.Find(-1,-1)==3 && *sums.Find(95,95)==9);
+    sums.Clear(); assert(sums.Find(-1,-1)==nullptr); sums.Get(95,95)+=7; assert(*sums.Find(95,95)==7);
+    sums.Configure(2000000,2000000); sums.Get(1700000,0)=2; assert(*sums.Find(1700000,0)==2); // sparse allocation fallback
+    OrderedIds ordered(32000);
+    std::vector<int> ids(32000); std::iota(ids.begin(),ids.end(),0);
+    for(int size:{0,1,127,128,2000,5000,10000,32000}) {
+        std::shuffle(ids.begin(),ids.end(),rng); auto sorted=ids;
+        std::sort(sorted.begin(),sorted.begin()+size); ordered.Sort(ids,size); assert(ids==sorted);
+    }
+    // Duplicates and IDs outside the advertised engine bound preserve std::sort.
+    for(int special:{-1,32000,0}) {
+        std::iota(ids.begin(),ids.end(),0); ids[129]=special; auto sorted=ids;
+        std::sort(sorted.begin(),sorted.begin()+256); ordered.Sort(ids,256); assert(ids==sorted);
+    }
+    std::cout << "ranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow and ID sort PASS\n";
 }

@@ -999,8 +999,16 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos) const
 }
 
 IBuilderTask* CEconomyManager::EnqueueMexWithin(
-		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware)
+		CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots, bool allyAware,
+        const std::vector<AIFloat3>& excluded)
 {
+    // The caller owns a bounded, expiring policy list. Empty is the exact old
+    // path; rejected candidates never consume or release another task's claim.
+    const auto excludedSpot = [&excluded](const AIFloat3& p) {
+        return std::any_of(excluded.begin(), excluded.end(), [&p](const AIFloat3& q) {
+            return p.SqDistance2D(q) < SQUARE(64.f);
+        });
+    };
 	if (metalMap) return (maxSpots > 0 && GetFieldMexCount(center, radius) >= maxSpots)
 		? nullptr : EnqueueFieldMex(builder, center, radius);
 	if ((builder == nullptr) || (builder->GetCircuitDef() == nullptr)) {
@@ -1029,7 +1037,7 @@ IBuilderTask* CEconomyManager::EnqueueMexWithin(
 				continue;
 			}
 			const AIFloat3& pos = task->GetPosition();
-			if ((pos.SqDistance2D(center) > radiusSq)
+			if ((pos.SqDistance2D(center) > radiusSq) || excludedSpot(pos)
 					|| !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())) {
 				continue;
 			}
@@ -1054,7 +1062,7 @@ IBuilderTask* CEconomyManager::EnqueueMexWithin(
 			break;
 		}
 		const AIFloat3& pos = metalMgr->GetSpots()[spot.first].position;
-		if (!metalMgr->IsOpenSpot(spot.first) || !IsOpenMexSpot(spot.first)
+		if (excludedSpot(pos) || !metalMgr->IsOpenSpot(spot.first) || !IsOpenMexSpot(spot.first)
 				|| !terrainMgr->CanReachAtSafe(builder, pos, builder->GetCircuitDef()->GetBuildDistance())
 				|| (allyAware && (terrainMgr->IsZoneAlly(pos) || !IsOwnSpot(pos)))) {  // D-066/D-072: the allies' ground and the allies' spots are theirs
 			continue;

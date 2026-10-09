@@ -9,6 +9,7 @@
 #define SRC_CIRCUIT_SPRING_SPRINGUNIT_H_
 
 #include <vector>
+#include "spring/RouteCommand.h"
 
 struct SSkirmishAICallback;
 
@@ -21,10 +22,14 @@ public:
 
 	int GetCMDQueueSize(int unitId);
 	int GetCMD(int unitId, int commandIdx = 0);
+    bool HasRouteIntent(int unitId, const std::vector<routecommand::Command>& issued, int frame) const;
+	bool HasGuardIntent(int unitId, int targetId, int frame) const;
 	// Callback-thread snapshots, without allocating per-unit C++ wrappers.
 	// The buffer retains MAX_UNITS elements; only the returned prefix is valid.
 	int GetFriendlyUnitIds(std::vector<int>& buffer) const;
 	void GetPosition(int unitId, float* position) const;
+	void GetVelocity(int unitId, float* velocity) const;
+	float GetCombatHealth(int unitId) const;
 
 private:
 	const struct SSkirmishAICallback* sAICallback;

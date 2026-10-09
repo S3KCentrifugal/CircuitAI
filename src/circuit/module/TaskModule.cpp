@@ -110,6 +110,16 @@ void ITaskModule::DequeueTask(IUnitTask* task, bool done)
 	task->Stop(done);
 }
 
+void ITaskModule::AbortTask(IUnitTask* task)
+{
+	// D-216: idle/nil/player are manager-owned shared states, not cancellable
+	// work. TECH retiring an already-idle opening lab used to stop the shared
+	// idle task, orphaning every other idle factory until a new event re-added
+	// it. Idempotence also protects persistent recruits during reassignment.
+	if (task == nullptr || task == idleTask || task == nilTask || task == playerTask || task->IsDead()) return;
+	DequeueTask(task, false);
+}
+
 IUnitTask* ITaskModule::MakeTask(CCircuitUnit* unit)
 {
 	return static_cast<ITaskModuleScript*>(script)->MakeTask(unit);  // DefaultMakeTask

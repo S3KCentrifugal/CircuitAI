@@ -1,7 +1,7 @@
 // D-136: a dedicated factory feeds an accessible specialist mountain lane.
-#include "../manager/lanes.as"
-#include "../manager/layout.as"
-#include "../manager/lifecycle.as"
+#include "../systems/world/lanes.as"
+#include "../systems/construction/layout.as"
+#include "../systems/construction/lifecycle.as"
 
 namespace TechFlank {
     bool loaded = false, enabled = true, laneQualified = false;

@@ -1,13 +1,13 @@
 // Helpers & Role Handlers
-#include "manager/commands.as"
-#include "manager/artillery_policy.as"
-#include "helpers/generic_helpers.as"
-#include "helpers/map_helpers.as"
-#include "helpers/unit_helpers.as"
-#include "helpers/role_helpers.as"
-#include "helpers/limits_helpers.as"
-#include "helpers/porc_helpers.as"
-#include "helpers/layout_helpers.as"
+#include "systems/presentation/commands.as"
+#include "systems/diagnostics/artillery_policy.as"
+#include "helpers/common/generic_helpers.as"
+#include "helpers/spatial/map_helpers.as"
+#include "helpers/units/unit_helpers.as"
+#include "helpers/roles/role_helpers.as"
+#include "helpers/roles/limits_helpers.as"
+#include "helpers/combat/porc_helpers.as"
+#include "helpers/spatial/layout_helpers.as"
 #include "global.as"
 #include "maps.as"
 #include "maps/factory_mapping.as"
@@ -28,7 +28,7 @@
 #include "manager/builder.as"
 #include "manager/factory.as"
 #include "manager/economy.as"
-#include "manager/metal_economy.as"
+#include "systems/construction/metal_economy.as"
 
 namespace Factory {
 	CCircuitDef@ AiGetFactoryToBuild(const AIFloat3& in pos, bool isStart, bool isReset) {

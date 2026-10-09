@@ -2,12 +2,76 @@
 #define CIRCUIT_RANGED_GEOMETRY_H
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
 namespace circuit::ranged {
+// Remove only redundant straight-line points, preserving every turn, reversal
+// and both endpoints. In-place O(N), O(1) scratch; the exact XZ polyline is
+// unchanged, so terrain/threat validation is not replaced by a shortcut. Grid
+// routes often contain dozens of collinear cells, each formerly a network MOVE.
+template<class Position>
+void CompactStraightRoute(std::vector<Position>& route) {
+    size_t out=0;
+    for(size_t i=0;i<route.size();++i) {
+        const Position point=route[i];
+        while(out>=2) {
+            const auto& a=route[out-2]; const auto& b=route[out-1];
+            const double ux=b.x-a.x, uz=b.z-a.z, vx=point.x-b.x, vz=point.z-b.z;
+            if(ux*vz!=uz*vx || ux*vx+uz*vz<0) break;
+            --out;
+        }
+        route[out++]=point;
+    }
+    route.resize(out);
+}
+
+// Recoil CCommandAI::GetCancelQueued treats a Shift-Move within 17 elmos
+// of a queued position as a toggle. The worker's grid endpoint and our exact
+// firing slot can otherwise cancel each other and cause an endless replan.
+// Only the overlapping tail is removed (O(k) removed waypoints); the caller validates the
+// resulting complete route before issuing it. See D-228 and the native test.
+template<class Position>
+void AppendExactGoal(std::vector<Position>& route,const Position& goal) {
+    while(!route.empty()) {
+        const float x=route.back().x-goal.x, z=route.back().z-goal.z;
+        if(x*x+z*z>=17.f*17.f) break;
+        route.pop_back();
+    }
+    route.push_back(goal);
+}
+
+// Engine IDs are bounded and unique, but keep comparison-sort fallback for a
+// malformed/extended callback result. Reused bits give O(N + bound/64) ordering
+// with precisely std::sort's ascending output, not a persistent unit cache.
+class OrderedIds {
+public:
+    explicit OrderedIds(int bound): bound(bound), bits((bound+63)/64) {}
+    void Sort(std::vector<int>& ids,int count) {
+        if(count<128) { std::sort(ids.begin(),ids.begin()+count); return; }
+        std::fill(bits.begin(),bits.end(),0);
+        for(int i=0;i<count;++i) {
+            const int id=ids[i];
+            if(id<0 || id>=bound || (bits[id/64]&(std::uint64_t(1)<<(id%64)))) {
+                std::sort(ids.begin(),ids.begin()+count); return;
+            }
+            bits[id/64]|=std::uint64_t(1)<<(id%64);
+        }
+        int out=0;
+        for(size_t word=0;word<bits.size();++word) {
+            auto value=bits[word];
+            while(value) { ids[out++]=int(word*64)+std::countr_zero(value); value&=value-1; }
+        }
+    }
+private:
+    int bound;
+    std::vector<std::uint64_t> bits;
+};
+
 struct Point { float x = 0.f, z = 0.f; };
 inline float DistanceSq(Point a, Point b) {
     const float x = a.x-b.x, z = a.z-b.z; return x*x+z*z;
@@ -49,32 +113,105 @@ inline float UsefulScore(float cost, float hp, float damage, float reserved,
     return (1.f+cost)*(.05f+.95f*efficiency)*(heavy?1.2f:1.f)*(los?1.f:.65f)*progress;
 }
 
-// Frame-local spatial index. Build O(N); queries cost visited cells + results,
-// not O(N) per shooter and not universally O(1). Buckets retain allocation
-// across refreshes. All access stays on the AI callback thread.
+// Callback-owned storage for a map-sized grid, with a sparse overflow for legal
+// negative/off-map coordinates. Configure only before use: touched holds bucket
+// addresses. Clear visits last generation's occupied cells, not all historical
+// buckets, and vector values retain capacity. No cached engine observation is
+// reused. See ranged_geometry_test's ordered legacy oracle (D-221).
+template<class T> class CellStore {
+public:
+    CellStore() = default;
+    CellStore(const CellStore&) = delete;
+    CellStore& operator=(const CellStore&) = delete;
+    void Configure(int width, int height) {
+        Clear(); overflow.clear(); dense.clear();
+        columns=rows=0;
+        // Very large/unknown maps retain the exact sparse path instead of an
+        // unbounded allocation. Coordinates are never clamped into other cells.
+        if(width>0 && height>0 && std::uint64_t(width)*height<=1048576) {
+            columns=width; rows=height; dense.resize(size_t(width)*height);
+        }
+    }
+    void Clear() {
+        for(auto* bucket:touched) {
+            if constexpr (requires { bucket->value.clear(); }) bucket->value.clear();
+            else bucket->value=T{};
+            bucket->active=false;
+        }
+        touched.clear();
+        minX=minZ=std::numeric_limits<int>::max();
+        maxX=maxZ=std::numeric_limits<int>::min();
+    }
+    T& Get(int x,int z) {
+        Bucket& b=Inside(x,z) ? dense[size_t(z)*columns+x] : overflow[Key(x,z)];
+        if(!b.active) {
+            b.active=true; touched.push_back(&b);
+            minX=std::min(minX,x); maxX=std::max(maxX,x);
+            minZ=std::min(minZ,z); maxZ=std::max(maxZ,z);
+        }
+        return b.value;
+    }
+    const T* Find(int x,int z) const {
+        if(Inside(x,z)) { const auto& b=dense[size_t(z)*columns+x]; return b.active?&b.value:nullptr; }
+        const auto it=overflow.find(Key(x,z));
+        return it!=overflow.end() && it->second.active ? &it->second.value : nullptr;
+    }
+    bool Clip(int& x0,int& z0,int& x1,int& z1) const {
+        x0=std::max(x0,minX); x1=std::min(x1,maxX);
+        z0=std::max(z0,minZ); z1=std::min(z1,maxZ);
+        return x0<=x1 && z0<=z1;
+    }
+private:
+    struct Bucket { T value{}; bool active=false; };
+    bool Inside(int x,int z) const { return x>=0 && z>=0 && x<columns && z<rows; }
+    static std::uint64_t Key(int x,int z) { return (std::uint64_t(std::uint32_t(x))<<32)|std::uint32_t(z); }
+    int columns=0,rows=0;
+    int minX=std::numeric_limits<int>::max(),minZ=minX;
+    int maxX=std::numeric_limits<int>::min(),maxZ=maxX;
+    std::vector<Bucket> dense;
+    // unordered_map rehash preserves element addresses used by touched.
+    std::unordered_map<std::uint64_t,Bucket> overflow;
+    std::vector<Bucket*> touched;
+};
+
+// Build O(N); clear O(previously occupied cells); queries cost intersecting
+// occupied-bounds cells + results. Preserve z/x/insertion traversal exactly.
+// Any is only for side-effect-free existence predicates, never scored sums.
 class SpatialIndex {
 public:
     explicit SpatialIndex(float cell=512.f): cell(cell) {}
-    void Clear() { for (auto& [key, values]: cells) values.clear(); }
-    void Add(Point p, int id) { cells[Key(p)].push_back(id); }
+    void Configure(float width,float height) { cells.Configure(Coord(width)+1,Coord(height)+1); }
+    void Clear() { cells.Clear(); }
+    void Add(Point p, int id) { cells.Get(Coord(p.x),Coord(p.z)).push_back(id); }
     void Remove(Point p, int id) {
-        auto it=cells.find(Key(p));
-        if(it!=cells.end()) std::erase(it->second,id);
+        // Get only after Find succeeds: a removal must not allocate/touch a
+        // previously empty cell or change insertion order of surviving IDs.
+        const int x=Coord(p.x),z=Coord(p.z);
+        if(cells.Find(x,z)) std::erase(cells.Get(x,z),id);
     }
     template<class F> void Query(Point p, float radius, F&& visit) const {
-        const int x0=Coord(p.x-radius), x1=Coord(p.x+radius);
-        const int z0=Coord(p.z-radius), z1=Coord(p.z+radius);
+        int x0=Coord(p.x-radius), x1=Coord(p.x+radius);
+        int z0=Coord(p.z-radius), z1=Coord(p.z+radius);
+        if(!cells.Clip(x0,z0,x1,z1)) return;
         for (int z=z0;z<=z1;++z) for(int x=x0;x<=x1;++x) {
-            const auto it=cells.find(Key(x,z));
-            if (it!=cells.end()) for(int id:it->second) visit(id);
+            const auto* values=cells.Find(x,z);
+            if(values) for(int id:*values) visit(id);
         }
+    }
+    template<class F> bool Any(Point p,float radius,F&& predicate) const {
+        int x0=Coord(p.x-radius),x1=Coord(p.x+radius);
+        int z0=Coord(p.z-radius),z1=Coord(p.z+radius);
+        if(!cells.Clip(x0,z0,x1,z1)) return false;
+        for(int z=z0;z<=z1;++z) for(int x=x0;x<=x1;++x) {
+            const auto* values=cells.Find(x,z);
+            if(values) for(int id:*values) if(predicate(id)) return true;
+        }
+        return false;
     }
 private:
     int Coord(float v) const { return int(std::floor(v/cell)); }
-    static std::uint64_t Key(int x,int z) { return (std::uint64_t(std::uint32_t(x))<<32)|std::uint32_t(z); }
-    std::uint64_t Key(Point p) const { return Key(Coord(p.x),Coord(p.z)); }
     float cell;
-    std::unordered_map<std::uint64_t,std::vector<int>> cells;
+    CellStore<std::vector<int>> cells;
 };
 }
 #endif

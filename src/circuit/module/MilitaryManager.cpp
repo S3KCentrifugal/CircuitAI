@@ -1222,6 +1222,11 @@ void CMilitaryManager::ProcessHubDefence(CBDefenceTask* task)
 	task->SetDefPointId(closestPoint->id);
 }
 
+AIFloat3 CMilitaryManager::GroundObjective(CCircuitUnit* unit, const AIFloat3& previous)
+{
+	return static_cast<CMilitaryScript*>(script)->GroundObjective(unit, previous);
+}
+
 AIFloat3 CMilitaryManager::GetScoutPosition(CCircuitUnit* unit)
 {
 	ClearScoutPosition(unit->GetTask());

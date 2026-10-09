@@ -27,6 +27,10 @@ local function pos(g,i)
     if not d then log("ERROR missing_unit="..g.unit);return end
     local y=Spring.GetGroundHeight(x,z)
     if UnitDefs[d.id].canFly then return x,math.max(0,y)+160,z end
+    if g.land then
+        if y<0 then log("ERROR wet_land_site="..g.unit.." x="..x.." z="..z);return end
+        return x,y,z
+    end
     if y>=-20 then log("ERROR dry_site="..g.unit.." x="..x.." z="..z);return end
     return x,y,z
 end
@@ -82,7 +86,7 @@ function widget:UnitCreated(id,def,team,builder)
     end
 end
 function widget:UnitDestroyed(id,def,team)
-    if tracked[id] then log("death id="..id.." team="..team.." cost="..UnitDefs[def].metalCost.." attackerTeam="..tostring(tracked[id].attackerTeam));tracked[id]=nil end
+    if tracked[id] then log("death id="..id.." team="..team.." cost="..UnitDefs[def].metalCost.." attackerTeam="..tostring(tracked[id].attackerTeam).." unit="..UnitDefs[def].name);tracked[id]=nil end
     last[id]=nil
 end
 function widget:UnitFinished(id,def,team)
@@ -102,6 +106,39 @@ function widget:GameFrame(f)
         Spring.SendCommands(string.format("give 1 %s %d @%d,%d,%d",pending.g.unit,pending.g.team,pending.x,pending.y,pending.z))
     end
     if pending and f-pending.sent>300 then log("ERROR spawn_timeout="..pending.g.unit);pending=nil end
+    -- Optional investigation fixture: remove named supplied assets at an exact
+    -- frame (e.g. forward radar loss). This never commands friendly combat
+    -- ships. Existing cases omit the list and retain their original behavior.
+    for _,event in ipairs(cfg.remove_units or {}) do
+        if not event.done and f>=event.second*30 then
+            event.done=true
+            local ids={}
+            for id,u in pairs(tracked) do
+                if u.team==event.team and UnitDefs[u.def].name==event.unit then ids[#ids+1]=id end
+            end
+            table.sort(ids)
+            Spring.SelectUnitArray(ids,false)
+            Spring.SendCommands("destroy")
+            Spring.SelectUnitArray({},false)
+            log("fixture_removed team="..event.team.." unit="..event.unit.." count="..#ids)
+        end
+    end
+    if cfg.objective_observer and f%150==0 then
+        -- Spectator truth is measurement only; none of it is sent to the AI.
+        -- Record lost vision as well as initial detection so a surviving yard
+        -- cannot be mistaken for a destroyed target when its contact vanishes.
+        for id,u in pairs(tracked) do
+            if u.team==1 and UnitDefs[u.def].isImmobile then
+                local state=Spring.GetUnitLosState(id,0,false) or {}
+                local health,_,_,_,progress=Spring.GetUnitHealth(id)
+                if health then
+                    log("objective id="..id.." unit="..UnitDefs[u.def].name
+                        .." los="..tostring(state.los==true).." radar="..tostring(state.radar==true)
+                        .." health="..math.floor(health).." progress="..tostring(progress))
+                end
+            end
+        end
+    end
     if f%30==0 then
         for id,u in pairs(tracked) do
             local host=Spring.GetUnitRulesParam(id,"carrier_host_unit_id") or -1
@@ -124,7 +161,13 @@ function widget:GameFrame(f)
                     positions[#positions+1]={id=id,x=x,z=z}
                     local patrol=false
                     for _,cmd in ipairs(Spring.GetUnitCommands(id,12) or {}) do if cmd.id==CMD.PATROL then patrol=true end end
-                    log("boat id="..id.." x="..math.floor(x).." z="..math.floor(z).." patrol="..tostring(patrol)
+                    local health,maximum=Spring.GetUnitHealth(id)
+                    if cfg.protection_observer then
+                        local stockpile,queued=Spring.GetUnitStockpile(id)
+                        if stockpile then log("protection id="..id.." unit="..UnitDefs[u.def].name.." stockpile="..stockpile.." queued="..tostring(queued)) end
+                    end
+                    log("boat id="..id.." unit="..UnitDefs[u.def].name.." x="..math.floor(x).." z="..math.floor(z)
+                        .." health="..math.floor(health or 0).." maxhealth="..math.floor(maximum or 0).." patrol="..tostring(patrol)
                         .." target="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1))
                 end
             end

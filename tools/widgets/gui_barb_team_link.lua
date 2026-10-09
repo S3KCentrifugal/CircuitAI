@@ -13,10 +13,9 @@
 --
 -- Install: copy into <BAR data dir>/LuaUI/Widgets/ and enable it (F11).
 -- Open/close: the launcher, /barblink or Ctrl+Alt+B; Escape closes.
--- Layout overlay (D-053): the eye button or /barblayout draws every allied
--- BARb's planned base on the ground - grey zones, red corridors, green armed
--- slots, yellow held, cyan being built, blue built, orange tenants - and an
--- arrow from the complex's origin toward its front.
+-- Blueprint overlay: player/team controls or /barblayout show the selected team's
+-- native reservations: cyan footprints, survey ticks, construction states,
+-- factory-facing arrows and crossed orange protected resource footprints.
 --
 -- Both directions only work on the machine that runs the AIs (the host),
 -- playing or spectating:
@@ -24,7 +23,7 @@
 --   widget -> AI   Spring.SendSkirmishAIMessage(teamId, "barb|<command>|<teamId>|...")
 -- Commands carry the target team id and the AI ignores any other; the widget
 -- never broadcasts, so hosting two ally teams locally cannot cross-steer them.
--- Wire formats: data/script/src/manager/widget_link.as and commands.as.
+-- Wire formats: data/script/src/systems/presentation/widget_link.as and commands.as.
 -- Topics shown: roster, role, orphan, donation, ferry, spam, seaassist, layout.
 
 function widget:GetInfo()
@@ -42,6 +41,7 @@ local theatres = (function()
 local surveys, staging = {}, {}
 local PREFIX = "barbtheatre|1|"
 local mode = nil
+local function groupMode() return mode=="team" or mode=="all" end
 local activeTeams = {}
 local options = {live=true, routes=true, sites=false, shores=false, cues=true, teaching=true, labels=true, context=true, opacity=0.85, collapsed=false}
 local classFilter = {[0]=true,true,true,true,true,true,true}
@@ -155,7 +155,7 @@ local function setMode(value, teams)
     if value~=mode then selectedLane,selectedTeam=nil,nil end
     mode=value
     activeTeams={}
-    if value=="all" then
+    if value=="all" or value=="team" then
         for _,id in ipairs(teams or Spring.GetTeamList()) do if permitted(id) then activeTeams[id]=true end end
     elseif type(value)=="number" and permitted(value) then activeTeams[value]=true end
 end
@@ -282,7 +282,7 @@ local function marker(p,kind,title,detail,c,offset)
 end
 
 local function drawSurvey(team,s,first,index,count)
-    local shift=mode=="all" and (index-(count+1)/2)*12 or 0
+    local shift=groupMode() and (index-(count+1)/2)*12 or 0
     local tr,tg,tb=Spring.GetTeamColor(team)
     local teamColour={tr,tg,tb,1}
     -- Geometry, classifications and extents arrive from the AI.
@@ -393,7 +393,7 @@ local function drawSurvey(team,s,first,index,count)
         if x and first and options.labels then
             local c=b.pond and (b.friendly and mint or muted) or colours[5]
             local title=(b.pond and "POND " or "SEA ") .. (b.id+1)
-            local detail=b.shared and "shared naval theatre" or (mode=="all" and "isolated water" or (b.friendly and "friendly rear water" or "enemy / neutral water"))
+            local detail=b.shared and "shared naval theatre" or (groupMode() and "isolated water" or (b.friendly and "friendly rear water" or "enemy / neutral water"))
             if b.pond then detail=detail .. " / no navy" end
             label(x-60,y+35,title,detail,c)
         end
@@ -404,12 +404,12 @@ local function drawSurvey(team,s,first,index,count)
 
     for _,g in ipairs(options.sites and s.geos or {}) do
         local x,y=project(g[2],g[3])
-        if x and (mode~="all" or first) then
-            local c=mode=="all" and {1,0.83,0.4,1} or (g[4]==1 and {1,0.62,0.3,1} or mint)
+        if x and (not groupMode() or first) then
+            local c=groupMode() and {1,0.83,0.4,1} or (g[4]==1 and {1,0.62,0.3,1} or mint)
             disk(x,y,12,ink)
             path({0,11,10,0,0,-11,-10,0,0,11},x,y,1,c,2)
             gl.Color(c); gl.Text(mode=="all" and "G" or (g[4]==1 and "+" or "~"),x,y-4,13,"oc")
-            if options.labels then gl.Text(mode=="all" and "GEO" or (g[5] .. "%"),x,y-24,10,"oc") end
+            if options.labels then gl.Text(groupMode() and "GEO" or (g[5] .. "%"),x,y-24,10,"oc") end
             local mx,my=Spring.GetMouseState()
             if (mx-x)^2+(my-y)^2<500 then
                 -- Group duplicate map positions for presentation, preserving every AI's assessment.
@@ -447,7 +447,7 @@ local function drawSurvey(team,s,first,index,count)
         end
     end
     for _,b in ipairs(options.cues and options.shores and s.beaches or {}) do
-        local c=mode=="all" and teamColour or (b.use==0 and mint or {1,0.48,0.32,1})
+        local c=groupMode() and teamColour or (b.use==0 and mint or {1,0.48,0.32,1})
         for i,e in ipairs(b.edges) do
             local x,y=project(e[1],e[2]); local a,d=project(e[3],e[4])
             if x and a then
@@ -521,7 +521,7 @@ local function draw(panel)
     button("guideHide",x+w-50,top-31,42,"Hide",false,function() setMode(nil) end)
     if options.collapsed then return end
     local y=top-58
-    gl.Color(muted); gl.Text((mode=="all" and "ALL PLAYERS" or "PLAYER "..mode).."  /  "..(options.live and "LIVE" or "FROZEN VIEW"),x+14,y,11,"o")
+    gl.Color(muted); gl.Text((mode=="team" and "TEAM" or (mode=="all" and "ALL PLAYERS" or "PLAYER "..mode)).."  /  "..(options.live and "LIVE" or "FROZEN VIEW"),x+14,y,11,"o")
     y=y-36
     button("guideLive",x+12,y,124,options.live and "Live updates: ON" or "Live updates: OFF",options.live,function() options.live=not options.live end)
     button("guideRefresh",x+144,y,124,"Refresh now",false,function() if refreshAction then refreshAction() end end)
@@ -649,7 +649,7 @@ local ICON = {
 }
 local MAX_EVENTS = 120
 local QUERY_INTERVAL_FRAMES = 1800
-local WIN_W, WIN_H = 340, 346   -- unscaled px
+local WIN_W, WIN_H = 340, 390   -- unscaled px
 local LAUNCHER = 26             -- unscaled px
 
 local C = {
@@ -729,8 +729,7 @@ local events = {}
 local eventScroll, listScroll = 0, 0
 local lastQueryFrame = -1
 local firstAnnounceFrame = nil
-local layoutShown = false
-local layoutData = {}
+local blueprints = {} -- shared read-only layout observer; initialized below
 local hookAIMessages, unhookAIMessages   -- defined with the message code below
 local lastRowClick = nil                 -- a row's last click (double-click flies the camera)
 
@@ -761,9 +760,11 @@ local function aisOfAlly(allyTeam)
 end
 
 local function refreshTeams()
+    local live={}
 	for _, teamId in ipairs(spGetTeamList() or {}) do
 		local _, _, isDead, isAI, _, allyTeam = spGetTeamInfo(teamId)
 		if isAI and not isDead and isPermittedTeam(teamId) then
+            live[teamId]=true
 			local _, name = spGetAIInfo(teamId)
 			local r, g, b = spGetTeamColor(teamId)
 			local e = ais[teamId] or { teamId = teamId }
@@ -773,6 +774,7 @@ local function refreshTeams()
 			ais[teamId] = e
 		end
 	end
+    for id in pairs(ais) do if not live[id] then ais[id]=nil end end
 	aiOrder = {}
 	for id in pairs(ais) do aiOrder[#aiOrder + 1] = id end
 	table.sort(aiOrder, function(a, b)
@@ -944,14 +946,18 @@ local function setTheatres(value)
     theatrePending = {}
     theatreStatus = value and "Requesting lanes..." or ""
     local ids={}
-    for _,id in ipairs(aiOrder) do if mayCommand(id) then ids[#ids+1]=id end end
+    -- Keep the old all-player API for benchmark fixtures. The visible Team
+    -- control requests/draws only the selected ally team, even for spectators.
+    for _,id in ipairs(aiOrder) do
+        if mayCommand(id) and (value~="team" or ais[id].allyTeam==selectedAlly) then ids[#ids+1]=id end
+    end
     theatres.SetMode(value,ids)
     local function request(id)
         theatrePending[id]={time=Spring.GetTimer(),frame=spGetGameFrame()}
         theatres.Requested(id)
         spSendSkirmishAIMessage(id,"barb|theatres|" .. id .. "|refresh")
     end
-    if value=="all" then
+    if value=="all" or value=="team" then
         for _,id in ipairs(ids) do request(id) end
         if #ids==0 then theatreStatus="Lanes require a locally hosted BARb AI." end
     elseif type(value)=="number" and mayCommand(value) then
@@ -967,6 +973,9 @@ function widget:Initialize()
 	hookAIMessages()
 	WG.barblink = {
 		SetTheatres = setTheatres,
+        SetBlueprints = blueprints.SetMode,
+        BlueprintSnapshot = blueprints.Snapshot,
+        BlueprintStatus = blueprints.Status,
         TheatreSnapshot = theatres.Snapshot,
         TheatreStatus = function() return theatreStatus end,
         TheatreOptions = theatres.Config,
@@ -997,6 +1006,7 @@ function widget:Initialize()
 end
 
 function widget:Shutdown()
+    blueprints.SetMode(nil)
 	unhookAIMessages()
 	WG.barblink = nil
 	if WG.guishader then
@@ -1006,7 +1016,7 @@ function widget:Shutdown()
 end
 
 function widget:GetConfigData()
-	return { open = open, offX = offX / mathMax(scale, 0.01), offY = offY / mathMax(scale, 0.01), overlay = layoutShown, theatres=theatres.GetConfig() }
+	return { open = open, offX = offX / mathMax(scale, 0.01), offY = offY / mathMax(scale, 0.01),  theatres=theatres.GetConfig() }
 end
 
 function widget:SetConfigData(data)
@@ -1036,6 +1046,7 @@ function widget:Update()
 end
 
 function widget:GameFrame(n)
+    if n % 600 == 0 then blueprints.Tick() end
 	if n < 90 then return end
 	if n % 900 == 0 and theatres.Mode() and theatres.Live() then setTheatres(theatres.Mode()) end
 	if lastQueryFrame < 0 or n % QUERY_INTERVAL_FRAMES == 0 then
@@ -1047,97 +1058,155 @@ function widget:GameFrame(n)
 	end
 end
 
--- ---------------------------------------------------------------- layout overlay (D-053)
-
-local glDrawGroundQuad, glLineWidth, glBeginEnd, glVertex, glDepthTest = gl.DrawGroundQuad, gl.LineWidth, gl.BeginEnd, gl.Vertex, gl.DepthTest
-local GL_LINES = GL.LINES
-local spGetGroundHeight = Spring.GetGroundHeight
-local LAYOUT_COLOURS = {
-	zone = { 0.65, 0.65, 0.65, 0.18 },
-	corridor = { 0.9, 0.2, 0.2, 0.22 },
-	p = { 0.2, 0.9, 0.2, 0.35 },   -- planned, armed
-	h = { 0.9, 0.8, 0.2, 0.30 },   -- held
-	s = { 0.2, 0.8, 0.9, 0.40 },   -- served, being built
-	b = { 0.2, 0.4, 1.0, 0.45 },   -- built
-	t = { 1.0, 0.6, 0.1, 0.35 },   -- tenant
-}
-
-local function layoutParse(teamId, text)
-	local entries = {}
-	for _, item in ipairs(split(text, ";")) do
-		local f = split(item, ":")
-		if #f >= 8 then
-			entries[#entries + 1] = {
-				kind = f[1], name = f[2], x = tonumber(f[3]) or 0, z = tonumber(f[4]) or 0, facing = tonumber(f[5]) or 0,
-				w = tonumber(f[6]) or 0, d = tonumber(f[7]) or 0, state = f[8],
-			}
-		end
-	end
-	layoutData[teamId].entries = entries
-	local slots, built = 0, 0
-	for _, e in ipairs(entries) do
-		if e.kind == "slot" then slots = slots + 1; if e.state:sub(1, 1) == "b" then built = built + 1 end end
-	end
-	addEvent(string.format("Team %d layout: %d slots, %d built", teamId, slots, built), "info")
+-- ---------------------------------------------------------------- blueprints
+-- Keep rendering state inside a closure: Lua 5.1 limits top-level locals. Parsing,
+-- ground samples and GL list creation happen only on a CHANGED complete snapshot.
+-- No per-frame unit/terrain scans, no orders to units and no synced map drawing.
+do
+    local mode, wanted, data = nil, {}, {}
+    local colours = {zone={0.18,0.55,0.9,0.5}, corridor={0.45,0.8,1,0.6},
+        p={0.3,0.8,1,0.9}, h={0.35,0.55,0.75,0.6}, c={1,0.85,0.35,0.95},
+        s={0.4,1,0.8,0.95}, b={0.3,0.55,0.7,0.35}, t={1,0.65,0.3,0.8},
+        resource={1,0.55,0.25,0.9}}
+    local dirs = {[0]={0,1}, {1,0}, {0,-1}, {-1,0}}
+    local function dispose(d) if d and d.list then gl.DeleteList(d.list); d.list=nil end end
+    local function finite(v) return v and v==v and v~=math.huge and v~=-math.huge end
+    local function compile(d)
+        dispose(d)
+        -- A display list is owned by exactly one committed team snapshot.
+        -- Water plans must be drawn at the surface, not hidden on the seabed.
+        d.list=gl.CreateList(function()
+            for _,e in ipairs(d.entries) do
+                local c=colours[e.kind] or colours[e.state:sub(1,1)] or colours.p
+                if e.state:sub(2,2)=='t' and e.state:sub(1,1)~='b' then c=colours.t end
+                local x1,z1,x2,z2=e.x-e.w/2,e.z-e.d/2,e.x+e.w/2,e.z+e.d/2
+                local y=math.max(0,Spring.GetGroundHeight(e.x,e.z),Spring.GetGroundHeight(x1,z1),
+                    Spring.GetGroundHeight(x2,z2),Spring.GetGroundHeight(x1,z2),Spring.GetGroundHeight(x2,z1))+5
+                gl.Color(c[1],c[2],c[3],c[4]); gl.LineWidth(e.kind=='slot' and 1.5 or 1)
+                gl.BeginEnd(GL.LINES,function()
+                    local function line(ax,az,bx,bz) gl.Vertex(ax,y,az); gl.Vertex(bx,y,bz) end
+                    line(x1,z1,x2,z1); line(x2,z1,x2,z2); line(x2,z2,x1,z2); line(x1,z2,x1,z1)
+                    if e.kind=='resource' then line(x1,z1,x2,z2); line(x1,z2,x2,z1)
+                    elseif e.kind=='corridor' then
+                        -- Corridors export axis-aligned bounds, not a facing.
+                        if e.w>e.d then line(x1,e.z,x2,e.z) else line(e.x,z1,e.x,z2) end
+                    elseif e.kind=='slot' then
+                        local r=math.min(8,e.w/4,e.d/4)
+                        line(e.x-r,e.z,e.x+r,e.z); line(e.x,e.z-r,e.x,e.z+r)
+                        local ud=UnitDefNames and UnitDefNames[e.name]
+                        if ud and ud.isFactory then
+                            local dir=dirs[e.facing] or dirs[0]
+                            local length=math.min(e.w,e.d)*0.4
+                            local tx,tz=e.x+dir[1]*length,e.z+dir[2]*length
+                            line(e.x,e.z,tx,tz)
+                            line(tx,tz,tx-dir[1]*12+dir[2]*8,tz-dir[2]*12-dir[1]*8)
+                            line(tx,tz,tx-dir[1]*12-dir[2]*8,tz-dir[2]*12+dir[1]*8)
+                        end
+                    else
+                        -- Survey ticks give large reserved envelopes a blueprint outline.
+                        for x=x1+64,x2-1,64 do line(x,z1,x,z1+8); line(x,z2,x,z2-8) end
+                        for z=z1+64,z2-1,64 do line(x1,z,x1+8,z); line(x2,z,x2-8,z) end
+                    end
+                end)
+            end
+        end)
+    end
+    local function commit(id,payload)
+        local d=data[id] or {}; data[id]=d; d.parts=nil
+        if d.text==payload then return end
+        local entries,slots,built,zones,resources={},0,0,0,0
+        for item in payload:gmatch('[^;]+') do
+            local f=split(item,':')
+            local x,z,w,h=tonumber(f[3]),tonumber(f[4]),tonumber(f[6]),tonumber(f[7])
+            local kind=f[1]
+            if (kind=='slot' or kind=='zone' or kind=='corridor' or kind=='resource') and
+                finite(x) and finite(z) and finite(w) and finite(h) and w>0 and h>0 and
+                x-w/2>=0 and z-h/2>=0 and x+w/2<=Game.mapSizeX and z+h/2<=Game.mapSizeZ then
+                entries[#entries+1]={kind=kind,name=f[2],x=x,z=z,w=w,d=h,facing=tonumber(f[5]) or 0,state=f[8] or 'p'}
+                if kind=='slot' then slots=slots+1; if (f[8] or ''):sub(1,1)=='b' then built=built+1 end
+                elseif kind=='resource' then resources=resources+1 else zones=zones+1 end
+            end
+        end
+        d.text=payload; d.entries=entries; d.slots=slots; d.built=built; d.zones=zones; d.resources=resources
+        d.frame=spGetGameFrame()
+        d.label=nil
+        for _,e in ipairs(entries) do if e.kind=='slot' then
+            d.label={e.x,math.max(0,Spring.GetGroundHeight(e.x,e.z))+65,e.z}; break
+        end end
+        compile(d)
+    end
+    function blueprints.Receive(id,idx,total,payload)
+        if not wanted[id] or not mayCommand(id) or not isPermittedTeam(id) then return end
+        -- CallUI sends a whole snapshot synchronously, ordered on the AI thread.
+        -- Ignore gaps/duplicates, cap memory, and keep the old list until complete.
+        if total==0 and idx==0 then commit(id,''); return end
+        if total<1 or total>1024 or total~=math.floor(total) or idx~=math.floor(idx) or idx<1 or idx>total or #payload>3000 then return end
+        local d=data[id] or {}; data[id]=d
+        if idx==1 then d.parts={}; d.total=total; d.next=1 end
+        if not d.parts or d.total~=total or d.next~=idx then d.parts=nil; return end
+        d.parts[idx]=payload; d.next=idx+1
+        if idx==total then commit(id,table.concat(d.parts)) end
+    end
+    function blueprints.SetMode(value)
+        if value~=nil and value~='team' and type(value)~='number' then return end
+        mode=value; refreshTeams()
+        if type(value)=='number' and ais[value] and mayCommand(value) then
+            selected=value; selectedAlly=ais[value].allyTeam
+        end
+        local nextWanted={}
+        for _,id in ipairs(aiOrder) do
+            if mayCommand(id) and isPermittedTeam(id) and (id==value or (value=='team' and ais[id].allyTeam==selectedAlly)) then nextWanted[id]=true end
+        end
+        for id in pairs(wanted) do
+            if not nextWanted[id] then
+                spSendSkirmishAIMessage(id,'barb|layout|'..id..'|off'); dispose(data[id]); data[id]=nil
+            end
+        end
+        local previous=wanted; wanted=nextWanted -- receive can re-enter while sending
+        for id in pairs(wanted) do
+            if not previous[id] then spSendSkirmishAIMessage(id,'barb|layout|'..id..'|on') end
+        end
+    end
+    function blueprints.Tick()
+        blueprints.SetMode(mode) -- prune permission loss, dead teams, changed team selection
+        for id in pairs(wanted) do spSendSkirmishAIMessage(id,'barb|layout|'..id..'|renew') end
+    end
+    function blueprints.Mode() return mode end
+    function blueprints.Snapshot(id)
+        local d=data[id]
+        return {visible=wanted[id] and true or false,slots=d and d.slots or 0,built=d and d.built or 0,
+            zones=d and d.zones or 0,resources=d and d.resources or 0,x=d and d.label and d.label[1],z=d and d.label and d.label[3],frame=d and d.frame,ready=d and d.entries~=nil or false}
+    end
+    function blueprints.Status()
+        if mode==nil then return 'Blueprints hidden' end
+        local n,slots,built,pending=0,0,0,0
+        for id in pairs(wanted) do
+            n=n+1; local d=data[id]
+            if d and d.entries then slots=slots+d.slots; built=built+d.built else pending=pending+1 end
+        end
+        if n==0 then return 'No permitted locally hosted AI selected' end
+        return string.format('%d AI | %d slots | %d built%s',n,slots,built,pending>0 and ' | awaiting plans' or '')
+    end
+    function blueprints.Draw()
+        if mode==nil or Spring.IsGUIHidden() then return end
+        gl.DepthTest(false)
+        for id,d in pairs(data) do
+            if wanted[id] and isPermittedTeam(id) and mayCommand(id) then
+                if d.list then gl.CallList(d.list) end
+                -- One cached label anchor per team; no entry traversal or terrain callback per draw.
+                if d.label then
+                    local a=ais[id]; local c=a and a.color or colours.p
+                    gl.Color(c[1],c[2],c[3],1); gl.PushMatrix()
+                    gl.Translate(d.label[1],d.label[2],d.label[3]); gl.Billboard()
+                    gl.Text((a and a.name or ('AI '..id))..' / '..(a and a.roster and a.roster.role or 'layout'),0,0,14,'oc')
+                    gl.PopMatrix()
+                end
+            end
+        end
+        gl.LineWidth(1); gl.Color(1,1,1,1); gl.DepthTest(true)
+    end
 end
-
-local function layoutReceive(teamId, idx, total, payload)
-	if not isPermittedTeam(teamId) then return end   -- CR-008: never draw a non-allied plan
-	if total <= 0 then
-		layoutData[teamId] = nil
-		addEvent(string.format("Team %d has no planned layout", teamId), "info")
-		return
-	end
-	local d = layoutData[teamId]
-	if not d or idx == 1 then d = { parts = {}, total = total, entries = {} }; layoutData[teamId] = d end
-	d.parts[idx] = payload
-	d.total = total
-	for i = 1, total do if not d.parts[i] then return end end
-	layoutParse(teamId, table.concat(d.parts, "", 1, total))
-	d.parts = {}
-end
-
-local function setOverlay(on)
-	layoutShown = on
-	refreshTeams()
-	for _, id in ipairs(aiOrder) do send(id, "barb|layout|" .. id .. "|" .. (on and "on" or "off")) end
-	addEvent(on and "Layout overlay on: zones grey, corridors red, slots green / yellow / cyan / blue, tenants orange" or "Layout overlay off", "info")
-end
-
-local FACING_DIR = { [0] = { 0, 1 }, [1] = { 1, 0 }, [2] = { 0, -1 }, [3] = { -1, 0 } }
-
-function widget:DrawWorld()
-	if not layoutShown then return end
-	glDepthTest(false)
-	for _, d in pairs(layoutData) do
-		for _, e in ipairs(d.entries or {}) do
-			if e.kind == "complex" then
-				local dir = FACING_DIR[e.facing] or FACING_DIR[0]
-				local x2, z2 = e.x + dir[1] * 240, e.z + dir[2] * 240
-				glColor(1, 1, 1, 0.9)
-				glLineWidth(3)
-				glBeginEnd(GL_LINES, function()
-					glVertex(e.x, spGetGroundHeight(e.x, e.z) + 8, e.z)
-					glVertex(x2, spGetGroundHeight(x2, z2) + 8, z2)
-				end)
-				glLineWidth(1)
-			elseif e.w > 0 and e.d > 0 then
-				local c
-				if e.kind == "zone" or e.kind == "corridor" then
-					c = LAYOUT_COLOURS[e.kind]
-				else
-					c = LAYOUT_COLOURS[e.state:sub(1, 1)] or LAYOUT_COLOURS.p
-					if e.state:sub(2, 2) == "t" and e.state:sub(1, 1) ~= "b" then c = LAYOUT_COLOURS.t end
-				end
-				glColor(c[1], c[2], c[3], c[4])
-				local hw, hd = e.w / 2 - 2, e.d / 2 - 2
-				glDrawGroundQuad(e.x - hw, e.z - hd, e.x + hw, e.z + hd)
-			end
-		end
-	end
-	glColor(1, 1, 1, 1)
-	glDepthTest(true)
-end
+function widget:DrawWorld() blueprints.Draw() end
 
 -- ---------------------------------------------------------------- messages
 
@@ -1183,8 +1252,8 @@ local function onAIMessage(aiTeam, dataStr)
 		else addEvent(string.format("Team %d spam %s (%s, %s)", sender, what, p[6] or "?", p[7] or "?"), "info") end
 	elseif topic == "seaassist" and e then
 		addEvent(string.format("Team %d sea assist: %s", sender, rest), "info")
-	elseif topic == "layout" and sender then
-		layoutReceive(sender, tonumber(p[5]) or 0, tonumber(p[6]) or 0, table.concat(p, "|", 7))
+	elseif topic == "layout" and sender == aiTeam then
+		blueprints.Receive(sender, tonumber(p[5]) or 0, tonumber(p[6]) or 0, table.concat(p, "|", 7))
 	end
 end
 
@@ -1370,18 +1439,20 @@ local function drawWindow()
 	local bx = right - bs
 	local by = hy1 + (hh - bs) / 2
 	bx = iconButton(bx, by, bs, ICON.close, "close", function() playClick(); setOpen(false) end, "Close (Escape)", false, "x")
-	bx = iconButton(bx, by, bs, ICON.overlay, "overlay", function() playClick(); setOverlay(not layoutShown) end,
-		layoutShown and "Layout overlay on: click to hide (/barblayout)" or "Show every AI's planned base on the map (/barblayout)", layoutShown, "o")
+	bx = iconButton(bx, by, bs, ICON.overlay, "overlay", function() playClick(); if blueprints.Mode() then blueprints.SetMode(nil) else blueprints.SetMode("team") end end,
+        "Toggle selected team's blueprints (/barblayout)", blueprints.Mode()~=nil, "o")
 	bx = iconButton(bx, by, bs, ICON.queryall, "queryall", function() playClick(); queryAll() end, "Ask every AI for its details", false, "*")
     local cy = hy1 - px(5)
-    local bw=(w-px(8))/3
-    labelButton(left,cy-px(22),left+bw,cy,ICON.overlay,"Lanes: player","lanesPlayer",function()
+    local buttonsLeft=left+px(52)
+    local bw=(w-px(60))/3
+    text(font2,"Lanes",left,cy-px(14),px(9),"o",C.onSurfaceVariant)
+    labelButton(buttonsLeft,cy-px(22),buttonsLeft+bw,cy,ICON.overlay,"Player","lanesPlayer",function()
         playClick(); if theatres.Mode()==selected then setTheatres(nil) else setTheatres(selected) end
     end,"Toggle lanes and strategic sites for the selected player",theatres.Mode()~=nil and theatres.Mode()==selected)
-    labelButton(left+bw+px(4),cy-px(22),left+2*bw+px(4),cy,ICON.queryall,"All players","lanesAll",function()
-        playClick(); if theatres.Mode()=="all" then setTheatres(nil) else setTheatres("all") end
-    end,"Toggle every permitted local AI's strategic map",theatres.Mode()=="all")
-    labelButton(left+2*bw+px(8),cy-px(22),right,cy,ICON.close,"Hide lanes","lanesOff",function()
+    labelButton(buttonsLeft+bw+px(4),cy-px(22),buttonsLeft+2*bw+px(4),cy,ICON.team,"Team","lanesTeam",function()
+        playClick(); if theatres.Mode()=="team" then setTheatres(nil) else setTheatres("team") end
+    end,"Lanes and strategic sites for locally hosted AIs on the selected ally team",theatres.Mode()=="team")
+    labelButton(buttonsLeft+2*bw+px(8),cy-px(22),right,cy,ICON.close,"Hide","lanesOff",function()
         playClick(); setTheatres(nil)
     end,"Hide lanes and strategic sites immediately",theatres.Mode()==nil)
     cy=cy-px(28)
@@ -1390,6 +1461,22 @@ local function drawWindow()
         register(left,cy-px(15),right,cy,"laneStatus",function() end,theatreStatus)
     end
     cy=cy-px(16)
+
+    text(font2,"Layouts",left,cy-px(14),px(9),"o",C.onSurfaceVariant)
+    labelButton(buttonsLeft,cy-px(22),buttonsLeft+bw,cy,ICON.overlay,"Player","plansPlayer",function()
+        playClick(); if blueprints.Mode()==selected then blueprints.SetMode(nil) else blueprints.SetMode(selected) end
+    end,"Follow selected AI's live blueprint",type(blueprints.Mode())=="number")
+    labelButton(buttonsLeft+bw+px(4),cy-px(22),buttonsLeft+2*bw+px(4),cy,ICON.team,"Team","plansTeam",function()
+        playClick(); if blueprints.Mode()=="team" then blueprints.SetMode(nil) else blueprints.SetMode("team") end
+    end,"Blueprints of every locally hosted AI on the selected ally team",blueprints.Mode()=="team")
+    labelButton(buttonsLeft+2*bw+px(8),cy-px(22),right,cy,ICON.close,"Hide","plansOff",function()
+        playClick(); blueprints.SetMode(nil)
+    end,"Hide blueprints and stop requesting snapshots",blueprints.Mode()==nil)
+    cy=cy-px(25)
+    text(font,fitText(font,blueprints.Status(),px(8),w),left,cy-px(9),px(8),"o",C.onSurfaceVariant)
+    cy=cy-px(17)
+    register(left,cy,right,cy+px(15),"planLegend",function() end,
+        "Blueprint: cyan=planned, grey=held/built, yellow=claimed, mint=under construction. Orange X=protected metal/geo. Arrows=factory exit direction. Updates within 4 game seconds.")
 
 	-- ally-team chips (only when more than one ally team has an AI)
 	if #allyTeams > 1 then
@@ -1400,7 +1487,10 @@ local function drawWindow()
 			local cw = textWidth(font2, label, px(9)) + px(28)
 			labelButton(cx, cy - chH, cx + cw, cy, ICON.team, label, "ally" .. at, function()
 				playClick(); selectedAlly = at; selected = aisOfAlly(at)[1]; listScroll = 0
-                if type(theatres.Mode())=="number" then setTheatres(selected) end
+                if type(theatres.Mode())=="number" then setTheatres(selected)
+                elseif theatres.Mode()=="team" then setTheatres("team") end
+                if type(blueprints.Mode())=="number" then blueprints.SetMode(selected)
+                elseif blueprints.Mode()=="team" then blueprints.SetMode("team") end
 			end, string.format("Show team %d's AIs (%d)", at + 1, #aisOfAlly(at)), at == selectedAlly)
 			cx = cx + cw + px(4)
 			if cx > right - px(40) then break end
@@ -1450,6 +1540,7 @@ local function drawWindow()
 				local follow=type(theatres.Mode())=="number"
 				selected = id
 				if follow then setTheatres(id) end
+                if type(blueprints.Mode())=="number" then blueprints.SetMode(id) end
 				lastRowClick = now
 			end,
 				string.format("Team %d: %s%s", id, a.name, a.roster and (", " .. a.roster.role .. ", " .. (a.roster.side or "?")) or ""))
@@ -1621,7 +1712,13 @@ end
 function widget:TextCommand(cmd)
 	if cmd=="barbtheatres" then if theatres.Mode() then setTheatres(nil) else setTheatres(selected or "all") end; return true end
 	if cmd == "barblink" then setOpen(not open); return true end
-	if cmd == "barblayout" then setOverlay(not layoutShown); return true end
+	if cmd == "barblayout" then
+        if blueprints.Mode() then blueprints.SetMode(nil) else blueprints.SetMode("team") end
+        return true
+    end
+    if cmd == "barblayout player" then blueprints.SetMode(selected); return true end
+    if cmd == "barblayout team" then blueprints.SetMode("team"); return true end
+    if cmd == "barblayout off" then blueprints.SetMode(nil); return true end
 	return false
 end
 

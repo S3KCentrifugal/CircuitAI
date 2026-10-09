@@ -3,16 +3,16 @@
 #include "../unit.as"
 #include "../task.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
-#include "../helpers/map_helpers.as"
-#include "../helpers/guard_helpers.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
+#include "../helpers/construction/guard_helpers.as"
 #include "../manager/builder.as"
-#include "../manager/team_economy.as"
+#include "../systems/team/team_economy.as"
 #include "../manager/factory.as"
-#include "../manager/layout.as"
-#include "../manager/eco_planner.as"
+#include "../systems/construction/layout.as"
+#include "../systems/construction/eco_planner.as"
 
 /******************************************************************************
 
@@ -111,6 +111,9 @@ namespace TechBuild {
     // counts such a step as met (its structures were reclaimed on purpose).
     bool EnergyRetired(const string &in name)
     {
+        // The nuke chain retains and completes its modest T1 production buffer
+        // until the silo stands, even though its first fusion is already up.
+        if (TechChain::NukeRush()) return false;
         const string side = Global::AISettings::Side;
         const bool t1 = (name == UnitHelpers::GetWindNameForSide(side)) || (name == UnitHelpers::GetSolarNameForSide(side));
         const bool adv = (name == UnitHelpers::GetAdvSolarNameForSide(side));
@@ -532,7 +535,8 @@ namespace TechBuild {
         CCircuitUnit@ tlab = Factory::primaryT1BotLab;
         // D-102: not once the economy is online (reclaiming a lab for metal is pointless late)
         if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab) && !EcoOnline()) {
-            if (tlab.task !is null) aiFactoryMgr.AbortTask(tlab.task);   // native's recruit task would re-issue the build on idle
+            if (tlab.task !is null && (tlab.task.GetType() == int(Task::Type::FACTORY)
+                || tlab.task.GetType() == int(Task::Type::WAIT))) aiFactoryMgr.AbortTask(tlab.task); // never abort a shared idle state
             Lifecycle::Retire(tlab, "the advanced lab is under way; the throwaway T1 lab is reclaimed (D-066)");
         }
         // D-078 (owner's rule): the advanced lab retires the moment an advanced
@@ -545,10 +549,26 @@ namespace TechBuild {
                 fundedLoggedFor = t2.id;
                 GenericHelpers::LogUtil("[TECH][Build] the advanced lab is kept: the advanced fusion is funded without it: " + fundedWhy + " (D-105)", 1);
             }
-            const bool due = (t2 !is null) && AfusUnderWay() && BankHasRoomFor(t2, 2500.0f) && !EcoOnline() && !funded;   // D-102, D-105
+            // D-229: a nuke opening cashes in the technology lab after its
+            // required constructors finish. The shared lifecycle stops all
+            // production/guards before the existing reclaim actors take over.
+            // The opening prepares storage before reclaim so its lump-sum
+            // refund can fund mex upgrades and fusion without overflowing.
+            CCircuitDef@ rushStore = TechChain::NukeRush() ? ai.GetCircuitDef(TechChain::DefFor("mstor")) : null;
+            const bool rushRelease = rushStore !is null && rushStore.count - aiBuilderMgr.GetUnfinishedCount(rushStore) > 0
+                && t2 !is null && !Lifecycle::IsRetiring(t2) && TechChain::NukeConstructorsReady();
+            const bool due = (t2 !is null) && !EcoOnline()
+                && ((AfusUnderWay() && !funded && BankHasRoomFor(t2, 2500.0f))
+                    || (rushRelease && aiEconomyMgr.metal.current < aiEconomyMgr.metal.storage * 0.5f));
             if (due && !Lifecycle::IsRetiring(t2)) {
-                if (t2.task !is null) aiFactoryMgr.AbortTask(t2.task);
-                Lifecycle::Retire(t2, "an advanced fusion is under construction and the bank has room for the lab's metal (D-078)");
+                if (t2.task !is null && (t2.task.GetType() == int(Task::Type::FACTORY)
+                    || t2.task.GetType() == int(Task::Type::WAIT))) aiFactoryMgr.AbortTask(t2.task);
+                Lifecycle::Retire(t2, rushRelease ? "nuke opening: constructors complete; refund the lab into the fusion (D-229)"
+                    : "an advanced fusion is under construction and the bank has room for the lab's metal (D-078)");
+                if (rushRelease) {
+                    TechChain::nukeLabReleased = true;
+                    TechChain::nukeRetiredLabId = t2.id;
+                }
             }
             // INV-007: it never stays active while that holds
             if (due && !Lifecycle::IsRetiring(t2)) {
@@ -595,7 +615,8 @@ namespace TechBuild {
         const string key = "" + target.id;
         reclaimTargets.set(key, int64(ai.frame));
         int64 last = -100000; turretsPulledAt.get(key, last);
-        if (ai.frame - int(last) < 30 * SECOND) return;
+        const int joinInterval = TechChain::NukeRush() ? 2 * SECOND : 30 * SECOND;
+        if (ai.frame - int(last) < joinInterval) return;
         turretsPulledAt.set(key, int64(ai.frame));
         const int n = aiBuilderMgr.TurretsOnReclaim(target.id, Global::RoleSettings::Tech::ReclaimTurretMargin, true);
         GenericHelpers::LogUtil("[TECH][Reclaim] " + n + " turret(s) pulled onto " + target.circuitDef.GetName() + " " + target.id, (n > 0) ? 1 : 3);
@@ -609,6 +630,7 @@ namespace TechBuild {
 
     IUnitTask@ ReclaimT1Lab(CCircuitUnit@ u, float radius)
     {
+        if (TechChain::NukeRush() && UnitHelpers::IsCommander(u.circuitDef)) return null;
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (lab is null || lab is u) return null;
         if (lab.id != throwawayLabId) return null;   // D-076: only the throwaway lab; a later spam lab is a keeper
@@ -783,7 +805,13 @@ namespace TechBuild {
     {
         CCircuitUnit@ lab = Factory::primaryT2BotLab;
         if (lab is null || lab is u || !Lifecycle::IsRetiring(lab)) return null;
-        if (!BankHasRoomFor(lab, 2500.0f)) return null;
+        // D-229: storage is completed before retiring this lab. BAR pays the
+        // refund at completion, not during reclaim. The commander can reclaim
+        // it immediately; waiting for nanos delays the mex/fusion funding while
+        // the advanced constructors are occupied upgrading income.
+        if (TechChain::NukeRush() && TechChain::nukeLabReleased) {
+            if (aiEconomyMgr.metal.current >= aiEconomyMgr.metal.storage * 0.9f) return null;
+        } else if (!BankHasRoomFor(lab, 2500.0f)) return null;
         if (!T2MayReclaim(u, lab)) return null;   // D-105: T2 constructors only as a last resort
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, lab, 180 * SECOND));
         if (t !is null) PullTurrets(lab);

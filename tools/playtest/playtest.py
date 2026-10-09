@@ -14,7 +14,7 @@ widget, the infolog and the screenshots all live there. The install is read
 for the engine, the game archives, the maps and the last lobby script
 (modoptions template) only.
 
-Doc: tools/playtest/README.md. Skill: .claude/skills/playtest/SKILL.md.
+Doc: tools/playtest/README.md. Skill: skills/playtest/SKILL.md.
 """
 import argparse
 import datetime as dt

@@ -10,15 +10,19 @@
 #include "task/fighter/RouteTask.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/RangedGeometry.h"
 #include "unit/CircuitUnit.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "CircuitAI.h"
 #include "spring/SpringCallback.h"
 #include "spring/CustomCommand.h"
 #include "spring/SpringUnit.h"
+#include "spring/SpringMap.h"
+#include "task/RetreatTask.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
+#include "Sim/Units/CommandAI/Command.h"
 #include "Log.h"
 
 #include <algorithm>
@@ -56,9 +60,20 @@ void CRouteTask::AssignTo(CCircuitUnit* unit)
     hadAssignee = true;
 	// Deal lanes from the centre outwards: 0, +1, -1, +2, -2 ... so a small
 	// stream still straddles the line rather than drifting to one side.
-	const unsigned int k = laneDealt++ % std::max(1, laneCount);
+	unsigned int slot;
+    if (rowSpacing > 0.f && !freeFormationSlots.empty()) {
+        slot = *freeFormationSlots.begin();
+        freeFormationSlots.erase(freeFormationSlots.begin());
+    } else {
+        slot = laneDealt++;
+    }
+    // Reuse casualties' slots in O(log N), without shuffling survivors or
+    // growing an arbitrarily deep formation after repeated reinforcements.
+    if (rowSpacing > 0.f) formationSlots[unit] = slot;
+	const unsigned int k = slot % std::max(1, laneCount);
 	const int lane = (k == 0) ? 0 : (((k % 2) == 1) ? int((k + 1) / 2) : -int(k / 2));
 	lanes[unit] = lane;
+    rows[unit] = slot / std::max(1, laneCount);
 }
 
 void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
@@ -77,6 +92,12 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
 	lanes.erase(unit);
+    rows.erase(unit);
+    const auto slot = formationSlots.find(unit);
+    if (slot != formationSlots.end()) {
+        freeFormationSlots.insert(slot->second);
+        formationSlots.erase(slot);
+    }
 	unitRoutes.erase(unit);
     unitArrival.erase(unit);
 	issuing.erase(unit);
@@ -84,6 +105,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	retryUnits.erase(unit);
 	engaging.erase(unit);
     issuedVersion.erase(unit);
+    dispatches.erase(unit);
     if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
     if (ManagedControl() && hadAssignee && units.empty()) manager->AbortTask(this);
 }
@@ -93,6 +115,11 @@ void CRouteTask::SetLanes(int count, float spacing, float endSpread)
 	laneCount = std::max(1, count);
 	laneSpacing = std::max(0.f, spacing);
 	laneEndSpread = std::min(1.f, std::max(0.f, endSpread));
+}
+
+void CRouteTask::SetRowSpacing(float spacing)
+{
+    rowSpacing = std::isfinite(spacing) ? std::clamp(spacing, 0.f, 512.f) : 0.f;
 }
 
 void CRouteTask::SetTraversal(bool preserve, float radius, bool fight)
@@ -114,7 +141,7 @@ AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 	if (unitRoutes.count(unit)) return route[idx];
 	const AIFloat3& p = route[idx];
 	const int lane = LaneOf(unit);
-	if ((lane == 0) || (laneSpacing <= 0.f) || (route.size() < 2)) {
+	if (((lane == 0) && rowSpacing <= 0.f) || (laneSpacing <= 0.f) || (route.size() < 2)) {
 		return p;
 	}
 	// Sideways is perpendicular to the leg arriving at this point (for the
@@ -128,11 +155,16 @@ AIFloat3 CRouteTask::LanePoint(CCircuitUnit* unit, unsigned int idx) const
 	}
 	const float scale = (idx + 1 == route.size()) ? laneEndSpread : 1.f;
 	const float off = laneSpacing * float(lane) * scale;
-	AIFloat3 out(p.x + (-dir.z / len) * off, p.y, p.z + (dir.x / len) * off);
+	const auto row = rows.find(unit);
+    const float behind = row == rows.end() ? 0.f : rowSpacing * row->second;
+    AIFloat3 out(p.x + (-dir.z / len) * off - dir.x / len * behind,
+        p.y, p.z + (dir.x / len) * off - dir.z / len * behind);
 	CTerrainManager::CorrectPosition(out);
 	// Formation offsets can cross a coast even when the centre route is legal.
-	// SEA collapses that member to the route, rather than issuing a cliff order.
-	if (seaControl && !manager->GetCircuit()->GetTerrainManager()->CanMoveToPos(unit->GetArea(), out)) return p;
+	// Both land spam and SEA collapse that member to the route instead of
+	// issuing an unreachable cliff/coast order. This uses the existing movement
+	// area lookup, not a new path query; aircraft have no restricted area.
+	if (!manager->GetCircuit()->GetTerrainManager()->CanMoveToPos(unit->GetArea(), out)) return p;
 	return out;
 }
 
@@ -140,6 +172,7 @@ void CRouteTask::Start(CCircuitUnit* unit)
 {
     if (holdPosition) unit->TrySetMoveState(CCircuitDef::MoveType::HOLD_POS);
 	IssueRoute(unit, 0);
+    if (seaTarget >= 0) IssuePriorityTarget(unit, seaTarget, navalTarget);
 }
 
 void CRouteTask::Update()
@@ -215,43 +248,71 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
-	if (seaControl) IFighterTask::OnUnitDamaged(unit, attacker);
+    if (seaControl && repairThreshold > 0.f && unit->GetHealthPercent() < repairThreshold) {
+        // Opt-in task policy, never mutate a shared UnitDef retreat threshold.
+        // Native retreat owns safe destination, repair, completion and return.
+        auto* military = static_cast<CMilitaryManager*>(manager);
+        military->AssignTask(unit, military->EnqueueRetreat());
+        return;
+    }
+    if (seaControl) IFighterTask::OnUnitDamaged(unit, attacker);
 	// No retreat: spam trades bodies for pressure.
 }
 
-bool CRouteTask::SetSeaTarget(int id)
+void CRouteTask::SetRepairThreshold(float value)
+{
+    repairThreshold = std::isfinite(value) ? std::clamp(value, 0.f, .9f) : 0.f;
+}
+
+bool CRouteTask::SetSeaTarget(int id) { return SetPriorityTarget(id, false); }
+bool CRouteTask::SetNavalTarget(int id) { return SetPriorityTarget(id, true); }
+
+void CRouteTask::IssuePriorityTarget(CCircuitUnit* unit, int id, bool naval)
+{
+    auto* circuit = manager->GetCircuit();
+    const auto* def = unit->GetCircuitDef();
+    if (id >= 0) {
+        const auto* enemy = circuit->GetEnemyInfo(id);
+        if (enemy == nullptr || !enemy->IsInRadarOrLOS()) return;
+        if (naval) {
+            auto* targetDef = enemy->GetCircuitDef();
+            const auto& p = enemy->GetPos();
+            const bool submerged = targetDef != nullptr && targetDef->IsInWater(circuit->GetMap()->GetElevationAt(p.x,p.z),p.y);
+            if (submerged ? !(def->HasSurfToWater() || def->HasSubToWater())
+                : !(def->HasSurfToLand() || def->HasSubToLand())) return;
+        } else if (!def->HasSurfToAir()) return;
+    }
+    TRY_UNIT(circuit, unit,
+        float params[] = {float(id >= 0 ? id : seaTarget)};
+        SendCustomCommand(circuit->GetSkirmishAIId(), unit->GetId(), id >= 0 ? CMD_UNIT_SET_TARGET : CMD_UNIT_CANCEL_TARGET, params);
+        unit->TrySetFireState(id >= 0 ? CCircuitDef::FireType::OPEN : def->GetFireState());
+    )
+}
+
+bool CRouteTask::SetPriorityTarget(int id, bool naval)
 {
     if (!seaControl) return false;
     auto* circuit = manager->GetCircuit();
     if (id >= 0) {
         const auto* enemy = circuit->GetEnemyInfo(id);
         if (enemy == nullptr || !enemy->IsInRadarOrLOS() || enemy->GetCircuitDef() == nullptr
-            || !enemy->GetCircuitDef()->IsAbleToFly()) return false;
+            || enemy->GetCircuitDef()->IsAbleToFly() == naval) return false;
         const auto data = enemy->GetData()->GetData();
         if (data.losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL
             | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD)) return false;
         if (data.IsIgnore() && (!enemy->GetCircuitDef()->IsIgnore()
             || enemy->GetUnit()->GetRulesParamFloat("ignoredByAI", 0.f) > 0.f)) return false;
     }
-    if (id == seaTarget) return true;
-    // Explicit SEA opt-in: do not enable CircuitUnit's shared CmdSetTarget stub.
-    // BAR's priority-fire command leaves the MOVE/patrol queue intact. Issue on
-    // target transitions only; script reacquires legal contacts each census.
+    if (id == seaTarget && naval == navalTarget) return true;
+    // O(members) only on intent changes; new assignees receive the current
+    // priority in Start. Cancel the old ID so out-of-range lists cannot grow.
+    // Movement remains the route/formation, never an engine ATTACK chase.
     for (auto* unit : units) {
-        if (!unit->GetCircuitDef()->HasSurfToAir()) continue;
-        TRY_UNIT(circuit, unit,
-            if (id >= 0) {
-                float params[] = {float(id)};
-                SendCustomCommand(circuit->GetSkirmishAIId(), unit->GetId(), CMD_UNIT_SET_TARGET, params);
-                unit->TrySetFireState(CCircuitDef::FireType::OPEN);
-            } else if (seaTarget >= 0) {
-                float params[] = {float(seaTarget)};
-                SendCustomCommand(circuit->GetSkirmishAIId(), unit->GetId(), CMD_UNIT_CANCEL_TARGET, params);
-                unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
-            }
-        )
+        if (seaTarget >= 0) IssuePriorityTarget(unit, -1, navalTarget);
+        if (id >= 0) IssuePriorityTarget(unit, id, naval);
     }
     seaTarget = id;
+    navalTarget = naval;
     return true;
 }
 
@@ -280,7 +341,10 @@ bool CRouteTask::IsAtEnd(CCircuitUnit* unit) const
 	const int frame = manager->GetCircuit()->GetLastFrame();
 	const auto it=unitArrival.find(unit);
     const float radius=it==unitArrival.end() ? arriveRadius : it->second;
-    return unit->GetPos(frame).SqDistance2D(route.back()) < SQUARE(radius);
+    // SEA formation completion is relative to this member's lane/row, not
+    // the cohort center. Otherwise an offset ship idles and requeues forever.
+    const AIFloat3 goal=seaControl && unitRoutes.count(unit)==0 ? LanePoint(unit,route.size()-1) : route.back();
+    return unit->GetPos(frame).SqDistance2D(goal) < SQUARE(radius);
 }
 
 unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
@@ -341,6 +405,55 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 	if (!issuing.insert(unit).second) return;
 	lastIssue[unit]=circuit->GetLastFrame();
 	const int timeout = circuit->GetLastFrame() + FRAMES_PER_SEC * 600;
+	// Project every ORIGINAL waypoint before reducing commands: projecting a
+    // simplified fleet centerline changes offsets at turns and shallow coasts.
+    // Only ordinary MOVE legs participate; joining endpoints, reversals and
+    // all PATROL/FIGHT transitions retain their original dispatch path.
+    if (seaControl && compactMoves && !patrol && !fightAtEnd && fromIdx < route.size()) {
+        std::vector<AIFloat3> projected;
+        projected.reserve(route.size()-fromIdx);
+        for (unsigned int i=fromIdx; i<route.size(); ++i) projected.push_back(LanePoint(unit,i));
+        auto reduced = projected;
+        ranged::CompactStraightRoute(reduced);
+        if (reduced.size() < projected.size() && ClearNavalPolyline(unit,projected)) projected.swap(reduced);
+        auto& old = dispatches[unit];
+        std::vector<routecommand::Command> commands;
+        commands.reserve(projected.size());
+        // A matching intent retains its ORIGINAL deadline, never silently
+        // extends it. The live callback below still detects same-frame STOP,
+        // command rejection, expiry, takeover and engine-internal detours.
+        // A new raw path/version can reduce to exactly the same per-member
+        // intent. Revalidate that intent and the live queue, then promote its
+        // version; requiring the old version here would miss this useful case.
+        bool same = old.version >= 0 && old.target == seaTarget && old.naval == navalTarget && old.hold == holdPosition
+            && old.commands.size() == projected.size() && !retryUnits.count(unit) && !engaging.count(unit)
+            && unit->GetTask() == this && !unit->IsDead();
+        for (size_t i=0; i<projected.size(); ++i) {
+            const auto& p=projected[i];
+            routecommand::Command c{CMD_MOVE, i==0 ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY, timeout,p.x,p.y,p.z};
+            commands.push_back(c);
+            if (same) { c.timeout=old.commands[i].timeout; same = c == old.commands[i]; }
+        }
+        bool sent = false;
+        TRY_UNIT(circuit, unit,
+            unit->CmdWantedSpeed(NO_SPEED_LIMIT);
+            if (same && circuit->GetUnitAPI()->HasRouteIntent(unit->GetId(),old.commands,circuit->GetLastFrame())) {
+                old.version = version;
+                sent = true;
+            } else {
+                // Clear first: a partial/rejected dispatch cannot be claimed
+                // as an authoritative queue on the next recovery attempt.
+                old.commands.clear(); old.version = -1;
+                for (const auto& c:commands) unit->CmdMoveTo({c.x,c.y,c.z},c.options,c.timeout);
+                old.commands=std::move(commands); old.version=version; old.target=seaTarget; old.naval=navalTarget; old.hold=holdPosition;
+                sent = true;
+            }
+        )
+        issuing.erase(unit);
+        if (sent) issuedVersion[unit]=version;
+        return;
+    }
+	dispatches.erase(unit);
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		for (unsigned int i = fromIdx; i < route.size(); ++i) {
@@ -352,6 +465,30 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 	)
 	issuing.erase(unit);
     if (ManagedControl()) issuedVersion[unit] = version;
+}
+
+bool CRouteTask::ClearNavalPolyline(CCircuitUnit* unit, const std::vector<AIFloat3>& points) const
+{
+    const auto* terrain = manager->GetCircuit()->GetTerrainManager();
+    const auto* movement = terrain->GetMobileType(unit->GetCircuitDef()->GetId());
+    if (movement == nullptr || !movement->canFloat || movement->maxElevation >= 0) return false;
+    const auto* area = terrain->GetAreaData();
+    const int extent = std::max(unit->GetCircuitDef()->GetMoveXSize(),unit->GetCircuitDef()->GetMoveZSize())/2 + 1;
+    const float width=CTerrainManager::GetTerrainWidth(), height=CTerrainManager::GetTerrainHeight();
+    // Validate the union of adjacent projected legs once, not the growing
+    // merged segment repeatedly (quadratic). Direct height-array reads on the
+    // owner thread, sampled at terrain-square spacing across the footprint.
+    for (size_t j=1; j<points.size(); ++j) {
+        const auto& a=points[j-1]; const auto& b=points[j];
+        const int steps=std::max(1,int(std::ceil(std::sqrt(a.SqDistance2D(b))/SQUARE_SIZE)));
+        for (int i=0; i<=steps; ++i) for (int dx=-extent; dx<=extent; ++dx) for (int dz=-extent; dz<=extent; ++dz) {
+            const float x=a.x+(b.x-a.x)*i/steps+dx*SQUARE_SIZE, z=a.z+(b.z-a.z)*i/steps+dz*SQUARE_SIZE;
+            if (x<0 || z<0 || x>=width || z>=height) return false;
+            const float elevation=area->GetElevationAt(x,z);
+            if (!std::isfinite(elevation) || elevation>movement->maxElevation) return false;
+        }
+    }
+    return true;
 }
 
 const std::vector<AIFloat3>& CRouteTask::RouteFor(CCircuitUnit* unit) const

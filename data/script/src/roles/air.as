@@ -1,17 +1,17 @@
 // role: AIR
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
-#include "../helpers/objective_helpers.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "../types/role_config.as"
 #include "../global.as"
 #include "../types/terrain.as"
 // Dynamic factory production
-#include "../manager/factory_production.as"
+#include "../systems/production/factory_production.as"
 // T2 bomber waves
-#include "../manager/air_waves.as"
+#include "../systems/air/air_waves.as"
 #include "air_rules.as"
-#include "../manager/air_production.as"
+#include "../systems/air/air_production.as"
 
 namespace RoleAir {
     IUnitTask@ g_airStrategicFocusTask = null;

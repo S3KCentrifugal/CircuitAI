@@ -3,21 +3,57 @@ import argparse, hashlib, json, re, subprocess, sys
 from pathlib import Path
 import playtest, storage
 from air_arena import lua
+from sea_tempo_benchmark import summarize, audit
+from sea_progression_audit import audit as audit_progression
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[1]
 
+
+def audit_transit(text, case):
+    """Physical arrival/health evidence, independent of AI decision messages."""
+    spec=case['native_transit']; latest={}
+    for line in text.splitlines():
+        if '[SeaArena]' not in line or ' boat ' not in line:continue
+        fields=dict(re.findall(r'(\w+)=([^\s]+)',line))
+        if fields.get('unit')==spec['unit']:latest[fields['id']]=fields
+    expected=sum(g['count'] for g in case['groups'] if g['team']==0 and g['unit']==spec['unit'])
+    failures=[]; x,z=spec['points'][-1]
+    if len(latest)!=expected:failures.append(f'Expected {expected} observed boats; got {len(latest)}')
+    for unit,sample in latest.items():
+        if int(sample['frame'])<90*30:failures.append(f'{unit}: missing late observation')
+        if (float(sample['x'])-x)**2+(float(sample['z'])-z)**2>360**2:
+            failures.append(f'{unit}: did not reach formation destination')
+        if sample['health']!=sample['maxhealth']:failures.append(f'{unit}: damaged during empty-sea transit')
+    return failures
+
+def scenario_label(name, control=False):
+    """Fit storage's 24-character category without merging long case names."""
+    suffix='-ctrl' if control else '-cand'
+    normalized=re.sub(r'[^a-z0-9]+','-',name.lower()).strip('-') or 'sea'
+    if len(normalized+suffix)<=24:
+        return normalized+suffix
+    # The full case identity remains in sea-arena.json. Hash the unshortened
+    # name: mere prefix truncation merged supported/unsupported counter cases.
+    digest=hashlib.sha256(name.encode('utf-8')).hexdigest()[:8]
+    return normalized[:10].rstrip('-')+'-'+digest+suffix
+
+def frozen_actor_condition(manager, support_turrets):
+    if not support_turrets:
+        return 'ai.frame>=0'
+    # Static nanos belong to FactoryManager, not BuilderManager. A repair
+    # fixture must leave both their task selection and recovery subs active.
+    return ('(SeaEconomy::ConstructorDef(u.circuitDef) || UnitHelpers::IsCommander(u.circuitDef))'
+            if manager=='builder' else 'SeaEconomy::SupportedFactory(u.circuitDef)')
+
 def prepare(a):
     case=json.loads(storage.resolve_definition(a.case,'cases').read_text())
-    # Keep the full scenario identity: truncating at 19 characters collapsed
-    # supported/unsupported counter cases into the same discovery category.
-    # storage.allocate normalizes names and still gives every game a unique ID.
-    label=case.get('name',Path(a.case).stem)+('-ctrl' if a.control else '-cand')
+    label=scenario_label(case.get('name',Path(a.case).stem),a.control)
     d=storage.allocate('sea','combat',label,case.get('map_key','glacial'),'supplied',seed=a.seed)
     starts=d/'starts.as'; starts.write_text(''.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::SEA, false),\n' for x,z in case.get('starts',[[2300,4400],[4600,4400]])))
     call=[sys.executable,str(HERE/'playtest.py')]
     subprocess.run(call+['stage','--dir',str(d),'--dll',str(a.dll),'--data',str(a.data),'--map',case.get('map','Glacial Gap v1.1'),'--map-file',str(starts),
-        '--game','Beyond All Reason test-31479-433a460','--engine','recoil_2026.07.04','--role','SEA','--roles','all','--ally-spots','1','--side',a.side,
+        '--game',getattr(a,'game','Beyond All Reason test-31479-433a460'),'--engine','recoil_2026.07.04','--role','SEA','--roles','all','--ally-spots','1','--side',a.side,
         '--speed',str(a.speed),'--minutes',str(a.minutes),'--shots',case.get('shots','0.4@2400@3400:4450,0.7@2400@3400:4450,3@3200@3400:4450,7@4000@3400:4450'),
         '--width','1280','--height','720','--lean-render','--bonus','0','--ai-option','profile='+a.profile,'--ai-option','random_seed='+str(a.seed),
         '--modoption','deathmode=neverend','--modoption','startenergy=1000000','--modoption','startenergystorage=1000000',
@@ -38,7 +74,7 @@ def prepare(a):
         # Recovery submarines must retain their native reclaim/repair task and
         # leave the yard. Freezing them like construction ships can obstruct
         # subsequent hulls and turn a response test into a fixture artifact.
-        condition='(SeaEconomy::ConstructorDef(u.circuitDef) || UnitHelpers::IsCommander(u.circuitDef))' if name=='builder' and case.get('support_turrets') else 'ai.frame>=0'
+        condition=frozen_actor_condition(name,case.get('support_turrets',False))
         p.write_text(s[:b+1]+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied fixture only\n'+s[b+1:])
     if case.get('production'):
         # Finish the supplied initial workforce before the first recruitment
@@ -46,6 +82,31 @@ def prepare(a):
         p=staged/'src/manager/factory.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
         p.write_text(s[:b+1]+'\n if (ai.frame<600) return aiFactoryMgr.Enqueue(TaskS::Wait(false,SECOND)); // fixture setup barrier\n'+s[b+1:])
     setup=staged/'src/setup.as';s=setup.read_text();s=s.replace('Global::AISettings::Role = derivedRole;','derivedRole=AiRole::SEA;\nGlobal::AISettings::Role = derivedRole;');setup.write_text(s)
+    if case.get('native_transit'):
+        # Mechanism fixture, not autonomous combat evidence. Both builds get
+        # identical routes/formation; only the candidate exposes compaction.
+        spec=case['native_transit']
+        p=staged/'src/systems/sea/sea_combat.as';s=p.read_text()
+        s=s.replace('bool Active() { return ', 'bool Active() { return false && ',1);p.write_text(s)
+        points=','.join(f'AIFloat3({float(x)},0,{float(z)})' for x,z in spec['points'])
+        compact=('transit.SetMoveCompaction(Global::RoleSettings::Sea::CompactMoveRoutes);'
+                 if 'CompactMoveRoutes' in g.read_text() else '')
+        p=staged/'src/manager/military.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
+        s=s[:b+1]+f'\n if (ai.teamId==0 && u.circuitDef.GetName()=="{spec["unit"]}") return SeaTransitFixture::Task();\n'+s[b+1:]
+        s+='''\nnamespace SeaTransitFixture {
+            CRouteTask@ transit;
+            IUnitTask@ Task() {
+                if (transit is null || transit.IsDead()) {
+                    @transit=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+                    transit.SetSeaControl(true); transit.SetTraversal(true,48,false);
+                    transit.SetLanes(3,96,1); transit.SetRowSpacing(80);
+                    '''+compact+''' array<AIFloat3> points={'''+points+'''};
+                    transit.SetRoute(points);
+                }
+                return transit;
+            }
+        }\n'''
+        p.write_text(s)
     if case.get('enemy_air_route'):
         # Script only the enemy transit. Friendly scout/AA orders remain wholly
         # production policy, so physical response is not a fixture instruction.
@@ -56,6 +117,41 @@ def prepare(a):
             array<AIFloat3> points={'''+points+'''};
             transit.SetTraversal(true,64,false); transit.SetPatrol(true); transit.SetRoute(points); return transit;
         } // enemy flight path fixture only\n'''+s[b+1:];p.write_text(s)
+    if case.get('enemy_routes'):
+        # Deterministic opposing bait only. Friendly combat remains entirely AI
+        # controlled; identical trajectories are used for old/new comparisons.
+        p=staged/'src/systems/sea/sea_combat.as';s=p.read_text()
+        s=s.replace('bool Active() { return ', 'bool Active() { return ai.teamId!=1 && ',1);p.write_text(s)
+        clauses=[]
+        for route in case['enemy_routes']:
+            points=','.join(f'AIFloat3({float(x)},0,{float(z)})' for x,z in route['points'])
+            clauses.append('if (ai.teamId==1 && u.circuitDef.GetName()=="'+route['unit']+'") { '
+                'CRouteTask@ scripted=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route())); '
+                'array<AIFloat3> points={'+points+'}; scripted.SetTraversal(true,32,false); '
+                'scripted.SetPatrol(true); scripted.SetRoute(points); return scripted; }')
+        p=staged/'src/manager/military.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
+        p.write_text(s[:b+1]+'\n'+'\n'.join(clauses)+'\n'+s[b+1:])
+    if case.get('friendly_routes'):
+        # Exercise escort following a moving protected ship. Only that ship's
+        # route is scripted; support movement/stockpiling remains production AI.
+        clauses, exclusions = [], []
+        for route in case['friendly_routes']:
+            points=','.join(f'AIFloat3({float(x)},0,{float(z)})' for x,z in route['points'])
+            match='ai.teamId==0 && u.circuitDef.GetName()=="'+route['unit']+'"'
+            exclusions.append('if (u !is null && '+match+') return false;')
+            clauses.append('if ('+match+') { CRouteTask@ scripted=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route())); '
+                'array<AIFloat3> points={'+points+'}; scripted.SetSeaControl(true); scripted.SetTraversal(true,32,false); '
+                'scripted.SetPatrol(true); scripted.SetRoute(points); return scripted; }')
+        p=staged/'src/systems/sea/sea_operations.as';s=p.read_text();b=s.index('{',s.index('bool Eligible(CCircuitUnit@ u)'))
+        p.write_text(s[:b+1]+'\n'+'\n'.join(exclusions)+'\n'+s[b+1:])
+        p=staged/'src/manager/military.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
+        p.write_text(s[:b+1]+'\n'+'\n'.join(clauses)+'\n'+s[b+1:])
+    if case.get('verified_water_fixture'):
+        # Isolate the post-survey policy with a declared scenario precondition.
+        # This is not evidence that the natural-game survey gate has passed.
+        x,z=case['verified_water_fixture']
+        p=staged/'src/systems/sea/sea_invasion.as';s=p.read_text();b=s.index('{',s.index('void Tick()'))
+        p.write_text(s[:b+1]+f'\n if (ai.teamId==0) {{ secured=ai.frame>=600; body=aiBattle.WaterBody(AIFloat3({x},0,{z}),false); return; }} // supplied survey precondition only\n'+s[b+1:])
     case.update(seed=a.seed,side=a.side,minutes=a.minutes,speed=a.speed,control=a.control,order_slack=a.order_slack)
     (d/'LuaUI/Config').mkdir(exist_ok=True,parents=True);(d/'LuaUI/Config/sea_arena.lua').write_text('return '+lua(case)+'\n')
     (d/'sea-arena.json').write_text(json.dumps(case,indent=2))
@@ -64,7 +160,11 @@ def prepare(a):
         'staged_data':{str(p.relative_to(staged.parent)):hashlib.sha256(p.read_bytes()).hexdigest()
             for p in staged.parent.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
         'observer_sha256':hashlib.sha256((HERE/'widgets/sea_arena.lua').read_bytes()).hexdigest(),
-        'overrides':['SEA role forced','economic builders frozen; recovery active in supported fixtures','factories frozen unless production fixture; setup barrier at frame 600','supplied forces and startup energy','fixed engine RNG seed']},indent=2))
+        'overrides':['SEA role forced','economic builders frozen; recovery active in supported fixtures','factories frozen unless production fixture; setup barrier at frame 600','supplied forces and startup energy','fixed engine RNG seed']
+            +(['enemy transit routes scripted'] if case.get('enemy_routes') else [])
+            +(['protected friendly ship route scripted; escort commands remain autonomous'] if case.get('friendly_routes') else [])
+            +(['friendly native formation route supplied; mechanism test only'] if case.get('native_transit') else [])
+            +(['verified-water gate supplied; not a natural survey test'] if case.get('verified_water_fixture') else [])},indent=2))
     subprocess.run([sys.executable,str(ROOT/'tools/knowledge/check_script_api.py'),'--dll',str(a.dll),'--scripts',str(staged)],check=True)
     print('SEA_ARENA='+str(d),flush=True)
     return d,call,case.get('checks','sea-arena')
@@ -72,11 +172,29 @@ def prepare(a):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--case',default='surface-line');p.add_argument('--dll',required=True,type=Path)
     p.add_argument('--data',type=Path,default=ROOT/'data');p.add_argument('--side',default='armada');p.add_argument('--profile',default='experimental_hard')
+    p.add_argument('--game',default='Beyond All Reason test-31479-433a460')
     p.add_argument('--control',action='store_true');p.add_argument('--seed',type=int,default=1891);p.add_argument('--minutes',type=int,default=8);p.add_argument('--speed',type=int,default=10)
     p.add_argument('--legacy-layout',action='store_true',help='Verify adaptive combat independently of experimental building')
     p.add_argument('--order-slack',type=float,help='Isolate optional native naval order changes; zero uses native defaults')
     a=p.parse_args();d,call,checks=prepare(a)
     subprocess.run(call+['launch','--dir',str(d),'--engine','recoil_2026.07.04'],check=True)
-    return subprocess.run(call+['watch','--dir',str(d),'--role','SEA','--checks',checks,'--minutes',str(a.minutes),'--wall-minutes','15']).returncode
+    code=subprocess.run(call+['watch','--dir',str(d),'--role','SEA','--checks',checks,'--minutes',str(a.minutes),'--wall-minutes','15']).returncode
+    case=json.loads((d/'sea-arena.json').read_text())
+    acceptance=case.get('acceptance')
+    if acceptance or case.get('native_transit') or case.get('progression_audit'):
+        archive=max((d/'runs').glob('*'),key=lambda p:p.name)
+        text=(archive/'infolog.txt').read_text(errors='replace')
+        measurements={}
+        if case.get('progression_audit'):
+            failures,measurements=audit_progression(text,case)
+        else:
+            failures=audit_transit(text,case) if case.get('native_transit') else audit(summarize(text),acceptance)
+        # Never replace the runner's report/result. A smoke PASS may still be
+        # a tactical failure; publish the explicit physical judgment beside it.
+        with (archive/'sea-tempo-acceptance.json').open('x',encoding='utf-8') as f:
+            json.dump(dict(acceptance=acceptance or case.get('progression_audit'),measurements=measurements,failures=failures,pass_outcome=not failures),f,indent=2)
+        print('SEA outcome: '+('FAIL '+str(failures) if failures else 'PASS'),flush=True)
+        code=code or int(bool(failures))
+    return code
 
 if __name__=='__main__':sys.exit(main())

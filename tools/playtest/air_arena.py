@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import re
 import shutil
 import statistics
@@ -44,6 +45,8 @@ def resolve_case(path, side, defender, seed, visibility=None):
         if field not in case:
             raise ValueError('Missing case field: ' + field)
     case = copy.deepcopy(case)
+    if type(case.get('factory_production', False)) is not bool:
+        raise ValueError('factory_production must be a boolean')
     case.update(side=side, defender=defender, seed=seed, scout=ROSTERS[side]['scout'])
     case.setdefault('visibility', 'radar')
     if visibility:
@@ -149,8 +152,8 @@ def summarize(base):
 
 def prepare(args):
     base = args.dir.resolve()
-    if not base.is_relative_to(ROOT / 'build-theatres') or base == ROOT / 'build-theatres':
-        raise ValueError('Use a child of repository build-theatres')
+    if not base.is_relative_to(RAW_ROOT) or base == RAW_ROOT:
+        raise ValueError('Use a child of benchmark-repository build-theatres')
     if (base / 'playtest.pid').exists():
         # Refuse to restage a potentially live game. The ordinary stop command
         # removes the pid; an unused stale directory can simply be given a new name.
@@ -204,6 +207,8 @@ def prepare(args):
            '--extra-widget', str(HERE / 'widgets/air_command_watch.lua')]
     if args.data:
         cmd += ['--data', str(args.data)]
+    if case.get('factory_production', False):
+        cmd += ['--modoption', 'startmetal=1000000', '--modoption', 'startmetalstorage=1000000']
     subprocess.run(cmd, check=True)
     script = base / 'script.txt'
     text = script.read_text()
@@ -214,7 +219,8 @@ def prepare(args):
     teams['teams'][1]['side'] = args.defender
     (base / 'teams.json').write_text(json.dumps(teams, indent=2))
     staged = base / 'AI/Skirmish/BARbTest/test/script'
-    overrides = ['builder/factory tasks frozen', 'AIR role on both teams', 'sustainable-income combat gate waived',
+    overrides = ['builders and enemy factories frozen; own factories active' if case.get('factory_production', False)
+                 else 'builder/factory tasks frozen', 'AIR role on both teams', 'sustainable-income combat gate waived',
                  'defensive fighters remain in home screen', 'supplied energy storage and 1000x passive energy',
                  'stockpile ammunition replenished']
     checked_replace(staged / 'src/setup.as', 'Global::AISettings::Role = derivedRole;',
@@ -224,8 +230,11 @@ def prepare(args):
         p = staged / 'src/manager' / (name + '.as')
         source = p.read_text()
         at = source.index('{', source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
-        p.write_text(source[:at+1] + '\n if (ai.frame >= 0) return ' + manager + '.Enqueue(' + wait + '); // arena only\n' + source[at+1:])
-    checked_replace(staged / 'src/manager/air_economy.as',
+        condition = 'ai.teamId != 0' if name == 'factory' and case.get('factory_production', False) else 'ai.frame >= 0'
+        p.write_text(source[:at+1] + '\n if (' + condition + ') return ' + manager + '.Enqueue(' + wait + '); // arena only\n' + source[at+1:])
+    if case.get('factory_production', False):
+        overrides.append('supplied initial metal/storage: 1000000; normal own factory production policy')
+    checked_replace(staged / 'src/systems/air/air_economy.as',
                     'bool MassBombers() {',
                     'bool MassBombers() { if (ai.frame >= 0) return true; // supplied combat arena only')
     # Supplied combat deliberately has no opening crew/turrets or recruitment.
@@ -235,7 +244,10 @@ def prepare(args):
         overrides.append('T1 opening production gate disabled for supplied combat')
     if case.get('bomber_only', True):
         checked_replace(staged / 'src/global.as', 'float BomberWaveFighterRatio = 1.0f;', 'float BomberWaveFighterRatio = 0.0f;')
-        checked_replace(staged / 'src/manager/air_raids.as', 'AirScreen::HomeValue() < AirEconomy::EnemyAir()', 'false /* bomber-only arena */')
+        raid_file = staged / 'src/systems/air/air_raids.as'
+        escort_gate = ('AirOperations::AvailableFighters(true)' if 'AirOperations::AvailableFighters(true)' in raid_file.read_text()
+                       else 'AirScreen::HomeValue()') + ' < AirEconomy::EnemyAir()'
+        checked_replace(raid_file, escort_gate, 'false /* bomber-only arena */')
         overrides.append('T1 home-air and T2 escort launch gates waived')
     for profile in ('experimental_balanced', 'experimental_hard', 'experimental_terrible'):
         path = staged / profile / 'main.as'

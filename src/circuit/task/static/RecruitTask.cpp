@@ -38,6 +38,11 @@ CRecruitTask::~CRecruitTask()
 
 bool CRecruitTask::CanAssignTo(CCircuitUnit* unit) const
 {
+	// D-216: completion temporarily clears target while engine repeat continues.
+	// A nearby idle lab must not adopt that live pump's task in this window:
+	// one target pointer and one script owner cannot represent two factories.
+	// Ordinary recruitment retains its existing assignment semantics.
+	if (repeat && !units.empty() && units.find(unit) == units.end()) return false;
 	return (target == nullptr) && unit->GetCircuitDef()->CanBuild(buildDef) &&
 		   (position.SqDistance2D(unit->GetPos(manager->GetCircuit()->GetLastFrame())) <= sqradius);
 }
@@ -131,6 +136,9 @@ void CRecruitTask::Cancel()
 	CUnitAPI* unitAPI = circuit->GetUnitAPI();
 	for (CCircuitUnit* unit : units) {
 		// Clear build-queue
+		if (repeat) {
+			TRY_UNIT(circuit, unit, unit->GetUnit()->SetRepeat(false);)
+		}
 		int cmdSize = unitAPI->GetCMDQueueSize(unit->GetId());
 		std::vector<float> params;
 		params.reserve(cmdSize);
@@ -184,7 +192,8 @@ bool CRecruitTask::Execute(CCircuitUnit* unit)
 
 	if (geom::is_valid(buildPos)) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, UNIT_NO_FACING, 0, frame + FRAMES_PER_SEC * 10);
+			if (repeat) unit->GetUnit()->SetRepeat(true);
+			unit->CmdBuild(buildDef, buildPos, UNIT_NO_FACING, 0, repeat ? INT_MAX : frame + FRAMES_PER_SEC * 10);
 		)
 	} else {
 		manager->AbortTask(this);
@@ -195,7 +204,29 @@ bool CRecruitTask::Execute(CCircuitUnit* unit)
 
 void CRecruitTask::OnUnitIdle(CCircuitUnit* unit)
 {
+	if (repeat) {
+		// Engine idle callbacks can race a repeat's next build. Repair an empty
+		// queue only; never add another copy of the repeating build command.
+		auto* api = manager->GetCircuit()->GetUnitAPI();
+		const int size = api->GetCMDQueueSize(unit->GetId());
+		for (int i = 0; i < size; ++i) if (api->GetCMD(unit->GetId(), i) < 0) return;
+	}
 	Start(unit);
+}
+
+void CRecruitTask::RemoveAssignee(CCircuitUnit* unit)
+{
+	if (repeat && !unit->IsDead()) {
+		// Reassignment/player control can remove the worker without stopping the
+		// old task first. Remove only this owner's repeated build, not a player's
+		// unrelated queue. The normal Cancel path still owns whole-queue cleanup.
+		TRY_UNIT(manager->GetCircuit(), unit,
+			unit->GetUnit()->SetRepeat(false);
+			unit->CmdRemove({-float(buildDef->GetId())}, UNIT_COMMAND_OPTION_ALT_KEY | UNIT_COMMAND_OPTION_CONTROL_KEY);
+		)
+	}
+	IBuilderTask::RemoveAssignee(unit);
+	if (repeat && units.empty()) manager->AbortTask(this);
 }
 
 void CRecruitTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
@@ -219,6 +250,13 @@ void CRecruitTask::SetTarget(CCircuitUnit* unit)
 		}
 	}
 	IBuilderTask::SetTarget(unit);
+    static_cast<CFactoryManager*>(manager)->RefreshPendingRecruit(this);
+}
+
+void CRecruitTask::Dead()
+{
+    IUnitTask::Dead();
+    static_cast<CFactoryManager*>(manager)->RefreshPendingRecruit(this);
 }
 
 } // namespace circuit

@@ -58,6 +58,29 @@ struct Route {
 struct Cancelled final : std::exception {
     const char* what() const noexcept override { return "lane request cancelled"; }
 };
+// One owner/thread per workspace. Generations avoid clearing V cells for a
+// short route; the retained heap keeps the legacy (cost, cell) tie order.
+// Full-field lane consumers still receive completely initialized arrays.
+struct SearchWorkspace {
+    std::vector<std::uint32_t> stamps;
+    std::vector<std::pair<float, int>> heap;
+    std::uint32_t generation = 0;
+    void Begin(std::size_t size);
+    bool Seen(int cell) const { return stamps[cell] == generation; }
+};
+struct PointWorkspace {
+    SearchWorkspace search;
+    Grid penalty, distance;
+    std::vector<char> blocked;
+    std::vector<int> previous;
+    // A zero version deliberately disables cost reuse. Callers must keep the
+    // immutable terrain alive and version every threat publication. Obstacles
+    // are live inputs and always force recomputation (terrain_route_test).
+    const Grid* terrain = nullptr;
+    const Grid* threat = nullptr;
+    std::uint64_t version = 0;
+    float landCost = 0, waterCost = 0, weight = 0, ceiling = 0;
+};
 std::uint64_t Fingerprint(const std::vector<Route>& routes);
 class Solver final : private Settings {
 public:
@@ -67,7 +90,8 @@ public:
     // Empty means unreachable; never snap either end across an impassable cell.
     std::vector<int> PointRoute(const Point& from, const Point& to, int cls, const Grid& threat,
         float landCost, float waterCost, float threatWeight, float maxWaterThreat,
-        const std::vector<char>* obstacles = nullptr) const;
+        const std::vector<char>* obstacles = nullptr, PointWorkspace* workspace = nullptr,
+        std::uint64_t threatVersion = 0) const;
     // Pure qualification, also exercised by synthetic route regressions.
     bool HasMountainTraverse(const Route& route, float rise) const;
     // Shared by the legacy choke analyser and lane planner; no second BFS.
@@ -75,7 +99,8 @@ public:
     void DijkstraMulti(const std::vector<int>& starts, const Grid& penalty, int cls, const Grid* extra,
         Grid& dist, std::vector<int>& prev, bool reverse = true, float gradeWeight = 0.f,
         const std::vector<char>* blocked = nullptr, float cliffWeight = 0.f, bool preferShelf = true,
-        const Grid* initialCost = nullptr) const;
+        const Grid* initialCost = nullptr, int terminal = -1, SearchWorkspace* workspace = nullptr,
+        int escape = -1) const;
     std::uint64_t Searches() const { return searches; }
     std::uint64_t Expanded() const { return expanded; }
 private:

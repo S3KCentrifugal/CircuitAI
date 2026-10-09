@@ -1,10 +1,31 @@
-#include "../manager/sea_economy.as"
-#include "../manager/sea_combat.as"
+#include "../systems/sea/sea_economy.as"
+#include "../systems/sea/sea_combat.as"
 
 namespace SeaFactories {
+    bool T2Finished(const string &in side) {
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
+        return d !is null && d.count>aiBuilderMgr.GetUnfinishedCount(d);
+    }
+    bool NeedSeaplane(const string &in side) {
+        CCircuitDef@ d=ai.GetCircuitDef(UnitHelpers::GetSeaplanePlatformNameForSide(side));
+        return d !is null && d.IsAvailable(ai.frame) && SeaMath::SeaplaneNext(Global::RoleSettings::Sea::SeaplanesAfterT2,
+            T2Finished(side),d.count,aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY),d));
+    }
+    bool FactoryAllowed(const CCircuitDef@ d) {
+        // Native switching must not bypass SEA's surveyed forward staging.
+        if (SeaInvasion::Active() && SeaInvasion::Factory(d)) return false;
+        if (d is null || !Global::RoleSettings::Sea::SeaplanesAfterT2) return true;
+        const string side=UnitHelpers::GetSideForUnitName(d.GetName());
+        if (UnitHelpers::IsT2Shipyard(d.GetName()) && d.count==0 && !SeaEconomy::TechReady(ai.GetCircuitDef(d.id))) return false;
+        if (UnitHelpers::IsSeaplanePlatform(d.GetName())) return T2Finished(side) && SeaEconomy::SeaplaneReady(d);
+        // A lost opening yard must remain recoverable. Other discretionary
+        // factory purchases wait for the post-T2 platform commitment.
+        return (UnitHelpers::IsT1Shipyard(d.GetName()) && d.count==0) || !NeedSeaplane(side);
+    }
     int nextForward=0, stableSince=-1;
     AIFloat3 forwardSite(-1,0,-1);
     dictionary draining;
+    dictionary urgentProducts;
     bool CombatHull(const CCircuitDef@ d) {
         // Profiles intentionally zero naval threat weights. Combat role masks
         // remain valid for friendly cover; threat weights are enemy valuation.
@@ -13,9 +34,12 @@ namespace SeaFactories {
                 | Unit::Role::RIOT.mask | Unit::Role::ARTY.mask | Unit::Role::AS.mask);
     }
     bool Hold(CCircuitUnit@ u) { return SeaLayout::Active() && u !is null && (Lifecycle::IsRetiring(u) || draining.exists(""+u.id)); }
-    IUnitTask@ Recruit(CCircuitUnit@ yard, CCircuitDef@ d, Task::RecruitType type, bool funded=false) {
+    IUnitTask@ Recruit(CCircuitUnit@ yard, CCircuitDef@ d, Task::RecruitType type, bool funded=false, bool urgent=false) {
         if (d is null || !d.IsAvailable(ai.frame) || !yard.circuitDef.CanBuild(d)) return null;
         IUnitTask@ t=aiFactoryMgr.Enqueue(TaskS::Recruit(type,Task::Priority::HIGH,d,yard.GetPos(ai.frame),64.0f));
+        if (t !is null) {
+            if (urgent) urgentProducts.set(""+yard.id,int(d.id)); else urgentProducts.delete(""+yard.id);
+        }
         if (t !is null && funded) SeaEconomy::Admit(d,true);
         return t;
     }
@@ -24,10 +48,27 @@ namespace SeaFactories {
         const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
         const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
         array<string> names;
-        if (!advanced && SeaCombat::fleet>=1500)
-            names.insertLast(side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub");
+        if (!advanced && Global::RoleSettings::Sea::EnableEarlyRezSub) {
+            CCircuitDef@ rez=ai.GetCircuitDef(side=="armada" ? "armrecl" : side=="cortex" ? "correcl" : "legnavyrezsub");
+            const int target=AiMax(SeaRecovery::Demand(rez),SeaMath::RecoveryCount(aiEconomyMgr.metal.income,SeaCombat::fleet,
+                Global::RoleSettings::Sea::MetalIncomePerRezSub,Global::RoleSettings::Sea::FleetMetalPerRezSub));
+            if (rez !is null && rez.count+aiFactoryMgr.GetPendingRecruitCount(rez)<target
+                && aiFactoryMgr.GetPendingRecruitCount(rez)==0) {
+                // A free requesting yard is available capacity. Fund both the
+                // hull and energy before allocating this discretionary support.
+                SeaEconomy::Tick();
+                if (SeaEconomy::Fund(rez,AiMax(yard.circuitDef.GetBuildSpeed(),SeaEconomy::LocalPower(yard)))) {
+                    IUnitTask@ t=Recruit(yard,rez,Task::RecruitType::BUILDPOWER,true);
+                    if (t !is null) { GenericHelpers::LogUtil("[SEA][Recovery] recruit "+rez.GetName()+" target="+target,1); return t; }
+                }
+            }
+        }
         if (advanced && SeaCombat::fleet>=5000) {
-            names.insertLast(UnitHelpers::GetNavalAntiNukeShipNameForSide(side));
+            CCircuitDef@ protection=ai.GetCircuitDef(UnitHelpers::GetNavalAntiNukeShipNameForSide(side));
+            if (protection !is null && protection.count+aiFactoryMgr.GetPendingRecruitCount(protection)<SeaProtection::Demand()) {
+                IUnitTask@ task=Recruit(yard,protection,Task::RecruitType::FIREPOWER);
+                if (task !is null) return task;
+            }
             names.insertLast(UnitHelpers::GetNavalJammerShipNameForSide(side));
         }
         for (uint i=0;i<names.length();++i) {
@@ -39,8 +80,32 @@ namespace SeaFactories {
         }
         return null;
     }
+    IUnitTask@ Workforce(CCircuitUnit@ yard) {
+        if (!SeaLayout::Enabled() || yard is null || !SeaEconomy::Yard(yard.circuitDef)) return null;
+        SeaEconomy::Tick();
+        const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
+        const bool advanced=UnitHelpers::IsT2Shipyard(yard.circuitDef.GetName());
+        CCircuitDef@ con=ai.GetCircuitDef(SeaEconomy::Constructor(side,advanced));
+        if (con is null || !yard.circuitDef.CanBuild(con)) return null;
+        const int pending=aiFactoryMgr.GetPendingRecruitCount(con), have=con.count+pending;
+        if (have<2) return Recruit(yard,con,Task::RecruitType::BUILDPOWER);
+        const float energyGoal=advanced ? aiEconomyMgr.metal.income*Global::RoleSettings::Sea::EnergyPerMetal : SeaEconomy::HomeEnergyTarget();
+        // Every extra worker must have growth work, not just an absent local
+        // assistant. This prevents reclassifying factory guards from causing
+        // an unlimited queue of constructors with nothing useful to build.
+        if (aiEconomyMgr.energy.income>=energyGoal && !SeaEconomy::capacityPressure) return null;
+        CCircuitDef@ project=ai.GetCircuitDef(advanced ? UnitHelpers::GetNavalFusionNameForSide(side) : UnitHelpers::GetTidalNameForSide(side));
+        if (project is null) return null;
+        const uint tier=advanced ? 1 : 0;
+        const float shortage=BuildPowerMath::Shortage(SeaEconomy::UsefulPower(project,Global::RoleSettings::Sea::EconomyIncomeShare),SeaEconomy::homePower[tier],SeaEconomy::homePending[tier]);
+        if (shortage<con.GetBuildSpeed()*.5f || SeaEconomy::homeIdle[tier]>=con.GetBuildSpeed() || pending>0 || project is null) return null;
+        if (!SeaEconomy::FundGrowth(yard,con,project)) return null;
+        IUnitTask@ task=Recruit(yard,con,Task::RecruitType::BUILDPOWER,true);
+        if (task !is null) GenericHelpers::LogUtil("[SEA][Workforce] recruit "+con.GetName()+" shortage="+shortage,1);
+        return task;
+    }
     IUnitTask@ Produce(CCircuitUnit@ yard) {
-        if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.DefaultMakeTask(yard);
+        if (yard is null || !SeaEconomy::Yard(yard.circuitDef)) return aiFactoryMgr.MakeFactoryTask(yard,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (Hold(yard)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
         SeaEconomy::Tick();
         const string side=UnitHelpers::GetSideForUnitName(yard.circuitDef.GetName());
@@ -48,30 +113,9 @@ namespace SeaFactories {
         CCircuitDef@ con=ai.GetCircuitDef(SeaEconomy::Constructor(side,advanced));
         if (con !is null && con.count+aiFactoryMgr.GetPendingRecruitCount(con)>=1) {
             CCircuitDef@ counter=SeaCombat::Select(yard,true);
-            if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER); if (response !is null) return response; }
-            // A safe, established fleet can briefly reserve income for its T2
-            // package. Otherwise continuous T1 recruits consume the bank that
-            // the builder's two-resource admission gate requires. Counter
-            // deficits above always interrupt this saving state.
-            CCircuitDef@ t2=ai.GetCircuitDef(UnitHelpers::GetT2ShipyardForSide(side));
-            if (!advanced && SeaCombat::Active() && SeaEconomy::Have(t2)==0
-                && SeaCombat::fleet>=Global::RoleSettings::Sea::TechScreenMetal
-                && SeaEconomy::TechReady(t2,true)
-                && aiBattle.AmphThreat(yard.GetPos(ai.frame))<=Global::RoleSettings::Sea::HarborMaxThreat)
-                return aiFactoryMgr.Enqueue(TaskS::Wait(false,2*SECOND));
+            if (counter !is null) { IUnitTask@ response=Recruit(yard,counter,Task::RecruitType::FIREPOWER,false,true); if (response !is null) return response; }
         }
-        if (con !is null && yard.circuitDef.CanBuild(con)) {
-            const int have=con.count+aiFactoryMgr.GetPendingRecruitCount(con);
-            CCircuitDef@ project=ai.GetCircuitDef(advanced ? UnitHelpers::GetNavalFusionNameForSide(side) : UnitHelpers::GetTidalNameForSide(side));
-            const float shortage=BuildPowerMath::Shortage(SeaEconomy::UsefulPower(project,Global::RoleSettings::Sea::EconomyIncomeShare),SeaEconomy::mobilePower,SeaEconomy::pendingPower);
-            if (have<2) { IUnitTask@ t=Recruit(yard,con,Task::RecruitType::BUILDPOWER); if (t !is null) return t; }
-            else if (shortage>=con.GetBuildSpeed()*.5f && SeaEconomy::idlePower<con.GetBuildSpeed()
-                && aiFactoryMgr.GetPendingRecruitCount(con)==0 && project !is null
-                && SeaEconomy::Fund(con,SeaEconomy::LocalPower(yard),con.GetBuildSpeed()*project.costM/project.GetBuildTime(),con.GetBuildSpeed()*project.costE/project.GetBuildTime())) {
-                IUnitTask@ t=Recruit(yard,con,Task::RecruitType::BUILDPOWER,true);
-                if (t !is null) { GenericHelpers::LogUtil("[SEA][Workforce] recruit "+con.GetName()+" shortage="+shortage,1); return t; }
-            }
-        }
+        IUnitTask@ workforce=Workforce(yard); if (workforce !is null) return workforce;
         if (SeaCombat::Active()) {
             // Shared by both economic implementations; counter emergencies
             // above retain precedence over discretionary utility hulls.
@@ -106,7 +150,7 @@ namespace SeaFactories {
                 }
             }
         }
-        return aiFactoryMgr.DefaultMakeTask(yard);
+        return aiFactoryMgr.MakeFactoryTask(yard,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
     }
     bool Safe(const AIFloat3 &in p) {
         if (aiBattle.AmphThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat || aiBattle.AirThreat(p)>Global::RoleSettings::Sea::HarborMaxThreat) return false;

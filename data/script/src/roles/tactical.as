@@ -1,14 +1,14 @@
 // role: TACTICAL
-#include "../helpers/unit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 #include "../types/role_config.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "../global.as"
 #include "../types/terrain.as"
-#include "../helpers/objective_helpers.as"
-#include "../helpers/objective_executor.as"
+#include "../helpers/objectives/objective_helpers.as"
+#include "../helpers/objectives/objective_executor.as"
 #include "../types/strategic_objectives.as"
-#include "../manager/factory_production.as"
-#include "../helpers/sea_constructor_helpers.as"
+#include "../systems/production/factory_production.as"
+#include "../helpers/construction/sea_constructor_helpers.as"
 
 namespace RoleTactical {
 

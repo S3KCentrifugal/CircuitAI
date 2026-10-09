@@ -326,14 +326,37 @@ std::vector<AIFloat3> CBattleAnalysis::GetTerrainRoute(const AIFloat3& from, con
 {
     EnsureGrid();
     if (!laneTerrain) CaptureLaneRequest(1, 0.f, 0.f, 1.f, 0.f, 1.f, 0);
-    Grid threat(height.size());
-    for (size_t c = 0; c < threat.size(); ++c) {
-        const auto p = CellPos(c);
-        threat[c] = cls == L_AIR ? AirThreat(p) : (cls == L_AMPH ? AmphThreat(p) : SurfThreat(p));
+    if (routeSnapshotTerrain != laneTerrain) {
+        routeSnapshotTerrain = laneTerrain;
+        for (auto& snapshot : routeSnapshots) { snapshot.version = 0; snapshot.workspace.version = 0; }
+        amphRouteWorkspace.version = 0;
     }
+    auto& snapshot = routeSnapshots[cls == L_AIR ? 1 : 0];
+    auto& threat = cls == L_AMPH ? amphRouteThreat : snapshot.threat;
+    const auto version = circuit->GetThreatMap()->GetPublicationVersion();
+    if (cls == L_AMPH || snapshot.version != version || threat.size() != height.size()) {
+        threat.resize(height.size());
+        for (size_t c = 0; c < threat.size(); ++c) {
+            const auto p = CellPos(c);
+            threat[c] = cls == L_AIR ? AirThreat(p) : (cls == L_AMPH ? AmphThreat(p) : SurfThreat(p));
+        }
+        if (cls != L_AMPH) snapshot.version = version;
+    }
+    auto& workspace = cls == L_AMPH ? amphRouteWorkspace : snapshot.workspace;
     const auto cells = lane::Solver(*laneTerrain, laneSettings).PointRoute(
         {from.x, from.y, from.z}, {to.x, to.y, to.z}, cls, threat,
-        landCost, waterCost, threatWeight, maxWaterThreat);
+        landCost, waterCost, threatWeight, maxWaterThreat, nullptr, &workspace, cls == L_AMPH ? 0 : version);
+    static const bool verify = std::getenv("CIRCUIT_VERIFY_POINT_ROUTES") != nullptr;
+    if (verify) {
+        Grid fresh(height.size());
+        for (size_t c=0; c<fresh.size(); ++c) {
+            const auto p=CellPos(c);
+            fresh[c]=cls==L_AIR ? AirThreat(p) : cls==L_AMPH ? AmphThreat(p) : SurfThreat(p);
+        }
+        const auto expected=lane::Solver(*laneTerrain,laneSettings).PointRoute(
+            {from.x,from.y,from.z},{to.x,to.y,to.z},cls,fresh,landCost,waterCost,threatWeight,maxWaterThreat);
+        if (cells!=expected) circuit->LOG("[INVARIANT] INV-176 published route cache differs from fresh query");
+    }
     std::vector<AIFloat3> result;
     result.reserve(cells.size());
     for (int c : cells) { auto p = CellPos(c); p.y = Height(p); result.push_back(p); }
@@ -429,10 +452,26 @@ std::vector<AIFloat3> CBattleAnalysis::GetLaneRoute(int lane, const AIFloat3& fr
 	// Never snap an inaccessible start across water or a cliff to another component.
 	const int origin = Cell(from), entry = lanes[lane].cells.front();
 	if (!pass[cls][origin] || !pass[cls][entry]) return result;
-	Grid distance;
-	std::vector<int> previous;
-	lane::Solver(*laneTerrain, laneSettings).DijkstraMulti({entry}, Grid(height.size(), 1.f), cls, nullptr, distance, previous);
-	if (distance[origin] == std::numeric_limits<float>::max()) return result;
+	// This consumer needs only the origin-to-entry chain, never the remaining
+    // distance field. Same strict tie rules, with lazy scratch initialization.
+    auto& ws=laneJoinWorkspace;
+    ws.penalty.resize(height.size(),1.f);
+    auto& distance=ws.distance; auto& previous=ws.previous;
+    lane::Solver solver(*laneTerrain,laneSettings);
+    solver.DijkstraMulti({entry},ws.penalty,cls,nullptr,distance,previous,
+        true,0.f,nullptr,0.f,true,nullptr,origin,&ws.search);
+    if (!ws.search.Seen(origin) || distance[origin] == std::numeric_limits<float>::max()) return result;
+    if (std::getenv("CIRCUIT_VERIFY_POINT_ROUTES") != nullptr) {
+        Grid fullDistance; std::vector<int> fullPrevious;
+        solver.DijkstraMulti({entry},Grid(height.size(),1.f),cls,nullptr,fullDistance,fullPrevious);
+        int cell=origin;
+        for (size_t i=0;i<height.size() && cell!=entry && cell>=0;++i) {
+            if (distance[cell]!=fullDistance[cell] || previous[cell]!=fullPrevious[cell]) {
+                circuit->LOG("[INVARIANT] INV-176 lane-join route differs from full search"); break;
+            }
+            cell=previous[cell];
+        }
+    }
 	int at = origin;
 	for (size_t step = 0; step < height.size() && at != entry; ++step) {
 		result.push_back(CellPos(at));

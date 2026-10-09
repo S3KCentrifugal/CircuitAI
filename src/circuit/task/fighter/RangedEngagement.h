@@ -13,15 +13,17 @@ public:
     ~CRangedEngagement();
     void Update(CCircuitUnit* unit);
     void Idle() { nextFrame=0; }
-    void MoveFailed() { query.reset(); moving=false; nextFrame=0; ++failures; }
+    void MoveFailed() { query.reset(); moving=false; orientUntil=0; nextFrame=0; ++failures; }
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
 private:
     void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage);
-    void Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape);
-    void Hold(CCircuitUnit* unit);
+    bool Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape);
+    void Hold(CCircuitUnit* unit,bool unsafe=false);
     void Disperse(CCircuitUnit* unit);
+    void UpdateCohort(CCircuitUnit* unit);
     bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
+    bool SafeMove(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,float margin,bool escape);
     CCircuitAI* ai;
     IUnitTask* owner;
     // Tasks may outlive the derived manager destructor during shutdown.
@@ -40,6 +42,8 @@ private:
     // Callback cancellation must not depend on allocator reuse of this/owner.
     std::shared_ptr<int> lifetime=std::make_shared<int>(0);
     unsigned generation=0;
+    bool urgentMove=false;
+    int moveObjective=-1, moveMode=-1;
     bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;
     float reservedDamage=0.f;
     std::vector<int> nearby;

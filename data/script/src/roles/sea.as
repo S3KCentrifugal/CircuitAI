@@ -1,14 +1,17 @@
 // role: SEA
-#include "../helpers/unit_helpers.as"
-#include "../helpers/economy_helpers.as"
-#include "../helpers/unitdef_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
 #include "../types/role_config.as"
 #include "../global.as"
 #include "../types/terrain.as"
-#include "../helpers/objective_helpers.as"
-#include "../manager/factory_production.as"
-#include "../helpers/sea_constructor_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
+#include "../systems/production/factory_production.as"
+#include "../helpers/construction/sea_constructor_helpers.as"
 #include "sea_build.as"
+#include "../systems/sea/sea_recovery.as"
+#include "../systems/sea/sea_invasion.as"
+#include "../systems/sea/sea_coast.as"
 
 namespace RoleSea {
 
@@ -50,6 +53,9 @@ namespace RoleSea {
     ******************************************************************************/
 
     void Sea_Init() {
+        aiBuilderMgr.recoverConstruction = true;
+        SeaInvasion::Init();
+        SeaRecovery::Reset();
         GenericHelpers::LogUtil("Sea role initialization logic executed", 2);
 
         // Apply SEA role settings
@@ -69,6 +75,13 @@ namespace RoleSea {
         aiMilitaryMgr.quota.raid.avg = Global::RoleSettings::Sea::MilitaryRaidAvgPower; 
 
         Sea_ApplyStartLimits();
+
+        // Missing factory metadata must be registered on this SEA instance,
+        // not by changing shared profiles used by other roles.
+        if (Global::RoleSettings::Sea::SeaplanesAfterT2) {
+            CCircuitDef@ platform=ai.GetCircuitDef("legsplab");
+            if (platform !is null) aiFactoryMgr.RegisterScriptFactory(platform,ai.GetCircuitDef("corplat"));
+        }
 
         // Some experimental profiles omit the Legion advanced shipyard from
         // native factory metadata. SEA's opt-in must register it before a
@@ -108,8 +121,12 @@ namespace RoleSea {
         dictionary startLimits; 
 
         startLimits.set("armbanth", 0);
-        startLimits.set("armmar", 0);
-        startLimits.set("armcroc", 0);
+        // D-212's SEA-owned amphibious factories need their invasion products.
+        // Map-specific restrictions are still applied by the shared setup.
+        if (!Global::RoleSettings::Sea::AmphibiousInvasion) {
+            startLimits.set("armmar", 0);
+            startLimits.set("armcroc", 0);
+        }
 
         startLimits.set("armsilo", 0);
         startLimits.set("corsilo", 0);
@@ -195,8 +212,12 @@ namespace RoleSea {
     }
 
     void Sea_MainUpdate() {
+        SeaRecovery::Tick();
         if (SeaLayout::Enabled()) SeaBuild::Tick();
         SeaCombat::Tick();
+        SeaCoast::Tick();
+        SeaExpansion::Tick();
+        SeaInvasion::Tick();
         if (SeaCombat::Active()) return;
         // Delay dynamic quota adjustments until configured time into the game
         if (ai.frame < (Global::RoleSettings::Sea::DynamicQuotaDelaySeconds * SECOND)) {
@@ -224,10 +245,14 @@ namespace RoleSea {
 
     IUnitTask@ Sea_FactoryAiMakeTask(CCircuitUnit@ u)
     {
+        IUnitTask@ invasion=SeaInvasion::Produce(u);
+        if (invasion !is null) return invasion;
+        if (u !is null && Global::RoleSettings::Sea::SeaplanesAfterT2 && UnitHelpers::IsSeaplanePlatform(u.circuitDef.GetName()))
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         if (SeaLayout::Active()) return SeaFactories::Produce(u);
         const CCircuitDef@ facDef = (u is null ? null : u.circuitDef);
         if (facDef is null) {
-            return aiFactoryMgr.DefaultMakeTask(u);
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         }
 
         const string fname = facDef.GetName();
@@ -235,7 +260,7 @@ namespace RoleSea {
         bool isT1Shipyard = UnitHelpers::IsT1Shipyard(fname);
         bool isT2Shipyard = (!isT1Shipyard && UnitHelpers::IsT2Shipyard(fname));
         if (!isT1Shipyard && !isT2Shipyard) {
-            return aiFactoryMgr.DefaultMakeTask(u);
+            return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
         }
 
         const AIFloat3 pos = u.GetPos(ai.frame);
@@ -252,9 +277,11 @@ namespace RoleSea {
             const int workers=con is null ? 0 : con.count+aiFactoryMgr.GetPendingRecruitCount(con);
             if (workers>=1) {
                 CCircuitDef@ counter=SeaCombat::Select(u,true);
-                if (counter !is null) return SeaFactories::Recruit(u,counter,Task::RecruitType::FIREPOWER);
+                if (counter !is null) return SeaFactories::Recruit(u,counter,Task::RecruitType::FIREPOWER,false,true);
             }
             if (workers>=2) {
+                IUnitTask@ workforce=SeaFactories::Workforce(u);
+                if (workforce !is null) return workforce;
                 IUnitTask@ utility=SeaFactories::Utility(u);
                 if (utility !is null) return utility;
                 CCircuitDef@ combat=SeaCombat::Select(u);
@@ -436,7 +463,7 @@ namespace RoleSea {
         }
 
         // Fallback to default when nothing triggers
-        return aiFactoryMgr.DefaultMakeTask(u);
+        return aiFactoryMgr.MakeFactoryTask(u,true,Global::RoleSettings::Sea::KeepFactoriesQueued);
     }
 
     string Sea_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
@@ -459,6 +486,7 @@ namespace RoleSea {
     }
 
     bool Sea_AiIsSwitchAllowed(const CCircuitDef@ facDef, float armyCost, int factoryCount, float metalCurrent, bool &out assistRequired) {
+        if (!SeaFactories::FactoryAllowed(facDef)) { assistRequired=false; return false; }
         const bool isOK = (armyCost > 1.2f * facDef.costM * float(factoryCount)) || (metalCurrent > facDef.costM);
         assistRequired = !isOK;
         return isOK;
@@ -482,8 +510,31 @@ namespace RoleSea {
     ******************************************************************************/ 
 
     IUnitTask@ Sea_BuilderAiMakeTask(CCircuitUnit@ builder) {
+        IUnitTask@ coastal=SeaCoast::Build(builder);
+        if (coastal !is null) return coastal;
+        if (builder !is null && SeaRecovery::IsSub(builder.circuitDef)) return SeaRecovery::Make(builder);
+        IUnitTask@ commander=SeaBuild::Commander(builder);
+        if (commander !is null) return commander;
+        // Run before native default-task creation: it may enqueue discretionary
+        // converters/guards even when the first ship has free reachable metal.
+        IUnitTask@ mex=SeaBuild::OpeningMex(builder);
+        if (mex !is null) return mex;
+        if (builder !is null && (builder.task is null || (!builder.task.IsEnemyReclaim()
+            && builder.task.GetType()!=int(Task::Type::PLAYER) && builder.task.GetType()!=int(Task::Type::RETREAT)))) {
+            IBuilderTask@ current=cast<IBuilderTask>(builder.task);
+            if (current is null || current.IsDead() || current.GetBuildType()>=int(Task::BuildType::REPAIR)) {
+                IUnitTask@ invasion=SeaInvasion::Build(builder); if (invasion !is null) return invasion;
+            }
+        }
         if (SeaLayout::Active()) return SeaBuild::MakeTask(builder);
         if (SeaLayout::Enabled()) return SeaBuild::LegacyTask(builder);
+        if (builder !is null && (builder.task is null || (!builder.task.IsEnemyReclaim()
+            && builder.task.GetType()!=int(Task::Type::PLAYER)))) {
+            IBuilderTask@ current=cast<IBuilderTask>(builder.task);
+            if (current is null || current.IsDead() || current.GetBuildType()>=int(Task::BuildType::REPAIR)) {
+                IUnitTask@ platform=SeaBuild::Seaplane(builder); if (platform !is null) return platform;
+            }
+        }
         return Sea_LegacyBuilderTask(builder);
     }
 
@@ -590,7 +641,8 @@ namespace RoleSea {
 	CCircuitUnit@ energizer2 = null;
     void Sea_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
-		//LogUtil("BUILDER::AiUnitAdded:" + unit.circuitDef, 2);
+		SeaRecovery::Added(unit);
+		SeaExpansion::Added(unit);
 		const CCircuitDef@ cdef = unit.circuitDef;
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
 			return;
@@ -624,6 +676,8 @@ namespace RoleSea {
 
     void Sea_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+		SeaRecovery::Removed(unit);
+        SeaExpansion::Removed(unit);
 		if (energizer1 is unit)
 			@energizer1 = null;
 		else if (energizer2 is unit)
@@ -759,14 +813,15 @@ namespace RoleSea {
         }
 
         // If seaplane is desired and not yet queued for this objective, build one when metal income gate is met
-        if (wantsSeaplane && mi >= 30.0f) {
+        if (wantsSeaplane && mi >= 30.0f && (!Global::RoleSettings::Sea::SeaplanesAfterT2 || SeaFactories::T2Finished(unitSide))) {
             string platName = UnitHelpers::GetSeaplanePlatformNameForSide(unitSide);
             int alreadyQueued = ObjectiveHelpers::GetObjectiveBuildingsQueuedCount(currentObjective.id, platName);
             if (alreadyQueued <= 0) {
                 // Attempt to assign and build platform
                 if (!ObjectiveHelpers::TryAssign(currentObjective.id, "SEA_" + label)) return null;
                 AIFloat3 pos = Sea_GetObjectiveBuildPos(currentObjective, Factory::GetPreferredFactoryPos());
-                IUnitTask@ tFac = Builder::EnqueueSeaplanePlatform(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
+                IUnitTask@ tFac = Global::RoleSettings::Sea::SeaplanesAfterT2 ? SeaBuild::Seaplane(builder)
+                    : Builder::EnqueueSeaplanePlatform(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
                 if (tFac is null) { ObjectiveHelpers::Unassign(currentObjective.id); return null; }
                 ObjectiveHelpers::IncrementDefenseQueued(currentObjective.id, platName, 1);
                 // Release assignment so follow-up stages (tidals) can proceed later

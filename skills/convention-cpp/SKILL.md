@@ -2,12 +2,12 @@
 name: convention-cpp
 description: 'Write or review CircuitAI native C++ mechanisms, Recoil callback and script bindings, task ownership, spatial indexes and performance-sensitive code. Use for native AI changes; verify behavior preservation, callback threading, resource lifetime and measured costs against the deployed BAR/Recoil pins.'
 metadata:
-  version: '1.0.0'
+  version: '1.1.0'
 ---
 
 # CircuitAI C++ conventions
 
-Read [intent](../../doc/intent.md), applicable decisions and known issues first.
+Read [intent](../../../rjm.bar.docs/projects/circuitai/intent.md), applicable decisions and known issues first.
 Native code provides mechanisms; role priorities and tuning belong in active
 `data/` script/JSON. Expose new controls through registered bindings; a public
 C++ method alone is not script accessible. Never apply role policy globally by
@@ -23,7 +23,7 @@ changing a shared UnitDef to fix one role.
 3. Preserve task handover, player control, carrier gadget ownership, retreat,
    destruction and reload semantics. Store unit IDs across callbacks; reacquire
    and validate units. Do not retain temporary wrapper objects or span storage.
-4. Read the [performance engineering guide](../../doc/performance/engineering-guide.md)
+4. Read the [performance engineering guide](../../../rjm.bar.docs/projects/circuitai/performance/engineering-guide.md)
    for callback complexity, index mutation, cache invalidation, VM allocation,
    synchronous command borrowing, multiplayer evidence and worker restrictions.
 5. State complexity in terms of actual inputs, including mutation and memory.
@@ -39,6 +39,48 @@ changing a shared UnitDef to fix one role.
    Compile all supported experimental profiles when bindings change. Publish
    the matched stripped DLL, debug symbols and data to the development output
    required by AGENTS.md; keep the live installation untouched.
+
+## Exact spatial optimization
+
+- Preserve candidate **order**, not only membership: ties and floating-point
+  sums observe z/x/insertion order. Compare to a frozen old implementation over
+  mutation, clear/rebuild, overflow coordinates and reused IDs.
+- For candidate scans, early exit belongs only in a pure existence query. A callback returning early
+  does not stop its outer iterator. Preserve full traversal for scoring, sums,
+  RNG and observable side effects. Sign-only numeric shortcuts require proven
+  contribution domains and an exact exceptional-value fallback.
+- Allocation reuse is not observation caching. Fresh legal friendly callbacks
+  remain necessary without a lifecycle/version contract, including mutations
+  between asks in the same frame. Bounded-ID ordering must retain duplicate and
+  out-of-bound fallback behavior.
+- Touched-cell storage must track all mutations and retain stable addresses.
+  Include sparse overflow and allocation bounds; never clamp coordinates to fit
+  an optimization. State average and worst-case complexity separately.
+- Use `tools/run_ranged_performance_tests.sh` for D-221's ordered oracle.
+  Enable `CIRCUIT_VERIFY_RANGED_QUERIES` / `CIRCUIT_VERIFY_RANGED_SNAPSHOT` in
+  correctness games only, never timing games. See the maintenance guide for
+  measurement limits and results; speedup figures are not timeless guarantees.
+
+## Point-route and lifecycle indexes (D-243)
+
+- A nonnegative-cost point Dijkstra may stop only when the requested endpoint
+  is **settled**, not first discovered. Preserve the full-field overload for
+  consumers of every distance. Keep heap tie order and strict relaxation; test
+  ordered paths against the old full-field solver, including directed edges.
+- Reused double-buffer addresses are not publication versions. Key prepared
+  costs by exact terrain lifetime, threat publication and every cost parameter.
+  Live obstacle/weapon overlays need fresh inputs. Generation wrap must clear
+  stamps; query-local escape exceptions must not mutate cached blocked cells.
+- O(1) definition counts require lifecycle writers before synchronous script
+  callbacks: enqueue, target changes, repeat, direct death, dequeue, transfer,
+  frame adoption and load. Remove stale keys without dereferencing them. Retain
+  a live legacy-scan oracle for correctness runs, disabled for timings.
+- Project formation offsets before MOVE reduction. Exact collinearity is not
+  proof of equivalent combat steering: D-243 limits compaction to untargeted
+  SEA transit, with depth/footprint validation and original combat waypoints.
+  A retained queue must match current ownership, intent, options, surviving
+  suffix, expiry and recovery state; an empty queue must recover immediately.
+- See the [implementation and tests](../../../rjm.bar.docs/projects/circuitai/reviews/2026-10-08-serene-performance-implementation.md).
 
 ## Threading and callbacks
 

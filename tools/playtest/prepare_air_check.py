@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from benchmark_store import RAW_ROOT
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,8 +14,8 @@ def main():
     parser.add_argument('--seed', type=int, default=930146)
     args = parser.parse_args()
     base = args.dir.resolve()
-    if not base.is_relative_to((ROOT / 'build-theatres').resolve()):
-        parser.error('fixture directory must be under repository build-theatres')
+    if not base.is_relative_to((RAW_ROOT).resolve()):
+        parser.error('fixture directory must be under benchmark-repository build-theatres')
     script = base / 'script.txt'
     text = script.read_text()
     text = re.sub(r'\bFixedRNGSeed\s*=\s*\d+;', '', text, flags=re.I)
@@ -59,7 +60,7 @@ def main():
         path.write_text(path.read_text().replace('int MaxProductionBays = 0;', 'int MaxProductionBays = 3;'))
     if args.scenario == 'idle':
         # Force a real idle interval only in the staged test controller.
-        path = base / 'AI/Skirmish/BARbTest/test/script/src/manager/air_production.as'
+        path = base / 'AI/Skirmish/BARbTest/test/script/src/systems/air/air_production.as'
         source = path.read_text()
         marker = 'const bool basic = UnitHelpers::IsT1AircraftPlant(name);'
         if marker not in source:

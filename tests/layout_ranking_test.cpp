@@ -316,6 +316,21 @@ void TestRingOrderAndClearOf()
 
 int main()
 {
+    for (int requested=0;requested<4;++requested) for (int actual=0;actual<4;++actual) {
+        Check(MatchesFacingPass(actual,requested)==(actual==requested),
+            "opening facing pass tests and serves the same exit orientation");
+        Check(MatchesFacingPass(actual,-1), "other roles retain any reserved facing");
+    }
+	// Real completed power, not a dense reservation of future turrets, owns
+	// rush placement. Cover overlap, unequal build speed and exact reach edges.
+	const std::vector<BuiltPower> built{{{0, 0}, 100.f, 240.f}, {{10, 0}, 100.f, 300.f}};
+	Check(PowerAt({5, 0}, built) == 540.f, "sum overlapping completed assistants");
+	Check(PowerAt({20, 0}, built) == 300.f, "include exact reach boundary");
+	Check(PowerAt({20.01f, 0}, built) == 0.f, "exclude just beyond reach");
+	Check(PowerAt({0, 0}, {}) == 0.f, "planned but unbuilt area has no power");
+	Check(BuiltPowerBefore(540, 10000, 300, 1), "working power outranks proximity");
+	Check(BuiltPowerBefore(540, 4, 540, 9), "equal power prefers anchor proximity");
+	Check(!BuiltPowerBefore(540, 4, 540, 4), "exact ties retain candidate order");
 	TestCentroidAndNearest();
 	TestFirstTurretNearestSeed();
 	TestBlockFillsAcrossRows();

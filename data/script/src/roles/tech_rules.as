@@ -3,22 +3,22 @@
 #include "../unit.as"
 #include "../task.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
-#include "../helpers/map_helpers.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
 #include "../manager/builder.as"
 #include "../manager/factory.as"
-#include "../manager/layout.as"
-#include "../manager/eco_planner.as"
-#include "../manager/spam.as"
+#include "../systems/construction/layout.as"
+#include "../systems/construction/eco_planner.as"
+#include "../systems/combat/spam.as"
 #include "tech_forward.as"
 #include "tech_factories.as"
 #include "tech_harbour.as"
 #include "tech_weapons.as"
 #include "tech_fortifications.as"
 #include "tech_flank.as"
-#include "../manager/lanes.as"
+#include "../systems/world/lanes.as"
 
 /******************************************************************************
 
@@ -278,7 +278,13 @@ namespace TechRules {
     }
     IUnitTask@ DoWait(Ctx@ c)           { return TechBuild::Wait(3 * SECOND); }
     IUnitTask@ DoKeepCurrent(Ctx@ c)    { return TechBuild::KeepCurrent(c.u); }
-    IUnitTask@ DoChain(Ctx@ c)          { return TechChain::Next(c.u); }
+    IUnitTask@ DoChain(Ctx@ c)
+    {
+        IUnitTask@ t = TechChain::Next(c.u);
+        // A rush placement waiting on its turret frames must not fall through
+        // to an economy row that starts the same fusion at an unsupported site.
+        return (t is null && TechChain::NukeRush()) ? TechBuild::Wait(SECOND) : t;
+    }
     IUnitTask@ DoOpening(Ctx@ c)        { return RoleTech::Opening::MakeTask(c.u); }
     IUnitTask@ DoReclaimT1Lab(Ctx@ c)
     {
@@ -547,8 +553,20 @@ namespace TechRules {
             }
         }
         bool openingWorker = MetalEconomy::Active() && MetalEconomy::OpeningWorker(u);
+        const bool nukeRush = TechChain::NukeRush();
         for (uint i = 0; i < table.length(); ++i) {
             Rule@ r = table[i];
+            // D-229: a first-shot investment has a fixed upgrade/build-power
+            // budget. Once its silo stands this gate disappears; the shared
+            // economic policy and its placement sequence are unchanged.
+            if (nukeRush) {
+                if (r.key == "defence.fortify" || r.key == "mex.upgrade" || r.key == "mex.expand"
+                    || r.key == "energy.reclaim" || r.key == "lab.t2" || r.key == "defence.base"
+                    || r.key == "power.t1" || r.key == "power.turret" || r.key == "turret.build"
+                    || r.key == "weapons.super" || r.key == "weapons.cluster" || r.key == "flank.factory"
+                    || r.key == "air.dedicated" || r.key == "air.flex" || r.key == "fwd.t1" || r.key == "fwd.t2.defend"
+                    || r.key == "energy.convert.float" || r.key == "energy.float" || r.key == "storage.metal") continue;
+            }
             if (MetalEconomy::Active()) {
                 // Keep lab reclaim/rebuild precedence, then protect the two
                 // dedicated opening workers before discretionary investment.

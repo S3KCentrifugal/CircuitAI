@@ -75,6 +75,8 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 
 	r = engine->RegisterObjectType("CBuilderManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CBuilderManager aiBuilderMgr", manager); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "float GetRecoveryMetal(CCircuitUnit@, float)", asMETHOD(CBuilderManager, GetRecoveryMetal), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ FindRecoveryTask(CCircuitUnit@, int, float, const CCircuitDef@)", asMETHOD(CBuilderManager, FindRecoveryTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CBuilderManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "void AbortTask(IUnitTask@)", asMETHODPR(CBuilderManager, AbortTask, (IUnitTask*), void), asCALL_THISCALL); ASSERT(r >= 0);  // D-108: a builder handed a dedicated role drops its other job
 	r = engine->RegisterObjectMethod("CBuilderManager", "void AssignTask(CCircuitUnit@, IUnitTask@)", asMETHODPR(CBuilderManager, AssignTask, (CCircuitUnit*, IUnitTask*), void), asCALL_THISCALL); ASSERT(r >= 0);  // D-112: one unit onto a task (it leaves its old task, which carries on without it)
@@ -89,6 +91,9 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterObjectMethod("CBuilderManager", "int GetQueuedBuildCount(int, const CCircuitDef@) const", asFUNCTION(CBuilderManager_GetQueuedBuildCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "int dangerHysteresis", asOFFSET(CBuilderManager, dangerHysteresis)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "bool experimentalBuild", asOFFSET(CBuilderManager, experimentalBuild)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "bool recoverConstruction", asOFFSET(CBuilderManager, recoverConstruction)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "int constructionRetrySeconds", asOFFSET(CBuilderManager, constructionRetrySeconds)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty("CBuilderManager", "int constructionReleaseSeconds", asOFFSET(CBuilderManager, constructionReleaseSeconds)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CBuilderManager", "bool experimentalAirDirect", asOFFSET(CBuilderManager, experimentalAirDirect)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindReclaimTargetFor(CCircuitUnit@)", asMETHOD(CBuilderManager, FindReclaimTargetFor), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "CCircuitUnit@ FindUnfinishedFor(CCircuitUnit@, const CCircuitDef@)", asMETHOD(CBuilderManager, FindUnfinishedFor), asCALL_THISCALL); ASSERT(r >= 0);

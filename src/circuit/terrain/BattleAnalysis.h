@@ -145,6 +145,9 @@ public:
 
 	// --- water
 	void PrepareWater() { BuildWater(); }  // idempotent, without lane/beach policy side effects
+	float GetWaterSurveyCoverage(int body, int maxAgeFrames);
+	springai::AIFloat3 GetWaterScoutGoal(int body, int maxAgeFrames, const springai::AIFloat3& from, int seed);
+	int GetWaterEnemyCount(int body);
 	int WaterBody(const springai::AIFloat3& pos, bool subDepth) const;   // -1 when none
 	bool IsHostileWater(int body, bool subDepth) const;
 	void MarkHostileWater(const springai::AIFloat3& pos, float radius);
@@ -232,6 +235,18 @@ private:
     Grid observedWaterWeapons; // current weapon coverage, independent of profile threat multipliers
     lane::Settings laneSettings;
     std::shared_ptr<const lane::Terrain> laneTerrain;
+    // Synchronous callback-only scratch, never shared with lane workers.
+    // Keep terrain alive to prevent pointer ABA; threat publication versions
+    // prevent double-buffer ABA. Amphibious observed-weapon overlays remain
+    // uncached until all of their mutations have a separate version.
+    std::shared_ptr<const lane::Terrain> routeSnapshotTerrain;
+    struct RouteSnapshot { Grid threat; std::uint64_t version = 0; lane::PointWorkspace workspace; };
+    std::array<RouteSnapshot, 2> routeSnapshots; // surface and air
+    Grid amphRouteThreat;
+    lane::PointWorkspace amphRouteWorkspace;
+    // Const lane joining is owner-thread-only; uniform costs need no threat
+    // version. Retain scratch but never cache the mutable route result.
+    mutable lane::PointWorkspace laneJoinWorkspace;
     lane::JobGate laneJobs;
     std::shared_ptr<std::atomic<bool>> laneCancel;
     int laneRevision = 0;
@@ -282,6 +297,11 @@ private:
 	std::vector<int> body8, body15;
 	std::vector<char> hostile8, hostile15;
 	bool waterBuilt;
+	// Lazily sampled legal ally sensor maps. Reset on load/reconstruction: a
+	// saved claim of control must never substitute for renewed reconnaissance.
+	void UpdateWaterSurvey(int body);
+	std::vector<std::vector<int>> surveyCells;
+	std::vector<int> surveySeen, surveyFrame;
 	std::vector<SBeach> beaches;
 
 	std::vector<char> pass[_LANE_CLASSES_];

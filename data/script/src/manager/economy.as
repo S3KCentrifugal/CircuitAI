@@ -1,9 +1,9 @@
 #include "../define.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "../global.as"
 #include "../types/role_config.as"
-#include "../helpers/map_helpers.as"
-#include "team_economy.as"
+#include "../helpers/spatial/map_helpers.as"
+#include "../systems/team/team_economy.as"
 
 // void OpenStrategy(const CCircuitDef@ facDef, const AIFloat3& in pos)
 // {

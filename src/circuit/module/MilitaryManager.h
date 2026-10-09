@@ -312,6 +312,7 @@ public:
 	bool HasDefence(int cluster);
 	void ProcessHubDefence(CBDefenceTask* task);
 	springai::AIFloat3 GetScoutPosition(CCircuitUnit* unit);
+	springai::AIFloat3 GroundObjective(CCircuitUnit* unit, const springai::AIFloat3& previous);
 	void ClearScoutPosition(IUnitTask* task);
 	void FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions);
 	void FillAttackSafePos(CCircuitUnit* unit, F3Vec& outPositions);

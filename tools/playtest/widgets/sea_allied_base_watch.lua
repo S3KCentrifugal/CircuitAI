@@ -61,7 +61,10 @@ function widget:UnitFinished(id,def,team)
     log((ok and "PASS" or "FAIL").." forward yard team="..team.." unit="..d.name.." rear="..rear.." eco="..front.." facing="..Spring.GetUnitBuildFacing(id).." expected="..f)
 end
 function widget:GameFrame(frame)
-    if frame==150 then Spring.SendCommands({"cheat 1","globallos"}) end
+    -- Natural benchmarks must preserve each AI's fog of war. GlobalLOS is a
+    -- synced game command that reveals enemies to every allyteam, not a
+    -- spectator-only rendering option. Only supplied fixtures may enable it.
+    if cfg.supplied and frame==150 then Spring.SendCommands({"cheat 1","globallos"}) end
     if frame%5==0 and #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     if frame%150~=0 then return end
     for _,c in ipairs(claims) do

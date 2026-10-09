@@ -16,9 +16,7 @@
 #include "spring/CustomCommand.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
-#ifdef DEBUG_VIS
 #include "task/UnitTask.h"
-#endif
 
 #include "AISCommands.h"
 #include "Sim/Units/CommandAI/Command.h"
@@ -114,6 +112,7 @@ void CCircuitUnit::SetTask(IUnitTask* task)
 
 void CCircuitUnit::ClearAct()
 {
+	ClearPriorityTarget(); // ClearAct covers reassignment, retreat, player control and task stop.
 	CActionList::Clear();
 	dgunAct = nullptr;
 	travelAct = nullptr;
@@ -327,11 +326,34 @@ void CCircuitUnit::CmdWantedSpeed(float speed)
 void CCircuitUnit::CmdStop(short options, int timeout)
 {
 	unit->Stop(options, timeout);
+	priorityTarget = -1; // BAR STOP cancels the priority list; allow a new intent.
 }
 
 void CCircuitUnit::CmdSetTarget(CEnemyInfo* enemy)
 {
-//	unit->ExecuteCustomCommand(CMD_UNIT_SET_TARGET, {(float)target->GetId()});
+    if (circuitDef->GetTargetMinCost() <= 0.f) return;
+    const int next = enemy != nullptr && !enemy->IsHidden() && enemy->IsInRadarOrLOS() ? enemy->GetId() : -1;
+    if (next == priorityTarget) return;
+    ClearPriorityTarget();
+    if (next < 0) return;
+    // Unlike queued ATTACK, BAR priority fire also applies during the preceding
+    // MOVE. OPEN fire is retained so incompatible mounts (dedicated AA) keep
+    // choosing their own targets. Never enable the old global stub for all units.
+    float params[] = {float(next)};
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
+    priorityTarget = next;
+}
+
+void CCircuitUnit::ClearPriorityTarget()
+{
+    if (priorityTarget < 0) return;
+    if (!isDead && manager != nullptr) {
+        TRY_UNIT(manager->GetCircuit(), this,
+            float params[] = {float(priorityTarget)};
+            SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_CANCEL_TARGET, params);
+        )
+    }
+    priorityTarget = -1;
 }
 
 void CCircuitUnit::CmdCloak(bool state)
@@ -380,12 +402,33 @@ void CCircuitUnit::CmdAirStrafe(float value)
 
 void CCircuitUnit::CmdBARPriority(float value)
 {
+	requestedPriority = value;
+	if (buildPriorityOverride >= 0) value = float(buildPriorityOverride);
 	if (priority == value) {
 		return;
 	}
 	priority = value;
 	float params[] = {value};
 	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_BAR_PRIORITY, params);
+}
+
+void CCircuitUnit::SetBuildPriorityOverride(int value)
+{
+	// Opt-in script policy, -1 restores native task decisions. Keep the last
+	// native request so ending an override restores it immediately. The existing
+	// effective-value cache suppresses duplicate synchronized commands, including
+	// native re-evaluation while an override holds. Default units are unchanged.
+	if (value < -1 || value > 1 || value == buildPriorityOverride) return;
+	buildPriorityOverride = value;
+	IUnitTask* currentTask = GetTask();
+	if (value < 0 && currentTask != nullptr && (currentTask->IsExternalControlled()
+	    || currentTask->GetType() == IUnitTask::Type::PLAYER)) {
+		// Manual ownership may already have changed the game's priority. Drop
+		// our cached belief without overwriting the player's setting on release.
+		priority = -1.f;
+		return;
+	}
+	CmdBARPriority(requestedPriority >= 0 ? requestedPriority : 1.f);
 }
 
 void CCircuitUnit::CmdTerraform(std::vector<float>&& params)
@@ -591,7 +634,7 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool qu
 		// redundant follow-up order when they request a persistent target only.
 		if (queueFight) CmdFightTo(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);
 		CmdWantedSpeed(NO_SPEED_LIMIT);
-		CmdSetTarget(target);
+		CmdSetTarget(enemy);
 	)
 }
 
@@ -616,7 +659,7 @@ void CCircuitUnit::Attack(const AIFloat3& pos, CEnemyInfo* enemy, bool isGround,
 		}
 		CmdFightTo(enemy->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, timeout);  // los-cheat related
 		CmdWantedSpeed(NO_SPEED_LIMIT);
-		CmdSetTarget(target);
+		CmdSetTarget(enemy);
 		if (circuitDef->IsAttrOnOff()) {
 			unit->SetOn(isStatic == circuitDef->IsOnSlow());
 		}

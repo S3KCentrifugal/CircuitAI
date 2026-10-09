@@ -16,6 +16,8 @@ import time
 import uuid
 from pathlib import Path
 
+from benchmark_store import EVIDENCE_ROOT, RAW_ROOT, historical_path, require_checkout
+
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 DOMAINS = ('air', 'tech', 'front', 'sea', 'tactical', 'support', 'shared')
@@ -91,11 +93,16 @@ def resolve_definition(value, kind):
     raise FileNotFoundError('Unknown ' + kind + ': ' + str(value))
 
 
-def allocate(domain, area, scenario, map_slug, kind, *, root=ROOT, **metadata):
+def allocate(domain, area, scenario, map_slug, kind, *, root=None, **metadata):
     if domain not in DOMAINS or area not in AREAS or kind not in KINDS:
         raise ValueError('Unknown test classification')
     category = dict(domain=domain, area=area, scenario=slug(scenario), map=slug(map_slug), kind=kind)
-    games = (Path(root) / 'build-theatres/games').resolve()
+    if root is None:
+        require_checkout()
+        games = RAW_ROOT / 'games'
+    else:
+        # Explicit roots keep isolated tests and caller-owned scratch stores local.
+        games = (Path(root) / 'build-theatres/games').resolve()
     folder = games / domain / area / category['scenario'] / category['map'] / run_id()
     if not folder.resolve().is_relative_to(games):
         raise ValueError('Run path escapes game storage')
@@ -144,7 +151,10 @@ def archive_metadata(directory, archive, checks_bytes, verdict, reason, frame, c
     return value
 
 
-def publish(archive, screenshots=(), *, store=ROOT/'doc/benchmarks/records'):
+def publish(archive, screenshots=(), *, store=None):
+    if store is None:
+        require_checkout()
+        store = EVIDENCE_ROOT / 'records'
     archive, store = Path(archive).resolve(), Path(store).resolve()
     result = read_json(archive/'result.json')
     if not result.get('complete'):
@@ -220,6 +230,8 @@ def publish(archive, screenshots=(), *, store=ROOT/'doc/benchmarks/records'):
 
 def historical_category(path):
     name = path.name
+    if name == 'sea-production-capacity.json':
+        return 'sea', 'economy'
     if name.startswith('ranged-'):
         return 'shared', 'combat'
     if 'scorecards' in path.parts or name == 'scorecard-design.md':
@@ -238,7 +250,10 @@ def historical_category(path):
     return 'shared', 'reliability'
 
 
-def build_index(store=ROOT/'doc/benchmarks'):
+def build_index(store=None):
+    if store is None:
+        require_checkout()
+        store = EVIDENCE_ROOT
     store = Path(store)
     entries = []
     for path in sorted(store.rglob('*')):
@@ -280,14 +295,17 @@ def build_index(store=ROOT/'doc/benchmarks'):
 
 def verify_migration(root=ROOT):
     root = Path(root)
-    record = read_json(root/'doc/test-storage-migration.json')
+    from importlib.util import spec_from_file_location, module_from_spec
+    spec = spec_from_file_location('documentation_store', ROOT/'tools/knowledge/documentation_store.py')
+    docs = module_from_spec(spec); spec.loader.exec_module(docs)
+    record = read_json(docs.document('test-storage-migration.json'))
     problems = []
     for move in record['moves']:
         path = root/move['new']
         if not path.is_file() or file_hash(path) != move['sha256']:
             problems.append('Moved definition changed/missing: ' + move['new'])
     for name, expected in record['historical_files'].items():
-        path = root/name
+        path = historical_path(name, root)
         if not path.is_file() or file_hash(path) != expected['sha256']:
             problems.append('Historical evidence changed/missing: ' + name)
     return problems
@@ -317,7 +335,7 @@ def main():
     elif args.command == 'index':
         print('Indexed',len(build_index()),'evidence files')
     elif args.command == 'find':
-        for entry in read_json(ROOT/'doc/benchmarks/catalog.json')['entries']:
+        for entry in read_json(EVIDENCE_ROOT/'catalog.json')['entries']:
             if ((args.domain is None or entry['domain']==args.domain)
                 and (args.area is None or entry['area']==args.area)
                 and (args.kind is None or entry.get('experiment_kind')==args.kind)):

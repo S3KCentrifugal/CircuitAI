@@ -2,15 +2,33 @@ function widget:GetInfo()
     return {name="AIR command observer",desc="Read-only synchronized order counts",author="CircuitAI",layer=126,enabled=true,handler=true}
 end
 local previous,hook
-local counts,last={},{}
+local counts,last,moveBursts={},{},{}
+local detailConfig=VFS.FileExists("LuaUI/Config/full_match_perf.lua",VFS.RAW_FIRST) and VFS.Include("LuaUI/Config/full_match_perf.lua",nil,VFS.RAW_FIRST) or {}
+local jointDetail=detailConfig.command_detail==true
 local function count(id,def,team,cmd,params,options,tag,player,fromSynced,fromLua)
-    local c=counts[team] or {all=0,air=0,repeated=0,byDef={},byCommand={},byOrigin={}};counts[team]=c;c.all=c.all+1
+    local c=counts[team] or {all=0,air=0,repeated=0,byDef={},byCommand={},byOrigin={},joint={}};counts[team]=c;c.all=c.all+1
     local origin=fromLua==true and "lua" or fromLua==false and "nonlua" or "unknown"
     c.byOrigin[origin]=(c.byOrigin[origin] or 0)+1
     local d=UnitDefs[def]
     local name=d and d.name or "unknown"
     c.byDef[name]=(c.byDef[name] or 0)+1
     c.byCommand[cmd]=(c.byCommand[cmd] or 0)+1
+    -- Separate attribution run only: marginal definition/command totals do
+    -- not prove which hull issued MOVE. Count their joint distribution with
+    -- the engine-provided origin, without inspecting or modifying queues.
+    if jointDetail then
+        local key=name..":"..cmd..":"..origin
+        local row=c.joint[key]
+        if not row then row={name=name,cmd=cmd,origin=origin,count=0,maxBurst=0};c.joint[key]=row end
+        row.count=row.count+1
+        if cmd==CMD.MOVE then
+            local frame=Spring.GetGameFrame()
+            local burst=moveBursts[id]
+            if not burst or burst.frame~=frame or burst.team~=team then burst={frame=frame,team=team,origins={}};moveBursts[id]=burst end
+            burst.origins[origin]=(burst.origins[origin] or 0)+1
+            row.maxBurst=math.max(row.maxBurst,burst.origins[origin])
+        end
+    end
     if not d or not d.canFly then return end
     c.air=c.air+1
     local signature=tostring(cmd)
@@ -47,11 +65,14 @@ function widget:GameFrame(frame)
             for origin,n in pairs(c.byOrigin) do
                 Spring.Echo("[CommandOrigin] frame="..frame.." team_source="..team..":"..origin.." count="..n)
             end
+            for _,row in pairs(c.joint) do
+                Spring.Echo(string.format("[CommandJoint] frame=%d team=%d def=%s cmd=%d origin=%s orders=%d max_unit_frame_moves=%d",frame,team,row.name,row.cmd,row.origin,row.count,row.maxBurst))
+            end
         end
         counts={}
     end
 end
-function widget:UnitDestroyed(id) last[id]=nil end
+function widget:UnitDestroyed(id) last[id]=nil;moveBursts[id]=nil end
 function widget:Shutdown()
     if widgetHandler.UnitCommand==hook then widgetHandler.UnitCommand=previous;widgetHandler:UpdateCallIn("UnitCommand") end
 end

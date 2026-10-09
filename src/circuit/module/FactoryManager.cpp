@@ -512,6 +512,22 @@ void CFactoryManager::ReadConfig()
 			boolean("prefer_screen", policy.preferScreen);
 			boolean("allow_radar", policy.allowRadar);
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
+			boolean("stage_when_blocked", policy.stageWhenBlocked);
+			boolean("coordinated", policy.coordinated);
+			number("cohort_size", policy.cohortSize, 1.f, 12.f);
+			number("cohort_radius", policy.cohortRadius, 128.f, 1600.f);
+			number("regroup_seconds", policy.regroupSeconds, 0.f, 20.f);
+			number("rush_ratio", policy.rushRatio, 1.f, 5.f);
+			number("catch_seconds", policy.catchSeconds, 0.f, 15.f);
+			number("engagement_seconds", policy.engagementSeconds, 0.f, 30.f);
+			number("advantage_enter", policy.advantageEnter, 1.f, 5.f);
+			number("advantage_exit", policy.advantageExit, 1.f, 5.f);
+			number("loss_fraction", policy.lossFraction, 0.f, .9f);
+			number("static_loss_fraction", policy.staticLossFraction, 0.f, .9f);
+            boolean("support_allies", policy.supportAllies);
+            number("support_loss_fraction", policy.supportLossFraction, 0.f, .9f);
+            number("intent_gain", policy.intentGain, 0.f, .5f);
+			if (policy.advantageExit > policy.advantageEnter) valid = false;
 			if (valid) cdef->SetRangedPolicy(policy);
 			else {
 				circuit->LOG("CONFIG %s: %s has invalid ranged policy; ranged disabled", cfgName.c_str(), defName.c_str());
@@ -537,6 +553,14 @@ void CFactoryManager::ReadConfig()
 		cdef->SetOn(behaviour.get("on", true).asBool());
 		cdef->SetBuildAllowed(behaviour.get("build", true).asBool());
 		cdef->SetStandoff(std::clamp(behaviour.get("standoff", 0.f).asFloat(), 0.f, 0.95f));
+        const auto& targetCost = behaviour["target_min_cost"];
+        // Validate once at profile load. The zero default preserves every
+        // unconfigured unit, including other aircraft and all land units.
+        if (!targetCost.isNull()) {
+            if (targetCost.isNumeric() && std::isfinite(targetCost.asFloat()) && targetCost.asFloat() >= 0.f)
+                cdef->SetTargetMinCost(targetCost.asFloat());
+            else circuit->LOG("CONFIG %s: %s invalid target_min_cost", cfgName.c_str(), defName.c_str());
+        }
 
 		const Json::Value& reload = behaviour["reload"];
 		if (!reload.isNull()) {
@@ -887,7 +911,17 @@ int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 {
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
-		DoneTask(iter->second);
+		CRecruitTask* task = static_cast<CRecruitTask*>(iter->second);
+		if (task->IsRepeat()) {
+			// One persistent owner, one engine repeat queue. Finishing an offspring
+			// must not call Cancel(), which clears that queue (D-119/D-216).
+			// Erase before changing the borrowed target: the next UnitCreated
+			// installs its own mapping. Ordinary recruits keep their old lifecycle.
+			unfinishedUnits.erase(iter);
+			task->SetTarget(nullptr);
+		} else {
+			DoneTask(task);
+		}
 	}
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
@@ -931,10 +965,35 @@ int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	return 0; //signaling: OK
 }
 
+int CFactoryManager::GetPendingRecruitCount(const CCircuitDef* def) const
+{
+    const int indexed = def == nullptr ? 0 : pendingRecruits.Count(def->GetId());
+    static const bool verify = std::getenv("CIRCUIT_VERIFY_ECONOMY_INDEX") != nullptr;
+    if (verify) {
+        int count = 0;
+        for (const CRecruitTask* task : factoryTasks)
+            if (!task->IsDead() && task->GetBuildDef() == def && task->GetTarget() == nullptr) ++count;
+        if (count != indexed) circuit->LOG("[INVARIANT] INV-175 recruit index=%i scan=%i", indexed, count);
+    }
+    return indexed;
+}
+
+void CFactoryManager::RefreshPendingRecruit(CRecruitTask* task)
+{
+    // SetTarget covers frame creation and repeat-production completion; Dead
+    // covers cancellation before script removal hooks. No snapshot staleness.
+    const auto* def = task->GetBuildDef();
+    if (!task->IsDead() && task->GetTarget() == nullptr && def != nullptr)
+        pendingRecruits.Set(task, def->GetId());
+    else pendingRecruits.Erase(task);
+}
+
 CRecruitTask* CFactoryManager::Enqueue(const TaskS::SRecruitTask& ti)
 {
 	CRecruitTask* task = new CRecruitTask(this, ti.priority, ti.buildDef, ti.position, ti.type, ti.radius);
+	task->SetRepeat(ti.repeat);
 	factoryTasks.push_back(task);
+    RefreshPendingRecruit(task); // visible to the synchronous TaskAdded script
 	updateTasks.push_back(task);
 	TaskAdded(task);
 	return task;
@@ -975,6 +1034,7 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 		case IUnitTask::Type::FACTORY:{
 			switch (static_cast<IBuilderTask*>(task)->GetBuildType()) {
 				case IBuilderTask::BuildType::RECRUIT: {
+                    pendingRecruits.Erase(static_cast<CRecruitTask*>(task));
 					auto it = std::find(factoryTasks.begin(), factoryTasks.end(), task);
 					if (it != factoryTasks.end()) {
 						factoryTasks.erase(it);
@@ -1560,6 +1620,11 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 
 IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
 {
+	return MakeFactoryTask(unit, false);
+}
+
+IUnitTask* CFactoryManager::MakeFactoryTask(CCircuitUnit* unit, bool keepActive, bool keepQueued)
+{
 	const IUnitTask* task = nullptr;
 
 	if (unit->GetCircuitDef()->IsAssist()) {
@@ -1575,14 +1640,14 @@ IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
 		}
 
 		if (task == nullptr) {
-			task = CreateFactoryTask(unit);
+			task = CreateFactoryTask(unit, keepActive, keepQueued);
 		}
 	}
 
 	return const_cast<IUnitTask*>(task);  // if nullptr then continue to Wait (or Idle)
 }
 
-IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit)
+IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActive, bool keepQueued)
 {
 	if (unit->GetCircuitDef()->GetMobileId() < 0) {
 		if (circuit->GetEnemyManager()->IsAirValid()) {
@@ -1597,7 +1662,11 @@ IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit)
 		}
 	}
 
-	const bool isActive = (noT1FacCount <= 0) || !IsT1Factory(unit->GetCircuitDef());
+	// Script may retain a complementary low-tier factory after teching.
+	// This per-request lever changes no metadata or global tier counts. Keep
+	// normal availability, AA viability, resource and pending-task checks.
+	// O(1) policy input: no extra unit scan, cache or engine command.
+	const bool isActive = keepActive || (noT1FacCount <= 0) || !IsT1Factory(unit->GetCircuitDef());
 
 	IUnitTask* task = UpdateBuildPower(unit, isActive);
 	if (task != nullptr) {
@@ -1609,7 +1678,11 @@ IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit)
 							(economyMgr->GetAvgMetalIncome() * 1.2f < economyMgr->GetMetalPull()) &&
 							(metalPull * economyMgr->GetPullMtoS() > circuit->GetBuilderManager()->GetMetalPull());
 	const bool isNotReady = !economyMgr->IsExcessed() || isStalling;
-	if (isNotReady) {
+	// D-211: script can keep one valid recruit queued through a resource dip.
+	// The existing recruit task still gates energy and lowers spending priority
+	// under metal pressure. Other roles retain admission waits by default.
+	// O(1) extra policy input; no polling, extra recruit, or repeated command.
+	if (isNotReady && !keepQueued) {
 		return Enqueue(TaskS::Wait(false, FRAMES_PER_SEC * 3));
 	}
 

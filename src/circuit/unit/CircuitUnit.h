@@ -142,6 +142,7 @@ public:
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);
+	void ClearPriorityTarget();
 	void CmdCloak(bool state);
 	void CmdFireAtRadar(bool state);
 	void CmdFindPad(int timeout = INT_MAX);
@@ -151,6 +152,7 @@ public:
 	void CmdMiscPriority(float value);
 	void CmdAirStrafe(float value);
 	void CmdBARPriority(float value);
+	void SetBuildPriorityOverride(int value);
 	void CmdTerraform(std::vector<float>&& params);
 	void CmdSelfD(bool state);
 	bool IsInSelfD() const { return isSelfD; }
@@ -230,6 +232,8 @@ private:
 	int ammoFrame;
 
 	float priority;
+	float requestedPriority = -1.f;
+	int buildPriorityOverride = -1;
 
 	// ---- Bit fields ---- BEGIN
 	bool isDead : 1;
@@ -250,6 +254,7 @@ private:
 
 	CEnemyInfo* target;
 	int targetTile;
+	int priorityTarget = -1; // ID only: never retain a dead enemy wrapper.
 
 	CCircuitDef::AttrM attr;
 

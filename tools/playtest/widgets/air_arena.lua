@@ -210,7 +210,12 @@ local function observeRoute(f)
                     local safe=across<=probe.safe_below or across>=probe.safe_above
                     event("route_crossing",{wave=w.id,alive=alive,x=math.floor(cx),z=math.floor(cz),flank=safe and 1 or 0})
                     photograph("wave"..w.id.."-flank-crossing",cx,cz,probe.height or 6500)
-                    if not safe and probe.require_flank~=false then
+                    local original=units[w.target]
+                    local requireTarget=not probe.target_units or (original and probe.target_units[UnitDefs[original.def].name])
+                    -- A later frontline-cleanup wave is meant to enter the
+                    -- defended corridor. Enforce flank geometry only for the
+                    -- scenario's declared backline targets, when specified.
+                    if not safe and probe.require_flank~=false and requireTarget then
                         event("error",{reason="direct_corridor_crossed",wave=w.id})
                     end
                 end
@@ -271,6 +276,14 @@ function widget:UnitDestroyed(id,def,team)
         attacker=u.lastAttacker or -1,attackerTeam=u.lastAttackerTeam or -1,cost=UnitDefs[def].metalCost})
     for _,w in pairs(waves) do if not w.ended and w.target==id then event("target_dead",{wave=w.id,target=id,cost=UnitDefs[def].metalCost}) end end
     units[id]=nil
+end
+function widget:UnitFinished(id,def,team)
+    if not cfg.factory_production or team~=0 or units[id] or not UnitDefs[def].canFly then return end
+    -- Spawned aircraft already entered through the pending fixture queue.
+    -- These are real completed factory outputs, not supplied replacements.
+    units[id]={team=team,def=def,kind="aircraft",group="production",wave=0}
+    event("spawn",{id=id,team=team,unit=UnitDefs[def].name,kind="aircraft",group="production",cost=UnitDefs[def].metalCost})
+    event("produced",{id=id,team=team,unit=UnitDefs[def].name})
 end
 function widget:GameFrame(f)
     if f==150 then

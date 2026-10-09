@@ -1604,6 +1604,7 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 	unit->SetArea(area);
 
 	teamUnits[unitId] = unit;
+    ++ownedUnitRevision;
 	cdef->Inc();
 
 	// FIXME: Sometimes area where factory is placed is not suitable for its units.
@@ -1616,7 +1617,9 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 
 void CCircuitAI::UnregisterTeamUnit(CCircuitUnit* unit)
 {
+    builderManager->ForgetUnfinishedCount(unit);
 	teamUnits.erase(unit->GetId());
+    ++ownedUnitRevision;
 	unit->GetCircuitDef()->Dec();
 
 	/*(unit->GetTask() == nullptr) ? DeleteTeamUnit(unit) : */unit->SetIsDead();
