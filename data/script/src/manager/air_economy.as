@@ -1,6 +1,6 @@
 #include "air_layout.as"
 #include "economy.as"
-#include "../helpers/air_math.as"
+#include "../helpers/math/air_math.as"
 #include "air_workforce.as"
 
 namespace AirEconomy {

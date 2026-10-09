@@ -1,6 +1,6 @@
 // Mirror of team coordination events to a local LuaUI widget.
 #include "../define.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 
 /******************************************************************************
 

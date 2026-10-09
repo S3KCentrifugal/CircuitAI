@@ -1,8 +1,8 @@
 // role: AIR
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
-#include "../helpers/objective_helpers.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "../types/role_config.as"
 #include "../global.as"
 #include "../types/terrain.as"

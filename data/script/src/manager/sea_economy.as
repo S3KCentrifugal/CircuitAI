@@ -1,6 +1,6 @@
 #include "sea_layout.as"
-#include "../helpers/build_power_math.as"
-#include "../helpers/sea_math.as"
+#include "../helpers/math/build_power_math.as"
+#include "../helpers/math/sea_math.as"
 #include "economy.as"
 #include "team_economy.as"
 

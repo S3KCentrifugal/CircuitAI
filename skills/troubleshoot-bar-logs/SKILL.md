@@ -131,7 +131,7 @@ menu — the incident, if any, is earlier.
 ### 4. Filter the AI noise
 
 CircuitAI lines are emitted by `GenericHelpers::LogUtil`
-(`data/script/src/helpers/generic_helpers.as`) in this shape:
+(`data/script/src/helpers/common/generic_helpers.as`) in this shape:
 
 ```text
 :::AI LOG:S:<skirmishAIId>:T:<teamId>:F:<frame>:L::<message>

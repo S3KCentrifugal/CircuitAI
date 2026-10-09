@@ -32,20 +32,20 @@ for t in "${tests[@]}"; do
 		rc=1
 	fi
 done
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/production_math.as" "$REPO/tests/production_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/placement_math.as" "$REPO/tests/placement_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/amphibious_math.as" "$REPO/tests/amphibious_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/air_math.as" "$REPO/tests/air_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/build_power_math.as" "$REPO/tests/build_power_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/metal_math.as" "$REPO/tests/metal_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/team_share_math.as" "$REPO/tests/team_share_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/sea_math.as" "$REPO/tests/sea_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/recovery_math.as" "$REPO/tests/recovery_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/sea_coast_math.as" "$REPO/tests/sea_coast_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/land_siege_math.as" "$REPO/tests/land_siege_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/spam_math.as" "$REPO/tests/spam_math_tests.as" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/nuke_math.as" "$REPO/tests/nuke_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/production_math.as" "$REPO/tests/production_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/placement_math.as" "$REPO/tests/placement_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/amphibious_math.as" "$REPO/tests/amphibious_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/air_math.as" "$REPO/tests/air_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/build_power_math.as" "$REPO/tests/build_power_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/metal_math.as" "$REPO/tests/metal_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/team_share_math.as" "$REPO/tests/team_share_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/sea_math.as" "$REPO/tests/sea_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/recovery_math.as" "$REPO/tests/recovery_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/sea_coast_math.as" "$REPO/tests/sea_coast_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/land_siege_math.as" "$REPO/tests/land_siege_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/spam_math.as" "$REPO/tests/spam_math_tests.as" || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/math/nuke_math.as" "$REPO/tests/nuke_math_tests.as" || rc=1
 "${PYTHON:-python}" "$REPO/tools/knowledge/check_performance_policy.py" --runner "$OUT/production_math_test.exe" --output "$OUT/performance-policy" || rc=1
 "${PYTHON:-python}" "$REPO/tools/knowledge/check_weapon_work.py" --runner "$OUT/production_math_test.exe" --output "$OUT/weapon-policy" || rc=1
-"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/collection_helpers.as" "$REPO/tests/collection_helpers_tests.as" --dictionary || rc=1
+"$OUT/production_math_test.exe" "$REPO/data/script/src/helpers/common/collection_helpers.as" "$REPO/tests/collection_helpers_tests.as" --dictionary || rc=1
 exit $rc

@@ -1,5 +1,5 @@
 // SEA policy only. Native queries own legality/reachability and task lifetimes.
-#include "../helpers/sea_math.as"
+#include "../helpers/math/sea_math.as"
 namespace SeaRecovery {
     array<int> subs;
     int nextUpdate=0;

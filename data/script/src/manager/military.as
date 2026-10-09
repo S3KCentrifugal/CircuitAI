@@ -1,6 +1,6 @@
 #include "../define.as"
 #include "../unit.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "porc_policy.as"
 #include "spam.as"
 #include "ferry.as"

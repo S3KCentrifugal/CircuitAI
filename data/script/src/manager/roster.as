@@ -2,8 +2,8 @@
 #include "../define.as"
 #include "../global.as"
 #include "../types/ai_role.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/map_helpers.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
 #include "widget_link.as"
 
 /******************************************************************************

@@ -3,10 +3,10 @@
 #include "../unit.as"
 #include "../task.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/map_helpers.as"
-#include "../helpers/layout_helpers.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
+#include "../helpers/spatial/layout_helpers.as"
 #include "widget_link.as"
 
 /******************************************************************************

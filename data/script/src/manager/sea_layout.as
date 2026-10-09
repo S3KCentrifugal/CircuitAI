@@ -1,4 +1,4 @@
-#include "../helpers/layout_helpers.as"
+#include "../helpers/spatial/layout_helpers.as"
 #include "lifecycle.as"
 
 namespace SeaLayout {

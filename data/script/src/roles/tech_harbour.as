@@ -1,4 +1,4 @@
-#include "../helpers/sea_constructor_helpers.as"
+#include "../helpers/construction/sea_constructor_helpers.as"
 #include "../manager/layout.as"
 /******************************************************************************
 

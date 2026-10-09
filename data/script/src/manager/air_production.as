@@ -5,7 +5,7 @@
 #include "air_recon.as"
 #include "air_base_response.as"
 #include "air_naval_support.as"
-#include "../helpers/air_math.as"
+#include "../helpers/math/air_math.as"
 namespace AirProduction {
     dictionary home; // mutually exclusive with AirWaves' held/launch ledgers
     int countLog = -100000;

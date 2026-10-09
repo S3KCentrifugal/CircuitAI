@@ -1,5 +1,5 @@
 #include "../src/setup.as"
-#include "../src/helpers/generic_helpers.as"
+#include "../src/helpers/common/generic_helpers.as"
 #include "../src/global.as"
 #include "../src/maps.as"
 #include "../src/types/strategy.as" // for StrategyUtil names when logging

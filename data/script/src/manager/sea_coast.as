@@ -1,4 +1,4 @@
-#include "../helpers/sea_coast_math.as"
+#include "../helpers/math/sea_coast_math.as"
 
 // D-219: SEA's land recovery owner. It is dormant during the naval opening and
 // while any useful, safe shipyard/constructor/combat hull holds the home sea.

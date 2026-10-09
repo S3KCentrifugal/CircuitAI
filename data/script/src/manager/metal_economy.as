@@ -1,4 +1,4 @@
-#include "../helpers/metal_math.as"
+#include "../helpers/math/metal_math.as"
 #include "metal_layout.as"
 
 // All entry points are gated. The normal role controllers retain their exact

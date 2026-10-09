@@ -1,15 +1,15 @@
 #include "../unit.as"
 #include "../task.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 // Unit helpers for selecting defs by side
-#include "../helpers/unit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 // UnitDef helpers for counts
-#include "../helpers/unitdef_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
 // Guard assignment helper utilities
-#include "../helpers/guard_helpers.as"
+#include "../helpers/construction/guard_helpers.as"
 // Map helpers (distance/range checks)
-#include "../helpers/map_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
 // Shared enum for strategic building types
 #include "../types/building_type.as"
 // Team state: T1 constructor registry for orphan rescue

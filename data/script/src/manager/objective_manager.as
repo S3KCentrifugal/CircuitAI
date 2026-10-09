@@ -1,4 +1,4 @@
-#include "../helpers/objective_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
 #include "../global.as"
 #include "../types/strategic_objectives.as"
 

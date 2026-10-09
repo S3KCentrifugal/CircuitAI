@@ -1,5 +1,5 @@
 #include "../global.as"
-#include "../helpers/map_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
 
 // D-076: one lifecycle state per structure, read by every actor.
 //

@@ -1,9 +1,9 @@
-#include "../helpers/production_math.as"
-#include "../helpers/layout_helpers.as"
+#include "../helpers/math/production_math.as"
+#include "../helpers/spatial/layout_helpers.as"
 #include "lifecycle.as"
 
 // AIR sites use native reservation/claim/frame ownership. No TECH controller calls.
-#include "../helpers/air_home.as"
+#include "../helpers/spatial/air_home.as"
 #include "air_eco_layout.as"
 
 namespace AirLayout {

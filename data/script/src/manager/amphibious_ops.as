@@ -1,5 +1,5 @@
 #include "lanes.as"
-#include "../helpers/amphibious_math.as"
+#include "../helpers/math/amphibious_math.as"
 #include "amphibious_beaches.as"
 #include "amphibious_formation.as"
 

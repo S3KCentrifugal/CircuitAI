@@ -1,6 +1,6 @@
 // Read-only water theatre survey. No reservations, tasks or unit-cap changes.
 // Reuses CBattleAnalysis' four-connected, conservative 8-deep water components.
-#include "../helpers/unit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 
 namespace WaterTheatres {
     class Body {

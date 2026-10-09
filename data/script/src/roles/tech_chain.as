@@ -23,7 +23,7 @@ k/n <key> <have>/<target>: ordered|assist|waiting by <def> <id>` on change;
 `[TECH][Chain] complete at <s> s`.
 
 ******************************************************************************/
-#include "../helpers/nuke_math.as"
+#include "../helpers/math/nuke_math.as"
 namespace TechChain
 {
     class Step

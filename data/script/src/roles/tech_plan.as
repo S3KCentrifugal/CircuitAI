@@ -1,6 +1,6 @@
 #include "../global.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "tech_chain.as"
 
 // D-080: what the TECH role does once its rush objective stands. The owner's

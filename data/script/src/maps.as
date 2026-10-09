@@ -1,5 +1,5 @@
 
-#include "helpers/generic_helpers.as"
+#include "helpers/common/generic_helpers.as"
 
 //Maps
 #include "maps/default_map_config.as"

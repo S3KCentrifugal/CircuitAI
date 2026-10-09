@@ -55,18 +55,18 @@ if(BUILD_TESTING)
         ../src/lib/angelscript/add_on/scriptarray)
     target_compile_definitions(circuit_production_math_test PRIVATE ANGELSCRIPT_EXPORT AS_MAX_PORTABILITY)
     add_test(NAME circuit_production_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/production_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/production_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/production_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/production_math_tests.as")
     add_test(NAME circuit_placement_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/placement_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/placement_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/placement_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/placement_math_tests.as")
     add_test(NAME circuit_air_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/air_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/air_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/air_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/air_math_tests.as")
     add_test(NAME circuit_build_power_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/build_power_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/build_power_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/build_power_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/build_power_math_tests.as")
     add_test(NAME circuit_land_siege_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/land_siege_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/land_siege_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/land_siege_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/land_siege_math_tests.as")
     find_package(Python3 COMPONENTS Interpreter QUIET)
     add_test(NAME circuit_spam_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/spam_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/spam_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/spam_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/spam_math_tests.as")
     if(Python3_Interpreter_FOUND)
         add_test(NAME circuit_performance_policy_test COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../tools/knowledge/check_performance_policy.py"
@@ -109,7 +109,7 @@ if(BUILD_TESTING)
     target_include_directories(circuit_metal_field_test PRIVATE ../src)
     add_test(NAME circuit_metal_field_test COMMAND circuit_metal_field_test)
     add_test(NAME circuit_metal_math_test COMMAND circuit_production_math_test
-        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/metal_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/metal_math_tests.as")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/metal_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/metal_math_tests.as")
 endif()
 
 if(BUILD_TESTING)
@@ -117,10 +117,10 @@ if(BUILD_TESTING)
     target_compile_features(circuit_naval_geometry_test PRIVATE cxx_std_20)
     target_include_directories(circuit_naval_geometry_test PRIVATE ../src/circuit)
     add_test(NAME circuit_naval_geometry_test COMMAND circuit_naval_geometry_test)
-    add_test(NAME circuit_sea_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/sea_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/sea_math_tests.as")
-    add_test(NAME circuit_nuke_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/nuke_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/nuke_math_tests.as")
-    add_test(NAME circuit_recovery_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/recovery_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/recovery_math_tests.as")
-    add_test(NAME circuit_sea_coast_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/sea_coast_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/sea_coast_math_tests.as")
+    add_test(NAME circuit_sea_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/sea_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/sea_math_tests.as")
+    add_test(NAME circuit_nuke_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/nuke_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/nuke_math_tests.as")
+    add_test(NAME circuit_recovery_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/recovery_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/recovery_math_tests.as")
+    add_test(NAME circuit_sea_coast_math_test COMMAND circuit_production_math_test "${CMAKE_CURRENT_SOURCE_DIR}/../data/script/src/helpers/math/sea_coast_math.as" "${CMAKE_CURRENT_SOURCE_DIR}/sea_coast_math_tests.as")
 endif()
 
 if(BUILD_TESTING)

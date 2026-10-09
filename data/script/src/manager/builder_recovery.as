@@ -1,5 +1,5 @@
-#include "../helpers/recovery_math.as"
-#include "../helpers/unit_helpers.as"
+#include "../helpers/math/recovery_math.as"
+#include "../helpers/units/unit_helpers.as"
 #include "roster.as"
 #include "ferry.as"
 

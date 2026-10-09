@@ -1,6 +1,6 @@
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/team_share_math.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/math/team_share_math.as"
 
 /******************************************************************************
 

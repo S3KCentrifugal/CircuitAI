@@ -1,6 +1,6 @@
 #include "../global.as"
-#include "../helpers/economy_helpers.as"
-#include "../helpers/unit_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 #include "lifecycle.as"
 #include "layout.as"
 #include "team_economy.as"

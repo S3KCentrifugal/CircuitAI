@@ -2,7 +2,7 @@
 #include "../define.as"
 #include "../unit.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 
 /******************************************************************************
 

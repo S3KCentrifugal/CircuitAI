@@ -1,5 +1,5 @@
 #include "../manager/air_economy.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "../manager/air_reclaim.as"
 namespace AirBuild {
     IUnitTask@ starterReclaimTask;

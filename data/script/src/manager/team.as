@@ -1,6 +1,6 @@
 #include "../global.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "roster.as"
 #include "donation.as"
 #include "sea_assist.as"

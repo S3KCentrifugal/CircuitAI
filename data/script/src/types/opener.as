@@ -1,4 +1,4 @@
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "../global.as"
 
 namespace Opener {

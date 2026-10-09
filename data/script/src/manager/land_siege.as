@@ -1,6 +1,6 @@
-#include "../helpers/land_siege_math.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/math/land_siege_math.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "../global.as"
 #include "../task.as"
 

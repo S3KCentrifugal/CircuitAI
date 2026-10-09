@@ -1,7 +1,7 @@
 // Lanes between both teams' start positions (D-127): doc/roles/tech-lanes.md.
 #include "../define.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "commands.as"
 #include "layout.as"
 #include "spam.as"

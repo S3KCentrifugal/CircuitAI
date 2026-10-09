@@ -2,8 +2,8 @@
 // Dynamic factory production system using role-based unit selection and threat-driven weighting.
 // Replaces static factory.json with scriptable logic that adapts to enemy composition and economy.
 
-#include "../helpers/unit_helpers.as"
-#include "../helpers/economy_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 #include "../global.as"
 
 namespace FactoryProduction {

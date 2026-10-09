@@ -1,20 +1,20 @@
 // role: TECH
 #include "../global.as"
-#include "../helpers/role_limit_helpers.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
+#include "../helpers/roles/role_limit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
 #include "../types/role_config.as"
 #include "../types/terrain.as"
 
 // Guard assignment helper utilities
-#include "../helpers/guard_helpers.as"
+#include "../helpers/construction/guard_helpers.as"
 // Economy decision helpers (converter logic, nano counts, etc.)
-#include "../helpers/economy_helpers.as"
+#include "../helpers/construction/economy_helpers.as"
 // Collection/dictionary helpers
-#include "../helpers/collection_helpers.as"
-#include "../helpers/objective_helpers.as"
+#include "../helpers/common/collection_helpers.as"
+#include "../helpers/objectives/objective_helpers.as"
 // Builder state and helpers
-#include "../helpers/map_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
 #include "../manager/builder.as"
 #include "../manager/team.as"
 #include "../manager/layout.as"

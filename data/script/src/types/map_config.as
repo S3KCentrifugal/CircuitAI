@@ -11,8 +11,8 @@
 //   1. If role dictionary contains a side key ("armada"/"cortex"/"legion"), use only that nested dictionary (strict side filtering).
 //   2. Else, treat role dictionary as flat factory->weight table and filter by factory name prefix (legacy behavior).
 //   3. If invalid/empty, fallback to legacy deterministic mapping.
-#include "../helpers/map_helpers.as"
-#include "../helpers/generic_helpers.as"
+#include "../helpers/spatial/map_helpers.as"
+#include "../helpers/common/generic_helpers.as"
 #include "start_spot.as"
 #include "strategic_objectives.as"
 

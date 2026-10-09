@@ -1,4 +1,4 @@
-#include "../helpers/build_power_math.as"
+#include "../helpers/math/build_power_math.as"
 #include "team_economy.as"
 
 // AIR owns the observation and admissions; arithmetic has no role dependency.

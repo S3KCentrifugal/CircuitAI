@@ -5,7 +5,7 @@
 #include "../types/map_config.as"
 #include "../global.as"
 #include "../types/role_config.as"
-#include "../helpers/unit_helpers.as"
+#include "../helpers/units/unit_helpers.as"
 #include "builder.as"
 #include "ferry.as"
 

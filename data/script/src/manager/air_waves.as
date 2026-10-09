@@ -3,11 +3,11 @@
 #include "../unit.as"
 #include "../task.as"
 #include "../global.as"
-#include "../helpers/generic_helpers.as"
-#include "../helpers/unit_helpers.as"
-#include "../helpers/unitdef_helpers.as"
+#include "../helpers/common/generic_helpers.as"
+#include "../helpers/units/unit_helpers.as"
+#include "../helpers/units/unitdef_helpers.as"
 #include "military.as"
-#include "../helpers/air_math.as"
+#include "../helpers/math/air_math.as"
 #include "air_operations.as"
 
 /******************************************************************************

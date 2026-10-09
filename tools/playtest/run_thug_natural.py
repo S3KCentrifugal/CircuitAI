@@ -58,7 +58,7 @@ def main():
     staged=directory/'AI/Skirmish/BARbTest/test'
     pool_symbols(staged)
     if a.bot_opening:
-        path=staged/'script/src/helpers/factory_helpers.as';source=path.read_text()
+        path=staged/'script/src/helpers/construction/factory_helpers.as';source=path.read_text()
         needle='string SelectStartFactoryForRole(AiRole role, const string &in side)'
         start=source.index('{',source.index(needle))+1
         path.write_text(source[:start]+'\n if (ai.teamId==0 && role==AiRole::FRONT && side=="cortex") return "corlab"; // declared integration opener\n'+source[start:])
