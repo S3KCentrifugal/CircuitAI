@@ -295,7 +295,10 @@ def build_index(store=None):
 
 def verify_migration(root=ROOT):
     root = Path(root)
-    record = read_json(root/'doc/test-storage-migration.json')
+    from importlib.util import spec_from_file_location, module_from_spec
+    spec = spec_from_file_location('documentation_store', ROOT/'tools/knowledge/documentation_store.py')
+    docs = module_from_spec(spec); spec.loader.exec_module(docs)
+    record = read_json(docs.document('test-storage-migration.json'))
     problems = []
     for move in record['moves']:
         path = root/move['new']

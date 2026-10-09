@@ -833,28 +833,45 @@ int CBattleAnalysis::GetSeaForceCount() {
     if (frame==seaForceFrame) return int(seaForces.size());
     seaForceFrame=frame;
     GetNavalForceCount();
-    // Own the extension, never append to AIR's cached snapshot. One O(F+E)
-    // copy/scan per requesting frame, then O(C log C) stable contact ordering;
-    // SEA requests once per second. No callback wrappers escape this function.
-    seaForces=navalForces;
+    // SEA engagement observations are fresh on each requesting frame. Keep
+    // AIR's five-second membership snapshot untouched. One O(F+E) pass with
+    // retained vector capacity; no per-ship scans or hidden-position callbacks.
+    seaForces.clear();
+    for (const auto& force : navalForces) {
+        if (!(force.flags & 1)) continue;
+        auto it = circuit->GetFriendlyUnits().find(force.id);
+        if (it == circuit->GetFriendlyUnits().end()) continue;
+        NavalForce fresh = force;
+        fresh.pos = it->second->GetPos(frame);
+        fresh.body = WaterBody(fresh.pos,false);
+        seaForces.push_back(fresh);
+    }
     for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
         const auto* e=kv.second;
         auto* d=e->GetCircuitDef();
-        if (!e->IsInRadarOrLOS() || (e->GetData().losStatus &
-            (SEnemyData::LosMask::HIDDEN|SEnemyData::LosMask::NEUTRAL|SEnemyData::LosMask::DYING|SEnemyData::LosMask::DEAD))) continue;
-        if (e->IsIgnore() && (d==nullptr || !d->IsIgnore() || e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
-        const auto& p=e->GetPos(); // last legal observation, never query hidden UnitDef
-        if (Height(p)>=-8.f) continue;
+        if (e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN|SEnemyData::LosMask::NEUTRAL
+            | SEnemyData::LosMask::DYING|SEnemyData::LosMask::DEAD)) continue;
+        const bool observed=e->IsInRadarOrLOS();
+        // Static memory is a search objective (flag 128), never fire authority.
+        if (!observed && (d==nullptr || d->IsMobile())) continue;
+        if (e->IsIgnore() && (d==nullptr || !d->IsIgnore() || (observed
+            && e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f))) continue;
+        const auto& p=e->GetPos(); // only the last legal observation
+        if (Height(p)>=-8.f || (d!=nullptr && (d->IsAbleToFly() || d->IsSurfer()))) continue;
         const int body=WaterBody(p,false);
         if (body<0) continue;
         if (d==nullptr) {
-            // Underwater sonar blips have a legal submerged position but no
-            // identified definition/cost. Script chooses the uncertainty budget.
             if (p.y < -1.f) seaForces.push_back({p,0.f,e->GetId(),-1,2|16,body});
-        } else if (!d->IsMobile() && !d->IsBuilder() && !e->IsBeingBuilt()) {
-            seaForces.push_back({p,d->GetCostM(),e->GetId(),d->GetId(),
-                (d->IsInWater(Height(p),p.y) ? 2 : 0)|8,body});
+            continue;
         }
+        const bool submerged=d->IsInWater(Height(p),p.y);
+        const bool antiSub=submerged ? d->HasSubToWater() : d->HasSurfToWater();
+        if (d->IsMobile() && !(d->IsFloater() || d->IsSubmarine() || (d->IsAmphibious() && submerged))) continue;
+        // Unfinished yards and mobile constructors are denial targets too.
+        const int flags=(submerged?2:0)|(antiSub?4:0)|(!d->IsMobile()?8:0)
+            |(!d->IsMobile() && !d->GetBuildOptions().empty()?32:0)
+            |(d->IsMex()?64:0)|(!observed?128:0);
+        seaForces.push_back({p,d->GetCostM(),e->GetId(),d->GetId(),flags,body});
     }
     std::sort(seaForces.begin(),seaForces.end(),[](const NavalForce& a,const NavalForce& b){return a.id<b.id;});
     return int(seaForces.size());

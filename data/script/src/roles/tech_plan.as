@@ -66,6 +66,7 @@ namespace TechPlan {
         if (plan == "nuke") {
             if (phase == 1) {
                 if (objective != "nuke") s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
+                else s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1)); // D-229: no aircraft-factory spending before the rush silo
                 s.insertLast(TechChain::Step("income", "", gate200));
             } else if (phase == 2) {
                 s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant

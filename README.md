@@ -1,46 +1,42 @@
-Circuit AI (requires info update)
-=========
-C++ Skirmish AI for Recoil RTS engine.
+# CircuitAI / SMRTBARb
 
-Coding agents: start with [AGENTS.md](AGENTS.md), the sole repository
-instruction entry point. Shared runbooks use the open Agent Skills format
-under `skills/`; no vendor-specific coding-agent configuration is required.
+C++ Skirmish AI for Recoil, with AngelScript policy and BAR behavior profiles.
 
-### SMRTBARb
-This fork ships as **SMRTBARb** (an alias of BARb). Every push to `smrt-test` (test builds, pre-releases)
-or `smrt-prod` (production, Latest) builds it in GitHub Actions with BAR's Recoil docker harness and
-publishes it for Windows (`SMRTBARb-v<version>-<channel>-windows.zip`) and Linux
-(`SMRTBARb-v<version>-<channel>-linux.tar.gz`) as one GitHub release with generated notes; see
-[doc/release.md](doc/release.md).
+| Directory | Developer purpose |
+| --- | --- |
+| `src/` | Native AI mechanisms, bindings and vendored dependencies |
+| `data/` | Active AngelScript policy, profiles and deployed AI metadata |
+| `data_sample/` | Upstream reference examples; not the active implementation |
+| `tests/` | Native and script test source, including benchmark programs |
+| `tools/` | Build, validation, simulation and evidence-publication tooling |
+| `platform/`, `packaging/`, `util/` | Platform support, release packaging and development utilities |
+| `skills/`, `AGENTS.md` | Reusable runbooks and repository working conventions |
 
-### Benchmarks
-Published evidence and raw simulation archives live in the separate
-[CircuitAI.benchmarks repository](https://github.com/S3KCentrifugal/CircuitAI.benchmarks).
-Keep its checkout beside this one, or set `CIRCUIT_BENCHMARK_REPO`.
-[Setup, ownership and migration details](doc/benchmark-repository.md).
+Build definitions, CI, hooks, licenses and small navigation files stay with the
+source. Generated evidence does not: keep this checkout focused on code and the
+tools needed to build, test and maintain it.
 
-### Requirements
-* gcc 5.4+
-* spring 104.0-dev
-* SDL2 (optional)
+- **Documentation:** [rjm.bar.docs/projects/circuitai](../rjm.bar.docs/projects/circuitai/README.md)
+  owns implementation plans, reviews, decisions, changelogs and the test index.
+- **Results and artifacts:** [CircuitAI.benchmarks](https://github.com/S3KCentrifugal/CircuitAI.benchmarks)
+  owns published benchmarks, raw games and build-validation logs, pinned
+  binaries, symbols and snapshots. Large raw artifacts are Git-ignored and
+  require separate backup.
 
-### Compiling
-Build process of native AI described in the [wiki](https://springrts.com/wiki/AI:Development:Lang:Cpp) of Spring RTS engine.
-Required steps on linux:
-```
-$ git clone https://github.com/spring/spring.git
-$ cd spring && git checkout maintenance
-$ git clone https://github.com/rlcevg/CircuitAI.git AI/Skirmish/CircuitAI
-$ cmake . && make CircuitAI
+Clone the benchmark repository beside this checkout, or set
+`CIRCUIT_BENCHMARK_REPO`. Resolve output locations without creating local copies:
+
+```sh
+python tools/playtest/benchmark_store.py validation
+python tools/playtest/benchmark_store.py raw
 ```
 
-### Installing
-To install the AI, put files into proper directory, see CppTestAI or Shard for reference.
-An example location of `libSkirmishAI.so` on linux would be `/home/<user>/.spring/engine/<engine version>/AI/Skirmish/CircuitAI/<AI version>/libSkirmishAI.so`
+Use a named session/build directory under the returned validation root. Keep
+test definitions and reusable runners here; send their retained output there.
+Disposable unit-test scratch may use the OS temporary directory. Build output
+required for engine integration remains in its configured external build tree.
 
-### Linux troubleshooting
-Dead AI upon match start: ensure that `libSkirmishAI.so` is compatible with `AI/Interfaces/C/0.1/libAIInterface.so` (i.e. replace it with own build)
-
-For those who lost all hope, behold: [Vagrant](https://docs.vagrantup.com/v2/).
-Just navigate to Vagrantfile and do "vagrant up". It will take some time to warm up, install all dependencies and compile Circuit for the first time.
-Subsequent builds should be done manually, see Vagrantfile for reference.
+See [storage ownership and migration](../rjm.bar.docs/projects/circuitai/benchmark-repository.md)
+and [AGENTS.md](AGENTS.md) for the build/validation workflow. The small `doc/`
+navigation files and existing local `build-theatres` compatibility junction
+support older links; they are not new output locations.

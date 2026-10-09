@@ -414,6 +414,7 @@ namespace AirWaves {
             // This only governs launch; an existing offensive wave stays committed.
             if (!plannedDefensive && defensiveMinimum > bombers) {
                 targetMinimum = defensiveMinimum;
+                HoldReason("defensive payload", bombers, defensiveMinimum);
                 raw.Abort();
                 return null;
             }
@@ -451,7 +452,8 @@ namespace AirWaves {
                     Invariants::Violation("INV-105", "failed.raid", "AIR selected a target in an unexpired failed raid region");
             plannedCount = AirMath::OperationSize(bombers, targetMinimum, OpeningDone(), OpeningSize(),
                 plannedFront, plannedDefensive, Global::RoleSettings::Air::StrikeFirstSize);
-            if (plannedCount == 0 || FightersFor(plannedCount) > int(AirProduction::home.getSize())) {
+            if (plannedCount == 0 || FightersFor(plannedCount) > int(AirOperations::AvailableFighters())) {
+                HoldReason(plannedCount == 0 ? "target/opening budget" : "escort budget", bombers, targetMinimum);
                 raw.Abort(); return null;
             }
             ConfigureStrike(wt, ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side)), heldBombers, plannedCount);
@@ -602,18 +604,35 @@ namespace AirWaves {
         if (releaseUntilFrame < 0) _TryLaunch(frame);
     }
 
+    void HoldReason(const string &in reason, int available, int required)
+    {
+        // Diagnostics only: no command throttle or additional target scan.
+        if (ai.frame-lastNoTargetLog < 30*SECOND) return;
+        lastNoTargetLog = ai.frame;
+        GenericHelpers::LogUtil("[AIR][Waves] held: " + reason + " available=" + available
+            + " required=" + required + " baseContact=" + AirBaseResponse::Emergency(), 1);
+    }
+
     void _TryLaunch(int frame)
     {
-        if (AirBaseResponse::Emergency()) return;
+        // D-227: base response already owns aircraft assigned to a real
+        // defense target. An incompatible contact cannot veto spare bombers.
         const int bombers = int(heldBombers.getSize());
-        const int fighters = Global::RoleSettings::Air::ExperimentalBuild ? int(AirProduction::home.getSize()) : int(heldFighters.getSize());
+        const int fighters = Global::RoleSettings::Air::ExperimentalBuild ? int(AirOperations::AvailableFighters()) : int(heldFighters.getSize());
         if (bombers == 0) { holdSinceFrame = -1; return; }
         if (holdSinceFrame < 0) holdSinceFrame = frame;
         if (Global::RoleSettings::Air::ExperimentalBuild) {
-            const bool busy = (waveTask !is null && !waveTask.IsDead()) || !lastWaveEvaluated;
-            if (busy || frame - lastPlanFrame < 10 * SECOND) return;
+            // One surviving committed bomber must not lock out every later
+            // cohort. The old operation/escorts retain their task in
+            // AirOperations; cadence only spaces additional fresh operations.
+            const bool busy = waveTask !is null && !waveTask.IsDead()
+                && frame-lastLaunchFrame < AiMax(1, Global::RoleSettings::Air::StrikeCadenceSeconds)*SECOND;
+            if (busy) { HoldReason("strike cadence", bombers, targetMinimum); return; }
+            if (frame - lastPlanFrame < 10 * SECOND) return;
             const int floor = 3; // A small defensive T3 response may launch before the offensive draw.
-            if (bombers < floor || fighters < FightersFor(floor)) return;
+            if (bombers < floor || fighters < FightersFor(floor)) {
+                HoldReason(bombers < floor ? "bomber floor" : "escort floor", bombers, floor); return;
+            }
             lastPlanFrame = frame;
             // Re-probe even below an old target minimum: reconnaissance may
             // expose a cheaper objective. Never waive the new target's budget.
@@ -663,6 +682,7 @@ namespace AirWaves {
                 }
             }
             attached = AirOperations::AttachFighters(cast<CAirWaveTask>(planned), !plannedDefensive);
+            AirOperations::TrackBombers(planned, waveBombers);
         } else {
             _ReleaseHeld(@heldBombers, @waveBombers, @aborted, limit);
             _ReleaseHeld(@heldFighters, null, @aborted, limit < 0 ? -1 : FightersFor(limit));

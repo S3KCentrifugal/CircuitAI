@@ -3,6 +3,7 @@
 #include "sea_economy.as"
 #include "sea_operations.as"
 #include "sea_patrol.as"
+#include "sea_protection.as"
 namespace SeaCombat {
     class Hull {
         CCircuitDef@ def;
@@ -51,6 +52,7 @@ namespace SeaCombat {
     void Leave() {
         SeaOperations::Leave();
         SeaPatrol::Leave();
+        SeaProtection::Leave();
         for (uint i=0;i<owned.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(owned[i]);
             if (u is null || u.task is null) continue;
@@ -108,6 +110,7 @@ namespace SeaCombat {
         air=SeaMath::RememberThreat(air,nextAir,ai.frame-airSeen,memory);
         shore=aiBattle.GetNavalThreatCost(3);
         SeaPatrol::Tick();
+        SeaProtection::Tick();
         // Avoid the legacy map-wide army/per-player comparison. The native
         // reachable-group gate and damage-triggered response remain active.
         aiMilitaryMgr.quota.attack=Global::RoleSettings::Sea::MilitaryAttackThreshold;
@@ -130,6 +133,16 @@ namespace SeaCombat {
             const int desired=fleet<1000 ? 1 : Global::RoleSettings::Sea::FleetScouts;
             if (scout !is null && scout.count+aiFactoryMgr.GetPendingRecruitCount(scout)<desired
                 && scout.IsAvailable(ai.frame) && yard.circuitDef.CanBuild(scout)) return scout;
+            // The T2 yard supplies advanced surface/AA hulls. Keep the T1 yard
+            // useful as a submarine screen/raiding stream. This is after the
+            // caller's workforce, recovery and urgent air/sub counter checks.
+            if (Global::RoleSettings::Sea::T1SubmarinesAfterT2 && SeaFactories::T2Finished(side)) {
+                CCircuitDef@ sub=ai.GetCircuitDef(side=="armada" ? "armsub" : side=="cortex" ? "corsub" : "legnavysub");
+                if (sub !is null && sub.IsAvailable(ai.frame) && yard.circuitDef.CanBuild(sub)) {
+                    GenericHelpers::LogUtil("[SEA][SubStream] recruit="+sub.GetName(),1);
+                    return sub;
+                }
+            }
         }
         array<float> have(3,0.0f);
         dictionary localCounts;

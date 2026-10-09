@@ -53,6 +53,7 @@ namespace RoleSea {
     ******************************************************************************/
 
     void Sea_Init() {
+        aiBuilderMgr.recoverConstruction = true;
         SeaInvasion::Init();
         SeaRecovery::Reset();
         GenericHelpers::LogUtil("Sea role initialization logic executed", 2);

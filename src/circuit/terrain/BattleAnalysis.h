@@ -235,6 +235,18 @@ private:
     Grid observedWaterWeapons; // current weapon coverage, independent of profile threat multipliers
     lane::Settings laneSettings;
     std::shared_ptr<const lane::Terrain> laneTerrain;
+    // Synchronous callback-only scratch, never shared with lane workers.
+    // Keep terrain alive to prevent pointer ABA; threat publication versions
+    // prevent double-buffer ABA. Amphibious observed-weapon overlays remain
+    // uncached until all of their mutations have a separate version.
+    std::shared_ptr<const lane::Terrain> routeSnapshotTerrain;
+    struct RouteSnapshot { Grid threat; std::uint64_t version = 0; lane::PointWorkspace workspace; };
+    std::array<RouteSnapshot, 2> routeSnapshots; // surface and air
+    Grid amphRouteThreat;
+    lane::PointWorkspace amphRouteWorkspace;
+    // Const lane joining is owner-thread-only; uniform costs need no threat
+    // version. Retain scratch but never cache the mutable route result.
+    mutable lane::PointWorkspace laneJoinWorkspace;
     lane::JobGate laneJobs;
     std::shared_ptr<std::atomic<bool>> laneCancel;
     int laneRevision = 0;

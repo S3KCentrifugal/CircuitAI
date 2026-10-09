@@ -25,6 +25,13 @@
 
 namespace circuit::layout_rank {
 
+// Opt-in facing passes must not consume a differently oriented reservation:
+// the footprint and exit predicate were evaluated for this pass's facing.
+// A negative filter retains the legacy reservation preference for other roles.
+inline bool MatchesFacingPass(int actual, int filter) {
+    return filter < 0 || actual == filter;
+}
+
 struct Pt {
 	float x = 0.f;
 	float z = 0.f;
@@ -39,6 +46,29 @@ inline float Sq(const Pt& a, const Pt& b)
 inline float Dist(const Pt& a, const Pt& b)
 {
 	return std::sqrt(Sq(a, b));
+}
+
+// D-229: only completed, owned static assistants enter this snapshot. Future
+// reserved turrets deliberately contribute nothing. Speeds may be expressed
+// per frame or per second, provided every source uses the same unit.
+struct BuiltPower {
+	Pt pos;
+	float reachSq;
+	float speed;
+};
+
+inline float PowerAt(const Pt& site, const std::vector<BuiltPower>& sources)
+{
+	float sum = 0.f;
+	for (const auto& source : sources) {
+		if (Sq(site, source.pos) <= source.reachSq) sum += source.speed;
+	}
+	return sum;
+}
+
+inline bool BuiltPowerBefore(float powerA, float distanceA, float powerB, float distanceB)
+{
+	return powerA != powerB ? powerA > powerB : distanceA < distanceB;
 }
 
 // The mean of pts; `fallback` when there is none.

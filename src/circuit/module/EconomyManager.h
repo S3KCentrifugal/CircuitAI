@@ -117,7 +117,7 @@ public:
 	// our own economy's fields the script lacked (D-106)
 	float GetOwnEco(int resource, int field);
 	int GetClaimedMexCountWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots);
-	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false);
+	IBuilderTask* EnqueueMexWithin(CCircuitUnit* builder, const springai::AIFloat3& center, float radius, int maxSpots, bool allyAware = false, const std::vector<springai::AIFloat3>& excluded = {});
 	// D-072: a metal spot belongs to the team whose start position is nearest
 	// to it; the script feeds the allies' starts (the roster) and the ally-aware
 	// mex enqueue leaves the others' spots alone.

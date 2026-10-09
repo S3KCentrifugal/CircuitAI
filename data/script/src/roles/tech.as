@@ -201,6 +201,7 @@ namespace RoleTech
 	******************************************************************************/
 	void Tech_Init()
 	{
+        aiBuilderMgr.recoverConstruction = true;
         TechFortifications::Reset();
 
 		// Apply TECH role settings
@@ -275,7 +276,9 @@ namespace RoleTech
 		// reclaim (one owner per decision); native's ReclaimOldEnergy is off
 		aiEconomyMgr.reclEnergyEff = Global::RoleSettings::Tech::ExperimentalBuild ? 0.0f : Global::RoleSettings::Tech::ReclaimEnergyEff;
 		aiEconomyMgr.reclaimOldConvertersAlways = Global::RoleSettings::Tech::ReclaimOldConvertersAlways;
-		aiEconomyMgr.assistNanoEnabled = Global::RoleSettings::Tech::AssistNanoEnabled;
+		// The later economy switch must retain the same single layout owner as
+		// Tech_Init; native factory-assist orders have no reserved turret slot.
+		aiEconomyMgr.assistNanoEnabled = !Global::RoleSettings::Tech::ExperimentalBuild && Global::RoleSettings::Tech::AssistNanoEnabled;
 		aiEconomyMgr.assistNanoIncomeMod = Global::RoleSettings::Tech::AssistNanoIncomeMod;
 		const string side = Global::AISettings::Side;
 		CCircuitDef@ solar = ai.GetCircuitDef(UnitHelpers::GetSolarNameForSide(side));
@@ -939,6 +942,13 @@ namespace RoleTech
 			if (yt !is null) return yt;
 		}
 		CCircuitDef@ clusterNano = TechFactories::Nano();
+        if (TechChain::NukeRush() && facDef.GetName() == TechChain::DefFor("nano")) {
+            // Nanos enter through the factory manager, not the mobile-builder
+            // rule table. Route this opening's assistants through its policy
+            // here as well, including before a reclaim ever transfers them.
+            IUnitTask@ rushAssist = Tech_TurretAssist(u, true);
+            if (rushAssist !is null) return rushAssist;
+        }
 		if (clusterNano !is null && facDef.GetName() == clusterNano.GetName() && TechFactories::ClusterOfTurret(u) !is null)
 		{
 			IUnitTask@ ft = TechFactories::TurretFocus(u, true);
@@ -952,6 +962,46 @@ namespace RoleTech
 			GenericHelpers::LogUtil("[TECH][Factory] " + facDef.GetName() + " " + u.id + " is retiring: no production", 3);
 			return null;
 		}
+
+        // D-229: the first-shot budget needs two technology builders, not the
+        // normal bank-driven constructor expansion. This only owns bot labs
+        // while the selected nuke silo is unfinished. Donation/recovery queues
+        // are still handled by their existing higher-level request owners.
+        if (TechChain::NukeRush() && (UnitHelpers::IsT1BotLab(facDef.GetName()) || UnitHelpers::IsT2BotLab(facDef.GetName()))) {
+            const bool advanced = UnitHelpers::IsT2BotLab(facDef.GetName());
+            const string conSide = UnitHelpers::GetSideForUnitName(facDef.GetName());
+            array<string> names = advanced ? UnitHelpers::GetT2BotConstructors(conSide) : UnitHelpers::GetT1BotConstructors(conSide);
+            if (names.length() > 0) {
+                CCircuitDef@ conDef = ai.GetCircuitDef(names[0]);
+                const int wanted = advanced ? TechChain::wantAck : TechChain::wantCk;
+                if (conDef !is null && conDef.count + aiFactoryMgr.GetPendingRecruitCount(conDef) < wanted) {
+                    if (conDef.maxThisUnit < wanted) conDef.maxThisUnit = wanted;
+                    return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, conDef, u.GetPos(ai.frame), 64.f));
+                }
+            }
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        }
+        if (TechChain::nukeOpening && facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(Global::AISettings::Side)
+            && ai.frame < Global::RoleSettings::Tech::NukeRushScoutSeconds * SECOND) {
+            if (TechChain::NukeRush()) {
+                CCircuitDef@ silo = ai.GetCircuitDef(TechChain::DefFor("silo"));
+                CCircuitUnit@ frame = silo is null ? null : aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(),
+                    Global::RoleSettings::Tech::ChainAssistRadius, silo);
+                // Survey shortly before stockpiling rather than repeatedly
+                // replacing scouts while the economy is still funding a silo.
+                if (frame is null || frame.GetBuildProgress() < 0.70f)
+                    return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+            }
+            CCircuitDef@ scout = ai.GetCircuitDef(UnitHelpers::GetT1AirScoutForSide(Global::AISettings::Side));
+            const int scoutCount = Global::RoleSettings::Tech::NukeRushScouts;
+            if (scout !is null && scout.count + aiFactoryMgr.GetPendingRecruitCount(scout) < scoutCount) {
+                if (scout.maxThisUnit < scoutCount) scout.maxThisUnit = scoutCount;
+                return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, scout, u.GetPos(ai.frame), 64.f));
+            }
+            // Once the silo stands, filled reconnaissance does not block the
+            // ordinary air-constructor / T2-air economic transition.
+            if (TechChain::NukeRush()) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
+        }
 		// Determine side from factory unit name
 		string side = UnitHelpers::GetSideForUnitName(facDef.GetName());
 		const AIFloat3 pos = u.GetPos(ai.frame);
@@ -1459,6 +1509,20 @@ namespace RoleTech
 
 	IUnitTask @Tech_MilitaryAiMakeTask(CCircuitUnit @u)
 	{
+        if (TechChain::nukeOpening && u !is null
+            && u.circuitDef.GetName() == UnitHelpers::GetT1AirScoutForSide(Global::AISettings::Side)) {
+            array<AIFloat3> route = Lanes::ScriptStarts(true);
+            if (route.length() > 0) {
+                CRouteTask@ recon = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+                if (recon !is null) {
+                    recon.SetAirControl(true); recon.SetPatrol(true);
+                    u.SetIdleMode(0); u.SetFireState(0);
+                    recon.SetRoute(route);
+                    GenericHelpers::LogUtil("[TECH][NukeRush] scout " + u.id + " surveys enemy starts", 1);
+                    return recon;
+                }
+            }
+        }
 		// D-121: an island TECH's fleet runs its yard's route to the enemy
 		if (u !is null && u.circuitDef !is null && TechHarbour::IsHarbourUnit(u.circuitDef))
 		{
@@ -1925,9 +1989,38 @@ namespace RoleTech
 		return "armmex";
 	}
 
-	IUnitTask @Tech_TurretAssist(CCircuitUnit @u)
+	IUnitTask @Tech_TurretAssist(CCircuitUnit @u, bool factorySide = false)
 	{
 		if (u is null || u.circuitDef is null) return null;
+        if (TechChain::NukeRush()) {
+            // The retiring lab is a durable lifecycle target. Reclaim task
+            // entries can disappear when another worker's short task ends;
+            // keep the refund staffed until the lab itself is gone.
+            CCircuitUnit@ retiredLab = ai.GetTeamUnit(TechChain::nukeRetiredLabId);
+            // Match the existing reclaim dispatch / INV-008 envelope. The
+            // lab's model extends beyond its centre; using bare build distance
+            // here dropped edge turrets after their first reclaim task ended.
+            const float reach = u.circuitDef.GetBuildDistance() + Global::RoleSettings::Tech::ReclaimTurretMargin;
+            if (retiredLab !is null && MapHelpers::SqDist(u.GetPos(ai.frame), retiredLab.GetPos(ai.frame)) <= reach * reach)
+                return aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, retiredLab, 30 * SECOND));
+            // A silo is not in TECH's ordinary economic assist list. Native
+            // fallback can refuse a large frame while metal is low, leaving
+            // completed in-range turrets idle during the timed opening.
+            array<string> rushProjects = {TechChain::DefFor("alab"), TechChain::DefFor("nano"), TechChain::DefFor("mstor"), TechChain::DefFor("estor"),
+                TechChain::DefFor("fusion"), TechChain::DefFor("silo"), TechChain::DefFor("ap"),
+                TechChain::DefFor("wind"), TechChain::DefFor("solar")};
+            for (uint i = 0; i < rushProjects.length(); ++i) {
+                CCircuitDef@ rushDef = ai.GetCircuitDef(rushProjects[i]);
+                CCircuitUnit@ rushFrame = (rushDef is null) ? null : aiBuilderMgr.FindUnfinishedFor(u, rushDef);
+                if (rushFrame !is null)
+                    return factorySide ? aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, rushFrame))
+                        : aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, rushFrame, 30 * SECOND));
+            }
+            // The generic turret.any rule searches a 700-elmo neighbourhood,
+            // wider than a stationary nano can reach. Never strand this rush's
+            // power on an out-of-range mex while waiting for the next frame.
+            return factorySide ? aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND)) : TechBuild::Wait(2 * SECOND);
+        }
 		CCircuitUnit @reclaim = aiBuilderMgr.FindReclaimTargetFor(u);
 		if (reclaim !is null)
 		{

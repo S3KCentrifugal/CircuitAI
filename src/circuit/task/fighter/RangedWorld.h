@@ -2,6 +2,7 @@
 #define CIRCUIT_RANGED_WORLD_H
 
 #include "terrain/RangedGeometry.h"
+#include "terrain/GroundCohort.h"
 #include "AIFloat3.h"
 #include <map>
 #include <memory>
@@ -51,8 +52,10 @@ public:
     struct Friend {
         int id; springai::AIFloat3 pos; float radius;
         bool screen; float radar, jammer, los;
+        CCircuitDef* def=nullptr;
+        float combatHealth=-1.f; // lazy, invalidated with the per-frame snapshot
     };
-    struct Slot { springai::AIFloat3 pos; float spacing, value; };
+    struct Slot { springai::AIFloat3 pos; float spacing, value; float radius=0.f; bool coordinated=false; };
 
     explicit CRangedWorld(CCircuitAI* circuit);
     ~CRangedWorld();
@@ -80,12 +83,34 @@ public:
     float ClusterValue(const springai::AIFloat3& target, float radius) const;
     bool Escort(CCircuitUnit* sensor, springai::AIFloat3& position);
     bool HasMembers() const { return !slots.empty(); }
+    struct CohortPlan {
+        int frame=-1, target=-1, regroupUntil=0, nextRegroup=0, nextMerge=0;
+        springai::AIFloat3 center, back, focus;
+        float radius=0.f;
+        cohort::Mode mode=cohort::Mode::ADVANCE;
+        std::vector<int> members;
+        std::vector<int> candidates; // reused local enemy-query storage
+        // Permissions live only for this observed plan. IDs, never contact
+        // indices, survive a snapshot refresh. Every route revalidates them.
+        std::vector<int> assault;
+        cohort::Reason reason=cohort::Reason::TRAVEL;
+        float loss=1.f, advantage=0.f;
+        int assemblyTarget=-1, objectiveFrame=-1;
+        int protectedTarget=-1; // last legally seen commander/reclaimer; losing LOS is not a kill
+        springai::AIFloat3 strategic;
+        bool committed=false, supporting=false;
+        float screenDepth=0.f;
+    };
+    const CohortPlan& PlanCohort(CCircuitUnit* unit);
+    bool CohortSafe(CCircuitUnit* unit,const springai::AIFloat3& from,
+                    const springai::AIFloat3& to,float margin,bool escaping);
     void ReleaseEscort(int id) { escorts.erase(id); }
 
 private:
     CCircuitAI* circuit;
     int frame = -1;
     float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f, largestFriendRadius = 0.f;
+    float largestCohortHazard = 0.f;
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;
     struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; };
@@ -107,6 +132,17 @@ private:
     std::unordered_map<int,History> history;
     struct EscortLease { int anchor=-1; bool jammer=false; };
     std::map<int,EscortLease> escorts;
+    // Callback-thread IDs only. Rebuilt on task recreation, removed on Leave.
+    // Formation buckets bound local recruitment; at most cohortSize members
+    // are sampled per plan, once per decision frame, not once per shooter.
+    std::map<int,CohortPlan> cohorts;
+    std::unordered_map<int,int> membership;
+    int nextCohort=0;
+    void JoinCohort(CCircuitUnit* unit);
+    float EffectiveDps(CCircuitDef* def,int armor,int category,
+                       const springai::AIFloat3& from,const springai::AIFloat3& to,
+                       float horizon,bool advancing);
+    void AssessCohort(CCircuitUnit* unit,CohortPlan& group,const Contact& target,float range);
 };
 }
 #endif

@@ -76,6 +76,7 @@ namespace Commands {
         float assistNanoIncomeMod;
         bool holdStartFactory;
         bool experimentalBuild;
+        bool recoverConstruction;
         float experimentalDirectRange;
         float experimentalSearchRadius;
         bool autoStorageEnabled;
@@ -97,6 +98,7 @@ namespace Commands {
             assistNanoIncomeMod = aiEconomyMgr.assistNanoIncomeMod;
             holdStartFactory = aiEconomyMgr.holdStartFactory;
             experimentalBuild = aiBuilderMgr.experimentalBuild;
+            recoverConstruction = aiBuilderMgr.recoverConstruction;
             experimentalDirectRange = aiBuilderMgr.experimentalDirectRange;
             experimentalSearchRadius = aiBuilderMgr.experimentalSearchRadius;
             autoStorageEnabled = aiEconomyMgr.autoStorageEnabled;
@@ -121,6 +123,7 @@ namespace Commands {
             aiEconomyMgr.assistNanoIncomeMod = assistNanoIncomeMod;
             aiEconomyMgr.holdStartFactory = holdStartFactory;
             aiBuilderMgr.experimentalBuild = experimentalBuild;
+            aiBuilderMgr.recoverConstruction = recoverConstruction;
             aiBuilderMgr.experimentalDirectRange = experimentalDirectRange;
             aiBuilderMgr.experimentalSearchRadius = experimentalSearchRadius;
             aiEconomyMgr.autoStorageEnabled = autoStorageEnabled;
@@ -211,9 +214,7 @@ namespace Commands {
         }
         // barb|layout|<team>|on|off : push the planned base to the widget's overlay (D-053)
         if (cmd == "layout" && parts.length() >= 4) {
-            if (AirEconomy::Active()) { AirLayout::SetOverlay(parts[3] == "on"); return true; }
-            Layout::SetOverlay(parts[3] == "on");
-            if (!Layout::planned) WidgetLink::Send("layout", "0|0|none");
+            WidgetLink::SetLayoutOverlay(parts[3] != "off", parts[3] == "on");
             return true;
         }
         GenericHelpers::LogUtil("[Commands] Unknown command: " + data, 2);
@@ -245,6 +246,7 @@ namespace Commands {
     // From Main::AiUpdate: logs the end of a drawing, then the intro's next step
     void DrawTick()
     {
+        WidgetLink::LayoutTick();
         if (drawQueued && AiDrawQueueSize() == 0) {
             drawQueued = false;
             GenericHelpers::LogUtil("[Commands] map drawing complete: " + drawnStarts.length() + " stroke(s) on the map", 1);
@@ -566,6 +568,7 @@ namespace Commands {
         // and the native manager settings its InitHandler changed (CR-007).
         if (Global::AISettings::Role == AiRole::AIR) AirBuild::Leave();
         if (Global::AISettings::Role == AiRole::SEA) SeaBuild::Leave();
+        if (Global::AISettings::Role == AiRole::TECH) TechChain::LeaveNukeOpening();
         Layout::OnRoleLeave();
         TechWeapons::OnRoleLeave();   // D-126
         Lanes::OnRoleLeave();         // D-127

@@ -1,25 +1,29 @@
 // Pure placement geometry, shared by policy and the standalone AS tests.
 namespace PlacementMath {
+    // Named policy/geometry constants preserve the original arithmetic and types.
+    // Zero/One are integer identities; ZeroValue/UnitValue are float identities.
+    const float ZeroValue = 0.0f;
+
     bool FriendlyTerritory(float allyDistanceSquared, float enemyDistanceSquared)
     {
-        return allyDistanceSquared >= 0.0f && enemyDistanceSquared >= 0.0f
+        return allyDistanceSquared >= ZeroValue && enemyDistanceSquared >= ZeroValue
             && allyDistanceSquared < enemyDistanceSquared;
     }
     bool CoversCore(float coverage, float distanceSquared, float coreRadius)
     {
-        return coverage > 0.0f && coreRadius >= 0.0f && coverage >= coreRadius
-            && distanceSquared >= 0.0f && distanceSquared <= (coverage - coreRadius) * (coverage - coreRadius);
+        return coverage > ZeroValue && coreRadius >= ZeroValue && coverage >= coreRadius
+            && distanceSquared >= ZeroValue && distanceSquared <= (coverage - coreRadius) * (coverage - coreRadius);
     }
-    bool FootprintIntersectsCircle(float x, float z, float halfX, float halfZ,
+    bool FootprintIntersectsCircle(float positionX, float positionZ, float halfWidth, float halfDepth,
         float centreX, float centreZ, float radius)
     {
-        if (halfX < 0.0f || halfZ < 0.0f || radius < 0.0f) return true;
-        float dx = x - centreX;
-        float dz = z - centreZ;
-        if (dx < 0.0f) dx = -dx;
-        if (dz < 0.0f) dz = -dz;
-        dx = dx > halfX ? dx - halfX : 0.0f;
-        dz = dz > halfZ ? dz - halfZ : 0.0f;
-        return dx * dx + dz * dz <= radius * radius;
+        if (halfWidth < ZeroValue || halfDepth < ZeroValue || radius < ZeroValue) return true;
+        float distanceX = positionX - centreX;
+        float distanceZ = positionZ - centreZ;
+        if (distanceX < ZeroValue) distanceX = -distanceX;
+        if (distanceZ < ZeroValue) distanceZ = -distanceZ;
+        distanceX = distanceX > halfWidth ? distanceX - halfWidth : ZeroValue;
+        distanceZ = distanceZ > halfDepth ? distanceZ - halfDepth : ZeroValue;
+        return distanceX * distanceX + distanceZ * distanceZ <= radius * radius;
     }
 }

@@ -29,16 +29,18 @@ namespace SeaExpansion {
     }
     bool SafeApproach(const AIFloat3 &in from, const AIFloat3 &in to) {
         if (!ClearOfEnemies(to)) return false;
-        const float distance=sqrt(MapHelpers::SqDist(from,to));
-        const int samples=AiMax(1,int(distance/128.0f)+1);
-        // O(distance/128), bounded by the two search radii. Conservative direct
-        // corridor admission includes torpedo coverage (even zero-weight static
-        // weapons), unlike the native destination-only safe-reachability check.
-        // The engine's native pathfinder still owns the actual coastal detour.
-        for (int i=0;i<=samples;++i) {
-            const float fraction=float(i)/samples;
-            const AIFloat3 p(from.x+(to.x-from.x)*fraction,0,from.z+(to.z-from.z)*fraction);
-            if (!SeaMath::ExpansionThreatSafe(aiBattle.AmphThreat(p),Global::RoleSettings::Sea::ExpansionMaxThreat)) return false;
+        // Follow the cached water graph rather than testing a straight line
+        // through an island. The engine still validates the worker MoveDef.
+        array<AIFloat3>@ route=aiBattle.GetTerrainRoute(from,to,5,10,1,3,1000000);
+        if (route.length()<2) return MapHelpers::SqDist(from,to)<128.0f*128.0f;
+        for (uint leg=1;leg<route.length();++leg) {
+            const AIFloat3 a=route[leg-1], b=route[leg];
+            const int samples=AiMax(1,int(sqrt(MapHelpers::SqDist(a,b))/128.0f)+1);
+            for (int i=0;i<=samples;++i) {
+                const float fraction=float(i)/samples;
+                const AIFloat3 p(a.x+(b.x-a.x)*fraction,0,a.z+(b.z-a.z)*fraction);
+                if (!SeaMath::ExpansionThreatSafe(aiBattle.AmphThreat(p),Global::RoleSettings::Sea::ExpansionMaxThreat)) return false;
+            }
         }
         return true;
     }
@@ -178,7 +180,7 @@ namespace SeaExpansion {
         const string key=""+u.id;
         int64 next=0;
         if (retryAt.get(key,next) && ai.frame<next)
-            return blocked.exists(key) ? aiBuilderMgr.Enqueue(TaskB::Wait(SECOND)) : null;
+            return null; // blocked expansion may use home work throughout the retry window
         blocked.delete(key);
         // Failed searches get a short per-worker backoff, not an order limiter.
         // Completion immediately permits the next mex in a cluster.
@@ -190,22 +192,33 @@ namespace SeaExpansion {
         // This extra query is only needed while the worker is still near home.
         const AIFloat3 home=Factory::primaryT1Shipyard is null ? Global::Map::StartPos : Factory::primaryT1Shipyard.GetPos(ai.frame);
         IUnitTask@ task=null;
+        IBuilderTask@ mex=null;
+        array<AIFloat3> excluded;
         const float nearby=Global::RoleSettings::Sea::NearbyMexRadius;
-        if (MapHelpers::SqDist(from,home)<=nearby*nearby)
-            @task=aiEconomyMgr.EnqueueMexWithin(u,home,nearby,0,true);
-        if (task is null) {
-            IUnitTask@ fort=Fortify(u); if (fort !is null) { retryAt.delete(key); return fort; }
-            @task=aiEconomyMgr.EnqueueMexWithin(u,from,Global::RoleSettings::Sea::ExpansionMexRadius,0,true);
-        }
-        IBuilderTask@ mex=cast<IBuilderTask>(task);
-        if (mex is null) return null;
-        if (!SafeApproach(from,mex.GetBuildPos()) || !Escorted(mex.GetBuildPos())) {
-            // Only this unassigned, unstarted proposal belongs to this decision.
-            // Retained frames remain available to another safe native approach.
+        // Bounded candidate attempts. Exclusion applies to adoption as well as
+        // new spot claims, so an unsafe unfinished mex cannot mask another site.
+        // Rejected unassigned tasks are released; another worker's task is not.
+        for (int attempt=0;attempt<Global::RoleSettings::Sea::ExpansionCandidates;++attempt) {
+            if (MapHelpers::SqDist(from,home)<=nearby*nearby)
+                @task=aiEconomyMgr.EnqueueMexAvoiding(u,home,nearby,true,excluded);
+            if (task is null) @task=aiEconomyMgr.EnqueueMexAvoiding(u,from,Global::RoleSettings::Sea::ExpansionMexRadius,true,excluded);
+            @mex=cast<IBuilderTask>(task);
+            if (mex is null) break;
+            const AIFloat3 candidate=mex.GetBuildPos();
+            const bool usable=aiEconomyMgr.IsMexTaskUsable(task);
+            if (usable && aiTerrainMgr.CanReachAt(u,candidate,u.circuitDef.GetBuildDistance())
+                && SafeApproach(from,candidate) && Escorted(candidate)) break;
+            if (!usable) GenericHelpers::LogUtil("[SEA][Expansion] stale mex skipped ship="+u.id+" x="+int(candidate.x)+" z="+int(candidate.z),2);
+            excluded.insertLast(candidate);
             if (mex.target is null && mex.GetUnits().length()==0) aiBuilderMgr.AbortTask(task);
-            blocked.set(key,true);
-            GenericHelpers::LogUtil("[SEA][Expansion] unsafe approach deferred ship="+u.id,2);
-            return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+            @mex=null; @task=null;
+        }
+        if (mex is null) {
+            IUnitTask@ fort=Fortify(u); if (fort !is null) { retryAt.delete(key); return fort; }
+            // No safe expansion job: permit home work during the short retry,
+            // rather than making the first constructor permanently WAIT.
+            GenericHelpers::LogUtil("[SEA][Expansion] no safe candidate ship="+u.id+" rejected="+excluded.length(),2);
+            blocked.set(key,true); return null;
         }
         if (mex.GetBuildType()!=int(Task::BuildType::MEX))
             Invariants::Violation("INV-158",""+u.id,"SEA frontier claim is not a mex task");

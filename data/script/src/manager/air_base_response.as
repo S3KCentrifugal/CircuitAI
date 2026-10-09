@@ -7,11 +7,19 @@ namespace AirBaseResponse {
     array<int> targets(4, -1);
     array<AIFloat3> aims(4);
     dictionary members;
+    dictionary waiting;
+    CRouteTask@ reserve;
+    AIFloat3 assembly;
+    int waitingSince = -1;
+    float groundCost = 0, aaCost = 0;
     int updated = -100000, lastSeen = -100000;
     bool contact = false;
     bool Active() { return AirEconomy::Active() && Global::RoleSettings::Air::BaseResponseEnabled; }
     bool Emergency() { return Active() && contact; }
     bool InBase(const AIFloat3 &in p) {
+        // The outer radius of a frontline ally can cross into enemy territory.
+        // Keep cliff/edge intrusions on our side without claiming enemy bases.
+        if (!AirHome::Friendly(p)) return false;
         for (uint i = 0; i < WallHelpers::starts.length(); ++i)
             if (AirMath::BaseContact(MapHelpers::SqDist(p, WallHelpers::starts[i]), Global::RoleSettings::Air::BaseResponseRadius)) return true;
         return false;
@@ -52,6 +60,31 @@ namespace AirBaseResponse {
         if (kind < 0 || groups[kind] is null || groups[kind].IsDead()) return null;
         // Let the existing interceptor controller answer simultaneous aircraft.
         if (kind == 2 && AirScreen::IntrusionCost() > 0) return null;
+        if (kind == 0 && !members.exists("" + u.id)) {
+            if (reserve is null || reserve.IsDead()) {
+                // Bounded allied-start candidates; no unit-by-unit world scan.
+                // Prefer the least exposed friendly assembly site, then home.
+                assembly = Global::Map::StartPos;
+                float risk = aiBattle.AirThreat(assembly);
+                for (uint i = 0; i < WallHelpers::starts.length(); ++i) {
+                    const AIFloat3 p = WallHelpers::starts[i];
+                    if (!AirHome::Friendly(p)) continue;
+                    const float candidate = aiBattle.AirThreat(p);
+                    if (candidate < risk) { risk = candidate; assembly = p; }
+                }
+                @reserve = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+                if (reserve is null) return null;
+                reserve.SetAirControl(true); reserve.SetHoldPosition(true);
+                reserve.SetTraversal(true, 96.0f, false);
+                reserve.SetLanes(12, 96.0f, 1.0f);
+                array<AIFloat3> route = {AirScreen::Clamp(assembly + AIFloat3(0,0,64)), AirScreen::Clamp(assembly)};
+                reserve.SetRoute(route);
+            }
+            if (waitingSince < 0 && u.circuitDef.GetName() != "corbw") waitingSince = ai.frame;
+            waiting.set("" + u.id, true);
+            u.SetIdleMode(0); u.SetFireState(2); Forget(u.id);
+            return reserve;
+        }
         u.SetIdleMode(0); u.SetFireState(2);
         members.set("" + u.id, kind);
         Forget(u.id);
@@ -66,6 +99,61 @@ namespace AirBaseResponse {
         contact = false;
         for (int i = 0; i < 4; ++i) ClearGroup(i);
         members.deleteAll(); updated = -100000; lastSeen = -100000;
+        ClearReserve(); groundCost = 0; aaCost = 0;
+    }
+    void ClearReserve() {
+        CRouteTask@ old = reserve; @reserve = null;
+        waiting.deleteAll(); waitingSince = -1;
+        if (old !is null && !old.IsDead()) old.Abort();
+    }
+    int Required(float aircraftCost) {
+        return AirMath::DefenceWave(groundCost, aaCost, aircraftCost,
+            Global::RoleSettings::Air::BaseResponseGroundRatio, Global::RoleSettings::Air::BaseResponseAaRatio,
+            Global::RoleSettings::Air::BaseResponseMinWave, Global::RoleSettings::Air::BaseResponseMaxWave);
+    }
+    void ReleaseReserve() {
+        array<string>@ keys = waiting.getKeys();
+        array<string> assembled;
+        float cost = 0;
+        int damageUnits = 0, assembledDamage = 0;
+        const float radius = AiMax(64.0f, Global::RoleSettings::Air::BaseResponseAssemblyRadius);
+        for (uint i = 0; i < keys.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
+            if (!Free(u) || reserve is null || u.task !is reserve) { waiting.delete(keys[i]); continue; }
+            // EMP support joins the release but cannot satisfy its lethal
+            // strength requirement. Otherwise a Shuriken-only cohort can
+            // repeatedly stun a foothold without ever destroying it.
+            const bool damage = u.circuitDef.GetName() != "corbw";
+            if (damage) { cost += u.circuitDef.costM; ++damageUnits; }
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), assembly) <= radius*radius) {
+                assembled.insertLast(keys[i]);
+                if (damage) ++assembledDamage;
+            }
+        }
+        if (waiting.isEmpty()) { waitingSince = -1; return; }
+        if (!contact || groups[0] is null || groups[0].IsDead()) return;
+        if (damageUnits == 0) { waitingSince = -1; return; }
+        const int wanted = Required(cost / float(damageUnits));
+        const int age = ai.frame - waitingSince;
+        const int deadline = AiMax(1, Global::RoleSettings::Air::BaseResponseMaxWaitSeconds)*SECOND;
+        if (!AirMath::DefenceRelease(damageUnits, assembledDamage, wanted, age, deadline)) return;
+        // Full releases use assembled units. The deadline explicitly also
+        // releases late arrivals: production/path stalls must not wait forever.
+        @keys = age >= deadline ? waiting.getKeys() : @assembled;
+        keys.sortAsc(); int joined = 0;
+        const int limit = AiMax(wanted, Global::RoleSettings::Air::BaseResponseMaxWave);
+        for (uint i = 0; i < keys.length() && joined < limit; ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
+            if (!Free(u)) continue;
+            if (!aiMilitaryMgr.TransferUnit(u, groups[0])) continue;
+            waiting.delete(keys[i]); members.set(keys[i], 0); ++joined;
+        }
+        if (joined == 0) Invariants::Violation("INV-165", "gunship cohort", "eligible defense release transferred no aircraft");
+        else GenericHelpers::LogUtil("[AIR][BaseResponse] wave=" + joined + " wanted=" + wanted
+            + " aaMetal=" + aaCost + " groundMetal=" + groundCost + " age=" + age/SECOND
+                + " lethal=" + damageUnits + " reason=" + (age >= deadline ? "deadline" : "assembled"), 1);
+        // A partial transfer/remainder keeps its oldest waiting deadline.
+        if (waiting.isEmpty()) waitingSince = -1;
     }
     void Tick() {
         if (!Active() || ai.frame-updated < SECOND) return;
@@ -101,7 +189,35 @@ namespace AirBaseResponse {
         if (contact != previous) GenericHelpers::LogUtil("[AIR][BaseResponse] contact=" + contact, 1);
         if (!contact && ai.frame-lastSeen >= AiMax(1, Global::RoleSettings::Air::BaseResponseSearchSeconds)*SECOND) {
             for (int k = 0; k < 4; ++k) ClearGroup(k);
-            members.deleteAll(); return;
+            members.deleteAll(); ClearReserve(); return;
+        }
+        groundCost = 0; aaCost = 0;
+        if (selected[0] >= 0) {
+            const AIFloat3 incident = aiBattle.GetGroundContactPos(selected[0]);
+            const float radius = AiMax(1.0f, Global::RoleSettings::Air::BaseResponseThreatRadius);
+            // O(contacts), once per response tick, never O(aircraft*contacts).
+            // AA just outside the incident still counts when its range covers it.
+            for (int i = 0; i < contacts; ++i) {
+                const CCircuitDef@ d = ai.GetCircuitDef(aiBattle.GetGroundContactDefId(i));
+                if (d is null) continue;
+                const float sq = MapHelpers::SqDist(incident, aiBattle.GetGroundContactPos(i));
+                if (sq <= radius*radius) groundCost += d.costM;
+                const float reach = AiMax(radius, d.GetMaxRange());
+                if (d.HasSurfToAir() && sq <= reach*reach) aaCost += d.costM;
+            }
+            for (int i = 0; i < aiBattle.GetAirContactCount(); ++i)
+                if (aiBattle.IsAirContactArmed(i) && MapHelpers::SqDist(incident, aiBattle.GetAirContactPos(i)) <= radius*radius)
+                    aaCost += aiBattle.GetAirContactCost(i);
+            // The shared naval snapshot excludes dry ground contacts, so
+            // coastal AA can be added once without double-counting shore flak.
+            const int naval = aiBattle.GetNavalForceCount();
+            for (int i = 0; i < naval; ++i) {
+                if ((aiBattle.GetNavalForceFlags(i) & 9) != 0) continue; // friendly or factory
+                const CCircuitDef@ d = ai.GetCircuitDef(aiBattle.GetNavalForceDefId(i));
+                if (d is null || !d.HasSurfToAir()) continue;
+                const float reach = AiMax(radius, d.GetMaxRange());
+                if (MapHelpers::SqDist(incident, aiBattle.GetNavalForcePos(i)) <= reach*reach) aaCost += d.costM;
+            }
         }
         for (int k = 0; k < 4; ++k) {
             if (k == 2 && AirScreen::IntrusionCost() > 0) { ClearGroup(k); continue; }
@@ -114,11 +230,16 @@ namespace AirBaseResponse {
                 @groups[k] = cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
                 if (groups[k] is null) continue;
                 groups[k].SetAirControl(true); groups[k].SetTraversal(true, 192.0f, true);
+                if (k == 0) groups[k].SetLanes(12, 96.0f, 1.0f);
                 groups[k].SetPatrol(true); // retry an empty queue without landing
                 targets[k] = -2;
             }
             if (next != targets[k]) {
-                array<AIFloat3> route = {AirScreen::Clamp(aims[k])};
+                // Two points preserve lateral spacing while searching after
+                // contact loss. Visible targets use native direct attack;
+                // the staging cohort prevents single-file reinforcements.
+                const AIFloat3 near = AirScreen::Clamp(aims[k] + (Global::Map::StartPos-aims[k])*0.1f);
+                array<AIFloat3> route = {near, AirScreen::Clamp(aims[k])};
                 groups[k].SetAirTarget(k == 2 ? -1 : next); groups[k].SetRoute(route);
                 targets[k] = next;
                 GenericHelpers::LogUtil("[AIR][BaseResponse] group=" + k + " target=" + next, 1);
@@ -136,15 +257,20 @@ namespace AirBaseResponse {
         int joined = 0;
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
-            if (members.exists("" + ids[i]) || !Free(u)) continue;
+            if (members.exists("" + ids[i]) || waiting.exists("" + ids[i]) || !Free(u)) continue;
             IUnitTask@ task = TaskFor(u);
             if (task is null) continue;
             if (aiMilitaryMgr.TransferUnit(u, task)) ++joined;
             else { members.delete("" + ids[i]); Invariants::Violation("INV-140", ""+ids[i], "base response transfer failed"); }
         }
         if (joined > 0) GenericHelpers::LogUtil("[AIR][BaseResponse] dispatched=" + joined + " total=" + members.getSize(), 1);
+        ReleaseReserve();
     }
     const array<string> lethal = {"armkam", "armbrawl", "corape", "legmos", "legstronghold", "corshad"};
+    int ProductionTarget() {
+        CCircuitDef@ best = ai.GetCircuitDef(GunshipName(Global::AISettings::Side, AirEconomy::t2 > 0));
+        return AiMax(Global::RoleSettings::Air::BaseResponseGunships, Required(best is null ? 250.0f : best.costM));
+    }
     int Deficit() {
         int ready = 0, frames = 0, pending = 0;
         array<Id>@ ids = ai.GetOwnedUnitIds();
@@ -158,7 +284,11 @@ namespace AirBaseResponse {
             CCircuitDef@ d = ai.GetCircuitDef(lethal[i]);
             if (d !is null) pending += aiFactoryMgr.GetPendingRecruitCount(d);
         }
-        return AirMath::DefenceDeficit(Global::RoleSettings::Air::BaseResponseGunships, ready, frames, pending);
+        return AirMath::DefenceDeficit(ProductionTarget(), ready, frames, pending);
+    }
+    string GunshipName(const string &in side, bool advanced) {
+        return side == "armada" ? (advanced ? "armbrawl" : "armkam")
+            : side == "cortex" ? (advanced ? "corape" : "corshad") : (advanced ? "legstronghold" : "legmos");
     }
     IUnitTask@ Produce(CCircuitUnit@ plant) {
         if (!Emergency()) return null;
@@ -166,13 +296,13 @@ namespace AirBaseResponse {
         const bool advanced = UnitHelpers::IsT2AircraftPlant(plant.circuitDef.GetName());
         if (!advanced && !UnitHelpers::IsT1AircraftPlant(plant.circuitDef.GetName())) return null;
         // Never substitute an EMP-only army for damage. A small support group
-        // follows each damage order at Cortex T1; both are sent immediately.
-        string name = side == "armada" ? (advanced ? "armbrawl" : "armkam")
-            : side == "cortex" ? (advanced ? "corape" : "corshad") : (advanced ? "legstronghold" : "legmos");
+        // follows damage production at Cortex T1 and assembles with the cohort.
+        string name = GunshipName(side, advanced);
         const int missing = Deficit();
-        if (!advanced && side == "cortex" && Global::RoleSettings::Air::BaseResponseGunships-missing > 0) {
+        const int damageProjected = ProductionTarget() - missing;
+        if (!advanced && side == "cortex" && damageProjected > 0) {
             const int support = AiMin(Global::RoleSettings::Air::BaseResponseEmpSupport,
-                1+(Global::RoleSettings::Air::BaseResponseGunships-missing)/3);
+                1+damageProjected/3);
             IUnitTask@ supportTask = AirProduction::Recruit(plant, "corbw", support, "base.emp", Task::Priority::HIGH);
             if (supportTask !is null) return supportTask;
         }

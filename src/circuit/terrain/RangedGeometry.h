@@ -10,6 +10,41 @@
 #include <vector>
 
 namespace circuit::ranged {
+// Remove only redundant straight-line points, preserving every turn, reversal
+// and both endpoints. In-place O(N), O(1) scratch; the exact XZ polyline is
+// unchanged, so terrain/threat validation is not replaced by a shortcut. Grid
+// routes often contain dozens of collinear cells, each formerly a network MOVE.
+template<class Position>
+void CompactStraightRoute(std::vector<Position>& route) {
+    size_t out=0;
+    for(size_t i=0;i<route.size();++i) {
+        const Position point=route[i];
+        while(out>=2) {
+            const auto& a=route[out-2]; const auto& b=route[out-1];
+            const double ux=b.x-a.x, uz=b.z-a.z, vx=point.x-b.x, vz=point.z-b.z;
+            if(ux*vz!=uz*vx || ux*vx+uz*vz<0) break;
+            --out;
+        }
+        route[out++]=point;
+    }
+    route.resize(out);
+}
+
+// Recoil CCommandAI::GetCancelQueued treats a Shift-Move within 17 elmos
+// of a queued position as a toggle. The worker's grid endpoint and our exact
+// firing slot can otherwise cancel each other and cause an endless replan.
+// Only the overlapping tail is removed (O(k) removed waypoints); the caller validates the
+// resulting complete route before issuing it. See D-228 and the native test.
+template<class Position>
+void AppendExactGoal(std::vector<Position>& route,const Position& goal) {
+    while(!route.empty()) {
+        const float x=route.back().x-goal.x, z=route.back().z-goal.z;
+        if(x*x+z*z>=17.f*17.f) break;
+        route.pop_back();
+    }
+    route.push_back(goal);
+}
+
 // Engine IDs are bounded and unique, but keep comparison-sort fallback for a
 // malformed/extended callback result. Reused bits give O(N + bound/64) ordering
 // with precisely std::sort's ascending output, not a persistent unit cache.

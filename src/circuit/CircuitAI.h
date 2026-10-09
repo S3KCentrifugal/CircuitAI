@@ -158,6 +158,7 @@ public:
 	void Garbage(CCircuitUnit* unit, const char* reason);
 	CCircuitUnit* GetTeamUnit(ICoreUnit::Id unitId) const;
 	const Units& GetTeamUnits() const { return teamUnits; }
+    unsigned int GetOwnedUnitRevision() const { return ownedUnitRevision; }
 
 	void UpdateFriendlyUnits() { allyTeam->UpdateFriendlyUnits(); }
 	CAllyUnit* GetFriendlyUnit(springai::Unit* u) const;
@@ -187,6 +188,7 @@ private:
 	void UpdateActions();
 
 	Units teamUnits;  // owner
+    unsigned int ownedUnitRevision = 0;
 	EnemyInfos enemyInfos;  // owner
 	CAllyTeam* allyTeam;
 	bool isAllyTeamInit;

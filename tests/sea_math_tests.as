@@ -7,6 +7,33 @@ void test_invasion_replans_only_uncommitted_or_dead_slots() {
     for (int state=1;state<=3;++state)
         Check(!SeaMath::ReplanInvasionSlot(state,false,false));
 }
+void test_conversion_counts_active_draw_and_pending_capacity_once() {
+    // 2000 income, 300 productive spending, 700 conversion, 980 completed +
+    // committed capacity, 100 reserve: another 620 E/s can be converted.
+    Check(SeaMath::ConversionGap(2000,1000,700,980,100)==620);
+    Check(SeaMath::ConversionGap(2000,300,0,980,100)==620);
+    Check(SeaMath::ConversionGap(2000,1000,700,1580,100)==20);
+    Check(SeaMath::ConversionGap(500,1000,0,70,100)==0);
+    Check(SeaMath::ConversionGap(500,0,50,70,100)==330);
+}
+void test_conversion_uses_surplus_and_activation_bank_not_metal_income_ceiling() {
+    Check(SeaMath::ConversionReady(false,750,1000,.75f,2000,250,620,600,0,3));
+    Check(SeaMath::ConversionReady(false,725,1000,.75f,2000,250,60,70,2,3));
+    Check(!SeaMath::ConversionReady(false,724,1000,.75f,2000,250,620,600,0,3));
+    Check(!SeaMath::ConversionReady(false,900,1000,.75f,2000,250,449,600,0,3));
+    Check(!SeaMath::ConversionReady(false,900,1000,.75f,2000,250,620,600,3,3));
+    Check(!SeaMath::ConversionReady(true,1000,1000,.75f,2000,250,620,600,0,3));
+    Check(!SeaMath::ConversionReady(false,0,0,.75f,2000,250,620,600,0,3));
+    Check(!SeaMath::ConversionReady(false,590,1000,0,2000,250,620,600,0,3));
+}
+void test_fusion_investment_needs_sustained_income_and_uncommitted_bank() {
+    Check(SeaMath::CapitalEnergyReady(35,1200,300,1000,5200,33500,360,.45f,30,1200));
+    Check(!SeaMath::CapitalEnergyReady(29,1200,6000,50000,5200,33500,360,.45f,30,1200));
+    Check(!SeaMath::CapitalEnergyReady(35,1199,6000,50000,5200,33500,360,.45f,30,1200));
+    Check(!SeaMath::CapitalEnergyReady(35,1200,99,1000,5200,33500,360,.45f,30,1200));
+    Check(!SeaMath::CapitalEnergyReady(35,1200,300,499,5200,33500,360,.45f,30,1200));
+    Check(!SeaMath::CapitalEnergyReady(30,1200,100,1000,5200,33500,360,.45f,30,1200));
+}
 void test_seaplane_requires_sustained_income_even_with_gifted_bank() {
     Check(!SeaMath::SeaplaneEconomyReady(false,80,1500,100000,100000,1450,5000,80,1500,500,1000));
     Check(!SeaMath::SeaplaneEconomyReady(true,79.9f,1500,100000,100000,1450,5000,80,1500,500,1000));
@@ -213,4 +240,62 @@ void test_capacity_and_commander_boundaries() {
     Check(!SeaMath::HarborAdmission(false,true,false));
     Check(!SeaMath::HarborAdmission(false,false,true));
     Check(SeaMath::HarborAdmission(false,true,true));
+}
+void test_mission_prefers_production_denial_but_defends_urgent_contacts() {
+    const float yard=SeaMath::ObjectiveScore(8|32,true,650,1000,false,false);
+    Check(yard>SeaMath::ObjectiveScore(0,false,150,300,false,false));
+    Check(SeaMath::ObjectiveScore(0,false,880,300,true,false)>yard);
+    Check(SeaMath::ObjectiveScore(8|32,true,650,1000,false,true)>yard);
+}
+void test_pursuit_accounts_for_free_fire_and_mission_leash() {
+    Check(!SeaMath::Engagement(7000,700,0));
+    Check(SeaMath::Engagement(800,700,0));
+    Check(SeaMath::Engagement(900,700,.02f));
+    Check(SeaMath::PursuitBad(230,81,67.2f,1,1,3,30,0,12,0));
+    Check(!SeaMath::PursuitBad(230,81,67.2f,1,2,3,30,0,12,0));
+    Check(SeaMath::PursuitBad(150,81,60,1,3,6,10,.02f,12,0));
+    Check(SeaMath::PursuitBad(0,81,60,1,3,6,50,0,12,1));
+    Check(!SeaMath::PursuitBad(0,81,90,.8f,1,6,0,.05f,12,0));
+    Check(SeaMath::PursuitBad(0,81,90,.7f,.6f,6,0,.05f,12,0));
+    Check(!SeaMath::PursuitBad(0,81,90,.7f,2,6,0,.05f,12,0));
+}
+void test_growth_does_not_credit_expanders_or_other_tiers() {
+    Check(SeaMath::LocalWorkPower(125,true,true,true,false)==0);
+    Check(SeaMath::LocalWorkPower(350,false,false,true,false)==0);
+    Check(SeaMath::LocalWorkPower(125,false,true,false,false)==0);
+    Check(SeaMath::LocalWorkPower(125,false,true,true,true)==0);
+    Check(SeaMath::LocalWorkPower(125,false,true,true,false)==125);
+    Check(SeaMath::GrowthUsage(20,5)==15);
+    Check(SeaMath::GrowthUsage(3,5)==0);
+}
+void test_reinforcements_join_locally_without_inheriting_far_release() {
+    Check(SeaMath::JoinCohort(100,720,2,24,false,false));
+    Check(!SeaMath::JoinCohort(100,720,2,24,true,false));
+    Check(SeaMath::JoinCohort(100,720,2,24,true,true));
+    Check(!SeaMath::JoinCohort(100,720,24,24,false,true));
+    Check(!SeaMath::JoinCohort(721*721,720,2,24,false,true));
+}
+void test_remembered_structure_requires_visual_reacquisition() {
+    Check(SeaMath::ApproachRange(700,500,false)==616);
+    Check(SeaMath::ApproachRange(700,500,true)==400);
+    Check(SeaMath::ApproachRange(300,500,true)==264);
+}
+void test_first_t2_startup_buffer_preserves_expansion_reserve() {
+    Check(SeaMath::TechStartupBank(80,2,800,true)==160);
+    Check(SeaMath::TechStartupBank(30,2,800,true)==100);
+    Check(SeaMath::TechStartupBank(500,2,800,true)==800);
+    Check(SeaMath::TechStartupBank(80,2,800,false)==800);
+    Check(SeaMath::TechReady(80,1200,160,1000,30,800,160,4000,20000,150,.65f));
+    Check(!SeaMath::TechReady(29,1200,160,1000,30,800,160,4000,20000,150,.65f));
+}
+void test_shore_survey_cannot_repeat_nearby_coast_forever() {
+    Check(SeaMath::ScoutScore(true,true,100,6000)>SeaMath::ScoutScore(false,true,100,200));
+    Check(SeaMath::ScoutScore(false,true,100,6000)>SeaMath::ScoutScore(true,false,3600,200));
+    Check(SeaMath::ScoutScore(true,true,100,1000)>SeaMath::ScoutScore(true,true,100,2000));
+}
+void test_asw_arc_is_symmetric_and_uses_all_slots() {
+    Check(SeaMath::AntiSubAngle(0,1,2.4f)==0);
+    Check(SeaMath::AntiSubAngle(0,3,2.4f)==-1.2f);
+    Check(SeaMath::AntiSubAngle(1,3,2.4f)==0);
+    Check(SeaMath::AntiSubAngle(2,3,2.4f)==1.2f);
 }

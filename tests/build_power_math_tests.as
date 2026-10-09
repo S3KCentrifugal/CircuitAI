@@ -7,6 +7,17 @@ void test_energy_is_independent() {
     Check(!BuildPowerMath::Funded(1000, 200, 160, 160, 0, 2100, 30, 20, 60));
     Check(BuildPowerMath::Funded(1000, 200, 160, 60, 0, 2100, 30, 20, 60));
 }
+void test_sea_growth_uses_budget_limited_completion() {
+    // 13 M/s fully spent, 45% of replaceable yard work funds local growth.
+    // Nominal 450 BP implies an unaffordable 7.7-second constructor; funded
+    // speed pays the same 200 metal over 34 seconds, then supports tidal work.
+    const float budget=13*.45f;
+    const float power=BuildPowerMath::Power(budget,135,3460,200,2000);
+    Check(!BuildPowerMath::Funded(1,0,13,13-budget,0,200,3460/450.0f,125*90.0f/2190,45));
+    Check(BuildPowerMath::Funded(1,0,13,13-budget,0,200,3460/power,125*90.0f/2190,45));
+    // A separately committed project cannot be paid a second time.
+    Check(!BuildPowerMath::Funded(1,0,13,13-budget,90,200,3460/power,125*90.0f/2190,45));
+}
 void test_unaffordable_opening_turret_does_not_veto_constructor() {
     Check(BuildPowerMath::Funded(1000, 200, 160, 60, 0, 2100, 30, 20, 60));
     Check(!BuildPowerMath::Funded(1000, 200, 160, 60, 0, 3200, 15, 20, 60));

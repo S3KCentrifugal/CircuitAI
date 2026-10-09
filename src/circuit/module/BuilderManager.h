@@ -4,7 +4,6 @@
  *  Created on: Dec 1, 2014
  *      Author: rlcevg
  */
-
 #ifndef SRC_CIRCUIT_MODULE_BUILDERMANAGER_H_
 #define SRC_CIRCUIT_MODULE_BUILDERMANAGER_H_
 
@@ -12,6 +11,7 @@
 #include "task/builder/BuilderTask.h"
 #include "terrain/TerrainData.h"
 #include "unit/CircuitUnit.h"
+#include "util/DefinitionCounts.h"
 
 #include <map>
 #include <set>
@@ -279,7 +279,16 @@ public:
 	// gets one construction command with no command timeout, and inside
 	// experimentalDirectRange the engine walks the last leg itself. Off by
 	// default; a role's script turns it on for its own AI instance only.
+	const std::set<CCircuitUnit*>& GetWorkers() const { return workers; }
 	bool IsExperimentalBuild() const { return experimentalBuild; }
+	bool IsConstructionRecoveryEnabled() const { return recoverConstruction; }
+	static bool IsLayoutEconomy(IBuilderTask::BuildType type) {
+		return type == IBuilderTask::BuildType::ENERGY || type == IBuilderTask::BuildType::CONVERT
+			|| type == IBuilderTask::BuildType::STORE || type == IBuilderTask::BuildType::NANO;
+	}
+	bool SuppressEconomyChain(IBuilderTask::BuildType type) const {
+		return recoverConstruction && experimentalBuild && IsLayoutEconomy(type);
+	}
 	bool IsExperimentalAirDirect() const { return experimentalAirDirect; }
 	float GetExperimentalDirectRange() const { return experimentalDirectRange; }
 	float GetExperimentalSearchRadius() const { return experimentalSearchRadius; }
@@ -291,7 +300,9 @@ public:
 	// mode 0: metal features, 1: completed naval repair (optional def filter),
 	// 2: naval wreck resurrection. Script orders the independent queries.
 	IBuilderTask* FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred);
+    float GetRecoveryMetal(CCircuitUnit* worker, float radius);
 private:
+    void RefreshRecoveryFeatures();
 	struct SRecoveryFeature { int id; springai::AIFloat3 pos; float metal; bool resurrect; };
 	std::vector<SRecoveryFeature> recoveryFeatures;
 	int recoveryFrame = -100000;
@@ -342,9 +353,9 @@ private:
 public:
 	virtual void FallbackTask(CCircuitUnit* unit) override;
 
-	void MarkUnfinishedUnit(CAllyUnit* target, IBuilderTask* task) {
-		unfinishedUnits[target] = task;
-	}
+    void MarkUnfinishedUnit(CAllyUnit* target, IBuilderTask* task);
+    // Called at unregister, before any later script can observe a dead unit.
+    void ForgetUnfinishedCount(CAllyUnit* target) { unfinishedCounts.Erase(target); }
 	void MarkRepairUnit(ICoreUnit::Id targetId, CBRepairTask* task) {
 		repairUnits[targetId] = task;
 	}
@@ -420,6 +431,8 @@ private:
 	EHandlers destroyedHandler;
 
 	std::map<CAllyUnit*, IBuilderTask*> unfinishedUnits;
+    DefinitionCounts<CAllyUnit*> unfinishedCounts;
+    void EraseUnfinishedUnit(CAllyUnit* target);
 	std::map<ICoreUnit::Id, CBRepairTask*> repairUnits;
 	std::map<CAllyUnit*, CBReclaimTask*> reclaimUnits;
 	std::map<CAllyUnit*, ICoreUnit::Id> reclaimIds;  // the id behind each key: UnregisterReclaim may get a freed pointer (CR-001)
@@ -435,6 +448,10 @@ private:
 	std::map<CCircuitUnit*, int> dangerTime;  // unit: frame
 	int dangerHysteresis;  // frames
 	bool experimentalBuild = false;          // script property (D-064, D-066: the whole experimental build system)
+	bool recoverConstruction = false;        // opt-in TECH/SEA; independent of placement mode
+	int constructionRetrySeconds = 10;
+	int constructionReleaseSeconds = 30;
+	int nextLegacyWatchdog = 0;
 	bool experimentalAirDirect = false;     // opt-in: engine controls flying constructors' last approach
 	float experimentalDirectRange = 1600.f;  // elmos
 	float experimentalSearchRadius = 512.f;  // elmos: how far from the asked anchor a site may be packed (D-066)

@@ -4,6 +4,8 @@ Discovery is deliberately conservative: extracted names are source definitions,
 not pass claims. Runner-generated combinations remain named families; the
 benchmark catalog, not this inventory, owns execution evidence.
 """
+import os
+from documentation_store import document
 import argparse
 import ast
 import hashlib
@@ -13,7 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'doc/testing'
+OUT = document('testing')
 DOMAINS = ('air', 'sea', 'tech', 'front', 'tactical', 'support')
 
 
@@ -126,7 +128,7 @@ runner families. A listed definition does **not** mean it passed or was played.
             for r in subset:
                 if r['kind'] != kind or r['area'] != area:
                     continue
-                lines += [f"### [{r['title']}](../../../{r['id']})", '']
+                lines += [f"### [{r['title']}]({os.path.relpath(ROOT / r['id'], OUT / 'index').replace(chr(92), '/')})", '']
                 if r['detail']:
                     lines += [r['detail'], '']
                 lines += ['- `' + n.replace('`', "'") + '`' for n in r['definitions']]
@@ -171,7 +173,7 @@ def main():
     for path, content in outputs.items():
         if args.check:
             if not path.exists() or path.read_text(encoding='utf-8') != content:
-                stale.append(str(path.relative_to(ROOT)))
+                stale.append(str(path))
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding='utf-8', newline='\n')

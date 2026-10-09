@@ -56,7 +56,9 @@ namespace Invariants {
         // Dedicated pressure pumps have their own funded admission policy;
         // TECH's heavy-army gate must not contradict that shared T1 policy.
         const bool pressure = Spam::IsSpamDef(u.circuitDef) && Spam::repeatTask.exists("" + u.GetProducerId());
-        if (!builder && !coastal && !pressure && mi < TechPlan::CombatGate())
+        const bool nukeRecon = TechChain::nukeOpening
+            && name == UnitHelpers::GetT1AirScoutForSide(Global::AISettings::Side);
+        if (!builder && !coastal && !pressure && !nukeRecon && mi < TechPlan::CombatGate())
             Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
 
@@ -96,6 +98,7 @@ namespace Invariants {
     int baseFactorySince = -1;    // D-114: INV-044
     int baseFactoryLog = -100000; // D-114: INV-044
     int t2ConsAtHigh = 0;
+    int nukeSiloSince = -1;
     dictionary retiredLabsSeen;   // D-102: INV-026
     bool t1LabSeen = false;
     int ladderFloatSince = -1;
@@ -126,6 +129,22 @@ namespace Invariants {
 
     void Tick()
     {
+        // D-229: a completed silo hands builders back to ordinary economy.
+        // Lost earlier recipe structures must not restart the rush.
+        if (TechChain::NukeRush()) {
+            CCircuitDef@ silo = ai.GetCircuitDef(TechChain::DefFor("silo"));
+            array<string> deferred = {TechChain::DefFor("ap"), TechChain::DefFor("aap")};
+            for (uint i = 0; i < deferred.length(); ++i) {
+                CCircuitDef@ plant = ai.GetCircuitDef(deferred[i]);
+                if (plant !is null && aiBuilderMgr.GetUnfinishedCount(plant) > 0)
+                    Violation("INV-170", deferred[i], "aircraft factory under construction before the nuke-opening silo completed");
+            }
+            const bool complete = silo !is null && silo.count - aiBuilderMgr.GetUnfinishedCount(silo) > 0;
+            if (!complete) nukeSiloSince = -1;
+            else if (nukeSiloSince < 0) nukeSiloSince = ai.frame;
+            else if (ai.frame - nukeSiloSince > 2 * SECOND)
+                Violation("INV-168", "nuke-handoff", "completed silo has not released the nuke opening's economy restrictions");
+        } else nukeSiloSince = -1;
         // INV-002: a frame of ours under construction has build power on it
         // within InvariantFrameSeconds (the nearest frame to the base is the
         // one watched; a chain leaves none further out).
@@ -186,7 +205,12 @@ namespace Invariants {
                 if (d is null) continue;
                 const int now = aiBuilderMgr.GetUnfinishedCount(d);
                 int64 before = 0; energyFrames.get(energy[i], before);
-                if (now > int(before) && floats)
+                // The bounded nuke energy recipe funds future mex upkeep,
+                // construction and stockpile demand, absent from current pull.
+                // AFUS is never part of that exception.
+                const bool rushEnergy = TechChain::NukeRush() && (energy[i] == UnitHelpers::GetFusionNameForSide(side)
+                    || energy[i] == UnitHelpers::GetWindNameForSide(side) || energy[i] == UnitHelpers::GetSolarNameForSide(side));
+                if (now > int(before) && floats && !rushEnergy)
                     Violation("INV-009", energy[i], "a " + energy[i] + " frame appeared while " + TechChain::FloatWhy());
                 energyFrames.set(energy[i], int64(now));
             }
@@ -262,7 +286,7 @@ namespace Invariants {
             string why;
             // the slots, not what is left after the dear frames: a turret started
             // before the lab is not a violation once the lab starts (D-098)
-            const int allowed = Layout::TurretSlots(why);
+            const int allowed = TechChain::NukeRush() ? 2 : Layout::TurretSlots(why);
             if (frames > allowed) {
                 if (turretsOverSince < 0) turretsOverSince = ai.frame;
                 else if (ai.frame - turretsOverSince >= int(Global::RoleSettings::Tech::InvariantTurretFlightSeconds) * SECOND)
@@ -276,7 +300,9 @@ namespace Invariants {
             CCircuitDef@ fd = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
             const int frames = (fd is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(fd);
             // not while the metal floats (the fusion then goes ahead on purpose, D-100)
-            if (!aiEconomyMgr.IsMetalMap() && frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
+            // Nuke openings deliberately buy a bounded set of upgrades; the
+            // ordinary economy still requires all nearby mexes (D-229).
+            if (!TechChain::NukeRush() && !aiEconomyMgr.IsMetalMap() && frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
                 const AIFloat3 t1 = Economy::MexTracker::GetNearestNonUpgradedMexInRange(Global::Map::StartPos, Global::Map::StartPos,
                     Global::RoleSettings::Tech::ChainMohoRadius);
                 if (t1.x >= 0.0f)
@@ -339,7 +365,7 @@ namespace Invariants {
             const float mStor = aiEconomyMgr.metal.storage;
             const bool high = mStor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * mStor
                 && Factory::primaryT2BotLab !is null && !Lifecycle::IsRetiring(Factory::primaryT2BotLab)
-                && t2Cons < Global::RoleSettings::Tech::T2BotConstructorCap;
+                && t2Cons < (TechChain::NukeRush() ? TechChain::wantAck : Global::RoleSettings::Tech::T2BotConstructorCap);
             if (!high || t2Cons > t2ConsAtHigh) { t2ConsHighSince = high ? ai.frame : -1; t2ConsAtHigh = t2Cons; }
             else if (t2ConsHighSince < 0) { t2ConsHighSince = ai.frame; t2ConsAtHigh = t2Cons; }
             else if (ai.frame - t2ConsHighSince >= 60 * SECOND) {

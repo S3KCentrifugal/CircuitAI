@@ -18,6 +18,8 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "Log.h"
+#include <cstdlib>
 
 namespace circuit {
 
@@ -175,6 +177,8 @@ bool CBMexTask::Reevaluate(CCircuitUnit* unit)
 			return false;
 		};
 		if (circuit->GetTerrainManager()->IsZoneAlly(buildPos)) {
+			static const bool trace = std::getenv("CIRCUIT_BUILD_TRACE") != nullptr;
+			if (trace) circuit->LOG("MEX_REJECT: team=%d worker=%d reason=ally-zone pos=%.0f,%.0f", circuit->GetTeamId(),unit->GetId(),buildPos.x,buildPos.z);
 			return closeTask();
 		}
 		auto& ids = circuit->GetCallback()->GetFriendlyUnitIdsIn(buildPos, buildDef->GetExtrRangeM(), false);
@@ -183,6 +187,8 @@ bool CBMexTask::Reevaluate(CCircuitUnit* unit)
 			if ((au != nullptr) && au->GetCircuitDef()->IsMex()
 				&& (au->GetUnit()->GetTeam() != circuit->GetTeamId()))
 			{
+				static const bool trace = std::getenv("CIRCUIT_BUILD_TRACE") != nullptr;
+				if (trace) circuit->LOG("MEX_REJECT: team=%d worker=%d reason=ally-mex owner=%d pos=%.0f,%.0f", circuit->GetTeamId(),unit->GetId(),au->GetUnit()->GetTeam(),buildPos.x,buildPos.z);
 				return closeTask();
 			}
 		}

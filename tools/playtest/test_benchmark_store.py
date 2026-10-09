@@ -1,6 +1,7 @@
 """External evidence ownership, path safety and migration preservation."""
 import contextlib
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -64,6 +65,35 @@ class BenchmarkStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             benchmark_store.historical_path('../outside')
 
+    def test_validation_location_honors_checkout_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkout = Path(tmp) / 'benchmark store'
+            checkout.mkdir()
+            (checkout / 'benchmark-store.json').write_text('{}')
+            env = dict(os.environ, CIRCUIT_BENCHMARK_REPO=str(checkout))
+            value = subprocess.check_output(
+                [sys.executable, str(Path(benchmark_store.__file__)), 'validation'],
+                env=env, text=True).strip()
+            self.assertEqual(Path(value), checkout.resolve() / 'build-validation')
+            self.assertFalse((checkout / 'build-validation').exists())
+
+    def test_validation_location_fails_closed_when_checkout_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [sys.executable, str(Path(benchmark_store.__file__)), 'validation'],
+                env=dict(os.environ, CIRCUIT_BENCHMARK_REPO=tmp),
+                text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Clone', result.stderr)
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_historical_build_paths_resolve_without_a_source_junction(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(benchmark_store, 'BENCHMARK_REPO', Path(tmp)):
+            for name in ('build-validation/b04/source.zip', 'build-theatres/old/report.md'):
+                self.assertEqual(benchmark_store.historical_path(name), Path(tmp) / name)
+            self.assertEqual(benchmark_store.historical_path('tests/terrain_route_test.cpp'),
+                             benchmark_store.SOURCE_ROOT / 'tests/terrain_route_test.cpp')
+
 
 class MigrationTests(unittest.TestCase):
     def setUp(self):
@@ -106,6 +136,45 @@ class MigrationTests(unittest.TestCase):
         (self.dest / 'build-theatres/original.txt').unlink()
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(ValueError, 'Missing'):
             migration.verify(self.dest, self.manifest)
+
+
+class ValidationMigrationTests(unittest.TestCase):
+    def test_selected_validation_tree_is_hashed_and_other_trees_are_not_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, dest, manifest = root / 'source', root / 'dest', root / 'manifest'
+            tree = source / 'build-validation'
+            tree.mkdir(parents=True)
+            (tree / 'pin.log').write_bytes(b'original\r\n')
+            with contextlib.redirect_stdout(io.StringIO()):
+                migration.snapshot(source, manifest, ('build-validation',))
+                dest.mkdir()
+                tree.rename(dest / tree.name)
+                self.assertTrue(migration.verify(dest, manifest)['verified'])
+            summary = json.loads((manifest / 'manifest.json').read_text())
+            self.assertEqual(list(summary['trees']), ['build-validation'])
+            pin = dest / 'build-validation/pin.log'
+            stat = pin.stat()
+            pin.write_bytes(b'modified\r\n')
+            os.utime(pin, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+            with self.assertRaisesRegex(ValueError, 'differs'):
+                migration.verify(dest, manifest)
+
+    def test_unsafe_or_overlapping_tree_selection_is_rejected(self):
+        for trees in (('../outside',), ('.',), ('/outside',),
+                      ('build-validation', 'build-validation'),
+                      ('build-validation', 'build-validation/pins')):
+            with self.subTest(trees=trees), self.assertRaises(ValueError):
+                migration.selected_trees(trees)
+
+    def test_manifest_inside_moved_tree_is_rejected_before_creation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            tree = source / 'build-validation'
+            tree.mkdir()
+            with self.assertRaisesRegex(ValueError, 'outside'):
+                migration.snapshot(source, tree / 'manifest', ('build-validation',))
+            self.assertEqual(list(tree.iterdir()), [])
 
 
 if __name__ == '__main__':

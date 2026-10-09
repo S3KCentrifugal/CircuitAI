@@ -1,15 +1,28 @@
 // Pure wave policy, shared by the runtime controller and standalone tests.
 namespace AmphibiousMath {
+    // Named policy/geometry constants preserve the original arithmetic and types.
+    // Zero/One are integer identities; ZeroValue/UnitValue are float identities.
+    const int Zero = 0;
+    const int FormationSideCount = 2;
+    const int One = 1;
+    const float ZeroValue = 0.0f;
+    const float EconomyRaidScoreMultiplier = 4.0f;
+    const float UnitValue = 1.0f;
+    const float TargetDistanceScale = 800.0f;
+    const float NearbyNavalDistance = 1000.0f;
+    const float NearbyNavalScoreMultiplier = 2.0f;
+    const float BeachTravelDistanceScale = 2400.0f;
+
     int FormationLane(int index) {
-        if (index<=0) return 0;
-        return index%2==1 ? (index+1)/2 : -index/2;
+        if (index<=Zero) return Zero;
+        return index%FormationSideCount==One ? (index+One)/FormationSideCount : -index/FormationSideCount;
     }
-    bool Scope(bool tech, bool air, bool experimental) { return experimental && (tech || air); }
+    bool Scope(bool technologyRole, bool airRole, bool experimental) { return experimental && (technologyRole || airRole); }
     // TECH reserves Telchine recruitment for starts whose land army cannot leave.
     // AIR's auxiliary production and already-owned amphibious combat are separate.
-    bool TelchineStartAllowed(bool tech, bool landLocked) { return !tech || landLocked; }
+    bool TelchineStartAllowed(bool technologyRole, bool landLocked) { return !technologyRole || landLocked; }
     bool Gathered(int alive, int arrived, float fraction) {
-        return alive > 0 && arrived > 0 && float(arrived) >= float(alive) * fraction;
+        return alive > Zero && arrived > Zero && float(arrived) >= float(alive) * fraction;
     }
     bool Release(int alive, int arrived, int target, int minimum, int age, int timeout, float fraction) {
         return alive >= minimum && (alive >= target || age >= timeout) && Gathered(alive, arrived, fraction);
@@ -17,29 +30,29 @@ namespace AmphibiousMath {
     bool Secured(int alive, int arrived, float fraction, bool contact, int quietFrames, int requiredFrames) {
         return !contact && quietFrames >= requiredFrames && Gathered(alive, arrived, fraction);
     }
-    bool Landing(bool crossedWater, float height) { return crossedWater && height >= 0.0f; }
+    bool Landing(bool crossedWater, float height) { return crossedWater && height >= ZeroValue; }
     bool MayAdvance(bool assembling, bool secured) { return assembling || secured; }
     float TargetScore(bool raider, bool economy, float cost, float distance, float threat) {
-        return (raider && economy ? 4.0f : 1.0f) * cost / (1.0f + distance / 800.0f + threat);
+        return (raider && economy ? EconomyRaidScoreMultiplier : UnitValue) * cost / (UnitValue + distance / TargetDistanceScale + threat);
     }
     bool RecruitReady(float minimumIncome, float gate, int stableFrames, int windowFrames,
-        float bankM, float costM, float reserveM, float bankE, float energyBuffer, bool energyStalling) {
-        return minimumIncome >= gate && stableFrames >= windowFrames && costM > 0.0f
-            && bankM >= costM + reserveM && bankE >= energyBuffer && !energyStalling;
+        float metalBank, float metalCost, float metalReserve, float energyBank, float energyBuffer, bool energyStalling) {
+        return minimumIncome >= gate && stableFrames >= windowFrames && metalCost > ZeroValue
+            && metalBank >= metalCost + metalReserve && energyBank >= energyBuffer && !energyStalling;
     }
-    float RecruitSeconds(float costM, float costE, float incomeM, float incomeE, float shareM, float shareE) {
-        if (costM <= 0 || costE < 0 || incomeM <= 0 || incomeE <= 0 || shareM <= 0 || shareE <= 0) return -1.0f;
-        const float metalSeconds = costM / (incomeM * shareM), energySeconds = costE / (incomeE * shareE);
+    float RecruitSeconds(float metalCost, float energyCost, float metalIncome, float energyIncome, float metalShare, float energyShare) {
+        if (metalCost <= Zero || energyCost < Zero || metalIncome <= Zero || energyIncome <= Zero || metalShare <= Zero || energyShare <= Zero) return -UnitValue;
+        const float metalSeconds = metalCost / (metalIncome * metalShare), energySeconds = energyCost / (energyIncome * energyShare);
         return metalSeconds > energySeconds ? metalSeconds : energySeconds;
     }
     int GuardAllocation(int alive, int desired, int assaultMinimum, int groups, int maximum) {
-        if (groups >= maximum || alive < desired + assaultMinimum || desired <= 0 || assaultMinimum <= 0) return 0;
+        if (groups >= maximum || alive < desired + assaultMinimum || desired <= Zero || assaultMinimum <= Zero) return Zero;
         return desired;
     }
     float BeachScore(float assets, float navalDistance, float travel, float threat) {
-        if (assets <= 0 || threat < 0) return 0.0f;
-        const float naval = navalDistance < 1000.0f ? 2.0f : 1.0f;
-        return naval * assets / (1.0f + travel / 2400.0f + threat);
+        if (assets <= Zero || threat < Zero) return ZeroValue;
+        const float naval = navalDistance < NearbyNavalDistance ? NearbyNavalScoreMultiplier : UnitValue;
+        return naval * assets / (UnitValue + travel / BeachTravelDistanceScale + threat);
     }
     bool GuardRelease(bool assets, int absentFrames, int graceFrames, bool claimLost) {
         return claimLost || (!assets && absentFrames >= graceFrames);

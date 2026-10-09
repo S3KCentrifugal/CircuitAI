@@ -5,7 +5,7 @@
 // Naval danger costs O(K*E) for distinct candidate cells K, sea contacts E;
 // at most 49 candidates/boat, with cached overlapping formation candidates.
 namespace SeaPatrol {
-    class Sector { AIFloat3 pos; int body=-1, owner=-1, visited=-100000; }
+    class Sector { AIFloat3 pos; int body=-1, owner=-1, visited=-100000; bool shore=false; }
     class Boat {
         int id=-1, body=-1, sector=-1, until=0, seen=0, slot=-1, retry=0;
         int mode=-1, target=-1;
@@ -68,13 +68,20 @@ namespace SeaPatrol {
     void Grid() {
         if (gridReady) return;
         gridReady=true;
-        // At most 32*32 terrain samples even on very large maps. Positions are
-        // hypotheses, not enemy knowledge. Threat tests remain live at admission.
-        cell=AiMax(Global::RoleSettings::Sea::ScoutPatrolCell,float(AiMax(AiTerrainWidth(),AiTerrainHeight()))/32.0f);
+        // At most 64*64 cells, built once; four height probes classify shores.
+        // Terrain is public, enemy buildings are not. Visits require arrival,
+        // never just an assigned destination. Live threat checks stay at admission.
+        cell=AiMax(Global::RoleSettings::Sea::ShoreSurveyCell,float(AiMax(AiTerrainWidth(),AiTerrainHeight()))/64.0f);
         for (float z=cell*.5f;z<AiTerrainHeight();z+=cell) for (float x=cell*.5f;x<AiTerrainWidth();x+=cell) {
             AIFloat3 p(x,0,z); const int body=aiBattle.WaterBody(p,false);
             if (body<0 || aiBattle.Height(p)>-20) continue;
-            Sector@ s=Sector(); s.pos=p; s.body=body; sectors.insertLast(s);
+            Sector@ s=Sector(); s.pos=p; s.body=body;
+            for (int j=0;j<4;++j) {
+                const float a=float(j)*1.570796f;
+                AIFloat3 edge=Spam::_Clamp(AIFloat3(x+cos(a)*cell,0,z+sin(a)*cell));
+                if (aiBattle.Height(edge)>=-8) { s.shore=true; break; }
+            }
+            sectors.insertLast(s);
         }
     }
     Raid@ Basin(int body) {
@@ -172,44 +179,80 @@ namespace SeaPatrol {
     }
     void Patrol(Boat@ b,CCircuitUnit@ u) {
         if (ai.frame<b.retry) return;
-        if (b.mode==0 && b.route !is null && !b.route.IsDead() && ai.frame<b.until && Safe(u,b.goal,b.body)) return;
+        const AIFloat3 here=u.GetPos(ai.frame);
+        const bool scout=Scout(u.circuitDef);
+        const float sight=u.circuitDef.GetLosRadius()*.5f;
+        const bool arrived=MapHelpers::SqDist(here,b.goal)<sight*sight;
+        if (b.mode==0 && b.sector>=0 && arrived) sectors[b.sector].visited=ai.frame;
+        if ((b.mode==0 || b.mode==2) && b.route !is null && !b.route.IsDead() && u.task is b.route
+            && ai.frame<b.until && Safe(u,b.goal,b.body) && (b.mode==2 || !scout || !arrived)) return;
         if (b.sector>=0 && sectors[b.sector].owner==b.id) sectors[b.sector].owner=-1;
         b.sector=-1;
-        const AIFloat3 here=u.GetPos(ai.frame);
+        if (scout) for (uint i=0;i<SeaLayout::berths.length();++i) {
+            SeaLayout::Berth@ berth=SeaLayout::berths[i];
+            if (berth.slot<0 || berth.active || berth.retired || !UnitHelpers::IsT2Shipyard(berth.name)
+                || aiTerrainMgr.GetReservationState(berth.slot)!=0) continue;
+            CCircuitDef@ d=ai.GetCircuitDef(berth.name);
+            if (!SeaEconomy::TechReady(d,true) || SeaLayout::VisibleBuffer(d,berth.centre,berth.facing)) continue;
+            const AIFloat3 goal=SeaLayout::SurveyPoint(d,berth.centre,berth.facing);
+            bool leased=false;
+            for (uint j=0;j<boats.length();++j) if (boats[j] !is b && boats[j].mode==2
+                && ai.frame<boats[j].until && MapHelpers::SqDist(boats[j].goal,goal)<cell*cell) { leased=true; break; }
+            if (leased || !Safe(u,goal,b.body)) continue;
+            array<AIFloat3> points={goal};
+            if (Order(b,u,points,false)) {
+                b.mode=2; b.goal=goal; b.until=ai.frame+Global::RoleSettings::Sea::HarborSurveySeconds*SECOND;
+                b.route.SetSeaTarget(-1);
+                GenericHelpers::LogUtil("[SEA][HarborScout] id="+b.id+" berth="+berth.key,1); return;
+            }
+        }
         // Lease distinct sectors; oldest first with travel cost as tie-breaker.
         // Search cost is bounded by Grid, and no index survives a unit transfer.
-        int best=-1; float score=1e30f;
+        int best=-1; float score=-1e30f;
         for (uint i=0;i<sectors.length();++i) {
             Sector@ s=sectors[i];
             if (s.body!=b.body || (s.owner>=0 && s.owner!=b.id)) continue;
             // Dedicated AA covers the friendly coast; expendable T1 scouts
             // alone explore the whole connected sea.
             if (!Scout(u.circuitDef) && MapHelpers::SqDist(s.pos,Global::Map::StartPos)>2400*2400) continue;
-            const float rank=float(s.visited)+sqrt(MapHelpers::SqDist(here,s.pos))*2;
-            if (rank>=score || !Safe(u,s.pos,b.body)) continue;
+            // Newly surveyed coasts cool down so the nearest shore does not
+            // win forever. Unvisited enemy shores precede open-sea coverage.
+            if (scout && s.visited>=0 && ai.frame-s.visited<Global::RoleSettings::Sea::ScoutPatrolSeconds*SECOND) continue;
+            const float rank=SeaMath::ScoutScore(scout && s.shore,s.visited<0,ai.frame-s.visited,sqrt(MapHelpers::SqDist(here,s.pos)));
+            if (rank<=score || !Safe(u,s.pos,b.body)) continue;
             score=rank; best=int(i);
         }
         if (best<0) { b.retry=ai.frame+5*SECOND; return; }
-        Sector@ s=sectors[best]; s.owner=b.id; s.visited=ai.frame; b.sector=best; b.goal=s.pos;
-        if (SeaInvasion::Active() && Scout(u.circuitDef)) {
+        Sector@ s=sectors[best]; s.owner=b.id; b.sector=best; b.goal=s.pos;
+        if (!s.shore && SeaInvasion::Active() && scout) {
             // Arriving matters, not assigning a sector. Fill actual legal
             // LOS/sonar holes; this native O(W_body) scan runs only at renewal.
             AIFloat3 hole=aiBattle.GetWaterScoutGoal(b.body,Global::RoleSettings::Sea::InvasionSurveySeconds*SECOND,here,b.id);
-            if (hole.x>=0 && Safe(u,hole,b.body)) b.goal=hole;
+            // A coarse native visibility hole can remain behind a shoreline
+            // occluder while the boat is already within its arrival disc.
+            // Reissuing that same goal every census neither explores nor
+            // improves LOS; keep the distinct leased sector in that case.
+            if (hole.x>=0 && MapHelpers::SqDist(here,hole)>sight*sight && Safe(u,hole,b.body)) {
+                b.goal=hole;
+                // A native survey hole is not evidence of visiting this grid
+                // sector. Release its lease and leave its age unchanged.
+                s.owner=-1; b.sector=-1;
+            }
         }
         // MOVE to the sector before queuing its patrol. Including the current
         // base position in that loop would make every scout revisit the yard.
         array<AIFloat3> points;
-        for (int i=0;i<3;++i) {
+        if (scout) points.insertLast(b.goal);
+        for (int i=0;!scout && i<3;++i) {
             const float a=float(i)*2.094395f;
             AIFloat3 p(b.goal.x+cos(a)*cell*.3f,0,b.goal.z+sin(a)*cell*.3f);
             if (Safe(u,p,b.body)) points.insertLast(p);
         }
-        if (points.length()<2) { points.resize(0); points.insertLast(here); points.insertLast(b.goal); }
-        if (Order(b,u,points,true)) {
+        if (points.length()==0) points.insertLast(b.goal);
+        if (Order(b,u,points,!scout)) {
             b.route.SetSeaTarget(-1); b.mode=0; b.target=-1;
-            b.until=ai.frame+Global::RoleSettings::Sea::ScoutPatrolSeconds*SECOND;
-            GenericHelpers::LogUtil("[SEA][Patrol] id="+b.id+" sector="+best+" goal="+int(b.goal.x)+","+int(b.goal.z),1);
+            b.until=ai.frame+(scout ? AiMax(Global::RoleSettings::Sea::ShoreSurveySeconds,int(sqrt(MapHelpers::SqDist(here,b.goal))/AiMax(1.0f,u.circuitDef.speed))+15) : Global::RoleSettings::Sea::ScoutPatrolSeconds)*SECOND;
+            GenericHelpers::LogUtil("[SEA][Patrol] id="+b.id+" sector="+best+" shore="+s.shore+" goal="+int(b.goal.x)+","+int(b.goal.z),1);
         }
     }
     void Tick() {

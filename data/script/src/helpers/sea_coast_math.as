@@ -10,8 +10,8 @@ namespace SeaCoastMath {
         return ownDistance < allyDistance || (ownDistance == allyDistance && ownTeam < allyTeam);
     }
     bool TechFunded(float metalIncome, float energyIncome, float metalBank, float energyBank,
-                    float costM, float costE, float minimumM, float minimumE) {
-        return (metalIncome >= minimumM && energyIncome >= minimumE)
-            || (metalBank >= costM && energyBank >= costE);
+                    float metalCost, float energyCost, float minimumMetalIncome, float minimumEnergyIncome) {
+        return (metalIncome >= minimumMetalIncome && energyIncome >= minimumEnergyIncome)
+            || (metalBank >= metalCost && energyBank >= energyCost);
     }
 }

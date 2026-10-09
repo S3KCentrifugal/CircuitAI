@@ -1,6 +1,7 @@
 """Generate the SEA review annex from the effective shared BAR roster (read only)."""
 import json
 from pathlib import Path
+from documentation_store import document
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT.parent / 'rjm.bar.docs/tools/knowledge/.cache/kb.json'
@@ -102,4 +103,4 @@ if __name__ == '__main__':
         rows.append(f"| [{name}]({source}) — {NAMES['names'].get(name,name)}{extra} | {u.get('metalcost','?')} / {u.get('movementclass','air' if u.get('canfly') else 'static')} | {'<br>'.join(ws) or 'Unarmed'} | {controls(name,u)} |")
     rows+=['',f'Enumerated {sum(n in units for n in selected)} distinct UnitDefs.','',
         'Control gaps requiring individual fixtures: mines, naval engineers building ships, carrier drone launch/docking, nuclear submarine stockpiles, interceptor coverage, submerged seaplane landing, Legion switching weapon groups, and auxiliaries on disconnected ponds. Enumeration is not a claim these mechanics are already automated or tested.']
-    (ROOT/'doc/sea-unit-controls.md').write_text('\n'.join(rows)+'\n',encoding='utf-8')
+    (document('sea-unit-controls.md')).write_text('\n'.join(rows)+'\n',encoding='utf-8')

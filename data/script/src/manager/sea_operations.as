@@ -7,13 +7,39 @@ namespace SeaOperations {
     class Cohort {
         string key;
         int defId=-1, body=-1, created=0, ordered=-100000, target=-999, nativeUntil=0;
-        int search=0, retry=0;
+        int search=0, retry=0, serial=0, sampleFrame=0, sampleTarget=-1, pursuitStart=0;
+        bool released=false;
+        int avoidUntil=0;
+        AIFloat3 avoidCentre;
+        int capacity=0;
+        int coastSearch=0, coastTarget=-1;
+        AIFloat3 coastGoal;
+        int repairCheck=-100000;
+        bool repairAccess=false;
+        float health=1, sampleHealth=1, sampleDistance=0;
+        AIFloat3 anchor, samplePos, previousCentre;
+        array<int> failedIds, failedUntil;
         array<int> ids;
         AIFloat3 centre, goal;
         CRouteTask@ route;
     }
     array<Cohort@> groups;
-    dictionary byKey;
+    array<AIFloat3> repairSites;
+    dictionary byKey, memberGroup;
+    int nextSerial=0;
+    string Cell(int body, int defId, int x, int z) { return ""+body+":"+defId+":"+x+":"+z; }
+    bool Failed(Cohort@ g,int id) {
+        for (int i=int(g.failedIds.length())-1;i>=0;--i) {
+            if (ai.frame>=g.failedUntil[i]) { g.failedIds.removeAt(i); g.failedUntil.removeAt(i); }
+            else if (g.failedIds[i]==id) return true;
+        }
+        return false;
+    }
+    void Fail(Cohort@ g,int id) {
+        if (id<0 || Failed(g,id)) return;
+        if (g.failedIds.length()>=16) { g.failedIds.removeAt(0); g.failedUntil.removeAt(0); }
+        g.failedIds.insertLast(id); g.failedUntil.insertLast(ai.frame+Global::RoleSettings::Sea::FleetFailureSeconds*SECOND);
+    }
     bool Escort(const CCircuitDef@ d) {
         // Builders (including naval engineers/recovery subs) retain economy
         // ownership. This is the finite ordinary naval sensor/ABM roster.
@@ -31,6 +57,7 @@ namespace SeaOperations {
             || u.circuitDef.IsAbleToFly() || u.circuitDef.GetBuildSpeed()>0
             || u.GetRulesParam("carrier_host_unit_id",-1)>=0) return false;
         const CCircuitDef@ d=u.circuitDef;
+        if (SeaProtection::Handles(d)) return false;
         if (SeaPatrol::Handles(d)) return false;
         // Explicit roster membership excludes amphibious land. Siege hulls
         // participate only in emergency screening, then regain native artillery.
@@ -50,46 +77,76 @@ namespace SeaOperations {
         // role change; do not retain a route or borrowed native unit handle.
         for (uint i=0;i<groups.length();++i)
             if (groups[i].route !is null && !groups[i].route.IsDead()) groups[i].route.Abort();
-        groups.resize(0); byKey.deleteAll();
+        groups.resize(0); repairSites.resize(0); byKey.deleteAll(); memberGroup.deleteAll(); nextSerial=0;
     }
     void Census() {
-        for (uint i=0;i<groups.length();++i) { groups[i].ids.resize(0); groups[i].centre=AIFloat3(0,0,0); }
+        // Persistent unit->cohort leases avoid reshuffling every second. A
+        // spatial bucket index considers nine nearby cells for new/dispersed
+        // ships only, not every ship against every group. O(U + G + local joins),
+        // with bounded cohort size; dense bucket occupancy is still explicit.
+        dictionary cells, nextMembers;
+        repairSites.resize(0);
+        const float radius=Global::RoleSettings::Sea::FleetCohortRadius;
+        for (uint i=0;i<groups.length();++i) {
+            Cohort@ g=groups[i]; g.previousCentre=g.centre; g.capacity=int(g.ids.length());
+            g.ids.resize(0); g.centre=AIFloat3(0,0,0); g.health=0;
+            const string cell=Cell(g.body,g.defId,int(g.previousCentre.x/radius),int(g.previousCentre.z/radius));
+            array<int>@ bucket;
+            if (!cells.get(cell,@bucket) || bucket is null) { @bucket=array<int>(); cells.set(cell,@bucket); }
+            bucket.insertLast(int(i));
+        }
         for (uint i=0;i<SeaCombat::owned.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(SeaCombat::owned[i]);
+            if (u !is null && u.GetBuildProgress()>=1 && u.circuitDef.GetBuildSpeed()>0
+                && !SeaEconomy::SupportedFactory(u.circuitDef) && !u.circuitDef.IsAbleToFly()
+                && !SeaRecovery::Protected(u) && aiBattle.AmphThreat(u.GetPos(ai.frame))<=.1f)
+                repairSites.insertLast(u.GetPos(ai.frame));
             if (!Eligible(u)) continue;
             const AIFloat3 p=u.GetPos(ai.frame);
-            const int body=aiBattle.WaterBody(p,false);
-            if (body<0) continue;
-            const bool scout=u.circuitDef.IsRoleAny(Unit::Role::SCOUT.mask);
-            const string key=""+body+":"+u.circuitDef.id+(scout ? ":"+u.id : "");
+            const int body=aiBattle.WaterBody(p,false); if (body<0) continue;
+            const string member=""+u.id; string oldKey;
             int index=-1;
-            if (!byKey.get(key,index)) {
-                index=int(groups.length()); byKey.set(key,index);
-                Cohort@ g=Cohort(); g.key=key; g.defId=u.circuitDef.id; g.body=body; g.created=ai.frame;
-                groups.insertLast(g);
+            if (!memberGroup.get(member,oldKey) || !byKey.get(oldKey,index)) index=-1;
+            if (index>=0 && (groups[index].body!=body || groups[index].defId!=int(u.circuitDef.id)
+                || MapHelpers::SqDist(p,groups[index].previousCentre)>radius*radius*4)) index=-1;
+            bool joining=index<0;
+            if (index<0) {
+                float best=radius*radius;
+                const int cx=int(p.x/radius), cz=int(p.z/radius);
+                for (int z=cz-1;z<=cz+1;++z) for (int x=cx-1;x<=cx+1;++x) {
+                    array<int>@ bucket;
+                    if (!cells.get(Cell(body,u.circuitDef.id,x,z),@bucket) || bucket is null) continue;
+                    for (uint j=0;j<bucket.length();++j) {
+                        Cohort@ candidate=groups[bucket[j]];
+                        const float dist=MapHelpers::SqDist(p,candidate.previousCentre);
+                        const bool settled=candidate.route is null || candidate.route.IsDead() || dist<radius*radius*.16f;
+                        if (dist<best && SeaMath::JoinCohort(dist,radius,candidate.capacity,
+                            Global::RoleSettings::Sea::FleetCohortMaximum,candidate.released,settled)) { index=bucket[j]; best=dist; }
+                    }
+                }
             }
-            Cohort@ g=groups[index]; g.ids.insertLast(u.id);
-            g.centre.x+=p.x; g.centre.z+=p.z;
+            if (index<0) {
+                index=int(groups.length()); Cohort@ g=Cohort();
+                g.serial=++nextSerial; g.key=""+g.serial; g.defId=u.circuitDef.id; g.body=body;
+                g.created=ai.frame; g.previousCentre=p; g.anchor=p;
+                groups.insertLast(g);
+                const string cell=Cell(body,g.defId,int(p.x/radius),int(p.z/radius));
+                array<int>@ bucket;
+                if (!cells.get(cell,@bucket) || bucket is null) { @bucket=array<int>(); cells.set(cell,@bucket); }
+                bucket.insertLast(index);
+            }
+            Cohort@ g=groups[index]; if (joining) ++g.capacity; g.ids.insertLast(u.id); nextMembers.set(member,g.key);
+            g.centre.x+=p.x; g.centre.z+=p.z; g.health+=u.GetHealthPercent();
         }
-        // Preserve reverse teardown/callback order, but compact survivors in
-        // one stable O(G) pass. Repeated removeAt on interleaved dead scouts
-        // shifts the live suffix repeatedly and can make cleanup O(G^2).
-        for (int i=int(groups.length())-1;i>=0;--i) {
-            Cohort@ g=groups[i];
-            if (g.ids.length()==0 && g.route !is null && !g.route.IsDead()) g.route.Abort();
-        }
-        uint live=0;
+        for (int i=int(groups.length())-1;i>=0;--i)
+            if (groups[i].ids.length()==0 && groups[i].route !is null && !groups[i].route.IsDead()) groups[i].route.Abort();
+        uint live=0; byKey.deleteAll();
         for (uint i=0;i<groups.length();++i) {
-            Cohort@ g=groups[i];
-            if (g.ids.length()==0) continue;
-            g.centre.x/=float(g.ids.length()); g.centre.z/=float(g.ids.length());
-            @groups[live++]=g;
+            Cohort@ g=groups[i]; if (g.ids.length()==0) continue;
+            const float count=float(g.ids.length()); g.centre.x/=count; g.centre.z/=count; g.health/=count;
+            @groups[live]=g; byKey.set(g.key,int(live)); ++live;
         }
-        groups.resize(live);
-        // Rebuild after compaction: dead scout IDs must not accumulate for an
-        // entire match, nor leave shifted array indexes in the dictionary.
-        byKey.deleteAll();
-        for (uint i=0;i<groups.length();++i) byKey.set(groups[i].key,int(i));
+        groups.resize(live); memberGroup=nextMembers;
     }
     AIFloat3 Search(Cohort@ g) {
         // Different scouts sweep different bearings. Destinations are advisory
@@ -118,7 +175,7 @@ namespace SeaOperations {
         p=Spam::_Clamp(AIFloat3(g.centre.x+cos(angle)*1200,0,g.centre.z+sin(angle)*1200));
         return aiBattle.WaterBody(p,false)==g.body ? p : g.centre;
     }
-    bool Route(Cohort@ g, const AIFloat3 &in goal, bool withdrawing, bool scout, bool hold=false) {
+    bool Route(Cohort@ g, const AIFloat3 &in goal, bool withdrawing, bool scout, bool hold=false, bool transit=false) {
         CCircuitUnit@ lead=ai.GetTeamUnit(g.ids[0]); if (lead is null) return false;
         // GetUnitTerrainRoute is explicitly a ground/amphibious MoveDef API.
         // The naval lane graph supplies water waypoints; the engine executes
@@ -136,14 +193,26 @@ namespace SeaOperations {
             @g.route=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
             if (g.route is null) return false;
             g.route.SetSeaControl(true);
-            g.route.SetLanes(AiMin(7,int(g.ids.length())),Global::RoleSettings::Sea::FleetLaneSpacing,1.0f);
+            // Fixed per hull type, not the number present on its first tick.
+            // A one-ship assembly route must not lock future recruits into a
+            // single column. Width leaves room to share one useful firing band.
+            const int columns=AiMin(12,AiMax(3,int(lead.circuitDef.GetMaxRange()*.9f/Global::RoleSettings::Sea::FleetLaneSpacing)));
+            g.route.SetLanes(columns,Global::RoleSettings::Sea::FleetLaneSpacing,1.0f);
+            g.route.SetRowSpacing(Global::RoleSettings::Sea::FleetRowSpacing);
         }
         // MOVE for scouting/withdrawal prevents engine FIGHT from chasing a
         // contact into the very sub field that caused the withdrawal.
         // A previous invasion screen may have requested HOLD. Other goals
         // retain their original movement state when that screen is interrupted.
-        g.route.SetHoldPosition(hold);
-        g.route.SetTraversal(true,96,!withdrawing && !scout);
+        // SEA movement owns pursuit. HOLD permits weapons to fire but forbids
+        // engine auto-chase; priority fire is separate from the MOVE queue.
+        g.route.SetHoldPosition(true);
+        // Engine goal-radius/steering can change even on a collinear path.
+        // Keep every combat approach, withdrawal and firing adjustment exact;
+        // only untargeted search/transit may compact validated ship offsets.
+        g.route.SetMoveCompaction(Global::RoleSettings::Sea::CompactMoveRoutes && transit && !withdrawing && !hold);
+        RepairPolicy(g);
+        g.route.SetTraversal(true,64,false);
         g.route.SetRoute(points);
         for (uint i=0;i<g.ids.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(g.ids[i]); if (!Eligible(u) || u.task is g.route) continue;
@@ -153,20 +222,170 @@ namespace SeaOperations {
         g.goal=goal; g.ordered=ai.frame;
         return true;
     }
+    bool Coast(Cohort@ g, const CCircuitDef@ def, bool reserve) {
+        // A verified, quiet sea is a prerequisite, not absence of one contact.
+        // Keep one local fighting cohort on naval duty and give landing-site
+        // protection precedence. New water contacts preempt this branch.
+        if (reserve || !SeaInvasion::secured || SeaInvasion::body!=g.body
+            || !(def.HasSurfToLand() || def.HasSubToLand())) return false;
+        if (ai.frame>=g.coastSearch) {
+            g.coastSearch=ai.frame+10*SECOND; g.coastTarget=-1;
+            float best=-1;
+            CCircuitUnit@ lead=ai.GetTeamUnit(g.ids[0]);
+            const float range=def.GetMaxRange(1)*.85f;
+            for (int i=0;i<aiBattle.GetGroundContactCount();++i) {
+                const int id=aiBattle.GetGroundContactId(i);
+                if (Failed(g,id)) continue;
+                CCircuitDef@ enemy=ai.GetCircuitDef(aiBattle.GetGroundContactDefId(i));
+                if (enemy is null || enemy.IsAbleToFly()) continue;
+                const AIFloat3 target=aiBattle.GetGroundContactPos(i);
+                if (MapHelpers::SqDist(target,g.centre)>4000.0f*4000.0f) continue;
+                // Eight bounded shoreline candidates, movement-area checked.
+                // Full path search is deferred until the chosen intent changes.
+                for (int j=0;j<8;++j) {
+                    const float angle=float(j)*.78539816f;
+                    const AIFloat3 p=Spam::_Clamp(AIFloat3(target.x+cos(angle)*range,0,target.z+sin(angle)*range));
+                    if (aiBattle.WaterBody(p,false)!=g.body || !aiTerrainMgr.CanReachAt(lead,p,64)) continue;
+                    const float score=(aiBattle.IsGroundContactEconomy(i) ? 3000.0f : 1800.0f)
+                        /(1.0f+sqrt(MapHelpers::SqDist(g.centre,p))/1600.0f+aiBattle.SurfThreat(p));
+                    if (score>best) { best=score; g.coastTarget=id; g.coastGoal=p; }
+                }
+            }
+        }
+        if (g.coastTarget<0) return false;
+        if (SeaMath::NewObjective(g.target,g.coastTarget,MapHelpers::SqDist(g.goal,g.coastGoal),ai.frame-g.ordered,30*SECOND)) {
+            if (!Route(g,g.coastGoal,false,false,true)) { Fail(g,g.coastTarget); g.coastTarget=-1; return false; }
+            g.target=g.coastTarget;
+            GenericHelpers::LogUtil("[SEA][CoastSupport] cohort="+g.serial+" target="+g.target,1);
+        }
+        if (g.route !is null) g.route.SetNavalTarget(g.coastTarget);
+        return true;
+    }
+    void AntiSubFormation(Cohort@ g,const AIFloat3 &in target) {
+        const CCircuitDef@ d=ai.GetCircuitDef(g.defId);
+        const string name=d.GetName();
+        // These surfaced ASW hulls must use depth-charge/torpedo range, not
+        // the 700-elmo surface cannon. Legion destroyers have no ASW weapon.
+        if (g.route is null || (name!="armroy" && name!="corroy" && name!="legnavyfrigate")) return;
+        // Legion's 460-range torpedo exceeds its 400-radius own sonar. Its
+        // script lever retains self-detection when the forward sonar is lost;
+        // Armada/Cortex destroyers can use their normal firing margin.
+        const float range=d.GetMaxRange(2)*(name=="legnavyfrigate"
+            ? Global::RoleSettings::Sea::AntiSubFrigateRangeFraction : Global::RoleSettings::Sea::AntiSubRangeFraction);
+        if (range<=0 || MapHelpers::SqDist(g.centre,target)>(range+600)*(range+600)) return;
+        const float bearing=atan2(g.centre.z-target.z,g.centre.x-target.x);
+        // Do not squeeze a large cohort into overlapping arc slots. Its native
+        // spaced rows remain preferable when one firing band cannot hold it.
+        if (g.ids.length()>1 && 2*range*sin(Global::RoleSettings::Sea::AntiSubArcRadians/(2*float(g.ids.length()-1)))
+            <Global::RoleSettings::Sea::FleetLaneSpacing) return;
+        array<int> ordered=g.ids;
+        array<float> lateral(ordered.length());
+        const float tx=-sin(bearing),tz=cos(bearing);
+        for (uint i=0;i<ordered.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(ordered[i]);
+            const AIFloat3 p=u is null ? g.centre : u.GetPos(ai.frame);
+            lateral[i]=(p.x-target.x)*tx+(p.z-target.z)*tz;
+        }
+        // Stable spatial order prevents routes crossing through neighboring
+        // hulls. Insertion sort is bounded by FleetCohortMaximum (24), and runs
+        // only on a new combat intent; endpoints are then O(cohort size).
+        for (uint i=1;i<ordered.length();++i) {
+            const int id=ordered[i]; const float rank=lateral[i]; uint j=i;
+            while (j>0 && (lateral[j-1]>rank || (lateral[j-1]==rank && ordered[j-1]>id))) {
+                lateral[j]=lateral[j-1]; ordered[j]=ordered[j-1]; --j;
+            }
+            lateral[j]=rank; ordered[j]=id;
+        }
+        // A concave line puts every member inside the same firing band. Invalid coast
+        // slots retain the native, movement-area-tested formation, never stack
+        // all ships on one forced destination. No per-frame MOVE micro.
+        for (uint i=0;i<ordered.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(ordered[i]); if (u is null || u.task !is g.route) continue;
+            const float angle=bearing+SeaMath::AntiSubAngle(int(i),int(ordered.length()),Global::RoleSettings::Sea::AntiSubArcRadians);
+            const AIFloat3 p=Spam::_Clamp(AIFloat3(target.x+cos(angle)*range,0,target.z+sin(angle)*range));
+            if (aiBattle.WaterBody(p,false)!=g.body || !aiTerrainMgr.CanMoveTo(u,p)) continue;
+            array<AIFloat3> points={u.GetPos(ai.frame),p};
+            if (!g.route.SetUnitRoute(u,points,32)) Invariants::Violation("INV-179",""+u.id,"SEA ASW formation route rejected");
+        }
+        GenericHelpers::LogUtil("[SEA][ASWFormation] cohort="+g.serial+" n="+g.ids.length()+" range="+range,1);
+    }
+    bool RepairApproachSafe(const AIFloat3 &in from,const AIFloat3 &in haven) {
+        if (!SeaExpansion::ClearOfEnemies(haven)) return false;
+        array<AIFloat3>@ route=aiBattle.GetTerrainRoute(from,haven,5,10,1,3,1000000);
+        if (route.length()<2) return MapHelpers::SqDist(from,haven)<128.0f*128.0f;
+        // Retreat starts under fire. The builder's zero-threat approach rule
+        // would reject that first sample and disable early repair every time.
+        // Admit escape through no worse exposure into a clear destination;
+        // do not grant permission to cross a stronger defensive line.
+        const float ceiling=AiMax(.1f,aiBattle.AmphThreat(from));
+        for (uint leg=1;leg<route.length();++leg) {
+            const AIFloat3 a=route[leg-1], b=route[leg];
+            const int samples=AiMax(1,int(sqrt(MapHelpers::SqDist(a,b))/128.0f)+1);
+            for (int i=0;i<=samples;++i) {
+                const float fraction=float(i)/samples;
+                if (aiBattle.AmphThreat(AIFloat3(a.x+(b.x-a.x)*fraction,0,a.z+(b.z-a.z)*fraction))>ceiling) return false;
+            }
+        }
+        return true;
+    }
+    void RepairPolicy(Cohort@ g) {
+        if (g.route is null || g.route.IsDead()) return;
+        if (ai.frame-g.repairCheck>=15*SECOND) {
+            g.repairCheck=ai.frame; g.repairAccess=false;
+            CCircuitUnit@ lead=ai.GetTeamUnit(g.ids[0]);
+            float best=1600.0f*1600.0f; AIFloat3 haven;
+            for (uint i=0;i<repairSites.length();++i) {
+                const float distance=MapHelpers::SqDist(g.centre,repairSites[i]);
+                if (distance<best && aiTerrainMgr.CanReachAt(lead,repairSites[i],128)) {
+                    best=distance; haven=repairSites[i]; g.repairAccess=true;
+                }
+            }
+            // One terrain/threat route test per cohort per 15 seconds, not
+            // a worker path search for every damaged ship on every hit.
+            if (g.repairAccess) g.repairAccess=RepairApproachSafe(g.centre,haven);
+        }
+        const float elapsed=AiMax(1.0f,float(ai.frame-g.sampleFrame)/SECOND);
+        const float lossRate=AiMax(0.0f,g.sampleHealth-g.health)/elapsed;
+        // Allow a short exit under the recently observed damage rate. Native
+        // retreat retains destination/path/repair ownership. Without safe
+        // repair access, reserve withdrawal for critically damaged hulls.
+        const float threshold=g.repairAccess ? AiMin(.7f,Global::RoleSettings::Sea::FleetRepairHealth+lossRate*4) : .2f;
+        g.route.SetRepairThreshold(threshold);
+    }
     void Tick() {
         if (!SeaCombat::Active() || !Global::RoleSettings::Sea::FleetOperations) return;
         Census();
+        dictionary reserves;
+        // One pass rather than an extra fleet scan for every coastal mission.
+        for (uint i=0;i<groups.length();++i) {
+            const CCircuitDef@ hull=ai.GetCircuitDef(groups[i].defId);
+            if (Escort(hull) || Siege(hull) || !(hull.HasSurfToLand() || hull.HasSubToLand())) continue;
+            const string bodyKey=""+groups[i].body;
+            if (!reserves.exists(bodyKey)) reserves.set(bodyKey,groups[i].serial);
+        }
         const int contacts=aiBattle.GetSeaForceCount(); // legal SEA extension; AIR snapshot unchanged
         for (uint k=0;k<groups.length();++k) {
             Cohort@ g=groups[k]; if (g.ids.length()==0) continue;
+            if (int(g.ids.length())>Global::RoleSettings::Sea::FleetCohortMaximum)
+                Invariants::Violation("INV-171",g.key,"SEA local cohort exceeded configured capacity");
+            // Joining a settled line need not change its objective. Transfer
+            // only new members here, otherwise they could inherit a released
+            // cohort's ID while retaining a native attack/idle task forever.
+            if (g.route !is null && !g.route.IsDead()) for (uint j=0;j<g.ids.length();++j) {
+                CCircuitUnit@ recruit=ai.GetTeamUnit(g.ids[j]);
+                if (Eligible(recruit) && recruit.task !is g.route && !aiMilitaryMgr.TransferUnit(recruit,g.route))
+                    Invariants::Violation("INV-145",""+recruit.id,"SEA reinforcement handover failed");
+            }
+            RepairPolicy(g);
             CCircuitDef@ def=ai.GetCircuitDef(g.defId);
             const bool scout=def.IsRoleAny(Unit::Role::SCOUT.mask);
             const bool siege=Siege(def);
             const bool subWeapon=def.HasSurfToWater() || def.HasSubToWater();
-            float nearest=1e30f, enemySubs=0, cover=0;
+            float nearest=1e30f, enemySubs=0, cover=0, bestScore=-1, enemyCost=0, localEnemy=0, localAlly=0;
+            CCircuitDef@ targetDef=null; int targetFlags=0;
             bool scoutExposed=false;
             int target=-1; bool targetSub=false;
-            AIFloat3 goal=g.centre;
+            AIFloat3 goal=g.centre, targetPosition=g.centre;
             const float radius=Global::RoleSettings::Sea::FleetScreenRadius;
             for (int i=0;i<contacts;++i) {
                 if (aiBattle.GetSeaForceBody(i)!=g.body) continue;
@@ -174,6 +393,11 @@ namespace SeaOperations {
                 const AIFloat3 p=aiBattle.GetSeaForcePos(i);
                 const float dist=MapHelpers::SqDist(g.centre,p);
                 if ((flags&1)!=0) {
+                    const int allyId=aiBattle.GetSeaForceDefId(i);
+                    const CCircuitDef@ friendly=allyId>=0 ? ai.GetCircuitDef(allyId) : null;
+                    if (friendly !is null && friendly.IsMobile() && friendly.GetBuildSpeed()<=0
+                        && friendly.HasSurfToLand() && (flags&2)==0 && dist<radius*radius)
+                        localAlly+=aiBattle.GetSeaForceCost(i);
                     if ((flags&4)!=0 && (flags&8)==0 && dist<radius*radius) {
                         // Mixed surface armament is not all anti-sub power.
                         CCircuitDef@ allyDef=ai.GetCircuitDef(aiBattle.GetSeaForceDefId(i));
@@ -193,7 +417,27 @@ namespace SeaOperations {
                 }
                 if ((flags&2)!=0 && !subWeapon) continue;
                 if ((flags&2)==0 && !def.HasSurfToLand() && !def.HasSubToLand()) continue;
-                if (dist<nearest) { nearest=dist; target=aiBattle.GetSeaForceId(i); goal=p; targetSub=(flags&2)!=0; }
+                const int id=aiBattle.GetSeaForceId(i);
+                // Sonar may identify a contact without a UnitDef (-1). The
+                // native integer getter requires a validated definition ID.
+                const int contactDef=aiBattle.GetSeaForceDefId(i);
+                CCircuitDef@ candidate=contactDef>=0 ? ai.GetCircuitDef(contactDef) : null;
+                const bool mobile=candidate !is null && candidate.IsMobile();
+                if (mobile && candidate.GetBuildSpeed()<=0 && candidate.HasSurfToLand()
+                    && (flags&(2|128))==0 && dist<radius*radius) localEnemy+=aiBattle.GetSeaForceCost(i);
+                if (Failed(g,id)) continue;
+                const float homeSq=MapHelpers::SqDist(p,Global::Map::StartPos);
+                const bool urgent=mobile && homeSq<1600.0f*1600.0f && dist<2400.0f*2400.0f;
+                // A nearby second bait is the same rejected fight. Do not
+                // alternate IDs and immediately cancel the escape route.
+                if (mobile && !urgent && ai.frame<g.avoidUntil
+                    && MapHelpers::SqDist(p,g.avoidCentre)<radius*radius) continue;
+                const float score=SeaMath::ObjectiveScore(flags,candidate !is null && candidate.GetBuildSpeed()>0,
+                    aiBattle.GetSeaForceCost(i),sqrt(dist),urgent,id==g.target);
+                if (score>bestScore) {
+                    bestScore=score; nearest=dist; target=id; goal=p; targetPosition=p; targetSub=(flags&2)!=0;
+                    @targetDef=candidate; targetFlags=flags; enemyCost=aiBattle.GetSeaForceCost(i);
+                }
             }
             const bool danger=SeaMath::NeedsScreen(enemySubs,cover,Global::RoleSettings::Sea::FleetScreenRatio);
             if ((danger && !subWeapon) || scoutExposed) {
@@ -212,7 +456,7 @@ namespace SeaOperations {
                 if (aiBattle.WaterBody(goal,false)!=g.body) goal=g.centre;
                 if (SeaMath::NewObjective(g.target,-2,MapHelpers::SqDist(goal,g.goal),ai.frame-g.ordered,10*SECOND)) {
                     if (Route(g,goal,true,scout)) {
-                        g.target=-2; GenericHelpers::LogUtil("[SEA][Screen] hold "+def.GetName()+" subs="+enemySubs+" cover="+cover,1);
+                        g.target=-2; if (g.route !is null) g.route.SetNavalTarget(-1); GenericHelpers::LogUtil("[SEA][Screen] hold "+def.GetName()+" subs="+enemySubs+" cover="+cover,1);
                     }
                 }
                 continue;
@@ -261,39 +505,66 @@ namespace SeaOperations {
                 }
                 continue;
             }
-            if (ai.frame<g.nativeUntil) continue;
             if (ai.frame<g.retry) continue;
-            if (!scout && !SeaMath::ReleaseFleet(int(g.ids.length()),ai.frame-g.created,
-                Global::RoleSettings::Sea::FleetReleaseCount,Global::RoleSettings::Sea::FleetReleaseSeconds*SECOND)) continue;
-            if (target>=0 && !scout) {
-                const float range=def.GetMaxRange(targetSub ? 2 : 1);
-                if (nearest<range*range) {
-                    // Reuse proven native contact formations and repair logic;
-                    // the director owns approach/recovery, not every shot.
-                    IUnitTask@ attack;
-                    for (uint j=0;j<g.ids.length();++j) {
-                        CCircuitUnit@ u=ai.GetTeamUnit(g.ids[j]);
-                        IFighterTask@ current=u is null ? null : cast<IFighterTask>(u.task);
-                        if (current !is null && current.GetFightType()==int(Task::FightType::ATTACK)) { @attack=u.task; break; }
-                    }
-                    if (attack is null) @attack=aiMilitaryMgr.Enqueue(TaskF::Common(Task::FightType::ATTACK));
-                    if (attack !is null) {
-                        for (uint j=0;j<g.ids.length();++j) {
-                            CCircuitUnit@ u=ai.GetTeamUnit(g.ids[j]);
-                            // Retain an already-correct native owner. The
-                            // contact deadline is an observation cadence, not
-                            // permission to reassign the same fleet repeatedly.
-                            if (Eligible(u) && u.task !is attack) aiMilitaryMgr.TransferUnit(u,attack);
-                        }
-                        g.nativeUntil=ai.frame+Global::RoleSettings::Sea::FleetContactSeconds*SECOND;
-                    }
+            if (!g.released) {
+                // Assembly is not permission to sit under fire. A local
+                // weapon-range contact or damage releases this cohort now;
+                // pursuit admission below can still choose to disengage.
+                const float immediateRange=targetDef is null ? 0 : AiMax(def.GetMaxRange(1),targetDef.GetMaxRange(1))+128;
+                g.released=g.health<.95f || target>=0 && nearest<immediateRange*immediateRange
+                    || SeaMath::ReleaseFleet(int(g.ids.length()),ai.frame-g.created,
+                        Global::RoleSettings::Sea::FleetReleaseCount,Global::RoleSettings::Sea::FleetReleaseSeconds*SECOND);
+                if (!g.released) {
+                    if (g.route is null || g.route.IsDead()) Route(g,g.previousCentre,false,true,true);
                     continue;
                 }
-                // Approach at the selected layer's range, never max(surface,
-                // underwater). The centre path and lane offsets are validated.
-                const float dist=sqrt(nearest);
-                const float slack=AiMax(80.0f,range*.8f);
-                goal=AIFloat3(goal.x+(g.centre.x-goal.x)*slack/dist,0,goal.z+(g.centre.z-goal.z)*slack/dist);
+            }
+            if (target>=0 && !scout) {
+                const float range=def.GetMaxRange(targetSub ? 2 : 1), distance=sqrt(nearest);
+                const bool mobile=targetDef !is null && targetDef.IsMobile();
+                if (target!=g.sampleTarget) {
+                    g.sampleTarget=target; g.sampleFrame=ai.frame; g.pursuitStart=0;
+                    g.sampleDistance=distance; g.sampleHealth=g.health; g.samplePos=goal; g.anchor=g.centre;
+                }
+                const float elapsed=float(ai.frame-g.sampleFrame)/SECOND;
+                const float enemySpeed=elapsed>0 ? sqrt(MapHelpers::SqDist(goal,g.samplePos))/elapsed : 0;
+                const float advantage=AiMax(localAlly,def.costM*float(g.ids.length()))/AiMax(1.0f,AiMax(localEnemy,enemyCost));
+                // Crossing an empty sea toward a contact is transit, not a
+                // losing range trade. Start the leash at first engagement.
+                if (mobile && g.pursuitStart==0 && SeaMath::Engagement(distance,targetDef.GetMaxRange(1),g.sampleHealth-g.health)) {
+                    g.pursuitStart=ai.frame; g.anchor=g.centre;
+                }
+                const float beyond=sqrt(MapHelpers::SqDist(g.centre,g.anchor))-Global::RoleSettings::Sea::FleetPursuitLeash;
+                const bool bait=mobile && g.pursuitStart>0 && elapsed>=2 && SeaMath::PursuitBad(distance-range,def.GetSpeed(),enemySpeed,
+                    g.health,advantage,elapsed,g.sampleDistance-distance,g.sampleHealth-g.health,
+                    Global::RoleSettings::Sea::FleetClosingSeconds,beyond);
+                if (bait) {
+                    Fail(g,target);
+                    // A short legal withdrawal cancels the chase immediately;
+                    // next census can choose a different territorial objective.
+                    const float length=AiMax(1.0f,distance);
+                    const float step=AiMax(240.0f,targetDef.GetMaxRange(1)+192.0f-distance);
+                    AIFloat3 escape=Spam::_Clamp(AIFloat3(g.centre.x+(g.centre.x-goal.x)*step/length,0,
+                        g.centre.z+(g.centre.z-goal.z)*step/length));
+                    Route(g,escape,true,true,true); g.target=-5;
+                    g.anchor=escape; g.avoidCentre=goal;
+                    g.avoidUntil=ai.frame+Global::RoleSettings::Sea::FleetFailureSeconds*SECOND;
+                    if (g.route !is null) g.route.SetNavalTarget(-1);
+                    g.retry=ai.frame+2*SECOND;
+                    GenericHelpers::LogUtil("[SEA][Pursuit] break cohort="+g.serial+" target="+target+" gap="+(distance-range),1);
+                    continue;
+                }
+                if (elapsed>=6) { g.sampleFrame=ai.frame; g.sampleDistance=distance; g.sampleHealth=g.health; g.samplePos=goal; }
+                // Range margin lets the entire shallow line fire. Do not
+                // continually move a firing fleet merely because a target drifts.
+                const bool remembered=(targetFlags&128)!=0;
+                const float slack=AiMax(64.0f,SeaMath::ApproachRange(range,def.GetLosRadius(),remembered));
+                if (distance>1) goal=AIFloat3(goal.x+(g.centre.x-goal.x)*slack/distance,0,
+                    goal.z+(g.centre.z-goal.z)*slack/distance);
+                const bool inBand=!remembered && distance<range*.98f && distance>range*.72f;
+                if (inBand && g.target==target && g.route !is null && !g.route.IsDead()) {
+                    g.route.SetNavalTarget((targetFlags&128)!=0 ? -1 : target); continue;
+                }
             } else {
                 AIFloat3 screen;
                 if (!scout && SeaInvasion::Screen(g.body,g.defId,screen)) {
@@ -309,18 +580,34 @@ namespace SeaOperations {
                     }
                     continue;
                 }
+                int reserve=-1; reserves.get(""+g.body,reserve);
+                if (!scout && Coast(g,def,reserve==g.serial)) continue;
+                Failed(g,-1); // expire exclusions even when contacts vanish
+                if (!scout && g.failedIds.length()>0) {
+                    // No alternative objective: finish the withdrawal. A new
+                    // forward search must not immediately recreate the chase
+                    // that was rejected as bait on the previous census.
+                    if (g.target!=-6 && Route(g,g.anchor,true,true,true)) {
+                        g.target=-6; g.route.SetNavalTarget(-1);
+                    }
+                    continue;
+                }
                 target=-1;
                 if (ai.frame-g.ordered<Global::RoleSettings::Sea::FleetSearchSeconds*SECOND
                     && g.route !is null && !g.route.IsDead() && !g.route.IsAtEnd(ai.GetTeamUnit(g.ids[0]))) continue;
                 ++g.search; goal=Search(g);
             }
-            if (!SeaMath::NewObjective(g.target,target,MapHelpers::SqDist(goal,g.goal),ai.frame-g.ordered,
+            const bool rangeCorrection=target>=0 && target==g.target && sqrt(nearest)<def.GetMaxRange(targetSub ? 2 : 1)*.72f
+                && MapHelpers::SqDist(goal,g.goal)>96.0f*96.0f;
+            if (!rangeCorrection && !SeaMath::NewObjective(g.target,target,MapHelpers::SqDist(goal,g.goal),ai.frame-g.ordered,
                 Global::RoleSettings::Sea::FleetSearchSeconds*SECOND)) continue;
-            if (Route(g,goal,false,scout)) {
+            if (Route(g,goal,false,scout,false,target<0)) {
                 g.target=target;
+                if (target>=0 && targetSub && (targetFlags&128)==0) AntiSubFormation(g,targetPosition);
+                if (g.route !is null) g.route.SetNavalTarget(target>=0 && (targetFlags&128)==0 ? target : -1);
                 GenericHelpers::LogUtil("[SEA][Fleet] "+def.GetName()+" n="+g.ids.length()+" target="+target+" goal="+int(goal.x)+","+int(goal.z),1);
             } else {
-                g.ordered=ai.frame; g.retry=ai.frame+10*SECOND; ++g.search;
+                Fail(g,target); g.ordered=ai.frame; g.retry=ai.frame+SECOND; ++g.search;
                 GenericHelpers::LogUtil("[SEA][Fleet] route unavailable "+def.GetName()+"; select another water objective",3);
             }
         }

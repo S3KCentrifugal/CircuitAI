@@ -1,220 +1,256 @@
-// Deterministic AIR decisions. No engine state or hidden policy constants.
+// Deterministic AIR decisions. No engine state; policy constants are named below.
 namespace AirMath {
+    // Named policy/geometry constants preserve the original arithmetic and types.
+    // Zero/One are integer identities; ZeroValue/UnitValue are float identities.
+    const int Zero = 0;
+    const int One = 1;
+    const float RadiusToDiameter = 2.0f;
+    const float UnitValue = 1.0f;
+    const float RadarArrivalRadiusSquaredFactor = 4.0f;
+    const float TransitionStorageFullFraction = 0.85f;
+    const int FullCampusFactoryCount = 6;
+    const int CampusVariantCount = 3;
+    const int MinimumDefensiveWaveCount = 3;
+    const float ZeroValue = 0.0f;
+    const float OverflowMetalReserve = 150.0f;
+    const float OverflowEnergyReserve = 500.0f;
+    const int MaximumIncrementableBayCount = 2147483646;
+    const int MaximumSignedInteger = 2147483647;
+    const int MaximumOpeningWaveCount = 300;
+    const float MaximumValidScalarValue = 1.0e12f;
+    const float MaximumSafeIntegerConversion = 2147483520.0f;
+    const float MaximumBomberOrdersPerCycle = 9.0f;
+    const int ProductionCycleLength = 10;
+    const int ReducedCampusFactoryCount = 3;
+
     // Full waves respect assembly; the deadline must also break assembly stalls.
     bool ReconRelease(int available, int ready, int wanted, int elapsed, int maximumWait) {
-        return available > 0 && ((wanted > 0 && ready >= wanted)
-            || (maximumWait > 0 && elapsed >= maximumWait));
+        return available > Zero && ((wanted > Zero && ready >= wanted)
+            || (maximumWait > Zero && elapsed >= maximumWait));
     }
     bool BaseContact(float distanceSquared, float radius) {
-        return distanceSquared >= 0 && radius > 0 && distanceSquared <= radius*radius;
+        return distanceSquared >= Zero && radius > Zero && distanceSquared <= radius*radius;
     }
     int DefenceDeficit(int target, int available, int frames, int pending) {
         const int missing = target-available-frames-pending;
-        return missing > 0 ? missing : 0;
+        return missing > Zero ? missing : Zero;
+    }
+    int DefenceWave(float ground, float antiAirMetal, float aircraftCost, float groundRatio, float antiAirRatio, int minimum, int maximum) {
+        if (minimum < One) minimum = One;
+        if (maximum < minimum) maximum = minimum;
+        if (!Valid(ground) || !Valid(antiAirMetal) || !Valid(aircraftCost) || aircraftCost <= Zero
+            || !Valid(groundRatio) || !Valid(antiAirRatio)) return minimum;
+        const int budget = Missing(ground * groundRatio + antiAirMetal * antiAirRatio, Zero, aircraftCost);
+        return budget < minimum ? minimum : budget > maximum ? maximum : budget;
+    }
+    bool DefenceRelease(int available, int assembled, int wanted, int age, int deadline) {
+        // The first waiting aircraft owns the clock. More births or a larger
+        // observed AA budget must not restart a stalled production deadline.
+        return available > Zero && wanted > Zero && (assembled >= wanted || (deadline > Zero && age >= deadline));
     }
     bool DefensiveBomberTarget(bool advancedBomber, bool mobile, bool heavy) {
         return !advancedBomber || !mobile || heavy;
     }
-    bool T1OpeningReady(int crew, int requiredCrew, int nanos, int requiredNanos, bool recovering)
+    bool T1OpeningReady(int crew, int requiredCrew, int constructionTurrets, int requiredConstructionTurrets, bool recovering)
     {
-        return !recovering && requiredCrew > 0 && requiredNanos >= 0
-            && crew >= requiredCrew && nanos >= requiredNanos;
+        return !recovering && requiredCrew > Zero && requiredConstructionTurrets >= Zero
+            && crew >= requiredCrew && constructionTurrets >= requiredConstructionTurrets;
     }
     float RadarSpacing(float radius, float overlap)
     {
-        if (!Valid(radius) || radius <= 0 || !Valid(overlap) || overlap >= 1) return 0;
-        return 2.0f * radius * (1.0f - overlap);
+        if (!Valid(radius) || radius <= Zero || !Valid(overlap) || overlap >= One) return Zero;
+        return RadiusToDiameter * radius * (UnitValue - overlap);
     }
-    bool RadarReady(bool visited, float distanceSq, float radius)
+    bool RadarReady(bool visited, float distanceSquared, float radius)
     {
-        return visited && Valid(distanceSq) && Valid(radius) && radius > 0 && distanceSq <= 4.0f*radius*radius;
+        return visited && Valid(distanceSquared) && Valid(radius) && radius > Zero && distanceSquared <= RadarArrivalRadiusSquaredFactor*radius*radius;
     }
     int RadarColumns(int count, float span, float spacing)
     {
-        if (count <= 0 || !Valid(span) || !Valid(spacing) || spacing <= 0) return 0;
-        if (span / spacing >= float(count - 1)) return count;
-        const int fit = 1 + int(span / spacing);
+        if (count <= Zero || !Valid(span) || !Valid(spacing) || spacing <= Zero) return Zero;
+        if (span / spacing >= float(count - One)) return count;
+        const int fit = One + int(span / spacing);
         return fit < count ? fit : count;
     }
     bool WorkforceTurn(bool missing, bool funded, bool emergency, int combatOrders, int maximum)
     {
-        return missing && funded && maximum > 0 && (!emergency || combatOrders >= maximum);
+        return missing && funded && maximum > Zero && (!emergency || combatOrders >= maximum);
     }
     bool SaveForLab(bool advanced, bool pending, bool recovering, bool screenReady,
         int seconds, int earliest, float metal, float energy, float minimumMetal,
         float minimumEnergy, float bank, float cost)
     {
         return !advanced && !pending && !recovering && screenReady && seconds >= earliest
-            && Valid(metal) && Valid(energy) && Valid(bank) && Valid(cost) && cost > 0
+            && Valid(metal) && Valid(energy) && Valid(bank) && Valid(cost) && cost > Zero
             && metal >= minimumMetal && energy >= minimumEnergy && bank < cost;
     }
-    bool TransitionStorage(bool advancedPlant, float bank, float capacity, float labCost)
+    bool TransitionStorage(bool advancedPlant, float bank, float capacity, float factoryMetalCost)
     {
-        return !advancedPlant && Valid(bank) && Valid(capacity) && Valid(labCost)
-            && capacity>0 && labCost>capacity && bank>capacity*0.85f;
+        return !advancedPlant && Valid(bank) && Valid(capacity) && Valid(factoryMetalCost)
+            && capacity>Zero && factoryMetalCost>capacity && bank>capacity*TransitionStorageFullFraction;
     }
     // Snapshot indexes can change while the same enemy is still alive.
-    int RetainedContact(int current, const array<int> &in ids, const array<float> &in remaining)
+    int RetainedContact(int current, const array<int> &in unitIdentifiers, const array<float> &in remaining)
     {
-        if (current < 0 || ids.length() != remaining.length()) return -1;
-        for (uint i=0;i<ids.length();++i)
-            if (ids[i]==current && Valid(remaining[i]) && remaining[i]>0) return int(i);
-        return -1;
+        if (current < Zero || unitIdentifiers.length() != remaining.length()) return -One;
+        for (uint index=Zero;index<unitIdentifiers.length();++index)
+            if (unitIdentifiers[index]==current && Valid(remaining[index]) && remaining[index]>Zero) return int(index);
+        return -One;
     }
     int CampusSize(bool compact, int variant)
     {
-        if (!compact || variant < 0) return 6;
-        return variant % 3 == 0 ? 6 : variant % 3 == 1 ? 3 : 1;
+        if (!compact || variant < Zero) return FullCampusFactoryCount;
+        return variant % CampusVariantCount == Zero ? FullCampusFactoryCount : variant % CampusVariantCount == One ? ReducedCampusFactoryCount : One;
     }
     int OperationSize(int available, int required, bool openingDone, int opening,
         bool front, bool defensive, int laterMinimum)
     {
-        if (available <= 0 || required < 0 || opening <= 0 || laterMinimum <= 0) return 0;
+        if (available <= Zero || required < Zero || opening <= Zero || laterMinimum <= Zero) return Zero;
         int count = opening;
-        if (defensive) count = required > 3 ? required : 3;
+        if (defensive) count = required > MinimumDefensiveWaveCount ? required : MinimumDefensiveWaveCount;
         else if (front) count = available;
         else if (openingDone) count = required > laterMinimum ? required : laterMinimum;
-        return count >= required && count <= available ? count : 0;
+        return count >= required && count <= available ? count : Zero;
     }
     bool SustainedProduction(bool ready, float minimumMetal, float minimumEnergy,
         float requiredMetal, float energyPerMetal, float reserveEnergy)
     {
         return ready && Valid(minimumMetal) && Valid(minimumEnergy) && Valid(requiredMetal)
-            && requiredMetal > 0 && Valid(energyPerMetal) && energyPerMetal > 0 && Valid(reserveEnergy)
+            && requiredMetal > Zero && Valid(energyPerMetal) && energyPerMetal > Zero && Valid(reserveEnergy)
             && minimumMetal >= requiredMetal && minimumEnergy >= requiredMetal*energyPerMetal+reserveEnergy;
     }
     bool PendingReactor(bool reactor, bool construction, bool hasTarget, float progress)
     {
-        return reactor && construction && (!hasTarget || (Valid(progress) && progress < 1.0f));
+        return reactor && construction && (!hasTarget || (Valid(progress) && progress < UnitValue));
     }
     // Conservative admission for a single additional reactor after the bomber
     // milestone: leave the configured share of future income to production.
-    bool OverflowGrowth(bool floatingMetal, bool recovering, bool pendingReactor, float bankM, float bankE,
-        float incomeM, float incomeE, float committedM, float committedE, float costM, float costE,
+    bool OverflowGrowth(bool floatingMetal, bool recovering, bool pendingReactor, float metalBank, float energyBank,
+        float metalIncome, float energyIncome, float committedMetal, float committedEnergy, float metalCost, float energyCost,
         float productionShare, float seconds)
     {
-        if (!floatingMetal || recovering || pendingReactor || !Valid(bankM) || !Valid(bankE)
-            || !Valid(incomeM) || !Valid(incomeE) || !Valid(committedM) || !Valid(committedE)
-            || !Valid(costM) || costM <= 0.0f || !Valid(costE) || costE <= 0.0f
-            || !Valid(productionShare) || productionShare > 1.0f || !Valid(seconds)) return false;
-        const float share = 1.0f - productionShare;
-        return bankM + incomeM * share * seconds >= committedM + costM + 150.0f
-            && bankE + incomeE * share * seconds >= committedE + costE + 500.0f;
+        if (!floatingMetal || recovering || pendingReactor || !Valid(metalBank) || !Valid(energyBank)
+            || !Valid(metalIncome) || !Valid(energyIncome) || !Valid(committedMetal) || !Valid(committedEnergy)
+            || !Valid(metalCost) || metalCost <= ZeroValue || !Valid(energyCost) || energyCost <= ZeroValue
+            || !Valid(productionShare) || productionShare > UnitValue || !Valid(seconds)) return false;
+        const float share = UnitValue - productionShare;
+        return metalBank + metalIncome * share * seconds >= committedMetal + metalCost + OverflowMetalReserve
+            && energyBank + energyIncome * share * seconds >= committedEnergy + energyCost + OverflowEnergyReserve;
     }
-    bool BayAllowed(int count, int ceiling) { return count >= 0 && (ceiling <= 0 || count < ceiling); }
+    bool BayAllowed(int count, int ceiling) { return count >= Zero && (ceiling <= Zero || count < ceiling); }
     int PlannedBays(int completed, int minimum) {
-        if (completed < 0) completed = 0;
-        if (completed >= 2147483646) return 2147483647;
-        return completed + 1 > minimum ? completed + 1 : minimum;
+        if (completed < Zero) completed = Zero;
+        if (completed >= MaximumIncrementableBayCount) return MaximumSignedInteger;
+        return completed + One > minimum ? completed + One : minimum;
     }
     float BayPitch(float halfEnvelope, float gap) {
-        return 2.0f * halfEnvelope + (gap > 0.0f ? gap : 0.0f);
+        return RadiusToDiameter * halfEnvelope + (gap > ZeroValue ? gap : ZeroValue);
     }
     bool GrowthPhase(bool windowReady, float minimumIncome, float threshold) {
-        return windowReady && Valid(minimumIncome) && threshold > 0.0f && minimumIncome >= threshold;
+        return windowReady && Valid(minimumIncome) && threshold > ZeroValue && minimumIncome >= threshold;
     }
-    bool MassBombersReady(int completedAfus, int required) { return required <= 0 || completedAfus >= required; }
-    bool EnergyEraAllows(bool basicEnergy, bool advancedSolar, bool fusionUp, bool afusStarted) {
-        if (basicEnergy) return !fusionUp && !afusStarted;
-        if (advancedSolar) return !afusStarted;
+    bool MassBombersReady(int completedAdvancedFusions, int required) { return required <= Zero || completedAdvancedFusions >= required; }
+    bool EnergyEraAllows(bool basicEnergy, bool advancedSolar, bool fusionUp, bool advancedFusionStarted) {
+        if (basicEnergy) return !fusionUp && !advancedFusionStarted;
+        if (advancedSolar) return !advancedFusionStarted;
         return true;
     }
     int OpeningWave(int low, int high, int roll) {
-        if (low < 1) low = 1;
+        if (low < One) low = One;
         if (high < low) high = low;
-        if (high > 300) high = 300;
+        if (high > MaximumOpeningWaveCount) high = MaximumOpeningWaveCount;
         if (low > high) low = high;
         return roll < low ? low : roll > high ? high : roll;
     }
 
-    bool Valid(float value) { return value == value && value >= 0.0f && value < 1.0e12f; }
+    bool Valid(float value) { return value == value && value >= ZeroValue && value < MaximumValidScalarValue; }
     float RaidResistance(float previous, float survival, float low, float high, float growth, float recovery, float ceiling)
     {
-        if (!Valid(previous) || !Valid(survival) || !Valid(ceiling) || ceiling < 1.0f) return 1.0f;
-        float factor = Clamp(previous, 1.0f, ceiling);
-        if (survival < low && Valid(growth) && growth > 1.0f) factor *= growth;
-        else if (survival > high && Valid(recovery)) factor *= Clamp(recovery, 0.0f, 1.0f);
-        return Clamp(factor, 1.0f, ceiling);
+        if (!Valid(previous) || !Valid(survival) || !Valid(ceiling) || ceiling < UnitValue) return UnitValue;
+        float factor = Clamp(previous, UnitValue, ceiling);
+        if (survival < low && Valid(growth) && growth > UnitValue) factor *= growth;
+        else if (survival > high && Valid(recovery)) factor *= Clamp(recovery, ZeroValue, UnitValue);
+        return Clamp(factor, UnitValue, ceiling);
     }
-    float Clamp(float value, float lo, float hi) { return value < lo ? lo : value > hi ? hi : value; }
+    float Clamp(float value, float lowerBound, float upperBound) { return value < lowerBound ? lowerBound : value > upperBound ? upperBound : value; }
     int Missing(float required, float available, float unitCost)
     {
-        if (!Valid(required) || !Valid(available) || !Valid(unitCost) || unitCost <= 0.0f) return 0;
+        if (!Valid(required) || !Valid(available) || !Valid(unitCost) || unitCost <= ZeroValue) return Zero;
         const float need = (required - available) / unitCost;
-        if (need <= 0.0f) return 0;
-        if (need >= 2147483520.0f) return 2147483647;
+        if (need <= ZeroValue) return Zero;
+        if (need >= MaximumSafeIntegerConversion) return MaximumSignedInteger;
         const int whole = int(need);
-        return whole + (float(whole) < need ? 1 : 0);
+        return whole + (float(whole) < need ? One : Zero);
     }
     bool Emergency(float armedIntrusion, float homeValue, float ratio)
     {
-        return Valid(armedIntrusion) && armedIntrusion > 0.0f && Valid(homeValue)
+        return Valid(armedIntrusion) && armedIntrusion > ZeroValue && Valid(homeValue)
             && Valid(ratio) && armedIntrusion * ratio > homeValue;
     }
     // Order allocation, not a claim that unequal aircraft have equal costs.
     int BomberOrders(float homeValue, float enemyValue, int clearOrders, int parityOrders)
     {
-        if (!Valid(homeValue) || !Valid(enemyValue) || homeValue <= 0.0f) return 0;
-        if (enemyValue > homeValue) return 0;
-        const float ratio = Clamp(enemyValue / homeValue, 0.0f, 1.0f);
-        return int(Clamp(float(clearOrders) + float(parityOrders - clearOrders) * ratio, 0.0f, 9.0f));
+        if (!Valid(homeValue) || !Valid(enemyValue) || homeValue <= ZeroValue) return Zero;
+        if (enemyValue > homeValue) return Zero;
+        const float ratio = Clamp(enemyValue / homeValue, ZeroValue, UnitValue);
+        return int(Clamp(float(clearOrders) + float(parityOrders - clearOrders) * ratio, ZeroValue, MaximumBomberOrdersPerCycle));
     }
     bool BomberTurn(int sequence, int orders)
     {
-        if (sequence < 0 || orders <= 0 || orders > 10) return false;
-        const int slot = sequence % 10;
-        return ((slot + 1) * orders / 10) > (slot * orders / 10);
+        if (sequence < Zero || orders <= Zero || orders > ProductionCycleLength) return false;
+        const int slot = sequence % ProductionCycleLength;
+        return ((slot + One) * orders / ProductionCycleLength) > (slot * orders / ProductionCycleLength);
     }
-    int WaveTarget(int wave, int first, int increment, int cap, int held,
-        float seconds, float rawRate, float metal, float energy, float costM, float costE)
+    int WaveTarget(int wave, int first, int increment, int maximumCount, int held,
+        float seconds, float rawRate, float metal, float energy, float metalCost, float energyCost)
     {
-        if (wave < 0 || first <= 0 || increment < 0 || cap < first || held < 0 || !Valid(seconds)
-            || !Valid(rawRate) || !Valid(metal) || !Valid(energy) || !Valid(costM) || costM <= 0.0f
-            || !Valid(costE) || costE <= 0.0f) return first > 0 ? first : 1;
+        if (wave < Zero || first <= Zero || increment < Zero || maximumCount < first || held < Zero || !Valid(seconds)
+            || !Valid(rawRate) || !Valid(metal) || !Valid(energy) || !Valid(metalCost) || metalCost <= ZeroValue
+            || !Valid(energyCost) || energyCost <= ZeroValue) return first > Zero ? first : One;
         float rate = rawRate;
-        if (rate > metal / costM) rate = metal / costM;
-        if (rate > energy / costE) rate = energy / costE;
+        if (rate > metal / metalCost) rate = metal / metalCost;
+        if (rate > energy / energyCost) rate = energy / energyCost;
         // Bound the float result before conversion; extreme valid configuration
         // must not overflow the schedule or a rate-times-duration integer cast.
         const float scheduled = float(first) + float(wave) * float(increment);
         const float reachable = float(held) + rate * seconds;
         const float target = scheduled < reachable ? scheduled : reachable;
         if (target <= float(first)) return first;
-        if (target >= float(cap)) return cap;
+        if (target >= float(maximumCount)) return maximumCount;
         return int(target);
     }
     bool LaunchDue(int held, int target, int minimum, int age, int cadence, bool escortReady, bool active)
     {
-        return !active && escortReady && minimum > 0 && target >= minimum && held >= minimum
-            && (held >= target || (cadence > 0 && age >= cadence));
+        return !active && escortReady && minimum > Zero && target >= minimum && held >= minimum
+            && (held >= target || (cadence > Zero && age >= cadence));
     }
     int SortieSize(int held, int scheduled, int minimum, int escorts, float ratio)
     {
-        if (held < minimum || minimum <= 0 || scheduled < minimum || escorts < 0 || !Valid(ratio)) return 0;
+        if (held < minimum || minimum <= Zero || scheduled < minimum || escorts < Zero || !Valid(ratio)) return Zero;
         int count = held < scheduled ? held : scheduled;
-        if (ratio > 0.0f) {
+        if (ratio > ZeroValue) {
             const float supported = float(escorts) / ratio;
             if (supported < float(count)) count = int(supported);
         }
-        return count >= minimum ? count : 0;
+        return count >= minimum ? count : Zero;
     }
 
-    float NavalDeficit(float enemy, float friendly, float submerged, float antiSub) {
-        if (!Valid(enemy) || !Valid(friendly) || !Valid(submerged) || !Valid(antiSub)) return 0;
-        const float surfaceGap = enemy > friendly ? enemy-friendly : 0;
-        const float subGap = submerged > antiSub ? submerged-antiSub : 0;
-        return surfaceGap > subGap ? surfaceGap : subGap;
+    float NavalDeficit(float enemy, float friendly, float submerged, float antiSubmarineMetal) {
+        if (!Valid(enemy) || !Valid(friendly) || !Valid(submerged) || !Valid(antiSubmarineMetal)) return Zero;
+        const float surfaceGap = enemy > friendly ? enemy-friendly : Zero;
+        const float submarineGap = submerged > antiSubmarineMetal ? submerged-antiSubmarineMetal : Zero;
+        return surfaceGap > submarineGap ? surfaceGap : submarineGap;
     }
     bool NavalSectorContains(float distanceSquared,float radius) {
-        return Valid(distanceSquared) && Valid(radius) && radius>0 && distanceSquared<=radius*radius;
+        return Valid(distanceSquared) && Valid(radius) && radius>Zero && distanceSquared<=radius*radius;
     }
     int NavalWave(float deficit, float minimumDeficit, float reserve, float cost, int low, int high) {
-        if (!Valid(deficit) || !Valid(minimumDeficit) || deficit <= 0 || deficit < minimumDeficit
-            || !Valid(reserve) || reserve < 1 || !Valid(cost) || cost <= 0 || low <= 0 || high < low) return 0;
-        const int raw = Missing(deficit*reserve,0,cost);
+        if (!Valid(deficit) || !Valid(minimumDeficit) || deficit <= Zero || deficit < minimumDeficit
+            || !Valid(reserve) || reserve < One || !Valid(cost) || cost <= Zero || low <= Zero || high < low) return Zero;
+        const int raw = Missing(deficit*reserve,Zero,cost);
         return raw < low ? low : raw > high ? high : raw;
     }
     bool NavalRelease(int ready, int target, int age, int deadline, bool routeReady) {
-        return routeReady && ready > 0 && target > 0 && (ready >= target || (deadline > 0 && age >= deadline));
+        return routeReady && ready > Zero && target > Zero && (ready >= target || (deadline > Zero && age >= deadline));
     }
 }

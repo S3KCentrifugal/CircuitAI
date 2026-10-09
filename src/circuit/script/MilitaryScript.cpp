@@ -142,7 +142,22 @@ bool CMilitaryScript::Init()
 	int r = mod->SetDefaultNamespace("Military"); ASSERT(r >= 0);
 	InitModule(mod);
 	militaryInfo.makeDefence = script->GetFunc(mod, "void AiMakeDefence(int, const AIFloat3& in)");
+	militaryInfo.groundObjective = script->GetFunc(mod, "AIFloat3 AiGroundObjective(CCircuitUnit@, const AIFloat3& in)");
 	return true;
+}
+
+AIFloat3 CMilitaryScript::GroundObjective(CCircuitUnit* unit, const AIFloat3& previous)
+{
+	// Optional, called on cohort objective completion, never per shooter.
+	// Copy the value before returning the borrowed context to its pool.
+	auto result=previous;
+	if (!militaryInfo.groundObjective) return result;
+	asIScriptContext* ctx=script->PrepareContext(militaryInfo.groundObjective);
+	ctx->SetArgObject(0,unit);
+	ctx->SetArgAddress(1,const_cast<AIFloat3*>(&previous));
+	if (script->Exec(ctx)) result=*static_cast<AIFloat3*>(ctx->GetReturnObject());
+	script->ReturnContext(ctx);
+	return result;
 }
 
 void CMilitaryScript::MakeDefence(int cluster, const AIFloat3& pos)

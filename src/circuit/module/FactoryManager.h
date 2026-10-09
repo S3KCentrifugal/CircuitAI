@@ -11,6 +11,7 @@
 #include "module/TaskModule.h"
 #include "task/static/RecruitTask.h"
 #include "unit/CircuitUnit.h"
+#include "util/DefinitionCounts.h"
 
 #include <map>
 
@@ -168,6 +169,8 @@ public:
 	float GetFacModE() const { return facModE; }
 	bool CanEnqueueTask() const { return factoryTasks.size() < factories.size() * 2; }
 	const std::vector<CRecruitTask*>& GetTasks() const { return factoryTasks; }
+    int GetPendingRecruitCount(const CCircuitDef* def) const;
+    void RefreshPendingRecruit(CRecruitTask* task);
 	bool IsAssistRequired() const { return isAssistRequired; }
 	void ApplySwitchFrame();
 	bool IsSwitchTime();
@@ -236,6 +239,7 @@ private:
 
 	std::map<CAllyUnit*, IBuilderTask*> unfinishedUnits;
 	std::vector<CRecruitTask*> factoryTasks;  // order matters
+    DefinitionCounts<CRecruitTask*> pendingRecruits;
 	float metalRequire;
 	float energyRequire;
 	float newFacModM = 0.f;

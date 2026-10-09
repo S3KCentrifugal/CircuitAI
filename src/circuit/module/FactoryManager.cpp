@@ -513,6 +513,21 @@ void CFactoryManager::ReadConfig()
 			boolean("allow_radar", policy.allowRadar);
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
 			boolean("stage_when_blocked", policy.stageWhenBlocked);
+			boolean("coordinated", policy.coordinated);
+			number("cohort_size", policy.cohortSize, 1.f, 12.f);
+			number("cohort_radius", policy.cohortRadius, 128.f, 1600.f);
+			number("regroup_seconds", policy.regroupSeconds, 0.f, 20.f);
+			number("rush_ratio", policy.rushRatio, 1.f, 5.f);
+			number("catch_seconds", policy.catchSeconds, 0.f, 15.f);
+			number("engagement_seconds", policy.engagementSeconds, 0.f, 30.f);
+			number("advantage_enter", policy.advantageEnter, 1.f, 5.f);
+			number("advantage_exit", policy.advantageExit, 1.f, 5.f);
+			number("loss_fraction", policy.lossFraction, 0.f, .9f);
+			number("static_loss_fraction", policy.staticLossFraction, 0.f, .9f);
+            boolean("support_allies", policy.supportAllies);
+            number("support_loss_fraction", policy.supportLossFraction, 0.f, .9f);
+            number("intent_gain", policy.intentGain, 0.f, .5f);
+			if (policy.advantageExit > policy.advantageEnter) valid = false;
 			if (valid) cdef->SetRangedPolicy(policy);
 			else {
 				circuit->LOG("CONFIG %s: %s has invalid ranged policy; ranged disabled", cfgName.c_str(), defName.c_str());
@@ -950,11 +965,35 @@ int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	return 0; //signaling: OK
 }
 
+int CFactoryManager::GetPendingRecruitCount(const CCircuitDef* def) const
+{
+    const int indexed = def == nullptr ? 0 : pendingRecruits.Count(def->GetId());
+    static const bool verify = std::getenv("CIRCUIT_VERIFY_ECONOMY_INDEX") != nullptr;
+    if (verify) {
+        int count = 0;
+        for (const CRecruitTask* task : factoryTasks)
+            if (!task->IsDead() && task->GetBuildDef() == def && task->GetTarget() == nullptr) ++count;
+        if (count != indexed) circuit->LOG("[INVARIANT] INV-175 recruit index=%i scan=%i", indexed, count);
+    }
+    return indexed;
+}
+
+void CFactoryManager::RefreshPendingRecruit(CRecruitTask* task)
+{
+    // SetTarget covers frame creation and repeat-production completion; Dead
+    // covers cancellation before script removal hooks. No snapshot staleness.
+    const auto* def = task->GetBuildDef();
+    if (!task->IsDead() && task->GetTarget() == nullptr && def != nullptr)
+        pendingRecruits.Set(task, def->GetId());
+    else pendingRecruits.Erase(task);
+}
+
 CRecruitTask* CFactoryManager::Enqueue(const TaskS::SRecruitTask& ti)
 {
 	CRecruitTask* task = new CRecruitTask(this, ti.priority, ti.buildDef, ti.position, ti.type, ti.radius);
 	task->SetRepeat(ti.repeat);
 	factoryTasks.push_back(task);
+    RefreshPendingRecruit(task); // visible to the synchronous TaskAdded script
 	updateTasks.push_back(task);
 	TaskAdded(task);
 	return task;
@@ -995,6 +1034,7 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 		case IUnitTask::Type::FACTORY:{
 			switch (static_cast<IBuilderTask*>(task)->GetBuildType()) {
 				case IBuilderTask::BuildType::RECRUIT: {
+                    pendingRecruits.Erase(static_cast<CRecruitTask*>(task));
 					auto it = std::find(factoryTasks.begin(), factoryTasks.end(), task);
 					if (it != factoryTasks.end()) {
 						factoryTasks.erase(it);

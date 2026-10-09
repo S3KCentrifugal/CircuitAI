@@ -10,6 +10,22 @@
 using namespace circuit::ranged;
 int main()
 {
+    // Queue the exact formation slot without toggling off a nearby grid
+    // endpoint. Recoil uses a strict 17-elmo positional cancellation radius.
+    std::vector<Point> route;
+    AppendExactGoal(route,Point{100,100});
+    assert(route.size()==1 && route.back().x==100);
+    AppendExactGoal(route,Point{116,100});
+    assert(route.size()==1 && route.back().x==116);
+    AppendExactGoal(route,Point{133,100});
+    assert(route.size()==2 && route.front().x==116);
+    AppendExactGoal(route,Point{133,100});
+    assert(route.size()==2);
+    AppendExactGoal(route,Point{143,110});
+    assert(route.size()==2 && route.back().x==143 && route.back().z==110);
+    route={{100,100},{132,100}};
+    AppendExactGoal(route,Point{116,100});
+    assert(route.size()==1 && route.back().x==116);
     // Safe endpoints alone must not permit a path through a defended area.
     assert(!SafeSegment({-200,0},{200,0},{0,0},100));
     assert(SafeSegment({-200,150},{200,150},{0,0},100));

@@ -153,7 +153,7 @@ namespace SeaEcoLayout {
         const float floor=float(Global::RoleSettings::Sea::FusionMinimumTurrets)*nano.GetBuildSpeed();
         const float target=preparing ? floor : AiMax(floor,SeaEconomy::UsefulPower(work,Global::RoleSettings::Sea::EconomyIncomeShare));
         if (existing>=target || !SeaEconomy::Fund(nano,u.circuitDef.GetBuildSpeed(),0,0)) return null;
-        const int slot=aiTerrainMgr.NextSlotAny(b.group,aiTerrainMgr.GetReservationPos(b.fusion));
+        const int slot=aiTerrainMgr.NextReachableSlot(u,nano,b.zone,b.group,8);
         if (slot<0 || !aiTerrainMgr.CanReachAt(u,aiTerrainMgr.GetReservationPos(slot),u.circuitDef.GetBuildDistance())) return null;
         IUnitTask@ task=SeaLayout::Pinned(nano,slot,Task::BuildType::NANO,Task::Priority::HIGH);
         if (task !is null) { SeaEconomy::Admit(nano,true,true); b.active=true; }
@@ -193,19 +193,18 @@ namespace SeaEcoLayout {
                 slot=b.fusion;
                 if (!Rear(b,d)) { Invariants::Violation("INV-137",d.GetName(),"SEA fusion footprint is forward of harbor"); return null; }
             } else {
-                slot=aiTerrainMgr.NextSetSlot(d);
-                if (slot>=0) {
-                    const AIFloat3 p=aiTerrainMgr.GetReservationPos(slot);
-                    // NextSetSlot is per definition across all blocks. The
-                    // owner of that site, not the first block, becomes active.
-                    if (abs(p.x-b.centre.x)>b.half || abs(p.z-b.centre.z)>b.half) continue;
+                slot=aiTerrainMgr.NextReachableSlot(u,d,b.zone,0,8);
+                // -2 preserves the cursor for a later ask; do not create new
+                // packs simply because the candidate budget was exhausted.
+                if (slot==-1) {
+                    aiTerrainMgr.PackSet(b.zone,d,b.group,direction,b.centre,
+                        d.GetName()==UnitHelpers::GetNavalEnergyConverterNameForSide(side) ? 4 : 2,false);
+                    slot=aiTerrainMgr.NextReachableSlot(u,d,b.zone,0,8);
                 }
-                if (slot<0) slot=aiTerrainMgr.PackSet(b.zone,d,b.group,direction,b.centre,
-                    d.GetName()==UnitHelpers::GetNavalEnergyConverterNameForSide(side) ? 4 : 2,false);
             }
             if (slot<0) continue;
             if (!aiTerrainMgr.IsReservationBuildable(slot)
-                || !aiTerrainMgr.CanReachAt(u,aiTerrainMgr.GetReservationPos(slot),u.circuitDef.GetBuildDistance())) return null;
+                || !aiTerrainMgr.CanReachAt(u,aiTerrainMgr.GetReservationPos(slot),u.circuitDef.GetBuildDistance())) continue;
             IUnitTask@ task=SeaLayout::Pinned(d,slot,kind,Task::Priority::NORMAL);
             if (task !is null) {
                 b.active=true; Save(i);

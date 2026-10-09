@@ -6,6 +6,7 @@ namespace SeaLayout {
         string key, name;
         int slot = -1, exitZone = 0, facing = 0, unit = -1;
         int cursor = 0, nextSearch = 0, oldUnit = -1, supportSince = -1;
+        int reasonNext = 0;
         bool active = false, exited = false, retired = false;
         AIFloat3 centre, anchor;
     }
@@ -179,11 +180,19 @@ namespace SeaLayout {
         }
         return true;
     }
+    AIFloat3 SurveyPoint(CCircuitDef@ d,const AIFloat3 &in p,int f) {
+        return LayoutHelpers::Offset(p,f,0,float(d.GetFootprintZ())*8.0f+Global::RoleSettings::Sea::HarborFogBuffer);
+    }
     bool VisibleBuffer(CCircuitDef@ d,const AIFloat3 &in p,int f) {
         // Reserve geometry before it is scouted, but buy only inside current
         // allied LOS with a buffer beyond the factory's nose.
         const float buffer=Global::RoleSettings::Sea::HarborFogBuffer;
-        return aiTerrainMgr.IsAreaVisible(LayoutHelpers::Offset(p,f,0,float(d.GetFootprintZ())*8.0f+buffer),buffer);
+        return aiTerrainMgr.IsAreaVisible(SurveyPoint(d,p,f),buffer);
+    }
+    void Blocked(Berth@ b,const string &in reason) {
+        if (ai.frame<b.reasonNext) return;
+        b.reasonNext=ai.frame+30*SECOND;
+        GenericHelpers::LogUtil("[SEA][HarborBlocked] berth="+b.key+" reason="+reason+" site="+int(b.centre.x)+","+int(b.centre.z),1);
     }
     void ReleaseSupport(const string &in owner) {
         for (uint i=0;i<patches.length();++i) {
@@ -304,6 +313,31 @@ namespace SeaLayout {
         CCircuitDef@ d=ai.GetCircuitDef(name);
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         if (!SeaFactories::FactoryAllowed(d)) return null;
+        // A first yard is a single usable footprint, not a requirement to fit
+        // a future multi-yard berth. Both SEA builder modes share the native
+        // enemy-facing-first preference; actual yard/exit adoption follows in
+        // RefreshGeometry. Later factories keep the strict berth rules below.
+        if (SeaEconomy::Yard(d) && !hadFactory && oldUnit<0) {
+            if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY),d)>0) return null;
+            AIFloat3 openingAnchor=u.GetPos(ai.frame);
+            // On Supreme the commander starts on shore, more than the packed
+            // search's 512-elmo radius from usable water. Repeating that dry
+            // anchor never creates a yard. Reuse a reachable, preplanned water
+            // anchor when available; the opening is still unpinned and may
+            // choose a different footprint/facing with a safe exit. No new
+            // terrain search or global radius change is needed for other roles.
+            float nearest=1.0e20f;
+            for (uint i=0;i<berths.length();++i) {
+                Berth@ first=berths[i];
+                if (first.name!=name || first.slot<0 || first.retired || first.oldUnit>=0
+                    || !aiTerrainMgr.CanReachAt(u,first.centre,u.circuitDef.GetBuildDistance())) continue;
+                const float distance=MapHelpers::SqDist(u.GetPos(ai.frame),first.centre);
+                if (distance<nearest) { nearest=distance; openingAnchor=first.centre; }
+            }
+            IUnitTask@ opening=aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW,d,openingAnchor,null,0.0f,false,true,180*SECOND));
+            if (opening !is null) AiPreferFactoryFacing(opening,facing);
+            return opening;
+        }
         // Native/default and objective placement must use the same economic
         // gate as the direct role request. Existing tasks resume elsewhere.
         const bool gatedPlatform=UnitHelpers::IsSeaplanePlatform(name) && Global::RoleSettings::Sea::SeaplanesAfterT2;
@@ -321,14 +355,16 @@ namespace SeaLayout {
             aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
             b.slot=-1; b.exitZone=0; b.cursor=0; Save(b);
         }
-        if (!Search(b) || !aiTerrainMgr.CanReachAt(u,b.centre,u.circuitDef.GetBuildDistance())) return null;
+        if (!Search(b)) { Blocked(b,"site"); return null; }
+        if (!aiTerrainMgr.CanReachAt(u,b.centre,u.circuitDef.GetBuildDistance())) { Blocked(b,"builder-reach"); return null; }
         const bool opening=Opening(b);
         if (SeaEconomy::Yard(d) && !SeaMath::HarborAdmission(opening,ForwardSite(d,b.centre,b.facing),
             opening || VisibleBuffer(d,b.centre,b.facing))) {
+            Blocked(b,"forward-or-visibility");
             // Preserve a preplan briefly for the scouts; if vision does not
             // arrive, continue bounded site search instead of buying in fog.
             if (b.supportSince<0) b.supportSince=ai.frame;
-            if (ai.frame-b.supportSince>=10*SECOND && aiTerrainMgr.GetReservationState(b.slot)==0) {
+            if (ai.frame-b.supportSince>=Global::RoleSettings::Sea::HarborSurveySeconds*SECOND && aiTerrainMgr.GetReservationState(b.slot)==0) {
                 ReleaseSupport(b.key); aiTerrainMgr.ReleasePersistentBuilding(b.slot); aiTerrainMgr.ReleaseZone(b.exitZone);
                 b.slot=-1; b.exitZone=0; b.supportSince=-1; Save(b);
             }

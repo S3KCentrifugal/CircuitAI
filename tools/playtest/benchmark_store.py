@@ -1,6 +1,7 @@
 """Locations shared by evidence publishers and isolated simulation runners.
 
-Evidence and raw runs belong to the sibling CircuitAI.benchmarks checkout.
+Evidence, raw runs and retained build validations belong to the sibling
+CircuitAI.benchmarks checkout.
 Keep code/case definitions in CircuitAI. CIRCUIT_BENCHMARK_REPO permits another
 checkout location without rewriting historical records or hardcoding a user.
 """
@@ -12,6 +13,7 @@ BENCHMARK_REPO = Path(os.environ.get(
     'CIRCUIT_BENCHMARK_REPO', SOURCE_ROOT.parent / 'CircuitAI.benchmarks')).expanduser().resolve()
 EVIDENCE_ROOT = BENCHMARK_REPO / 'doc/benchmarks'
 RAW_ROOT = BENCHMARK_REPO / 'build-theatres'
+VALIDATION_ROOT = BENCHMARK_REPO / 'build-validation'
 
 
 def require_checkout():
@@ -28,7 +30,8 @@ def historical_path(path, source_root=SOURCE_ROOT):
     relative = Path(path)
     if relative.is_absolute() or '..' in relative.parts:
         raise ValueError('Expected a contained repository-relative path')
-    if relative.parts[:2] in (('doc', 'benchmarks'), ('doc', 'images')):
+    if (relative.parts[:2] in (('doc', 'benchmarks'), ('doc', 'images'))
+            or relative.parts[:1] in (('build-theatres',), ('build-validation',))):
         return BENCHMARK_REPO / relative
     return Path(source_root) / relative
 
@@ -36,7 +39,8 @@ def historical_path(path, source_root=SOURCE_ROOT):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('location', choices=('repo', 'evidence', 'raw'))
+    parser.add_argument('location', choices=('repo', 'evidence', 'raw', 'validation'))
     args = parser.parse_args()
     require_checkout()
-    print({'repo': BENCHMARK_REPO, 'evidence': EVIDENCE_ROOT, 'raw': RAW_ROOT}[args.location])
+    print({'repo': BENCHMARK_REPO, 'evidence': EVIDENCE_ROOT,
+           'raw': RAW_ROOT, 'validation': VALIDATION_ROOT}[args.location])

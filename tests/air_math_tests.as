@@ -120,6 +120,25 @@ void test_recon_never_launches_empty() { Check(!AirMath::ReconRelease(0,0,20,999
 void test_recon_full_unassembled_wave_waits() { Check(!AirMath::ReconRelease(20,19,20,89,90)); }
 void test_defense_radius_includes_boundary() { Check(AirMath::BaseContact(1800*1800,1800)); }
 void test_defense_does_not_claim_frontline() { Check(!AirMath::BaseContact(1801*1801,1800)); }
+void test_gunship_group_has_small_raid_floor() { Check(AirMath::DefenceWave(100,0,250,0.35f,2,4,30)==4); }
+void test_gunship_budget_never_shrinks_as_aa_grows() {
+    int previous = 0;
+    for (int aa = 0; aa <= 10000; aa += 100) {
+        const int required = AirMath::DefenceWave(500, float(aa), 330, .35f, 2, 4, 30);
+        Check(required >= previous && required >= 4 && required <= 30); previous = required;
+    }
+}
+void test_gunship_new_arrival_does_not_waive_deadline() { Check(!AirMath::DefenceRelease(1,1,4,44,45)); }
+void test_gunship_exact_deadline_releases_partial() { Check(AirMath::DefenceRelease(1,0,4,45,45)); }
+void test_gunship_invalid_limits_still_require_one() { Check(AirMath::DefenceWave(0,0,330,.35f,2,0,-5)==1); }
+void test_gunship_aa_budget_increases_group() { Check(AirMath::DefenceWave(100,1000,250,0.35f,2,4,30)==9); }
+void test_gunship_heavier_aircraft_need_fewer_members() { Check(AirMath::DefenceWave(100,1000,500,0.35f,2,4,30)==5); }
+void test_gunship_budget_is_capped() { Check(AirMath::DefenceWave(100000,100000,50,0.35f,2,4,30)==30); }
+void test_gunship_invalid_cost_keeps_floor() { Check(AirMath::DefenceWave(100,1000,0,0.35f,2,4,30)==4); }
+void test_gunship_births_do_not_release_unassembled_group() { Check(!AirMath::DefenceRelease(10,3,9,44,45)); }
+void test_gunship_ready_group_releases_immediately() { Check(AirMath::DefenceRelease(10,9,9,1,45)); }
+void test_gunship_deadline_releases_stalled_small_group() { Check(AirMath::DefenceRelease(2,1,9,45,45)); }
+void test_gunship_empty_group_never_releases() { Check(!AirMath::DefenceRelease(0,0,9,100,45)); }
 void test_defense_counts_frames_and_orders_once() { Check(AirMath::DefenceDeficit(20,7,5,3)==5); }
 void test_defense_stops_at_shared_target() { Check(AirMath::DefenceDeficit(20,18,2,1)==0); }
 void test_advanced_defense_bombers_skip_t1_mobiles() { Check(!AirMath::DefensiveBomberTarget(true,true,false)); }

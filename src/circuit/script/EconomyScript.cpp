@@ -9,8 +9,15 @@
 #include "script/ScriptManager.h"
 #include "module/EconomyManager.h"
 #include "task/builder/BuilderTask.h"
+#include "CircuitAI.h"
+#include "terrain/TerrainManager.h"
+#include "spring/SpringCallback.h"
+#include "unit/ally/AllyUnit.h"
+#include "unit/CircuitUnit.h"
+#include "util/Utils.h"
 #include "util/ExtAS.h"
 #include "angelscript/include/angelscript.h"
+#include "angelscript/add_on/scriptarray/scriptarray.h"
 
 namespace circuit {
 
@@ -39,6 +46,41 @@ static IUnitTask* CEconomyManager_EnqueueMexWithin(
 		CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius, int maxSpots)
 {
 	return mgr->EnqueueMexWithin(builder, center, radius, maxSpots);
+}
+
+static IUnitTask* CEconomyManager_EnqueueMexAvoiding(CEconomyManager* mgr,
+        CCircuitUnit* builder, const AIFloat3& center, float radius, bool allyAware, CScriptArray* avoid)
+{
+    std::vector<AIFloat3> excluded;
+    if (avoid != nullptr) {
+        excluded.reserve(avoid->GetSize());
+        for (asUINT i=0; i<avoid->GetSize(); ++i) excluded.push_back(*static_cast<AIFloat3*>(avoid->At(i)));
+    }
+    return mgr->EnqueueMexWithin(builder, center, radius, 0, allyAware, excluded);
+}
+
+// Policy-side admission for explicit mex searches. A cached open spot/queued
+// order can outlive allied ownership or a completed extractor. Reevaluate
+// would immediately reject it, leaving a SEA ship choosing the same job on
+// every idle ask. Bounded local callback only for a candidate, not every tick.
+// The caller chooses exclusion/backoff; legacy/native task selection is intact.
+static bool CEconomyManager_IsMexTaskUsable(CEconomyManager* mgr, IUnitTask* task)
+{
+    if (!task || task->IsDead() || task->GetType()!=IUnitTask::Type::BUILDER) return false;
+    auto* mex=static_cast<IBuilderTask*>(task);
+    if (mex->GetBuildType()!=IBuilderTask::BuildType::MEX || !mex->GetBuildDef()) return false;
+    if (mex->GetTarget()) return !mex->GetTarget()->IsDead() && !mex->GetTarget()->IsFinished();
+    auto* circuit=mgr->GetCircuit();
+    auto* terrain=circuit->GetTerrainManager();
+    const auto& pos=mex->GetPosition();
+    if (!geom::is_valid(pos) || terrain->IsZoneAlly(pos)
+        || terrain->IsAllyLayoutBlocked(mex->GetBuildDef(),pos,mex->GetFacing())) return false;
+    const auto& ids=circuit->GetCallback()->GetFriendlyUnitIdsIn(pos,mex->GetBuildDef()->GetExtrRangeM(),false);
+    for (int id:ids) {
+        auto* ally=circuit->GetFriendlyUnit(id);
+        if (ally && ally->GetCircuitDef()->IsMex()) return false;
+    }
+    return true;
 }
 
 static IUnitTask* CEconomyManager_EnqueueFieldUpgrade(CEconomyManager* mgr, CCircuitUnit* builder, const AIFloat3& center, float radius)
@@ -101,6 +143,8 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "void ClearAllyStarts()", asFUNCTION(CEconomyManager_ClearAllyStarts), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "void AddAllyStart(const AIFloat3& in)", asFUNCTION(CEconomyManager_AddAllyStart), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetMexTaskCountWithin(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetMexTaskCountWithin), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexAvoiding(CCircuitUnit@, const AIFloat3& in, float, bool, array<AIFloat3>@)", asFUNCTION(CEconomyManager_EnqueueMexAvoiding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMexTaskUsable(IUnitTask@)", asFUNCTION(CEconomyManager_IsMexTaskUsable), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	// Per-role energy table overrides (D-047); -1 keeps a field.
 	r = engine->RegisterObjectMethod("CEconomyManager", "void SetEnergyCondition(const CCircuitDef@, int limit, float metalIncome, float energyIncome)", asFUNCTION(CEconomyManager_SetEnergyCondition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEnergyLimit(const CCircuitDef@) const", asFUNCTION(CEconomyManager_GetEnergyLimit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

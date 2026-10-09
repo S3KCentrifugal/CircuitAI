@@ -477,7 +477,7 @@ void CBuilderManager::Init()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CBuilderManager::Update, this), 1/*interval*/, offset + 1);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CBuilderManager::Watchdog, this),
-								FRAMES_PER_SEC * 60,
+								FRAMES_PER_SEC * 5,
 								circuit->GetSkirmishAIId() * WATCHDOG_COUNT + 10);
 	};
 
@@ -488,7 +488,7 @@ int CBuilderManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 {
 	// D-108 crash: a new unit may be allocated where a freed one's stale
 	// unfinishedUnits key points; that entry (and its dead task) is not this unit's
-	unfinishedUnits.erase(unit);
+	EraseUnfinishedUnit(unit);
 
 	auto search = createdHandler.find(unit->GetCircuitDef()->GetId());
 	if (search != createdHandler.end()) {
@@ -604,7 +604,7 @@ int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 	}
 	// D-108 crash: the entry goes with the frame even when its task was already
 	// dequeued (DequeueTask erases by the task's current target only)
-	unfinishedUnits.erase(unit);
+	EraseUnfinishedUnit(unit);
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
 		DoneTask(itre->second);
@@ -651,7 +651,7 @@ int CBuilderManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	// D-108 crash: a dead unit never stays a key; the scans over unfinishedUnits
 	// (FindUnfinishedFor, FindUnfinishedNear, CountUnfinishedNear,
 	// GetUnfinishedCount) dereference it, and the unit is freed after this event
-	unfinishedUnits.erase(unit);
+	EraseUnfinishedUnit(unit);
 	auto itre = repairUnits.find(unit->GetId());
 	if (itre != repairUnits.end()) {
 		AbortTask(itre->second);
@@ -678,7 +678,7 @@ int CBuilderManager::UnitCaptured(CCircuitUnit* unit, int oldTeamId, int newTeam
 	if (iter != unfinishedUnits.end()) {
 		AbortTask(iter->second);
 	}
-	unfinishedUnits.erase(unit);
+	EraseUnfinishedUnit(unit);
 	return IModule::UnitCaptured(unit, oldTeamId, newTeamId);
 }
 
@@ -744,6 +744,11 @@ float CBuilderManager::GetStaticBuildPowerNear(const AIFloat3& position, float r
 
 int CBuilderManager::GetUnfinishedCount(const CCircuitDef* def) const
 {
+    const int indexed = def == nullptr ? 0 : unfinishedCounts.Count(def->GetId());
+    // Debug oracle deliberately retains the old O(N) scan. Never enable it
+    // for timing; it checks ownership, duplicate adoption and load callbacks.
+    static const bool verify = std::getenv("CIRCUIT_VERIFY_ECONOMY_INDEX") != nullptr;
+    if (!verify) return indexed;
 	// D-108 crash: the keys of unfinishedUnits are never dereferenced (one can
 	// outlive its unit); our live units are walked and looked up by pointer
 	int count = 0;
@@ -755,7 +760,24 @@ int CBuilderManager::GetUnfinishedCount(const CCircuitDef* def) const
 			++count;
 		}
 	}
-	return count;
+    if (indexed != count) circuit->LOG("[INVARIANT] INV-175 unfinished index=%i scan=%i def=%i", indexed, count, def == nullptr ? -1 : def->GetId());
+	return indexed;
+}
+
+void CBuilderManager::MarkUnfinishedUnit(CAllyUnit* target, IBuilderTask* task)
+{
+    unfinishedUnits[target] = task;
+    CCircuitUnit* own = circuit->GetTeamUnit(target->GetId());
+    if (own == target && !own->IsDead()) unfinishedCounts.Set(target, own->GetCircuitDef()->GetId());
+    else unfinishedCounts.Erase(target);
+}
+
+void CBuilderManager::EraseUnfinishedUnit(CAllyUnit* target)
+{
+    // The saved definition in the index permits removal of stale pointer keys
+    // without dereferencing them (D-108). Every map erase must use this path.
+    unfinishedCounts.Erase(target);
+    unfinishedUnits.erase(target);
 }
 
 CCircuitUnit* CBuilderManager::FindOwnNear(const AIFloat3& pos, float radius, const CCircuitDef* def)
@@ -944,9 +966,7 @@ IUnitTask* CBuilderManager::FindQueuedTask(CCircuitUnit* builder, IBuilderTask::
 		// D-093: with the layout on, an economy order the layout did not place is
 		// never adopted (played: the chain's take-over walked the commander to a
 		// turbine 467 elmos outside the layout)
-		if (experimentalBuild && !task->IsLayoutOwned()
-			&& ((type == IBuilderTask::BuildType::ENERGY) || (type == IBuilderTask::BuildType::CONVERT)
-				|| (type == IBuilderTask::BuildType::STORE) || (type == IBuilderTask::BuildType::NANO)))
+		if (experimentalBuild && !task->IsLayoutOwned() && IsLayoutEconomy(type))
 		{
 			continue;
 		}
@@ -1230,11 +1250,12 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 				case IBuilderTask::BuildType::RESURRECT: {
 				} break;
 				default: {
-					unfinishedUnits.erase(taskB->GetTarget());
+					EraseUnfinishedUnit(taskB->GetTarget());
 					// D-108 crash: and every other entry of this task (a task whose
 					// target changed left its old frame behind, a dangling key once freed)
 					for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
-						itu = (itu->second == taskB) ? unfinishedUnits.erase(itu) : std::next(itu);
+						if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
+						else ++itu;
 					}
 				} break;
 			}
@@ -1725,6 +1746,45 @@ IBuilderTask* CBuilderManager::MakeEnergizerTask(CCircuitUnit* unit, const CQuer
 // eligible improving candidates query the existing R reclaim/rez task claims.
 // Repair selection scans U friendly units. Reach tests run only for improving
 // candidates or the current job. Cache holds values/IDs, never borrowed wrappers.
+void CBuilderManager::RefreshRecoveryFeatures()
+{
+    const int frame = circuit->GetLastFrame();
+    auto* clb = circuit->GetCallback();
+    if (frame - recoveryFrame >= FRAMES_PER_SEC || frame < recoveryFrame) {
+        recoveryFrame = frame;
+        recoveryFeatures.clear(); // capacity retained across snapshots
+        auto features = clb->GetFeatures();
+        for (Feature* f : features) {
+            FeatureDef* def = f->GetDef();
+            const float metal = def->GetContainedResource(circuit->GetEconomyManager()->GetMetalRes()) * f->GetReclaimLeft();
+            const int rezId = clb->Feature_ResurrectDef(f->GetFeatureId());
+            CCircuitDef* rez = rezId > 0 ? circuit->GetCircuitDef(rezId) : nullptr;
+            if (def->IsReclaimable() && metal > 0) {
+                const bool ship = rez != nullptr && rez->IsMobile() && !rez->IsAbleToFly()
+                    && rez->GetDef()->GetMinWaterDepth() > 0;
+                recoveryFeatures.push_back({f->GetFeatureId(), f->GetPosition(), metal, ship});
+            }
+            delete def;
+        }
+        utils::free_clear(features);
+    }
+}
+
+float CBuilderManager::GetRecoveryMetal(CCircuitUnit* worker, float radius)
+{
+    if (worker == nullptr || !std::isfinite(radius) || radius <= 0) return 0.f;
+    RefreshRecoveryFeatures();
+    circuit->GetThreatMap()->SetThreatType(worker);
+    const auto& origin=worker->GetPos(circuit->GetLastFrame());
+    float value=0;
+    for (const auto& feature : recoveryFeatures) {
+        if (!feature.resurrect || origin.SqDistance2D(feature.pos)>radius*radius) continue;
+        if (circuit->GetTerrainManager()->CanReachAtSafe2(worker,feature.pos,worker->GetCircuitDef()->GetBuildDistance()))
+            value+=feature.metal;
+    }
+    return value;
+}
+
 IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred)
 {
     if (unit == nullptr || !unit->GetCircuitDef()->IsAbleToResurrect()
@@ -1777,24 +1837,7 @@ IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, fl
         }
         return task;
     }
-    if (frame - recoveryFrame >= FRAMES_PER_SEC || frame < recoveryFrame) {
-        recoveryFrame = frame;
-        recoveryFeatures.clear(); // capacity retained across snapshots
-        auto features = clb->GetFeatures();
-        for (Feature* f : features) {
-            FeatureDef* def = f->GetDef();
-            const float metal = def->GetContainedResource(circuit->GetEconomyManager()->GetMetalRes()) * f->GetReclaimLeft();
-            const int rezId = clb->Feature_ResurrectDef(f->GetFeatureId());
-            CCircuitDef* rez = rezId > 0 ? circuit->GetCircuitDef(rezId) : nullptr;
-            if (def->IsReclaimable() && metal > 0) {
-                const bool ship = rez != nullptr && rez->IsMobile() && !rez->IsAbleToFly()
-                    && rez->GetDef()->GetMinWaterDepth() > 0;
-                recoveryFeatures.push_back({f->GetFeatureId(), f->GetPosition(), metal, ship});
-            }
-            delete def;
-        }
-        utils::free_clear(features);
-    }
+    RefreshRecoveryFeatures();
     const SRecoveryFeature* selected = nullptr;
     for (const auto& f : recoveryFeatures) {
         if (mode == 2 && (!f.resurrect || clb->Feature_ResurrectDef(f.id) <= 0)) continue;
@@ -2195,10 +2238,72 @@ void CBuilderManager::Watchdog()
 {
 	ZoneScopedN(__PRETTY_FUNCTION__);
 
+	const int frame = circuit->GetLastFrame();
+    const bool legacyDue = frame >= nextLegacyWatchdog;
+    if (legacyDue) nextLegacyWatchdog = frame + 60 * FRAMES_PER_SEC;
+    if (!recoverConstruction && !legacyDue) return;
+    if (recoverConstruction && experimentalBuild) {
+        // Recovery of old queued chains after load/role adoption. These exact
+        // task kinds are refused by FindQueuedTask: counting one forever can
+        // block a layout prerequisite (played: 4 nanos + one timeout=0 ghost).
+        // Do not cancel a frame or detach productive owners. Enqueue/pin is
+        // atomic within a callback, so no new layout order is half-pinned here.
+        std::vector<IBuilderTask*> abandoned;
+        for (const auto& byType : buildTasks) for (auto* task : byType) {
+            if (!task->IsDead() && IsLayoutEconomy(task->GetBuildType()) && !task->IsLayoutOwned()
+                && !task->GetTarget() && task->GetAssignees().empty()) abandoned.push_back(task);
+        }
+        for (auto* task : abandoned) {
+            circuit->LOG("BUILD_RECOVERY: team=%d action=discard-unowned-chain def=%s",circuit->GetTeamId(),task->GetBuildDef()->GetDef()->GetName());
+            AbortTask(task);
+        }
+    }
+    // Opt-in fixture diagnostics: a queued task can block a script prerequisite
+    // even without a worker owning it. No callbacks/logging in normal games.
+    static const bool traceConstruction = std::getenv("CIRCUIT_BUILD_TRACE") != nullptr;
+    if (recoverConstruction && legacyDue && traceConstruction) {
+        for (const auto& byType : buildTasks) for (const auto* task : byType) {
+            if (task->IsDead() || task->GetTarget() || !task->GetBuildDef()) continue;
+            const auto& p = task->GetPosition();
+            circuit->LOG("BUILD_QUEUE: def=%s kind=%d owners=%u touched=%d timeout=%d layout=%d slot=%d power=%.2f pos=%.0f,%.0f",
+                task->GetBuildDef()->GetDef()->GetName(), int(task->GetBuildType()), unsigned(task->GetAssignees().size()),
+                task->GetLastTouched(), task->GetTimeout(), int(task->IsLayoutOwned()), task->GetReservationId(),
+                task->GetBuildPowerM(), p.x, p.z);
+            for (auto* owner : task->GetAssignees()) circuit->LOG("BUILD_QUEUE: owner=%d current=%d matches=%d commands=%d",
+                owner->GetId(), int(owner->GetTask()->GetType()), int(owner->GetTask()==task), int(circuit->GetCallback()->Unit_HasCommands(owner->GetId())));
+            for (auto* worker : workers) if (worker->GetCircuitDef()->CanBuild(task->GetBuildDef())) {
+                circuit->LOG("BUILD_QUEUE: candidate=%d can=%d reachable=%d", worker->GetId(), int(task->CanAssignTo(worker)),
+                    int(!geom::is_valid(p) || circuit->GetTerrainManager()->CanReachAtSafe(worker,p,worker->GetCircuitDef()->GetBuildDistance())));
+            }
+        }
+    }
 	CEconomyManager* economyMgr = circuit->GetEconomyManager();
 	Resource* metalRes = economyMgr->GetMetalRes();
 	// somehow workers get stuck
 	for (CCircuitUnit* worker : workers) {
+        IUnitTask* current = worker->GetTask();
+        if (recoverConstruction && current == idleTask) {
+            const bool listed = idleTask->GetAssignees().count(worker) != 0;
+            if (legacyDue && traceConstruction) circuit->LOG("BUILD_IDLE: team=%d worker=%d listed=%d taskFrame=%d state=%d commands=%d",
+                circuit->GetTeamId(),worker->GetId(),int(listed),worker->GetTaskFrame(),int(worker->GetTaskState()),
+                int(circuit->GetCallback()->Unit_HasCommands(worker->GetId())));
+            if (!listed) {
+                // Restore the exact idle owner's scheduling membership. This
+                // does not choose a build or interrupt a command; without it
+                // the normal idle slice can never ask this worker for a job.
+                circuit->LOG("BUILD_RECOVERY: team=%d builder=%d action=restore-idle-membership",circuit->GetTeamId(),worker->GetId());
+                idleTask->AssignTo(worker);
+            }
+        }
+        if (recoverConstruction && current && current->GetType() == IUnitTask::Type::BUILDER) {
+            auto* build = static_cast<IBuilderTask*>(current);
+            if (build->GetBuildDef() && build->GetBuildType() < IBuilderTask::BuildType::REPAIR) {
+                build->RecoverConstruction(worker, std::max(5, constructionRetrySeconds) * FRAMES_PER_SEC,
+                    std::max(constructionRetrySeconds + 5, constructionReleaseSeconds) * FRAMES_PER_SEC);
+                continue; // one recovery owner; no random radial move from legacy watchdog
+            }
+        }
+        if (!legacyDue) continue;
 		if (CCircuitUnit::ETaskState::EXECUTE != worker->GetTaskState()) {  // FIXME: Doesn't deal with Reclaim and Resurrect of Features
 			continue;
 		}
@@ -2236,6 +2341,8 @@ void CBuilderManager::Watchdog()
 			task->OnUnitMoveFailed(worker);
 		}
 	}
+
+	if (!legacyDue) return;
 
 	// find unfinished abandoned buildings
 	float maxCost = MAX_BUILD_SEC * std::min(economyMgr->GetAvgMetalIncome(), buildPower) * economyMgr->GetEcoFactor();

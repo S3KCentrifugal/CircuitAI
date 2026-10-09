@@ -25,11 +25,11 @@ Target CircuitAI's vendored **AngelScript 2.39.0 WIP**, version integer
 
 Do not treat the text `2.39.0 WIP` as a stable release boundary. Upstream WIP
 continued changing after CircuitAI's snapshot. Read
-[version compatibility](./references/version-compatibility.md) before using
+[version compatibility](../../../rjm.bar.docs/projects/circuitai/skills/convention-angelscript/references/version-compatibility.md) before using
 new or unusual syntax.
 
 For CircuitAI-specific callbacks, native types, and ownership rules, also read
-`doc/angelscript-references.md`.
+`../rjm.bar.docs/projects/circuitai/angelscript-references.md`.
 
 ## Guiding Style
 
@@ -125,7 +125,7 @@ that the language does not provide.
      host registers it.
 
 8. **Perform a performance pass.**
-   - Read the [CircuitAI performance contracts](../../doc/performance/engineering-guide.md).
+   - Read the [CircuitAI performance contracts](../../../rjm.bar.docs/projects/circuitai/performance/engineering-guide.md).
      Document complexity, lifetime, invalidation and an equivalence test near
      optimized code; distinguish native calls, CPU time and synchronized orders.
    - Identify callback frequency and collection sizes.
@@ -208,7 +208,7 @@ array<int> CollectPositive(const array<int>& in values)
 
 Returning a fresh array is appropriate for setup, configuration, and small
 collections. In hot updates, prefer an output buffer or in-place compaction;
-see [performance and safety](./references/performance-and-safety.md).
+see [performance and safety](../../../rjm.bar.docs/projects/circuitai/skills/convention-angelscript/references/performance-and-safety.md).
 When receiving a returned reference container without another copy, bind it to
 a handle: `array<int>@ positive = CollectPositive(values);`.
 
@@ -316,6 +316,16 @@ host-specific effects.
 
 ## Review Checklist
 
+For local power queries (D-243), retain the original census publication cadence.
+A per-frame spatial index must also invalidate on `ai.GetOwnedUnitRevision()`:
+transfers/destruction can occur between asks in the same frame. Index candidates,
+not mutable eligibility or final floating totals. Sort candidates into the old
+ID order before summation, reread task/retirement flags, and retain pending-task
+traversal order. This is O(N) once per used frame plus local candidates per query,
+not an O(1) economy. `Sea::VerifyPowerIndex` repeats the old scan for correctness;
+disable it when measuring performance. Immutable UnitDef names may be classified
+once, but mutable role/attribute policy must not inherit that cache lifetime.
+
 - [ ] Exact engine pin and host registration were checked.
 - [ ] Every optional handle and downcast is null-checked.
 - [ ] Handle assignment and object assignment are not confused.
@@ -339,6 +349,6 @@ host-specific effects.
 
 ## References
 
-- [Popular idioms and examples](./references/idioms.md)
-- [Performance, memory, and safety](./references/performance-and-safety.md)
-- [Version compatibility and sources](./references/version-compatibility.md)
+- [Popular idioms and examples](../../../rjm.bar.docs/projects/circuitai/skills/convention-angelscript/references/idioms.md)
+- [Performance, memory, and safety](../../../rjm.bar.docs/projects/circuitai/skills/convention-angelscript/references/performance-and-safety.md)
+- [Version compatibility and sources](../../../rjm.bar.docs/projects/circuitai/skills/convention-angelscript/references/version-compatibility.md)

@@ -23,6 +23,7 @@ k/n <key> <have>/<target>: ordered|assist|waiting by <def> <id>` on change;
 `[TECH][Chain] complete at <s> s`.
 
 ******************************************************************************/
+#include "../helpers/nuke_math.as"
 namespace TechChain
 {
     class Step
@@ -69,6 +70,206 @@ namespace TechChain
     int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
 
     bool Active() { return active && !done; }
+    bool NukeRush() { return Active() && objective == "nuke"; }
+    bool nukeLabReleased = false;
+    int nukeRetiredLabId = -1;
+    bool nukeBayReleased = false;
+    float nukePreviousReclaim = 0.0f;
+    int nukePreviousT1Minimum = 0;
+    int nukePreviousT2Minimum = 0;
+    bool nukeOpening = false;
+    int nukeRefundWorker = -1;
+    bool nukeStorageReleased = false;
+    int nukeStorageCheckFrame = 0;
+    int nukeStorageTraceFrame = 0;
+    string nukeEnergyDef;
+    int nukeSiloEnergyCount = 0;
+    int nukeFundingSilo = -1;
+    int nukeFundingUntil = 0;
+    array<Id> nukeLowPriority;
+
+    void ReleaseStockpileBudget()
+    {
+        for (uint i = 0; i < nukeLowPriority.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(nukeLowPriority[i]);
+            if (u !is null) u.SetBuildPriorityOverride(-1);
+        }
+        nukeLowPriority.resize(0);
+        nukeFundingSilo = -1;
+    }
+
+    void LeaveNukeOpening()
+    {
+        if (!nukeOpening) return;
+        ReleaseStockpileBudget();
+        Global::RoleSettings::Tech::MinimumT1ConstructorBots = nukePreviousT1Minimum;
+        Global::RoleSettings::Tech::MinimumT2ConstructorBots = nukePreviousT2Minimum;
+        nukeOpening = false;
+        active = false;
+        done = true;
+        GenericHelpers::LogUtil("[TECH][NukeRush] role exit released resource priorities", 1);
+        // Commands restores native economy settings immediately afterward.
+        // No per-unit resource priority may leak into the incoming role.
+    }
+
+    void FirstStockpileBudget()
+    {
+        if (nukeFundingSilo < 0) return;
+        CCircuitUnit@ silo = ai.GetTeamUnit(nukeFundingSilo);
+        if (!NukeMath::KeepFirstStockpileBudget(silo !is null, silo is null ? 0 : silo.GetStockpile(), ai.frame, nukeFundingUntil)) {
+            ReleaseStockpileBudget();
+            GenericHelpers::LogUtil("[TECH][NukeRush] first-stockpile resource priority released", 1);
+            return;
+        }
+        // Economic decisions/layout already resumed. BAR's low build priority
+        // lets those tasks consume the surplus after the stockpile rather than
+        // starving the first missile. Generation and reconnaissance stay high.
+        // One O(N) pass per existing TECH tick, for this short opening only.
+        // The native effective-priority cache suppresses unchanged commands.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        nukeLowPriority.resize(0);
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef.GetBuildSpeed() <= 0.0f) continue;
+            IUnitTask@ task = u.task;
+            int priority = -1;
+            if (task !is null && !task.IsExternalControlled() && !task.IsEnemyReclaim()
+                && task.GetType() != int(Task::Type::PLAYER) && task.GetType() != int(Task::Type::RETREAT)) {
+                IBuilderTask@ work = cast<IBuilderTask>(task);
+                if (work !is null) {
+                    priority = 0;
+                    if (work.GetBuildType() == int(Task::BuildType::RECLAIM)) priority = 1;
+                    CCircuitDef@ d = work.buildDef;
+                    if (d !is null && (d.GetName() == DefFor("wind") || d.GetName() == DefFor("solar")
+                        || d.GetName() == DefFor("advsolar")
+                        || d.GetName() == DefFor("ap")
+                        || d.GetName() == UnitHelpers::GetT1AirScoutForSide(Global::AISettings::Side))) priority = 1;
+                }
+            }
+            u.SetBuildPriorityOverride(priority);
+            if (priority >= 0) nukeLowPriority.insertLast(u.id);
+        }
+    }
+
+    void RefundEmptyStorage(CCircuitDef@ siloDef)
+    {
+        if (nukeStorageReleased || siloDef is null || !nukeBayReleased
+            // Start before stalling: the engine retains a small resource margin
+            // even at zero effective income surplus. Never require literal zero.
+            || aiEconomyMgr.metal.current > AiMax(50.0f, aiEconomyMgr.metal.storage
+                * AiMax(0.0f, AiMin(0.25f, Global::RoleSettings::Tech::NukeRushStorageLowPercent)))
+            || ai.frame < nukeStorageCheckFrame) return;
+        nukeStorageCheckFrame = ai.frame + 5 * SECOND;
+        CCircuitUnit@ silo = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(),
+            Global::RoleSettings::Tech::ChainAssistRadius, siloDef);
+        if (silo is null) return;
+        CCircuitDef@ storeDef = ai.GetCircuitDef(DefFor("mstor"));
+        if (storeDef is null || aiEconomyMgr.metal.current + storeDef.costM >= 1000.0f) return;
+        // One bounded early-game scan, only during a low-bank silo build.
+        // Count actual in-range assistants, not reserved future build power.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        CCircuitUnit@ store = null;
+        float power = 0.0f;
+        const AIFloat3 siloPos = silo.GetPos(ai.frame);
+        const float siloRadius = siloDef.GetModelRadius();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.GetBuildProgress() < 1.0f) continue;
+            if (u.circuitDef is storeDef && !Lifecycle::IsRetiring(u)) @store = u;
+            IBuilderTask@ task = u.task is null ? null : cast<IBuilderTask>(u.task);
+            const float reach = u.circuitDef.GetBuildDistance() + siloRadius;
+            const AIFloat3 pos = u.GetPos(ai.frame);
+            const float dy = pos.y - siloPos.y;
+            if (task !is null && task.target is silo && reach > 0.0f
+                && MapHelpers::SqDist(pos, siloPos) + dy * dy <= reach * reach)
+                power += u.circuitDef.GetBuildSpeed();
+        }
+        const bool trace = ai.frame >= nukeStorageTraceFrame;
+        if (trace) {
+            nukeStorageTraceFrame = ai.frame + 30 * SECOND;
+            GenericHelpers::LogUtil("[TECH][NukeRush] storage refund check: bank=" + int(aiEconomyMgr.metal.current)
+                + " store=" + (store is null ? -1 : store.id) + " assignedBP=" + int(power)
+                + " income=" + aiEconomyMgr.metal.income + " buildTime=" + siloDef.GetBuildTime(), 1);
+        }
+        if (store is null) return;
+        // Retain enough active assistance to spend incoming metal on the silo.
+        // Never divert its construction owner, a mex worker or a distant
+        // worker. Ordinary TECH never enters this exception to storage policy.
+        const float storeRadius = storeDef.GetModelRadius();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !(UnitHelpers::IsCommander(u.circuitDef)
+                || UnitHelpers::IsT1BotConstructor(u.circuitDef.GetName()))) continue;
+            IBuilderTask@ task = u.task is null ? null : cast<IBuilderTask>(u.task);
+            const float reach = u.circuitDef.GetBuildDistance() + storeRadius;
+            const float dy = u.GetPos(ai.frame).y - store.GetPos(ai.frame).y;
+            if (trace) GenericHelpers::LogUtil("[TECH][NukeRush] storage assistant: unit=" + u.id
+                + " target=" + (task is null || task.target is null ? -1 : task.target.id)
+                + " reach=" + reach + " distanceSq=" + MapHelpers::SqDist(u.GetPos(ai.frame), store.GetPos(ai.frame))
+                + " BP=" + u.circuitDef.GetBuildSpeed() + " siloOwner=" + u.circuitDef.CanBuild(siloDef), 3);
+            // Assistants may join the original BIG_GUN construction task as
+            // well as a separate REPAIR task. T1 workers cannot build this silo,
+            // so the CanBuild exclusion protects its original owner either way.
+            if (task is null || task.target !is silo || u.circuitDef.CanBuild(siloDef)
+                || task.IsExternalControlled() || task.IsEnemyReclaim()
+                || !NukeMath::RefundHasSparePower(aiEconomyMgr.metal.income, siloDef.costM, siloDef.GetBuildTime(), power, u.circuitDef.GetBuildSpeed())
+                || !NukeMath::LocalRefundWorker(MapHelpers::SqDist(u.GetPos(ai.frame), store.GetPos(ai.frame)) + dy * dy,
+                    reach, Global::RoleSettings::Tech::NukeRushStorageReclaimMove)) continue;
+            // A T1 bot needs more than 30 s to reclaim a full store. Use its
+            // actual build time and worker power, with room for the short walk;
+            // truncating this task leaves a partly reclaimed store and no refund.
+            const int refundSeconds = AiMax(60, int(storeDef.GetBuildTime() / u.circuitDef.GetBuildSpeed()) + 30);
+            IUnitTask@ reclaim = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, store, refundSeconds * SECOND));
+            if (reclaim is null) return;
+            nukeStorageReleased = true;
+            Lifecycle::Retire(store, "nuke opening: low bank; surplus assistance refunds storage (D-229)");
+            aiBuilderMgr.AssignTask(u, reclaim);
+            GenericHelpers::LogUtil("[TECH][NukeRush] refund storage " + store.id + " using surplus assistant " + u.id
+                + " bank=" + int(aiEconomyMgr.metal.current) + " assignedBP=" + int(power), 1);
+            return;
+        }
+    }
+
+    void StaffOpeningRefund()
+    {
+        if (!NukeRush() || nukeRefundWorker >= 0 || !TechBuild::T2Begun()) return;
+        CCircuitUnit@ lab = Factory::primaryT1BotLab;
+        if (lab is null || !Lifecycle::IsRetiring(lab)) return;
+        // Reassign one local assistant, never the owner of the advanced-lab
+        // build task. Waiting for all repairs to finish delays this refund
+        // until the T2 lab is already complete, missing its useful window.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        CCircuitUnit@ worker = null;
+        float best = 800.0f * 800.0f;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !UnitHelpers::IsT1BotConstructor(u.circuitDef.GetName()) || u.GetBuildProgress() < 1.0f) continue;
+            IBuilderTask@ task = u.task is null ? null : cast<IBuilderTask>(u.task);
+            if (task is null || task.GetBuildType() != int(Task::BuildType::REPAIR)) continue;
+            const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), lab.GetPos(ai.frame));
+            if (sq < best) { best = sq; @worker = u; }
+        }
+        if (worker is null) return;
+        IUnitTask@ reclaim = TechBuild::ReclaimT1Lab(worker, 800.0f);
+        if (reclaim is null) return;
+        nukeRefundWorker = worker.id;
+        aiBuilderMgr.AssignTask(worker, reclaim);
+        GenericHelpers::LogUtil("[TECH][NukeRush] local assistant " + worker.id + " refunds the first lab during T2 construction", 1);
+    }
+
+    bool NukeConstructorsReady(int wanted = -1)
+    {
+        if (!NukeRush()) return false;
+        // Only while considering one lab retirement. Counts include factory
+        // frames; never reclaim a lab with the required constructor unfinished.
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        int ready = 0;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u !is null && UnitHelpers::IsT2BotConstructor(u.circuitDef.GetName()) && u.GetBuildProgress() >= 1.0f) ++ready;
+        }
+        return ready >= (wanted < 0 ? wantAck : wanted);
+    }
 
     // D-084: a dear step (fusion, advanced lab, advanced fusion, silo, gantry)
     // has an order out and no frame yet: every builder belongs to it until
@@ -81,6 +282,9 @@ namespace TechChain
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
             if (s.key == "income" || (i < skipped.length() && skipped[i])) continue;
+            if (NukeRush() && s.key == "lab" && TechBuild::WasIntoT2()) continue;
+            if (NukeRush() && s.key == "alab" && nukeLabReleased) continue;
+            if (NukeRush() && s.key == "mstor" && nukeStorageReleased) continue;
             // D-101 (played: with the metal floating the builders went past the
             // upgrades (D-100), the last upgrade order waited with no frame, this
             // blocked the converters, energy floated 600 s and the chain held the
@@ -116,6 +320,8 @@ namespace TechChain
         if (key == "lab") return UnitHelpers::GetT1BotLabForSide(side);
         if (key == "alab") return UnitHelpers::GetT2BotLabForSide(side);
         if (key == "nano") return UnitHelpers::GetT1NanoNameForSide(side);
+        if (key == "mstor") return UnitHelpers::GetMetalStorageNameForSide(side);
+        if (key == "estor") return UnitHelpers::GetEnergyStorageNameForSide(side);
         if (key == "nanot2") { if (side == "cortex") return "cornanotct2"; if (side == "legion") return "legnanotct2"; return "armnanotct2"; }
         if (key == "fusion") return UnitHelpers::GetFusionNameForSide(side);
         if (key == "afus") return UnitHelpers::GetAdvFusionNameForSide(side);
@@ -180,6 +386,7 @@ namespace TechChain
         if (key == "lab" || key == "alab" || key == "gantry" || key == "silo" || key == "aap" || key == "ap") return Task::BuildType::FACTORY;
         if (key == "lrpc") return Task::BuildType::BIG_GUN;   // D-080
         if (key == "nano" || key == "nanot2") return Task::BuildType::NANO;
+        if (key == "mstor" || key == "estor") return Task::BuildType::STORE;
         return Task::BuildType::ENERGY;
     }
 
@@ -235,13 +442,25 @@ namespace TechChain
     // the eco player's core structure; the benchmarks set the others.
     string Choose()
     {
-        return "afus";
+        return TechPlan::Choose() == "nuke" ? "nuke" : "afus";
     }
 
     void Init()
     {
         steps.resize(0);
         active = false; done = false;
+        nukeLabReleased = false;
+        nukeRetiredLabId = -1;
+        nukeBayReleased = false;
+        nukeOpening = false;
+        nukeRefundWorker = -1;
+        nukeStorageReleased = false;
+        nukeStorageCheckFrame = 0;
+        nukeStorageTraceFrame = 0;
+        nukeEnergyDef = "";
+        nukeSiloEnergyCount = 0;
+        ReleaseStockpileBudget();
+        powerSiteRetry = 0;
         if (MetalEconomy::Active()) return; // field growth has no finite mex/converter recipe
         stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
         objective = Global::RoleSettings::Tech::RushObjective;
@@ -271,10 +490,16 @@ namespace TechChain
         // are the constructors' (played: a commander sent 1,500 elmos out for
         // a fourth mex before the lab).
         Add("mex", Global::RoleSettings::Tech::OpeningMexCap, Global::RoleSettings::Tech::OpeningMexRadius);
+        if (objective == "nuke") {
+            // A third T1 worker keeps local energy/recycling work available
+            // while one expands and another opens the technology lab.
+            wantCk = AiMax(2, Global::RoleSettings::Tech::NukeRushT1Constructors);
+        }
         Add("lab", 1);
         Add(energy, e1);
         Add("mex", mexes, Global::RoleSettings::Tech::ChainMexFarRadius);
         Add(energy, e2);
+        if (objective == "nuke") Add("estor", 1);
         Add("alab", 1);
         if (objective == "fusion") {
             Add("fusion", 1);
@@ -287,9 +512,30 @@ namespace TechChain
             wantAck = 2;
             Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("afus", 1);
         } else if (objective == "nuke") {
-            wantAck = 2;
-            // played: two advanced solars cost four minutes on an energy-starved base; the fusion and the solars carry the silo
-            Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("silo", 1);
+            wantAck = AiMax(1, Global::RoleSettings::Tech::NukeRushT2Constructors);
+            const int rushEnergy = int(Global::RoleSettings::Tech::NukeRushBootstrapEnergy / 20.0f * scale + 0.5f);
+            nukeEnergyDef = DefFor(energy);
+            nukeSiloEnergyCount = AiMax(rushEnergy, int(Global::RoleSettings::Tech::NukeRushSiloEnergy / 20.0f * scale + 0.5f));
+            Add("mstor", 1);
+            Add(energy, rushEnergy);
+            Add("moho", 1);
+            // BAR refunds an owned building's metal at reclaim completion.
+            // One store preserves the technology-lab refund instead of losing
+            // it against the small early bank before the fusion can spend it.
+            Add("nano", Global::RoleSettings::Tech::NukeRushTurrets);
+            Add("fusion", 1);
+            Add(energy, nukeSiloEnergyCount);
+            // A second T2 constructor owns the remaining bounded upgrades in
+            // Next(). Do not hold the silo behind that worker's travel time.
+            // With only one T2 constructor the upgrades remain sequential.
+            if (wantAck < 2) Add("moho", Global::RoleSettings::Tech::NukeRushMexUpgrades);
+            Add("estor", Global::RoleSettings::Tech::NukeRushEnergyStores);
+            Add("silo", 1); // reconnaissance lab is funded after silo completion
+            nukeOpening = true;
+            nukePreviousReclaim = aiEconomyMgr.reclEnergyEff;
+            nukePreviousT1Minimum = Global::RoleSettings::Tech::MinimumT1ConstructorBots;
+            nukePreviousT2Minimum = Global::RoleSettings::Tech::MinimumT2ConstructorBots;
+            aiEconomyMgr.reclEnergyEff = 0.0f; // keep bootstrap energy until the silo stands
         } else if (objective == "gantry") {
             wantAck = 2;
             Add(energy, e3); Add("moho", 2); Add("fusion", 1); Add("nano", 2); Add("gantry", 1);
@@ -337,15 +583,40 @@ namespace TechChain
 
     void Tick()
     {
+        FirstStockpileBudget();
+        StaffOpeningRefund();
         TrackEnergy();   // D-079
         Layout::TickSets();   // D-101
         if (!Active()) return;
+        if (NukeRush()) {
+            CCircuitDef@ silo = ai.GetCircuitDef(DefFor("silo"));
+            if (silo !is null && silo.count - aiBuilderMgr.GetUnfinishedCount(silo) > 0) { Complete(); return; }
+            RefundEmptyStorage(silo);
+            CCircuitUnit@ retired = ai.GetTeamUnit(nukeRetiredLabId);
+            // Completed turrets can join after retirement. The native join
+            // predicate sends nothing to turrets already reclaiming this lab;
+            // PullTurrets bounds this early-game O(N) scan to once per 2 s.
+            if (retired !is null) TechBuild::PullTurrets(retired);
+        }
+        if (NukeRush() && nukeLabReleased && !nukeBayReleased && Lifecycle::goneAt.exists("" + nukeRetiredLabId)) {
+            // The retired lab's bay is available to the rush project. Later
+            // T2 recovery uses Layout::T2LabTask's normal re-planning path.
+            if (Layout::labSlot >= 0) aiTerrainMgr.ReleaseReservation(Layout::labSlot);
+            Layout::labSlot = -1;
+            aiTerrainMgr.SetLayoutInt(Layout::BOX + ".lab_slot", -1);
+            if (TechBuild::t2LabExitZone > 0) aiTerrainMgr.ReleaseZone(TechBuild::t2LabExitZone);
+            TechBuild::t2LabExitZone = 0;
+            if (Factory::primaryT2BotLab !is null && Factory::primaryT2BotLab.id == nukeRetiredLabId)
+                @Factory::primaryT2BotLab = null;
+            nukeBayReleased = true;
+            GenericHelpers::LogUtil("[TECH][NukeRush] retired lab bay and exit released", 1);
+        }
         for (uint i = 0; i < steps.length(); ++i) {
             // D-100 (owner: the fusion started with the mexes near it still T1; it
             // would have come sooner upgraded): the moho step upgrades every mex of
             // ours within ChainMexFarRadius, the ground the mex steps took, the
             // recipe's count at least
-            if (steps[i].key == "moho" && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f) {
+            if (!NukeRush() && steps[i].key == "moho" && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f) {
                 const int near = Economy::MexTracker::GetOwnedMexCountInRange(Global::Map::StartPos, Global::RoleSettings::Tech::ChainMohoRadius);
                 const int want = (near > steps[i].base) ? near : steps[i].base;
                 if (want != steps[i].target) {
@@ -379,6 +650,72 @@ namespace TechChain
             + " by " + u.circuitDef.GetName() + " " + u.id, changed ? 1 : 3);
     }
 
+    string projectBlocker = "";
+    int projectBlockerLog = 0;
+    void ProjectBlocked(const string& in reason, CCircuitDef@ d, int completed, int required, int queued=0) {
+        const string key=d.GetName()+":"+reason+":"+completed+":"+required+":"+queued;
+        if (key==projectBlocker && ai.frame<projectBlockerLog) return;
+        projectBlocker=key; projectBlockerLog=ai.frame+30*SECOND;
+        GenericHelpers::LogUtil("[TECH][ProjectBlocked] def="+d.GetName()+" reason="+reason
+            +" completed="+completed+" required="+required+" queued="+queued+" siteRetryUntil="+powerSiteRetry,1);
+    }
+    int powerSiteRetry = 0;
+    IUnitTask@ SupportedProject(CCircuitDef@ d, Task::BuildType type)
+    {
+        if (d.GetName() == DefFor("silo")) {
+            CCircuitDef@ fusion = ai.GetCircuitDef(DefFor("fusion"));
+            if (fusion is null || fusion.count - aiBuilderMgr.GetUnfinishedCount(fusion) == 0) {
+                ProjectBlocked("completed-fusion",d,0,1,
+                    fusion is null ? 0 : aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY),fusion));
+                Invariants::Violation("INV-169", "nuke-power", "nuke opening attempted a silo before its required fusion completed");
+                return null;
+            }
+            // T2 workers skip T1 energy steps; enforce the completed production
+            // buffer at admission too, rather than counting planned generators.
+            CCircuitDef@ buffer = ai.GetCircuitDef(nukeEnergyDef);
+            if (buffer is null || buffer.count - aiBuilderMgr.GetUnfinishedCount(buffer) < nukeSiloEnergyCount) {
+                ProjectBlocked("energy-buffer",d,buffer is null ? 0 : buffer.count-aiBuilderMgr.GetUnfinishedCount(buffer),nukeSiloEnergyCount);
+                return null;
+            }
+        }
+        // D-229: planned turret slots are not usable build power. This opt-in
+        // query ranks legal layout sites by completed assistants in range.
+        // A failed site search is shared by all builders for five seconds.
+        if (ai.frame < powerSiteRetry) return null;
+        CCircuitDef@ nd = ai.GetCircuitDef(DefFor("nano"));
+        const int required = d.GetName() == DefFor("fusion")
+            ? AiMin(Global::RoleSettings::Tech::NukeRushTurrets, Global::RoleSettings::Tech::NukeRushFusionTurrets)
+            : Global::RoleSettings::Tech::NukeRushTurrets;
+        if (nd is null || nd.count - aiBuilderMgr.GetUnfinishedCount(nd) < required) {
+            ProjectBlocked("completed-turrets",d,nd is null ? 0 : nd.count-aiBuilderMgr.GetUnfinishedCount(nd),required,
+                nd is null ? 0 : aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO),nd));
+            return null;
+        }
+        powerSiteRetry = ai.frame + 5 * SECOND;
+        for (int z = 0; z < Layout::ZoneCount(); ++z) {
+            const int slot = aiTerrainMgr.PackNearBuiltPower(Layout::ZoneAt(z), d, Layout::nanoGroup,
+                Layout::facing, Layout::TurretSeed(), 16.0f);
+            if (slot < 0) continue;
+            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, d,
+                aiTerrainMgr.GetReservationPos(slot), 0.0f, true, 300 * SECOND));
+            if (t is null) {
+                ProjectBlocked("enqueue-rejected",d,nd.count-aiBuilderMgr.GetUnfinishedCount(nd),required);
+                aiTerrainMgr.ReleaseReservation(slot); return null;
+            }
+            if (!AiPinReservation(t, slot)) {
+                ProjectBlocked("pin-rejected-slot-"+slot,d,nd.count-aiBuilderMgr.GetUnfinishedCount(nd),required);
+                aiBuilderMgr.AbortTask(t);
+                aiTerrainMgr.ReleaseReservation(slot);
+                return null;
+            }
+            projectBlocker="";
+            powerSiteRetry = 0;
+            return t;
+        }
+        ProjectBlocked("no-supported-site",d,nd.count-aiBuilderMgr.GetUnfinishedCount(nd),required);
+        return null;
+    }
+
     IUnitTask@ Order(int i, Step@ s, CCircuitDef@ d, CCircuitUnit@ u)
     {
         const string key = s.key;
@@ -396,11 +733,25 @@ namespace TechChain
         if (key == "alab") return Layout::T2LabTask(300 * SECOND);
         if (key == "moho") {
             AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
-            if (at.x < 0.0f) return null;
+            if (at.x < 0.0f) {
+                if (NukeRush() && aiBuilderMgr.GetUnfinishedCount(d) == 0
+                    && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), d) == 0) s.exhausted = true;
+                return null;
+            }
             return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
         }
-        if (key == "nano") return Layout::NanoTask(u, Task::Priority::HIGH);
-        if (key == "silo") return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
+        if (key == "nano") {
+            // A distant mex worker must not own a no-frame turret reservation
+            // while local workers wait for the completed bank. It can assist
+            // a real frame, but only local builders reserve new rush turrets.
+            if (NukeRush() && MapHelpers::SqDist(u.GetPos(ai.frame), Layout::TurretSeed()) > 800.0f * 800.0f) return null;
+            return Layout::NanoTask(u, Task::Priority::HIGH, NukeRush() ? 2 : -1);
+        }
+        if (NukeRush() && (key == "fusion" || key == "silo"))
+            return SupportedProject(d, key == "silo" ? Task::BuildType::BIG_GUN : Task::BuildType::ENERGY);
+        if (key == "silo") {
+            return Builder::EnqueueNukeSilo(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
+        }
         if (key == "gantry") {
             bool routed;   // D-114: a front factory cluster from +200 metal
             IUnitTask@ ft = TechFactories::Route(UnitHelpers::GetLandGantryForSide(Global::AISettings::Side), u, routed);
@@ -451,7 +802,24 @@ namespace TechChain
         CCircuitUnit@ lab = Factory::primaryT1BotLab;
         if (lab is null || lab is u || Lifecycle::IsRetiring(lab)) return null;   // D-076
         if (TechFactories::IsSpamLab(lab)) return null;   // D-119
-        if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors()) > 0) return null;
+        if (NukeRush()) {
+            // The first lab can consume the starting energy before a turbine
+            // exists. Extra assistance cannot accelerate an energy-starved
+            // constructor: let the commander execute the energy step instead.
+            if (aiEconomyMgr.energy.current < 300.0f && aiEconomyMgr.energy.income < 90.0f) return null;
+            // Definition counts include unfinished factory products. Keep the
+            // commander assisting the first real constructor frame until it
+            // completes; a frame at 1% is not replacement build power yet.
+            array<Id>@ ids = ai.GetOwnedUnitIds();
+            CCircuitUnit@ frame = null;
+            for (uint i = 0; i < ids.length(); ++i) {
+                CCircuitUnit@ con = ai.GetTeamUnit(ids[i]);
+                if (con is null || !UnitHelpers::IsT1BotConstructor(con.circuitDef.GetName())) continue;
+                if (con.GetBuildProgress() >= 1.0f) return null;
+                @frame = con;
+            }
+            if (frame !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 10 * SECOND));
+        } else if (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors()) > 0) return null;
         IUnitTask@ g = GuardHelpers::AssignWorkerGuard(u, lab, Task::Priority::HIGH, true, 20 * SECOND);
         if (g !is null && ai.frame - firstConLog > 30 * SECOND) {
             firstConLog = ai.frame;
@@ -460,12 +828,64 @@ namespace TechChain
         return g;
     }
 
+    bool RushExpansionWorker(CCircuitUnit@ u)
+    {
+        return (Builder::primaryT1BotConstructor !is null && u.id == Builder::primaryT1BotConstructor.id)
+            || (wantCk >= 3 && Builder::secondaryT1BotConstructor !is null && u.id == Builder::secondaryT1BotConstructor.id);
+    }
+
     IUnitTask@ Next(CCircuitUnit@ u)
     {
         if (!Active() || u is null || u.circuitDef is null) return null;
+        if (NukeRush() && UnitHelpers::IsT2BotConstructor(u.circuitDef.GetName())) {
+            // The second technology builder grows income while the first
+            // opens the fusion. Do not serialize both workers behind the
+            // turret/energy preparation steps; that loses the mex payback.
+            CCircuitDef@ fusion = ai.GetCircuitDef(DefFor("fusion"));
+            CCircuitDef@ nano = ai.GetCircuitDef(DefFor("nano"));
+            CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
+            const int beforeFusion = AiMin(Global::RoleSettings::Tech::NukeRushMexUpgrades,
+                Global::RoleSettings::Tech::NukeRushMexBeforeFusion);
+            const bool incomeReady = moho !is null && moho.count - aiBuilderMgr.GetUnfinishedCount(moho) >= beforeFusion;
+            const bool powerReady = nano !is null && nano.count - aiBuilderMgr.GetUnfinishedCount(nano)
+                >= AiMin(Global::RoleSettings::Tech::NukeRushTurrets, Global::RoleSettings::Tech::NukeRushFusionTurrets);
+            // The first available T2 worker starts fusion. Waiting for a
+            // designated primary stranded the base while that unit finished a
+            // distant fourth upgrade. The shared queued/frame checks below
+            // already prevent duplicate fusion orders.
+            const bool openProject = powerReady && incomeReady && fusion !is null && fusion.count == 0;
+            if (!openProject && moho !is null && moho.count - aiBuilderMgr.GetUnfinishedCount(moho)
+                < Global::RoleSettings::Tech::NukeRushMexUpgrades) {
+                Step upgrade("moho", moho.GetName(), Global::RoleSettings::Tech::NukeRushMexUpgrades);
+                IUnitTask@ task = moho.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), moho)
+                    < upgrade.target ? Order(-1, @upgrade, moho, u) : null;
+                if (task !is null) return task;
+                CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame),
+                    Global::RoleSettings::Tech::ChainAssistRadius, moho);
+                if (frame !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 30 * SECOND));
+            }
+        }
         {
             IUnitTask@ g = CommanderOnFirstConstructor(u);
             if (g !is null) return g;
+        }
+        if (NukeRush() && !NukeConstructorsReady(1)
+            && UnitHelpers::IsCommander(u.circuitDef)) {
+            CCircuitUnit@ lab = Factory::primaryT2BotLab;
+            if (lab !is null && lab.GetBuildProgress() >= 1.0f && !Lifecycle::IsRetiring(lab)) {
+                // Do not divide a small metal income among new turret frames
+                // and the technology constructor. Assist the actual unit frame
+                // rather than walking a guard task into the factory footprint.
+                array<Id>@ ids = ai.GetOwnedUnitIds();
+                for (uint j = 0; j < ids.length(); ++j) {
+                    CCircuitUnit@ con = ai.GetTeamUnit(ids[j]);
+                    if (con !is null && UnitHelpers::IsT2BotConstructor(con.circuitDef.GetName())
+                        && con.GetBuildProgress() < 1.0f
+                        && MapHelpers::SqDist(u.GetPos(ai.frame), con.GetPos(ai.frame)) < 600.0f * 600.0f)
+                        return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, con, 10 * SECOND));
+                }
+                return TechBuild::Wait(SECOND);
+            }
         }
         // D-075: a cheap step's frame beside the builder is finished before
         // anything else (played: two turret frames were left to decay while
@@ -474,6 +894,11 @@ namespace TechChain
             const AIFloat3 here = u.GetPos(ai.frame);
             for (uint i = 0; i < steps.length(); ++i) {
                 Step@ s = steps[i];
+                if (NukeRush() && nukeStorageReleased && s.key == "mstor") continue;
+                if (NukeRush() && s.key == "mex" && s.radius > Global::RoleSettings::Tech::OpeningMexRadius
+                    && !RushExpansionWorker(u)) continue;
+                if (NukeRush() && UnitHelpers::GetConstructorTier(u.circuitDef) >= 2
+                    && (s.key == "mex" || s.key == "wind" || s.key == "solar" || s.key == "mstor" || s.key == "nano")) continue;
                 CCircuitDef@ d = ai.GetCircuitDef(s.defName);
                 if (d is null || (i < skipped.length() && skipped[i])) continue;
                 if (d.costM >= Global::RoleSettings::Tech::ChainParallelCostM) continue;
@@ -489,6 +914,12 @@ namespace TechChain
         bool unmet = false;   // some step is not met, whether or not this builder could help
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
+            if (NukeRush() && nukeStorageReleased && s.key == "mstor") continue;
+            // Disallow both starting AND assisting distant expansion with the
+            // slow commander / local technology worker. Merely setting can=false
+            // below still falls through into the generic unfinished-frame assist.
+            if (NukeRush() && s.key == "mex" && s.radius > Global::RoleSettings::Tech::OpeningMexRadius
+                && !RushExpansionWorker(u)) continue;
             // D-080: an income step is climbed, not built: converters while energy
             // floats, T2 mex upgrades, the next advanced fusion, until metal income
             // reaches the target (the economy rows get the builder when the ladder
@@ -500,7 +931,12 @@ namespace TechChain
             }
             CCircuitDef@ d = ai.GetCircuitDef(s.defName);
             if (d is null) continue;
-            if (s.key == "mex" && s.exhausted) continue;
+            // T1 workers fund bootstrap energy in parallel. The sole scarce
+            // technology builder must start mex upgrades as soon as it exits
+            // the lab, rather than spending minutes building T1 turbines.
+            if (NukeRush() && (s.key == "mex" || s.key == "wind" || s.key == "solar" || s.key == "mstor" || s.key == "nano")
+                && UnitHelpers::GetConstructorTier(u.circuitDef) >= 2) continue;
+            if ((s.key == "mex" || (NukeRush() && s.key == "moho")) && s.exhausted) continue;
             // an energy step the veto refuses (a fusion stands, D-077) is met from
             // then on: its turbines were reclaimed on purpose (played: the chain
             // rebuilt them and never completed)
@@ -508,7 +944,7 @@ namespace TechChain
             // the first lab is reclaimed once the advanced lab begins (D-066): its step is met from then on
             if (s.key == "lab" && TechBuild::WasIntoT2()) continue;   // D-102: met for good once the T2 phase has begun
             // the advanced lab is reclaimed once the advanced fusion is under way (D-078): its step is met from then on
-            if (s.key == "alab" && TechBuild::IntoAfus()) continue;
+            if (s.key == "alab" && (TechBuild::IntoAfus() || (NukeRush() && nukeLabReleased))) continue;
             if (i < skipped.length() && skipped[i]) continue;
             const int have = Standing(s, d);
             if (have >= s.target) continue;
@@ -523,7 +959,10 @@ namespace TechChain
             // framed (played: skipped while the constructor walked to the site)
             const bool waitsForAirCon = (s.key == "aap") && (AirConstructors() == 0 || unfinished == 0);
             if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
-            else if (i + 1 < steps.length() && ai.frame - stallFrame > int(Global::RoleSettings::Tech::ChainStepStallSeconds) * SECOND) {
+            // Required nuke prerequisites are never skipped. A queued project
+            // may inherit time spent waiting for its supporting turret bank;
+            // that old clock must not skip fusion while its builder approaches.
+            else if (!NukeRush() && i + 1 < steps.length() && ai.frame - stallFrame > int(Global::RoleSettings::Tech::ChainStepStallSeconds) * SECOND) {
                 // never the objective itself (played: an advanced fusion whose site
                 // the engine refused was skipped and the chain declared itself done)
                 skipped[i] = true;
@@ -537,6 +976,21 @@ namespace TechChain
             int queued = aiBuilderMgr.GetQueuedBuildCount(int(TypeFor(s.key)), d);
             if (s.key == "silo") queued += aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::BIG_GUN), d);
             bool can = u.circuitDef.CanBuild(d);
+            // The bounded upgrade assignment above owns parallel T2 income
+            // work. Do not skip an unfinished fusion here: the next step is
+            // the silo, whose energy draw would delay both projects.
+            // Technology builders handle upgrades while T1 builders prepare
+            // the local turret bank. Do not march the slow commander across
+            // the mex triangle to assist every upgrade in sequence.
+            if (NukeRush() && s.key == "moho" && !can) {
+                // The commander can halve a nearby upgrade's construction
+                // time. Distant expansion remains the constructor's job.
+                if (UnitHelpers::IsCommander(u.circuitDef) && unfinished > 0) {
+                    CCircuitUnit@ upgrade = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame), 600.0f, d);
+                    if (upgrade !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, upgrade, 30 * SECOND));
+                }
+                continue;
+            }
             // the far mex step belongs to the constructors: the commander stays home
             if (s.key == "mex" && s.radius > Global::RoleSettings::Tech::OpeningMexRadius && UnitHelpers::IsCommander(u.circuitDef)) can = false;
             const bool cheap = (d.costM < Global::RoleSettings::Tech::ChainParallelCostM);
@@ -553,7 +1007,7 @@ namespace TechChain
             const int inFlight = unfinished + queued + (pending ? 1 : 0);
             if (cheap) {
                 // one per builder, in parallel: a solar is not worth a walk to assist
-                if (can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105: no converter hold with the metal bank full
+                if (!NukeRush() && can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105: no converter hold with the metal bank full
                     stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
                     Trace(FloatWhy(), int(i), s, have, u);
                     continue;
@@ -597,15 +1051,16 @@ namespace TechChain
                     return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND));
                 }
             }
-            if (!can) continue;   // the next step this builder can build
+            if (!can && !NukeRush()) continue;   // the next step this builder can build
             if (queued > 0 || pending) {
                 // an order is out and no frame exists yet: the economy rows keep
                 // this builder useful (played: waiting here stalled the base for
                 // the five minutes an abandoned solar order took to time out)
-                Trace("order out; economy meanwhile", int(i), s, have, u);
-                return null;
+                Trace(NukeRush() ? "order out; rendezvous" : "order out; economy meanwhile", int(i), s, have, u);
+                return NukeRush() ? TechBuild::Wait(SECOND) : null;
             }
-            if (IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105
+            if (!can) return TechBuild::Wait(SECOND);
+            if (IsEnergyKey(s.key) && !(NukeRush() && s.key == "fusion") && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105
                 stallFrame = ai.frame;   // waiting for need is not a stall (D-079)
                 Trace(FloatWhy(), int(i), s, have, u);
                 return null;   // the economy rows: energy.convert eats the surplus
@@ -628,7 +1083,26 @@ namespace TechChain
             return null;
         }
         if (unmet) return null;   // this builder skipped what it cannot build; the chain goes on
+        Complete();
+        return null;
+    }
+
+    void Complete()
+    {
         if (!done) {
+            if (NukeRush()) {
+                CCircuitDef@ siloDef = ai.GetCircuitDef(DefFor("silo"));
+                array<Id>@ ids = ai.GetOwnedUnitIds();
+                for (uint i = 0; i < ids.length(); ++i) {
+                    CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+                    if (u !is null && u.circuitDef is siloDef && u.GetBuildProgress() >= 1.0f) { nukeFundingSilo = u.id; break; }
+                }
+                nukeFundingUntil = ai.frame + Global::RoleSettings::Tech::NukeRushStockpileBudgetSeconds * SECOND;
+                aiEconomyMgr.reclEnergyEff = RoleTech::economySwitched ? 0.0f : nukePreviousReclaim;
+                Global::RoleSettings::Tech::MinimumT1ConstructorBots = nukePreviousT1Minimum;
+                Global::RoleSettings::Tech::MinimumT2ConstructorBots = nukePreviousT2Minimum;
+                GenericHelpers::LogUtil("[TECH][NukeRush] silo complete; normal economy resumes", 1);
+            }
             done = true;
             GenericHelpers::LogUtil("[TECH][Chain] complete: objective " + objective + " reached at " + int((ai.frame - startFrame) / SECOND)
                 + " s; the economy rules continue", 1);
@@ -645,7 +1119,6 @@ namespace TechChain
                 GenericHelpers::LogUtil("[TECH][Chain] plan " + objective + ": " + line, 1);
             }
         }
-        return null;
     }
 
     // D-080: one rung of the metal ladder for this builder.

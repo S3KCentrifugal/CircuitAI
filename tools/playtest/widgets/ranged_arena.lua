@@ -3,6 +3,7 @@ local cfg=VFS.Include("LuaUI/Config/ranged_arena.lua")
 local tracked,queue,pending,seen,orders,lastReload={}, {}, nil, {}, {}, {}
 local priorDamage,damageHook,priorCommand,commandHook
 local camera,photos=nil,{}
+local commandTypes,unitCommands={},{}
 local function log(s) Spring.Echo("[RangedArena] frame="..Spring.GetGameFrame().." "..s) end
 local occupied={}
 local function site(g,x,z)
@@ -23,7 +24,7 @@ local function site(g,x,z)
             local free=y>=0 and math.abs(y-reference)<=64
             if free and mobile and not UnitDefs[def.id].canFly then free=Spring.TestMoveOrder(def.id,px,y,pz,0,0,0,true,true,false) end
             if free and not mobile then free=Spring.TestBuildOrder(def.id,px,y,pz,0)>0 end
-            for _,p in ipairs(occupied) do if (px-p[1])^2+(pz-p[2])^2<96^2 then free=false;break end end
+            for _,p in ipairs(occupied) do if (px-p[1])^2+(pz-p[2])^2<(cfg.min_spawn_spacing or 96)^2 then free=false;break end end
             if free then occupied[#occupied+1]={px,pz};return px,y+(UnitDefs[def.id].canFly and 160 or 0),pz end
         end
     end
@@ -39,8 +40,13 @@ local function child(id)
 end
 local function damage(id,def,team,amount,paralyzer,weapon,projectile,attacker,attackerDef,attackerTeam)
     child(id);child(attacker)
+    if cfg.natural and tracked[attacker] and team~=0 and not tracked[id] then
+        local x,_,z=Spring.GetUnitPosition(id)
+        tracked[id]={team=team,def=def}
+        log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name.." x="..math.floor(x or 0).." z="..math.floor(z or 0))
+    end
     if tracked[id] or tracked[attacker] then
-        log("damage id="..id.." team="..team.." amount="..math.floor(amount).." attacker="..tostring(attacker).." attackerTeam="..tostring(attackerTeam).." weapon="..tostring(weapon))
+        log("damage id="..id.." team="..team.." amount="..math.floor(amount).." attacker="..tostring(attacker).." attackerTeam="..tostring(attackerTeam).." weapon="..tostring(weapon).." weaponName="..tostring(WeaponDefs[weapon or -1] and WeaponDefs[weapon].name or "unknown"))
     end
 end
 local function command(id,def,team,cmd,params,options,tag,player,fromSynced,fromLua)
@@ -48,6 +54,10 @@ local function command(id,def,team,cmd,params,options,tag,player,fromSynced,from
     local count=orders[team] or {all=0,lua=0,nonlua=0};orders[team]=count
     count.all=count.all+1
     if fromLua==true then count.lua=count.lua+1 elseif fromLua==false then count.nonlua=count.nonlua+1 end
+    if team==0 and fromLua==false then
+        commandTypes[cmd]=(commandTypes[cmd] or 0)+1
+        local key=UnitDefs[def].name..":"..cmd;unitCommands[key]=(unitCommands[key] or 0)+1
+    end
     if team==0 and cmd==34923 and cfg.trace_orders~=false then
         local x,_,z=Spring.GetUnitPosition(id)
         log("priority id="..id.." unit="..UnitDefs[def].name.." target="..tostring(params[1]).." x="..math.floor(x).." z="..math.floor(z))
@@ -63,6 +73,12 @@ function widget:Initialize()
     log("loaded case="..cfg.name.." variant="..cfg.variant)
 end
 function widget:UnitCreated(id,def,team,builder)
+    if cfg.natural and team==0 and UnitDefs[def].name==cfg.unit then
+        local x,_,z=Spring.GetUnitPosition(id)
+        tracked[id]={team=team,def=def}
+        log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name.." x="..math.floor(x).." z="..math.floor(z))
+        return
+    end
     if pending and team==pending.g.team and UnitDefs[def].name==pending.g.unit then
         tracked[id]={team=team,def=def};log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name.." x="..math.floor(pending.x).." z="..math.floor(pending.z));pending=nil
     elseif builder and (tracked[builder] or (cfg.builders and team==0)) then
@@ -73,12 +89,15 @@ function widget:UnitDestroyed(id,def,team)
     if tracked[id] then log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil end
 end
 function widget:UnitFinished(id,def,team)
-    if cfg.production and tracked[id] then
+    if (cfg.production or cfg.natural) and tracked[id] then
         log("finished id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost)
     end
 end
 function widget:GameFrame(f)
-    if f==150 then Spring.SendCommands("cheat 1");log("ready") end
+    if f==150 then
+        if not cfg.natural then Spring.SendCommands("cheat 1") end
+        log("ready")
+    end
     if f<300 then return end
     if cfg.drop_energy_after_seconds and not cfg.energy_dropped and f>=cfg.drop_energy_after_seconds*30 then
         cfg.energy_dropped=true
@@ -156,6 +175,10 @@ function widget:GameFrame(f)
             log(string.format("economy metal=%.1f storage=%.1f income=%.1f expense=%.1f energy=%.1f eincome=%.1f eexpense=%.1f",m,ms,mi,me,e,ei,ee))
         end
         for team,c in pairs(orders) do log("orders team="..team.." total="..c.all.." nonlua="..c.nonlua.." lua="..c.lua) end
+        if cfg.command_breakdown then
+            for cmd,count in pairs(commandTypes) do log("command_type command="..cmd.." count="..count) end
+            for key,count in pairs(unitCommands) do log("unit_command key="..key.." count="..count) end
+        end
         log("render fps="..Spring.GetFPS())
     end
     if not cfg.headless then
@@ -164,7 +187,7 @@ function widget:GameFrame(f)
                 photos[second]=true
                 local p=cfg.camera or {4000,5000,2600}
                 Spring.SendCommands({"setmaxspeed 0.25","setminspeed 0.25","setmaxspeed 0.25"})
-                local state={mode=1,px=p[1],py=math.max(0,Spring.GetGroundHeight(p[1],p[2])),pz=p[2],height=p[3],angle=.9}
+                local state={mode=1,px=p[1],py=math.max(0,Spring.GetGroundHeight(p[1],p[2])),pz=p[2],height=p[3],angle=cfg.camera_angle or .9}
                 Spring.SetCameraState(state,0)
                 local ids={};for id,u in pairs(tracked) do if u.team==0 and UnitDefs[u.def].name==cfg.unit then ids[#ids+1]=id end end
                 Spring.SelectUnitArray(ids,false)

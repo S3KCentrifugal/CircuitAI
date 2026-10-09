@@ -31,8 +31,6 @@ namespace AirLayout {
     bool enabled = false;
     int searchAfter = 0;
     int facing = 0;
-    bool overlay = false;
-    int overlayFrame = -1;
     dictionary placeRetry;
     dictionary originalFactoryCaps;
 
@@ -48,15 +46,8 @@ namespace AirLayout {
         }
     }
 
-    void SetOverlay(bool on) { overlay = on; overlayFrame = -1; Draw(); }
-    void Draw()
-    {
-        if (!enabled || !overlay || (overlayFrame >= 0 && ai.frame - overlayFrame < 4 * SECOND)) return;
-        overlayFrame = ai.frame;
-        const string all = "complex:" + facing + ":0:0:" + facing + ":0:0:c;" + aiTerrainMgr.DescribeLayout();
-        const uint parts = (all.length() + 2999) / 3000;
-        for (uint i = 0; i < parts; ++i) WidgetLink::Send("layout", "" + (i + 1) + "|" + parts + "|" + all.substr(i * 3000, 3000));
-    }
+    void SetOverlay(bool on) { WidgetLink::SetLayoutOverlay(on); }
+    void Draw() { WidgetLink::LayoutTick(); }
 
     bool Inside(const AIFloat3 &in p, float margin)
     {
@@ -531,7 +522,7 @@ namespace AirLayout {
         aiEconomyMgr.assistNanoEnabled = aiTerrainMgr.GetLayoutInt("air.nanoPrior", 1) != 0;
         aiTerrainMgr.ResetLayout(); aiTerrainMgr.SetLayoutEnabled(false);
         aiBuilderMgr.experimentalAirDirect = false;
-        enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0; overlay = false;
+        enabled = false; bays.resize(0); windClusters.resize(0); searchAfter = 0;
         AirEcoLayout::Leave();
         placeRetry.deleteAll();
     }

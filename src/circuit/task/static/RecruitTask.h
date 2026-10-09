@@ -42,6 +42,7 @@ public:
 	virtual void OnUnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 
 	virtual void SetTarget(CCircuitUnit* unit) override;
+    void Dead() override;
 
 	RecruitType GetRecruitType() const { return recruitType; }
 	void SetRepeat(bool value) { repeat = value; }

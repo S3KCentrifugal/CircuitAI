@@ -20,12 +20,7 @@ using namespace springai;
 // count already contains frames; count only orders without a frame here.
 static int CFactoryManager_GetPendingRecruitCount(const CFactoryManager* manager, const CCircuitDef* def)
 {
-	if (def == nullptr) return 0;
-	int count = 0;
-	for (const CRecruitTask* task : manager->GetTasks()) {
-		if (!task->IsDead() && (task->GetBuildDef() == def) && (task->GetTarget() == nullptr)) ++count;
-	}
-	return count;
+    return manager->GetPendingRecruitCount(def);
 }
 
 CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)

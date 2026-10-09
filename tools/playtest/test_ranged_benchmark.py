@@ -6,6 +6,63 @@ from ranged_benchmark import summarize
 
 
 class MeasurementsTest(unittest.TestCase):
+    def test_first_actual_shot_and_forward_progress_exclude_shutdown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            (path/'ranged-arena.json').write_text(json.dumps(dict(
+                name='thug', unit='corthud', variant='ranged', seed=1, minutes=3,
+                starts=[[0,0],[0,1000]], assertions=dict(min_kills=0,
+                    min_shooters=1, min_damage=100, max_first_shot_seconds=30))))
+            (path/'infolog.txt').write_text('''[RangedArena] frame=300 spawn id=1 team=0 unit=corthud x=0 z=0
+[RangedArena] frame=600 unit id=1 unit=corthud x=0 z=-100 hp=900 host=-1
+[RangedArena] frame=900 shot id=1 unit=corthud weapon=1 target=2 distance=300 intent=2
+[RangedArena] frame=900 damage id=2 team=1 amount=104 attacker=1 attackerTeam=0 weapon=8
+[RangedArena] frame=900 unit id=1 unit=corthud x=0 z=500 hp=900 host=-1
+[RangedArena] frame=5400 orders team=0 nonlua=30 lua=0
+[RangedArena] frame=5500 unit id=1 unit=corthud x=0 z=9000 hp=900 host=-1
+''')
+            result = summarize(path)
+            self.assertTrue(result['passed'])
+            self.assertEqual(result['first_shot_seconds'],30)
+            self.assertEqual(result['minimum_forward_projection'],-100)
+            self.assertEqual(result['maximum_forward_projection'],500)
+            self.assertEqual(result['firing_sample_fraction_20_to_120'],.5)
+
+    def response_result(self, events):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            (path/'ranged-arena.json').write_text(json.dumps(dict(
+                name='turn', unit='legmed', variant='ranged', seed=1, minutes=4,
+                assertions=dict(min_kills=0, min_shooters=0, max_target_response_seconds=30))))
+            (path/'infolog.txt').write_text('''[RangedArena] frame=300 spawn id=1 team=0 unit=legmed x=0 z=0
+[RangedArena] frame=300 spawn id=2 team=0 unit=armpw x=0 z=0
+[RangedArena] frame=300 spawn id=3 team=1 unit=armestor x=0 z=900
+[RangedArena] frame=300 spawn id=4 team=1 unit=armestor x=0 z=-900
+[RangedArena] frame=330 detected id=3 unit=armestor
+[RangedArena] frame=340 damage id=3 team=1 amount=500 attacker=1 attackerTeam=0 weapon=8
+[RangedArena] frame=1800 detected id=4 unit=armestor
+''' + events + '\n[RangedArena] frame=7200 orders team=0 nonlua=20 lua=0\n')
+            return summarize(path)
+
+    def test_each_visible_target_requires_real_damage_from_tested_hulls(self):
+        result = self.response_result('''[RangedArena] frame=1810 shot id=1 unit=legmed weapon=1 target=4 distance=900 intent=4
+[RangedArena] frame=1811 damage id=4 team=1 amount=0 attacker=1 attackerTeam=0 weapon=7
+[RangedArena] frame=1812 damage id=4 team=1 amount=100 attacker=2 attackerTeam=0 weapon=6''')
+        self.assertFalse(result['passed'])
+        self.assertIsNone(result['target_response_seconds']['4'])
+
+    def test_facing_recovery_must_finish_before_response_deadline(self):
+        on_time = self.response_result('[RangedArena] frame=2700 damage id=4 team=1 amount=500 attacker=1 attackerTeam=0 weapon=8')
+        late = self.response_result('[RangedArena] frame=2701 damage id=4 team=1 amount=500 attacker=1 attackerTeam=0 weapon=8')
+        self.assertTrue(on_time['passed'])
+        self.assertEqual(on_time['target_response_seconds']['4'], 30)
+        self.assertFalse(late['passed'])
+
+    def test_shutdown_damage_does_not_repair_a_firing_stall(self):
+        result = self.response_result('[RangedArena] frame=7500 damage id=4 team=1 amount=500 attacker=1 attackerTeam=0 weapon=8')
+        self.assertFalse(result['passed'])
+        self.assertIsNone(result['target_response_seconds']['4'])
+
     def test_logs_and_overkill_are_not_confused_with_fixture_events(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)
@@ -61,6 +118,7 @@ class MeasurementsTest(unittest.TestCase):
 [RangedArena] frame=7500 orders team=0 nonlua=999 lua=0
 [WorkforcePerf] frame=7500 ai_all_p95_ms=9
 [RangedArena] frame=7501 damage id=2 team=1 amount=25
+[RangedArena] frame=
 ''')
             result=summarize(path)
             self.assertTrue(result['passed'])

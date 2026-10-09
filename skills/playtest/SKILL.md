@@ -6,8 +6,8 @@ description: 'Run a local BAR simulation with a fresh BARb build: stage, launch 
 # Playtest: local simulations
 
 For optimization work, apply the
-[performance contracts](../../doc/performance/engineering-guide.md) and
-use the [test definition index](../../doc/testing/README.md). Compare pinned
+[performance contracts](../../../rjm.bar.docs/projects/circuitai/performance/engineering-guide.md) and
+use the [test definition index](../../../rjm.bar.docs/projects/circuitai/testing/README.md). Compare pinned
 old/new inputs in serial games; changing populations or concurrent games cannot
 establish a CPU/FPS gain. Keep raw verdicts, distinguish per-unit engine orders
 from Lua orders and network packets, and report compilation failures separately
@@ -26,16 +26,35 @@ not exact same-state FPS comparisons. Keep camera/focus and speed-window limits
 visible in the report. Do not close an upstream engine bottleneck because an
 AI-only component benchmark improved.
 
+For D-243 routes/economy, run the native differential suite and separate games
+with `CIRCUIT_VERIFY_POINT_ROUTES=1`, `CIRCUIT_VERIFY_ECONOMY_INDEX=1` and staged
+`Sea::VerifyPowerIndex=true`. The full-match runner's `--verify-indexes` enables
+these and marks timings invalid. All three must be disabled for timing. Pin
+the pre-change dirty-tree snapshot, not just HEAD. Keep the original failed
+verdict when Glacial hits known TECH invariants, even if new index checks pass.
+Use `sea-route-transit` for physical formation arrival and command comparisons;
+it supplies a route and is not autonomous combat evidence. Same-seed large-fleet
+outcomes can vary on the baseline, so casualties alone do not prove an exact
+optimization changed tactics. Record the compaction setting and build identity.
+
 Tool: `tools/playtest/playtest.py` (reference: `tools/playtest/README.md`).
 It stages a DLL plus the repo's `data/` as `BARbTest/test` into its own
 engine write dir, never the install, and stops only its own engine.
-Widgets: [references/widgets.md](references/widgets.md). Reading logs and
+Widgets: [references/widgets.md](../../../rjm.bar.docs/projects/circuitai/skills/playtest/references/widgets.md). Reading logs and
 crashes: [`skills/troubleshoot-bar-logs/SKILL.md`](../troubleshoot-bar-logs/SKILL.md)
 (and `skills/ai-not-moving` when commanders stand still: apply it to
 `<dir>/runs/<stamp>/infolog.txt`, prefix `Skirmish AI <BARb playtest-test>`;
 a compile failure shows as `being removed from team 0` at f=59).
 
 ## 1. Pin the build
+
+Retain build logs, symbols, data/source snapshots and validation output in the
+external benchmark checkout, not the source tree. Resolve the location with
+`python tools/playtest/benchmark_store.py validation` (honors
+`CIRCUIT_BENCHMARK_REPO`), then use a named session directory beneath it as the
+scratchpad below. A missing benchmark checkout is an error, not permission to
+recreate local `build-validation/`. Test source and reusable runners stay here;
+disposable native-test scratch may use the OS temporary directory.
 
 First publish every completed build to the mandatory output
 `C:\bardev\bar-RecoilEngine\build-amd64-windows\install\AI\Skirmish\BARb\stable`:
@@ -85,7 +104,7 @@ Recurring AngelScript errors:
 
 ## 3. Launch
 
-For new experiments follow [storage conventions](../../doc/test-storage.md).
+For new experiments follow [storage conventions](../../../rjm.bar.docs/projects/circuitai/test-storage.md).
 AIR arenas and scorecard runs allocate a unique categorized write directory
 when `--dir` is omitted. For the generic runner or a specialised preparer,
 allocate one first and pass the returned path to every stage/run/watch/stop:
@@ -244,7 +263,7 @@ Existing ones:
 | `draw_test.lua` | draws a test map drawing |
 | `role_swap_test.lua` | switches roles |
 
-Writing one: [references/widgets.md](references/widgets.md).
+Writing one: [references/widgets.md](../../../rjm.bar.docs/projects/circuitai/skills/playtest/references/widgets.md).
 
 ## 7. Judge and read
 

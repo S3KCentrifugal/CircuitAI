@@ -6,6 +6,40 @@ namespace AirOperations {
     array<CAirWaveTask@> operations;
     array<bool> offensive;
     dictionary escorts; // unit ID -> owning wave (kept until the last bomber dies)
+    dictionary bombers; // all live cohorts, not only AirWaves' newest operation
+    void TrackBombers(IUnitTask@ owner, const dictionary &in cohort) {
+        array<string>@ ids = cohort.getKeys();
+        for (uint i = 0; i < ids.length(); ++i) bombers.set(ids[i], @owner);
+    }
+    int BomberCount(const string &in name) {
+        int count = 0;
+        array<string>@ ids = bombers.getKeys();
+        for (uint i = 0; i < ids.length(); ++i) {
+            IUnitTask@ owner;
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (!bombers.get(ids[i], @owner) || owner is null || owner.IsDead() || u is null || u.task !is owner)
+                bombers.delete(ids[i]);
+            else if (u.circuitDef.GetName() == name) ++count;
+        }
+        return count;
+    }
+    bool CanEscort(CCircuitUnit@ u) {
+        return u !is null && u.GetBuildProgress() >= 1.0f && AirScreen::IsFighter(u.circuitDef)
+            && !Committed(u.id) && (u.task is null || (u.task.GetType() != int(Task::Type::PLAYER)
+                && u.task.GetType() != int(Task::Type::RETREAT) && !u.task.IsExternalControlled()));
+    }
+    float AvailableFighters(bool value = false) {
+        // Admission and transfer share this predicate. A fighter covering a
+        // ground incident is absent from the wall ledger, but still available
+        // to escort. One linear census per planning attempt, no order emission.
+        float result = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (CanEscort(u)) result += value ? u.circuitDef.costM : 1.0f;
+        }
+        return result;
+    }
     bool Committed(int id)
     {
         IUnitTask@ task;
@@ -29,9 +63,7 @@ namespace AirOperations {
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
-            if (u is null || u.GetBuildProgress() < 1.0f || !AirScreen::IsFighter(u.circuitDef)
-                || Committed(u.id) || (u.task !is null && (u.task.GetType() == int(Task::Type::PLAYER)
-                    || u.task.GetType() == int(Task::Type::RETREAT) || u.task.IsExternalControlled()))) continue;
+            if (!CanEscort(u)) continue;
             // Transfer only this member; aborting a shared wall task steals its neighbours.
             if (!aiMilitaryMgr.TransferUnit(u, owner)) continue;
             const string key = "" + u.id;
@@ -110,6 +142,9 @@ namespace AirOperations {
     }
     void Tick()
     {
+        // Prune once per policy tick even when factories stop requesting new
+        // aircraft; dead operations must not retain a growing ID/handle ledger.
+        BomberCount("");
         for (int i = int(operations.length())-1; i >= 0; --i) {
             if (operations[i] is null || operations[i].IsDead()) { operations.removeAt(i); offensive.removeAt(i); }
             else if (offensive[i] && operations[i].GetState() == 5)
@@ -134,7 +169,9 @@ namespace AirOperations {
             IUnitTask@ task; escorts.get(ids[i], @task);
             if (task !is null && !task.IsDead() && tasks.findByRef(task) < 0) tasks.insertLast(task);
         }
-        escorts.deleteAll(); operations.resize(0); offensive.resize(0);
+        for (uint i = 0; i < operations.length(); ++i)
+            if (operations[i] !is null && !operations[i].IsDead() && tasks.findByRef(operations[i]) < 0) tasks.insertLast(operations[i]);
+        escorts.deleteAll(); bombers.deleteAll(); operations.resize(0); offensive.resize(0);
         for (uint i = 0; i < tasks.length(); ++i) tasks[i].Abort();
     }
 }

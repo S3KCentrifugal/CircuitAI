@@ -25,7 +25,7 @@ them apart. Topics mirrored today:
     role      reply to a widget command (commands.as)
     ferry     ferry runs (ferry.as); spam  on / off / front / focus (spam.as);
     seaassist shipyard unlocks and hand-outs (sea_assist.as); layout  the
-              planned base for the overlay (layout.as)
+              planned base for the overlay (shared leased feed below)
 
 tools/widgets/gui_barb_team_link.lua is a widget that displays them.
 
@@ -38,5 +38,34 @@ namespace WidgetLink {
     {
         if (!Enabled) return;
         ai.CallUI(Prefix + topic + "|" + ai.teamId + "|" + ai.allyTeamId + "|" + payload);
+    }
+    // Local observation only: one feed for every role using native layouts.
+    // Stop all serialization when hidden; renew the lease from the UI so a
+    // removed widget cannot leave a permanent background polling workload.
+    bool layoutOverlay = false;
+    int layoutUntil = -1, layoutFrame = -1;
+    string layoutLast;
+    void SetLayoutOverlay(bool on, bool refresh = true)
+    {
+        const bool starting = on && !layoutOverlay;
+        layoutOverlay = on;
+        layoutUntil = ai.frame + 45 * SECOND;
+        if (!on) { layoutLast = ""; layoutFrame = -1; return; }
+        if (starting) { layoutLast = ""; layoutFrame = -1; }
+        LayoutTick(starting || refresh);
+    }
+    void LayoutTick(bool force = false)
+    {
+        if (!layoutOverlay) return;
+        if (ai.frame > layoutUntil) { SetLayoutOverlay(false); return; }
+        if (!force && layoutFrame >= 0 && ai.frame - layoutFrame < 4 * SECOND) return;
+        layoutFrame = ai.frame;
+        const string snapshot = aiTerrainMgr.IsLayoutEnabled() ? aiTerrainMgr.DescribeLayout() : "";
+        if (!force && snapshot == layoutLast) return;
+        layoutLast = snapshot;
+        const uint parts = (snapshot.length() + 2999) / 3000;
+        if (parts == 0) Send("layout", "0|0|none");
+        for (uint i = 0; i < parts; ++i)
+            Send("layout", "" + (i + 1) + "|" + parts + "|" + snapshot.substr(i * 3000, 3000));
     }
 }

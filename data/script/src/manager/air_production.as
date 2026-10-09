@@ -13,13 +13,7 @@ namespace AirProduction {
     int Projected(CCircuitDef@ d) { return d is null ? 0 : d.count + aiFactoryMgr.GetPendingRecruitCount(d); }
     float AvailableFighterValue()
     {
-        float value = AirScreen::HomeValue();
-        array<string>@ ids = AirWaves::heldFighters.getKeys();
-        for (uint i = 0; i < ids.length(); ++i) {
-            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
-            if (u !is null && u.GetBuildProgress() >= 1.0f && !home.exists(ids[i])) value += u.circuitDef.costM;
-        }
-        return value;
+        return AirOperations::AvailableFighters(true);
     }
     IUnitTask@ Recruit(CCircuitUnit@ plant, const string &in name, int target, const string &in purpose, Task::Priority priority, bool utility = false)
     {
@@ -41,7 +35,8 @@ namespace AirProduction {
                 Global::RoleSettings::Air::CombatOrdersPerEconomyConstructor,
                 aiTerrainMgr.GetLayoutInt(combatKey, 0) + 1));
             if (!utility) aiTerrainMgr.SetLayoutInt("air.mix." + plant.id, (aiTerrainMgr.GetLayoutInt("air.mix." + plant.id, 0) + 1) % 10);
-            GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target, 1);
+            GenericHelpers::LogUtil("[AIR][Produce] " + purpose + " " + name + " plant=" + plant.id + " projected=" + Projected(d) + "/" + target
+                + " baseContact=" + AirBaseResponse::Emergency(), 1);
         }
         return t;
     }
@@ -127,8 +122,12 @@ namespace AirProduction {
                 if (unit !is null && unit.circuitDef.GetName() == fighter && unit.GetBuildProgress() < 1.0f) futureValue += fighterDef.costM;
             }
         }
-        const float homeValue = AirScreen::HomeValue();
-        const bool emergency = AirBaseResponse::Emergency() || AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
+        // Fighters temporarily covering ground defense still fund the home
+        // reserve. Counting only wall tasks requests endless replacements and
+        // starves gunships/bombers despite an already funded free fighter pool.
+        const float homeValue = AvailableFighterValue();
+        const bool airEmergency = AirMath::Emergency(intrusion, homeValue, Global::RoleSettings::Air::InterceptCostRatio);
+        const bool emergency = AirBaseResponse::Emergency() || airEmergency;
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
         const bool saving = AirEconomy::SavingForFirstLab();
@@ -203,7 +202,10 @@ namespace AirProduction {
             @t = Recruit(u, fighter, Projected(fighterDef) + 1, "dedicated.fighter", Task::Priority::NORMAL);
             if (t !is null) return t;
         }
-        const int strikeOrders = emergency ? 0 : AirMath::BomberOrders(AvailableFighterValue(), AirEconomy::EnemyAir(),
+        // Produce() above already funds the ground-defense deficit first.
+        // A lingering contact must not veto replacement bomber production
+        // once that reserve is funded. An air superiority emergency still can.
+        const int strikeOrders = airEmergency ? 0 : AirMath::BomberOrders(homeValue, AirEconomy::EnemyAir(),
             AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersClear : Global::RoleSettings::Air::BomberOrdersClear,
             AirEconomy::MassBombers() ? Global::RoleSettings::Air::MassBomberOrdersParity : Global::RoleSettings::Air::BomberOrdersParity);
         const bool strike = strikeOrders > 0 && AirMath::BomberTurn(aiTerrainMgr.GetLayoutInt("air.mix." + u.id, 0), strikeOrders);
@@ -218,9 +220,12 @@ namespace AirProduction {
                     if (!support && AirEconomy::MassBombers() && side != "legion") continue;
                     if (support && aiBattle.EnemyCost(0) + aiBattle.EnemyCost(4) + aiBattle.EnemyCost(5) < 300.0f) continue;
 
-                    const int target = ProductionMath::StrikeTarget(AirEconomy::metal,
+                    int target = ProductionMath::StrikeTarget(AirEconomy::metal,
                         support ? Global::RoleSettings::Air::T1SupportMetalStep : Global::RoleSettings::Air::T1BomberMetalStep,
                         support ? 3 : Global::RoleSettings::Air::T1RaidMinimum, support ? (side == "cortex" ? Global::RoleSettings::Air::T1SupportCap : Global::RoleSettings::Air::T1StrikeOpenerSize) : Global::RoleSettings::Air::T1BomberCap);
+                    // The cap is a reserve for the next raid. Committed
+                    // survivors must not consume it indefinitely.
+                    if (!support) target += AirOperations::BomberCount(bomber);
                     @t = Recruit(u, support ? RoleAir::GetT1StrikeAircraftNameForSide(side) : bomber, target,
                         support || side == "legion" ? "front.support" : "t1.bomber", Task::Priority::NORMAL);
                     if (t !is null) { aiTerrainMgr.SetLayoutInt("air.t1.mix", phase + 1); return t; }
@@ -237,7 +242,7 @@ namespace AirProduction {
             CCircuitDef@ bd = ai.GetCircuitDef(bomber);
             CCircuitDef@ fd = ai.GetCircuitDef(fighter);
             // Native counts include frames and orders immediately, including births between slow ticks.
-            const int b = AiMax(0, Projected(bd) - int(AirWaves::waveBombers.getSize()));
+            const int b = AiMax(0, Projected(bd) - AirOperations::BomberCount(bomber));
             const int f = AiMax(0, Projected(fd) + AirScreen::CountOther(fighter) - int(AirOperations::escorts.getSize()));
             if (f < AirWaves::FightersFor(b)) {
                 @t = Recruit(u, fighter, Projected(fd) + 1, "wave.escort", Task::Priority::NORMAL);

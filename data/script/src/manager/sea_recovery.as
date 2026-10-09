@@ -4,6 +4,28 @@ namespace SeaRecovery {
     array<int> subs;
     int nextUpdate=0;
     bool lowMetal=false;
+    int opportunityFrame=-100000;
+    float safeWreckMetal=0, damagedMetal=0;
+    int Demand(const CCircuitDef@ recovery) {
+        if (recovery is null || !SeaEconomy::HoldingWater()) return 0;
+        if (ai.frame-opportunityFrame>=10*SECOND) {
+            opportunityFrame=ai.frame; safeWreckMetal=0; damagedMetal=0;
+            CCircuitUnit@ survey=null;
+            for (uint i=0;i<SeaCombat::owned.length();++i) {
+                CCircuitUnit@ u=ai.GetTeamUnit(SeaCombat::owned[i]);
+                if (u is null || u.GetBuildProgress()<1) continue;
+                if (survey is null && SeaEconomy::ConstructorDef(u.circuitDef)) @survey=u;
+                if (u.circuitDef.GetBuildSpeed()>0 || u.circuitDef.IsAbleToFly() || !u.circuitDef.IsMobile()) continue;
+                const AIFloat3 p=u.GetPos(ai.frame);
+                const float radius=Global::RoleSettings::Sea::RecoverySearchRadius;
+                if (aiBattle.WaterBody(p,false)>=0 && aiBattle.AmphThreat(p)<=.1f
+                    && MapHelpers::SqDist(p,Global::Map::StartPos)<radius*radius && u.GetHealthPercent()<.8f)
+                    damagedMetal+=u.circuitDef.costM*(1-u.GetHealthPercent());
+            }
+            if (survey !is null) safeWreckMetal=aiBuilderMgr.GetRecoveryMetal(survey,Global::RoleSettings::Sea::RecoverySearchRadius);
+        }
+        return int((safeWreckMetal+damagedMetal)/(AiMax(1.0f,recovery.costM)*Global::RoleSettings::Sea::RecoveryOpportunityMultiple));
+    }
     bool IsSub(const CCircuitDef@ d) {
         if (d is null) return false;
         const string n=d.GetName();
@@ -47,7 +69,7 @@ namespace SeaRecovery {
         const int i=subs.find(u.id); if (i>=0) subs.removeAt(i);
     }
     void Reset() {
-        subs.resize(0); nextUpdate=0; lowMetal=false;
+        subs.resize(0); nextUpdate=0; lowMetal=false; opportunityFrame=-100000; safeWreckMetal=0; damagedMetal=0;
         array<Id>@ ids=ai.GetOwnedUnitIds();
         for (uint i=0;i<ids.length();++i) Added(ai.GetTeamUnit(ids[i]));
     }

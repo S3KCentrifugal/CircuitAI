@@ -20,13 +20,20 @@ def summarize(directory):
     text = (directory / 'infolog.txt').read_text(errors='replace')
     units, shooters, deaths, orders, first, damage = {}, set(), [], 0, None, 0
     positions, separations, shots, samples = {}, [], [], []
+    forward, firing_samples, last_fire, reasons = [], [], {}, {}
     fps, cloaked, children, friendly_damage = [], set(), {}, 0
     order_frame = last_frame = 0
     spawned, sensor_advance = {}, {}
-    dx = cfg.get('starts', [[0,0],[0,1]])[1][0] - cfg.get('starts', [[0,0],[0,1]])[0][0]
-    dz = cfg.get('starts', [[0,0],[0,1]])[1][1] - cfg.get('starts', [[0,0],[0,1]])[0][1]
+    detected, first_hit = {}, {}
+    unit_commands, friendly_weapons = {}, {}
+    starts = cfg.get('starts') or [[0,0],[0,1]]
+    dx = starts[1][0] - starts[0][0]
+    dz = starts[1][1] - starts[0][1]
     norm = max(1, (dx*dx+dz*dz)**.5)
     for line in text.splitlines():
+        if 'COHORT:' in line and 'reason=' in line:
+            reason=re.search(r'reason=(\d+)',line)
+            if reason: reasons[reason[1]]=reasons.get(reason[1],0)+1
         if '[WorkforcePerf]' in line and 'ai_all_p95_ms=' in line:
             sample = {k: float(v) for k, v in re.findall(r'(\w+)=([\d.]+)', line)}
             if sample.get('frame', 0) <= cfg['minutes']*1800:
@@ -34,9 +41,11 @@ def summarize(directory):
         if '[RangedArena] frame=' not in line:
             continue
         row = dict(re.findall(r'(\w+)=([^ ]+)', line))
+        if not row.get('frame', '').isdigit():
+            continue  # Shutdown may truncate even the event prefix.
         # A process stop can truncate any final event, not only positions.
         event=re.search(r'\[RangedArena\] frame=\d+ (\w+)',line)
-        required={'spawn':('id','unit','team','x','z'), 'unit':('id','unit','x','z','hp','host'),
+        required={'spawn':('id','unit','team','x','z'), 'detected':('id','unit'), 'unit':('id','unit','x','z','hp','host'),
                   'orders':('team','nonlua','lua'), 'death':('id','team','unit','cost'),
                   'damage':('id','team','amount','attacker','attackerTeam','weapon'),
                   'shot':('id','unit','weapon','target','distance','intent'), 'render':('fps',)}
@@ -49,6 +58,8 @@ def summarize(directory):
         if ' spawn ' in line:
             units[int(row['id'])] = (row['unit'], int(row['team']))
             if 'x' in row: spawned[int(row['id'])] = (int(row['x']),int(row['z']))
+        if ' detected ' in line:
+            detected.setdefault(int(row['id']), frame)
         if ' child ' in line:
             host = int(row.get('host', row.get('parent', -1)))
             children[int(row['id'])] = host
@@ -59,18 +70,25 @@ def summarize(directory):
         if ' shot ' in line and row['unit'] in cfg.get('units', [cfg['unit']]):
             shooters.add(int(row['id']))
             shots.append(row)
+            last_fire[int(row['id'])]=frame
         if ' damage ' in line and row.get('attackerTeam') == '0':
             attacker = int(row['attacker'])
             attacker = children.get(attacker, attacker)
             if units.get(attacker, ('', -1))[0] in cfg.get('units', [cfg['unit']]):
                 damage += max(0, int(row['amount']))
                 first = frame if first is None else first
-                if row['team'] == '0': friendly_damage += max(0, int(row['amount']))
+                if row['team'] == '0':
+                    value=max(0,int(row['amount']));friendly_damage += value
+                    name=row.get('weaponName',row['weapon']);friendly_weapons[name]=friendly_weapons.get(name,0)+value
+                elif int(row['amount']) > 0:
+                    first_hit.setdefault(int(row['id']), frame)
         if ' death ' in line:
             deaths.append(row)
         if ' orders ' in line and row['team'] == '0':
             orders = int(row['nonlua'])
             order_frame = frame
+        if ' unit_command ' in line and 'key' in row and 'count' in row:
+            unit_commands[row['key']]=int(row['count'])
         # The watcher can stop the engine while the final log line is being
         # written. Incomplete position rows supply no geometry evidence.
         if ' unit id=' in line and 'x' in row and 'z' in row and row.get('unit') in cfg.get('sensor_units', []):
@@ -80,6 +98,11 @@ def summarize(directory):
                 sensor_advance[row['unit']] = max(sensor_advance.get(row['unit'],0),advance)
         if ' unit id=' in line and 'x' in row and 'z' in row and row.get('unit') in cfg.get('units', [cfg['unit']]):
             positions.setdefault(frame, []).append((int(row['x']), int(row['z'])))
+            uid=int(row['id']); origin=spawned.get(uid)
+            if origin:
+                forward.append(((int(row['x'])-origin[0])*dx+(int(row['z'])-origin[1])*dz)/norm)
+            if 600<=frame<=3600:
+                firing_samples.append(frame-last_fire.get(uid,-10000)<=60)
     for frame, points in positions.items():
         if frame < 1800 or len(points) < 2:
             continue
@@ -89,6 +112,7 @@ def summarize(directory):
     losses = [d for d in deaths if d['team'] == '0' and d['unit'] in watched]
     unrelated = [d for d in deaths if d['team'] == '0' and d['unit'] not in watched]
     kills = [d for d in deaths if d['team'] == '1']
+    allied_losses = [d for d in deaths if d['team']=='0' and d['unit'] in cfg.get('support_units',[]) and int(d['frame'])<=30*cfg.get('support_deadline_seconds',cfg['minutes']*60)]
     checks = cfg.get('assertions', {})
     failures = []
     assigned_types = sorted(set(re.findall(r'RANGED: assigned (\w+)\(', text)))
@@ -97,9 +121,23 @@ def summarize(directory):
     if len(shooters) < checks.get('min_shooters', 1) and cfg['unit'] != 'legvcarry': failures.append('no verified shots')
     if len(shots) > checks.get('max_shots', float('inf')): failures.append('unexpected shots')
     if len(losses) > checks.get('max_losses', 0): failures.append('ranged casualties')
+    if len(allied_losses)>checks.get('max_allied_losses',float('inf')): failures.append('allied screen/support casualties')
     if len(unrelated) < checks.get('min_unrelated_losses', 0): failures.append('unrelated death not exercised')
     if len(cloaked) < checks.get('min_cloaked', 0): failures.append('cloak never observed')
     if friendly_damage > checks.get('max_friendly_damage', float('inf')): failures.append('friendly splash damage')
+    first_shot=min((int(s['frame']) for s in shots),default=None)
+    if damage<checks.get('min_damage',0): failures.append('insufficient useful engagement damage')
+    if 'max_first_shot_seconds' in checks and (first_shot is None or first_shot/30>checks['max_first_shot_seconds']):
+        failures.append('first actual shot exceeded deadline')
+    # A shot at the first target cannot conceal a later aiming stall. Measure
+    # each observable fixture enemy against positive damage by watched hulls,
+    # not marker-weapon reloads, allied spam or post-deadline shutdown events.
+    response = {str(unit): max(0, first_hit[unit]-frame)/30 if unit in first_hit else None
+                for unit, frame in detected.items() if units.get(unit, ('', -1))[1] == 1}
+    if 'max_target_response_seconds' in checks:
+        limit = checks['max_target_response_seconds']
+        if not response or any(delay is None or delay > limit for delay in response.values()):
+            failures.append('visible target firing response exceeded deadline')
     for name in cfg.get('sensor_units', []):
         if sensor_advance.get(name,0) < checks.get('min_sensor_advance',0): failures.append('sensor did not advance: '+name)
     if last_frame < cfg['minutes']*1800-300: failures.append('incomplete observation window')
@@ -107,7 +145,7 @@ def summarize(directory):
     verdict = json.loads(archives[-1].read_text()).get('verdict') if archives else None
     if verdict and verdict != 'PASS': failures.append('original watch verdict: '+verdict)
     if re.search(r'\[INVARIANT\]|\[RangedArena\].*ERROR|Error in.*ranged_arena', text): failures.append('runtime/fixture error')
-    result = dict(schema=5, case=cfg['name'], variant=cfg['variant'], seed=cfg['seed'], directory=str(directory),
+    result = dict(schema=8, case=cfg['name'], variant=cfg['variant'], seed=cfg['seed'], directory=str(directory),
                   measurement_deadline_frame=cfg['minutes']*1800,
                   first_damage_seconds=first/30 if first else None, raw_damage_including_overkill=damage,
                   shooters_fired=len(shooters), shots=len(shots), enemy_kills=len(kills), friendly_losses=len(losses),
@@ -115,15 +153,22 @@ def summarize(directory):
                   nonlua_commands=orders, commands_per_game_minute=orders/(order_frame/1800) if order_frame else None,
                   command_window_frame=order_frame, last_observed_frame=last_frame, watch_verdict=verdict,
                   sensor_forward_progress=sensor_advance,
+                  target_response_seconds=response,
                   assigned_unit_types=assigned_types,
                   minimum_sampled_spacing_after_60s=min(separations) if separations else None,
                   render_fps_after_60s=fps, cloaked_units_observed=len(cloaked),
                   carrier_children_observed=len(children), friendly_damage_including_overkill=friendly_damage,
                   deaths=deaths,
+                  allied_losses_during_support=len(allied_losses), unit_commands=unit_commands, friendly_damage_by_weapon=friendly_weapons,
+                  first_shot_seconds=first_shot/30 if first_shot is not None else None,
+                  firing_sample_fraction_20_to_120=sum(firing_samples)/len(firing_samples) if firing_samples else None,
+                  minimum_forward_projection=min(forward) if forward else None,
+                  maximum_forward_projection=max(forward) if forward else None,
+                  engagement_reason_samples=reasons,
                   engine_ai_windows=samples, failures=failures, passed=not failures)
     # New analysis schema gets a new path. Earlier immutable measurements
     # remain valid evidence rather than being silently recomputed in place.
-    output = directory / 'ranged-measurements-v5.json'
+    output = directory / 'ranged-measurements-v8.json'
     if output.exists() and json.loads(output.read_text()) != result:
         raise RuntimeError('Refusing to overwrite a different measurement: ' + str(output))
     output.write_text(json.dumps(result, indent=2)+'\n')
@@ -140,6 +185,8 @@ def main():
     parser.add_argument('--profile', default='experimental_balanced')
     parser.add_argument('--minutes', type=int, default=4)
     parser.add_argument('--speed', type=int, default=8)
+    parser.add_argument('--seed', type=int, default=2071)
+    parser.add_argument('--headless', action='store_true')
     args = parser.parse_args()
     if args.summarize:
         print(json.dumps(summarize(args.summarize), indent=2))
@@ -149,8 +196,9 @@ def main():
     for case in args.cases:
         command = [sys.executable, str(HERE/'ranged_arena.py'), '--case', case, '--dll', str(args.dll),
                    '--data', str(args.data), '--variant', args.variant, '--profile', args.profile,
-                   '--minutes', str(args.minutes), '--speed', str(args.speed)]
+                   '--minutes', str(args.minutes), '--speed', str(args.speed), '--seed', str(args.seed)]
         print('BEGIN_CASE='+case, flush=True)
+        if args.headless: command += ['--headless']
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         directory = None
         for line in process.stdout:

@@ -28,6 +28,21 @@ void CUnitAPI::GetPosition(int unitId,float* position) const
 	sAICallback->Unit_getPos(skirmishAIId,unitId,position);
 }
 
+void CUnitAPI::GetVelocity(int unitId,float* velocity) const
+{
+	sAICallback->Unit_getVel(skirmishAIId,unitId,velocity);
+}
+
+float CUnitAPI::GetCombatHealth(int unitId) const
+{
+	// Only called for legally observed friends, lazily once per local snapshot.
+	// Frames, stunned units and disarmed weapons cannot justify an assault.
+	if(sAICallback->Unit_isBeingBuilt(skirmishAIId,unitId)
+		|| sAICallback->Unit_isParalyzed(skirmishAIId,unitId)
+		|| sAICallback->Unit_getRulesParamFloat(skirmishAIId,unitId,"disarmed",0.f)>0.f) return 0.f;
+	return std::max(0.f,sAICallback->Unit_getHealth(skirmishAIId,unitId));
+}
+
 CUnitAPI::CUnitAPI(const struct SSkirmishAICallback* clb, int sAIId)
 		: sAICallback(clb)
 		, skirmishAIId(sAIId)
@@ -76,6 +91,20 @@ bool CUnitAPI::HasGuardIntent(int unitId, int targetId, int frame) const
 		}
 		return c;
 	});
+}
+
+bool CUnitAPI::HasRouteIntent(int unitId, const std::vector<routecommand::Command>& issued, int frame) const
+{
+    const int count = sAICallback->Unit_getCurrentCommands(skirmishAIId, unitId);
+    return routecommand::LiveSuffix(issued, count, frame, [&](int i, routecommand::Command& c) {
+        c.id = sAICallback->Unit_CurrentCommand_getId(skirmishAIId, unitId, i);
+        c.options = sAICallback->Unit_CurrentCommand_getOptions(skirmishAIId, unitId, i);
+        c.timeout = sAICallback->Unit_CurrentCommand_getTimeOut(skirmishAIId, unitId, i);
+        float params[4];
+        if (sAICallback->Unit_CurrentCommand_getParams(skirmishAIId,unitId,i,params,4) != 3) return false;
+        c.x=params[0]; c.y=params[1]; c.z=params[2];
+        return true;
+    });
 }
 
 } /* namespace circuit */

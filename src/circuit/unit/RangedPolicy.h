@@ -25,6 +25,20 @@ struct RangedPolicy {
     bool allowRadar = true;
     bool advanceUnknownRadar = true;
     bool stageWhenBlocked = false; // opt-in: deploy outside coverage if no firing band fits
+    bool coordinated = false; // local same-type firing cohorts, not legacy siege
+    float cohortSize = 12.f;
+    float cohortRadius = 900.f;
+    float regroupSeconds = 8.f;
+    float rushRatio = 1.75f;
+    float catchSeconds = 6.f;
+    // Zero preserves the original coordinated controller for profiles which
+    // do not explicitly opt into outcome-based engagement.
+    float engagementSeconds = 0.f;
+    float advantageEnter = 1.4f, advantageExit = 1.1f;
+    float lossFraction = .35f, staticLossFraction = 0.f;
+    bool supportAllies = false; // opt-in frontline screening; never waives hard hazards
+    float supportLossFraction = 0.f; // explicit HP budget when joining an allied mobile engagement
+    float intentGain = 0.f; // required relative endpoint improvement; zero preserves old micro
 };
 }
 #endif

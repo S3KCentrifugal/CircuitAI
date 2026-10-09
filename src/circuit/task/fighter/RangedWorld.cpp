@@ -103,6 +103,7 @@ void CRangedWorld::Refresh()
     clusterValues.Clear();
     enemies.Clear(); staticHazards.Clear(); allies.Clear(); formations.Clear();
     largestRange=largestStaticRange=0.f; nonnegativeHazardCosts=finiteStaticHazards=true;
+    largestCohortHazard=0.f;
     largestSpacing=0.f; largestFriendRadius=0.f;
     // Profile threat suppression must not erase an actual weapon's coverage.
     // Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
@@ -145,6 +146,11 @@ void CRangedWorld::Refresh()
         c.armor=meta.armor; c.explosionRadius=meta.explosionRadius;
         c.hazardRadius=std::max(c.armed ? c.groundRange+c.radius : 0.f,c.explosionRadius);
         largestRange=std::max(largestRange,c.hazardRadius);
+        // Reclaimers can be unarmed and exceed 600 elmos (including the
+        // advanced Legion construction turret). Keep this separate from the
+        // legacy weapon bound so existing ranged-query semantics stay exact.
+        largestCohortHazard=std::max(largestCohortHazard,std::max(c.hazardRadius,
+            c.def->IsAbleToReclaim()?c.def->GetBuildDistance()+c.radius:0.f));
         if(!(c.hazardRadius<=0.f)) {
             nonnegativeHazardCosts=nonnegativeHazardCosts && std::isfinite(c.cost) && c.cost>=0.f;
             if(!c.mobile) {
@@ -201,7 +207,12 @@ void CRangedWorld::Refresh()
         const auto& meta=MetadataFor(d);
         float raw[3]; api->GetPosition(id,raw);
         AIFloat3 position(raw[0],raw[1],raw[2]); terrain::CTerrainData::CorrectPosition(position);
-        Friend f{id,position,d->GetRadius(),d->IsAttacker() && !d->IsAttrRanged(),meta.radar,meta.jammer,meta.los};
+        // Coordinated frontline bots retain their old screening role for
+        // precision artillery. Opting Thugs into ranged movement must not
+        // make allied Starlights/Sharpshooters stop recognizing their screen.
+        const bool screen=d->IsAttacker() && (!d->IsAttrRanged() || d->GetRangedPolicy().coordinated);
+        Friend f{id,position,d->GetRadius(),screen,meta.radar,meta.jammer,meta.los};
+        f.def=d;
         largestFriendRadius=std::max(largestFriendRadius,f.radius);
         allies.Add(P(f.pos),int(friends.size())); friends.push_back(f);
     }
@@ -216,7 +227,7 @@ void CRangedWorld::Refresh()
             const auto p=u->GetPos(now);
             if(index>=friends.size() || friends[index].id!=id || friends[index].pos!=p
                 || friends[index].radius!=d->GetRadius()
-                || friends[index].screen!=(d->IsAttacker() && !d->IsAttrRanged())
+                || friends[index].screen!=(d->IsAttacker() && (!d->IsAttrRanged() || d->GetRangedPolicy().coordinated))
                 || friends[index].radar!=MetadataFor(d).radar
                 || friends[index].jammer!=MetadataFor(d).jammer
                 || friends[index].los!=MetadataFor(d).los) equal=false;
@@ -228,7 +239,14 @@ void CRangedWorld::Refresh()
     performance::Scope statePhase(circuit,performance::RANGED_STATE);
     for (auto it=slots.begin();it!=slots.end();) {
         auto* u=circuit->GetTeamUnit(it->first);
-        if (!u || u->IsDead() || !u->GetCircuitDef()->IsAttrRanged()) { it=slots.erase(it); continue; }
+        if (!u || u->IsDead() || !u->GetCircuitDef()->IsAttrRanged()) {
+            // Match task-release cleanup even if a lifecycle callback arrived
+            // after this snapshot. Otherwise stale members inflate rush value
+            // and keep empty cohorts alive. Advance before Leave erases here.
+            const int stale=(it++)->first;
+            Leave(stale);
+            continue;
+        }
         formations.Add(P(it->second.pos),it->first);
         largestSpacing=std::max(largestSpacing,it->second.spacing); ++it;
     }
@@ -254,21 +272,48 @@ void CRangedWorld::Join(CCircuitUnit* unit)
 {
     const auto* d=unit->GetCircuitDef();
     SetSlot(unit->GetId(),unit->GetPos(circuit->GetLastFrame()),d->GetRangedPolicy().spacing,d->GetCostM());
+    if(d->GetRangedPolicy().coordinated) JoinCohort(unit);
 }
-void CRangedWorld::Leave(int id) { slots.erase(id); ReleaseShot(id); }
+void CRangedWorld::Leave(int id) {
+    slots.erase(id); ReleaseShot(id);
+    auto member=membership.find(id);
+    if(member!=membership.end()) {
+        auto group=cohorts.find(member->second);
+        if(group!=cohorts.end()) {
+            std::erase(group->second.members,id); group->second.frame=-1;
+            if(group->second.members.empty()) cohorts.erase(group);
+        }
+        membership.erase(member);
+    }
+}
 void CRangedWorld::SetSlot(int id,const AIFloat3& pos,float spacing,float value)
 {
     auto old=slots.find(id);
     if(old!=slots.end()) formations.Remove(P(old->second.pos),id);
     slots[id]={pos,spacing,value};
+    // Cache immutable type facts at the mutation boundary, not in every local
+    // neighbor test. A reused unit ID receives fresh facts on Join/SetSlot.
+    if(const auto* unit=circuit->GetTeamUnit(id)) {
+        auto* def=unit->GetCircuitDef();
+        slots[id].radius=def->GetRadius();
+        slots[id].coordinated=def->GetRangedPolicy().coordinated;
+        largestFriendRadius=std::max(largestFriendRadius,slots[id].radius);
+    }
     largestSpacing=std::max(largestSpacing,spacing);
     formations.Add(P(pos),id);
 }
 bool CRangedWorld::FreeSlot(int id,const AIFloat3& pos,float spacing) const
 {
-    return !formations.Any(P(pos),std::max(spacing,largestSpacing),[&](int other) {
+    const auto own=slots.find(id);
+    const float radius=own==slots.end()?0.f:own->second.radius;
+    return !formations.Any(P(pos),std::max({spacing,largestSpacing,radius+largestFriendRadius}),[&](int other) {
         const auto it=slots.find(other); if(other==id || it==slots.end()) return false;
-        const float separation=std::max(spacing,it->second.spacing);
+        // D-228: Thug screen reservations must not exclude the entire narrow
+        // firing band of a Starlight behind them. Other artillery pairs retain
+        // their old spacing; FriendlyLine still forbids shooting through hulls.
+        const float separation=own==slots.end()?std::max(spacing,it->second.spacing)
+            :cohort::PairSpacing(spacing,it->second.spacing,own->second.coordinated,
+                                 it->second.coordinated,radius+it->second.radius);
         return pos.SqDistance2D(it->second.pos)<separation*separation;
     });
 }

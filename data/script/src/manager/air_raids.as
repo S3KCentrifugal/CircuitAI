@@ -6,6 +6,7 @@ namespace AirRaids {
     dictionary cohort;
     CAirWaveTask@ wave = null;
     int lastTry = -100000;
+    int lastLaunch = -100000;
     bool OpeningPending() { return Global::RoleSettings::Air::T1OpeningRaidEnabled && aiTerrainMgr.GetLayoutInt("air.t1.openingDone", 0) == 0; }
     int OpeningSize()
     {
@@ -43,13 +44,16 @@ namespace AirRaids {
     {
         if (!AirEconomy::Active() || ai.frame - lastTry < 10 * SECOND) return;
         lastTry = ai.frame;
-        if (AirBaseResponse::Emergency()) return;
-        if (wave !is null && !wave.IsDead()) return;
+        // Actual defensive ownership removes members from held. Do not veto
+        // unrelated reserves merely because another unit is defending land.
+        if (wave !is null && !wave.IsDead()
+            && ai.frame-lastLaunch < AiMax(1, Global::RoleSettings::Air::StrikeCadenceSeconds)*SECOND) return;
         if (wave !is null) {
             int survivors = 0;
             array<string>@ ids = cohort.getKeys();
             for (uint i = 0; i < ids.length(); ++i) if (ai.GetTeamUnit(parseInt(ids[i])) !is null) ++survivors;
-            GenericHelpers::LogUtil("[AIR][Raid] exhausted cohort=" + cohort.getSize() + " survivors=" + survivors, 1);
+            GenericHelpers::LogUtil("[AIR][Raid] previous cohort=" + cohort.getSize() + " survivors=" + survivors
+                + " committed=" + !wave.IsDead(), 1);
             cohort.deleteAll(); joining.deleteAll(); @wave = null;
         }
         if (OpeningPending() && aiTerrainMgr.GetLayoutInt("air.t1.openingReady", 0) == 0) return;
@@ -60,7 +64,7 @@ namespace AirRaids {
         }
         const int minimum = OpeningPending() ? OpeningSize() : Global::RoleSettings::Air::T1RaidMinimum;
         if (int(held.getSize()) < minimum
-            || AirScreen::HomeValue() < AirEconomy::EnemyAir()) return;
+            || AirOperations::AvailableFighters(true) < AirEconomy::EnemyAir()) return;
         array<string>@ ids = held.getKeys();
         CCircuitUnit@ first = ai.GetTeamUnit(parseInt(ids[0]));
         if (first is null) { held.delete(ids[0]); return; }
@@ -90,6 +94,7 @@ namespace AirRaids {
             aiTerrainMgr.SetLayoutInt("air.t1.openingDone", 1);
         }
         const int escorts = AirOperations::AttachFighters(wave);
+        AirOperations::TrackBombers(wave, cohort); lastLaunch = ai.frame;
         GenericHelpers::LogUtil("[AIR][Raid] launched bombers=" + cohort.getSize() + " escorts=" + escorts + " target=" + wave.GetStrikeTargetId(), 1);
     }
     void Removed(int id) { held.delete("" + id); joining.delete("" + id); }
@@ -104,6 +109,6 @@ namespace AirRaids {
             }
         }
         if (wave !is null && !wave.IsDead()) wave.Abort();
-        @wave = null; held.deleteAll(); joining.deleteAll(); cohort.deleteAll(); lastTry = -100000;
+        @wave = null; held.deleteAll(); joining.deleteAll(); cohort.deleteAll(); lastTry = -100000; lastLaunch = -100000;
     }
 }

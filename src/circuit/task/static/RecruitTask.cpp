@@ -250,6 +250,13 @@ void CRecruitTask::SetTarget(CCircuitUnit* unit)
 		}
 	}
 	IBuilderTask::SetTarget(unit);
+    static_cast<CFactoryManager*>(manager)->RefreshPendingRecruit(this);
+}
+
+void CRecruitTask::Dead()
+{
+    IUnitTask::Dead();
+    static_cast<CFactoryManager*>(manager)->RefreshPendingRecruit(this);
 }
 
 } // namespace circuit

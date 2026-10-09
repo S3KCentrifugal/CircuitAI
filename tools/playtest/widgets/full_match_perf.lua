@@ -14,7 +14,7 @@ end
 function widget:GameFrame(frame)
  if frame==300 or frame%1800==0 then
   local active=0
-  for team=0,15 do
+  for team=0,(cfg.teams or 16)-1 do
    local _,_,dead,isAI=Spring.GetTeamInfo(team,false)
    local count=Spring.GetTeamUnitCount(team) or 0
    if isAI and not dead and count>0 then active=active+1 end

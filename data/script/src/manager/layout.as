@@ -50,8 +50,6 @@ namespace Layout {
     bool planned = false;
     bool fallback = false;
     int facing = 0;
-    bool overlay = false;
-    int overlayTick = 0;
     bool fallbackLogged = false;
 
     // The box, mirrored in native layout ints (tech.box.*) for save/load.
@@ -734,7 +732,6 @@ namespace Layout {
         }
         if (planned && HasBox()) CheckForward();   // D-081
         if (planned && HasBox()) RegisterFactoryZones();   // D-104
-        if (overlay) SendOverlay();
     }
 
     // ---------------------------------------------------------------- queries for the planner
@@ -1329,7 +1326,7 @@ namespace Layout {
     int turretCapLog = -100000;
     int lastTurretAllowed = -1;
 
-    IUnitTask@ NanoTask(CCircuitUnit@ unit, Task::Priority priority)
+    IUnitTask@ NanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget = -1)
     {
         if (fallback && aiTerrainMgr.IsLayoutEnabled()) return CrampedNanoTask(unit, priority);   // D-121
         if (!HasComplex() || unit is null || unit.circuitDef is null || nano is null) return null;
@@ -1339,7 +1336,10 @@ namespace Layout {
         // the ones in flight are enough; the caller assists instead
         {
             string why;
-            const int allowed = TurretsAllowed(why);
+            // Ordinary callers retain the resource-derived cap. A timed
+            // opening may supply a bounded concurrent-project budget; geometry,
+            // ally reservations, pinning and completed counts stay shared.
+            const int allowed = parallelBudget >= 0 ? parallelBudget : TurretsAllowed(why);
             const int inFlight = TurretsInFlight();
             if (inFlight >= allowed) {
                 if (ai.frame - turretCapLog > 15 * SECOND || allowed != lastTurretAllowed) {
@@ -1398,6 +1398,8 @@ namespace Layout {
         if (t is null) return null;
         if (!AiPinReservation(t, id)) {
             GenericHelpers::LogUtil("[Layout] could not pin a turret to slot " + id, 1);
+            aiBuilderMgr.AbortTask(t);
+            return null;
         }
         return t;
     }
@@ -1532,23 +1534,7 @@ namespace Layout {
 
     // ---------------------------------------------------------------- overlay
 
-    void SetOverlay(bool on)
-    {
-        overlay = on;
-        overlayTick = 0;
-        if (on) SendOverlay();
-    }
-
-    void SendOverlay()
-    {
-        if (!planned) return;
-        if ((overlayTick++ % 4) != 0) return;
-        const string all = "complex:" + facing + ":0:0:" + facing + ":0:0:c;" + aiTerrainMgr.DescribeLayout();
-        const uint chunk = 3000;
-        uint parts = (all.length() + chunk - 1) / chunk;
-        if (parts == 0) parts = 1;
-        for (uint i = 0; i < parts; ++i) {
-            WidgetLink::Send("layout", "" + (i + 1) + "|" + parts + "|" + all.substr(i * chunk, chunk));
-        }
-    }
+    // Compatibility wrappers; the shared widget service handles every role.
+    void SetOverlay(bool on) { WidgetLink::SetLayoutOverlay(on); }
+    void SendOverlay() { WidgetLink::LayoutTick(); }
 }

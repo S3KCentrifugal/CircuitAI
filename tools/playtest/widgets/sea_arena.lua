@@ -27,6 +27,10 @@ local function pos(g,i)
     if not d then log("ERROR missing_unit="..g.unit);return end
     local y=Spring.GetGroundHeight(x,z)
     if UnitDefs[d.id].canFly then return x,math.max(0,y)+160,z end
+    if g.land then
+        if y<0 then log("ERROR wet_land_site="..g.unit.." x="..x.." z="..z);return end
+        return x,y,z
+    end
     if y>=-20 then log("ERROR dry_site="..g.unit.." x="..x.." z="..z);return end
     return x,y,z
 end
@@ -82,7 +86,7 @@ function widget:UnitCreated(id,def,team,builder)
     end
 end
 function widget:UnitDestroyed(id,def,team)
-    if tracked[id] then log("death id="..id.." team="..team.." cost="..UnitDefs[def].metalCost.." attackerTeam="..tostring(tracked[id].attackerTeam));tracked[id]=nil end
+    if tracked[id] then log("death id="..id.." team="..team.." cost="..UnitDefs[def].metalCost.." attackerTeam="..tostring(tracked[id].attackerTeam).." unit="..UnitDefs[def].name);tracked[id]=nil end
     last[id]=nil
 end
 function widget:UnitFinished(id,def,team)
@@ -157,7 +161,13 @@ function widget:GameFrame(f)
                     positions[#positions+1]={id=id,x=x,z=z}
                     local patrol=false
                     for _,cmd in ipairs(Spring.GetUnitCommands(id,12) or {}) do if cmd.id==CMD.PATROL then patrol=true end end
-                    log("boat id="..id.." x="..math.floor(x).." z="..math.floor(z).." patrol="..tostring(patrol)
+                    local health,maximum=Spring.GetUnitHealth(id)
+                    if cfg.protection_observer then
+                        local stockpile,queued=Spring.GetUnitStockpile(id)
+                        if stockpile then log("protection id="..id.." unit="..UnitDefs[u.def].name.." stockpile="..stockpile.." queued="..tostring(queued)) end
+                    end
+                    log("boat id="..id.." unit="..UnitDefs[u.def].name.." x="..math.floor(x).." z="..math.floor(z)
+                        .." health="..math.floor(health or 0).." maxhealth="..math.floor(maximum or 0).." patrol="..tostring(patrol)
                         .." target="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1))
                 end
             end

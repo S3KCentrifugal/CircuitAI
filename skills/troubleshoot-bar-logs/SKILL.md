@@ -11,7 +11,7 @@ metadata:
 ## When to Use
 
 For CPU/APM investigations read the repository
-[performance evidence guide](../../doc/performance/engineering-guide.md).
+[performance evidence guide](../../../rjm.bar.docs/projects/circuitai/performance/engineering-guide.md).
 Keep inclusive versus exclusive phase timing separate, record unit populations
 and game/content/build pins, and distinguish AI orders from Lua gadget orders.
 Do not infer network packets or whole-game FPS improvements from order counts
@@ -204,4 +204,4 @@ run before trusting a replay to reproduce.
 ## Related
 
 - `skills/convention-angelscript/SKILL.md` for script-side fixes.
-- `doc/TRUSTED_REFERENCE_REPOSITORIES.md` for the engine and game sources.
+- `../rjm.bar.docs/projects/circuitai/TRUSTED_REFERENCE_REPOSITORIES.md` for the engine and game sources.

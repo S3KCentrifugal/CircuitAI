@@ -11,7 +11,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('prefix',type=Path)
     p.add_argument('--dll',type=Path,required=True)
-    a=p.parse_args();root=Path(__file__).resolve().parents[2]
+    a=p.parse_args()
     prefix=a.prefix.resolve();dll=a.dll.resolve();dbg=dll.with_suffix('.dbg')
     modules=json.loads(Path(str(prefix)+'.modules.json').read_text(encoding='utf-8-sig'))
     counts=Counter();locations=Counter();threads=Counter()
@@ -31,10 +31,13 @@ def main():
     response.write_text('\n'.join(hex(image_base+rva) for rva in locations)+'\n')
     raw=Path(str(prefix)+'.symbols.txt')
     if locations:
-        cmd=['docker','run','--rm','--pull=never','-v',str(root)+':/src:ro','--entrypoint',
+        # Evidence lives outside the source checkout. Mount just the immutable
+        # symbols and sample directory; never assume either is under the repo.
+        cmd=['docker','run','--rm','--pull=never','--network','none',
+             '-v',str(dbg.parent)+':/symbols:ro','-v',str(response.parent)+':/samples:ro','--entrypoint',
              'x86_64-w64-mingw32-addr2line','ghcr.io/beyond-all-reason/recoil-build-amd64-windows:latest',
-             '-a','-f','-C','-i','-e','/src/'+dbg.relative_to(root).as_posix(),
-             '@/src/'+response.relative_to(root).as_posix()]
+             '-a','-f','-C','-i','-e','/symbols/'+dbg.name,
+             '@/samples/'+response.name]
         text=subprocess.run(cmd,check=True,capture_output=True,text=True).stdout
     else:text=''
     raw.write_text(text)

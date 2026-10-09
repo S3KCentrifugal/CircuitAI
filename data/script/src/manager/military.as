@@ -8,6 +8,33 @@
 
 namespace Military {
 
+    // Cohort travel policy; native targeting/terrain/safety may stop the move.
+    // Called only after a contact/objective is cleared, not per member/frame.
+    AIFloat3 AiGroundObjective(CCircuitUnit@ u, const AIFloat3& in previous)
+    {
+        if (u is null) return previous;
+        const AIFloat3 pos = u.GetPos(ai.frame);
+        const int lane = Lanes::BestLane(Lanes::BOT);
+        if (lane >= 0) {
+            float nearest = 1e30f;
+            int step = 0;
+            // Bounded samples follow lane bends instead of a map-wide search.
+            for (int i = 0; i <= 20; ++i) {
+                const float distance = pos.SqDistance2D(aiBattle.GetLanePoint(lane, float(i) / 20.0f));
+                if (distance < nearest) { nearest = distance; step = i; }
+            }
+            return aiBattle.GetLanePoint(lane, float(AiMin(20, step + 2)) / 20.0f);
+        }
+        const array<AIFloat3> starts = Lanes::EnemyStarts();
+        AIFloat3 goal = previous;
+        float nearest = 1e30f;
+        for (uint i = 0; i < starts.length(); ++i) {
+            const float distance = pos.SqDistance2D(starts[i]);
+            if (distance > 256.0f * 256.0f && distance < nearest) { nearest = distance; goal = starts[i]; }
+        }
+        return goal;
+    }
+
 	// ==================== Hooks (config / role-driven) ====================
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)

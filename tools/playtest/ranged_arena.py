@@ -50,7 +50,7 @@ def prepare(args):
     case = json.loads(storage.resolve_definition(args.case, 'cases').read_text())
     role = case.get('role', 'FRONT')
     if role not in ('FRONT', 'TECH', 'AIR', 'SEA', 'SUPPORT', 'TACTICAL'): raise ValueError('Unsupported arena role: '+role)
-    directory = storage.allocate('shared', 'combat', case['name'], case['map_key'], 'supplied', seed=args.seed)
+    directory = storage.allocate('shared', 'combat', case.get('storage_scenario',case['name']), case['map_key'], 'supplied', seed=args.seed)
     starts = directory / 'starts.as'
     starts.write_text(''.join(f'StartSpot(AIFloat3({x},0,{z}), AiRole::{role}, false),\n' for x,z in case['starts']))
     command = [sys.executable, str(HERE / 'playtest.py')]
@@ -79,6 +79,8 @@ def prepare(args):
         path = staged/'script/src/manager'/(name+'.as')
         source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
         repair='\n if (ai.teamId==1 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);' if name=='builder' and case.get('enemy_repair') else ''
+        if name=='builder' and case.get('friendly_repair'):
+            repair+='\n if (ai.teamId==0 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);'
         condition = 'ai.teamId==1' if name=='factory' and case.get('production') else 'ai.frame>=0'
         if name=='builder' and case.get('builders'): condition = 'ai.teamId==1'
         if name=='builder' and case.get('production'):
@@ -91,6 +93,8 @@ def prepare(args):
     # The enemy follows a declared path or holds, with normal weapon firing.
     destination = case.get('enemy_destination')
     point = f'AIFloat3({destination[0]},0,{destination[1]})' if destination else 'u.GetPos(ai.frame)'
+    if case.get('enemy_waypoints'):
+        point = ','.join(f'AIFloat3({x},0,{z})' for x,z in case['enemy_waypoints'])
     override = '''
         if (ai.teamId==1 && u.circuitDef.IsMobile()) {
             CRouteTask@ route=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
@@ -146,7 +150,7 @@ def prepare(args):
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
     pins={'dll_sha256':hashlib.sha256(args.dll.read_bytes()).hexdigest(),
           'diagnostics':{name:os.environ[name] for name in
-              ('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES')
+              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES')
               if name in os.environ},
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),

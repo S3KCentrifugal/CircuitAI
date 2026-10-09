@@ -5,6 +5,7 @@ from pathlib import Path
 
 from analyze_full_match_performance import analyze, summary
 from summarize_full_match_performance import reduce
+from analyze_sea_route_performance import analyze as analyze_routes
 
 
 class FullMatchEvidenceTests(unittest.TestCase):
@@ -64,6 +65,37 @@ class FullMatchEvidenceTests(unittest.TestCase):
         self.assertFalse(window['engine_measurement_valid'])
         self.assertEqual(window['average_sim_speed'], 1)
         self.assertIsNone(summary(data)['worst_ai'])
+
+    def test_route_joint_counts_exclude_gaia_and_keep_calls_distinct(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'infolog.txt'
+            log.write_text('\n'.join([
+                '[PerfSeaRoute] frame=1799 team=0 cohort=1 members=2 points=100',
+                '[PerfSeaRoute] frame=1801 team=0 cohort=1 members=2 points=90',
+                '[CommandJoint] frame=1800 team=0 def=armroy cmd=10 origin=nonlua orders=198 max_unit_frame_moves=99',
+                '[CommandJoint] frame=1800 team=0 def=armroy cmd=20 origin=nonlua orders=2 max_unit_frame_moves=0',
+                '[CommandJoint] frame=1800 team=17 def=bird cmd=10 origin=lua orders=900 max_unit_frame_moves=1',
+                '[AirOrders] frame=1800 team=0 all_apm=200 air_apm=0',
+                '[AirOrders] frame=1800 team=17 all_apm=900 air_apm=900',
+                '[PerfLabel] frame=1800 team=0 label=sea.route calls=1 inclusive_ms=1900 exclusive_ms=1800 max_ms=1900',
+            ]))
+            result = analyze_routes(log, {0})
+        self.assertEqual(result['reconciled_intervals'], 1)
+        self.assertEqual(result['mismatches'], [])
+        row = result['windows'][0]
+        self.assertEqual(row['route_requests'], 1)
+        self.assertEqual(row['route_points_max'], 100)
+        self.assertEqual(row['unit_orders'], 200)
+        self.assertEqual(row['move_orders'], 198)
+        self.assertEqual(row['max_unit_frame_moves'], 99)
+        self.assertEqual(row['label_exclusive_ms_per_frame']['sea.route'], 1)
+
+    def test_missing_joint_observations_fail_reconciliation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'infolog.txt'
+            log.write_text('[AirOrders] frame=1800 team=0 all_apm=4 air_apm=0\n')
+            result = analyze_routes(log, {0})
+        self.assertEqual(result['mismatches'], [dict(frame=1800, team=0, expected=4, joint=0)])
 
 
 if __name__ == '__main__':

@@ -75,7 +75,7 @@ should keep, which this check verifies after the fact:
   to load (wrong engine folder, a crash at init - see `AGENTS.md` for the
   `.dbg` symbolising steps).
 - Opening lines present but no orders: `grep -n "\[TECH\]\[Opening\]\|\[Eco\] next\|RESERVE:" /tmp/game.log | head -40`
-  and read `doc/known-issues.md` KI-409 / KI-410 for the played-behaviour
+  and read `../rjm.bar.docs/projects/circuitai/known-issues.md` KI-409 / KI-410 for the played-behaviour
   checklists.
 - A single role stuck while others move: that role's `Init` threw at
   runtime - AngelScript runtime exceptions are logged as `Exception` lines,
@@ -83,6 +83,6 @@ should keep, which this check verifies after the fact:
 
 ## 5. Record it
 
-Every occurrence goes into `doc/known-issues.md` KI-402's history line
+Every occurrence goes into `../rjm.bar.docs/projects/circuitai/known-issues.md` KI-402's history line
 (date, cause, fix) so the table above grows with real cases; a new cause
 gets a row in step 2.
