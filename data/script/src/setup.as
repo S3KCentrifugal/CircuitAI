@@ -1,6 +1,6 @@
 // Helpers & Role Handlers
-#include "manager/commands.as"
-#include "manager/artillery_policy.as"
+#include "systems/presentation/commands.as"
+#include "systems/diagnostics/artillery_policy.as"
 #include "helpers/common/generic_helpers.as"
 #include "helpers/spatial/map_helpers.as"
 #include "helpers/units/unit_helpers.as"
@@ -28,7 +28,7 @@
 #include "manager/builder.as"
 #include "manager/factory.as"
 #include "manager/economy.as"
-#include "manager/metal_economy.as"
+#include "systems/construction/metal_economy.as"
 
 namespace Factory {
 	CCircuitDef@ AiGetFactoryToBuild(const AIFloat3& in pos, bool isStart, bool isReset) {

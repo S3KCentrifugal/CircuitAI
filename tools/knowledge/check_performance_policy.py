@@ -24,7 +24,7 @@ def function(source, signature):
 def generate():
     fixtures = ROOT / 'tests/fixtures/performance'
     old = (fixtures / 'energy_options_before.as').read_text(encoding='utf-8')
-    new = (ROOT / 'data/script/src/manager/eco_planner.as').read_text(encoding='utf-8')
+    new = (ROOT / 'data/script/src/systems/construction/eco_planner.as').read_text(encoding='utf-8')
     text = '''
 class Option { int id; float cost, metalPerE, output; }
 class State { float bank; }
@@ -39,7 +39,7 @@ bool Affordable(const Option@ o, const State@ s) { return o.cost <= s.bank; }
         head = body[:body.index('{')].replace('EnergyOptions', label)
         text += head + '{ array<Option@> opts = input;\n' + body[begin:] + '\n'
     old = (fixtures / 'layout_can_place_before.as').read_text(encoding='utf-8')
-    new = (ROOT / 'data/script/src/manager/layout.as').read_text(encoding='utf-8')
+    new = (ROOT / 'data/script/src/systems/construction/layout.as').read_text(encoding='utf-8')
     text += '''
 class CCircuitDef { int key; int GetName() const { return key; } }
 class dictionary {

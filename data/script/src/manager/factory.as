@@ -7,7 +7,7 @@
 #include "../types/role_config.as"
 #include "../helpers/units/unit_helpers.as"
 #include "builder.as"
-#include "ferry.as"
+#include "../systems/team/ferry.as"
 
 namespace Factory {
 

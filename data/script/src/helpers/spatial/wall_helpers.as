@@ -1,6 +1,6 @@
 #include "../math/placement_math.as"
 #include "../../global.as"
-#include "../../manager/roster.as"
+#include "../../systems/team/roster.as"
 
 namespace WallHelpers {
     array<AIFloat3> starts;

@@ -1,6 +1,6 @@
 #include "../../types/strategic_objectives.as"
 #include "../../global.as"
-#include "../../manager/objective_manager.as"
+#include "../../systems/world/objective_manager.as"
 #include "../spatial/map_helpers.as"
 
 namespace ObjectiveHelpers {

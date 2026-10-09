@@ -60,7 +60,7 @@ def main():
         path.write_text(path.read_text().replace('int MaxProductionBays = 0;', 'int MaxProductionBays = 3;'))
     if args.scenario == 'idle':
         # Force a real idle interval only in the staged test controller.
-        path = base / 'AI/Skirmish/BARbTest/test/script/src/manager/air_production.as'
+        path = base / 'AI/Skirmish/BARbTest/test/script/src/systems/air/air_production.as'
         source = path.read_text()
         marker = 'const bool basic = UnitHelpers::IsT1AircraftPlant(name);'
         if marker not in source:

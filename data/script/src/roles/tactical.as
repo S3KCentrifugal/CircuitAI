@@ -7,7 +7,7 @@
 #include "../helpers/objectives/objective_helpers.as"
 #include "../helpers/objectives/objective_executor.as"
 #include "../types/strategic_objectives.as"
-#include "../manager/factory_production.as"
+#include "../systems/production/factory_production.as"
 #include "../helpers/construction/sea_constructor_helpers.as"
 
 namespace RoleTactical {

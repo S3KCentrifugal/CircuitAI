@@ -1,6 +1,6 @@
 #include "sea_factories.as"
-#include "../manager/sea_eco_layout.as"
-#include "../manager/sea_expansion.as"
+#include "../systems/sea/sea_eco_layout.as"
+#include "../systems/sea/sea_expansion.as"
 
 namespace SeaBuild {
     int lastTick=-1;

@@ -234,7 +234,7 @@ def prepare(args):
         p.write_text(source[:at+1] + '\n if (' + condition + ') return ' + manager + '.Enqueue(' + wait + '); // arena only\n' + source[at+1:])
     if case.get('factory_production', False):
         overrides.append('supplied initial metal/storage: 1000000; normal own factory production policy')
-    checked_replace(staged / 'src/manager/air_economy.as',
+    checked_replace(staged / 'src/systems/air/air_economy.as',
                     'bool MassBombers() {',
                     'bool MassBombers() { if (ai.frame >= 0) return true; // supplied combat arena only')
     # Supplied combat deliberately has no opening crew/turrets or recruitment.
@@ -244,7 +244,7 @@ def prepare(args):
         overrides.append('T1 opening production gate disabled for supplied combat')
     if case.get('bomber_only', True):
         checked_replace(staged / 'src/global.as', 'float BomberWaveFighterRatio = 1.0f;', 'float BomberWaveFighterRatio = 0.0f;')
-        raid_file = staged / 'src/manager/air_raids.as'
+        raid_file = staged / 'src/systems/air/air_raids.as'
         escort_gate = ('AirOperations::AvailableFighters(true)' if 'AirOperations::AvailableFighters(true)' in raid_file.read_text()
                        else 'AirScreen::HomeValue()') + ' < AirEconomy::EnemyAir()'
         checked_replace(raid_file, escort_gate, 'false /* bomber-only arena */')

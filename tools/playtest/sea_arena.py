@@ -86,7 +86,7 @@ def prepare(a):
         # Mechanism fixture, not autonomous combat evidence. Both builds get
         # identical routes/formation; only the candidate exposes compaction.
         spec=case['native_transit']
-        p=staged/'src/manager/sea_combat.as';s=p.read_text()
+        p=staged/'src/systems/sea/sea_combat.as';s=p.read_text()
         s=s.replace('bool Active() { return ', 'bool Active() { return false && ',1);p.write_text(s)
         points=','.join(f'AIFloat3({float(x)},0,{float(z)})' for x,z in spec['points'])
         compact=('transit.SetMoveCompaction(Global::RoleSettings::Sea::CompactMoveRoutes);'
@@ -120,7 +120,7 @@ def prepare(a):
     if case.get('enemy_routes'):
         # Deterministic opposing bait only. Friendly combat remains entirely AI
         # controlled; identical trajectories are used for old/new comparisons.
-        p=staged/'src/manager/sea_combat.as';s=p.read_text()
+        p=staged/'src/systems/sea/sea_combat.as';s=p.read_text()
         s=s.replace('bool Active() { return ', 'bool Active() { return ai.teamId!=1 && ',1);p.write_text(s)
         clauses=[]
         for route in case['enemy_routes']:
@@ -142,7 +142,7 @@ def prepare(a):
             clauses.append('if ('+match+') { CRouteTask@ scripted=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route())); '
                 'array<AIFloat3> points={'+points+'}; scripted.SetSeaControl(true); scripted.SetTraversal(true,32,false); '
                 'scripted.SetPatrol(true); scripted.SetRoute(points); return scripted; }')
-        p=staged/'src/manager/sea_operations.as';s=p.read_text();b=s.index('{',s.index('bool Eligible(CCircuitUnit@ u)'))
+        p=staged/'src/systems/sea/sea_operations.as';s=p.read_text();b=s.index('{',s.index('bool Eligible(CCircuitUnit@ u)'))
         p.write_text(s[:b+1]+'\n'+'\n'.join(exclusions)+'\n'+s[b+1:])
         p=staged/'src/manager/military.as';s=p.read_text();b=s.index('{',s.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))
         p.write_text(s[:b+1]+'\n'+'\n'.join(clauses)+'\n'+s[b+1:])
@@ -150,7 +150,7 @@ def prepare(a):
         # Isolate the post-survey policy with a declared scenario precondition.
         # This is not evidence that the natural-game survey gate has passed.
         x,z=case['verified_water_fixture']
-        p=staged/'src/manager/sea_invasion.as';s=p.read_text();b=s.index('{',s.index('void Tick()'))
+        p=staged/'src/systems/sea/sea_invasion.as';s=p.read_text();b=s.index('{',s.index('void Tick()'))
         p.write_text(s[:b+1]+f'\n if (ai.teamId==0) {{ secured=ai.frame>=600; body=aiBattle.WaterBody(AIFloat3({x},0,{z}),false); return; }} // supplied survey precondition only\n'+s[b+1:])
     case.update(seed=a.seed,side=a.side,minutes=a.minutes,speed=a.speed,control=a.control,order_slack=a.order_slack)
     (d/'LuaUI/Config').mkdir(exist_ok=True,parents=True);(d/'LuaUI/Config/sea_arena.lua').write_text('return '+lua(case)+'\n')

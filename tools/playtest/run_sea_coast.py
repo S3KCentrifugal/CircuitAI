@@ -47,7 +47,7 @@ def main():
     assert needle in s
     s=s.replace(needle,needle+'\n if (ai.teamId!=0 || ai.frame<3600) return aiFactoryMgr.Enqueue(TaskS::Wait(false,SECOND));\n')
     path.write_text(s)
-    path=base/'src/manager/sea_coast.as';s=path.read_text()
+    path=base/'src/systems/sea/sea_coast.as';s=path.read_text()
     # Read-only telemetry sent to an unsynced observer for screenshots/assertions.
     needle='            Garrison();'
     assert s.count(needle)==1

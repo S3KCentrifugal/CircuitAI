@@ -37,13 +37,13 @@ def main():
     setup=staged/'src/setup.as'
     setup.write_text(setup.read_text().replace('Global::AISettings::Role = derivedRole;',
         'derivedRole=AiRole::SEA;\nGlobal::AISettings::Role = derivedRole;'))
-    combat=staged/'src/manager/sea_combat.as'
+    combat=staged/'src/systems/sea/sea_combat.as'
     combat.write_text(combat.read_text().replace('bool Active() { return Global::AISettings::Role',
         'bool Active() { return ai.teamId==0 && Global::AISettings::Role'))
     if a.blocked:
         # Keep the hostile contact alive. This negative fixture validates the
         # survey gate directly, not whether the supplied navy can win a fight.
-        operations=staged/'src/manager/sea_operations.as'
+        operations=staged/'src/systems/sea/sea_operations.as'
         operations.write_text(operations.read_text().replace('void Tick() {','void Tick() { if (ai.teamId>=0) return; // negative fixture: stationary navy\n',1))
     # The opposing player is a stationary target/known-contact fixture. Supplied
     # sensing planes stay put so coverage comes from real sensors, never globallos.

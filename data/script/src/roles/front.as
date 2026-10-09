@@ -10,8 +10,8 @@
 #include "../helpers/roles/role_limit_helpers.as"
 #include "../global.as"
 #include "../types/terrain.as"
-#include "../manager/factory_production.as"
-#include "../manager/land_siege.as"
+#include "../systems/production/factory_production.as"
+#include "../systems/combat/land_siege.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../manager/builder.as"
 #include "../manager/economy.as"

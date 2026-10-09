@@ -9,16 +9,16 @@
 #include "../helpers/spatial/map_helpers.as"
 #include "../manager/builder.as"
 #include "../manager/factory.as"
-#include "../manager/layout.as"
-#include "../manager/eco_planner.as"
-#include "../manager/spam.as"
+#include "../systems/construction/layout.as"
+#include "../systems/construction/eco_planner.as"
+#include "../systems/combat/spam.as"
 #include "tech_forward.as"
 #include "tech_factories.as"
 #include "tech_harbour.as"
 #include "tech_weapons.as"
 #include "tech_fortifications.as"
 #include "tech_flank.as"
-#include "../manager/lanes.as"
+#include "../systems/world/lanes.as"
 
 /******************************************************************************
 

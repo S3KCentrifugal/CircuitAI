@@ -1,5 +1,5 @@
-#include "../manager/sea_economy.as"
-#include "../manager/sea_combat.as"
+#include "../systems/sea/sea_economy.as"
+#include "../systems/sea/sea_combat.as"
 
 namespace SeaFactories {
     bool T2Finished(const string &in side) {

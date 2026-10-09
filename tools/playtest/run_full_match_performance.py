@@ -105,23 +105,23 @@ def main():
         wrap(scripts/f'src/roles/{wrapped_role}.as',wrapped_role.title()+'_MainUpdate','void','','',wrapped_role+'-update')
     if a.detail_sea:
         for section in ['economy','combat','patrol','operations','recovery','coast','expansion','invasion','eco_layout']:
-            wrap(scripts/f'src/manager/sea_{section}.as','Tick','void','','','sea.'+section)
+            wrap(scripts/f'src/systems/sea/sea_{section}.as','Tick','void','','','sea.'+section)
         for section in ['build','factories']:
             wrap(scripts/f'src/roles/sea_{section}.as','Tick','void','','','sea.'+section)
-        wrap(scripts/'src/manager/sea_layout.as','RefreshGeometry','void','','','sea.geometry')
+        wrap(scripts/'src/systems/sea/sea_layout.as','RefreshGeometry','void','','','sea.geometry')
         # Attribution only. Keep nested labels separate from their parents:
         # objective selection, route solving and AA danger checks scale with
         # different inputs and must not be credited to layout work by default.
-        wrap(scripts/'src/manager/sea_operations.as','Census','void','','','sea.cohort-census')
-        route_path=scripts/'src/manager/sea_operations.as'
+        wrap(scripts/'src/systems/sea/sea_operations.as','Census','void','','','sea.cohort-census')
+        route_path=scripts/'src/systems/sea/sea_operations.as'
         transit=', bool transit=false' if 'bool transit=false' in route_path.read_text() else ''
         wrap(route_path,'Route','bool',
              'Cohort@ g, const AIFloat3 &in goal, bool withdrawing, bool scout, bool hold=false'+transit,
              'g,goal,withdrawing,scout,hold'+(',transit' if transit else ''),'sea.route')
-        wrap(scripts/'src/manager/sea_patrol.as','InterceptionSite','bool',
+        wrap(scripts/'src/systems/sea/sea_patrol.as','InterceptionSite','bool',
              'CCircuitUnit@ u,const AIFloat3 &in p,int body,const string &in cellKey',
              'u,p,body,cellKey','sea.aa-safety')
-        path=scripts/'src/manager/sea_operations.as'
+        path=scripts/'src/systems/sea/sea_operations.as'
         source=path.read_text(encoding='utf-8')
         needle='array<AIFloat3>@ points=aiBattle.GetTerrainRoute(g.centre,goal,5,10,1,3,1000000);'
         if source.count(needle)!=1:raise ValueError('Expected one naval route query for attribution')

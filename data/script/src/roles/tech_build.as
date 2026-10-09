@@ -9,10 +9,10 @@
 #include "../helpers/spatial/map_helpers.as"
 #include "../helpers/construction/guard_helpers.as"
 #include "../manager/builder.as"
-#include "../manager/team_economy.as"
+#include "../systems/team/team_economy.as"
 #include "../manager/factory.as"
-#include "../manager/layout.as"
-#include "../manager/eco_planner.as"
+#include "../systems/construction/layout.as"
+#include "../systems/construction/eco_planner.as"
 
 /******************************************************************************
 

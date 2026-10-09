@@ -13,10 +13,10 @@
 // Shared enum for strategic building types
 #include "../types/building_type.as"
 // Team state: T1 constructor registry for orphan rescue
-#include "team.as"
-#include "ferry.as"
-#include "layout.as"
-#include "sea_assist.as"
+#include "../systems/team/team.as"
+#include "../systems/team/ferry.as"
+#include "../systems/construction/layout.as"
+#include "../systems/team/sea_assist.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).

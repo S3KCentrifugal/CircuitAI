@@ -23,7 +23,7 @@
 --   widget -> AI   Spring.SendSkirmishAIMessage(teamId, "barb|<command>|<teamId>|...")
 -- Commands carry the target team id and the AI ignores any other; the widget
 -- never broadcasts, so hosting two ally teams locally cannot cross-steer them.
--- Wire formats: data/script/src/manager/widget_link.as and commands.as.
+-- Wire formats: data/script/src/systems/presentation/widget_link.as and commands.as.
 -- Topics shown: roster, role, orphan, donation, ferry, spam, seaassist, layout.
 
 function widget:GetInfo()

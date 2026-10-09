@@ -6,8 +6,8 @@
 #include "../helpers/common/generic_helpers.as"
 #include "../helpers/units/unit_helpers.as"
 #include "../manager/builder.as"
-#include "../manager/layout.as"
-#include "../manager/spam.as"
+#include "../systems/construction/layout.as"
+#include "../systems/combat/spam.as"
 #include "tech_forward.as"
 #include "tech_factories.as"
 

@@ -16,7 +16,7 @@
 #include "../helpers/spatial/map_helpers.as"
 #include "../helpers/construction/guard_helpers.as"
 #include "../manager/builder.as"
-#include "../manager/layout.as"
+#include "../systems/construction/layout.as"
 #include "tech_build.as"
 #include "tech_factories.as"
 

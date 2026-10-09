@@ -1,6 +1,6 @@
 #include "air_build.as"
-#include "../manager/air_defence.as"
-#include "../manager/air_growth.as"
+#include "../systems/air/air_defence.as"
+#include "../systems/air/air_growth.as"
 
 // Ordered, total dispatcher. Each action rechecks mutable claims before enqueue.
 namespace AirRules {

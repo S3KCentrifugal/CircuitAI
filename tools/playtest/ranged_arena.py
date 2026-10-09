@@ -115,10 +115,10 @@ def prepare(args):
         # Supplied buildings did not come through TECH's reserved layout.
         # Its geometry/economy Tick cannot judge this isolated production
         # fixture. Lifecycle OnUnitAdded and Spam's own invariants stay active.
-        path=staged/'script/src/manager/invariants.as'
+        path=staged/'script/src/systems/diagnostics/invariants.as'
         source=path.read_text(); start=source.index('{',source.index('void Tick()'))+1
         path.write_text(source[:start]+'\n if (ai.frame>=0) return; // supplied-layout fixture only\n'+source[start:])
-        path=staged/'script/src/manager/spam.as'
+        path=staged/'script/src/systems/combat/spam.as'
         source=path.read_text(); start=source.index('{',source.index('void Update()'))+1
         probe='''
         if (ai.teamId==0 && ai.frame % (10*SECOND)==0) {

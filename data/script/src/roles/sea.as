@@ -6,12 +6,12 @@
 #include "../global.as"
 #include "../types/terrain.as"
 #include "../helpers/objectives/objective_helpers.as"
-#include "../manager/factory_production.as"
+#include "../systems/production/factory_production.as"
 #include "../helpers/construction/sea_constructor_helpers.as"
 #include "sea_build.as"
-#include "../manager/sea_recovery.as"
-#include "../manager/sea_invasion.as"
-#include "../manager/sea_coast.as"
+#include "../systems/sea/sea_recovery.as"
+#include "../systems/sea/sea_invasion.as"
+#include "../systems/sea/sea_coast.as"
 
 namespace RoleSea {
 
