@@ -72,6 +72,24 @@ Do not infer internet-peer savings from a local game. Runtime counters should
 be opt-in, bounded and cheap when disabled. Run the actual interpreter and
 engine with matched DLL/data, not just regex/API checks.
 
+## Ranged combat snapshots (D-207)
+
+`CRangedWorld` owns one lazy snapshot per AI simulation frame. Do not call
+`UpdateFriendlyUnits` from its reader: that path reconstructs engine wrappers,
+ally objects and map nodes for the whole ally army. The direct `CUnitAPI`
+reader retains its ID buffer, uses the same legal callback and authority
+definitions, and sorts IDs to preserve ordered-map traversal. This is
+O(F log F), not constant time. The optional
+`CIRCUIT_VERIFY_RANGED_SNAPSHOT` oracle compares positions, IDs, counts and
+radii against the old view; enable it for correctness, never for timing.
+
+Definition metadata is immutable within the AI lifetime. Frame snapshots are
+borrowed only during the owning callback. Spatial bucket storage is retained,
+so clearing also visits historical bucket count B. Do not describe local
+queries as unconditional O(1), or move engine callbacks onto path workers.
+The [ranged report](../benchmarks/ranged-combat.md) separates behavior changes,
+allocation savings, local command counts and the limits of FPS evidence.
+
 ## Entry points
 
 - [AngelScript skill](../../skills/convention-angelscript/SKILL.md)

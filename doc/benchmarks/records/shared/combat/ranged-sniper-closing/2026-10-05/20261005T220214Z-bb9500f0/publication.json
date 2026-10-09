@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "ce520c048e58dc03aba64d8b1a6cfdb06dbb72af5eceb7fb1f652b3139a51da7",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "launched.json": "86eeae6cfb86f27fbfe40a863e67fd5f384ff9a3fa0499c814c4744bb20fc344",
+    "ranged-arena-pins.json": "f0c1765f3fa615ebef5345fa6d7717b0be2174dd7f2fbf6b308cc9057eb33084",
+    "ranged-arena.json": "353cef1d4931742619460d9a296d12c84cd70ed287090867c32e4e996c6c37a1",
+    "ranged-measurements-v5.json": "8c9adf13838e1bf328bbe3d65c7e3902f46804348974178d5eadbc4cefbd95fa",
+    "report.md": "e6108863583d58e79f168693116bc7e2047b20c7a0f20776d20b677180f1dfa1",
+    "result.json": "afcc86935e099b18b7602abf83b5aee74ef2115104455addcb974117b5fbdd5e",
+    "run-inputs.json": "9b1efa430ef96e56d32e00e2cd898ccd0dd6032a18494d390dce0bfe71782fca",
+    "run-plan.json": "3392f97b6871522e3eca9cef62ff5058867fe8c089061e647f7d02494d3e6c39",
+    "script.txt": "049d520469345a93de454ab5ce8f7a8487c21b5693cdad6b33ba8a6a7aa7b572",
+    "staged.json": "7933d6f2e91846dae987d38fbe796d1783cc683129db4f00867935dd3018f9b8",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "9f089a5bd7a370205239ed0079f565391c907d1b2ff0014f49b81d8812e304c8"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-sniper-closing\\glitters\\20261005T220054Z-eb75ca63\\runs\\20261005T220214Z-bb9500f0",
+  "schema": 1
+}

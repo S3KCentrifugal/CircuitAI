@@ -12464,3 +12464,60 @@ Inventory: 46 base/Legion siege entries, five optional Scavenger entries, plus
 five new proposal entries. No candidate simulation, damage improvement or
 performance gain is claimed. Fixtures cover moving fire, cloak, arcs, blast
 spacing, sensors, missions, full salvos, carriers and CPU/APM.
+
+
+## D-207 - Opt-in ranged land combat with shared observations and independent firing
+
+2026-10-05. The authorized implementation follows D-206: retain classifications,
+append one ranged attribute, and specialize positioning, shot choice, withdrawal
+and sensor support through JSON-controlled native mechanisms. The ten proposed
+land units are the migration scope; existing naval, air and specialist missions
+keep their owners. Reject blanket artillery/siege normalization because those
+lists also drive counter accounting and discard useful mobile targeting.
+
+**Invariant.** INV-147: an admitted ranged controller has a compatible loaded
+weapon (or the explicit carrier adapter). Safety and path validity precede
+target value. Movement and shot intent have separate owners; stale path results
+cannot order a reassigned unit. Existing production and non-enrolled combat
+remain outside this opt-in behavior.
+
+**Implementation and evidence.** The [implementation reference](ranged-combat.md)
+links every native/script owner, all JSON controls, research sources, test
+runners and known verification limits. Shared spatial snapshots avoid a full
+world scan per shooter; loaded weapon geometry is cached per UnitDef. The
+path contract requires a full coarse cell even for a precise final firing slot.
+The first failed and corrected simulations remain archived. Built and Checked:
+C++ integration with warnings, 13 native suites, embedded VM policy tests,
+77-entry profile preservation, API parity and measurement/storage regressions.
+Played: per-unit combat, bait, closing assault, sensor escort, AA, friendly splash,
+energy stall, unrelated death, configuration loading and population stress.
+The [benchmark report](benchmarks/ranged-combat.md) is authoritative for exact
+builds, passes, retained failures, command/CPU/FPS measurements and limitations.
+A passing small fixture is not proof of multiplayer or long-game FPS parity.
+
+**Refinements found in play/review.** Guided missiles use a 2-D ally corridor:
+a straight height exemption missed a radar struck after a target died. Escape
+estimation allows a half-turn for a forward-facing hull. Starlights forbid
+advancing toward unidentified radar contacts while retaining permitted blind
+firing. Applying that gate to Sharpshooters reduced bait clearance from nine
+targets to four, so their cloaked, turreted approach was restored. A rear-only idle dispersal rule was tried and rejected: Starlight bait
+clearance fell from nine targets to two without improving closing survival.
+Retain validated formation routes and coverage rechecks; preserve the failed
+trial as evidence rather than silently treating the extra restriction as safer.
+The latter is a JSON lever, not a hardcoded unit-name exception (INV-149).
+
+**Performance decision.** Replace per-frame ally-wrapper reconstruction with a
+sorted reusable legal-ID snapshot; differential checks preserve the old view
+(INV-148). Keep engine callbacks on the owning thread and do not impose an APM
+ceiling. Shared snapshot cost fell in measured diagnostics, but the richer
+controller still has a measured cost over the old behavior. Report that cost,
+failed trials and safety/clearance tradeoffs instead of claiming zero FPS impact.
+
+**Evidence tooling.** Publication encountered transient Windows directory
+rename denials after copying result bundles. The [publisher](../tools/playtest/storage.py)
+now retries only the atomic rename with bounded backoff; it never overwrites
+a competing destination or rewrites original evidence. Permanent failure
+retains the pending bundle. [Tests](../tools/playtest/test_storage.py) exercise
+both outcomes; 20 storage tests passed. This change does not touch runtime AI.
+The single-line sensor travel threshold and the stronger two-line coverage
+scenario are distinguished in KI-511 and the benchmark report.

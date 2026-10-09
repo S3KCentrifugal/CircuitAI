@@ -1,0 +1,21 @@
+{
+  "files": {
+    "README.md": "00cd913e96e49ae6f89fe328c45743cda9520c95ab02c21eee1839da32b3a379",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "launched.json": "e1734c525bf8ebcbfc8f6ec62a71038db00e18c3c675b97fd3925b62ecdb5ef5",
+    "ranged-arena-pins.json": "57a560a981c446c0ecae030b35c11a1693d84c9edb1c6947f358ae5e4ed988e5",
+    "ranged-arena.json": "c6ab64129e1ab280c903ebec308cb61344af8ca674280d0bca06194f23eced17",
+    "ranged-measurements-v5.json": "ed08e77c1c18280ad35c22e1011aa11ee3144619fb59c16ca4e9e86b26c40840",
+    "report.md": "27203c183b39ab484a2dbf4674d2749779ba4f48beae3975068bcb8f56a60f23",
+    "result.json": "bd75718ea8cc4a2d476e1300f2003ff54d8394e5f23fcb35481d3681519154cd",
+    "run-inputs.json": "49f7835cd193dbb08c86223bc86088f44d2e7f405db7eeb01ca0188259d71625",
+    "run-plan.json": "f422f59f6d51e3ed2571df569916b2f33096c9f54e809eda2fb814507b23e2e4",
+    "script.txt": "aab3067b0353cb777f5858e17e75585125acfb35d8bcdb9095ffe4d53c77dc7b",
+    "staged.json": "e37c5b4c3aa538112cd1e64fa07b1115f1e297896775ebb4b0d267fcef15fbc2",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "9f089a5bd7a370205239ed0079f565391c907d1b2ff0014f49b81d8812e304c8"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-starlight-closing\\glitters\\20261005T212521Z-d10e78e2\\runs\\20261005T212640Z-ed3b3318",
+  "schema": 1
+}

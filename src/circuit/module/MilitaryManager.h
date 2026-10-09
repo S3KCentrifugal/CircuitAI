@@ -25,6 +25,7 @@ namespace circuit {
 class IMainJob;
 class CBDefenceTask;
 class CFGuardTask;
+class CRangedWorld;
 
 namespace TaskF {
 	struct SFightTask {
@@ -376,8 +377,12 @@ public:
 								  float powerMod, bool isTest);
 
 	float GetRangeUnitCountCompensatorScale();
+	IUnitTask* TryMakeRangedTask(CCircuitUnit* unit);
+	std::shared_ptr<CRangedWorld> GetRangedWorld();
+	bool HasRangedUnits() const;
 
 private:
+	std::shared_ptr<CRangedWorld> rangedWorld;
 	virtual IUnitTask* DefaultMakeTask(CCircuitUnit* unit) override;
 
 	void Watchdog();

@@ -466,6 +466,58 @@ void CFactoryManager::ReadConfig()
 		if (cdef->IsAttrNoDGun()) {
 			cdef->RemDGun();
 		}
+		if (cdef->IsAttrRanged()) {
+			// Invalid containers/types must disable this opt-in controller, not
+			// throw while parsing an otherwise usable profile.
+			const Json::Value settings = behaviour["ranged"].isObject() ? behaviour["ranged"] : Json::Value(Json::objectValue);
+			RangedPolicy policy;
+			bool valid = behaviour["ranged"].isObject();
+			const auto modeValue = settings.get("target_mode", "skirmish");
+			if (!modeValue.isString()) valid = false;
+			const std::string mode = modeValue.isString() ? modeValue.asString() : "";
+			if (mode == "precision") policy.mode = RangedPolicy::Mode::PRECISION;
+			else if (mode == "bombardment") policy.mode = RangedPolicy::Mode::BOMBARDMENT;
+			else if (mode == "carrier") policy.mode = RangedPolicy::Mode::CARRIER;
+			else if (mode != "skirmish") valid = false;
+			// Validate at load, not in each shooter update. Reject malformed
+			// policies explicitly instead of letting NaNs disable safety checks.
+			auto number = [&](const char* key, float& value, float low, float high) {
+				const auto& setting = settings[key];
+				if (setting.isNull()) return;
+				if (!setting.isNumeric()) { valid = false; return; }
+				const float candidate = setting.asFloat();
+				if (!std::isfinite(candidate) || candidate < low || candidate > high) { valid = false; return; }
+				value = candidate;
+			};
+			auto boolean = [&](const char* key, bool& value) {
+				const auto& setting = settings[key];
+				if (setting.isNull()) return;
+				if (!setting.isBool()) { valid = false; return; }
+				value = setting.asBool();
+			};
+			number("range_fraction", policy.rangeFraction, .5f, .99f);
+			number("spacing", policy.spacing, 16.f, 1024.f);
+			number("safety_margin", policy.safetyMargin, 0.f, 512.f);
+			number("range_hysteresis", policy.hysteresis, 8.f, 256.f);
+			number("reaction_seconds", policy.reactionSeconds, .1f, 5.f);
+			number("target_hysteresis", policy.targetHysteresis, 1.f, 3.f);
+			number("sensor_offset", policy.sensorOffset, 32.f, 512.f);
+			number("cloak_reserve_seconds", policy.cloakReserve, 0.f, 30.f);
+			number("repaired_target_penalty", policy.repairedTargetPenalty, .01f, 1.f);
+			number("splash_weight", policy.splashWeight, 0.f, 3.f);
+			boolean("cloak_on_reload", policy.cloakOnReload);
+			boolean("allow_mobile", policy.allowMobile);
+			boolean("allow_static", policy.allowStatic);
+			boolean("prefer_heavy", policy.preferHeavy);
+			boolean("prefer_screen", policy.preferScreen);
+			boolean("allow_radar", policy.allowRadar);
+			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
+			if (valid) cdef->SetRangedPolicy(policy);
+			else {
+				circuit->LOG("CONFIG %s: %s has invalid ranged policy; ranged disabled", cfgName.c_str(), defName.c_str());
+				cdef->DelAttribute(ATTR_TYPE(RANGED));
+			}
+		}
 
 		const Json::Value& fire = behaviour["fire_state"];
 		if (!fire.isNull()) {

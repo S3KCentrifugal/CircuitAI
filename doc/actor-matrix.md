@@ -569,3 +569,15 @@ storage capacity only; factory income/banked-cost admission remains authoritativ
 | Scalar count | DictIntOr, SeaCombat Select | A failed dictionary out lookup chooses zero after the call; pending recruits are read fresh, not stored across admissions. |
 | SEA scout/AA route | SeaPatrol Tick/Order/Release/Leave; SeaOperations Eligible | One owned unit ID per route, unique water-sector lease and stable formation slot. Excluded from surface cohort ownership. Death/transfer/retreat releases leases on the next one-second census; role exit releases immediately. |
 | SEA priority fire | SeaPatrol FireTarget, CRouteTask SetSeaTarget/RemoveAssignee | Only currently observed aircraft in the hull's weapon range. ID-specific BAR cancel clears even a pending priority without clearing another target; commands change only on target transitions. |
+
+### D-207 ranged combat ownership
+
+| Object | Actors | State and ownership |
+| --- | --- | --- |
+| Ranged UnitDef policy | FactoryManager, CircuitDef, script admission | One appended attribute, validated JSON; roles and existing attributes preserved. |
+| Ranged unit task | MilitaryManager, military.as, ArtilleryTask, RangedEngagement | Specialist admission precedes ordinary ranged control; no polling task theft. Damage can hand over to repair retreat. |
+| Firing intent | RangedEngagement, BAR priority-target gadget, RetreatTask | ID-specific target cancellation; no attack-pursuit fallback; explicit firing target is separate from MOVE. |
+| Firing slot and path | RangedWorld, RangedEngagement, native path worker | Local slot registry; callback-thread geometry validation; lifetime/generation guards; slot released on removal/death/stop. |
+| Sensor escort | MilitaryManager, SupportTask, RangedWorld | Typed anchor/lease; radar vision ahead and jammer behind; existing fighting squads keep their sensors; no ARTY-to-squad cast. |
+| Carrier child | BAR carrier gadget | Parent controller does not own drone orders, spawning or docking. |
+| Combat evidence | ranged_arena.lua, ranged_benchmark.py | Observer measures actual shots/damage/orders; staged fixture alone owns supplied enemy movement and economic freeze. |

@@ -624,6 +624,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tests/ranged_geometry_test.cpp",
+      "domain": "shared",
+      "area": "native",
+      "kind": "suite",
+      "title": "ranged_geometry_test",
+      "definitions": [],
+      "detail": "Native executable; unnamed assertions remain inside the linked suite.",
+      "sha256": "1fd23f22bc67fe853c7d3215e9c17d848d39cd97ac544a78edc46ed8442af57e",
+      "execution": "not inferred"
+    },
+    {
       "id": "tests/sea_math_tests.as",
       "domain": "sea",
       "area": "policy",
@@ -726,6 +737,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/knowledge/check_ranged_profiles.py",
+      "domain": "shared",
+      "area": "validation",
+      "kind": "validator",
+      "title": "check_ranged_profiles",
+      "definitions": [],
+      "detail": "Validate the D-207 enrollment and unchanged classifications against its checkpoint.",
+      "sha256": "a779eb7ddb90f6b6f246ac2393952b391f97dffe3877bb87695c5d459593d1be",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/knowledge/check_role_docs.py",
       "domain": "shared",
       "area": "validation",
@@ -782,6 +804,21 @@
       ],
       "detail": "Catalog tests protect definition discovery and evidence separation.",
       "sha256": "1f795d21f47deb0bd6df60fc9e92ff24c7d103636c7e7a21d95351d234c9b9fa",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/knowledge/test_ranged_profiles.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_ranged_profiles",
+      "definitions": [
+        "test_neutralize_preserves_unrelated_definition_bytes",
+        "test_span_braces_in_comments_do_not_end_object",
+        "test_span_nested_threat_keeps_late_retreat_and_mixed_newlines"
+      ],
+      "detail": "",
+      "sha256": "0e801ebe4b0c71e5608a8761c1f13ca9beccfd6b852286e1a9ee454a3e4a11c4",
       "execution": "not inferred"
     },
     {
@@ -1731,6 +1768,259 @@
       "definitions": [],
       "detail": "Map: glacial",
       "sha256": "57198ad80421fb03d5aa9e1c7b338d2df49db01f1a5b5d5c356bd5b7183a8cc4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armfboy.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-armfboy",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "0cdaf969fbf30bb89691fc216abbd4f0dbf62f22fd4f97b09dacf1560eb080f9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armfido.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-armfido",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "9366f1872c8b40d61d7c6482b4db5ac90241dfc7f239f4b9714e8c3023eede5a",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armmanni-closing-assault.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-starlight-closing",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "fb56edcf340ccd4d1bc4a456a13fe2e63f90083a1ec6552504e62a1408b7b0f1",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armmanni-repaired-bait.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-starlight-bait",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "6215b7203739862530e31ae6305741cc69f8e85ec7b7182b25d4c0c7f0cb9007",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armmanni.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-armmanni",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "47c3f83ac258160264fba2deddd6fa77330474a6e269f8d46c42153f77bd41bd",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armsnipe-closing-assault.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-sniper-closing",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "3e0acd8f34d85a9c2aa0141e241dbb276e7339b399a3247461a5b7479a00f86c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armsnipe-energy-starved.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-sniper-low-energy",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "2a5656e9aa44193171ff47f042fb6c9018c9683b9c384646858d775428d16547",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armsnipe-repaired-bait.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-sniper-bait",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "db0065ed0a7a84cb320af3965f7079029cc636c94dc42c66b95b6c653cb75c9d",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-armsnipe.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-armsnipe",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "80b855680768c17e7264dd095c6a6ece07535948761473a7bd184af9dd1b3e60",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-corban-air.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-corban-air",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "d1896ffac22a5e66c1bb4ed4a1e7ab8e56ec92986f3c7cba20ec2f80393ce25c",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-corban.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-corban",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "bfaae031981fbe8305f18f1fdef5c46af655ff2f070b1a84e4f55fa16b251dc4",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-cormort.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-cormort",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "186982485856940fa2d0733ce2d5f864c67025c387160b788bf4074f0b151aaf",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-cortrem.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-cortrem",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "27780aa070cc0f6f8285b3ff91ad1d0c0d7d4d610b7ea47e21535bdafce1b1a5",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-foreign-death.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-foreign-death",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "1cfcfa9ef492dfcb96590609dcb7b78f9322fe3af44c7655f56de88969d06c7e",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-legamcluster.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-legamcluster",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "39e68a60fa8a2d2384989decf20e4f679586f0f93186d2932c6b0eb8057d2cdd",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-legmed.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-legmed",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "2b60fe49be9558e5a52a27a57ab296f985b81640585321243c073e7de0954f9f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-legvcarry.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-legvcarry",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "4e0841625cb6ed582e05587d428595b28982675a395b36d139cdf396d93c61b9",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-mixed-flat.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-mixed-flat",
+      "definitions": [],
+      "detail": "Map: Comet Catcher Remake 1.8",
+      "sha256": "2ddda634eac278ef177f0124631504c7f00c47d85d234fd54459dd40bcb63791",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-mixed-sensors.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-mixed-sensors",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "a58ff258f81dd6dc96f437cbec701147f2fad5aeba4033e583c07a438279eb05",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-population-120.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-population-120",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "580ecf61cb54780ad122727179533a70d84ca57054f17a6464a447cd5f10edf7",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-profile-load.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-profile-load",
+      "definitions": [],
+      "detail": "Map: Comet Catcher Remake 1.8",
+      "sha256": "a4d0fdd33f103f6e189ade8952cb5b0a28df8ddd5881ab3fff73542336b2416a",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-sensor-advance.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-sensor-advance",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "8a6c23260b39f0d100725239631d8543b80a75e270799ec6e72dc6f75eaa46aa",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/cases/shared/combat/ranged-splash-screen.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "scenario",
+      "title": "ranged-splash-screen",
+      "definitions": [],
+      "detail": "Map: All That Glitters v2.2.3",
+      "sha256": "801db0d0b3d08077af131f6e6797686bde9abf7f9c741d9106b3d2d5a23cc875",
       "execution": "not inferred"
     },
     {
@@ -3066,6 +3356,65 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/checks/shared/combat/ranged-arena.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "ranged-arena",
+      "definitions": [
+        "expect: damage",
+        "expect: loaded",
+        "expect: orders",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/combat/ranged-no-energy.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "ranged-no-energy",
+      "definitions": [
+        "expect: loaded",
+        "expect: orders",
+        "expect: spawn",
+        "forbid: crash",
+        "forbid: energy",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "b6d38fe97ea22c152559d988de0ad5ae7dc88d8108ad92525f0696728b8c3285",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/checks/shared/combat/ranged-profile-load.json",
+      "domain": "shared",
+      "area": "combat",
+      "kind": "checks",
+      "title": "ranged-profile-load",
+      "definitions": [
+        "expect: loaded",
+        "expect: ranged",
+        "forbid: crash",
+        "forbid: fixture",
+        "forbid: invariant",
+        "forbid: policy",
+        "forbid: script"
+      ],
+      "detail": "",
+      "sha256": "7af929d4994a3a5707179728982ec07f4954a80cda619c54f9e430917344da2c",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/checks/shared/combat/strategic_juno.json",
       "domain": "shared",
       "area": "combat",
@@ -4257,6 +4606,28 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/ranged_arena.py",
+      "domain": "shared",
+      "area": "runners",
+      "kind": "runner family",
+      "title": "ranged_arena",
+      "definitions": [],
+      "detail": "Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.",
+      "sha256": "9b1ec5a9d8e2fa41c37affb13135a504d44e99e0c6f45f62c9860ade47924c8f",
+      "execution": "not inferred"
+    },
+    {
+      "id": "tools/playtest/ranged_benchmark.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "tool",
+      "title": "ranged_benchmark",
+      "definitions": [],
+      "detail": "Summarize immutable ranged fixtures, or run a serial supplied-force matrix.",
+      "sha256": "b30cde51f4513885c90b485964d3b618d9dc669102d994a62fced979d17e1ce1",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/run_air_natural.py",
       "domain": "air",
       "area": "runners",
@@ -4552,7 +4923,7 @@
       "title": "storage",
       "definitions": [],
       "detail": "Organize game tests without replacing historical evidence.",
-      "sha256": "163b846dd3f151d281109c1894c21d719b331958fe95c72f898f109045610d25",
+      "sha256": "0620c89c9b82ec59cafc15c6fc3fc3bd480201f57b22b7bc78252ddcf9e04395",
       "execution": "not inferred"
     },
     {
@@ -4701,6 +5072,22 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/test_ranged_benchmark.py",
+      "domain": "shared",
+      "area": "tooling",
+      "kind": "suite",
+      "title": "test_ranged_benchmark",
+      "definitions": [
+        "test_early_failure_uses_observed_command_window_and_fails_acceptance",
+        "test_failed_watch_verdict_and_missing_sensor_movement_remain_failures",
+        "test_logs_and_overkill_are_not_confused_with_fixture_events",
+        "test_shutdown_grace_and_partial_events_do_not_extend_measurements"
+      ],
+      "detail": "",
+      "sha256": "df330894124de1911a5fddb7f1dbee226bcb98e4799b0a6a886073598a4bbd2c",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/test_scorecard.py",
       "domain": "shared",
       "area": "tooling",
@@ -4748,8 +5135,10 @@
         "test_publish_changed_original_evidence_is_rejected",
         "test_publish_changed_selection_cannot_overwrite_existing_record",
         "test_publish_is_idempotent_and_preserves_failure",
+        "test_publish_permanent_rename_failure_retains_pending_bundle",
         "test_publish_post_run_analysis_gets_its_own_hash",
         "test_publish_refuses_live_snapshot",
+        "test_publish_retries_transient_rename_without_changing_evidence",
         "test_record_collision_does_not_replace_previous_benchmark",
         "test_record_identical_benchmark_is_idempotent",
         "test_resolve_all_legacy_paths_and_short_ids_preserves_definitions",
@@ -4759,7 +5148,7 @@
         "test_resolve_missing_path_cannot_escape_category"
       ],
       "detail": "Storage boundaries: preserve history, resolve old commands, refuse collisions.",
-      "sha256": "2c76bc180792bec5bba434d3bc3c0b4d557fb2bd628f860e2f8346bb29ecbcb0",
+      "sha256": "5b3f50eedbf1f3492b74f2618b50a6068965d434cf64655d85e4cd3a102d01d6",
       "execution": "not inferred"
     },
     {
@@ -5205,6 +5594,17 @@
       "execution": "not inferred"
     },
     {
+      "id": "tools/playtest/widgets/ranged_arena.lua",
+      "domain": "shared",
+      "area": "fixtures",
+      "kind": "fixture/observer",
+      "title": "ranged_arena",
+      "definitions": [],
+      "detail": "In-game fixture/observer; source inventory, not a claim of execution.",
+      "sha256": "2163596f1c116e6433753a34201f8b9b7f7c871ea920c44edb828ce2da7111ba",
+      "execution": "not inferred"
+    },
+    {
       "id": "tools/playtest/widgets/role_swap_test.lua",
       "domain": "shared",
       "area": "fixtures",
@@ -5487,7 +5887,7 @@
       "title": "run_native_tests",
       "definitions": [],
       "detail": "",
-      "sha256": "8d64f0c84e3246f6b92b1e3be714ed5d5240c6587e0921f44bced9fcac470d52",
+      "sha256": "85edb6892229b9ba97bbceb48cf9cf834268257573e6b1e587e9c80ed3f9ffd6",
       "execution": "not inferred"
     },
     {

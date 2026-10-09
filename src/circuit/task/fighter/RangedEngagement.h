@@ -1,0 +1,49 @@
+#ifndef CIRCUIT_RANGED_ENGAGEMENT_H
+#define CIRCUIT_RANGED_ENGAGEMENT_H
+#include "task/fighter/RangedWorld.h"
+#include <memory>
+
+namespace springai { class Weapon; }
+namespace circuit {
+class IUnitTask;
+class IPathQuery;
+class CRangedEngagement {
+public:
+    CRangedEngagement(CCircuitAI* ai, IUnitTask* owner, CCircuitUnit* unit);
+    ~CRangedEngagement();
+    void Update(CCircuitUnit* unit);
+    void Idle() { nextFrame=0; }
+    void MoveFailed() { query.reset(); moving=false; nextFrame=0; ++failures; }
+    void Release(CCircuitUnit* unit, bool commands=true);
+    int Target() const { return target; }
+private:
+    void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage);
+    void Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape);
+    void Hold(CCircuitUnit* unit);
+    void Disperse(CCircuitUnit* unit);
+    bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
+    CCircuitAI* ai;
+    IUnitTask* owner;
+    // Tasks may outlive the derived manager destructor during shutdown.
+    std::shared_ptr<CRangedWorld> worldOwner;
+    CRangedWorld& world;
+    const CRangedWorld::Capabilities& caps;
+    int id, target=-1, weaponIndex=-1, nextFrame=0, targetFrame=0;
+    int lastReload=-1, burstUntil=0, withdrawalUntil=0, failures=0;
+    int lastProgressFrame=0;
+    int lastShotFrame=0, orientUntil=0;
+    int traceFrame=-150;
+    size_t pathCursor=0;
+    springai::AIFloat3 lastPos, destination;
+    std::unique_ptr<springai::Weapon> liveWeapon;
+    std::shared_ptr<IPathQuery> query;
+    // Callback cancellation must not depend on allocator reuse of this/owner.
+    std::shared_ptr<int> lifetime=std::make_shared<int>(0);
+    unsigned generation=0;
+    bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;
+    float reservedDamage=0.f;
+    std::vector<int> nearby;
+    std::vector<springai::AIFloat3> path;
+};
+}
+#endif

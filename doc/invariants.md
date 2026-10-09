@@ -202,3 +202,9 @@ step.
 
 | INV-145 | Eligible SEA cohort members accept the selected route task; player, retreat, carrier and AA tasks are excluded. | SeaOperations::Route logs failed TransferUnit; SEA arena checks forbid all invariants. | D-201 |
 | INV-146 | Eligible SEA scout/AA hulls accept their individual patrol/interception route; player, carrier and repair retreat ownership remains protected. | SeaPatrol::Order audits handover; Supreme observer measures physical separation, patrol queues and AA damage. | D-202 |
+
+| INV-147 | An admitted ranged controller has at least one compatible loaded damage weapon, or a configured carrier adapter. | RangedEngagement construction audits cached mounted weapons; ranged fixtures forbid the diagnostic. | D-207 |
+
+| INV-148 | Ranged friendly snapshot preserves sorted legal IDs, positions and radii from the legacy view. | Optional CIRCUIT_VERIFY_RANGED_SNAPSHOT compares both paths in engine fixtures; disabled in timing runs. | D-207 |
+
+| INV-149 | A ranged policy that forbids advancing on unknown radar never selects such a movement objective. | RangedEngagement checks the chosen objective before generating firing slots; precision closing fixtures forbid the diagnostic. | D-207 |

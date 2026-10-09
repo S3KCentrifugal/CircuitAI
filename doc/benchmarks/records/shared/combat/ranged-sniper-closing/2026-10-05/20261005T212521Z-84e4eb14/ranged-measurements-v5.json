@@ -1,0 +1,221 @@
+{
+  "schema": 5,
+  "case": "ranged-sniper-closing",
+  "variant": "baseline",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-sniper-closing\\glitters\\20261005T212404Z-1be7dc4e",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 12.633333333333333,
+  "raw_damage_including_overkill": 38138,
+  "shooters_fired": 6,
+  "shots": 19,
+  "enemy_kills": 14,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 856.0,
+  "nonlua_commands": 707,
+  "commands_per_game_minute": 176.75,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7500,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [],
+  "minimum_sampled_spacing_after_60s": 23.08679276123039,
+  "render_fps_after_60s": [
+    61.0,
+    75.0,
+    206.0,
+    187.0,
+    171.0,
+    172.0,
+    190.0,
+    225.0,
+    204.0,
+    193.0,
+    230.0,
+    214.0,
+    232.0,
+    204.0,
+    201.0,
+    203.0,
+    283.0,
+    196.0,
+    200.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:40.036414][f=0000379]",
+      "frame": "379",
+      "id": "29947",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:40.223292][f=0000386]",
+      "frame": "386",
+      "id": "15598",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:49.244868][f=0002426]",
+      "frame": "2426",
+      "id": "14262",
+      "team": "0",
+      "unit": "armarad",
+      "cost": "400"
+    },
+    {
+      "t": "00:00:50.347377][f=0002689]",
+      "frame": "2689",
+      "id": "14370",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:50.747580][f=0002786]",
+      "frame": "2786",
+      "id": "26019",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:50.890463][f=0002821]",
+      "frame": "2821",
+      "id": "3031",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:51.577018][f=0002985]",
+      "frame": "2985",
+      "id": "15146",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:51.586696][f=0002987]",
+      "frame": "2987",
+      "id": "24732",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:51.987317][f=0003084]",
+      "frame": "3084",
+      "id": "10085",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.011095][f=0003089]",
+      "frame": "3089",
+      "id": "10821",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.179354][f=0003130]",
+      "frame": "3130",
+      "id": "31054",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.231199][f=0003142]",
+      "frame": "3142",
+      "id": "15398",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:52.813645][f=0003282]",
+      "frame": "3282",
+      "id": "679",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.234650][f=0003383]",
+      "frame": "3383",
+      "id": "14057",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    },
+    {
+      "t": "00:00:53.442655][f=0003433]",
+      "frame": "3433",
+      "id": "18782",
+      "team": "1",
+      "unit": "corak",
+      "cost": "43"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.045532,
+      "ai_all_p95_ms": 0.297729,
+      "ai_all_max_ms": 7.88916,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.670166,
+      "ai_all_mean_ms": 0.08991
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.031494,
+      "ai_all_p95_ms": 0.324951,
+      "ai_all_max_ms": 2.337646,
+      "sim_speed": 8.007,
+      "ai_all_p99_ms": 0.626953,
+      "ai_all_mean_ms": 0.078572
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.026123,
+      "ai_all_p95_ms": 0.307617,
+      "ai_all_max_ms": 2.109619,
+      "sim_speed": 7.51,
+      "ai_all_p99_ms": 0.562012,
+      "ai_all_mean_ms": 0.075374
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.026611,
+      "ai_all_p95_ms": 0.337646,
+      "ai_all_max_ms": 2.144043,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.671143,
+      "ai_all_mean_ms": 0.077715
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

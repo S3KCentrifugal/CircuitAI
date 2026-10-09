@@ -1,0 +1,175 @@
+{
+  "schema": 5,
+  "case": "ranged-starlight-bait",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-starlight-bait\\glitters\\20261005T214637Z-37c1ef6d",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 12.533333333333333,
+  "raw_damage_including_overkill": 17013,
+  "shooters_fired": 5,
+  "shots": 16,
+  "enemy_kills": 9,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 3660.0,
+  "nonlua_commands": 371,
+  "commands_per_game_minute": 92.75,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7800,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armmanni"
+  ],
+  "minimum_sampled_spacing_after_60s": 253.85231927244627,
+  "render_fps_after_60s": [
+    37.0,
+    75.0,
+    123.0,
+    165.0,
+    151.0,
+    101.0,
+    129.0,
+    158.0,
+    153.0,
+    159.0,
+    171.0,
+    154.0,
+    166.0,
+    151.0,
+    147.0,
+    148.0,
+    200.0,
+    143.0,
+    146.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:45.580478][f=0000721]",
+      "frame": "721",
+      "id": "15598",
+      "team": "1",
+      "unit": "armfboy",
+      "cost": "1400"
+    },
+    {
+      "t": "00:00:45.983749][f=0000789]",
+      "frame": "789",
+      "id": "29947",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:46.462639][f=0000903]",
+      "frame": "903",
+      "id": "6003",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    },
+    {
+      "t": "00:00:47.034969][f=0001042]",
+      "frame": "1042",
+      "id": "7383",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    },
+    {
+      "t": "00:00:47.247902][f=0001093]",
+      "frame": "1093",
+      "id": "20443",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:47.636066][f=0001183]",
+      "frame": "1183",
+      "id": "22963",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    },
+    {
+      "t": "00:00:47.809838][f=0001225]",
+      "frame": "1225",
+      "id": "3874",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    },
+    {
+      "t": "00:00:48.208349][f=0001322]",
+      "frame": "1322",
+      "id": "14370",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    },
+    {
+      "t": "00:00:48.877072][f=0001361]",
+      "frame": "1361",
+      "id": "29202",
+      "team": "1",
+      "unit": "armnanotc",
+      "cost": "230"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.055908,
+      "ai_all_p95_ms": 0.391113,
+      "ai_all_max_ms": 8.611572,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.823486,
+      "ai_all_mean_ms": 0.118122
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.031738,
+      "ai_all_p95_ms": 0.347168,
+      "ai_all_max_ms": 2.847168,
+      "sim_speed": 7.973,
+      "ai_all_p99_ms": 0.772217,
+      "ai_all_mean_ms": 0.087365
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.032471,
+      "ai_all_p95_ms": 0.369141,
+      "ai_all_max_ms": 3.29834,
+      "sim_speed": 7.513,
+      "ai_all_p99_ms": 0.811035,
+      "ai_all_mean_ms": 0.09122
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.033691,
+      "ai_all_p95_ms": 0.394775,
+      "ai_all_max_ms": 2.901367,
+      "sim_speed": 7.509,
+      "ai_all_p99_ms": 0.725098,
+      "ai_all_mean_ms": 0.094619
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

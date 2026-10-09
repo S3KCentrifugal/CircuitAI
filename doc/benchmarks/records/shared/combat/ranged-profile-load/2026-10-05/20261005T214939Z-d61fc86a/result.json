@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "checks.json": {
+      "bytes": 932,
+      "sha256": "7af929d4994a3a5707179728982ec07f4954a80cda619c54f9e430917344da2c"
+    },
+    "infolog.txt": {
+      "bytes": 383490,
+      "sha256": "0462405ac584ea3b93c9d5de07c61bc0aa3c3e11b9fa07d52fd1027b0fb17c81"
+    },
+    "launched.json": {
+      "bytes": 152,
+      "sha256": "841942d03299f3701b06883833126d96a392ebd2413c49a660363f14225fe601"
+    },
+    "ranged-arena-pins.json": {
+      "bytes": 36466,
+      "sha256": "4ad14f944811486dc4efd14ce38c10091758b078d0b7aba9b8dcf964c125536a"
+    },
+    "ranged-arena.json": {
+      "bytes": 2619,
+      "sha256": "6d495a459611be1300673b3d2b06df07d033ed1bfa60435b1c0b8b488b114793"
+    },
+    "report.md": {
+      "bytes": 2870,
+      "sha256": "c07a6cd1ceebb359e6a66a4aad525d35531c3bed24899f425c7b61aa6d6fbf50"
+    },
+    "run-inputs.json": {
+      "bytes": 36443,
+      "sha256": "12a1aae23ba5bd6c1701572cf2c9e8e1f15e6d752684dc69232ccb7043a014da"
+    },
+    "run-plan.json": {
+      "bytes": 257,
+      "sha256": "74539fc13341ff9a7e387c80977a74d9940f4fa40ffb884dd2a3a8ab006524e9"
+    },
+    "script.txt": {
+      "bytes": 6150,
+      "sha256": "9470d85da1012fed0fbc806bfa31af4f74a5cc55dfc75bd93b89ab1a0e87cc8d"
+    },
+    "staged.json": {
+      "bytes": 292,
+      "sha256": "d3b9fecae88a2dd878c643a519e988e6f07a35f6ffea101b2c10c3a502c36744"
+    },
+    "starts.as": {
+      "bytes": 114,
+      "sha256": "078434aa49ed673e6bb892017c844c11e24cc8f80ff1406bfb1f3336277a85a1"
+    },
+    "teams.json": {
+      "bytes": 467,
+      "sha256": "e15661f5744de8d37b71a8987717fd06bf0a1b926c5c399733568d3fee78990b"
+    }
+  },
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "comet",
+    "scenario": "ranged-profile-load"
+  },
+  "comparison": "Use scorecard cohorts for strength comparisons; categories are discovery metadata only.",
+  "complete": true,
+  "game": "Beyond All Reason test-31479-433a460",
+  "id": "20261005T214939Z-d61fc86a",
+  "last_frame": 2100,
+  "map": "Comet Catcher Remake 1.8",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-profile-load\\comet\\20261005T214844Z-58c6a43a\\runs\\20261005T214939Z-d61fc86a",
+  "reason": "reached 1 min",
+  "recorded_at_utc": "2026-10-05T21:49:39.381442+00:00",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1,
+  "teams": [
+    {
+      "ai": "test",
+      "ally": 0,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 1,
+      "team": 0,
+      "x": 4000.0,
+      "z": 1800.0
+    },
+    {
+      "ai": "test",
+      "ally": 1,
+      "role": "FRONT",
+      "side": "armada",
+      "spot": 2,
+      "team": 1,
+      "x": 4000.0,
+      "z": 7000.0
+    }
+  ],
+  "verdict": "PASS"
+}

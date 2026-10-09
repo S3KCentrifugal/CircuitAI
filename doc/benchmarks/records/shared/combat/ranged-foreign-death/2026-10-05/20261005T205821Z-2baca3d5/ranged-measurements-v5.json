@@ -1,0 +1,143 @@
+{
+  "schema": 5,
+  "case": "ranged-foreign-death",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-foreign-death\\glitters\\20261005T205708Z-ebcdbc3b",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 17.366666666666667,
+  "raw_damage_including_overkill": 5767,
+  "shooters_fired": 4,
+  "shots": 21,
+  "enemy_kills": 4,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 510.0,
+  "nonlua_commands": 194,
+  "commands_per_game_minute": 48.5,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7350,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "legmed"
+  ],
+  "minimum_sampled_spacing_after_60s": 135.05924625881784,
+  "render_fps_after_60s": [
+    65.0,
+    85.0,
+    235.0,
+    233.0,
+    230.0,
+    209.0,
+    256.0,
+    253.0,
+    237.0,
+    234.0,
+    241.0,
+    205.0,
+    240.0,
+    255.0,
+    246.0,
+    239.0,
+    254.0,
+    201.0,
+    216.0
+  ],
+  "cloaked_units_observed": 0,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:37.465700][f=0000542]",
+      "frame": "542",
+      "id": "29947",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:38.665063][f=0000817]",
+      "frame": "817",
+      "id": "31054",
+      "team": "0",
+      "unit": "armck",
+      "cost": "110"
+    },
+    {
+      "t": "00:00:39.084153][f=0000917]",
+      "frame": "917",
+      "id": "15598",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:40.608475][f=0001282]",
+      "frame": "1282",
+      "id": "6003",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    },
+    {
+      "t": "00:00:40.610584][f=0001284]",
+      "frame": "1284",
+      "id": "20443",
+      "team": "1",
+      "unit": "armllt",
+      "cost": "85"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.041992,
+      "ai_all_p95_ms": 0.299561,
+      "ai_all_max_ms": 7.911621,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.716431,
+      "ai_all_mean_ms": 0.087929
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.023682,
+      "ai_all_p95_ms": 0.309448,
+      "ai_all_max_ms": 1.947144,
+      "sim_speed": 8.003,
+      "ai_all_p99_ms": 0.523438,
+      "ai_all_mean_ms": 0.066888
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.02417,
+      "ai_all_p95_ms": 0.295166,
+      "ai_all_max_ms": 1.750244,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.689209,
+      "ai_all_mean_ms": 0.067315
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.023926,
+      "ai_all_p95_ms": 0.30542,
+      "ai_all_max_ms": 1.736816,
+      "sim_speed": 7.509,
+      "ai_all_p99_ms": 0.637451,
+      "ai_all_mean_ms": 0.068751
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

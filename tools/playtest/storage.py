@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import time
 import uuid
 from pathlib import Path
 
@@ -202,12 +203,25 @@ def publish(archive, screenshots=(), *, store=ROOT/'doc/benchmarks/records'):
     (temporary/'README.md').write_bytes(summary_bytes)
     # rename refuses an existing non-empty directory: concurrent writers cannot
     # overwrite evidence. An interrupted pending folder is retained for recovery.
-    temporary.rename(dest)
+    # Windows can briefly deny a directory rename while a newly copied PNG
+    # or JSON is still held by another reader. Retry only this atomic step;
+    # never recopy/rewrite evidence or replace a competing destination. The
+    # bounded failure leaves the verified pending bundle available for recovery.
+    for attempt in range(8):
+        try:
+            temporary.rename(dest)
+            break
+        except PermissionError:
+            if dest.exists() or attempt == 7:
+                raise
+            time.sleep(.05 * 2**attempt)
     return dest
 
 
 def historical_category(path):
     name = path.name
+    if name.startswith('ranged-'):
+        return 'shared', 'combat'
     if 'scorecards' in path.parts or name == 'scorecard-design.md':
         return 'shared', 'strategy'
     if 'lane-workers' in path.parts:

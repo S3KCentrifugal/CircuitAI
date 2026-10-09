@@ -8,6 +8,7 @@ if(CIRCUIT_BUILD_TESTS)
 	add_subdirectory(tests)
 endif()
 
+# Native source discovery includes the opt-in ranged combat components.
 set(mySourceDirRel         "src/") # Common values are "" or "src"
 set(additionalSources      ${CMAKE_SOURCE_DIR}/rts/System/StringUtil.cpp)
 set(additionalSources      ${additionalSources} ${CMAKE_SOURCE_DIR}/rts/System/Misc/SpringTime.cpp)

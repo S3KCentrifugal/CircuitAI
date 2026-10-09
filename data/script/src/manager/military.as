@@ -44,6 +44,9 @@ namespace Military {
 		if (t !is null) return t;
 		@t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
+		// Preserve specialist owners above; production is unaffected.
+		@t = aiMilitaryMgr.TryMakeRangedTask(u);
+		if (t !is null) return t;
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if (cfg !is null && cfg.MilitaryAiMakeTaskHandler !is null) {

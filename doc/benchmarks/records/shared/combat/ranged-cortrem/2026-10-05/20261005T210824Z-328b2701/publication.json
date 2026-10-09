@@ -1,0 +1,22 @@
+{
+  "files": {
+    "README.md": "30525b595dba7a22f04cc0cd5be053a3d45263fbe9367d101af7403dcd044b40",
+    "checks.json": "2962307009fe6fb082793209514d0bfa7cde60adbb467c3ea31b69f4495f84cc",
+    "launched.json": "326fbac52d1aef9b1a03d938c311bac8e412d225e61d283c5f38221dbb6b2925",
+    "ranged-arena-pins.json": "d9565a4c18ce12c7cd70a20e22cb20c21503bb92220ca189787a8e0792972880",
+    "ranged-arena.json": "b353cd6d2d8147f5a83e9e7c9b0b0a423082b007310f36ca6157042abea6751a",
+    "ranged-measurements-v5.json": "a66ee9aa4778171a728312f8fc889f913aa0b4d2b662dd3a75d93c2a4bba9fc5",
+    "report.md": "9dc3a622954036b85c751f1bddc64fd9c3f0e78a9e7d2440170a2e5da0a42909",
+    "result.json": "ae88c7a6217b7fa7a7945ac7772281d1ff33e36a54355d512f4521f981f5267a",
+    "run-inputs.json": "fff4be374e08a0d442d24a9b53ef4499f6bc52aba298d3b9bb1ca6b1d6d7646b",
+    "run-plan.json": "7e8e60edd105e3a66fec1707eebb3abb68f441a5e518c43e4bab2810823b3713",
+    "screen_2026-10-05_21-07-56-786.png": "d90d9e4462473e64d78a64824f9d1b2d8114cc9775b5a4ed44e4417cbac3ba93",
+    "script.txt": "d043d15e1b1edcb3a264fab059a72eb302d9894863122c9c7222f3a726035693",
+    "staged.json": "0c722f98f39ea769242322ab5ebb9947ee6bafa13c873d4802a7221915d0dd67",
+    "starts.as": "40163f5a42e4b8fa6fdf278f99bf5c1a65a3c15797be6ee358d995576642af1a",
+    "teams.json": "99b95035e5e56357a76da25fbf38e8202bc0be7c17cd2c8129d4f12d27c1341a"
+  },
+  "note": "Includes post-run analyses; original result.json retains raw observation hashes.",
+  "raw_archive": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-cortrem\\glitters\\20261005T210707Z-c5039655\\runs\\20261005T210824Z-328b2701",
+  "schema": 1
+}

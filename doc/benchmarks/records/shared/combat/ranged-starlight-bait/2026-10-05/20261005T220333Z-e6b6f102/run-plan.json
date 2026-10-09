@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-starlight-bait"
+  },
+  "id": "20261005T220214Z-555b6dd7",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-sniper-bait"
+  },
+  "id": "20261005T202323Z-50ad252e",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

@@ -1,0 +1,14 @@
+{
+  "category": {
+    "area": "combat",
+    "domain": "shared",
+    "kind": "supplied",
+    "map": "glitters",
+    "scenario": "ranged-mixed-sensors"
+  },
+  "id": "20261005T220451Z-b71f2013",
+  "requested": {
+    "seed": 2071
+  },
+  "schema": 1
+}

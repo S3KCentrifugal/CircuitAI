@@ -1,0 +1,132 @@
+{
+  "schema": 5,
+  "case": "ranged-mixed-flat",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-mixed-flat\\comet\\20261005T211502Z-acaf8535",
+  "measurement_deadline_frame": 7200,
+  "first_damage_seconds": 51.7,
+  "raw_damage_including_overkill": 14423,
+  "shooters_fired": 10,
+  "shots": 21,
+  "enemy_kills": 3,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 1320.0,
+  "nonlua_commands": 1492,
+  "commands_per_game_minute": 373.0,
+  "command_window_frame": 7200,
+  "last_observed_frame": 7500,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {
+    "armaser": 1552.0,
+    "armseer": 1787.0
+  },
+  "assigned_unit_types": [
+    "armfboy",
+    "armmanni",
+    "armsnipe"
+  ],
+  "minimum_sampled_spacing_after_60s": 24.020824298928627,
+  "render_fps_after_60s": [
+    61.0,
+    37.0,
+    184.0,
+    212.0,
+    199.0,
+    222.0,
+    230.0,
+    172.0,
+    204.0,
+    202.0,
+    224.0,
+    235.0,
+    226.0,
+    228.0,
+    171.0,
+    212.0,
+    245.0,
+    208.0,
+    238.0
+  ],
+  "cloaked_units_observed": 4,
+  "carrier_children_observed": 0,
+  "friendly_damage_including_overkill": 0,
+  "deaths": [
+    {
+      "t": "00:00:43.077499][f=0001783]",
+      "frame": "1783",
+      "id": "6003",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:43.518028][f=0001875]",
+      "frame": "1875",
+      "id": "20443",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    },
+    {
+      "t": "00:00:44.143476][f=0002024]",
+      "frame": "2024",
+      "id": "7383",
+      "team": "1",
+      "unit": "armhlt",
+      "cost": "440"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.042603,
+      "ai_all_p95_ms": 0.294556,
+      "ai_all_max_ms": 10.700439,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.585693,
+      "ai_all_mean_ms": 0.088431
+    },
+    {
+      "t": 0.0,
+      "f": 3600.0,
+      "frame": 3600.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.037354,
+      "ai_all_p95_ms": 0.31311,
+      "ai_all_max_ms": 1.781372,
+      "sim_speed": 8.075,
+      "ai_all_p99_ms": 0.637817,
+      "ai_all_mean_ms": 0.07886
+    },
+    {
+      "t": 0.0,
+      "f": 5400.0,
+      "frame": 5400.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.032715,
+      "ai_all_p95_ms": 0.317017,
+      "ai_all_max_ms": 1.925415,
+      "sim_speed": 7.514,
+      "ai_all_p99_ms": 0.613281,
+      "ai_all_mean_ms": 0.074817
+    },
+    {
+      "t": 0.0,
+      "f": 7200.0,
+      "frame": 7200.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.030518,
+      "ai_all_p95_ms": 0.344238,
+      "ai_all_max_ms": 1.9104,
+      "sim_speed": 7.508,
+      "ai_all_p99_ms": 0.661865,
+      "ai_all_mean_ms": 0.073781
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

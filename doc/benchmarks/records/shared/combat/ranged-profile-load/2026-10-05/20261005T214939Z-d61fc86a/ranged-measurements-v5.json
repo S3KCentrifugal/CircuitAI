@@ -1,0 +1,106 @@
+{
+  "schema": 5,
+  "case": "ranged-profile-load",
+  "variant": "ranged",
+  "seed": 2071,
+  "directory": "C:\\bardev\\s3k-CircuitAI\\build-theatres\\games\\shared\\combat\\ranged-profile-load\\comet\\20261005T214844Z-58c6a43a",
+  "measurement_deadline_frame": 1800,
+  "first_damage_seconds": 19.5,
+  "raw_damage_including_overkill": 10755,
+  "shooters_fired": 7,
+  "shots": 61,
+  "enemy_kills": 4,
+  "friendly_losses": 0,
+  "enemy_metal_destroyed": 680.0,
+  "nonlua_commands": 546,
+  "commands_per_game_minute": 546.0,
+  "command_window_frame": 1800,
+  "last_observed_frame": 2400,
+  "watch_verdict": "PASS",
+  "sensor_forward_progress": {},
+  "assigned_unit_types": [
+    "armfboy",
+    "armfido",
+    "armmanni",
+    "armsnipe",
+    "corban",
+    "cormort",
+    "cortrem",
+    "legamcluster",
+    "legmed",
+    "legvcarry"
+  ],
+  "minimum_sampled_spacing_after_60s": 106.25441167311595,
+  "render_fps_after_60s": [
+    46.0
+  ],
+  "cloaked_units_observed": 1,
+  "carrier_children_observed": 6,
+  "friendly_damage_including_overkill": 125,
+  "deaths": [
+    {
+      "t": "00:00:42.498022][f=0000941]",
+      "frame": "941",
+      "id": "26019",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:42.759799][f=0001004]",
+      "frame": "1004",
+      "id": "3031",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:42.909364][f=0001039]",
+      "frame": "1039",
+      "id": "10085",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:43.368966][f=0001149]",
+      "frame": "1149",
+      "id": "15146",
+      "team": "1",
+      "unit": "armestor",
+      "cost": "170"
+    },
+    {
+      "t": "00:00:45.080235][f=0001560]",
+      "frame": "1560",
+      "id": "11300",
+      "team": "0",
+      "unit": "legdrone",
+      "cost": "15"
+    },
+    {
+      "t": "00:00:45.209034][f=0001590]",
+      "frame": "1590",
+      "id": "679",
+      "team": "0",
+      "unit": "legdrone",
+      "cost": "15"
+    }
+  ],
+  "engine_ai_windows": [
+    {
+      "t": 0.0,
+      "f": 1800.0,
+      "frame": 1800.0,
+      "samples": 1800.0,
+      "ai_all_p50_ms": 0.061676,
+      "ai_all_p95_ms": 0.20282,
+      "ai_all_max_ms": 2.557281,
+      "sim_speed": 0.0,
+      "ai_all_p99_ms": 0.592194,
+      "ai_all_mean_ms": 0.092886
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

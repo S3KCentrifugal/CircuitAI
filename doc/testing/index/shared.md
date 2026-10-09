@@ -59,6 +59,38 @@ Generated source inventory. Execution is not inferred.
 - `forbid: invariant`
 - `forbid: script`
 
+### [ranged-arena](../../../tools/playtest/checks/shared/combat/ranged-arena.json)
+
+- `expect: damage`
+- `expect: loaded`
+- `expect: orders`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [ranged-no-energy](../../../tools/playtest/checks/shared/combat/ranged-no-energy.json)
+
+- `expect: loaded`
+- `expect: orders`
+- `expect: spawn`
+- `forbid: crash`
+- `forbid: energy`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: script`
+
+### [ranged-profile-load](../../../tools/playtest/checks/shared/combat/ranged-profile-load.json)
+
+- `expect: loaded`
+- `expect: ranged`
+- `forbid: crash`
+- `forbid: fixture`
+- `forbid: invariant`
+- `forbid: policy`
+- `forbid: script`
+
 ### [strategic_juno](../../../tools/playtest/checks/shared/combat/strategic_juno.json)
 
 - `expect: advanced-jammer`
@@ -189,6 +221,100 @@ Generated source inventory. Execution is not inferred.
 - `forbid: fixture removed`
 - `forbid: invariant`
 - `forbid: script error`
+
+## Combat / Scenario
+
+### [ranged-armfboy](../../../tools/playtest/cases/shared/combat/ranged-armfboy.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-armfido](../../../tools/playtest/cases/shared/combat/ranged-armfido.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-starlight-closing](../../../tools/playtest/cases/shared/combat/ranged-armmanni-closing-assault.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-starlight-bait](../../../tools/playtest/cases/shared/combat/ranged-armmanni-repaired-bait.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-armmanni](../../../tools/playtest/cases/shared/combat/ranged-armmanni.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-sniper-closing](../../../tools/playtest/cases/shared/combat/ranged-armsnipe-closing-assault.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-sniper-low-energy](../../../tools/playtest/cases/shared/combat/ranged-armsnipe-energy-starved.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-sniper-bait](../../../tools/playtest/cases/shared/combat/ranged-armsnipe-repaired-bait.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-armsnipe](../../../tools/playtest/cases/shared/combat/ranged-armsnipe.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-corban-air](../../../tools/playtest/cases/shared/combat/ranged-corban-air.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-corban](../../../tools/playtest/cases/shared/combat/ranged-corban.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-cormort](../../../tools/playtest/cases/shared/combat/ranged-cormort.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-cortrem](../../../tools/playtest/cases/shared/combat/ranged-cortrem.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-foreign-death](../../../tools/playtest/cases/shared/combat/ranged-foreign-death.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-legamcluster](../../../tools/playtest/cases/shared/combat/ranged-legamcluster.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-legmed](../../../tools/playtest/cases/shared/combat/ranged-legmed.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-legvcarry](../../../tools/playtest/cases/shared/combat/ranged-legvcarry.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-mixed-flat](../../../tools/playtest/cases/shared/combat/ranged-mixed-flat.json)
+
+Map: Comet Catcher Remake 1.8
+
+### [ranged-mixed-sensors](../../../tools/playtest/cases/shared/combat/ranged-mixed-sensors.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-population-120](../../../tools/playtest/cases/shared/combat/ranged-population-120.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-profile-load](../../../tools/playtest/cases/shared/combat/ranged-profile-load.json)
+
+Map: Comet Catcher Remake 1.8
+
+### [ranged-sensor-advance](../../../tools/playtest/cases/shared/combat/ranged-sensor-advance.json)
+
+Map: All That Glitters v2.2.3
+
+### [ranged-splash-screen](../../../tools/playtest/cases/shared/combat/ranged-splash-screen.json)
+
+Map: All That Glitters v2.2.3
 
 ## Cooperation / Checks
 
@@ -377,6 +503,10 @@ In-game fixture/observer; source inventory, not a claim of execution.
 In-game fixture/observer; source inventory, not a claim of execution.
 
 ### [playtest_camera](../../../tools/playtest/widgets/playtest_camera.lua)
+
+In-game fixture/observer; source inventory, not a claim of execution.
+
+### [ranged_arena](../../../tools/playtest/widgets/ranged_arena.lua)
 
 In-game fixture/observer; source inventory, not a claim of execution.
 
@@ -575,6 +705,10 @@ Native executable; unnamed assertions remain inside the linked suite.
 Native executable; unnamed assertions remain inside the linked suite.
 
 ### [production_math_test](../../../tests/production_math_test.cpp)
+
+Native executable; unnamed assertions remain inside the linked suite.
+
+### [ranged_geometry_test](../../../tests/ranged_geometry_test.cpp)
 
 Native executable; unnamed assertions remain inside the linked suite.
 
@@ -910,6 +1044,10 @@ Audit actual AIR sorties and interception from streaming combat-arena events.
 
 Playtest: launch a BAR skirmish with the freshly built BARb, watch its log, stop it.
 
+### [ranged_arena](../../../tools/playtest/ranged_arena.py)
+
+Supplied-force ranged combat: unchanged AI commands team 0; fixture owns team 1.
+
 ### [run_dense_economy](../../../tools/playtest/run_dense_economy.py)
 
 Physical dense economy / naval support acceptance, in isolated staged data.
@@ -1014,6 +1152,12 @@ Catalog tests protect definition discovery and evidence separation.
 - `test_every_categorized_definition_is_present_once`
 - `test_standalone_probes_and_observers_are_discoverable`
 
+### [test_ranged_profiles](../../../tools/knowledge/test_ranged_profiles.py)
+
+- `test_neutralize_preserves_unrelated_definition_bytes`
+- `test_span_braces_in_comments_do_not_end_object`
+- `test_span_nested_threat_keeps_late_retreat_and_mixed_newlines`
+
 ### [test_analyze_sea](../../../tools/playtest/test_analyze_sea.py)
 
 - `test_compile_only_log_cannot_pass_physical_opening`
@@ -1046,6 +1190,13 @@ Replay buffered log batches: polling must not forgive late milestones.
 - `test_event_after_missed_predecessor_fails_without_crashing`
 - `test_event_exactly_at_deadline_passes`
 - `test_event_without_deadline_passes`
+
+### [test_ranged_benchmark](../../../tools/playtest/test_ranged_benchmark.py)
+
+- `test_early_failure_uses_observed_command_window_and_fails_acceptance`
+- `test_failed_watch_verdict_and_missing_sensor_movement_remain_failures`
+- `test_logs_and_overkill_are_not_confused_with_fixture_events`
+- `test_shutdown_grace_and_partial_events_do_not_extend_measurements`
 
 ### [test_scorecard](../../../tools/playtest/test_scorecard.py)
 
@@ -1085,8 +1236,10 @@ Storage boundaries: preserve history, resolve old commands, refuse collisions.
 - `test_publish_changed_original_evidence_is_rejected`
 - `test_publish_changed_selection_cannot_overwrite_existing_record`
 - `test_publish_is_idempotent_and_preserves_failure`
+- `test_publish_permanent_rename_failure_retains_pending_bundle`
 - `test_publish_post_run_analysis_gets_its_own_hash`
 - `test_publish_refuses_live_snapshot`
+- `test_publish_retries_transient_rename_without_changing_evidence`
 - `test_record_collision_does_not_replace_previous_benchmark`
 - `test_record_identical_benchmark_is_idempotent`
 - `test_resolve_all_legacy_paths_and_short_ids_preserves_definitions`
@@ -1294,6 +1447,10 @@ Reuse the amphibious harness for labelled shoreline and inland-combat probes.
 
 Stage a supplied, isolated turret interruption fixture; never writes the live install.
 
+### [ranged_benchmark](../../../tools/playtest/ranged_benchmark.py)
+
+Summarize immutable ranged fixtures, or run a serial supplied-force matrix.
+
 ### [scorecard](../../../tools/playtest/scorecard.py)
 
 Immutable match evidence, strict comparison cohorts and a private OpenSkill ladder.
@@ -1335,6 +1492,10 @@ Enforce the invariant practice (D-076, doc/practice-invariants.md).
 ### [check_performance_policy](../../../tools/knowledge/check_performance_policy.py)
 
 D-199: compile actual old/new policy bodies in the pinned AngelScript VM.
+
+### [check_ranged_profiles](../../../tools/knowledge/check_ranged_profiles.py)
+
+Validate the D-207 enrollment and unchanged classifications against its checkpoint.
 
 ### [check_role_docs](../../../tools/knowledge/check_role_docs.py)
 
