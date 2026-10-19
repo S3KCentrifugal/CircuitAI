@@ -144,6 +144,7 @@ bool CCommanderControl::SetOption(const std::string& name,float value) {
         {"front_radius",&options.frontRadius,100,1000},{"front_threat",&options.frontThreat,0,50},
         {"front_mex_seconds",&options.frontMexSeconds,0,30},{"front_stall_seconds",&options.frontStallSeconds,3,60},
         {"front_detour_seconds",&options.frontDetourSeconds,0,3},{"t3_decline_gate",&options.t3DeclineGate,0,1},
+        {"move_resend_seconds",&options.moveResendSeconds,0,3},{"fallback_goal_hold_seconds",&options.fallbackGoalHoldSeconds,0,5},
         {"t3_intercept",&options.t3Intercept,0,1},{"t3_health",&options.t3Health,.1f,.5f},
         {"t3_distance",&options.t3Distance,250,2000},{"detection_margin",&options.detectionMargin,8,200},
         {"afus_defence_radius",&options.afusDefenceRadius,0,5000},
@@ -400,6 +401,19 @@ void CCommanderControl::Move(CCircuitUnit* unit,State& s,const AIFloat3& goal,in
     // Exact destination, ownership and live queue suffix must all agree. A
     // swallowed order or move failure is reissued; a moving target is new intent.
     if(!s.route.empty() && s.goal==goal && ai->GetUnitAPI()->HasRouteIntent(unit->GetId(),s.route,frame)) return;
+    // Owner 2026-10-19: the same goal is resent at most once per
+    // move_resend_seconds, +1 s per resend in a row, at most 3 s. A goal the
+    // engine keeps refusing was resent every tick (fallback line, All That
+    // Glitters: one commander 6 MOVEs/s to the same point). A new goal
+    // goes at once.
+    if(options.moveResendSeconds>0) {
+        if(s.moveGoal.SqDistance2D(goal)<16.f*16.f) {
+            const float wait=std::min(3.f,options.moveResendSeconds+s.moveResends);
+            if(frame<s.moveSent+int(wait*FRAMES_PER_SEC)) return;
+            ++s.moveResends;
+        } else s.moveResends=0;
+        s.moveGoal=goal; s.moveSent=frame;
+    }
     CheckPerimeter(unit,s,goal,frame,"move");
     s.goal=goal; s.route={{CMD_MOVE,0,frame+90,goal.x,goal.y,goal.z}};
     TRY_UNIT(ai,unit,unit->CmdMoveTo(goal,0,frame+90);)

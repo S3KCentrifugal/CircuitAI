@@ -40,6 +40,9 @@ private:
         // Throttles (owner 2026-10-19): a failed detour or a declined T3 waits
         // 1 s, +1 s per failure in a row, at most 3 s; success resets.
         int detourNext=0,detourFails=0,t3DeclineFails=0;
+        // Same-goal MOVE resend backoff and fallback goal hold (owner 2026-10-19).
+        int moveSent=-10000,moveResends=0,fallbackGoalSince=-10000;
+        springai::AIFloat3 moveGoal{-1,0,-1};
         springai::AIFloat3 frontProgressPos;
         // D-293 fallback: held until fallbackUntil, porc line replanned once/second.
         int fallbackUntil=-1,fallbackPlanned=-10000,fallbackPorc=-1,fallbackMoveUntil=-1;
@@ -85,6 +88,8 @@ private:
         bool work=true; // D-299 ladder and fallback hand-over (script Global::Commander::Work)
         bool frontRecovery=false;
         float frontMexSeconds=0,frontStallSeconds=10,frontDetourSeconds=0; // 0: no detour backoff
+        float moveResendSeconds=0;   // 0: a swallowed/failed MOVE is resent every tick
+        float fallbackGoalHoldSeconds=0; // 0: the fallback goal may change every replan
         float scan=1000,leash=700,step=96,support=600,minValue=180,killReward=45;
         float hpReserve=.35f,retreat=.45f,recover=.8f,aggression=.25f;
         float shots=2,margin=150,escapeSeconds=4.3f,alignSeconds=.6f;
