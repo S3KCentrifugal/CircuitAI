@@ -22,6 +22,10 @@ struct RangedPolicy {
     float hysteresis = 48.f;
     float reactionSeconds = 1.f;
     float targetHysteresis = 1.2f;
+    // Order throttles (owner 2026-10-19): least seconds between non-urgent
+    // MOVE replacements, and least seconds a live priority target is kept.
+    float moveMinSeconds = 0.f;   // 0: off
+    float targetMinSeconds = 0.f; // 0: off
     float sensorOffset = 160.f;
     float cloakReserve = 3.f;
     float repairedTargetPenalty = .25f;

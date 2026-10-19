@@ -73,6 +73,13 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
         // an unchanged live intent must not be resent each decision tick.
         if(selected<0 || frame-targetFrame<30 || int(unit->GetUnit()->GetRulesParamFloat("unitTargetID",-1.f))==selected) return;
     }
+    // Owner 2026-10-19: a live priority target is kept for target_min_seconds;
+    // each swap costs CANCEL+SET. A lost target, a cancel (selected<0) or a
+    // pick worth 1.5x the reserved damage still switches at once.
+    const float hold=unit->GetCircuitDef()->GetRangedPolicy().targetMinSeconds;
+    if(target>=0 && selected>=0 && selected!=target && hold>0.f && frame-targetFrame<int(hold*FRAMES_PER_SEC)
+        && damage<reservedDamage*1.5f && ai->GetEnemyManager()->GetEnemyUnit(target)!=nullptr
+        && int(unit->GetUnit()->GetRulesParamFloat("unitTargetID",-1.f))==target) return;
     const int avoid=unit->GetCircuitDef()->GetRangedPolicy().avoidCategory;
     if(selected>=0 && avoid!=0) {
         // INV-207: every candidate loop filters identified avoided categories
@@ -201,12 +208,18 @@ bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape
         if(live.SqLength2D()>4096.f && wanted.SqLength2D()>=live.SqLength2D()
             && product>0.f && product*product>.94f*live.SqLength2D()*wanted.SqLength2D()) return true;
     }
+    // Owner 2026-10-19: a live, still-legal move is replaced at most once per
+    // move_min_seconds; danger (urgent), escapes and an idle unit go at once.
+    // Kiting units were re-moved on every 8-frame decision (cortrem 2.5/s).
+    if(!urgentMove && !escape && moving && policy.moveMinSeconds>0.f
+        && ai->GetLastFrame()<lastMoveFrame+int(policy.moveMinSeconds*FRAMES_PER_SEC)
+        && ai->GetUnitAPI()->GetCMDQueueSize(id)>0 && LegalPath(unit,path,escape)) return true;
     if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),dest) || !SafeMove(unit,pos,dest,policy.safetyMargin,escape)) return false;
     if(trace) ai->LOG("RANGED: move-replace unit=%d objective=%d mode=%d urgent=%d moving=%d pending=%d queue=%d from=%.1f,%.1f old=%.1f,%.1f new=%.1f,%.1f",
         id,moveObjective,moveMode,int(urgentMove),int(moving),int(query!=nullptr),
         ai->GetUnitAPI()->GetCMDQueueSize(id),pos.x,pos.z,destination.x,destination.z,dest.x,dest.z);
     completedMove=false;
-    destination=dest; query.reset(); const unsigned version=++generation;
+    destination=dest; query.reset(); const unsigned version=++generation; lastMoveFrame=ai->GetLastFrame();
     world.SetSlot(id,dest,policy.spacing,unit->GetCircuitDef()->GetCostM());
     auto* finder=ai->GetPathfinder();
     if(policy.coordinated && pos.SqDistance2D(dest)<=1024.f*1024.f) {
