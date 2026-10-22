@@ -62,6 +62,13 @@
 #include <map>
 
 namespace circuit {
+namespace {
+constexpr float COMMANDER_SNIPE_DEFAULT_MIN_TECH = 3.f;
+constexpr int COMMANDER_SNIPE_DEFAULT_INTERVAL_FRAMES = 15;
+constexpr float COMMANDER_SNIPE_DEFAULT_ACQUIRE_MARGIN = 64.f;
+constexpr float COMMANDER_SNIPE_DEFAULT_RELEASE_MARGIN = 200.f;
+constexpr float COMMANDER_SNIPE_SUBMERGED_HEIGHT = -8.f;
+}
 
 void CMilitaryManager::SetAggressionDelta(float value)
 {
@@ -593,6 +600,39 @@ void CMilitaryManager::ReadConfig()
 			cfgName.c_str(), sensorInfo.isEnabled ? "enabled" : "disabled",
 			sensorInfo.maxPerSquad, sensorInfo.topCandidates, int(sensorInfo.rebalance));
 
+	/*
+	 * D-352 commander snipe: see SCommSnipeInfo. "units" are def names that
+	 * always take part; "min_tech" adds every armed, mobile, non-builder def
+	 * at that BAR techlevel or above (0 adds none). Aircraft only with "air".
+	 */
+	const Json::Value& snipeCfg = root["commander_snipe"];
+	commSnipeInfo.isEnabled = false;
+	commSnipeInfo.defs.clear();
+	if (!snipeCfg.isNull() && snipeCfg.get("enabled", true).asBool()) {
+		const float minTech = snipeCfg.get("min_tech", COMMANDER_SNIPE_DEFAULT_MIN_TECH).asFloat();
+		const bool withAir = snipeCfg.get("air", false).asBool();
+		std::set<std::string> names;
+		for (const auto& name : snipeCfg["units"]) names.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (names.count(d.GetDef()->GetName()) > 0) {
+				commSnipeInfo.defs.insert(d.GetId());
+				continue;
+			}
+			if (minTech <= 0.f || !d.IsMobile() || d.IsRoleComm() || d.IsBuilder()
+				|| !(d.HasSurfToLand() || d.HasSubToLand()) || (d.IsAbleToFly() && !withAir)) continue;
+			const auto& cp = d.GetDef()->GetCustomParams();
+			const auto level = cp.find("techlevel");
+			if (level != cp.end() && std::atof(level->second.c_str()) >= minTech) commSnipeInfo.defs.insert(d.GetId());
+		}
+		commSnipeInfo.interval = std::max(1, snipeCfg.get("interval", COMMANDER_SNIPE_DEFAULT_INTERVAL_FRAMES).asInt());
+		commSnipeInfo.acquireMargin = snipeCfg.get("acquire_margin", COMMANDER_SNIPE_DEFAULT_ACQUIRE_MARGIN).asFloat();
+		commSnipeInfo.releaseMargin = std::max(commSnipeInfo.acquireMargin, snipeCfg.get("release_margin", COMMANDER_SNIPE_DEFAULT_RELEASE_MARGIN).asFloat());
+		commSnipeInfo.isEnabled = !commSnipeInfo.defs.empty();
+	}
+	circuit->LOG("CONFIG %s: commander snipe %s | defs=%u interval=%i acquire=+%.0f release=+%.0f",
+			cfgName.c_str(), commSnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(commSnipeInfo.defs.size()),
+			commSnipeInfo.interval, commSnipeInfo.acquireMargin, commSnipeInfo.releaseMargin);
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
@@ -752,6 +792,10 @@ void CMilitaryManager::Init()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Update, this), 1/*interval / 2*/, offset + 1);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDefenceTasks, this), FRAMES_PER_SEC * 5, offset + 2);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSensorGuards, this), FRAMES_PER_SEC * 5, offset + 3);
+		if (commSnipeInfo.isEnabled) {
+			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
+					commSnipeInfo.interval, offset + 2);
+		}
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -1925,6 +1969,56 @@ float CMilitaryManager::GetSquadValue(const IFighterTask* task) const
  * back to no task, and MakeTask gives each a fresh CSupportTask that re-picks
  * an uncovered squad on its next update.
  */
+void CMilitaryManager::UpdateCommanderSnipe()
+{
+	struct SComm { int id; AIFloat3 pos; };
+	std::vector<SComm> comms;
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		const CEnemyInfo* e = kv.second;
+		// Scouted: identified once in LOS. A cloaked commander keeps its
+		// def and is tracked by its radar dot; BAR keeps radar targets.
+		if (e->IsHidden() || !e->IsInRadarOrLOS()) continue;
+		const CCircuitDef* edef = e->GetCircuitDef();
+		if (edef == nullptr || !edef->IsRoleComm()) continue;
+		comms.push_back({e->GetId(), e->GetPos()});
+	}
+
+	const int frame = circuit->GetLastFrame();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if (commSnipeInfo.defs.count(unit->GetCircuitDef()->GetId()) == 0) continue;
+		const int locked = unit->GetCommanderTarget();
+		IUnitTask* task = unit->GetTask();
+		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
+			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled())
+		{
+			if (locked >= 0) unit->SetCommanderTarget(-1, frame);
+			continue;
+		}
+		const CCircuitDef* cdef = unit->GetCircuitDef();
+		const AIFloat3& pos = unit->GetPos(frame);
+		int best = -1;
+		float bestSq = std::numeric_limits<float>::max();
+		for (const SComm& c : comms) {
+			const bool submerged = c.pos.y < COMMANDER_SNIPE_SUBMERGED_HEIGHT;
+			const float range = cdef->GetMaxRange(submerged ? CCircuitDef::RangeType::WATER : CCircuitDef::RangeType::LAND);
+			if (range <= 0.f) continue;
+			const float reach = range + (c.id == locked ? commSnipeInfo.releaseMargin : commSnipeInfo.acquireMargin);
+			const float sq = pos.SqDistance2D(c.pos);
+			if (sq > SQUARE(reach)) continue;
+			// Hysteresis: the current lock wins while it stays in reach.
+			if (c.id == locked) { best = locked; break; }
+			if (sq < bestSq) { bestSq = sq; best = c.id; }
+		}
+		if (best != locked) {
+			circuit->LOG("SNIPE: unit=%d (%s) commander %d -> %d", unit->GetId(), cdef->GetDef()->GetName(), locked, best);
+		}
+		TRY_UNIT(circuit, unit,
+			unit->SetCommanderTarget(best, frame);
+		)
+	}
+}
+
 void CMilitaryManager::UpdateSensorGuards()
 {
 	if (!sensorInfo.isEnabled || !sensorInfo.rebalance) {
