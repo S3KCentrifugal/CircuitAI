@@ -8,6 +8,7 @@
 #include "shared/scout_raid.as"
 #include "shared/construction.as"
 #include "shared/lolcannon.as"
+#include "shared/rez_replenish.as"
 #include "roles/tech.as"
 #include "roles/air.as"
 #include "roles/front.as"
