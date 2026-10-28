@@ -573,6 +573,7 @@ namespace FrontRadar {
         if (ai.frame - fwdPlanFrame < 5 * SECOND) return fwdPlanned;
         fwdPlanFrame = ai.frame;
         fwdPlanned = false;
+        if (ai.frame < Global::FrontRadar::ForwardStartSeconds * SECOND || anchors.length() == 0) return false;
         const AIFloat3 home = Global::Map::StartPos;
         const int n = aiBattle.GetGhostCount();
         float dmin = -1.0f;
@@ -604,6 +605,9 @@ namespace FrontRadar {
             const AIFloat3 site(AiMax(m, AiMin(float(AiTerrainWidth()) - m, img.x + cos(a) * reach)), 0.0f,
                 AiMax(m, AiMin(float(AiTerrainHeight()) - m, img.z + sin(a) * reach)));
             if (GhostFailed(site) || aiBattle.SurfThreat(site) > Global::FrontRadar::GhostMaxThreat) continue;
+            // 2026-10-28 (4 games): sites at the enemy start drew T1 cons 3,000+ across the map,
+            // and a quarter of orders lost a builder. Only a site our front already reaches.
+            if (!Near(anchors, site, Global::FrontRadar::ForwardFromFront)) continue;
             fwdPlanned = true; fwdPlanSite = site; fwdPlanImage = img;
             return true;
         }
@@ -628,8 +632,12 @@ namespace FrontRadar {
         return false;
     }
 
+    int fwdFails = 0;                // consecutive forward orders that ended with no radar: the next waits longer
+
     void ForwardDrop(const string &in why)
     {
+        ++fwdFails;
+        fwdNext = AiMax(fwdNext, ai.frame + AiMin(Global::FrontRadar::ForwardBackoffMax, Global::FrontRadar::ForwardBackoff << AiMin(fwdFails - 1, 4)) * SECOND);
         if (fwdOrder !is null && !fwdOrder.IsDead()) aiBuilderMgr.AbortTask(fwdOrder);
         @fwdOrder = null;
         fwdOwner = -1;
@@ -649,7 +657,7 @@ namespace FrontRadar {
         const bool framed = bt !is null && bt.target !is null;
         if (fwdOrder.IsDead()) {
             if (!Near(oursT1, fwdSite, 400.0f)) ForwardDrop("died with no radar");
-            else { @fwdOrder = null; fwdOwner = -1; }
+            else { @fwdOrder = null; fwdOwner = -1; fwdFails = 0; }
             return;
         }
         if (framed) return;
