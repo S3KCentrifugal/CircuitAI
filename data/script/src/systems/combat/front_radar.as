@@ -143,6 +143,12 @@ namespace FrontRadar {
     int fwdOwner = -1, fwdFrame = -1, fwdNext = 0, fwdPlanFrame = -100000;
     bool fwdPlanned = false;         // the last plan found an uncovered forward image and a safe site
     AIFloat3 fwdPlanSite, fwdPlanImage;
+    // fwd5: the same image also gets a long-range radar site, GhostT2RadarRange back from it.
+    // A T2 builder takes that one first: it stands ~1,150 further back, nearer our front.
+    bool fwdPlannedT1 = false, fwdPlannedT2 = false;
+    AIFloat3 fwdPlanSiteT2;
+    bool fwdOrderT2 = false;         // the live order is a long-range radar
+    int dFwdOrdersT2 = 0, dFwdNoT2 = 0;
     int dFwdUncovered = 0, dFwdScans = 0, dFwdOrders = 0;
     // Why an uncovered forward image got no order, per plan scan (each reason once a scan):
     // early, no anchors, every site failed / under threat / off our front; no builder
@@ -409,15 +415,15 @@ namespace FrontRadar {
                     + dAsk + " (interval " + dWait + ", metal " + dMetal + ", no image " + dNone + ", ordered " + dOrder
                     + "), sites rejected: failed " + dFailed + ", near our radar " + dCrowdOurs + ", near ally " + dCrowdAlly
                     + ", threat " + dThreat + ", walk threat " + dPath + ", unreachable " + dReach + "; T1 radars lost " + dLostT1
-                    + "; forward image uncovered " + dFwdUncovered + " of " + dFwdScans + " scans, forward orders " + dFwdOrders, 1);
+                    + "; forward image uncovered " + dFwdUncovered + " of " + dFwdScans + " scans, forward orders " + dFwdOrders + " (long-range " + dFwdOrdersT2 + ")", 1);
             if (GhostEnabled())
                 GenericHelpers::LogUtil("[FrontRadar] forward why: early " + dFwdEarly + ", no anchors " + dFwdNoAnchor
                     + ", no site " + dFwdNoSite + " (site failed " + dFwdSiteFailed + ", site threat " + dFwdSiteThreat
                     + ", off front " + dFwdSiteOff + "); with a site: no builder asked " + dFwdNoAsk + ", flying " + dFwdFly
                     + ", metal " + dFwdMetal + ", too far " + dFwdFar + ", walk threat " + dFwdPath + ", unreachable " + dFwdReach
-                    + ", commander waiting " + dFwdCommWait + ", backoff after a failure " + dFwdBackoff, 1);
+                    + ", commander waiting " + dFwdCommWait + ", backoff after a failure " + dFwdBackoff + ", long-range site only and no T2 builder " + dFwdNoT2, 1);
             dLostT1 = 0;
-            dFwdUncovered = dFwdScans = dFwdOrders = 0;
+            dFwdUncovered = dFwdScans = dFwdOrders = dFwdOrdersT2 = dFwdNoT2 = 0;
             dFwdEarly = dFwdNoAnchor = dFwdSiteFailed = dFwdSiteThreat = dFwdSiteOff = dFwdNoSite = 0;
             dFwdNoAsk = dFwdFly = dFwdMetal = dFwdFar = dFwdPath = dFwdReach = dFwdCommWait = dFwdBackoff = 0;
             dAsk = dWait = dMetal = dNone = dOrder = 0;
@@ -433,7 +439,7 @@ namespace FrontRadar {
         if (Near(oursT1, g, r1)) return true;
         if (Near(ours, g, Global::FrontRadar::GhostT2RadarRange * Global::FrontRadar::GhostCoverage)) return true;
         if (ghostOrder !is null && !ghostOrder.IsDead() && MapHelpers::SqDist(ghostSite, g) <= r1 * r1) return true;
-        if (fwdOrder !is null && !fwdOrder.IsDead() && MapHelpers::SqDist(fwdSite, g) <= r1 * r1) return true;
+        if (fwdOrder !is null && !fwdOrder.IsDead() && MapHelpers::SqDist(fwdSite, g) <= ForwardOrderReach() * ForwardOrderReach()) return true;
         const int recent = Global::FrontRadar::GhostAllySeconds * SECOND;
         for (uint i = 0; i < allyGhost.length(); ++i)
             if (ai.frame - allyGhostFrame[i] <= recent && MapHelpers::SqDist(allyGhost[i], g) <= r1 * r1) return true;
@@ -585,11 +591,12 @@ namespace FrontRadar {
     // long-range radar step), the FRONT commander first of all (CommanderFront::Work).
     // One order at a time per AI; a dead order with no radar near it, or one without a
     // frame after ForwardOrderSeconds, blocks its spot GhostFailSeconds.
-    const uint FWD_FLY = 1, FWD_METAL = 2, FWD_FAR = 4, FWD_PATH = 8, FWD_REACH = 16, FWD_COMMWAIT = 32, FWD_BACKOFF = 64;
+    const uint FWD_FLY = 1, FWD_METAL = 2, FWD_FAR = 4, FWD_PATH = 8, FWD_REACH = 16, FWD_COMMWAIT = 32, FWD_BACKOFF = 64, FWD_NOT2 = 128;
 
     bool ForwardPlan()
     {
-        if (ai.frame - fwdPlanFrame < 5 * SECOND) return fwdPlanned && !GhostFailed(fwdPlanSite);
+        if (ai.frame - fwdPlanFrame < 5 * SECOND)
+            return (fwdPlannedT1 && !GhostFailed(fwdPlanSite)) || (fwdPlannedT2 && !GhostFailed(fwdPlanSiteT2));
         fwdPlanFrame = ai.frame;
         if (fwdPlanned && (fwdOrder is null || fwdOrder.IsDead())) {
             if (!fwdAsked) ++dFwdNoAsk;
@@ -600,11 +607,12 @@ namespace FrontRadar {
             if ((fwdWhy & FWD_REACH) != 0) ++dFwdReach;
             if ((fwdWhy & FWD_COMMWAIT) != 0) ++dFwdCommWait;
             if ((fwdWhy & FWD_BACKOFF) != 0) ++dFwdBackoff;
+            if ((fwdWhy & FWD_NOT2) != 0) ++dFwdNoT2;
         }
         fwdWhy = 0;
         fwdAsked = false;
         const bool was = fwdPlanned;
-        fwdPlanned = false;
+        fwdPlanned = fwdPlannedT1 = fwdPlannedT2 = false;
         if (!was) fwdPlanSince = -1;
         if (ai.frame < Global::FrontRadar::ForwardStartSeconds * SECOND) { ++dFwdEarly; return false; }
         if (anchors.length() == 0) { ++dFwdNoAnchor; return false; }
@@ -628,31 +636,55 @@ namespace FrontRadar {
         ++dFwdScans;
         if (best < 0.0f) return false;
         ++dFwdUncovered;
-        const float reach = Global::FrontRadar::GhostRadarRange * Global::FrontRadar::GhostCoverage * 0.98f;
+        uint why = 0;
+        AIFloat3 site;
+        if (Global::FrontRadar::ForwardT2) {
+            const uint w = ForwardSite(img, Global::FrontRadar::GhostT2RadarRange * Global::FrontRadar::GhostCoverage * 0.98f, site);
+            if (w == 0) { fwdPlannedT2 = true; fwdPlanSiteT2 = site; } else why |= w;
+        }
+        const uint w1 = ForwardSite(img, Global::FrontRadar::GhostRadarRange * Global::FrontRadar::GhostCoverage * 0.98f, site);
+        if (w1 == 0) { fwdPlannedT1 = true; fwdPlanSite = site; } else why |= w1;
+        if (fwdPlannedT1 || fwdPlannedT2) {
+            if (!fwdPlanned && fwdPlanSince < 0) fwdPlanSince = ai.frame;
+            fwdPlanned = true; fwdPlanImage = img;
+            return true;
+        }
+        ++dFwdNoSite;
+        if ((why & 1) != 0) ++dFwdSiteFailed;
+        if ((why & 2) != 0) ++dFwdSiteThreat;
+        if ((why & 4) != 0) ++dFwdSiteOff;
+        return false;
+    }
+
+    // A site `reach` from the image towards our start, turned round it when that spot is
+    // failed, hot or off our front. 0 when found, otherwise the reasons seen: 1 failed, 2 threat, 4 off front
+    uint ForwardSite(const AIFloat3 &in img, float reach, AIFloat3 &out site)
+    {
+        uint why = 0;
+        const AIFloat3 home = Global::Map::StartPos;
         const float dx = home.x - img.x, dz = home.z - img.z;
         const float len = AiMax(1.0f, sqrt(dx * dx + dz * dz));
         const float base = atan2(dz / len, dx / len);
         const float m = 64.0f;
-        bool sFailed = false, sThreat = false, sOff = false;
         for (int k = 0; k <= 2 * Global::FrontRadar::ForwardTurns; ++k) {
             const int step = (k + 1) / 2 * ((k % 2 == 1) ? 1 : -1);
             const float a = base + float(step) * Global::FrontRadar::ForwardTurn;
-            const AIFloat3 site(AiMax(m, AiMin(float(AiTerrainWidth()) - m, img.x + cos(a) * reach)), 0.0f,
+            site = AIFloat3(AiMax(m, AiMin(float(AiTerrainWidth()) - m, img.x + cos(a) * reach)), 0.0f,
                 AiMax(m, AiMin(float(AiTerrainHeight()) - m, img.z + sin(a) * reach)));
-            if (GhostFailed(site)) { sFailed = true; continue; }
-            if (aiBattle.SurfThreat(site) > Global::FrontRadar::ForwardMaxThreat) { sThreat = true; continue; }
+            if (GhostFailed(site)) { why |= 1; continue; }
+            if (aiBattle.SurfThreat(site) > Global::FrontRadar::ForwardMaxThreat) { why |= 2; continue; }
             // 2026-10-28 (4 games): sites at the enemy start drew T1 cons 3,000+ across the map,
             // and a quarter of orders lost a builder. Only a site our front already reaches.
-            if (!Near(anchors, site, Global::FrontRadar::ForwardFromFront)) { sOff = true; continue; }
-            if (!fwdPlanned && fwdPlanSince < 0) fwdPlanSince = ai.frame;
-            fwdPlanned = true; fwdPlanSite = site; fwdPlanImage = img;
-            return true;
+            if (!Near(anchors, site, Global::FrontRadar::ForwardFromFront)) { why |= 4; continue; }
+            return 0;
         }
-        ++dFwdNoSite;
-        if (sFailed) ++dFwdSiteFailed;
-        if (sThreat) ++dFwdSiteThreat;
-        if (sOff) ++dFwdSiteOff;
-        return false;
+        return why;   // every turn set a bit
+    }
+
+    // How far the live forward order's radar reaches (coverage fraction)
+    float ForwardOrderReach()
+    {
+        return (fwdOrderT2 ? Global::FrontRadar::GhostT2RadarRange : Global::FrontRadar::GhostRadarRange) * Global::FrontRadar::GhostCoverage;
     }
 
     // Our radars (finished or frames), our live orders, an ally's long-range radar or
@@ -660,8 +692,7 @@ namespace FrontRadar {
     bool ForwardReached(const AIFloat3 &in g)
     {
         if (GhostReached(g)) return true;
-        const float r1 = Global::FrontRadar::GhostRadarRange * Global::FrontRadar::GhostCoverage;
-        if (fwdOrder !is null && !fwdOrder.IsDead() && MapHelpers::SqDist(fwdSite, g) <= r1 * r1) return true;
+        if (fwdOrder !is null && !fwdOrder.IsDead() && MapHelpers::SqDist(fwdSite, g) <= ForwardOrderReach() * ForwardOrderReach()) return true;
         const float r2 = Global::FrontRadar::GhostT2RadarRange * Global::FrontRadar::GhostCoverage;
         const int stale = 3 * AiMax(1, Global::FrontRadar::BroadcastSeconds) * SECOND;
         array<string>@ keys = allies.getKeys();
@@ -698,7 +729,7 @@ namespace FrontRadar {
         IBuilderTask@ bt = cast<IBuilderTask>(fwdOrder);
         const bool framed = bt !is null && bt.target !is null;
         if (fwdOrder.IsDead()) {
-            if (!Near(oursT1, fwdSite, 400.0f)) ForwardDrop("died with no radar");
+            if (!Near(fwdOrderT2 ? ours : oursT1, fwdSite, 400.0f)) ForwardDrop("died with no radar");
             else { @fwdOrder = null; fwdOwner = -1; fwdFails = 0; }
             return;
         }
@@ -736,15 +767,27 @@ namespace FrontRadar {
         // within ForwardCommanderWait, so its ghost rung keeps running.
         if (u.circuitDef.IsAbleToFly()) { fwdWhy |= FWD_FLY; return null; }
         if (comm && (fwdPlanSince < 0 || ai.frame - fwdPlanSince < Global::FrontRadar::ForwardCommanderWait * SECOND)) { fwdWhy |= FWD_COMMWAIT; return null; }
-        CCircuitDef@ rd = ai.GetCircuitDef(UnitHelpers::GetStaticRadarNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
+        const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        // fwd5: a T2 builder takes the long-range site first (further back), a T1 builder the T1 site
+        bool t2 = false;
+        CCircuitDef@ rd = null;
+        if (fwdPlannedT2 && !GhostFailed(fwdPlanSiteT2)) {
+            CCircuitDef@ r2 = ai.GetCircuitDef(UnitHelpers::GetStaticT2RadarNameForSide(side));
+            if (r2 !is null && u.circuitDef.CanBuild(r2) && r2.IsAvailable(ai.frame)) { @rd = r2; t2 = true; }
+        }
+        if (rd is null) {
+            if (!fwdPlannedT1 || GhostFailed(fwdPlanSite)) { fwdWhy |= FWD_NOT2; return null; }
+            @rd = ai.GetCircuitDef(UnitHelpers::GetStaticRadarNameForSide(side));
+        }
         if (rd is null || !u.circuitDef.CanBuild(rd) || !rd.IsAvailable(ai.frame)) return null;
         if (aiEconomyMgr.metal.current < rd.costM * 0.5f) { fwdWhy |= FWD_METAL; return null; }
+        const AIFloat3 target = t2 ? fwdPlanSiteT2 : fwdPlanSite;
         const AIFloat3 pos = u.GetPos(ai.frame);
-        const float walk = sqrt(MapHelpers::SqDist(pos, fwdPlanSite));
+        const float walk = sqrt(MapHelpers::SqDist(pos, target));
         if (walk > (comm ? Global::FrontRadar::ForwardCommanderTravel : Global::FrontRadar::ForwardTravel)) { fwdWhy |= FWD_FAR; return null; }
-        if (!GhostPathSafe(pos, fwdPlanSite, Global::FrontRadar::ForwardMaxThreat)) { fwdWhy |= FWD_PATH; return null; }
-        if (!aiTerrainMgr.CanReachAt(u, fwdPlanSite, u.circuitDef.GetBuildDistance())) { fwdWhy |= FWD_REACH; return null; }
-        @fwdOrder = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, rd, fwdPlanSite,
+        if (!GhostPathSafe(pos, target, Global::FrontRadar::ForwardMaxThreat)) { fwdWhy |= FWD_PATH; return null; }
+        if (!aiTerrainMgr.CanReachAt(u, target, u.circuitDef.GetBuildDistance())) { fwdWhy |= FWD_REACH; return null; }
+        @fwdOrder = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, rd, target,
             Global::FrontRadar::GhostShake, true, Global::FrontRadar::ForwardOrderSeconds * SECOND));
         if (fwdOrder is null) { fwdNext = ai.frame + 5 * SECOND; return null; }
         IBuilderTask@ bt = cast<IBuilderTask>(fwdOrder);
@@ -755,7 +798,9 @@ namespace FrontRadar {
             fwdNext = ai.frame + 5 * SECOND;
             return null;
         }
-        fwdSite = fwdPlanSite;
+        fwdSite = target;
+        fwdOrderT2 = t2;
+        if (t2) ++dFwdOrdersT2;
         fwdImage = fwdPlanImage;
         fwdOwner = int(u.id);
         fwdFrame = ai.frame;

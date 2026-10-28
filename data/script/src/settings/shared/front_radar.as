@@ -42,14 +42,15 @@ namespace Global { namespace FrontRadar {
     // Forward radar (owner 2026-10-28): the most forward scouted enemy base stays under radar, overlap allowed
     float ForwardBand = 1200.0f;        // images this much further from our start than the nearest one still count as the forward base
     float ForwardTurn = 0.45f;          // radians: a hot site is turned this far round the image, per step
-    int ForwardTurns = 2;               // steps each way
-    float ForwardTravel = 2500.0f;      // a builder walks at most this far to the forward site (5000: long cross-map walks died)
+    int ForwardTurns = 3;               // steps each way (2 until fwd5)
+    float ForwardTravel = 3500.0f;      // a builder walks at most this far to the forward site (5000: long cross-map walks died; 2500 until fwd5)
     float ForwardCommanderTravel = 1500.0f; // ...and the FRONT commander this far (2500 starved its own ghost rung)
-    float ForwardFromFront = 1500.0f;   // the site must lie this close to one of our front structures (FrontRadar anchors)
-    float ForwardMaxThreat = 1.0f;      // enemy surface threat above this at a forward site or on the walk to it: skipped
+    float ForwardFromFront = 2500.0f;   // the site must lie this close to one of our front structures (FrontRadar anchors); at 1500 it was behind all 3,981 no-site scans (fwd4)
+    float ForwardMaxThreat = 4.0f;      // enemy surface threat above this at a forward site or on the walk to it: skipped (1.0 in fwd4 lost more builders)
+    bool ForwardT2 = true;              // T2 builders put a long-range radar GhostT2RadarRange back from the forward image (fwd4: ~half of T1 orders died with no radar)
     int ForwardStartSeconds = 300;      // no forward orders before this
     int ForwardBackoff = 15;            // after a forward order ends with no radar the next waits this, doubling per failure
-    int ForwardBackoffMax = 180;
+    int ForwardBackoffMax = 60;         // 180: the backoff was the largest "with a site" block (fwd4)
     int ForwardCommanderWait = 30;      // the FRONT commander takes a forward site only after it stood this long with no builder order
     int ForwardOrderSeconds = 120;      // an order with no frame this long after it was placed is dropped
     float GhostPathStep = 200.0f;       // the walk to the site is sampled this often for enemy surface threat (GhostMaxThreat)
