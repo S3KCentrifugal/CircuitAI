@@ -46,6 +46,7 @@ namespace Global { namespace FrontRadar {
     float ForwardTravel = 2500.0f;      // a builder walks at most this far to the forward site (5000: long cross-map walks died)
     float ForwardCommanderTravel = 1500.0f; // ...and the FRONT commander this far (2500 starved its own ghost rung)
     float ForwardFromFront = 1500.0f;   // the site must lie this close to one of our front structures (FrontRadar anchors)
+    float ForwardMaxThreat = 1.0f;      // enemy surface threat above this at a forward site or on the walk to it: skipped
     int ForwardStartSeconds = 300;      // no forward orders before this
     int ForwardBackoff = 15;            // after a forward order ends with no radar the next waits this, doubling per failure
     int ForwardBackoffMax = 180;
