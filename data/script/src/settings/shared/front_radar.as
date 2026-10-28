@@ -38,6 +38,13 @@ namespace Global { namespace FrontRadar {
     int GhostOrderSeconds = 60;         // native timeout of the order; one with no radar frame this long after it was placed is aborted
     int GhostFailSeconds = 180;         // a spot whose order died with no radar is skipped this long
     int GhostAllySeconds = 90;          // an allied SMRTBARb's ghost order counts as a radar this long
-    int GhostAllySpacingSeconds = 600;  // ...and keeps our sites GhostSpacing away this long (allies' T1 radars are not broadcast)
+    int GhostAllySpacingSeconds = 180;  // ...and keeps our sites GhostSpacing away this long (allies' T1 radars are not broadcast); 600 rejected most sites near allies (2026-10-28 diagnostics)
+    // Forward radar (owner 2026-10-28): the most forward scouted enemy base stays under radar, overlap allowed
+    float ForwardBand = 1200.0f;        // images this much further from our start than the nearest one still count as the forward base
+    float ForwardTurn = 0.45f;          // radians: a hot site is turned this far round the image, per step
+    int ForwardTurns = 2;               // steps each way
+    float ForwardTravel = 5000.0f;      // a builder walks at most this far to the forward site
+    float ForwardCommanderTravel = 2500.0f; // ...and the FRONT commander this far
+    int ForwardOrderSeconds = 120;      // an order with no frame this long after it was placed is dropped
     float GhostPathStep = 200.0f;       // the walk to the site is sampled this often for enemy surface threat (GhostMaxThreat)
 } }

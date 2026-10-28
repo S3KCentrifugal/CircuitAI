@@ -97,6 +97,9 @@ namespace CommanderFront {
         // owner 2026-10-28: a ghost radar this commander ordered is finished before other rungs
         IUnitTask@ ghost=FrontRadar::GhostKeep(unit);
         if(ghost !is null) return ghost;
+        // owner 2026-10-28: the most forward scouted enemy base stays under radar
+        IUnitTask@ forward=FrontRadar::ForwardTask(unit);
+        if(forward !is null) return forward;
         LoadLadder();
         // Roles choose the order, definitions and spacing.
         const string side=UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName());
