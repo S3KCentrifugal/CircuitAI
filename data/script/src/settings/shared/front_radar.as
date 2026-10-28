@@ -49,6 +49,7 @@ namespace Global { namespace FrontRadar {
     int ForwardStartSeconds = 300;      // no forward orders before this
     int ForwardBackoff = 15;            // after a forward order ends with no radar the next waits this, doubling per failure
     int ForwardBackoffMax = 180;
+    int ForwardCommanderWait = 30;      // the FRONT commander takes a forward site only after it stood this long with no builder order
     int ForwardOrderSeconds = 120;      // an order with no frame this long after it was placed is dropped
     float GhostPathStep = 200.0f;       // the walk to the site is sampled this often for enemy surface threat (GhostMaxThreat)
 } }

@@ -570,9 +570,11 @@ namespace FrontRadar {
     // frame after ForwardOrderSeconds, blocks its spot GhostFailSeconds.
     bool ForwardPlan()
     {
-        if (ai.frame - fwdPlanFrame < 5 * SECOND) return fwdPlanned;
+        if (ai.frame - fwdPlanFrame < 5 * SECOND) return fwdPlanned && !GhostFailed(fwdPlanSite);
         fwdPlanFrame = ai.frame;
+        const bool was = fwdPlanned;
         fwdPlanned = false;
+        if (!was) fwdPlanSince = -1;
         if (ai.frame < Global::FrontRadar::ForwardStartSeconds * SECOND || anchors.length() == 0) return false;
         const AIFloat3 home = Global::Map::StartPos;
         const int n = aiBattle.GetGhostCount();
@@ -608,6 +610,7 @@ namespace FrontRadar {
             // 2026-10-28 (4 games): sites at the enemy start drew T1 cons 3,000+ across the map,
             // and a quarter of orders lost a builder. Only a site our front already reaches.
             if (!Near(anchors, site, Global::FrontRadar::ForwardFromFront)) continue;
+            if (!fwdPlanned && fwdPlanSince < 0) fwdPlanSince = ai.frame;
             fwdPlanned = true; fwdPlanSite = site; fwdPlanImage = img;
             return true;
         }
@@ -632,6 +635,7 @@ namespace FrontRadar {
         return false;
     }
 
+    int fwdPlanSince = -1;           // since when a forward site has stood planned with no order
     int fwdFails = 0;                // consecutive forward orders that ended with no radar: the next waits longer
 
     void ForwardDrop(const string &in why)
@@ -687,6 +691,11 @@ namespace FrontRadar {
         }
         if (ai.frame < fwdNext || !ForwardPlan()) return null;
         if (comm && ghostOrder !is null && !ghostOrder.IsDead() && int(u.id) == ghostOwner) return null;
+        // 2026-10-28: AIR air cons were re-tasked at once (272 of 272 orders died within
+        // 30 s); ground builders only. The commander takes it only when no builder did
+        // within ForwardCommanderWait, so its ghost rung keeps running.
+        if (u.circuitDef.IsAbleToFly()) return null;
+        if (comm && (fwdPlanSince < 0 || ai.frame - fwdPlanSince < Global::FrontRadar::ForwardCommanderWait * SECOND)) return null;
         CCircuitDef@ rd = ai.GetCircuitDef(UnitHelpers::GetStaticRadarNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
         if (rd is null || !u.circuitDef.CanBuild(rd) || !rd.IsAvailable(ai.frame)) return null;
         if (aiEconomyMgr.metal.current < rd.costM * 0.5f) return null;
@@ -710,6 +719,7 @@ namespace FrontRadar {
         fwdOwner = int(u.id);
         fwdFrame = ai.frame;
         fwdNext = ai.frame + 10 * SECOND;
+        fwdPlanSince = -1;
         ++dFwdOrders;
         AiSendMessage(GHOST_PREFIX + int(fwdSite.x) + "," + int(fwdSite.z));
         GenericHelpers::LogUtil("[FrontRadar] " + u.circuitDef.GetName() + " " + u.id + " orders forward radar " + rd.GetName()
