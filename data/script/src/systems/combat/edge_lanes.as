@@ -315,7 +315,10 @@ namespace EdgeLanes {
         }
         if (i1 < 0) return false;
         end = rim[i1];
-        // follow the rim both ways through the back, over short gaps; the far end on the other side
+        // follow the rim both ways through the back, over short gaps; the far end on the other side.
+        // Owner, 2026-10-30 (Starwatcher): a gap is also a playable sample that is not back but
+        // not an ally's either - the map's corner sample, just past RimBackReach of every enemy
+        // start, cut the left edge lane's walk there, so it never crossed to the far corner
         array<int> ends = { i1, i1 };
         for (int k = 0; k < 2; ++k) {
             const int dir = (k == 0) ? 1 : -1;
@@ -323,7 +326,8 @@ namespace EdgeLanes {
             for (int c = 0; c < n; ++c) {
                 j = (j + dir + n) % n;
                 if (back[j]) { ends[k] = j; gap = 0; }
-                else if (rim[j].x < 0.0f && gap < Global::Spam::RimGapSamples) ++gap;
+                else if (gap < Global::Spam::RimGapSamples
+                    && (rim[j].x < 0.0f || NearestSq(rim[j], theirs) < NearestSq(rim[j], ours))) ++gap;
                 else break;
             }
         }

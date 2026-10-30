@@ -90,7 +90,8 @@ namespace Spam {
         // edge pulled straight in, up to RimDepth, to ground the spam unit can reach;
         // the back edge is the rim behind the median enemy start, nearer an enemy start
         // than any allied one and within RimBackReach of an enemy start. The walk along
-        // it steps over RimGapSamples unplayable samples. Off: the rectangle corners.
+        // it steps over RimGapSamples unplayable samples, or playable ones off the back
+        // that are not an ally's (a map corner past RimBackReach). Off: the rectangle corners.
         bool RimEnabled = true;
         float RimStep = 256.0f;
         float RimDepth = 1536.0f;
