@@ -32,7 +32,7 @@ namespace TheRock {
 	// pass may flag isolated starts that need hover/amphibious to break out.
 	StartSpot@[] spots = {
 		StartSpot(AIFloat3( 773, 0,  228), AiRole::FRONT, false), // P1  front
-		StartSpot(AIFloat3( 305, 0, 2124), AiRole::FRONT, false), // P2  front
+		StartSpot(AIFloat3( 305, 0, 2124), AiRole::SUPPORT, false), // P2 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(2090, 0, 3267), AiRole::FRONT, false), // P3  front
 		StartSpot(AIFloat3( 369, 0, 4034), AiRole::SEA,   false), // P4  sea
 		StartSpot(AIFloat3( 485, 0, 5871), AiRole::FRONT, false), // P5  front
@@ -43,7 +43,7 @@ namespace TheRock {
 		StartSpot(AIFloat3(9563, 0, 5455), AiRole::FRONT, false), // P10 front
 		StartSpot(AIFloat3(8152, 0, 4428), AiRole::FRONT, false), // P11 front
 		StartSpot(AIFloat3(9817, 0, 3826), AiRole::SEA,   false), // P12 sea
-		StartSpot(AIFloat3(9750, 0, 2216), AiRole::FRONT, false), // P13 front
+		StartSpot(AIFloat3(9750, 0, 2216), AiRole::SUPPORT, false), // P13 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(9760, 0, 1116), AiRole::AIR,   false), // P14 air
 		StartSpot(AIFloat3(9554, 0,  282), AiRole::FRONT, false), // P15 front
 		StartSpot(AIFloat3(8500, 0, 1395), AiRole::FRONT, false) // P16 front

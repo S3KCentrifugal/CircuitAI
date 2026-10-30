@@ -35,14 +35,14 @@ namespace KolmogorovRemake {
 		StartSpot(AIFloat3(5080, 0, 9578), AiRole::FRONT, false), // P5  front
 		StartSpot(AIFloat3(4290, 0, 7918), AiRole::FRONT, false), // P6  front
 		StartSpot(AIFloat3(3180, 0, 9385), AiRole::FRONT, false), // P7  front
-		StartSpot(AIFloat3( 886, 0, 7215), AiRole::FRONT, false), // P8  front
+		StartSpot(AIFloat3( 886, 0, 7215), AiRole::SUPPORT, false), // P8 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(5071, 0,  745), AiRole::FRONT, false), // P9  front
 		StartSpot(AIFloat3(5796, 0, 2298), AiRole::FRONT, false), // P10 front
 		StartSpot(AIFloat3(6466, 0, 3727), AiRole::FRONT, false), // P11 front
 		StartSpot(AIFloat3(7858, 0, 4342), AiRole::FRONT, false), // P12 front
 		StartSpot(AIFloat3(9478, 0, 5145), AiRole::FRONT, false), // P13 front
 		StartSpot(AIFloat3(9309, 0, 3122), AiRole::FRONT, false), // P14 front
-		StartSpot(AIFloat3(7327, 0,  684), AiRole::FRONT, false), // P15 front
+		StartSpot(AIFloat3(7327, 0,  684), AiRole::SUPPORT, false), // P15 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(9250, 0, 1160), AiRole::AIR,   false) // P16 air
 	};
 

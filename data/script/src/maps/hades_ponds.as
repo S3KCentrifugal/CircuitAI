@@ -25,7 +25,7 @@ namespace HadesPonds {
 	// landLocked heuristic: not yet surveyed on this map; every spot passes false. A future
 	// pass may flag isolated starts that need hover/amphibious to break out.
 	StartSpot@[] spots = {
-		StartSpot(AIFloat3( 560, 0,  685), AiRole::FRONT, false), // P1  front
+		StartSpot(AIFloat3( 560, 0,  685), AiRole::SUPPORT, false), // P1 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(1299, 0, 1339), AiRole::FRONT, false), // P2  front
 		StartSpot(AIFloat3(1349, 0, 2397), AiRole::FRONT, false), // P3  front
 		StartSpot(AIFloat3( 964, 0, 3363), AiRole::FRONT, false), // P4  front
@@ -33,7 +33,7 @@ namespace HadesPonds {
 		StartSpot(AIFloat3(1164, 0, 5560), AiRole::FRONT, false), // P6  front
 		StartSpot(AIFloat3(1654, 0, 6503), AiRole::FRONT, false), // P7  front
 		StartSpot(AIFloat3(1006, 0, 6992), AiRole::FRONT, false), // P8  front
-		StartSpot(AIFloat3(7654, 0, 7522), AiRole::FRONT, false), // P9  front
+		StartSpot(AIFloat3(7654, 0, 7522), AiRole::SUPPORT, false), // P9 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(6906, 0, 6836), AiRole::FRONT, false), // P10 front
 		StartSpot(AIFloat3(6856, 0, 5764), AiRole::FRONT, false), // P11 front
 		StartSpot(AIFloat3(7212, 0, 4828), AiRole::FRONT, false), // P12 front

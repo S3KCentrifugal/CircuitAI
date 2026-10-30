@@ -34,7 +34,7 @@ namespace EskerCreek {
 		StartSpot(AIFloat3( 2148, 0, 1775), AiRole::FRONT, false), // P2  front
 		StartSpot(AIFloat3( 1953, 0, 2845), AiRole::FRONT, false), // P3  front
 		StartSpot(AIFloat3( 2435, 0, 3391), AiRole::FRONT, false), // P4  front
-		StartSpot(AIFloat3( 1825, 0, 4319), AiRole::FRONT, false), // P5  front
+		StartSpot(AIFloat3( 1825, 0, 4319), AiRole::SUPPORT, false), // P5 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3( 1688, 0, 5944), AiRole::AIR,   false), // P6  air (local override; was front)
 		StartSpot(AIFloat3( 2358, 0, 7047), AiRole::FRONT, false), // P7  front
 		StartSpot(AIFloat3( 2114, 0, 8004), AiRole::FRONT, false), // P8  front
@@ -42,7 +42,7 @@ namespace EskerCreek {
 		StartSpot(AIFloat3(10107, 0, 6399), AiRole::FRONT, false), // P10 front
 		StartSpot(AIFloat3(10281, 0, 5307), AiRole::FRONT, false), // P11 front
 		StartSpot(AIFloat3( 9803, 0, 4779), AiRole::FRONT, false), // P12 front
-		StartSpot(AIFloat3(10436, 0, 3887), AiRole::FRONT, false), // P13 front
+		StartSpot(AIFloat3(10436, 0, 3887), AiRole::SUPPORT, false), // P13 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(10542, 0, 2220), AiRole::AIR,   false), // P14 air (local override; was front; mirror of P6)
 		StartSpot(AIFloat3( 9890, 0, 1186), AiRole::FRONT, false), // P15 front
 		StartSpot(AIFloat3(10104, 0,  211), AiRole::FRONT, false) // P16 front

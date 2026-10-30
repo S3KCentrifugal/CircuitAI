@@ -30,12 +30,12 @@ namespace TheRockJungle {
 		StartSpot(AIFloat3( 499, 0, 2882), AiRole::AIR,   false), // P3  air
 		StartSpot(AIFloat3(2539, 0, 3394), AiRole::FRONT, false), // P4  front
 		StartSpot(AIFloat3(1417, 0, 4801), AiRole::SEA,   false), // P5  sea
-		StartSpot(AIFloat3( 338, 0, 5953), AiRole::FRONT, false), // P6  front
+		StartSpot(AIFloat3( 338, 0, 5953), AiRole::SUPPORT, false), // P6 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3( 723, 0, 7506), AiRole::FRONT, false), // P7  front
 		StartSpot(AIFloat3(2585, 0, 6551), AiRole::FRONT, false), // P8  front
 		StartSpot(AIFloat3(9510, 0,  698), AiRole::FRONT, false), // P9  front
 		StartSpot(AIFloat3(7646, 0, 1614), AiRole::FRONT, false), // P10 front
-		StartSpot(AIFloat3(9816, 0, 2368), AiRole::FRONT, false), // P11 front
+		StartSpot(AIFloat3(9816, 0, 2368), AiRole::SUPPORT, false), // P11 SUPPORT (owner 2026-10-30: support spawn; was front)
 		StartSpot(AIFloat3(8789, 0, 3363), AiRole::SEA,   false), // P12 sea
 		StartSpot(AIFloat3(7599, 0, 4671), AiRole::FRONT, false), // P13 front
 		StartSpot(AIFloat3(9725, 0, 5196), AiRole::AIR,   false), // P14 air
