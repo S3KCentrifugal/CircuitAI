@@ -155,6 +155,18 @@ namespace FrontLabPorc {
         if (l.target.x >= 0.0f && walker !is null) {
             array<AIFloat3>@ r = aiBattle.GetUnitTerrainRoute(walker, l.pos, l.target, true, 1.0f, 6.0f, 0.0f, 0.0f);
             if (r !is null) l.route = r;
+            // played 2026-10-30: from a few lab centres the route search finds nothing; start it a
+            // little out from the lab toward the target, on each side, and put the lab in front
+            const float dx = l.target.x - l.pos.x, dz = l.target.z - l.pos.z;
+            const float d = sqrt(dx * dx + dz * dz);
+            for (int k = 0; k < 4 && l.route.length() < 2 && d > 1.0f; ++k) {
+                const float a = float(k) * 1.5708f;   // ahead, left, back, right
+                const float ux = dx / d, uz = dz / d;
+                const float ox = ux * cos(a) - uz * sin(a), oz = ux * sin(a) + uz * cos(a);
+                const AIFloat3 from(l.pos.x + ox * 160.0f, l.pos.y, l.pos.z + oz * 160.0f);
+                @r = aiBattle.GetUnitTerrainRoute(walker, from, l.target, true, 1.0f, 6.0f, 0.0f, 0.0f);
+                if (r !is null && r.length() >= 2) { l.route = r; l.route.insertAt(0, l.pos); }
+            }
         }
         if (!CorridorOn()) return;
         if (l.target.x < 0.0f || l.route.length() < 2) {
