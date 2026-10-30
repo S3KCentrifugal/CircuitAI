@@ -2,9 +2,9 @@
 namespace Global {
 namespace RoleSettings {        
         // Early allocation by reachable walking distance from starting commanders.
-        // At this game time, every ally may take unoccupied reachable spots, beside an ally base too (owner 2026-10-30).
+        // At this game time, every ally may take unoccupied reachable spots.
         bool MexOwnershipEnabled = false;
-        float MexOwnershipSeconds = 270.0f; // 0 disables early protection (owner 2026-10-30: 4:30, released before 5 minutes; D-352 had 6, land and water alike)
+        float MexOwnershipSeconds = 360.0f; // 0 disables early protection (D-352: 6 minutes, down from 10, land and water alike)
         // D-387: capture for the owner. A builder takes a spot an allied AI owns
         // instead of skipping it, and the finished extractor is given to that
         // owner; ownership names the recipient, not the builder. False restores
