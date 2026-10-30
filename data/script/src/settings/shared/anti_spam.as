@@ -35,6 +35,10 @@ namespace Global { namespace AntiSpam {
     float MinAnchorShare = 0.15f;
     float FrontMinHeat = 5.0f;
     float FrontSearch = 2500.0f;
+    // Owner 2026-10-30: when every gun of a porc is gone (nanos excepted), its creator rebuilds it
+    // RetreatStep elmos further toward our base, again on each wipe, down to MinRetreatShare (the base).
+    float RetreatStep = 50.0f;
+    float MinRetreatShare = 0.05f;
     // Layout along the lane (toward the enemy is +): nanos at NanoAlong, guns at GunAlong.
     float NanoAlong = 0.0f;
     float GunAlong = 130.0f;

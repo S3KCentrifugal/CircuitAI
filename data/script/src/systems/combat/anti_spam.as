@@ -89,6 +89,8 @@ namespace AntiSpam {
         // an allied creator's own report (antispam|lane ... |light,dragon,nano,t2), and whether we build for it
         array<int> ownerStanding = { 0, 0, 0, 0 };
         bool help = false;
+        bool armed = false;       // a gun of ours stood here since the last step back
+        int stepsBack = 0;
         int fails = 0;
         int shift = 0;
         int backoffUntil = -1;
@@ -524,7 +526,36 @@ namespace AntiSpam {
                 }
                 @l.orders[k] = null;
             }
+            if (l.mine) StepBack(l);
         }
+    }
+
+    // Owner 2026-10-30: human long-range porc that overlaps a porc kills it from out of its reach. Once every
+    // gun of a porc of ours is gone (its nanos may live), it is rebuilt RetreatStep further toward our base,
+    // again on each wipe, until it stands MinRetreatShare along the axis (the base itself).
+    void StepBack(Lane@ l)
+    {
+        if (l.standing[0] + l.standing[1] + l.standing[3] > 0) { l.armed = true; return; }
+        if (!l.armed) return;
+        l.armed = false;
+        CCircuitDef@ walker = ai.GetCircuitDef(UnitHelpers::GetT1BotScoutForSide(Global::AISettings::Side));
+        const AIFloat3 home = Global::Map::StartPos;
+        for (int n = 1; n <= 8; ++n) {
+            const AIFloat3 q = At(l.anchor, -Global::AntiSpam::RetreatStep * float(n), 0.0f);
+            if (Along(q) < Global::AntiSpam::MinRetreatShare) break;
+            if (!EdgeLanes::InBounds(q) || (walker !is null && !aiTerrainMgr.CanTraverse(walker, home, q))) continue;
+            const AIFloat3 was = l.anchor;
+            l.anchor = q;
+            l.stepsBack += 1;
+            l.shift = 0;
+            l.fails = 0;
+            l.lastStep = -1;
+            GenericHelpers::LogUtil("[AntiSpam] porc " + l.key + " wiped (nanos " + l.standing[2] + " left): rebuilt " + int(Global::AntiSpam::RetreatStep * float(n))
+                + " back at (" + int(q.x) + "," + int(q.z) + ") from (" + int(was.x) + "," + int(was.z) + "), " + int(Along(q) * 100.0f) + "% out, step back " + l.stepsBack, 1);
+            Publish(true);
+            return;
+        }
+        GenericHelpers::LogUtil("[AntiSpam] porc " + l.key + " wiped at the base line (" + int(Along(l.anchor) * 100.0f) + "% out); rebuilt in place", 1);
     }
 
     bool NearNanoSlot(Lane@ l, const AIFloat3 &in q)
@@ -748,6 +779,9 @@ namespace AntiSpam {
                 GenericHelpers::LogUtil("[AntiSpam] team " + fromTeamId + " holds lane " + key + " at (" + xz[0] + "," + xz[1] + ")", 1);
             }
             l.publishedFrame = ai.frame;
+            // the creator stepped it back after a wipe
+            const AIFloat3 a(float(parseInt(xz[0])), 0.0f, float(parseInt(xz[1])));
+            if (MapHelpers::SqDist(a, l.anchor) > 1.0f) { l.anchor = a; l.lateral = Side(a); }
             if (parts.length() >= 5) {
                 array<string>@ st = parts[4].split(",");
                 for (uint k = 0; k < 4 && k < st.length(); ++k) l.ownerStanding[k] = int(parseInt(st[k]));
