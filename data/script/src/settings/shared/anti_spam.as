@@ -22,11 +22,19 @@ namespace Global { namespace AntiSpam {
     float LaneBin = 800.0f;
     float LaneMinShare = 0.25f;
     int LaneMinUnits = 12;
-    int MaxLanes = 2;
-    float LaneSeparation = 1600.0f;
-    // The lane's anchor stands AnchorShare of the way from our starts' centre to
-    // the enemy's, on the lane, pulled toward the axis until a ground unit can reach it.
-    float AnchorShare = 0.28f;
+    // Owner 2026-10-30: every stream gets its porc (the centre too), so up to 4, 1200 apart.
+    int MaxLanes = 4;
+    float LaneSeparation = 1200.0f;
+    // Owner 2026-10-30: the porc stands where the stream crosses into our half (HalfShare of the
+    // way from our starts' centre to the enemy's), but behind where our armies fight: when a combat
+    // zone (heat FrontMinHeat) within FrontSearch of that crossing is nearer home, the porc stands
+    // FrontMarginShare behind it, never nearer home than MinAnchorShare. Pulled toward the axis until
+    // a ground unit can reach it.
+    float HalfShare = 0.5f;
+    float FrontMarginShare = 0.08f;
+    float MinAnchorShare = 0.15f;
+    float FrontMinHeat = 5.0f;
+    float FrontSearch = 2500.0f;
     // Layout along the lane (toward the enemy is +): nanos at NanoAlong, guns at GunAlong.
     float NanoAlong = 0.0f;
     float GunAlong = 130.0f;
@@ -52,13 +60,13 @@ namespace Global { namespace AntiSpam {
     array<float> LadderT2Metal = { 35.0f, 55.0f, 80.0f };
     array<float> LadderT2Energy = { 600.0f, 900.0f, 1300.0f };
     float T2Shake = 40.0f;                 // native looks only this far round a T2 slot, to stay in the nanos' reach
-    // Owner (owner 2026-10-30): the richest allied FRONT by the 10 s minimum metal income every
-    // FRONT publishes; the nearest FRONT only when nobody's income is known yet. An owner whose lane
-    // stands empty for HandOverSeconds hands it on when another FRONT earns HandOverRatio x as much.
+    // Owner 2026-10-30: the richest allied FRONT (by the 10 s minimum metal income every FRONT
+    // publishes) creates a porc; the nearest FRONT only while nobody's income is known. The creator
+    // rebuilds it; the richest FRONT rebuilds it too only while the creator is very poor: below
+    // VeryPoorMetal, or below VeryPoorShare of the richest FRONT's income.
     int IncomeStaleSeconds = 70;
-    int HandOverSeconds = 60;
-    float HandOverRatio = 1.5f;
-    float HandOverMinGap = 10.0f;
+    float VeryPoorMetal = 15.0f;
+    float VeryPoorShare = 0.33f;
     int PublishSeconds = 20;               // the owner's lanes go to the allies this often
     int OwnerWaitSeconds = 90;             // a lane nobody published this long after we saw it: we hold it ourselves
     int ReportSeconds = 120;
