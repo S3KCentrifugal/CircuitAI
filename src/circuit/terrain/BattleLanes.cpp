@@ -31,6 +31,10 @@
 #include "util/GameAttribute.h"
 #include "unit/CircuitDef.h"
 #include "unit/ally/AllyUnit.h"
+#include "unit/ally/AllyTeam.h"
+#include "control/service/CombatSnapshot.h"
+#include "Unit.h"
+#include <sstream>
 #include "spring/SpringCallback.h"
 #include "UnitDef.h"
 #include "MoveData.h"
@@ -530,9 +534,151 @@ bool CBattleAnalysis::SetFrontLane(const std::vector<AIFloat3>& points,float hal
     // collinear vertices. Vertex-only seeding cuts holes in long straight lanes.
     frontLaneDistance=lane::CorridorDistances(path,gw,gh,cellSize);
     frontLanePath.Set(std::move(path));
+    laneFront.Reset(frontLanePath.Length());
+    laneFrontFrame=-1;
     frontLaneWidth=std::clamp(halfWidth,64.f,2048.f);
+    // Damage callbacks must not project O(P) route segments per projectile.
+    // Rasterize B<=128 lane samples into the existing coarse heat grid once
+    // per route change: O(H + B*R^2), H heat cells, R corridor radius in cells.
+    // Reads are O(1), and route replacement owns all invalidation.
+    frontCombatBin.assign(hw*hh,-1);
+    std::vector<float> nearest(hw*hh,std::numeric_limits<float>::max());
+    const float reach=frontLaneWidth+laneFront.step*.5f+heatCell;
+    for(int i=0;i<laneFront.count;++i) {
+        const auto p=frontLanePath.At((i+.5f)*laneFront.step);
+        const int x0=std::max(0,int((p.x-reach)/heatCell)),x1=std::min(hw-1,int((p.x+reach)/heatCell));
+        const int z0=std::max(0,int((p.z-reach)/heatCell)),z1=std::min(hh-1,int((p.z+reach)/heatCell));
+        for(int z=z0;z<=z1;++z)for(int x=x0;x<=x1;++x) {
+            const float d=std::hypot((x+.5f)*heatCell-p.x,(z+.5f)*heatCell-p.z);
+            const int index=z*hw+x;
+            if(d<nearest[index]){nearest[index]=d;frontCombatBin[index]=i;}
+        }
+    }
     return true;
 }
+void CBattleAnalysis::SetLaneFrontOptions(float horizon,float memory,float ratio,float margin,float minimumCost) {
+    if(!std::isfinite(horizon) || !std::isfinite(memory) || !std::isfinite(ratio)
+        || !std::isfinite(margin) || !std::isfinite(minimumCost))return;
+    laneFrontHorizon=std::clamp(horizon,0.f,30.f);
+    laneFrontMemory=std::clamp(memory,0.f,120.f);
+    laneFrontRatio=std::clamp(ratio,1.f,10.f);
+    laneFrontMargin=std::clamp(margin,0.f,1024.f);
+    laneFrontMinimumCost=std::clamp(minimumCost,0.f,10000.f);
+    laneFrontFrame=-1;
+}
+
+void CBattleAnalysis::RecordLaneCombat(const AIFloat3& pos) {
+    if(laneFrontHorizon<=0 || !laneFront.count || !std::isfinite(pos.x) || !std::isfinite(pos.z))return;
+    if(pos.x<0 || pos.z<0 || pos.x>=gw*cellSize || pos.z>=gh*cellSize || GetFrontLaneDistance(pos)>frontLaneWidth)return;
+    const int x=std::min(hw-1,int(pos.x)/heatCell),z=std::min(hh-1,int(pos.z)/heatCell);
+    const int bin=frontCombatBin[z*hw+x];
+    if(bin>=0)laneFront.bins[bin].damage=circuit->GetLastFrame();
+}
+
+void CBattleAnalysis::UpdateLaneFront() {
+    const int frame=circuit->GetLastFrame();
+    if(laneFrontHorizon<=0 || !laneFront.count)return;
+    const auto& snapshot=circuit->GetAllyTeam()->GetCombatSnapshot();
+    snapshot.Want(frame);
+    if(laneFrontFrame>=0 && frame-laneFrontFrame<30)return;
+    laneFrontFrame=frame;
+    laneFront.Begin();
+    // One enclosing-circle query per assigned lane per second, never per unit
+    // consumer. O(cells + E*P + F*P + (E+F)*B), P route segments, B<=128,
+    // E/F candidates. No path solves; fixed bins and retained snapshot buckets.
+    // Long/curved lanes can encompass much of the map. This is not O(1), and
+    // 16-AI cost remains queued. Route replacement resets evidence and stamps.
+    float minx=1e30f,minz=1e30f,maxx=0,maxz=0;
+    for(int i=0;i<=laneFront.count;++i) {
+        const auto p=frontLanePath.At(i*laneFront.step);
+        minx=std::min(minx,p.x);minz=std::min(minz,p.z);maxx=std::max(maxx,p.x);maxz=std::max(maxz,p.z);
+    }
+    const AIFloat3 center((minx+maxx)*.5f,0,(minz+maxz)*.5f);
+    const float radius=std::hypot(maxx-minx,maxz-minz)*.5f+frontLaneWidth+laneFront.step;
+    for(int id:circuit->GetCallback()->GetFriendlyUnitIdsIn(center,radius,false)) {
+        auto* ally=circuit->GetFriendlyUnit(id);
+        if(!ally)continue;
+        auto* def=ally->GetCircuitDef();
+        if(!def || def->IsAbleToFly() || !def->IsAttacker() || def->IsRoleComm() || def->IsRoleScout() || def->IsRoleArty()
+            || def->GetCostM()<laneFrontMinimumCost || def->GetMaxRange(CCircuitDef::RangeType::LAND)<=0)continue;
+        const auto pos=ally->GetPos(frame);
+        const auto p=frontLanePath.Project({pos.x,pos.y,pos.z});
+        if(p.distance>frontLaneWidth || ally->GetUnit()->IsBeingBuilt())continue;
+        if(def->IsMobile()) {
+            const auto area=circuit->GetTerrainManager()->GetCurrentMapArea(def,pos);
+            if(!area.second || !area.first || !circuit->GetTerrainManager()->CanMoveToPos(area.first,GetFrontLanePoint(p.progress)))continue;
+        }
+        const float health=std::clamp(ally->GetUnit()->GetHealth()/std::max(1.f,def->GetHealth()),0.f,1.f);
+        if(health<=0)continue;
+        const float reach=def->GetMaxRange(CCircuitDef::RangeType::LAND);
+        laneFront.Add(p.progress-reach,p.progress+reach,def->GetPower()*health,true);
+    }
+    // All route vertices bound the broad phase, including bends between bins.
+    // Long-range weapons in other corridors retain their full reach.
+    const auto lo=frontLanePath.Lower(),hi=frontLanePath.Upper();
+    snapshot.QueryInfluencing({lo.x,lo.z},{hi.x,hi.z},frontLaneWidth+600.f+CCombatSnapshot::RADAR_ERROR,[&](const CCombatSnapshot::Entry& e) {
+        auto* def=e.defId>=0?circuit->GetCircuitDefSafe(e.defId):nullptr;
+        if(def && (def->IsAbleToFly() || !def->IsAttacker() || def->GetMaxRange(CCircuitDef::RangeType::LAND)<=0))return;
+        const float age=std::max(0.f,float(frame-e.lastObserved)/30.f);
+        const bool remembered=!e.los && !e.radar;
+        if(remembered && e.speed>0 && age>laneFrontMemory)return;
+        const auto p=frontLanePath.Project({e.pos.x,0,e.pos.z});
+        const float range=def?def->GetMaxRange(CCircuitDef::RangeType::LAND):300.f;
+        const float uncertainty=std::min(600.f,e.speed*age)+(e.los?0.f:CCombatSnapshot::RADAR_ERROR);
+        // Movement prediction is only along this lane; cross-lane weapons
+        // contribute firing reach but cannot magically walk through a ridge.
+        const float travel=p.distance<=frontLaneWidth?e.speed*laneFrontHorizon:0.f;
+        const float reach=range+uncertainty+travel;
+        if(p.distance>frontLaneWidth+reach)return;
+        const float along=std::sqrt(std::max(0.f,reach*reach-std::pow(std::max(0.f,p.distance-frontLaneWidth),2.f)));
+        laneFront.Add(p.progress-along,p.progress+along,def?def->GetPower():0.f,false,remembered || !def);
+    });
+}
+
+float CBattleAnalysis::LimitLaneAdvance(float from,float goal) {
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0)return goal;
+    // Missing/stale enemy publications cannot authorize further deployment.
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    if(observed<0 || circuit->GetLastFrame()-observed>60)return std::min(from,goal);
+    return laneFront.Limit(from,goal,laneFrontMargin,laneFrontRatio,circuit->GetLastFrame(),90);
+}
+
+float CBattleAnalysis::LaneCombatDistance(const AIFloat3& from,float memorySeconds) {
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0 || !laneFront.count || !std::isfinite(from.x) || !std::isfinite(from.z))
+        return std::numeric_limits<float>::infinity();
+    const int frame=circuit->GetLastFrame();
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    return laneFront.CombatDistance(GetFrontLaneProgress(from),frame,
+        int(std::clamp(memorySeconds,0.f,120.f)*FRAMES_PER_SEC),observed>=0 && frame-observed<=60);
+}
+
+bool CBattleAnalysis::LaneWorkAllowed(const AIFloat3& site) {
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0 || !laneFront.count)return true;
+    if(!std::isfinite(site.x) || !std::isfinite(site.z))return false;
+    const auto p=frontLanePath.Project({site.x,site.y,site.z});
+    const auto state=laneFront.Status(laneFront.Index(p.progress),circuit->GetLastFrame(),90);
+    return state!=lane::Front::ACTIVE && state!=lane::Front::EXPECTED && state!=lane::Front::ENEMY;
+}
+
+std::string CBattleAnalysis::DescribeLaneFront() {
+    UpdateLaneFront();
+    std::ostringstream out;
+    out<<laneFrontFrame;
+    // Bounded run-length zones, sampled along the actual curved route by the
+    // renderer. States are evidence labels, not calibrated probabilities.
+    for(int i=0;i<laneFront.count;) {
+        const auto state=laneFront.Status(i,circuit->GetLastFrame(),90);
+        int end=i+1;
+        while(end<laneFront.count && laneFront.Status(end,circuit->GetLastFrame(),90)==state)++end;
+        out<<'|'<<i*laneFront.step<<','<<end*laneFront.step<<','<<int(state);
+        i=end;
+    }
+    return out.str();
+}
+
 float CBattleAnalysis::GetFrontLaneDistance(const AIFloat3& p) const {
     if(frontLaneDistance.empty())return 0.f;
     return frontLaneDistance[Cell(p)];

@@ -89,6 +89,22 @@ adding or changing recurring work, not only when replacing an optimization.
   and any verification gaps. Never infer FPS or network improvements from
   asymptotic reasoning or a microbenchmark alone.
 
+## Lane geometry regression
+
+Changes to corridor generation, passability, lane joining or assignment must
+run the offline real-map matrix as well as the focused synthetic tests.
+`tests/fixtures/lane_maps.json` declares the covered archive versions; original
+All That Glitters and Extended are separate fixtures. Run
+`tools/knowledge/check_map_lanes.py` with the compiled `field_analysis_test`
+executable, installed map archives and a fresh external benchmark output
+directory. `tools/run_native_tests.sh` can include it through
+`CIRCUIT_LANE_MAP_ARCHIVES` and `CIRCUIT_LANE_MAP_OUT`. Missing archives or an
+unconfigured matrix are verification gaps, not passes. Add location-specific
+geometry assertions for reported map failures; do not merely bless changed
+lane counts. See `../rjm.bar.docs/projects/circuitai/testing/lane-map-regression.md`.
+The matrix covers representative maps, not every supported map, and does not
+replace match-level assignment/command checks or deferred performance testing.
+
 ## Project Context
 
 CircuitAI is a C++ Skirmish AI for the Recoil RTS engine. Native behavior is under `src/circuit/`. The primary, active AngelScript implementation and profiles are under the root `data/` tree: policy code is in `data/script/` and JSON behavior profiles are in `data/config/`. The parallel `data_sample/` tree contains sample AngelScript and configuration for reference only; it is not the implementation target. The C++ code is normally integrated into an engine checkout as a Skirmish AI and depends on Recoil's generated C++ AI wrapper.
@@ -289,6 +305,7 @@ This is the implementation target for every AngelScript and profile change.
 | `src/AIExport.cpp`, `src/AIExport.h` | Skirmish AI ABI entry points that the engine loads. |
 | `src/circuit/CircuitAI.cpp`, `src/circuit/CircuitAI.h` | Top-level AI object: engine event dispatch, module ownership, lifecycle. |
 | `src/circuit/module/` | Native managers - `BuilderManager`, `EconomyManager`, `FactoryManager`, `MilitaryManager` - over the `Module` and `TaskModule` bases. |
+| `src/circuit/control/` | D-388 unit controllers ([unit-controller-architecture.md](../rjm.bar.docs/projects/circuitai/unit-controller-architecture.md)): per-unit-type behaviour owners chosen in `behaviour.json` (`controllers` presets, per-type `controller` key). `core/` is the framework (`IUnitController` and `CUnitControllerBase<Config,State>`, `ControllerRegistry` = the ownership arbiter, `Suspension.h`/`Ownership` precedence ladder, `CommandWriter` = the single writer of cloak/fire/move state, `ControlledTask`, `ConfigTable`, `PresetResolver`, `SlotStore`); `kernel/` is engine-free decision maths (`CommanderCombat.h`, `CommanderFortification.h`, `CommanderJammerCoverage.h`, D-389 `CommanderPosture.h`); `service/` is shared per side (`CombatSnapshot`: seen and remembered enemies); `unit/commander/` is the commander controller (formerly `module/CommanderControl`), every faction commander. Script levers: `aiControllers`, plus the legacy `aiBuilderMgr.SetCommanderCombatOption`. Tests: `tests/control_core_test.cpp`, `tests/commander_posture_test.cpp`, `tests/commander_combat_test.cpp`. |
 | `src/circuit/script/` | AngelScript integration and the registration surface: `InitScript`, `ModuleScript`, the per-manager `BuilderScript`, `EconomyScript`, `FactoryScript`, `MilitaryScript`, plus `Script.cpp` and `RefCounter.h`. **A native C++ method is not script-accessible unless it is registered here.** |
 | `src/circuit/task/` | Task hierarchy: `UnitTask`, `IdleTask`, `NilTask`, `PlayerTask`, `RetreatTask`, plus the `builder/`, `common/`, `fighter/`, and `static/` task families. |
 | `src/circuit/unit/` | `CircuitDef` (UnitDef wrapper and classification), `CircuitUnit`, `CircuitWDef` (weapon defs), `CoreUnit`, `FactoryData`, and the `action/`, `ally/`, `enemy/` subtrees. Classification and economy logic that reads BAR custom parameters lives here. |

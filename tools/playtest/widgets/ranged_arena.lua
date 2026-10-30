@@ -34,7 +34,10 @@ local function site(g,x,z)
     -- BAR factories expose canMove for their command queue, but are immobile.
     -- A movement test always rejects them; validate their building footprint.
     local mobile=UnitDefs[def.id].canMove and not UnitDefs[def.id].isFactory and (UnitDefs[def.id].speed or 0)>0
-    local reference=Spring.GetGroundHeight(g.position[1],g.position[2])
+    -- Relative waves belong on the anchor's ground level. Their nominal
+    -- offset may land on a mesa, which must not exclude the nearby valley.
+    local referencePosition=g.anchorPosition or g.position
+    local reference=Spring.GetGroundHeight(referencePosition[1],referencePosition[2])
     -- Supplied units must not begin on isolated mountain tops. Validate the
     -- loaded movement footprint and same-height approach before spawning;
     -- record adjusted coordinates so baseline/candidate inputs are auditable.
@@ -379,6 +382,22 @@ function widget:GameFrame(f)
                 end
         end
     end
+    -- Explicit group lifecycle waves. Select only this fixture's named team
+    -- units, including replacements; never enabled by natural/performance runs.
+    for index,event in ipairs(cfg.group_loss_steps or {}) do
+        if not event.done and f>=event.seconds*30 then
+            event.done=true
+            local names,ids={},{}
+            for _,name in ipairs(event.units) do names[name]=true end
+            for _,id in ipairs(Spring.GetTeamUnits(event.team or 0) or {}) do
+                local def=UnitDefs[Spring.GetUnitDefID(id)]
+                if def and names[def.name] then ids[#ids+1]=id end
+            end
+            table.sort(ids)
+            Spring.SelectUnitArray(ids,false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
+            log("group_loss step="..index.." count="..#ids)
+        end
+    end
     -- Optional lifecycle fixture: remove an entire screen after pairing. This
     -- is explicit supplied-force intervention, never enabled in natural games.
     if not cfg.fixture_units_removed and (cfg.created_removal_pending
@@ -590,6 +609,22 @@ function widget:GameFrame(f)
                 end
             end
         end
+    end
+    if cfg.commander_defense_observation and f%150==0 then
+        local name=cfg.commander_defense_observation
+        local count,stock,queued,power=0,0,0,0
+        for _,id in ipairs(Spring.GetTeamUnits(0) or {}) do
+            local def=UnitDefs[Spring.GetUnitDefID(id)]
+            local _,_,_,_,progress=Spring.GetUnitHealth(id)
+            if def and def.name==name and (progress or 0)>=1 then
+                count=count+1
+                local loaded,pending=Spring.GetUnitStockpile(id)
+                stock=stock+(loaded or 0);queued=queued+(pending or 0)
+                local enabled,charge=Spring.GetUnitShieldState(id)
+                if enabled then power=power+(charge or 0) end
+            end
+        end
+        log(string.format("defense_ready def=%s count=%d stock=%d queued=%d power=%d",name,count,stock,queued,power))
     end
     -- D-372 supplied correctness census: count finished forward structures,
     -- not task offers. This observer never orders units or changes AI policy.

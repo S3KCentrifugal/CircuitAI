@@ -1993,6 +1993,9 @@ namespace Builder {
         // FRONT ownership precedes generic edge/spam/economy providers and
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
+            if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
+            IUnitTask@ decoy=CommanderGroup::PrepareDecoy(u);
+            if(decoy !is null) return decoy;
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
@@ -2417,6 +2420,8 @@ namespace Builder {
 		// Log details (id, name, tier, commander)
 		LogAiUnitAdded(unit, cdef, usage);
 
+        if (CommanderGroup::OnAdded(unit)) return;
+
 		// Commander registration; if it's a new commander, record and stop
 		if (TryRegisterCommander(unit, cdef)) {
 			return;
@@ -2787,6 +2792,7 @@ namespace Builder {
 
 		Team::SeaAssist::OnUnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
+        CommanderGroup::OnRemoved(unit);
 
 		// Ensure any per-builder task mapping is cleared for this unit
 		ClearBuilderTaskByUnit(unit);

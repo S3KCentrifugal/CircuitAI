@@ -7,6 +7,7 @@
  */
 
 #include "script/InitScript.h"
+#include "control/core/ControllerRegistry.h"
 #include "script/SetupScript.h"
 #include "script/ScriptManager.h"
 #include "script/RefCounter.h"
@@ -283,6 +284,16 @@ static void ConstructCopySInitInfo(CInitScript::SInitInfo* mem, const CInitScrip
 static void DestructSInitInfo(CInitScript::SInitInfo *mem)
 {
 	mem->~SInitInfo();
+}
+
+// D-388: unit controller levers for script (aiControllers). Null unit types are refused.
+static bool CControllerRegistry_Assign(CControllerRegistry* registry, const CCircuitDef* cdef, const std::string& preset)
+{
+	return (cdef != nullptr) && registry->AssignPreset(cdef->GetId(), preset);
+}
+static std::string CControllerRegistry_PresetOf(CControllerRegistry* registry, const CCircuitDef* cdef)
+{
+	return (cdef == nullptr) ? std::string() : registry->PresetOf(cdef->GetId());
 }
 
 static CCircuitDef* CCircuitAI_GetCircuitDef(CCircuitAI* circuit, const std::string& name)
@@ -1381,6 +1392,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationCount(const CCircuitDef@) const", asFUNCTION(CTerrainManager_GetReservationCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CTerrainManager", "float reservationMatchRadius", asOFFSET(CTerrainManager, reservationMatchRadius)); ASSERT(r >= 0);
 	// Layout: JSON permits the mechanism and TECH opts its own AI instance in.
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetBuildSiteReservations(bool)", asMETHOD(CTerrainManager, SetBuildSiteReservations), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool SetLayoutEnabled(bool)", asMETHOD(CTerrainManager, SetLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutEnabled() const", asMETHOD(CTerrainManager, IsLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutConfigured() const", asMETHOD(CTerrainManager, IsLayoutConfigured), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1480,6 +1492,15 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CSetupManager", "bool ConfigBool(const string& in, bool)", asFUNCTION(CSetupManager_ConfigBool), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSetupManager", "string ConfigString(const string& in, const string& in)", asFUNCTION(CSetupManager_ConfigString), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 
+	// D-388: unit controllers (control/core/ControllerRegistry.h). Presets come from
+	// behaviour.json "controllers"; these levers change one preset or move a unit type.
+	CControllerRegistry* controllers = circuit->GetControllers();
+	r = engine->RegisterObjectType("CControllerRegistry", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
+	r = engine->RegisterGlobalProperty("CControllerRegistry aiControllers", controllers); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CControllerRegistry", "bool SetOption(const string& in, const string& in, float)", asMETHOD(CControllerRegistry, SetPresetOption), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CControllerRegistry", "bool Assign(const CCircuitDef@, const string& in)", asFUNCTION(CControllerRegistry_Assign), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CControllerRegistry", "string PresetOf(const CCircuitDef@)", asFUNCTION(CControllerRegistry_PresetOf), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+
 	// D-126: battlefield analysis for TECH's weapon clusters (terrain/BattleAnalysis.h)
 	CBattleAnalysis* battle = circuit->GetBattle();
 	r = engine->RegisterObjectType("CBattleAnalysis", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
@@ -1528,6 +1549,10 @@ void CInitScript::RegisterMgr()
     r=engine->RegisterObjectMethod("CBattleAnalysis","bool CorridorOpen(int, const AIFloat3& in) const",asMETHOD(CBattleAnalysis,CorridorOpen),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","AIFloat3 CorridorPoint(int, float) const",asMETHOD(CBattleAnalysis,CorridorPoint),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float GetFrontLaneLength() const",asMETHOD(CBattleAnalysis,GetFrontLaneLength),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","void SetLaneFrontOptions(float, float, float, float, float)",asMETHOD(CBattleAnalysis,SetLaneFrontOptions),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","float LimitLaneAdvance(float, float)",asMETHOD(CBattleAnalysis,LimitLaneAdvance),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","float LaneCombatDistance(const AIFloat3& in, float)",asMETHOD(CBattleAnalysis,LaneCombatDistance),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","string DescribeLaneFront()",asMETHOD(CBattleAnalysis,DescribeLaneFront),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","bool ArmyFrontLanesEnabled() const",asMETHOD(CBattleAnalysis,ArmyFrontLanesEnabled),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","void SetArmyFrontLanesEnabled(bool)",asMETHOD(CBattleAnalysis,SetArmyFrontLanesEnabled),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float GetFrontLaneWidth() const",asMETHOD(CBattleAnalysis,GetFrontLaneWidth),asCALL_THISCALL);ASSERT(r>=0);

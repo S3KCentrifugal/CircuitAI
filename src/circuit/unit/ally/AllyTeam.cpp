@@ -128,6 +128,8 @@ void CAllyTeam::Release()
 		delete kv.second;
 	}
 	friendlyUnits.clear();
+	friendlyStructures.clear();
+	friendlyStructuresReady=false;
 
 	mapManager = nullptr;
 	metalManager = nullptr;
@@ -169,6 +171,8 @@ void CAllyTeam::UpdateFriendlyUnits()
 		delete kv.second;
 	}
 	friendlyUnits.clear();
+	friendlyStructures.clear();
+	friendlyStructuresReady=false;
 	COOAICallback* clb = circuit->GetCallback();
 	const std::vector<Unit*>& units = clb->GetFriendlyUnits();
 	if (!reclaimMarks.empty()) {
@@ -193,6 +197,18 @@ void CAllyTeam::UpdateFriendlyUnits()
 	// claims are released by RemoveAssignee, with the timeout as a safety net.
 	pulseClaims.Prune(lastUpdate, [](int) { return true; });
 	nuclearHistory.Prune(lastUpdate, alive);
+}
+
+const CAllyTeam::AllyStructures& CAllyTeam::GetFriendlyStructures()
+{
+    // One ordered filter per existing publication, shared by all allied layout
+    // readers. No extra refresh, callback or per-structure tree allocation.
+    if (!friendlyStructuresReady) {
+        for (const auto& entry : friendlyUnits)
+            if (!entry.second->GetCircuitDef()->IsMobile()) friendlyStructures.push_back(entry);
+        friendlyStructuresReady=true;
+    }
+    return friendlyStructures;
 }
 
 CAllyUnit* CAllyTeam::GetFriendlyUnit(ICoreUnit::Id unitId) const
@@ -318,6 +334,9 @@ void CAllyTeam::Update(CCircuitAI* ai)
 		return;
 	}
 
+	if (combatSnapshot.Due(circuit->GetLastFrame())) {
+		combatSnapshot.Rebuild(circuit, circuit->GetLastFrame());  // D-389
+	}
 	if (circuit->GetLastFrame() % THREAT_UPDATE_RATE == uEnemyMark) {
 		EnqueueUpdate();
 	} else {

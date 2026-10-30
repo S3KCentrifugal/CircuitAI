@@ -53,6 +53,27 @@ function widget:GetInfo()
 	}
 end
 
+-- BEGIN DIALOG METRICS
+local dialogUI = {}
+function dialogUI.Scale(width,height,panelWidth,panelHeight)
+    local preference=Spring.GetConfigFloat and Spring.GetConfigFloat("ui_scale",1) or 1
+    if type(preference)~="number" or preference~=preference then preference=1 end
+    local desired=1.25*math.max(1,height/1080)*math.max(.75,math.min(2,preference))
+    return math.min(desired,math.max(1,width)/(panelWidth+24),math.max(1,height)/(panelHeight+24))
+end
+function dialogUI.Fit(text,size,width)
+    local measure=gl.GetTextWidth and gl.GetTextWidth(text)
+    local function pixels(t) return (gl.GetTextWidth and gl.GetTextWidth(t) or #t*.55)*size end
+    if (measure or #text*.55)*size<=width then return text end
+    local lo,hi=0,#text
+    while lo<hi do
+        local mid=math.ceil((lo+hi)/2)
+        if pixels(string.sub(text,1,mid).."...")<=width then lo=mid else hi=mid-1 end
+    end
+    return string.sub(text,1,lo).."..."
+end
+-- END DIALOG METRICS
+
 local theatres = (function()
 local surveys, staging = {}, {}
 local PREFIX = "barbtheatre|1|"
@@ -1335,7 +1356,7 @@ local drawWorld, drawMiniMap, drawScreen, update
 
 local function button(id, x, y, w, title, isOn, action)
     gl.Color(isOn and {0.12,0.30,0.34,0.98} or {0.09,0.13,0.18,0.98}); gl.Rect(x, y, x+w, y+24)
-    gl.Color(isOn and mint or {0.83,0.87,0.93,1}); gl.Text(title, x+w/2, y+7, 10, "oc")
+    gl.Color(isOn and mint or {0.83,0.87,0.93,1}); gl.Text(dialogUI.Fit(title,12,w-12), x+w/2, y+6, 12, "oc")
     controls[#controls+1] = {x, y, x+w, y+24, id=id, action=action}
 end
 local function hitAt(x, y)
@@ -1388,7 +1409,7 @@ local config, getConfig, textCommand, shutdown
 -- model and explicit settings are the only inputs; no selection/roster/time
 -- callbacks participate. Preparation yields between bounded geometry batches.
 local ux = {schemaVersion=2, view="terrain", primary=0, compare=-1, side=-1,
-    detail="essential", labels="names", background="normal", opacity=0.35,
+    detail="essential", labels="names", background="normal", opacity=0.55,
     inspect=false, debug=false, advanced=false, collapsed=false,
     categories={resources=true, coastal_access=true}, preset="Terrain overview"}
 local presets, legacyConfig = {}, nil
@@ -1623,7 +1644,7 @@ local function uxPreset(name)
         local shown=on; config(copy(presets[name])); on=shown;ux.preset=name;compileAll();return
     end
     ux.categories={resources=true,coastal_access=true};ux.primary=0;ux.compare=-1;ux.side=-1;ux.debug=false;ux.debugCandidates=false;ux.debugIds=false
-    ux.detail="essential";ux.labels="names";ux.background="normal";ux.opacity=0.35
+    ux.detail="essential";ux.labels="names";ux.background="normal";ux.opacity=0.55
     ux.view=name=="Ground approaches" and "approaches" or name=="Coastal access" and "positions" or "terrain"
     if name=="Coastal access" then ux.primary=3;ux.compare=2;ux.categories={coastal_access=true} end
     ux.preset=name;setGround(false);compileAll()
@@ -1737,7 +1758,7 @@ drawScreen=function()
     local w=480;local h=ux.collapsed and 40 or (440+(ux.advanced and 130 or 0)+(uxFocus and ux.inspect and 90 or 0))
     -- Keep the complete panel reachable on small/resized viewports. Only UI
     -- geometry scales; terrain features and display settings stay unchanged.
-    local scale=math.min(1,math.max(1,vw-16)/w,math.max(1,vh-16)/h)
+    local scale=dialogUI.Scale(vw,vh,w,h)
     dockX=math.max(8,math.min(vw-w*scale-8,dockX or vw-w*scale-20))
     dockY=math.max(h*scale+8,math.min(vh-8,dockY or vh-110))
     local x,top=dockX/scale,dockY/scale;legendRect={x,top-h,x+w,top}
@@ -1765,7 +1786,7 @@ drawScreen=function()
         uxChoose("movement",x+12,y,220,title,movement,"primary")
         local cmp={{-1,"None"}};for _,v in ipairs(movement) do if v[1]~=ux.primary then cmp[#cmp+1]=v end end
         uxChoose("compare",x+240,y,220,"Compare: "..(ux.compare<0 and "None" or CLASS_NAMES[ux.compare] or "deep-draft"),cmp,"compare")
-    else gl.Color(muted);gl.Text("Movement filters inactive: Terrain is a physical overview",x+12,y+8,11,"o") end
+    else gl.Color(muted);gl.Text("Movement filters inactive: Terrain is a physical overview",x+12,y+8,12,"o") end
     y=y-32
     local sides={{-1,"Neutral"}};for _,s in ipairs(model and model.sides or {}) do if s.ally>=0 then sides[#sides+1]={s.ally,"Ally team "..s.ally.." (setup)"} end end
     uxChoose("perspective",x+12,y,220,ux.side<0 and "Perspective: Neutral" or "Setup ally team "..ux.side,sides,"side")
@@ -1797,7 +1818,7 @@ drawScreen=function()
         end
         y=y-58
     else
-        gl.Color(muted);gl.Text(ux.view=="approaches" and "Slash: primary only   Cross: comparison only   Plain: shared" or "Edges: physical transitions   Open ground: no partition lines",x+12,y+6,10,"o");y=y-28
+        gl.Color(muted);gl.Text(ux.view=="approaches" and "Slash: primary only   Cross: comparison only   Plain: shared" or "Edges: physical transitions   Open ground: no partition lines",x+12,y+6,12,"o");y=y-28
     end
     if ux.inspect then
         local fs={};for i,f in ipairs(uxFeatures) do
@@ -1808,15 +1829,15 @@ drawScreen=function()
     end
     local f=uxFocus and uxFeatures[uxFocus]
     if f and ux.inspect then
-        gl.Color(mint);gl.Text(f.basis or "Terrain-derived",x+12,y+5,11,"o");y=y-16
+        gl.Color(mint);gl.Text(f.basis or "Terrain-derived",x+12,y+5,12,"o");y=y-16
         local types={};for cls=0,7 do if hasBit(f.mask or 0,cls) then types[#types+1]=CLASS_NAMES[cls] or "deep-draft" end end
-        gl.Color(muted);gl.Text(#types>0 and ("Movement: "..table.concat(types,", ")) or "Physical geography; no movement claim",x+12,y,9,"o");y=y-16
+        gl.Color(muted);gl.Text(#types>0 and ("Movement: "..table.concat(types,", ")) or "Physical geography; no movement claim",x+12,y,12,"o");y=y-16
         -- Wrapped card text stays inside the panel at small resolutions.
         local line="";for word in string.gmatch(f.reason or "", "%S+") do
-            if #line+#word>68 then gl.Color(muted);gl.Text(line,x+12,y,10,"o");y=y-14;line="" end
+            if #line+#word>68 then gl.Color(muted);gl.Text(line,x+12,y,12,"o");y=y-14;line="" end
             line=line..word.." "
         end
-        gl.Color(muted);gl.Text(line,x+12,y,10,"o");y=y-18
+        gl.Color(muted);gl.Text(line,x+12,y,12,"o");y=y-18
     end
     if ux.advanced then
         button("debugBoundaries",x+12,y,280,"Debug: analysis boundaries",ux.debug,function() uxChange("debug",not ux.debug) end)
@@ -1826,10 +1847,10 @@ drawScreen=function()
         button("debugCandidates",x+12,y,280,"Debug: clearance candidates",ux.debugCandidates,function() uxChange("debugCandidates",not ux.debugCandidates) end)
         button("debugIds",x+300,y,160,"Source IDs",ux.debugIds,function() uxChange("debugIds",not ux.debugIds) end);y=y-30
         local cl=model and model.classes[ux.primary]
-        gl.Color(muted);gl.Text(cl and string.format("Representative: slope %.0f deg; depth %.0f..%.0f (-1 unbounded)",cl.slope,cl.minDepth,cl.maxDepth) or "Representative movement assumptions unavailable",x+12,y,10,"o")
-        y=y-18;gl.Text("Terrain-derived, not engine-checked for every unit. Initial map only.",x+12,y,10,"o")
+        gl.Color(muted);gl.Text(cl and string.format("Representative: slope %.0f deg; depth %.0f..%.0f (-1 unbounded)",cl.slope,cl.minDepth,cl.maxDepth) or "Representative movement assumptions unavailable",x+12,y,12,"o")
+        y=y-18;gl.Text("Terrain-derived, not engine-checked for every unit. Initial map only.",x+12,y,12,"o")
     end
-    gl.Color(muted);gl.Text(status,x+12,top-h+28,10,"o");gl.Text(uxNotice,x+12,top-h+12,9,"o")
+    gl.Color(muted);gl.Text(dialogUI.Fit(status,12,w-24),x+12,top-h+28,12,"o");gl.Text(dialogUI.Fit(uxNotice,11,w-24),x+12,top-h+12,11,"o")
     if uxMenu then
         local menu=uxMenu;local mh=math.min(#menu.items,12)*25
         local mx=math.max(8,math.min(vw-358,menu.x))
@@ -4223,12 +4244,16 @@ local strategy = (function()
     local lastPayload, lastTerritory = {}, {}
     local mode, cls, team, selectedCorridor = 1, 0, -1, nil
     local side=nil
+    local heat=true
+    local territoryOpacity=.28
+    local zoneColours={[2]={1,.65,.1},[3]={1,.15,.15},[4]={.8,.3,1}}
     local modes = {"Overview", "Territory", "Commander", "Diagnostics"}
     local classes = {[0]="Vehicle", "Bot", "Amphibious", "Hover", "All-terrain", "Ship", "Sub"}
     -- Lane query classes differ from the field's class enum.
     local laneClass = {[0]=0, [1]=1, [2]=2, [3]=3, [4]=4, [5]=5}
     local controls, lists, terrainLists, job, inspection = {}, {}, {}, nil, nil
     local terrainKey=""
+    local heatCache={}
     local view, panel, freezeFrame = {}, nil, nil
     local displayTeams={}
     local function split(s, sep)
@@ -4257,6 +4282,19 @@ local strategy = (function()
         end
         return out
     end
+    local function front(s)
+        local parts=split(s or "","|")
+        local stamp=tonumber(parts[1]);local zones={}
+        if not stamp or stamp<0 or #parts>129 then return nil end
+        local last=0
+        for i=2,#parts do
+            local n=numbers(parts[i])
+            if not n or #n~=3 or n[1]<last or n[2]<=n[1] or n[2]>1000000
+                or n[3]<0 or n[3]>4 or n[3]~=math.floor(n[3]) then return nil end
+            zones[#zones+1]=n;last=n[2]
+        end
+        return {frame=stamp,zones=zones}
+    end
     local function receive(id,payload)
         if not isPermittedTeam(id) or #payload>150000 or lastPayload[id]==payload then return false end
         local f=split(payload,";")
@@ -4274,14 +4312,27 @@ local strategy = (function()
         if side==nil then side=ally end
         live[id]={team=id,ally=ally,frame=frame,assignment=assignment,class=laneClass[class],corridor=corridor,rank=rank,count=count,
             pos=pos,progress=tonumber(f[9]) or -1,help=help,request=tonumber(f[11]) or -1,fieldRevision=f[12],
-            route=route(f[13]),proposal=route(f[14]),samples=samples,native=numbers(f[16] or ""),status=f[17] or "legacy snapshot",proposalStatus=f[18] or "unknown"}
+            route=route(f[13]),proposal=route(f[14]),samples=samples,native=numbers(f[16] or ""),status=f[17] or "legacy snapshot",proposalStatus=f[18] or "unknown",front=front(f[19]),defense=string.sub(f[20] or "unavailable",1,180)}
         lastPayload[id]=payload;revision=revision+1
+        return true
+    end
+    local function receiveFront(id,payload)
+        if not isPermittedTeam(id) or #payload>12000 then return false end
+        local f=split(payload,";");local s=live[id]
+        if #f~=2 or not s or tonumber(f[1])~=s.assignment then return false end
+        local value=front(f[2])
+        if not value or (s.front and value.frame<=s.front.frame) then return false end
+        -- Copy the record: Freeze owns the preceding immutable table.
+        local copy={};for k,v in pairs(s) do copy[k]=v end
+        copy.front=value;live[id]=copy;revision=revision+1
         return true
     end
     local function invalidate() built=-1 end
     local function clearLists()
         for _,id in ipairs(lists) do gl.DeleteList(id) end
         for _,id in ipairs(terrainLists) do gl.DeleteList(id) end
+        for _,entry in pairs(heatCache) do gl.DeleteList(entry.id) end
+        heatCache={}
         lists={};terrainLists={};terrainKey="";job=nil
     end
     local function colour(id,alpha)
@@ -4306,6 +4357,104 @@ local strategy = (function()
     local function cross(x,z,r)
         gl.BeginEnd(GL.LINES,function() vertex(x-r,z);vertex(x+r,z);vertex(x,z-r);vertex(x,z+r) end)
     end
+    -- Sparse categorical heat cells, not an enemy-density estimate. Rebuilt only
+    -- with publication/filter changes in Update; DrawWorld only calls lists.
+    -- At most 128x128 map cells per team; overlapping samples keep the strongest
+    -- category instead of accumulating opacity. Route sampling scales with length.
+    local function drawHeat(s,m)
+        if not heat or not s.front then return end
+        local cell=math.max(96,math.max(Game.mapSizeX,Game.mapSizeZ)/128)
+        local gw=math.ceil(Game.mapSizeX/cell)
+        local corridor=m.corridors[s.corridor]
+        local radius=math.max(cell,math.min(384,(corridor and corridor.width or 512)*.5))
+        local length=0
+        for i=2,#s.route do
+            local a,b=s.route[i-1],s.route[i]
+            length=length+math.sqrt((b[1]-a[1])^2+(b[2]-a[2])^2)
+        end
+        local step=math.max(cell*.5,length/2048)
+        local cells,keys={},{}
+        local priority={[2]=1,[4]=2,[3]=3}
+        local function stamp(x,z,kind)
+            local reach=radius+cell*.71
+            for gz=math.max(0,math.floor((z-reach)/cell)),math.min(math.ceil(Game.mapSizeZ/cell)-1,math.floor((z+reach)/cell)) do
+                for gx=math.max(0,math.floor((x-reach)/cell)),math.min(gw-1,math.floor((x+reach)/cell)) do
+                    local distance=math.sqrt(((gx+.5)*cell-x)^2+((gz+.5)*cell-z)^2)
+                    if distance<reach then
+                        local weight=math.max(.12,1-distance/reach)
+                        local key=gz*gw+gx;local old=cells[key]
+                        if not old then keys[#keys+1]=key end
+                        if not old or priority[kind]>priority[old.kind] then
+                            cells[key]={x=gx*cell,z=gz*cell,kind=kind,weight=weight}
+                        elseif old.kind==kind then old.weight=math.max(old.weight,weight) end
+                    end
+                end
+            end
+        end
+        local zi,progress=1,0
+        for i=2,#s.route do
+            local a,b=s.route[i-1],s.route[i]
+            local dx,dz=b[1]-a[1],b[2]-a[2];local len=math.sqrt(dx*dx+dz*dz)
+            local finish=progress+len
+            while s.front.zones[zi] and s.front.zones[zi][2]<=progress do zi=zi+1 end
+            local j=zi
+            while len>0 and s.front.zones[j] and s.front.zones[j][1]<finish do
+                local zone=s.front.zones[j]
+                local lo,hi=math.max(progress,zone[1]),math.min(finish,zone[2])
+                if zone[3]>=2 and hi>lo then
+                    local count=math.max(1,math.ceil((hi-lo)/step))
+                    for k=0,count do
+                        local t=(lo+(hi-lo)*k/count-progress)/len
+                        stamp(a[1]+dx*t,a[2]+dz*t,zone[3])
+                    end
+                end
+                if zone[2]>=finish then break end
+                j=j+1
+            end
+            zi=j;progress=finish
+        end
+        gl.BeginEnd(GL.QUADS,function()
+            for _,key in ipairs(keys) do
+                local q=cells[key];local c=zoneColours[q.kind]
+                if s.frontStale then gl.Color(.55,.58,.62,.12+q.weight*.12)
+                else gl.Color(c[1],c[2],c[3],.12+q.weight*.42) end
+                local right,bottom=math.min(Game.mapSizeX,q.x+cell),math.min(Game.mapSizeZ,q.z+cell)
+                vertex(q.x,q.z);vertex(right,q.z);vertex(right,bottom);vertex(q.x,bottom)
+            end
+        end)
+    end
+    local function drawFront(s)
+        if not s.front then return end
+        -- Both intervals and route segments are ordered: sweep once, O(P+Z),
+        -- rather than projecting every zone over the entire polyline.
+        local zones=s.front.zones
+        local zi,progress=1,0
+        for i=2,#s.route do
+            local a,b=s.route[i-1],s.route[i]
+            local dx,dz=b[1]-a[1],b[2]-a[2];local len=math.sqrt(dx*dx+dz*dz)
+            local finish=progress+len
+            while zones[zi] and zones[zi][2]<=progress do zi=zi+1 end
+            local j=zi
+            while len>0 and zones[j] and zones[j][1]<finish do
+                local zone=zones[j];local kind=zone[3]
+                local lo,hi=math.max(zone[1],progress),math.min(zone[2],finish)
+                if kind>=2 and hi>lo then
+                    if s.frontStale then gl.Color(.6,.6,.6,.45)
+                    elseif kind==3 then gl.Color(1,.15,.15,.85)
+                    elseif kind==2 then gl.Color(1,.65,.1,.8)
+                    else gl.Color(.8,.3,1,.7) end
+                    gl.LineWidth(kind==3 and 12 or 8)
+                    local u,v=(lo-progress)/len,(hi-progress)/len
+                    local points={{a[1]+dx*u,a[2]+dz*u},{a[1]+dx*v,a[2]+dz*v}}
+                    line(points,kind~=3 or s.frontStale)
+                    if kind==3 and not s.frontStale then cross((points[1][1]+points[2][1])*.5,(points[1][2]+points[2][2])*.5,45) end
+                end
+                if zone[2]>=finish then break end
+                j=j+1
+            end
+            zi=j;progress=finish
+        end
+    end
     local function at(runs,cell)
         local lo,hi=1,#(runs or {})
         while lo<=hi do
@@ -4318,7 +4467,7 @@ local strategy = (function()
         local out={}
         local m=field.Model()
         for id,s in pairs(frozen or live) do
-            if isPermittedTeam(id) and (not m or not m.corridorRevision or s.fieldRevision==m.corridorRevision) and (side==nil or side<0 or side==s.ally) and (team<0 or team==id) and s.class==cls then out[#out+1]=s end
+            if isPermittedTeam(id) and (not m or not m.corridorRevision or s.fieldRevision==m.corridorRevision) and (side==nil or side<0 or side==s.ally) and (team<0 or team==id) and s.class==cls and (not selectedCorridor or s.corridor==selectedCorridor) then out[#out+1]=s end
         end
         table.sort(out,function(a,b)return a.team<b.team end)
         return out
@@ -4349,7 +4498,7 @@ local strategy = (function()
                         gl.BeginEnd(GL.QUADS,function()
                             for _,q in ipairs(batch) do
                                 local own=owners[q[5]];local id=own and own[1] or -1
-                                if own and #own>1 then gl.Color(1,.62,.12,.25) else colour(id,own and .16 or .045) end
+                                if own and #own>1 then gl.Color(1,.62,.12,math.min(.65,territoryOpacity+.12)) else colour(id,own and territoryOpacity or .06) end
                                 vertex(q[1],q[2]);vertex(q[3],q[2]);vertex(q[3],q[4]);vertex(q[1],q[4])
                             end
                         end)
@@ -4375,7 +4524,7 @@ local strategy = (function()
                     terrainLists[#terrainLists+1]=gl.CreateList(function()
                         local own=owners[id];colour(own and own[1],.65)
                         local points={};for _,p in ipairs(c.spine) do points[#points+1]={p[1],p[2]} end
-                        line(points,false);cross(c.x,c.z,40)
+                        gl.LineWidth(2);line(points,false);cross(c.x,c.z,40);gl.LineWidth(1)
                     end)
                     coroutine.yield()
                 end
@@ -4409,8 +4558,21 @@ local strategy = (function()
                 end
             end
             for _,s in ipairs(view) do
+                -- Frame stamps alone do not change geometry. Keep the heat list
+                -- across 1 Hz publications when route, bands and freshness agree.
+                local parts={tostring(heat),tostring(s.frontStale or false),tostring(s.corridor)}
+                for _,p in ipairs(s.route) do parts[#parts+1]=p[1]..","..p[2] end
+                parts[#parts+1]="zones"
+                for _,z in ipairs(s.front and s.front.zones or {}) do parts[#parts+1]=table.concat(z,",") end
+                local key=table.concat(parts,";")
+                local cached=heatCache[s.team]
+                if not cached or cached.key~=key then
+                    if cached then gl.DeleteList(cached.id) end
+                    heatCache[s.team]={key=key,id=gl.CreateList(function()drawHeat(s,m)end)}
+                end
                 lists[#lists+1]=gl.CreateList(function()
-                    colour(s.team,1);gl.LineWidth(3);line(s.route,false)
+                    colour(s.team,.75);gl.LineWidth(2);line(s.route,false)
+                    drawFront(s)
                     if s.help[1]>=0 then gl.Color(1,.74,.25,.9);gl.LineWidth(2);line(s.proposal,true) end
                     if s.pos[1]>=0 then colour(s.team,1);cross(s.pos[1],s.pos[2],75) end
                     if mode==3 and s.native and #s.native>=10 and s.native[8]>=0 then
@@ -4429,6 +4591,15 @@ local strategy = (function()
     end
     local function update()
         if not show then return end
+        if not frozen then
+            for id,s in pairs(live) do
+                local stale=s.front and Spring.GetGameFrame()-s.front.frame>90 or false
+                if stale~=(s.frontStale or false) then
+                    local copy={};for k,v in pairs(s) do copy[k]=v end
+                    copy.frontStale=stale;live[id]=copy;revision=revision+1
+                end
+            end
+        end
         for id in pairs(displayTeams) do if not isPermittedTeam(id) then invalidate();break end end
         local m=field.Model();if not m then return end
         if built<0 or modelSeen~=m or (not frozen and built~=revision and not job) then prepare(m) end
@@ -4447,6 +4618,7 @@ local strategy = (function()
         for id in pairs(displayTeams) do if not isPermittedTeam(id) then clearLists();invalidate();return end end
         gl.DepthTest(false)
         for _,id in ipairs(terrainLists) do gl.CallList(id) end
+        for _,s in ipairs(view) do local entry=heatCache[s.team];if entry then gl.CallList(entry.id) end end
         for _,id in ipairs(lists) do gl.CallList(id) end
         gl.LineWidth(1);gl.Color(1,1,1,1);gl.DepthTest(true)
     end
@@ -4455,25 +4627,36 @@ local strategy = (function()
         if not show or Spring.IsGUIHidden() then return end
         for id in pairs(displayTeams) do if not isPermittedTeam(id) then invalidate();return end end
         controls={}
-        local sx,sy=gl.GetViewSizes();local w=math.min(480,sx-24);local x,y=12,sy-54
+        local sx,sy=gl.GetViewSizes();local w,h=560,520
+        local scale=dialogUI.Scale(sx,sy,w,h)
+        sx,sy=sx/scale,sy/scale
+        local x,y=12,sy-42
+        gl.PushMatrix();gl.Scale(scale,scale,1)
         -- Dock below a top-left minimap instead of drawing underneath it.
         if Spring.GetMiniMapGeometry then
             local mx,my,mw,mh=Spring.GetMiniMapGeometry()
-            if mx and x<mx+mw and x+w>mx and y+30>my and y-330<my+mh then
-                if my>=372 then y=my-42 else x=math.min(sx-w-12,mx+mw+12) end
+            if mx then mx,my,mw,mh=mx/scale,my/scale,mw/scale,mh/scale end
+            if mx and x<mx+mw and x+w>mx and y+30>my and y-(h-30)<my+mh then
+                if my>=h+12 then y=my-42 else x=math.min(sx-w-12,mx+mw+12) end
             end
         end
-        panel={x,y-330,x+w,y+30};gl.Color(.025,.04,.06,.95);gl.Rect(unpack(panel));gl.Color(1,1,1,1)
-        gl.Text("Strategy inspection",x+12,y+10,16,"o")
+        x=math.max(12,math.min(sx-w-12,x));y=math.max(h-18,math.min(sy-42,y))
+        panel={x,y-(h-30),x+w,y+30};gl.Color(.025,.04,.06,.95);gl.Rect(unpack(panel));gl.Color(1,1,1,1)
+        gl.Text("Battlefield overview",x+12,y+10,17,"o")
         local function button(label,bx,by,bw,action,active)
-            local r={bx,by,bx+bw,by+30,action};controls[#controls+1]=r
-            gl.Color(active and .16 or .075,active and .32 or .12,.2,1);gl.Rect(bx,by,bx+bw,by+30)
-            gl.Color(1,1,1,1);gl.Text(label,bx+7,by+9,11,"o")
+            local r={bx,by,bx+bw,by+30,action,label=label};controls[#controls+1]=r
+            local mx,my
+            if Spring.GetMouseState then mx,my=Spring.GetMouseState();mx,my=mx/scale,my/scale end
+            local hover=mx and inside(mx,my,r)
+            gl.Color(active and .16 or (hover and .15 or .075),active and .32 or (hover and .22 or .12),active and .4 or .2,1);gl.Rect(bx,by,bx+bw,by+30)
+            if active then gl.Color(.55,.84,1,1);gl.Rect(bx,by,bx+bw,by+2) end
+            gl.Color(1,1,1,1);gl.Text(dialogUI.Fit(label,12,bw-14),bx+7,by+9,12,"o")
         end
+        button(heat and "Heatmap ON" or "Heatmap OFF",x+w-126,y,114,function()heat=not heat;invalidate()end,heat)
         local bw=(w-24)/4
         for i,label in ipairs(modes) do button(label,x+12+(i-1)*bw,y-34,bw-3,function()mode=i;invalidate()end,mode==i) end
         button(classes[cls].." >",x+12,y-70,125,function()cls=(cls+1)%7;selectedCorridor=nil;inspection=nil;invalidate()end)
-        button(team<0 and "All FRONT teams >" or "Team "..team.." >",x+143,y-70,125,function()
+        button(team<0 and "All teams >" or "Team "..team.." >",x+143,y-70,125,function()
             local ids={};for id in pairs(frozen or live) do if isPermittedTeam(id) and (side==nil or side<0 or (frozen or live)[id].ally==side) then ids[#ids+1]=id end end;table.sort(ids)
             local nextId=-1;for _,id in ipairs(ids) do if id>team then nextId=id;break end end;team=nextId;invalidate()
         end)
@@ -4489,15 +4672,30 @@ local strategy = (function()
             if frozen then frozen=nil;frozenTerritory=nil;freezeFrame=nil else frozen={};for id,s in pairs(live) do frozen[id]=s end;frozenTerritory={};for id,s in pairs(territory.Snapshot()) do frozenTerritory[id]=s end;freezeFrame=Spring.GetGameFrame() end;invalidate()
         end,frozen~=nil)
         button(inspect and "Inspect ON" or "Inspect map",x+128,y-106,120,function()inspect=not inspect end,inspect)
-        button("Reset filters",x+254,y-106,115,function()team=-1;cls=0;mode=1;selectedCorridor=nil;inspection=nil;invalidate()end)
+        button("Reset filters",x+254,y-106,115,function()team=-1;side=-1;cls=0;mode=1;selectedCorridor=nil;inspection=nil;invalidate()end)
         local now=Spring.GetGameFrame();local oldest=now
         for _,s in ipairs(view) do oldest=math.min(oldest,s.frame) end
-        local function text(t) y=y-18;gl.Color(.85,.9,.94,1);gl.Text(t,x+12,y,11,"o") end
+        button("Territory: "..math.floor(territoryOpacity*100).."%",x+w-170,y-106,158,function()
+            territoryOpacity=territoryOpacity>=.45 and .16 or territoryOpacity+.12;terrainKey="";invalidate()
+        end)
+        local function text(t) y=y-21;gl.Color(.85,.9,.94,1);gl.Text(dialogUI.Fit(t,13,w-24),x+12,y,13,"o") end
         y=y-116
         text((frozen and "FROZEN  " or (now-oldest>900 and "STALE  " or "LIVE  "))..(#view==0 and "Waiting for FRONT snapshots" or string.format("%d team(s) | oldest %.0fs old",#view,math.max(0,now-oldest)/30))..(job and " | preparing" or ""))
-        text("Fill = assigned responsibility, not physical control. Orange = shared.")
+        local legendY=y-36;local legendW=(w-24)/4
+        local labels={"Active combat","Contact","Enemy reach","Stale evidence"}
+        local colours={zoneColours[3],zoneColours[2],zoneColours[4],{.55,.58,.62}}
+        for i,label in ipairs(labels) do
+            local bx=x+12+(i-1)*legendW;local c=colours[i]
+            gl.Color(c[1],c[2],c[3],.28);gl.Rect(bx,legendY,bx+legendW-4,legendY+28)
+            gl.Color(c[1],c[2],c[3],1);gl.Rect(bx,legendY,bx+3,legendY+28)
+            gl.Color(1,1,1,1);gl.Text(label,bx+7,legendY+9,12,"o")
+        end
+        y=legendY-4
+        text("Heat = assessed lane zones; colour is evidence, not enemy count.")
+        text("Team-coloured areas = assigned lanes. Orange = shared assignment.")
         text(mode==2 and "Mex + = current policy owner. Pink diamond = differs from lane assignment." or "Solid = commander route. Dashed amber = proposal only. + = choke/position.")
-        text("Terrain: initial map; physical control unknown. Threat: AI observations only.")
+
+        text("Terrain = map geometry. Threats = observed or remembered enemies.")
         local m=field.Model()
         if not m then text(field.Status())
         elseif inspection then
@@ -4507,13 +4705,18 @@ local strategy = (function()
         else text("Enable Inspect map, then click terrain to isolate a corridor.") end
         local s=view[1]
         if s then
+            text(s.front and string.format("Assessment %.0fs old; contacts may be remembered",math.max(0,now-s.front.frame)/30) or "Front evidence unavailable")
             text(string.format("Team %d | r%d | seat %d/%d | %.0f elmos | %s",s.team,s.assignment,s.rank+1,s.count,s.progress,s.status))
             if s.native and #s.native>=10 and s.native[1]>=0 then
                 local n=s.native
                 text(string.format("Screens %d | bound %.0f | %s | decision %.0fs old",n[3],n[5],n[7]==1 and "return-home latch" or (n[10]==1 and "working" or "front active"),math.max(0,now-n[1])/30))
             else text("Commander front decision: not available yet (opening or inactive).") end
+            text("Defense: "..(s.defense or "unavailable"))
             text(s.help[1]>=0 and ("ADVISORY: assist team "..s.help[1]..(s.help[3]==1 and " (income-loss suspect)" or " (pressure)")) or ("Proposal: "..s.proposalStatus..". Other units keep existing behavior."))
         end
+        gl.PopMatrix()
+        for _,r in ipairs(controls) do for i=1,4 do r[i]=r[i]*scale end end
+        for i=1,4 do panel[i]=panel[i]*scale end
         gl.Color(1,1,1,1)
     end
     local function mousePress(x,y,button,blocked)
@@ -4530,18 +4733,35 @@ local strategy = (function()
         inspection={corridor=corridor,clearance=at(m.clearanceRuns[cls],cell)}
         selectedCorridor=corridor and corridor>=0 and corridor or nil;invalidate();return true
     end
-    return {Receive=receive,TerritoryChanged=function(id,payload)if lastTerritory[id]~=payload then lastTerritory[id]=payload;revision=revision+1 end end,Update=update,DrawWorld=drawWorld,DrawScreen=drawScreen,MousePress=mousePress,
+    return {Receive=receive,ReceiveFront=receiveFront,TerritoryChanged=function(id,payload)if lastTerritory[id]~=payload then lastTerritory[id]=payload;revision=revision+1 end end,Update=update,DrawWorld=drawWorld,DrawScreen=drawScreen,MousePress=mousePress,
+        PanelRect=function()return panel end,
+        ButtonRect=function(label) for _,r in ipairs(controls) do if r.label==label then return {r[1],r[2],r[3],r[4]} end end end,
         Mode=function()return show end,Set=function(v)show=v==true;invalidate();if not show then clearLists() end end,
         Shutdown=clearLists,Snapshot=function()return {teams=snapshot(),mode=mode,class=cls,side=side,frozen=frozen~=nil,preparing=job~=nil,ready=field.Model()~=nil and built>=0 and job==nil,terrainLists=#terrainLists,dynamicLists=#lists,status=field.Status()}end,
         TextCommand=function(cmd) if cmd=="barbstrategy" then show=not show;invalidate();if not show then clearLists() end;return true end return false end,
-        At=at,GetConfig=function()return {show=show,class=cls,mode=mode,side=side}end,
-        Config=function(c)if type(c)=="table" then if c.side~=nil then side=math.floor(tonumber(c.side) or -1) end;show=c.show==true;cls=math.floor(math.max(0,math.min(6,tonumber(c.class) or 0)));mode=math.floor(math.max(1,math.min(4,tonumber(c.mode) or 1)));invalidate();if not show then clearLists() end end end}
+        At=at,GetConfig=function()return {show=show,class=cls,mode=mode,side=side,heat=heat,territoryOpacity=territoryOpacity}end,
+        Config=function(c)if type(c)=="table" then heat=c.heat~=false;if type(c.territoryOpacity)=="number" and c.territoryOpacity==c.territoryOpacity then territoryOpacity=math.max(.12,math.min(.6,c.territoryOpacity)) end;if c.side~=nil then side=math.floor(tonumber(c.side) or -1) end;terrainKey="";show=c.show==true;cls=math.floor(math.max(0,math.min(6,tonumber(c.class) or 0)));mode=math.floor(math.max(1,math.min(4,tonumber(c.mode) or 1)));invalidate();if not show then clearLists() end end end}
 end)()
 -- END STRATEGY MODULE
 function widget:ViewResize(newX, newY)
 	vsx, vsy = newX, newY
 	initFlowUI()
 	updatePlacement()
+end
+
+-- BAR's public notification, not spectator LOS or hidden projectile reads.
+-- Spectator alerts lack an unambiguous enemy side, so never relay them.
+-- The gadget emits NukeLaunched only to players outside the launcher's allyteam.
+local lastNuclearWarning=-100000
+function widget:NotificationEvent(message)
+    local recipient=type(message)=="string" and message:match("^NukeLaunched (%d+)$")
+    if not recipient or isSpectator() or tonumber(recipient)~=spGetMyPlayerID() then return end
+    local frame=Spring.GetGameFrame()
+    if frame==lastNuclearWarning then return end
+    lastNuclearWarning=frame
+    for _,id in ipairs(aiOrder) do
+        if mayCommand(id) then spSendSkirmishAIMessage(id,"barb|nuclear-warning|"..id) end
+    end
 end
 
 local theatrePending = {}
@@ -4939,6 +5159,8 @@ local function onAIMessage(aiTeam, dataStr)
 		addEvent(string.format("Team %d sea assist: %s", sender, rest), "info")
 	elseif topic == "sealanes" and sender == aiTeam then
 		seaLanes.Receive(sender, table.concat(p, "|", 5))
+	elseif topic == "lane_front" and sender == aiTeam then
+        strategy.ReceiveFront(sender, table.concat(p, "|", 5))
 	elseif topic == "strategy" and sender == aiTeam then
         strategy.Receive(sender, table.concat(p, "|", 5))
 	elseif topic == "frontlanes" and sender == aiTeam then

@@ -1,6 +1,23 @@
 // Mono-space font required
 {
 "commander": {
+    "defense": {
+        "enabled": 1, "radius": 1800, "memory": 45, "strategic_memory": 600,
+        "heavy_metal": 1200, "heavy_health": 4000, "baseline_health": 1000,
+        "stable_seconds": 60, "stable_distance": 160,
+        // Gates are admission policy, not a claim of optimal PvP thresholds.
+        // Full project funding + operating energy + readiness still apply.
+        "rules": {
+            "light": {"metal": 0, "energy": 0, "limit": 2},
+            "hlt": {"metal": 20, "energy": 500, "limit": 3},
+            "t2": {"metal": 50, "energy": 1000, "seconds": 90, "limit": 4},
+            "heavy": {"metal": 120, "energy": 2500, "seconds": 120, "value_ratio": 0.75, "limit": 3},
+            "artillery": {"metal": 120, "energy": 2500, "seconds": 120, "limit": 3},
+            "lrpc": {"metal": 200, "energy": 5000, "seconds": 240, "value_ratio": 1, "limit": 2},
+            "antinuke": {"metal": 50, "energy": 1000, "seconds": 240, "limit": 2},
+            "shield": {"metal": 100, "energy": 2500, "seconds": 150, "limit": 2}
+        }
+    },
 	// Shared commander micro; role policy supplies advance and operating leash.
 	"combat": {
 		"enabled": 1, "scan": 1000, "support": 600,
@@ -9,7 +26,6 @@
 		"step": 80, "max_approach": 180, "max_seconds": 12,
 		"align_seconds": 0.6, "shots": 2, "margin": 150,
 		"cloak_seconds": 1.5, "escape_seconds": 4.3,
-		"fog_cloak_distance": 600, "fog_cloak_income": 500,
 		"friendly_margin": 12, "front_workers": 2,
 		// Persistent FRONT lane duty after the opener. No riot/time home latch.
 		// Cross-lane LLTs start when unseen ground is within front_line_fog elmos
@@ -18,9 +34,26 @@
 		// Jam safety accepts combat risk; heavy T2 means mobile combat metal >=900.
 		"front_distance": 6000,
 		"front_persistent": 1,
+        "commander_group_combat_distance": 1000,
+        "commander_group_combat_memory": 30,
+        "commander_group_radius": 600,
+        "commander_group_maintenance": 1,
+        "commander_group_line_review_seconds": 5,
+        "commander_group_project_hold_seconds": 30,
+        "commander_group_t2_metal": 50,
+        "commander_group_t2_energy": 1000,
+        "commander_group_second_t2_metal": 120,
+        "commander_group_second_t2_energy": 2500,
+        "commander_group_third_t2_metal": 240,
+        "commander_group_third_t2_energy": 5000,
 		"commander_group_income": 20,
 		"commander_group_jammer_edge": 100,
 		"commander_group_jammer_income": 25,
+		"commander_group_defence_metal": 50,
+		"commander_group_defence_energy": 1000,
+		"commander_group_budget_seconds": 30,
+		"commander_group_budget_fraction": 0.25,
+		"commander_group_mex_upgrade": 1,
 		"health_retreat": 0.4,
 		"health_shot_seconds": 2,
 		"front_mex_los": 1,
@@ -60,7 +93,7 @@
 		// the commander (members within group_radius) is worth >= metal inside
 		// range_scale x its weapon range. Per AI: CommanderCombat::Override().
 		"fallback": 1, "fallback_metal": 400, "fallback_range_scale": 2, "fallback_group_radius": 400,
-		"fallback_offset": 120, "fallback_search": 2000, "fallback_hold_seconds": 3, "fallback_porc_range": 1500, "sensor_memory": 10,
+		"fallback_offset": 120, "fallback_search": 2000, "fallback_prepare_seconds": 4, "fallback_hold_seconds": 3, "fallback_porc_range": 1500, "sensor_memory": 10,
 		// D-294: T3 engagement from the line; t3_profiles overrides the plan per unit.
 		"t3_leash": 900, "t3_hold_seconds": 4, "t3_dodge_seconds": 1.2, "t3_hunt_leash": 1800, "t3_screen": 300,
 		"t3_hunt": 0, "t3_artillery_approach": 180, "t3_trade": 0, "t3_retry_seconds": 1, "t3_cloaked_volley_risk": 0.25,

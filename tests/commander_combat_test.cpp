@@ -1,5 +1,5 @@
-#include "terrain/CommanderCombat.h"
-#include "terrain/CommanderFortification.h"
+#include "control/kernel/CommanderCombat.h"
+#include "control/kernel/CommanderFortification.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>

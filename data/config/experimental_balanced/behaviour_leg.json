@@ -13,6 +13,7 @@
 		"behaviour": {
 			"legcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,

@@ -208,6 +208,13 @@ public:
 	bool SetLayoutEnabled(bool enabled);
 	bool IsLayoutEnabled() const { return layoutEnabled; }
 	bool IsLayoutConfigured() const { return layoutConfigured; }
+    // Ordinary-placement participation, independent of planned-layout policy.
+    void SetBuildSiteReservations(bool enabled);
+    bool ReserveBuildSite(int& claim, CCircuitDef* def, const springai::AIFloat3& pos, int facing);
+    void ReleaseBuildSite(int& claim);
+    void ObserveBuildStructure(CCircuitUnit* unit);
+    void ForgetBuildStructure(int unitId);
+    bool buildSiteReservations = false;
 	struct SZone {
 		int id;
 		int2 c1, c2;   // cell rectangle [c1, c2)

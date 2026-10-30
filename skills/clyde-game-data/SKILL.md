@@ -183,7 +183,7 @@ Folder `<YYYYMMDD-HHMMSS>Z_bar-lobbies.clyde_<map>_<id8>/`. A folder without
 
 | Path | What |
 | --- | --- |
-| `manifest.json` | `ai` (`channel`, `release` = the tag that played), `outcome`, `winningAllyTeams` (AIs are ally team 1), `gameSeconds`, `humans`, `host.engineExit` (0 = clean), `lag`, `load`, `teams` (per-team end stats: metal, damage, units) |
+| `manifest.json` | `ai` (`channel`, `release` = the tag that played), `outcome`, `winningAllyTeams` (AIs are ally team 1), `gameSeconds`, `humans`, `host.engineExit` (0 = clean), `lag`, `load`, `teams` (per-team end stats: metal, damage, units); `profile` (from the engine's game-end profiler table in the infolog, games archived from 2026-10-27 on: `simS`, `aiS`, `aiPctOfSim`, `aiByTeamS`, `drawS`, `luaCallinsS`, `profilerS`, and every timer in `timers`; `AI` needs the profiler on; empty if the engine never reached game end) |
 | `lobby.json` | the room at the start: `bots` (`name`, `team`, `ally`, `side` 0 Armada / 1 Cortex / 2 Random, `bonus`), `players` with skill, `scriptTags` (mod options), `setup` |
 | `logs/infolog.txt.gz` | the engine log with **every AI line** |
 | `logs/engine-console.log.gz` | engine stdout, nearly the same |

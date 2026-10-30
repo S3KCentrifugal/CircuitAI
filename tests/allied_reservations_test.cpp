@@ -174,7 +174,40 @@ void test_random_mutations_match_brute_force_and_legacy() {
         }
     }
 }
+static void test_ordinary_task_lifecycle() {
+    Reservations r;
+    int task = 0;
+    const Rect a{20,20,24,24}, b{40,40,44,44};
+    Check(r.ClaimTask(1,task,a) && task != 0, "ordinary task claims selected footprint");
+    const auto revision = r.Revision();
+    Check(r.ClaimTask(1,task,a) && revision == r.Revision(), "retry does not mutate index");
+    Check(r.OverlapsOther(2,a) && !r.OverlapsOther(1,a), "ordinary task excludes ally only");
+    for (auto kind : {Reservations::SLOT,Reservations::ZONE,Reservations::EXIT}) {
+        r.Put(2,kind,1,b);
+        Check(!r.ClaimTask(1,task,b), "ordinary task respects every planned exclusion");
+        Check(r.OverlapsOther(2,a), "rejected relocation preserves old claim");
+        r.Erase(2,kind,1);
+    }
+    Check(r.ClaimTask(1,task,b), "relocation succeeds after exclusion released");
+    Check(!r.OverlapsOther(2,a) && r.OverlapsOther(2,b), "relocation frees old site");
+    r.Put(1,Reservations::STRUCTURE,9,b);
+    r.ReleaseTask(1,task);
+    Check(task == 0 && r.OverlapsOther(2,b), "nanoframe survives task cancellation");
+    r.Erase(1,Reservations::STRUCTURE,9);
+    Check(!r.OverlapsOther(2,b), "destroyed structure releases footprint");
+    Check(r.ClaimTask(1,task,a), "released task can claim again");
+    r.Put(1,Reservations::SLOT,3,b);
+    r.RemoveKind(1,Reservations::TASK);
+    Check(!r.OverlapsOther(2,a) && r.OverlapsOther(2,b), "disable ordinary participation preserves plan");
+    r.ReleaseTask(1,task);
+    r.Put(1,Reservations::STRUCTURE,9,a);
+    r.RemoveOwner(1);
+    Check(!r.OverlapsOther(2,a) && !r.OverlapsOther(2,b), "AI teardown releases every kind");
+    int invalid = 0;
+    Check(!r.ClaimTask(1,invalid,{0,0,0,0}) && invalid == 0, "invalid site cannot allocate claim");
+}
 int main() {
+    test_ordinary_task_lifecycle();
     test_foreign_overlap_interior_is_blocked(); test_owner_can_place_inside_own_zone();
     test_touching_edges_leave_no_overlap(); test_cross_bucket_footprint_detects_one_cell_overlap();
     test_replacement_frees_old_ground(); test_releasing_slot_keeps_overlapping_zone();

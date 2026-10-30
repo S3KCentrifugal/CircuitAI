@@ -1,4 +1,4 @@
-#include "terrain/CommanderJammerCoverage.h"
+#include "control/kernel/CommanderJammerCoverage.h"
 #include <cassert>
 #include <iostream>
 using namespace circuit::commander;
