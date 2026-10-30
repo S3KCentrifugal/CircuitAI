@@ -17,7 +17,8 @@ void CCommanderTask::AssignTo(CCircuitUnit* unit) {
     // second command owner. This task owns no generic fighter side sets.
     restored=false;
     oldFire=unit->GetRequestedFireState(); oldMove=unit->GetRequestedMoveState();
-    oldCloak=unit->GetUnit()->IsCloaked();
+    oldCloak=unit->GetUnit()->IsCloaked()
+        && !manager->GetCircuit()->GetCommanderControl()->FogCloak(unit);
     IUnitTask::AssignTo(unit);
 }
 void CCommanderTask::Restore(CCircuitUnit* unit) {
@@ -29,7 +30,7 @@ void CCommanderTask::Restore(CCircuitUnit* unit) {
     TRY_UNIT(manager->GetCircuit(),unit,
         if(restore && unit->GetRequestedFireState()!=oldFire) unit->TrySetFireState(static_cast<CCircuitDef::FireT>(oldFire));
         if(unit->GetRequestedMoveState()!=oldMove) unit->TrySetMoveState(static_cast<CCircuitDef::MoveT>(oldMove));
-        if(restore) unit->CmdCloak(oldCloak);
+        if(restore) unit->CmdCloak(oldCloak || manager->GetCircuit()->GetCommanderControl()->FogCloak(unit));
     )
 }
 void CCommanderTask::Stop(bool done) {
@@ -58,7 +59,8 @@ void CCommanderTask::Resume(CCircuitUnit* unit) {
     // leave the combat escape route running under their restored ownership.
     TRY_UNIT(manager->GetCircuit(),unit,unit->CmdStop();)
     if(previous && !previous->IsDead() && previous->GetManager()==manager
-        && !previous->IsExternalControlled() && previous->CanAssignTo(unit)) {
+        && !previous->IsExternalControlled() && previous->CanAssignTo(unit)
+        && manager->GetCircuit()->GetCommanderControl()->CanResumeFrontTask(unit,previous)) {
         manager->AssignTask(unit,previous);
     } else RemoveAssignee(unit);
 }

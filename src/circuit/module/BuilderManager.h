@@ -211,7 +211,7 @@ namespace TaskB {
 	static inline SServBTask Patrol(IBuilderTask::Priority priority,
 			const springai::AIFloat3& position, int timeout)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::PATROL;
 		ti.priority = priority;
 		ti.position = position;
@@ -221,7 +221,7 @@ namespace TaskB {
 	static inline SServBTask Guard(IBuilderTask::Priority priority,
 			CCircuitUnit* target, bool isInterrupt, int timeout = ASSIGN_TIMEOUT)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::GUARD;
 		ti.priority = priority;
 		ti.target = target;
@@ -231,14 +231,14 @@ namespace TaskB {
 	}
 	static inline SServBTask Combat(float powerMod)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::COMBAT;
 		ti.powerMod = powerMod;
 		return ti;
 	}
 	static inline SServBTask Wait(int timeout)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::WAIT;
 		ti.timeout = timeout;
 		return ti;
@@ -292,7 +292,7 @@ public:
 	void InitHandlers();
 private:
 	void ReadConfig();
-	void Init();
+	void InitBuilder();
 
 public:
 	virtual int UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder) override;
@@ -306,11 +306,13 @@ public:
 
 	float GetGoalExecTime() const { return goalExecTime; }
 	unsigned int GetWorkerCount() const { return workers.size(); }
+    IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
     CCommanderTask* EnqueueCommander(IUnitTask* previous);
     bool SetCommanderCombatOption(const std::string& name,float value);
     float GetCommanderEnergyReserve() const;
     float GetCommanderEnergyDeficit() const;
     int GetCommanderOperation() const;
+    std::string DescribeCommanderFront(int id) const;
     IUnitTask* CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius);
     bool CommanderFrontAdopt(CCircuitUnit* unit,IUnitTask* task,float reach);
 	void AddBuildPower(CCircuitUnit* unit);

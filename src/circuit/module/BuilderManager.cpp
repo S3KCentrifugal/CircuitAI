@@ -1,3 +1,4 @@
+#include "task/builder/CommanderGroupFollowTask.h"
 /*
  * BuilderManager.cpp
  *
@@ -80,7 +81,7 @@ CBuilderManager::CBuilderManager(CCircuitAI* circuit)
 		, buildPower(.0f)
 		, dangerHysteresis(MAX_TRAVEL_SEC * FRAMES_PER_SEC)
 {
-	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CBuilderManager::Init, this));
+	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CBuilderManager::InitBuilder, this));
 
 	buildTasks.resize(static_cast<IBuilderTask::BT>(IBuilderTask::BuildType::_SIZE_));
 
@@ -481,7 +482,7 @@ void CBuilderManager::ReadConfig()
 	}
 }
 
-void CBuilderManager::Init()
+void CBuilderManager::InitBuilder()
 {
 	CSetupManager::StartFunc subinit = [this](const AIFloat3& pos) {
 		CScheduler* scheduler = circuit->GetScheduler().get();
@@ -614,6 +615,15 @@ int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 	}
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
+        // Completion event, before DoneTask releases/reassigns the builders.
+        // O(assigned builders), no new world scan or recurring callback.
+        if (iter->second->GetBuildType()==IBuilderTask::BuildType::MEX) {
+            for (auto* worker : iter->second->GetAssignees())
+                circuit->GetCommanderControl()->MexFinished(worker,unit);
+            // D-387: a new extractor on an ally's spot goes to that ally
+            // (deferred a frame; upgrades are BuildType::MEXUP, never given).
+            circuit->GetEconomyManager()->MexBuilt(unit);
+        }
 		DoneTask(iter->second);
 	}
 	for (IBuilderTask* task : staleOwners) {
@@ -1221,6 +1231,10 @@ IUnitTask* CBuilderManager::FindMatchingGuard(CCircuitUnit* unit, const TaskB::S
 		? current : nullptr;
 }
 
+IUnitTask* CBuilderManager::EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius) {
+    auto* task=new CCommanderGroupFollowTask(this,leader->GetId(),radius);
+    updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
+}
 CCommanderTask* CBuilderManager::EnqueueCommander(IUnitTask* previous) {
     auto* task=new CCommanderTask(this,previous);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
@@ -1231,6 +1245,7 @@ bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float val
 float CBuilderManager::GetCommanderEnergyReserve() const { return circuit->GetCommanderControl()->GetReserve(); }
 float CBuilderManager::GetCommanderEnergyDeficit() const { return circuit->GetCommanderControl()->GetDeficit(); }
 int CBuilderManager::GetCommanderOperation() const { return circuit->GetCommanderControl()->GetOperation(); }
+std::string CBuilderManager::DescribeCommanderFront(int id) const { return circuit->GetCommanderControl()->DescribeFront(id); }
 IUnitTask* CBuilderManager::CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius) {
     return circuit->GetCommanderControl()->FrontWork(unit,kind,def,radius);
 }

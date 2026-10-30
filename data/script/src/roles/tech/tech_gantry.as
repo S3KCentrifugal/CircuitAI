@@ -30,7 +30,7 @@ namespace TechGantry {
         // the other branch's ten-unit composition or override amphibious policy.
         return ai.GetCircuitDef(UnitHelpers::GetGantrySignatureUnitForSide(Global::AISettings::Side));
     }
-    // D-364: `grossIncome` funds on the 10-second minimum metal income itself. The
+    // D-370: `grossIncome` funds on the 10-second minimum metal income itself. The
     // default subtracts the current usage, which a TECH spending its income never
     // clears (at +1,000 metal and +1,000 usage the net is 0), so the gantry the
     // income step made due could only be funded by a bank above its whole cost.
@@ -52,7 +52,7 @@ namespace TechGantry {
             Global::RoleSettings::Tech::GantryFundingSeconds,
             Global::RoleSettings::Tech::GantryFundingShare, 0.0f);
     }
-    // owner, 2026-10-26: the early checks fund on gross income like D-364 (net income is ~0
+    // owner, 2026-10-26: the early checks fund on gross income like D-370 (net income is ~0
     // for a TECH spending what it earns, so the 175 gantry needed its whole cost banked)
     // owner, 2026-10-25: the t3rush early check funds the gantry alone, not the gantry
     // plus its first T3 unit (played: "bank 4156/37400 metal" held the order 2-3 min past 175)
@@ -477,7 +477,7 @@ namespace TechGantry {
         const string progress = "turrets " + completed + "/" + block + " of " + cluster.slots + (rush ? " (t3rush: not waited for)" : "");
         const bool able = builder.circuitDef.CanBuild(definition)
             && builder.circuitDef.GetBuildSpeed() >= Global::RoleSettings::Tech::GantryMinimumBuilderPower;
-        // D-364 (owner): a gantry the income step made due (one per
+        // D-370 (owner): a gantry the income step made due (one per
         // GantryScaleMetalStep) is ordered as soon as it is funded on that income and
         // this builder can build it; its turret block keeps filling behind it
         // (gantry.support, lab.front) and the turrets assist the frame. Played: the
@@ -545,7 +545,7 @@ namespace TechGantry {
             || !ReachableBattlefield(cluster.pos, cluster.facing)
             || TechChain::NukeRush() || TechChain::nukeFundingSilo >= 0 || TechHeavyRush::Pending())) return Null("early admission: funding, battlefield path or a rush commitment");
         IUnitTask@ task = TechFactories::OrderPinned(builder, Task::BuildType::FACTORY, definition,
-            cluster.labRes, stepFunded ? "gantry (funded by the income step, " + completed + " of " + block + " turrets stand; D-364)"
+            cluster.labRes, stepFunded ? "gantry (funded by the income step, " + completed + " of " + block + " turrets stand; D-370)"
                 : fallback ? "gantry (funded missing-turret-builder fallback)"
                 : completed < block ? "gantry (t3rush: its turrets go up beside the frame)" : "gantry (supported cluster)");
         if (task !is null) {
@@ -589,7 +589,7 @@ namespace TechGantry {
         return false;
     }
     IUnitTask@ SupportWork(CCircuitUnit@ builder) {
-        // D-364: the heavy rush no longer holds the open gantry cluster's turrets either
+        // D-370: the heavy rush no longer holds the open gantry cluster's turrets either
         if (!RecoveryEnabled() || TechChain::NukeRush() || TechChain::nukeFundingSilo >= 0) return null;
         TechFactories::Cluster@ cluster = TechFactories::ExistingGantry();
         if (cluster is null) {
@@ -892,7 +892,7 @@ namespace TechGantryScale {
         lastHave = have; lastOpen = openClusters; lastTurretProgress = AiMax(lastTurretProgress, turretProgress);
         const bool energyOk = Global::RoleSettings::Tech::GantryScaleEnergyFloor <= 0.0f
             || Economy::GetMinEnergyIncomeLast10s() >= Global::RoleSettings::Tech::GantryScaleEnergyFloor;
-        // D-364: only the nuke commitment blocks the step gantry (the chain on its
+        // D-370: only the nuke commitment blocks the step gantry (the chain on its
         // silo, then the bounded first-stockpile window). The heavy rush used to
         // block it too, and its finite batch waits for FRONT recipients it may never
         // get: played, a T3-plan TECH with the heavy strategy rolled sat at a full

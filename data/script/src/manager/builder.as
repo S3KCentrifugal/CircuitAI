@@ -1993,6 +1993,18 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+        // FRONT ownership precedes generic edge/spam/economy providers and
+        // tracking gates. Otherwise they can bypass the role's front ladder.
+        if(Global::AISettings::Role==AiRole::FRONT) {
+            if (FrontConstructors::Eligible(u)) {
+                if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
+                    || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+                if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
+                if (FrontConstructors::Seat(u.id) != 2) return aiBuilderMgr.DefaultMakeTask(u);
+            }
+            IUnitTask@ front=UnitHelpers::IsCommander(u.circuitDef)?CommanderFront::Work(u):CommanderGroup::Work(u);
+            if(front !is null) return front;
+        }
 		IUnitTask@ t = null;
 		GenericHelpers::LogUtil("[BUILDER] AiMakeTask called for builder id=" + u.id, 4);
 		// Finish what you started (D-050). Native re-evaluates a builder's task
@@ -2436,6 +2448,8 @@ namespace Builder {
 			return;
 		}
 
+        if (usage == Unit::UseAs::BUILDER && FrontConstructors::OnAdded(unit)) return;
+
 		// Handle constructor-specific registration
 		int ctorTier = UnitHelpers::GetConstructorTier(cdef);
 		string uname = (cdef is null ? "" : cdef.GetName());
@@ -2794,6 +2808,7 @@ namespace Builder {
 		Team::SeaAssist::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
 		LolCannon::UnitRemoved(unit);
+        FrontConstructors::OnRemoved(unit);
 
 		// Ensure any per-builder task mapping is cleared for this unit
 		ClearBuilderTaskByUnit(unit);

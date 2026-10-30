@@ -4,6 +4,7 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
             uint GeothermalBuilders = 2;
             float GeothermalRadius = 3200.0f;

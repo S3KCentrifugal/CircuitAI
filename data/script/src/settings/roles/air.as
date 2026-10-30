@@ -13,6 +13,7 @@ namespace Air {
             float FirstLabIncomeShare = 0.75f; // leave income and a bank for immediate defence
             bool ContinuousFactoryProduction = true; // refill on completion; funded T2 labs bypass discretionary growth holds
             int MaxProductionBays = 0; // zero: no AIR policy cap; terrain/income/support still gate
+            bool CenteredT2FactorySupport = true; // D-381: split support banks inside the existing reserved bay
             int PlannedT2Bays = 6;
             int PlannedT1Bays = 1;
             int PlannedEcoModules = 4; // one AFUS and eight converter pins each; reservation, not a build order
@@ -28,10 +29,27 @@ namespace Air {
             int ConverterParallel = 3;
             float ConverterDraw = 70.0f;
             float ConverterEnergyReserve = 150.0f;
+            bool FloatingSupportFirst = true; // D-378: funded standing-plant support before discretionary expansion
             int T2NanoSoftLimit = 20;
             int T2ExpansionSupport = 20; // completed turrets per existing T2 air lab; banked metal cannot bypass
             int T1NanoLimit = 5;
-            int OpeningNanoCount = 2; // completed support near the first T1 plant before the opening raid
+            int OpeningNanoCount = 2; // completed support near the first T1 plant before the opening raid, and before the first T2 plant (D-365)
+            // D-365 (owner): the first advanced plant waits while the energy bank sits at
+            // this fraction of storage with income over pull and a converter can still be
+            // placed (transition.convert spends it first); converters keep coming one over
+            // the plan while the energy floats, bounded by income / ConverterDraw.
+            float FloatingEnergyFraction = 0.85f;
+            // D-365 (owner, second report): this many of the first advanced plant's own
+            // bay turrets stand (or are framed) before the plant itself is ordered, so
+            // the turrets build the frame. The bay is reserved first; only the plant's
+            // slot waits. 0 removes the rule.
+            int FirstPlantBayTurrets = 2;
+            // D-366 (owner): AIR scales its energy like SUPPORT (D-359): ordinary fusions,
+            // converters alongside, until the 10-second minimum energy income reaches
+            // this; the advanced fusion only after that. Also the growth milestone
+            // (`air.massBombers`) when it is reached before two advanced fusions stand.
+            // 0 removes the gate.
+            float AdvancedFusionEnergyIncome = 4000.0f;
             bool T1OpeningRaidEnabled = true;
             int T1OpeningBomberMin = 1;
             int T1OpeningBomberMax = 10;
@@ -90,6 +108,39 @@ namespace Air {
             float FusionAccessMinEnergy = 450.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
             float ProductionIncomeShare = 0.65f;
+            // D-368 (owner): production funds growth. A plant's discretionary orders (those
+            // beyond the fighter floor, interception and base response) wait while the metal
+            // bank is under GrowthReserveMetal and the team's pull already exceeds
+            // ProductionIncomeShare of the income. Before the first advanced plant the
+            // reserve is that plant's cost (banked as a player banks it, from
+            // ProductionReserveSeconds with the screen up; played: the T1 plant emptied
+            // the bank between minutes 4 and 8 at twice the income) and the share is
+            // TransitionProductionShare. Played before: the bank sat at 150 of 15,100 for
+            // twenty minutes with one plant, fusions chosen and never affordable.
+            float GrowthReserveMetal = 1500.0f;
+            float TransitionProductionShare = 0.2f;
+            int ProductionReserveSeconds = 4 * 60;
+            // D-368: advanced plants follow the income, as SUPPORT's T2 bot labs do (D-361):
+            // a second at T2PlantSecondMetalIncome of 10-second minimum metal income, another
+            // per T2PlantMetalIncomeStep, up to MaxT2AirPlants; a full metal bank holding a
+            // plant's whole cost admits one more (played: a full 3,000 bank is not one).
+            // Each next plant needs T2PlantExpansionTurrets finished turrets at every
+            // standing plant, completing its twenty-turret bank before expansion,
+            // and PlantBankFraction of its cost banked. INV-243 reports a bank
+            // full PlantOverflowSeconds with fewer plants than the income wants.
+            float T2PlantSecondMetalIncome = 50.0f;
+            float T2PlantMetalIncomeStep = 40.0f;
+            int MaxT2AirPlants = 8;
+            int T2PlantExpansionTurrets = 20;
+            float PlantBankFraction = 0.5f;
+            int PlantOverflowSeconds = 120;
+            // D-368: a plant order that dies without a frame (the engine refused the pinned
+            // site; played: 1,388 orders in six minutes on one bay, every eight frames) is
+            // not repeated within PlantOrderRetrySeconds, and after PlantOrderRetries deaths
+            // its bay is skipped for PlantBayBlockedSeconds so another bay is planned.
+            int PlantOrderRetrySeconds = 20;
+            int PlantOrderRetries = 3;
+            int PlantBayBlockedSeconds = 300;
             float TransitionMinMetal = 50.0f;
             float T1BomberMetalStep = 8.0f;
             int T1BomberCap = 12;
@@ -97,7 +148,7 @@ namespace Air {
             int T1SupportCap = 16;
             float TransitionMinEnergy = 1200.0f;
             int TransitionEarliestSeconds = 8 * 60;
-            // D-362: the first-lab saving hold (transition.save) ends while the metal bank
+            // D-368: the first-lab saving hold (transition.save) ends while the metal bank
             // is floating and holds the funded lab's remaining cost plus this fraction of
             // storage besides: what the hold protects is banked and the rest overflows.
             // Played before the change: 7,300 of 7,300 metal for three minutes at +99
@@ -162,9 +213,19 @@ namespace Air {
             int NavalSupportSearchSeconds = 20;
 
             bool BaseResponseEnabled = true;
+            bool BomberSupportEnabled = true;
+            array<string> BomberSupportDefinitions = {"armthund", "armsb", "armpnix", "corshad", "corsb", "corhurc", "legspbomber", "legphoenix"};
+            float BomberSupportMaxThreat = 1500.0f; // existing strike threat scale
+            array<string> BomberSupportSpotters = {"armkam", "armsaber", "armbrawl", "armblade", "armdfly",
+                "corbw", "corcut", "corape", "corcrwh", "legmos", "legspsurfacegunship", "legspcarrier", "legfort", "legstronghold"};
+
             float BaseResponseRadius = 1800.0f;
             int BaseResponseSearchSeconds = 20;
             int BaseResponseGunships = 20; // one shared reserve, including frames/orders
+            // D-368: while the first advanced plant's cost is being banked (the production
+            // budget unmet) the reserve is BaseResponseMinWave only: played, a Cortex AIR at
+            // +10 metal built 53 Shadows and 36 EMP bats for allied bases over 20 minutes and
+            // had no plant at 28 min.
             int BaseResponseEmpSupport = 4;
             int BaseResponseMinWave = 4;
             int BaseResponseMaxWave = 30;

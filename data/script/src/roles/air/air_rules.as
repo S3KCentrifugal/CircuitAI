@@ -28,10 +28,18 @@ namespace AirRules {
             @t = AirBuild::Assist(u, true);
             if (t !is null) return AirBuild::Record(t, "recovery.assist", u);
         }
+        @t = AirBuild::FloatingSupport(u);
+        if (t !is null) return AirBuild::Record(t, "overflow.production.support", u);
         @t = AirBuild::Resume(u);
         if (t !is null) return AirBuild::Record(t, "project.resume", u);
         @t = AirDefence::MakeTask(u, true);
         if (t !is null) return AirBuild::Record(t, "defence.antinuke", u);
+        // D-365 (owner): once an advanced plant's bay is reserved, its two turrets are
+        // every builder's first job, ahead of the economy rules (played: left to the
+        // plant's own rule they took five minutes while the bank floated); D-368: every
+        // plant's bay, not only the first
+        @t = AirBuild::PendingBayTurrets(u);
+        if (t !is null) return AirBuild::Record(t, "transition.turrets", u);
         // Home spots precede the starter. Recovery never repeats a paid opening.
         if (AirEconomy::t1 + AirEconomy::t2 == 0 && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) == 0) {
             // maxSpots limits native search candidates, not owned extractors.
@@ -78,6 +86,11 @@ namespace AirRules {
         // First access precedes discretionary shared economy/its assists.
         // Later factories retain the twenty-turret gate and capacity policy.
         if (AirEconomy::t2 == 0) {
+            // D-365: floating energy becomes metal before the first advanced plant
+            if (AirEconomy::EnergyFloating()) {
+                @t = AirBuild::Convert(u);
+                if (t !is null) return AirBuild::Record(t, "transition.convert", u);
+            }
             @t = AirBuild::Factory(u, true);
             if (t !is null) return AirBuild::Record(t, "transition.bay", u);
             if (AirEconomy::SavingForFirstLab()) {
@@ -87,7 +100,7 @@ namespace AirRules {
                 if (t !is null) return AirBuild::Record(t, "transition.support", u);
                 @t = AirBuild::Assist(u);
                 if (t !is null) return AirBuild::Record(t, "transition.finish", u);
-                // D-362: the hold only while the bank is under the lab's reserve and the
+                // D-368: the hold only while the bank is under the lab's reserve and the
                 // free fraction; a floating bank falls through to the ordinary rules
                 // (support, conversion, shared growth, the first fusion) and spends.
                 if (!AirEconomy::BankBeyondLab())
@@ -102,6 +115,13 @@ namespace AirRules {
         }
         @t = AirBuild::Convert(u);
         if (t !is null) return AirBuild::Record(t, "mex.phase.convert", u);
+        // D-368 (owner): a surplus buys advanced production capacity before the energy
+        // ladder spends it (SUPPORT's order, D-361): the next plant the income wants,
+        // half its cost banked, turrets first on its bay (transition.turrets above)
+        if (AirEconomy::t2 > 0) {
+            @t = AirBuild::Factory(u, true);
+            if (t !is null) return AirBuild::Record(t, "production.ladder", u);
+        }
         @t = AirGrowth::MakeTask(u);
         if (t !is null) return t;
         @t = AirBuild::FirstFusion(u);

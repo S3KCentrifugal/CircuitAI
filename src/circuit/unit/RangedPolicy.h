@@ -110,6 +110,9 @@ struct RangedPolicy {
     float pokeHealth = ranged_policy_defaults::POKE_HEALTH;
     float pokePressHealth = ranged_policy_defaults::POKE_PRESS_HEALTH;
     float pokePauseSeconds = ranged_policy_defaults::POKE_PAUSE_SECONDS;
+    // fireAtWill is declared below (owner 2026-10-19 spam rules).
+    bool fireInRange = false; // automatic response without changing coordinated movement; alwaysFireAtWill overrides it
+    bool commanderFocus = false; // strict shot priority for a peer-spotted commander
     // Owner 2026-10-19: 0 = off. Armed static defences of this tech level or
     // lower (BAR customparams.techlevel, 1 when absent) are not coverage this
     // hull avoids: it picks firing sites, paths and stays inside their reach

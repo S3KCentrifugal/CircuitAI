@@ -64,14 +64,54 @@ AIFloat3 CCommanderControl::FrontPosition(CCircuitUnit* unit,State& s,int frame)
             advance=std::max(advance,std::min(limit,furthestAny-100.f));
             s.pushBound=-1;
         }
+        // Unscreened pushes may bridge an unreachable coarse sector up to
+        // front_distance; screened pushes retain the screen-derived bound.
+        float reachableBound=options.frontPushAhead>0
+            ?std::min(limit,options.frontPushScreen>0?std::min(options.frontDistance,s.pushBound):options.frontDistance)
+            :advance;
         // Cached observed enemy groups, not hidden enemy positions. An edge
         // threat within this corridor arrests its own commander's advance.
         for(const auto& group:ai->GetEnemyManager()->GetEnemyGroups())
-            if(battle->GetFrontLaneDistance(group.pos)<=battle->GetFrontLaneWidth())
-                advance=std::min(advance,std::max(0.f,battle->GetFrontLaneProgress(group.pos)-options.frontStandoff));
+            if(battle->GetFrontLaneDistance(group.pos)<=battle->GetFrontLaneWidth()) {
+                const float boundary=std::max(0.f,battle->GetFrontLaneProgress(group.pos)-options.frontStandoff);
+                advance=std::min(advance,boundary);reachableBound=std::min(reachableBound,boundary);
+            }
+        // Enemy groups behind the commander may stop a push, but must not
+        // turn ordinary deployment into a trip home. Combat owns withdrawals.
+        if(options.frontPersistent>0) { advance=std::max(own,advance);reachableBound=std::max(own,reachableBound); }
         auto anchor=battle->GetFrontLanePoint(advance);
         anchor.y=ai->GetMap()->GetElevationAt(anchor.x,anchor.z);
-        if(!OnMap(anchor) || !ai->GetTerrainManager()->CanReachAt(unit,anchor,64)
+        // A corridor point can fall in a coarse terrain sector this commander
+        // cannot enter. Keeping an already-arrived old anchor then stalls every
+        // future deployment. Probe three earlier and three later points inside
+        // the SAME safety bound;
+        // this is endpoint admission, not a path solve or permission to pass a
+        // threat/screen boundary. At most six extra queries per second, only
+        // on an unreachable endpoint (commander-support-cortex regression).
+        bool reachable=OnMap(anchor) && ai->GetTerrainManager()->CanReachAt(unit,anchor,64);
+        if(options.frontPersistent>0 && OnMap(anchor) && !reachable) {
+            for(float back:{128.f,256.f,384.f}) {
+                const float progress=advance-back;
+                if(progress<=own+options.frontRadius*.5f) break;
+                auto probe=battle->GetFrontLanePoint(progress);
+                probe.y=ai->GetMap()->GetElevationAt(probe.x,probe.z);
+                if(OnMap(probe) && ai->GetTerrainManager()->CanReachAt(unit,probe,64)
+                    && ai->GetThreatMap()->GetThreatAt(unit,probe)<=options.frontThreat) {
+                    advance=progress;anchor=probe;reachable=true;break;
+                }
+            }
+            if(!reachable) for(float ahead:{128.f,256.f,384.f}) {
+                const float progress=std::min(reachableBound,advance+ahead);
+                if(progress<=advance+64.f) break;
+                auto probe=battle->GetFrontLanePoint(progress);
+                probe.y=ai->GetMap()->GetElevationAt(probe.x,probe.z);
+                if(OnMap(probe) && ai->GetTerrainManager()->CanReachAt(unit,probe,64)
+                    && ai->GetThreatMap()->GetThreatAt(unit,probe)<=options.frontThreat) {
+                    advance=progress;anchor=probe;reachable=true;break;
+                }
+            }
+        }
+        if(!reachable
             || ai->GetThreatMap()->GetThreatAt(unit,anchor)>options.frontThreat) {
             // Legacy: keep the last safe front. Push (D-356): the last front
             // may lie beyond the bound the screens now give (they fell back
@@ -153,21 +193,91 @@ bool CCommanderControl::AdoptFrontWork(CCircuitUnit* unit,IUnitTask* task,float 
 }
 
 IUnitTask* CCommanderControl::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef* buildDef,float radius) {
+    if(kind==19) return GroupWork(unit);
+    if(HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    if(kind==WORK_SOLAR) {
+        if(!Handles(unit) || !options.frontDuty || options.frontSolarIncome<=0 || !unit->IsFinished()) return nullptr;
+        auto found=commanders.find(unit->GetId());
+        if(found==commanders.end()) return nullptr;
+        auto& state=found->second;
+        auto* current=unit->GetTask();
+        if(!current || current->IsExternalControlled() || current->IsEnemyReclaim()
+            || current->GetType()==IUnitTask::Type::PLAYER || current->GetType()==IUnitTask::Type::RETREAT) return nullptr;
+        if((state.workKind==WORK_SOLAR || state.workKind==WORK_REPAIR_COMBAT)
+            && current==state.workTask && !current->IsDead()) return current;
+        auto* eco=ai->GetEconomyManager();
+        if(eco->GetAvgEnergyIncome()>=options.frontSolarIncome || eco->GetEnergyStore()<=0
+            || eco->GetEnergyCur()>=eco->GetEnergyStore()*options.frontSolarStorage) return nullptr;
+        // Priority-two repairs retain precedence over emergency economy. Only
+        // ask the existing bounded repair selector when a solar is eligible;
+        // ordinary deployment does not gain another friendly-unit query.
+        if(options.frontRepairCombat>0) {
+            if(auto* repair=FrontWork(unit,WORK_REPAIR_COMBAT,nullptr,0)) return repair;
+        }
+        const int frame=ai->GetLastFrame();
+        if(frame<state.frontSolarNext) return nullptr;
+        auto* def=buildDef?buildDef:ai->GetCircuitDefSafe(int(options.frontSolarDef));
+        if(!def || !unit->GetCircuitDef()->CanBuild(def)) return nullptr;
+        const auto pos=unit->GetPos(frame);
+        const float reach=unit->GetCircuitDef()->GetBuildDistance();
+        const float radius=options.frontSolarRadius;
+        auto* terrain=ai->GetTerrainManager();
+        auto* builder=ai->GetBuilderManager();
+        CTerrainManager::TerrainPredicate allowed=[&](const AIFloat3& at) {
+            return at.SqDistance2D(pos)<=radius*radius && InsideLine(state,at,frame,reach)
+                && ai->GetThreatMap()->GetThreatAt(unit,at)<=options.frontThreat
+                && terrain->CanReachAtSafe2(unit,at,reach);
+        };
+        // Task-offer work only: reuse a local energy claim before a bounded
+        // nearest-site search. Failed placement retries after three seconds;
+        // no map/army scan, no independent timer, and no base-layout detour.
+        IBuilderTask* task=nullptr;
+        for(auto* queued:builder->GetTasks(BT::ENERGY)) {
+            if(!queued->IsDead() && queued->GetBuildDef()==def && allowed(queued->GetPosition())
+                && queued->CanAssignTo(unit)) { task=queued;break; }
+        }
+        if(!task) {
+            const auto site=terrain->FindBuildSite(def,pos,std::min(radius,std::max(32.f,reach-32.f)),0,allowed);
+            const auto at=OnMap(site)?site:terrain->FindBuildSite(def,pos,radius,0,allowed);
+            if(OnMap(at)) task=builder->Enqueue(TaskB::Common(BT::ENERGY,IBuilderTask::Priority::HIGH,def,at,0.f,true,60*FRAMES_PER_SEC));
+        }
+        if(!task) { state.frontSolarNext=frame+3*FRAMES_PER_SEC;return nullptr; }
+        state.workTask=task;state.workKind=WORK_SOLAR;
+        ai->LOG("[CommanderWork] unit=%i work=22 solar=%s income=%.1f storage=%.3f",unit->GetId(),def->GetDef()->GetName(),
+            eco->GetAvgEnergyIncome(),eco->GetEnergyCur()/eco->GetEnergyStore());
+        return task;
+    }
+    if(kind==20) return GroupAssist(unit);
+    if(GroupActive(unit) && (kind==WORK_MEX_DEFENCE || kind==WORK_TERRITORY_LINE
+        || kind==WORK_LINE || (kind==WORK_TIMED && buildDef && buildDef->GetId()==int(options.frontLineDef))
+        || kind==3 || kind==WORK_RADAR || kind==2)) return nullptr;
+    if(GroupActive(unit) && kind==WORK_MEX_LANE) buildDef=nullptr;
     if(!Handles(unit) || !options.frontDuty || !options.frontReady || !unit->IsFinished()
-        || unit->GetHealthPercent()<options.recover) return nullptr;
+        || (kind!=WORK_HOLD && options.healthRetreatFraction<=0
+            && unit->GetHealthPercent()<options.recover && !Jammed(unit))) return nullptr;
     auto found=commanders.find(unit->GetId()); if(found==commanders.end()) return nullptr;
     auto& s=found->second; const int frame=ai->GetLastFrame();
     const auto record=[&](IUnitTask* task) {
+        // Lane mexes already passed their own LOS/reach/territory window before
+        // claiming a spot. Reapplying the narrower generic-work window here
+        // strands the claim and can alternate idle holds with deployment.
         // D-356: an offer whose site lies beyond the corridor (lane half-width
         // plus front_lane_margin, or the build distance) is declined, never
         // aborted: assist/repair/base rungs hand back tasks the shared queue
         // created for other builders, which keep them.
         if(auto* build=dynamic_cast<IBuilderTask*>(task);build && !FallbackActive(s,frame)
+            && kind!=WORK_MEX_DEFENCE && kind!=WORK_TERRITORY_LINE && kind!=WORK_REPAIR_COMBAT && kind!=WORK_MEX_LANE
             && ai->GetBattle()->GetFrontLaneLength()>0.f
             && ai->GetBattle()->GetFrontLaneDistance(build->GetPosition())>ai->GetBattle()->GetFrontLaneWidth()
                 +(options.frontLaneMargin>0?options.frontLaneMargin:unit->GetCircuitDef()->GetBuildDistance())) {
             task=nullptr;
         }
+        if(auto* build=dynamic_cast<IBuilderTask*>(task); build && options.frontPersistent>0
+            && !FallbackActive(s,frame) && ai->GetBattle()->GetFrontLaneLength()>0.f
+            && kind!=WORK_MEX_DEFENCE && kind!=WORK_TERRITORY_LINE && kind!=WORK_REPAIR_COMBAT && kind!=WORK_MEX_LANE
+            && ai->GetBattle()->GetFrontLaneProgress(build->GetPosition())
+                <ai->GetBattle()->GetFrontLaneProgress(unit->GetPos(frame))-options.frontWorkBehind)
+            task=nullptr; // decline shared work; never abort another builder's task
         // Native placement may move a site (shake, blocked cells). While a
         // fallback holds, an offer that ends outside the perimeter is dropped
         // here, and aborted when no one else took it (INV-218 at the source).
@@ -176,7 +286,10 @@ IUnitTask* CCommanderControl::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef*
             if(build->GetAssignees().empty()) ai->GetBuilderManager()->AbortTask(build);
             task=nullptr;
         }
-        s.workTask=task; s.workReach=0; s.workHeld=FallbackActive(s,frame); s.workBoundary=s.fallbackBoundary;
+        if(task && (kind==WORK_MEX_DEFENCE || kind==WORK_TERRITORY_LINE)
+            && task->GetType()==IUnitTask::Type::BUILDER && options.frontFortifyAdvance>0)
+            s.fortifyNextProgress=ai->GetBattle()->GetFrontLaneProgress(unit->GetPos(frame))+options.frontFortifyAdvance;
+        s.workTask=task; s.workReach=0; s.workKind=kind; s.workHeld=FallbackActive(s,frame); s.workBoundary=s.fallbackBoundary;
         if(task) ai->LOG("[CommanderWork] unit=%i work=%i task=%i",unit->GetId(),kind,
             task->GetType()==IUnitTask::Type::BUILDER?int(static_cast<IBuilderTask*>(task)->GetBuildType()):-1);
         return task;
@@ -186,11 +299,12 @@ IUnitTask* CCommanderControl::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef*
     // ownership; repairs/guard/base queues cannot monopolise a FRONT builder.
     if(kind==WORK_ADVANCE) {
         if(options.frontPushAhead<=0 || FallbackActive(s,frame)
-            || (frame<s.lineUntil && !s.lineDone)) return nullptr;
+            || (frame<s.lineUntil && !s.lineDone)
+            || (s.territoryPending && options.frontFortifyAdvance<=0)) return nullptr;
         const auto anchor=FrontPosition(unit,s,frame),pos=unit->GetPos(frame);
         if(anchor.x<0 || pos.SqDistance2D(anchor)<=options.frontRadius*options.frontRadius*.25f) return nullptr;
         auto* build=dynamic_cast<IBuilderTask*>(unit->GetTask());
-        if(build && !build->IsDead() && build->GetBuildDef()
+        if(build && !build->IsDead() && build->GetBuildDef() && CanResumeFrontTask(unit,build)
             && ((build->GetTarget() && !build->GetTarget()->IsFinished()) || build==s.workTask)
             && build->GetPosition().SqDistance2D(pos)<=std::pow((build==s.workTask?std::max(options.frontRadius,s.workReach)
                 :options.frontRadius)+unit->GetCircuitDef()->GetBuildDistance(),2.f)) return build;
@@ -211,17 +325,18 @@ IUnitTask* CCommanderControl::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef*
     // can acquire repair/reclaim work beyond its endpoint and out of the lane.
     // Cancel the old queue only when this task starts, never while offering it.
     if(kind==WORK_HOLD) {
-        if(options.frontPushAhead<=0 || radius<=0 || FallbackActive(s,frame)) return nullptr;
+        if(options.frontPushAhead<=0 || radius<=0 || (options.frontPersistent<=0 && FallbackActive(s,frame))) return nullptr;
         const auto anchor=FrontPosition(unit,s,frame);
-        if(anchor.x<0 || unit->GetPos(frame).SqDistance2D(anchor)>
-            options.frontRadius*options.frontRadius*.25f) return nullptr;
+        if(options.frontPersistent<=0 && (anchor.x<0 || unit->GetPos(frame).SqDistance2D(anchor)>
+            options.frontRadius*options.frontRadius*.25f)) return nullptr;
         auto* hold=static_cast<IWaitTask*>(ai->GetBuilderManager()->Enqueue(
             TaskB::Wait(int(std::clamp(radius,1.f,30.f)*FRAMES_PER_SEC))));
         hold->SetStationary(true);
         return record(hold);
     }
     // Native Start can re-ask policy synchronously; keep a live ladder task.
-    if(auto* current=unit->GetTask(); current && current==s.workTask && !current->IsDead()) return current;
+    if(auto* current=unit->GetTask(); current && current==s.workTask && !current->IsDead()
+        && CanResumeFrontTask(unit,current)) return current;
     // D-299 ladder kinds: commander-local, filtered to the perimeter while a
     // fallback holds. The script orders them (CommanderFront::Work).
     if(kind>=WORK_LINE) return record(LadderWork(unit,s,kind,buildDef,radius,frame));
@@ -293,6 +408,7 @@ IUnitTask* CCommanderControl::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef*
 // releases: the meta's rule is "com forward until the first riot units
 // appear, then home" (53-expansion-and-territory.md). Zero disables a gate.
 bool CCommanderControl::PushHome(CCircuitUnit* unit,State& s,int frame) {
+    if(options.frontPersistent>0) { s.pushHome=false; return false; }
     if(s.pushHome || options.frontPushAhead<=0) return s.pushHome;
     const char* reason=nullptr;
     if(options.frontPushUntilSeconds>0 && frame>=int(options.frontPushUntilSeconds*FRAMES_PER_SEC)) reason="time";

@@ -46,7 +46,7 @@ def prepare(args):
         '--modoption','deathmode=neverend','--modoption','startenergy='+str(case.get('start_energy',1000000)),
         '--modoption','startmetal='+str(case.get('start_metal',1000)),
         '--modoption','startmetalstorage='+str(case.get('start_metal',1000)),
-        '--modoption','startenergystorage=1000000',
+        '--modoption','startenergystorage='+str(case.get('start_energy_storage',1000000)),
         '--extra-widget',str(HERE/'widgets/ranged_arena.lua'),
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')]
     # Declared per-case mod options (e.g. the Legion faction for legscout).
@@ -84,6 +84,8 @@ def prepare(args):
                 condition = '!u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)'
         if name=='builder' and case.get('production'):
             repair += '\n if (ai.teamId==0 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);'
+        if name=='builder' and case.get('commander_repair_only'):
+            repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); IUnitTask@ repair=aiBuilderMgr.CommanderFrontWork(u,21,null,0.f); if(repair !is null) return repair; return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); } // stationary repair isolation fixture\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
@@ -131,7 +133,13 @@ def prepare(args):
         # fixture it escorts the supplied T3 and confounds concealed approaches.
         override=override.replace('if (ai.teamId==1 && u.circuitDef.IsMobile())',
             'if (ai.teamId==1 && u.circuitDef.IsMobile() && !u.circuitDef.IsRoleAny(Unit::Role::COMM.mask))',1)
-    override=override.replace('ai.teamId==1','ai.teamId=='+str(case.get('enemy_team',1)))
+    # Supplied allied spotters may need to hold as well as the opposing army.
+    # This affects only the fixture's military override, never normal policy.
+    held_teams = case.get('hold_teams', [case.get('enemy_team', 1)])
+    if not held_teams or any(type(team) is not int or team < 0 for team in held_teams):
+        raise ValueError('hold_teams must contain nonnegative integer team IDs')
+    hold_condition = '(' + ' || '.join('ai.teamId==' + str(team) for team in held_teams) + ')'
+    override=override.replace('ai.teamId==1', hold_condition)
     patched = source[:start]+override+source[start:]
     if case.get('native_route'): patched = 'CRouteTask@ FixtureRoute;\n'+patched
     path.write_text(patched)
@@ -261,6 +269,9 @@ def prepare(args):
         }
 '''
         profile.write_text(source[:start]+probe+source[start:])
+    if case.get('front_constructor_observation'):
+        subprocess.run([sys.executable,str(HERE/'prepare_front_constructor_check.py'),
+                        '--dir',str(directory)],check=True)
     config=directory/'LuaUI/Config';config.mkdir(parents=True,exist_ok=True)
     (config/'ranged_arena.lua').write_text('return '+lua(case)+'\n')
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
@@ -278,6 +289,8 @@ def prepare(args):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
+    if case.get('commander_repair_only'):
+        pins['overrides'] += ['team 0 commander offers stationary repair then stationary hold; normal combat controller remains active']
     if case.get('commander_front_work'):
         pins['overrides'] += [('all commanders' if case.get('coverage_probe') else 'team 0 commanders')
                              +' use real FRONT builder policy; other builders frozen']
