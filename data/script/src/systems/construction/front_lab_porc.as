@@ -2,9 +2,9 @@
 //
 // Corridor: every T2 bot lab and vehicle plant of ours, from the moment it is framed, reserves a
 // corridor from itself to the nearest enemy start: the lab's exit cone (ReserveExitCone), then the
-// terrain route of the largest unit it makes (aiBattle.GetUnitTerrainRoute, dry, no threat) cut into
-// short native corridor zones (ReserveZone(..., true)) LabCorridorWidthFactor x that unit's movement
-// footprint wide. A corridor zone is never laid, so no structure of ours or of an allied BARb is
+// coarse terrain route of its movement class (aiBattle.GetTerrainRoute: bots or vehicles, no threat)
+// cut into native corridor zones (ReserveZone(..., true)) LabCorridorWidthFactor x the movement
+// footprint of the largest unit it makes wide, a few per frame (ReserveTiles). A corridor zone is never laid, so no structure of ours or of an allied BARb is
 // placed on it (native placement and IsAllyLayoutBlocked); metal and geo spots are holes in every
 // zone, so T1 and T2 mexes still go up there. Cells already built on, or touching an ally's
 // reservation, are left out (a tile touching one is refused whole): it is an attempt, not a promise.
@@ -22,12 +22,14 @@
 // finished or not, so a lost gun is rebuilt. One order per lab, joined by at most one more
 // constructor; an order that dies with no gun widens the search, three in a row hold the lab 90 s.
 //
-// Cost: one owned-unit scan every LabPorcScanSeconds, or when our T2 lab count changes; one route
-// and up to ~(route length / width) zone reservations per lab, once. Work reads the cache.
+// Cost: one owned-unit scan every LabPorcScanSeconds, or when our T2 lab count changes; one coarse
+// route per lab, once; its zone reservations at most LabCorridorTilesPerFrame a frame. No engine
+// message or unit command comes from a corridor. Work reads the cache.
 // Log [FRONT][LabCorridor], [FRONT][LabPorc].
 namespace FrontLabPorc {
     const int HoldSeconds = 90;
     const int OrderTimeoutSeconds = 240;
+    const int FailHoldSeconds = 10;
 
     class Lab {
         int id = -1;
@@ -35,7 +37,13 @@ namespace FrontLabPorc {
         AIFloat3 pos;
         AIFloat3 target(-1.0f, 0.0f, -1.0f);   // the enemy start the corridor leads to
         float width = 64.0f;
+        string unit;                           // the largest unit it makes
+        int squares = 4;                       // ... and its movement footprint
         array<AIFloat3> route;                 // lab to the corridor's end
+        float length = 0.0f;
+        float tileAt = -1.0f;                  // ReserveTiles' cursor along the route; -1 when done or none
+        float tileStop = 0.0f;
+        int tilesTried = 0, tilesHeld = 0, exitHeld = 0;
         array<int> zones;                      // corridor tiles and the exit cone
         bool planned = false;
         bool far = false;
@@ -91,13 +99,14 @@ namespace FrontLabPorc {
         return (n == "") ? null : ai.GetCircuitDef(n);
     }
 
-    // The largest unit a lab makes and its movement footprint (squares), from settings
-    bool Biggest(const string &in lab, string &out unit, int &out squares) {
+    // The largest unit a lab makes, its movement footprint (squares) and lane class, from settings
+    bool Biggest(const string &in lab, string &out unit, int &out squares, int &out cls) {
         const array<string>@ labsList = Global::RoleSettings::Front::LabCorridorLabs;
         for (uint i = 0; i < labsList.length(); ++i) {
             if (labsList[i] != lab) continue;
             unit = Global::RoleSettings::Front::LabCorridorUnits[i];
             squares = Global::RoleSettings::Front::LabCorridorSquares[i];
+            cls = Global::RoleSettings::Front::LabCorridorClass[i];
             return true;
         }
         return false;
@@ -143,17 +152,24 @@ namespace FrontLabPorc {
         return l.route[l.route.length() - 1];
     }
 
-    // The lab's exit cone and its corridor to the nearest enemy start, once
+    // The lab's exit cone now, and its corridor route to the nearest enemy start; the corridor's
+    // tiles are reserved a few per frame by ReserveTiles.
+    // Performance (owner, 2026-10-30: "all 8 AI get to t2 usually"; the first build froze every
+    // client ~1 s per corridor on Proving Grounds): the route is the coarse lane-class route
+    // (aiBattle.GetTerrainRoute on the AI's shared terrain grid, the one Spam and the raids use), not
+    // GetUnitTerrainRoute, whose first call per unit def built a whole-map fine terrain for that def.
+    // Reservations stay inside this AI: ShareZone writes the ally team's in-process rectangle index
+    // (no engine message, no network, no unit command); allies only read it when they place a
+    // building, and a queued ally build whose cached site is now covered re-searches once.
     void Plan(Lab@ l, CCircuitUnit@ lab) {
         l.planned = true;
         l.far = PorcOn() && sqrt(MapHelpers::SqDist(l.pos, Global::Map::StartPos)) > Global::RoleSettings::Front::LabPorcMinDistance;
         l.target = NearestEnemyStart(l.pos);
-        string unit = ""; int squares = 4;
-        if (!Biggest(l.defName, unit, squares)) unit = "";
-        l.width = float(squares) * SQUARE_SIZE * Global::RoleSettings::Front::LabCorridorWidthFactor;
-        CCircuitDef@ walker = (unit == "") ? null : ai.GetCircuitDef(unit);
-        if (l.target.x >= 0.0f && walker !is null) {
-            array<AIFloat3>@ r = aiBattle.GetUnitTerrainRoute(walker, l.pos, l.target, true, 1.0f, 6.0f, 0.0f, 0.0f);
+        int cls = Lanes::BOT;
+        if (!Biggest(l.defName, l.unit, l.squares, cls)) { l.unit = ""; l.squares = 4; }
+        l.width = float(l.squares) * SQUARE_SIZE * Global::RoleSettings::Front::LabCorridorWidthFactor;
+        if (l.target.x >= 0.0f) {
+            array<AIFloat3>@ r = aiBattle.GetTerrainRoute(l.pos, l.target, cls, 1.0f, 6.0f, 0.0f, 0.0f);
             if (r !is null) l.route = r;
             // played 2026-10-30: from a few lab centres the route search finds nothing; start it a
             // little out from the lab toward the target, on each side, and put the lab in front
@@ -164,14 +180,13 @@ namespace FrontLabPorc {
                 const float ux = dx / d, uz = dz / d;
                 const float ox = ux * cos(a) - uz * sin(a), oz = ux * sin(a) + uz * cos(a);
                 const AIFloat3 from(l.pos.x + ox * 160.0f, l.pos.y, l.pos.z + oz * 160.0f);
-                @r = aiBattle.GetUnitTerrainRoute(walker, from, l.target, true, 1.0f, 6.0f, 0.0f, 0.0f);
+                @r = aiBattle.GetTerrainRoute(from, l.target, cls, 1.0f, 6.0f, 0.0f, 0.0f);
                 if (r !is null && r.length() >= 2) { l.route = r; l.route.insertAt(0, l.pos); }
             }
         }
         if (!CorridorOn()) return;
         if (l.target.x < 0.0f || l.route.length() < 2) {
-            GenericHelpers::LogUtil("[FRONT][LabCorridor] " + l.defName + " " + l.id + ": no route to an enemy start ("
-                + (walker is null ? "no unit " + unit : "route of " + l.route.length() + " points") + "); no corridor", 1);
+            GenericHelpers::LogUtil("[FRONT][LabCorridor] " + l.defName + " " + l.id + ": no route to an enemy start; no corridor", 1);
             return;
         }
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
@@ -179,31 +194,69 @@ namespace FrontLabPorc {
             GenericHelpers::LogUtil("[FRONT][LabCorridor] the profile's layout gate is closed; no corridor", 1);
             return;
         }
-        const int exitZone = aiTerrainMgr.ReserveExitCone(lab, Global::RoleSettings::Front::LabCorridorExitLength, 16.0f);
-        if (exitZone > 0) l.zones.insertLast(exitZone);
-        // Tiles of `step` along the route, each holding the corridor's full width there: in route
-        // coordinates a tile must cover |along| <= step/2 and |across| <= width/2, so its world
-        // half-sizes are step/2 |u| + width/2 |n| per axis (exact on straight axis runs).
-        float length = 0.0f;
-        for (uint i = 1; i < l.route.length(); ++i) length += sqrt(MapHelpers::SqDist(l.route[i - 1], l.route[i]));
-        const float stop = length - Global::RoleSettings::Front::LabCorridorStopShort;
-        const float step = l.width;
-        int tiles = 0, held = 0;
-        for (float s = 0.0f; s <= stop; s += step) {
-            float ux, uz;
-            const AIFloat3 c = Along(l, s + step * 0.5f, ux, uz);
-            const float ax = abs(ux), az = abs(uz);
-            const float hx = step * 0.5f * ax + l.width * 0.5f * az + SQUARE_SIZE;
-            const float hz = step * 0.5f * az + l.width * 0.5f * ax + SQUARE_SIZE;
-            ++tiles;
-            const int z = aiTerrainMgr.ReserveZone(c, 0, hx, hz, true);
-            if (z > 0) { l.zones.insertLast(z); ++held; }
-        }
+        l.exitHeld = aiTerrainMgr.ReserveExitCone(lab, Global::RoleSettings::Front::LabCorridorExitLength, 16.0f);
+        if (l.exitHeld > 0) l.zones.insertLast(l.exitHeld);
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
+        l.length = 0.0f;
+        for (uint i = 1; i < l.route.length(); ++i) l.length += sqrt(MapHelpers::SqDist(l.route[i - 1], l.route[i]));
+        l.tileStop = l.length - Global::RoleSettings::Front::LabCorridorStopShort;
+        l.tileAt = 0.0f;
+    }
+
+    // At most LabCorridorTilesPerFrame corridor tiles per frame over all labs, so a lab's ~50-100
+    // reservations spread over a few seconds instead of one frame. A tile is the bounding box of
+    // route samples `width` apart, grown while the samples stay within half a width of one axis
+    // (one rectangle for a straight axis run, up to LabCorridorMaxRun), then widened by half the
+    // corridor's width on every side: any route point is at least width/2 from the tile's edge.
+    // Mex and geo spots inside are holes (see the header). O(tiles x route points) per lab, once.
+    int tileFrame = -1;
+    void ReserveTiles() {
+        if (!CorridorOn() || tileFrame == ai.frame) return;
+        tileFrame = ai.frame;
+        int budget = Global::RoleSettings::Front::LabCorridorTilesPerFrame;
+        bool layoutOn = true, opened = false;
+        for (uint i = 0; i < labs.length() && budget > 0; ++i) {
+            Lab@ l = labs[i];
+            if (l.route.length() < 2 || l.tileAt < 0.0f) continue;
+            if (!opened) {
+                opened = true;
+                layoutOn = aiTerrainMgr.IsLayoutEnabled();
+                if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) return;
+            }
+            const float step = l.width, pad = l.width * 0.5f + SQUARE_SIZE;
+            while (budget > 0 && l.tileAt >= 0.0f) {
+                if (l.tileAt >= l.tileStop) { Done(l); break; }
+                float ux, uz;
+                AIFloat3 p = Along(l, l.tileAt, ux, uz);
+                float x1 = p.x, x2 = p.x, z1 = p.z, z2 = p.z;
+                float s = l.tileAt;
+                while (s < l.tileStop) {
+                    const float next = AiMin(s + step, l.tileStop);
+                    p = Along(l, next, ux, uz);
+                    const float nx1 = AiMin(x1, p.x), nx2 = AiMax(x2, p.x), nz1 = AiMin(z1, p.z), nz2 = AiMax(z2, p.z);
+                    const bool first = (s == l.tileAt);
+                    if (!first && (AiMin(nx2 - nx1, nz2 - nz1) > l.width * 0.5f
+                        || AiMax(nx2 - nx1, nz2 - nz1) > Global::RoleSettings::Front::LabCorridorMaxRun)) break;
+                    x1 = nx1; x2 = nx2; z1 = nz1; z2 = nz2;
+                    s = next;
+                    if (first && AiMin(x2 - x1, z2 - z1) > l.width * 0.5f) break;   // a diagonal step: one tile
+                }
+                const AIFloat3 c((x1 + x2) * 0.5f, 0.0f, (z1 + z2) * 0.5f);
+                const int z = aiTerrainMgr.ReserveZone(c, 0, (x2 - x1) * 0.5f + pad, (z2 - z1) * 0.5f + pad, true);
+                ++l.tilesTried; --budget;
+                if (z > 0) { l.zones.insertLast(z); ++l.tilesHeld; }
+                l.tileAt = (s > l.tileAt) ? s : l.tileStop + 1.0f;
+            }
+        }
+        if (opened && !layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
+    }
+
+    void Done(Lab@ l) {
+        l.tileAt = -1.0f;
         GenericHelpers::LogUtil("[FRONT][LabCorridor] " + l.defName + " " + l.id + " at (" + int(l.pos.x) + "," + int(l.pos.z)
-            + "): corridor " + int(l.width) + " wide (" + unit + ", " + squares + " squares) to the enemy start at ("
-            + int(l.target.x) + "," + int(l.target.z) + "), " + int(length) + " long, " + held + " of " + tiles + " tiles held"
-            + (exitZone > 0 ? ", exit cone held" : ", no exit cone") + (l.far ? "; forward lab, porc cluster due" : ""), 1);
+            + "): corridor " + int(l.width) + " wide (" + l.unit + ", " + l.squares + " squares) to the enemy start at ("
+            + int(l.target.x) + "," + int(l.target.z) + "), " + int(l.length) + " long, " + l.tilesHeld + " of " + l.tilesTried + " tiles held"
+            + (l.exitHeld > 0 ? ", exit cone held" : ", no exit cone") + (l.far ? "; forward lab, porc cluster due" : ""), 1);
     }
 
     Lab@ Find(int id) {
@@ -257,28 +310,44 @@ namespace FrontLabPorc {
             best.standing[t] += 1;
             if (guns[g].GetBuildProgress() < 1.0f) @best.frames[t] = guns[g];
         }
-        // a lab's order that died: did it leave a gun?
-        for (uint i = 0; i < labs.length(); ++i) {
-            Lab@ l = labs[i];
-            if (l.order is null || !l.order.IsDead()) continue;
-            if (l.standing[l.orderTier] > l.orderBefore || (l.orderRepair && l.standing[l.orderTier] >= l.orderBefore)) { l.fails = 0; l.shift = 0; }
-            else {
-                l.shift += 1;
-                l.fails += 1;
-                if (l.fails >= 3) {
-                    l.holdUntil = ai.frame + HoldSeconds * SECOND;
-                    l.fails = 0;
-                    GenericHelpers::LogUtil("[FRONT][LabPorc] " + l.defName + " " + l.id + ": three orders died with no gun; waiting " + HoldSeconds + " s", 1);
-                }
-            }
-            @l.order = null;
-        }
+        // an order that died without TaskRemoved (none expected): forget it; the counts above decide
+        for (uint i = 0; i < labs.length(); ++i)
+            if (labs[i].order !is null && labs[i].order.IsDead()) @labs[i].order = null;
     }
 
     void Refresh() {
         if (!CorridorOn() && !PorcOn()) return;
         Defs();
         if (ai.frame - lastScan >= Global::RoleSettings::Front::LabPorcScanSeconds * SECOND || LabCount() != lastLabCount) Scan();
+        ReserveTiles();
+    }
+
+    // Front_BuilderAiTaskRemoved: our order's end settles the lab at once. Played 2026-10-30
+    // (live, an armavp): with the bookkeeping only in the 5 s scan, an order that died at once was
+    // re-placed by the next ask 9 times in 20 s. A finished gun counts at once; an order that dies
+    // with no gun waits FailHoldSeconds x the failures in a row, three of them HoldSeconds.
+    void TaskRemoved(IUnitTask@ task, bool done) {
+        if (task is null) return;
+        for (uint i = 0; i < labs.length(); ++i) {
+            Lab@ l = labs[i];
+            if (l.order !is task) continue;
+            @l.order = null;
+            if (done) {
+                if (l.orderTier >= 1 && l.orderTier <= 3 && !l.orderRepair) l.standing[l.orderTier] += 1;
+                l.fails = 0; l.shift = 0;
+                return;
+            }
+            l.shift += 1;
+            l.fails += 1;
+            if (l.fails >= 3) {
+                l.holdUntil = ai.frame + HoldSeconds * SECOND;
+                l.fails = 0;
+                GenericHelpers::LogUtil("[FRONT][LabPorc] " + l.defName + " " + l.id + ": three orders died with no gun; waiting " + HoldSeconds + " s", 1);
+            } else {
+                l.holdUntil = ai.frame + FailHoldSeconds * l.fails * SECOND;
+            }
+            return;
+        }
     }
 
     bool IsOurs(IUnitTask@ t) {

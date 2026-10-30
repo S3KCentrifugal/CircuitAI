@@ -292,7 +292,7 @@ namespace Front {
 
             // T2 lab corridors and forward lab porc (owner, 2026-10-30; systems/construction/front_lab_porc.as).
             // LabCorridor: every T2 bot lab and vehicle plant of ours reserves its exit cone and a corridor
-            // along the route of the largest unit it makes to the nearest enemy start; no structure goes
+            // along its movement class's coarse route to the nearest enemy start; no structure goes
             // on it but mexes (spots are holes). Width = that unit's movement footprint x 8 x WidthFactor.
             // LabPorc: a lab more than LabPorcMinDistance from our start gets LabPorcTier's guns (1 = Pit Bull /
             // Scorpion / Chimera, 2 = Rattlesnake / Persecutor / Eviscerator, 3 = the T2 flak) from FRONT T2 constructors.
@@ -305,6 +305,9 @@ namespace Front {
             array<string> LabCorridorLabs = { "armalab", "armavp", "coralab", "coravp", "legalab", "legavp" };
             array<string> LabCorridorUnits = { "armfboy", "armbull", "corsumo", "corgol", "legamph", "legmed" };
             array<int> LabCorridorSquares = { 4, 4, 4, 4, 5, 4 };   // HBOT4, HTANK4, HBOT4, HTANK4, HABOT5, HTANK4
+            array<int> LabCorridorClass = { 1, 0, 1, 0, 1, 0 };     // the route's lane class: 1 bots, 0 vehicles (Lanes::BOT, Lanes::LAND)
+            int LabCorridorTilesPerFrame = 16;         // corridor reservations per frame over all labs (performance, owner 2026-10-30)
+            float LabCorridorMaxRun = 1024.0f;         // the longest single rectangle on a straight axis run
             bool LabPorc = false;
             float LabPorcMinDistance = 900.0f;         // labs further than this from our start get guns
             array<int> LabPorcTier = { 1, 1, 2, 3 };   // build order: two pop-ups, the heavy plasma, then one T2 flak (owner 2026-10-30)
