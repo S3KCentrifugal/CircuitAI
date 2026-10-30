@@ -564,9 +564,17 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.repeatFrames = std::max(0, nuclear.get("repeat_seconds", 300).asInt()) * FRAMES_PER_SEC;
 	nuclearInfo.repeatRadius = std::max(0.f, nuclear.get("repeat_radius", 0.f).asFloat());
 	nuclearInfo.overnukeSilos = std::max(0, nuclear.get("overnuke_silos", 3).asInt());
-	nuclearInfo.overnukeMin = std::max(1, nuclear.get("overnuke_min", 17).asInt());
-	nuclearInfo.overnukeMax = std::max(nuclearInfo.overnukeMin, nuclear.get("overnuke_max", 30).asInt());
+	nuclearInfo.overnukeMin = std::max(1, nuclear.get("overnuke_min", 10).asInt());
+	nuclearInfo.overnukeMax = std::max(nuclearInfo.overnukeMin, nuclear.get("overnuke_max", 25).asInt());
 	nuclearInfo.overnukeScoutEvery = std::max(0, nuclear.get("overnuke_scout_every", 10).asInt());
+	nuclearInfo.overnukeStock = nuclear.get("overnuke_stock", true).asBool();
+	nuclearInfo.overnukeStockCap = std::max(1, nuclear.get("overnuke_stock_cap", 10).asInt());
+	nuclearInfo.overnukeStockFrames = std::max(0, nuclear.get("overnuke_stock_seconds", 900).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.overnukeFireBelowHealth = std::min(1.f, std::max(0.f, nuclear.get("overnuke_fire_below_health", 0.5f).asFloat()));
+	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
+			cfgName.c_str(), nuclearInfo.overnukeSilos, nuclearInfo.overnukeMin, nuclearInfo.overnukeMax,
+			nuclearInfo.overnukeScoutEvery, int(nuclearInfo.overnukeStock), nuclearInfo.overnukeStockCap,
+			nuclearInfo.overnukeStockFrames / FRAMES_PER_SEC, nuclearInfo.overnukeFireBelowHealth);
 	if (!stockCfg.isNull()) {
 		stockInfo.patienceSeconds = std::max(0.f, stockCfg.get("patience_seconds", 240.f).asFloat());
 		stockInfo.minFraction = std::min(1.f, std::max(0.f, stockCfg.get("min_fraction", 0.25f).asFloat()));

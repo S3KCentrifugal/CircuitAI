@@ -32,6 +32,7 @@
 #include "WeaponDef.h"
 
 #include "spring/SpringMap.h"
+#include "spring/SpringUnit.h"
 
 #include "AISCommands.h"
 #include "Lua.h"
@@ -658,9 +659,13 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 					at.x, at.z, over.Fired(), over.Goal());
 			over.End(frame, policy.repeatFrames);
 		} else if (position.SqDistance2D(at) < SQUARE(cdef->GetMaxRange())) {
+			if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
+				return false;  // hold fire: the salvo is still stocking
+			}
+			const AIFloat3 aim(over.Pos().x, 0.f, over.Pos().z);  // ReleaseSalvo may have moved it
 			SetTarget(nullptr);
-			targetPos = at;
-			targetPos.y = circuit->GetMap()->GetElevationAt(at.x, at.z);
+			targetPos = aim;
+			targetPos.y = circuit->GetMap()->GetElevationAt(aim.x, aim.z);
 			return true;
 		} else {
 			return scan();  // out of this silo's reach: its own target
@@ -668,9 +673,85 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	}
 	if (!scan()) return false;
 	const int roll = policy.overnukeMin + rand() % (policy.overnukeMax - policy.overnukeMin + 1);
-	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll);
-	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches", silos, targetPos.x, targetPos.z, roll);
+	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll,
+			frame, policy.overnukeStock);
+	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
+			over.Stocking() ? ", stocking the salvo first" : "");
+	if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
+		return false;
+	}
+	targetPos = AIFloat3(over.Pos().x, 0.f, over.Pos().z);
+	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
 	return true;
+}
+
+/*
+ * Salvo (owner 2026-10-30). While the overnuke stocks, every silo that reaches
+ * the target holds fire. Each of their updates (one per silo every
+ * TARGET_DELAY) sums the stock of the reaching silos - a walk over our own
+ * SUPER tasks, a handful - and opens fire once it reaches the roll (capped by
+ * what they can hold), the timeout runs out, or a reaching silo is hit. At the
+ * release the scan runs once more: when scouting has found a better aim point
+ * since the target was chosen, the whole salvo goes there.
+ */
+bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	const auto& policy = militaryMgr->GetNuclearInfo();
+	strategic::Overnuke& over = militaryMgr->GetOvernuke();
+	const AIFloat3 at(over.Pos().x, 0.f, over.Pos().z);
+	int stocked = 0, reaching = 0;
+	bool hit = false;
+	for (const IFighterTask* task : militaryMgr->GetTasks(IFighterTask::FightType::SUPER)) {
+		const auto& assignees = task->GetAssignees();
+		if (assignees.empty()) continue;
+		CCircuitUnit* silo = *assignees.begin();
+		CCircuitDef* sdef = silo->GetCircuitDef();
+		if (!IsNukeSilo(sdef) || (silo->GetPos(frame).SqDistance2D(at) >= SQUARE(sdef->GetMaxRange()))) continue;
+		++reaching;
+		stocked += std::max(0, silo->GetUnit()->GetStockpile());
+		if (policy.overnukeFireBelowHealth > 0.f) {
+			hit = hit || (silo->GetUnit()->GetHealth() < policy.overnukeFireBelowHealth * silo->GetUnit()->GetMaxHealth());
+		}
+	}
+	const int need = std::min(over.Goal(), policy.overnukeStockCap * std::max(1, reaching));
+	const strategic::SalvoGate gate = strategic::SalvoRelease(stocked, need, frame, over.Since(),
+			policy.overnukeStockFrames, hit);
+	if (gate == strategic::SalvoGate::HOLD) {
+		return false;
+	}
+	const AIFloat3 keep = targetPos;
+	if (scan() && (targetPos.SqDistance2D(at) > SQUARE(over.Radius()))) {
+		circuit->LOG("NUKE: overnuke salvo moves from (%.0f, %.0f) to (%.0f, %.0f): a better target found since",
+				at.x, at.z, targetPos.x, targetPos.z);
+		over.Retarget({targetPos.x, targetPos.z});
+	}
+	targetPos = keep;
+	over.Release(stocked);
+	static const char* why[] = {"", "stocked", "timeout", "a silo hit"};
+	circuit->LOG("NUKE: overnuke salvo released (%s) after %is: %i stocked in %i silos, %i launches",
+			why[int(gate)], (frame - over.Since()) / FRAMES_PER_SEC, stocked, reaching, over.Goal());
+	return true;
+}
+
+/*
+ * The salvo's last launch: stop every silo still holding the attack order, so
+ * none fires again at the finished target before its next update.
+ */
+void CSuperTask::StopNukeSilos()
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	for (IFighterTask* task : circuit->GetMilitaryManager()->GetTasks(IFighterTask::FightType::SUPER)) {
+		const auto& assignees = task->GetAssignees();
+		if (assignees.empty() || !IsNukeSilo((*assignees.begin())->GetCircuitDef())) continue;
+		CCircuitUnit* silo = *assignees.begin();
+		CSuperTask* st = static_cast<CSuperTask*>(task);
+		TRY_UNIT(circuit, silo, silo->CmdStop();)
+		st->SetTarget(nullptr);
+		st->isTargetOverride = false;
+		st->state = State::ROAM;
+	}
 }
 
 bool CSuperTask::SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef)
@@ -926,9 +1007,30 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);
 		strategic::Overnuke& over = circuit->GetMilitaryManager()->GetOvernuke();
 		const int scouts = over.Scouts();
+		const bool salvo = over.Salvo();
 		if (over.Count({aim.x, aim.z}, frame, policy.repeatFrames, policy.overnukeScoutEvery)) {
 			circuit->LOG("NUKE: overnuke launch %i of %i from %s(%i)%s", over.Fired(), over.Goal(),
 					d->GetDef()->GetName(), unit->GetId(), (over.Scouts() > scouts) ? ": scouts asked" : "");
+			if (salvo && over.Active()) {
+				// Mid-salvo: the attack-ground order ends with the shot, so the
+				// next update re-aims the moment the reload (30 s, less with
+				// veterancy: the engine's reload frame already has it) is over,
+				// not at the next 10 s tick (played: 39 s between volleys).
+				int ready = -1;
+				for (int w = 0; w < 4; ++w) {  // silos mount 1-2 weapons; a missing index reads -1
+					ready = std::max(ready, circuit->GetUnitAPI()->GetVisibleWeaponReload(unit->GetId(), w));
+				}
+				if (ready <= frame) ready = frame + d->GetReloadTime();
+				targetFrame = ready - TARGET_DELAY + 1;
+				if (frame - lastSmileyFrame > SMILEY_DEDUPE_EVENT) {
+					lastSmileyFrame = frame;
+					circuit->DrawSmiley(aim, SMILEY_RADIUS);
+				}
+				return;
+			}
+			if (salvo) {
+				StopNukeSilos();  // the last one: no silo fires again at the finished target
+			}
 		}
 	} else {
 		const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();

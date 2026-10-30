@@ -82,6 +82,10 @@ private:
 	bool IsPulse(CCircuitDef* cdef) const;
 	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	int CountNukeSilos() const;  // our finished nuke silos (one super task each)
+	// Salvo (owner 2026-10-30): true once the stocking overnuke may open fire;
+	// scan is SelectNuclearTarget's aim-point scan (it moves targetPos).
+	bool ReleaseSalvo(int frame, const std::function<bool ()>& scan);
+	void StopNukeSilos();  // every nuke silo: stop and drop the target
 	bool SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	bool CanAimStrategic(CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	// Tactical launchers (Perdition, Catalyst): the richest blast in range.

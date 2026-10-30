@@ -257,9 +257,17 @@ public:
 		// of them fire at one target for a roll of overnukeMin..overnukeMax
 		// launches; every overnukeScoutEvery launches AIR scouts the area.
 		int overnukeSilos = 3;  // 0 = off
-		int overnukeMin = 17;
-		int overnukeMax = 30;
+		int overnukeMin = 10;
+		int overnukeMax = 25;
 		int overnukeScoutEvery = 10;
+		// Salvo (owner 2026-10-30): the reaching silos hold fire until together
+		// they stock the roll (each holds overnukeStockCap), then fire as fast as
+		// their reload allows; earlier after overnukeStockFrames, or when a
+		// reaching silo falls below overnukeFireBelowHealth of its health.
+		bool overnukeStock = true;
+		int overnukeStockCap = 10;  // BAR stockpilelimit of every silo
+		int overnukeStockFrames = 900 * FRAMES_PER_SEC;  // 0 = no timeout
+		float overnukeFireBelowHealth = 0.5f;  // 0 = off
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 	strategic::Overnuke& GetOvernuke() { return overnuke; }

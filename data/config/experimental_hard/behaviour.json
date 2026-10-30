@@ -1,6 +1,6 @@
     // Mono-space font required
 	{
-"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0},
+"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
 		"layout": {
