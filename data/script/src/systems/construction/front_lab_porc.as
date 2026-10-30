@@ -12,10 +12,11 @@
 // The corridor stops LabCorridorStopShort before the enemy start. It is released when the lab dies.
 //
 // Porc: a lab standing more than LabPorcMinDistance from our start gets its own cluster, built by
-// FRONT T2 constructors: LabPorcTier in order (default the two pop-ups, then the heavy plasma;
-// Pit Bull / Scorpion / Chimera and Rattlesnake / Persecutor / Eviscerator, the edge porc names).
+// FRONT T2 constructors: LabPorcTier in order (default the two pop-ups, the heavy plasma, then one T2 flak;
+// Pit Bull / Scorpion / Chimera, Rattlesnake / Persecutor / Eviscerator, armflak / corflak / legflak: the edge porc names).
 // The pop-ups stand LabPorcPopupForward along the corridor toward the enemy, one each side of it
-// LabPorcPopupSide beyond its edge; the heavy LabPorcHeavyForward along, beside the corridor. The
+// LabPorcPopupSide beyond its edge; the heavy LabPorcHeavyForward along, beside the corridor, and the flak
+// there on the corridor's other side (owner, 2026-10-30: "add one t2 flak ... with the same restrictions"). The
 // corridor and the exit cone are reserved first, so native placement keeps the guns off the
 // exits and off the path. Guns of those kinds within LabPorcRadius count for the nearest far lab,
 // finished or not, so a lost gun is rebuilt. One order per lab, joined by at most one more
@@ -38,8 +39,8 @@ namespace FrontLabPorc {
         array<int> zones;                      // corridor tiles and the exit cone
         bool planned = false;
         bool far = false;
-        array<int> standing = { 0, 0, 0 };     // tier 0 unused, 1 mid, 2 heavy
-        array<CCircuitUnit@> frames(3);
+        array<int> standing = { 0, 0, 0, 0 };  // tier 0 unused, 1 mid, 2 heavy, 3 flak
+        array<CCircuitUnit@> frames(4);
         IUnitTask@ order;
         int orderTier = -1;
         int orderBefore = 0;
@@ -86,6 +87,7 @@ namespace FrontLabPorc {
         string n = "";
         if (tier == 1) Global::Spam::EdgePorcMid.get(Global::AISettings::Side, n);
         else if (tier == 2) Global::Spam::EdgePorcHeavy.get(Global::AISettings::Side, n);
+        else if (tier == 3) Global::Spam::EdgePorcFlak.get(Global::AISettings::Side, n);
         return (n == "") ? null : ai.GetCircuitDef(n);
     }
 
@@ -204,11 +206,12 @@ namespace FrontLabPorc {
         array<Id>@ ids = ai.GetOwnedUnitIds();
         CCircuitDef@ mid = GunDef(1);
         CCircuitDef@ heavy = GunDef(2);
+        CCircuitDef@ flak = GunDef(3);
         array<CCircuitUnit@> guns;
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null) continue;
-            if (u.circuitDef is mid || u.circuitDef is heavy) { guns.insertLast(u); continue; }
+            if (u.circuitDef is mid || u.circuitDef is heavy || u.circuitDef is flak) { guns.insertLast(u); continue; }
             bool isLab = false;
             for (uint d = 0; d < labDefs.length() && !isLab; ++d) isLab = u.circuitDef is labDefs[d];
             if (!isLab) continue;
@@ -227,7 +230,7 @@ namespace FrontLabPorc {
         // each gun counts for the nearest far lab within LabPorcRadius
         const float r = Global::RoleSettings::Front::LabPorcRadius;
         for (uint i = 0; i < labs.length(); ++i)
-            for (int t = 0; t < 3; ++t) { labs[i].standing[t] = 0; @labs[i].frames[t] = null; }
+            for (int t = 0; t < 4; ++t) { labs[i].standing[t] = 0; @labs[i].frames[t] = null; }
         for (uint g = 0; g < guns.length(); ++g) {
             const AIFloat3 p = guns[g].GetPos(ai.frame);
             Lab@ best = null;
@@ -238,7 +241,7 @@ namespace FrontLabPorc {
                 if (sq <= bestSq) { bestSq = sq; @best = labs[i]; }
             }
             if (best is null) continue;
-            const int t = (guns[g].circuitDef is heavy) ? 2 : 1;
+            const int t = (guns[g].circuitDef is heavy) ? 2 : (guns[g].circuitDef is flak) ? 3 : 1;
             best.standing[t] += 1;
             if (guns[g].GetBuildProgress() < 1.0f) @best.frames[t] = guns[g];
         }
@@ -273,14 +276,16 @@ namespace FrontLabPorc {
     }
 
     // Slot of the k-th gun of a tier at a far lab: pop-ups either side of the corridor ahead of the
-    // lab, the heavy beside the corridor nearer the lab
+    // lab, the heavy beside the corridor nearer the lab, the flak across the corridor from the heavy
     AIFloat3 Slot(Lab@ l, int tier, int k) {
         float ux, uz;
-        const float along = (tier == 2) ? Global::RoleSettings::Front::LabPorcHeavyForward : Global::RoleSettings::Front::LabPorcPopupForward;
+        const bool back = tier >= 2;
+        const float along = back ? Global::RoleSettings::Front::LabPorcHeavyForward : Global::RoleSettings::Front::LabPorcPopupForward;
+        if (tier == 3) ++k;   // the side the heavy does not take
         const AIFloat3 c = Along(l, along, ux, uz);
         const float nx = -uz, nz = ux;
         const float side = ((k % 2) == 0 ? 1.0f : -1.0f)
-            * (l.width * 0.5f + ((tier == 2) ? Global::RoleSettings::Front::LabPorcHeavySide : Global::RoleSettings::Front::LabPorcPopupSide));
+            * (l.width * 0.5f + (back ? Global::RoleSettings::Front::LabPorcHeavySide : Global::RoleSettings::Front::LabPorcPopupSide));
         return AIFloat3(c.x + nx * side, 0.0f, c.z + nz * side);
     }
 
@@ -311,16 +316,17 @@ namespace FrontLabPorc {
             CCircuitUnit@ labUnit = ai.GetTeamUnit(l.id);
             if (labUnit is null || labUnit.GetBuildProgress() < 1.0f) continue;   // the guns follow a standing lab
             // the first step of the ladder not yet met
-            array<int> need = { 0, 0, 0 };
+            array<int> need = { 0, 0, 0, 0 };
             int step = -1, tier = -1;
             for (uint s = 0; s < tiers.length(); ++s) {
                 const int t = tiers[s];
-                if (t < 1 || t > 2) continue;
+                if (t < 1 || t > 3) continue;
                 need[t] += 1;
                 if (l.standing[t] < need[t]) { step = int(s); tier = t; break; }
             }
             if (tier < 0) continue;
-            const float minIncome = (tier == 2) ? Global::RoleSettings::Front::LabPorcHeavyMetalIncome : Global::RoleSettings::Front::LabPorcPopupMetalIncome;
+            const float minIncome = (tier == 2) ? Global::RoleSettings::Front::LabPorcHeavyMetalIncome
+                : (tier == 3) ? Global::RoleSettings::Front::LabPorcFlakMetalIncome : Global::RoleSettings::Front::LabPorcPopupMetalIncome;
             if (mi < minIncome) continue;
             CCircuitDef@ d = GunDef(tier);
             if (d is null || !u.circuitDef.CanBuild(d)) continue;
@@ -328,7 +334,7 @@ namespace FrontLabPorc {
             if (step != l.lastStep) {
                 l.lastStep = step;
                 GenericHelpers::LogUtil("[FRONT][LabPorc] " + l.defName + " " + l.id + " step " + (step + 1) + " of " + tiers.length() + ": "
-                    + d.GetName() + " (stand: mid " + l.standing[1] + ", heavy " + l.standing[2] + "; M +" + int(mi) + ", "
+                    + d.GetName() + " (stand: mid " + l.standing[1] + ", heavy " + l.standing[2] + ", flak " + l.standing[3] + "; M +" + int(mi) + ", "
                     + int(sqrt(MapHelpers::SqDist(l.pos, Global::Map::StartPos))) + " from our start)", 1);
             }
             if (l.frames[tier] !is null && ai.GetTeamUnit(l.frames[tier].id) !is null) {

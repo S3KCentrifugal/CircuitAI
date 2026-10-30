@@ -295,7 +295,7 @@ namespace Front {
             // along the route of the largest unit it makes to the nearest enemy start; no structure goes
             // on it but mexes (spots are holes). Width = that unit's movement footprint x 8 x WidthFactor.
             // LabPorc: a lab more than LabPorcMinDistance from our start gets LabPorcTier's guns (1 = Pit Bull /
-            // Scorpion / Chimera, 2 = Rattlesnake / Persecutor / Eviscerator) from FRONT T2 constructors.
+            // Scorpion / Chimera, 2 = Rattlesnake / Persecutor / Eviscerator, 3 = the T2 flak) from FRONT T2 constructors.
             // Both off here; experimental_balanced turns them on. Log [FRONT][LabCorridor], [FRONT][LabPorc].
             bool LabCorridor = false;
             float LabCorridorWidthFactor = 2.0f;
@@ -307,7 +307,7 @@ namespace Front {
             array<int> LabCorridorSquares = { 4, 4, 4, 4, 5, 4 };   // HBOT4, HTANK4, HBOT4, HTANK4, HABOT5, HTANK4
             bool LabPorc = false;
             float LabPorcMinDistance = 900.0f;         // labs further than this from our start get guns
-            array<int> LabPorcTier = { 1, 1, 2 };      // build order: two pop-ups, then the heavy plasma
+            array<int> LabPorcTier = { 1, 1, 2, 3 };   // build order: two pop-ups, the heavy plasma, then one T2 flak (owner 2026-10-30)
             float LabPorcPopupForward = 320.0f;        // pop-ups this far down the corridor from the lab
             float LabPorcPopupSide = 64.0f;            // ... this far outside the corridor's edge, one each side
             float LabPorcHeavyForward = 160.0f;
@@ -316,6 +316,7 @@ namespace Front {
             float LabPorcRadius = 600.0f;              // our guns of those kinds this near a far lab count for it
             float LabPorcPopupMetalIncome = 15.0f;     // sustained (10 s minimum) metal income for a pop-up order
             float LabPorcHeavyMetalIncome = 30.0f;     // ... and for the heavy
+            float LabPorcFlakMetalIncome = 30.0f;      // ... and for the T2 flak
             float LabPorcReach = 3000.0f;              // idle, guarding or assisting T2 constructors this near the lab are asked
             float LabPorcTakeRadius = 1200.0f;         // ... and ones walking to an unframed build this near
             int LabPorcScanSeconds = 5;
