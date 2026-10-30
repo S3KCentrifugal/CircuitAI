@@ -73,12 +73,14 @@ namespace AntiSpam {
         bool mine = false;
         int publishedFrame = -100000;
         // owner only, from the census
-        array<int> standing = { 0, 0, 0 };   // light, dragon, nano
-        array<CCircuitUnit@> frames(3);
+        array<int> standing = { 0, 0, 0, 0 };   // light, dragon, nano, T2 pop-up
+        array<CCircuitUnit@> frames(4);
         array<int> staticIds;     // our guns and nanos of this lane
-        array<IUnitTask@> orders(3);         // the live order of each kind
-        array<int> orderBefore = { 0, 0, 0 };
-        array<bool> orderRepair = { false, false, false };
+        array<IUnitTask@> orders(4);         // the live order of each kind
+        array<int> orderBefore = { 0, 0, 0, 0 };
+        array<bool> orderRepair = { false, false, false, false };
+        int heldFrame = -1;       // when we took it
+        int emptySince = -1;      // since when nothing of ours stands on it
         int fails = 0;
         int shift = 0;
         int backoffUntil = -1;
@@ -103,6 +105,9 @@ namespace AntiSpam {
     int detectedFrame = -1;
     int windowCount = 0;
     int ownLaneCount = 0;
+    dictionary incomes;           // FRONT team id -> its published 10 s minimum metal income
+    dictionary incomeFrames;      // FRONT team id -> when it came
+    int lastIncome = -100000;
     AIFloat3 s0, e0;
     float fx = 0.0f, fz = 0.0f, nx = 0.0f, nz = 0.0f, axisLen = 0.0f;
     bool axisReady = false;
@@ -257,7 +262,36 @@ namespace AntiSpam {
         return AIFloat3(-1.0f, 0.0f, -1.0f);
     }
 
-    // Our start or an allied one: whose is nearest the anchor among FRONTs (any role without one)
+    // A FRONT's published income, if fresh; every AI reads the same table (our own entry too), so they agree on the richest
+    bool IncomeOf(int team, float &out income)
+    {
+        const string k = "" + team;
+        int at = -100000;
+        income = 0.0f;
+        if (!incomeFrames.get(k, at) || ai.frame - at > Global::AntiSpam::IncomeStaleSeconds * SECOND) return false;
+        double v = 0.0;
+        incomes.get(k, v);
+        income = float(v);
+        return true;
+    }
+
+    // The richest FRONT by published income (ties: lower team id); -1 when nobody's income is known
+    int RichestFront()
+    {
+        array<Team::Roster::Entry@>@ fronts = Team::Roster::WithRole(AiRole::FRONT);
+        int best = -1;
+        float bestInc = -1.0f;
+        float inc = 0.0f;
+        if (Global::AISettings::Role == AiRole::FRONT && IncomeOf(ai.teamId, inc)) { best = ai.teamId; bestInc = inc; }
+        for (uint i = 0; i < fronts.length(); ++i) {
+            const int t = fronts[i].teamId;
+            if (t == ai.teamId || !IncomeOf(t, inc)) continue;
+            if (inc > bestInc || (inc == bestInc && t < best)) { best = t; bestInc = inc; }
+        }
+        return best;
+    }
+
+    // Owner 2026-10-30: the richest allied FRONT holds a new lane; the nearest FRONT (any role without one) until incomes are known
     bool WeOwn(const AIFloat3 &in anchor)
     {
         array<Team::Roster::Entry@>@ fronts = Team::Roster::WithRole(AiRole::FRONT);
@@ -266,6 +300,10 @@ namespace AntiSpam {
         if (fronts.length() == 0 && !iFront) @pool = Team::Roster::All();
         const float mine = MapHelpers::SqDist(Global::Map::StartPos, anchor);
         if (!iFront && fronts.length() > 0) return false;
+        if (iFront) {
+            const int rich = RichestFront();
+            if (rich >= 0) return rich == ai.teamId;
+        }
         for (uint i = 0; i < pool.length(); ++i) {
             const float d = MapHelpers::SqDist(pool[i].startPos, anchor);
             if (d < mine || (d == mine && pool[i].teamId < ai.teamId)) return false;
@@ -302,9 +340,12 @@ namespace AntiSpam {
             l.anchor = c.anchor;
             l.lateral = c.lateral;
             l.mine = true;
+            l.heldFrame = ai.frame;
             lanes.insertLast(l);
+            float inc = 0.0f;
+            const bool known = IncomeOf(ai.teamId, inc);
             GenericHelpers::LogUtil("[AntiSpam] holding lane " + l.key + " at (" + int(l.anchor.x) + "," + int(l.anchor.z) + ")"
-                + (own ? " (nearest FRONT)" : " (nobody published it)"), 1);
+                + (own ? (known ? " (richest FRONT, M +" + int(inc) + ")" : " (nearest FRONT)") : " (nobody published it)"), 1);
             Publish(true);
         }
     }
@@ -367,6 +408,7 @@ namespace AntiSpam {
         string n = "";
         if (kind == 0) Global::AntiSpam::LightGun.get(Global::AISettings::Side, n);
         else if (kind == 1) Global::AntiSpam::DragonGun.get(Global::AISettings::Side, n);
+        else if (kind == 3) Global::AntiSpam::T2Gun.get(Global::AISettings::Side, n);
         else n = UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side);
         return n;
     }
@@ -378,6 +420,11 @@ namespace AntiSpam {
         const array<float> nanoSide = { -150.0f, 150.0f, -420.0f, 420.0f, 0.0f };
         if (kind == 0) return At(l.anchor, Global::AntiSpam::GunAlong, lightSide[k % lightSide.length()]);
         if (kind == 1) return At(l.anchor, Global::AntiSpam::GunAlong + 20.0f, dragonSide[k % dragonSide.length()]);
+        if (kind == 3) {
+            // between the light guns and the nano line, so each slot is near a nano slot
+            const array<float> t2Side = { -260.0f, 260.0f, 0.0f, -480.0f, 480.0f };
+            return At(l.anchor, Global::AntiSpam::GunAlong - 40.0f, t2Side[k % t2Side.length()]);
+        }
         return At(l.anchor, Global::AntiSpam::NanoAlong, nanoSide[k % nanoSide.length()]);
     }
 
@@ -387,11 +434,11 @@ namespace AntiSpam {
         for (uint j = 0; j < lanes.length(); ++j) {
             if (!lanes[j].mine) continue;
             any = true;
-            for (int t = 0; t < 3; ++t) { lanes[j].standing[t] = 0; @lanes[j].frames[t] = null; }
+            for (int t = 0; t < 4; ++t) { lanes[j].standing[t] = 0; @lanes[j].frames[t] = null; }
             lanes[j].staticIds.resize(0);
         }
         if (!any) return;
-        const array<string> names = { KindName(0), KindName(1), KindName(2) };
+        const array<string> names = { KindName(0), KindName(1), KindName(2), KindName(3) };
         const float r2 = Global::AntiSpam::ClusterRadius * Global::AntiSpam::ClusterRadius;
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
@@ -399,9 +446,9 @@ namespace AntiSpam {
             if (u is null || u.circuitDef.IsMobile()) continue;
             const string dn = u.circuitDef.GetName();
             int t = 0;
-            while (t < 3 && dn != names[t]) ++t;
+            while (t < 4 && dn != names[t]) ++t;
             // other guns of ours near the lane are repaired too
-            if (t == 3 && !u.circuitDef.HasSurfToLand()) continue;
+            if (t == 4 && !u.circuitDef.HasSurfToLand()) continue;
             const AIFloat3 q = u.GetPos(ai.frame);
             Lane@ best = null;
             float bestSq = r2;
@@ -413,14 +460,14 @@ namespace AntiSpam {
             if (best is null) continue;
             if (t == 2 && !NearNanoSlot(best, q)) continue;   // an ordinary turret near the lane
             best.staticIds.insertLast(int(u.id));
-            if (t == 3) continue;
+            if (t == 4) continue;
             best.standing[t] += 1;
             if (u.GetBuildProgress() < 1.0f) @best.frames[t] = u;
         }
         for (uint j = 0; j < lanes.length(); ++j) {
             Lane@ l = lanes[j];
             if (!l.mine) continue;
-            for (int k = 0; k < 3; ++k) {
+            for (int k = 0; k < 4; ++k) {
                 if (l.orders[k] is null || !l.orders[k].IsDead()) continue;
                 if (l.standing[k] > l.orderBefore[k] || (l.orderRepair[k] && l.standing[k] >= l.orderBefore[k])) { l.fails = 0; l.shift = 0; }
                 else {
@@ -460,7 +507,7 @@ namespace AntiSpam {
         // (arena 2026-10-27: FRONT's lab turrets took the gun order's armcv the same frame; the order sat unbuilt 9 min)
         if (u.task !is null) {
             for (uint j = 0; j < lanes.length(); ++j)
-                for (int k = 0; k < 3; ++k)
+                for (int k = 0; k < 4; ++k)
                     if (lanes[j].orders[k] is u.task && !u.task.IsDead()) return u.task;
         }
         IBuilderTask@ current = u.task is null ? null : cast<IBuilderTask>(u.task);
@@ -469,7 +516,7 @@ namespace AntiSpam {
         for (uint j = 0; j < lanes.length(); ++j) {
             Lane@ l = lanes[j];
             if (!l.mine) continue;
-            for (int k = 0; k < 3; ++k) {
+            for (int k = 0; k < 4; ++k) {
                 IUnitTask@ o = l.orders[k];
                 if (o is null || o.IsDead() || int(o.GetUnits().length()) >= Global::AntiSpam::OrderBuilders) continue;
                 if (!aiTerrainMgr.CanReachAt(u, l.anchor, u.circuitDef.GetBuildDistance() + 200.0f)) break;
@@ -486,12 +533,17 @@ namespace AntiSpam {
             Lane@ l = lanes[j];
             if (!l.mine || ai.frame < l.backoffUntil) continue;
             if (!aiTerrainMgr.CanReachAt(u, l.anchor, u.circuitDef.GetBuildDistance() + 200.0f)) continue;
+            bool t1Due = false;   // a funded T1 step still misses something (standing or on order)
             for (int s = 0; s < steps; ++s) {
+                bool missing = false;
+                for (int t = 0; t < 3 && !missing; ++t) missing = l.standing[t] < Want(t, s);
+                if (!missing) continue;
+                if (mi < Global::AntiSpam::LadderMetal[s] || ei < Global::AntiSpam::LadderEnergy[s]) break;
+                t1Due = true;
                 bool due = false;
                 // a dead order waits for Census to count it (the slot shift and back-off), so no new one before then
                 for (int t = 0; t < 3 && !due; ++t) due = l.standing[t] < Want(t, s) && l.orders[t] is null;
-                if (!due) continue;
-                if (mi < Global::AntiSpam::LadderMetal[s] || ei < Global::AntiSpam::LadderEnergy[s]) break;
+                if (!due) continue;   // all on order: a later step may want another kind
                 for (uint m = 0; m < kinds.length(); ++m) {
                     const int kind = kinds[m];
                     if (l.standing[kind] >= Want(kind, s) || l.orders[kind] !is null) continue;
@@ -522,8 +574,64 @@ namespace AntiSpam {
                 }
                 break;   // this step is due but this constructor builds none of it
             }
+            if (t1Due) continue;
+            IUnitTask@ t2 = T2Task(u, l, mi, ei);
+            if (t2 !is null) return t2;
         }
         return null;
+    }
+
+    // A standing lane nano whose build reach holds p with `margin` to spare
+    bool InNanoReach(Lane@ l, const AIFloat3 &in p, float margin)
+    {
+        for (uint i = 0; i < l.staticIds.length(); ++i) {
+            CCircuitUnit@ n = ai.GetTeamUnit(l.staticIds[i]);
+            if (n is null || n.GetBuildProgress() < 1.0f || !UnitHelpers::IsT1Nano(n.circuitDef.GetName())) continue;
+            const float reach = n.circuitDef.GetBuildDistance() - margin;
+            if (reach > 0.0f && MapHelpers::SqDist(p, n.GetPos(ai.frame)) <= reach * reach) return true;
+        }
+        return false;
+    }
+
+    // Owner 2026-10-30: the T1 ladder stands for our income, so T2 pop-ups go in, each where a lane nano repairs it
+    IUnitTask@ T2Task(CCircuitUnit@ u, Lane@ l, float mi, float ei)
+    {
+        if (l.orders[3] !is null) return null;
+        const int steps = AiMin(int(Global::AntiSpam::LadderT2.length()), AiMin(int(Global::AntiSpam::LadderT2Metal.length()), int(Global::AntiSpam::LadderT2Energy.length())));
+        int want = 0;
+        int step = -1;
+        for (int s = 0; s < steps; ++s) {
+            if (mi < Global::AntiSpam::LadderT2Metal[s] || ei < Global::AntiSpam::LadderT2Energy[s]) break;
+            want = Global::AntiSpam::LadderT2[s];
+            step = s;
+        }
+        if (l.standing[3] >= want) return null;
+        CCircuitDef@ d = ai.GetCircuitDef(KindName(3));
+        if (d is null || !u.circuitDef.CanBuild(d)) return null;   // a T2 constructor's job
+        IUnitTask@ order = null;
+        if (l.frames[3] !is null && ai.GetTeamUnit(l.frames[3].id) !is null) {
+            @order = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, l.frames[3], 120 * SECOND));
+        } else {
+            if (d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
+            if (!d.IsAvailable(ai.frame)) return null;
+            // the first slot a standing nano reaches, shake included
+            const float shake = Global::AntiSpam::T2Shake;
+            const float margin = shake + d.GetModelRadius();
+            AIFloat3 p(-1.0f, 0.0f, -1.0f);
+            for (int k = 0; k < 5 && p.x < 0.0f; ++k) {
+                const AIFloat3 q = GunSlot(l, 3, l.standing[3] + l.shift + k);
+                if (InNanoReach(l, q, margin)) p = q;
+            }
+            if (p.x < 0.0f) return null;   // no nano stands near the slots yet: the T1 ladder rebuilds them first
+            @order = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, d, p, shake, true, 180 * SECOND));
+            if (order !is null) GenericHelpers::LogUtil("[AntiSpam] " + u.circuitDef.GetName() + " " + u.id + " orders T2 " + d.GetName()
+                + " " + (l.standing[3] + 1) + " of " + want + " (T2 step " + (step + 1) + ") of lane " + l.key + " at (" + int(p.x) + "," + int(p.z) + "), in a lane nano's reach", 1);
+        }
+        if (order is null) return null;
+        @l.orders[3] = order;
+        l.orderBefore[3] = l.standing[3];
+        l.orderRepair[3] = l.frames[3] !is null;
+        return order;
     }
 
     /**************************************************************************
@@ -547,12 +655,75 @@ namespace AntiSpam {
         }
     }
 
+    // Every FRONT tells the allies its 10 s minimum metal income, so all of them can name the richest
+    void PublishIncome()
+    {
+        if (Global::AISettings::Role != AiRole::FRONT || ai.frame - lastIncome < Global::AntiSpam::PublishSeconds * SECOND) return;
+        lastIncome = ai.frame;
+        const int mi = int(Economy::GetMinMetalIncomeLast10s());
+        const int ei = int(Economy::GetMinEnergyIncomeLast10s());
+        SetIncome(ai.teamId, float(mi));
+        AiSendMessage(PREFIX + "inc|" + mi + "|" + ei);
+    }
+
+    void SetIncome(int team, float mi)
+    {
+        incomes.set("" + team, double(mi));
+        incomeFrames.set("" + team, ai.frame);
+    }
+
+    // A lane given up: its candidate waits OwnerWaitSeconds again, so the richest FRONT, not the first seer, takes it
+    void ForgetLane(const string &in key)
+    {
+        for (uint i = 0; i < lanes.length(); ++i) {
+            if (lanes[i].key != key) continue;
+            for (uint j = 0; j < candidates.length(); ++j)
+                if (Abs(candidates[j].lateral - lanes[i].lateral) < Global::AntiSpam::LaneSeparation) candidates[j].firstFrame = ai.frame;
+            lanes.removeAt(i);
+            return;
+        }
+    }
+
+    // Owner 2026-10-30: a lane of ours that stands empty while a FRONT earning much more is there goes to that FRONT
+    void HandOver()
+    {
+        const int rich = RichestFront();
+        if (rich < 0 || rich == ai.teamId) return;
+        float richInc = 0.0f, ourInc = 0.0f;
+        if (!IncomeOf(rich, richInc) || !IncomeOf(ai.teamId, ourInc)) return;
+        if (richInc < ourInc * Global::AntiSpam::HandOverRatio || richInc < ourInc + Global::AntiSpam::HandOverMinGap) return;
+        for (uint i = 0; i < lanes.length(); ++i) {
+            Lane@ l = lanes[i];
+            if (!l.mine) continue;
+            bool empty = true;
+            for (int k = 0; k < 4 && empty; ++k) empty = l.standing[k] == 0 && (l.orders[k] is null || l.orders[k].IsDead());
+            if (!empty) { l.emptySince = -1; continue; }
+            if (l.emptySince < 0) l.emptySince = ai.frame;
+            if (ai.frame - l.emptySince < Global::AntiSpam::HandOverSeconds * SECOND || ai.frame - l.heldFrame < Global::AntiSpam::HandOverSeconds * SECOND) continue;
+            const string key = l.key;
+            const array<string>@ parts = key.split(":");
+            GenericHelpers::LogUtil("[AntiSpam] lane " + key + " empty " + ((ai.frame - l.emptySince) / SECOND) + " s at M +" + int(ourInc)
+                + "; handed to the richest FRONT, team " + rich + " (M +" + int(richInc) + ")", 1);
+            AiSendMessage(PREFIX + "drop|" + parts[1] + "|" + rich);
+            ForgetLane(key);
+            return;   // one a pass; the lanes array changed
+        }
+    }
+
     // Team::HandleMessage
     bool HandleMessage(const string &in msg, int fromTeamId)
     {
         if (msg.findFirst(PREFIX) != 0) return false;
         array<string>@ parts = msg.split("|");
         if (parts.length() < 4) return true;
+        if (parts[1] == "inc") {
+            SetIncome(fromTeamId, float(parseInt(parts[2])));
+            return true;
+        }
+        if (parts[1] == "drop") {
+            ForgetLane(fromTeamId + ":" + parts[2]);
+            return true;
+        }
         if (parts[1] == "lane") {
             const string key = fromTeamId + ":" + parts[2];
             array<string>@ xz = parts[3].split(",");
@@ -599,6 +770,7 @@ namespace AntiSpam {
         lastTick = ai.frame;
         Init();
         if (!Axis()) return;
+        PublishIncome();
         Scan();
         if (ai.frame - lastPrune >= 10 * SECOND) {
             lastPrune = ai.frame;
@@ -614,12 +786,13 @@ namespace AntiSpam {
         }
         if (lanes.length() == 0) return;
         Census();
+        HandOver();
         Publish(false);
         if (ai.frame - lastReport >= Global::AntiSpam::ReportSeconds * SECOND) {
             lastReport = ai.frame;
             for (uint i = 0; i < lanes.length(); ++i) {
                 Lane@ l = lanes[i];
-                GenericHelpers::LogUtil("[AntiSpam] lane " + l.key + (l.mine ? " (ours)" : "") + ": light " + l.standing[0] + ", dragon " + l.standing[1] + ", nano " + l.standing[2] + "; spam seen " + windowCount, 1);
+                GenericHelpers::LogUtil("[AntiSpam] lane " + l.key + (l.mine ? " (ours)" : "") + ": light " + l.standing[0] + ", dragon " + l.standing[1] + ", nano " + l.standing[2] + ", T2 " + l.standing[3] + "; spam seen " + windowCount, 1);
             }
         }
     }

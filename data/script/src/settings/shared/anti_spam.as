@@ -45,6 +45,20 @@ namespace Global { namespace AntiSpam {
     array<int> LadderNano = { 2, 2, 2, 3, 3, 4 };
     array<float> LadderMetal = { 10.0f, 15.0f, 22.0f, 30.0f, 40.0f, 50.0f };
     array<float> LadderEnergy = { 100.0f, 150.0f, 250.0f, 350.0f, 500.0f, 700.0f };
+    // T2 pop-ups (Pit Bull / Scorpion / Chimera; owner 2026-10-30) once the T1 ladder stands for the
+    // income we have, each slot within a standing lane nano's build reach so the nanos repair it.
+    dictionary T2Gun = { {"armada", "armpb"}, {"cortex", "corvipe"}, {"legion", "legapopupdef"} };
+    array<int> LadderT2 = { 2, 3, 4 };
+    array<float> LadderT2Metal = { 35.0f, 55.0f, 80.0f };
+    array<float> LadderT2Energy = { 600.0f, 900.0f, 1300.0f };
+    float T2Shake = 40.0f;                 // native looks only this far round a T2 slot, to stay in the nanos' reach
+    // Owner (owner 2026-10-30): the richest allied FRONT by the 10 s minimum metal income every
+    // FRONT publishes; the nearest FRONT only when nobody's income is known yet. An owner whose lane
+    // stands empty for HandOverSeconds hands it on when another FRONT earns HandOverRatio x as much.
+    int IncomeStaleSeconds = 70;
+    int HandOverSeconds = 60;
+    float HandOverRatio = 1.5f;
+    float HandOverMinGap = 10.0f;
     int PublishSeconds = 20;               // the owner's lanes go to the allies this often
     int OwnerWaitSeconds = 90;             // a lane nobody published this long after we saw it: we hold it ourselves
     int ReportSeconds = 120;
