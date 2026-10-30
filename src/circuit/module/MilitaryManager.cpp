@@ -2322,7 +2322,9 @@ IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)
 	 */
 	if (cdef->IsRoleTrans()) {
 		task = Enqueue(TaskF::Common(IFighterTask::FightType::FERRY));
-	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));	} else if (cdef->IsRoleSupport()) {
+	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
+		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
+	} else if (cdef->IsRoleSupport()) {
 		if (!HasRangedUnits() && /*cdef->IsAttacker() && */GetTasks(IFighterTask::FightType::ATTACK).empty() && GetTasks(IFighterTask::FightType::DEFEND).empty()) {
 			task = Enqueue(TaskF::Defend(IFighterTask::FightType::ATTACK, IFighterTask::FightType::SUPPORT, minAttackers));
 		} else {
