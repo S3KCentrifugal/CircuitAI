@@ -999,6 +999,10 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos)
 		if (r == nullptr) return true;
 		const int ownTeam = circuit->GetTeamId();
 		if (r->owner < 0 || r->owner == ownTeam) return true;
+		// Owner 2026-10-30: the post-window openings release the spot to any
+		// ally. Their nearest-start owner kept a TECH home spot nobody built
+		// shut to the FRONTs beside it all game (Entrenched Plains, AIs 8-11).
+		if (r->rule == int(mex_territory::Rule::OPEN_LAND) || r->rule == int(mex_territory::Rule::OPEN_CLASS)) return true;
 		if (!mexResolvedLandWindow || !mexResolvedTheatreWindow) {
 			for (IBuilderTask* task : circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::MEX)) {
 				if (task != nullptr && !task->IsDead() && task->GetPosition().SqDistance2D(pos) < SQUARE(64.f)) return true;
@@ -1635,9 +1639,10 @@ IBuilderTask* CEconomyManager::UpdateMetalTasks(const AIFloat3& position, CCircu
 			CMetalData::PointPredicate predicate = [this, &spots, map, &mexDefs, terrainMgr, unit, &mexDef](int index) {
 				const AIFloat3& pos = spots[index].position;
 				// D-327: the walking-distance ownership replaces the ally-zone veto only
-				// while its opening window runs; afterwards the zone veto and the Voronoi split hold
+				// while its opening window runs; afterwards the zone veto holds, except
+				// with mex navigation, where an open spot is free to any ally (owner 2026-10-30)
 				if (IsAllyOpenMexSpot(index)
-					&& (IsMexOwnershipActive() ? IsOwnSpot(pos) : (!terrainMgr->IsZoneAlly(pos) && (!mexNavigationEnabled || IsOwnSpot(pos))))
+					&& (mexNavigationEnabled ? IsOwnSpot(pos) : !terrainMgr->IsZoneAlly(pos))
 					&& CanReachMex(unit, pos))  // hostile environment
 				{
 					for (CCircuitDef* mDef : mexDefs) {

@@ -2,9 +2,9 @@
 namespace Global {
 namespace RoleSettings {        
         // Early allocation by reachable walking distance from starting commanders.
-        // At this game time, every ally may take unoccupied reachable spots.
+        // At this game time, every ally may take unoccupied reachable spots, beside an ally base too (owner 2026-10-30).
         bool MexOwnershipEnabled = false;
-        float MexOwnershipSeconds = 360.0f; // 0 disables early protection (D-352: 6 minutes, down from 10, land and water alike)
+        float MexOwnershipSeconds = 270.0f; // 0 disables early protection (owner 2026-10-30: 4:30, released before 5 minutes; D-352 had 6, land and water alike)
         // D-352: mex ownership by theatre. Rules in resource/MexTerritory.h; policy
         // here. Every number an ally reads comes from the roster broadcast
         // (systems/team/mex_claim.as), never from a map config.
