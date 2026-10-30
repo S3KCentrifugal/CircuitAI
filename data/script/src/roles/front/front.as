@@ -21,6 +21,7 @@
 #include "../../systems/construction/front_recovery.as"
 #include "../../systems/construction/front_mex_upgrade.as"
 #include "../../systems/construction/front_factory_nanos.as"
+#include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/commander_front.as"
 #include "../../systems/construction/front_spawn_factory.as"
 // Builder state and helpers for enqueueing structures like nanos
@@ -46,6 +47,7 @@ namespace RoleFront {
     void Front_Init() {
         FrontGeothermal::Reset();
         FrontFactoryNanos::Reset();
+        FrontLabPorc::Reset();
         FrontSpawnFactory::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
@@ -612,6 +614,9 @@ namespace RoleFront {
         // Owner (2026-10-25): a T2 lab's turrets from the moment it is framed (front_factory_nanos.as)
         IUnitTask@ labNano=FrontFactoryNanos::Work(builder);
         if (labNano !is null) return labNano;
+        // Owner (2026-10-30): T2 lab corridors to the enemy base; forward labs' own porc (front_lab_porc.as)
+        IUnitTask@ labPorc=FrontLabPorc::Work(builder);
+        if (labPorc !is null) return labPorc;
         // Select explicit geo work before asking native to enqueue another
         // energy task. Overriding an already-created task would leak work.
         IUnitTask@ geothermal=FrontGeothermal::Work(builder);

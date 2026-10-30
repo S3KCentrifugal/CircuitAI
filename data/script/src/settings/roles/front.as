@@ -289,6 +289,36 @@ namespace Front {
             float T2FactoryNanoReach = 2500.0f;        // idle, guarding or assisting constructors this near the lab are asked
             float T2FactoryNanoTakeRadius = 1200.0f;   // ... and ones walking to an unframed build this near
             int T2FactoryNanoScanSeconds = 2;          // turret count refresh while a lab is short
+
+            // T2 lab corridors and forward lab porc (owner, 2026-10-30; systems/construction/front_lab_porc.as).
+            // LabCorridor: every T2 bot lab and vehicle plant of ours reserves its exit cone and a corridor
+            // along the route of the largest unit it makes to the nearest enemy start; no structure goes
+            // on it but mexes (spots are holes). Width = that unit's movement footprint x 8 x WidthFactor.
+            // LabPorc: a lab more than LabPorcMinDistance from our start gets LabPorcTier's guns (1 = Pit Bull /
+            // Scorpion / Chimera, 2 = Rattlesnake / Persecutor / Eviscerator) from FRONT T2 constructors.
+            // Both off here; experimental_balanced turns them on. Log [FRONT][LabCorridor], [FRONT][LabPorc].
+            bool LabCorridor = false;
+            float LabCorridorWidthFactor = 2.0f;
+            float LabCorridorStopShort = 900.0f;       // the corridor ends this far short of the enemy start
+            float LabCorridorExitLength = 240.0f;      // the exit cone in front of the lab
+            // lab, the largest unit it makes (by movement class), that class's footprint in squares
+            array<string> LabCorridorLabs = { "armalab", "armavp", "coralab", "coravp", "legalab", "legavp" };
+            array<string> LabCorridorUnits = { "armfboy", "armbull", "corsumo", "corgol", "legamph", "legmed" };
+            array<int> LabCorridorSquares = { 4, 4, 4, 4, 5, 4 };   // HBOT4, HTANK4, HBOT4, HTANK4, HABOT5, HTANK4
+            bool LabPorc = false;
+            float LabPorcMinDistance = 900.0f;         // labs further than this from our start get guns
+            array<int> LabPorcTier = { 1, 1, 2 };      // build order: two pop-ups, then the heavy plasma
+            float LabPorcPopupForward = 320.0f;        // pop-ups this far down the corridor from the lab
+            float LabPorcPopupSide = 64.0f;            // ... this far outside the corridor's edge, one each side
+            float LabPorcHeavyForward = 160.0f;
+            float LabPorcHeavySide = 96.0f;
+            float LabPorcShake = 128.0f;               // native looks this far round a slot for room
+            float LabPorcRadius = 600.0f;              // our guns of those kinds this near a far lab count for it
+            float LabPorcPopupMetalIncome = 15.0f;     // sustained (10 s minimum) metal income for a pop-up order
+            float LabPorcHeavyMetalIncome = 30.0f;     // ... and for the heavy
+            float LabPorcReach = 3000.0f;              // idle, guarding or assisting T2 constructors this near the lab are asked
+            float LabPorcTakeRadius = 1200.0f;         // ... and ones walking to an unframed build this near
+            int LabPorcScanSeconds = 5;
         }
 }
 }
