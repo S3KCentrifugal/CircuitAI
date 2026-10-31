@@ -80,6 +80,8 @@ namespace FrontOverflow {
     int blockRetry = -1;
     AIFloat3 blockCentre(-1.0f, 0.0f, -1.0f);
     array<AIFloat3> allCells;   // every block's cells, for the log's placement check
+    uint blockFirstCell = 0;    // the current block's first entry in allCells
+    bool anchored = false;      // the current block's first converter stands (its grid is set)
 
     float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even 4x4 footprints sit on 16-elmo lines
 
@@ -154,7 +156,7 @@ namespace FrontOverflow {
         cells = bestCells;
         cellState.resize(cells.length()); cellTasks.resize(cells.length());
         for (uint i = 0; i < cells.length(); ++i) { cellState[i] = 0; @cellTasks[i] = null; }
-        blockCentre = best; blocks++; failsHere = 0;
+        blockCentre = best; blocks++; failsHere = 0; blockFirstCell = allCells.length(); anchored = false;
         for (uint i = 0; i < cells.length(); ++i) allCells.insertLast(cells[i]);
         GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
             + Global::RoleSettings::Front::OverflowBlockCols + "x" + Global::RoleSettings::Front::OverflowBlockRows + ", eco anchor "
@@ -162,25 +164,55 @@ namespace FrontOverflow {
         return true;
     }
 
-    // A cell's converter: ours standing or framed on it
-    bool Occupied(CCircuitDef@ d, const AIFloat3 &in p)
+    // A cell's converter: ours standing or framed on it, or slipped by the native site search (siteRadius 24
+    // lets it move one 16-elmo step); out = where it stands
+    bool Occupied(CCircuitDef@ d, const AIFloat3 &in p, AIFloat3 &out at)
     {
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef !is d) continue;
-            if (MapHelpers::SqDist(u.GetPos(ai.frame), p) <= 12.0f * 12.0f) return true;
+            const AIFloat3 q = u.GetPos(ai.frame);
+            if (MapHelpers::SqDist(q, p) <= 24.0f * 24.0f) { at = q; return true; }
         }
         return false;
+    }
+    // The block's first converter slipped: the open cells follow it, so the block stays gap-free round what
+    // stands (arm C, 2026-10-31: the slipped first converter overlapped its neighbours' cells and they failed)
+    void Follow(const AIFloat3 &in from, const AIFloat3 &in to)
+    {
+        const float dx = to.x - from.x, dz = to.z - from.z;
+        if (dx * dx + dz * dz <= 4.0f * 4.0f) return;
+        int moved = 0;
+        for (uint i = 0; i < cells.length(); ++i) {
+            if (cellState[i] != 0) continue;
+            const AIFloat3 was = cells[i];
+            cells[i] = AIFloat3(was.x + dx, was.y, was.z + dz);
+            for (uint k = blockFirstCell; k < allCells.length(); ++k)
+                if (MapHelpers::SqDist(allCells[k], was) < 1.0f) { allCells[k] = cells[i]; break; }
+            moved++;
+        }
+        if (moved > 0) GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " follows its first converter: "
+            + moved + " open cells moved " + int(dx) + "," + int(dz), 1);
     }
 
     void RefreshCells(CCircuitDef@ d)
     {
         for (uint i = 0; i < cells.length(); ++i) {
             if (cellState[i] == 1) {
-                if (cellTasks[i] !is null && !cellTasks[i].IsDead()) continue;
+                if (cellTasks[i] !is null && !cellTasks[i].IsDead()) {
+                    // the block's first frame: where it really stands sets the grid for the open cells
+                    if (!anchored) {
+                        AIFloat3 at;
+                        if (Occupied(d, cells[i], at)) { Follow(cells[i], at); anchored = true; }
+                    }
+                    continue;
+                }
                 // the order ended: built, framed, or failed
-                cellState[i] = Occupied(d, cells[i]) ? 2 : 3;
+                AIFloat3 at;
+                const bool built = Occupied(d, cells[i], at);
+                if (built && !anchored) { Follow(cells[i], at); anchored = true; }
+                cellState[i] = built ? 2 : 3;
                 @cellTasks[i] = null;
                 if (cellState[i] == 3) { blockFails++; failsHere++; }
             }
@@ -215,6 +247,10 @@ namespace FrontOverflow {
         }
         const int i = OpenCell();
         if (i < 0) return null;   // the rest of the block is ordered
+        if (!anchored) {
+            // one cell until the block's first frame stands and sets the grid (Follow)
+            for (uint k = 0; k < cells.length(); ++k) if (cellState[k] == 1) return null;
+        }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::CONVERT, Task::Priority::HIGH, d, cells[i], 0.0f, true, 180 * SECOND));
         if (t is null) { cellState[i] = 3; blockFails++; failsHere++; return null; }
         IBuilderTask@ bt = cast<IBuilderTask>(t);
