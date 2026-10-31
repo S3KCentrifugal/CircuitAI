@@ -20,6 +20,7 @@
 #include "../../systems/construction/front_eco_ladder.as"
 #include "../../systems/construction/front_recovery.as"
 #include "../../systems/construction/front_mex_upgrade.as"
+#include "../../systems/construction/front_overflow.as"
 #include "../../systems/construction/front_factory_nanos.as"
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/commander_front.as"
@@ -232,6 +233,7 @@ namespace RoleFront {
         Front_IncomeLimits(metalIncome, energyIncome);
         FrontRecovery::Update(metalIncome);
         FrontMexUp::Update(); // owner, 2026-10-22: T2 helpers move to open mex upgrades
+        FrontOverflow::Update(); // owner, 2026-10-31: energy overflow into T2 converter blocks; per-minute overflow log
 
         // One-time switch for T1 combat units to 'raider' role when metal income > 250
         if (!g_frontT1CombatRoleSwitchDone && metalIncome > 250.0f) {
@@ -424,6 +426,10 @@ namespace RoleFront {
             IUnitTask@ massTask = FrontTankMass::Try(u, factoryName, side, g_frontRaiderOpenerDone || FrontOpener::WasQueued("batch"));
             if (massTask !is null) return massTask;
         }
+
+        // Owner (2026-10-31): extra T2 constructors (and assist bots) for converter blocks and mex upgrades
+        IUnitTask@ extraBuilder = FrontOverflow::Recruit(u, factoryName, side);
+        if (extraBuilder !is null) return extraBuilder;
 
         // T2 Bot Lab enforcement (Front-specific minimum T2 bot constructors)
         if (UnitHelpers::IsT2BotLab(factoryName)) {
@@ -631,6 +637,9 @@ namespace RoleFront {
         IUnitTask@ reclaim=FrontReclaim::Work(builder);
         if (reclaim !is null) return reclaim;
         // Owner (2026-10-16): fusion, second fusion, advanced fusion, second advanced fusion, gantry
+        // Owner (2026-10-31): an overflowing energy bank goes into T2 converter blocks (mexes first)
+        IUnitTask@ overflow=FrontOverflow::Work(builder);
+        if (overflow !is null) return overflow;
         IUnitTask@ ladderGantry=Front_TryLadderGantry(builder);
         if (ladderGantry !is null) return ladderGantry;
         IUnitTask@ ladder=FrontEcoLadder::Work(builder);

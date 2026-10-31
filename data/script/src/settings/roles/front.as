@@ -141,7 +141,30 @@ namespace Front {
             int EcoLadderFrameHelpers = 4;                // the ladder's constructors on a reactor frame at a time
             float EcoLadderFrameHelpRadius = 3000.0f;     // a frame this near the constructor
             float EcoLadderConvertBankPercent = 0.6f;
-            int EcoLadderGantryAfterAdvFusions = 2;       // the gantry step once this many advanced fusions stand (1 in experimental_balanced)
+            int EcoLadderGantryAfterAdvFusions = 2;
+            // Owner (2026-10-31): rezzed fusions of other factions, underwater/cloaked fusions and every geothermal
+            // plant (regular and advanced) count as fusions for the ladder, so one standing is "the first fusion stands"
+            bool EcoLadderFusionEquivalents = false;
+            // Owner (2026-10-31): energy overflow into metal (systems/construction/front_overflow.as). Off here, on in
+            // experimental_balanced. OverflowLog (the per-minute [FRONT][Overflow] line) runs either way.
+            bool OverflowConverters = false;
+            bool OverflowLog = true;
+            float OverflowBankPercent = 0.9f;     // the energy bank this full...
+            float OverflowSpareEnergy = 800.0f;   // ...or income beating the pull by this
+            int OverflowSeconds = 20;             // for this long
+            int OverflowParallel = 3;             // T2 converters unfinished at once
+            int OverflowMaxConverters = 40;
+            int OverflowBlockCols = 3;            // a block: cols x rows converters, no gaps
+            int OverflowBlockRows = 3;
+            float OverflowMaxThreat = 0.0f;       // surface threat allowed at a new block
+            int OverflowPullSeconds = 10;         // a helping T2 constructor moved onto a converter at most this often
+            bool OverflowMexFirst = true;         // with the bank full, T1 mex upgrades before converters and reactors
+            int OverflowExtraT2Seconds = 45;      // extra T2 constructors once an overflow lasts this long:
+            int OverflowExtraT2Max = 3;           // 1, plus 1 per OverflowExtraT2Spare above OverflowSpareEnergy, at most this
+            float OverflowExtraT2Spare = 1200.0f;
+            int MexUpExtraT2Max = 3;              // extra T2 constructors while T1 mexes of ours wait for an upgrade
+            int MexUpExtraAssistMax = 2;          // fast-assist bots (Butler, Twitcher, Proteus) for those upgrades
+            int OverflowRecruitSeconds = 30;      // one extra recruit at most this often       // the gantry step once this many advanced fusions stand (1 in experimental_balanced)
             // FRONT recovery after losing the base (systems/construction/front_recovery.as); off here, on in experimental_balanced
             bool Recovery = false;
             float RecoveryEnterMetalIncome = 15.0f;      // recovery starts below this metal income...

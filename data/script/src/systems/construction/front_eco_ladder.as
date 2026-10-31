@@ -41,16 +41,47 @@ namespace FrontEcoLadder {
     // standing finished
     int Done(const string &in name) { CCircuitDef@ d = Def(name); return d is null ? 0 : AiMax(0, d.count - aiBuilderMgr.GetUnfinishedCount(d)); }
 
-    int Fusions() { return Done(UnitHelpers::GetFusionNameForSide(Side())); }
-    int FusionsTotal() { return Total(UnitHelpers::GetFusionNameForSide(Side())); }
+    // Fusion equivalents (owner, 2026-10-31; Front::EcoLadderFusionEquivalents): a rezzed fusion of our
+    // own faction was always one of ours (the engine registers a resurrected unit like a built one), but
+    // a rezzed Cortex or Legion fusion, an underwater or cloaked fusion, and every geothermal plant
+    // (regular 300 E, advanced 1250 E, the Prude 750 E) count too: they give a fusion's energy and are
+    // the usual reason the bank overflows. Each counts as one fusion (so a geo satisfies "the first
+    // fusion stands"); a rezzed advanced fusion of another faction counts as an advanced fusion.
+    array<string> FusionLike = {"armfus", "corfus", "legfus", "armckfus", "armuwfus", "coruwfus"};
+    array<string> AdvFusionLike = {"armafus", "corafus", "legafus"};
+    array<string> GeoLike = {"armgeo", "corgeo", "leggeo", "armuwgeo", "coruwgeo", "armageo", "corageo", "legageo", "armgmm"};
+    bool EquivalentsOn() { return Global::RoleSettings::Front::EcoLadderFusionEquivalents; }
+    // other than our own faction's fusion; done = finished only
+    int Equivalents(const array<string> &in names, const string &in own, bool done)
+    {
+        int n = 0;
+        for (uint i = 0; i < names.length(); ++i) {
+            if (names[i] == own) continue;
+            n += done ? Done(names[i]) : Total(names[i]);
+        }
+        return n;
+    }
+    int FusionEquivalents(bool done)
+    {
+        if (!EquivalentsOn()) return 0;
+        return Equivalents(FusionLike, UnitHelpers::GetFusionNameForSide(Side()), done) + Equivalents(GeoLike, "", done);
+    }
+    int AdvFusionEquivalents(bool done)
+    {
+        if (!EquivalentsOn()) return 0;
+        return Equivalents(AdvFusionLike, UnitHelpers::GetAdvFusionNameForSide(Side()), done);
+    }
+    int OwnFusionsTotal() { return Total(UnitHelpers::GetFusionNameForSide(Side())); }
+    int Fusions() { return Done(UnitHelpers::GetFusionNameForSide(Side())) + FusionEquivalents(true); }
+    int FusionsTotal() { return OwnFusionsTotal() + FusionEquivalents(false); }
     // framed, standing and queued by anyone (the T2 vehicle plant's build chain, the native eco)
     int FusionsPlanned()
     {
         CCircuitDef@ d = Def(UnitHelpers::GetFusionNameForSide(Side()));
-        return d is null ? 0 : d.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), d);
+        return (d is null ? 0 : d.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), d)) + FusionEquivalents(false);
     }
-    int AdvFusions() { return Done(UnitHelpers::GetAdvFusionNameForSide(Side())); }
-    int AdvFusionsTotal() { return Total(UnitHelpers::GetAdvFusionNameForSide(Side())); }
+    int AdvFusions() { return Done(UnitHelpers::GetAdvFusionNameForSide(Side())) + AdvFusionEquivalents(true); }
+    int AdvFusionsTotal() { return Total(UnitHelpers::GetAdvFusionNameForSide(Side())) + AdvFusionEquivalents(false); }
     int Gantries() { return UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllLandGantries()); }
 
     // Our finished land gantry with the fewest turrets ordered, null if none stands
@@ -172,7 +203,8 @@ namespace FrontEcoLadder {
         const bool full = aiEconomyMgr.energy.storage > 0.0f && aiEconomyMgr.energy.current >= aiEconomyMgr.energy.storage * Global::RoleSettings::Front::EcoLadderConvertFullPercent;
         const bool surplus = ConvertBankOk()
             && (full || spare >= Global::RoleSettings::Front::EcoLadderT2ConverterEnergy + Global::RoleSettings::Front::EcoLadderT2ConverterReserve);
-        return AiMin(Global::RoleSettings::Front::EcoLadderMaxT2Converters, surplus ? have + 1 : have);
+        // Front::OverflowConverters (front_overflow.as): its own blocks may start more at once
+        return AiMax(FrontOverflow::CapTarget(), AiMin(Global::RoleSettings::Front::EcoLadderMaxT2Converters, surplus ? have + 1 : have));
     }
     // Advanced fusions wanted, standing and framed: past two, one more at a time while metal income is
     // under the gantry's
@@ -298,7 +330,9 @@ namespace FrontEcoLadder {
         CountStall();
         UpdateMexGate(s);
         // the mex gate: no fusion past the ones we have (native and the build chain too)
-        const int fusionCap = MexGateHolds() ? AiMax(1, FusionsTotal()) : Fusions_Wanted;
+        // (our own faction's fusions only: a geo or rezzed reactor standing in for the first must not
+        // let native put up the second while the gate holds)
+        const int fusionCap = MexGateHolds() ? (FusionEquivalents(false) > 0 ? OwnFusionsTotal() : AiMax(1, OwnFusionsTotal())) : Fusions_Wanted;
         Cap(UnitHelpers::GetFusionNameForSide(side), (s >= S_GANTRY || ReclaimFusions()) ? 0 : fusionCap);   // none rebuilt while they come down
         Cap(UnitHelpers::GetAdvFusionNameForSide(side), s >= S_GANTRY ? Global::RoleSettings::Front::EcoLadderMaxAdvFusions : 2);
         Cap(UnitHelpers::GetEnergyConverterNameForSide(side), fusionEra ? 0 : -1);
@@ -605,7 +639,7 @@ namespace FrontEcoLadder {
                 IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::ENERGY, Task::Priority::HIGH, reactor, at, SQUARE_SIZE * 32, true, 0));
                 if (t !is null) {
                     if (fusionStep) @Builder::FusionBuildTask = t; else @Builder::AdvancedFusionBuildTask = t;
-                    @reactorTask = t; reactorOrdered = ai.frame; reactorBefore = fusionStep ? FusionsTotal() : have;
+                    @reactorTask = t; reactorOrdered = ai.frame; reactorBefore = reactor.count;   // WatchReactor compares our own def's count
                     GenericHelpers::LogUtil("[FRONT][Eco] " + StageName(s) + ": " + reactor.GetName() + " " + (have + 1) + "/" + want
                         + " at " + int(at.x) + "," + int(at.z) + (reactorTry + first > 0 ? " (site " + ((reactorTry + first) % 3 + 1) + " of 3)" : "")
                         + " by " + u.circuitDef.GetName() + " " + u.id + " | M +" + int(mi) + " bank " + int(aiEconomyMgr.metal.current), 1);
