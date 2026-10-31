@@ -3329,12 +3329,12 @@ local aggressionDrag
 local hoverId, pressedId = nil, nil
 -- Debug strikes (owner 2026-10-31, branch debug-widget-test): the "debug"
 -- button under the aggression slider opens a window that aims every hosted
--- AI's nuke silos, or its lolcannons in range, at a map position or a team
+-- AI's nuke silos, or its lolcannons in range, at a map position or a player
 -- (barb|debug, data/script/src/systems/presentation/debug_strike.as).
 local debugOpen = false
 local debugWin = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
-local debugFields = { x = "", y = "", team = "" }
-local debugFocus = nil           -- "x", "y" or "team" while that field takes the keyboard
+local debugFields = { x = "", y = "", player = "" }
+local debugFocus = nil           -- "x", "y" or "player" while that field takes the keyboard
 local debugOn = { nuke = false, lol = false }
 
 local ais = {}                   -- teamId -> { teamId, name, color, allyTeam, roster, lastReply, replyKind }
@@ -3465,9 +3465,16 @@ local function teamLabel(t)
 	return pname and string.format("team %d (%s)", t, pname) or string.format("team %d", t)
 end
 
+local function playerLabel(p)
+	local name = Spring.GetPlayerInfo(p, false)
+	return name and string.format("player %d (%s)", p, name) or string.format("player %d", p)
+end
+
 -- "nuke" or "lol": the first press sends the fields' strike to every AI this
 -- host may command, the second turns it off. x and y (the map's x and z, in
--- elmos) win over #; # is a team number, sent only to the AIs it is an enemy of.
+-- elmos) win over #; # is a player id (not a spectator), sent only to the AIs
+-- that are enemies of the team the player plays. Units carry only their team,
+-- so each AI resolves the player to that team itself (engine GetPlayerTeam).
 local function debugStrike(weapon)
 	local ids = {}
 	for _, id in ipairs(aiOrder) do if mayCommand(id) then ids[#ids + 1] = id end end
@@ -3488,19 +3495,21 @@ local function debugStrike(weapon)
 		end
 		payload = string.format("pos|%d|%d", mathFloor(x + 0.5), mathFloor(z + 0.5))
 		what = string.format("(%d, %d)", mathFloor(x + 0.5), mathFloor(z + 0.5))
-	elseif debugFields.team ~= "" then
-		local t = tonumber(debugFields.team)
-		if not t or t ~= mathFloor(t) or not Spring.GetTeamInfo(t, false) then
-			addEvent("Debug: # must be a team number in this game", "warn"); return
+	elseif debugFields.player ~= "" then
+		local p = tonumber(debugFields.player)
+		local name, spec, t, _
+		if p and p == mathFloor(p) then name, _, spec, t = Spring.GetPlayerInfo(p, false) end
+		if not name or spec or not t then
+			addEvent("Debug: # must be the player id of a player (not a spectator) in this game", "warn"); return
 		end
 		local enemies = {}
 		for _, id in ipairs(ids) do if id ~= t and not spAreTeamsAllied(id, t) then enemies[#enemies + 1] = id end end
-		if #enemies == 0 then addEvent(string.format("Debug: no hosted AI is an enemy of %s", teamLabel(t)), "warn"); return end
+		if #enemies == 0 then addEvent(string.format("Debug: no hosted AI is an enemy of %s", playerLabel(p)), "warn"); return end
 		ids = enemies
-		payload = string.format("team|%d", t)
-		what = teamLabel(t)
+		payload = string.format("player|%d", p)
+		what = string.format("%s, %s", playerLabel(p), teamLabel(t))
 	else
-		addEvent("Debug: enter x and y, or a team number in #", "warn"); return
+		addEvent("Debug: enter x and y, or a player id in #", "warn"); return
 	end
 	for _, id in ipairs(ids) do send(id, string.format("barb|debug|%d|%s|%s", id, weapon, payload)) end
 	debugOn[weapon] = true
@@ -3515,10 +3524,13 @@ local function debugStateText(weapon, s)
 	local function n(v, unit) v = tonumber(v) or 0; return string.format("%d %s%s", v, unit, v == 1 and "" or "s") end
 	if w[1] == "pos" then
 		return string.format("(%s, %s), %s%s", w[2] or "?", w[3] or "?", n(w[4], units), weapon == "nuke" and (", " .. n(w[5], "launch")) or "")
+	elseif w[1] == "player" then
+		return string.format("%s, %s%s", playerLabel(tonumber(w[2]) or -1), n(w[4], units), weapon == "nuke" and (", " .. n(w[5], "launch")) or "")
 	elseif w[1] == "team" then
 		return string.format("%s, %s%s", teamLabel(tonumber(w[2]) or -1), n(w[3], units), weapon == "nuke" and (", " .. n(w[4], "launch")) or "")
 	elseif w[1] == "done" then
-		return string.format("%s done after %s", teamLabel(tonumber(w[2]) or -1), n(w[3], "launch"))
+		local who = w[4] and playerLabel(tonumber(w[4]) or -1) or teamLabel(tonumber(w[2]) or -1)
+		return string.format("%s done after %s", who, n(w[3], "launch"))
 	end
 	return "off"
 end
@@ -4622,7 +4634,7 @@ local function onAIMessage(aiTeam, dataStr)
 			local running = false
 			for _, a in pairs(ais) do
 				local w = a.debugNuke and string.match(a.debugNuke, "^(%a+)")
-				if w == "pos" or w == "team" then running = true end
+				if w == "pos" or w == "team" or w == "player" then running = true end
 			end
 			if not running then debugOn.nuke = false end
 		end
@@ -5122,7 +5134,7 @@ local function drawWindow()
         cy=cy-px(25)
         labelButton(left,cy-px(18),left+px(70),cy,nil,"debug","debugOpen",function()
             playClick(); debugOpen=not debugOpen; if not debugOpen then debugFocus=nil end
-        end,"Debug strikes: nuke or lolcannon fire at a map position or a team",debugOpen)
+        end,"Debug strikes: nuke or lolcannon fire at a map position or a player",debugOpen)
         cy=cy-px(23)
 		local replyColor = C.onSurfaceVariant
 		if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
@@ -5203,9 +5215,9 @@ local function drawDebugWindow()
 	debugField(left, cy - fh, left + half, cy, "x", "x", "Map x in elmos (left to right)")
 	debugField(left + half + px(6), cy - fh, right, cy, "y", "y", "Map y in elmos (top to bottom: the game's z)")
 	cy = cy - fh - px(5)
-	debugField(left, cy - fh, left + half, cy, "team", "#",
-		"A team number, used when x and y are empty: nuke its best scouted target, lolcannons fire at its scouted units in range")
-	text(font, "team #", left + half + px(6), cy - fh * 0.5 - px(3), px(8), "o", C.onSurfaceVariant)
+	debugField(left, cy - fh, left + half, cy, "player", "#",
+		"A player id, used when x and y are empty: nuke the player's best scouted target, lolcannons fire at the player's scouted units in range")
+	text(font, "player id", left + half + px(6), cy - fh * 0.5 - px(3), px(8), "o", C.onSurfaceVariant)
 	cy = cy - fh - px(7)
 
 	local enabled = false
@@ -5214,12 +5226,12 @@ local function drawDebugWindow()
 	labelButton(left, cy - bh, left + half, cy, nil, "nuke", "debugNuke", function()
 		playClick(); debugFocus = nil; debugStrike("nuke")
 	end, debugOn.nuke and "Stop: every nuke silo back to its own targets"
-		or "Every nuke silo, at fire at will, nukes (x, y) again and again; or the best scouted target of team # until it has none left",
+		or "Every nuke silo, at fire at will, nukes (x, y) again and again; or the best scouted target of player # until the player has none left",
 		debugOn.nuke, enabled)
 	labelButton(left + half + px(6), cy - bh, right, cy, nil, "lol", "debugLol", function()
 		playClick(); debugFocus = nil; debugStrike("lol")
 	end, debugOn.lol and "Stop: every lolcannon back to its own targets"
-		or "Every lolcannon in range fires at (x, y) again and again; or at the scouted units of team # it can reach",
+		or "Every lolcannon in range fires at (x, y) again and again; or at the scouted units of player # it can reach",
 		debugOn.lol, enabled)
 	cy = cy - bh - px(6)
 
@@ -5408,7 +5420,7 @@ end
 -- SDL keycodes: the main row's digits and '.' are ASCII; the keypad's are
 -- SDLK_KP_1..9 (0x40000059..61), SDLK_KP_0 (0x40000062), SDLK_KP_PERIOD (0x40000063).
 local KP_ENTER, KP_1, KP_0, KP_PERIOD = 0x40000058, 0x40000059, 0x40000062, 0x40000063
-local DEBUG_ORDER = { x = "y", y = "team", team = "x" }
+local DEBUG_ORDER = { x = "y", y = "player", player = "x" }
 
 -- While a debug field has the keyboard every key stops here, so typing a
 -- number never selects a control group or fires a hotkey.
@@ -5422,7 +5434,7 @@ local function debugKey(key)
 	if key >= 48 and key <= 57 then ch = string.char(key)
 	elseif key >= KP_1 and key <= KP_1 + 8 then ch = tostring(key - KP_1 + 1)
 	elseif key == KP_0 then ch = "0"
-	elseif (key == 46 or key == KP_PERIOD) and f ~= "team" and not string.find(v, ".", 1, true) then ch = "." end
+	elseif (key == 46 or key == KP_PERIOD) and f ~= "player" and not string.find(v, ".", 1, true) then ch = "." end
 	if ch and #v < 7 then debugFields[f] = v .. ch end
 	return true
 end

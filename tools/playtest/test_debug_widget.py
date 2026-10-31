@@ -10,6 +10,11 @@ class DebugWindowTests(unittest.TestCase):
         self.lua.execute((ROOT / 'tools/playtest/fixtures/lane_ui_mock.lua').read_text())
         self.lua.execute('''
             Spring.AreTeamsAllied=function(a,b) return math.floor(a/8)==math.floor(b/8) end
+            -- players 0..15: player p plays team 15-p; player 20 spectates
+            Spring.GetPlayerInfo=function(p)
+                if p==20 then return 'spec',true,true,0 end
+                if p>=0 and p<16 then return 'P'..p,true,false,15-p end
+            end
             messages={}
             Spring.SendSkirmishAIMessage=function(id,text) messages[#messages+1]=id..'>'..text; return true end
             function sent(text) for _,m in ipairs(messages) do if m==text then return true end end return false end
@@ -49,18 +54,27 @@ class DebugWindowTests(unittest.TestCase):
             assert(sent('0>barb|debug|0|lol|pos|12|50'), messages[1])
         ''')
 
-    def test_team_strike_goes_only_to_enemies_of_the_team(self):
+    def test_player_strike_goes_only_to_enemies_of_the_players_team(self):
         self.lua.execute('''
-            click('dbgFieldteam'); typeText('9'); key(13)
+            click('dbgFieldplayer'); typeText('6'); key(13)   -- player 6 plays team 9
             widget:DrawScreen(); messages={}
             click('debugLol')
             assert(#messages==8, #messages)
-            assert(sent('0>barb|debug|0|lol|team|9') and not sent('9>barb|debug|9|lol|team|9'))
+            assert(sent('0>barb|debug|0|lol|player|6') and not sent('9>barb|debug|9|lol|player|6'))
+        ''')
+
+    def test_spectator_or_unknown_player_is_refused(self):
+        self.lua.execute('''
+            click('dbgFieldplayer'); typeText('20'); key(13)
+            widget:DrawScreen(); messages={}
+            click('debugNuke'); assert(#messages==0)
+            click('dbgFieldplayer'); key(8); key(8); typeText('99'); key(13)
+            widget:DrawScreen(); click('debugNuke'); assert(#messages==0)
         ''')
 
     def test_xy_wins_over_team_and_half_a_position_is_refused(self):
         self.lua.execute('''
-            click('dbgFieldteam'); typeText('9')
+            click('dbgFieldplayer'); typeText('6')
             click('dbgFieldx'); typeText('100'); key(13)
             widget:DrawScreen(); messages={}
             click('debugNuke'); assert(#messages==0)   -- y is empty
@@ -78,13 +92,14 @@ class DebugWindowTests(unittest.TestCase):
 
     def test_done_report_releases_the_nuke_button(self):
         self.lua.execute('''
-            click('dbgFieldteam'); typeText('9'); key(13)
+            click('dbgFieldplayer'); typeText('6'); key(13)
             widget:DrawScreen(); click('debugNuke'); messages={}
-            widget:RecvSkirmishAIMessage(3,'barb|debug|3|0|team 9 2 1|off')
-            widget:RecvSkirmishAIMessage(3,'barb|debug|3|0|done 9 4|off')
+            widget:RecvSkirmishAIMessage(3,'barb|debug|3|0|player 6 9 2 1|off')
+            widget:DrawScreen()
+            widget:RecvSkirmishAIMessage(3,'barb|debug|3|0|done 9 4 6|off')
             widget:DrawScreen(); click('debugNuke')
             -- the button was released by the report, so this press starts a new strike
-            assert(sent('3>barb|debug|3|nuke|team|9'), messages[1])
+            assert(sent('3>barb|debug|3|nuke|player|6'), messages[1])
         ''')
 
     def test_close_keeps_strike_and_draws_nothing(self):

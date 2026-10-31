@@ -285,6 +285,9 @@ public:
 	// window, through the script (barb|debug). weapon: debug::NUKE or LOL;
 	// mode: debug::Mode OFF, POS (x, z) or TEAM (team). False when malformed.
 	bool SetDebugStrike(int weapon, int mode, float x, float z, int team);
+	// A team strike on the team that player plays (engine GetPlayerTeam); false
+	// for an unknown player, a spectator or a player of our own team.
+	bool SetDebugStrikePlayer(int weapon, int player);
 	debug::Strike& GetDebugStrike(int weapon) { return debugStrikes[(weapon == debug::LOL) ? debug::LOL : debug::NUKE]; }
 	// The widget's status line for one weapon (debug::Describe)
 	std::string GetDebugStrikeState(int weapon) const;

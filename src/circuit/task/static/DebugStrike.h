@@ -3,8 +3,11 @@
  *
  * Debug strikes (owner 2026-10-31, branch debug-widget-test): the team link
  * widget's debug window aims every nuke silo, or every lolcannon in range, at
- * one map position or at the scouted units of one team, until the same button
- * is pressed again. CMilitaryManager owns one Strike per weapon; each
+ * one map position or at the scouted units of one player (or team), until the
+ * same button is pressed again. The widget names a player id; units carry only
+ * their team, so CMilitaryManager resolves the player to the team it plays
+ * (engine Game::GetPlayerTeam, -1 for a spectator) and the strike runs on that
+ * team, remembering the player for the status line. CMilitaryManager owns one Strike per weapon; each
  * CSuperTask compares the serial with the one it last acted on, so a new
  * command reaches every silo and cannon at its next update without a walk over
  * the tasks. Pure state and rules here (tests/debug_strike_test.cpp); the
@@ -29,6 +32,7 @@ struct Strike {
 	Mode mode = Mode::OFF;
 	float x = 0.f, z = 0.f;  // POS: the aim
 	int team = -1;           // TEAM: the target team
+	int player = -1;         // TEAM by player id: the player the team was resolved from, else -1
 	int launches = 0;        // nuke launches since the strike began
 	int serial = 0;          // bumped by every Set: tasks act on a change at once
 
@@ -60,8 +64,19 @@ inline bool Set(Strike& s, Mode mode, float x, float z, int team, float width, f
 	s.x = (mode == Mode::POS) ? x : 0.f;
 	s.z = (mode == Mode::POS) ? z : 0.f;
 	s.team = (mode == Mode::TEAM) ? team : -1;
+	s.player = -1;
 	s.launches = 0;
 	++s.serial;
+	return true;
+}
+
+// A strike on a player's units: playerTeam is the team the engine resolved
+// the player to (-1 for an unknown player or a spectator); our own team and a
+// negative player id are refused too.
+inline bool SetPlayer(Strike& s, int player, int playerTeam, int ownTeam)
+{
+	if ((player < 0) || !Set(s, Mode::TEAM, 0.f, 0.f, playerTeam, 0.f, 0.f, ownTeam)) return false;
+	s.player = player;
 	return true;
 }
 
@@ -74,15 +89,23 @@ inline bool TeamDone(const Strike& s, int knownUnits)
 }
 
 // The widget's status text: "off", "pos <x> <z> <units> <launches>",
-// "team <team> <units> <launches>", "done <team> <launches>". units is the
-// number of silos or cannons acting on the strike now.
+// "team <team> <units> <launches>", "done <team> <launches>"; a strike set by
+// player id reads "player <player> <team> <units> <launches>" and ends as
+// "done <team> <launches> <player>". units is the number of silos or cannons
+// acting on the strike now.
 inline std::string Describe(const Strike& s, int units)
 {
 	char buf[96];
 	switch (s.mode) {
 		case Mode::POS:  std::snprintf(buf, sizeof(buf), "pos %.0f %.0f %d %d", s.x, s.z, units, s.launches); break;
-		case Mode::TEAM: std::snprintf(buf, sizeof(buf), "team %d %d %d", s.team, units, s.launches); break;
-		case Mode::DONE: std::snprintf(buf, sizeof(buf), "done %d %d", s.team, s.launches); break;
+		case Mode::TEAM:
+			if (s.player >= 0) std::snprintf(buf, sizeof(buf), "player %d %d %d %d", s.player, s.team, units, s.launches);
+			else std::snprintf(buf, sizeof(buf), "team %d %d %d", s.team, units, s.launches);
+			break;
+		case Mode::DONE:
+			if (s.player >= 0) std::snprintf(buf, sizeof(buf), "done %d %d %d", s.team, s.launches, s.player);
+			else std::snprintf(buf, sizeof(buf), "done %d %d", s.team, s.launches);
+			break;
 		default:         std::snprintf(buf, sizeof(buf), "off"); break;
 	}
 	return buf;

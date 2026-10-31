@@ -113,6 +113,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetNuclearAimRadius() const", asMETHOD(CMilitaryManager, GetNuclearAimRadius), asCALL_THISCALL); ASSERT(r >= 0);
 	// Debug strikes (owner 2026-10-31, debug-widget-test): barb|debug from the widget (presentation/commands.as)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetDebugStrike(int, int, float, float, int)", asMETHOD(CMilitaryManager, SetDebugStrike), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetDebugStrikePlayer(int, int)", asMETHOD(CMilitaryManager, SetDebugStrikePlayer), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "string GetDebugStrikeState(int) const", asFUNCTION(CMilitaryManager_GetDebugStrikeState), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "const float armyCost", asOFFSET(CMilitaryManager, armyCost)); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CMilitaryManager", "void SetAggressionDelta(float)", asMETHOD(CMilitaryManager, SetAggressionDelta), asCALL_THISCALL); ASSERT(r >= 0);

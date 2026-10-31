@@ -2129,6 +2129,20 @@ bool CMilitaryManager::SetDebugStrike(int weapon, int mode, float x, float z, in
 	return ok;
 }
 
+bool CMilitaryManager::SetDebugStrikePlayer(int weapon, int player)
+{
+	if ((weapon != debug::NUKE) && (weapon != debug::LOL)) return false;
+	debug::Strike& s = GetDebugStrike(weapon);
+	const int team = (player >= 0) ? circuit->GetGame()->GetPlayerTeam(player) : -1;  // -1: unknown or spectator
+	const bool ok = debug::SetPlayer(s, player, team, circuit->GetTeamId());
+	if (ok) {
+		circuit->LOG("DEBUG: %s strike set: %s (player %i plays team %i)", (weapon == debug::NUKE) ? "nuke" : "lol", debug::Describe(s, 0).c_str(), player, team);
+	} else {
+		circuit->LOG("DEBUG: %s strike refused: player=%i team=%i", (weapon == debug::NUKE) ? "nuke" : "lol", player, team);
+	}
+	return ok;
+}
+
 std::string CMilitaryManager::GetDebugStrikeState(int weapon) const
 {
 	const debug::Strike& s = debugStrikes[(weapon == debug::LOL) ? debug::LOL : debug::NUKE];

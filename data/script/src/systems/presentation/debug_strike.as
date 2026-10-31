@@ -14,6 +14,10 @@ sends, to every AI its host may command:
     barb|debug|<teamId>|nuke|team|<team>   every nuke silo: the richest aim point of that team's
                                            scouted units, until none is left after a launch
     barb|debug|<teamId>|lol|pos|<x>|<z>    every lolcannon that reaches (x, z) fires at it
+    barb|debug|<teamId>|nuke|player|<player>  the same on the team that player plays (the widget's
+                                           # field: a player id; units carry only their team, so the
+                                           DLL resolves it with the engine's GetPlayerTeam)
+    barb|debug|<teamId>|lol|player|<player>  lolcannons, the same way
     barb|debug|<teamId>|lol|team|<team>    every lolcannon in range of a scouted unit of that
                                            team fires at the dearest one it reaches
     barb|debug|<teamId>|nuke|off           back to normal targeting (lol|off the same)
@@ -21,7 +25,8 @@ sends, to every AI its host may command:
 The orders are native (CSuperTask::UpdateDebug, task/static/DebugStrike.h);
 this file parses the line and publishes the state back as the widget state key
 "debug": "barb|debug|<team>|<ally>|<nuke state>|<lol state>", each state one
-of "off", "pos x z units launches", "team T units launches", "done T launches"
+of "off", "pos x z units launches", "team T units launches",
+"player P T units launches", "done T launches" or "done T launches P"
 (CMilitaryManager::GetDebugStrikeState). Nothing is published before the first
 debug command, so games that never use the window write no extra state.
 
@@ -63,6 +68,9 @@ namespace DebugStrike {
         } else if (parts[4] == "team" && parts.length() == 6) {
             int team;
             ok = ParseInt(parts[5], team) && aiMilitaryMgr.SetDebugStrike(weapon, TEAM, 0.f, 0.f, team);
+        } else if (parts[4] == "player" && parts.length() == 6) {
+            int player;
+            ok = ParseInt(parts[5], player) && aiMilitaryMgr.SetDebugStrikePlayer(weapon, player);
         }
         GenericHelpers::LogUtil("[DebugStrike] " + parts[3] + " " + parts[4] + (ok ? " set" : " refused (malformed or invalid)"), 1);
         used = true;

@@ -57,6 +57,22 @@ void test_describe()
     s.launches = 6; s.mode = Mode::DONE;
     assert(Describe(s, 0) == "done 5 6");
 }
+void test_player_strike_runs_on_the_resolved_team()
+{
+    Strike s;
+    assert(!SetPlayer(s, 4, -1, 3));   // unknown player or spectator: the engine gave no team
+    assert(!SetPlayer(s, 4, 3, 3));    // a player of our own team
+    assert(!SetPlayer(s, -1, 5, 3));
+    assert(!s.Active());
+    assert(SetPlayer(s, 4, 5, 3));
+    assert(s.Active() && s.mode == Mode::TEAM && s.team == 5 && s.player == 4);
+    s.launches = 2;
+    assert(Describe(s, 3) == "player 4 5 3 2");
+    s.mode = Mode::DONE;
+    assert(Describe(s, 0) == "done 5 2 4");
+    assert(Set(s, Mode::TEAM, 0.f, 0.f, 6, 8192.f, 8192.f, 3));
+    assert(s.player == -1 && Describe(s, 0) == "team 6 0 0");   // a team strike forgets the player
+}
 int main()
 {
     test_position_strike_needs_a_point_on_the_map();
@@ -64,6 +80,7 @@ int main()
     test_every_set_bumps_the_serial_and_resets_the_count();
     test_team_done_only_after_a_launch();
     test_describe();
+    test_player_strike_runs_on_the_resolved_team();
     std::cout << "debug_strike_test: all passed\n";
     return 0;
 }
