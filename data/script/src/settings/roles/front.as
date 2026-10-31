@@ -200,6 +200,15 @@ namespace Front {
             float ArtySquadFollowBehind = 120.0f;
             float ArtySquadRepath = 96.0f;
             int ArtySquadStragglerSeconds = 60;   // longest the lead waits for stragglers before advancing anyway
+            // Owner (2026-10-31): formation. Heavies/anti-spam walk ArtySquadHeavyAhead in front of the artillery lead;
+            // the lead advances ArtySquadPaceStep at a time, the next step once every member is within
+            // ArtySquadPaceTolerance of its place, so the squad keeps its slowest member's pace.
+            float ArtySquadHeavyAhead = 60.0f;
+            float ArtySquadHeavySpacing = 80.0f;    // heavies' line abreast, apart
+            float ArtySquadPackRadius = 170.0f;     // the other artillery's ring around the lead (support: ArtySquadFollowBehind)
+            float ArtySquadPaceStep = 200.0f;
+            float ArtySquadPaceTolerance = 90.0f;
+            int ArtySquadPaceWaitSeconds = 20;   // longest the lead paces for one member short of its place
             // Owner (2026-10-31): while a finished T2 bot lab stands, every T2BotSquadIntervalSeconds, T2BotSquadChance
             // for one faction bot squad (heavy, or artillery on T2BotSquadArtyShare) with a radar, two jammer and a flak
             // bot, held at the lab until complete, then moved as the artillery squad above. Off here.

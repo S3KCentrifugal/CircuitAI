@@ -36,14 +36,20 @@ namespace FrontArtySquad {
         array<int> slots;       // def ids still to come out
         array<int> members;
         array<int> fireSent;    // frame each member last got fire at will, parallel to members
+        array<int> joined;      // frame each member joined, parallel to members (survival log)
+        array<AIFloat3> slotSent;   // slot last sent to the member's own route, parallel to members (x < 0: none)
+        bool leadHeavy;         // no artillery left: a heavy leads and the screen route is unused
         int leader;
         bool released;
         CRouteTask@ leadRoute;
         CRouteTask@ followRoute;
+        CRouteTask@ frontRoute;     // heavies and anti-spam, ArtySquadHeavyAhead in front of the lead
+        AIFloat3 frontGoal;
         AIFloat3 leadGoal;
         AIFloat3 followGoal;
         int nextLog;
         int waitSince;          // frame the lead began waiting for stragglers, -1 when not waiting
+        int paceSince;          // frame the lead began pacing for a member short of its place, -1 when not
     }
     array<Squad@> squads;
     int nextSquadId = 1;
@@ -57,6 +63,17 @@ namespace FrontArtySquad {
             // T2 bot lab support (owner, 2026-10-31): radar, jammer, flak bots
             || n == "armmark" || n == "armaser" || n == "armaak" || n == "corvoyr" || n == "corspec" || n == "coraak"
             || n == "legaradk" || n == "legajamk" || n == "legadvaabot";
+    }
+
+    // Owner (2026-10-31): heavies and anti-spam screen in front of the artillery
+    bool IsHeavy(const string &in n) {
+        return n == "armfboy" || n == "armbull" || n == "leginc" || n == "legaheattank" || n == "legstr" || n == "armmav"
+            || n == "armzeus" || n == "correap" || n == "corsumo" || n == "corcan";
+    }
+
+    string ClassOf(const string &in n) {
+        if (IsEscort(n)) return "support";
+        return IsHeavy(n) ? "heavy" : "arty";
     }
 
     bool BotEnabled() { return Global::RoleSettings::Front::T2BotSquadChance > 0.0f; }
@@ -136,9 +153,9 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDefId; s.label = label;
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1;
         s.botLabId = botLab is null ? (leadDefId < 0 ? u.id : -1) : botLab.id;
-        s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal;
+        s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
         IUnitTask@ first = null;
         const AIFloat3 pos = u.GetPos(ai.frame);
@@ -214,9 +231,9 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDef.id; s.label = "artillery squad";
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1;
         s.botLabId = botLab is null ? -1 : botLab.id;
-        s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal;
+        s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
         IUnitTask@ first = null;
         array<string> names;
@@ -265,9 +282,11 @@ namespace FrontArtySquad {
             const int slot = s.slots.find(unit.circuitDef.id);
             if (slot < 0) continue;
             s.slots.removeAt(slot);
-            s.members.insertLast(unit.id); s.fireSent.insertLast(-100000);
+            s.members.insertLast(unit.id); s.fireSent.insertLast(-100000); s.joined.insertLast(ai.frame);
+            s.slotSent.insertLast(AIFloat3(-1.0f, 0.0f, -1.0f));
             GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": member " + s.members.length() + " " + unit.circuitDef.GetName()
-                + " " + unit.id + (s.slots.length() == 0 ? "; squad complete" : ", " + s.slots.length() + " to come"), 1);
+                + " " + unit.id + " (" + ClassOf(unit.circuitDef.GetName()) + ")"
+                + (s.slots.length() == 0 ? "; squad complete" : ", " + s.slots.length() + " to come"), 1);
             return true;
         }
         return false;
@@ -289,10 +308,22 @@ namespace FrontArtySquad {
         return r;
     }
 
+    void ForgetSlots(Squad@ s) {
+        for (uint k = 0; k < s.slotSent.length(); ++k) s.slotSent[k] = AIFloat3(-1.0f, 0.0f, -1.0f);
+    }
+
     bool EnsureRoutes(Squad@ s) {
         if (s.leadRoute is null || s.leadRoute.IsDead()) @s.leadRoute = NewRoute(s.leadGoal);
-        if (s.followRoute is null || s.followRoute.IsDead()) @s.followRoute = NewRoute(s.followGoal);
-        return s.leadRoute !is null && s.followRoute !is null;
+        if (s.followRoute is null || s.followRoute.IsDead()) { @s.followRoute = NewRoute(s.followGoal); ForgetSlots(s); }
+        if (s.frontRoute is null || s.frontRoute.IsDead()) { @s.frontRoute = NewRoute(s.frontGoal); ForgetSlots(s); }
+        return s.leadRoute !is null && s.followRoute !is null && s.frontRoute !is null;
+    }
+
+    // The route a member belongs on: the lead's, the heavy screen's (ahead of an artillery lead), or the pack's
+    IUnitTask@ WantedRoute(Squad@ s, CCircuitUnit@ m) {
+        if (m.id == s.leader) return cast<IUnitTask>(s.leadRoute);
+        if (!s.leadHeavy && m.circuitDef !is null && IsHeavy(m.circuitDef.GetName())) return cast<IUnitTask>(s.frontRoute);
+        return cast<IUnitTask>(s.followRoute);
     }
 
     // Military MakeTask
@@ -302,7 +333,7 @@ namespace FrontArtySquad {
         if (s is null || !EnsureRoutes(s)) return null;
         const int k = s.members.find(unit.id);
         if (k >= 0) { unit.SetFireState(OPEN); s.fireSent[k] = ai.frame; }
-        return unit.id == s.leader ? cast<IUnitTask>(s.leadRoute) : cast<IUnitTask>(s.followRoute);
+        return WantedRoute(s, unit);
     }
 
     void UnitRemoved(CCircuitUnit@ unit) {
@@ -310,8 +341,13 @@ namespace FrontArtySquad {
         for (uint i = 0; i < squads.length(); ++i) {
             const int k = squads[i].members.find(unit.id);
             if (k < 0) continue;
-            squads[i].members.removeAt(k); squads[i].fireSent.removeAt(k);
-            if (squads[i].leader == unit.id) squads[i].leader = -1;
+            Squad@ s = squads[i];
+            const string n = unit.circuitDef is null ? "?" : unit.circuitDef.GetName();
+            // test log (owner, 2026-10-31): survival of artillery vs heavies/anti-spam vs support
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": lost " + n + " " + unit.id + " (" + ClassOf(n) + ") after "
+                + ((ai.frame - s.joined[k]) / SECOND) + " s" + (s.released ? " in the field" : " at the lab"), 1);
+            s.members.removeAt(k); s.fireSent.removeAt(k); s.joined.removeAt(k); s.slotSent.removeAt(k);
+            if (s.leader == unit.id) s.leader = -1;
             return;
         }
     }
@@ -320,15 +356,30 @@ namespace FrontArtySquad {
         for (uint i = 0; i < squads.length(); ++i) {
             if (squads[i].leadRoute !is null && cast<IUnitTask>(squads[i].leadRoute) is task) @squads[i].leadRoute = null;
             if (squads[i].followRoute !is null && cast<IUnitTask>(squads[i].followRoute) is task) @squads[i].followRoute = null;
+            if (squads[i].frontRoute !is null && cast<IUnitTask>(squads[i].frontRoute) is task) @squads[i].frontRoute = null;
         }
+    }
+
+    // "heavy N/M arty N/M support N/M" alive of joined so far
+    string Census(Squad@ s) {
+        int h = 0, a = 0, e = 0;
+        for (uint k = 0; k < s.members.length(); ++k) {
+            CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
+            if (m is null || m.circuitDef is null) continue;
+            const string c = ClassOf(m.circuitDef.GetName());
+            if (c == "heavy") ++h; else if (c == "support") ++e; else ++a;
+        }
+        return "heavy " + h + ", arty " + a + ", support " + e;
     }
 
     void Release(uint index, const string &in why) {
         Squad@ s = squads[index];
         squads.removeAt(index);
-        GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " " + why + ": " + s.members.length() + " member(s) back to normal orders", 1);
+        GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " " + why + ": " + s.members.length() + " member(s) back to normal orders ("
+            + Census(s) + ")", 1);
         if (s.leadRoute !is null && !s.leadRoute.IsDead()) s.leadRoute.Abort();
         if (s.followRoute !is null && !s.followRoute.IsDead()) s.followRoute.Abort();
+        if (s.frontRoute !is null && !s.frontRoute.IsDead()) s.frontRoute.Abort();
     }
 
     // The nearest known enemy to `from` (ground contacts, else the nearest enemy group)
@@ -361,39 +412,86 @@ namespace FrontArtySquad {
 
     bool OnRoute(Squad@ s, CCircuitUnit@ m) {
         return m.task !is null && ((s.leadRoute !is null && cast<IUnitTask>(s.leadRoute) is m.task)
-            || (s.followRoute !is null && cast<IUnitTask>(s.followRoute) is m.task));
+            || (s.followRoute !is null && cast<IUnitTask>(s.followRoute) is m.task)
+            || (s.frontRoute !is null && cast<IUnitTask>(s.frontRoute) is m.task));
     }
 
-    // Pick the lead: first living member of the lead type, else the longest-ranged non-escort member
+    // Pick the lead: first living member of the lead type, else the longest-ranged artillery member (ties: the
+    // slowest); heavies and anti-spam lead only a squad without artillery (owner, 2026-10-31)
     void ChooseLeader(Squad@ s) {
-        int pick = -1; float range = -1.0f, speed = 0.0f; bool leadType = false;
+        int pick = -1; float range = -1.0f, speed = 0.0f; int rank = -1;   // rank 2 lead type, 1 artillery, 0 heavy
         for (uint k = 0; k < s.members.length(); ++k) {
             CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
             if (m is null || m.circuitDef is null || IsEscort(m.circuitDef.GetName())) continue;
-            const bool isLead = m.circuitDef.id == s.leadDefId;
+            const int rk = m.circuitDef.id == s.leadDefId ? 2 : (IsHeavy(m.circuitDef.GetName()) ? 0 : 1);
             const float r = m.circuitDef.GetMaxRange();
             const float sp = m.circuitDef.GetSpeed();
-            if ((isLead && !leadType) || (isLead == leadType && (r > range || (r == range && sp < speed)))) {
-                pick = m.id; range = r; speed = sp; leadType = isLead;
+            if (rk > rank || (rk == rank && (r > range || (r == range && sp < speed)))) {
+                pick = m.id; range = r; speed = sp; rank = rk;
             }
         }
+        s.leadHeavy = rank == 0;
+        ForgetSlots(s);   // members change routes: every slot is re-sent
         if (pick == s.leader) return;
         s.leader = pick;
         CCircuitUnit@ l = ai.GetTeamUnit(pick);
         if (l is null || !EnsureRoutes(s)) return;
-        // The old lead (if alive) walks with the rest; the new one takes the lead route
+        // everyone on a squad route moves to the route of its place (the new lead takes the lead route)
         for (uint k = 0; k < s.members.length(); ++k) {
             CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
-            if (m is null) continue;
-            IUnitTask@ want = m.id == pick ? cast<IUnitTask>(s.leadRoute) : cast<IUnitTask>(s.followRoute);
-            if (m.task !is null && m.task !is want && SquadOf(m.id) is s
-                && (cast<IUnitTask>(s.leadRoute) is m.task || cast<IUnitTask>(s.followRoute) is m.task)) aiMilitaryMgr.TransferUnit(m, want);
+            if (m is null || !OnRoute(s, m)) continue;
+            IUnitTask@ want = WantedRoute(s, m);
+            if (m.task !is want) aiMilitaryMgr.TransferUnit(m, want);
         }
         GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": lead " + l.circuitDef.GetName() + " " + pick
-            + " range " + int(l.circuitDef.GetMaxRange()), 1);
+            + " range " + int(l.circuitDef.GetMaxRange()) + (s.leadHeavy ? " (no artillery: heavies lead)" : ""), 1);
+    }
+
+    // Owner (2026-10-31): spacing. Each member's own place relative to the lead's goal, as (forward, side):
+    // heavies in a line abreast ArtySquadHeavyAhead in front, ArtySquadHeavySpacing apart; the other artillery
+    // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (60..300 degrees,
+    // a second ring 1.35x out for every other unit of a pack above 8); support on a ring of ArtySquadFollowBehind
+    // behind (135..225 degrees). O(members) per update; a place is re-sent only once it moved ArtySquadRepath.
+    void Places(Squad@ s, array<float> &out fo, array<float> &out so) {
+        const uint n = s.members.length();
+        fo.resize(n); so.resize(n);
+        int nh = 0, na = 0, ne = 0;
+        array<int> cls(n);   // 0 front heavy, 1 pack, 2 support, -1 lead or gone
+        for (uint k = 0; k < n; ++k) {
+            fo[k] = 0.0f; so[k] = 0.0f; cls[k] = -1;
+            CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
+            if (m is null || m.circuitDef is null || m.id == s.leader) continue;
+            const string nm = m.circuitDef.GetName();
+            if (IsEscort(nm)) { cls[k] = 2; ++ne; }
+            else if (!s.leadHeavy && IsHeavy(nm)) { cls[k] = 0; ++nh; }
+            else { cls[k] = 1; ++na; }
+        }
+        const float ahead = Global::RoleSettings::Front::ArtySquadHeavyAhead;
+        const float gap = Global::RoleSettings::Front::ArtySquadHeavySpacing;
+        const float ring = Global::RoleSettings::Front::ArtySquadPackRadius;
+        const float back = Global::RoleSettings::Front::ArtySquadFollowBehind;
+        const float PI = 3.14159f;
+        int ih = 0, ia = 0, ie = 0;
+        for (uint k = 0; k < n; ++k) {
+            if (cls[k] == 0) {
+                fo[k] = ahead; so[k] = (float(ih) - float(nh - 1) * 0.5f) * gap; ++ih;
+            } else if (cls[k] == 1) {
+                const float a = PI * (1.0f / 3.0f + (4.0f / 3.0f) * (na > 1 ? float(ia) / float(na - 1) : 0.5f));
+                const float r = ring * (na > 8 && (ia % 2) == 1 ? 1.35f : 1.0f);
+                ++ia;
+                fo[k] = cos(a) * r; so[k] = sin(a) * r;
+            } else if (cls[k] == 2) {
+                const float a = PI * (0.75f + 0.5f * (ne > 1 ? float(ie) / float(ne - 1) : 0.5f)); ++ie;
+                fo[k] = cos(a) * back; so[k] = sin(a) * back;
+            }
+        }
     }
 
     // AiUpdate
+    // Owner (2026-10-31): formation. Heavies and anti-spam (IsHeavy) walk ArtySquadHeavyAhead in front of an
+    // artillery lead to take the hits; the rest of the artillery and the support space out around it (Places). The lead (longest-ranged artillery) advances in steps of ArtySquadPaceStep, the next step only once every
+    // member on the squad's routes is within ArtySquadPaceTolerance of its place, so the squad moves at its slowest
+    // member's speed; it stops at ArtySquadRangeFraction of its range from the nearest known enemy.
     void Update() {
         if (squads.length() == 0 || ai.frame < nextUpdate) return;
         nextUpdate = ai.frame + AiMax(1, Global::RoleSettings::Front::ArtySquadUpdateSeconds) * SECOND;
@@ -404,15 +502,15 @@ namespace FrontArtySquad {
             int armed = 0;
             for (int k = int(s.members.length()) - 1; k >= 0; --k) {
                 CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
-                if (m is null) { s.members.removeAt(uint(k)); s.fireSent.removeAt(uint(k)); continue; }
+                if (m is null) { s.members.removeAt(uint(k)); s.fireSent.removeAt(uint(k)); s.joined.removeAt(uint(k)); s.slotSent.removeAt(uint(k)); continue; }
                 if (ai.frame - s.fireSent[k] >= resend) { m.SetFireState(OPEN); s.fireSent[k] = ai.frame; }
                 if (!IsEscort(m.circuitDef.GetName())) ++armed;
             }
             if (!s.released) {
                 if (s.slots.length() > 0 && ai.frame < s.deadline) continue;   // still gathering at the plant
                 s.released = true;
-                GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " departs with " + s.members.length() + " member(s)"
-                    + (s.slots.length() > 0 ? " (" + s.slots.length() + " never came, gather deadline)" : ""), 1);
+                GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " departs with " + s.members.length() + " member(s) ("
+                    + Census(s) + ")" + (s.slots.length() > 0 ? " (" + s.slots.length() + " never came, gather deadline)" : ""), 1);
                 s.slots.resize(0);
             }
             if (armed == 0) { Release(i, s.members.length() == 0 ? "was destroyed" : "lost its combat units"); continue; }
@@ -423,7 +521,21 @@ namespace FrontArtySquad {
                 && l.task.GetType() != int(Task::Type::RETREAT) && !l.task.IsExternalControlled())
                 aiMilitaryMgr.TransferUnit(l, cast<IUnitTask>(s.leadRoute));
             const AIFloat3 lp = l.GetPos(ai.frame);
-            // cohesion: the farthest member on the squad's routes; a member another controller took is put back
+            AIFloat3 enemy;
+            const bool known = NearestEnemy(lp, enemy);
+            // advance direction: toward the enemy, else away from home
+            float dx = known ? enemy.x - lp.x : lp.x - Global::Map::StartPos.x;
+            float dz = known ? enemy.z - lp.z : lp.z - Global::Map::StartPos.z;
+            float len = sqrt(dx * dx + dz * dz);
+            if (len < 1.0f) { dx = 1.0f; dz = 0.0f; len = 1.0f; }
+            dx /= len; dz /= len;
+            array<float> fo, so;
+            Places(s, fo, so);
+            // pace: how far behind its place (relative to the lead's goal) is the slowest member; a member another
+            // controller took is put back on its route
+            const float goalAhead = (s.leadGoal.x - lp.x) * dx + (s.leadGoal.z - lp.z) * dz;
+            float lag = AiMax(0.0f, goalAhead);
+            string lagName = l.circuitDef.GetName() + " " + l.id;
             float far = 0.0f;
             string farName = "";
             int pulled = 0;
@@ -433,18 +545,21 @@ namespace FrontArtySquad {
                 if (!OnRoute(s, m)) {
                     if (m.task is null || m.task.GetType() == int(Task::Type::PLAYER)
                         || m.task.GetType() == int(Task::Type::RETREAT) || m.task.IsExternalControlled()) continue;
-                    if (aiMilitaryMgr.TransferUnit(m, cast<IUnitTask>(s.followRoute))) ++pulled;
+                    if (aiMilitaryMgr.TransferUnit(m, WantedRoute(s, m))) { ++pulled; s.slotSent[k] = AIFloat3(-1.0f, 0.0f, -1.0f); }
                     continue;
                 }
-                const float d = lp.distance2D(m.GetPos(ai.frame));
+                const AIFloat3 mp = m.GetPos(ai.frame);
+                const float d = lp.distance2D(mp);
                 if (d > far) { far = d; farName = m.circuitDef.GetName() + " " + m.id; }
+                const float place = goalAhead + fo[k];
+                const float behind = place - ((mp.x - lp.x) * dx + (mp.z - lp.z) * dz);
+                if (behind > lag) { lag = behind; lagName = m.circuitDef.GetName() + " " + m.id; }
             }
             if (pulled > 0) GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": " + pulled + " member(s) put back on the squad route", 1);
             const float range = l.circuitDef.GetMaxRange() * Global::RoleSettings::Front::ArtySquadRangeFraction;
-            AIFloat3 enemy;
-            AIFloat3 goal = lp;
+            AIFloat3 goal = s.leadGoal;
             string state = "hold";
-            if (!NearestEnemy(lp, enemy)) state = "no enemy known";
+            if (!known) { state = "no enemy known"; goal = lp; }
             else {
                 const float d = lp.distance2D(enemy);
                 const bool straggling = far > Global::RoleSettings::Front::ArtySquadCohesion;
@@ -452,29 +567,42 @@ namespace FrontArtySquad {
                 else if (s.waitSince < 0) s.waitSince = ai.frame;
                 const bool waitOver = straggling
                     && ai.frame - s.waitSince >= AiMax(0, Global::RoleSettings::Front::ArtySquadStragglerSeconds) * SECOND;
-                if (d <= range) state = "in range " + int(d);
+                // a member that cannot reach its place (terrain, a blocked slot) holds the pace at most ArtySquadPaceWaitSeconds
+                const bool lagging = lag > Global::RoleSettings::Front::ArtySquadPaceTolerance;
+                if (!lagging) s.paceSince = -1;
+                else if (s.paceSince < 0) s.paceSince = ai.frame;
+                if (d <= range) { state = "in range " + int(d); goal = lp; }
                 else if (straggling && !waitOver) state = "waits for stragglers " + int(far) + " (" + farName + ")";
+                else if (lagging && !waitOver
+                         && ai.frame - s.paceSince < AiMax(0, Global::RoleSettings::Front::ArtySquadPaceWaitSeconds) * SECOND)
+                    state = "paces for " + lagName + " " + int(lag) + " behind";
                 else {
-                    // walk to the point at `range` from the enemy along the line from the lead
-                    const float t = (d - range) / d;
-                    goal = Clamp(lp.x + (enemy.x - lp.x) * t, lp.z + (enemy.z - lp.z) * t);
+                    // the next step toward the point at `range` from the enemy
+                    const float step = AiMin(d - range, AiMax(1.0f, Global::RoleSettings::Front::ArtySquadPaceStep));
+                    goal = Clamp(lp.x + dx * step, lp.z + dz * step);
                     state = "advances, enemy at " + int(d) + (straggling ? ", stragglers left behind " + int(far) + " (" + farName + ")" : "");
                 }
             }
             s.leadGoal = SetGoal(s.leadRoute, s.leadGoal, goal, Global::RoleSettings::Front::ArtySquadRepath);
-            // the rest: ArtySquadFollowBehind behind the lead, away from the enemy (or toward home)
-            AIFloat3 away = Global::Map::StartPos;
-            if (state != "no enemy known") away = AIFloat3(lp.x * 2.0f - enemy.x, 0.0f, lp.z * 2.0f - enemy.z);
-            float dx = away.x - lp.x, dz = away.z - lp.z;
-            const float len = sqrt(dx * dx + dz * dz);
-            const float back = Global::RoleSettings::Front::ArtySquadFollowBehind;
-            AIFloat3 follow = lp;
-            if (len > 1.0f) follow = Clamp(lp.x + dx / len * back, lp.z + dz / len * back);
-            s.followGoal = SetGoal(s.followRoute, s.followGoal, follow, Global::RoleSettings::Front::ArtySquadRepath);
+            // every member to its own place around the lead's goal (heavies ahead, the pack around, support behind)
+            const float repath = Global::RoleSettings::Front::ArtySquadRepath;
+            s.frontGoal = Clamp(s.leadGoal.x + dx * Global::RoleSettings::Front::ArtySquadHeavyAhead,
+                s.leadGoal.z + dz * Global::RoleSettings::Front::ArtySquadHeavyAhead);   // new members' first goal
+            s.followGoal = s.leadGoal;
+            for (uint k = 0; k < s.members.length(); ++k) {
+                CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
+                if (m is null || m.id == l.id || m.task is null) continue;
+                CRouteTask@ r = cast<CRouteTask>(cast<IFighterTask>(WantedRoute(s, m)));
+                if (r is null || m.task !is cast<IUnitTask>(r)) continue;
+                const AIFloat3 slot = Clamp(s.leadGoal.x + dx * fo[k] - dz * so[k], s.leadGoal.z + dz * fo[k] + dx * so[k]);
+                if (s.slotSent[k].x >= 0.0f && MapHelpers::SqDist(s.slotSent[k], slot) < repath * repath) continue;
+                const array<AIFloat3> points = {slot};
+                if (r.SetUnitRoute(m, points, 48.0f)) s.slotSent[k] = slot;
+            }
             if (ai.frame >= s.nextLog) {
                 s.nextLog = ai.frame + 20 * SECOND;
                 GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": lead " + s.leader + " at (" + int(lp.x) + ", " + int(lp.z)
-                    + ") " + state + ", " + s.members.length() + " member(s), farthest " + int(far), 1);
+                    + ") " + state + ", " + s.members.length() + " member(s) (" + Census(s) + "), farthest " + int(far), 1);
             }
         }
     }
