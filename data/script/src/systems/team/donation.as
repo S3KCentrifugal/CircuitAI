@@ -1,3 +1,4 @@
+#include "../../helpers/math/tech_economy_math.as"
 // TECH's hand-outs to its allies: T2 combat bots by plan, T2 constructors on request.
 #include "../../define.as"
 #include "../../global.as"
@@ -300,6 +301,11 @@ namespace Donation {
         }
     }
 
+    int ConstructorUnitLimit(int physical) {
+        return TechEconomyMath::ConstructorUnitLimit(Global::RoleSettings::Tech::T2BotConstructorCap,
+            physical, int(pendingRequests.length()));
+    }
+
     // Factory::AiMakeTask asks here before the role handler, as it asks the
     // ferry. Returns a constructor order for TECH's advanced bot lab while
     // requests outnumber what is already ordered; null otherwise.
@@ -328,7 +334,10 @@ namespace Donation {
         array<string> ctors = UnitHelpers::GetT2BotConstructors(Global::AISettings::Side);
         if (ctors.length() == 0) return null;
         CCircuitDef@ d = ai.GetCircuitDef(ctors[0]);
-        if (d is null || !d.IsAvailable(ai.frame)) return null;
+        if (d is null || d.maxThisUnit <= 0) return null;
+        const int deliveryLimit = ConstructorUnitLimit(d.count);
+        if (d.maxThisUnit < deliveryLimit) d.maxThisUnit = deliveryLimit;
+        if (!d.IsAvailable(ai.frame)) return null;
         IUnitTask@ order = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH,
                 d, factory.GetPos(ai.frame), 64.f));
         if (order is null) return null;   // nothing ordered, nothing counted (CR-014)
