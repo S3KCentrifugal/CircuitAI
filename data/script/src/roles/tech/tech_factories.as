@@ -90,11 +90,21 @@ namespace TechFactories {
         int gantryCompletedTurrets = 0;
         bool gantryFallback = false;
         bool earlyGantry = false; // budget/path checks apply only to this optional admission
-        IUnitTask@ gantrySupportTask; // native owns its command/recovery lifecycle
+        // The gantry block's turret orders in flight, up to GantrySupportParallel
+        // (owner, 2026-10-24: the air constructors drop them side by side). Native
+        // owns each task's command/recovery lifecycle; a dead task is pruned.
+        array<IUnitTask@> supportTasks;
+        array<int> supportSlots;     // each task's slot
+        array<int> supportFrames;    // each task's order frame
+        dictionary supportSlotFails; // slot id -> orders that died there with no turret frame
+        dictionary supportSlotRest;  // slot id -> frame it may be ordered again
         IUnitTask@ labTask;          // the factory's order while it lives (builders join it)
         Row@ row;                    // D-117: a T1 spam lab's row
         int rowK = 0;                // D-117: its place in the row (0 = the row's first lab)
         int invOpenLog = -100000;    // INV-046
+        bool prebuild = false;       // GantryNanoPrebuildShare: opened for its turrets ahead of the gantry's income gate
+        int nanoWant = -1;           // GantryNanoFirst: the turrets it plans while its gantry goes up (logged on change)
+        bool nanoFull = false;       // ... and they all stood once
     }
     array<Cluster@> clusters;
     // Existing order is chosen in stable cluster insertion order. Planning-only
@@ -811,8 +821,12 @@ namespace TechFactories {
         routed = false;
         if (!IsLandFactory(defName)) return null;
         const bool gantry = UnitHelpers::IsLandGantry(defName);
+        // owner, 2026-10-26: the t3rush gantry (due at +175) takes its front cluster below the
+        // +200 "economy online" gate too. Played: at +177 the step gantry fell to the legacy
+        // EnqueueLandGantry, native found no site, and the dead order's 120 s cooldown kept
+        // MayPlan from the planned cluster until +366.
         if (!GantryMath::ClusterEligible(TechGantry::RecoveryEnabled(), TechBuild::EcoOnline(),
-            false, gantry, Active())) return null;
+            TechPlan::plan == "t3rush", gantry, Active())) return null;
         routed = true;
         return Work(ai.GetCircuitDef(defName), u);
     }
@@ -845,6 +859,12 @@ namespace TechFactories {
         if (c is null) return null;
         if (c.tier == 1 && !u.IsAttrAny(NO_DISRUPT.mask)) u.AddAttribute(NO_DISRUPT.type);   // D-117
         CCircuitUnit@ l = LabAt(c);
+        // GantryNanoFirst: the gantry block's next turret frame before the gantry frame
+        if (c.tier >= 3 && (l is null || l.GetBuildProgress() < 1.0f)) {
+            CCircuitUnit@ nf = TechGantry::BlockFrameInReach(c, u);
+            if (nf !is null) return factorySide ? aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::HIGH, nf))
+                : aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, nf, Global::RoleSettings::Tech::GantryNanoFirstAssistSeconds * SECOND));
+        }
         if (l is null) {
             if (c.tier != 1) return null;   // the factory is not up yet: other work (its block, its frame)
             // D-117: a spam lab's turrets wait for their lab

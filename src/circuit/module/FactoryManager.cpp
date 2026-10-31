@@ -530,11 +530,25 @@ void CFactoryManager::ReadConfig()
 			boolean("prefer_screen", policy.preferScreen);
 			boolean("allow_radar", policy.allowRadar);
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
+			boolean("low_trajectory", policy.lowTrajectory);
 			boolean("hold_fireline", policy.holdFireline);
 			boolean("stage_when_blocked", policy.stageWhenBlocked);
 			boolean("fire_at_will", policy.fireAtWill);
             boolean("fire_in_range", policy.fireInRange);
             boolean("commander_focus", policy.commanderFocus);
+			number("spam_max_cost", policy.spamMaxCost, 0.f, 2000.f);
+			{
+				// Owner 2026-10-27: an explicit spam roster. A name this game
+				// does not have is logged and skipped, not a malformed policy.
+				const auto& spam = settings["spam_units"];
+				if (!spam.isNull() && !spam.isArray()) valid = false;
+				else for (const auto& name : spam) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* spamDef = circuit->GetCircuitDef(name.asCString());
+					if (spamDef == nullptr) circuit->LOG("CONFIG %s: %s spam_units has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+					else policy.spamDefs.insert(spamDef->GetId());
+				}
+			}
             number("commander_priority", policy.commanderPriority, 1.f, 100.f);
 			boolean("coordinated", policy.coordinated);
             // Fireline holding is an individual forward-arc doctrine. Reject
@@ -983,6 +997,11 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 
 	IUnitTask* task = builder->GetTask();
 	if ((task == nullptr) || (task->GetType() != IUnitTask::Type::FACTORY)) {
+		// Owner, 2026-10-26: the gantry's engine repeat started its last product again
+		// before the AI's next order arrived; the next recruit may adopt it
+		if (builder->IsLagRepeat() && unit->GetUnit()->IsBeingBuilt()) {
+			lagStrays[builder->GetId()] = unit->GetId();
+		}
 		return 0; //signaling: OK
 	}
 
@@ -991,6 +1010,11 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 		if (taskR->GetTarget() == nullptr) {
 			taskR->SetTarget(unit);
 			unfinishedUnits[unit] = taskR;
+			// Lag fallback: from now the engine repeats this product until the AI's next order
+			if (builder->IsLagRepeat() && !taskR->IsRepeat()) {
+				lagStrays.erase(builder->GetId());
+				TRY_UNIT(circuit, builder, builder->GetUnit()->SetRepeat(true);)
+			}
 		}
 	}
 
@@ -1084,6 +1108,7 @@ int CFactoryManager::UnitIdle(CCircuitUnit* unit)
 
 int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	lagStrays.erase(unit->GetId());
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
 		AbortTask(iter->second);
@@ -1112,6 +1137,20 @@ int CFactoryManager::GetPendingRecruitCount(const CCircuitDef* def) const
         if (count != indexed) circuit->LOG("[INVARIANT] INV-175 recruit index=%i scan=%i", indexed, count);
     }
     return indexed;
+}
+
+CCircuitUnit* CFactoryManager::TakeLagStray(CCircuitUnit* factory)
+{
+	auto it = lagStrays.find(factory->GetId());
+	if (it == lagStrays.end()) return nullptr;
+	const CCircuitUnit::Id id = it->second;
+	lagStrays.erase(it);
+	CCircuitUnit* stray = circuit->GetTeamUnit(id);
+	// ids are reused: the unit must still be this factory's unfinished product
+	if (stray == nullptr || stray->IsDead() || stray->IsFinished()
+		|| stray->GetProducerId() != factory->GetId()) return nullptr;
+	if (unfinishedUnits.find(stray) != unfinishedUnits.end()) return nullptr;
+	return stray;
 }
 
 void CFactoryManager::RefreshPendingRecruit(CRecruitTask* task)
