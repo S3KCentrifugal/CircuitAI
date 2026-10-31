@@ -23,20 +23,22 @@ bool CCommanderController::HealthRetreat(CCircuitUnit* unit) const {
     if(!Handles(unit)) return false;
     const State* found=states.Find(unit->GetId());
     Bind bound(this,found?found->preset:0);
-    if(cfg->safety.healthRetreat<=0) return false;
-    return unit->GetHealthPercent()<cfg->safety.healthRetreat
-        || (found && found->retreat.health);
+    const float threshold=commander::RetreatHealth(ActualDecoy(unit->GetCircuitDef()),
+        cfg->safety.healthRetreat,cfg->safety.decoyHealthRetreat);
+    return commander::HealthWithdrawal(unit->GetHealthPercent(),threshold,found && found->retreat.health);
 }
 
 bool CCommanderController::HealthControl(CCircuitUnit* unit,State& s,int frame) {
-    if(cfg->safety.healthRetreat<=0
-        || unit->GetHealthPercent()>=std::max(cfg->combat.recover,cfg->safety.healthRetreat)) {
+    const bool decoy=ActualDecoy(unit->GetCircuitDef());
+    const float threshold=commander::RetreatHealth(decoy,cfg->safety.healthRetreat,cfg->safety.decoyHealthRetreat);
+    const float recover=decoy?cfg->safety.decoyHealthRecover:cfg->combat.recover;
+    if(commander::HealthRecovered(unit->GetHealthPercent(),threshold,recover)) {
         s.retreat.health=false;s.retreat.healthGoal={-1,0,-1};s.retreat.healthShotUntil=-1;return false;
     }
     if(!HealthRetreat(unit)) return false;
     const auto pos=unit->GetPos(frame);
     auto* def=unit->GetCircuitDef();
-    const float window=cfg->safety.healthShotSeconds;
+    const float window=decoy?0.f:cfg->safety.healthShotSeconds;
     const bool recentDamage=s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC;
     // An actual cloak and a clear in-range T3 shot are required. Never hand a
     // low-health exception to the general jammer controller (which can chase

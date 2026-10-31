@@ -161,7 +161,8 @@ void CCommanderController::UpdatePosture(CCircuitUnit* unit,State& s,int frame,b
     // One scalar at the existing posture cadence. Keep the unlock across income
     // dips and commander replacement, but only during this FRONT duty lifetime.
     if(role.frontDuty) role.peakEnergyIncome=std::max(role.peakEnergyIncome,income);
-    in.preferCloak=posture::IncomeCloakEnabled(role.frontDuty,cfg->cloak.frontIncome,role.peakEnergyIncome);
+    const float incomeThreshold=ActualDecoy(def)?cfg->cloak.decoyFrontIncome:cfg->cloak.frontIncome;
+    in.preferCloak=posture::IncomeCloakEnabled(role.frontDuty,incomeThreshold,role.peakEnergyIncome);
     // Hysteresis: once the one-minute cloak spend passes the budget, posture
     // cloaks stay off until it falls to half of it (no on/off every second).
     const float budgetCap=cfg->cloak.budget*income*WINDOW_SECONDS;

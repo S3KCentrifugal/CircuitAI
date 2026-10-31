@@ -1994,8 +1994,6 @@ namespace Builder {
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
             if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
-            IUnitTask@ decoy=CommanderGroup::PrepareDecoy(u);
-            if(decoy !is null) return decoy;
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;

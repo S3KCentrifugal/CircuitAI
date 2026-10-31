@@ -6,6 +6,15 @@
 #include <vector>
 
 namespace circuit::commander {
+// Configuration is selected by actual UnitDef decoy identity, not its disguised
+// enemy-facing definition. Pure admission/recovery rules; no engine queries.
+inline float RetreatHealth(bool decoy,float normal,float bait) { return decoy?bait:normal; }
+inline bool HealthWithdrawal(float health,float threshold,bool active) {
+    return threshold>0.f && (health<threshold || active);
+}
+inline bool HealthRecovered(float health,float threshold,float recover) {
+    return threshold<=0.f || health>=std::max(threshold,recover);
+}
 // Pure geometry, used by the live controller and its differential tests.
 // Contacts are caller-owned and freshly observed in engine query order. Candidate
 // directions are bounded; every local contact participates in line scoring.

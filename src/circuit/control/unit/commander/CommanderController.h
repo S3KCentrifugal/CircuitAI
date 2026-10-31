@@ -166,6 +166,8 @@ struct CommanderCombatConfig {
 };
 struct CommanderSafetyConfig {
     float healthRetreat=0,healthShotSeconds=2;
+    float decoyHealthRetreat=.9f,decoyHealthRecover=.95f;
+    float decoyBait=1; // reuse safety/lane work, never plan a real-commander D-gun attack
     float jamSafe=0,jamHeavyCost=900;
     float cloakEnergyRetreat=0,cloakRetreatDistance=600;
 };
@@ -188,6 +190,7 @@ struct CommanderCloakConfig {
     float memoryCap=600;        // ...and their position uncertainty is capped here
     float budget=.15f;          // cloak energy per minute as a share of income (0: no cap)
     float frontIncome=0;        // 0 disables FRONT economy cloak; enabled by active JSON
+    float decoyFrontIncome=0;   // decoys are visible bait unless explicitly opted in
     float stillSeconds=10;      // bank seconds a stationary cloak must be funded for
     float period=30;            // frames between posture choices
     float log=1;                // per-minute cloak energy log line

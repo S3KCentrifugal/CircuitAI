@@ -11,9 +11,8 @@ namespace CommanderGroup {
     const array<string> jammers={"armaser","armjam","corspec","coreter","legavjam"};
     const array<string> decoys={"armdecom","cordecom","legdecom"};
     bool loaded=false,enabled=false,wantDecoy=false;
-    int economy=-1,desired=0,next=0,bridge=-1;
-    IUnitTask@ bridgeRecruit;
-    IUnitTask@ decoyFactory;
+    int economy=-1,desired=0,next=0;
+    float decoyM=100,decoyE=2000,decoySeconds=60,decoyReserveM=500,decoyReserveE=2000;
     float firstM=50,firstE=1000,secondM=120,secondE=2500,thirdM=240,thirdE=5000;
     bool Eligible(CCircuitUnit@ unit) {
         return unit !is null && !unit.circuitDef.IsAbleToFly()
@@ -34,9 +33,11 @@ namespace CommanderGroup {
         enabled=aiTerrainMgr.GetLayoutInt("front.constructor.group_enabled",0)!=0;
         desired=aiTerrainMgr.GetLayoutInt("front.group.desired",0);
         economy=aiTerrainMgr.GetLayoutInt("front.group.economy",-1);
-        bridge=aiTerrainMgr.GetLayoutInt("front.group.bridge",-1);
         wantDecoy=aiTerrainMgr.GetLayoutInt("front.group.decoy",0)!=0;
         for(uint i=0;i<members.length();++i) members[i]=aiTerrainMgr.GetLayoutInt("front.group.member."+i,-1);
+        decoyM=Setting("decoy_metal",100);decoyE=Setting("decoy_energy",2000);
+        decoySeconds=Setting("decoy_seconds",60);
+        decoyReserveM=Setting("decoy_reserve_metal",500);decoyReserveE=Setting("decoy_reserve_energy",2000);
         firstM=Setting("t2_metal",50);firstE=Setting("t2_energy",1000);
         secondM=Setting("second_t2_metal",120);secondE=Setting("second_t2_energy",2500);
         thirdM=Setting("third_t2_metal",240);thirdE=Setting("third_t2_energy",5000);
@@ -84,10 +85,7 @@ namespace CommanderGroup {
         if(members.find(unit.id)>=0) return true;
         if(unit.id==economy) return false;
         const string name=unit.circuitDef.GetName();
-        if(bridgeRecruit !is null && name==BotName("ck") && FrontConstructors::Missing()<0) {
-            bridge=unit.id;aiTerrainMgr.SetLayoutInt("front.group.bridge",bridge);@bridgeRecruit=null;
-            return false;
-        }
+
         int seat=-1;
         if(t2.find(name)>=0) {
             seat=CommanderGroupMath::Admission(ai.GetTeamUnit(economy)!is null,members,desired);
@@ -105,7 +103,6 @@ namespace CommanderGroup {
         if(!loaded) return;
         const int seat=members.find(unit.id);
         if(seat>=0) {members[seat]=-1;Save(seat);aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+seat,-1.f);}
-        if(bridge==unit.id) {bridge=-1;aiTerrainMgr.SetLayoutInt("front.group.bridge",-1);}
         if(economy==unit.id) {economy=-1;aiTerrainMgr.SetLayoutInt("front.group.economy",-1);}
         next=0;
     }
@@ -125,76 +122,45 @@ namespace CommanderGroup {
         for(uint i=0;i<names.length();++i) {
             CCircuitDef@ def=ai.GetCircuitDef(names[i]);
             if(def is null || !factory.circuitDef.CanBuild(def)) continue;
+            if(seat==5 && !DecoyFunded(factory,def)) return null;
             // This FRONT-local cap permits the dedicated seat without changing
             // other roles or the shared UnitDef classification.
             if(def.maxThisUnit<def.count+1) def.maxThisUnit=def.count+1;
             if(!def.IsAvailable(ai.frame)) continue;
             IUnitTask@ task=aiFactoryMgr.Enqueue(TaskS::Recruit(seat<3?Task::RecruitType::BUILDPOWER:Task::RecruitType::FIREPOWER,
-                Task::Priority::HIGH,def,factory.GetPos(ai.frame),64.f));
+                seat==5?Task::Priority::NORMAL:Task::Priority::HIGH,def,factory.GetPos(ai.frame),64.f));
             @recruits[seat]=task;
             if(task !is null) GenericHelpers::LogUtil("[CommanderGroup] recruit seat="+seat+" def="+def.GetName(),1);
             return task;
         }
         return null;
     }
-    string BotName(const string &in suffix) {
-        const string side=Global::AISettings::Side.length()>0?Global::AISettings::Side:ai.GetSideName();
-        return (side=="cortex"?"cor":side=="legion"?"leg":"arm")+suffix;
-    }
-    bool NeedsDecoyFactory() {
-        if(!enabled || !wantDecoy || members[5]>=0) return false;
-        for(uint i=0;i<decoys.length();++i) {
-            // The faction's advanced bot factory is the decoy production edge.
-            const string prefix=i==0?"arm":i==1?"cor":"leg";
-            CCircuitDef@ lab=ai.GetCircuitDef(prefix+"alab");
-            if(lab !is null && lab.count>0) return false;
-        }
-        return true;
-    }
-    IUnitTask@ PrepareDecoy(CCircuitUnit@ unit) {
-        if(Global::AISettings::Role!=AiRole::FRONT) return null;
-        Update();
-        if(!NeedsDecoyFactory() || (unit.id!=economy && unit.id!=bridge && !FrontConstructors::IsBase(unit.id))) return null;
-        if(unit.task !is null && (unit.task.IsExternalControlled() || unit.task.IsEnemyReclaim()
-            || unit.task.GetType()==int(Task::Type::PLAYER) || unit.task.GetType()==int(Task::Type::RETREAT))) return null;
-        if(decoyFactory !is null && !decoyFactory.IsDead()) {
-            IBuilderTask@ project=cast<IBuilderTask>(decoyFactory);
-            return project !is null && project.buildDef !is null && unit.circuitDef.CanBuild(project.buildDef)?decoyFactory:null;
-        }
-        @decoyFactory=null;
-        CCircuitDef@ lab=ai.GetCircuitDef(BotName("alab"));
-        if(lab is null || !unit.circuitDef.CanBuild(lab)) @lab=ai.GetCircuitDef(BotName("lab"));
-        if(lab is null || !unit.circuitDef.CanBuild(lab) || lab.count>0
-            || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY),lab)>0) return null;
-        if(lab.maxThisUnit<1) lab.maxThisUnit=1;
-        @decoyFactory=aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::HIGH,lab,Global::Map::StartPos,null));
-        return decoyFactory;
-    }
-    IUnitTask@ RecruitBridge(CCircuitUnit@ factory) {
-        if(!NeedsDecoyFactory() || ai.GetTeamUnit(bridge)!is null) return null;
-        CCircuitDef@ lab=ai.GetCircuitDef(BotName("alab"));
-        CCircuitUnit@ base=ai.GetTeamUnit(FrontConstructors::seats[0]);
-        if(lab !is null && base !is null && base.circuitDef.CanBuild(lab)) return null;
-        if(bridgeRecruit !is null && !bridgeRecruit.IsDead()) return null;
-        CCircuitDef@ def=ai.GetCircuitDef(BotName("ck"));
-        if(def is null || !factory.circuitDef.CanBuild(def) || aiFactoryMgr.GetPendingRecruitCount(def)>0
-            || aiBuilderMgr.GetUnfinishedCount(def)>0) return null;
-        if(def.maxThisUnit<def.count+1) def.maxThisUnit=def.count+1;
-        @bridgeRecruit=aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER,Task::Priority::HIGH,
-            def,factory.GetPos(ai.frame),64.f));
-        return bridgeRecruit;
+    bool DecoyFunded(CCircuitUnit@ factory,CCircuitDef@ def) {
+        if(aiBuilderMgr.FrontCommanderId()>=0 || FrontConstructors::Missing()>=0) return false;
+        if(desired>0 && ai.GetTeamUnit(economy) is null) return false;
+        for(int i=0;i<desired;++i) if(members[i]<0) return false;
+        if(!CommanderGroupMath::DecoyIncome(aiEconomyMgr.metal.income,aiEconomyMgr.energy.income,decoyM,decoyE)) return false;
+        // Read cached resource aggregates only on a compatible factory ask.
+        // Bound the forecast by unassisted production time; never extend it
+        // to justify a faster factory. No army scan or recurring allocation.
+        const float power=factory.circuitDef.GetBuildSpeed();
+        if(power<=0) return false;
+        const float seconds=AiMin(decoySeconds,def.GetBuildTime()/power);
+        return CommanderGroupMath::ReplacementResource(aiEconomyMgr.metal.current,decoyReserveM,
+                aiEconomyMgr.metal.income,aiEconomyMgr.metal.pull,def.costM,seconds)
+            && CommanderGroupMath::ReplacementResource(aiEconomyMgr.energy.current,decoyReserveE,
+                aiEconomyMgr.energy.income,aiEconomyMgr.energy.pull,def.costE,seconds);
     }
     IUnitTask@ Recruit(CCircuitUnit@ factory) {
         Update();
         IUnitTask@ task=FrontConstructors::Recruit(factory,enabled);
         if(task !is null || !enabled) return task;
-        @task=RecruitBridge(factory);if(task !is null) return task;
-        if(wantDecoy) {@task=RecruitSeat(factory,5,decoys);if(task !is null) return task;}
         for(int i=0;i<desired;++i) {@task=RecruitSeat(factory,i,t2);if(task !is null) return task;}
         if(desired>0) {
             @task=RecruitSeat(factory,3,radars);if(task !is null) return task;
             @task=RecruitSeat(factory,4,jammers);if(task !is null) return task;
         }
+        if(wantDecoy) {@task=RecruitSeat(factory,5,decoys);if(task !is null) return task;}
         return null;
     }
     IUnitTask@ Work(CCircuitUnit@ unit) {

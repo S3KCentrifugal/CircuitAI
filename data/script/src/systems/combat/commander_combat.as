@@ -91,6 +91,11 @@ namespace CommanderCombat {
             Option("cloak_energy_retreat",0.f);
             Option("cloak_retreat_distance",600.f);
             Option("health_retreat",.4f);
+            Option("decoys",1.f);
+            Option("decoy_bait",1.f);
+            Option("decoy_health_retreat",.9f);
+            Option("decoy_health_recover",.95f);
+            Option("decoy_front_cloak_income",0.f);
             Option("health_shot_seconds",2.f);
             Option("commander_group_jammer_edge",100.f);
             Option("commander_group_jammer_income",25.f);
