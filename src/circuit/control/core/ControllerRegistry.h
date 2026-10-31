@@ -35,9 +35,9 @@ public:
 
 	template <class T>
 	T* Add(std::unique_ptr<T> controller) {
-		T* raw = controller.get();
 		controllers.push_back(std::move(controller));
-		return raw;
+		// Borrow from the registry after ownership transfer, not the moved-from parameter.
+		return static_cast<T*>(controllers.back().get());
 	}
 
 	void ReadConfig(const Json::Value& root);
