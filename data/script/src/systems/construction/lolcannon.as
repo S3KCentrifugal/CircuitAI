@@ -1926,9 +1926,8 @@ namespace LolCannon {
         }
         const string why = all ? "done" : (stuck ? "no crew member can build the rest" : "gave up after " + Global::LolCannon::ExtrasFinishSeconds + " s");
         GenericHelpers::LogUtil("[LolCannon] REPORT cover " + tally + " at=" + (ai.frame / SECOND) + "s took=" + ((ai.frame - extrasStarted) / SECOND) + "s (" + why + ")", 1);
-        if (!aiTerrainMgr.IsLayoutEnabled()) {
-            for (int g = 0; g < 3; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
-        }
+        // slots never ordered still hold their reservation (TECH too: an ordered one is -1, owned by its order)
+        for (int g = 0; g < 3; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
         ReleaseCrew("cover " + why + " (" + built + " built; the next at " + int(Gate()) + " metal/s)");
         phase = IDLE;
         nextPlan = ai.frame + 30 * SECOND;
