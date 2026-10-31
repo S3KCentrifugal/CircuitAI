@@ -270,6 +270,11 @@ public:
 		int overnukeStockCap = 10;  // BAR stockpilelimit of every silo
 		int overnukeStockFrames = 900 * FRAMES_PER_SEC;  // 0 = no timeout
 		float overnukeFireBelowHealth = 0.5f;  // 0 = off
+		// Second breakpoint (owner 2026-10-30): from overnukeTeamSilos finished
+		// silos across every allied BARb, the roll is overnukeTeamMin..Max.
+		int overnukeTeamSilos = 8;  // 0 = off
+		int overnukeTeamMin = 15;
+		int overnukeTeamMax = 30;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 	strategic::Overnuke& GetOvernuke() { return overnuke; }

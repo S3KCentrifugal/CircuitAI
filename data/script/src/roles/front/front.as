@@ -23,6 +23,8 @@
 #include "../../systems/construction/front_overflow.as"
 #include "../../systems/construction/front_factory_nanos.as"
 #include "../../systems/construction/front_lab_porc.as"
+#include "../../systems/construction/front_agitator.as"
+#include "../../systems/construction/front_silo_grid.as"
 #include "../../systems/construction/commander_front.as"
 #include "../../systems/construction/front_spawn_factory.as"
 // Builder state and helpers for enqueueing structures like nanos
@@ -49,6 +51,7 @@ namespace RoleFront {
         FrontGeothermal::Reset();
         FrontFactoryNanos::Reset();
         FrontLabPorc::Reset();
+        FrontAgitator::Reset();
         FrontSpawnFactory::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
@@ -234,6 +237,7 @@ namespace RoleFront {
         Front_IncomeLimits(metalIncome, energyIncome);
         FrontRecovery::Update(metalIncome);
         FrontMexUp::Update(); // owner, 2026-10-22: T2 helpers move to open mex upgrades
+        FrontAgitator::Sample(); // owner, 2026-11-01: bank at 80% in the last 2 min gates forward agitators
         FrontOverflow::Update(); // owner, 2026-10-31: energy overflow into T2 converter blocks; per-minute overflow log
 
         // One-time switch for T1 combat units to 'raider' role when metal income > 250
@@ -679,6 +683,9 @@ namespace RoleFront {
         // Owner (2026-10-30): T2 lab corridors to the enemy base; forward labs' own porc (front_lab_porc.as)
         IUnitTask@ labPorc=FrontLabPorc::Work(builder);
         if (labPorc !is null) return labPorc;
+        // Owner (2026-11-01): forward agitators and T2 pop-up artillery at our front mex / porc (front_agitator.as)
+        IUnitTask@ agitator=FrontAgitator::Work(builder);
+        if (agitator !is null) return agitator;
         // Select explicit geo work before asking native to enqueue another
         // energy task. Overriding an already-created task would leak work.
         IUnitTask@ geothermal=FrontGeothermal::Work(builder);
@@ -694,6 +701,9 @@ namespace RoleFront {
         if (ladderGantry !is null) return ladderGantry;
         IUnitTask@ ladder=FrontEcoLadder::Work(builder);
         if (ladder !is null) return ladder;
+        // Owner (2026-10-30): from 35 min at sustained 225 metal / 2000 energy, silos in one tight grid off the lanes (front_silo_grid.as)
+        IUnitTask@ silo=FrontSiloGrid::Work(builder);
+        if (silo !is null) return silo;
         // Owner (2026-10-22): T2 constructors upgrade our T1 mexes before native assist/help work
         IUnitTask@ mexUp=FrontMexUp::Work(builder);
         if (mexUp !is null) return mexUp;
@@ -865,6 +875,7 @@ namespace RoleFront {
     void Front_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
         FrontFactoryNanos::TaskRemoved(task, done);
         FrontLabPorc::TaskRemoved(task, done);
+        FrontAgitator::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
     }
 
