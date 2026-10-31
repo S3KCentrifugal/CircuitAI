@@ -79,16 +79,16 @@ namespace FrontOverflow {
 
     float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even 4x4 footprints sit on 16-elmo lines
 
-    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ out)
+    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells)
     {
         const int cols = Global::RoleSettings::Front::OverflowBlockCols, rows = Global::RoleSettings::Front::OverflowBlockRows;
         const float pitch = 32.0f;
-        out.resize(0);
+        fitCells.resize(0);
         for (int r = 0; r < rows; ++r) {
             for (int k = 0; k < cols; ++k) {
                 const AIFloat3 p(Snap(c.x) + (float(k) - float(cols - 1) * 0.5f) * pitch, 0.0f, Snap(c.z) + (float(r) - float(rows - 1) * 0.5f) * pitch);
                 if (aiTerrainMgr.BuildableFraction(d, p, 8.0f, 8.0f, 0) < 1.0f) return false;
-                out.insertLast(p);
+                fitCells.insertLast(p);
             }
         }
         // no surface threat at the block
