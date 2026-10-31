@@ -38,6 +38,7 @@
 #include "task/builder/MexTask.h"
 #include "task/builder/MexUpTask.h"
 #include "task/builder/TerraformTask.h"
+#include "task/builder/RestoreTask.h"
 #include "task/builder/RepairTask.h"
 #include "task/builder/ReclaimTask.h"
 #include "task/builder/ResurrectTask.h"
@@ -46,6 +47,7 @@
 #include "task/builder/CombatTask.h"
 #include "task/builder/CommanderTask.h"
 #include "module/CommanderControl.h"
+#include "module/RestoreControl.h"
 #include "task/builder/BuildChain.h"
 #include "CircuitAI.h"
 #include "unit/ally/AllyTeam.h"
@@ -81,6 +83,7 @@ CBuilderManager::CBuilderManager(CCircuitAI* circuit)
 		, dangerHysteresis(MAX_TRAVEL_SEC * FRAMES_PER_SEC)
 {
 	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CBuilderManager::Init, this));
+	restoreControl = std::make_unique<CRestoreControl>(circuit);
 
 	buildTasks.resize(static_cast<IBuilderTask::BT>(IBuilderTask::BuildType::_SIZE_));
 
@@ -349,6 +352,7 @@ void CBuilderManager::ReadConfig()
 		terraDef = circuit->GetEconomyManager()->GetSideInfo().defaultDef;
 	}
 	goalExecTime = econ.get("goal_exec", 16.f).asFloat();
+	restoreControl->ReadConfig(root);
 
 	const Json::Value& cond = root["porcupine"]["superweapon"]["condition"];
 	super.minIncome = cond.get((unsigned)0, 50.f).asFloat();
@@ -493,6 +497,9 @@ void CBuilderManager::Init()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CBuilderManager::Watchdog, this),
 								FRAMES_PER_SEC * 5,
 								circuit->GetSkirmishAIId() * WATCHDOG_COUNT + 10);
+		// Terrain restore: one scan per interval, a no-op when restore.enable is off
+		scheduler->RunJobEvery(CScheduler::GameJob(&CRestoreControl::Scan, restoreControl.get()),
+								restoreControl->GetScanInterval(), offset + 5);
 	};
 
 	circuit->GetSetupManager()->ExecOnFindStart(subinit);
@@ -1262,6 +1269,20 @@ IUnitTask* CBuilderManager::Enqueue(const TaskB::SServBTask& ti)
 	lastEnqueued = task;
 	TaskAdded(task);
 	return task;
+}
+
+CBRestoreTask* CBuilderManager::EnqueueRestore(const AIFloat3& position, float radius, int reason, int maxFrames)
+{
+	CBRestoreTask* task = new CBRestoreTask(this, IBuilderTask::Priority::HIGH, position, radius, reason, maxFrames);
+	updateTasks.push_back(task);
+	lastEnqueued = task;
+	TaskAdded(task);
+	return task;
+}
+
+bool CBuilderManager::RequestRestore(const AIFloat3& position, float radius)
+{
+	return restoreControl->RequestSite(position, radius, CRestoreControl::SCRIPT);
 }
 
 CRetreatTask* CBuilderManager::EnqueueRetreat()

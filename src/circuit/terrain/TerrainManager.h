@@ -22,6 +22,7 @@
 #include <string>
 #include <deque>
 #include <functional>
+#include <vector>
 #include <tuple>
 #include <cstdint>
 
@@ -634,6 +635,34 @@ public:
 	bool CanReachAtSafe2(CCircuitUnit* unit, const springai::AIFloat3& destination, const float range);
 	bool CanMobileReachAt(terrain::SArea* area, const springai::AIFloat3& destination, const float range);
 	bool CanMobileReachAtSafe(terrain::SArea* area, const springai::AIFloat3& destination, const float range, const float threat = THREAT_MIN);
+
+	// Terrain restore (owner 2026-10-31): ground against the heightmap read at
+	// game start (CTerrainData::GetOriginalHeightMap). One cell is one 8x8-elmo
+	// heightmap square. The cached heightmap is refreshed every 10 s; `live`
+	// reads the engine instead, one callback per sampled cell (completion
+	// checks only). `skip` drops cells (structure footprints) by world x, z.
+	struct SDamageQuery {
+		float threshold = 12.f;     // |current - original| that counts, elmos
+		float lavaLevel = -1e9f;    // cells below it whose original stood above it + lavaMargin count too
+		float lavaMargin = 4.f;
+		bool live = false;
+		int step = 1;               // sample every step-th cell
+		std::function<bool (float, float)> skip;
+	};
+	struct STerrainDamage {
+		float dug = 0.f;     // deepest point below the original
+		float raised = 0.f;  // highest point above the original
+		int cells = 0;       // sampled cells that count (threshold or lava)
+		int lavaCells = 0;   // of those, cells under fixable lava
+		float minX = 0.f, minZ = 0.f, maxX = 0.f, maxZ = 0.f;  // their bounding box, cell centres
+	};
+	float GetOriginalElevationAt(float x, float z) const;
+	STerrainDamage GetTerrainDamage(const springai::AIFloat3& pos, float radius, const SDamageQuery& query) const;
+	// Sector indices within radius whose worker-computed damage reaches the
+	// threshold, or that dip under the lava after being dug.
+	void FindDamagedSectors(const springai::AIFloat3& center, float radius, float threshold, float lavaLevel,
+			std::vector<int>& out) const;
+	springai::AIFloat3 GetSectorCenter(int sIndex) const { return areaData->sector[sIndex].position; }
 
 	float GetLandPercent() const { return areaData->percentLand; }
 	float GetMinLandPercent() const { return minLandPercent; }

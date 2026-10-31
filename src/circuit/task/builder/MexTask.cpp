@@ -8,6 +8,7 @@
 #include "task/builder/MexTask.h"
 #include "module/EconomyManager.h"
 #include "module/BuilderManager.h"
+#include "module/RestoreControl.h"
 #include "module/MilitaryManager.h"
 #include "resource/MetalManager.h"
 #include "terrain/TerrainManager.h"
@@ -166,6 +167,9 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 			economyMgr->SetOpenMexSpot(spotId, true);
 		}
 	} else {
+		// Terrain restore: a cratered spot is restored on the next scan and
+		// offered again when its spot reopens (a no-op without damage there).
+		static_cast<CBuilderManager*>(manager)->GetRestoreControl()->RequestSite(buildPos, 48.f, CRestoreControl::SITE);
 		if (spotId == metal_field::SiteTagV1) { manager->AbortTask(this); return false; }
 		metalMgr->SetOpenSpot(spotId, true);
 		economyMgr->SetOpenMexSpot(spotId, true);

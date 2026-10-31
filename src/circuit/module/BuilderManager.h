@@ -17,6 +17,7 @@
 #include <map>
 #include <set>
 #include <deque>
+#include <memory>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -33,6 +34,8 @@ class CBRepairTask;
 class CBReclaimTask;
 class CCombatTask;
 class CCommanderTask;
+class CBRestoreTask;
+class CRestoreControl;
 
 struct SBuildChain;
 
@@ -307,6 +310,11 @@ public:
 	float GetGoalExecTime() const { return goalExecTime; }
 	unsigned int GetWorkerCount() const { return workers.size(); }
     CCommanderTask* EnqueueCommander(IUnitTask* previous);
+	// Terrain restore (owner 2026-10-31): a detached task (not in buildTasks,
+	// not saved) created and assigned by CRestoreControl only.
+	CBRestoreTask* EnqueueRestore(const springai::AIFloat3& position, float radius, int reason, int maxFrames);
+	CRestoreControl* GetRestoreControl() const { return restoreControl.get(); }
+	bool RequestRestore(const springai::AIFloat3& position, float radius);  // script: restore this site if damaged
     bool SetCommanderCombatOption(const std::string& name,float value);
     float GetCommanderEnergyReserve() const;
     float GetCommanderEnergyDeficit() const;
@@ -526,6 +534,7 @@ private:
 	int approachKept = 0, approachOverBudget = 0;
 
 	CCircuitDef* terraDef = nullptr;
+	std::unique_ptr<CRestoreControl> restoreControl;
 	std::unordered_map<IBuilderTask::BT, std::unordered_map<CCircuitDef*, SBuildChain*>> buildChains;  // owner
 	struct SSuper {
 		float minIncome;  // metal per second

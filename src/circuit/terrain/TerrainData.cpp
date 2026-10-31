@@ -261,6 +261,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 	map->GetSlopeMap(slopeMap);
 	const FloatVec& standardSlopeMap = slopeMap;
 	map->GetHeightMap(areaData.heightMap);
+	origHeightMap = areaData.heightMap;  // terrain restore: the reference every damage check compares with
 	const FloatVec& standardHeightMap = areaData.heightMap;
 	const int convertStoSM = GetConvertStoSM();  // * for conversion, / for reverse conversion
 	const int convertStoHM = GetConvertStoHM();  // * for conversion, / for reverse conversion
@@ -818,10 +819,23 @@ std::shared_ptr<IMainJob> CTerrainData::UpdateAreas()
 			sector[i].percentLand = .0f;
 			sector[i].minElevation = standardHeightMap[iMapH];
 			sector[i].maxElevation = standardHeightMap[iMapH];
+			// Terrain restore: damage against the start heightmap, folded into
+			// the loop that already reads every cell of a changed sector.
+			sector[i].dug = .0f;
+			sector[i].raised = .0f;
+			const bool hasOrig = (origHeightMap.size() == standardHeightMap.size());
 			for (int zH = 0; zH < convertStoHM; zH++) {
 				for (int xH = 0, iH = iMapH + zH * heightMapXSize + xH; xH < convertStoHM; xH++, iH = iMapH + zH * heightMapXSize + xH) {
 					if (standardHeightMap[iH] >= 0) {
 						sector[i].percentLand++;
+					}
+					if (hasOrig) {
+						const float delta = standardHeightMap[iH] - origHeightMap[iH];
+						if (delta > sector[i].raised) {
+							sector[i].raised = delta;
+						} else if (-delta > sector[i].dug) {
+							sector[i].dug = -delta;
+						}
 					}
 
 					if (sector[i].minElevation > standardHeightMap[iH]) {

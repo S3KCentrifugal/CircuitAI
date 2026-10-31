@@ -116,6 +116,8 @@ struct SSector {
 		, minElevation(.0f)
 		, maxElevation(.0f)
 		, maxSlope(.0f)
+		, dug(.0f)
+		, raised(.0f)
 	{}
 
 	bool isWater;  // (Water = true) (Land = false)
@@ -126,6 +128,11 @@ struct SSector {
 	float minElevation;  // 0 or less for water
 	float maxElevation;
 	float maxSlope;      // 0 or higher
+	// Terrain damage against the heightmap read at game start, in elmos, over
+	// the sector's height cells: deepest dig (crater) and highest raise. Kept
+	// current by UpdateAreas for changed sectors only; 0 until the first change.
+	float dug;
+	float raised;
 };
 
 struct SImmobileType {
@@ -240,6 +247,11 @@ public:
 	// Engine slope map, one value per 16x16 elmos (1 - cos of the slope; a
 	// movedef's maxSlope is in the same units). For layout flatness scoring.
 	const FloatVec& GetSlopeMap() const { return slopeMap; }
+	// The heightmap as it stood when the first AI initialised (the engine's
+	// original heightmap is not in the AI interface; map gadgets that shift the
+	// ground run in their Initialize, before any AI). Written once in Init, then
+	// read-only, so the terrain worker may read it. Same layout as heightMap.
+	const FloatVec& GetOriginalHeightMap() const { return origHeightMap; }
 	int GetSlopeMapXSize() const { return slopeMapXSize; }
 	void OnAreaUsersUpdated();
 	SAreaData* GetNextAreaData() {
@@ -251,6 +263,7 @@ private:
 	std::shared_ptr<circuit::CScheduler> scheduler;
 	circuit::CGameAttribute* gameAttribute;
 	FloatVec slopeMap;
+	FloatVec origHeightMap;
 	int slopeMapXSize;  // slope map width
 	bool isUpdating;
 	int aiToUpdate;

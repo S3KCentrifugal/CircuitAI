@@ -1,6 +1,25 @@
     // Mono-space font required
 	{
 "nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
+// Terrain restore (owner 2026-10-31, RestoreControl): builders pull craters
+// (nukes, commander blasts, bombs) and the lava in them back to the map's
+// original height with the engine's restore order. Looks at the base, at sites
+// a task could not build on, and at crater lava under our ground units.
+"restore": {
+	"enable": true,
+	"units": ["commander", "t1", "rez"],  // add "t2" to send T2 constructors too
+	"damage": 12,          // elmos off the original height that count as damage
+	"min_cells": 6,        // damaged 8x8-elmo cells a patch needs
+	"base_radius": 1500,   // base area kept restored
+	"max_active": 2,       // restores running at once
+	"reach": 2500,         // builders further away are not sent
+	"lava": true,          // restore crater lava (lava maps only)
+	"lava_margin": 4,      // the original ground must stand this far above the lava
+	"interval": 10,        // seconds between scans
+	"max_seconds": 90,     // a restore not done by then is aborted
+	"cooldown": 60,        // a patch tried, or too small, is left this long
+	"busy_penalty": 800    // elmos added to a builder that is constructing
+},
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
 		"layout": {

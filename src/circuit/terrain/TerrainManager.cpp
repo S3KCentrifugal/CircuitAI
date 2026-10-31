@@ -6130,6 +6130,96 @@ void CTerrainManager::UpdateAreaUsers(int interval)
 	}), interval);
 }
 
+float CTerrainManager::GetOriginalElevationAt(float x, float z) const
+{
+	const FloatVec& orig = terrainData->GetOriginalHeightMap();
+	const int width = areaData->heightMapXSize;
+	if ((width <= 0) || orig.empty()) {
+		return circuit->GetMap()->GetElevationAt(x, z);
+	}
+	const int height = int(orig.size()) / width;
+	const int cx = std::clamp(int(x) / SQUARE_SIZE, 0, width - 1);
+	const int cz = std::clamp(int(z) / SQUARE_SIZE, 0, height - 1);
+	return orig[cz * width + cx];
+}
+
+// At most (2 * 200 / 8 + 1)^2 = 2601 cells for the engine's largest restore.
+CTerrainManager::STerrainDamage CTerrainManager::GetTerrainDamage(const AIFloat3& pos, float radius,
+		const SDamageQuery& query) const
+{
+	STerrainDamage damage;
+	const FloatVec& orig = terrainData->GetOriginalHeightMap();
+	const FloatVec& cur = areaData->heightMap;
+	const int width = areaData->heightMapXSize;
+	if ((width <= 0) || orig.empty() || (orig.size() != cur.size())) {
+		return damage;
+	}
+	const int height = int(orig.size()) / width;
+	const int step = std::max(1, query.step);
+	const int x1 = std::max(0, int((pos.x - radius) / SQUARE_SIZE));
+	const int x2 = std::min(width - 1, int((pos.x + radius) / SQUARE_SIZE));
+	const int z1 = std::max(0, int((pos.z - radius) / SQUARE_SIZE));
+	const int z2 = std::min(height - 1, int((pos.z + radius) / SQUARE_SIZE));
+	CMap* map = circuit->GetMap();
+	for (int z = z1; z <= z2; z += step) {
+		const float wz = z * SQUARE_SIZE + SQUARE_SIZE / 2;
+		for (int x = x1; x <= x2; x += step) {
+			const float wx = x * SQUARE_SIZE + SQUARE_SIZE / 2;
+			if (query.skip && query.skip(wx, wz)) {
+				continue;
+			}
+			const int i = z * width + x;
+			const float o = orig[i];
+			const float c = query.live ? map->GetElevationAt(wx, wz) : cur[i];
+			const float delta = c - o;
+			damage.raised = std::max(damage.raised, delta);
+			damage.dug = std::max(damage.dug, -delta);
+			const bool isLava = (c < query.lavaLevel) && (o >= query.lavaLevel + query.lavaMargin);
+			if (!isLava && (std::fabs(delta) < query.threshold)) {
+				continue;
+			}
+			if (isLava) {
+				++damage.lavaCells;
+			}
+			if (damage.cells++ == 0) {
+				damage.minX = damage.maxX = wx;
+				damage.minZ = damage.maxZ = wz;
+			} else {
+				damage.minX = std::min(damage.minX, wx);
+				damage.maxX = std::max(damage.maxX, wx);
+				damage.minZ = std::min(damage.minZ, wz);
+				damage.maxZ = std::max(damage.maxZ, wz);
+			}
+		}
+	}
+	return damage;
+}
+
+void CTerrainManager::FindDamagedSectors(const AIFloat3& center, float radius, float threshold, float lavaLevel,
+		std::vector<int>& out) const
+{
+	const int size = terrainData->convertStoP;
+	const int sx1 = std::max(0, int((center.x - radius) / size));
+	const int sx2 = std::min(terrainData->sectorXSize - 1, int((center.x + radius) / size));
+	const int sz1 = std::max(0, int((center.z - radius) / size));
+	const int sz2 = std::min(terrainData->sectorZSize - 1, int((center.z + radius) / size));
+	const float sqRadius = SQUARE(radius);
+	for (int z = sz1; z <= sz2; ++z) {
+		for (int x = sx1; x <= sx2; ++x) {
+			const int i = z * terrainData->sectorXSize + x;
+			const terrain::SSector& sector = areaData->sector[i];
+			if (sector.position.SqDistance2D(center) > sqRadius) {
+				continue;
+			}
+			if ((sector.dug >= threshold) || (sector.raised >= threshold)
+				|| ((sector.dug > 1.f) && (sector.minElevation < lavaLevel)))
+			{
+				out.push_back(i);
+			}
+		}
+	}
+}
+
 #ifdef DEBUG_VIS
 void CTerrainManager::UpdateVis()
 {

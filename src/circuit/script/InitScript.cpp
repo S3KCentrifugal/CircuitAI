@@ -57,6 +57,9 @@
 
 #include <format>
 #include <atomic>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace circuit {
 
@@ -593,6 +596,24 @@ static int CCircuitDef_GetFootprintZ(const CCircuitDef* cdef)
 static int CTerrainManager_GetTerrainWidth(CTerrainManager* terrainMgr)
 {
 	return CTerrainManager::GetTerrainWidth();
+}
+
+// Terrain restore (owner 2026-10-31): ground at game start, and the largest
+// |current - original| within radius (cached heightmap, refreshed every 10 s).
+static float CTerrainManager_GetOriginalElevation(CTerrainManager* terrainMgr, const AIFloat3& pos)
+{
+	return terrainMgr->GetOriginalElevationAt(pos.x, pos.z);
+}
+
+static float CTerrainManager_GetTerrainDamage(CTerrainManager* terrainMgr, const AIFloat3& pos, float radius)
+{
+	if (!std::isfinite(pos.x) || !std::isfinite(pos.z) || !std::isfinite(radius)) {
+		return 0.f;
+	}
+	CTerrainManager::SDamageQuery query;
+	query.threshold = std::numeric_limits<float>::max();  // the extremes only, no cell list
+	const CTerrainManager::STerrainDamage damage = terrainMgr->GetTerrainDamage(pos, std::clamp(radius, 0.f, 400.f), query);
+	return std::max(damage.dug, damage.raised);
 }
 
 static bool CTerrainManager_CanMoveTo(CTerrainManager* terrainMgr, CCircuitUnit* unit, const AIFloat3& pos)
@@ -1349,6 +1370,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "float SetAllyZoneRange(float)", asMETHOD(CTerrainManager, SetAllyZoneRange), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetTerrainWidth() const", asFUNCTION(CTerrainManager_GetTerrainWidth), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "bool CanMoveTo(CCircuitUnit@, const AIFloat3& in) const", asFUNCTION(CTerrainManager_CanMoveTo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "float GetOriginalElevation(const AIFloat3& in) const", asFUNCTION(CTerrainManager_GetOriginalElevation), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // terrain restore
+	r = engine->RegisterObjectMethod("CTerrainManager", "float GetTerrainDamage(const AIFloat3& in, float) const", asFUNCTION(CTerrainManager_GetTerrainDamage), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // terrain restore
     r = engine->RegisterObjectMethod("CTerrainManager", "bool CanTraverse(CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asFUNCTION(CTerrainManager_CanTraverse), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 FindSafeDropSpot(CCircuitUnit@, const AIFloat3& in, float radius, float surfaceThreat, float airThreat)", asFUNCTION(CTerrainManager_FindSafeDropSpot), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	// Reservations: doc/base-layout.md

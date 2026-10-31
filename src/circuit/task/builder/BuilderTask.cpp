@@ -15,6 +15,7 @@
 #include "map/InfluenceMap.h"
 #include "module/EconomyManager.h"
 #include "module/BuilderManager.h"
+#include "module/RestoreControl.h"
 #include "module/MilitaryManager.h"
 #include "resource/MetalManager.h"
 #include "resource/EnergyGrid.h"
@@ -354,6 +355,8 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
 	} else if (siteRadius > 0.f) {
+		// Terrain restore: a cratered placed site is restored on the next scan
+		static_cast<CBuilderManager*>(manager)->GetRestoreControl()->RequestSite(position, siteRadius, CRestoreControl::SITE);
 		// A placed site (the FRONT ghost radar): no room near it is a failed
 		// order, not a structure somewhere up to 1,600 elmos away.
 		circuit->LOG("SITE: aborting %s task, no site within %.0f of (%.0f, %.0f)",
@@ -366,6 +369,8 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		manager->AbortTask(this);
 		return false;
 	} else {
+		// Terrain restore: no site at all may mean craters where we build
+		static_cast<CBuilderManager*>(manager)->GetRestoreControl()->RequestSite(position, 200.f, CRestoreControl::SITE);
 		if (geom::is_in_range(circuit->GetSetupManager()->GetBasePos(), position, searchRadius)) {  // base must be full
 			circuit->GetSetupManager()->FindNewBase(unit);
 		}

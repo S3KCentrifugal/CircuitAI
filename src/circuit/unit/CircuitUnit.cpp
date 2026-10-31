@@ -695,6 +695,12 @@ void CCircuitUnit::CmdResurrectInArea(const AIFloat3& pos, float radius, short o
 	unit->ResurrectInArea(pos, radius, options, timeout);
 }
 
+void CCircuitUnit::CmdRestoreArea(const AIFloat3& pos, float radius, short options, int timeout)
+{
+	++lagload::Get().other;
+	unit->RestoreArea(pos, radius, options, timeout);
+}
+
 bool CCircuitUnit::RepeatState(int& sent, int& sentFrame, int value)
 {
 	// True when this exact value was sent within the last 10 s: skip it. A
