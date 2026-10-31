@@ -38,7 +38,7 @@ namespace TaskF {
 
 	static inline SFightTask Common(IFighterTask::FightType type)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = type;
 
 		ti.check = type;
@@ -49,14 +49,14 @@ namespace TaskF {
 	}
 	static inline SFightTask Guard(CCircuitUnit* vip)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::GUARD;
 		ti.vip = vip;
 		return ti;
 	}
 	static inline SFightTask Defend(IFighterTask::FightType promote, float power)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::DEFEND;
 		ti.check = IFighterTask::FightType::_SIZE_;  // NONE
 		ti.promote = promote;
@@ -65,7 +65,7 @@ namespace TaskF {
 	}
 	static inline SFightTask Defend(IFighterTask::FightType check, IFighterTask::FightType promote, float power)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::DEFEND;
 		ti.check = check;
 		ti.promote = promote;
@@ -99,7 +99,7 @@ public:
 private:
 	void ReadConfig();
 	void InitEconomyScores(const std::vector<CCircuitDef*>&& builders);
-	void Init();
+	void InitMilitary();
 
 public:
 	virtual int UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder) override;
@@ -317,7 +317,10 @@ public:
 	springai::AIFloat3 GetScoutPosition(CCircuitUnit* unit);
 	springai::AIFloat3 GroundObjective(CCircuitUnit* unit, const springai::AIFloat3& previous);
 	void ClearScoutPosition(IUnitTask* task);
-	void FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions);
+	// defend: a DefendTask leader; it follows the coverage lane only when
+	// coverage.json defend_follows_lane says so (D-356), else the influence
+	// and metal-cluster front positions below.
+	void FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions, bool defend = false);
 	void FillAttackSafePos(CCircuitUnit* unit, F3Vec& outPositions);
 	void FillStaticSafePos(CCircuitUnit* unit, F3Vec& outPositions);
 	void FillSafePos(CCircuitUnit* unit, F3Vec& outPositions);

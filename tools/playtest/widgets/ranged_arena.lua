@@ -9,6 +9,7 @@ local priorDamage,damageHook
 local camera,photos=nil,{}
 local commandTypes,unitCommands={},{}
 local factorySamples,factoryIds={},{}
+local openingFactory,openingProducts=nil,0
 local completed=false
 local fixtureReady=false
 local commanderShooters,commanderShooterCount={},0
@@ -45,6 +46,7 @@ local function site(g,x,z)
             -- Ships and floating units spawn on water; everything else on land.
             local naval=(UnitDefs[def.id].minWaterDepth or 0)>0 or UnitDefs[def.id].floatOnWater
             local free=(y>=0 or naval) and math.abs(y-reference)<=64
+            if g.anchorPosition and (px-g.anchorPosition[1])^2+(pz-g.anchorPosition[2])^2>g.relative_to.max_distance^2 then free=false end
             if free and mobile and not UnitDefs[def.id].canFly then free=Spring.TestMoveOrder(def.id,px,y,pz,0,0,0,true,true,false) end
             if free and not mobile then free=Spring.TestBuildOrder(def.id,px,y,pz,0)>0 end
             for _,p in ipairs(occupied) do if (px-p[1])^2+(pz-p[2])^2<(cfg.min_spawn_spacing or 96)^2 then free=false;break end end
@@ -52,6 +54,29 @@ local function site(g,x,z)
         end
     end
     log("ERROR unbuildable_spawn="..g.unit.." x="..x.." z="..z)
+end
+-- Correctness fixtures only: resolve once when a declared wave becomes due.
+-- Earlier construction can change a commander's resting point. A fixed world
+-- coordinate does not establish an in-range shot or an actual WAIT handover.
+local function anchorGroup(g)
+    if not g.relative_to then return true end
+    local spec,id=g.relative_to,nil
+    for candidate,u in pairs(tracked) do
+        if u.team==spec.team and UnitDefs[u.def].name==spec.unit then
+            if id then log("ERROR ambiguous_spawn_anchor="..spec.unit);return false end
+            id=candidate
+        end
+    end
+    if not id then log("ERROR missing_spawn_anchor="..spec.unit);return false end
+    local x,_,z=Spring.GetUnitPosition(id)
+    local cmd=Spring.GetUnitCurrentCommand(id)
+    if not x or (spec.require_command and cmd~=spec.require_command) then
+        log("ERROR spawn_anchor_command unit="..id.." command="..tostring(cmd));return false
+    end
+    g.anchorPosition={x,z}
+    g.position={x+spec.offset[1],z+spec.offset[2]}
+    log("spawn_anchor unit="..id.." command="..tostring(cmd).." x="..math.floor(x).." z="..math.floor(z))
+    return true
 end
 local function child(id)
     if not id or tracked[id] then return end
@@ -132,6 +157,41 @@ end
 function widget:UnitDamaged(...) if not damageHook then damage(...) end end
 function widget:UnitCommand(...) command(...) end
 function widget:UnitCreated(id,def,team,builder)
+    -- Explicit fixture transition, deferred to GameFrame rather than mutating
+    -- units inside the creation callback. Natural cases leave this unset.
+    if cfg.remove_units_on_created and team==(cfg.remove_unit_team or 0)
+        and UnitDefs[def].name==cfg.remove_units_on_created then cfg.created_removal_pending=true end
+    if cfg.jammer_overlap_observation and team==0 and builder and (UnitDefs[def].jammerRadius or 0)>0 then
+        local x,_,z=Spring.GetUnitPosition(id)
+        for _,ally in ipairs(Spring.GetTeamUnits(cfg.jammer_overlap_observation.ally_team) or {}) do
+            local d=UnitDefs[Spring.GetUnitDefID(ally)]
+            local ax,_,az=Spring.GetUnitPosition(ally)
+            local _,_,_,_,built=Spring.GetUnitHealth(ally)
+            local radius=d and (d.jammerRadius or 0) or 0
+            if radius>100 and (built or 0)>=1 and Spring.GetUnitIsActive(ally)
+                and (x-ax)^2+(z-az)^2<(radius-102)^2 then
+                log("ERROR commander_group_jammer_deep_overlap unit="..id.." allied="..ally)
+            end
+        end
+    end
+    -- Opt-in opener proof uses actual factory products. Production debug logs
+    -- may be suppressed; count only the selected producer's finite prefix.
+    if cfg.factory_opening and team==0 and builder then
+        local producer=UnitDefs[Spring.GetUnitDefID(builder)]
+        local opening=cfg.factory_opening
+        if producer and producer.name==opening.factory and openingProducts<#opening.products then
+            openingFactory=openingFactory or builder
+            if builder==openingFactory then
+                openingProducts=openingProducts+1
+                local name=UnitDefs[def].name
+                if name~=opening.products[openingProducts] then
+                    log("ERROR factory_opening_order step="..openingProducts.." unit="..name)
+                end
+                log("factory_opening_step="..openingProducts.." unit="..name)
+                if openingProducts==#opening.products then log("factory_opening_complete count="..openingProducts) end
+            end
+        end
+    end
     if cfg.factory_throughput and team==0 and UnitDefs[def].isFactory then factoryIds[id]=true end
     if cfg.natural and team==0 and UnitDefs[def].name==cfg.unit then
         local x,_,z=Spring.GetUnitPosition(id)
@@ -159,6 +219,19 @@ function widget:UnitCreated(id,def,team,builder)
 end
 function widget:UnitDestroyed(id,def,team,attacker,attackerDef,attackerTeam)
     factoryIds[id]=nil
+    -- D-356: coverage_loss_teams narrows the probe's commander-loss error to the
+    -- listed teams (a 1v1 hold fixture tests its own commander; the enemy
+    -- commander dying to the forward turret is not that fixture's failure).
+    local lossCounted=true
+    if cfg.coverage_loss_teams then
+        lossCounted=false
+        for _,t in ipairs(cfg.coverage_loss_teams) do if t==team then lossCounted=true end end
+    end
+    if cfg.coverage_probe and lossCounted and team>=0 and team<#(cfg.starts or {})
+        and UnitDefs[def] and UnitDefs[def].customParams
+        and UnitDefs[def].customParams.iscommander then
+        log("ERROR coverage_commander_lost team="..team.." id="..id)
+    end
     if cfg.kill_census and tracked[id] then
         local by=attackerDef and UnitDefs[attackerDef] and UnitDefs[attackerDef].name or "none"
         log("killed def="..UnitDefs[def].name.." team="..team.." by="..by.." byTeam="..tostring(attackerTeam))
@@ -181,6 +254,66 @@ function widget:UnitFinished(id,def,team)
     end
 end
 function widget:GameFrame(f)
+    -- Explicit supplied health fixture, never enabled in natural games. Verify
+    -- the synced developer action took effect before accepting movement proof.
+    if cfg.commander_health_fixture and f%3==0 then
+        local fixture=cfg.commander_health_fixture
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].name==cfg.unit then
+                local x,_,z=Spring.GetUnitPosition(id)
+                local hp,maxhp=Spring.GetUnitHealth(id)
+                if fixture.sent and not fixture.applied and hp and maxhp
+                    and math.abs(hp/maxhp-fixture.percent/100)<.01 then
+                    fixture.applied=true
+                    log("health_fixture_applied unit="..id.." percent="..fixture.percent)
+                end
+                if fixture.applied and fixture.hold_seconds and hp and maxhp then
+                    if f<(fixture.after_seconds+fixture.hold_seconds)*30
+                        and f>=(fixture.lastHealthSet or 0)+150 then
+                        fixture.lastHealthSet=f
+                        Spring.SendLuaRulesMsg("$dev$:sethealth "..id..":"..fixture.percent)
+                    end
+                    local command=Spring.GetUnitCurrentCommand(id)
+                    if not fixture.buildObserved and hp/maxhp>=.4 and hp/maxhp<.8
+                        and command and command<0 then
+                        fixture.buildObserved=true
+                        log("health_fixture_building_below_recovery unit="..id)
+                    end
+                end
+                local ready=not fixture.wait_cloaked or Spring.GetUnitIsCloaked(id)
+                if ready and fixture.enemy_range then
+                    ready=false
+                    for enemy,e in pairs(tracked) do
+                        if e.team==1 and UnitDefs[e.def].name==fixture.enemy_unit then
+                            local ex,_,ez=Spring.GetUnitPosition(enemy)
+                            if ex and (x-ex)^2+(z-ez)^2<=fixture.enemy_range^2 then ready=true end
+                        end
+                    end
+                end
+                if not fixture.sent and ready and f>=fixture.after_seconds*30 then
+                    fixture.sent=true;fixture.x=x;fixture.z=z;fixture.lastHealthSet=f
+                    if fixture.wait_cloaked then log("health_fixture_actual_cloak") end
+                    Spring.SendLuaRulesMsg("$dev$:sethealth "..id..":"..fixture.percent)
+                elseif fixture.sent and hp and maxhp and hp/maxhp<.4 then
+                    if not fixture.observed then
+                        fixture.observed=true;log("health_fixture_below_40 unit="..id)
+                        local jammer=false
+                        for _,ally in ipairs(Spring.GetTeamUnits(0) or {}) do
+                            local d=UnitDefs[Spring.GetUnitDefID(ally)]
+                            local ax,_,az=Spring.GetUnitPosition(ally)
+                            local _,_,_,_,built=Spring.GetUnitHealth(ally)
+                            if d and (d.radarDistanceJam or 0)>0 and (built or 0)>=1
+                                and Spring.GetUnitIsActive(ally) and (x-ax)^2+(z-az)^2<d.radarDistanceJam^2 then jammer=true end
+                        end
+                        if jammer then log("health_fixture_inside_active_jammer") end
+                    end
+                    if not fixture.moved and (x-fixture.x)^2+(z-fixture.z)^2>128^2 then
+                        fixture.moved=true;log("health_fixture_withdrew unit="..id)
+                    end
+                end
+            end
+        end
+    end
     if f==150 then
         if not cfg.natural then Spring.SendCommands("cheat 1") end
         log("ready")
@@ -248,7 +381,8 @@ function widget:GameFrame(f)
     end
     -- Optional lifecycle fixture: remove an entire screen after pairing. This
     -- is explicit supplied-force intervention, never enabled in natural games.
-    if cfg.remove_units_after_seconds and not cfg.fixture_units_removed and f>=cfg.remove_units_after_seconds*30 then
+    if not cfg.fixture_units_removed and (cfg.created_removal_pending
+        or (cfg.remove_units_after_seconds and f>=cfg.remove_units_after_seconds*30)) then
         cfg.fixture_units_removed=true
         local ids={}
         for id,u in pairs(tracked) do
@@ -260,6 +394,56 @@ function widget:GameFrame(f)
         end
         Spring.SelectUnitArray(ids,false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
         log("fixture_units_removed unit="..cfg.remove_unit_name.." count="..#ids)
+    end
+    -- Read-only repair evidence: health gain while command 40 holds a fixed
+    -- builder position. Fixture only, never enabled by production AI data.
+    if cfg.repair_observation and f%3==0 then
+        cfg.repair_samples=cfg.repair_samples or {}
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].customParams and UnitDefs[u.def].customParams.iscommander then
+                local commands=Spring.GetUnitCommands(id,1) or {}
+                local c=commands[1]
+                local prior=cfg.repair_samples[id]
+                if c and c.id==40 and c.params and #c.params==5 and cfg.repair_observation then
+                    local x,_,z=Spring.GetUnitPosition(id)
+                    local hp=Spring.GetUnitHealth(c.params[1])
+                    if prior and prior.target==c.params[1] then
+                        if (x-prior.x)^2+(z-prior.z)^2>64 then log("ERROR stationary_repair_moved unit="..id) end
+                        if hp and hp>prior.hp+20+(f-prior.frame)/3 and not prior.healed then
+                            prior.healed=true;log("stationary_repair_healed unit="..id.." target="..prior.target)
+                        end
+                    elseif hp then cfg.repair_samples[id]={x=x,z=z,hp=hp,frame=f,target=c.params[1]} end
+                else cfg.repair_samples[id]=nil end
+            end
+        end
+    end
+    if cfg.energy_retreat_observation and f%3==0 then
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].name=="armjamt" and f>=690 and f<750
+                and Spring.GetUnitIsActive(id) and not cfg.jam_observed then
+                cfg.jam_observed=true;log("energy_retreat_jammer_active")
+            end
+            if u.team==0 and UnitDefs[u.def].name==cfg.unit and f>=2700 then
+                local x,_,z=Spring.GetUnitPosition(id)
+                local prior=cfg.energy_recovery_sample
+                if not prior then cfg.energy_recovery_sample={x=x,z=z,frame=f}
+                elseif not cfg.energy_recovery_checked and f>=prior.frame+300 then
+                    cfg.energy_recovery_checked=true
+                    local start=cfg.starts[1]
+                    if (x-prior.x)^2+(z-prior.z)^2<=32^2
+                        and (x-start[1])^2+(z-start[2])^2<900^2 then
+                        log("energy_recovery_stationary")
+                    else log("ERROR energy_recovery_wandering") end
+                end
+            end
+            if u.team==0 and UnitDefs[u.def].name==cfg.unit and not cfg.withdrawal_observed then
+                local x,_,z=Spring.GetUnitPosition(id)
+                local start=cfg.starts[1]
+                if f>=690 and (x-start[1])^2+(z-start[2])^2>256^2 then
+                    cfg.withdrawal_observed=true;log("energy_retreat_moved unit="..id)
+                end
+            end
+        end
     end
     if cfg.drop_energy_after_seconds and not cfg.energy_dropped and f>=cfg.drop_energy_after_seconds*30 then
         cfg.energy_dropped=true
@@ -273,7 +457,7 @@ function widget:GameFrame(f)
     for _,g in ipairs(cfg.groups) do
         if not g.queued and f>=(g.after_seconds or 10)*30 then
             g.queued=true
-            for i=1,g.count do
+            for i=1,(anchorGroup(g) and g.count or 0) do
                 local columns=g.columns or 4;local spacing=g.spacing or 120
                 local x=g.position[1]+((i-1)%columns)*spacing
                 local z=g.position[2]+math.floor((i-1)/columns)*spacing
@@ -358,7 +542,10 @@ function widget:GameFrame(f)
                     if cfg.commander_geometry then log("commander_geometry id="..id.." y="..tostring(y).." ground="..Spring.GetGroundHeight(x,z).." radius="..Spring.GetUnitRadius(id)) end
                     log("commander id="..id.." x="..math.floor(x).." z="..math.floor(z).." hp="..math.floor(hp or 0)
                         .." cloaked="..tostring(Spring.GetUnitIsCloaked(id)).." fire="..tostring(state.firestate))
-                    if cfg.commander_front_work and f<45*30 and z>4350 then
+                    -- Legacy Comet opening fixture: its nano arrives at 45 s
+                    -- and its north-facing front is z=4350. Coverage fixtures
+                    -- have explicit starts/nano schedules and their own probes.
+                    if cfg.commander_front_work and not cfg.coverage_probe and f<45*30 and z>4350 then
                         log("ERROR commander_left_before_nano id="..id)
                     end
                 end
@@ -377,7 +564,8 @@ function widget:GameFrame(f)
                             local x,_,z=Spring.GetUnitPosition(id);local tx,_,tz=Spring.GetUnitPosition(target)
                             if tx then distance=math.floor(math.sqrt((x-tx)^2+(z-tz)^2)) end
                         end
-                        log("shot id="..id.." unit="..d.name.." weapon="..index.." target="..tostring(kind==1 and target or -1).." distance="..distance.." intent="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1))
+                        log("shot id="..id.." unit="..d.name.." weapon="..index.." target="..tostring(kind==1 and target or -1).." distance="..distance.." intent="..tostring(Spring.GetUnitRulesParam(id,"unitTargetID") or -1)
+                            .." weaponName="..tostring(WeaponDefs[w.weaponDef].name or "unknown"))
                         if cfg.shot_census and caseUnits[d.name] and kind==1 and target then
                             local targetDef=Spring.GetUnitDefID(target)
                             if targetDef then
@@ -402,6 +590,90 @@ function widget:GameFrame(f)
                 end
             end
         end
+    end
+    -- D-372 supplied correctness census: count finished forward structures,
+    -- not task offers. This observer never orders units or changes AI policy.
+    if cfg.commander_group_observation and f%150==0 then
+        local counts={nano=0,defence=0,radar=0,jammer=0}
+        local sites={nano={},radar={},jammer={}}
+        local names=cfg.commander_group_observation
+        local start=cfg.starts[1]
+        for _,id in ipairs(Spring.GetTeamUnits(0) or {}) do
+            local def=UnitDefs[Spring.GetUnitDefID(id)]
+            local x,_,z=Spring.GetUnitPosition(id)
+            local _,_,_,_,progress=Spring.GetUnitHealth(id)
+            if def and x and (progress or 0)>=1 and (x-start[1])^2+(z-start[2])^2>600^2 then
+                for kind,name in pairs(names) do
+                    if def.name==name then
+                        counts[kind]=counts[kind]+1
+                        if cfg.commander_radar_package_check and not cfg.radar_package_observed and sites[kind] then
+                            sites[kind][#sites[kind]+1]={id=id,x=x,z=z,range=def.buildDistance or def.builddistance or 0}
+                        end
+                    end
+                end
+            end
+        end
+        log(string.format("commander_group_finished nano=%d defence=%d radar=%d jammer=%d",counts.nano,counts.defence,counts.radar,counts.jammer))
+        -- A reused radar is valid: prove a finished OWN nano reaches it and
+        -- an active finished jammer occupies its local package. Fixture-only
+        -- O(R*(N+J)); reuse this census and stop after the first witnessed pair.
+        if cfg.commander_radar_package_check and not cfg.radar_package_observed then
+            for _,radar in ipairs(sites.radar) do
+                local power,jamming
+                for _,nano in ipairs(sites.nano) do
+                    if (radar.x-nano.x)^2+(radar.z-nano.z)^2<=nano.range^2 then power=nano.id;break end
+                end
+                for _,jammer in ipairs(sites.jammer) do
+                    if Spring.GetUnitIsActive(jammer.id) and (radar.x-jammer.x)^2+(radar.z-jammer.z)^2<=160^2 then jamming=jammer.id;break end
+                end
+                if power and jamming then
+                    cfg.radar_package_observed=true
+                    log("commander_group_radar_package radar="..radar.id.." nano="..power.." jammer="..jamming)
+                    break
+                end
+            end
+        end
+        if cfg.jammer_overlap_observation and not cfg.jammer_overlap_observed then
+            for _,radar in ipairs(Spring.GetTeamUnits(0) or {}) do
+                local d=UnitDefs[Spring.GetUnitDefID(radar)]
+                if d and d.name==names.radar then
+                    local x,_,z=Spring.GetUnitPosition(radar)
+                    for _,ally in ipairs(Spring.GetTeamUnits(cfg.jammer_overlap_observation.ally_team) or {}) do
+                        local jam=UnitDefs[Spring.GetUnitDefID(ally)]
+                        local ax,_,az=Spring.GetUnitPosition(ally)
+                        local radius=jam and (jam.jammerRadius or 0) or 0
+                        if radius>260 and Spring.GetUnitIsActive(ally) and (x-ax)^2+(z-az)^2<(radius-260)^2 then
+                            cfg.jammer_overlap_observed=true;log("commander_group_allied_radar_coverage")
+                        end
+                    end
+                end
+            end
+        end
+    end
+    -- D-375 opt-in correctness check of real frame positions, not task offers.
+    -- Small supplied arenas only: O(T^2) for the observed forward turrets.
+    if cfg.front_spacing_observation and f%150==0 then
+        local names={armllt=true,corllt=true,leglht=true,armbeamer=true,corhllt=true,legmg=true}
+        local turrets={}
+        local start=cfg.starts[1]
+        for _,id in ipairs(Spring.GetTeamUnits(0) or {}) do
+            local def=UnitDefs[Spring.GetUnitDefID(id)]
+            local x,_,z=Spring.GetUnitPosition(id)
+            if def and names[def.name] and x and (x-start[1])^2+(z-start[2])^2>600^2 then
+                local range=0
+                for _,weapon in ipairs(def.weapons or {}) do
+                    range=math.max(range,WeaponDefs[weapon.weaponDef].range or 0)
+                end
+                for _,other in ipairs(turrets) do
+                    local minimum=.5*math.max(range,other.range)
+                    if (x-other.x)^2+(z-other.z)^2<(minimum-.1)^2 then
+                        log(string.format("front_spacing_violation units=%d,%d required=%.1f",id,other.id,minimum))
+                    end
+                end
+                turrets[#turrets+1]={id=id,x=x,z=z,range=range}
+            end
+        end
+        log(string.format("front_spacing_observed turrets=%d",#turrets))
     end
     if f%300==0 then
         if cfg.trace_spam then

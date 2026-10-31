@@ -1,4 +1,5 @@
 #include "../../global.as"
+#include "../world/coverage_lanes.as"
 
 namespace CommanderCombat {
     int appliedRole=-1;
@@ -31,6 +32,7 @@ namespace CommanderCombat {
         appliedRole=-1;
     }
     void Update() {
+        CoverageLanes::Tick();
         // Configure once per role transition. Native observes only the maintained
         // commander registry; script does not scan units or issue combat orders.
         const int role=int(Global::AISettings::Role);
@@ -38,10 +40,25 @@ namespace CommanderCombat {
         if(role!=appliedRole || side!=appliedSide) {
             appliedRole=role;
             appliedSide=side;
-            const bool front=role==int(AiRole::FRONT) || role==int(AiRole::TACTICAL);
+            // D-356: the roles whose commander leaves home at all come from the
+            // profile (commander.json advance_roles); SEA, AIR, TECH and SUPPORT
+            // commanders stay home by default (no D-gun under water, build
+            // power worth more at the base). front_duty (the lane push and the
+            // work ladder) stays FRONT-only; INV-236 checks the pair natively.
+            bool front=false;
+            {
+                array<string>@ roles=aiSetupMgr.ConfigString("commander/combat/advance_roles","FRONT,TACTICAL").split(",");
+                const string own=Team::Roster::RoleName(Global::AISettings::Role);
+                for(uint i=0;i<roles.length();++i) {
+                    string name=roles[i];
+                    while(name.length()>0 && name.substr(0,1)==" ") name=name.substr(1);
+                    while(name.length()>0 && name.substr(name.length()-1,1)==" ") name=name.substr(0,name.length()-1);
+                    if(name==own) front=true;
+                }
+            }
             Option("enabled",Global::Commander::Enabled?1.f:0.f);
             Option("advance",front?1.f:0.f);
-            aiBuilderMgr.SetCommanderCombatOption("front_duty",role==int(AiRole::FRONT)?1.f:0.f);
+            aiBuilderMgr.SetCommanderCombatOption("front_duty",(role==int(AiRole::FRONT) && front)?1.f:0.f);
             Option("leash",front?Global::Commander::FrontLeash:Global::Commander::HomeLeash);
             Option("scan",Global::Commander::Scan);
             Option("support",Global::Commander::SupportMetal);
@@ -62,12 +79,68 @@ namespace CommanderCombat {
             Option("friendly_margin",Global::Commander::FriendlyMargin);
             Option("front_workers",Global::Commander::FrontWorkers);
             Option("front_distance",Global::Commander::FrontDistance);
+            Option("front_push_ahead",0.f);
+            // D-356 push bound and end; D-357 corridor mex sweep. JSON supplies the
+            // policy; the fallbacks equal the native defaults (legacy behaviour).
+            Option("front_persistent",0.f);
+            Option("front_radar_spacing",500.f);
+            Option("front_mex_los",0.f);
+            Option("cloak_energy_retreat",0.f);
+            Option("fog_cloak_distance",600.f);
+            Option("fog_cloak_income",500.f);
+            Option("cloak_retreat_distance",600.f);
+            Option("health_retreat",.4f);
+            Option("health_shot_seconds",2.f);
+            Option("commander_group_jammer_edge",100.f);
+            Option("commander_group_jammer_income",25.f);
+            Option("commander_group_mex_priority",3.f);
+            Option("commander_group_radar_priority",2.f);
+            Option("commander_group_line_priority",1.f);
+            Option("front_mex_defence",0.f);
+            Option("front_line_enabled",0.f);
+            Option("front_line_fog",1000.f);
+            Option("front_fortify_bank",.5f);
+            Option("front_fortify_priority",1.f);
+            Option("front_fortify_advance",0.f);
+            Option("front_line_spacing",1.5f);
+            Option("front_defence_spacing",.5f);
+            aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",-1.f);
+            array<string>@ defenceNames=aiSetupMgr.ConfigString("commander/combat/front_defence_definitions",
+                "armllt,corllt,leglht,armbeamer,corhllt,legmg").split(",");
+            for(uint i=0;i<defenceNames.length();++i) {
+                CCircuitDef@ defence=ai.GetCircuitDef(defenceNames[i]);
+                if(defence !is null) aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",float(defence.id));
+            }
+            Option("front_line_depth",800.f);
+            Option("front_mex_offset",160.f);
+            Option("front_work_behind",400.f);
+            Option("jam_safe",0.f);
+            Option("jam_heavy_cost",900.f);
+            Option("front_push_screen",0.f);
+            Option("front_push_until_seconds",0.f);
+            Option("front_push_home_riot",0.f);
+            Option("front_lane_margin",0.f);
+            Option("front_mex_reach",0.f);
+            Option("front_mex_behind",400.f);
+            Option("front_mex_ahead",600.f);
+            Option("front_mex_capture_enemy",0.f);
+            Option("front_mex_turret_every",0.f);
+            Option("front_mex_enemy_home",0.f);
             Option("front_standoff",Global::Commander::FrontStandoff);
             Option("front_radius",Global::Commander::FrontRadius);
             Option("front_threat",Global::Commander::FrontThreat);
             Option("front_recovery",Global::Commander::FrontRecovery?1.f:0.f);
+            Option("front_repair_combat",0.f);
+            Option("front_solar_income",0.f);
+            Option("front_solar_storage",.2f);
+            Option("front_solar_radius",300.f);
             Option("front_mex_seconds",Global::Commander::FrontMexSeconds);
             Option("front_stall_seconds",Global::Commander::FrontStallSeconds);
+            Option("front_detour_seconds",0.f);
+            Option("move_resend_seconds",0.f);
+            Option("t3_decline_gate",0.f);
+            Option("t3_immediate_shot",0.f);
+            Option("t3_position_seconds",0.f);
             Option("t3_intercept",Global::Commander::T3Intercept);
             Option("t3_health",Global::Commander::T3Health);
             Option("t3_distance",Global::Commander::T3Distance);

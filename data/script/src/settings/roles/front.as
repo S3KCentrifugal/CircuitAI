@@ -4,6 +4,7 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
             uint GeothermalBuilders = 2;
             float GeothermalRadius = 3200.0f;
@@ -119,12 +120,6 @@ namespace Front {
 
             int MaxT2BotLabs = 1;
             int MaxT2VehicleLabs = 1;
-
-            /******************** DYNAMIC FACTORY PRODUCTION ********************/
-            // Toggle for role-based dynamic factory production system (replaces factory.json logic)
-            // When enabled, FRONT factories (labs, air plants, gantries, etc.) delegate unit
-            // selection to FactoryProduction::MakeTask using threat-aware scoring.
-            bool UseDynamicFactoryProduction = false;
 
             /******************** FRONT ECONOMY SETTINGS ********************/
             // Consider energy storage "low" when current < storage * percent

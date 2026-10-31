@@ -15,16 +15,19 @@ CCommanderTask::~CCommanderTask() { if(previous) previous->Release(); }
 void CCommanderTask::AssignTo(CCircuitUnit* unit) {
     // Do not call IFighterTask::AssignTo: its generic DGun action would be a
     // second command owner. This task owns no generic fighter side sets.
+    restored=false;
     oldFire=unit->GetRequestedFireState(); oldMove=unit->GetRequestedMoveState();
-    oldCloak=unit->GetUnit()->IsCloaked();
+    oldCloak=unit->GetUnit()->IsCloaked()
+        && !manager->GetCircuit()->GetCommanderControl()->FogCloak(unit);
     IUnitTask::AssignTo(unit);
 }
 void CCommanderTask::Restore(CCircuitUnit* unit) {
-    if(unit->IsDead() || unit->IsDestroying()) return;
+    if(restored || unit->IsDead() || unit->IsDestroying()) return;
+    restored=true;
     TRY_UNIT(manager->GetCircuit(),unit,
-        unit->TrySetFireState(static_cast<CCircuitDef::FireT>(oldFire));
-        unit->TrySetMoveState(static_cast<CCircuitDef::MoveT>(oldMove));
-        unit->CmdCloak(oldCloak);
+        if(unit->GetRequestedFireState()!=oldFire) unit->TrySetFireState(static_cast<CCircuitDef::FireT>(oldFire));
+        if(unit->GetRequestedMoveState()!=oldMove) unit->TrySetMoveState(static_cast<CCircuitDef::MoveT>(oldMove));
+        unit->CmdCloak(oldCloak || manager->GetCircuit()->GetCommanderControl()->FogCloak(unit));
     )
 }
 void CCommanderTask::Stop(bool done) {
@@ -53,7 +56,8 @@ void CCommanderTask::Resume(CCircuitUnit* unit) {
     // leave the combat escape route running under their restored ownership.
     TRY_UNIT(manager->GetCircuit(),unit,unit->CmdStop();)
     if(previous && !previous->IsDead() && previous->GetManager()==manager
-        && !previous->IsExternalControlled() && previous->CanAssignTo(unit)) {
+        && !previous->IsExternalControlled() && previous->CanAssignTo(unit)
+        && manager->GetCircuit()->GetCommanderControl()->CanResumeFrontTask(unit,previous)) {
         manager->AssignTask(unit,previous);
     } else RemoveAssignee(unit);
 }

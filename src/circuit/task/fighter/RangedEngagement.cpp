@@ -24,22 +24,41 @@
 #include <cstdlib>
 
 namespace circuit {
+namespace {
+constexpr float POKE_DIRECTION_MIN_LENGTH_SQ = .5f;
+constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
+}
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
 static const bool trace = std::getenv("CIRCUIT_RANGED_TRACE") != nullptr;
 
 CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUnit* unit)
     : ai(ai),owner(owner),worldOwner(ai->GetMilitaryManager()->GetRangedWorld()),world(*worldOwner),
-      caps(world.CapabilitiesFor(unit->GetCircuitDef())),id(unit->GetId())
+      caps(world.CapabilitiesFor(unit->GetCircuitDef())),id(unit->GetId()),
+      lastPos(unit->GetPos(ai->GetLastFrame())), destination(lastPos)
 {
-    lastPos=unit->GetPos(ai->GetLastFrame()); destination=lastPos;
     lastShotFrame=lastProgressFrame=ai->GetLastFrame();
     world.Join(unit); world.Refresh();
     unit->TrySetMoveState(CCircuitDef::HOLD_POS);
     // Priority targets are explicit user targets in BAR and can fire on HOLD.
     // Automatic fire would bypass precision/splash selection while approaching
     // the firing band (the engine includes target radius in reach).
-    unit->TrySetFireState(CCircuitDef::HOLD);
+    const auto& policy=unit->GetCircuitDef()->GetRangedPolicy();
+    // Fast-reload Thugs/Maces otherwise remain silent between priority picks.
+    // The individual controller retains precision HOLD behavior.
+    // Keep primary reload observation across loss of a priority target. Leaving
+    // firing range clears liveWeapon; treating that as ready made poke phases
+    // alternate every decision while the gun was actually still reloading.
+    // One wrapper per controller lifetime, one fresh callback per decision.
+    if(policy.coordinated && policy.pokeIn>0.f && !caps.weapons.empty()) {
+        pokeWeapon.reset(unit->GetUnit()->GetWeapon(caps.weapons.front().mount.get()));
+        pokeReload=pokeWeapon->GetReloadFrame();
+    }
+    // D-383 explicitly opts Thugs into defensive automatic fire. Other poke
+    // hulls retain D-355's explicit targeting during ordinary kite/retreat;
+    // the old blanket OPEN experiment increased outmatched casualties.
+    const bool open=policy.coordinated && policy.fireAtWill && policy.pokeIn<=0.f;
+    unit->TrySetFireState(open?CCircuitDef::FireType::OPEN:CCircuitDef::HOLD);
     ai->LOG("RANGED: assigned %s(%d) weapons=%u",unit->GetCircuitDef()->GetDef()->GetName(),id,unsigned(caps.weapons.size()));
     if(caps.weapons.empty()) ai->LOG("[INVARIANT] INV-147 ranged unit %d has no compatible loaded weapon",id);
     if(trace) for(const auto& w:caps.weapons) ai->LOG("RANGED: weapon unit=%d index=%d range=%.1f speed=%.3f gravity=%.3f category=%d forward=%d",id,w.index,w.range,w.speed,w.gravity,w.category,int(w.forward));
@@ -311,7 +330,9 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     if(member==group.members.end() || group.members.size()>size_t(policy.cohortSize)) {
         ai->LOG("[INVARIANT] INV-166 coordinated unit has invalid cohort membership unit=%d",id); return;
     }
-    if(group.target<0 && group.mode==cohort::Mode::HOLD) {
+    if(group.target<0 && group.mode==cohort::Mode::HOLD && !policy.fireInRange && !policy.commanderFocus) {
+        if(policy.fireAtWill && policy.pokeIn>0.f && unit->GetRequestedFireState()!=CCircuitDef::HOLD)
+            unit->TrySetFireState(CCircuitDef::HOLD);
         // Cancel the old approach when a protected contact leaves vision.
         // Otherwise Disperse deliberately preserves that in-flight move.
         if(policy.engagementSeconds>0.f && group.protectedTarget>=0) {
@@ -335,13 +356,36 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     if(assessed) ai->GetUnitAPI()->GetVelocity(id,rawVelocity);
     const AIFloat3 velocity(rawVelocity[0]*FRAMES_PER_SEC,0.f,rawVelocity[2]*FRAMES_PER_SEC);
     int best=-1,weapon=-1; float score=-1.f,damage=0.f;
+    bool bestCommander=false;
     const CRangedWorld::Contact* danger=nullptr; float penetration=0.f;
     const CRangedWorld::Contact* incoming=nullptr;
     const CRangedWorld::Contact* objective=nullptr;
+    // Owner 2026-10-17: poke cadence. Any assessed, targeted front cohort pokes
+    // the closest similar-range mobile, whatever the local metal balance; the
+    // band is deeper when our side clearly outweighs the opposition. Sustained
+    // rushes, rush fallback, regrouping and the rear line keep their movement.
+    // Owner 2026-10-19: the local metal ratio picks the regime. PRESS holds
+    // the deep band to win; EVEN trades once per reload; OUTMATCHED trades
+    // only intermittently. EVEN and OUTMATCHED hulls pop out at poke_health.
+    const bool poking=assessed && policy.pokeIn>0.f && group.target>=0
+        && !group.sustainedRush && !group.rushFallback && !group.formationRear
+        && group.mode!=cohort::Mode::REGROUP
+        && (group.reason==cohort::Reason::FAVORABLE || group.reason==cohort::Reason::OUTMATCHED);
+    const cohort::Poke regime=poking?cohort::PokeRegime(group.ownValue,group.hostileValue,policy.pokeRatio):cohort::Poke::EVEN;
+    const bool dominant=poking && regime==cohort::Poke::PRESS;
+    const float pokeIn=dominant?policy.pokeInDominant:policy.pokeIn;
+    const auto pokeable=[&](const CRangedWorld::Contact& c) {
+        return poking && c.def && c.mobile && c.armed && !c.def->IsEnemyRoleAny(CCircuitDef::COMM)
+            && !c.def->IsAbleToReclaim()
+            && cohort::Pokeable(c.groundRange,c.hazardRadius+policy.safetyMargin,maxRange,pokeIn,policy.pokeOut);
+    };
+    const CRangedWorld::Contact* closest=nullptr; float closestDistance=std::numeric_limits<float>::max();
     for(int i:nearby) {
         const auto& c=contacts[i];
         if(c.id==group.target) objective=&c;
         if(!c.def || c.def->IsAbleToFly() || c.pos.y< -20.f) continue;
+        const bool poked=pokeable(c);
+        if(poked && pos.SqDistance2D(c.pos)<closestDistance) { closestDistance=pos.SqDistance2D(c.pos); closest=&c; }
         // The local escape decision remains individual: a centroid must not
         // hide a flank being overrun. Mobile exposure is allowed only during
         // an approved rush; sustained commitment deliberately spends against
@@ -378,20 +422,27 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             && group.mode==cohort::Mode::RUSH && (!assessed || c.groundRange>=maxRange
                 || (policy.supportAllies && group.supporting
                     && distance>c.groundRange+policy.safetyMargin));
+        // A poker accepts the reach of a similar-range mobile; its cadence,
+        // not the escape, takes it back out while the weapon reloads.
         if((c.hazardRadius>0.f || reclaim>0.f) && distance<reach && reach-distance>penetration
-            && (distance<reclaim || !(approvedStatic || approvedMobile))) {
+            && (distance<reclaim || !(approvedStatic || approvedMobile || poked))) {
             danger=&c; penetration=reach-distance;
         }
         // Target permissions never suppress the hazard above. Coordinated
         // movement is opt-in, but still honors existing JSON target controls.
         if(c.mobile?!policy.allowMobile:!policy.allowStatic) continue;
         if(policy.avoidCategory & c.def->GetCategory()) continue; // D-294
+        const bool focusCommander=policy.commanderFocus && world.PeerSeesCommander(c,def,pos,policy.cohortRadius);
         for(size_t wi=0;wi<caps.weapons.size();++wi) {
             const auto& w=caps.weapons[wi];
             if(!(w.category&c.def->GetCategory()) || (!c.los && !policy.allowRadar)) continue;
             const float range=world.Range(w,pos,c.pos);
+            // A commander kill is explicitly preferred even inside its death
+            // blast. Otherwise nearby Thugs veto every focused shot against
+            // this short-range target. Our own splash/line safety still applies.
+            const float splash=focusCommander?w.splash:std::max(w.splash,c.explosionRadius);
             if(distance>range || !world.Trajectory(w,pos,c.pos)
-                || world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))
+                || world.FriendlySplash(id,c.pos,splash)
                 || world.FriendlyLine(w,id,pos,c.pos)) continue;
             const float hit=c.armor>=0 && size_t(c.armor)<w.damage.size()?w.damage[c.armor]*w.alphaScale:0.f;
             if(hit<=0.f) continue;
@@ -401,9 +452,32 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(c.def->IsBuilder()) s*=2.f;
             if(c.id==target) s*=policy.targetHysteresis;
             if(world.Reserved(c.id,id)>=c.health) s*=.2f;
+            if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
-            if(s>score) { score=s; best=i; weapon=int(wi); damage=hit; }
+            // Commander focus is a tier, not a multiplier defeated by low HP
+            // repairers or existing shot reservations. Geometry still vetoes.
+            if((focusCommander && !bestCommander) || (focusCommander==bestCommander && s>score)) {
+                score=s; best=i; weapon=int(wi); damage=hit;bestCommander=focusCommander;
+            }
         }
+    }
+    if(policy.fireInRange) {
+        // Open only once the existing shot geometry admits an in-range target.
+        // Engine auto-acquisition includes target radius and can fire earlier,
+        // disturbing the established poke/withdrawal band. Threatened hulls
+        // still open immediately on this decision; danger does not veto fire.
+        const int fire=best>=0?CCircuitDef::FireType::OPEN:CCircuitDef::FireType::HOLD;
+        if(unit->GetRequestedFireState()!=fire) unit->TrySetFireState(fire);
+    }
+    if(group.target<0 && group.mode==cohort::Mode::HOLD) {
+        // Keep the old idle dispersion/movement; only permit defensive fire
+        // and priority selection that the former early return skipped.
+        if(policy.engagementSeconds>0.f && group.protectedTarget>=0) {
+            Hold(unit,true);
+            world.SetSlot(id,pos,policy.spacing,def->GetCostM());
+        } else Disperse(unit);
+        SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
+        return;
     }
     auto point=group.focus;
     if(group.target>=0) {
@@ -421,10 +495,35 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         const float offset=(rank-(group.members.size()-1)*.5f)*(policy.spacing+1.f);
         point+=AIFloat3(-group.back.z,0,group.back.x)*offset;
     }
+    // In to the band while the weapon is ready, out to poke_out while it
+    // reloads: roughly one step in per reload cycle, straight along the line
+    // to the closest pokeable enemy so each step is as short as possible.
+    // The regime (above) decides whether reload, health or a pause apply.
+    const bool poke=closest!=nullptr;
+    // One owner, no polling watchdog or periodic resends. Phase (reload) changes
+    // do not toggle fire state; only entering/leaving a peer engagement does.
+    if(!policy.fireInRange && policy.fireAtWill && policy.pokeIn>0.f) {
+        const int fire=poke && !danger?CCircuitDef::FireType::OPEN:CCircuitDef::FireType::HOLD;
+        if(unit->GetRequestedFireState()!=fire) unit->TrySetFireState(fire);
+    }
+    int phase=-1;
+    if(poke) {
+        const bool reloading=pokeReload>frame;
+        const float health=unit->GetUnit()->GetHealth()/std::max(1.f,def->GetHealth());
+        const bool paused=regime==cohort::Poke::OUTMATCHED
+            && frame<pokeShotFrame+int(policy.pokePauseSeconds*FRAMES_PER_SEC);
+        const float fraction=cohort::PokeFraction(regime,reloading,health,paused,
+            policy.pokeIn,policy.pokeInDominant,policy.pokeOut,policy.pokeHealth,policy.pokePressHealth);
+        phase=fraction<1.f?1:0;
+        const float reach=world.Range(caps.weapons.front(),pos,closest->pos)*fraction;
+        AIFloat3 away=pos-closest->pos; away.Normalize2D();
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        point=closest->pos+away*reach;
+    }
     if(group.sustainedRush) { danger=nullptr; incoming=nullptr; withdrawalUntil=0; }
     if(danger) {
         AIFloat3 away=pos-danger->pos; away.Normalize2D();
-        if(away.SqLength2D()<.5f) away=group.back;
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
         const bool disengage=!group.committed || group.mode==cohort::Mode::WITHDRAW || !danger->mobile
             || danger->def->IsEnemyRoleAny(CCircuitDef::COMM) || danger->def->IsAbleToReclaim()
             || (!(policy.supportAllies && group.supporting)
@@ -438,13 +537,13 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     } else if(frame<withdrawalUntil && moving) {
         SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
         return;
-    } else if(incoming && !(policy.supportAllies && group.supporting && group.committed)
+    } else if(incoming && !poke && !(policy.supportAllies && group.supporting && group.committed)
         && point.SqDistance2D(incoming->pos)<pos.SqDistance2D(incoming->pos)) {
         // Hold the line when a shorter-ranged enemy is already approaching.
         // Advancing into it doubles closure and spends the entire range
         // advantage turning around. Let it enter our fire before pulling back.
         point=pos;
-    } else if(best>=0 && !group.sustainedRush && !group.rushFallback && !group.formationRear && (assessed || group.mode!=cohort::Mode::REGROUP)
+    } else if(best>=0 && !poke && !group.sustainedRush && !group.rushFallback && !group.formationRear && (assessed || group.mode!=cohort::Mode::REGROUP)
         && world.FreeSlot(id,pos,policy.spacing)
         && !(policy.supportAllies && group.supporting && group.committed
             && (pos.x-group.focus.x)*group.back.x+(pos.z-group.focus.z)*group.back.z>group.screenDepth+policy.spacing)) {
@@ -455,16 +554,19 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // still advance to their shared slots until they too can contribute.
         point=pos;
     }
-    if(!danger && best<0 && objective && pos.SqDistance2D(point)<4096.f
-        && (group.mode==cohort::Mode::ADVANCE || group.mode==cohort::Mode::RUSH)) {
-        const float distance=std::sqrt(pos.SqDistance2D(objective->pos));
-        const float reach=world.Range(caps.weapons.front(),pos,objective->pos);
+    // A stepping-in poker takes the same last step onto its closest enemy;
+    // a reloading poker never steps forward.
+    const CRangedWorld::Contact* step=poke?(phase==1?closest:nullptr):objective;
+    if(!danger && best<0 && step && pos.SqDistance2D(point)<4096.f
+        && (phase==1 || group.mode==cohort::Mode::ADVANCE || group.mode==cohort::Mode::RUSH)) {
+        const float distance=std::sqrt(pos.SqDistance2D(step->pos));
+        const float reach=world.Range(caps.weapons.front(),pos,step->pos);
         if(distance>reach && distance-reach<64.f) {
             // Engine arrival can stop 32 elmos before a firing slot. A unit
             // just outside range must take the remaining step, not consider
             // itself settled forever. The next legal shot holds it immediately;
             // mobile danger and static/terrain validation still take precedence.
-            point=pos+(objective->pos-pos)*((distance-reach+32.f)/distance);
+            point=pos+(step->pos-pos)*((distance-reach+32.f)/distance);
         }
     }
     CTerrainManager::CorrectPosition(point);
@@ -508,13 +610,14 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         && world.FreeSlot(id,pos,policy.spacing)
         && SafeMove(unit,pos,pos,policy.safetyMargin,false);
     if(completedStage) point=pos;
-    if(!completedStage && !danger && group.mode!=cohort::Mode::REGROUP
+    if(!completedStage && !danger && !poke && group.mode!=cohort::Mode::REGROUP
         && destination.SqDistance2D(point)<4.f*policy.spacing*policy.spacing
         && pos.SqDistance2D(destination)<arrival*arrival
         && ((!group.sustainedRush && !group.rushFallback && best>=0) || group.target<0 || (formationStaging
             && SafeMove(unit,pos,destination,policy.safetyMargin,false)))
         && world.FreeSlot(id,destination,policy.spacing)) point=destination;
-    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode);
+    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode) || phase!=pokePhase;
+    pokePhase=phase;
     moveObjective=group.target; moveMode=int(group.mode);
     const bool settled=pos.SqDistance2D(point)<arrival*arrival;
     if(safe && !settled) {
@@ -551,9 +654,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
     if(trace && frame>=traceFrame+150) {
         traceFrame=frame;
-        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f",
+        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f poke=%d regime=%d own=%.0f hostile=%.0f closest=%d",
             id,unsigned(group.members.size()),int(group.mode),group.target,group.radius,point.x,point.z,danger?danger->id:-1,
-            int(group.reason),group.loss,group.advantage,int(group.committed),int(group.supporting),group.screenDepth);
+            int(group.reason),group.loss,group.advantage,int(group.committed),int(group.supporting),group.screenDepth,
+            phase,int(regime),group.ownValue,group.hostileValue,closest?closest->id:-1);
     }
 }
 
@@ -595,8 +699,13 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         assistCheckFrame=-1;
     }
 
+    if(pokeWeapon) {
+        const int reload=pokeWeapon->GetReloadFrame();
+        if(reload>pokeReload && reload>frame) pokeShotFrame=frame;
+        pokeReload=reload;
+    }
     if(liveWeapon) {
-        const int reload=liveWeapon->GetReloadFrame();
+        const int reload=pokeWeapon && weaponIndex==0?pokeReload:liveWeapon->GetReloadFrame();
         if(reload>lastReload && lastReload>=0) {
             lastShotFrame=frame; failures=0;
             orientUntil=0; // Actual fire completes facing recovery immediately.
@@ -707,7 +816,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if(policy.mode==RangedPolicy::Mode::BOMBARDMENT && !c.mobile) value*=1.5f;
             if(closing && closing->id==c.id) value*=2.f;
             // Owner 2026-10-19: the tower shooting at a pressing hull comes first.
-            if(CRangedWorld::Pressed(c,policy.pressStatic)) value*=2.f;
+            if(CRangedWorld::Pressed(c,policy.pressStatic)) value*=PRESSED_STATIC_TARGET_MULTIPLIER;
+            if(c.def && c.def->IsEnemyRoleAny(CCircuitDef::COMM)) value*=policy.commanderPriority;
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;

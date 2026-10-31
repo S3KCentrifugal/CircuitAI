@@ -5,6 +5,11 @@ namespace RoleSettings {
         // At this game time, every ally may take unoccupied reachable spots.
         bool MexOwnershipEnabled = false;
         float MexOwnershipSeconds = 360.0f; // 0 disables early protection (D-352: 6 minutes, down from 10, land and water alike)
+        // D-387: capture for the owner. A builder takes a spot an allied AI owns
+        // instead of skipping it, and the finished extractor is given to that
+        // owner; ownership names the recipient, not the builder. False restores
+        // the skip. Upgrades and metal-map field sites are not captured.
+        bool MexCaptureForOwner = true;
         // D-352: mex ownership by theatre. Rules in resource/MexTerritory.h; policy
         // here. Every number an ally reads comes from the roster broadcast
         // (systems/team/mex_claim.as), never from a map config.
@@ -12,9 +17,9 @@ namespace RoleSettings {
             bool TheatresEnabled = false;      // experimental_balanced switches it on
             float TheatreSeconds = -1.0f;      // sea and race-won spots: -1 the land window, 0 the whole game
             float HomeRadius = 900.0f;         // rule 1: every role owns the land spots this close to its start
-            float LaneMergeRadius = 450.0f;    // lane partition: a route joins a lane this close to its spine
-            float LaneMergeShare = 0.6f;       //   for this share of its cells
-            float LaneBandRadius = 1200.0f;    //   a cluster this close to a spine is a lane cluster
+            float LaneMergeRadius = 450.0f;    // retired by D-358 (the partition is the field's corridor table); accepted, ignored
+            float LaneMergeShare = 0.6f;       //   retired by D-358; accepted, ignored
+            float LaneBandRadius = 1200.0f;    //   a cluster this close to its corridor's centre line is a lane cluster (D-358)
             bool FrontLaneSpots = true;        // roles that claim lane clusters inside the window
             bool SupportLaneSpots = true;
             bool TacticalLaneSpots = false;

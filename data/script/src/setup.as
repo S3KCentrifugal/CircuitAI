@@ -60,7 +60,12 @@ namespace Factory {
 				if (isReset && fac == "none") return null;
 				CCircuitDef@ def = (fac != "") ? ai.GetCircuitDef(fac) : null;
 				if (def !is null && def.IsAvailable(ai.frame)) {
-					if (!isReset) Global::AISettings::StartFactory = fac;
+					// A later recovery can ask isStart again. Keep the opening
+					// identity stable: roster/corridor class must not alternate
+					// when the recovered lab changes between bots and vehicles.
+					// The selected result below still owns this actual build.
+					if (!isReset && Global::AISettings::StartFactory.length()==0)
+						Global::AISettings::StartFactory = fac;
 					@result = def;
 				}
 			}
@@ -272,10 +277,11 @@ namespace Setup {
 		CheckModOptions();
 		aiEconomyMgr.SetMexOwnership(Global::RoleSettings::MexOwnershipEnabled,
 			Global::RoleSettings::MexOwnershipSeconds);
-		// Role masks used by Military's threat/cost caches. FactoryProduction owns
-		// the table but only builds it when a role enables dynamic production, and
-		// no role does; without this every cached enemy threat and cost stays 0.
-		FactoryProduction::BuildRoleCaches();
+		aiEconomyMgr.SetMexCapture(Global::RoleSettings::MexCaptureForOwner);  // D-387
+		// Role indices used by Military's threat/cost caches. Built once here,
+		// before any role runs; without this every cached enemy threat and cost
+		// stays 0 (KI-201's history, D-002).
+		Military::BuildRoleCaches();
 		// Wave policy defaults for every role; a role overrides in its Init.
 		aiMilitaryMgr.quota.attackWait = Global::Military::AttackWaitSeconds;
 		aiMilitaryMgr.quota.attackScale = Global::Military::AttackScale;

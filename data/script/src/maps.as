@@ -5,11 +5,14 @@
 #include "maps/default_map_config.as"
 #include "maps/swirly_rock.as"
 #include "maps/all_that_glitters.as"
-#include "maps/supreme_isthmus.as"
+#include "maps/supreme_isthmus_v2_1.as"
+#include "maps/supreme_isthmus_v1_7.as"
 #include "maps/eight_horses.as"
 #include "maps/flats_and_forests.as"
 #include "maps/glacial_gap.as"
 #include "maps/forge.as"
+#include "maps/full_metal_plate.as"
+#include "maps/oort_cloud.as"
 #include "maps/red_river_estuary.as"
 #include "maps/serene_caldera.as"
 #include "maps/shore_to_shore.as"
@@ -89,14 +92,18 @@ namespace Maps {
         
 		// Initialize per-map extras (objectives, etc.) before registration
 		SupremeIsthmus::registerObjectives();
+		SupremeIsthmus17::registerObjectives();
 
 		mapManager.RegisterMapConfig(SupremeIsthmus::config);
+		mapManager.RegisterMapConfig(SupremeIsthmus17::config);
 		mapManager.RegisterMapConfig(PinewoodDerby::config);
 		mapManager.RegisterMapConfig(AllThatGlitters::config);
         mapManager.RegisterMapConfig(EightHorses::config);
         mapManager.RegisterMapConfig(FlatsAndForests::config);
         mapManager.RegisterMapConfig(GlacialGap::config);
         mapManager.RegisterMapConfig(Forge::config);
+        mapManager.RegisterMapConfig(FullMetalPlate::config);
+        mapManager.RegisterMapConfig(OortCloud::config);
         mapManager.RegisterMapConfig(RedRiverEstuary::config);
         mapManager.RegisterMapConfig(SereneCaldera::config);
         mapManager.RegisterMapConfig(ShoreToShore::config);

@@ -47,6 +47,11 @@ namespace Support {
             float AdvancedSolarEnergyIncomeMinimum = 600.0f;
             // Stop building advanced solars if above this energy income level
             float AdvancedSolarEnergyIncomeMaximum = 1000.0f;
+            // D-364: SUPPORT scales energy with ordinary fusions, one per shortfall, and
+            // offers an advanced fusion only once the 10-second minimum energy income
+            // reaches this. TECH goes to the advanced fusion on its metal gate instead;
+            // SUPPORT keeps that metal on T2 combat units. 0 removes the gate.
+            float AdvancedFusionEnergyIncome = 4000.0f;
 
             // Legacy ladder only (ExperimentalBuild=false). The shared opening
             // uses TECH's map-aware T2 recipe instead of these admission gates.
@@ -54,7 +59,24 @@ namespace Support {
             float MinimumEnergyIncomeForT2Lab = 550.0f;
             float RequiredMetalCurrentForT2Lab = 800.0f;
 
-            int MaxT2BotLabs = 1;
+            // D-367: SUPPORT adds T2 bot labs as its income grows: the second once the
+            // 10-second minimum metal income reaches T2LabSecondMetalIncome, another per
+            // T2LabMetalIncomeStep over it, up to MaxT2BotLabs (the legacy ladder reads the
+            // cap too). An extra lab is ordered only while the metal bank is ahead
+            // (TechBuild::MetalAhead: full for PowerAheadSeconds, or rising), so it spends
+            // a surplus and never the budget of a frame going up; an open cluster is
+            // finished whatever the bank. Played before the change: one lab and 21
+            // builders held a 15,850 metal bank full from minute 14 to 40 at +145..+207.
+            // INV-240 watches a bank full for T2LabOverflowSeconds under the wanted count.
+            int MaxT2BotLabs = 4;
+            float T2LabSecondMetalIncome = 80.0f;
+            float T2LabMetalIncomeStep = 60.0f;
+            int T2LabOverflowSeconds = 120;
+            // D-367 (owner): with a vent within Tech::LocalGeothermalRadius of the start
+            // (Supreme Isthmus, Forge) SUPPORT takes one basic geothermal and the T1
+            // converters that turn its 300 E/s into metal before the advanced lab;
+            // without a vent the lab comes as before. 4 converters x 70 E/s each.
+            int GeothermalConverters = 4;
 
             /******************** BUILDER CAP LIMITS ********************/
             // Hard caps for T1/T2 land builders used when computing income-based limits

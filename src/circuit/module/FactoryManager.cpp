@@ -38,6 +38,19 @@
 #include "Log.h"
 
 namespace circuit {
+namespace {
+constexpr float POKE_MIN_IN_RANGE = 0.f;
+constexpr float POKE_MAX_IN_RANGE = .99f;
+constexpr float POKE_MIN_PRESS_RANGE = .5f;
+constexpr float POKE_MIN_OUT_RANGE = 1.f;
+constexpr float POKE_MAX_OUT_RANGE = 1.5f;
+constexpr float POKE_MIN_METAL_RATIO = 1.f;
+constexpr float POKE_MAX_METAL_RATIO = 10.f;
+constexpr float POKE_MIN_HEALTH = 0.f;
+constexpr float POKE_MAX_HEALTH = 1.f;
+constexpr float POKE_MIN_PAUSE_SECONDS = 0.f;
+constexpr float POKE_MAX_PAUSE_SECONDS = 60.f;
+}
 
 using namespace springai;
 using namespace terrain;
@@ -59,7 +72,7 @@ CFactoryManager::CFactoryManager(CCircuitAI* circuit)
 		, bpRatio(1.f)
 		, reWeight(.5f)
 {
-	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CFactoryManager::Init, this));
+	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CFactoryManager::InitFactory, this));
 
 
 	for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
@@ -283,13 +296,13 @@ void CFactoryManager::InitHandlers()
 			if (--fac.nanoSize > 0) {
 				continue;
 			}
-			auto it = havens.begin();
-			while (it != havens.end()) {
-				if (it->SqDistance2D(assPos) < sqRadius) {
-					*it = havens.back();
+			std::size_t index = 0;
+			while (index < havens.size()) {
+				if (havens[index].SqDistance2D(assPos) < sqRadius) {
+					havens[index] = havens.back();
 					havens.pop_back();
 				} else {
-					++it;
+					++index;
 				}
 			}
 		}
@@ -519,6 +532,10 @@ void CFactoryManager::ReadConfig()
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
 			boolean("hold_fireline", policy.holdFireline);
 			boolean("stage_when_blocked", policy.stageWhenBlocked);
+			boolean("fire_at_will", policy.fireAtWill);
+            boolean("fire_in_range", policy.fireInRange);
+            boolean("commander_focus", policy.commanderFocus);
+            number("commander_priority", policy.commanderPriority, 1.f, 100.f);
 			boolean("coordinated", policy.coordinated);
             // Fireline holding is an individual forward-arc doctrine. Reject
             // unsupported cohort ownership instead of silently allowing retreats.
@@ -555,7 +572,15 @@ void CFactoryManager::ReadConfig()
                 }
             }
             number("evasion_limit", policy.evasionLimit, 0.f, 10.f);
-            // Owner 2026-10-19: the static press.
+            // Owner 2026-10-17: poke cadence; only the coordinated controller reads it.
+            number("poke_in", policy.pokeIn, POKE_MIN_IN_RANGE, POKE_MAX_IN_RANGE);
+            number("poke_in_dominant", policy.pokeInDominant, POKE_MIN_PRESS_RANGE, POKE_MAX_IN_RANGE);
+            number("poke_out", policy.pokeOut, POKE_MIN_OUT_RANGE, POKE_MAX_OUT_RANGE);
+            number("poke_ratio", policy.pokeRatio, POKE_MIN_METAL_RATIO, POKE_MAX_METAL_RATIO);
+            // Owner 2026-10-19: poke regimes and the static press.
+            number("poke_health", policy.pokeHealth, POKE_MIN_HEALTH, POKE_MAX_HEALTH);
+            number("poke_press_health", policy.pokePressHealth, POKE_MIN_HEALTH, POKE_MAX_HEALTH);
+            number("poke_pause_seconds", policy.pokePauseSeconds, POKE_MIN_PAUSE_SECONDS, POKE_MAX_PAUSE_SECONDS);
             number("press_static", policy.pressStatic, 0.f, 3.f);
             // The cohort controller has its own static admission (assault list).
             if (policy.pressStatic > 0.f && policy.coordinated) valid = false;
@@ -913,7 +938,7 @@ void CFactoryManager::ReadConfig()
 	reWeight = root["response"].get("_weight_", .5f).asFloat();
 }
 
-void CFactoryManager::Init()
+void CFactoryManager::InitFactory()
 {
 	CSetupManager::StartFunc subinit = [this](const AIFloat3& pos) {
 		CScheduler* scheduler = circuit->GetScheduler().get();
@@ -1691,7 +1716,7 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 					float maxEnergyUse = 0.f;
 					for (CCircuitUnit* fac : af.factories) {
 						auto fit = factories.begin();  // FIXME: Nested loops
-						while ((fit->unit != fac) && (fit != factories.end())) {
+						while ((fit != factories.end()) && (fit->unit != fac)) {
 							++fit;
 						}
 						if (fit != factories.end()) {

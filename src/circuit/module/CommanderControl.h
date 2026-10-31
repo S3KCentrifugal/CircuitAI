@@ -1,5 +1,7 @@
 #pragma once
 #include "terrain/CommanderCombat.h"
+#include "terrain/CommanderFortification.h"
+#include "terrain/CommanderJammerCoverage.h"
 #include "spring/RouteCommand.h"
 #include "AIFloat3.h"
 #include <cmath>
@@ -20,16 +22,49 @@ public:
     void MoveFailed(int id);
     void Damaged(CCircuitUnit* unit);
     bool Handles(CCircuitUnit* unit) const;
+    bool Jammed(CCircuitUnit* unit);
     bool RetreatCloakFunded(CCircuitUnit* unit) const;
+    bool FogCloak(CCircuitUnit* unit) const;
+    bool EnergyRetreat(CCircuitUnit* unit) const;
+    bool HealthRetreat(CCircuitUnit* unit) const;
+    bool GroupSiteAllowed(CCircuitUnit* unit,const springai::AIFloat3& site) const;
+    commander::JammerCoverage GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
+        const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr);
+    float GroupJammerMargin() const { return options.groupJammerEdge; }
     bool RetreatStation(CCircuitUnit* unit,springai::AIFloat3& goal) const;
     bool SetOption(const std::string& name,float value);
     float GetReserve() const { return reserve; }
     float GetDeficit() const;
     int GetOperation() const { return operation; }
+    // Read-only cached decision state. No callbacks, census or replanning;
+    // O(log commanders), called only by the strategic snapshot publisher.
+    std::string DescribeFront(int id) const;
+
     bool ReceiveProjectiles(const char* message);
     IUnitTask* FrontWork(CCircuitUnit* unit,int kind,CCircuitDef* buildDef,float radius);
     bool CanStartRadar(CCircuitUnit* unit);
+    void MexFinished(CCircuitUnit* commander, CCircuitUnit* mex);
+    bool GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& site) const;
+    bool CanResumeFrontTask(CCircuitUnit* unit, IUnitTask* task) const;
+    std::vector<commander::DefenceExclusion> DefenceExclusions(CCircuitUnit* unit,CCircuitDef* def,
+        const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr) const;
 private:
+    std::vector<int> frontDefenceDefs;
+    bool IsFrontDefence(const CCircuitDef* def) const;
+    // Script owns the one-member roster and faction definitions. IDs are
+    // reacquired on every ask and cleared on ownership loss, never wrappers.
+    int groupUnit=-1, groupDef=-1, groupNano=-1, groupRadar=-1, groupJammer=-1,groupAA=-1;
+    int groupNext=0;
+    bool groupArrived=false;
+    CCircuitUnit* GroupCommander() const;
+    bool GroupActive(CCircuitUnit* commander);
+    IUnitTask* GroupWork(CCircuitUnit* unit);
+    IUnitTask* GroupAssist(CCircuitUnit* commander);
+    bool GroupTaskFunded(IUnitTask* task) const;
+    IUnitTask* GroupBuild(CCircuitUnit* unit, CCircuitDef* def, const springai::AIFloat3& site, bool bootstrap=false);
+    IUnitTask* GroupPower(CCircuitUnit* unit, const springai::AIFloat3& site, bool& covered);
+    bool GroupPowered(const springai::AIFloat3& site) const;
+    void UpdateCommanderGroup();
     // Values are logged as integers; append new modes only.
     enum class Mode { SUPPORT,ASSESS,APPROACH,ALIGN,PENDING,ESCAPE,RECOVER,FALLBACK };
     struct State {
@@ -37,9 +72,20 @@ private:
         int generation=0,seen=-10000,started=0,pending=-1,fired=-1,failed=0;
         int retry=0,target=-1,leaseUntil=0,next=0,lastLog=0,lastDamage=-1,frontFrame=-10000,frontYield=0;
         int frontMexFrame=-10000,frontProgressFrame=0;
+        int frontSolarNext=0; // failed local placement retry, no recurring timer
         // Throttles (owner 2026-10-19): a failed detour or a declined T3 waits
         // 1 s, +1 s per failure in a row, at most 3 s; success resets.
         int detourNext=0,detourFails=0,t3DeclineFails=0;
+        int t3PositionUntil=0,t3PositionTarget=-1;
+        bool immediatePending=false;
+        bool energyRetreat=false;
+        bool fogCloak=false;
+        int fogCloakNext=0;
+        bool healthRetreat=false;
+        int healthPlan=-10000,healthShotUntil=-1;
+        springai::AIFloat3 healthGoal{-1,0,-1};
+        int energyPlan=-10000;
+        springai::AIFloat3 energyGoal{-1,0,-1};
         float detourDist=0.f; // distance to the front at the last detour MOVE
         // Same-goal MOVE resend backoff and fallback goal hold (owner 2026-10-19).
         int moveSent=-10000,moveResends=0,fallbackGoalSince=-10000;
@@ -74,9 +120,39 @@ private:
         bool lineDone=false,radarCovered=false,workHeld=false; // workHeld: offered under a fallback
         springai::AIFloat3 lineAnchor{-1,0,-1},lineThreat,radarPos{-1,0,-1};
         const IUnitTask* workTask=nullptr;
+        int workKind=-1;
         commander::FallbackBoundary workBoundary; // perimeter when workTask was offered
         std::map<int,int> timedNext;
         std::vector<routecommand::Command> route;
+        // D-356 lane push census of the last FrontPosition: corridor combat
+        // screens within scan, the furthest one's lane progress, the anchor
+        // bound actually applied (INV-234 re-derives it in Deploy), and the
+        // "then home" latch (never released: the meta's "then home").
+        int pushScreens=0; float pushScreenProgress=-1,pushBound=-1;
+        // The lane progress the recorded front was built at. INV-234 compares
+        // this, not a re-projection of the point: on a folded polyline the
+        // exact lane point can project onto a later segment (b06 Glacial,
+        // +194 elmos), which is geometry, not a goal beyond the bound.
+        float pushGoalProgress=-1;
+        bool pushHome=false;
+        // D-357 corridor mex sweep: distinct spots offered, the last one, and
+        // whether the next lane offer is the turret that follows them.
+        int laneMexCount=0; bool laneMexTurret=false;
+        springai::AIFloat3 laneMexLast{-1,0,-1};
+        // Completion-owned IDs, never borrowed unit pointers. Released with the
+        // commander; destroyed/transferred mexes are removed on a work offer.
+        std::vector<int> unfortifiedMexes;
+        struct TerritoryPlan {
+            std::vector<springai::AIFloat3> sites;
+            float progress=0;
+            bool pending=true;
+        };
+        std::vector<TerritoryPlan> territoryPlans;
+        float territoryProgress=-1;
+        float fortifyNextProgress=0;
+        int territoryCorridor=-1, territoryClass=-1, fortifyRetry=0, mexFortifyRetry=0;
+        bool territoryPending=false;
+
     };
     struct Threat {
         commander::Point pos,velocity;
@@ -89,8 +165,11 @@ private:
         bool enabled=false,advance=false,decoys=false,frontDuty=false,frontReady=false;
         bool work=true; // D-299 ladder and fallback hand-over (script Global::Commander::Work)
         bool frontRecovery=false;
+        float frontRepairCombat=0;
+        float frontSolarIncome=0, frontSolarStorage=.2f, frontSolarRadius=300, frontSolarDef=-1;
         float frontMexSeconds=0,frontStallSeconds=10,frontDetourSeconds=0; // 0: no detour backoff
         float moveResendSeconds=0;   // 0: a swallowed/failed MOVE is resent every tick
+        float t3ImmediateShot=0,t3PositionSeconds=0; // opt-in balanced combat policy
         float fallbackGoalHoldSeconds=0; // 0: the fallback goal may change every replan
         float scan=1000,leash=700,step=96,support=600,minValue=180,killReward=45;
         float hpReserve=.35f,retreat=.45f,recover=.8f,aggression=.25f;
@@ -98,6 +177,34 @@ private:
         float maxApproach=180,maxSeconds=12,cloakSeconds=1.5f,donorReserve=1200;
         float friendlyMargin=12,normalRange=.85f,frontWorkers=2;
         float frontDistance=1600,frontStandoff=650,frontRadius=500,frontThreat=3;
+        float jamSafe=0, jamHeavyCost=900;
+        float healthRetreatFraction=0,healthShotSeconds=2,groupJammerEdge=100,groupJammerIncome=25;
+        float cloakEnergyRetreat=0,cloakRetreatDistance=600,frontMexAA=-1;
+        float fogCloakDistance=0,fogCloakIncome=500;
+        float frontMexLos=0,radarSpacing=500;
+        float groupMexPriority=3,groupRadarPriority=2,groupLinePriority=1;
+        float frontPersistent=0, frontMexDefence=0, frontLineEnabled=0;
+        float frontLineFog=1000, frontLineSpacing=1.5f;
+        float frontDefenceSpacing=.5f;
+        float frontLineDepth=800, frontMexOffset=160, frontWorkBehind=400;
+        float frontFortifyBank=.5f, frontFortifyPriority=1;
+        float frontFortifyAdvance=0; // 0: complete the line before advancing
+        float frontCorridor=-1, frontCorridorClass=-1, frontLineDef=-1;
+        float frontPushAhead=0; // 0: old screen-led anchor; positive: continuous lane advance
+        // D-356: the push is screen-led (corridor combat units required before
+        // the anchor leaves the commander's own progress; 0 = unscreened), ends
+        // after front_push_until_seconds or once observed enemy riot metal
+        // reaches front_push_home_riot ("then home"; 0 = never), and FRONT
+        // offers beyond lane half-width + front_lane_margin are declined
+        // (0 = the commander's build distance).
+        float frontPushScreen=0,frontPushUntilSeconds=0,frontPushHomeRiot=0,frontLaneMargin=0;
+        // D-357: corridor mex sweep. Spots within half-width + front_mex_reach
+        // (0 = build distance) of the lane, from front_mex_behind behind the
+        // commander to front_mex_ahead ahead of it; enemy extractors on those
+        // spots are captured when front_mex_capture_enemy; one line turret per
+        // front_mex_turret_every corridor mexes (0 = none).
+        float frontMexReach=0,frontMexBehind=400,frontMexAhead=600,frontMexCaptureEnemy=0,frontMexTurretEvery=0;
+        float frontMexEnemyHome=0; // spots this close to an enemy start are the enemy's home ground: never swept (0 = off)
         float t3Intercept=1,t3Health=.2f,t3Distance=1000,detectionMargin=32;
         float afusDefenceRadius=0; // opt-in script policy; zero preserves ordinary combat
         // D-293: fall back to the backline porc line before a capable group.
@@ -136,6 +243,7 @@ private:
     // UnitDef decoy relationship separately; definitions live for this AI/game.
     mutable std::map<int,bool> actualDecoys;
     bool ActualDecoy(CCircuitDef* definition) const;
+    void UpdateFogCloak(CCircuitUnit* unit,State& state,int frame);
     std::vector<commander::Contact> contacts;
     std::set<int> afusDefs; // script-selected immutable definition IDs, per AI
     int protectedAfus=-1; // fresh local observation, never retained across Tick
@@ -164,12 +272,20 @@ private:
     int sensorFrame=-10000;
     int projectileFrame=-1,sequence=0,operation=0;
     float reserve=0;
+    float maxJammerRadius=-1;
+    std::vector<int> jammerIds;
+    std::vector<float> jammerRadii;
+    void InitJammerRadii();
+    bool HealthControl(CCircuitUnit* unit,State& s,int frame);
+    struct JamZone { commander::Point center; float radius; };
+    std::vector<JamZone> jamZones;
+    bool JamControl(CCircuitUnit* unit,State& state,int frame);
     void Tick(CCircuitUnit* unit,State& state,int frame);
     void Observe(CCircuitUnit* unit,int frame);
     // moving: unguided ballistic shells mostly miss a moving commander (D-294).
     float Exposure(commander::Point from,commander::Point to,float seconds,float height,bool moving=false,float newVolleyRisk=1.f) const;
     bool Route(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to) const;
-    void Move(CCircuitUnit* unit,State& state,const springai::AIFloat3& goal,int frame);
+    void Move(CCircuitUnit* unit,State& state,const springai::AIFloat3& goal,int frame,bool transit=false);
     void Conceal(CCircuitUnit* unit,State& state,bool value);
     void Transition(CCircuitUnit* unit,State& state,Mode mode,int frame);
     bool Deploy(CCircuitUnit* unit,State& state,int frame);
@@ -178,7 +294,7 @@ private:
     bool Intercept(CCircuitUnit* unit,State& state,int frame);
     void EndT3(CCircuitUnit* unit,State& state,int frame,const char* reason);
     void Decline(CCircuitUnit* unit,State& state,const commander::Contact& target,int frame,const char* reason);
-    bool Fire(CCircuitUnit* unit,State& state,const commander::Line& line,int frame);
+    bool Fire(CCircuitUnit* unit,State& state,const commander::Line& line,int frame,bool acceptT3Risk=false,bool acceptJamRisk=false);
     bool FallbackActive(const State& state,int frame) const { return state.fallback && frame<state.fallbackUntil; }
     // Engine reachability indexes sectors by position without bounds checks
     // (KI register, GetClosestSector). Reject garbage/off-map points first.
@@ -189,11 +305,25 @@ private:
     void PlanFallback(CCircuitUnit* unit,State& state,int frame);
     bool Fallback(CCircuitUnit* unit,State& state,IUnitTask* current,int frame);
     void CheckPerimeter(CCircuitUnit* unit,const State& state,const springai::AIFloat3& goal,int frame,const char* source) const;
-    // D-299 work ladder (CommanderWork.cpp). Kinds 5..12; see FrontWork.
+    // D-299 work ladder (CommanderWork.cpp). Kinds 5..16; see FrontWork. The
+    // script names them in commander.json front_ladder (CommanderFront::Work).
     enum WorkKind { WORK_LINE=5,WORK_REPAIR_DEFENCE=6,WORK_REPAIR_UNITS=7,WORK_RECLAIM=8,
-        WORK_TIMED=9,WORK_RADAR=10,WORK_FACTORY=11,WORK_BASE=12,WORK_MEX=13 };
+        WORK_TIMED=9,WORK_RADAR=10,WORK_FACTORY=11,WORK_BASE=12,WORK_MEX=13,WORK_ADVANCE=14,WORK_HOLD=15,
+        WORK_MEX_LANE=16, WORK_TERRITORY_LINE=17, WORK_MEX_DEFENCE=18, WORK_REPAIR_COMBAT=21, WORK_SOLAR=22 };
     IUnitTask* LadderWork(CCircuitUnit* unit,State& state,int kind,CCircuitDef* buildDef,float radius,int frame);
-    IUnitTask* RepairWork(CCircuitUnit* unit,const State& state,bool defence,float radius,int frame);
+    // D-357: the corridor mex sweep (WORK_MEX_LANE) and its dry probe (INV-235).
+    IUnitTask* LaneMexWork(CCircuitUnit* unit,State& state,CCircuitDef* turretDef,int frame);
+    bool LaneMexAvailable(CCircuitUnit* unit,State& state,int frame);
+    bool LaneMexSiteAllowed(CCircuitUnit* unit,const springai::AIFloat3& site) const;
+    float LaneMexAheadLimit(CCircuitUnit* unit,State& state,int frame,float own);
+    // D-356: the "then home" latch of the lane push.
+    bool PushHome(CCircuitUnit* unit,State& state,int frame);
+    IUnitTask* MexDefenceWork(CCircuitUnit* unit,State& state,CCircuitDef* def,int frame);
+    IUnitTask* TerritoryLineWork(CCircuitUnit* unit,State& state,CCircuitDef* def,int frame);
+    IUnitTask* FortifySite(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& site,int frame,
+        const springai::AIFloat3* coveragePoint=nullptr);
+
+    IUnitTask* RepairWork(CCircuitUnit* unit,const State& state,bool defence,float radius,int frame,bool stationary=false);
     IUnitTask* ReclaimWork(CCircuitUnit* unit,const State& state,float radius,int frame);
     IUnitTask* LineWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);
     IUnitTask* RadarWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);

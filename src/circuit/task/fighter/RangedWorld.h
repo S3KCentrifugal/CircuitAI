@@ -72,6 +72,7 @@ public:
     bool FreeSlot(int id, const springai::AIFloat3& pos, float spacing) const;
     void Nearby(const springai::AIFloat3& pos, float radius, std::vector<int>& result) const;
     const std::vector<Contact>& Contacts() const { return contacts; }
+    bool PeerSeesCommander(const Contact& contact,CCircuitDef* def,const springai::AIFloat3& shooter,float peerRadius) const;
     const std::vector<int>& Objectives() const { return objectives; }
     // press (owner 2026-10-19, RangedPolicy::pressStatic): armed static
     // contacts of that tech level or lower count only with their death blast.
@@ -116,6 +117,7 @@ public:
         std::vector<int> assault;
         cohort::Reason reason=cohort::Reason::TRAVEL;
         float loss=1.f, advantage=0.f;
+        float ownValue=0.f, hostileValue=0.f; // local metal (cost x HP) from AssessCohort
         int assemblyTarget=-1, objectiveFrame=-1;
         int protectedTarget=-1; // last legally seen commander/reclaimer; losing LOS is not a kill
         springai::AIFloat3 strategic;

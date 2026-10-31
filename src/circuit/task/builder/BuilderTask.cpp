@@ -6,6 +6,7 @@
  */
 
 #include "task/builder/BuilderTask.h"
+#include "task/builder/RepairTask.h"
 #include "task/DormantTaskChain.h"
 #include "terrain/ReservationClaim.h"
 #include "task/builder/BuildChain.h"
@@ -27,6 +28,7 @@
 #include "unit/action/FightAction.h"
 #include "unit/action/MoveAction.h"
 #include "CircuitAI.h"
+#include "module/CommanderControl.h"
 #include "util/Utils.h"
 
 #include "spring/SpringCallback.h"
@@ -343,6 +345,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 	FindBuildSite(unit, pos, searchRadius);
 
 	if (geom::is_valid(buildPos)) {
+        if(!circuit->GetCommanderControl()->GroupMayBuild(unit,buildDef,buildPos)) return false;
 		TRY_UNIT(circuit, unit,
 			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
 		)
@@ -372,6 +375,11 @@ bool IBuilderTask::TryBuildCachedSite(CCircuitUnit* unit)
         || !circuit->GetBuilderManager()->IsBuildPositionAllowed(buildDef, buildPos)
         || circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
         || !circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) return false;
+    if(!circuit->GetCommanderControl()->GroupMayBuild(unit,buildDef,buildPos)) return false;
+    const auto coverage=circuit->GetCommanderControl()->GroupJammerCoverage(unit,buildDef,buildPos,0.f,this);
+    if(!coverage.NearUnjammed({buildPos.x,buildPos.z},circuit->GetCommanderControl()->GroupJammerMargin())) return false;
+    const auto exclusions=circuit->GetCommanderControl()->DefenceExclusions(unit,buildDef,buildPos,0.f,this);
+    if(!commander::DefenceSpaced({buildPos.x,buildPos.z},exclusions)) return false;
     TRY_UNIT(circuit, unit,
         unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(circuit->GetLastFrame()));
     )
@@ -515,6 +523,7 @@ void IBuilderTask::OnUnitIdle(CCircuitUnit* unit)
 
 void IBuilderTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+    if(manager->GetCircuit()->GetCommanderControl()->Jammed(unit)) return;
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -634,6 +643,9 @@ CCircuitUnit* IBuilderTask::GetNextAssignee()
 
 void IBuilderTask::Update(CCircuitUnit* unit)
 {
+    if(auto* repair=dynamic_cast<CBRepairTask*>(this); repair && repair->IsStationaryCommander(unit)) {
+        repair->UpdateStationary(unit);return;
+    }
 	if (IsExperimental() && (target != nullptr) && (engaged.find(unit) != engaged.end())
 		&& !manager->GetCircuit()->GetEconomyManager()->IsEnergyEmpty())
 	{
@@ -1015,8 +1027,14 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 	FindFacing(pos);
 
 	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
-	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder](const AIFloat3& p) {
-		return manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
+    const auto exclusions=manager->GetCircuit()->GetCommanderControl()->DefenceExclusions(builder,buildDef,pos,searchRadius,this);
+    auto* control=manager->GetCircuit()->GetCommanderControl();
+    const auto coverage=control->GroupJammerCoverage(builder,buildDef,pos,searchRadius,this);
+	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control](const AIFloat3& p) {
+		return commander::DefenceSpaced({p.x,p.z},exclusions)
+            && control->GroupSiteAllowed(builder,p)
+            && coverage.NearUnjammed({p.x,p.z},control->GroupJammerMargin())
+            && manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
             && terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
 	if (reservationId >= 0) {

@@ -5,12 +5,11 @@
 #include "../../helpers/construction/economy_helpers.as"
 #include "../../helpers/construction/guard_helpers.as"
 #include "../../helpers/units/unitdef_helpers.as"
-// Dynamic factory production + shared helpers
+// Shared helpers
 #include "../../helpers/objectives/objective_helpers.as"
 #include "../../helpers/roles/role_limit_helpers.as"
 #include "../../global.as"
 #include "../../types/terrain.as"
-#include "../../systems/production/factory_production.as"
 #include "../../systems/production/front_opener.as"
 #include "../../systems/combat/land_siege.as"
 #include "../../systems/construction/front_geothermal.as"
@@ -53,14 +52,6 @@ namespace RoleFront {
         g_frontVehicleThresholdsApplied = false;
 
         Front_ApplyStartLimits();
-
-        // Initialize dynamic factory production system for FRONT role when enabled
-        if (Global::RoleSettings::Front::UseDynamicFactoryProduction) {
-            FactoryProduction::Initialize();
-            GenericHelpers::LogUtil("[FRONT] Dynamic factory production system initialized", 2);
-        } else {
-            GenericHelpers::LogUtil("[FRONT] Dynamic factory production disabled; using legacy factory selection", 2);
-        }
 
         // Log all strategic objectives with distance from start
         ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::FRONT, "FRONT");
@@ -253,6 +244,9 @@ namespace RoleFront {
 
     // One-time T1 raider opener state for the first suitable T1 land factory
     bool g_frontRaiderOpenerDone = false;
+    array<IUnitTask@> g_frontOpeningRaiders;
+    int g_frontRaiderFactoryId = -1;
+    bool g_frontPostRaidConstructorQueued = false;
 
     // One-time scout rush state for the very first T1 land factory (bot or vehicle)
     bool g_frontScoutRushFinished = false;
@@ -323,17 +317,50 @@ namespace RoleFront {
         const AIFloat3 pos = u.GetPos(ai.frame);
         IUnitTask@ last = null;
         const int count = Global::RoleSettings::Front::RaiderOpenerCount;
+        g_frontRaiderFactoryId = u.id;
         if (tank !is null && count > 0) FrontOpener::Begin(u, tank, count);
         for (int i = 0; i < count; ++i) {
             @last = aiFactoryMgr.Enqueue(
                 TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::NORMAL, pdef, pos, 64.f)
             );
             if (tank !is null) FrontOpener::Recruit(last);
+            if (last !is null) g_frontOpeningRaiders.insertLast(last);
         }
         g_frontRaiderOpenerDone = true;
         FrontOpener::MarkQueued("batch");
         GenericHelpers::LogUtil("[FRONT] T1 raider opener enqueued count=" + count + " unit=" + raiderName, 2);
         return last;
+    }
+
+    // D-376: one extra constructor AFTER the finite raid queue drains. Keeping
+    // handles tests this batch, not surviving raiders or unrelated production.
+    // R status checks and at most R^2 array shifts, R=RaiderOpenerCount (ten
+    // by default), only while opening; release each retired handle.
+    // A cancelled recruit is settled too, so factory loss cannot deadlock this
+    // one-time follow-up. The existing minimum-constructor rule stays first.
+    IUnitTask@ Front_TryPostRaidConstructor(CCircuitUnit@ factory, const array<string>& in names)
+    {
+        if (!g_frontRaiderOpenerDone || g_frontRaiderFactoryId < 0 || g_frontPostRaidConstructorQueued
+            || FrontOpener::WasQueued("constructor")) return null;
+        for (int i = int(g_frontOpeningRaiders.length()) - 1; i >= 0; --i) {
+            if (g_frontOpeningRaiders[i].IsDead()) g_frontOpeningRaiders.removeAt(i);
+        }
+        if (g_frontOpeningRaiders.length() > 0) return null;
+        // Keep the fourth step at the original producer while it survives;
+        // another suitable land factory may recover it after producer loss.
+        if (factory.id != g_frontRaiderFactoryId && ai.GetTeamUnit(g_frontRaiderFactoryId) !is null) return null;
+        if (names.length() == 0) return null;
+        CCircuitDef@ constructor = ai.GetCircuitDef(names[0]);
+        if (constructor is null || !factory.circuitDef.CanBuild(constructor) || !constructor.IsAvailable(ai.frame)) return null;
+        IUnitTask@ task = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER,
+            Task::Priority::HIGH, constructor, factory.GetPos(ai.frame), 64.f));
+        if (task !is null) {
+            @FrontConstructors::recruit = task;
+            g_frontPostRaidConstructorQueued = true;
+            FrontOpener::MarkQueued("constructor");
+            GenericHelpers::LogUtil("[FRONT] Post-raider constructor enqueued unit=" + constructor.GetName(), 2);
+        }
+        return task;
     }
 
     // Ensure labs recruit a minimum number of constructors
@@ -353,20 +380,6 @@ namespace RoleFront {
         // T1 Bot Lab enforcement
         if (UnitHelpers::IsT1BotLab(factoryName)) {
             array<string> botConstructorNames = UnitHelpers::GetT1BotConstructors(side);
-            if (botConstructorNames.length() > 0) {
-                string botConstructorName = botConstructorNames[0];
-                int existingBotConstructors = UnitDefHelpers::GetUnitDefCount(botConstructorName);
-                if (existingBotConstructors < Global::RoleSettings::Front::MinT1BotConstructorCount) {
-                    CCircuitDef@ ctorDef = ai.GetCircuitDef(botConstructorName);
-                    if (ctorDef !is null && ctorDef.IsAvailable(ai.frame)) {
-                        const AIFloat3 pos = u.GetPos(ai.frame);
-                        return aiFactoryMgr.Enqueue(
-                            TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, ctorDef, pos, 64.f)
-                        );
-                    }
-                }
-            }
-
             // After constructor enforcement, try one-time scout rush for T1 bot lab
             IUnitTask@ rushTask = Front_TryScoutRush(u, factoryName, side);
             if (rushTask !is null) return rushTask;
@@ -374,25 +387,13 @@ namespace RoleFront {
             // After scout rush, try one-time T1 raider opener for T1 bot lab
             IUnitTask@ raiderTask = Front_TryT1RaiderOpener(u, factoryName, side);
             if (raiderTask !is null) return raiderTask;
+            IUnitTask@ postRaidConstructor = Front_TryPostRaidConstructor(u, botConstructorNames);
+            if (postRaidConstructor !is null) return postRaidConstructor;
         }
 
         // T1 Vehicle Plant enforcement
         if (UnitHelpers::IsT1VehicleLab(factoryName)) {
             array<string> vehicleConstructorNames = UnitHelpers::GetT1VehicleConstructors(side);
-            if (vehicleConstructorNames.length() > 0) {
-                string vehicleConstructorName = vehicleConstructorNames[0];
-                int existingVehicleConstructors = UnitDefHelpers::GetUnitDefCount(vehicleConstructorName);
-                if (existingVehicleConstructors < Global::RoleSettings::Front::MinT1VehicleConstructorCount) {
-                    CCircuitDef@ vdef = ai.GetCircuitDef(vehicleConstructorName);
-                    if (vdef !is null && vdef.IsAvailable(ai.frame)) {
-                        const AIFloat3 pos2 = u.GetPos(ai.frame);
-                        return aiFactoryMgr.Enqueue(
-                            TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, vdef, pos2, 64.f)
-                        );
-                    }
-                }
-            }
-
             // After constructor enforcement, try one-time scout rush for T1 vehicle plant
             IUnitTask@ rushTask2 = Front_TryScoutRush(u, factoryName, side);
             if (rushTask2 !is null) return rushTask2;
@@ -400,6 +401,8 @@ namespace RoleFront {
             // After scout rush, try one-time T1 raider opener for T1 vehicle plant
             IUnitTask@ raiderTask2 = Front_TryT1RaiderOpener(u, factoryName, side);
             if (raiderTask2 !is null) return raiderTask2;
+            IUnitTask@ postRaidConstructor2 = Front_TryPostRaidConstructor(u, vehicleConstructorNames);
+            if (postRaidConstructor2 !is null) return postRaidConstructor2;
         }
 
         // T2 Bot Lab enforcement (Front-specific minimum T2 bot constructors)
@@ -440,16 +443,6 @@ namespace RoleFront {
 
         IUnitTask@ siege = LandSiege::Produce(u);
         if (siege !is null) return siege;
-
-        // After constructor guarantees (T1/T2) and optional scout rushes, prefer dynamic factory
-        // production for all factories (T1/T2 labs, air, gantries, etc.) when enabled.
-        if (Global::RoleSettings::Front::UseDynamicFactoryProduction) {
-            IUnitTask@ dynTask = FactoryProduction::MakeTask(u);
-            if (dynTask !is null) {
-                return dynTask;
-            }
-            GenericHelpers::LogUtil("[FRONT] Dynamic factory production returned null for '" + factoryName + "', using default", 3);
-        }
 
         // Fall back to default when no rule triggers
         return aiFactoryMgr.DefaultMakeTask(u);
@@ -818,7 +811,7 @@ namespace RoleFront {
     ******************************************************************************/ 
 
     // Helper to attempt building a T1 nano caretaker
-    IUnitTask@ Front_TryBuildNano(float metalIncome) {
+    IUnitTask@ Front_TryBuildNano(float metalIncome, bool baseOnly = false) {
         float energyPercent = (aiEconomyMgr.energy.storage > 0.0f)
             ? (aiEconomyMgr.energy.current / aiEconomyMgr.energy.storage)
             : 0.0f;
@@ -839,7 +832,8 @@ namespace RoleFront {
 
         if (allowByReserves || allowFirstNanoByIncome) {
             CCircuitUnit@ targetFactory = Factory::SelectFactoryNeedingNano();
-            if (targetFactory !is null) {
+            if (targetFactory !is null && (!baseOnly || MapHelpers::SqDist(targetFactory.GetPos(ai.frame), Global::Map::StartPos)
+                <= Global::RoleSettings::Front::BaseSupportRadius * Global::RoleSettings::Front::BaseSupportRadius)) {
                 IUnitTask@ tNano = Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::HIGH);
                 if (tNano !is null) return tNano;
             }
@@ -854,7 +848,7 @@ namespace RoleFront {
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
         // Primary constructor branch (Bots)
-        if (u is Builder::primaryT1BotConstructor) {
+        if (FrontConstructors::IsBase(u.id) && (u.circuitDef.GetName() == "armck" || u.circuitDef.GetName() == "corck" || u.circuitDef.GetName() == "legck")) {
             int t2ConstructionBotCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
             int t2LabCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotLabs());
 
@@ -875,7 +869,7 @@ namespace RoleFront {
                     storedMetalTriggerMet = (aiEconomyMgr.metal.current >= (t2LabDef.costM * Global::RoleSettings::Front::T2LabStoredMetalThresholdRatio));
                 }
                 if (incomeTriggerMet || timeTriggerMet || storedMetalTriggerMet) {
-                    AIFloat3 anchor2 = Factory::GetT1BotLabPos();
+                    AIFloat3 anchor2 = Global::Map::StartPos;
                     IUnitTask@ t2b = Builder::EnqueueT2BotLabIfNeeded(unitSide, anchor2, SQUARE_SIZE * 30, SECOND * 300);
                     if (t2b !is null) return t2b;
                 }
@@ -884,7 +878,7 @@ namespace RoleFront {
             // Transition to vehicles if metal income > threshold and no vehicle plant
             int t1VehLabCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1VehicleLabs());
             if (metalIncome > Global::RoleSettings::Front::MinimumMetalIncomeForT1FactoryTransition && t1VehLabCount < 1) {
-                AIFloat3 pos = Factory::GetPreferredFactoryPos();
+                AIFloat3 pos = Global::Map::StartPos;
                 IUnitTask@ tVeh = Builder::EnqueueT1VehiclePlant(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
                 if (tVeh !is null) return tVeh;
             }
@@ -905,7 +899,7 @@ namespace RoleFront {
 
             if (shouldT2Lab) {
                 // Place near our T1 Bot Lab (or commander fallback via Factory)
-                AIFloat3 anchor = Factory::GetT1BotLabPos();
+                AIFloat3 anchor = Global::Map::StartPos;
                 IUnitTask@ tLab = Builder::EnqueueT2BotLabIfNeeded(unitSide, anchor, SQUARE_SIZE * 30, SECOND * 300);
                 if (tLab !is null) return tLab;
             }
@@ -913,13 +907,13 @@ namespace RoleFront {
             // After T2 lab attempt: build a T1 nano caretaker when either reserves allow
             // it or we're early-game with sufficient income and zero existing nanos.
             // Route through centralized per-factory nano selection and enqueue helpers.
-            IUnitTask@ tNano = Front_TryBuildNano(metalIncome);
+            IUnitTask@ tNano = Front_TryBuildNano(metalIncome, true);
             if (tNano !is null) return tNano;
 
         }
 
         // Primary constructor branch (Vehicles)
-        if (u is Builder::primaryT1VehConstructor) {
+        if (FrontConstructors::IsBase(u.id) && (u.circuitDef.GetName() == "armcv" || u.circuitDef.GetName() == "corcv" || u.circuitDef.GetName() == "legcv")) {
             int t2VehLabCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2VehicleLabs());
             
             // Fast-track: if we have zero T2 vehicle labs and ANY trigger is met, build a T2 Vehicle Plant now.
@@ -943,7 +937,7 @@ namespace RoleFront {
                 }
 
                 if (incomeTriggerMet || timeTriggerMet || storedMetalTriggerMet) {
-                    IUnitTask@ tVeh2 = Builder::EnqueueT2VehiclePlant(unitSide, Factory::GetPreferredFactoryPos(), SQUARE_SIZE * 24, 600 * SECOND);
+                    IUnitTask@ tVeh2 = Builder::EnqueueT2VehiclePlant(unitSide, Global::Map::StartPos, SQUARE_SIZE * 24, 600 * SECOND);
                     if (tVeh2 !is null) return tVeh2;
                 }
             }
@@ -951,20 +945,21 @@ namespace RoleFront {
             // Transition to bots if metal income > threshold and no bot lab
             int t1BotLabCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotLabs());
             if (metalIncome > Global::RoleSettings::Front::MinimumMetalIncomeForT1FactoryTransition && t1BotLabCount < 1) {
-                AIFloat3 pos = Factory::GetPreferredFactoryPos();
+                AIFloat3 pos = Global::Map::StartPos;
                 IUnitTask@ tBot = Builder::EnqueueT1BotLab(unitSide, pos, SQUARE_SIZE * 24, 600 * SECOND);
                 if (tBot !is null) return tBot;
             }
             
             // Try building nano
-            IUnitTask@ tNano = Front_TryBuildNano(metalIncome);
+            IUnitTask@ tNano = Front_TryBuildNano(metalIncome, true);
             if (tNano !is null) return tNano;
 
             // No special vehicle-only eco tasks for now; default
             return defaultTask;
         }
 
-        return defaultTask;
+        IUnitTask@ support = Front_TryBuildNano(metalIncome, true);
+        return support is null ? defaultTask : support;
     }
 
     IUnitTask@ Front_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent) {
