@@ -2,8 +2,34 @@
 #include <cassert>
 #include <iostream>
 #include <new>
+#include <array>
 using namespace circuit::commander;
 int main() {
+    // Exercise every combination of available offers. Routine weapons cannot
+    // suppress a ready sensor; urgent counters win, and owed nanos defer sensors.
+    // An accepted offer must stop evaluation (placement has side effects).
+    for(bool nanoDue:{false,true}) for(bool nearCombat:{false,true}) for(int ready=0;ready<16;++ready) {
+        std::array<int,4> calls{};
+        int jobs[4]={0,1,2,3};
+        int expected=-1;
+        const int middle=nanoDue?1:nearCombat?2:-1;
+        if(ready&1) expected=0;
+        else if(middle>=0 && (ready&(1<<middle))) expected=middle;
+        else if(ready&8) expected=3;
+        int combatQueries=0;
+        auto* selected=SelectGroupConstruction(nanoDue,[&]{++combatQueries;return nearCombat;},[&](ConstructionPhase phase)->int* {
+            const int i=int(phase);
+            ++calls[i];
+            assert(calls[i]==1); // no repeated placement attempt in the same phase
+            return (ready&(1<<i))?&jobs[i]:nullptr;
+        });
+        assert(selected==(expected<0?nullptr:&jobs[expected]));
+        assert(calls[0]==1);
+        assert(calls[1]==int(expected!=0 && nanoDue));
+        assert(calls[2]==int(expected!=0 && !nanoDue && nearCombat));
+        assert(calls[3]==int(expected<0 || expected==3));
+        assert(combatQueries==int(expected!=0 && !nanoDue));
+    }
     // A completed emergency solar and a later factory assist can occupy the
     // identical address. Retirement must invalidate both identity and kind.
     struct Task { int type; };

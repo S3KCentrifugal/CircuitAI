@@ -2,6 +2,21 @@
 #include <algorithm>
 
 namespace circuit::commander {
+enum class ConstructionPhase { URGENT, NANO, SENSORS, DEFENSE };
+// Lazy offers: stop at the first accepted job, with no candidate allocation or
+// speculative placement. The caller shares one defense decision across URGENT
+// and DEFENSE. Tests exercise competing offers and the nano obligation.
+template<class NearCombat,class Offer>
+auto SelectGroupConstruction(bool nanoDue, NearCombat&& nearCombat, Offer&& offer)
+    -> decltype(offer(ConstructionPhase::URGENT)) {
+    if(auto task=offer(ConstructionPhase::URGENT)) return task;
+    if(nanoDue) {
+        if(auto task=offer(ConstructionPhase::NANO)) return task;
+    } else if(nearCombat()) {
+        if(auto task=offer(ConstructionPhase::SENSORS)) return task;
+    }
+    return offer(ConstructionPhase::DEFENSE);
+}
 // Non-owning task identity. The manager must retire it before releasing a task,
 // otherwise allocator address reuse can turn unrelated work into a protected job.
 // Constant-time, no reference ownership or allocation; tested with address reuse.

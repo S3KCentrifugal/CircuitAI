@@ -235,7 +235,7 @@ IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
             if(target) def=target->GetCircuitDef();
         }
         groupJobNano=def && def->GetId()==groupNano;
-        ai->LOG("[CommanderGroup] job_start def=%s nano=%i",def?def->GetDef()->GetName():"unknown",int(groupJobNano));
+        ai->LOG("[CommanderGroup] job_start def=%s nano=%i team=%i",def?def->GetDef()->GetName():"unknown",int(groupJobNano),ai->GetTeamId());
     }
     return task;
 }
@@ -247,7 +247,10 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     if(task!=groupJob) return;
     groupJob=nullptr; // manager still owns task during this callback
     defenseNext=defenseOfferNext=defenseDecisionNext=0;
-    ai->LOG("[CommanderGroup] job_end done=%i nano=%i",int(done),int(groupJobNano));
+    const auto* finishedBuild=dynamic_cast<IBuilderTask*>(task);
+    const auto* finishedDef=finishedBuild?finishedBuild->GetBuildDef():nullptr;
+    ai->LOG("[CommanderGroup] job_end done=%i nano=%i team=%i def=%s",int(done),int(groupJobNano),
+        ai->GetTeamId(),finishedDef?finishedDef->GetDef()->GetName():"repair");
     if(done) if(auto* upgrade=dynamic_cast<IBuilderTask*>(task);upgrade && upgrade->GetBuildType()==BT::MEXUP
         && upgrade->GetTarget() && upgrade->GetTarget()->IsFinished())
         ai->LOG("[CommanderGroup] mex_upgrade_done target=%i",upgrade->GetTarget()->GetId());
@@ -531,15 +534,22 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
                 return TrackGroupJob(task);
     }
     if(builder && nearby && !groupJob) {
-        if(auto* task=GroupPlannedDefense(unit,anchor,frame)) return task;
-        if(groupNanoDue) {
-            // Obligations survive anchor/worker losses. Complete locally before
-            // opening another project; a retreat may temporarily defer work.
-            const auto site=groupNanoSite.SqDistance2D(center)<=SQUARE(cfg->group.radius)?groupNanoSite:center;
-            if(auto* task=GroupBuild(unit,ai->GetCircuitDefSafe(groupNano),site,true)) return TrackGroupJob(task);
-        } else if(GroupNearCombat(anchor)) {
-            if(auto* task=GroupConstruction(unit,anchor,frame)) return task;
-        }
+        // Routine weapons must not starve missing radar/jammer coverage. Only
+        // the configured urgent bands precede it; accepted jobs are untouched.
+        using Phase=commander::ConstructionPhase;
+        if(auto* task=commander::SelectGroupConstruction(groupNanoDue,
+            [&]{return GroupNearCombat(anchor);},[&](Phase phase)->IUnitTask* {
+                switch(phase) {
+                    case Phase::URGENT: return GroupPlannedDefense(unit,anchor,frame,int(cfg->group.sensorDefenseBand));
+                    case Phase::NANO: {
+                        const auto site=groupNanoSite.SqDistance2D(center)<=SQUARE(cfg->group.radius)?groupNanoSite:center;
+                        return TrackGroupJob(GroupBuild(unit,ai->GetCircuitDefSafe(groupNano),site,true));
+                    }
+                    case Phase::SENSORS: return GroupConstruction(unit,anchor,frame);
+                    case Phase::DEFENSE: return GroupPlannedDefense(unit,anchor,frame);
+                }
+                return nullptr;
+            })) return task;
     }
     if(builder && nearby && !groupJob && !groupNanoDue) {
         if(auto* task=GroupUpgradeMex(unit,anchor)) return task;

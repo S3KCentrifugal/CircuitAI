@@ -202,6 +202,7 @@ struct CommanderGroupConfig {
     float jammerEdge=0,jammerIncome=25;
     float jammerGain=.25f,jammerSpacing=.6f,jammerHold=10,jammerOutage=60;
     float mexPriority=3,radarPriority=2,linePriority=1;
+    float sensorDefenseBand=3; // weapons at/above this band precede sensor work
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
 };
@@ -394,7 +395,7 @@ private:
     using DefenseBuilders=std::array<DefenseBuilder,6>;
     DefenseBuilders GatherDefenseBuilders(CCircuitUnit* anchor);
     defense::Project DefenseProject(CCircuitDef* def,const DefenseFacts& facts,const DefenseBuilders& builders);
-    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame);
+    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand=0);
     bool IsGroupStructure(int defId) const;
     bool GroupLaneWorkAllowed(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& at) const;
     IUnitTask* GroupUpgradeMex(CCircuitUnit* unit,CCircuitUnit* anchor);

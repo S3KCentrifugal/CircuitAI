@@ -104,6 +104,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::jammerHold>("commander_group_jammer_hold",0,120),
         Group<&GC::jammerOutage>("commander_group_jammer_outage",0,600),
         Group<&GC::jammerIncome>("commander_group_jammer_income",0,100000),
+        Group<&GC::sensorDefenseBand>("commander_group_sensor_defense_band",0,100),
         Group<&GC::defenceMetal>("commander_group_defence_metal",0,100000),
         Group<&GC::defenceEnergy>("commander_group_defence_energy",0,1000000),
         Group<&GC::budgetSeconds>("commander_group_budget_seconds",0,120),

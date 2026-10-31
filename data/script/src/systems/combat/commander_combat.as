@@ -101,6 +101,7 @@ namespace CommanderCombat {
             Option("commander_group_jammer_gain",.25f);
             Option("commander_group_jammer_spacing",.6f);
             Option("commander_group_jammer_hold",10.f);
+            Option("commander_group_sensor_defense_band",3.f);
             Option("commander_group_jammer_outage",60.f);
             Option("commander_group_jammer_income",25.f);
             Option("commander_group_defence_metal",50.f);
