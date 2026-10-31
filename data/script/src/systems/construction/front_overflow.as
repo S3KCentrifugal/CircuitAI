@@ -58,7 +58,7 @@ namespace FrontOverflow {
         CCircuitDef@ d = ConvDef();
         if (d is null || d.count >= Global::RoleSettings::Front::OverflowMaxConverters) return 0;
         int n = int(Spare() / ConvDraw);
-        if (BankFull(Global::RoleSettings::Front::OverflowBankPercent)) n = AiMax(n, 1);
+        if (BankFull(Global::RoleSettings::Front::OverflowBankPercent)) n = AiMax(n, Global::RoleSettings::Front::OverflowFullBankParallel);
         return AiMin(Global::RoleSettings::Front::OverflowParallel, n);
     }
     // the ladder's cap on the converter def (native included): what stands plus what we may start
@@ -85,15 +85,30 @@ namespace FrontOverflow {
         const int cols = Global::RoleSettings::Front::OverflowBlockCols, rows = Global::RoleSettings::Front::OverflowBlockRows;
         const float pitch = 32.0f;
         fitCells.resize(0);
+        // The whole block and the converter's block-map yard round it free of every structure and yard (arm C,
+        // 2026-10-31): experimental_balanced block_map.json gives converters yard [8, 8] (64 elmo a side) that
+        // no other structure may stand in, and a 16-elmo look at each cell centre missed it - 68 of 118 cell
+        // orders on Forge aborted "no site within 24". Own converters ignore each other, so only the outside
+        // edge needs the margin.
+        const float margin = Global::RoleSettings::Front::OverflowBlockMargin;
+        const AIFloat3 mid(Snap(c.x), 0.0f, Snap(c.z));
+        if (aiTerrainMgr.BuildableFraction(d, mid, float(cols) * pitch * 0.5f + margin, float(rows) * pitch * 0.5f + margin, 0) < 1.0f) return false;
         for (int r = 0; r < rows; ++r) {
             for (int k = 0; k < cols; ++k) {
                 const AIFloat3 p(Snap(c.x) + (float(k) - float(cols - 1) * 0.5f) * pitch, 0.0f, Snap(c.z) + (float(r) - float(rows - 1) * 0.5f) * pitch);
-                if (aiTerrainMgr.BuildableFraction(d, p, 8.0f, 8.0f, 0) < 1.0f) return false;
+                if (aiTerrainMgr.BuildableFraction(d, p, 15.0f, 15.0f, 0) < 1.0f) return false;
                 fitCells.insertLast(p);
             }
         }
         // no surface threat at the block
         return aiBattle.SurfThreat(c) <= Global::RoleSettings::Front::OverflowMaxThreat;
+    }
+
+    array<AIFloat3> givenUp;    // centres of blocks given up: not chosen again
+    bool NearGivenUp(const AIFloat3 &in p)
+    {
+        for (uint i = 0; i < givenUp.length(); ++i) if (MapHelpers::SqDist(p, givenUp[i]) < 128.0f * 128.0f) return true;
+        return false;
     }
 
     // Candidates: rings round the eco anchor, the side away from the map centre first
@@ -121,7 +136,7 @@ namespace FrontOverflow {
                 const float startBack = (Global::Map::StartPos.x - centre.x) * bx + (Global::Map::StartPos.z - centre.z) * bz;
                 if (back < startBack - 200.0f) continue;
                 const float score = back - 0.5f * rings[ri];
-                if (score <= bestScore) continue;
+                if (score <= bestScore || NearGivenUp(p)) continue;
                 if (!CellsFit(d, p, fit)) continue;
                 bestScore = score; best = p; bestCells = fit;
             }
@@ -136,7 +151,7 @@ namespace FrontOverflow {
         cells = bestCells;
         cellState.resize(cells.length()); cellTasks.resize(cells.length());
         for (uint i = 0; i < cells.length(); ++i) { cellState[i] = 0; @cellTasks[i] = null; }
-        blockCentre = best; blocks++;
+        blockCentre = best; blocks++; failsHere = 0;
         for (uint i = 0; i < cells.length(); ++i) allCells.insertLast(cells[i]);
         GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
             + Global::RoleSettings::Front::OverflowBlockCols + "x" + Global::RoleSettings::Front::OverflowBlockRows + ", eco anchor "
@@ -164,11 +179,20 @@ namespace FrontOverflow {
                 // the order ended: built, framed, or failed
                 cellState[i] = Occupied(d, cells[i]) ? 2 : 3;
                 @cellTasks[i] = null;
-                if (cellState[i] == 3) blockFails++;
+                if (cellState[i] == 3) { blockFails++; failsHere++; }
             }
+        }
+        // a block whose cells keep failing is given up: base structures came into its yard after it was chosen
+        if (failsHere >= Global::RoleSettings::Front::OverflowBlockFailLimit && OpenCell() >= 0) {
+            int dropped = 0;
+            for (uint i = 0; i < cells.length(); ++i) if (cellState[i] == 0) { cellState[i] = 3; dropped++; }
+            givenUp.insertLast(blockCentre);
+            GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " given up after " + failsHere
+                + " failed cells (" + dropped + " not ordered)", 1);
         }
     }
     int blockFails = 0;
+    int failsHere = 0;      // failed cells in the current block
     int OpenCell()
     {
         for (uint i = 0; i < cells.length(); ++i) if (cellState[i] == 0) return int(i);
@@ -189,7 +213,7 @@ namespace FrontOverflow {
         const int i = OpenCell();
         if (i < 0) return null;   // the rest of the block is ordered
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::CONVERT, Task::Priority::HIGH, d, cells[i], 0.0f, true, 180 * SECOND));
-        if (t is null) { cellState[i] = 3; blockFails++; return null; }
+        if (t is null) { cellState[i] = 3; blockFails++; failsHere++; return null; }
         IBuilderTask@ bt = cast<IBuilderTask>(t);
         if (bt !is null) bt.siteRadius = 24.0f;   // its own cell or nothing
         cellState[i] = 1; @cellTasks[i] = t;

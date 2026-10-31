@@ -98,6 +98,11 @@ namespace Main {
         Global::RoleSettings::Front::EcoLadderLaterAdvFusionAtStart = true;
         Global::RoleSettings::Front::EcoLadderFusionEquivalents = true; // owner 2026-10-31: geos and rezzed fusions of any faction count as fusions
         Global::RoleSettings::Front::OverflowConverters = true; // owner 2026-10-31: energy overflow into T2 converter blocks (front_overflow.as)
+        Global::RoleSettings::Front::OverflowSeconds = 10;          // 2026-10-31 arm C: headless A/B (20 s, 3 at once) left 1,000-7,000 E/s over
+        Global::RoleSettings::Front::OverflowParallel = 6;
+        Global::RoleSettings::Front::OverflowFullBankParallel = 2;
+        Global::RoleSettings::Front::OverflowPullSeconds = 5;
+        Global::RoleSettings::Front::OverflowExtraT2Seconds = 20;
         Global::RoleSettings::Front::SpawnFactoryEnabled = true;
         Global::RoleSettings::Front::T2FactoryNanos = 6; // owner 2026-10-25: a T2 lab's turrets from its frame (front_factory_nanos.as)
         Global::RoleSettings::Front::T2FactoryNanosMax = 14; // owner 2026-10-25: up to 14 as the metal bank nears overflow

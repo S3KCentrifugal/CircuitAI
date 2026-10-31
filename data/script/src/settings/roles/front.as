@@ -156,6 +156,9 @@ namespace Front {
             int OverflowMaxConverters = 40;
             int OverflowBlockCols = 3;            // a block: cols x rows converters, no gaps
             int OverflowBlockRows = 3;
+            float OverflowBlockMargin = 64.0f;    // free ground round a block (the converter's block-map yard)
+            int OverflowBlockFailLimit = 2;       // failed cells before the rest of a block is given up
+            int OverflowFullBankParallel = 1;     // converters going up at once while the bank is full, whatever the spare
             float OverflowMaxThreat = 0.0f;       // surface threat allowed at a new block
             int OverflowPullSeconds = 10;         // a helping T2 constructor moved onto a converter at most this often
             bool OverflowMexFirst = true;         // with the bank full, T1 mex upgrades before converters and reactors
