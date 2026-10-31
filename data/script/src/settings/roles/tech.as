@@ -663,20 +663,20 @@ namespace Tech {
             /******************** WORKFORCE MINIMUMS ********************/
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
-            int MinimumT2ConstructorBots = 1;
-            int T2BotConstructorCap = 10;                   // D-119 (owner): T2 construction bots at most this many for TECH (the T2 air constructors keep T2ConstructorCap)
-            int FastAssistBotCap = 10;                      // D-119 (owner): fast assist bots (Fark, Freaker, legaceb) at most this many
+            int MinimumT2ConstructorBots = 3;
+            int T2BotConstructorCap = 3;                    // Retained home pool; requested donations receive separate production headroom
+            int FastAssistBotCap = 5;                       // D-417: retained fast-assist pool (Fark, Freaker, legaceb)
             float FastAssistMetalReserve = 2000.0f;
             // D-308: compact banks need mobile support sooner; retain the hard
             // cap and rush budget, with no extra polling or recruit batches.
             float CompactFastAssistIncomeScale = 2.0f;
             float CompactFastAssistMetalReserve = 1000.0f;
-            int T2ConstructorCap = 60;                      // D-103: T2 constructors (bot and air) produced up to this while the metal bank is over T2ConstructorBankShare
+            int T2ConstructorCap = 60;                      // T2 air constructor ceiling; bots use the separate retained pool cap
             float T2ConstructorBankShare = 0.5f;            // D-103: the metal bank share of storage above which the advanced lab makes T2 constructors
             // T2 constructors TECH keeps before it builds any for an ally's
             // request (played: every one it made was ferried away, and the
             // advanced lab built nothing else).
-            int DonationKeepT2Constructors = 2;
+            int DonationKeepT2Constructors = 3;
 
             /******************** BUILDER CAP LIMITS ********************/
             // Hard caps for T1/T2 land builders used when computing income-based limits
@@ -686,7 +686,7 @@ namespace Tech {
             /******************** TECH START LIMIT CAPS ********************/
             // Initial caps applied at game start for the TECH role
             int StartCapRezBots = 0;
-            int StartCapFastAssistBots = 10;                // D-119 (owner): was 50
+            int StartCapFastAssistBots = 5;                 // Mobile support replaces excess home constructors
 
             int StartCapT1BotLabs = 1;
             int StartCapT2BotLabs = 1;

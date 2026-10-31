@@ -59,3 +59,34 @@ void test_standard_assist_target_matches_previous_policy() {
         }
     }
 }
+
+void test_three_home_constructors_count_queued_work_without_double_counting_frames() {
+    Check(TechEconomyMath::WorkforceNeeded(2,0,3));
+    Check(!TechEconomyMath::WorkforceNeeded(2,1,3));
+    Check(!TechEconomyMath::WorkforceNeeded(3,0,3));
+    Check(!TechEconomyMath::WorkforceNeeded(10,0,3));
+    Check(!TechEconomyMath::WorkforceNeeded(0,0,0));
+    Check(TechEconomyMath::WorkforceNeeded(4,0,5));
+    Check(!TechEconomyMath::WorkforceNeeded(4,1,5));
+}
+void test_delivery_headroom_is_separate_from_home_target() {
+    Check(TechEconomyMath::ConstructorUnitLimit(3,3,0)==3);
+    Check(TechEconomyMath::ConstructorUnitLimit(3,3,7)==4);
+    Check(TechEconomyMath::ConstructorUnitLimit(3,4,6)==5);
+    Check(TechEconomyMath::ConstructorUnitLimit(3,4,0)==4);
+    Check(TechEconomyMath::ConstructorUnitLimit(3,2,0)==3);
+    Check(TechEconomyMath::ConstructorUnitLimit(3,10,0)==10);
+    Check(TechEconomyMath::ConstructorUnitLimit(5,5,1)==6);
+}
+void test_nuke_opening_can_fill_own_floor_before_promised_deliveries() {
+    Check(TechEconomyMath::ConstructorOpeningTarget(2,3,0)==2);
+    Check(TechEconomyMath::ConstructorOpeningTarget(2,3,1)==3);
+    Check(TechEconomyMath::ConstructorOpeningTarget(4,3,1)==4);
+}
+void test_five_assist_target_preserves_opening_and_income_gates() {
+    Check(TechEconomyMath::FastAssistTarget(44.99f,1,false,5)==0);
+    Check(TechEconomyMath::FastAssistTarget(45,1,false,5)==5);
+    Check(TechEconomyMath::FastAssistTarget(1000,1,false,5)==5);
+    Check(TechEconomyMath::FastAssistTarget(1000,1,true,5)==2);
+    Check(TechEconomyMath::FastAssistTarget(22.5f,2,false,5)==5);
+}
