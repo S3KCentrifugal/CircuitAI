@@ -773,7 +773,9 @@ AIFloat3 CTerrainManager::FindBuildSite(CCircuitDef* cdef, const AIFloat3& pos,
 		pinnedReservation = -1;
 		pinnedReservationRequired = false;
 	}
-	if (layoutEnabled && serve && !reservations.empty()) {
+	// A required pin is served with the layout gate shut too: FRONT runs no layout but
+	// opens the gate to reserve its silo grid (front_silo_grid.as, owner 2026-10-30).
+	if ((layoutEnabled || required) && serve && !reservations.empty()) {
 		AIFloat3 rpos;
 		int rfacing, rid;
 		if (FindReservedSite(cdef, pos, predicate, rpos, rfacing, rid, facingFilter)) {
@@ -2437,7 +2439,7 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 	const bool required = pinnedReservationRequired;
 	pinnedReservation = -1;
 	pinnedReservationRequired = false;
-	if (!layoutEnabled) {
+	if (!layoutEnabled && !(required && (pinned >= 0))) {
 		return false;
 	}
 	ExpireReservations();

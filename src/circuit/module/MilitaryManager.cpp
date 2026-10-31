@@ -571,8 +571,12 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.overnukeStockCap = std::max(1, nuclear.get("overnuke_stock_cap", 10).asInt());
 	nuclearInfo.overnukeStockFrames = std::max(0, nuclear.get("overnuke_stock_seconds", 900).asInt()) * FRAMES_PER_SEC;
 	nuclearInfo.overnukeFireBelowHealth = std::min(1.f, std::max(0.f, nuclear.get("overnuke_fire_below_health", 0.5f).asFloat()));
-	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
+	nuclearInfo.overnukeTeamSilos = std::max(0, nuclear.get("overnuke_team_silos", 8).asInt());
+	nuclearInfo.overnukeTeamMin = std::max(1, nuclear.get("overnuke_team_min", 15).asInt());
+	nuclearInfo.overnukeTeamMax = std::max(nuclearInfo.overnukeTeamMin, nuclear.get("overnuke_team_max", 30).asInt());
+	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i team(silos=%i roll=%i..%i) scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
 			cfgName.c_str(), nuclearInfo.overnukeSilos, nuclearInfo.overnukeMin, nuclearInfo.overnukeMax,
+			nuclearInfo.overnukeTeamSilos, nuclearInfo.overnukeTeamMin, nuclearInfo.overnukeTeamMax,
 			nuclearInfo.overnukeScoutEvery, int(nuclearInfo.overnukeStock), nuclearInfo.overnukeStockCap,
 			nuclearInfo.overnukeStockFrames / FRAMES_PER_SEC, nuclearInfo.overnukeFireBelowHealth);
 	if (!stockCfg.isNull()) {

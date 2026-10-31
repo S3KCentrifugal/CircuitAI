@@ -24,6 +24,7 @@
 #include "../../systems/construction/front_factory_nanos.as"
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/front_agitator.as"
+#include "../../systems/construction/front_silo_grid.as"
 #include "../../systems/construction/commander_front.as"
 #include "../../systems/construction/front_spawn_factory.as"
 // Builder state and helpers for enqueueing structures like nanos
@@ -700,6 +701,9 @@ namespace RoleFront {
         if (ladderGantry !is null) return ladderGantry;
         IUnitTask@ ladder=FrontEcoLadder::Work(builder);
         if (ladder !is null) return ladder;
+        // Owner (2026-10-30): from 35 min at sustained 225 metal / 2000 energy, silos in one tight grid off the lanes (front_silo_grid.as)
+        IUnitTask@ silo=FrontSiloGrid::Work(builder);
+        if (silo !is null) return silo;
         // Owner (2026-10-22): T2 constructors upgrade our T1 mexes before native assist/help work
         IUnitTask@ mexUp=FrontMexUp::Work(builder);
         if (mexUp !is null) return mexUp;

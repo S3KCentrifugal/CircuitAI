@@ -45,8 +45,8 @@ function widget:GameFrame(f)
         echo("supplied silos, income and the antinuke ring")
     end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
-    if f==1800 then
-        -- the AI's ally team sees the whole map: the target is known without a
+    if f==(cfg.look or 1800) then
+        -- the AI's ally team sees the whole map (later with look: the antinukes stock up first): the target is known without a
         -- scout of ours inside the blast (the silo never fires at ground holding
         -- its own unit)
         Spring.SendCommands("globallos 0")

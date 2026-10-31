@@ -1,6 +1,6 @@
     // Mono-space font required
 	{
-"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
+"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_team_silos": 8, "overnuke_team_min": 15, "overnuke_team_max": 30, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
 // Terrain restore (owner 2026-10-31, RestoreControl): builders pull craters
 // (nukes, commander blasts, bombs) and the lava in them back to the map's
 // original height with the engine's restore order. Looks at the base, at sites

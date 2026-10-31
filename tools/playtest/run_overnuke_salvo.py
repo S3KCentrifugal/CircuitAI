@@ -26,6 +26,7 @@ def main():
     p.add_argument('--antis', type=int, required=True)
     p.add_argument('--silos', type=int, default=0, help='0: max(3, ceil(salvo / 7)), what 15 minutes of stocking fills')
     p.add_argument('--minutes', type=float, default=32)
+    p.add_argument('--look-minute', type=float, default=1, help='minute the AI first sees the target: later lets the antinukes stock up')
     p.add_argument('--map', default='Supreme Isthmus v1.7')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
@@ -41,7 +42,7 @@ def main():
                        f'StartSpot(AIFloat3({east[0]},0,{east[1]}), AiRole::TECH, false)\n')
     check = d / 'checks.json'
     check.write_text(json.dumps({'stop_minute': a.minutes, 'expect': [
-        {'key': 'stocking', 'pattern': r'NUKE: overnuke with \d+ silos .*stocking the salvo first', 'by_minute': 6, 'scope': 'any'},
+        {'key': 'stocking', 'pattern': r'NUKE: overnuke with \d+ silos .*stocking the salvo first', 'by_minute': a.look_minute + 5, 'scope': 'any'},
         {'key': 'released', 'pattern': r'NUKE: overnuke salvo released', 'by_minute': a.minutes, 'scope': 'any'},
         {'key': 'result', 'pattern': r'\[SalvoTest\] RESULT ', 'by_minute': a.minutes, 'scope': 'any'}],
         'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception', 'scope': 'any'}]}, indent=2))
@@ -56,7 +57,7 @@ def main():
     subprocess.run(stage, cwd=ROOT, check=True)
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     (d / 'LuaUI/Config/overnuke_salvo.lua').write_text(
-        'return {salvo=%d, silos=%d, antis=%d}\n' % (a.salvo, silos, a.antis))
+        'return {salvo=%d, silos=%d, antis=%d, look=%d}\n' % (a.salvo, silos, a.antis, int(a.look_minute * 1800)))
     # pin the roll to the salvo under test
     staged = d / 'AI/Skirmish/BARbTest/test/config/experimental_balanced/behaviour.json'
     s = staged.read_text()
@@ -64,6 +65,8 @@ def main():
         if s.count(key) != 1:
             raise ValueError('overnuke roll lever missing in ' + str(staged))
     s = s.replace('"overnuke_min": 10', '"overnuke_min": %d' % a.salvo).replace('"overnuke_max": 25', '"overnuke_max": %d' % a.salvo)
+    # the team breakpoint (8+ silos across the allied AIs) has its own roll: pin it too
+    s = s.replace('"overnuke_team_min": 15', '"overnuke_team_min": %d' % a.salvo).replace('"overnuke_team_max": 30', '"overnuke_team_max": %d' % a.salvo)
     staged.write_text(s)
     # Only the nuke matchup is under test: the AI's factories stay idle, so no
     # army reaches the defender's antinukes before the salvo.

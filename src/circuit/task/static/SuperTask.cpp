@@ -672,7 +672,23 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 		}
 	}
 	if (!scan()) return false;
-	const int roll = policy.overnukeMin + rand() % (policy.overnukeMax - policy.overnukeMin + 1);
+	// Second breakpoint (owner 2026-10-30): with overnuke_team_silos finished silos across
+	// every allied BARb, the roll is overnuke_team_min..max. One walk over the allied units,
+	// once per new target (a few times a game).
+	int teamSilos = 0;
+	if (policy.overnukeTeamSilos > 0) {
+		const auto& aiTeams = circuit->GetAllyTeam()->GetTeamIds();
+		for (const auto& [id, ally] : circuit->GetAllyTeam()->GetFriendlyUnits()) {
+			if ((ally->GetCircuitDef() != nullptr) && IsNukeSilo(ally->GetCircuitDef())
+				&& (aiTeams.count(ally->GetUnit()->GetTeam()) != 0) && !ally->GetUnit()->IsBeingBuilt()) ++teamSilos;
+		}
+	}
+	const bool teamRoll = (policy.overnukeTeamSilos > 0) && (teamSilos >= policy.overnukeTeamSilos);
+	const int lo = teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
+	const int hi = teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
+	const int roll = lo + rand() % (hi - lo + 1);
+	circuit->LOG("NUKE: overnuke roll %i..%i (%i silos across the allied AIs%s)", lo, hi, teamSilos,
+			teamRoll ? ", the team breakpoint" : "");
 	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll,
 			frame, policy.overnukeStock);
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
