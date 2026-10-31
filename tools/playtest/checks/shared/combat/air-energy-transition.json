@@ -1,0 +1,60 @@
+{
+  "stop_minute": 3,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[AirEnergyProbe\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[AirEnergyProbe\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "recovery_rejects_solar",
+      "pattern": "\\[AirEnergyProbe\\] PASS recovery_rejects_solar",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "placement_rejects_solar",
+      "pattern": "\\[AirEnergyProbe\\] PASS placement_rejects_solar",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "placement_rejects_advanced",
+      "pattern": "\\[AirEnergyProbe\\] PASS placement_rejects_advanced",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "chooser_rejects_advanced",
+      "pattern": "\\[AirEnergyProbe\\] PASS chooser_rejects_advanced",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "reclaim_admitted",
+      "pattern": "\\[AirEnergyProbe\\] PASS reclaim_admitted",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "reclaim_finished",
+      "pattern": "\\[AirEnergyProbe\\] PASS reclaim_finished",
+      "scope": "any",
+      "by_minute": 2.8
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[AirEnergyProbe\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

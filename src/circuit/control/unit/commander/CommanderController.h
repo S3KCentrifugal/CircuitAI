@@ -310,6 +310,8 @@ public:
     bool OwnsGroupProject(const IUnitTask* task) const { return task && task==groupJob; }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);
+    IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
+    IUnitTask* SupportConstruction(CCircuitUnit* unit);
     std::string DescribeDefense() const { return defenseReason; }
     void SyncDefenseClaim(IBuilderTask* task,int& token);
     bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
@@ -347,6 +349,8 @@ private:
     // Script owns the one-member roster and faction definitions. IDs are
     // reacquired on every ask and cleared on ownership loss, never wrappers.
     int groupUnit=-1, groupDef=-1, groupNano=-1, groupRadar=-1, groupJammer=-1,groupAA=-1;
+    int supportAnchor=-1; // script-owned non-commander group; never enabled for FRONT
+    std::array<int,3> supportMaintenanceNext{};
     // Fixed roster: three T2 workers, radar, jammer, decoy. Script owns desired
     // seats; the native shell reacquires IDs and never ties lifetime to an anchor.
     std::array<int,6> groupMembers{{-1,-1,-1,-1,-1,-1}};

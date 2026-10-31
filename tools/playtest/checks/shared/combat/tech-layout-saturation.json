@@ -1,0 +1,66 @@
+{
+  "stop_minute": 3,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[TechLayoutProbe\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[TechLayoutProbe\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "primary_ring_first",
+      "pattern": "\\[TechLayoutProbe\\] PASS primary_ring_first",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "planned_is_not_build_power",
+      "pattern": "\\[TechLayoutProbe\\] PASS planned_is_not_build_power",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "support_ordered",
+      "pattern": "\\[TechLayoutProbe\\] PASS support_ordered",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "support_completed",
+      "pattern": "\\[TechLayoutProbe\\] PASS support_completed",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "reactor_supported",
+      "pattern": "\\[TechLayoutProbe\\] PASS reactor_supported",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "all_sides_used",
+      "pattern": "\\[TechLayoutProbe\\] PASS all_sides_used",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "overflow_only_when_full",
+      "pattern": "\\[TechLayoutProbe\\] PASS overflow_only_when_full",
+      "scope": "any",
+      "by_minute": 2.8
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[TechLayoutProbe\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

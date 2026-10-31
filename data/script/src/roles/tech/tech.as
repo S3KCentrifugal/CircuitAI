@@ -553,6 +553,7 @@ namespace RoleTech
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		Invariants::OnUnitAdded(unit);   // D-076: INV-001
+        if (FrontlineEngineering::IsFiendProduct(unit)) return; // local combat support, not factory donation quota
         if (TechHeavyRush::OnFinished(unit)) return;
         // D-158: keep the amphibious wave together; constructor donations are separate.
         if (!AmphibiousOps::Active() || unit is null || AmphibiousOps::Kind(unit.circuitDef)<0)
@@ -967,7 +968,10 @@ namespace RoleTech
             array<string> names = advanced ? UnitHelpers::GetT2BotConstructors(conSide) : UnitHelpers::GetT1BotConstructors(conSide);
             if (names.length() > 0) {
                 CCircuitDef@ conDef = ai.GetCircuitDef(names[0]);
-                const int wanted = advanced ? TechChain::wantAck : TechChain::wantCk;
+                const int wanted = advanced
+                    ? TechEconomyMath::ConstructorOpeningTarget(TechChain::wantAck,
+                        Global::RoleSettings::Tech::DonationKeepT2Constructors, int(Team::Donation::pendingRequests.length()))
+                    : TechChain::wantCk;
                 if (conDef !is null && conDef.count + aiFactoryMgr.GetPendingRecruitCount(conDef) < wanted) {
                     if (conDef.maxThisUnit < wanted) conDef.maxThisUnit = wanted;
                     return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, conDef, u.GetPos(ai.frame), 64.f));
@@ -1000,6 +1004,21 @@ namespace RoleTech
 		string side = UnitHelpers::GetSideForUnitName(facDef.GetName());
 		const AIFloat3 pos = u.GetPos(ai.frame);
 		float metalIncome = Economy::GetMinMetalIncomeLast10s();
+        if(FrontlineEngineering::active && EngineeringReplacements::BaseEmergency()
+            && UnitHelpers::IsT2BotLab(facDef.GetName())) {
+            // Preserve the native combat selector, but close released workforce
+            // production while base defense owns the budget. Base air roles keep
+            // their ordinary priority in their own plant below.
+            array<string> workers=UnitHelpers::GetT2BotConstructors(side);
+            array<string> helpers=UnitHelpers::GetFastAssistBots(side);
+            for(uint i=0;i<workers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(workers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            for(uint i=0;i<helpers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(helpers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            return aiFactoryMgr.DefaultMakeTask(u);
+        }
 		GenericHelpers::LogUtil("[TECH][Factory] MakeTask called for factory '" + facDef.GetName() + "' (side=" + side + ")", 4);
 		// Debug: log current primary factory ids vs this unit
 		{
@@ -1104,7 +1123,7 @@ namespace RoleTech
 			// D-119 (owner): T2 construction bots at most T2BotConstructorCap; the
 			// T2 air constructors (the dedicated roles, D-107) keep T2ConstructorCap
 			const bool botLab = UnitHelpers::IsT2BotLab(facDef.GetName());
-			const int t2Cons = botLab ? UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
+			const int t2Cons = botLab ? UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors(), true)
 				: UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
 			const int t2Cap = botLab ? Global::RoleSettings::Tech::T2BotConstructorCap : Global::RoleSettings::Tech::T2ConstructorCap;
 			const float stor = aiEconomyMgr.metal.storage;
@@ -1130,7 +1149,7 @@ namespace RoleTech
 		// Check T2 constructor threshold
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()))
 		{
-			int t2CtorCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+			int t2CtorCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors(), true);
 			if (t2CtorCount < Global::RoleSettings::Tech::MinimumT2ConstructorBots)
 			{
 				// Recruit only bot constructors from a bot lab
@@ -1154,7 +1173,7 @@ namespace RoleTech
 			if (Factory::primaryT2BotLab !is null && u.id == Factory::primaryT2BotLab.id)
 			{
 				array<string> fastAssist = UnitHelpers::GetFastAssistBots(side);
-				int haveAssist = UnitDefHelpers::SumUnitDefCounts(fastAssist);
+				int haveAssist = UnitDefHelpers::SumUnitDefCounts(fastAssist, true);
 				float metalCurrent = aiEconomyMgr.metal.current;
 				const float assistReserve = CompactEco::Active()
 					? Global::RoleSettings::Tech::CompactFastAssistMetalReserve
@@ -1647,6 +1666,7 @@ namespace RoleTech
 		bool isT1BotCtor = (UnitHelpers::GetAllT1BotConstructors().find(name) >= 0);
 		bool isT2BotCtor = UnitHelpers::IsT2BotConstructor(name);
 		bool isFastAssist = (UnitHelpers::GetAllFastAssistBots().find(name) >= 0);
+        if(isFastAssist) EngineeringReplacements::Claim(unit);
 
 		if (isT1BotCtor || isT2BotCtor || isFastAssist)
 		{
@@ -1655,6 +1675,7 @@ namespace RoleTech
 		}
 
 		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
+        FrontlineEngineering::Added(unit);
 		if (Team::IsT2Constructor(d))
 		{
 			aiFactoryMgr.isAssistRequired = false;
@@ -1663,6 +1684,7 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{ /* other bookkeeping moved to Builder::AiUnitRemoved */
+        FrontlineEngineering::Removed(unit);
         if (unit !is null) {
             EcoPlanner::conversionReasons.delete("" + unit.id);
             floatAssistReasons.delete("" + unit.id);
@@ -1952,12 +1974,16 @@ namespace RoleTech
 			/*maxCap*/ Global::RoleSettings::Tech::MaxT2Builders);
 
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetT2LandBuilders(side), t2BuilderCap);
-		// D-119: the T2 construction bots' hard cap, whatever raised it
+		// D-417: retained workforce cap plus explicit donation headroom.
 		{
 			array<string> t2Bots = UnitHelpers::GetAllT2BotConstructors();
 			for (uint i = 0; i < t2Bots.length(); ++i) {
 				CCircuitDef@ d = ai.GetCircuitDef(t2Bots[i]);
-				if (d !is null && d.maxThisUnit > Global::RoleSettings::Tech::T2BotConstructorCap) d.maxThisUnit = Global::RoleSettings::Tech::T2BotConstructorCap;
+				if (d !is null && d.maxThisUnit > 0)
+				{
+					const int limit = Team::Donation::ConstructorUnitLimit(d.count);
+					if (d.maxThisUnit != limit) d.maxThisUnit = limit;
+				}
 			}
 		}
 

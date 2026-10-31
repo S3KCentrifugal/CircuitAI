@@ -115,6 +115,11 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
 	r = engine->RegisterObjectProperty("CBuilderManager", "float experimentalSearchRadius", asOFFSET(CBuilderManager, experimentalSearchRadius)); ASSERT(r >= 0);
     r=engine->RegisterObjectMethod("CBuilderManager","bool SetCommanderCombatOption(const string &in, float)",asMETHOD(CBuilderManager,SetCommanderCombatOption),asCALL_THISCALL); ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","bool SetDefenseRule(int, const string &in, float)",asMETHOD(CBuilderManager,SetDefenseRule),asCALL_THISCALL); ASSERT(r>=0);
+    // These return manager-owned tasks. Auto-handles add a script reference;
+    // ordinary @ would consume the manager's reference on temporary release.
+    r=engine->RegisterObjectMethod("CBuilderManager","IUnitTask@+ SupportDefenseWork(CCircuitUnit@, int, int, int, int)",asMETHOD(CBuilderManager,SupportDefenseWork),asCALL_THISCALL); ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBuilderManager","IUnitTask@+ SupportConstruction(CCircuitUnit@)",asMETHOD(CBuilderManager,SupportConstruction),asCALL_THISCALL); ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBuilderManager","IUnitTask@+ SupportAssist(CCircuitUnit@, CCircuitUnit@, float)",asMETHOD(CBuilderManager,SupportAssist),asCALL_THISCALL); ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","string DescribeDefense() const",asMETHOD(CBuilderManager,DescribeDefense),asCALL_THISCALL); ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","bool PendingProtection(CCircuitDef@, const AIFloat3& in)",asMETHOD(CBuilderManager,PendingProtection),asCALL_THISCALL); ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","float GetCommanderEnergyReserve() const",asMETHOD(CBuilderManager,GetCommanderEnergyReserve),asCALL_THISCALL); ASSERT(r>=0);

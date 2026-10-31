@@ -2,6 +2,8 @@
 // stockpiles, geometry and live capabilities come from the engine, not this table.
 namespace DefensePlanner {
     bool loaded=false;
+    int loadedRole=-1;
+    bool loadedAdvancedOnly=false;
     void Option(int slot,const string& in key,float fallback,const string& in path) {
         aiBuilderMgr.SetDefenseRule(slot,key,aiSetupMgr.ConfigFloat(path+key,fallback));
     }
@@ -23,11 +25,16 @@ namespace DefensePlanner {
         // Local saturation is native. Keep a separate per-AI safety cap so
         // defenses left at an old front do not consume the new station's quota.
         const int total=int(aiSetupMgr.ConfigFloat(path+"total_limit",32));
-        if(priority>0 && def.maxThisUnit<total) def.maxThisUnit=total;
+        if(priority>0 && (!loadedAdvancedOnly || (slot!=0 && slot!=1 && slot!=15))
+            && def.IsBuildAllowed() && def.maxThisUnit<total) def.maxThisUnit=total;
     }
-    void Load() {
-        if(loaded || Global::AISettings::Role!=AiRole::FRONT) return;
-        loaded=true;
+    void Load(bool advancedOnly=false) {
+        if(Global::AISettings::Role!=AiRole::FRONT && !advancedOnly) return;
+        // Startup may load FRONT defaults before role setup applies TECH caps.
+        // Reconfigure on ownership/mode changes; never retain the T1 catalog or
+        // zero startup defense caps when engineers are released (D-419).
+        if(loaded && loadedRole==int(Global::AISettings::Role) && loadedAdvancedOnly==advancedOnly) return;
+        loaded=true;loadedRole=int(Global::AISettings::Role);loadedAdvancedOnly=advancedOnly;
         const string path="commander/defense/";
         Option(-1,"surplus_metal",0,path); Option(-1,"surplus_energy_margin",100,path);
         Option(-1,"surplus_fire_seconds",10,path); Option(-1,"surplus_limit",32,path);
@@ -56,6 +63,11 @@ namespace DefensePlanner {
         for(uint i=0;i<3;++i) {
             Rule(9+int(i)*2,anti[i],"allied_antinuke",3,2,0,0,240,0,0,0,0,0,0,1,0);
             Rule(10+int(i)*2,shield[i],"allied_shield",3,2,0,0,150,0,0,0,0,0,0,0,1);
+        }
+        if(advancedOnly) {
+            aiBuilderMgr.SetDefenseRule(0,"priority",0);
+            aiBuilderMgr.SetDefenseRule(1,"priority",0);
+            aiBuilderMgr.SetDefenseRule(15,"priority",0);
         }
     }
 }

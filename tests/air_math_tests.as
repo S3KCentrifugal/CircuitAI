@@ -90,7 +90,7 @@ void test_air_insufficient_cohort_is_not_released() { Check(AirMath::OperationSi
 void test_air_bad_opening_settings_are_bounded() { Check(AirMath::OpeningWave(20,10,1)==20 && AirMath::OpeningWave(1000,2000,1000)==300); }
 void test_air_shared_economy_retires_small_energy() { Check(!AirMath::EnergyEraAllows(true,false,true,false) && !AirMath::EnergyEraAllows(true,false,false,true)); }
 void test_air_shared_economy_keeps_reactors_and_converters() { Check(AirMath::EnergyEraAllows(false,false,true,true)); }
-void test_air_first_afus_retires_advanced_solar() { Check(AirMath::EnergyEraAllows(false,true,true,false) && !AirMath::EnergyEraAllows(false,true,true,true)); }
+void test_air_first_afus_retires_advanced_solar() { Check(!AirMath::EnergyEraAllows(false,true,true,false) && !AirMath::EnergyEraAllows(false,true,true,true)); }
 
 void test_air_campus_growth_cannot_overflow() { Check(AirMath::PlannedBays(2147483647,6)==2147483647); }
 void test_air_wipeout_increases_next_resistance() { Check(AirMath::RaidResistance(1,0,.3f,.8f,1.5f,.9f,3)==1.5f); }
@@ -216,3 +216,10 @@ void test_plants_wanted_one_more_per_step() { Check(AirMath::PlantsWanted(110,60
 void test_plants_wanted_is_capped() { Check(AirMath::PlantsWanted(5000,60,50,8)==8 && AirMath::PlantsWanted(5000,60,50,0)==1); }
 void test_plants_wanted_zero_step_stops_at_two() { Check(AirMath::PlantsWanted(500,60,0,8)==2); }
 void test_plant_banked_at_half_its_cost() { Check(AirMath::PlantBanked(1450,2900,.5f) && !AirMath::PlantBanked(1449,2900,.5f) && !AirMath::PlantBanked(1450,0,.5f)); }
+
+void test_air_small_energy_allowed_before_reactor() { Check(AirMath::EnergyEraAllows(true,false,false,false) && AirMath::EnergyEraAllows(false,true,false,false)); }
+void test_air_reclaim_one_generator_with_headroom() { Check(AirMath::EnergyRetirementFits(1200,1000,20,20,1.15f,500,1000,150,150)); }
+void test_air_reclaim_reserves_concurrent_output() { Check(!AirMath::EnergyRetirementFits(1200,1000,75,20,1.15f,500,1000,150,150)); }
+void test_air_reclaim_reserves_refund_space() { Check(!AirMath::EnergyRetirementFits(1200,1000,20,0,1.15f,800,1000,150,150)); }
+void test_air_reclaim_full_bank_waits() { Check(!AirMath::EnergyRetirementFits(5000,1000,20,0,1.15f,1000,1000,150,0)); }
+void test_air_reclaim_bad_inputs_rejected() { Check(!AirMath::EnergyRetirementFits(1200,1000,20,0,0.5f,0,1000,150,0)); }

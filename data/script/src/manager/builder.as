@@ -2241,6 +2241,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		TechBuild::ReactorTaskRemoved(task);
 		SeaEconomy::Removed(task);
 		MetalEconomy::Removed(task, done);
 		{

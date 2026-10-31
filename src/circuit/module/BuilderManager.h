@@ -311,6 +311,9 @@ public:
     CControlledTask* EnqueueControlled(IUnitController* controller,IUnitTask* previous);
     bool SetCommanderCombatOption(const std::string& name,float value);
     bool SetDefenseRule(int slot,const std::string& key,float value);
+    IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
+    IUnitTask* SupportConstruction(CCircuitUnit* unit);
+    IUnitTask* SupportAssist(CCircuitUnit* unit,CCircuitUnit* worker,float radius);
     std::string DescribeDefense() const;
     bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
     float GetCommanderEnergyReserve() const;

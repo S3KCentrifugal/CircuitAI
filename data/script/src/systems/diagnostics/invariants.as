@@ -86,7 +86,7 @@ namespace Invariants {
         // The finite heavy batch has its own admission budget. Exempt only
         // verified production provenance, not every heavy unit or whole role.
         const bool heavyBatch = TechHeavyRush::IsBatchProduction(u);
-        if (!builder && !coastal && !pressure && !nukeRecon && !heavyBatch
+        if (!builder && !coastal && !pressure && !nukeRecon && !heavyBatch && !FrontlineEngineering::IsFiendProduct(u)
             && !TechGantry::IsAdmittedProduction(u) && mi < TechPlan::CombatGate())
             Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
@@ -176,7 +176,6 @@ namespace Invariants {
     int afusSeenFrame = -1;       // D-108: INV-037
     int fwdIdleLogT1 = -100000;   // D-109: INV-039
     int forwardT1EligibleSince = -1; // continuous eligibility under the actual production prerequisites
-    int fwdIdleLogT2 = -100000;   // D-109: INV-039
     int ferryLog = -100000;       // D-110: INV-041, INV-042
     int baseFactorySince = -1;    // D-114: INV-044
     int baseFactoryLog = -100000; // D-114: INV-044
@@ -725,7 +724,6 @@ namespace Invariants {
         // within 180 s (T1: a spam lab wanted; T2: a mex cluster without long-range AA)
         {
             const int t1Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotConstructors());
-            const int t2Land = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
             // T1 spam work waits for the economy online (D-114), so the clock starts
             // at the later of the release and that (played: fired the tick it latched)
             const bool online = TechBuild::EcoOnline();   // first: it latches ecoOnlineFrame
@@ -747,21 +745,12 @@ namespace Invariants {
                 Violation("INV-039", "t1", "T1 land constructors released " + int((ai.frame - TechForward::sinceT1) / SECOND) + " s, "
                     + TechForward::SpamClusters().length() + " spam labs of " + TechForward::SpamLabsWanted(aiEconomyMgr.metal.income) + " wanted, no forward order for 180 s");
             }
-            const int last2 = (TechForward::lastOrderT2 > TechForward::sinceT2) ? TechForward::lastOrderT2 : TechForward::sinceT2;
-            if (TechForward::sinceT2 >= 0 && t2Land > 0 && ai.frame - last2 >= 180 * SECOND && ai.frame - fwdIdleLogT2 >= 180 * SECOND) {
-                CCircuitDef@ lraa = ai.GetCircuitDef(UnitHelpers::GetStaticT2AARangeNameForSide(Global::AISettings::Side));
-                array<TechForward::MexCluster@> cl = TechForward::Clusters();
-                int open = 0;
-                for (uint i = 0; lraa !is null && i < cl.length(); ++i) {
-                    if (MapHelpers::SqDist(cl[i].c, Layout::BaseCentre()) < TechForward::Sq(Global::RoleSettings::Tech::MexDefenceBaseClear)) continue;
-                    if (!TechForward::Stands(cl[i].c, Global::RoleSettings::Tech::MexDefenceRadius, lraa)) ++open;
-                }
-                if (open > 0) {
-                    fwdIdleLogT2 = ai.frame;
-                    Violation("INV-039", "t2", "T2 land constructors released " + int((ai.frame - TechForward::sinceT2) / SECOND) + " s, "
-                        + open + " mex cluster(s) without long-range AA, no defence order for 180 s");
-                }
-            }
+            // D-419: released T2 bots reinforce lanes, not mex-cluster AA.
+            // A missing safe route or saturated defenses legitimately means no
+            // construction; assert the decision clock instead of forced spending.
+            if (FrontlineEngineering::active && FrontlineEngineering::seats.length()>0
+                && FrontlineEngineering::reassess>=0 && ai.frame-FrontlineEngineering::reassess>5*SECOND)
+                Violation("INV-039", "t2", "Frontline Engineering lane reassessment overdue");
         }
 
         // INV-035 (D-108): a dedicated T2 air constructor never holds a
@@ -774,6 +763,7 @@ namespace Invariants {
                 CCircuitUnit@ du = (id < 0) ? null : ai.GetTeamUnit(id);
                 IBuilderTask@ bt = (du is null || du.task is null) ? null : cast<IBuilderTask>(du.task);
                 if (bt is null || bt.buildDef is null || bt.buildDef.GetName() == own) continue;
+                if(du.task is Layout::economySupportTask) continue; // support prerequisite, not unrelated work
                 // D-306: dedicated workers may finish pinned economy recovery;
                 // the AFUS worker may also build/assist admitted conversion.
                 if (Global::AISettings::Role == AiRole::TECH) {
