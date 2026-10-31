@@ -283,6 +283,7 @@ namespace Donation {
         // behind our land base; it must not consume a pending bot order.
         if (UnitHelpers::GetAllT2BotConstructors().find(unit.circuitDef.GetName())<0) return;
         if (ordered > 0) --ordered;
+        if(EngineeringReplacements::Claim(unit)) return;
         if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
             GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
                 + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);
@@ -313,6 +314,7 @@ namespace Donation {
     {
         if (!IsEnabled() || Global::AISettings::Role != AiRole::TECH) return null;
         if (factory is null || factory.circuitDef is null) return null;
+        if(FrontlineEngineering::active && EngineeringReplacements::BaseEmergency()) return null;
         // An order that produced nothing within the timeout (lab died, def
         // capped) is forgotten so the next lab poll re-orders. Checked before
         // the count gate: with one request and one dead order the gate used to

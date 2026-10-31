@@ -1,0 +1,120 @@
+{
+  "stop_minute": 10.2,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[EngineeringProbe\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "unavailable_helper_no_veto",
+      "pattern": "\\[EngineeringProbe\\] PASS unavailable_helper_no_veto",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "occupied_station_edge",
+      "pattern": "\\[EngineeringProbe\\] PASS occupied_station_edge",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[EngineeringProbe\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "least_progress",
+      "pattern": "\\[EngineeringProbe\\] PASS least_progress",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "physical_travel",
+      "pattern": "\\[EngineeringProbe\\] PASS physical_travel",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "no_early_switch",
+      "pattern": "\\[EngineeringProbe\\] PASS no_early_switch",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "unsafe_route_rejected",
+      "pattern": "\\[EngineeringProbe\\] PASS unsafe_route_rejected",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "five_minute_switch",
+      "pattern": "\\[EngineeringProbe\\] PASS five_minute_switch",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "t2_defense_built",
+      "pattern": "\\[EngineeringProbe\\] PASS t2_defense_built",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "no_t1_defense",
+      "pattern": "\\[EngineeringProbe\\] PASS no_t1_defense",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "relocation_arrived",
+      "pattern": "\\[EngineeringProbe\\] PASS relocation_arrived",
+      "scope": "any",
+      "by_minute": 10.1
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "helpers_joined",
+      "pattern": "\\[EngineeringProbe\\] PASS helpers_joined"
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "twitchers_cooperate",
+      "pattern": "\\[EngineeringProbe\\] PASS twitchers_cooperate"
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "constructors_ignore_fiends",
+      "pattern": "\\[EngineeringProbe\\] PASS constructors_ignore_fiends"
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "fiend_completed",
+      "pattern": "\\[EngineeringProbe\\] PASS fiend_completed"
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "lost_helper_replaced",
+      "pattern": "\\[EngineeringProbe\\] PASS lost_helper_replaced"
+    },
+    {
+      "by_minute": 7,
+      "scope": "any",
+      "key": "base_emergency_blocks_replacement",
+      "pattern": "\\[EngineeringProbe\\] PASS base_emergency_blocks_replacement"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[EngineeringProbe\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

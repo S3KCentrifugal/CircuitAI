@@ -1,0 +1,72 @@
+{
+  "stop_minute": 1.5,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[FerryWalk\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[FerryWalk\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "near_skips_transport",
+      "pattern": "\\[FerryWalk\\] PASS near_skips_transport",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "near_transferred",
+      "pattern": "\\[FerryWalk\\] PASS near_transferred",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "walks_before_transport",
+      "pattern": "\\[FerryWalk\\] PASS walks_before_transport",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "walking_arrival_transferred",
+      "pattern": "\\[FerryWalk\\] PASS walking_arrival_transferred",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "pickup_en_route",
+      "pattern": "\\[FerryWalk\\] PASS pickup_en_route",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "retains_wait_0",
+      "pattern": "\\[FerryWalk\\] PASS retains_wait_0",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "retains_wait_1",
+      "pattern": "\\[FerryWalk\\] PASS retains_wait_1",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "retains_wait_2",
+      "pattern": "\\[FerryWalk\\] PASS retains_wait_2",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[FerryWalk\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

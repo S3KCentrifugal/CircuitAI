@@ -159,10 +159,10 @@ static CScriptArray* CBattleAnalysis_GetTerrainRoute(CBattleAnalysis* battle, co
 
 static CScriptArray* CBattleAnalysis_GetUnitTerrainRoute(CBattleAnalysis* battle, const CCircuitDef* def,
         const AIFloat3& from, const AIFloat3& to, bool dry, float landCost, float waterCost,
-        float threatWeight, float maxWaterThreat)
+        float threatWeight, float maxWaterThreat, float exitRadius)
 {
     auto* cache=static_cast<CScriptManager::STypeInfoCache*>(asGetActiveContext()->GetEngine()->GetUserData());
-    const auto points=battle->GetUnitTerrainRoute(def,from,to,dry,landCost,waterCost,threatWeight,maxWaterThreat);
+    const auto points=battle->GetUnitTerrainRoute(def,from,to,dry,landCost,waterCost,threatWeight,maxWaterThreat,exitRadius);
     auto* array=CScriptArray::Create(cache->vec3Array,static_cast<asUINT>(points.size()));
     for (asUINT i=0;i<array->GetSize();++i) *static_cast<AIFloat3*>(array->At(i))=points[i];
     return array;
@@ -1552,7 +1552,10 @@ void CInitScript::RegisterMgr()
     r=engine->RegisterObjectMethod("CBattleAnalysis","void SetLaneFrontOptions(float, float, float, float, float)",asMETHOD(CBattleAnalysis,SetLaneFrontOptions),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float LimitLaneAdvance(float, float)",asMETHOD(CBattleAnalysis,LimitLaneAdvance),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float LaneCombatDistance(const AIFloat3& in, float)",asMETHOD(CBattleAnalysis,LaneCombatDistance),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","bool KnownEnemyNear(const AIFloat3& in, float, float)",asMETHOD(CBattleAnalysis,KnownEnemyNear),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","string DescribeLaneFront()",asMETHOD(CBattleAnalysis,DescribeLaneFront),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","float GetLaneHeldProgress()",asMETHOD(CBattleAnalysis,GetLaneHeldProgress),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","AIFloat3 GetFrontLanePoint(float) const",asMETHOD(CBattleAnalysis,GetFrontLanePoint),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","bool ArmyFrontLanesEnabled() const",asMETHOD(CBattleAnalysis,ArmyFrontLanesEnabled),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","void SetArmyFrontLanesEnabled(bool)",asMETHOD(CBattleAnalysis,SetArmyFrontLanesEnabled),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float GetFrontLaneWidth() const",asMETHOD(CBattleAnalysis,GetFrontLaneWidth),asCALL_THISCALL);ASSERT(r>=0);
@@ -1560,7 +1563,7 @@ void CInitScript::RegisterMgr()
     r=engine->RegisterObjectMethod("CBattleAnalysis","float GetFrontLaneDistance(const AIFloat3& in) const",asMETHOD(CBattleAnalysis,GetFrontLaneDistance),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","AIFloat3 GetFrontLaneGoal(const AIFloat3& in, float) const",asMETHOD(CBattleAnalysis,GetFrontLaneGoal),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","void SetFrontLaneOptions(float, float, float, bool)",asMETHOD(CBattleAnalysis,SetFrontLaneOptions),asCALL_THISCALL);ASSERT(r>=0);
-    r = engine->RegisterObjectMethod("CBattleAnalysis", "array<AIFloat3>@ GetUnitTerrainRoute(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in, bool, float, float, float, float)", asFUNCTION(CBattleAnalysis_GetUnitTerrainRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CBattleAnalysis", "array<AIFloat3>@ GetUnitTerrainRoute(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in, bool, float, float, float, float, float = 0)", asFUNCTION(CBattleAnalysis_GetUnitTerrainRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "AIFloat3 GetAirContactPos(int) const", asMETHOD(CBattleAnalysis, GetAirContactPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float GetAirContactCost(int) const", asMETHOD(CBattleAnalysis, GetAirContactCost), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "bool IsAirContactArmed(int) const", asMETHOD(CBattleAnalysis, IsAirContactArmed), asCALL_THISCALL); ASSERT(r >= 0);

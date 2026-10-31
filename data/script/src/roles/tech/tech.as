@@ -553,6 +553,7 @@ namespace RoleTech
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		Invariants::OnUnitAdded(unit);   // D-076: INV-001
+        if (FrontlineEngineering::IsFiendProduct(unit)) return; // local combat support, not factory donation quota
         if (TechHeavyRush::OnFinished(unit)) return;
         // D-158: keep the amphibious wave together; constructor donations are separate.
         if (!AmphibiousOps::Active() || unit is null || AmphibiousOps::Kind(unit.circuitDef)<0)
@@ -1003,6 +1004,21 @@ namespace RoleTech
 		string side = UnitHelpers::GetSideForUnitName(facDef.GetName());
 		const AIFloat3 pos = u.GetPos(ai.frame);
 		float metalIncome = Economy::GetMinMetalIncomeLast10s();
+        if(FrontlineEngineering::active && EngineeringReplacements::BaseEmergency()
+            && UnitHelpers::IsT2BotLab(facDef.GetName())) {
+            // Preserve the native combat selector, but close released workforce
+            // production while base defense owns the budget. Base air roles keep
+            // their ordinary priority in their own plant below.
+            array<string> workers=UnitHelpers::GetT2BotConstructors(side);
+            array<string> helpers=UnitHelpers::GetFastAssistBots(side);
+            for(uint i=0;i<workers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(workers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            for(uint i=0;i<helpers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(helpers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            return aiFactoryMgr.DefaultMakeTask(u);
+        }
 		GenericHelpers::LogUtil("[TECH][Factory] MakeTask called for factory '" + facDef.GetName() + "' (side=" + side + ")", 4);
 		// Debug: log current primary factory ids vs this unit
 		{
@@ -1650,6 +1666,7 @@ namespace RoleTech
 		bool isT1BotCtor = (UnitHelpers::GetAllT1BotConstructors().find(name) >= 0);
 		bool isT2BotCtor = UnitHelpers::IsT2BotConstructor(name);
 		bool isFastAssist = (UnitHelpers::GetAllFastAssistBots().find(name) >= 0);
+        if(isFastAssist) EngineeringReplacements::Claim(unit);
 
 		if (isT1BotCtor || isT2BotCtor || isFastAssist)
 		{
@@ -1658,6 +1675,7 @@ namespace RoleTech
 		}
 
 		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
+        FrontlineEngineering::Added(unit);
 		if (Team::IsT2Constructor(d))
 		{
 			aiFactoryMgr.isAssistRequired = false;
@@ -1666,6 +1684,7 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{ /* other bookkeeping moved to Builder::AiUnitRemoved */
+        FrontlineEngineering::Removed(unit);
         if (unit !is null) {
             EcoPlanner::conversionReasons.delete("" + unit.id);
             floatAssistReasons.delete("" + unit.id);

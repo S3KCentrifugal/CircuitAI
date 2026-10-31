@@ -39,6 +39,20 @@ public:
         if(b.enemy>0 || b.uncertain)return b.friendly>0?EXPECTED:ENEMY;
         return b.supporters>=2?SUPPORTED:UNKNOWN;
     }
+    // Continuous held-front position, not the sum of occupied bins. Unknown
+    // gaps behind demonstrated support do not reset progress. A hostile or
+    // contested interval cuts the held prefix; never count a distant raid.
+    // No friendly support evidence is unknown (-1), not a fully lost lane.
+    float HeldProgress(int frame,int hold) const {
+        float held=-1.f;
+        for(int i=0;i<count;++i) {
+            const auto state=Status(i,frame,hold);
+            if(state==ACTIVE || state==EXPECTED || state==ENEMY)
+                return held>=0?std::min(held,i*step):0.f;
+            if(state==SUPPORTED) held=(i+1)*step;
+        }
+        return held;
+    }
     // Distance along the route to the nearest independent combat interval.
     // UNKNOWN/fog and friendly occupation alone are not combat evidence.
     // O(B), B <= 128, allocation-free; callers choose their own memory window.

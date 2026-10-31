@@ -69,6 +69,8 @@ as_suites=(
 	"data/script/src/helpers/math/nuke_math.as tests/nuke_math_tests.as"
 	"data/script/src/helpers/math/heavy_rush_math.as tests/heavy_rush_math_tests.as"
 	"data/script/src/helpers/math/tech_economy_math.as tests/tech_economy_math_tests.as"
+	"data/script/src/helpers/math/ferry_math.as tests/ferry_math_tests.as"
+	"data/script/src/helpers/math/frontline_engineering_math.as tests/frontline_engineering_math_tests.as"
 	"data/script/src/helpers/math/gantry_math.as tests/gantry_math_tests.as"
 	"data/script/src/helpers/math/assist_math.as tests/assist_math_tests.as"
 	"data/script/src/helpers/math/commander_group_math.as tests/commander_group_math_tests.as"

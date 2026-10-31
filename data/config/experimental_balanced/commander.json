@@ -1,6 +1,13 @@
 // Mono-space font required
 {
 "commander": {
+    "engineering": {
+        "reassign_seconds": 300,
+        "route_threat": 0,
+        "arrival_radius": 240,
+        "route_exit_radius": 512,
+        "waypoint_radius": 64
+    },
     "defense": {
         "enabled": 1, "radius": 1800, "memory": 45, "strategic_memory": 600,
         "heavy_metal": 1200, "heavy_health": 4000, "baseline_health": 1000,

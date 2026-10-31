@@ -604,6 +604,7 @@ namespace TechBuild {
         if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
         if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108
         TechForward::Tick();   // D-109
+        FrontlineEngineering::Tick(TechForward::T2Released());
         // D-076: the T1 lab retires the moment the advanced lab is under way.
         // One state, read by every actor: production stops (Lifecycle::Retire
         // stops the unit, the factory rows return nothing), guards and the

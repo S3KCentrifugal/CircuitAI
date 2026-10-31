@@ -129,6 +129,12 @@ namespace Factory {
 		// constructor donations/recovery and spam. Checking only in the TECH
 		// delegate allowed these earlier providers to restart a retired lab.
 		if (Lifecycle::IsRetiring(u)) return null;
+        if(Global::AISettings::Role==AiRole::TECH && FrontlineEngineering::active
+            && EngineeringReplacements::BaseEmergency()) return RoleTech::Tech_FactoryAiMakeTask(u);
+        if(Global::AISettings::Role==AiRole::TECH) {
+            IUnitTask@ replacement=EngineeringReplacements::Recruit(u);
+            if(replacement !is null) return replacement;
+        }
         if(Global::AISettings::Role==AiRole::FRONT) {
             IUnitTask@ front=CommanderGroup::Recruit(u);
             if(front !is null) return front;

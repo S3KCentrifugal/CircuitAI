@@ -216,7 +216,7 @@ void CCommanderController::AssessGroupDefense(CCircuitUnit* anchor,int frame) {
     for(const auto& e:snapshot.StrategicContacts()) add(e,true);
     if(frame-ai->GetAllyTeam()->LastNuclearWarning()<defenseSettings.strategicMemory*FRAMES_PER_SEC)
         defenseDemand[dp::NUCLEAR].health=std::max(1.f,defenseDemand[dp::NUCLEAR].health);
-    if(GroupNearCombat(anchor) && defenseDemand[dp::LIGHT].health<defenseSettings.baselineHealth) {
+    if(supportAnchor<0 && GroupNearCombat(anchor) && defenseDemand[dp::LIGHT].health<defenseSettings.baselineHealth) {
         defenseDemand[dp::LIGHT].health=defenseSettings.baselineHealth;
         defenseDemand[dp::LIGHT].units=std::max(1.f,defenseDemand[dp::LIGHT].units);
     }
@@ -436,7 +436,7 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     const std::array<AIFloat3,5> offsets={AIFloat3(0,0,0),AIFloat3(192,0,0),AIFloat3(-192,0,0),AIFloat3(0,0,192),AIFloat3(0,0,-192)};
     for(const auto& offset:offsets) if(auto* task=GroupBuild(unit,def,center+offset,false,selected,best.surplus)) {
         ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f surplus=%i",def->GetDef()->GetName(),best.band,best.ready,best.score,int(best.surplus));
-        TrackGroupJob(task); defenseNext=defenseDecisionNext=0;
+        TrackGroupJob(task,supportAnchor<0); defenseNext=defenseDecisionNext=0;
         return task;
     }
     defenseReason+=" placement_blocked";
@@ -455,6 +455,9 @@ bool CCommanderController::IsGroupStructure(int id) const {
 }
 
 bool CCommanderController::GroupLaneWorkAllowed(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& at) const {
+    // Support groups travel to another team's lane. Their own AI's assigned
+    // lane is unrelated. GroupBuild still checks local threat, reach and layout.
+    if(!role.frontDuty && supportAnchor>=0) return true;
     const int frame=ai->GetLastFrame();
     // A known LRPC can mark the entire rear lane ENEMY. It must not prohibit
     // its own shield counter forever. Reuse this second's local assessment;
@@ -465,6 +468,38 @@ bool CCommanderController::GroupLaneWorkAllowed(CCircuitUnit* unit,CCircuitDef* 
         defenseSettings.enabled>0 && defenseSettings.shieldInPlasmaZone>0 && frame<defenseNext,
         (def && def->GetShieldRadius()>0) || protectedStructure,defenseDemand[dp::PLASMA].health>0,defenseLocalDanger,
         frame-unit->GetDamagedFrame()<defenseSettings.shieldSafeSeconds*FRAMES_PER_SEC);
+}
+
+IUnitTask* CCommanderController::SupportDefenseWork(CCircuitUnit* unit,int anchorId,int first,int second,int third) {
+    if(role.frontDuty) return nullptr;
+    if(anchorId<0) {
+        supportAnchor=-1;groupMembers[0]=groupMembers[1]=groupMembers[2]=-1;
+        defenseNext=defenseDecisionNext=0;
+        return nullptr;
+    }
+    if(!unit || !unit->IsFinished()) return nullptr;
+    const int frame=ai->GetLastFrame();
+    Bind bound(this,PresetOfUnit(unit->GetId()));
+    auto* anchor=ai->GetTeamUnit(anchorId);
+    if(!anchor || !anchor->IsFinished()) return nullptr;
+    if(supportAnchor!=anchorId || groupMembers[0]!=first || groupMembers[1]!=second || groupMembers[2]!=third) {
+        supportAnchor=anchorId;groupMembers[0]=first;groupMembers[1]=second;groupMembers[2]=third;
+        defenseNext=defenseDecisionNext=0;
+    }
+    if(!IsGroupMember(unit->GetId()) || control::SuspensionOf(unit,frame)!=control::Suspension::NONE
+        || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    auto* current=unit->GetTask();
+    if(current && (current->IsExternalControlled() || current->GetType()==IUnitTask::Type::PLAYER
+        || current->GetType()==IUnitTask::Type::RETREAT)) return nullptr;
+    if(unit->GetPos(frame).SqDistance2D(anchor->GetPos(frame))>SQUARE(cfg->group.radius)) return nullptr;
+    // CanAssignTo admits additional build power; it may reject an already
+    // assigned repairer once the remaining repair is small. Retain that worker.
+    if(groupJob && !groupJob->IsDead() && GroupProjectAllowed(unit,groupJob)
+        && (current==groupJob || groupJob->CanAssignTo(unit))) return groupJob;
+    if(groupJob && !groupJob->IsDead() && !groupJob->GetAssignees().empty()) return nullptr;
+    if(groupJob) groupJob->GetManager()->AbortTask(groupJob);
+    if(auto* defense=GroupPlannedDefense(unit,anchor,frame)) return defense;
+    return GroupLocalMaintenance(unit,anchor);
 }
 
 bool CCommanderController::PendingProtection(CCircuitDef* def,const AIFloat3& center) {
