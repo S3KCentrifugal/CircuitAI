@@ -40,13 +40,15 @@ def run(args, name):
     # map files drop the version, also a "_V2" one (Entrenched_Plains_V2 -> entrenched_plains.as)
     base = re.sub(r"(\s+v?[\d.]+|_v[\d.]+)$", "", name.strip(), flags=re.I).lower().replace(" ", "_")
     mf = REPO / "data" / "script" / "src" / "maps" / (base + ".as")
+    if not mf.exists():   # versioned map files (supreme_isthmus_v2_1.as)
+        mf = mf.with_name(re.sub(r"[^a-z0-9]+", "_", name.strip().lower()).strip("_") + ".as")
     extra = ["--map-file", str(mf)] if mf.exists() else []
     subprocess.run(PT + ["stage"] + common + extra + ["--dll", str(args.dll), "--map", name, "--role", "FRONT",
                    "--roles", "all", "--others", "test", "--ai-option", "profile=experimental_balanced",
                    "--game", args.game, "--speed", str(args.speed), "--minutes", str(args.minutes + 0.5),
-                   "--bonus-all", str(args.bonus), "--extra-widget", str(HERE / "lane_trail_watch.lua")], cwd=REPO, check=True)
+                   "--bonus-all", str(args.bonus), "--extra-widget", str(HERE / "lane_trail_watch.lua")] + (["--data", str(args.data)] if args.data else []) + args.stage_arg, cwd=REPO, check=True)
     w = d / "LuaUI/Widgets/lane_trail_watch.lua"
-    w.write_text(w.read_text().replace("__END_FRAME__", str(int(args.minutes * 60 * 30))))
+    w.write_text(w.read_text().replace("__END_FRAME__", str(int((args.minutes - 2) * 60 * 30))))   # the watch can stop ~1.3 min short of its stop minute
     checks = d / "lane-checks.json"
     checks.write_text(json.dumps({"stop_minute": args.minutes + 0.5, "expect": [
         {"key": "trails dumped", "pattern": r"\[LaneTrail\] END", "by_minute": args.minutes + 0.5, "scope": "any"}],
@@ -56,7 +58,8 @@ def run(args, name):
     threading.Thread(target=gantry_run.manage_priority, args=(str(args.out), stop), daemon=True).start()
     subprocess.run(PT + ["launch"] + common, cwd=REPO, check=True)
     r = subprocess.run(PT + ["watch", "--dir", str(d), "--role", "FRONT", "--minutes", str(args.minutes + 0.5),
-                        "--wall-minutes", "90", "--keep-going", "--stop-when-met", "--checks", str(checks)], cwd=REPO)
+                        "--wall-minutes", "90", "--keep-going", "--stop-when-met", "--checks", str(checks)]
+                       + (["--play-decided"] if args.play_decided else []), cwd=REPO)
     stop.set()
     with open(args.out / "summary.txt", "a") as f:
         f.write("%s %s: watch exit %d\n" % (time.strftime("%H:%M:%S"), name, r.returncode))
@@ -72,6 +75,11 @@ def main():
     ap.add_argument("--speed", type=float, default=10)
     ap.add_argument("--minutes", type=float, default=35)
     ap.add_argument("--bonus", type=int, default=60)
+    ap.add_argument("--data", type=Path, help="AI data dir to stage (default: the repo's data/), e.g. a copy with test gates")
+    ap.add_argument("--play-decided", action="store_true",
+                    help="keep playing once one side is dead (passive enemies: deathmode=neverend)")
+    ap.add_argument("--stage-arg", action="append", default=[],
+                    help="extra playtest.py stage argument, repeatable (--stage-arg=--enemies --stage-arg=prod)")
     args = ap.parse_args()
     if not args.game:
         playtest.die("no game version: pass --game 'Beyond All Reason test-...'")

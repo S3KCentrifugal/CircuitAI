@@ -12,7 +12,7 @@ end
 
 local END_FRAME = __END_FRAME__
 local STEP = 200
-local MAXPTS = 120
+local MAXPTS = 300
 local SPAM = {armpw=true, corak=true, leggob=true, armflash=true, corgator=true, leghades=true}
 local GANTRY = {corgant=true, armshltx=true, leggant=true}
 local watched = {}   -- id -> {team, def, born, pts = {x1, z1, x2, z2, ...}}
