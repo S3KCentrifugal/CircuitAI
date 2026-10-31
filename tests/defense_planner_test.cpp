@@ -61,6 +61,37 @@ int main() {
     p.buildPower=0;assert(Evaluate(r,p,e,1,0).reason==Reason::NO_BUILDER);
     r.priority=0;assert(Evaluate(r,p,e,1,0).reason==Reason::DISABLED);
     assert(std::string(Name(Reason::TOO_LATE))=="ready_too_late" && !Better(Evaluation{},good));
+    {
+        Settings s; s.enabled=1; s.surplusMetal=2000;
+        Rule r; r.def=1; r.minMetal=50; r.minEnergy=500; r.surplusPriority=4;
+        Project p{500,1000,1000,100,0,50,100,0};
+        Economy e{2001,10000,10,1000,10,100};
+        assert(Evaluate(r,p,e,0,0).reason==Reason::INCOME);
+        const auto funded=EvaluateSurplus(s,r,p,e,r.limit);
+        assert(funded.reason==Reason::READY && funded.surplus && funded.band==0);
+        e.metal=2000; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED);
+        e.metal=1999; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); e.metal=2001;
+        s.surplusMetal=0; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); s.surplusMetal=2000;
+        s.enabled=0; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); s.enabled=1;
+        assert(EvaluateSurplus(s,r,p,e,32).reason==Reason::LIMIT);
+        r.surplusPriority=0; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); r.surplusPriority=4;
+        e.energyPull=851; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::ENERGY);
+        e.energyPull=850; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::READY);
+        e.energy=624; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::ENERGY);
+        e.energy=1000; s.surplusFireSeconds=0; p.shotEnergy=801;
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::ENERGY);
+        p.shotEnergy=100; s.surplusFireSeconds=10; e.energy=1000;
+        r.seconds=6; p.buildTime=100; // 800 bank cannot pay 1000 construction + 500 reserve in six seconds
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::TOO_LATE);
+        r.seconds=90; e.energy=10000; p.buildPower=0;
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::NO_BUILDER); p.buildPower=100;
+        e.energyIncome=499; e.energyPull=0;
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::INCOME); e.energyIncome=1000;
+        auto light=r; light.surplusPriority=1;
+        assert(Better(EvaluateSurplus(s,r,p,e,0),EvaluateSurplus(s,light,p,e,0)));
+        e.metalIncome=50;
+        assert(Better(Evaluate(r,p,e,1,0),EvaluateSurplus(s,r,p,e,0)));
+    }
     Claims claims;int seen=0;
     int token=0;claims.Upsert(3,token,{30,-1,100,0,0,1});const int firstToken=token;
     claims.Upsert(3,token,{31,-1,100,0,0,1});assert(token==firstToken && token>0);

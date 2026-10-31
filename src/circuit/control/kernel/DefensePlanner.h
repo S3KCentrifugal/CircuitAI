@@ -17,12 +17,14 @@ struct Settings {
     float stableSeconds=60, stableDistance=160;
     float urgentBand=4;
     float shieldInPlasmaZone=1, shieldSafeSeconds=10;
+    float surplusMetal=0, surplusEnergyMargin=100, surplusFireSeconds=10, surplusLimit=32;
 };
 enum class Reason { READY, DISABLED, NO_BUILDER, INCOME, ENERGY, TOO_LATE, COVERED, LOW_VALUE, LIMIT };
 struct Rule {
     int def = -1, band = 2, limit = 4;
     float minMetal = 0, minEnergy = 0, seconds = 90, window = 30;
     float efficiency = .65f, valueRatio = 0, priority = 1, reserve = .2f;
+    float surplusPriority = 0;
     std::array<float, COUNT> weights{};
 };
 struct Demand {
@@ -36,7 +38,7 @@ struct Project {
     float metal = 0, energy = 0, buildTime = 0, buildPower = 0, travel = 0;
     float operatingEnergy = 0, shotEnergy = 0, warmup = 0;
 };
-struct Evaluation { Reason reason = Reason::DISABLED; float score = 0, ready = 0; int band = 0; };
+struct Evaluation { Reason reason = Reason::DISABLED; float score = 0, ready = 0; int band = 0; bool surplus = false; };
 
 inline float Confidence(float age, float memory) {
     return memory > 0 ? std::clamp(1.f - std::max(0.f, age) / memory, 0.f, 1.f) : (age <= 0 ? 1.f : 0.f);
@@ -108,6 +110,27 @@ inline Evaluation Evaluate(const Rule& r, const Project& p, const Economy& e,
 inline bool Better(const Evaluation& a, const Evaluation& b) {
     return a.reason == Reason::READY && (b.reason != Reason::READY || a.band > b.band
         || (a.band == b.band && a.score > b.score)); // ties retain catalog order
+}
+// Optional bank-funded capacity, independent of observed demand. Constant work,
+// no allocations; caller shares its existing one-second economy/worker snapshot.
+// Reserve firing energy separately so construction cannot spend the same bank.
+inline Evaluation EvaluateSurplus(const Settings& s, const Rule& r, Project p,
+    const Economy& e, int count) {
+    Evaluation v;
+    if (s.enabled <= 0 || s.surplusMetal <= 0 || e.metal <= s.surplusMetal || r.surplusPriority <= 0) return v;
+    const float firingReserve = std::max(p.shotEnergy, p.operatingEnergy * s.surplusFireSeconds);
+    if (e.energyIncome - e.energyPull < p.operatingEnergy + s.surplusEnergyMargin
+        || e.energy * (1 - r.reserve) < firingReserve) { v.reason = Reason::ENERGY; return v; }
+    Rule funded = r;
+    funded.minMetal = 0; // the bank funds this project; energy income still gates it
+    funded.limit = std::max(r.limit, int(s.surplusLimit));
+    funded.band = 0; // all demand-driven responses take precedence
+    p.energy += firingReserve;
+    v = Evaluate(funded, p, e, 1, count);
+    v.surplus = true;
+    if (v.reason == Reason::READY)
+        v.score = r.surplusPriority / (1 + v.ready / std::max(1.f, r.seconds));
+    return v;
 }
 inline int UrgencyBand(int ordinary, int urgent, bool immediate, float benefit) {
     return immediate && benefit>0?std::max(ordinary,urgent):ordinary;

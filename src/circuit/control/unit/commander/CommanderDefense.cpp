@@ -35,6 +35,8 @@ bool CCommanderController::SetDefenseRule(int slot,const std::string& key,float 
             return true;
         }
         float* field=key=="enabled"?&defenseSettings.enabled:key=="radius"?&defenseSettings.radius:
+            key=="surplus_metal"?&defenseSettings.surplusMetal:key=="surplus_energy_margin"?&defenseSettings.surplusEnergyMargin:
+            key=="surplus_fire_seconds"?&defenseSettings.surplusFireSeconds:key=="surplus_limit"?&defenseSettings.surplusLimit:
             key=="memory"?&defenseSettings.memory:key=="strategic_memory"?&defenseSettings.strategicMemory:
             key=="heavy_metal"?&defenseSettings.heavyMetal:key=="heavy_health"?&defenseSettings.heavyHealth:
             key=="baseline_health"?&defenseSettings.baselineHealth:key=="stable_seconds"?&defenseSettings.stableSeconds:
@@ -52,7 +54,7 @@ bool CCommanderController::SetDefenseRule(int slot,const std::string& key,float 
         } else {
             float* field=key=="metal"?&r.minMetal:key=="energy"?&r.minEnergy:key=="seconds"?&r.seconds:
                 key=="window"?&r.window:key=="efficiency"?&r.efficiency:key=="value_ratio"?&r.valueRatio:
-                key=="priority"?&r.priority:key=="reserve"?&r.reserve:nullptr;
+                key=="surplus_priority"?&r.surplusPriority:key=="priority"?&r.priority:key=="reserve"?&r.reserve:nullptr;
             const std::array<const char*,dp::COUNT> names={{"light","heavy","air","static","nuclear","plasma"}};
             for(int k=0;k<dp::COUNT;++k) if(key==names[k]) field=&r.weights[k];
             if(!field || (key=="reserve" && value>=1) || (key=="efficiency" && value>1)) return false;
@@ -390,12 +392,15 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
         auto capacity=DefenseCapacity(def,rule);
         if(rule.weights[dp::STATIC]>0 && anchor->GetPos(frame).SqDistance2D(defenseTargets[dp::STATIC])>SQUARE(facts.range)) capacity[dp::STATIC]=0;
         const float benefit=dp::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM());
-        auto result=dp::Evaluate(rule,DefenseProject(def,facts,builders),economy,benefit,defenseCounts[i]);
+        const auto project=DefenseProject(def,facts,builders);
+        auto result=dp::Evaluate(rule,project,economy,benefit,defenseCounts[i]);
         bool immediate=false;
         for(int k=0;k<dp::STATIC;++k) immediate=immediate || (defenseUrgent[k] && rule.weights[k]>0 && capacity[k]>0
             && dp::Residual(defenseDemand[k].health,defenseActive[k],defensePending[k])>0
             && defenseDemand[k].value>=def->GetCostM()*rule.valueRatio);
         result.band=dp::UrgencyBand(rule.band,int(defenseSettings.urgentBand),immediate,benefit);
+        const auto surplus=dp::EvaluateSurplus(defenseSettings,rule,project,economy,defenseCounts[i]);
+        if(dp::Better(surplus,result)) result=surplus;
         if(benefit>0 && result.reason!=dp::Reason::READY && rule.band>blockedBand) {
             blocked=def->GetDef()->GetName()+std::string(" ")+dp::Name(result.reason);blockedBand=rule.band;
         }
@@ -413,8 +418,11 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     if(groupNanoDue && best.band<3) return nullptr; // strategic urgency may defer, never erase, the nano obligation
     auto* def=ai->GetCircuitDefSafe(defenseRules[selected].def);
     if(!unit->GetCircuitDef()->CanBuild(def)) return nullptr; // preserve choice for the capable seat
-    if(dp::Evaluate(defenseRules[selected],DefenseProject(def,DefenseFactsFor(def),GatherDefenseBuilders(anchor)),economy,1,defenseCounts[selected]).reason!=dp::Reason::READY)
-        return nullptr;
+    const auto project=DefenseProject(def,DefenseFactsFor(def),GatherDefenseBuilders(anchor));
+    const auto admission=best.surplus
+        ?dp::EvaluateSurplus(defenseSettings,defenseRules[selected],project,economy,defenseCounts[selected])
+        :dp::Evaluate(defenseRules[selected],project,economy,1,defenseCounts[selected]);
+    if(admission.reason!=dp::Reason::READY) { defenseDecisionNext=0; return nullptr; }
     defenseOfferNext=frame+FRAMES_PER_SEC;
     const auto center=anchor->GetPos(frame);
     // Snapshot scoring is shared for one second, but a neighboring AI may
@@ -424,8 +432,8 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     // Fixed bounded sites, expensive placement only for the winning proposal.
     // Existing task placement owns reachability, lane, threat and layout claims.
     const std::array<AIFloat3,5> offsets={AIFloat3(0,0,0),AIFloat3(192,0,0),AIFloat3(-192,0,0),AIFloat3(0,0,192),AIFloat3(0,0,-192)};
-    for(const auto& offset:offsets) if(auto* task=GroupBuild(unit,def,center+offset,false,selected)) {
-        ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f",def->GetDef()->GetName(),best.band,best.ready,best.score);
+    for(const auto& offset:offsets) if(auto* task=GroupBuild(unit,def,center+offset,false,selected,best.surplus)) {
+        ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f surplus=%i",def->GetDef()->GetName(),best.band,best.ready,best.score,int(best.surplus));
         TrackGroupJob(task); defenseNext=defenseDecisionNext=0;
         return task;
     }

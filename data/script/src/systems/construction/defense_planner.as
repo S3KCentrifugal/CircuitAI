@@ -12,6 +12,7 @@ namespace DefensePlanner {
         if(def is null) return; // content availability, not an invented equivalent
         const string path="commander/defense/rules/"+key+"/";
         aiBuilderMgr.SetDefenseRule(slot,"def",float(def.id));
+        Option(slot,"surplus_priority",0,path);
         Option(slot,"band",float(band),path);Option(slot,"limit",float(limit),path);
         Option(slot,"metal",metal,path);Option(slot,"energy",energy,path);
         Option(slot,"seconds",seconds,path);Option(slot,"priority",priority,path);
@@ -28,6 +29,8 @@ namespace DefensePlanner {
         if(loaded || Global::AISettings::Role!=AiRole::FRONT) return;
         loaded=true;
         const string path="commander/defense/";
+        Option(-1,"surplus_metal",0,path); Option(-1,"surplus_energy_margin",100,path);
+        Option(-1,"surplus_fire_seconds",10,path); Option(-1,"surplus_limit",32,path);
         Option(-1,"enabled",1,path);Option(-1,"radius",1800,path);
         Option(-1,"memory",45,path);Option(-1,"strategic_memory",600,path);
         Option(-1,"heavy_metal",1200,path);Option(-1,"heavy_health",4000,path);

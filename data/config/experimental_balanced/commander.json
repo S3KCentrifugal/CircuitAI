@@ -5,12 +5,16 @@
         "enabled": 1, "radius": 1800, "memory": 45, "strategic_memory": 600,
         "heavy_metal": 1200, "heavy_health": 4000, "baseline_health": 1000,
         "stable_seconds": 60, "stable_distance": 160,
+        // Idle FRONT groups spend uncommitted metal above this bank (0 disables).
+        // Keep sustained firing headroom and a separate burst reserve.
+        "surplus_metal": 2000, "surplus_energy_margin": 100,
+        "surplus_fire_seconds": 10, "surplus_limit": 32,
         // Gates are admission policy, not a claim of optimal PvP thresholds.
         // Full project funding + operating energy + readiness still apply.
         "rules": {
-            "light": {"metal": 0, "energy": 0, "limit": 2},
-            "hlt": {"metal": 20, "energy": 500, "limit": 3},
-            "t2": {"metal": 50, "energy": 1000, "seconds": 90, "limit": 4},
+            "light": {"surplus_priority": 1, "metal": 0, "energy": 0, "limit": 2},
+            "hlt": {"surplus_priority": 2, "metal": 20, "energy": 500, "limit": 3},
+            "t2": {"surplus_priority": 4, "metal": 50, "energy": 1000, "seconds": 90, "limit": 4},
             "heavy": {"metal": 120, "energy": 2500, "seconds": 120, "value_ratio": 0.75, "limit": 3},
             "artillery": {"metal": 120, "energy": 2500, "seconds": 120, "limit": 3},
             "lrpc": {"metal": 200, "energy": 5000, "seconds": 240, "value_ratio": 1, "limit": 2},

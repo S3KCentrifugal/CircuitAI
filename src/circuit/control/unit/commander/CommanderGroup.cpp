@@ -256,7 +256,7 @@ void CCommanderController::GroupTaskFinished(IUnitTask* task,bool done) {
     const auto at=build->GetPosition();
     if(OnMap(at)) {groupNanoSite=at;++groupNanoOwed;groupNanoDue=true;}
 }
-IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site,bool nano,int defenseSlot) {
+IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site,bool nano,int defenseSlot,bool surplus) {
     if(!def || !unit->GetCircuitDef()->CanBuild(def)) return nullptr;
     if((def->GetId()==groupJammer || def->GetId()==groupJammer2)
         && ai->GetEconomyManager()->GetAvgMetalIncome()<cfg->group.jammerIncome) return nullptr;
@@ -295,7 +295,7 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
         // Check actual range/trajectory only on a returned site, not on every
         // terrain-search cell. Five proposal sites bound the expensive work.
         const auto capacity=DefenseCapacity(def,rule,&at);
-        if(defense::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM())<=0) return nullptr;
+        if(!surplus && defense::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM())<=0) return nullptr;
     }
     ai->LOG("[CommanderGroup] unit=%i build=%s nano=%i x=%.0f z=%.0f",unit->GetId(),def->GetDef()->GetName(),int(nano),at.x,at.z);
     return builder->Enqueue(TaskB::Common(type,IBuilderTask::Priority::HIGH,def,at,0.f,true,60*FRAMES_PER_SEC));

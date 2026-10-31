@@ -410,7 +410,7 @@ private:
     IUnitTask* GroupAssist(CCircuitUnit* commander);
     IUnitTask* StartedCommanderConstruction(CCircuitUnit* unit) const;
     bool GroupTaskFunded(IUnitTask* task) const;
-    IUnitTask* GroupBuild(CCircuitUnit* unit, CCircuitDef* def, const springai::AIFloat3& site, bool nano=false, int defenseSlot=-1);
+    IUnitTask* GroupBuild(CCircuitUnit* unit, CCircuitDef* def, const springai::AIFloat3& site, bool nano=false, int defenseSlot=-1, bool surplus=false);
     void UpdateCommanderGroup();
     struct Threat {
         commander::Point pos,velocity;
