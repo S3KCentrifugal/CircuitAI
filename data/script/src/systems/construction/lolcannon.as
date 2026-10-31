@@ -1716,10 +1716,12 @@ namespace LolCannon {
     // ---------------------------------------------------------------- the cover
 
     // The cover's slot for def d centred on `base`: the nearest spot round it that
-    // reserves (rings of the def's pitch, up to 3 out), else `base` itself, unpinned.
-    void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g)
+    // reserves (rings of the def's pitch, up to 3 out, along side/fwd), else `base`
+    // itself, unpinned. With `ahead`, only spots nearer the enemy start than the cannon
+    // (by 64) are taken (Scylla test 2026-10-31: a ring slide put a heavy porc behind it).
+    void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead)
     {
-        const AIFloat3 side = Layout::Side(facing), fwd = Layout::Fwd(facing);
+        const float limit = (ahead && siteTarget.x >= 0.0f) ? site.distance2D(siteTarget) - 64.0f : -1.0f;
         const float step = AiMax(LolCannonMath::Pitch(Layout::Across(d, facing)), LolCannonMath::Pitch(Layout::Along(d, facing))) + 16.0f;
         const float w = float(AiTerrainWidth()), h = float(AiTerrainHeight());
         for (int r = 0; r <= 3; ++r) {
@@ -1728,6 +1730,7 @@ namespace LolCannon {
                     if (AiMax(a, -a) != r && AiMax(b, -b) != r) continue;   // the ring only
                     const AIFloat3 q = At(base, side, float(a) * step, fwd, float(b) * step);
                     if (q.x < 64.0f || q.z < 64.0f || q.x > w - 64.0f || q.z > h - 64.0f) continue;
+                    if (limit >= 0.0f && q.distance2D(siteTarget) > limit) continue;
                     if (!aiTerrainMgr.CanReserveBuilding(d, q, facing)) continue;
                     const int id = aiTerrainMgr.ReserveBuilding(d, q, facing);
                     if (id < 0) continue;
@@ -1762,6 +1765,21 @@ namespace LolCannon {
         const float stripHalfL = (st is null) ? 0.0f : float(sr) * LolCannonMath::Pitch(Layout::Along(st, f)) * 0.5f;
         const float front = AiMax(gunHalfL, AiMax(blockHalfL, stripHalfL)) + 32.0f;
         const AIFloat3 side = Layout::Side(f), fwd = Layout::Fwd(f);
+        // the shields and the heavy porc go out along the true line to the enemy start,
+        // spread across it (Scylla test 2026-10-31: spread across the cardinal facing, with
+        // the start 40 degrees off it, one heavy porc stood further from the start than the
+        // cannon). `front` / cos keeps them clear of the cannon's, block's and strip's front edge.
+        AIFloat3 tFwd = fwd, tSide = side;
+        float cosT = 1.0f;
+        if (siteTarget.x >= 0.0f) {
+            const float dx = siteTarget.x - site.x, dz = siteTarget.z - site.z, len = sqrt(dx * dx + dz * dz);
+            if (len > 1.0f) {
+                tFwd = AIFloat3(dx / len, 0.0f, dz / len);
+                tSide = AIFloat3(-tFwd.z, 0.0f, tFwd.x);
+                cosT = AiMax(0.7f, tFwd.x * fwd.x + tFwd.z * fwd.z);
+            }
+        }
+        const float frontT = front / cosT;
         // the reservations need the layout on (FRONT runs none: switched on for this only)
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
         if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) {
@@ -1770,13 +1788,13 @@ namespace LolCannon {
         CCircuitDef@ shield = ExtraDef(0);
         CCircuitDef@ porc = ExtraDef(1);
         CCircuitDef@ flak = ExtraDef(2);
-        float shieldAhead = front;
+        float shieldAhead = frontT;
         if (shield !is null) {
             const float half = LolCannonMath::Pitch(Layout::Along(shield, f)) * 0.5f;
-            shieldAhead = front + half;
+            shieldAhead = frontT + half;
             const int n = ExtraWanted(0);
             for (int k = 0; k < n; ++k)
-                PlaceExtra(shield, At(site, side, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraShieldSpread / float(n - 1) : 0.0f), fwd, shieldAhead), 0);
+                PlaceExtra(shield, At(site, tSide, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraShieldSpread / float(n - 1) : 0.0f), tFwd, shieldAhead), 0, tSide, tFwd, true);
             shieldAhead += half;
         }
         if (porc !is null) {
@@ -1784,13 +1802,13 @@ namespace LolCannon {
             const float along = shieldAhead + Global::LolCannon::ExtraPorcAhead + half;
             const int n = ExtraWanted(1);
             for (int k = 0; k < n; ++k)
-                PlaceExtra(porc, At(site, side, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraPorcSpread / float(n - 1) : 0.0f), fwd, along), 1);
+                PlaceExtra(porc, At(site, tSide, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraPorcSpread / float(n - 1) : 0.0f), tFwd, along), 1, tSide, tFwd, true);
         }
         if (flak !is null) {
             const float half = LolCannonMath::Pitch(Layout::Along(flak, f)) * 0.5f;
             const int n = ExtraWanted(2);
             for (int k = 0; k < n; ++k)
-                PlaceExtra(flak, At(site, side, LolCannonMath::Offset(k, n, 160.0f), fwd, -(front + half)), 2);
+                PlaceExtra(flak, At(site, side, LolCannonMath::Offset(k, n, 160.0f), fwd, -(front + half)), 2, side, fwd, false);
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
         for (int g = 0; g < 3; ++g)
@@ -1963,6 +1981,7 @@ namespace LolCannon {
         for (uint i = 0; i < doneSites.length(); ++i) {
             if (aiBuilderMgr.FindOwnNear(doneSites[i], 96.0f, gun) !is null) continue;
             site = doneSites[i]; facing = doneFacings[i];
+            siteTarget = doneTargets[i];   // the cover faces the start this cannon was sited against
             array<AIFloat3> tc, sc;
             Slots(gun, nano, st, site, facing, 1.0f, tc, sc, blockCentre, stripCentre);
             const array<AIFloat3> tp = First(tc, TurretsWanted()), sp = First(sc, StoresNeeded());
