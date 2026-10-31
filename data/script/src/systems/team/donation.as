@@ -10,6 +10,7 @@
 #include "../presentation/widget_link.as"
 #include "ferry.as"
 #include "../../manager/economy.as"
+#include "../../helpers/math/front_tech_math.as"
 
 /******************************************************************************
 
@@ -82,6 +83,23 @@ namespace Donation {
     // ---- requester side
     int requestsSent = 0;
     int lastRequestFrame = -1;
+    bool planLoaded = false;
+    bool constructorPlanned = false;
+
+    bool HasConstructorPlan() {
+        // One persistent read per AI lifetime, not per factory/builder ask.
+        if (!planLoaded) {
+            constructorPlanned = aiTerrainMgr.GetLayoutInt("donation.constructor.planned", 0) != 0;
+            planLoaded = true;
+        }
+        return constructorPlanned;
+    }
+
+    bool FrontFactoryAllowed() {
+        if (Global::AISettings::Role != AiRole::FRONT) return true;
+        return FrontTechMath::FactoryAllowed(true, HasConstructorPlan(),
+            Economy::GetMinMetalIncomeLast10s(), Global::RoleSettings::Front::DeliveredConstructorT2FactoryIncome);
+    }
 
     bool IsEnabled() { return Global::ConstructorRequest::Enabled; }
 
@@ -396,6 +414,13 @@ namespace Donation {
             return true;
         }
         if (p[1] == "ack") {
+            Team::Roster::Entry@ donor = Team::Roster::Get(fromTeamId);
+            const bool planned = FrontTechMath::RememberPlan(HasConstructorPlan(), requestsSent > 0,
+                donor !is null && donor.role == AiRole::TECH && fromTeamId != ai.teamId);
+            if (planned && !constructorPlanned) {
+                constructorPlanned = true;
+                aiTerrainMgr.SetLayoutInt("donation.constructor.planned", 1);
+            }
             GenericHelpers::LogUtil("[Team][Donation] team " + fromTeamId + " (TECH) is building our constructor", 1);
             return true;
         }

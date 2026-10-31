@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <limits>
 
 namespace circuit {
 using springai::AIFloat3;
@@ -282,15 +283,34 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
         if(!nano) return nullptr; // each completed defense earns its own new nano
     }
     const auto center=anchor->GetPos(frame);
-    const auto coverage=GroupJammerCoverage(unit,def,site,160.f);
+    const bool jammer=def->GetId()==groupJammer || def->GetId()==groupJammer2;
+    const auto coverage=GroupJammerCoverage(unit,def,site,jammer?cfg->group.radius:160.f);
     CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
-        return GroupBuildSiteAllowed(unit,def,p) && GroupLaneWorkAllowed(unit,def,p)
-            && coverage.NearUnjammed({p.x,p.z},cfg->group.jammerEdge)
+        return coverage.Allows({p.x,p.z})
+            && GroupBuildSiteAllowed(unit,def,p) && GroupLaneWorkAllowed(unit,def,p)
             && p.SqDistance2D(center)<=SQUARE(cfg->group.radius)
             && ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat
             && ai->GetTerrainManager()->CanReachAtSafe2(unit,p,unit->GetCircuitDef()->GetBuildDistance());
     };
-    const auto at=ai->GetTerrainManager()->FindBuildSite(def,site,160.f,0,admit);
+    AIFloat3 at=-RgtVector;
+    if(!jammer) at=ai->GetTerrainManager()->FindBuildSite(def,site,160.f,0,admit);
+    else {
+        if(!coverage.persistent) return nullptr;
+        // Five deterministic, bounded neighbourhoods. Rank their legal sites by
+        // useful coverage and soft radius-relative spacing, not discovery order.
+        const auto direction=commander::Normal(coverage.probes[2].point-coverage.probes[1].point);
+        const commander::Point side{-direction.z,direction.x};
+        const float offset=std::min(cfg->group.radius*.65f,coverage.radius*.6f);
+        const std::array<commander::Point,5> offsets={commander::Point{},direction*offset,direction*(-offset),side*offset,side*(-offset)};
+        float best=-std::numeric_limits<float>::infinity();
+        for(const auto& delta:offsets) {
+            AIFloat3 proposal(site.x+delta.x,site.y,site.z+delta.z);
+            const auto candidate=ai->GetTerrainManager()->FindBuildSite(def,proposal,80.f,0,admit);
+            if(!OnMap(candidate)) continue;
+            const float score=coverage.Score({candidate.x,candidate.z});
+            if(score>best) {best=score;at=candidate;}
+        }
+    }
     if(!OnMap(at)) return nullptr;
     if(defenseSlot>=0) {
         const auto& rule=defenseRules[defenseSlot];
@@ -302,7 +322,14 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
         if(!surplus && defense::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM())<=0) return nullptr;
     }
     ai->LOG("[CommanderGroup] unit=%i build=%s nano=%i x=%.0f z=%.0f",unit->GetId(),def->GetDef()->GetName(),int(nano),at.x,at.z);
-    return builder->Enqueue(TaskB::Common(type,IBuilderTask::Priority::HIGH,def,at,0.f,true,60*FRAMES_PER_SEC));
+    auto* task=builder->Enqueue(TaskB::Common(type,IBuilderTask::Priority::HIGH,def,at,0.f,true,60*FRAMES_PER_SEC));
+    if(jammer && task) {
+        task->ReserveDefenseIntent(); // publish before the next ally asks
+        ai->LOG("[CommanderJammerPlan] unit=%i def=%s gain=%.3f critical=%i claims=%u x=%.0f z=%.0f",
+            unit->GetId(),def->GetDef()->GetName(),coverage.Gain({at.x,at.z}),
+            int(coverage.CriticalGap({at.x,at.z})),unsigned(coverage.infrastructure.size()),at.x,at.z);
+    }
+    return task;
 }
 IUnitTask* CCommanderController::StartedCommanderConstruction(CCircuitUnit* unit) const {
     if(!unit || !Handles(unit) || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;

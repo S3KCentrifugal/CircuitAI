@@ -127,6 +127,7 @@ public:
 	float GetCostE() const { return cost.energy; }
 
 	virtual void SetBuildPos(const springai::AIFloat3& pos);
+    void ReserveDefenseIntent();
 	const springai::AIFloat3& GetBuildPos() const { return buildPos; }
 	const springai::AIFloat3& GetPosition() const { return geom::is_valid(buildPos) ? buildPos : position; }
 

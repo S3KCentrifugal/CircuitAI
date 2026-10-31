@@ -72,6 +72,8 @@ as_suites=(
 	"data/script/src/helpers/math/gantry_math.as tests/gantry_math_tests.as"
 	"data/script/src/helpers/math/assist_math.as tests/assist_math_tests.as"
 	"data/script/src/helpers/math/commander_group_math.as tests/commander_group_math_tests.as"
+	"data/script/src/helpers/math/front_tech_math.as tests/front_tech_math_tests.as"
+	"data/script/src/helpers/math/front_energy_math.as tests/front_energy_math_tests.as"
 	"data/script/src/helpers/math/transport_math.as tests/transport_math_tests.as"
 	"data/script/src/helpers/math/scout_raid_math.as tests/scout_raid_math_tests.as"
 	"data/script/src/helpers/common/collection_helpers.as tests/collection_helpers_tests.as --dictionary"

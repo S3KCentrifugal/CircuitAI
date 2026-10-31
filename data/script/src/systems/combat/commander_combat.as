@@ -97,7 +97,11 @@ namespace CommanderCombat {
             Option("decoy_health_recover",.95f);
             Option("decoy_front_cloak_income",0.f);
             Option("health_shot_seconds",2.f);
-            Option("commander_group_jammer_edge",100.f);
+            Option("commander_group_jammer_edge",0.f);
+            Option("commander_group_jammer_gain",.25f);
+            Option("commander_group_jammer_spacing",.6f);
+            Option("commander_group_jammer_hold",10.f);
+            Option("commander_group_jammer_outage",60.f);
             Option("commander_group_jammer_income",25.f);
             Option("commander_group_defence_metal",50.f);
             Option("commander_group_defence_energy",1000.f);

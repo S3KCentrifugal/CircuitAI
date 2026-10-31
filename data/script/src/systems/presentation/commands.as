@@ -594,6 +594,7 @@ namespace Commands {
         const bool openerScoutQueued = FrontOpener::WasQueued("scout");
         const bool openerBatchQueued = FrontOpener::WasQueued("batch");
         Layout::OnRoleLeave();
+        FrontEnergy::Release(); // remove only our availability overlay before DefState restores caps
         if (openerScoutQueued) FrontOpener::MarkQueued("scout");
         if (openerBatchQueued) FrontOpener::MarkQueued("batch");
         TechWeapons::OnRoleLeave();   // D-126

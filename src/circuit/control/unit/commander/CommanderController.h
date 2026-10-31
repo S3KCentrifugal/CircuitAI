@@ -13,7 +13,7 @@
 #include "control/kernel/CommanderCombat.h"
 #include "control/kernel/CommanderFortification.h"
 #include "control/kernel/CommanderGroupWork.h"
-#include "control/kernel/CommanderJammerCoverage.h"
+#include "control/kernel/CommanderJammerPlan.h"
 #include "control/kernel/CommanderPosture.h"
 #include "control/kernel/DefensePlanner.h"
 #include "spring/RouteCommand.h"
@@ -199,7 +199,8 @@ struct CommanderCloakConfig {
 };
 struct CommanderGroupConfig {
     float defenceMetal=50,defenceEnergy=1000,budgetSeconds=30,budgetFraction=.25f,mexUpgrade=1;
-    float jammerEdge=100,jammerIncome=25;
+    float jammerEdge=0,jammerIncome=25;
+    float jammerGain=.25f,jammerSpacing=.6f,jammerHold=10,jammerOutage=60;
     float mexPriority=3,radarPriority=2,linePriority=1;
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
@@ -313,9 +314,8 @@ public:
     bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
     bool GroupSiteAllowed(CCircuitUnit* unit,const springai::AIFloat3& site) const;
     bool GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const springai::AIFloat3& site) const;
-    commander::JammerCoverage GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
+    commander::JammerPlan GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
         const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr);
-    float GroupJammerMargin() const { return cfg->group.jammerEdge; }
     bool RetreatStation(CCircuitUnit* unit,springai::AIFloat3& goal) const;
     float GetReserve() const { return reserve; }
     float GetDeficit() const;
@@ -469,6 +469,8 @@ private:
     std::vector<int> jammerIds;
     std::vector<float> jammerRadii;
     void InitJammerRadii();
+    commander::JammerDemandMemory jammerDemand;
+    std::map<int,commander::JammerOutage> jammerOutages;
     bool HealthControl(CCircuitUnit* unit,State& s,int frame);
     struct JamZone { commander::Point center; float radius; };
     std::vector<JamZone> jamZones;
