@@ -13,6 +13,7 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "Log.h"
+#include "terrain/BattleAnalysis.h"
 #include <limits>
 #include "task/common/WaitTask.h"
 
@@ -37,17 +38,47 @@ void CCommanderController::InitJammerRadii() {
     }
 }
 
-commander::JammerCoverage CCommanderController::GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
+commander::JammerPlan CCommanderController::GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
     const AIFloat3& center,float searchRadius,const IUnitTask* ignore) {
-    Bind bound(this,PresetOfUnit(unit?unit->GetId():-1)); // D-388: this unit's preset
-    if(!role.frontDuty || !role.frontReady || !def || (def->GetId()!=groupJammer && def->GetId()!=groupJammer2)
-        || (!IsGroupMember(unit->GetId()) && !Handles(unit))) return commander::JammerCoverage{};
+    Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
+    commander::JammerPlan plan;
+    if(!unit || !role.frontDuty || !role.frontReady || !def || (def->GetId()!=groupJammer && def->GetId()!=groupJammer2)
+        || (!IsGroupMember(unit->GetId()) && !Handles(unit))) return plan;
     InitJammerRadii();
-    std::vector<commander::JammerCoverage::Disc> discs;
-    // Include every disc intersecting any candidate's margin neighbourhood.
-    // Fresh membership and sensor state; immutable radii alone are cached.
-    // Own unstarted jobs and allied frames reserve space, never safety cover.
-    const float radius=maxJammerRadius+searchRadius+cfg->group.jammerEdge;
+    plan.enabled=true;plan.radius=jammerRadii[def->GetId()];
+    plan.minimumGain=cfg->group.jammerGain;plan.spacing=cfg->group.jammerSpacing;plan.inward=cfg->group.jammerEdge;
+    auto* anchor=GroupCommander();
+    if(!anchor) return plan;
+    const int frame=ai->GetLastFrame();
+    const auto anchorPos=anchor->GetPos(frame);
+    // Stable demand, not the current mobile jammer location, drives construction.
+    // Accepted jobs keep their commitment during movement/revalidation.
+    plan.persistent=ignore || jammerDemand.Stable(P(anchorPos),frame,int(cfg->group.jammerHold*FRAMES_PER_SEC),128.f);
+    auto* battle=ai->GetBattle();
+    if(battle->GetFrontLaneLength()<=0) return plan;
+    const float progress=battle->GetFrontLaneProgress(anchorPos);
+    const float step=std::min(cfg->group.radius,plan.radius*.65f);
+    const auto rear=battle->GetFrontLanePoint(progress-step);
+    const auto front=battle->GetFrontLanePoint(progress+step);
+    Point axis=P(front)-P(rear);
+    const float length=commander::Length(axis);
+    axis=length>0?axis*(1.f/length):Point{0,1};
+    const Point side{-axis.z,axis.x};
+    const float width=std::min(battle->GetFrontLaneWidth()*.5f,plan.radius*.35f);
+    plan.probes[0]={P(anchorPos),3,true};
+    plan.probes[1]={P(rear),2,true};
+    plan.probes[2]={P(front),2,false};
+    size_t index=3;
+    for(const auto& at:{rear,anchorPos,front}) for(float sign:{-1.f,1.f})
+        plan.probes[index++]={P(at)+side*(width*sign),1,false};
+    // A committed local structure (or the latest defense awaiting its nano)
+    // supplies an actual construction point in addition to the lane samples.
+    const auto* project=dynamic_cast<const IBuilderTask*>(groupJob);
+    const auto work=project?project->GetPosition():groupNanoSite;
+    if(OnMap(work) && work.SqDistance2D(anchorPos)<=SQUARE(cfg->group.radius))
+        plan.probes[8]={P(work),2,true};
+    // Include coverage of every probe AND candidate, not just the proposed center.
+    const float radius=maxJammerRadius+searchRadius+cfg->group.radius+plan.radius;
     const auto ids=ai->GetCallback()->GetFriendlyUnitIdsIn(center,radius,false);
     const auto* ignoredBuild=dynamic_cast<const IBuilderTask*>(ignore);
     const auto* ignoredTarget=ignoredBuild?ignoredBuild->GetTarget():nullptr;
@@ -56,18 +87,31 @@ commander::JammerCoverage CCommanderController::GroupJammerCoverage(CCircuitUnit
         const int definition=ai->GetCallback()->Unit_GetDefId(id);
         if(definition<=0 || size_t(definition)>=jammerRadii.size() || jammerRadii[definition]<=0) continue;
         auto* ally=ai->GetFriendlyUnit(id);
-        if(!ally || (!ally->GetUnit()->IsBeingBuilt() && !ai->GetUnitAPI()->IsActiveSensor(id))) continue;
-        discs.push_back({P(ally->GetPos(ai->GetLastFrame())),jammerRadii[definition]});
+        if(!ally || ally->GetCircuitDef()->IsMobile()) continue;
+        const bool reserved=jammerOutages[id].Reserve(ai->GetUnitAPI()->IsActiveSensor(id),
+            ally->GetUnit()->IsBeingBuilt(),definition,frame,int(cfg->group.jammerOutage*FRAMES_PER_SEC));
+        const commander::JammerPlan::Disc disc{P(ally->GetPos(frame)),jammerRadii[definition]};
+        if(reserved) plan.infrastructure.push_back(disc);
+        else plan.unavailable.push_back(disc);
     }
+    for(auto it=jammerOutages.begin();it!=jammerOutages.end();)
+        if(it->second.seen!=frame) it=jammerOutages.erase(it);else ++it;
+    // Own claims exclude the exact retrying task. Other owners' accepted
+    // claims use the existing shared spatial ledger and task lifecycle.
     for(auto* task:ai->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::DEFENCE)) {
         auto* definition=task->GetBuildDef();
-        if(task==ignore || task->IsDead() || !definition || task->GetTarget()) continue;
+        if(task==ignore || task->IsDead() || !definition) continue;
         const int id=definition->GetId();
         if(id<=0 || size_t(id)>=jammerRadii.size() || jammerRadii[id]<=0
             || task->GetPosition().SqDistance2D(center)>radius*radius) continue;
-        discs.push_back({P(task->GetPosition()),jammerRadii[id]});
+        plan.infrastructure.push_back({P(task->GetPosition()),jammerRadii[id]});
     }
-    return commander::JammerCoverage(std::move(discs));
+    ai->GetAllyTeam()->GetDefenseClaims().Nearby(center.x,center.z,radius,frame,[&](int owner,const defense::Claim& c) {
+        if(owner==ai->GetTeamId() || c.def<=0 || size_t(c.def)>=jammerRadii.size() || jammerRadii[c.def]<=0) return;
+        plan.infrastructure.push_back({{c.x,c.z},jammerRadii[c.def]});
+    });
+    plan.Prepare();
+    return plan;
 }
 
 bool CCommanderController::Jammed(CCircuitUnit* unit) {

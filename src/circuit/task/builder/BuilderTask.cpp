@@ -395,7 +395,7 @@ bool IBuilderTask::TryBuildCachedSite(CCircuitUnit* unit)
         || !circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) return false;
     if(!circuit->GetCommanderController()->GroupMayBuild(unit,buildDef,buildPos)) return false;
     const auto coverage=circuit->GetCommanderController()->GroupJammerCoverage(unit,buildDef,buildPos,0.f,this);
-    if(!coverage.NearUnjammed({buildPos.x,buildPos.z},circuit->GetCommanderController()->GroupJammerMargin())) return false;
+    if(!coverage.Allows({buildPos.x,buildPos.z})) return false;
     const auto exclusions=circuit->GetCommanderController()->DefenceExclusions(unit,buildDef,buildPos,0.f,this);
     if(!commander::DefenceSpaced({buildPos.x,buildPos.z},exclusions)) return false;
     TRY_UNIT(circuit, unit,
@@ -583,6 +583,11 @@ void IBuilderTask::Activate()
 void IBuilderTask::Deactivate()
 {
 	lastTouched = -1;
+}
+
+void IBuilderTask::ReserveDefenseIntent()
+{
+    manager->GetCircuit()->GetCommanderController()->SyncDefenseClaim(this,defenseClaim);
 }
 
 void IBuilderTask::RefreshBuildSiteClaim()
@@ -1077,7 +1082,7 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control](const AIFloat3& p) {
 		return commander::DefenceSpaced({p.x,p.z},exclusions)
             && control->GroupBuildSiteAllowed(builder,buildDef,p)
-            && coverage.NearUnjammed({p.x,p.z},control->GroupJammerMargin())
+            && coverage.Allows({p.x,p.z})
             && manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
             && terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
@@ -1384,6 +1389,7 @@ bool IBuilderTask::Load(std::istream& is)
 	target = circuit->GetTeamUnit(targetId);
 	position = AIFloat3(positionF3);
 	buildPos = AIFloat3(buildPosF3);
+    ReserveDefenseIntent();
 
 	if ((target == nullptr) && (buildDef != nullptr) && geom::is_valid(buildPos)) {
 		RefreshBuildSiteClaim();

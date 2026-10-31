@@ -371,7 +371,7 @@ dp::Project CCommanderController::DefenseProject(CCircuitDef* def,const DefenseF
     return p;
 }
 
-IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame) {
+IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand) {
     if(defenseSettings.enabled<=0) return nullptr;
     AssessGroupDefense(anchor,frame);
     auto* eco=ai->GetEconomyManager();
@@ -414,7 +414,9 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     defenseEvaluation=best;
     defenseReason=selected<0?blocked:ai->GetCircuitDefSafe(defenseRules[selected].def)->GetDef()->GetName();
     }
-    if(selected<0 || frame<defenseOfferNext) return nullptr;
+    // The priority probe and ordinary fallback reuse the same cached assessment
+    // and winner. Reject below-band offers before capability/site/claim work.
+    if(selected<0 || best.band<minimumBand || frame<defenseOfferNext) return nullptr;
     if(groupNanoDue && best.band<3) return nullptr; // strategic urgency may defer, never erase, the nano obligation
     auto* def=ai->GetCircuitDefSafe(defenseRules[selected].def);
     if(!unit->GetCircuitDef()->CanBuild(def)) return nullptr; // preserve choice for the capable seat
@@ -487,14 +489,16 @@ bool CCommanderController::PendingProtection(CCircuitDef* def,const AIFloat3& ce
 void CCommanderController::SyncDefenseClaim(IBuilderTask* build,int& token) {
     auto& claims=ai->GetAllyTeam()->GetDefenseClaims();
     auto* def=build?build->GetBuildDef():nullptr;
+    InitJammerRadii();
+    const float jamRadius=def && size_t(def->GetId())<jammerRadii.size()?jammerRadii[def->GetId()]:0;
     if(!def || build->IsDead() || def->IsMobile() || !OnMap(build->GetPosition())
-        || (!def->HasSurfToLand() && !def->HasSurfToAir() && def->GetShieldRadius()<=0 && !def->IsAttrStock())) {
+        || (!def->HasSurfToLand() && !def->HasSurfToAir() && def->GetShieldRadius()<=0 && !def->IsAttrStock() && jamRadius<=0)) {
         if(token) claims.Erase(ai->GetTeamId(),token);
         token=0;return;
     }
     const auto at=build->GetPosition();
     const auto& facts=DefenseFactsFor(def);
     claims.Upsert(ai->GetTeamId(),token,{def->GetId(),build->GetTarget()?build->GetTarget()->GetId():-1,
-        std::numeric_limits<int>::max(),at.x,at.z,std::max(facts.range,facts.coverage),def->GetCostM(),def->GetCostE()});
+        std::numeric_limits<int>::max(),at.x,at.z,std::max({facts.range,facts.coverage,jamRadius}),def->GetCostM(),def->GetCostE()});
 }
 }
