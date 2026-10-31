@@ -56,6 +56,9 @@ namespace CommanderCombat {
                     if(name==own) front=true;
                 }
             }
+            Option("commander_group_combat_distance",1000.f);
+            Option("commander_group_combat_memory",30.f);
+            Option("commander_group_radius",600.f);
             Option("enabled",Global::Commander::Enabled?1.f:0.f);
             Option("advance",front?1.f:0.f);
             aiBuilderMgr.SetCommanderCombatOption("front_duty",(role==int(AiRole::FRONT) && front)?1.f:0.f);
@@ -86,17 +89,32 @@ namespace CommanderCombat {
             Option("front_radar_spacing",500.f);
             Option("front_mex_los",0.f);
             Option("cloak_energy_retreat",0.f);
-            Option("fog_cloak_distance",600.f);
-            Option("fog_cloak_income",500.f);
             Option("cloak_retreat_distance",600.f);
             Option("health_retreat",.4f);
+            Option("decoys",1.f);
+            Option("decoy_bait",1.f);
+            Option("decoy_health_retreat",.9f);
+            Option("decoy_health_recover",.95f);
+            Option("decoy_front_cloak_income",0.f);
             Option("health_shot_seconds",2.f);
-            Option("commander_group_jammer_edge",100.f);
+            Option("commander_group_jammer_edge",0.f);
+            Option("commander_group_jammer_gain",.25f);
+            Option("commander_group_jammer_spacing",.6f);
+            Option("commander_group_jammer_hold",10.f);
+            Option("commander_group_sensor_defense_band",3.f);
+            Option("commander_group_jammer_outage",60.f);
             Option("commander_group_jammer_income",25.f);
+            Option("commander_group_defence_metal",50.f);
+            Option("commander_group_defence_energy",1000.f);
+            Option("commander_group_budget_seconds",30.f);
+            Option("commander_group_budget_fraction",.25f);
+            Option("commander_group_mex_upgrade",1.f);
             Option("commander_group_mex_priority",3.f);
             Option("commander_group_radar_priority",2.f);
             Option("commander_group_line_priority",1.f);
             Option("front_mex_defence",0.f);
+            Option("front_mex_min_income",0.f);
+            Option("front_mex_base_radius",Global::RoleSettings::Front::AllyRange);
             Option("front_line_enabled",0.f);
             Option("front_line_fog",1000.f);
             Option("front_fortify_bank",.5f);
@@ -157,6 +175,7 @@ namespace CommanderCombat {
             Option("fallback_group_radius",Global::Commander::FallbackGroupRadius);
             Option("fallback_offset",Global::Commander::FallbackOffset);
             Option("fallback_search",Global::Commander::FallbackSearch);
+            Option("fallback_prepare_seconds",Global::Commander::FallbackPrepareSeconds);
             Option("fallback_hold_seconds",Global::Commander::FallbackHoldSeconds);
             Option("fallback_porc_range",Global::Commander::FallbackPorcRange);
             Option("sensor_memory",Global::Commander::SensorMemory);

@@ -19,7 +19,7 @@ namespace CoverageLanes {
     bool assistEnabled=true;
     float assistThreat=3.f, assistAhead=1200.f;
     int assistSeconds=90;
-    int nextTick=0;
+    int nextTick=0, nextFront=0;
     string frontKey;
     string routeStatus="waiting", proposalStatus="none";
     // D-357: the corridor this AI last announced to its allies (re-sent when
@@ -65,6 +65,9 @@ namespace CoverageLanes {
         assistSeconds=aiSetupMgr.ConfigInt("coverage/assist_seconds",90);
         laneSpacing=aiSetupMgr.ConfigFloat("field/corridors/lane_spacing",768.f);
         aiBattle.SetFrontLaneOptions(advance,rangeSlack,baseRadius,defendFollows);
+        aiBattle.SetLaneFrontOptions(aiSetupMgr.ConfigFloat("coverage/front_horizon",0.f),
+            aiSetupMgr.ConfigFloat("coverage/front_memory",20.f),aiSetupMgr.ConfigFloat("coverage/front_ratio",1.5f),
+            aiSetupMgr.ConfigFloat("coverage/front_margin",128.f),aiSetupMgr.ConfigFloat("coverage/front_minimum_cost",100.f));
         GenericHelpers::LogUtil("[CoverageLane] enabled="+enabled+" advance="+int(advance)+" range_slack="+int(rangeSlack)
             +" base_radius="+int(baseRadius)+" defend_follows_lane="+defendFollows+" claim="+claim
             +" assist="+assistEnabled+" assist_threat="+assistThreat+" assist_ahead="+int(assistAhead)+" assist_seconds="+assistSeconds,1);
@@ -606,6 +609,8 @@ namespace CoverageLanes {
         }
         payload+=";"+aiBuilderMgr.DescribeCommanderFront(Builder::commander is null?-1:Builder::commander.id);
         payload+=";"+routeStatus+";"+proposalStatus;
+        payload+=";"+aiBattle.DescribeLaneFront();
+        payload+=";"+aiBuilderMgr.DescribeDefense();
         WidgetLink::SetState("strategy",WidgetLink::Line("strategy",payload));
     }
     void Clear() {
@@ -623,6 +628,10 @@ namespace CoverageLanes {
         if(!enabled || Global::AISettings::Role!=AiRole::FRONT) {
             if(frontPublished)Clear();
             return;
+        }
+        if(frontPublished && ai.frame>=nextFront) {
+            nextFront=ai.frame+SECOND;
+            WidgetLink::SetState("lane_front",WidgetLink::Line("lane_front",""+assignmentRevision+";"+aiBattle.DescribeLaneFront()));
         }
         if(ai.frame<nextTick || ai.frame<(2+ai.teamId%16)*SECOND)return;
         nextTick=ai.frame+10*SECOND;

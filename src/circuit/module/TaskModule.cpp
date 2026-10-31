@@ -1,3 +1,4 @@
+#include "task/builder/CommanderGroupFollowTask.h"
 /*
  * TaskModule.cpp
  *
@@ -207,3 +208,10 @@ void ITaskModule::Update()
 }
 
 } // namespace circuit
+
+namespace circuit {
+IUnitTask* ITaskModule::EnqueueGroupFollow(int target,float radius,bool guard,const springai::AIFloat3& goal) {
+    auto* task=new CCommanderGroupFollowTask(this,target,radius,guard,goal);
+    updateTasks.push_back(task);TaskAdded(task);return task;
+}
+}

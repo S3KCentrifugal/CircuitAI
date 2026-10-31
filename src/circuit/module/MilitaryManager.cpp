@@ -1433,9 +1433,12 @@ void CMilitaryManager::FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions, boo
 	outPositions.clear();
     // D-354/D-356: on a published corridor the lane goal is the front for
     // attack leaders; the advance and the defend opt-in come from coverage.json.
-    const auto* battle=circuit->GetBattle();
+    auto* battle=circuit->GetBattle();
     if(!unit->GetCircuitDef()->IsAbleToFly() && battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
-        const auto goal=battle->GetFrontLaneGoal(unit->GetPos(circuit->GetLastFrame()),battle->GetFrontLaneAdvance());
+        const auto pos=unit->GetPos(circuit->GetLastFrame());
+        const float from=battle->GetFrontLaneProgress(pos);
+        const float goalProgress=battle->LimitLaneAdvance(from,from+battle->GetFrontLaneAdvance());
+        const auto goal=battle->GetFrontLaneGoal(pos,goalProgress-from);
         if(circuit->GetTerrainManager()->CanReachAt(unit,goal,64)) {outPositions.push_back(goal);return;}
     }
 
@@ -2413,9 +2416,7 @@ IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)
 	if (cdef->IsRoleTrans()) {
 		task = Enqueue(TaskF::Common(IFighterTask::FightType::FERRY));
 	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
-
 		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
-
 	} else if (cdef->IsRoleSupport()) {
 		if (!HasRangedUnits() && /*cdef->IsAttacker() && */GetTasks(IFighterTask::FightType::ATTACK).empty() && GetTasks(IFighterTask::FightType::DEFEND).empty()) {
 			task = Enqueue(TaskF::Defend(IFighterTask::FightType::ATTACK, IFighterTask::FightType::SUPPORT, minAttackers));

@@ -31,4 +31,27 @@ namespace OwnedEconomy {
     }
     array<Id>@ Extractors() { Refresh(); return extractors; }
     array<Id>@ Geothermal() { Refresh(); return geothermal; }
+
+    // O(M) over the revision-maintained extractor subset, not all owned units
+    // per builder. Read completion/position live; ownership changes invalidate
+    // Refresh. A remembered coordinate is not evidence of an upgradeable mex.
+    CCircuitUnit@ NearestUpgradeTarget(CCircuitUnit@ worker, const CCircuitDef@ upgrade,
+            const AIFloat3& in center, float radius) {
+        if (worker is null || upgrade is null || radius <= 0.0f) return null;
+        array<Id>@ ids = Extractors();
+        const AIFloat3 from = worker.GetPos(ai.frame);
+        float best = 3.402823466e+38F;
+        CCircuitUnit@ chosen = null;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ unit = ai.GetTeamUnit(ids[i]);
+            if (unit is null || unit.GetBuildProgress() < 1.0f
+                || unit.circuitDef.GetExtractsMetal() >= upgrade.GetExtractsMetal()) continue;
+            const AIFloat3 pos = unit.GetPos(ai.frame);
+            const float distance = MapHelpers::SqDist(from, pos);
+            if (distance >= best || MapHelpers::SqDist(center, pos) > radius * radius) continue;
+            best = distance;
+            @chosen = unit;
+        }
+        return chosen;
+    }
 }

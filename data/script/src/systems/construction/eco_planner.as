@@ -790,10 +790,9 @@ namespace EcoPlanner {
         if (key == "mexup") {
             if (MetalEconomy::Active()) return aiEconomyMgr.EnqueueFieldUpgrade(u, Global::Map::StartPos, MetalEconomy::HomeRadius);
             CCircuitDef@ t2mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
-            AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, t2mex);
-            if (t2mex is null || at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, t2mex, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, t2mex,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "t2lab") {
             // The site is the layout's call (D-069): the pair's slot or the

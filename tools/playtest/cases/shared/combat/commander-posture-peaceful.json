@@ -1,0 +1,63 @@
+{
+  "name": "commander-posture-peaceful",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "TACTICAL",
+  "description": "D-389: a peaceful commander near fog with energy income above 500 (a supplied fusion) never cloaks; the per-minute cloak log shows no cloak energy. Replaces commander-fog-cloak (D-380).",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4300,
+      4000
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "commander_initial": true,
+  "enemy_commander_home": true,
+  "enemy_destination": [
+    4700,
+    4000
+  ],
+  "camera": [
+    4400,
+    4000,
+    1200
+  ],
+  "photos": [
+    23,
+    28,
+    40
+  ],
+  "min_spawn_spacing": 60,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "observation_frames": 3,
+  "groups": [
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3200,
+        4000
+      ],
+      "after_seconds": 20
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_kills": 0,
+    "min_damage": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-posture-peaceful",
+  "start_energy": 1000000,
+  "storage_scenario": "cmd-posture-peace",
+  "energy_retreat_observation": false,
+  "remove_units_after_seconds": 70,
+  "remove_unit_name": "armfus"
+}

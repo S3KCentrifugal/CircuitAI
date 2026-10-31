@@ -101,6 +101,9 @@ namespace LayoutHelpers {
     // Setup: run the role's plan once, after its caps and porc chain are in.
     void ApplyForRole()
     {
+        // Share ordinary sites without enabling factory packing or a role plan.
+        aiTerrainMgr.SetBuildSiteReservations(Global::AISettings::Role == AiRole::FRONT
+            || Global::AISettings::Role == AiRole::TACTICAL);
         RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
         if (cfg is null || cfg.LayoutPlanHandler is null) {
             GenericHelpers::LogUtil("[Layout] no plan for this role; placement is the native spiral", 2);

@@ -808,12 +808,12 @@ namespace TechChain
                     && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), d) == 0) s.exhausted = true;
                 return null;
             }
-            // Eligibility is separate from exhaustion: blocked mexes still
-            // count toward rush prerequisites and are reconsidered next ask.
-            at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, d);
-            if (at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, d,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            // Never manufacture a position-only task: native admission checks
+            // ownership, tier, live reachability and concurrent spot claims.
+            // Rejection must let the income ladder consider energy instead.
+            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "nano") {
             // A distant mex worker must not own a no-frame turret reservation
@@ -1234,6 +1234,8 @@ namespace TechChain
         // T2 mex upgrades first: the cheapest metal there is
         CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
         if (moho !is null && u.circuitDef.CanBuild(moho)) {
+            // Income steps are not concrete definitions in Tick's cap lift.
+            if (moho.maxThisUnit <= moho.count) moho.maxThisUnit = moho.count + 1;
             Step tmp("moho", DefFor("moho"), 99);
             IUnitTask@ t = Order(i, @tmp, moho, u);
             if (t !is null) { Trace("mex upgrade", i, s, have, u); return t; }

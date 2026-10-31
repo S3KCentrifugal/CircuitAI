@@ -174,8 +174,13 @@ const std::vector<Unit*>& COOAICallback::GetNeutralUnitsIn(const AIFloat3& pos, 
 {
 	float pos_posF3[3];
 	pos.LoadInto(pos_posF3);
-	unitIds.resize(MAX_UNITS);
-	int size = sAICallback->getNeutralUnitsIn(skirmishAIId, pos_posF3, radius, spherical, unitIds.data(), MAX_UNITS);
+	// Same reusable bounded-query contract as friendlies/enemies. Placement
+	// needs neutral nanoframes; do not zero MAX_UNITS for a small local result.
+	const auto result=queriedUnitIds.Read(MAX_UNITS,[&](int* output,int capacity) {
+		return sAICallback->getNeutralUnitsIn(skirmishAIId,pos_posF3,radius,spherical,output,capacity);
+	});
+	unitIds.assign(result.begin(),result.end());
+	const int size=static_cast<int>(unitIds.size());
 
 	units.resize(size);
 	for (int i = 0; i < size; ++i) {

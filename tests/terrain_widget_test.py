@@ -41,6 +41,9 @@ class TerrainWidgetTest(unittest.TestCase):
             io={open=function() return {read=function() return fixture end,close=function() end} end}
         ''')
         source = (ROOT / 'tools/widgets/gui_barb_team_link.lua').read_text(encoding='utf-8')
+        widget_source = (ROOT/'tools/widgets/gui_barb_team_link.lua').read_text(encoding='utf-8')
+        metrics = widget_source.split('-- BEGIN DIALOG METRICS',1)[1].split('-- END DIALOG METRICS',1)[0]
+        self.lua.globals().dialogUI = self.lua.execute(metrics+'\nreturn dialogUI')
         self.lua.execute('assert(loadstring(...))', source)
         chunk = source.split('local field = (function()', 1)[1].split('-- Strategic landmarks', 1)[0]
         # The trailing separator is a comment; evaluate the module in isolation.
@@ -218,6 +221,17 @@ class TerrainWidgetTest(unittest.TestCase):
         saved=self.api.GetConfig()
         self.api=self.lua.execute(self.chunk);self.api.Config(saved);self.ready()
         self.assertEqual(self.api.GetConfig()['preset'],'Saved 1')
+
+    def test_dialog_grows_at_high_resolution_and_stays_on_screen(self):
+        sizes=[]
+        for width,height in ((1280,720),(1920,1080),(2560,1440),(3840,2160)):
+            self.lua.execute(f'gl.GetViewSizes=function()return {width},{height} end')
+            self.api.DrawScreen()
+            r=self.api.ButtonRect('view_terrain')
+            self.assertGreaterEqual(r[1],0);self.assertGreaterEqual(r[2],0)
+            self.assertLessEqual(r[3],width);self.assertLessEqual(r[4],height)
+            sizes.append(r[4]-r[2])
+        self.assertGreater(sizes[-1],sizes[1]*1.9)
 
     def test_resized_panel_keeps_controls_and_reset_reachable(self):
         self.configure(view='positions',inspect=True,advanced=True,debug=True,

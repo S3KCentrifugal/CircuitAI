@@ -36,6 +36,7 @@
 		"footprint_width": 64,        // a corridor narrower than this at its choke is specialist: no FRONT seat, no mex lane
 		"band": 384,                  // elmos around a found route penalised before the next search
 		"lane_spacing": 768,          // D-360: elmos between side-by-side lanes inside one passage; a passage holds round(extent / spacing) lanes, at most its narrowest extent / (spacing / 2)
+		"distance_cost": 0.08,       // base travel cost + 1/(clearance+1); 0 restores clearance-only detours
 		"lane_max": 4                 // lanes a passage may hold at most; 1 keeps one lane per passage
 	},
 

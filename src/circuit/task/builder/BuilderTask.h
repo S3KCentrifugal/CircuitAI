@@ -72,6 +72,7 @@ protected:
 	IBuilderTask(ITaskModule* mgr, Type type, BuildType buildType);  // Load
 public:
 	virtual ~IBuilderTask();
+	virtual void ClearRelease() override;
 
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void AssignTo(CCircuitUnit* unit) override;
@@ -126,6 +127,7 @@ public:
 	float GetCostE() const { return cost.energy; }
 
 	virtual void SetBuildPos(const springai::AIFloat3& pos);
+    void ReserveDefenseIntent();
 	const springai::AIFloat3& GetBuildPos() const { return buildPos; }
 	const springai::AIFloat3& GetPosition() const { return geom::is_valid(buildPos) ? buildPos : position; }
 
@@ -194,9 +196,13 @@ public:
 	void RequireReservation() { pinRequired = true; pinnedReservation = -1; layoutOwned = true; }
 	bool IsLayoutOwned() const { return layoutOwned; }
 	int GetReservationId() const { return reservationId; }
+    void RefreshBuildSiteClaim();
 	// Called by the existing watchdog, only for script-opted-in roles.
 	void RecoverConstruction(CCircuitUnit* unit, int retryFrames, int releaseFrames);
 protected:
+    int buildSiteClaim = 0; // transient, reconstructed after load; not a planned slot
+    int defenseClaim = 0; // allied capability/budget claim; released at manager ownership boundary
+    bool BuildAtSite(CCircuitUnit* unit, int options, int timeout);
 	bool AdoptStandingFrame(CCircuitUnit* unit);
 	bool TryBuildCachedSite(CCircuitUnit* unit);
 	std::map<CCircuitUnit*, construction::Observation> constructionHealth;

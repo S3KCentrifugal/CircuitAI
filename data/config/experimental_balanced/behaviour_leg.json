@@ -13,6 +13,7 @@
 		"behaviour": {
 			"legcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,
@@ -784,6 +785,8 @@
 			},
 			"legdecom": {
 				"role": ["builder"],
+				"attribute": ["commander"],
+				"controller": "commander",
 				"buildspeed": 6.0,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1165,5 +1168,3 @@
 			}
 		}
 	}
-	
-	

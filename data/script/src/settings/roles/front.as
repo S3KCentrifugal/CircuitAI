@@ -112,6 +112,9 @@ namespace Front {
             // If total T2 labs (bot + vehicle) < 1 and metal income >= this, FRONT will attempt to build one.
             float MinimumMetalIncomeForFirstT2Lab = 50.0f;
             float MinimumMetalIncomeForT2Lab = 40.0f;
+            // Permanent admission floor once TECH acknowledges a constructor plan.
+            // Uses the existing ten-second minimum income; no plan keeps defaults.
+            float DeliveredConstructorT2FactoryIncome = 40.0f;
             float MinimumEnergyIncomeForT2Lab = 2000.0f;
             float RequiredMetalCurrentForT2Lab = 200.0f;
 
@@ -129,6 +132,9 @@ namespace Front {
             float MinimumMetalIncomeForFUS = 40.0f; 
             float MinimumEnergyIncomeForFUS = 1200.0f;
             float MaxEnergyIncomeForFUS = 4000.0f;
+            // Hard AFUS admission floors, unlike native energy-table preferences.
+            float MinimumMetalIncomeForAFUS = 70.0f;
+            float MinimumEnergyIncomeForAFUS = 4000.0f;
         }
 }
 }

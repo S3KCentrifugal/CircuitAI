@@ -1,0 +1,62 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "lane",
+      "pattern": "\\[LaneFrontProbe\\] route accepted",
+      "scope": "any",
+      "by_minute": 0.2
+    },
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "fallback",
+      "pattern": "\\[CommanderFallback\\] unit=(?P<unit>\\d+) on metal=",
+      "scope": "any",
+      "by_minute": 0.7
+    },
+    {
+      "key": "local",
+      "pattern": "\\[CommanderFallback\\] unit=(?P<unit>\\d+) line porc=-1 goal=4000,5\\d{3} .*source=lane",
+      "scope": "any",
+      "same_as": "fallback",
+      "by_minute": 0.8
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "home",
+      "pattern": "\\[CommanderFallback\\].* goal=\\d+,4\\d{3} ",
+      "scope": "any"
+    },
+    {
+      "key": "commander_lost",
+      "pattern": "\\[RangedArena\\].* death id=\\d+ team=0 unit=armcom",
+      "scope": "any"
+    }
+  ]
+}
