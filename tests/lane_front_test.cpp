@@ -3,6 +3,20 @@
 #include <iostream>
 using circuit::lane::Front;
 int main() {
+    { Front f; f.Reset(4096); f.Add(512,768,100,false);
+      assert(f.HeldProgress(100,90)==0); }
+    {
+        Front held;held.Reset(4096);
+        assert(held.HeldProgress(0,90)<0);
+        held.Add(512,768,100,true);held.Add(512,768,100,true);
+        assert(held.HeldProgress(0,90)==896);
+        held.Add(3000,3200,100,true);held.Add(3000,3200,100,true);
+        held.Add(1500,1700,100,false);
+        assert(held.HeldProgress(0,90)==896);
+        held.Reset(4096);held.Add(0,2000,100,true);held.Add(0,2000,100,true);
+        held.Damage(1000,30);
+        assert(held.HeldProgress(60,90)==896);
+    }
     Front f;f.Reset(4096);
     assert(f.Status(0,0,90)==Front::UNKNOWN);
     f.Add(500,800,100,true);

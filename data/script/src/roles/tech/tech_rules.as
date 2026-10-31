@@ -19,6 +19,7 @@
 #include "tech_fortifications.as"
 #include "tech_flank.as"
 #include "../../systems/world/lanes.as"
+#include "../../systems/construction/frontline_engineering.as"
 
 /******************************************************************************
 
@@ -272,6 +273,7 @@ namespace TechRules {
     }
     IUnitTask@ DoLandRecall(Ctx@ c)     { return TechForward::Recall(c.u); }       // D-109
     IUnitTask@ DoDefendMexes(Ctx@ c)    { return TechForward::DefendMexes(c.u); }  // D-109
+    IUnitTask@ DoEngineering(Ctx@ c) { return FrontlineEngineering::Work(c.u); }
     IUnitTask@ DoForwardT1(Ctx@ c)      { return TechForward::ForwardT1(c.u, c.mi); }   // D-109
     IUnitTask@ DoT1Turret(Ctx@ c)       { return Layout::NanoTask(c.u, Task::Priority::HIGH); }   // D-105
     // D-105, D-289: a turret with nothing high-priority in reach assists the
@@ -288,6 +290,10 @@ namespace TechRules {
     IUnitTask@ DoGantryNanos(Ctx@ c)   { return TechGantry::NanoFirstWork(c.u); }   // GantryNanoFirst (owner, 2026-10-26)
     IUnitTask@ DoGantryScale(Ctx@ c)   { return TechGantryScale::Work(c.u); }    // D-288
     IUnitTask@ DoKeepCurrent(Ctx@ c)    { return TechBuild::KeepCurrent(c.u); }
+    IUnitTask@ DoEconomySupport(Ctx@ c) { return Layout::EconomySupport(c.u); }
+    IUnitTask@ DoAirReactor(Ctx@ c) {
+        return UnitHelpers::IsAirConstructor(c.u.circuitDef) ? TechBuild::AssistAfus(c.u) : null;
+    }
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
     IUnitTask@ DoCompactSupport(Ctx@ c) { return c.draining ? null : CompactEco::SupportTask(c.u); }
@@ -484,6 +490,9 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
+        table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));
+        table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors finish the shared advanced fusion before discretionary work"));
+        table.insertLast(Rule("engineering.front", MOBILE, W1(@T2LandReleased), @DoEngineering, "Released T2 bots and fast assistants reinforce the least-progressed reachable FRONT lane"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));
         if (Global::Map::Config.TechCompactEconomy)
@@ -496,7 +505,6 @@ namespace TechRules {
         table.insertLast(Rule("air.flex",          CON_T2,       W0(), @DoAirFlexible,  "D-107: the other T2 air constructors: advanced converters while energy overflows, the advanced fusion going up when the converters cannot stay on"));
         table.insertLast(Rule("defence.fortify", CONSTRUCTORS, W0(), @DoDefence, "D-152: lane walls after base build power, or T2 resource protection, within the fortification budget"));
         table.insertLast(Rule("weapons.cluster",   CONSTRUCTORS, W0(), @DoWeaponsCluster, "D-126: from +200 metal, within the weapon budget: the highest-priority weapon cluster's next slot (kill zone, air defence, artillery, long range, coast, the super cannon's escort)"));
-        table.insertLast(Rule("fwd.t2.defend",     CON_T2,       W2(@LandCon, @T2LandReleased), @DoDefendMexes, "D-109: the T2 air constructors are up: T2 land constructors defend the mex clusters, long-range AA then flak"));
         table.insertLast(Rule("fwd.t1",            CON_T1,       W2(@LandCon, @T1LandReleased), @DoForwardT1,   "D-109: more than 5 T1 air constructors: T1 land constructors build the spam cluster forward (labs, their turrets, AA, pads)"));
         table.insertLast(Rule("opening.mex",       COMMANDER,    W1(@OpeningPending), @DoOpening,      "the nearest OpeningMexCap mexes within OpeningMexRadius"));
         table.insertLast(Rule("lab.t1.reclaim",    MOBILE,       W1(@IntoT2), @DoReclaimT1Lab, "the advanced lab is under way: every builder in range reclaims the T1 lab"));

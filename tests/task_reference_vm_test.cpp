@@ -22,6 +22,8 @@ void GetTask(asIScriptGeneric* call) {
     if (unitTask) unitTask->AddRef();
     call->SetReturnAddress(unitTask);
 }
+void BorrowTask(asIScriptGeneric* call) { call->SetReturnAddress(unitTask); }
+void CheckOwnerReference(asIScriptGeneric*) { assert(unitTask && unitTask->GetRefCount()==1); }
 void Replace(asIScriptGeneric* call) {
     Task* managerTask = call->GetArgByte(0) ? static_cast<Task*>(new BuilderTask) : new Task;
     circuit::AssignOwnedReference(unitTask, managerTask);
@@ -43,6 +45,8 @@ int main() {
     }
     assert(engine->RegisterObjectMethod("Task", "BuilderTask@ opCast()", asFUNCTION(CastBuilder), asCALL_GENERIC) >= 0);
     assert(engine->RegisterGlobalFunction("Task@ GetTask()", asFUNCTION(GetTask), asCALL_GENERIC) >= 0);
+    assert(engine->RegisterGlobalFunction("Task@+ BorrowTask()", asFUNCTION(BorrowTask), asCALL_GENERIC) >= 0);
+    assert(engine->RegisterGlobalFunction("void CheckOwnerReference()", asFUNCTION(CheckOwnerReference), asCALL_GENERIC) >= 0);
     assert(engine->RegisterGlobalFunction("void Replace(bool)", asFUNCTION(Replace), asCALL_GENERIC) >= 0);
     assert(engine->RegisterGlobalFunction("void Clear()", asFUNCTION(Clear), asCALL_GENERIC) >= 0);
     assert(engine->RegisterGlobalFunction("void Check(bool)", asFUNCTION(Check), asCALL_GENERIC) >= 0);
@@ -52,6 +56,10 @@ int main() {
             Task@ empty;
             Check(cast<BuilderTask>(empty) is null);
             Replace(false);
+            // Support callbacks return borrowed manager tasks. Temporary calls
+            // must not consume the owner reference, even across many ticks.
+            for(int i=0;i<100;++i) Check(BorrowTask() !is null);
+            CheckOwnerReference();
             Task@ ordinary = GetTask();
             Check(cast<BuilderTask>(ordinary) is null);
             Replace(true);

@@ -370,8 +370,9 @@ namespace AirLayout {
     {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
-        // Every AIR caller, including shared growth, must respect retirement.
-        if (!MetalEconomy::Active() && AirEconomy::CompletedAfus() > 0 && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
+        // Final admission guard covers recovery, shared growth and direct callers.
+        // Live completed reactors permit bootstrap power again if every reactor dies.
+        if (AirEconomy::HasReactor() && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
             || d.GetName() == UnitHelpers::GetSolarNameForSide(side)
             || d.GetName() == UnitHelpers::GetAdvSolarNameForSide(side))) return null;
         if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
@@ -453,7 +454,7 @@ namespace AirLayout {
     }
     IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority, float walkRadius = 0.0f)
     {
-        if (!MetalEconomy::Active() && (AirEconomy::CompletedAfus() > 0 || AirReclaim::Allowed())) return null;
+        if (AirEconomy::HasReactor()) return null;
         if (UnitHelpers::IsCommander(u.circuitDef)) {
             IUnitTask@ t = WindPass(u, d, priority, true);
             if (t !is null || (AirEconomy::CompletedConstructors() > 0 && walkRadius <= 0.0f)) return t;

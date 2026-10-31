@@ -644,6 +644,20 @@ float CBattleAnalysis::LimitLaneAdvance(float from,float goal) {
     return laneFront.Limit(from,goal,laneFrontMargin,laneFrontRatio,circuit->GetLastFrame(),90);
 }
 
+bool CBattleAnalysis::KnownEnemyNear(const AIFloat3& from,float radius,float memorySeconds) {
+    if(!std::isfinite(radius) || radius<=0 || !std::isfinite(memorySeconds)) return false;
+    const int frame=circuit->GetLastFrame();
+    auto& snapshot=circuit->GetAllyTeam()->GetCombatSnapshot();snapshot.Want(frame);
+    // A missing observation cannot clear a production emergency safely.
+    if(snapshot.Frame()<0 || frame-snapshot.Frame()>60) return true;
+    const int memory=int(std::clamp(memorySeconds,0.f,120.f)*FRAMES_PER_SEC);
+    bool found=false;
+    snapshot.Query({from.x,from.z},radius,[&](const CCombatSnapshot::Entry& e) {
+        const float dx=e.pos.x-from.x,dz=e.pos.z-from.z;
+        if((e.los || e.radar || frame-e.lastObserved<=memory) && dx*dx+dz*dz<=radius*radius) found=true;
+    });
+    return found;
+}
 float CBattleAnalysis::LaneCombatDistance(const AIFloat3& from,float memorySeconds) {
     UpdateLaneFront();
     if(laneFrontHorizon<=0 || !laneFront.count || !std::isfinite(from.x) || !std::isfinite(from.z))
@@ -679,6 +693,14 @@ std::string CBattleAnalysis::DescribeLaneFront() {
     return out.str();
 }
 
+float CBattleAnalysis::GetLaneHeldProgress() {
+    UpdateLaneFront();
+    const int frame=circuit->GetLastFrame();
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    if(laneFrontHorizon<=0 || observed<0 || frame-observed>60) return -1.f;
+    return laneFront.HeldProgress(frame,90);
+}
+
 float CBattleAnalysis::GetFrontLaneDistance(const AIFloat3& p) const {
     if(frontLaneDistance.empty())return 0.f;
     return frontLaneDistance[Cell(p)];
@@ -696,9 +718,9 @@ AIFloat3 CBattleAnalysis::GetFrontLaneGoal(const AIFloat3& from,float advance) c
 
 std::vector<AIFloat3> CBattleAnalysis::GetUnitTerrainRoute(const CCircuitDef* def,
         const AIFloat3& from, const AIFloat3& to, bool dry, float landCost,
-        float waterCost, float threatWeight, float maxWaterThreat)
+        float waterCost, float threatWeight, float maxWaterThreat, float exitRadius)
 {
-    return UnitTerrainRoute(def, from, to, dry, landCost, waterCost, threatWeight, maxWaterThreat, nullptr, 0.f);
+    return UnitTerrainRoute(def, from, to, dry, landCost, waterCost, threatWeight, maxWaterThreat, nullptr, 0.f, exitRadius);
 }
 
 std::vector<AIFloat3> CBattleAnalysis::SafeAirRoute(const AIFloat3& from, const AIFloat3& to,
@@ -829,7 +851,7 @@ std::vector<AIFloat3> CBattleAnalysis::GetUnitRaidRoute(const CCircuitDef* def,
 
 std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
         const AIFloat3& from, const AIFloat3& to, bool dry, float landCost,
-        float waterCost, float threatWeight, float maxWaterThreat, const Grid* hazard, float hazardValue)
+        float waterCost, float threatWeight, float maxWaterThreat, const Grid* hazard, float hazardValue, float exitRadius)
 {
     performance::Scope routeScope(circuit, performance::UNIT_ROUTE);
     EnsureGrid();
@@ -908,7 +930,9 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
             circuit->LOG("[INVARIANT] INV-176 retained unit terrain differs from refresh");
     }
     // Endpoints must connect to their grid centres; never snap over a cliff.
-    if (!corridor(from,CellPos(Cell(from))) || !corridor(CellPos(Cell(to)),to)) return {};
+    const bool originConnected=corridor(from,CellPos(Cell(from)));
+    exitRadius=std::isfinite(exitRadius)?std::clamp(exitRadius,0.f,1024.f):0.f;
+    if ((!originConnected && exitRadius<=0) || !corridor(CellPos(Cell(to)),to)) return {};
     auto& threat = unitRouteThreat;
     {
     performance::Scope threatScope(circuit, performance::UNIT_ROUTE_THREAT);
@@ -920,6 +944,7 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
     }
     // Exclude allied structures; the engine still resolves mobile traffic.
     auto& obstacles = unitRouteObstacles;
+    std::vector<std::array<float,4>> localFootprints;
     {
     performance::Scope obstacleScope(circuit, performance::UNIT_ROUTE_OBSTACLES);
     obstacles.assign(height.size(),0);
@@ -929,6 +954,9 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
         if (building==nullptr || building->IsMobile()) continue;
         const auto p=kv.second->GetPos(frame);
         const float r=std::max(building->GetDef()->GetXSize(),building->GetDef()->GetZSize())*SQUARE_SIZE*0.5f+halfWidth+cellSize*0.5f;
+        const float fineRadius=r-cellSize*.5f+2.f;
+        if(exitRadius>0 && std::abs(p.x-from.x)<=exitRadius+fineRadius && std::abs(p.z-from.z)<=exitRadius+fineRadius)
+            localFootprints.push_back({p.x-fineRadius,p.z-fineRadius,p.x+fineRadius,p.z+fineRadius});
         for (int z=std::max(0,int((p.z-r)/cellSize));z<=std::min(gh-1,int((p.z+r)/cellSize));++z)
             for (int x=std::max(0,int((p.x-r)/cellSize));x<=std::min(gw-1,int((p.x+r)/cellSize));++x)
                 obstacles[z*gw+x]=1;
@@ -937,14 +965,45 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
     std::vector<int> cells;
     {
         performance::Scope searchScope(circuit, performance::UNIT_ROUTE_SEARCH);
-        cells=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
+        if(originConnected) cells=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
             L_AMPH,threat,landCost,waterCost,threatWeight,maxWaterThreat,&obstacles,&unitRouteWorkspace,0);
     }
     // Same inputs and ordered route oracle; deliberately excluded from timing.
-    if (verify) {
+    if (verify && exitRadius<=0) {
         const auto expected=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
             L_AMPH,threat,landCost,waterCost,threatWeight,maxWaterThreat,&obstacles);
         if (cells!=expected) circuit->LOG("[INVARIANT] INV-176 unit route scratch differs from fresh search");
+    }
+    if(cells.empty() && exitRadius>0 && !obstacles[Cell(to)]) {
+        // D-419 opt-in only: coarse building dilation can seal a builder in
+        // open ground. One full goal field, not one search per exit candidate.
+        // O(G log G + K*(local footprints + fine corridor)), bounded K by the
+        // requested radius. Fresh footprints share the existing obstacle scan.
+        lane::Solver solver(t,laneSettings);
+        auto& ws=unitRouteWorkspace;
+        if(solver.PointRoute({to.x,to.y,to.z},{to.x,to.y,to.z},L_AMPH,threat,
+            landCost,waterCost,threatWeight,maxWaterThreat,&obstacles,&ws,0).empty()) return {};
+        solver.DijkstraMulti({Cell(to)},ws.penalty,L_AMPH,nullptr,ws.distance,ws.previous,
+            true,0.f,&ws.blocked,0.f,true,nullptr,-1,&ws.search);
+        int best=-1;float nearest=exitRadius*exitRadius;
+        const int radius=int(std::ceil(exitRadius/cellSize));
+        const int ox=Cell(from)%gw,oz=Cell(from)/gw;
+        for(int z=std::max(0,oz-radius);z<=std::min(gh-1,oz+radius);++z)
+            for(int x=std::max(0,ox-radius);x<=std::min(gw-1,ox+radius);++x) {
+                const int cell=z*gw+x;const auto point=CellPos(cell);
+                const float distance=point.SqDistance2D(from);
+                if(obstacles[cell] || !ws.search.Seen(cell) || distance>=nearest || !corridor(from,point)) continue;
+                bool clear=true;
+                for(const auto& box:localFootprints)
+                    if(!lane::SegmentOutsideBox(from.x,from.z,point.x,point.z,box[0],box[1],box[2],box[3])) {clear=false;break;}
+                if(clear) {best=cell;nearest=distance;}
+            }
+        for(size_t steps=0;best>=0 && steps<height.size();++steps) {
+            cells.push_back(best);
+            if(best==Cell(to)) break;
+            best=ws.previous[best];
+        }
+        if(cells.empty() || cells.back()!=Cell(to)) return {};
     }
     if (cells.empty()) return {};
     std::vector<AIFloat3> result;

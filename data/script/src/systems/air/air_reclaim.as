@@ -17,43 +17,47 @@ namespace AirReclaim {
             } else if (jobs[i].task is null || jobs[i].task.IsDead()) jobs.removeAt(i);
         }
     }
-    bool Allowed(bool advanced = false)
+    bool Allowed()
     {
-        if (MetalEconomy::Active()) {
-            MetalEconomy::Read();
-            return MetalEconomy::dense && AirEconomy::HasReactor() && !aiEconomyMgr.isEnergyStalling
-                && MetalMath::RetirePower(AirEconomy::energy, float(jobs.length() + 1) * 75.0f,
-                    aiEconomyMgr.energy.pull, MetalEconomy::goal, .1f);
-        }
-        if (!AirEconomy::HasReactor() || AirEconomy::recovery || aiEconomyMgr.isEnergyStalling) return false;
-        const string side = Global::AISettings::Side;
-        const float wind = AiMax(0.0f, AiMin(25.0f, (ai.GetWindMin() + ai.GetWindMax()) * 0.5f));
-        const float t1 = AirEconomy::Count(UnitHelpers::GetWindNameForSide(side)) * wind
-            + AirEconomy::Count(UnitHelpers::GetSolarNameForSide(side)) * 20.0f;
-        const float adv = advanced ? AirEconomy::Count(UnitHelpers::GetAdvSolarNameForSide(side)) * 75.0f : 0.0f;
-        return ProductionMath::LowTierEnergyReclaim(AirEconomy::CompletedAfus() > 0, AirEconomy::energy - t1,
-            adv, aiEconomyMgr.energy.pull, advanced ? Global::RoleSettings::Tech::ReclaimAdvSolarMargin : Global::RoleSettings::Tech::ReclaimT1EnergyMargin);
+        return AirEconomy::HasReactor() && !AirEconomy::recovery && !aiEconomyMgr.isEnergyStalling;
+    }
+    float Output(CCircuitUnit@ unit) {
+        const string name=unit.circuitDef.GetName();
+        const string side=UnitHelpers::GetSideForUnitName(name);
+        if(name==UnitHelpers::GetWindNameForSide(side))
+            return AiMax(0.0f,AiMin(25.0f,(ai.GetWindMin()+ai.GetWindMax())*0.5f));
+        return aiEconomyMgr.GetEnergyMake(unit.circuitDef);
+    }
+    bool CandidateFits(CCircuitUnit@ unit, float pendingOutput, float pendingRefund) {
+        return AirMath::EnergyRetirementFits(AirEconomy::energy,aiEconomyMgr.energy.pull,
+            Output(unit),pendingOutput,Global::RoleSettings::Air::ReclaimEnergyMargin,
+            aiEconomyMgr.metal.current,aiEconomyMgr.metal.storage,unit.circuitDef.costM,pendingRefund);
     }
     IUnitTask@ MakeTask(CCircuitUnit@ worker)
     {
         Tick();
-        // D-368: a reclaim at a floating metal bank wastes the builder's two minutes
-        // and the structure's metal; the retired wind or solar waits for room.
-        if (worker is null || !worker.circuitDef.IsMobile() || !Allowed() || AirEconomy::MetalFloating()
-            || jobs.length() >= uint(Global::RoleSettings::Tech::ReclaimEnergyConcurrent)) return null;
+        // Reuse one owned-ID snapshot; O(3N + J) for fixed three energy types,
+        // J bounded cleanup jobs. Reserve output and refunds before another order.
+        if (worker is null || !worker.circuitDef.IsMobile() || !Allowed()
+            || jobs.length() >= uint(Global::RoleSettings::Air::ReclaimEnergyConcurrent)) return null;
+        float pendingOutput=0.0f,pendingRefund=0.0f;
+        for(uint j=0;j<jobs.length();++j) {
+            CCircuitUnit@ target=ai.GetTeamUnit(jobs[j].target);
+            if(target !is null) {pendingOutput+=Output(target);pendingRefund+=target.circuitDef.costM;}
+        }
         const string side = Global::AISettings::Side;
         const array<string> names = {UnitHelpers::GetWindNameForSide(side), UnitHelpers::GetSolarNameForSide(side), UnitHelpers::GetAdvSolarNameForSide(side)};
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint tier = 0; tier < names.length(); ++tier) {
-            if (tier == 2 && !Allowed(true)) continue;
+
             CCircuitUnit@ best = null;
-            float distance = Global::RoleSettings::Tech::ReclaimEnergyRadius * Global::RoleSettings::Tech::ReclaimEnergyRadius;
+            float distance = Global::RoleSettings::Air::ReclaimEnergyRadius * Global::RoleSettings::Air::ReclaimEnergyRadius;
             for (uint i = 0; i < ids.length(); ++i) {
                 CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
                 if (u is null || u.GetBuildProgress() < 1.0f || u.circuitDef.GetName() != names[tier]) continue;
                 bool pending = false;
                 for (uint j = 0; j < jobs.length(); ++j) if (jobs[j].target == u.id) pending = true;
-                if (pending || !AirHome::EconomySite(u.GetPos(ai.frame))
+                if (pending || !CandidateFits(u,pendingOutput,pendingRefund) || !AirHome::EconomySite(u.GetPos(ai.frame))
                     || !aiTerrainMgr.CanReachAt(worker, u.GetPos(ai.frame), worker.circuitDef.GetBuildDistance())) continue;
                 const float sq = MapHelpers::SqDist(worker.GetPos(ai.frame), u.GetPos(ai.frame));
                 if (sq < distance) { @best = u; distance = sq; }

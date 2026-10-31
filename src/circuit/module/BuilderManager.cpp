@@ -1147,8 +1147,13 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 		case IBuilderTask::BuildType::RESURRECT: {
 			task = new CBResurrectTask(this, ti.priority, ti.position, ti.cost, ti.timeout, ti.f.radius);
 		} break;
-//		case IBuilderTask::BuildType::RECRUIT: {
-//		} break;
+        case IBuilderTask::BuildType::RECRUIT: {
+            // Mobile combat engineers use builder-owned production. A factory
+            // recruit would violate task-manager ownership (D-420 follow-up).
+            if(!ti.buildDef || !ti.buildDef->IsMobile()) return nullptr;
+            const SResource cost={ti.buildDef->GetCostM(),ti.buildDef->GetCostE()};
+            task=new CBGenericTask(this,ti.type,ti.priority,ti.buildDef,ti.position,cost,ti.f.shake,ti.timeout);
+        } break;
 		case IBuilderTask::BuildType::TERRAFORM: {
 			if (ti.ref.target != nullptr) {
 				task = new CBTerraformTask(this, ti.priority, ti.ref.target, ti.cost, ti.timeout);
@@ -1234,6 +1239,32 @@ bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float val
 }
 bool CBuilderManager::SetDefenseRule(int slot,const std::string& key,float value) {
     return circuit->GetCommanderController()->SetDefenseRule(slot,key,value);
+}
+IUnitTask* CBuilderManager::SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third) {
+    return circuit->GetCommanderController()->SupportDefenseWork(unit,anchor,first,second,third);
+}
+IUnitTask* CBuilderManager::SupportConstruction(CCircuitUnit* unit) {
+    return circuit->GetCommanderController()->SupportConstruction(unit);
+}
+IUnitTask* CBuilderManager::SupportAssist(CCircuitUnit* unit,CCircuitUnit* worker,float radius) {
+    if(!unit || !worker || unit==worker || !std::isfinite(radius) || radius<=0) return nullptr;
+    auto* task=worker->GetTask();
+    auto* build=dynamic_cast<IBuilderTask*>(task);
+    if(!build || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim() || !build->GetBuildDef()) return nullptr;
+    const int frame=circuit->GetLastFrame();
+    const auto at=worker->GetPos(frame);
+    if(unit->GetPos(frame).SqDistance2D(at)>SQUARE(radius)
+        || circuit->GetThreatMap()->GetThreatAt(unit,at)>0.f) return nullptr;
+    if(task->GetType()!=IUnitTask::Type::FACTORY
+        && (unit->GetTask()==task || task->CanAssignTo(unit))) return task;
+    // An existing frame can use local assistance even when the original
+    // construction task's economic build-power target is already satisfied.
+    auto* target=build->GetTarget();
+    if(!target || target->IsFinished()) return nullptr;
+    auto* repair=EnqueueRepairFor(target,60*FRAMES_PER_SEC,unit);
+    if(repair && (unit->GetTask()==repair || repair->CanAssignTo(unit))) return repair;
+    if(repair) DiscardUnusedTask(repair);
+    return nullptr;
 }
 std::string CBuilderManager::DescribeDefense() const { return circuit->GetCommanderController()->DescribeDefense(); }
 bool CBuilderManager::PendingProtection(CCircuitDef* def,const AIFloat3& at) { return circuit->GetCommanderController()->PendingProtection(def,at); }

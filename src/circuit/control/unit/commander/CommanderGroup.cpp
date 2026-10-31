@@ -41,6 +41,7 @@ int CCommanderController::FrontCommanderId() const {
     return -1;
 }
 CCircuitUnit* CCommanderController::GroupCommander() const {
+    if(!role.frontDuty && supportAnchor>=0) return ai->GetTeamUnit(supportAnchor);
     if(!role.frontDuty || !role.frontReady) return nullptr;
     for(const auto& entry:states) {
         auto* unit=ai->GetTeamUnit(entry.id);
@@ -208,6 +209,10 @@ bool CCommanderController::GroupSiteAllowed(CCircuitUnit* unit,const AIFloat3& s
 // local capture window; factories/radars/other group work keep their boundary.
 // Geometry only, no engine collection query. Income gates offers, not retention.
 bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const AIFloat3& site) const {
+    if(!role.frontDuty && supportAnchor>=0) {
+        auto* anchor=ai->GetTeamUnit(supportAnchor);
+        return anchor && site.SqDistance2D(anchor->GetPos(ai->GetLastFrame()))<=SQUARE(cfg->group.radius);
+    }
     if(GroupSiteAllowed(unit,site)) return true;
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
     if(!unit || !def || cfg->front.mexMinIncome<=0
@@ -417,6 +422,23 @@ bool CCommanderController::GroupProjectAllowed(CCircuitUnit* unit,IUnitTask* tas
         && commander::GroupJobInRange(at.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
             cfg->group.radius,unit->GetCircuitDef()->GetBuildDistance(),unit->GetTask()==task);
 }
+IUnitTask* CCommanderController::SupportConstruction(CCircuitUnit* unit) {
+    if(!unit || role.frontDuty) return nullptr;
+    auto* task=unit->GetTask();
+    if(!task || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim()) return nullptr;
+    auto* build=dynamic_cast<IBuilderTask*>(task);
+    if(!build) return nullptr;
+    // Constant-time retention through both task asks and the travel tick.
+    // Repair tasks also represent assistance on allied unfinished structures.
+    if(build->GetBuildDef() && build->GetBuildType()<IBuilderTask::BuildType::REPAIR) return task;
+    auto* repair=dynamic_cast<IRepairTask*>(task);
+    // Own frames are known immediately, before the shared friendly snapshot
+    // publishes them. RepairTask keeps its own live target where available.
+    CAllyUnit* target=build->GetTarget();
+    if(!target && repair) target=ai->GetFriendlyUnit(repair->GetTargetId());
+    return target && target->GetCircuitDef() && !target->GetCircuitDef()->IsMobile()
+        && target->GetUnit()->IsBeingBuilt()?task:nullptr;
+}
 IUnitTask* CCommanderController::GroupLocalMaintenance(CCircuitUnit* unit,CCircuitUnit* anchor) {
     // Fixed roster, anchor first; never scan unrelated builders or base queues.
     for(int id:{anchor->GetId(),groupUnit,groupMembers[0],groupMembers[1],groupMembers[2],groupMembers[5]}) {
@@ -432,10 +454,17 @@ IUnitTask* CCommanderController::GroupLocalMaintenance(CCircuitUnit* unit,CCircu
         }
     }
     const int frame=ai->GetLastFrame();
-    if(frame<groupMaintenanceNext) return nullptr;
-    groupMaintenanceNext=frame+FRAMES_PER_SEC;
-    // One bounded-area query per group/second, not per seat. Only within build
-    // reach; no repair excursion or unrestricted GUARD. Wrapper IDs are local.
+    int* nextMaintenance=&groupMaintenanceNext;
+    if(supportAnchor>=0 && !role.frontDuty) {
+        // Separate reach discs: one fixed timer per engineer avoids the first
+        // seat starving repairs only visible to another seat (including itself).
+        for(size_t i=0;i<supportMaintenanceNext.size();++i)
+            if(groupMembers[i]==unit->GetId()) {nextMaintenance=&supportMaintenanceNext[i];break;}
+    }
+    if(frame<*nextMaintenance) return nullptr;
+    *nextMaintenance=frame+FRAMES_PER_SEC;
+    // FRONT: one query per group/second. Engineering: at most three separate
+    // in-reach queries/second. No repair excursion or unrestricted GUARD.
     const auto here=unit->GetPos(frame);
     const float reach=std::max(0.f,unit->GetCircuitDef()->GetBuildDistance()-32.f);
     // Own the small result across EnqueueRepairFor/TaskAdded callbacks, which
@@ -448,7 +477,10 @@ IUnitTask* CCommanderController::GroupLocalMaintenance(CCircuitUnit* unit,CCircu
         if(!commander::UsefulGroupRepair(id==unit->GetId(),target->GetCircuitDef()->IsMobile(),
             IsGroupMember(id) || id==anchor->GetId(),native->IsBeingBuilt(),native->GetHealth(),native->GetMaxHealth())) continue;
         const auto at=target->GetPos(frame);
-        if(!GroupSiteAllowed(unit,at) || !ai->GetBattle()->LaneWorkAllowed(at)
+        const bool allowed=supportAnchor>=0 && !role.frontDuty
+            ? GroupBuildSiteAllowed(unit,target->GetCircuitDef(),at) && GroupLaneWorkAllowed(unit,target->GetCircuitDef(),at)
+            : GroupSiteAllowed(unit,at) && ai->GetBattle()->LaneWorkAllowed(at);
+        if(!allowed
             || at.SqDistance2D(anchor->GetPos(frame))>SQUARE(cfg->group.radius)
             || ai->GetThreatMap()->GetThreatAt(unit,at)>cfg->front.threat) continue;
         auto* task=ai->GetBuilderManager()->EnqueueRepairFor(target,15*FRAMES_PER_SEC,unit);

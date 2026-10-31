@@ -1,0 +1,151 @@
+{
+  "name": "frontline-engineers",
+  "unit": "armcom",
+  "side": "cortex",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Supplied Cortex engineers: Twitcher cooperation, Fiend completion, isolated constructor duties, replacement and observed base threat.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {
+      "unit": "corack",
+      "team": 0,
+      "count": 3,
+      "position": [
+        4000,
+        1600
+      ],
+      "spacing": 100,
+      "columns": 3,
+      "after_seconds": 10
+    },
+    {
+      "unit": "coraca",
+      "team": 0,
+      "count": 2,
+      "position": [
+        3000,
+        3000
+      ],
+      "spacing": 120,
+      "columns": 2,
+      "after_seconds": 12
+    },
+    {
+      "unit": "corfus",
+      "team": 0,
+      "count": 4,
+      "position": [
+        2500,
+        2500
+      ],
+      "spacing": 160,
+      "columns": 2,
+      "after_seconds": 10
+    },
+    {
+      "unit": "armstump",
+      "team": 2,
+      "count": 1,
+      "position": [
+        6500,
+        5500
+      ],
+      "after_seconds": 10
+    },
+    {
+      "unit": "corrad",
+      "team": 0,
+      "count": 1,
+      "position": [
+        5700,
+        5500
+      ],
+      "after_seconds": 12
+    },
+    {
+      "after_seconds": 10,
+      "position": [
+        4250,
+        1450
+      ],
+      "unit": "corfast",
+      "team": 0,
+      "columns": 2,
+      "spacing": 70,
+      "count": 2
+    },
+    {
+      "after_seconds": 10,
+      "position": [
+        3000,
+        2800
+      ],
+      "count": 1,
+      "team": 0,
+      "unit": "coralab"
+    },
+    {
+      "after_seconds": 10,
+      "position": [
+        3000,
+        3000
+      ],
+      "count": 1,
+      "team": 0,
+      "unit": "corrad"
+    },
+    {
+      "after_seconds": 200,
+      "position": [
+        3000,
+        3900
+      ],
+      "count": 1,
+      "team": 2,
+      "unit": "armstump"
+    }
+  ],
+  "photos": [],
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "checks": "frontline-engineers",
+  "units": [
+    "corack",
+    "coraca",
+    "corfus",
+    "corrad",
+    "corfast",
+    "coralab",
+    "corpyro",
+    "armstump"
+  ],
+  "assertions": {
+    "min_kills": 0,
+    "min_shooters": 0,
+    "max_losses": 1
+  },
+  "hold_all": true,
+  "enemy_team": 2,
+  "hold_teams": [
+    1,
+    2
+  ]
+}
