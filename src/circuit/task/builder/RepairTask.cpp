@@ -11,7 +11,7 @@
 #include "module/EconomyManager.h"
 #include "unit/action/TravelAction.h"
 #include "CircuitAI.h"
-#include "module/CommanderControl.h"
+#include "control/unit/commander/CommanderController.h"
 #include "util/Utils.h"
 #include "spring/CustomCommand.h"
 #include "spring/SpringCallback.h"
@@ -113,7 +113,7 @@ void CBRepairTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CBRepairTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
-    if(manager->GetCircuit()->GetCommanderControl()->Jammed(unit)) return;
+    if(manager->GetCircuit()->GetCommanderController()->Jammed(unit)) return;
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* cdef = unit->GetCircuitDef();

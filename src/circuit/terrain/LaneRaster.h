@@ -15,7 +15,7 @@ namespace circuit::lane {
 inline std::vector<float> CorridorDistances(const std::vector<Point>& points,
         int width, int height, float pitch) {
     if (width <= 0 || height <= 0 || !(pitch > 0) || points.size() < 2) return {};
-    std::vector<float> distance(std::size_t(width) * height, std::numeric_limits<float>::max());
+    std::vector<float> distance(static_cast<std::size_t>(width) * height, std::numeric_limits<float>::max());
     std::queue<int> pending;
     const auto seed = [&](int x, int z) {
         if (x < 0 || z < 0 || x >= width || z >= height) return;

@@ -60,7 +60,8 @@ class CPathFinder;
 class CTerrainManager;
 class CBattleAnalysis;
 class CBuilderManager;
-class CCommanderControl;
+class CCommanderController;
+class CControllerRegistry;
 class CWidgetState;
 class CFactoryManager;
 class CEconomyManager;
@@ -339,7 +340,9 @@ public:
 	CTerrainManager*  GetTerrainManager()  const { return terrainManager.get(); }
 	CBattleAnalysis*  GetBattle()          const { return battle.get(); }  // D-126
 	CBuilderManager*  GetBuilderManager()  const { return builderManager.get(); }
-    CCommanderControl* GetCommanderControl() const { return commanderControl.get(); }
+    // D-388: unit controllers; the commander controller is the first of them.
+    CControllerRegistry* GetControllers() const { return controllers.get(); }
+    CCommanderController* GetCommanderController() const { return commanderController; }
     CWidgetState* GetWidgetState() const { return widgetState.get(); }  // D-300
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -397,7 +400,8 @@ private:
 	std::shared_ptr<CTerrainManager> terrainManager;
 	std::shared_ptr<CBattleAnalysis> battle;  // D-126: TECH's weapon clusters
 	std::shared_ptr<CBuilderManager> builderManager;
-    std::unique_ptr<CCommanderControl> commanderControl;
+    std::unique_ptr<CControllerRegistry> controllers;  // owns every unit controller
+    CCommanderController* commanderController=nullptr;  // owned by controllers
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

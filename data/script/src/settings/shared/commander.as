@@ -22,6 +22,7 @@ namespace Global { namespace Commander {
     bool Fallback=true;
     float FallbackMetal=400.f, FallbackRangeScale=2.f, FallbackGroupRadius=400.f;
     float FallbackOffset=120.f, FallbackSearch=2000.f, FallbackHoldSeconds=3.f, FallbackPorcRange=1500.f;
+    float FallbackPrepareSeconds=4.f; // weapon-clear arrival plus time to establish the next line
     // Seconds a mobile enemy sensor lost from sight and radar still blocks a
     // concealed approach; afterwards its position is treated as unknown.
     float SensorMemory=10.f;

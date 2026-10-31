@@ -17,6 +17,29 @@ import storage
 import playtest
 from air_arena import lua
 
+def group_fixture_policy(source,values):
+    """Replace declared numeric group settings without stripping JSON comments."""
+    for key,value in values.items():
+        if not re.fullmatch(r'commander_group_[a-z0-9_]+',key) or type(value) not in (int,float):
+            raise ValueError('Invalid commander group fixture policy')
+        number=json.dumps(value,allow_nan=False)
+        source,count=re.subn(r'("'+re.escape(key)+r'"\s*:\s*)-?\d+(?:\.\d+)?',
+            lambda match:match[1]+number,source)
+        if count!=1:raise ValueError('Missing/duplicate commander group fixture key: '+key)
+    return source
+
+def defense_fixture_policy(values):
+    """Explicit script-visible rule overrides for supplied correctness arenas."""
+    lines=[]
+    for row in values:
+        if (set(row)!={'slot','key','value'} or type(row['slot']) is not int or not -1<=row['slot']<24
+            or not isinstance(row['key'],str) or not re.fullmatch(r'[a-z_]+',row['key'])
+            or type(row['value']) not in (int,float)):
+            raise ValueError('Invalid defense fixture policy')
+        number=json.dumps(float(row['value']),allow_nan=False)
+        lines.append(f'if(!aiBuilderMgr.SetDefenseRule({row["slot"]},"{row["key"]}",{number}f)) GenericHelpers::LogUtil("[DefenseFixture] ERROR rejected rule",1);')
+    return '\n'.join(lines)
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
@@ -61,11 +84,18 @@ def prepare(args):
                   '--extra-widget',str(HERE/'widgets/aggression_watch.lua')]
     if case.get('coverage_overlay'):
         stage += ['--extra-widget',str(ROOT/'tools/widgets/gui_barb_team_link.lua')]
+    if case.get('lane_front_overlay'):
+        stage += ['--extra-widget',str(ROOT/'tools/widgets/gui_barb_team_link.lua'),
+                  '--extra-widget',str(HERE/'widgets/lane_front_watch.lua')]
     subprocess.run(stage, check=True)
     script = directory/'script.txt'
     script.write_text(script.read_text().replace('[GAME]\n{','[GAME]\n{\n FixedRNGSeed='+str(args.seed)+';',1))
     staged = directory/'AI/Skirmish/BARbTest/test'
     pool_symbols(staged)
+    # Explicit correctness-fixture policy levers; never mutate source/live data.
+    if case.get('commander_policy'):
+        config_path=staged/'config'/args.profile/'commander.json'
+        config_path.write_text(group_fixture_policy(config_path.read_text(),case['commander_policy']))
     setup=staged/'script/src/setup.as'
     fixture_role=('(ai.teamId==0?AiRole::'+role+':AiRole::'+case['enemy_role']+')') if case.get('enemy_role') else 'AiRole::'+role
     setup.write_text(setup.read_text().replace('Global::AISettings::Role = derivedRole;',
@@ -165,6 +195,20 @@ def prepare(args):
             source=source[:start]+'\n if ('+scope+') CommanderCombat::Override("'+key+'",'+repr(float(value))+'f); // per-AI override fixture\n'+source[start:]
         declarations=''
         events=''
+        if case.get('defense_overrides'):
+            declarations+='bool _DefenseFixture=false;\n'
+            events+='\n if(ai.teamId==0 && ai.frame>=10*SECOND && !_DefenseFixture) {\n DefensePlanner::Load();\n'+defense_fixture_policy(case['defense_overrides'])+'\n _DefenseFixture=true; GenericHelpers::LogUtil("[DefenseFixture] applied",1);\n }\n'
+        if case.get('disable_lane_assignment'):
+            if case.get('lane_front_probe'): raise ValueError('Conflicting supplied lane policies')
+            declarations+='bool _FixtureNoLane=false;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=2*SECOND && !_FixtureNoLane) {
+     CoverageLanes::Load(); CoverageLanes::enabled=false;
+     CoverageLanes::Clear();
+     _FixtureNoLane=true;
+     AiLog("[FallbackCoverProbe] lane disabled");
+ }
+'''
         if case.get('coverage_probe'):
             minimum=float(case.get('coverage_min_advance',1000))
             if not 0 < minimum <= 50000: raise ValueError('Invalid coverage_min_advance')
@@ -185,6 +229,31 @@ def prepare(args):
              && aiBattle.GetFrontLaneDistance(p)<=aiBattle.GetFrontLaneWidth()
              && p.SqDistance2D(Global::Map::StartPos)>=_CoverageProbeMinimum*_CoverageProbeMinimum)
              AiLog("[CoverageProbe] advanced_in_lane team="+ai.teamId);
+     }
+ }
+'''
+        if case.get('lane_front_probe'):
+            declarations+='bool _LaneFrontSet=false; int _LaneFrontNext=0;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=2*SECOND) {
+     if(!_LaneFrontSet) {
+         // The supplied route owns this fixture; normal coverage must not
+         // replace it later in the same update with an automatically planned lane.
+         CoverageLanes::Load();
+         CoverageLanes::enabled=false;
+         if(CoverageLanes::frontPublished) CoverageLanes::Clear();
+         // Comet's z extent is 6144; reject a broken fixture explicitly.
+         array<AIFloat3> route={AIFloat3(4000,0,4000),AIFloat3(4000,0,6000)};
+         if(!aiBattle.SetFrontLane(route,384)) AiLog("[RangedArena] ERROR lane route rejected");
+         else AiLog("[LaneFrontProbe] route accepted");
+         aiBattle.SetLaneFrontOptions(5,20,1.5f,128,100);
+         _LaneFrontSet=true;
+     }
+     if(ai.frame>=_LaneFrontNext) {
+         _LaneFrontNext=ai.frame+SECOND;
+         AiLog("[LaneFrontProbe] "+aiBattle.DescribeLaneFront());
+         if(abs(aiBattle.GetFrontLaneLength()-2000.f)>1.f) AiLog("[RangedArena] ERROR fixture lane replaced");
+         AiLog("[LaneFrontBound] "+aiBattle.LimitLaneAdvance(0,2000));
      }
  }
 '''

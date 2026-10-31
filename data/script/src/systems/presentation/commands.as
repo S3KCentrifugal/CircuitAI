@@ -197,6 +197,10 @@ namespace Commands {
             return true;
         }
 
+        if (cmd == "nuclear-warning" && parts.length() == 3) {
+            aiBuilderMgr.SetDefenseRule(-1,"nuclear_warning",1);
+            return true;
+        }
         if (cmd == "theatres") { Lanes::RequestOverlay(parts.length() > 3 && parts[3] == "refresh"); return true; }
         if (cmd == "query") {
             Aggression::Announce();

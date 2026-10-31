@@ -15,7 +15,8 @@
 #include "map/MapManager.h"
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
-#include "module/CommanderControl.h"
+#include "control/core/ControllerRegistry.h"
+#include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
@@ -411,7 +412,7 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
 			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
 			if (unit != nullptr) {
-                if (commanderControl) commanderControl->WeaponFired(evt->unitId,evt->weaponDefId);
+                if (controllers) controllers->WeaponFired(evt->unitId,evt->weaponDefId);
 				CAirWaveTask* wave = dynamic_cast<CAirWaveTask*>(unit->GetTask());
                 if (wave != nullptr) wave->OnWeaponFired(unit, evt->weaponDefId);
 				CSuperTask* firingTask = dynamic_cast<CSuperTask*>(unit->GetTask());
@@ -685,7 +686,11 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
 	builderManager->InitHandlers();
 	militaryManager = std::make_shared<CMilitaryManager>(this);
 	militaryManager->InitHandlers();
-    commanderControl=std::make_unique<CCommanderControl>(this);
+    // D-388: the unit controllers, then their behaviour.json presets and
+    // per-type assignment (after the managers: roles are read by then).
+    controllers=std::make_unique<CControllerRegistry>(this);
+    commanderController=controllers->Add(std::make_unique<CCommanderController>(this));
+    controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.
     widgetState=std::make_unique<CWidgetState>(this);
     widgetState->Start();
@@ -822,7 +827,8 @@ int CCircuitAI::Release(int reason)
 	economyManager = nullptr;
 	factoryManager = nullptr;
 	builderManager = nullptr;
-    commanderControl.reset();
+    commanderController=nullptr;
+    controllers.reset();
 	battle = nullptr;
 	terrainManager = nullptr;
 	metalManager = nullptr;
@@ -907,7 +913,7 @@ int CCircuitAI::Update(int frame)
 		// scheduler->RunJobEvery(CScheduler::GameJob(&CInitScript::Update, script), TEAM_SLOWUPDATE_RATE, skirmishAIId);
 		script->Update();
 	}
-    if (commanderControl) commanderControl->Update();
+    if (controllers) controllers->Update();
 	UpdateActions();
 	FlushDrawQueue();  // D-118
 	if (performance::enabled && frame % (60 * FRAMES_PER_SEC) == 0) {
@@ -1182,6 +1188,7 @@ int CCircuitAI::Message(int playerId, const char* message)
 
 int CCircuitAI::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 {
+	terrainManager->ObserveBuildStructure(unit);
 	unit->SetProducerId(builder != nullptr ? builder->GetId() : -1, GetLastFrame());
 	for (auto& module : modules) {
 		module->UnitCreated(unit, builder);
@@ -1226,7 +1233,11 @@ int CCircuitAI::UnitFinished(CCircuitUnit* unit)
 		unit->CmdFireAtRadar(true);
 		unit->GetUnit()->SetAutoRepairLevel(0);
 		unit->GetUnit()->SetOn(unit->GetCircuitDef()->IsOn());
+		// D-389: a type a unit controller owns (commanders) cloaks only by its
+		// controller's posture (INV-246 caught this rule cloaking new and gifted
+		// commanders for good). Every other unit keeps the cheap-cloak rule.
 		if (unit->GetCircuitDef()->IsAbleToCloak()
+			&& (controllers == nullptr || controllers->ForDef(unit->GetCircuitDef()->GetId()) == nullptr)
 			&& unit->GetCircuitDef()->GetCloakCost() < economyManager->GetAvgEnergyIncome() * 0.1f)
 		{
 			unit->CmdCloak(true);
@@ -1310,6 +1321,8 @@ int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int we
 
 int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	// Mobile losses must not mutate the shared layout revision.
+	if (!unit->GetCircuitDef()->IsMobile()) terrainManager->ForgetBuildStructure(unit->GetId());
 	unit->MarkDestroying();
 	destroyed.insert(unit->GetId());
 	const int lostId = unit->GetId();
@@ -1350,7 +1363,11 @@ int CCircuitAI::UnitGiven(ICoreUnit::Id unitId, int oldTeamId, int newTeamId)
 		unit->CmdFireAtRadar(true);
 		unit->GetUnit()->SetAutoRepairLevel(0);
 		unit->GetUnit()->SetOn(true);
+		// D-389: a type a unit controller owns (commanders) cloaks only by its
+		// controller's posture (INV-246 caught this rule cloaking new and gifted
+		// commanders for good). Every other unit keeps the cheap-cloak rule.
 		if (unit->GetCircuitDef()->IsAbleToCloak()
+			&& (controllers == nullptr || controllers->ForDef(unit->GetCircuitDef()->GetId()) == nullptr)
 			&& unit->GetCircuitDef()->GetCloakCost() < economyManager->GetAvgEnergyIncome() * 0.1f)
 		{
 			unit->CmdCloak(true);
@@ -1433,6 +1450,7 @@ int CCircuitAI::EnemyLeaveRadar(CEnemyInfo* enemy)
 
 int CCircuitAI::EnemyDamaged(CEnemyInfo* enemy)
 {
+	if (battle != nullptr && enemy->GetData()->IsInLOS()) battle->RecordLaneCombat(enemy->GetPos());
 	// NOTE: Whole threat map updates in a fraction of a second, through polling
 	return 0;  // signaling: OK
 }
@@ -1560,7 +1578,7 @@ int CCircuitAI::Save(std::ostream& os)
 
 int CCircuitAI::LuaMessage(const char* inData)
 {
-    if (commanderControl && commanderControl->ReceiveProjectiles(inData)) return 0;
+    if (controllers && controllers->ReceiveMessage(inData)) return 0;
     if (builderManager != nullptr && builderManager->ReceiveResurrectionClaim(inData)) return 0;
 	script->LuaMessage(inData);
 	return 0;  // signaling: OK
@@ -1623,7 +1641,7 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 	unit->SetArea(area);
 
 	teamUnits[unitId] = unit;
-    if (commanderControl) commanderControl->Join(unit);
+    if (controllers) controllers->UnitAdded(unit);
     ++ownedUnitRevision;
 	cdef->Inc();
 
@@ -1637,7 +1655,7 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 
 void CCircuitAI::UnregisterTeamUnit(CCircuitUnit* unit)
 {
-    if (commanderControl) commanderControl->Leave(unit->GetId());
+    if (controllers) controllers->UnitRemoved(unit->GetId());
     builderManager->ForgetUnfinishedCount(unit);
 	teamUnits.erase(unit->GetId());
     ++ownedUnitRevision;

@@ -128,7 +128,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
         && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing))
 	{
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
+			if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 		)
 		return true;
 	}
@@ -142,7 +142,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 
 	if (geom::is_valid(buildPos)) {
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
+			if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 		)
 		return true;
 	}

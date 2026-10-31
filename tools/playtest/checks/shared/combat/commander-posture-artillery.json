@@ -1,0 +1,49 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "withdraw",
+      "pattern": "\\[CommanderPosture\\] unit=\\d+ posture=withdraw cloak=\\d reason=artillery",
+      "scope": "any",
+      "by_minute": 1.5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "commander_death",
+      "pattern": "\\[RangedArena\\].*death id=\\d+ team=0 unit=armcom",
+      "scope": "any"
+    },
+    {
+      "key": "cloak flapping",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=\\d+ .*toggles=([6-9]|\\d\\d)",
+      "scope": "any"
+    }
+  ]
+}

@@ -159,7 +159,7 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 			state = State::ENGAGE;  // isFirstTry = false
 //			metalMgr->SetOpenSpot(index, false);
 			TRY_UNIT(circuit, unit,
-				unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
+				if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 			)
 			return true;
 		} else {
@@ -310,7 +310,7 @@ bool CBMexTask::CheckLandBlock(CCircuitUnit* unit)
 				AIFloat3 newPos = pos + dir * (step * i);
 				unit->CmdMoveTo(newPos, UNIT_COMMAND_OPTION_SHIFT_KEY);
 			}
-			unit->CmdBuild(buildDef, buildPos, facing, UNIT_COMMAND_OPTION_SHIFT_KEY, CmdTimeout(frame));
+			if (!BuildAtSite(unit, UNIT_COMMAND_OPTION_SHIFT_KEY, CmdTimeout(frame))) return false;
 		);
 		return true;
 	}

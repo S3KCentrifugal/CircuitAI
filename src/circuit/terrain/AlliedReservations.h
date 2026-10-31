@@ -27,9 +27,38 @@ class Reservations {
 public:
     // EXIT (D-343): a factory exit corridor, shared in addition to its ZONE
     // entry so teammates can keep the corridor's far end open for ships.
-    enum Kind { SLOT, ZONE, EXIT };
+    enum Kind { SLOT, ZONE, EXIT, TASK, STRUCTURE };
     using Key = std::tuple<int, int, int>; // owner team, kind, local ID
     uint64_t Revision() const { return revision; }
+    // Simulation-thread transaction for ordinary placement. Retry keeps the
+    // same claim without allocation/index churn; another team's later claim
+    // is still checked. Tests: allied_reservations_test.
+    bool ClaimTask(int owner, int& id, const Rect& rect) {
+        if (!rect.Valid() || OverlapsOther(owner, rect)) return false;
+        if (id == 0) {
+            if (nextTaskId == std::numeric_limits<int>::max()) return false;
+            id = ++nextTaskId;
+        }
+        const auto it = entries.find(Key(owner, TASK, id));
+        if (it != entries.end() && Equal(it->second, rect)) return true;
+        Put(owner, TASK, id, rect);
+        return true;
+    }
+    void ReleaseTask(int owner, int& id) {
+        if (id != 0) Erase(owner, TASK, id);
+        id = 0;
+    }
+    void RemoveKind(int owner, Kind kind) {
+        auto it = entries.lower_bound(Key(owner, kind, std::numeric_limits<int>::min()));
+        while (it != entries.end() && std::get<0>(it->first) == owner && std::get<1>(it->first) == kind) {
+            ChangeCells(owner, it->second, false);
+            it = entries.erase(it);
+            ++revision;
+        }
+    }
+    static bool Equal(const Rect& a, const Rect& b) {
+        return a.x1 == b.x1 && a.z1 == b.z1 && a.x2 == b.x2 && a.z2 == b.z2;
+    }
     void Put(int owner, Kind kind, int id, const Rect& rect) {
         ++revision;
         Erase(owner, kind, id);
@@ -95,6 +124,7 @@ public:
         }
     }
 private:
+    int nextTaskId = 0;
     uint64_t revision = 0;
     static constexpr int pageCells = 32;
     struct Cell {

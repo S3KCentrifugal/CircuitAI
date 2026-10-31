@@ -12,7 +12,9 @@
 #include "util/math/QuadField.h"
 #include "util/math/Region.h"
 #include "terrain/AlliedReservations.h"
-#include "terrain/CommanderCombat.h"
+#include "control/kernel/CommanderCombat.h"
+#include "control/service/CombatSnapshot.h"
+#include "control/kernel/DefenseClaims.h"
 #include "resource/MetalField.h"
 #include "task/static/StrategicTargeting.h"
 
@@ -76,6 +78,8 @@ public:
 	void UpdateFriendlyUnits();
 	CAllyUnit* GetFriendlyUnit(ICoreUnit::Id unitId) const;
 	const AllyUnits& GetFriendlyUnits() const { return friendlyUnits; }
+	using AllyStructures=std::vector<std::pair<int,CAllyUnit*>>;
+	const AllyStructures& GetFriendlyStructures();
 
 	const std::set<CEnemyUnit*>& GetDyingEnemies() const { return enemyManager->GetDyingEnemies(); }
 	void DyingEnemy(CEnemyUnit* enemy, int frame) { enemyManager->DyingEnemy(enemy, frame); }
@@ -134,9 +138,17 @@ public:
 	metal_field::Claims& GetMetalClaims() { return metalClaims; }
 	strategic::Ledger& GetPulseClaims() { return pulseClaims; }
     commander::ShotClaims& GetCommanderShots() { return commanderShots; }
+    // D-389: the side's enemy picture, seen and remembered, rebuilt once a second by the owner AI.
+    const CCombatSnapshot& GetCombatSnapshot() const { return combatSnapshot; }
+    defense::Claims& GetDefenseClaims() { return defenseClaims; }
+    void NuclearWarning(int frame) { nuclearWarning=std::max(nuclearWarning,frame); }
+    int LastNuclearWarning() const { return nuclearWarning; }
 	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
 private:
     commander::ShotClaims commanderShots;
+    CCombatSnapshot combatSnapshot;
+    defense::Claims defenseClaims;
+    int nuclearWarning=-1000000;
 public:
 private:
 	strategic::Ledger pulseClaims, nuclearHistory;
@@ -154,6 +166,8 @@ private:
 	int resignSize;
 	int lastUpdate;
 	AllyUnits friendlyUnits;  // owner
+	AllyStructures friendlyStructures; // borrowed ordered subset, storage reused
+	bool friendlyStructuresReady=false;
 	CQuadField quadField;
 	std::map<ICoreUnit::Id, int> reclaimMarks;  // unitId: number of AIs reclaiming it
 

@@ -1074,6 +1074,7 @@ namespace TechWeapons {
     {
         if (TypeOf(s.role) == Task::BuildType::NANO && Layout::TurretsCapped()) return null;
         if (!TechForward::Buildable(u, d) || !WallHelpers::Allowed(d, at)) return null;
+        if ((s.role=="shield" || s.role=="antinuke") && aiBuilderMgr.PendingProtection(d,at)) return null;
         const int slot = aiTerrainMgr.ReserveBuilding(d, at, 0);
         if (slot < 0) return null;
         if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot)) || !WallHelpers::Allowed(d, aiTerrainMgr.GetReservationPos(slot))) {

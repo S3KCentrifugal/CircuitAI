@@ -87,6 +87,7 @@ public:
 	float GetFieldYield(CCircuitDef* def, const springai::AIFloat3& pos);
 	IBuilderTask* EnqueueFieldMex(CCircuitUnit* builder, const springai::AIFloat3& center, float radius);
 	IBuilderTask* EnqueueFieldUpgrade(CCircuitUnit* builder, const springai::AIFloat3& center, float radius);
+	IBuilderTask* EnqueueMexUpgrade(CCircuitUnit* builder, CCircuitUnit* target);
 	bool ClaimFieldSite(metal_field::Key& key, CCircuitDef* def, const springai::AIFloat3& pos, int targetId = -1);
 	bool OwnsFieldSite(metal_field::Key key) const;
 	void ReleaseFieldSite(metal_field::Key key);

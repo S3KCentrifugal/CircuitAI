@@ -151,6 +151,7 @@ struct SSettings {
 	// D-360: a passage wider than one lane holds lanes side by side (front coverage).
 	float laneSpacing = 768.f;          // elmos between lanes inside one passage; lanes = round(extent / spacing), capped by the narrowest extent / (spacing / 2)
 	int laneMax = 4;                    // lanes a passage may hold at most (1 disables the split)
+	float laneDistanceCost = 0.08f;    // base cost per step; 0 restores clearance-only routing
 	SMarkSettings marks;
 };
 

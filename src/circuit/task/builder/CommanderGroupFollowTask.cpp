@@ -7,8 +7,9 @@
 #include "util/Utils.h"
 
 namespace circuit {
-CCommanderGroupFollowTask::CCommanderGroupFollowTask(ITaskModule* manager,int target,float radius)
-    :IWaitTask(manager,true,-1),target(target),radius(radius) {}
+using springai::AIFloat3;
+CCommanderGroupFollowTask::CCommanderGroupFollowTask(ITaskModule* manager,int target,float radius,bool guard,const AIFloat3& destination)
+    :IWaitTask(manager,true,-1),target(target),radius(radius),guard(guard),destination(destination) {}
 void CCommanderGroupFollowTask::Start(CCircuitUnit* unit) {
     TRY_UNIT(manager->GetCircuit(),unit,unit->CmdStop();)
     Follow(unit);
@@ -30,7 +31,13 @@ void CCommanderGroupFollowTask::Follow(CCircuitUnit* unit) {
     auto* leader=ai->GetTeamUnit(target);
     if(!leader || unit->GetTask()!=this) return;
     const int frame=ai->GetLastFrame();
-    const auto at=leader->GetPos(frame);
+    // Sensors retain a live owned GUARD; idle/empty queues recover immediately.
+    if(guard && target!=unit->GetId()) {
+        if(sent>=0 && ai->GetUnitAPI()->HasGuardIntent(unit->GetId(),target,frame)) return;
+        TRY_UNIT(ai,unit,unit->GetUnit()->Guard(leader->GetUnit());)
+        sent=frame;return;
+    }
+    const auto at=target==unit->GetId()?destination:leader->GetPos(frame);
     if(unit->GetPos(frame).SqDistance2D(at)<=radius*radius) {
         if(!waiting) {
             TRY_UNIT(ai,unit,unit->CmdStop();unit->GetUnit()->Wait();)

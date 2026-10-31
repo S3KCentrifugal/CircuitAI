@@ -49,7 +49,7 @@ Five decisions on the FRONT commander and its lane, in one commit: immediate in-
 > lever being read.
 
 ````markdown
-**Screen-led anchor.** A pure rule in `terrain/CommanderCombat.h`, unit-tested: with no screen the base falls to `own - pushAhead`, so the commander waits; INV-234 re-derives `bound` in Deploy.
+**Screen-led anchor.** A pure rule in `control/kernel/CommanderCombat.h`, unit-tested: with no screen the base falls to `own - pushAhead`, so the commander waits; INV-234 re-derives `bound` in Deploy.
 
 ```cpp
 inline PushAnchor LanePushAnchor(float own, float furthestScreen, int screens, int screensNeeded,
