@@ -3,6 +3,26 @@ namespace TechLadderProbe {
     bool active = false;
     bool checked = false;
     bool assisted = false;
+    bool giftPending = false;
+    int giftedId = -1;
+    uint beforeGiftRevision = 0;
+    bool Gift(const string& in message) {
+        array<string>@ fields = message.split("|");
+        if (fields.length() != 3 || fields[0] != "tech-ladder" || fields[1] != "gift") return false;
+        CCircuitUnit@ mex = ai.GetTeamUnit(parseInt(fields[2]));
+        const bool owned = mex !is null && mex.GetBuildProgress() >= 1.0f
+            && OwnedEconomy::Extractors().find(mex.id) >= 0;
+        GenericHelpers::LogUtil("[TechLadderTest] " + (owned ? "PASS" : "FAIL") + " owned_before_gift", 1);
+        if (!owned) return true;
+        Economy::MexTracker::myMexes.resize(0);
+        Economy::MexTracker::RegisterMex(mex.GetPos(ai.frame));
+        giftedId = mex.id;
+        beforeGiftRevision = ai.GetOwnedUnitRevision();
+        array<CCircuitUnit@> transfer = {mex};
+        ai.GiveUnits(transfer, 1);
+        giftPending = true;
+        return true;
+    }
     void Tick() {
         if (!active || !checked || assisted) return;
         if (ai.GetCircuitDef("cornanotc").count < 12) return;
@@ -18,6 +38,7 @@ namespace TechLadderProbe {
         assisted = true;
     }
     bool Handle(const string& in message) {
+        if (Gift(message)) return true;
         if (message != "tech-ladder|setup") return false;
         if (!Global::Map::MapResolved) Setup::setupMap(AIFloat3(1400,0,10100));
         Global::AISettings::Role = AiRole::TECH;
@@ -41,6 +62,13 @@ namespace TechLadderProbe {
             if (frame !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND));
         }
         if (!active || unit.circuitDef.GetName() != "corack") return TechBuild::Wait(SECOND);
+        if (giftPending) {
+            if (ai.GetTeamUnit(giftedId) !is null) return TechBuild::Wait(SECOND);
+            const bool invalidated = ai.GetOwnedUnitRevision() != beforeGiftRevision
+                && OwnedEconomy::Extractors().find(giftedId) < 0;
+            GenericHelpers::LogUtil("[TechLadderTest] " + (invalidated ? "PASS" : "FAIL") + " gift_cache_invalidated", 1);
+            giftPending = false;
+        }
         IUnitTask@ current = TechBuild::KeepCurrent(unit);
         if (current !is null) return current;
         if (checked) return TechBuild::Wait(SECOND);
