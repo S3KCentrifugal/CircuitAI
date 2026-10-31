@@ -280,6 +280,12 @@ public:
 	void SetNuclearAim(const springai::AIFloat3& pos, float radius) { nuclearAim = pos; nuclearAimRadius = radius; }
 	springai::AIFloat3 GetNuclearAim() const { return nuclearAim; }
 	float GetNuclearAimRadius() const { return nuclearAimRadius; }
+	// Nuke launch scouting (owner 2026-10-31): every launch of ours counts and keeps
+	// where it went, so the script can tell AIR and ask scouts at the latest spot
+	void NoteNuclearLaunch(const springai::AIFloat3& pos, float radius) { ++nuclearLaunches; nuclearLaunchPos = pos; nuclearLaunchRadius = radius; }
+	int GetNuclearLaunches() const { return nuclearLaunches; }
+	springai::AIFloat3 GetNuclearLaunchPos() const { return nuclearLaunchPos; }
+	float GetNuclearLaunchRadius() const { return nuclearLaunchRadius; }
 
 	/*
 	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
@@ -542,6 +548,9 @@ private:
 	strategic::Overnuke overnuke;
 	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearAimRadius = 0.f;
+	int nuclearLaunches = 0;
+	springai::AIFloat3 nuclearLaunchPos = springai::AIFloat3(-1.f, 0.f, -1.f);
+	float nuclearLaunchRadius = 0.f;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
 

@@ -27,7 +27,7 @@ namespace AirBaseResponse {
     bool Free(CCircuitUnit@ u) {
         if (u is null || u.GetBuildProgress() < 1.0f || !u.circuitDef.IsAbleToFly()
             || u.circuitDef.GetBuildSpeed() > 0 || Team::Ferry::IsFerryTransport(u.circuitDef)
-            || u.id == Team::Ferry::buildingId || AirOperations::Committed(u.id)
+            || u.id == Team::Ferry::buildingId || AirOperations::Committed(u.id) || AirScoutSweep::Flying(u.id)
             || u.GetRulesParam("carrier_host_unit_id", -1) >= 0) return false;
         IUnitTask@ task = u.task;
         if (task is null) return true;
