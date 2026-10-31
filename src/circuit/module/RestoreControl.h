@@ -70,7 +70,7 @@ private:
 		int lavaCells;
 		float depth;
 	};
-	bool BuildPatch(const springai::AIFloat3& near, SPatch& patch);
+	bool BuildPatch(const springai::AIFloat3& nearPos, SPatch& patch);
 	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius);
 	bool IsCovered(const springai::AIFloat3& pos) const;
 	bool IsCoolingDown(int sector, int frame) const;

@@ -205,7 +205,7 @@ void CRestoreControl::CoolDown(const AIFloat3& pos, float radius, int frames)
 	cooldown[terrainMgr->GetSectorIndex(pos)] = until;
 }
 
-bool CRestoreControl::BuildPatch(const AIFloat3& near, SPatch& patch)
+bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 {
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	const int frame = circuit->GetLastFrame();
@@ -214,12 +214,12 @@ bool CRestoreControl::BuildPatch(const AIFloat3& near, SPatch& patch)
 	// footprint is taken as the circle around its larger side.
 	// Footprints are rasterised once into the window's cell grid (51x51 for
 	// the 200 radius), so the cell scan costs one lookup per cell.
-	const int x0 = int((near.x - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
-	const int z0 = int((near.z - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
+	const int x0 = int((nearPos.x - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
+	const int z0 = int((nearPos.z - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
 	const int side = int(2 * RESTORE_MAX_RADIUS / SQUARE_SIZE) + 2;
 	std::vector<char> blocked;
 	circuit->UpdateFriendlyUnits();
-	const std::vector<int> ids = circuit->GetCallback()->GetFriendlyUnitIdsIn(near, RESTORE_MAX_RADIUS * 1.5f, false);
+	const std::vector<int> ids = circuit->GetCallback()->GetFriendlyUnitIdsIn(nearPos, RESTORE_MAX_RADIUS * 1.5f, false);
 	for (int id : ids) {
 		CAllyUnit* au = circuit->GetFriendlyUnit(id);
 		if ((au == nullptr) || (au->GetCircuitDef() == nullptr) || au->GetCircuitDef()->IsMobile()) {
@@ -253,7 +253,7 @@ bool CRestoreControl::BuildPatch(const AIFloat3& near, SPatch& patch)
 			return (cx >= 0) && (cz >= 0) && (cx < side) && (cz < side) && (blocked[cz * side + cx] != 0);
 		};
 	}
-	const CTerrainManager::STerrainDamage damage = terrainMgr->GetTerrainDamage(near, RESTORE_MAX_RADIUS, query);
+	const CTerrainManager::STerrainDamage damage = terrainMgr->GetTerrainDamage(nearPos, RESTORE_MAX_RADIUS, query);
 	if (damage.cells < minCells) {
 		return false;
 	}

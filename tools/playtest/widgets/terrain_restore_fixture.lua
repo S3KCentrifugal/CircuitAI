@@ -54,19 +54,33 @@ end
 local function pickBombSpot()
     -- the nearest metal spot 400-1400 from the AI's start with none of its
     -- units within 350 (the blast must not take the commander with it)
-    local n=Spring.GetGameRulesParam("mex_count") or 0
-    local best,bestD=nil,math.huge
-    for i=1,n do
-        local x=Spring.GetGameRulesParam("mex_x"..i); local z=Spring.GetGameRulesParam("mex_z"..i)
-        if x and z then
-            local d=math.sqrt((x-wx)^2+(z-wz)^2)
-            if d>=400 and d<=1400 and d<bestD and #(Spring.GetUnitsInCylinder(x,z,350,0) or {})==0
-                and not structureNear(x,z,60) then
-                best,bestD={x=x,z=z},d
-            end
+    -- the game's spot finder (mex_* game rules are not set on every map)
+    local list={}
+    local finder=WG.resource_spot_finder
+    if finder and finder.metalSpotsList then
+        for _,p in ipairs(finder.metalSpotsList) do list[#list+1]={p.x,p.z} end
+    else
+        for i=1,(Spring.GetGameRulesParam("mex_count") or 0) do
+            list[#list+1]={Spring.GetGameRulesParam("mex_x"..i),Spring.GetGameRulesParam("mex_z"..i)}
         end
     end
-    return best
+    -- by the bomb minute the AI has often spread over every spot that close:
+    -- then 300-2000 with none of its units within 200
+    for _,t in ipairs({{400,1400,350},{300,2000,200}}) do
+        local best,bestD=nil,math.huge
+        for _,p in ipairs(list) do
+            local x,z=p[1],p[2]
+            if x and z then
+                local d=math.sqrt((x-wx)^2+(z-wz)^2)
+                if d>=t[1] and d<=t[2] and d<bestD and #(Spring.GetUnitsInCylinder(x,z,t[3],0) or {})==0
+                    and not structureNear(x,z,60) then
+                    best,bestD={x=x,z=z},d
+                end
+            end
+        end
+        if best then return best,#list end
+    end
+    return nil,#list
 end
 function widget:UnitCreated(id,def,team)
     local name=UnitDefs[def].name
@@ -89,13 +103,13 @@ function widget:GameFrame(f)
 
     -- the bomb: a commander self-destructs on a metal spot the AI will want
     if (cfg.case=="bomb" or cfg.case=="both") and f==cfg.bombFrame then
-        local s=pickBombSpot()
+        local s,spots=pickBombSpot()
         if s then
             sites[#sites+1]={name="bomb",x=s.x,z=s.z,frame=-1,state="waiting"}
             give(cfg.bomb,1,s.x,s.z)
             echo(string.format("bomb site (%.0f,%.0f) %.0f from the AI start",s.x,s.z,math.sqrt((s.x-wx)^2+(s.z-wz)^2)))
         else
-            echo("no free metal spot for the bomb")
+            echo("no free metal spot for the bomb (spots="..spots..")")
         end
     end
     if bomber and not bombOrdered then
@@ -146,7 +160,8 @@ function widget:GameFrame(f)
 
     -- result: every site settled, or the end frame
     if not done and #sites>0 then
-        local settled=true
+        -- the nuke's site exists only once it is ordered
+        local settled=not ((cfg.case=="nuke" or cfg.case=="both") and not siloOrdered)
         for _,s in ipairs(sites) do
             if s.state~="restored" or (s.name=="bomb" and not s.built and f<cfg.endFrame) then settled=false end
         end
