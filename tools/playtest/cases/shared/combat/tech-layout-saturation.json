@@ -4,7 +4,7 @@
   "side": "cortex",
   "role": "TECH",
   "enemy_role": "FRONT",
-  "description": "Primary ring before secondary interior, completed support before reactor, real support construction.",
+  "description": "Primary ring before secondary interior; home aircraft complete support and start an AFUS while distant engineering is bound.",
   "map": "Comet Catcher Remake 1.8",
   "map_key": "comet",
   "starts": [
@@ -24,6 +24,7 @@
   "ally_spots": "1,2",
   "commander_initial": false,
   "groups": [
+    {"unit":"corack","team":0,"count":1,"position":[7000,1500],"after_seconds":10},
     {
       "unit": "coraca",
       "team": 0,
@@ -57,7 +58,8 @@
       "after_seconds": 10
     }
   ],
-  "photos": [],
+  "camera": [5000,1500,2200],
+  "photos": [135],
   "start_metal": 100000,
   "start_energy": 1000000,
   "checks": "tech-layout-saturation",
