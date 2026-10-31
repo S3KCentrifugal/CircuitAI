@@ -136,5 +136,22 @@ namespace LolCannon {
     // a cannon standing this long with no roster target in range (no strike, so no
     // first package) has the enemy spawn it was sited against scouted instead
     int BlindScoutSeconds = 60;
+    // the cover (owner 2026-10-31): once the turrets, the storages and the cannon
+    // stand, the same crews (none released) build ExtraShields of the side's shield
+    // (Keeper armgate, Overseer corgate, Soteria legdeflector) just ahead of the
+    // cannon, ExtraHeavyPorc of its heavy porc (Pulsar armanni, Bulwark cordoom,
+    // Bastion legbastion) further ahead, towards the enemy start the cannon is
+    // sited against, ExtraPorcSpread apart across the facing, and ExtraFlak T2 flak
+    // (armflak, corflak, legflak) behind the cannon. The crews are released once
+    // all of them stand, every slot is given up, or ExtrasFinishSeconds pass.
+    bool Extras = true;
+    int ExtraShields = 2;
+    int ExtraHeavyPorc = 2;
+    int ExtraFlak = 1;
+    float ExtraShieldSpread = 320.0f;   // elmos between the two shields, across the facing
+    float ExtraPorcAhead = 200.0f;      // elmos from the shields' front edge to the heavy porc
+    float ExtraPorcSpread = 480.0f;     // elmos between the heavy porc, across the facing
+    float ExtraCountRadius = 900.0f;    // our cover structures this near the cannon count, wherever they went up
+    int ExtrasFinishSeconds = 900;
 }
 }
