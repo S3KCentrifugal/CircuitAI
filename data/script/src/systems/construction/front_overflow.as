@@ -57,6 +57,9 @@ namespace FrontOverflow {
         if (!Active()) return 0;
         CCircuitDef@ d = ConvDef();
         if (d is null || d.count >= Global::RoleSettings::Front::OverflowMaxConverters) return 0;
+        // native CBConvertTask aborts an unstarted converter order while the bank is under 55% of storage
+        // (arm C, 2026-10-31: most cells that failed without "no site" died that way, at once and unlogged)
+        if (!BankFull(Global::RoleSettings::Front::OverflowOrderBankPercent)) return 0;
         int n = int(Spare() / ConvDraw);
         if (BankFull(Global::RoleSettings::Front::OverflowBankPercent)) n = AiMax(n, Global::RoleSettings::Front::OverflowFullBankParallel);
         return AiMin(Global::RoleSettings::Front::OverflowParallel, n);
