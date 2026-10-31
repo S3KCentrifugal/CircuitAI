@@ -151,6 +151,28 @@ local function pickLavaSpot()
     end
     return best
 end
+local function pickPathSpot()
+    -- a lane point a Thor can cross before the strike (the lane's straight
+    -- line may run over a ridge): fewest blocked points on a coarse grid,
+    -- then nearest to cfg.pathAt and the lane's middle
+    local best,bestScore=nil,math.huge
+    for t=cfg.pathAt-0.15,cfg.pathAt+0.15,0.03 do
+        for side=-600,600,150 do
+            local x,z=lanePoint(t,side)
+            if x>200 and z>200 and x<Game.mapSizeX-200 and z<Game.mapSizeZ-200 then
+                local blocked=0
+                for dz=-cfg.radius,cfg.radius,50 do
+                    for dx=-cfg.radius,cfg.radius,50 do
+                        if thorBlocked(x+dx,z+dz,Spring.GetGroundHeight(x+dx,z+dz)) then blocked=blocked+1 end
+                    end
+                end
+                local score=blocked*10000+math.abs(t-cfg.pathAt)*4000+math.abs(side)
+                if score<bestScore then best,bestScore={x=x,z=z},score end
+            end
+        end
+    end
+    return best
+end
 function widget:UnitCreated(id,def,team)
     local name=UnitDefs[def].name
     if team==1 and name=="armsilo" and not silo then silo=id end
@@ -200,8 +222,9 @@ function widget:GameFrame(f)
             strikes[#strikes+1]={site=addSite("nuke",wx+dx/len*cfg.nukeOffset,wz+dz/len*cfg.nukeOffset),left=1}
         end
         if cases.path then
-            local x,z=lanePoint(cfg.pathAt,0)
-            strikes[#strikes+1]={site=addSite("path",x,z),left=cfg.pathNukes}
+            local s=pickPathSpot() or {}
+            if not s.x then s.x,s.z=lanePoint(cfg.pathAt,0) end
+            strikes[#strikes+1]={site=addSite("path",s.x,s.z),left=cfg.pathNukes}
         end
         if cases.lava then
             local s=pickLavaSpot()
