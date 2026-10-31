@@ -25,7 +25,7 @@ namespace FrontlineEngineering {
             || (origin==previousOrigin && previousSince>=0 && frame>=previousSince && frame<=previousUntil);
     }
     bool active=false,loaded=false;
-    int next=0,reassess=-1,target=-1;
+    int next=0,reassess=-1,target=-1,nextFollow=0;
     AIFloat3 station(-1.0f,0.0f,-1.0f);
     int interval=300;
     float threat=0.0f,arrival=240.0f,exitRadius=512.0f,waypointRadius=64.0f;
@@ -193,6 +193,41 @@ namespace FrontlineEngineering {
         }
         return path;
     }
+    bool TryStation(EngineeringLanes::Lane@ lane) {
+        int lead=-1;
+        array<AIFloat3>@ leadPath;
+        for(uint i=0;i<seats.length();++i) {
+            CCircuitUnit@ u=ai.GetTeamUnit(seats[i].id);
+            if(seats[i].helper || !Eligible(u) || Protected(u)) continue;
+            array<AIFloat3>@ path=SafeRoute(u,lane.station);
+            if(path.length()==0) continue;
+            lead=int(i);@leadPath=path;break;
+        }
+        if(lead<0) return false;
+        target=lane.team;station=lane.station;
+        for(uint i=0;i<seats.length();++i) {
+            seats[i].route.resize(0);seats[i].waypoint=0;seats[i].issued=-1;
+            seats[i].retry=ai.frame;
+        }
+        seats[lead].route=leadPath;
+        nextFollow=ai.frame+30*SECOND;
+        GenericHelpers::LogUtil("[FrontlineEngineering] lane="+target+" held="+int(lane.share*100.0f)+"% members="+seats.length(),1);
+        return true;
+    }
+    void FollowAssignedLane() {
+        if(target<0 || ai.frame<nextFollow) return;
+        nextFollow=ai.frame+30*SECOND;
+        // Five minutes governs switching lanes, not following our current
+        // lane's front. Only fresh movement >=128 triggers a route solve.
+        // No re-ranking; O(L) small summaries, then the existing safe admission.
+        for(uint i=0;i<EngineeringLanes::lanes.length();++i) {
+            EngineeringLanes::Lane@ lane=EngineeringLanes::lanes[i];
+            if(lane.team!=target) continue;
+            if(ai.frame-lane.frame<=45*SECOND && lane.share>=0 && station.distance2D(lane.station)>=128)
+                TryStation(lane);
+            return;
+        }
+    }
     void SelectLane() {
         reassess=ai.frame+interval*SECOND;
         // Sort only allied lane summaries. Route work happens once per candidate
@@ -214,27 +249,7 @@ namespace FrontlineEngineering {
         for(uint attempt=0;attempt<ranked.length();++attempt) {
             EngineeringLanes::Lane@ lane=EngineeringLanes::lanes[ranked[attempt]];
             if(target==lane.team && station.distance2D(lane.station)<128.0f) return;
-            int lead=-1;
-            array<AIFloat3>@ leadPath;
-            for(uint i=0;i<seats.length();++i) {
-                CCircuitUnit@ u=ai.GetTeamUnit(seats[i].id);
-                // Assistants or one boxed-in constructor must not veto the
-                // entire group. A reachable T2 constructor admits the lane;
-                // remaining members independently catch up through SafeRoute.
-                if(seats[i].helper || !Eligible(u) || Protected(u)) continue;
-                array<AIFloat3>@ path=SafeRoute(u,lane.station);
-                if(path.length()==0) continue;
-                lead=int(i);@leadPath=path;break;
-            }
-            if(lead<0) continue;
-            target=lane.team;station=lane.station;
-            for(uint i=0;i<seats.length();++i) {
-                seats[i].route.resize(0);seats[i].waypoint=0;seats[i].issued=-1;
-                seats[i].retry=ai.frame;
-            }
-            seats[lead].route=leadPath;
-            GenericHelpers::LogUtil("[FrontlineEngineering] lane="+target+" held="+int(lane.share*100.0f)+"% members="+seats.length(),1);
-            return;
+            if(TryStation(lane)) return;
         }
         if(target<0) {
             reassess=ai.frame+30*SECOND; // no first deployment yet
@@ -303,6 +318,7 @@ namespace FrontlineEngineering {
         }
         if(seats.length()==0) return;
         if(FrontlineEngineeringMath::ReassessmentDue(ai.frame,reassess)) SelectLane();
+        else FollowAssignedLane();
         for(uint i=0;i<seats.length();++i) {
             Seat@ seat=seats[i];CCircuitUnit@ u=ai.GetTeamUnit(seat.id);
             if(Protected(u)) continue;

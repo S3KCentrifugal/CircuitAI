@@ -5,7 +5,7 @@ namespace EngineeringProbe {
     array<bool> relocated;
     array<bool> deployed;
     array<int> helpers;
-    bool cooperative=false, isolated=true,emergencyChecked=false;
+    bool cooperative=false, isolated=true,emergencyChecked=false,followChecked=false;
     int lostHelper=-1;
     void Check(const string& in name,bool pass) {
         AiLog("[EngineeringProbe] "+(pass?"PASS ":"FAIL ")+name);
@@ -67,10 +67,15 @@ namespace EngineeringProbe {
             EngineeringLanes::Lane@ lane=EngineeringLanes::lanes[i];
             lane.frame=ai.frame;
             lane.share=lane.team==1?.2f:(phase>=2?.1f:.6f);
-            lane.station=AIFloat3(lane.team==1?4500:4000,0,1600);
+            lane.station=AIFloat3(lane.team==1?(helpers.length()>0 && ai.frame>=120*SECOND?4800:4500):4000,0,1600);
             if(helpers.length()>0) lane.combatDistance=100;
         }
         if(helpers.length()>0) {
+            if(!followChecked && ai.frame>=160*SECOND) {
+                followChecked=true;
+                Check("follows_current_lane",FrontlineEngineering::target==1 && FrontlineEngineering::station.x==4800
+                    && FrontlineEngineering::reassess==selectedAt+300*SECOND);
+            }
             int building=0;
             for(uint i=0;i<helpers.length();++i) {
                 CCircuitUnit@ u=ai.GetTeamUnit(helpers[i]);

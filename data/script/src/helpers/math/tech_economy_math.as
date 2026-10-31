@@ -1,5 +1,13 @@
 // Pure economy decisions shared by TECH policy and its actual-VM tests.
 namespace TechEconomyMath {
+    bool KeepConstruction(bool live, bool construction, bool hasTarget, float progress) {
+        return live && construction && (!hasTarget || progress < 1.0f);
+    }
+
+    bool SingleProjectAvailable(int queued, int unfinished) {
+        return queued == 0 && unfinished == 0;
+    }
+    bool StructureAssistAllowed(bool mobile) { return !mobile; }
     int ConstructorOpeningTarget(int opening, int retained, int requests) {
         return requests > 0 && retained > opening ? retained : opening;
     }

@@ -309,7 +309,6 @@ namespace Tech {
             float PlanAirConstructorsFromMetal = 200.0f;    // D-080: from this income T2 construction aircraft are the mobile build power
             float PlanAirConstructorPerMetal = 40.0f;       // D-080: one T2 air constructor per this much income ...
             int PlanMaxAirConstructors = 12;                // D-080: ... at most this many
-            int LadderParallelAfus = 2;                     // D-080: advanced fusions under construction at once on the ladder while the metal bank is full
             float InvariantLabReachSeconds = 90.0f;         // D-085 INV-016 / D-088 INV-017 patience         // D-085: INV-016 - the advanced lab standing this long with no static build power within ExpLabBuildPowerReach is a violation
             float InvariantDearOrderSeconds = 45.0f;        // D-084: INV-015 - a dear chain order with no frame this long is a violation
             float InvariantLadderFloatSeconds = 60.0f;      // D-080: INV-011 - the metal bank full this long with an income step unmet is a violation
@@ -457,8 +456,8 @@ namespace Tech {
             float LayoutLabServedReach = 300.0f;
             int LayoutLabMinSlots = 4;               // D-090: 8 found no site on Supreme (best 7)               // D-088: a lab site needs this many turret slots within reach (weighted) to be considered
             int LayoutLabFrontGapCells = 3;          // D-096: the advanced lab's front-line site may stand this many cells ahead of turret row 0 (the zone's edge, a rock)
-            int LayoutAfusSetSize = 3;               // D-101: advanced fusions per set: the first flush against a turret, the rest lined up away from it
-            int LayoutConvSetSize = 5;               // D-101: advanced converters per set, the same way
+            int LayoutAfusSetSize = 1;               // Re-rank around all sides for each reactor; do not project a three-reactor line
+            int LayoutConvSetSize = 1;               // Reserve converters individually around available support
             int LayoutSetMaximumTurretGapCells = 0;  // first member touches a supporting turret footprint
             float LayoutSetHoldSeconds = 300.0f;     // D-101: a set's unserved slots are released when nothing asked for its def this long
             float LayoutFrontMinCost = 1500.0f;      // D-096: a seen enemy group counts as a front at this metal cost; until one is seen the front is the map centre

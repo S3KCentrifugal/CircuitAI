@@ -289,6 +289,10 @@ namespace TechRules {
     bool GantryScaleDue(Ctx@ c)        { return TechGantryScale::Due(); }        // D-288: O(1), set at 1 Hz
     IUnitTask@ DoGantryScale(Ctx@ c)   { return TechGantryScale::Work(c.u); }    // D-288
     IUnitTask@ DoKeepCurrent(Ctx@ c)    { return TechBuild::KeepCurrent(c.u); }
+    IUnitTask@ DoEconomySupport(Ctx@ c) { return Layout::EconomySupport(c.u); }
+    IUnitTask@ DoAirReactor(Ctx@ c) {
+        return UnitHelpers::IsAirConstructor(c.u.circuitDef) ? TechBuild::AssistAfus(c.u) : null;
+    }
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
     IUnitTask@ DoCompactSupport(Ctx@ c) { return c.draining ? null : CompactEco::SupportTask(c.u); }
@@ -485,6 +489,8 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
+        table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));
+        table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors finish the shared advanced fusion before discretionary work"));
         table.insertLast(Rule("engineering.front", MOBILE, W1(@T2LandReleased), @DoEngineering, "Released T2 bots and fast assistants reinforce the least-progressed reachable FRONT lane"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));

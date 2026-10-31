@@ -1,0 +1,15 @@
+{
+  "name":"tech-energy-focus", "unit":"corcom", "side":"cortex", "role":"TECH", "enemy_role":"FRONT",
+  "description":"Supplied construction verifies one AFUS commitment through queue, frame and task retirement, plus idle air assistance and Fiend exclusion.",
+  "map":"Comet Catcher Remake 1.8", "map_key":"comet", "starts":[[3000,3000],[4000,3000],[6000,5000]],
+  "ally_spots":"1,2", "commander_initial":false,
+  "groups":[
+    {"unit":"corack","team":0,"count":1,"position":[4100,1600],"after_seconds":10},
+    {"unit":"coraca","team":0,"count":1,"position":[4100,1750],"after_seconds":10},
+    {"unit":"corca","team":0,"count":1,"position":[5500,1600],"after_seconds":10},
+    {"unit":"corfast","team":0,"count":1,"position":[5300,1600],"after_seconds":10},
+    {"unit":"corfus","team":0,"count":4,"position":[2500,2500],"spacing":160,"columns":2,"after_seconds":10}
+  ],
+  "photos":[], "start_metal":100000,"start_energy":1000000,"checks":"tech-energy-focus",
+  "assertions":{"min_kills":0,"min_shooters":0,"max_losses":0},"hold_all":true,"hold_teams":[1,2],"enemy_team":2
+}

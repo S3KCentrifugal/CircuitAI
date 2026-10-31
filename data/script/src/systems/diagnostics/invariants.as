@@ -763,6 +763,7 @@ namespace Invariants {
                 CCircuitUnit@ du = (id < 0) ? null : ai.GetTeamUnit(id);
                 IBuilderTask@ bt = (du is null || du.task is null) ? null : cast<IBuilderTask>(du.task);
                 if (bt is null || bt.buildDef is null || bt.buildDef.GetName() == own) continue;
+                if(du.task is Layout::economySupportTask) continue; // support prerequisite, not unrelated work
                 // D-306: dedicated workers may finish pinned economy recovery;
                 // the AFUS worker may also build/assist admitted conversion.
                 if (Global::AISettings::Role == AiRole::TECH) {

@@ -963,7 +963,7 @@ namespace AirBuild {
             CCircuitDef@ d = ai.GetCircuitDef(names[i]);
             if (!Can(u, d)) continue;
             const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
-            if (!reactor && AirEconomy::CompletedAfus() > 0) continue;
+            if (!reactor && reactorIncome) continue;
             if (reactor && (Busy(ai.GetCircuitDef(fusion), Task::BuildType::ENERGY) || Busy(ai.GetCircuitDef(advancedFusion), Task::BuildType::ENERGY))) continue;
             if (!reactor && !ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 50.0f, float(pending) * d.costM, d.costM, 20.0f)) continue;
             IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor, walkRadius);

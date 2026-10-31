@@ -1244,12 +1244,11 @@ namespace TechChain
         CCircuitDef@ afus = ai.GetCircuitDef(DefFor("afus"));
         if (afus is null) return null;
         const int building = aiBuilderMgr.GetUnfinishedCount(afus);
-        // a full metal bank means the ladder is build-power and order bound, not
-        // metal bound: another advanced fusion in parallel, up to LadderParallelAfus
-        const bool another = TechBuild::MetalFullLong() && building < Global::RoleSettings::Tech::LadderParallelAfus && u.circuitDef.CanBuild(afus);
-        if (building > 0 && !another) {
+        // Complete one reactor before spending on another, even at full metal.
+        if (building > 0) {
             CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, afus);
             if (frame !is null) { Trace("assist the advanced fusion", i, s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+            return null;
         }
         if (!u.circuitDef.CanBuild(afus)) return null;
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), afus) > 0) { Trace("advanced fusion order out", i, s, have, u); return null; }

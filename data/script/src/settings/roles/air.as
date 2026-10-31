@@ -6,6 +6,9 @@ namespace RoleSettings {
 namespace Air {
             // AIR owns these settings and all air.* reservations. TECH never reads them.
             bool ExperimentalBuild = true;
+            float ReclaimEnergyMargin = 1.15f; // remaining income must cover current pull
+            float ReclaimEnergyRadius = 2500.0f;
+            int ReclaimEnergyConcurrent = 2; // bounded incremental cleanup, not fleet-wide retirement
             bool FundFirstLab = false; // balanced opt-in; later factories retain Transition
             float FirstLabFundingSeconds = 180.0f;
             float FirstLabIncomeShare = 0.75f; // leave income and a bank for immediate defence

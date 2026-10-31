@@ -8,6 +8,12 @@
   "completion_grace_seconds": 8,
   "expect": [
     {
+      "key": "follows_current_lane",
+      "pattern": "\\[EngineeringProbe\\] PASS follows_current_lane",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
       "key": "unavailable_helper_no_veto",
       "pattern": "\\[EngineeringProbe\\] PASS unavailable_helper_no_veto",
       "scope": "any",
