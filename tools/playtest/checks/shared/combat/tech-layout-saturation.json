@@ -7,6 +7,8 @@
   },
   "completion_grace_seconds": 8,
   "expect": [
+    {"key":"distant_support_bound","pattern":"\\[TechLayoutProbe\\] PASS distant_support_bound","scope":"any","by_minute":2.8},
+    {"key":"home_air_builds_with_engineers","pattern":"\\[TechLayoutProbe\\] PASS home_air_builds_with_engineers","scope":"any","by_minute":2.8},
     {
       "key": "fixture",
       "pattern": "\\[TechLayoutProbe\\] PASS fixture",

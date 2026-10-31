@@ -1,4 +1,4 @@
-"""Focused TECH single-reactor and air-assistance check. Supplied units/economy, not a benchmark."""
+"""TECH layout and engineering/home-worker isolation check. Supplied economy, not a benchmark."""
 import argparse
 import json
 import subprocess
@@ -16,13 +16,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dll', type=Path, required=True)
     parser.add_argument('--data', type=Path, required=True)
+    parser.add_argument('--mode', choices=['fast', 'visual'], default='fast')
     args = parser.parse_args()
     case = 'tech-layout-saturation'
     probe_name = 'tech_layout_probe'
     namespace = 'TechLayoutProbe'
     arena = argparse.Namespace(case=case, dll=args.dll, data=args.data,
         variant='ranged', profile='experimental_balanced', game=None, seed=2071,
-        minutes=3, speed=20, mode='fast', headless=False)
+        minutes=3, speed=20, mode=args.mode, headless=False)
     directory, call = ranged_arena.prepare(arena)
     source = directory/'AI/Skirmish/BARbTest/test/script'
     probe = playtest.HERE/'fixtures'/f'{probe_name}.as'

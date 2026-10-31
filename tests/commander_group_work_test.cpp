@@ -5,6 +5,13 @@
 #include <array>
 using namespace circuit::commander;
 int main() {
+    for(bool front:{false,true}) for(bool anchor:{false,true}) for(bool member:{false,true}) {
+        assert(SupportBoundaryApplies(front,anchor,member)==(!front && anchor && member));
+    }
+    // Home aircraft and constructors remain unrestricted as engineering moves
+    // away; enrolled workers retain their radius, and FRONT uses its own policy.
+    assert(!SupportBoundaryApplies(false,true,false));
+    assert(SupportBoundaryApplies(false,true,true));
     // Exercise every combination of available offers. Routine weapons cannot
     // suppress a ready sensor; urgent counters win, and owed nanos defer sensors.
     // An accepted offer must stop evaluation (placement has side effects).
