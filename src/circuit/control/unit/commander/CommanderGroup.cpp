@@ -209,7 +209,10 @@ bool CCommanderController::GroupSiteAllowed(CCircuitUnit* unit,const AIFloat3& s
 // local capture window; factories/radars/other group work keep their boundary.
 // Geometry only, no engine collection query. Income gates offers, not retention.
 bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const AIFloat3& site) const {
-    if(!role.frontDuty && supportAnchor>=0) {
+    // Engineering's anchor must not constrain TECH's unrelated home builders.
+    // Fixed-size membership lookup; commander_group_work_test covers ownership.
+    if(commander::SupportBoundaryApplies(role.frontDuty,supportAnchor>=0,
+        unit && IsGroupMember(unit->GetId()))) {
         auto* anchor=ai->GetTeamUnit(supportAnchor);
         return anchor && site.SqDistance2D(anchor->GetPos(ai->GetLastFrame()))<=SQUARE(cfg->group.radius);
     }

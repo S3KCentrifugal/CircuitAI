@@ -1,5 +1,5 @@
 namespace TechLayoutProbe {
-    int phase=0,worker=-1,reactorWorker=-1,slot=-1;
+    int phase=0,worker=-1,reactorWorker=-1,anchor=-1,slot=-1;
     AIFloat3 site;
     IUnitTask@ work;
     IUnitTask@ Retain(CCircuitUnit@ u) {
@@ -16,6 +16,7 @@ namespace TechLayoutProbe {
                 const string name=ai.GetTeamUnit(ids[i]).circuitDef.GetName();
                 if(name=="coraca") reactorWorker=ids[i];
                 if(name=="corca") worker=ids[i];
+                if(name=="corack") anchor=ids[i];
             }
             @Layout::nano=ai.GetCircuitDef("cornanotc");Layout::nano.maxThisUnit=100;
             Layout::planned=true;Layout::fallback=false;Layout::facing=0;Layout::extraZones.resize(0);
@@ -25,7 +26,7 @@ namespace TechLayoutProbe {
             Layout::nanoGroup=aiTerrainMgr.LayBand(Layout::boxZone,Layout::nano,Layout::boxCentre,0,4,2,0,true,true,true);
             Layout::fwdGroup=aiTerrainMgr.LayBand(Layout::fwdZone,Layout::nano,Layout::fwdCentre,0,4,2,0,true,true,true);
             CCircuitDef@ af=ai.GetCircuitDef("corafus");af.maxThisUnit=20;
-            Check("fixture",worker>=0 && Layout::nanoGroup>0 && Layout::fwdGroup>0);
+            Check("fixture",worker>=0 && reactorWorker>=0 && anchor>=0 && Layout::nanoGroup>0 && Layout::fwdGroup>0);
             if(worker<0 || Layout::nanoGroup<=0) return;
             slot=Layout::PackSetAnywhere(af,Layout::boxCentre,1);
             site=aiTerrainMgr.GetReservationPos(slot);
@@ -49,6 +50,12 @@ namespace TechLayoutProbe {
             Check("all_sides_used",west && east && north && south);
             Check("overflow_only_when_full",overflow && full);
 
+            // Bind a distant engineering cohort through the real native entry.
+            // The home aircraft is not enrolled and must not inherit its radius.
+            aiBuilderMgr.SupportDefenseWork(ai.GetTeamUnit(reactorWorker),anchor,anchor,-1,-1);
+            Check("distant_support_bound",anchor>=0
+                && ai.GetTeamUnit(anchor).GetPos(ai.frame).distance2D(site)>1200);
+
             Layout::PrepareEconomySupport(site);
             @work=Layout::EconomySupport(ai.GetTeamUnit(worker));
             Check("support_ordered",work !is null && cast<IBuilderTask>(work).buildDef is Layout::nano);
@@ -60,6 +67,13 @@ namespace TechLayoutProbe {
             IBuilderTask@ build=cast<IBuilderTask>(work);
             Check("reactor_supported",build !is null && build.buildDef.GetName()=="corafus" && Layout::HasEconomySupport(build.GetBuildPos()));
             if(work !is null) aiBuilderMgr.AssignTask(ai.GetTeamUnit(worker),work);
+        }
+        if(phase==2) {
+            IBuilderTask@ build=cast<IBuilderTask>(work);
+            CCircuitUnit@ frame=build is null ? null : build.target;
+            if(frame is null || frame.GetBuildProgress()<=0.001f) return;
+            phase=3;
+            Check("home_air_builds_with_engineers",frame.circuitDef.GetName()=="corafus");
             AiLog("[TechLayoutProbe] complete");
         }
     }

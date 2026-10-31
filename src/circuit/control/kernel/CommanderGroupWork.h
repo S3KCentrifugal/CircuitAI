@@ -3,6 +3,11 @@
 
 namespace circuit::commander {
 enum class ConstructionPhase { URGENT, NANO, SENSORS, DEFENSE };
+// A support anchor is shared controller state, but its radius owns only the
+// enrolled workers. No scan/allocation: membership is supplied by the caller.
+inline bool SupportBoundaryApplies(bool frontDuty, bool hasAnchor, bool member) {
+    return !frontDuty && hasAnchor && member;
+}
 // Lazy offers: stop at the first accepted job, with no candidate allocation or
 // speculative placement. The caller shares one defense decision across URGENT
 // and DEFENSE. Tests exercise competing offers and the nano obligation.
