@@ -58,6 +58,7 @@
 		"health_shot_seconds": 2,
 		"front_mex_los": 1,
 		"front_mex_defence": 1,
+        "front_mex_min_income": 12,
 		"front_line_enabled": 1,
 		"front_line_fog": 1000,
 		"front_fortify_bank": 0,
@@ -76,7 +77,7 @@
 		"advance_roles": "FRONT,TACTICAL",
 		"front_repair_combat": 1,
 		"front_solar_income": 400, "front_solar_storage": 0.2, "front_solar_radius": 300,
-		"front_ladder": "repair_combat,mex_lane,commander_group,mex_defence,territory_line,advance,hold",
+		"front_ladder": "repair_combat,mex_defence,mex_lane,commander_group,territory_line,advance,hold",
 		// D-357 corridor mex sweep: spots within half-width + front_mex_reach (0: build
 		// distance) of the lane, front_mex_behind behind to front_mex_ahead ahead of the
 		// commander, en route every front_mex_seconds; enemy extractors there are

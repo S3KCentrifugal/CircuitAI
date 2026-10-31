@@ -2,6 +2,11 @@
 #include <limits>
 #include "control/kernel/CommanderCombat.h"
 namespace circuit::commander {
+// Policy inputs are explicit; exact boundaries are excluded. No engine work.
+inline bool ExpansionMexEligible(float income,float minimum,float distanceSquared,float baseRadius) {
+    return minimum>0.f && income>minimum && baseRadius>=0.f
+        && distanceSquared>baseRadius*baseRadius;
+}
 struct DefenceExclusion { Point center; float radius; };
 inline bool DefenceSpaced(Point site,const std::vector<DefenceExclusion>& exclusions) {
     for(const auto& exclusion:exclusions) {

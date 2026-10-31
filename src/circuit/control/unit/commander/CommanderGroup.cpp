@@ -174,7 +174,7 @@ bool CCommanderController::CanResumeFrontTask(CCircuitUnit* unit,IUnitTask* task
     // before a corridor exists; it must not need a lane/base-layout detour.
     if(definition->GetId()==int(cfg->front.solarDef))
         return at.SqDistance2D(pos)<=SQUARE(cfg->front.solarRadius);
-    if(!GroupSiteAllowed(unit,at)) return false;
+    if(!GroupBuildSiteAllowed(unit,definition,at)) return false;
     auto* worker=groupJob && !groupJob->GetAssignees().empty()?*groupJob->GetAssignees().begin():nullptr;
     const int defId=definition->GetId();
     // GroupSiteAllowed already confines assistance to the assigned territory.
@@ -202,9 +202,22 @@ bool CCommanderController::GroupSiteAllowed(CCircuitUnit* unit,const AIFloat3& s
     return battle->GetFrontLaneDistance(site)<=battle->GetFrontLaneWidth()
         +(cfg->front.laneMargin>0?cfg->front.laneMargin:unit->GetCircuitDef()->GetBuildDistance());
 }
+// An expansion mex may be on the lane's start connector, outside the group's
+// narrower territory polygon. Only LLTs and their nano support inherit that
+// local capture window; factories/radars/other group work keep their boundary.
+// Geometry only, no engine collection query. Income gates offers, not retention.
+bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const AIFloat3& site) const {
+    if(GroupSiteAllowed(unit,site)) return true;
+    Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
+    if(!unit || !def || cfg->front.mexMinIncome<=0
+        || (def->GetId()!=int(cfg->front.lineDef) && def->GetId()!=groupNano)) return false;
+    auto* anchor=Handles(unit)?unit:GroupCommander();
+    return anchor && LaneMexSiteAllowed(anchor,site);
+}
+
 bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site) const {
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
-    if(!GroupSiteAllowed(unit,site) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
+    if(!GroupBuildSiteAllowed(unit,def,site) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
     if(!IsGroupMember(unit->GetId())) return true;
     auto* anchor=GroupCommander();
     return anchor && def && commander::GroupJobInRange(site.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
@@ -267,7 +280,7 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
     const auto center=anchor->GetPos(frame);
     const auto coverage=GroupJammerCoverage(unit,def,site,160.f);
     CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
-        return GroupSiteAllowed(unit,p) && GroupLaneWorkAllowed(unit,def,p)
+        return GroupBuildSiteAllowed(unit,def,p) && GroupLaneWorkAllowed(unit,def,p)
             && coverage.NearUnjammed({p.x,p.z},cfg->group.jammerEdge)
             && p.SqDistance2D(center)<=SQUARE(cfg->group.radius)
             && ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat
@@ -365,7 +378,7 @@ bool CCommanderController::GroupProjectAllowed(CCircuitUnit* unit,IUnitTask* tas
             >SQUARE(unit->GetCircuitDef()->GetBuildDistance())) return false;
     }
     auto* anchor=GroupCommander();
-    return anchor && OnMap(at) && GroupSiteAllowed(unit,at) && GroupLaneWorkAllowed(unit,def,at)
+    return anchor && OnMap(at) && GroupBuildSiteAllowed(unit,def,at) && GroupLaneWorkAllowed(unit,def,at)
         && ai->GetThreatMap()->GetThreatAt(unit,at)<=cfg->front.threat
         && commander::GroupJobInRange(at.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
             cfg->group.radius,unit->GetCircuitDef()->GetBuildDistance(),unit->GetTask()==task);
@@ -480,6 +493,11 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
         // travelling to its reserved site must not bounce back into follow.
         if(current==groupJob) return current;
         if(nearby && groupJob->CanAssignTo(unit)) return groupJob;
+    }
+    if(builder && nearby && !groupJob && Handles(unit)) {
+        if(auto* state=states.Find(unit->GetId()))
+            if(auto* task=ExpansionMexWork(unit,*state,ai->GetCircuitDefSafe(int(cfg->front.lineDef)),frame))
+                return TrackGroupJob(task);
     }
     if(builder && nearby && !groupJob) {
         if(auto* task=GroupPlannedDefense(unit,anchor,frame)) return task;

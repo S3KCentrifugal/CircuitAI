@@ -250,7 +250,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
     if(kind==20) return GroupAssist(unit);
     // Every normal defensive offer shares tier selection and the following
     // nano obligation, even while the assigned T2 worker is still en route.
-    if(role.frontDuty && (kind==WORK_MEX_DEFENCE || kind==WORK_TERRITORY_LINE
+    if(role.frontDuty && ((kind==WORK_MEX_DEFENCE && cfg->front.mexMinIncome<=0) || kind==WORK_TERRITORY_LINE
         || kind==WORK_LINE || kind==WORK_TIMED || kind==WORK_RADAR || kind==2 || kind==3))
         return GroupWork(unit);
     if(GroupActive(unit) && kind==WORK_MEX_LANE) buildDef=nullptr;

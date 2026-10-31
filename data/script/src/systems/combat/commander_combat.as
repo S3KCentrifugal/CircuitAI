@@ -103,6 +103,8 @@ namespace CommanderCombat {
             Option("commander_group_radar_priority",2.f);
             Option("commander_group_line_priority",1.f);
             Option("front_mex_defence",0.f);
+            Option("front_mex_min_income",0.f);
+            Option("front_mex_base_radius",Global::RoleSettings::Front::AllyRange);
             Option("front_line_enabled",0.f);
             Option("front_line_fog",1000.f);
             Option("front_fortify_bank",.5f);

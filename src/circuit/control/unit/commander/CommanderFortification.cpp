@@ -1,6 +1,7 @@
 #include "control/unit/commander/CommanderController.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
+#include "setup/SetupManager.h"
 #include "terrain/BattleAnalysis.h"
 #include "terrain/TerrainManager.h"
 #include "control/kernel/CommanderFortification.h"
@@ -99,7 +100,7 @@ IUnitTask* CCommanderController::FortifySite(CCircuitUnit* unit,CCircuitDef* def
     const auto groupCenter=groupCommander?groupCommander->GetPos(frame):site;
     const float groupSight=groupCommander?cfg->group.radius:0.f;
     CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
-        if(!GroupSiteAllowed(unit,p)) return false;
+        if(!GroupBuildSiteAllowed(unit,def,p)) return false;
         // Reject before enqueueing/spending the incremental allowance. The
         // final build guard also enforces this, but an invalid offer otherwise
         // repeatedly abandons defenses after replacement (support-replace).
@@ -160,6 +161,73 @@ IUnitTask* CCommanderController::FortifySite(CCircuitUnit* unit,CCircuitDef* def
     if(task && IsGroupMember(unit->GetId())) ai->LOG("[CommanderGroup] unit=%i defence=%s nano_after=1",unit->GetId(),def->GetDef()->GetName());
     if(task) ai->LOG("[CommanderFront] unit=%i fortify_site x=%.0f z=%.0f line=%i frame=%i",unit->GetId(),at.x,at.z,int(coveragePoint!=nullptr),frame);
     return task;
+}
+
+// Local reconciliation, not completion debt: covers allied/constructor-built
+// mexes and retries after turret loss. No whole-map scan or retained unit pointers.
+// Per eligible offer O(K + M*(F+Q)) for local units K, mexes M, nearby defenses F
+// and queued defenses Q. Three placement alternatives; existing task cadence.
+IUnitTask* CCommanderController::ExpansionMexWork(CCircuitUnit* unit,State& s,CCircuitDef* def,int frame) {
+    static const bool trace=std::getenv("CIRCUIT_COMMANDER_TRACE")!=nullptr;
+    if(cfg->front.mexMinIncome<=0 || cfg->front.mexDefence<=0 || !Handles(unit)
+        || !role.frontReady || !def || !unit->GetCircuitDef()->CanBuild(def)
+        || HealthRetreat(unit) || EnergyRetreat(unit) || FallbackActive(s,frame)
+        || groupJob || groupNanoDue || frame<s.front.expansionMexNext) return nullptr;
+    const float income=ai->GetEconomyManager()->GetAvgMetalIncome();
+    if(income<=cfg->front.mexMinIncome) return nullptr;
+    // Preserve the existing three-second fortification retry interval. Do not
+    // cache coverage: the next offer sees deaths, transfers and new frames.
+    s.front.expansionMexNext=frame+3*FRAMES_PER_SEC;
+    const auto origin=ai->GetSetupManager()->GetStartPos();
+    const auto center=unit->GetPos(frame);
+    const auto ids=ai->GetCallback()->GetFriendlyUnitIdsIn(center,cfg->front.radius,false);
+    const float range=def->GetMaxRange()*.8f;
+    for(int id:ids) {
+        CAllyUnit* mex=ai->GetTeamUnit(id);
+        if(!mex) mex=ai->GetFriendlyUnit(id);
+        if(!mex || !mex->GetCircuitDef()->IsMex() || mex->GetUnit()->IsBeingBuilt()) continue;
+        const auto pos=mex->GetPos(frame);
+        if(trace) ai->LOG("[ExpansionMex] mex=%i income=%.1f distance=%.0f base=%.0f lane=%i",id,income,std::sqrt(pos.SqDistance2D(origin)),cfg->front.mexBaseRadius,int(GroupBuildSiteAllowed(unit,def,pos)));
+        if(!commander::ExpansionMexEligible(income,cfg->front.mexMinIncome,pos.SqDistance2D(origin),cfg->front.mexBaseRadius)
+            || !GroupBuildSiteAllowed(unit,def,pos)) continue;
+        const auto offered=[&](IUnitTask* task) {
+            ai->LOG("[CommanderFront] unit=%i expansion_mex=%i income=%.1f base_distance=%.0f",unit->GetId(),id,income,std::sqrt(pos.SqDistance2D(origin)));
+            return task;
+        };
+        bool covered=false;
+        for(int other:ai->GetCallback()->GetFriendlyUnitIdsIn(pos,range,false)) {
+            CAllyUnit* turret=ai->GetTeamUnit(other);
+            if(!turret) turret=ai->GetFriendlyUnit(other);
+            // Allied snapshots can carry a different AI's definition pointer.
+            if(!turret || turret->GetCircuitDef()->GetId()!=def->GetId()) continue;
+            if(turret->GetUnit()->IsBeingBuilt()) {
+                if(!GroupBuildSiteAllowed(unit,def,turret->GetPos(frame))
+                    || ai->GetThreatMap()->GetThreatAt(unit,turret->GetPos(frame))>cfg->front.threat) continue;
+                if(auto* repair=ai->GetBuilderManager()->EnqueueRepairFor(turret,60*FRAMES_PER_SEC,unit))
+                    if(repair->CanAssignTo(unit)) return offered(repair);
+            }
+            covered=true;break;
+        }
+        if(covered) continue;
+        // Join queued work anywhere in coverage, before trying a different site.
+        for(auto* task:ai->GetBuilderManager()->GetTasks(BT::DEFENCE)) {
+            if(task->IsDead() || task->GetBuildDef()!=def || task->GetPosition().SqDistance2D(pos)>range*range) continue;
+            if(task->CanAssignTo(unit)) return offered(task);
+            covered=true;break;
+        }
+        if(covered) continue;
+        const auto forward=Heading(ai->GetBattle(),pos);
+        const commander::Point side{-forward.z,forward.x};
+        for(float lateral:{0.f,64.f,-64.f}) {
+            auto at=F(P(pos)+forward*std::min(cfg->front.mexOffset,range*.6f)+side*lateral);
+            if(!OnMap(at)) continue;
+            at.y=ai->GetMap()->GetElevationAt(at.x,at.z);
+            if(auto* task=FortifySite(unit,def,at,frame)) {
+                return offered(task);
+            }
+        }
+    }
+    return nullptr;
 }
 
 IUnitTask* CCommanderController::MexDefenceWork(CCircuitUnit* unit,State& s,CCircuitDef* def,int frame) {

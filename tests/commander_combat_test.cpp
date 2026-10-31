@@ -11,6 +11,13 @@ static Contact Enemy(int id,float x,float z,float cost=100) {
     Contact c; c.id=id; c.pos={x,z}; c.radius=12; c.cost=cost; c.health=500; c.damage=99999; return c;
 }
 int main(int argc,char** argv) {
+    assert(!ExpansionMexEligible(12,12,901.f*901,900));
+    assert(!ExpansionMexEligible(11,12,901.f*901,900));
+    assert(!ExpansionMexEligible(13,12,900.f*900,900));
+    assert(!ExpansionMexEligible(13,12,899.f*899,900));
+    assert(ExpansionMexEligible(12.01f,12,901.f*901,900));
+    assert(!ExpansionMexEligible(100,0,901.f*901,900));
+    assert(!ExpansionMexEligible(100,12,std::numeric_limits<float>::quiet_NaN(),900));
     {
         const auto sites=TerritoryLine({0,0},{1,0},450.f,[](Point p) {
             return p.z>=-1000 && p.z<=750;

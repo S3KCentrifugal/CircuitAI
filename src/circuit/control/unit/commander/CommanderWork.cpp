@@ -86,7 +86,14 @@ IUnitTask* CCommanderController::LadderWork(CCircuitUnit* unit,State& s,int kind
             return ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,area,0,true);
         }
         case WORK_TERRITORY_LINE: return holding?nullptr:defenseSettings.enabled>0?GroupWork(unit):TerritoryLineWork(unit,s,buildDef,frame);
-        case WORK_MEX_DEFENCE: return holding?nullptr:defenseSettings.enabled>0?GroupWork(unit):MexDefenceWork(unit,s,buildDef,frame);
+        case WORK_MEX_DEFENCE: {
+            if(holding) return nullptr;
+            if(cfg->front.mexMinIncome>0) {
+                auto* task=ExpansionMexWork(unit,s,buildDef,frame);
+                return task && GroupActive(unit)?TrackGroupJob(task):task;
+            }
+            return defenseSettings.enabled>0?GroupWork(unit):MexDefenceWork(unit,s,buildDef,frame);
+        }
         case WORK_MEX_LANE: return holding?nullptr:LaneMexWork(unit,s,buildDef,frame);
         case WORK_TIMED: {
             // First timed_until seconds of the game: one of buildDef every

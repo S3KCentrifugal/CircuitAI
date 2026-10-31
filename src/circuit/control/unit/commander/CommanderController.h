@@ -95,6 +95,7 @@ struct CommanderFrontState {
     // D-357 corridor mex sweep: distinct spots offered, the last one, and
     // whether the next lane offer is the turret that follows them.
     int laneMexCount=0; bool laneMexTurret=false;
+    int expansionMexNext=0;
     springai::AIFloat3 laneMexLast{-1,0,-1};
     // Completion-owned IDs, never borrowed unit pointers. Released with the
     // commander; destroyed/transferred mexes are removed on a work offer.
@@ -209,6 +210,7 @@ struct CommanderFrontConfig {
     float mexSeconds=0,stallSeconds=10,detourSeconds=0; // 0: no detour backoff
     float mexAA=-1,mexLos=0,radarSpacing=500;
     float persistent=0,mexDefence=0,lineEnabled=0;
+    float mexMinIncome=0,mexBaseRadius=900; // 0 income disables expansion LLT policy
     float lineFog=1000,lineSpacing=1.5f;
     float defenceSpacing=.5f;
     float lineDepth=800,mexOffset=160,workBehind=400;
@@ -308,6 +310,7 @@ public:
     void SyncDefenseClaim(IBuilderTask* task,int& token);
     bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
     bool GroupSiteAllowed(CCircuitUnit* unit,const springai::AIFloat3& site) const;
+    bool GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const springai::AIFloat3& site) const;
     commander::JammerCoverage GroupJammerCoverage(CCircuitUnit* unit,CCircuitDef* def,
         const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr);
     float GroupJammerMargin() const { return cfg->group.jammerEdge; }
@@ -506,6 +509,7 @@ private:
     float LaneMexAheadLimit(CCircuitUnit* unit,State& state,int frame,float own);
     // D-356: the "then home" latch of the lane push.
     bool PushHome(CCircuitUnit* unit,State& state,int frame);
+    IUnitTask* ExpansionMexWork(CCircuitUnit* unit,State& state,CCircuitDef* def,int frame);
     IUnitTask* MexDefenceWork(CCircuitUnit* unit,State& state,CCircuitDef* def,int frame);
     IUnitTask* TerritoryLineWork(CCircuitUnit* unit,State& state,CCircuitDef* def,int frame);
     IUnitTask* FortifySite(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& site,int frame,

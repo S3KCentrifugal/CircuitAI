@@ -249,7 +249,7 @@ function widget:UnitDestroyed(id,def,team,attacker,attackerDef,attackerTeam)
     if tracked[id] then log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil end
 end
 function widget:UnitFinished(id,def,team)
-    if (cfg.production or cfg.natural or cfg.commander_front_work) and tracked[id] then
+    if (cfg.production or cfg.natural or cfg.commander_front_work or cfg.expansion_mex_observation) and tracked[id] then
         log("finished id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost)
         if cfg.front_arrival and team==0 and tracked[id].child and (UnitDefs[def].extractsMetal or 0)>0 then
             frontMexes=frontMexes+1;log("front_mexes="..frontMexes)
@@ -257,6 +257,33 @@ function widget:UnitFinished(id,def,team)
     end
 end
 function widget:GameFrame(f)
+    if cfg.expansion_mex_observation and f%90==0 then
+        local sx,sz=cfg.starts[1][1],cfg.starts[1][2]
+        local done=0
+        if f%900==0 then
+            local _,_,_,income=Spring.GetTeamResources(0,"metal")
+            log("expansion_income="..tostring(income))
+        end
+        for _,id in ipairs(Spring.GetTeamUnits(0) or {}) do
+            local d=UnitDefs[Spring.GetUnitDefID(id)]
+            local x,_,z=Spring.GetUnitPosition(id)
+            local _,_,_,_,built=Spring.GetUnitHealth(id)
+            if d and (d.extractsMetal or 0)>0 and x and built==1 and (x-sx)^2+(z-sz)^2>900^2 then
+                for _,tid in ipairs(Spring.GetUnitsInCylinder(x,z,320,0) or {}) do
+                    local td=UnitDefs[Spring.GetUnitDefID(tid)]
+                    local _,_,_,_,tb=Spring.GetUnitHealth(tid)
+                    if td and td.name=="armllt" and tb==1 then
+                        done=done+1
+                        if tracked[tid] and tracked[tid].parent then
+                            log("expansion_llt_finished turret="..tid.." builder="..tracked[tid].parent)
+                        end
+                        break
+                    end
+                end
+            end
+        end
+        if done>0 then log("expansion_covered="..done) end
+    end
     -- Explicit supplied health fixture, never enabled in natural games. Verify
     -- the synced developer action took effect before accepting movement proof.
     if cfg.commander_health_fixture and f%3==0 then

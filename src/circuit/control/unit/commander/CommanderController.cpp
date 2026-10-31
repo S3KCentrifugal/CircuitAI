@@ -108,6 +108,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::workers>("front_workers",1,20),Front<&FC::mexAA>("front_mex_aa",-1,100000),
         Front<&FC::radarSpacing>("front_radar_spacing",64,4000),Front<&FC::mexLos>("front_mex_los",0,1),
         Front<&FC::persistent>("front_persistent",0,1),Front<&FC::mexDefence>("front_mex_defence",0,1),
+        Front<&FC::mexMinIncome>("front_mex_min_income",0,10000),Front<&FC::mexBaseRadius>("front_mex_base_radius",0,10000),
         Front<&FC::lineEnabled>("front_line_enabled",0,1),Front<&FC::lineFog>("front_line_fog",0,4000),
         Front<&FC::fortifyBank>("front_fortify_bank",0,1),Front<&FC::fortifyPriority>("front_fortify_priority",0,2),
         Front<&FC::fortifyAdvance>("front_fortify_advance",0,2000),

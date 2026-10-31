@@ -1076,7 +1076,7 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
     const auto coverage=control->GroupJammerCoverage(builder,buildDef,pos,searchRadius,this);
 	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control](const AIFloat3& p) {
 		return commander::DefenceSpaced({p.x,p.z},exclusions)
-            && control->GroupSiteAllowed(builder,p)
+            && control->GroupBuildSiteAllowed(builder,buildDef,p)
             && coverage.NearUnjammed({p.x,p.z},control->GroupJammerMargin())
             && manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
             && terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
