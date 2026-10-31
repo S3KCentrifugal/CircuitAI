@@ -76,6 +76,7 @@ namespace FrontOverflow {
     int blocks = 0;
     int blockRetry = -1;
     AIFloat3 blockCentre(-1.0f, 0.0f, -1.0f);
+    array<AIFloat3> allCells;   // every block's cells, for the log's placement check
 
     float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even 4x4 footprints sit on 16-elmo lines
 
@@ -136,6 +137,7 @@ namespace FrontOverflow {
         cellState.resize(cells.length()); cellTasks.resize(cells.length());
         for (uint i = 0; i < cells.length(); ++i) { cellState[i] = 0; @cellTasks[i] = null; }
         blockCentre = best; blocks++;
+        for (uint i = 0; i < cells.length(); ++i) allCells.insertLast(cells[i]);
         GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
             + Global::RoleSettings::Front::OverflowBlockCols + "x" + Global::RoleSettings::Front::OverflowBlockRows + ", eco anchor "
             + int(anchor.x) + "," + int(anchor.z) + ")", 1);
@@ -338,6 +340,22 @@ namespace FrontOverflow {
             fullSeconds = 0.0f; overE = 0.0f; minuteFrom = ai.frame;
         }
     }
+    // finished T2 converters: on a block cell (within 4 elmo), near one (within 32: built off its cell), elsewhere
+    string Placement(CCircuitDef@ d)
+    {
+        if (d is null) return "";
+        int on = 0, near = 0, away = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef !is d || u.GetBuildProgress() < 1.0f) continue;
+            const AIFloat3 p = u.GetPos(ai.frame);
+            float best = 1.0e9f;
+            for (uint k = 0; k < allCells.length(); ++k) best = AiMin(best, MapHelpers::SqDist(p, allCells[k]));
+            if (best <= 4.0f * 4.0f) on++; else if (best <= 32.0f * 32.0f) near++; else away++;
+        }
+        return " | placed " + on + " on cell " + near + " off cell " + away + " outside blocks";
+    }
     void Report()
     {
         CCircuitDef@ d = ConvDef();
@@ -351,7 +369,7 @@ namespace FrontOverflow {
             + " | full " + int(fullSeconds) + " s, over " + int(overE) + " E (" + int(overE / 60.0f) + "/s)"
             + " | total full " + int(totalFull) + " s, over " + int(totalOver) + " E"
             + " | T2 conv " + standing + " standing " + framed + " framed " + queued + " queued (+" + int(float(standing) * ConvMetal) + " M/s)"
-            + " | blocks " + blocks + " (" + inBlocks + " of " + cells.length() + " in the last, " + blockFails + " cells failed, " + ordered + " ordered)"
+            + " | blocks " + blocks + " (" + inBlocks + " of " + cells.length() + " in the last, " + blockFails + " cells failed, " + ordered + " ordered)" + Placement(d)
             + " | fusions " + FrontEcoLadder::Fusions() + " adv " + FrontEcoLadder::AdvFusions() + (FrontEcoLadder::FirstFusionStands() ? " (first fusion stands)" : "")
             + " own " + FrontEcoLadder::Done(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side))
             + " geo " + FrontEcoLadder::Equivalents(FrontEcoLadder::GeoLike, "", true)
