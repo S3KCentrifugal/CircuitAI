@@ -141,7 +141,7 @@ namespace Front {
             int EcoLadderFrameHelpers = 4;                // the ladder's constructors on a reactor frame at a time
             float EcoLadderFrameHelpRadius = 3000.0f;     // a frame this near the constructor
             float EcoLadderConvertBankPercent = 0.6f;
-            int EcoLadderGantryAfterAdvFusions = 2;
+            int EcoLadderGantryAfterAdvFusions = 2;       // the gantry step once this many advanced fusions stand (1 in experimental_balanced)
             // Owner (2026-10-31): rezzed fusions of other factions, underwater/cloaked fusions and every geothermal
             // plant (regular and advanced) count as fusions for the ladder, so one standing is "the first fusion stands"
             bool EcoLadderFusionEquivalents = false;
@@ -164,7 +164,7 @@ namespace Front {
             float OverflowExtraT2Spare = 1200.0f;
             int MexUpExtraT2Max = 3;              // extra T2 constructors while T1 mexes of ours wait for an upgrade
             int MexUpExtraAssistMax = 2;          // fast-assist bots (Butler, Twitcher, Proteus) for those upgrades
-            int OverflowRecruitSeconds = 30;      // one extra recruit at most this often       // the gantry step once this many advanced fusions stand (1 in experimental_balanced)
+            int OverflowRecruitSeconds = 30;      // one extra recruit at most this often
             // FRONT recovery after losing the base (systems/construction/front_recovery.as); off here, on in experimental_balanced
             bool Recovery = false;
             float RecoveryEnterMetalIncome = 15.0f;      // recovery starts below this metal income...

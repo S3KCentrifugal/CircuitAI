@@ -353,6 +353,8 @@ namespace FrontOverflow {
             + " | T2 conv " + standing + " standing " + framed + " framed " + queued + " queued (+" + int(float(standing) * ConvMetal) + " M/s)"
             + " | blocks " + blocks + " (" + inBlocks + " of " + cells.length() + " in the last, " + blockFails + " cells failed, " + ordered + " ordered)"
             + " | fusions " + FrontEcoLadder::Fusions() + " adv " + FrontEcoLadder::AdvFusions() + (FrontEcoLadder::FirstFusionStands() ? " (first fusion stands)" : "")
+            + " own " + FrontEcoLadder::Done(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side))
+            + " geo " + FrontEcoLadder::Equivalents(FrontEcoLadder::GeoLike, "", true)
             + " | T2 ctors " + (UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors()) + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2VehicleConstructors()))
             + " assist " + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllFastAssistBots()) + " recruited " + recruits
             + " | mexes T1 " + T1MexesLeft() + " T2 " + FrontEcoLadder::Total(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side))
