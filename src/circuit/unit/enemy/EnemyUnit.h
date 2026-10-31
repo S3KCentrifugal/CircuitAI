@@ -65,6 +65,9 @@ struct SEnemyData {
 	ICoreUnit::Id id;  // FIXME: duplicate
 	float cost;
 	LM losStatus;
+	// The owner team, cached the first time the unit is in LOS (the engine
+	// reads an enemy's team only then); -1 never seen. Debug strikes by team.
+	int team;
 
 	void SetInLOS()     { losStatus |= LosMask::LOS; }
 	void SetInRadar()   { losStatus |= LosMask::RADAR; }

@@ -50,6 +50,12 @@ namespace circuit {
 using namespace springai;
 
 #define TARGET_DELAY	(FRAMES_PER_SEC * 10)
+// Debug strikes: a team strike rescans this often (the nuke's aim-point scan is
+// quadratic in the team's known units, so less often); orders are renewed
+// before the engine's 60 s order timeout.
+#define DEBUG_RESCAN_LOL	(FRAMES_PER_SEC * 2)
+#define DEBUG_RESCAN_NUKE	(FRAMES_PER_SEC * 5)
+#define DEBUG_ORDER_RENEW	(FRAMES_PER_SEC * 30)
 
 CSuperTask::CSuperTask(ITaskModule* mgr)
 		: IFighterTask(mgr, IFighterTask::FightType::SUPER, 1.f)
@@ -110,6 +116,10 @@ void CSuperTask::Update()
 
 	if (unit->Blocker() != nullptr) {
 		return;  // Do not interrupt current action
+	}
+
+	if (UpdateDebug(unit)) {
+		return;  // the widget's debug strike owns this silo or cannon
 	}
 
 	if (!tierByDef.empty()) {
@@ -981,6 +991,12 @@ bool CSuperTask::IsNukeSilo(CCircuitDef* cdef)
 	return (name == "armsilo") || (name == "corsilo") || (name == "legsilo");
 }
 
+bool CSuperTask::IsLolCannon(CCircuitDef* cdef)
+{
+	const std::string name = cdef->GetDef()->GetName();
+	return (name == "armvulc") || (name == "corbuzz") || (name == "legstarfall");
+}
+
 AIFloat3 CSuperTask::GetAimPos() const
 {
 	if (!isTargetOverride && (GetTarget() != nullptr)) {
@@ -998,6 +1014,21 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
 	if (!nuke && !pulse) return;
 	if (frame - lastStrategicLaunch <= SMILEY_DEDUPE_EVENT) return;
+	if (nuke && debugEngaged) {
+		// Debug strike: no nuclear history, no overnuke count, and the
+		// attack-ground order stays, so every stocked missile goes there too
+		lastStrategicLaunch = frame;
+		debug::Strike& s = circuit->GetMilitaryManager()->GetDebugStrike(debug::NUKE);
+		++s.launches;
+		const AIFloat3 at = GetAimPos();
+		circuit->LOG("DEBUG: nuke launch %i from %s(%i) at (%.0f, %.0f) (%s)", s.launches,
+				d->GetDef()->GetName(), unit->GetId(), at.x, at.z, how);
+		if (geom::is_valid(at) && (frame - lastSmileyFrame > SMILEY_DEDUPE_EVENT)) {
+			lastSmileyFrame = frame;
+			circuit->DrawSmiley(at, SMILEY_RADIUS);
+		}
+		return;
+	}
 	const AIFloat3 aim = GetAimPos();
 	if (!CanAimStrategic(unit, aim)) circuit->LOG("[INVARIANT] INV-095 strategic launch violates target-area exclusion: unit=%i", unit->GetId());
 	lastStrategicLaunch = frame;
@@ -1273,6 +1304,199 @@ void CSuperTask::CountTierShot(CCircuitUnit* unit, int frame)
 	if (++tierRotation.shots >= tierDwellShots) {
 		targetFrame = frame - tierRetargetFrames;  // the next area at the next update
 	}
+}
+
+/*
+ * Debug strikes (owner 2026-10-31, DebugStrike.h). Every silo and cannon reads
+ * the strike its manager holds: a new serial is acted on at the next update, a
+ * team strike is rescanned every DEBUG_RESCAN_*, and nothing else is read while
+ * no strike is on (one int compare per update). Nuke: every silo, set to fire
+ * at will, at the position, or at the richest aim point of the team's scouted
+ * units (no friendly unit in the blast), until the strike is turned off or the
+ * team has nothing scouted left after a launch. Lolcannon: each cannon that
+ * reaches the position, or a scouted unit of the team, fires at it; the others
+ * keep their tiered fire. Turned off: stop, fire state back, normal targeting.
+ */
+bool CSuperTask::UpdateDebug(CCircuitUnit* unit)
+{
+	if (debugKind == -2) {
+		CCircuitDef* d = unit->GetCircuitDef();
+		debugKind = IsNukeSilo(d) ? debug::NUKE : IsLolCannon(d) ? debug::LOL : -1;
+	}
+	if (debugKind < 0) {
+		return false;
+	}
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	debug::Strike& s = circuit->GetMilitaryManager()->GetDebugStrike(debugKind);
+	const bool nuke = (debugKind == debug::NUKE);
+	if (s.Active() && ((s.serial != debugSerial)
+		|| (frame - debugCheckFrame >= (nuke ? DEBUG_RESCAN_NUKE : DEBUG_RESCAN_LOL))))
+	{
+		debugSerial = s.serial;
+		debugCheckFrame = frame;
+		DebugScan(unit, s);
+	}
+	if (!s.Active() || !debugApplies) {
+		if (debugEngaged) {
+			EndDebug(unit, !s.Active() ? ((s.mode == debug::Mode::DONE) ? "the team has no scouted unit left" : "strike off")
+					: (nuke ? "no target" : "out of range"));
+		}
+		return false;
+	}
+	if (!debugEngaged) {
+		debugEngaged = true;
+		debugOrderTargetId = -1;
+		if (nuke) {
+			TRY_UNIT(circuit, unit, unit->TrySetFireState(CCircuitDef::FireType::OPEN);)
+		}
+		circuit->LOG("DEBUG: %s(%i) joins the %s strike: %s", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+				nuke ? "nuke" : "lol", debug::Describe(s, 0).c_str());
+	}
+	if (!debugHasAim) {
+		if (State::ENGAGE == state) {  // a team strike waits for scouting: hold, never a target of our own
+			TRY_UNIT(circuit, unit, unit->CmdStop();)
+			SetTarget(nullptr);
+			state = State::ROAM;
+		}
+		return true;
+	}
+	DebugOrder(unit);
+	return true;
+}
+
+void CSuperTask::DebugScan(CCircuitUnit* unit, debug::Strike& s)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	const bool nuke = (debugKind == debug::NUKE);
+	debugApplies = false;
+	debugHasAim = false;
+	debugTargetId = -1;
+	if (s.mode == debug::Mode::POS) {
+		const AIFloat3 at(s.x, 0.f, s.z);
+		if (position.SqDistance2D(at) >= maxSqRange) {
+			return;  // out of reach: this one keeps its normal fire
+		}
+		debugApplies = debugHasAim = true;
+		debugAim = at;
+		debugAim.y = circuit->GetMap()->GetElevationAt(at.x, at.z);
+		return;
+	}
+
+	// Team strike: the team's units the AI has scouted (its enemy datas, team
+	// cached at first LOS): structures where last seen, mobiles in radar or LOS
+	const int team = s.team;
+	auto targetable = [team](const SEnemyData& e) {
+		return !e.IsFake() && !e.IsDead() && !e.IsDying() && !e.IsIgnore() && (e.cdef != nullptr) && (e.team == team)
+			&& (!e.cdef->IsMobile() || e.IsInRadarOrLOS());
+	};
+	const auto* enemies = circuit->GetEnemyManager();
+	if (nuke) {
+		int known = 0;
+		for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+			for (const SEnemyData& e : *pool) if (targetable(e)) ++known;
+		}
+		if (debug::TeamDone(s, known)) {
+			s.mode = debug::Mode::DONE;
+			circuit->LOG("DEBUG: nuke strike on team %i done after %i launches: no scouted unit of it left", team, s.launches);
+			return;
+		}
+		debugApplies = true;  // every silo: hold until there is a target
+		if ((known > 0) && SelectAreaTarget(unit, cdef, "DEBUG NUKE", SQUARE(cdef->GetAoe()), 1, 0,
+			[&targetable](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
+				if (!targetable(e)) return false;
+				rank = 0; value = e.cost; return true;
+			}, 0.f, true, true))
+		{
+			debugHasAim = true;
+			debugAim = targetPos;
+		}
+		return;
+	}
+
+	// lolcannon: the dearest of the team's units in range, then the nearest;
+	// the one under fire is kept while it is as dear (tier::Better, one tier)
+	const int canTargetCat = cdef->GetTargetCategory();
+	tier::Candidate best{-1, 0, 0.f, 0.f};
+	const SEnemyData* bestData = nullptr;
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+		for (const SEnemyData& e : *pool) {
+			if (!targetable(e) || ((canTargetCat & e.cdef->GetCategory()) == 0)) continue;
+			const float sqDist = position.SqDistance2D(e.pos);
+			if (sqDist >= maxSqRange) continue;
+			const tier::Candidate c{e.id, 1, e.cost, sqDist, e.pos.x, e.pos.z};
+			if (tier::Better(c, (bestData == nullptr) ? nullptr : &best, debugOrderTargetId)) {
+				best = c;
+				bestData = &e;
+			}
+		}
+	}
+	if (bestData == nullptr) {
+		return;  // none of the team's units in reach: tiered fire as usual
+	}
+	debugApplies = debugHasAim = true;
+	debugTargetId = bestData->id;
+	debugAim = bestData->pos;
+	debugAim.y = circuit->GetMap()->GetElevationAt(debugAim.x, debugAim.z);
+}
+
+void CSuperTask::DebugOrder(CCircuitUnit* unit)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	CEnemyInfo* info = (debugTargetId >= 0) ? circuit->GetEnemyInfo(debugTargetId) : nullptr;
+	const bool onUnit = (info != nullptr) && info->IsInRadarOrLOS() && !circuit->IsCheating();
+	const bool moved = (debugTargetId != debugOrderTargetId) || (onUnit != debugOrderOnUnit)
+			|| (!onUnit && (debugAim.SqDistance2D(debugOrderAim) > SQUARE(16.f)));
+	if (!moved && (State::ENGAGE == state) && (frame - debugOrderFrame < DEBUG_ORDER_RENEW)) {
+		return;  // still on it
+	}
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if (moved) {
+		circuit->LOG("DEBUG: %s(%i) fires at %s (%.0f, %.0f)%s", cdef->GetDef()->GetName(), unit->GetId(),
+				((info != nullptr) && (info->GetCircuitDef() != nullptr)) ? info->GetCircuitDef()->GetDef()->GetName() : "ground",
+				debugAim.x, debugAim.z,
+				((info != nullptr) && !onUnit) ? " (last seen)" : "");
+	}
+	SetTarget(info);
+	isTargetOverride = false;
+	targetPos = debugAim;
+	TRY_UNIT(circuit, unit,
+		if (onUnit) {
+			unit->GetUnit()->Attack(info->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
+		} else {
+			unit->CmdAttackGround(debugAim, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
+		}
+	)
+	debugOrderFrame = frame;
+	debugOrderAim = debugAim;
+	debugOrderTargetId = debugTargetId;
+	debugOrderOnUnit = onUnit;
+	state = State::ENGAGE;
+}
+
+void CSuperTask::EndDebug(CCircuitUnit* unit, const char* why)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	TRY_UNIT(circuit, unit,
+		unit->CmdStop();
+		if (debugKind == debug::NUKE) {
+			unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
+		}
+	)
+	circuit->LOG("DEBUG: %s(%i) leaves the strike (%s): normal targeting", unit->GetCircuitDef()->GetDef()->GetName(),
+			unit->GetId(), why);
+	debugEngaged = false;
+	debugApplies = false;
+	debugHasAim = false;
+	debugTargetId = debugOrderTargetId = -1;
+	SetTarget(nullptr);
+	isTargetOverride = false;
+	tierTargetId = -1;
+	targetFrame = 0;  // the normal scan at the next update
+	state = State::ROAM;
 }
 
 void CSuperTask::SetTargetPos(const AIFloat3& pos)

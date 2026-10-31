@@ -2115,6 +2115,33 @@ void CMilitaryManager::UpdateSensorGuards()
 	}
 }
 
+bool CMilitaryManager::SetDebugStrike(int weapon, int mode, float x, float z, int team)
+{
+	if ((weapon != debug::NUKE) && (weapon != debug::LOL)) return false;
+	debug::Strike& s = GetDebugStrike(weapon);
+	const bool ok = debug::Set(s, debug::Mode(mode), x, z, team,
+			CTerrainManager::GetTerrainWidth(), CTerrainManager::GetTerrainHeight(), circuit->GetTeamId());
+	if (ok) {
+		circuit->LOG("DEBUG: %s strike set: %s", (weapon == debug::NUKE) ? "nuke" : "lol", debug::Describe(s, 0).c_str());
+	} else {
+		circuit->LOG("DEBUG: %s strike refused: mode=%i x=%.0f z=%.0f team=%i", (weapon == debug::NUKE) ? "nuke" : "lol", mode, x, z, team);
+	}
+	return ok;
+}
+
+std::string CMilitaryManager::GetDebugStrikeState(int weapon) const
+{
+	const debug::Strike& s = debugStrikes[(weapon == debug::LOL) ? debug::LOL : debug::NUKE];
+	int units = 0;
+	if (s.Active()) {  // the handful of SUPER tasks, only while a strike is on
+		for (const IFighterTask* task : GetTasks(IFighterTask::FightType::SUPER)) {
+			const CSuperTask* st = static_cast<const CSuperTask*>(task);
+			if (st->IsDebugEngaged(weapon)) ++units;
+		}
+	}
+	return debug::Describe(s, units);
+}
+
 springai::AIFloat3 CMilitaryManager::GetOvernukePos() const
 {
 	return springai::AIFloat3(overnuke.Pos().x, 0.f, overnuke.Pos().z);

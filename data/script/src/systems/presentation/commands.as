@@ -13,6 +13,7 @@
 #include "../../helpers/spatial/layout_helpers.as"
 #include "glyphs.as"
 #include "../combat/aggression.as"
+#include "debug_strike.as"
 
 /******************************************************************************
 
@@ -28,6 +29,7 @@ host-side console, never a network protocol. Lines are "barb|<command>|...":
     barb|draw|<teamId>|commander    draw an Armada commander's outline across the map centre (map lines)
     barb|draw|<teamId>|credits      draw the credits (the contributors) across the map centre
     barb|draw|<teamId>|clear        erase every line this instance drew
+    barb|debug|<teamId>|nuke|lol|...  debug strikes from the widget's debug window (debug_strike.as)
 
 The automatic match-start intro is disabled by default (IntroEnabled). Its
 title, commander, warning and credits remain available through the draw commands.
@@ -215,6 +217,10 @@ namespace Commands {
             Aggression::SetDelta(parts[3]);
             return true;
         }
+        // barb|debug|<team>|nuke|lol|pos|team|off|... : debug strikes (owner 2026-10-31, debug_strike.as)
+        if (cmd == "debug" && DebugStrike::Handle(parts)) {
+            return true;
+        }
         // barb|draw|<team>|commander|clear : map drawing from the AI (owner's request, 2026-09-26)
         if (cmd == "draw" && parts.length() >= 4) {
             Draw(parts[3]);
@@ -255,6 +261,7 @@ namespace Commands {
     void DrawTick()
     {
         WidgetLink::LayoutTick();
+        DebugStrike::Tick();
         if (drawQueued && AiDrawQueueSize() == 0) {
             drawQueued = false;
             GenericHelpers::LogUtil("[Commands] map drawing complete: " + drawnStarts.length() + " stroke(s) on the map", 1);

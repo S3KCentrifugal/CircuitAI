@@ -97,7 +97,8 @@ CEnemyUnit::CEnemyUnit(Id unitId, Unit* unit, CCircuitDef* cdef)
 			.influence = 0.f,
 			.id = unitId,
 			.cost = 0.f,
-			.losStatus = SEnemyData::LosMask::NONE})
+			.losStatus = SEnemyData::LosMask::NONE,
+			.team = -1})
 {
 	Init();
 }
@@ -121,7 +122,8 @@ CEnemyUnit::CEnemyUnit(CCircuitDef* cdef, const AIFloat3& pos)
 			.influence = 0.f,
 			.id = -1,
 			.cost = cdef->GetCostM(),
-			.losStatus = SEnemyData::LosMask::NONE})
+			.losStatus = SEnemyData::LosMask::NONE,
+			.team = -1})
 {
 }
 
@@ -188,6 +190,9 @@ void CEnemyUnit::UpdateInRadarData(const AIFloat3& p)
 
 void CEnemyUnit::UpdateInLosData()
 {
+	if (data.team < 0) {
+		data.team = unit->GetTeam();  // one engine call per unit: a capture keeps the first team
+	}
 	if (IsIgnore()) {
 		return;
 	}

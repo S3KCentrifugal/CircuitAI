@@ -11,6 +11,7 @@
 #include "module/TaskModule.h"
 #include "setup/DefenceData.h"
 #include "task/fighter/FighterTask.h"
+#include "task/static/DebugStrike.h"
 #include "task/static/StrategicTargeting.h"
 #include "unit/CircuitDef.h"
 #include "util/AvailList.h"
@@ -280,6 +281,13 @@ public:
 	void SetNuclearAim(const springai::AIFloat3& pos, float radius) { nuclearAim = pos; nuclearAimRadius = radius; }
 	springai::AIFloat3 GetNuclearAim() const { return nuclearAim; }
 	float GetNuclearAimRadius() const { return nuclearAimRadius; }
+	// Debug strikes (owner 2026-10-31, debug-widget-test): the widget's debug
+	// window, through the script (barb|debug). weapon: debug::NUKE or LOL;
+	// mode: debug::Mode OFF, POS (x, z) or TEAM (team). False when malformed.
+	bool SetDebugStrike(int weapon, int mode, float x, float z, int team);
+	debug::Strike& GetDebugStrike(int weapon) { return debugStrikes[(weapon == debug::LOL) ? debug::LOL : debug::NUKE]; }
+	// The widget's status line for one weapon (debug::Describe)
+	std::string GetDebugStrikeState(int weapon) const;
 
 	/*
 	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
@@ -542,6 +550,7 @@ private:
 	strategic::Overnuke overnuke;
 	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearAimRadius = 0.f;
+	std::array<debug::Strike, debug::_WEAPONS_> debugStrikes;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
 
