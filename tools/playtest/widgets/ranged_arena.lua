@@ -251,6 +251,9 @@ end
 function widget:UnitFinished(id,def,team)
     if (cfg.production or cfg.natural or cfg.commander_front_work or cfg.expansion_mex_observation) and tracked[id] then
         log("finished id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost)
+        if cfg.observe_factory_assist and tracked[id].parent then
+            log("construction_completed unit="..tracked[id].parent.." target="..id.." team="..team.." def="..UnitDefs[def].name)
+        end
         if cfg.front_arrival and team==0 and tracked[id].child and (UnitDefs[def].extractsMetal or 0)>0 then
             frontMexes=frontMexes+1;log("front_mexes="..frontMexes)
         end
@@ -736,6 +739,22 @@ function widget:GameFrame(f)
             end
         end
         log(string.format("front_spacing_observed turrets=%d",#turrets))
+    end
+    -- Optional retirement regression: require an actual commander GUARD on a
+    -- factory before accepting departure. Stop querying after the observation.
+    if cfg.observe_factory_assist and not cfg.factory_assist_observed and f%30==0 then
+        for id,u in pairs(tracked) do
+            if u.team==0 and not u.child and UnitDefs[u.def].name==cfg.unit then
+                local queue=Spring.GetUnitCommands(id,1) or {}
+                local command=queue[1]
+                local target=command and command.params and command.params[1]
+                local definition=target and UnitDefs[Spring.GetUnitDefID(target)]
+                if command and command.id==CMD.GUARD and definition and definition.isFactory then
+                    cfg.factory_assist_observed=true
+                    log("factory_assist unit="..id.." target="..target)
+                end
+            end
+        end
     end
     if f%300==0 then
         if cfg.trace_spam then

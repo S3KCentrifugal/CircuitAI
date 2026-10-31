@@ -1,8 +1,28 @@
 #include "control/kernel/CommanderGroupWork.h"
 #include <cassert>
 #include <iostream>
+#include <new>
 using namespace circuit::commander;
 int main() {
+    // A completed emergency solar and a later factory assist can occupy the
+    // identical address. Retirement must invalidate both identity and kind.
+    struct Task { int type; };
+    alignas(Task) unsigned char storage[sizeof(Task)];
+    auto* solar=new (storage) Task{22};
+    WorkIdentity<Task> work;
+    work.task=solar; work.kind=22;
+    Task other{1};
+    work.Retire(&other);
+    assert(work.task==solar && work.kind==22); // unrelated task preserves work
+    work.Retire(solar);
+    solar->~Task();
+    auto* assist=new (storage) Task{0};
+    assert(work.task!=assist && work.kind==-1);
+    work.task=assist; work.kind=0;
+    work.Retire(assist); // cancellation uses the same lifecycle as completion
+    work.Retire(assist); // repeated notification is harmless
+    assert(work.task==nullptr && work.kind==-1);
+    assist->~Task();
     // Exact income/bank boundaries, exhausted budgets and custom policy.
     assert(GroupBudget(50,1000,50,1000,170,3500,50,1000,680,14000,30,.25f));
     assert(!GroupBudget(49,1000,50,1000,9999,99999,0,0,680,14000,30,.25f));

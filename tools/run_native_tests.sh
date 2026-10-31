@@ -49,6 +49,7 @@ extra_sources() {
 }
 # The AngelScript suites: policy script, its tests, runner flags.
 as_suites=(
+	"data/script/src/helpers/construction/owned_economy_helpers.as tests/owned_economy_tests.as --strings"
 	"data/script/src/helpers/math/geothermal_math.as tests/geothermal_math_tests.as"
 	"data/script/src/helpers/math/production_math.as tests/production_math_tests.as"
 	"data/script/src/helpers/math/placement_math.as tests/placement_math_tests.as"

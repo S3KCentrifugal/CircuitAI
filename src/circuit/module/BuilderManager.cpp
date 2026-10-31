@@ -1294,7 +1294,7 @@ void CBuilderManager::AssignTask(CCircuitUnit* unit)
 
 void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 {
-    circuit->GetCommanderController()->GroupTaskFinished(task,done);
+    circuit->GetCommanderController()->TaskFinished(task,done);
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);

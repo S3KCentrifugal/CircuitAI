@@ -238,7 +238,11 @@ IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
     }
     return task;
 }
-void CCommanderController::GroupTaskFinished(IUnitTask* task,bool done) {
+void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
+    // Every completed/cancelled builder task, not just groupJob, can be the
+    // remembered solar/repair/hold job. Clear before task memory is released.
+    // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
+    for(auto& entry:states) entry.value->work.Retire(task);
     if(task!=groupJob) return;
     groupJob=nullptr; // manager still owns task during this callback
     defenseNext=defenseOfferNext=defenseDecisionNext=0;
