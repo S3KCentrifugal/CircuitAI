@@ -4,6 +4,30 @@ from test_lane_ui_memory import ROOT, LuaRuntime
 
 
 class ArenaObserverTests(unittest.TestCase):
+    def test_decoy_health_threshold_and_visibility_are_observed(self):
+        lua=self.observer()
+        lua.execute('''
+            cfg.commander_health_fixture={after_seconds=1,percent=88,retreat_percent=90,
+                visible_from=1,visible_until=3}
+            Spring.GetUnitHealth=function() return 88,100 end
+            Spring.GetUnitIsCloaked=function() return false end
+            Spring.SendLuaRulesMsg=function() end
+            Spring.GetTeamUnits=function() return {} end
+            widget:GameFrame(60)
+            widget:GameFrame(63)
+            Spring.GetUnitPosition=function() return 300,0,100 end
+            widget:GameFrame(66)
+            local text=table.concat(lines,";")
+            assert(text:find("bait_visible"))
+            assert(text:find("health_fixture_applied"))
+            assert(text:find("health_fixture_below_90"))
+            assert(text:find("health_fixture_withdrew"))
+            assert(not text:find("health_fixture_below_40"))
+            Spring.GetUnitIsCloaked=function() return true end
+            widget:GameFrame(69)
+            assert(table.concat(lines,";"):find("ERROR bait_cloaked"))
+        ''')
+
     def observer(self, legacy=False):
         lua=LuaRuntime()
         lua.execute('''

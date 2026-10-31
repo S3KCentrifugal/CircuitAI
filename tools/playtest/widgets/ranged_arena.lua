@@ -295,6 +295,13 @@ function widget:GameFrame(f)
             if u.team==0 and UnitDefs[u.def].name==cfg.unit then
                 local x,_,z=Spring.GetUnitPosition(id)
                 local hp,maxhp=Spring.GetUnitHealth(id)
+                if fixture.visible_until and f>=fixture.visible_from*30 and f<fixture.visible_until*30 then
+                    if Spring.GetUnitIsCloaked(id) or Spring.GetUnitRulesParam(id,"wantcloak")==1 then
+                        log("ERROR bait_cloaked unit="..id)
+                    elseif not fixture.visibleObserved then
+                        fixture.visibleObserved=true;log("bait_visible unit="..id)
+                    end
+                end
                 if fixture.sent and not fixture.applied and hp and maxhp
                     and math.abs(hp/maxhp-fixture.percent/100)<.01 then
                     fixture.applied=true
@@ -327,9 +334,9 @@ function widget:GameFrame(f)
                     fixture.sent=true;fixture.x=x;fixture.z=z;fixture.lastHealthSet=f
                     if fixture.wait_cloaked then log("health_fixture_actual_cloak") end
                     Spring.SendLuaRulesMsg("$dev$:sethealth "..id..":"..fixture.percent)
-                elseif fixture.sent and hp and maxhp and hp/maxhp<.4 then
+                elseif fixture.sent and hp and maxhp and hp/maxhp<(fixture.retreat_percent or 40)/100 then
                     if not fixture.observed then
-                        fixture.observed=true;log("health_fixture_below_40 unit="..id)
+                        fixture.observed=true;log("health_fixture_below_"..(fixture.retreat_percent or 40).." unit="..id)
                         local jammer=false
                         for _,ally in ipairs(Spring.GetTeamUnits(0) or {}) do
                             local d=UnitDefs[Spring.GetUnitDefID(ally)]

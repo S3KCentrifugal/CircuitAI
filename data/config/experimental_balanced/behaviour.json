@@ -203,6 +203,7 @@
 //########################################################################################################################
 
 		"behaviour": {
+			"armdecom": {"role": ["builder"], "attribute": ["commander"], "controller": "commander"},
 	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {
 				"role": ["builder"],
@@ -2098,6 +2099,8 @@
 			},
 			"cordecom": {
 				"role": ["builder"],
+				"attribute": ["commander"],
+				"controller": "commander",
 				"limit": 2,
 				"build_speed": 10.0,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2518,5 +2521,3 @@
 			}
 		}
 	}
-	
-	

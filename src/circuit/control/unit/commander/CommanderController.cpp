@@ -76,6 +76,8 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::cloakEnergyRetreat>("cloak_energy_retreat",0,1),
         Safety<&SC::cloakRetreatDistance>("cloak_retreat_distance",128,2000),
         Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
+        Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
+        Safety<&SC::decoyBait>("decoy_bait",0,1),
         // D-389 cloak posture
         Cloak<&KC::posture>("cloak_posture",0,1),Cloak<&KC::threatRadius>("threat_radius",400,4000),
         Cloak<&KC::horizon>("threat_horizon",0,15),Cloak<&KC::outrangeMargin>("outrange_margin",0,500),
@@ -86,6 +88,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Cloak<&KC::ambushSeconds>("ambush_seconds",0,120),Cloak<&KC::withdrawCloakSeconds>("withdraw_cloak_seconds",0,60),
         Cloak<&KC::memorySeconds>("threat_memory_seconds",0,600),Cloak<&KC::memoryCap>("threat_memory_cap",0,3000),
         Cloak<&KC::frontIncome>("front_cloak_income",0,1000000),
+        Cloak<&KC::decoyFrontIncome>("decoy_front_cloak_income",0,1000000),
         Cloak<&KC::budget>("cloak_budget",0,1),Cloak<&KC::stillSeconds>("cloak_still_seconds",0,60),
         Cloak<&KC::period>("posture_period",3,300),Cloak<&KC::log>("cloak_log",0,1),
         Cloak<&KC::blipDps>("blip_dps",0,10000),Cloak<&KC::blipRange>("blip_range",0,3000),
@@ -744,6 +747,13 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     }
     if(HealthControl(unit,s,frame)) {
         if(unit->GetTask() && unit->GetTask()->GetType()==IUnitTask::Type::RETREAT) RetreatConceal(unit,s,frame,threatened);
+        return;
+    }
+    if(cfg->safety.decoyBait>0 && ActualDecoy(def)) {
+        // A fake D-gun must not inherit the real commander's kill/trade plans.
+        // Retain ordinary lane construction and threat-based retreat concealment.
+        if(current->GetType()==IUnitTask::Type::RETREAT) RetreatConceal(unit,s,frame,threatened);
+        else Deploy(unit,s,frame);
         return;
     }
     // D-294: a T3 in range is engaged from the line (concealed per-T3 plan)
