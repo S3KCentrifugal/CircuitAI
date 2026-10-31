@@ -12,6 +12,7 @@
 #include "control/core/UnitController.h"
 #include "control/kernel/CommanderCombat.h"
 #include "control/kernel/CommanderFortification.h"
+#include "control/kernel/CommanderGroupWork.h"
 #include "control/kernel/CommanderJammerCoverage.h"
 #include "control/kernel/CommanderPosture.h"
 #include "control/kernel/DefensePlanner.h"
@@ -112,7 +113,7 @@ struct CommanderFrontState {
     int territoryCorridor=-1, territoryClass=-1, fortifyRetry=0, mexFortifyRetry=0;
     bool territoryPending=false;
 };
-struct CommanderWorkState {
+struct CommanderWorkState : commander::WorkIdentity<IUnitTask> {
     // D-299 work ladder. lineUntil keeps the last fallback line's turret
     // quota open after the fallback ends; task is the last ladder task
     // (address compared only, never dereferenced) that Deploy must not
@@ -120,8 +121,6 @@ struct CommanderWorkState {
     int lineUntil=-1,lineRetry=0,lineYield=-10000,radarFrame=-10000,lineOutside=-1;
     bool lineDone=false,radarCovered=false,held=false; // held: offered under a fallback
     springai::AIFloat3 lineAnchor{-1,0,-1},lineThreat,radarPos{-1,0,-1};
-    const IUnitTask* task=nullptr;
-    int kind=-1;
     commander::FallbackBoundary boundary; // perimeter when task was offered
     std::map<int,int> timedNext;
 };
@@ -302,7 +301,7 @@ public:
     bool EnergyRetreat(CCircuitUnit* unit) const;
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
-    void GroupTaskFinished(IUnitTask* task,bool done);
+    void TaskFinished(IUnitTask* task,bool done);
     bool OwnsGroupProject(const IUnitTask* task) const { return task && task==groupJob; }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);

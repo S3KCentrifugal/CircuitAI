@@ -2,6 +2,18 @@
 #include <algorithm>
 
 namespace circuit::commander {
+// Non-owning task identity. The manager must retire it before releasing a task,
+// otherwise allocator address reuse can turn unrelated work into a protected job.
+// Constant-time, no reference ownership or allocation; tested with address reuse.
+template<class Task> struct WorkIdentity {
+    const Task* task=nullptr;
+    int kind=-1;
+    void Retire(const Task* finished) {
+        if(task!=finished) return;
+        task=nullptr;
+        kind=-1;
+    }
+};
 // Admission only: never cancel a funded frame when income later fluctuates.
 inline bool GroupBudget(float metalIncome, float energyIncome, float minMetal, float minEnergy,
     float metalBank, float energyBank, float metalPull, float energyPull,
