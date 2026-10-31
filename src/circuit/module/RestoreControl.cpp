@@ -45,6 +45,7 @@ static const char* ReasonName(int reason)
 		case CRestoreControl::SITE:   return "site";
 		case CRestoreControl::LAVA:   return "lava";
 		case CRestoreControl::SCRIPT: return "script";
+		case CRestoreControl::PATH:   return "path";
 		default: return "?";
 	}
 }
@@ -92,12 +93,18 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	maxSeconds = std::max(10, cfg.get("max_seconds", maxSeconds).asInt());
 	cooldownSeconds = std::max(interval, cfg.get("cooldown", cooldownSeconds).asInt());
 	busyPenalty = std::max(0.f, cfg.get("busy_penalty", busyPenalty).asFloat());
+	path = cfg.get("path", path).asBool();
+	pathRadius = std::max(float(SQUARE_SIZE * 8), cfg.get("path_radius", pathRadius).asFloat());
+	const float slopeDeg = std::clamp(cfg.get("path_slope", 33.f).asFloat(), 1.f, 89.f);
+	pathSlope = 1.f - std::cos(slopeDeg * 3.14159265f / 180.f);  // the engine's slope unit
+	pathReach = std::max(0.f, cfg.get("path_reach", pathReach).asFloat());
+	pathUnits = std::max(0, cfg.get("path_units", pathUnits).asInt());
 	unitClass.clear();
-	circuit->LOG("RESTORE: %s units=%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i",
+	circuit->LOG("RESTORE: %s units=%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f",
 			enabled ? "on" : "off",
 			(allowMask & CLASS_COMMANDER) ? "commander " : "", (allowMask & CLASS_T1) ? "t1 " : "",
 			(allowMask & CLASS_T2) ? "t2 " : "", (allowMask & CLASS_REZ) ? "rez " : "",
-			threshold, minCells, baseRadius, maxActive, int(lava));
+			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach);
 }
 
 int CRestoreControl::GetScanInterval() const
@@ -270,7 +277,7 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 	return true;
 }
 
-CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius)
+CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float maxDist, bool front)
 {
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
@@ -280,6 +287,9 @@ CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius)
 	for (CCircuitUnit* unit : builderMgr->GetWorkers()) {
 		if (unit->IsDead() || unit->IsDestroying() || !IsEligible(unit) || (unit->GetCommanderTarget() >= 0)) {
 			continue;
+		}
+		if (front && (UnitClass(unit->GetCircuitDef()) == CLASS_COMMANDER)) {
+			continue;  // attack paths: constructors and rez bots go out, the commander stays
 		}
 		IUnitTask* task = unit->GetTask();
 		if (task == nullptr) {
@@ -301,7 +311,7 @@ CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius)
 			continue;
 		}
 		const float dist = std::sqrt(unit->GetPos(frame).SqDistance2D(pos));
-		if (dist > reach) {
+		if (dist > maxDist) {
 			continue;
 		}
 		const float score = dist + (busy ? busyPenalty : 0.f);
@@ -365,7 +375,15 @@ void CRestoreControl::Scan()
 		}
 	}
 	requests.clear();
-	// 3. Our base.
+	// 3. Our attack paths: craters a vehicle can no longer climb, crater lava.
+	if (path && (pathUnits > 0)) {
+		std::vector<int> sectors;
+		FindPathSectors(basePos, lavaLevel, sectors);
+		for (int i : sectors) {
+			candidates.push_back({terrainMgr->GetSectorCenter(i), PATH, 1.5f});
+		}
+	}
+	// 4. Our base.
 	if (geom::is_valid(basePos) && (baseRadius > 0.f)) {
 		std::vector<int> sectors;
 		terrainMgr->FindDamagedSectors(basePos, baseRadius, threshold, lavaLevel, sectors);
@@ -399,16 +417,19 @@ void CRestoreControl::Scan()
 		if (IsCovered(patch.center)) {
 			continue;
 		}
-		CCircuitUnit* unit = PickUnit(patch.center, patch.radius);
+		CCircuitUnit* unit = PickUnit(patch.center, patch.radius, (c.reason == PATH) ? std::max(reach, pathReach) : reach, c.reason == PATH);
 		if (unit == nullptr) {
 			// nobody may go (busy, too far, unsafe): ask again in two scans
 			CoolDown(patch.center, patch.radius, GetScanInterval() * 2);
 			continue;
 		}
-		CBRestoreTask* task = builderMgr->EnqueueRestore(patch.center, patch.radius, c.reason, FRAMES_PER_SEC * maxSeconds);
+		// restore.max_seconds is the work; the walk out is added on top
+		const AIFloat3& upos = unit->GetPos(frame);
+		const float walk = std::sqrt(upos.SqDistance2D(patch.center)) / std::max(unit->GetCircuitDef()->GetSpeed(), 20.f);
+		CBRestoreTask* task = builderMgr->EnqueueRestore(patch.center, patch.radius, c.reason,
+				FRAMES_PER_SEC * (maxSeconds + int(walk * 1.5f)));
 		active.push_back({task, patch.center, patch.radius});
 		CoolDown(patch.center, patch.radius, cooldownFrames);
-		const AIFloat3& upos = unit->GetPos(frame);
 		circuit->LOG("RESTORE: start %s(%i) reason=%s at (%.0f, %.0f) r=%.0f cells=%i lava=%i depth=%.0f lavaLevel=%.0f from %.0f away",
 				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), ReasonName(c.reason),
 				patch.center.x, patch.center.z, patch.radius, patch.cells, patch.lavaCells, patch.depth,
@@ -416,6 +437,77 @@ void CRestoreControl::Scan()
 		builderMgr->AssignTask(unit, task);
 		if (!task->IsDead() && task->GetAssignees().empty()) {
 			builderMgr->AbortTask(task);  // the assignment was refused; TaskEnded drops it
+		}
+	}
+}
+
+void CRestoreControl::FindPathSectors(const AIFloat3& basePos, float lavaLevel, std::vector<int>& out) const
+{
+	// Marks the sectors our ground army stands on (pathRadius) and the lane
+	// it came along from the base (half of it), each with the lowest slope
+	// limit of the units over it, then tests each marked sector once.
+	// Sector-level only: a few hundred units mark a few thousand sectors.
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	const int sizeX = terrainMgr->GetSectorXSize();
+	const int sizeZ = terrainMgr->GetSectorZSize();
+	const float size = terrainMgr->GetConvertStoP();
+	std::vector<float> limit(sizeX * sizeZ, -1.f);  // -1: off our paths
+	std::vector<int> marked;
+	auto mark = [&](const AIFloat3& p, float r, float slope) {
+		const int sx1 = std::max(0, int((p.x - r) / size));
+		const int sx2 = std::min(sizeX - 1, int((p.x + r) / size));
+		const int sz1 = std::max(0, int((p.z - r) / size));
+		const int sz2 = std::min(sizeZ - 1, int((p.z + r) / size));
+		for (int z = sz1; z <= sz2; ++z) {
+			for (int x = sx1; x <= sx2; ++x) {
+				float& l = limit[z * sizeX + x];
+				if (l < 0.f) {
+					marked.push_back(z * sizeX + x);
+					l = slope;
+				} else {
+					l = std::min(l, slope);
+				}
+			}
+		}
+	};
+	const int frame = circuit->GetLastFrame();
+	const bool hasBase = geom::is_valid(basePos);
+	int counted = 0;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		const CCircuitDef* cdef = unit->GetCircuitDef();
+		// the army: ground units that do not build (builders keep their own
+		// sites; the commander's ground is the base's)
+		if (unit->IsDead() || !cdef->IsMobile() || cdef->IsAbleToFly() || cdef->GetDef()->IsBuilder()) {
+			continue;
+		}
+		const terrain::SMobileType* mt = terrainMgr->GetMobileTypeById(cdef->GetMobileId());
+		const AIFloat3& pos = unit->GetPos(frame);
+		if ((mt == nullptr) || !geom::is_valid(pos)) {
+			continue;
+		}
+		const float slope = std::min(pathSlope, mt->maxSlope);
+		mark(pos, pathRadius, slope);
+		if (hasBase) {
+			const float len = std::sqrt(basePos.SqDistance2D(pos));
+			const float step = std::max(pathRadius, size);
+			for (float d = step; d < len; d += step) {
+				const float t = d / len;
+				mark(AIFloat3(basePos.x + (pos.x - basePos.x) * t, 0.f, basePos.z + (pos.z - basePos.z) * t), pathRadius * 0.5f, slope);
+			}
+		}
+		if (++counted >= pathUnits) {
+			break;
+		}
+	}
+	const std::vector<terrain::SSector>& sector = terrainMgr->GetAreaData()->sector;
+	for (int i : marked) {
+		const terrain::SSector& s = sector[i];
+		const bool damaged = (s.dug >= threshold) || (s.raised >= threshold);
+		const bool steep = damaged && (s.maxSlope > limit[i]) && (s.origMaxSlope <= limit[i]);
+		const bool hot = (s.dug > 1.f) && (s.minElevation < lavaLevel);
+		if (steep || hot) {
+			out.push_back(i);
 		}
 	}
 }
