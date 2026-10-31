@@ -668,6 +668,7 @@ namespace RoleTech
 		Opening::Tick();
 		TechBuild::Tick();
 		TechChain::Tick();
+        TechChain::AntiNukeBudget();
         TechHeavyRush::Tick();
         TechCapitalRush::Tick();
         TechGantry::SampleIncome();

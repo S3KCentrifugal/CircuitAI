@@ -27,7 +27,7 @@ local function report(event,id,def,team)
     end
     echo(string.format("%s kind=%s team=%d id=%d frame=%d at=%.0f,%.0f nearestNano=%.1f",event,k,team,id,Spring.GetGameFrame(),x or -1,z or -1,nearest))
     if k=="anti" and team==0 then
-        if event=="created" and Spring.GetGameFrame()<18000 then echo("FAIL premature antinuke") end
+        if event=="created" and Spring.GetGameFrame()<14400 then echo("FAIL premature antinuke") end
         if event=="finished" then
             echo((nearest<=reach and "PASS" or "FAIL").." nano range distance="..nearest.." reach="..reach)
         end
@@ -43,8 +43,24 @@ function widget:GameFrame(frame)
     for team=0,1 do
         local m,ms,_,mi,mp=Spring.GetTeamResources(team,"metal")
         local e,es,_,ei,ep=Spring.GetTeamResources(team,"energy")
-        if mi and ei and mi>=100 and ei>=2000 and not firstIncome[team] then
+        if mi and ei and mi>=35 and ei>=700 and not firstIncome[team] then
             firstIncome[team]=frame; echo("income-ready team="..team.." frame="..frame.." metal="..mi.." energy="..ei)
+        end
+        if frame%900==0 and team==0 and frame>=14400 and frame<=23400 then
+            -- Read-only: the energy users by unit type, to explain a stockpile stall.
+            local use={}
+            for _,u in ipairs(Spring.GetTeamUnits(0) or {}) do
+                local _,mu,_,eu=Spring.GetUnitResources(u)
+                local n=UnitDefs[Spring.GetUnitDefID(u)].name..(Spring.GetUnitRulesParam(u,"builderPriority")==0 and "/L" or "/H")
+                if eu and eu>1 then use[n]=(use[n] or 0)+eu end
+                if mu and mu>0.5 then use["M:"..n]=(use["M:"..n] or 0)+mu end
+            end
+            local rows={}
+            for n,v in pairs(use) do rows[#rows+1]={n,v} end
+            table.sort(rows,function(a,b) return a[2]>b[2] end)
+            local s=""
+            for i=1,math.min(16,#rows) do s=s..string.format(" %s=%.0f",rows[i][1],rows[i][2]) end
+            echo("energy-users team=0 frame="..frame..s)
         end
         if frame%900==0 then
             echo(string.format("economy team=%d frame=%d metal=%.1f/%.1f income=%.1f expense=%.1f energy=%.1f/%.1f income=%.1f expense=%.1f",team,frame,m or 0,ms or 0,mi or 0,mp or 0,e or 0,es or 0,ei or 0,ep or 0))

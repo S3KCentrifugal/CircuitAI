@@ -160,6 +160,65 @@ namespace TechChain
         }
     }
 
+    // First antinuke: from its frame until one interceptor is stocked (at most
+    // until AntiNukeBudgetUntilSeconds), every other build task, factory
+    // production included, drops to BAR's low build priority and uses what the
+    // antinuke leaves, as the first nuke stockpile does above. Its own builders,
+    // reclaim and repairs stay high; the stockpile is not a builder and stays
+    // high. Energy builds wait too: a metal stall made them outbid the frame.
+    // A nuke stockpile budget takes over.
+    array<Id> antiLowPriority;
+    int antiBudgetFrame = 0;
+    bool antiBudgetDone = false;
+    void ReleaseAntiNukeBudget()
+    {
+        for (uint i = 0; i < antiLowPriority.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(antiLowPriority[i]);
+            if (u !is null) u.SetBuildPriorityOverride(-1);
+        }
+        antiLowPriority.resize(0);
+    }
+    void AntiNukeBudget()
+    {
+        if (antiBudgetDone || !Global::RoleSettings::Tech::ExperimentalBuild || ai.frame < antiBudgetFrame) return;
+        antiBudgetFrame = ai.frame + SECOND;
+        CCircuitUnit@ anti = aiTerrainMgr.GetReservationUnit(aiTerrainMgr.GetLayoutInt("tech.antinuke.slot", -1));
+        if (anti is null && antiLowPriority.length() == 0) return;
+        if (anti !is null && anti.GetBuildProgress() >= 1.0f && anti.GetStockpile() > 0) antiBudgetDone = true;
+        if (anti is null || antiBudgetDone || nukeFundingSilo >= 0
+            || ai.frame >= Global::RoleSettings::Tech::AntiNukeBudgetUntilSeconds * SECOND) {
+            if (antiLowPriority.length() > 0) GenericHelpers::LogUtil("[TECH][AntiNuke] resource priority released"
+                + (antiBudgetDone ? " (interceptor stocked)" : ""), 1);
+            ReleaseAntiNukeBudget();
+            if (ai.frame >= Global::RoleSettings::Tech::AntiNukeBudgetUntilSeconds * SECOND) antiBudgetDone = true;
+            return;
+        }
+        const string antiName = anti.circuitDef.GetName();
+        if (antiLowPriority.length() == 0) GenericHelpers::LogUtil("[TECH][AntiNuke] other builders to low resource priority", 1);
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        antiLowPriority.resize(0);
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef.GetBuildSpeed() <= 0.0f) continue;
+            IUnitTask@ task = u.task;
+            int priority = -1;
+            if (task !is null && !task.IsExternalControlled() && !task.IsEnemyReclaim()
+                && task.GetType() != int(Task::Type::PLAYER) && task.GetType() != int(Task::Type::RETREAT)) {
+                priority = 0;
+                IBuilderTask@ work = cast<IBuilderTask>(task);
+                if (work !is null) {
+                    const int type = work.GetBuildType();
+                    CCircuitDef@ d = work.buildDef;
+                    // An assist names its frame; a repair of a standing unit names none.
+                    if (type == int(Task::BuildType::RECLAIM) || (type == int(Task::BuildType::REPAIR) && d is null)
+                        || (d !is null && d.GetName() == antiName)) priority = 1;
+                }
+            }
+            u.SetBuildPriorityOverride(priority);
+            if (priority >= 0) antiLowPriority.insertLast(u.id);
+        }
+    }
+
     void RefundEmptyStorage(CCircuitDef@ siloDef)
     {
         if (nukeStorageReleased || siloDef is null || !nukeBayReleased
@@ -478,6 +537,7 @@ namespace TechChain
         nukeEnergyDef = "";
         nukeSiloEnergyCount = 0;
         ReleaseStockpileBudget();
+        ReleaseAntiNukeBudget();
         powerSiteRetry = 0;
         if (MetalEconomy::Active()) return; // field growth has no finite mex/converter recipe
         stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
