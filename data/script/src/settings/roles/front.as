@@ -89,7 +89,7 @@ namespace Front {
             // Nuclear silos (owner, 2026-10-30; systems/construction/front_silo_grid.as). From NukeMinSeconds,
             // once the 10 s minimum metal / energy income have stayed at or above NukeMetalIncome / NukeEnergyIncome
             // for NukeSustainSeconds without a break, one silo at a time up to NukeLimit, all on one grid reserved
-            // at the first: SiloGridColumns across, no gap, SiloGridMargin clear round it, at least SiloGridLaneClear
+            // block by block (SiloGridShapes), side by side with no gap, SiloGridMargin clear round it, at least SiloGridLaneClear
             // off every allied start's line to its nearest enemy start, nearest home first. Log [FRONT][SiloGrid].
             bool SiloGrid = true;
             int NukeLimit = 8;
@@ -97,12 +97,15 @@ namespace Front {
             float NukeMetalIncome = 225.0f;
             float NukeEnergyIncome = 2000.0f;
             int NukeSustainSeconds = 60;
-            int SiloGridColumns = 4;
+            // block shapes tried in order, as columns,rows pairs; a block goes up next to the last one
+            array<int> SiloGridShapes = { 4, 2,  2, 2,  2, 1 };
             float SiloGridMargin = 48.0f;
             float SiloGridLaneClear = 200.0f;   // played: 500 left no site round a FRONT (8 allied lanes cross its base)
             float SiloGridSearchStep = 256.0f;
             int SiloGridSearchRings = 20;       // x SiloGridSearchStep: 5,120 out (played: edge FRONTs found no site within 3,584)
             int SiloGridSearchSpokes = 32;
+            float SiloGridMaxHomeDistance = 2560.0f;  // played: grids 4-5 km out stood mid-map; none was ever started
+            float SiloGridMaxForward = 300.0f;        // a site may be at most this much nearer the nearest enemy start than home
             int SiloGridRetrySeconds = 30;
             int SiloGridRetryMaxSeconds = 300;
             int SiloGridMaxTries = 12;          // reservations tried per search (each reserves up to NukeLimit slots)
