@@ -443,6 +443,12 @@ namespace RoleFront {
             }
         }
 
+        // Owner (2026-10-31): while a T2 bot lab stands, a roll every few minutes for a held heavy or artillery bot squad
+        if (UnitHelpers::IsT2BotLab(factoryName) && !EdgeLanes::IsEdgeLab(u) && !Spam::routeByFactory.exists("" + u.id)) {
+            IUnitTask@ botSquad = FrontArtySquad::BotRoll(u, side);
+            if (botSquad !is null) return botSquad;
+        }
+
         // T2 Vehicle Plant enforcement (Front-specific minimum T2 vehicle constructors)
         if (UnitHelpers::IsT2VehicleLab(factoryName) && Global::RoleSettings::Front::MinT2VehicleConstructorCount > 0) {
             int t2VehCtorCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2VehicleConstructors());

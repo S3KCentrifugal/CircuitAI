@@ -200,6 +200,13 @@ namespace Front {
             float ArtySquadFollowBehind = 120.0f;
             float ArtySquadRepath = 96.0f;
             int ArtySquadStragglerSeconds = 60;   // longest the lead waits for stragglers before advancing anyway
+            // Owner (2026-10-31): while a finished T2 bot lab stands, every T2BotSquadIntervalSeconds, T2BotSquadChance
+            // for one faction bot squad (heavy, or artillery on T2BotSquadArtyShare) with a radar, two jammer and a flak
+            // bot, held at the lab until complete, then moved as the artillery squad above. Off here.
+            float T2BotSquadChance = 0.0f;
+            int T2BotSquadIntervalSeconds = 180;
+            float T2BotSquadArtyShare = 0.5f;
+            int T2BotSquadGatherSeconds = 600;
             // Owner (2026-10-19): bot lab FRONTs, from the opener wave until a T2 factory stands: every
             // BotWaveIntervalSeconds, BotWaveChance for BotWaveMin..Max Pawns/Grunts (Goblins: BotWaveGoblinMin..Max),
             // held at the lab until the last is out, then one attack wave. Off here, on in experimental_balanced.

@@ -14,6 +14,15 @@
 // onto another task (not retreat or player) is put back on the squad's route, and only members on the
 // squad's routes count for cohesion. The lead waits at most ArtySquadStragglerSeconds, then advances anyway.
 // Escorts (jammer, radar, AA) never lead. Hooks as FrontWaveEscort; log [FRONT][ArtySquad].
+// Owner (2026-10-31): T2 bot lab squads, all from one finished T2 bot lab (BotRoll, called from that lab's
+// MakeTask). While a lab stands, every T2BotSquadIntervalSeconds, T2BotSquadChance for one squad, the heavy
+// or the artillery one (T2BotSquadArtyShare), each with a radar bot, two jammer bots and a flak bot:
+//   Armada heavy: 2 Fatboy, 3 Welder, 2 Gunslinger        Armada arty: 2 Fatboy, 4 Sharpshooter, 1 Welder
+//   Cortex heavy: 5 Mammoth                              Cortex arty: 10 Sheldon, 3 Sumo
+//   Legion heavy: 3 Incinerator                          Legion arty: 5 Arquebus, 5 Thanatos, 3 Hoplite, 1 Incinerator
+//   support: Armada Compass/2 Smuggler/Archangel, Cortex Augur/2 Deceiver/Manticore, Legion Euclid/2 Tiresias/Aquilon
+// They move and fight as the vehicle squad, except the lead is the longest-ranged member (ties: the slowest),
+// and the squad keeps the slowest member's pace through the cohesion wait. Log [FRONT][ArtySquad] ... bot squad.
 namespace FrontArtySquad {
     const int OPEN = 2;
     class Squad {
@@ -22,7 +31,8 @@ namespace FrontArtySquad {
         int botLabId;
         int started;
         int deadline;
-        int leadDefId;
+        int leadDefId;          // -1: the longest-ranged member leads (bot squads)
+        string label;           // "artillery squad" or "<kind> bot squad", for the log
         array<int> slots;       // def ids still to come out
         array<int> members;
         array<int> fireSent;    // frame each member last got fire at will, parallel to members
@@ -43,7 +53,116 @@ namespace FrontArtySquad {
 
     bool IsEscort(const string &in n) {
         return n == "armjam" || n == "armseer" || n == "armyork" || n == "coreter" || n == "corvrad" || n == "corsent"
-            || n == "legavjam" || n == "legavrad" || n == "legvflak";
+            || n == "legavjam" || n == "legavrad" || n == "legvflak"
+            // T2 bot lab support (owner, 2026-10-31): radar, jammer, flak bots
+            || n == "armmark" || n == "armaser" || n == "armaak" || n == "corvoyr" || n == "corspec" || n == "coraak"
+            || n == "legaradk" || n == "legajamk" || n == "legadvaabot";
+    }
+
+    bool BotEnabled() { return Global::RoleSettings::Front::T2BotSquadChance > 0.0f; }
+
+    // Owner (2026-10-31): T2 bot lab squads; arty false = the heavy squad. Unit ids from Beyond-All-Reason unitdefs.
+    array<string> BotComposition(const string &in side, bool arty) {
+        array<string> n;
+        array<string> support;
+        if (side == "armada") {
+            support = array<string> = {"armmark", "armaser", "armaser", "armaak"};   // Compass, 2 Smuggler, Archangel
+            if (arty) n = array<string> = {"armfboy", "armfboy", "armsnipe", "armsnipe", "armsnipe", "armsnipe", "armzeus"};
+            else n = array<string> = {"armfboy", "armfboy", "armzeus", "armzeus", "armzeus", "armmav", "armmav"};   // Fatboy, Welder, Gunslinger
+        } else if (side == "cortex") {
+            support = array<string> = {"corvoyr", "corspec", "corspec", "coraak"};   // Augur, 2 Deceiver, Manticore
+            if (arty) {
+                for (int i = 0; i < 10; ++i) n.insertLast("cormort");                 // Sheldon
+                for (int i = 0; i < 3; ++i) n.insertLast("corcan");                   // Sumo (corcan's BAR name)
+            } else {
+                for (int i = 0; i < 5; ++i) n.insertLast("corsumo");                  // Mammoth
+            }
+        } else if (side == "legion") {
+            support = array<string> = {"legaradk", "legajamk", "legajamk", "legadvaabot"};   // Euclid, 2 Tiresias, Aquilon
+            if (arty) {
+                for (int i = 0; i < 5; ++i) n.insertLast("legsrail");                 // Arquebus
+                for (int i = 0; i < 5; ++i) n.insertLast("leghrk");                   // Thanatos
+                for (int i = 0; i < 3; ++i) n.insertLast("legstr");                   // Hoplite
+                n.insertLast("leginc");                                               // Incinerator
+            } else {
+                for (int i = 0; i < 3; ++i) n.insertLast("leginc");                   // Incinerator
+            }
+        } else return n;
+        // support first, so it is out before the main units and the squad leaves together
+        array<string> all = support;
+        for (uint i = 0; i < n.length(); ++i) all.insertLast(n[i]);
+        return all;
+    }
+
+    int nextBotRoll = -1;
+
+    bool BotGathering() {
+        for (uint i = 0; i < squads.length(); ++i)
+            if (squads[i].botLabId >= 0 && squads[i].botLabId == squads[i].factoryId && !squads[i].released) return true;
+        return false;
+    }
+
+    // T2 bot lab MakeTask (FRONT): every T2BotSquadIntervalSeconds while a finished T2 bot lab stands,
+    // T2BotSquadChance for one squad; returns the lab's first recruit, or null
+    IUnitTask@ BotRoll(CCircuitUnit@ u, const string &in side) {
+        if (!BotEnabled() || u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f) return null;
+        const int interval = AiMax(1, Global::RoleSettings::Front::T2BotSquadIntervalSeconds) * SECOND;
+        if (nextBotRoll < 0) {
+            nextBotRoll = ai.frame + interval;
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] T2 bot lab " + u.id + " stands: first bot squad roll at " + (nextBotRoll / SECOND) + " s", 1);
+            return null;
+        }
+        if (ai.frame < nextBotRoll || BotGathering()) return null;   // one bot squad gathers at a time
+        nextBotRoll = ai.frame + interval;
+        const float chance = AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadChance);
+        // AiDice's rare -1 endpoint counts as a miss (KI-628)
+        const array<float> hit = {AiMax(0.0f, 1.0f - chance), chance};
+        if (chance < 1.0f && AiDice(hit) != 1) {
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] bot squad roll missed at lab " + u.id + "; next at " + (nextBotRoll / SECOND) + " s", 1);
+            return null;
+        }
+        const float share = AiMax(0.0f, AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadArtyShare));
+        const array<float> kind = {1.0f - share, share};
+        const bool arty = AiDice(kind) == 1;
+        IUnitTask@ first = Queue(u, null, side, BotComposition(side, arty), -1, arty ? "artillery bot squad" : "heavy bot squad",
+            Global::RoleSettings::Front::T2BotSquadGatherSeconds);
+        if (first !is null) GenericHelpers::LogUtil("[FRONT][ArtySquad] bot squad roll hit at lab " + u.id + "; next at " + (nextBotRoll / SECOND) + " s", 1);
+        return first;
+    }
+
+    // Queue a squad's members at lab u (and optional botLab); returns u's first recruit, null when nothing is buildable
+    IUnitTask@ Queue(CCircuitUnit@ u, CCircuitUnit@ botLab, const string &in side, const array<string> &in names,
+                     int leadDefId, const string &in label, int gatherSeconds) {
+        Squad@ s = Squad();
+        s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDefId; s.label = label;
+        s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1;
+        s.botLabId = botLab is null ? (leadDefId < 0 ? u.id : -1) : botLab.id;
+        s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal;
+        string queued = "", skipped = "";
+        IUnitTask@ first = null;
+        const AIFloat3 pos = u.GetPos(ai.frame);
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ def = ai.GetCircuitDef(names[i]);
+            if (def is null || !u.circuitDef.CanBuild(def) || !def.IsAvailable(ai.frame)) {
+                skipped += (skipped == "" ? "" : ", ") + names[i];
+                continue;
+            }
+            IUnitTask@ r = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, def, pos, 64.f));
+            if (r is null) { skipped += (skipped == "" ? "" : ", ") + names[i]; continue; }
+            if (first is null) @first = r;
+            s.slots.insertLast(def.id);
+            queued += (queued == "" ? "" : ", ") + names[i];
+        }
+        if (first is null) {
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] no " + label + " member buildable at factory " + u.id
+                + (skipped == "" ? "" : " (" + skipped + ")"), 1);
+            return null;
+        }
+        squads.insertLast(s);
+        GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " (" + label + ") at factory " + u.id + " (" + side + "): queued " + queued
+            + (skipped == "" ? "" : "; unavailable " + skipped), 1);
+        return first;
     }
 
     // [lead, ...rest] from the vehicle plant; bots (Legion) from a T2 bot lab
@@ -93,7 +212,7 @@ namespace FrontArtySquad {
             }
         }
         Squad@ s = Squad();
-        s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDef.id;
+        s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDef.id; s.label = "artillery squad";
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
         s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1;
         s.botLabId = botLab is null ? -1 : botLab.id;
@@ -247,13 +366,16 @@ namespace FrontArtySquad {
 
     // Pick the lead: first living member of the lead type, else the longest-ranged non-escort member
     void ChooseLeader(Squad@ s) {
-        int pick = -1; float range = -1.0f; bool leadType = false;
+        int pick = -1; float range = -1.0f, speed = 0.0f; bool leadType = false;
         for (uint k = 0; k < s.members.length(); ++k) {
             CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
             if (m is null || m.circuitDef is null || IsEscort(m.circuitDef.GetName())) continue;
             const bool isLead = m.circuitDef.id == s.leadDefId;
             const float r = m.circuitDef.GetMaxRange();
-            if ((isLead && !leadType) || (isLead == leadType && r > range)) { pick = m.id; range = r; leadType = isLead; }
+            const float sp = m.circuitDef.GetSpeed();
+            if ((isLead && !leadType) || (isLead == leadType && (r > range || (r == range && sp < speed)))) {
+                pick = m.id; range = r; speed = sp; leadType = isLead;
+            }
         }
         if (pick == s.leader) return;
         s.leader = pick;
@@ -360,5 +482,6 @@ namespace FrontArtySquad {
     void Load() {
         for (int i = int(squads.length()) - 1; i >= 0; --i) Release(uint(i), "reset on load");
         nextUpdate = 0;
+        nextBotRoll = -1;
     }
 }

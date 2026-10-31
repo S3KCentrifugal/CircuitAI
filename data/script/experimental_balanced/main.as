@@ -271,6 +271,9 @@ namespace Main {
         Global::RoleSettings::Front::VehicleT2WaveEscorts = true;
         // ... and 15% for a faction artillery squad instead (owner, 2026-10-20; systems/production/front_arty_squad.as)
         Global::RoleSettings::Front::VehicleT2ArtySquadChance = 0.15f;
+        // ... and a T2 bot lab all game: every 3 min, 50% for a heavy or (half the time) artillery bot squad with a
+        // radar, two jammer and a flak bot, moving together behind its longest-ranged unit (owner, 2026-10-31)
+        Global::RoleSettings::Front::T2BotSquadChance = 0.5f;
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
         Global::RoleSettings::Front::BotWaveChance = 0.5f;
