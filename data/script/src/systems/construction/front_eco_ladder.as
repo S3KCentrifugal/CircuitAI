@@ -617,8 +617,12 @@ namespace FrontEcoLadder {
         const bool fusionStep = s <= S_FUS3;
         CCircuitDef@ reactor = Def(fusionStep ? UnitHelpers::GetFusionNameForSide(side) : UnitHelpers::GetAdvFusionNameForSide(side));
         const int want = fusionStep ? s : AdvFusionTarget(s, mi);
-        // fusions: every one of ours counts, framed or queued by the build chain or the native eco
-        const int have = fusionStep ? FusionsPlanned() : AdvFusionsTotal();
+        // fusions: framed and standing ones of ours, and our own open order. A fusion queued by the build
+        // chain or the native eco no longer counts: with the energy bank full native never sends a builder
+        // to it (BuilderManager weighs ENERGY by E/M income; CBEnergyTask::CanAssignTo refuses it unless
+        // energy stalls), and the stage waited on it forever (played 2026-11-01, Thermal Shock: T11 held
+        // stage 2 from 14:20 past 20:00 with "fusions 1/1/3", metal bank 2-4.8k of 5k, E +3,800)
+        const int have = fusionStep ? FusionsTotal() + (reactorTask !is null ? 1 : 0) : AdvFusionsTotal();
         if (reactor !is null) WatchReactor(reactor);
         if (mexFirst && reactor !is null && have < want)
             ReactorHeld(reactor.GetName() + " " + (have + 1) + "/" + want + ": mex gate, " + Done(MexName()) + " T1 mexes still to upgrade");
