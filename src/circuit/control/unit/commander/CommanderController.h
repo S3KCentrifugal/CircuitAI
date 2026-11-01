@@ -54,6 +54,17 @@ struct CommanderRetreatState {
     bool health=false; int healthPlan=-10000,healthShotUntil=-1; springai::AIFloat3 healthGoal{-1,0,-1};
     int lastTaskType=-1;    // D-389: detects the end of a retreat lease
 };
+// Owner 2026-11-01: withdrawal from scouted enemy laser towers (keep-out) and
+// from shelling detected by the commander's own health-loss rate.
+struct CommanderKeepOutState {
+    bool active=false;            // a keep-out/shelling withdrawal owns the commander
+    const char* reason="";
+    int goalPlan=-10000,shelledUntil=-1,logNext=0;
+    springai::AIFloat3 goal{-1,0,-1};
+    int diveTarget=-1,diveStart=-1,diveUntil=-1; // a rare D-gun dive on one tower
+    float lastHp=-1; int lastHpFrame=-10000;
+    std::vector<std::pair<int,float>> losses; // (frame, health lost) inside the loss window
+};
 struct CommanderFallbackState {
     // D-293 fallback: held until `until`, porc line replanned once/second.
     bool active=false;
@@ -154,6 +165,7 @@ struct CommanderState : control::ControlledState {
     std::vector<routecommand::Command> route;
     CommanderConcealState conceal;
     CommanderRetreatState retreat;
+    CommanderKeepOutState keep;
     CommanderFallbackState fallback;
     CommanderT3State t3;
     CommanderFrontState front;
@@ -183,6 +195,16 @@ struct CommanderSafetyConfig {
     float decoyBait=1; // reuse safety/lane work, never plan a real-commander D-gun attack
     float jamSafe=0,jamHeavyCost=900;
     float cloakEnergyRetreat=0,cloakRetreatDistance=600;
+    // Owner 2026-11-01 tower keep-out: stay towerMargin outside the weapon range
+    // of scouted enemy LLTs, Beamers, Twin Guards and Cacophonies; dive one alone
+    // rarely (towerDiveChance per tower per towerDiveCooldown seconds).
+    float towerKeepOut=1,towerMargin=100,towerDiveChance=.15f,towerDiveCooldown=180,towerDiveHealth=.85f;
+    // Shelling: health lost per second over shellWindow, mostly unexplained by
+    // visible enemies in reach, with no radar dot closer than shellDotRange.
+    // The commander steps shellStep back, keeps out of a shellZone disc there
+    // for shellZoneSeconds and holds the withdrawal shellHold seconds. 0 rate = off.
+    float shellLossRate=35,shellWindow=5,shellUnexplained=.5f,shellDotRange=500;
+    float shellStep=600,shellZone=450,shellZoneSeconds=45,shellHold=8;
 };
 // D-389 cloak posture levers (commander-cloak-policy.md section 4.4).
 struct CommanderCloakConfig {
@@ -349,6 +371,9 @@ public:
     bool CanStartRadar(CCircuitUnit* unit);
     void MexFinished(CCircuitUnit* commander, CCircuitUnit* mex);
     bool GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& site) const;
+    // A commander or commander group member never takes work at a site inside a
+    // keep-out zone (scouted laser tower range, recent shelling).
+    bool KeepOutBlocks(CCircuitUnit* unit,const springai::AIFloat3& site) const;
     bool CanResumeFrontTask(CCircuitUnit* unit, IUnitTask* task) const;
     std::vector<commander::DefenceExclusion> DefenceExclusions(CCircuitUnit* unit,CCircuitDef* def,
         const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr) const;
@@ -494,6 +519,20 @@ private:
     commander::JammerDemandMemory jammerDemand;
     std::map<int,commander::JammerOutage> jammerOutages;
     bool HealthControl(CCircuitUnit* unit,State& s,int frame);
+    // ---- keep-out and shelling withdrawal (CommanderKeepOut.cpp) ----
+    struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false; };
+    std::vector<KeepOutZone> keepOut; // towers rebuilt once a second; shell zones until expiry
+    int keepOutFrame=-10000,nextDiveFrame=0;
+    std::set<int> towerDefs; bool towerDefsResolved=false;
+    std::map<int,int> diveRolled; // tower id -> frame a new dive roll is allowed
+    float nearestDot=-1; springai::AIFloat3 nearestDotPos; // radar-only contact, from Observe
+    float visibleReachDps=0; // in-LOS weapons whose range reaches the commander, from Observe
+    void RefreshKeepOut(CCircuitUnit* unit,int frame);
+    const KeepOutZone* KeepOutAt(commander::Point p,float margin=0) const;
+    springai::AIFloat3 KeepOutGoal(CCircuitUnit* unit,const springai::AIFloat3& goal) const;
+    springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame);
+    bool TowerDive(CCircuitUnit* unit,State& s,const KeepOutZone& zone,int frame);
+    bool SafetyWithdraw(CCircuitUnit* unit,State& s,int frame);
     struct JamZone { commander::Point center; float radius; };
     std::vector<JamZone> jamZones;
     bool JamControl(CCircuitUnit* unit,State& state,int frame);

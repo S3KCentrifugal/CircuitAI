@@ -247,6 +247,7 @@ bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircu
 bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site) const {
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
     if(!GroupBuildSiteAllowed(unit,def,site) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
+    if(KeepOutBlocks(unit,site)) return false;
     if(!IsGroupMember(unit->GetId())) return true;
     auto* anchor=GroupCommander();
     return anchor && def && commander::GroupJobInRange(site.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
