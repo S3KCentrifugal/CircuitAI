@@ -19,6 +19,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <unordered_map>
 #include <array>
 #include <type_traits>
 
@@ -352,6 +353,10 @@ public:
 		bool isEnabled = false;
 		std::unordered_set<CCircuitDef::Id> defs;
 		float maxSqSpeed = 0.f;  // (elmos/frame)^2
+		// Owner 2026-11-01: heavy units (Fatboy, Tzar, Mammoth ...) are the next
+		// targets after commanders, when moving at most `heavy_speed_fraction`
+		// of their own top speed. Value: that speed limit, (elmos/frame)^2.
+		std::unordered_map<CCircuitDef::Id, float> heavyMaxSqSpeed;
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
 	// A def whose escort is rationed: a mobile radar or jammer.
