@@ -233,9 +233,14 @@ namespace FrontAgitator {
             @kd.order = null;
             const string key = "" + kd.orderSpot;
             lastScan = -100000;   // the next ask rescans
-            if (done) { kd.fails.delete(key); return; }
+            if (done) {
+                kd.fails.delete(key);
+                GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] built at spot " + kd.orderSpot, 1);
+                return;
+            }
+            // an &out argument is overwritten even when the key is missing: check the result
             int n = 0;
-            kd.fails.get(key, n);
+            if (!kd.fails.get(key, n)) n = 0;
             ++n;
             if (n >= 3) {
                 kd.holds.set(key, ai.frame + SpotHoldSeconds * SECOND);
@@ -309,7 +314,7 @@ namespace FrontAgitator {
             if (d.maxThisUnit >= 0 && d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
             if (!d.IsAvailable(ai.frame)) return null;
             int n = 0;
-            kd.fails.get("" + s.id, n);
+            if (!kd.fails.get("" + s.id, n)) n = 0;
             const float shake = Global::RoleSettings::Front::AgitatorShake + 80.0f * float(n);
             @kd.order = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, d, s.pos, shake, true,
                 OrderTimeoutSeconds * SECOND));
