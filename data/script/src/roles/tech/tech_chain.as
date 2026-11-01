@@ -65,6 +65,7 @@ namespace TechChain
     int stallHave = -1;        // ... with this count ...
     int stallFrame = 0;        // ... since this frame; no progress for ChainStepStallSeconds skips it
     array<bool> skipped;
+    int mohoBlockedUntil = 0;  // no T1 mex left in range could be upgraded (terrain, approach, native refusal) until this frame
     int pendingStep = -1;      // an order for this step went out ...
     int pendingFrame = 0;      // ... at this frame; invisible to the queued and unfinished counts until its frame exists
     int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
@@ -676,6 +677,9 @@ namespace TechChain
     bool MohosPending()
     {
         if (!Active() || TechBuild::MetalFullLong() || Global::RoleSettings::Tech::ChainMohoRadius <= 0.0f) return false;   // metal floating: the upgrades are not what it waits on
+        // played (Thermal Shock 2026-11-01): a mex no constructor could upgrade
+        // kept the fusion and advanced fusion out of the eco planner for good
+        if (ai.frame < mohoBlockedUntil) return false;
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
             if (s.key != "moho" || (i < skipped.length() && skipped[i])) continue;
@@ -910,7 +914,9 @@ namespace TechChain
             // Never manufacture a position-only task: native admission checks
             // ownership, tier, live reachability and concurrent spot claims.
             // Rejection must let the income ladder consider energy instead.
-            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
+            IUnitTask@ up = (target is null) ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
+            mohoBlockedUntil = (up is null) ? ai.frame + 30 * SECOND : 0;
+            return up;
         }
         if (key == "nano") {
             // A distant mex worker must not own a no-frame turret reservation
@@ -1168,7 +1174,13 @@ namespace TechChain
             // donations prevent the ordinary full-metal exception. Query only
             // on the fusion row; other TECH energy ordering remains unchanged.
             const bool requiredFusion = s.key == "fusion" && (NukeRush() || TechHeavyRush::RequiresFusion());
-            if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
+            // A builder that cannot build this step only passes it on the way to
+            // a later one: it must not restart another step's clock (played:
+            // Thermal Shock 2026-11-01, the commander and T1 constructors went on
+            // to the advanced fusion step and reset the stuck mex-upgrade step's
+            // clock every few seconds; never skipped, no advanced fusion by 13 min)
+            if (stallStep != int(i) && !u.circuitDef.CanBuild(d)) {}
+            else if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
             // Required nuke prerequisites are never skipped. A queued project
             // may inherit time spent waiting for its supporting turret bank;
             // that old clock must not skip fusion while its builder approaches.
@@ -1289,6 +1301,12 @@ namespace TechChain
             IUnitTask@ t = Order(int(i), s, d, u);
             if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have, u); return t; }
             if (s.key == "mex" && s.exhausted) continue;
+            // no mex this builder can upgrade: on to the fusion and advanced
+            // fusion rather than hold every T2 constructor here
+            if (s.key == "moho" && !NukeRush() && ai.frame < mohoBlockedUntil) {
+                Trace("no upgradable mex: on to the next step", int(i), s, have, u);
+                continue;
+            }
             Trace("cannot order yet", int(i), s, have, u);
             return null;
         }
