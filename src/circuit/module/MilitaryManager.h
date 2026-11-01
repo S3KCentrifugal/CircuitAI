@@ -328,6 +328,20 @@ public:
 		float acquireMargin = 64.f; // lock when within weapon range + this
 		float releaseMargin = 200.f; // keep it while within range + this
 	};
+	/*
+	 * Owner 2026-11-01: legacy-path artillery (no `ranged` attribute) only ever
+	 * ordered structures, so a human's commander parked in range was never shot.
+	 * Listed defs also take an enemy commander inside weapon range whose speed
+	 * is at most `maxSpeed` (stationary, building, walking slowly) as their first
+	 * target. Off unless the "artillery_commander" block in behaviour.json
+	 * enables it.
+	 */
+	struct SArtyCommInfo {
+		bool isEnabled = false;
+		std::unordered_set<CCircuitDef::Id> defs;
+		float maxSqSpeed = 0.f;  // (elmos/frame)^2
+	};
+	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
 	// A def whose escort is rationed: a mobile radar or jammer.
 	bool IsSensorUnit(const CCircuitDef* cdef) const;
 	// Live sensors already escorting `task`.
@@ -553,6 +567,7 @@ private:
 	float nuclearLaunchRadius = 0.f;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
+	SArtyCommInfo artyCommInfo;
 
 	unsigned int preventCount = 0;
 	float amountFactor = 0.f;

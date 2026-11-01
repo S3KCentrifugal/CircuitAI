@@ -649,6 +649,27 @@ void CMilitaryManager::ReadConfig()
 			cfgName.c_str(), commSnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(commSnipeInfo.defs.size()),
 			commSnipeInfo.interval, commSnipeInfo.acquireMargin, commSnipeInfo.releaseMargin);
 
+	/*
+	 * Artillery commander targets: see SArtyCommInfo. "units" are def names;
+	 * "max_speed" is in elmos per second (a walking commander is ~37).
+	 */
+	const Json::Value& artyCommCfg = root["artillery_commander"];
+	artyCommInfo.isEnabled = false;
+	artyCommInfo.defs.clear();
+	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
+		std::set<std::string> names;
+		for (const auto& name : artyCommCfg["units"]) names.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (names.count(d.GetDef()->GetName()) > 0) artyCommInfo.defs.insert(d.GetId());
+		}
+		const float maxSpeed = std::max(0.f, artyCommCfg.get("max_speed", 12.f).asFloat()) / FRAMES_PER_SEC;
+		artyCommInfo.maxSqSpeed = SQUARE(maxSpeed);
+		artyCommInfo.isEnabled = !artyCommInfo.defs.empty();
+	}
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f",
+			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
+			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC);
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
