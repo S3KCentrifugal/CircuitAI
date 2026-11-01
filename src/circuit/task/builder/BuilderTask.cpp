@@ -6,6 +6,7 @@
  */
 
 #include "task/builder/BuilderTask.h"
+#include "task/builder/RepairTask.h"
 #include "task/DormantTaskChain.h"
 #include "terrain/ReservationClaim.h"
 #include "task/builder/BuildChain.h"
@@ -28,6 +29,8 @@
 #include "unit/action/FightAction.h"
 #include "unit/action/MoveAction.h"
 #include "CircuitAI.h"
+#include "control/unit/commander/CommanderController.h"
+#include "unit/ally/AllyTeam.h"
 #include "util/Utils.h"
 
 #include "spring/SpringCallback.h"
@@ -126,6 +129,18 @@ IBuilderTask::IBuilderTask(ITaskModule* mgr, Type type, BuildType buildType)
 IBuilderTask::~IBuilderTask()
 {
 	ReleaseDormantTaskChain(nextTask);
+}
+
+void IBuilderTask::ClearRelease()
+{
+    if(defenseClaim) manager->GetCircuit()->GetAllyTeam()->GetDefenseClaims().Erase(manager->GetCircuit()->GetTeamId(),defenseClaim);
+    defenseClaim=0;
+	// Manager ownership ends before a unit/script's final task reference. Release
+	// external reservations here, while the manager and terrain still exist,
+	// rather than dereferencing a destroyed manager in the final destructor.
+	// Stop/physical handoff normally cleared this already; shutdown need not Stop.
+	if (buildSiteClaim) manager->GetCircuit()->GetTerrainManager()->ReleaseBuildSite(buildSiteClaim);
+	IUnitTask::ClearRelease();
 }
 
 bool IBuilderTask::CanAssignTo(CCircuitUnit* unit) const
@@ -245,6 +260,11 @@ void IBuilderTask::Update()
 
 void IBuilderTask::Stop(bool done)
 {
+    // Release at logical removal, before deferred manager cleanup. Cancel can
+    // update the site; SyncDefenseClaim rejects dead tasks to avoid resurrection.
+    if(defenseClaim) manager->GetCircuit()->GetAllyTeam()->GetDefenseClaims().Erase(manager->GetCircuit()->GetTeamId(),defenseClaim);
+    defenseClaim=0;
+	manager->GetCircuit()->GetTerrainManager()->ReleaseBuildSite(buildSiteClaim);
 	constructionHealth.clear();
 	IUnitTask::Stop(done);
 	// D-117 crash (owner's game, build101, F25307): IUnitTask::Stop clears
@@ -351,8 +371,9 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 	FindBuildSite(unit, pos, searchRadius);
 
 	if (geom::is_valid(buildPos)) {
+        if(!circuit->GetCommanderController()->GroupMayBuild(unit,buildDef,buildPos)) return false;
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
+			if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 		)
 	} else if (siteRadius > 0.f) {
 		// Terrain restore: a cratered placed site is restored on the next scan
@@ -391,8 +412,13 @@ bool IBuilderTask::TryBuildCachedSite(CCircuitUnit* unit)
         || !circuit->GetBuilderManager()->IsBuildPositionAllowed(buildDef, buildPos)
         || circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
         || !circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) return false;
+    if(!circuit->GetCommanderController()->GroupMayBuild(unit,buildDef,buildPos)) return false;
+    const auto coverage=circuit->GetCommanderController()->GroupJammerCoverage(unit,buildDef,buildPos,0.f,this);
+    if(!coverage.Allows({buildPos.x,buildPos.z})) return false;
+    const auto exclusions=circuit->GetCommanderController()->DefenceExclusions(unit,buildDef,buildPos,0.f,this);
+    if(!commander::DefenceSpaced({buildPos.x,buildPos.z},exclusions)) return false;
     TRY_UNIT(circuit, unit,
-        unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(circuit->GetLastFrame()));
+        if (!BuildAtSite(unit, 0, CmdTimeout(circuit->GetLastFrame()))) return false;
     )
     return true;
 }
@@ -540,6 +566,7 @@ void IBuilderTask::OnUnitIdle(CCircuitUnit* unit)
 
 void IBuilderTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+    if(manager->GetCircuit()->GetCommanderController()->Jammed(unit)) return;
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -583,14 +610,42 @@ void IBuilderTask::Deactivate()
 	lastTouched = -1;
 }
 
+void IBuilderTask::ReserveDefenseIntent()
+{
+    manager->GetCircuit()->GetCommanderController()->SyncDefenseClaim(this,defenseClaim);
+}
+
+void IBuilderTask::RefreshBuildSiteClaim()
+{
+    manager->GetCircuit()->GetCommanderController()->SyncDefenseClaim(this,defenseClaim);
+    auto* terrain = manager->GetCircuit()->GetTerrainManager();
+    if (target != nullptr || buildDef == nullptr || !geom::is_valid(buildPos)
+        || !terrain->ReserveBuildSite(buildSiteClaim, buildDef, buildPos, facing)) {
+        terrain->ReleaseBuildSite(buildSiteClaim);
+    }
+}
+
+bool IBuilderTask::BuildAtSite(CCircuitUnit* unit, int options, int timeout)
+{
+    auto* terrain = manager->GetCircuit()->GetTerrainManager();
+    if (!terrain->ReserveBuildSite(buildSiteClaim, buildDef, buildPos, facing)) {
+        SetBuildPos(-RgtVector);
+        return false;
+    }
+    unit->CmdBuild(buildDef, buildPos, facing, options, timeout);
+    return true;
+}
+
 void IBuilderTask::SetBuildPos(const AIFloat3& pos)
 {
 	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
+    terrainMgr->ReleaseBuildSite(buildSiteClaim);
 	if (geom::is_valid(buildPos)) {
 		terrainMgr->DelBlocker(buildDef, buildPos, facing);
 	}
 	if (geom::is_valid(pos)) {
 		buildPos = CTerrainManager::Pos2BuildPos(buildDef, pos, facing);
+		RefreshBuildSiteClaim();
 		terrainMgr->AddBlocker(buildDef, buildPos, facing);
 	} else {
 		buildPos = pos;
@@ -601,6 +656,8 @@ void IBuilderTask::SetTarget(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+    // UnitCreated publishes the physical footprint before manager callbacks.
+    terrainMgr->ReleaseBuildSite(buildSiteClaim);
 	if (geom::is_valid(buildPos)) {
 		terrainMgr->DelBlocker(buildDef, buildPos, facing);
 	}
@@ -619,6 +676,7 @@ void IBuilderTask::SetTarget(CCircuitUnit* unit)
 	if (geom::is_valid(buildPos)) {
 		terrainMgr->AddBlocker(buildDef, buildPos, facing);
 	}
+    circuit->GetCommanderController()->SyncDefenseClaim(this,defenseClaim);
 }
 
 void IBuilderTask::UpdateTarget(CCircuitUnit* unit)
@@ -659,6 +717,9 @@ CCircuitUnit* IBuilderTask::GetNextAssignee()
 
 void IBuilderTask::Update(CCircuitUnit* unit)
 {
+    if(auto* repair=dynamic_cast<CBRepairTask*>(this); repair && repair->IsStationaryCommander(unit)) {
+        repair->UpdateStationary(unit);return;
+    }
 	if (IsExperimental() && (target != nullptr) && (engaged.find(unit) != engaged.end())
 		&& !manager->GetCircuit()->GetEconomyManager()->IsEnergyEmpty())
 	{
@@ -1066,8 +1127,14 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 	FindFacing(pos);
 
 	CTerrainManager* terrainMgr = manager->GetCircuit()->GetTerrainManager();
-	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder](const AIFloat3& p) {
-		return manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
+    const auto exclusions=manager->GetCircuit()->GetCommanderController()->DefenceExclusions(builder,buildDef,pos,searchRadius,this);
+    auto* control=manager->GetCircuit()->GetCommanderController();
+    const auto coverage=control->GroupJammerCoverage(builder,buildDef,pos,searchRadius,this);
+	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control](const AIFloat3& p) {
+		return commander::DefenceSpaced({p.x,p.z},exclusions)
+            && control->GroupBuildSiteAllowed(builder,buildDef,p)
+            && coverage.Allows({p.x,p.z})
+            && manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
             && terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
 	if (reservationId >= 0) {
@@ -1373,8 +1440,10 @@ bool IBuilderTask::Load(std::istream& is)
 	target = circuit->GetTeamUnit(targetId);
 	position = AIFloat3(positionF3);
 	buildPos = AIFloat3(buildPosF3);
+    ReserveDefenseIntent();
 
 	if ((target == nullptr) && (buildDef != nullptr) && geom::is_valid(buildPos)) {
+		RefreshBuildSiteClaim();
 		circuit->GetTerrainManager()->AddBlocker(buildDef, buildPos, facing);
 	}
 	if ((target != nullptr) && (buildType != BuildType::REPAIR) && (buildType != BuildType::RECLAIM)) {

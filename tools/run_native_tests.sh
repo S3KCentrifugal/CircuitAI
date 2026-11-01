@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# D-094 / D-363: compile and run the standalone native unit tests (tests/*_test.cpp)
+# D-094 / D-369: compile and run the standalone native unit tests (tests/*_test.cpp)
 # and the AngelScript helper suites (tests/*_tests.as, run by production_math_test
 # through the bundled AngelScript engine). Exit 0 when every test passes.
 #
@@ -9,6 +9,8 @@
 #                                                # here: the Linux CI runner (pr-checks.yml)
 #   bash tools/run_native_tests.sh --only cpp    # the C++ tests only
 #   bash tools/run_native_tests.sh --only as     # the AngelScript suites only
+# Optional real-map matrix: set CIRCUIT_LANE_MAP_ARCHIVES to installed archives
+# and CIRCUIT_LANE_MAP_OUT to a fresh external benchmark session directory.
 #
 # The tests include only engine-free headers (BaseLayoutGeometry.h, LayoutRanking.h
 # and the like), so no engine, wrapper or AI build is needed. The AngelScript suites
@@ -36,16 +38,19 @@ OUT="${TMPDIR:-${TEMP:-/tmp}}/circuit-native-tests"
 mkdir -p "$OUT"
 
 # The C++ tests, each a single translation unit, plus the extra sources a few need.
-tests=(mex_navigation_test mex_territory_test transport_definition_test commander_combat_test callback_buffer_test resurrection_claim_test reservation_claim_test task_reference_test dormant_task_chain_test economy_index_test route_command_test reservation_candidates_test construction_recovery_test guard_command_test target_preference_test layout_ranking_test base_layout_geometry_test allied_reservations_test local_reservations_test lane_solver_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test naval_geometry_test air_safety_test widget_state_test ranged_geometry_test ground_cohort_test local_rush_test water_survey_test field_analysis_test)
+tests=(performance_helpers_test defense_planner_test commander_group_work_test commander_fallback_test field_corridor_helpers_test lane_front_test control_core_test commander_posture_test mex_navigation_test mex_territory_test transport_definition_test commander_combat_test commander_jammer_coverage_test fog_proximity_test callback_buffer_test resurrection_claim_test reservation_claim_test task_reference_test dormant_task_chain_test economy_index_test route_command_test reservation_candidates_test construction_recovery_test guard_command_test target_preference_test layout_ranking_test base_layout_geometry_test allied_reservations_test local_reservations_test lane_solver_test lane_raster_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test naval_geometry_test air_safety_test widget_state_test ranged_geometry_test ground_cohort_test local_rush_test water_survey_test field_analysis_test)
 tests+=(task_lifetime_test escort_strike_test tier_targeting_test)
 extra_sources() {
 	case "$1" in
 		lane_solver_test|terrain_route_test) echo "src/circuit/terrain/LaneSolver.cpp" ;;
-		field_analysis_test) echo "src/circuit/terrain/field/FieldAnalysis.cpp src/circuit/terrain/field/FieldEncode.cpp src/circuit/terrain/field/FieldLandmarks.cpp src/circuit/terrain/field/FieldSettings.cpp src/lib/json/jsoncpp.cpp" ;;
+		control_core_test) echo "src/lib/json/jsoncpp.cpp" ;;
+		field_corridor_helpers_test) echo "src/circuit/terrain/field/FieldCorridors.cpp src/circuit/terrain/field/FieldLandmarks.cpp src/circuit/terrain/field/FieldSettings.cpp src/lib/json/jsoncpp.cpp" ;;
+		field_analysis_test) echo "src/circuit/terrain/field/FieldAnalysis.cpp src/circuit/terrain/field/FieldCorridors.cpp src/circuit/terrain/field/FieldEncode.cpp src/circuit/terrain/field/FieldLandmarks.cpp src/circuit/terrain/field/FieldSettings.cpp src/lib/json/jsoncpp.cpp" ;;
 	esac
 }
 # The AngelScript suites: policy script, its tests, runner flags.
 as_suites=(
+	"data/script/src/helpers/construction/owned_economy_helpers.as tests/owned_economy_tests.as --strings"
 	"data/script/src/helpers/math/geothermal_math.as tests/geothermal_math_tests.as"
 	"data/script/src/helpers/math/production_math.as tests/production_math_tests.as"
 	"data/script/src/helpers/math/placement_math.as tests/placement_math_tests.as"
@@ -65,8 +70,13 @@ as_suites=(
 	"data/script/src/helpers/math/nuke_math.as tests/nuke_math_tests.as"
 	"data/script/src/helpers/math/heavy_rush_math.as tests/heavy_rush_math_tests.as"
 	"data/script/src/helpers/math/tech_economy_math.as tests/tech_economy_math_tests.as"
+	"data/script/src/helpers/math/ferry_math.as tests/ferry_math_tests.as"
+	"data/script/src/helpers/math/frontline_engineering_math.as tests/frontline_engineering_math_tests.as"
 	"data/script/src/helpers/math/gantry_math.as tests/gantry_math_tests.as"
 	"data/script/src/helpers/math/assist_math.as tests/assist_math_tests.as"
+	"data/script/src/helpers/math/commander_group_math.as tests/commander_group_math_tests.as"
+	"data/script/src/helpers/math/front_tech_math.as tests/front_tech_math_tests.as"
+	"data/script/src/helpers/math/front_energy_math.as tests/front_energy_math_tests.as"
 	"data/script/src/helpers/math/transport_math.as tests/transport_math_tests.as"
 	"data/script/src/helpers/math/scout_raid_math.as tests/scout_raid_math_tests.as"
 	"data/script/src/helpers/math/lolcannon_math.as tests/lolcannon_math_tests.as"
@@ -100,8 +110,10 @@ else
 fi
 commands=()
 if [ "$ONLY" != as ]; then
+	tests+=(multi_queue_test)
 	for t in "${tests[@]}"; do
 		extra=""
+		[ "$t" = multi_queue_test ] && extra=" -I$SRC/tests/stubs"
 		for e in $(extra_sources "$t"); do extra="$extra $SRC/$e"; done
 		commands+=("$CXXBIN -std=c++20 -O1 -Wall -Wextra $LINK -I$SRC/src -I$SRC/src/circuit -I$SRC/src/lib $SRC/tests/$t.cpp$extra -o $BIN/$t$EXT")
 	done
@@ -149,6 +161,16 @@ if [ "$ONLY" != as ]; then
 	for t in "${tests[@]}"; do
 		run "$t" "$OUT/$t$EXT"
 	done
+	if [ -n "${CIRCUIT_LANE_MAP_ARCHIVES:-}" ]; then
+		if [ -z "${CIRCUIT_LANE_MAP_OUT:-}" ]; then
+			echo "CIRCUIT_LANE_MAP_OUT must name a fresh external benchmark directory" >&2
+			exit 2
+		fi
+		run "map_lane_matrix" "$PY" "$REPO/tools/knowledge/check_map_lanes.py" \
+			--exe "$OUT/field_analysis_test$EXT" --archives "$CIRCUIT_LANE_MAP_ARCHIVES" --out "$CIRCUIT_LANE_MAP_OUT"
+	else
+		echo "Real-map lane matrix NOT RUN (set CIRCUIT_LANE_MAP_ARCHIVES and CIRCUIT_LANE_MAP_OUT)."
+	fi
 fi
 echo "run_native_tests: $passed passed, $failed failed (--only $ONLY)"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

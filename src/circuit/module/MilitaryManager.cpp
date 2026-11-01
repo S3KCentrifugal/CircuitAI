@@ -84,7 +84,7 @@ CMilitaryManager::CMilitaryManager(CCircuitAI* circuit)
 		, armyCost(0.f)
 		, bigGunDef(nullptr)
 {
-	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CMilitaryManager::Init, this));
+	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CMilitaryManager::InitMilitary, this));
 
 	defence = circuit->GetAllyTeam()->GetDefenceData().get();
 
@@ -776,7 +776,7 @@ void CMilitaryManager::InitEconomyScores(const std::vector<CCircuitDef*>&& build
 	});
 }
 
-void CMilitaryManager::Init()
+void CMilitaryManager::InitMilitary()
 {
 	CMetalManager* metalMgr = circuit->GetMetalManager();
 	const CMetalData::Clusters& clusters = metalMgr->GetClusters();
@@ -1465,9 +1465,12 @@ void CMilitaryManager::FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions, boo
 	outPositions.clear();
     // D-354/D-356: on a published corridor the lane goal is the front for
     // attack leaders; the advance and the defend opt-in come from coverage.json.
-    const auto* battle=circuit->GetBattle();
-    if(!unit->GetCircuitDef()->IsAbleToFly() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
-        const auto goal=battle->GetFrontLaneGoal(unit->GetPos(circuit->GetLastFrame()),battle->GetFrontLaneAdvance());
+    auto* battle=circuit->GetBattle();
+    if(!unit->GetCircuitDef()->IsAbleToFly() && battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
+        const auto pos=unit->GetPos(circuit->GetLastFrame());
+        const float from=battle->GetFrontLaneProgress(pos);
+        const float goalProgress=battle->LimitLaneAdvance(from,from+battle->GetFrontLaneAdvance());
+        const auto goal=battle->GetFrontLaneGoal(pos,goalProgress-from);
         if(circuit->GetTerrainManager()->CanReachAt(unit,goal,64)) {outPositions.push_back(goal);return;}
     }
 
@@ -2590,8 +2593,7 @@ void CMilitaryManager::PointOfInterest(CEnemyInfo* enemy, int start, int step)
 		CMetalData::ClusterGraph::IncEdgeIt edgeIt(clusterGraph, node);
 		for (; edgeIt != lemon::INVALID; ++edgeIt) {
 			const int childId = clusterGraph.id(clusterGraph.oppositeNode(node, edgeIt));
-			if (visited.find(childId) == visited.end()) {
-				visited.insert(childId);
+			if (visited.insert(childId).second) {
 				toVisit.emplace_back(childId, q.second + step);
 			}
 		}

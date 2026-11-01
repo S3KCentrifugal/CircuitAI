@@ -17,6 +17,29 @@ import storage
 import playtest
 from air_arena import lua
 
+def group_fixture_policy(source,values):
+    """Replace declared numeric group settings without stripping JSON comments."""
+    for key,value in values.items():
+        if not re.fullmatch(r'commander_group_[a-z0-9_]+',key) or type(value) not in (int,float):
+            raise ValueError('Invalid commander group fixture policy')
+        number=json.dumps(value,allow_nan=False)
+        source,count=re.subn(r'("'+re.escape(key)+r'"\s*:\s*)-?\d+(?:\.\d+)?',
+            lambda match:match[1]+number,source)
+        if count!=1:raise ValueError('Missing/duplicate commander group fixture key: '+key)
+    return source
+
+def defense_fixture_policy(values):
+    """Explicit script-visible rule overrides for supplied correctness arenas."""
+    lines=[]
+    for row in values:
+        if (set(row)!={'slot','key','value'} or type(row['slot']) is not int or not -1<=row['slot']<24
+            or not isinstance(row['key'],str) or not re.fullmatch(r'[a-z_]+',row['key'])
+            or type(row['value']) not in (int,float)):
+            raise ValueError('Invalid defense fixture policy')
+        number=json.dumps(float(row['value']),allow_nan=False)
+        lines.append(f'if(!aiBuilderMgr.SetDefenseRule({row["slot"]},"{row["key"]}",{number}f)) GenericHelpers::LogUtil("[DefenseFixture] ERROR rejected rule",1);')
+    return '\n'.join(lines)
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
@@ -46,12 +69,14 @@ def prepare(args):
         '--modoption','deathmode=neverend','--modoption','startenergy='+str(case.get('start_energy',1000000)),
         '--modoption','startmetal='+str(case.get('start_metal',1000)),
         '--modoption','startmetalstorage='+str(case.get('start_metal',1000)),
-        '--modoption','startenergystorage=1000000',
+        '--modoption','startenergystorage='+str(case.get('start_energy_storage',1000000)),
         '--extra-widget',str(HERE/'widgets/ranged_arena.lua'),
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')]
     # Declared per-case mod options (e.g. the Legion faction for legscout).
     for key, value in case.get('modoptions', {}).items():
         stage += ['--modoption', f'{key}={value}']
+    if case.get('commander_idle_probe'):
+        stage += ['--extra-widget',str(HERE/'widgets/commander_idle_watch.lua')]
     if args.headless: stage += ['--headless']
     # No --game: playtest.py resolves the lobby's last game archive, so a
     # pinned archive name does not go stale when the installed BAR updates.
@@ -61,11 +86,22 @@ def prepare(args):
                   '--extra-widget',str(HERE/'widgets/aggression_watch.lua')]
     if case.get('coverage_overlay'):
         stage += ['--extra-widget',str(ROOT/'tools/widgets/gui_barb_team_link.lua')]
+    if case.get('lane_front_overlay'):
+        stage += ['--extra-widget',str(ROOT/'tools/widgets/gui_barb_team_link.lua'),
+                  '--extra-widget',str(HERE/'widgets/lane_front_watch.lua')]
     subprocess.run(stage, check=True)
     script = directory/'script.txt'
     script.write_text(script.read_text().replace('[GAME]\n{','[GAME]\n{\n FixedRNGSeed='+str(args.seed)+';',1))
     staged = directory/'AI/Skirmish/BARbTest/test'
     pool_symbols(staged)
+    # Explicit correctness-fixture policy levers; never mutate source/live data.
+    if case.get('commander_idle_probe'):
+        config_path=staged/'config'/args.profile/'commander.json'
+        config_path.write_text(re.sub(r'("front_ladder"\s*:\s*)"[^"]*"',
+            r'\1"advance,reclaim,hold"',config_path.read_text()))
+    if case.get('commander_policy'):
+        config_path=staged/'config'/args.profile/'commander.json'
+        config_path.write_text(group_fixture_policy(config_path.read_text(),case['commander_policy']))
     setup=staged/'script/src/setup.as'
     fixture_role=('(ai.teamId==0?AiRole::'+role+':AiRole::'+case['enemy_role']+')') if case.get('enemy_role') else 'AiRole::'+role
     setup.write_text(setup.read_text().replace('Global::AISettings::Role = derivedRole;',
@@ -84,6 +120,8 @@ def prepare(args):
                 condition = '!u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)'
         if name=='builder' and case.get('production'):
             repair += '\n if (ai.teamId==0 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);'
+        if name=='builder' and case.get('commander_repair_only'):
+            repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); IUnitTask@ repair=aiBuilderMgr.CommanderFrontWork(u,21,null,0.f); if(repair !is null) return repair; return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); } // stationary repair isolation fixture\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
@@ -131,7 +169,13 @@ def prepare(args):
         # fixture it escorts the supplied T3 and confounds concealed approaches.
         override=override.replace('if (ai.teamId==1 && u.circuitDef.IsMobile())',
             'if (ai.teamId==1 && u.circuitDef.IsMobile() && !u.circuitDef.IsRoleAny(Unit::Role::COMM.mask))',1)
-    override=override.replace('ai.teamId==1','ai.teamId=='+str(case.get('enemy_team',1)))
+    # Supplied allied spotters may need to hold as well as the opposing army.
+    # This affects only the fixture's military override, never normal policy.
+    held_teams = case.get('hold_teams', [case.get('enemy_team', 1)])
+    if not held_teams or any(type(team) is not int or team < 0 for team in held_teams):
+        raise ValueError('hold_teams must contain nonnegative integer team IDs')
+    hold_condition = '(' + ' || '.join('ai.teamId==' + str(team) for team in held_teams) + ')'
+    override=override.replace('ai.teamId==1', hold_condition)
     patched = source[:start]+override+source[start:]
     if case.get('native_route'): patched = 'CRouteTask@ FixtureRoute;\n'+patched
     path.write_text(patched)
@@ -157,6 +201,20 @@ def prepare(args):
             source=source[:start]+'\n if ('+scope+') CommanderCombat::Override("'+key+'",'+repr(float(value))+'f); // per-AI override fixture\n'+source[start:]
         declarations=''
         events=''
+        if case.get('defense_overrides'):
+            declarations+='bool _DefenseFixture=false;\n'
+            events+='\n if(ai.teamId==0 && ai.frame>=10*SECOND && !_DefenseFixture) {\n DefensePlanner::Load();\n'+defense_fixture_policy(case['defense_overrides'])+'\n _DefenseFixture=true; GenericHelpers::LogUtil("[DefenseFixture] applied",1);\n }\n'
+        if case.get('disable_lane_assignment'):
+            if case.get('lane_front_probe'): raise ValueError('Conflicting supplied lane policies')
+            declarations+='bool _FixtureNoLane=false;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=2*SECOND && !_FixtureNoLane) {
+     CoverageLanes::Load(); CoverageLanes::enabled=false;
+     CoverageLanes::Clear();
+     _FixtureNoLane=true;
+     AiLog("[FallbackCoverProbe] lane disabled");
+ }
+'''
         if case.get('coverage_probe'):
             minimum=float(case.get('coverage_min_advance',1000))
             if not 0 < minimum <= 50000: raise ValueError('Invalid coverage_min_advance')
@@ -177,6 +235,31 @@ def prepare(args):
              && aiBattle.GetFrontLaneDistance(p)<=aiBattle.GetFrontLaneWidth()
              && p.SqDistance2D(Global::Map::StartPos)>=_CoverageProbeMinimum*_CoverageProbeMinimum)
              AiLog("[CoverageProbe] advanced_in_lane team="+ai.teamId);
+     }
+ }
+'''
+        if case.get('lane_front_probe'):
+            declarations+='bool _LaneFrontSet=false; int _LaneFrontNext=0;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=2*SECOND) {
+     if(!_LaneFrontSet) {
+         // The supplied route owns this fixture; normal coverage must not
+         // replace it later in the same update with an automatically planned lane.
+         CoverageLanes::Load();
+         CoverageLanes::enabled=false;
+         if(CoverageLanes::frontPublished) CoverageLanes::Clear();
+         // Comet's z extent is 6144; reject a broken fixture explicitly.
+         array<AIFloat3> route={AIFloat3(4000,0,4000),AIFloat3(4000,0,6000)};
+         if(!aiBattle.SetFrontLane(route,384)) AiLog("[RangedArena] ERROR lane route rejected");
+         else AiLog("[LaneFrontProbe] route accepted");
+         aiBattle.SetLaneFrontOptions(5,20,1.5f,128,100);
+         _LaneFrontSet=true;
+     }
+     if(ai.frame>=_LaneFrontNext) {
+         _LaneFrontNext=ai.frame+SECOND;
+         AiLog("[LaneFrontProbe] "+aiBattle.DescribeLaneFront());
+         if(abs(aiBattle.GetFrontLaneLength()-2000.f)>1.f) AiLog("[RangedArena] ERROR fixture lane replaced");
+         AiLog("[LaneFrontBound] "+aiBattle.LimitLaneAdvance(0,2000));
      }
  }
 '''
@@ -261,6 +344,9 @@ def prepare(args):
         }
 '''
         profile.write_text(source[:start]+probe+source[start:])
+    if case.get('front_constructor_observation'):
+        subprocess.run([sys.executable,str(HERE/'prepare_front_constructor_check.py'),
+                        '--dir',str(directory)],check=True)
     config=directory/'LuaUI/Config';config.mkdir(parents=True,exist_ok=True)
     (config/'ranged_arena.lua').write_text('return '+lua(case)+'\n')
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
@@ -278,6 +364,8 @@ def prepare(args):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
+    if case.get('commander_repair_only'):
+        pins['overrides'] += ['team 0 commander offers stationary repair then stationary hold; normal combat controller remains active']
     if case.get('commander_front_work'):
         pins['overrides'] += [('all commanders' if case.get('coverage_probe') else 'team 0 commanders')
                              +' use real FRONT builder policy; other builders frozen']

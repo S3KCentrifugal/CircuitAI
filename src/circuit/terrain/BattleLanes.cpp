@@ -2,9 +2,10 @@
  * BattleLanes.cpp
  *
  * D-127: lanes between both teams' start positions, per movement class
- * (doc/roles/tech-lanes.md). Passability is the engine's own test: the slope
- * map (1 - cos(angle), 16 elmos a pixel) against each BAR movedef class's
- * maxslope, and the depth limits (gamedata/movedefs.lua):
+ * (doc/roles/tech-lanes.md). Passability is the engine's own test, computed
+ * once in field::FinePassability (D-358) at 16 elmos and downsampled here: the
+ * slope map (1 - cos(angle)) against each BAR movedef class's maxslope, and
+ * the depth limits (gamedata/movedefs.lua):
  *   land (tanks, TANK2..HTANK4)      27 deg -> 0.109, wade 20
  *   bot (BOT2..HBOT7)                54 deg -> 0.412, wade 20
  *   amphibious (ABOT3, ATANK3, ...)  54 deg on land, any water
@@ -24,8 +25,16 @@
 #include "terrain/TerrainManager.h"
 #include "terrain/TerrainData.h"
 #include "terrain/TerrainCorridor.h"
+#include "terrain/LaneRaster.h"
+#include "terrain/FieldService.h"
+#include "terrain/field/FieldCorridors.h"
+#include "util/GameAttribute.h"
 #include "unit/CircuitDef.h"
 #include "unit/ally/AllyUnit.h"
+#include "unit/ally/AllyTeam.h"
+#include "control/service/CombatSnapshot.h"
+#include "Unit.h"
+#include <sstream>
 #include "spring/SpringCallback.h"
 #include "UnitDef.h"
 #include "MoveData.h"
@@ -53,11 +62,9 @@ using namespace springai;
 
 static const int NB[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
-#define SLOPE_TANK   0.109f   // 1 - cos(27 deg)
-#define SLOPE_HOVER  0.161f   // 1 - cos(33 deg)
-#define SLOPE_BOT    0.412f   // 1 - cos(54 deg)
-#define WADE_DEPTH   20.f
-#define SHIP_DEPTH   8.f
+// D-358: the slope and depth limits live in terrain/field/FieldCorridors.h
+// (field::kSlopeTank..kSubDepth); this file reads passability through
+// field::FinePassability and never the slope map for that purpose.
 
 
 namespace {
@@ -207,43 +214,173 @@ void CBattleAnalysis::CancelLaneRequest()
 
 void CBattleAnalysis::BuildPass()
 {
+	// D-358: one definition of passability. The 16-elmo per-class raster comes
+	// from field::FinePassability (the function the field's corridor planner
+	// runs on the same engine maps); this 64-elmo lane cell is open when half
+	// of its 16 fine cells are, the rule D-127 chose so a narrow ramp survives
+	// the downsample. surfaceSlope keeps the mean engine slope for the solver's
+	// sideways-cliff cost. O(N16) once per AI.
 	const size_t N = height.size();
 	if (N > static_cast<size_t>(std::numeric_limits<int>::max())) return;
 	FloatVec slope;
 	circuit->GetMap()->GetSlopeMap(slope);
 	const int sw = std::max(1, CTerrainManager::GetTerrainWidth() / 16);
 	const int sh = std::max(1, CTerrainManager::GetTerrainHeight() / 16);
-	const int per = cellSize / 16;   // slope pixels a cell side
-	for (int k = 0; k < _LANE_CLASSES_; ++k) {
-		pass[k].assign(N, 0);
-	}
+	const auto* area = circuit->GetTerrainManager()->GetAreaData();
+	const int hw = std::max(1, area->heightMapXSize);
+	const int hh = hw > 0 ? int(area->heightMap.size() / hw) : 0;
+	field::SFinePass fine;
+	field::FinePassability(slope, sw, sh, area->heightMap, hw, hh, circuit->GetGameAttribute()->GetTerrainData().waterIsHarmful, fine);
+	const int per = cellSize / 16;   // fine cells a lane cell side
+	static const int laneToField[_LANE_CLASSES_] = {field::C_VEH, field::C_BOT, field::C_AMPH, field::C_HOVER, field::C_ALLT, field::C_SHIP, -1};
+	for (int k = 0; k < _LANE_CLASSES_; ++k) pass[k].assign(N, 0);
 	surfaceSlope.assign(N, 0.f);
 	for (size_t c = 0; c < N; ++c) {
 		const int cx = c % gw, cz = c / gw;
-		int n = 0, tank = 0, hover = 0, bot = 0;
+		int n = 0, ok[_LANE_CLASSES_] = {0, 0, 0, 0, 0, 0, 0};
 		for (int z = cz * per; z < (cz + 1) * per && z < sh; ++z) {
 			for (int x = cx * per; x < (cx + 1) * per && x < sw; ++x) {
 				const size_t i = size_t(z) * sw + x;
-				const float s = (i < slope.size()) ? slope[i] : 0.f;
-				surfaceSlope[c] += std::clamp(s, 0.f, 1.f);
+				surfaceSlope[c] += std::clamp(i < slope.size() ? slope[i] : 0.f, 0.f, 1.f);
 				++n;
-				tank += (s <= SLOPE_TANK);
-				hover += (s <= SLOPE_HOVER);
-				bot += (s <= SLOPE_BOT);
+				for (int k = 0; k < _LANE_CLASSES_; ++k) {
+					if (laneToField[k] >= 0 && fine.Pass(laneToField[k], fine.g.Index(x, z))) ++ok[k];
+				}
 			}
 		}
 		n = std::max(1, n);
 		surfaceSlope[c] /= n;
-		const bool water = height[c] < 0.f;
-		const bool wadable = height[c] >= -WADE_DEPTH;
-		pass[L_LAND][c] = wadable && (tank * 2 >= n);
-		pass[L_BOT][c] = wadable && (bot * 2 >= n);
-		pass[L_ALLTERRAIN][c] = wadable;
-		pass[L_AMPH][c] = water || (bot * 2 >= n);
-		pass[L_HOVER][c] = water || (hover * 2 >= n);
-		pass[L_NAVAL][c] = maxHeight[c] <= -SHIP_DEPTH;
+		for (int k = 0; k < _LANE_CLASSES_; ++k) pass[k][c] = (ok[k] * 2 >= n);
+		pass[L_NAVAL][c] = maxHeight[c] <= -field::kShipDepth;   // the lane grid's own conservative water body rule
 		pass[L_AIR][c] = 1;
 	}
+}
+
+// ---------------------------------------------------------------- corridors (D-358)
+
+constexpr float kSamePointElmos = 1.f;   // D-359: consecutive lane vertices closer than this are one vertex
+
+static std::shared_ptr<const field::SModel> FieldModelOf(CCircuitAI* circuit)
+{
+	return circuit->GetGameAttribute()->GetFieldService().GetModel();
+}
+
+int CBattleAnalysis::CorridorRevision() const
+{
+	const auto m = FieldModelOf(circuit);
+	return m ? int(m->fingerprint % 1000000007ull) + 1 : 0;
+}
+
+std::vector<int> CBattleAnalysis::CorridorsForClass(int cls, const AIFloat3& axisFrom, const AIFloat3& axisTo, float minWidth) const
+{
+	const auto m = FieldModelOf(circuit);
+	const int fcls = field::FieldClassOfLane(cls);
+	if (!m || fcls < 0 || !std::isfinite(minWidth)) return {};
+	return field::CorridorsOrdered(*m, fcls, {axisFrom.x, axisFrom.z}, {axisTo.x, axisTo.z}, std::max(0.f, minWidth));
+}
+
+std::vector<AIFloat3> CBattleAnalysis::CorridorCentre(int corridor, const AIFloat3& from, const AIFloat3& to) const
+{
+	const auto m = FieldModelOf(circuit);
+	if (!m || corridor < 0 || corridor >= int(m->corridors.size())) return {};
+	const field::SCorridor& c = m->corridors[corridor];
+	if (c.centre.size() < 2) return {};
+	// D-359: both legs are routed on the field grid to the centre vertex nearest
+	// by travel (RouteToCentre), so a lane never joins its corridor across a
+	// mesa; the centre is followed between the two vertices reached, from first.
+	// Empty when either end cannot reach the corridor: the script then keeps
+	// its fallback. Two O(N log N) searches per assignment, not per frame.
+	int i0 = -1, i1 = -1;
+	const auto legIn = field::RouteToCentre(*m, c.cls, {from.x, from.z}, c, &i0);
+	const auto legOut = field::RouteToCentre(*m, c.cls, {to.x, to.z}, c, &i1);
+	if (i0 < 0 || i1 < 0) return {};
+	std::vector<AIFloat3> out;
+	out.reserve(legIn.size() + legOut.size() + c.centre.size() + 2);
+	auto push = [&](float x, float z) {
+		if (!out.empty() && std::abs(out.back().x - x) < kSamePointElmos && std::abs(out.back().z - z) < kSamePointElmos) return;
+		out.emplace_back(x, Height({x, 0.f, z}), z);
+	};
+	push(from.x, from.z);
+	for (const auto& p : legIn) push(p.x, p.z);
+	const int step = i1 >= i0 ? 1 : -1;
+	for (int i = i0; ; i += step) {
+		push(c.centre[(std::size_t)i].x, c.centre[(std::size_t)i].z);
+		if (i == i1) break;
+	}
+	for (auto it = legOut.rbegin(); it != legOut.rend(); ++it) push(it->x, it->z);
+	push(to.x, to.z);
+	return out;
+}
+
+std::vector<AIFloat3> CBattleAnalysis::CorridorLink(int corridor, const AIFloat3& from) const
+{
+	const auto m = FieldModelOf(circuit);
+	if (!m || corridor < 0 || corridor >= int(m->corridors.size())) return {};
+	const field::SCorridor& c = m->corridors[corridor];
+	if (c.centre.empty() || !std::isfinite(from.x) || !std::isfinite(from.z)) return {};
+	int v = -1;
+	const auto leg = field::RouteToCentre(*m, c.cls, {from.x, from.z}, c, &v);
+	if (v < 0) return {};
+	std::vector<AIFloat3> out;
+	out.reserve(leg.size() + 2);
+	auto push = [&](float x, float z) {
+		if (!out.empty() && std::abs(out.back().x - x) < kSamePointElmos && std::abs(out.back().z - z) < kSamePointElmos) return;
+		out.emplace_back(x, Height({x, 0.f, z}), z);
+	};
+	push(from.x, from.z);
+	for (const auto& p : leg) push(p.x, p.z);
+	push(c.centre[(std::size_t)v].x, c.centre[(std::size_t)v].z);
+	return out;
+}
+
+bool CBattleAnalysis::CorridorOpen(int cls, const AIFloat3& p) const
+{
+	const auto m = FieldModelOf(circuit);
+	const int fcls = field::FieldClassOfLane(cls);
+	if (!m || fcls < 0 || !std::isfinite(p.x) || !std::isfinite(p.z) || m->cell <= 0) return false;
+	if (field::CorridorAt(*m, fcls, p.x, p.z, 0) < 0) return false;
+	// D-362: strict, every 16-elmo quarter of the cell passable
+	const auto& safe = m->clearanceOf[fcls];
+	const int cx = std::clamp((int)(p.x / m->cell), 0, m->gw - 1), cz = std::clamp((int)(p.z / m->cell), 0, m->gh - 1);
+	const std::size_t i = (std::size_t)cz * m->gw + cx;
+	return i < safe.size() && safe[i] > 0;
+}
+
+AIFloat3 CBattleAnalysis::CorridorPoint(int corridor, float progress) const
+{
+	const auto m = FieldModelOf(circuit);
+	if (!m || corridor < 0 || corridor >= int(m->corridors.size()) || !std::isfinite(progress)) return AIFloat3(-1.f, 0.f, -1.f);
+	const field::SPoint p = field::CorridorPoint(m->corridors[corridor], std::clamp(progress, 0.f, 1.f));
+	if (p.x < 0.f) return AIFloat3(-1.f, 0.f, -1.f);
+	return AIFloat3(p.x, Height({p.x, 0.f, p.z}), p.z);
+}
+
+float CBattleAnalysis::CorridorWidth(int corridor) const
+{
+	const auto m = FieldModelOf(circuit);
+	return (m && corridor >= 0 && corridor < int(m->corridors.size())) ? m->corridors[corridor].narrowest : 0.f;
+}
+
+float CBattleAnalysis::CorridorLength(int corridor) const
+{
+	const auto m = FieldModelOf(circuit);
+	return (m && corridor >= 0 && corridor < int(m->corridors.size())) ? m->corridors[corridor].length : 0.f;
+}
+
+AIFloat3 CBattleAnalysis::CorridorChoke(int corridor) const
+{
+	const auto m = FieldModelOf(circuit);
+	if (!m || corridor < 0 || corridor >= int(m->corridors.size())) return AIFloat3(-1.f, 0.f, -1.f);
+	const field::SPoint p = m->corridors[corridor].choke;
+	return AIFloat3(p.x, Height({p.x, 0.f, p.z}), p.z);
+}
+
+int CBattleAnalysis::CorridorAtPoint(int cls, const AIFloat3& p) const
+{
+	const auto m = FieldModelOf(circuit);
+	const int fcls = field::FieldClassOfLane(cls);
+	if (!m || fcls < 0 || !std::isfinite(p.x) || !std::isfinite(p.z)) return -1;
+	return field::CorridorAt(*m, fcls, p.x, p.z);
 }
 
 bool CBattleAnalysis::IsPassable(const AIFloat3& pos, int cls) const
@@ -393,28 +530,178 @@ bool CBattleAnalysis::SetFrontLane(const std::vector<AIFloat3>& points,float hal
         if(!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) || p.x<0 || p.z<0 || p.x>=gw*cellSize || p.z>=gh*cellSize) return false;
         path.emplace_back(p.x,p.y,p.z);
     }
-    frontLanePath.Set(std::move(path));frontLaneWidth=std::clamp(halfWidth,64.f,2048.f);
-    frontLaneDistance.clear();
-    if(points.size()<2)return true;
-    // O(G+P) publication, O(1) distance reads in target selection. Eight-neighbour
-    // distance is a Chebyshev corridor approximation (diagonals can extend the
-    // corridor by sqrt(2), plus cell quantization),
-    // not path reachability. Exact progression uses the immutable polyline.
-    frontLaneDistance.assign(height.size(),std::numeric_limits<float>::max());
-    std::queue<int> pending;
-    for(const auto& p:points) {const int c=Cell(p);if(frontLaneDistance[c]!=0){frontLaneDistance[c]=0;pending.push(c);}}
-    while(!pending.empty()) {
-        const int c=pending.front();pending.pop();
-        for(const auto& step:NB) {
-            const int x=c%gw+step[0],z=c/gw+step[1];if(x<0 || x>=gw || z<0 || z>=gh)continue;
-            const int next=z*gw+x;
-            if(frontLaneDistance[next]>frontLaneDistance[c]+cellSize) {
-                frontLaneDistance[next]=frontLaneDistance[c]+cellSize;pending.push(next);
-            }
+    // Seed every crossed cell: field corridor centres intentionally omit
+    // collinear vertices. Vertex-only seeding cuts holes in long straight lanes.
+    frontLaneDistance=lane::CorridorDistances(path,gw,gh,cellSize);
+    frontLanePath.Set(std::move(path));
+    laneFront.Reset(frontLanePath.Length());
+    laneFrontFrame=-1;
+    frontLaneWidth=std::clamp(halfWidth,64.f,2048.f);
+    // Damage callbacks must not project O(P) route segments per projectile.
+    // Rasterize B<=128 lane samples into the existing coarse heat grid once
+    // per route change: O(H + B*R^2), H heat cells, R corridor radius in cells.
+    // Reads are O(1), and route replacement owns all invalidation.
+    frontCombatBin.assign(hw*hh,-1);
+    std::vector<float> nearest(hw*hh,std::numeric_limits<float>::max());
+    const float reach=frontLaneWidth+laneFront.step*.5f+heatCell;
+    for(int i=0;i<laneFront.count;++i) {
+        const auto p=frontLanePath.At((i+.5f)*laneFront.step);
+        const int x0=std::max(0,int((p.x-reach)/heatCell)),x1=std::min(hw-1,int((p.x+reach)/heatCell));
+        const int z0=std::max(0,int((p.z-reach)/heatCell)),z1=std::min(hh-1,int((p.z+reach)/heatCell));
+        for(int z=z0;z<=z1;++z)for(int x=x0;x<=x1;++x) {
+            const float d=std::hypot((x+.5f)*heatCell-p.x,(z+.5f)*heatCell-p.z);
+            const int index=z*hw+x;
+            if(d<nearest[index]){nearest[index]=d;frontCombatBin[index]=i;}
         }
     }
     return true;
 }
+void CBattleAnalysis::SetLaneFrontOptions(float horizon,float memory,float ratio,float margin,float minimumCost) {
+    if(!std::isfinite(horizon) || !std::isfinite(memory) || !std::isfinite(ratio)
+        || !std::isfinite(margin) || !std::isfinite(minimumCost))return;
+    laneFrontHorizon=std::clamp(horizon,0.f,30.f);
+    laneFrontMemory=std::clamp(memory,0.f,120.f);
+    laneFrontRatio=std::clamp(ratio,1.f,10.f);
+    laneFrontMargin=std::clamp(margin,0.f,1024.f);
+    laneFrontMinimumCost=std::clamp(minimumCost,0.f,10000.f);
+    laneFrontFrame=-1;
+}
+
+void CBattleAnalysis::RecordLaneCombat(const AIFloat3& pos) {
+    if(laneFrontHorizon<=0 || !laneFront.count || !std::isfinite(pos.x) || !std::isfinite(pos.z))return;
+    if(pos.x<0 || pos.z<0 || pos.x>=gw*cellSize || pos.z>=gh*cellSize || GetFrontLaneDistance(pos)>frontLaneWidth)return;
+    const int x=std::min(hw-1,int(pos.x)/heatCell),z=std::min(hh-1,int(pos.z)/heatCell);
+    const int bin=frontCombatBin[z*hw+x];
+    if(bin>=0)laneFront.bins[bin].damage=circuit->GetLastFrame();
+}
+
+void CBattleAnalysis::UpdateLaneFront() {
+    const int frame=circuit->GetLastFrame();
+    if(laneFrontHorizon<=0 || !laneFront.count)return;
+    const auto& snapshot=circuit->GetAllyTeam()->GetCombatSnapshot();
+    snapshot.Want(frame);
+    if(laneFrontFrame>=0 && frame-laneFrontFrame<30)return;
+    laneFrontFrame=frame;
+    laneFront.Begin();
+    // One enclosing-circle query per assigned lane per second, never per unit
+    // consumer. O(cells + E*P + F*P + (E+F)*B), P route segments, B<=128,
+    // E/F candidates. No path solves; fixed bins and retained snapshot buckets.
+    // Long/curved lanes can encompass much of the map. This is not O(1), and
+    // 16-AI cost remains queued. Route replacement resets evidence and stamps.
+    float minx=1e30f,minz=1e30f,maxx=0,maxz=0;
+    for(int i=0;i<=laneFront.count;++i) {
+        const auto p=frontLanePath.At(i*laneFront.step);
+        minx=std::min(minx,p.x);minz=std::min(minz,p.z);maxx=std::max(maxx,p.x);maxz=std::max(maxz,p.z);
+    }
+    const AIFloat3 center((minx+maxx)*.5f,0,(minz+maxz)*.5f);
+    const float radius=std::hypot(maxx-minx,maxz-minz)*.5f+frontLaneWidth+laneFront.step;
+    for(int id:circuit->GetCallback()->GetFriendlyUnitIdsIn(center,radius,false)) {
+        auto* ally=circuit->GetFriendlyUnit(id);
+        if(!ally)continue;
+        auto* def=ally->GetCircuitDef();
+        if(!def || def->IsAbleToFly() || !def->IsAttacker() || def->IsRoleComm() || def->IsRoleScout() || def->IsRoleArty()
+            || def->GetCostM()<laneFrontMinimumCost || def->GetMaxRange(CCircuitDef::RangeType::LAND)<=0)continue;
+        const auto pos=ally->GetPos(frame);
+        const auto p=frontLanePath.Project({pos.x,pos.y,pos.z});
+        if(p.distance>frontLaneWidth || ally->GetUnit()->IsBeingBuilt())continue;
+        if(def->IsMobile()) {
+            const auto area=circuit->GetTerrainManager()->GetCurrentMapArea(def,pos);
+            if(!area.second || !area.first || !circuit->GetTerrainManager()->CanMoveToPos(area.first,GetFrontLanePoint(p.progress)))continue;
+        }
+        const float health=std::clamp(ally->GetUnit()->GetHealth()/std::max(1.f,def->GetHealth()),0.f,1.f);
+        if(health<=0)continue;
+        const float reach=def->GetMaxRange(CCircuitDef::RangeType::LAND);
+        laneFront.Add(p.progress-reach,p.progress+reach,def->GetPower()*health,true);
+    }
+    // All route vertices bound the broad phase, including bends between bins.
+    // Long-range weapons in other corridors retain their full reach.
+    const auto lo=frontLanePath.Lower(),hi=frontLanePath.Upper();
+    snapshot.QueryInfluencing({lo.x,lo.z},{hi.x,hi.z},frontLaneWidth+600.f+CCombatSnapshot::RADAR_ERROR,[&](const CCombatSnapshot::Entry& e) {
+        auto* def=e.defId>=0?circuit->GetCircuitDefSafe(e.defId):nullptr;
+        if(def && (def->IsAbleToFly() || !def->IsAttacker() || def->GetMaxRange(CCircuitDef::RangeType::LAND)<=0))return;
+        const float age=std::max(0.f,float(frame-e.lastObserved)/30.f);
+        const bool remembered=!e.los && !e.radar;
+        if(remembered && e.speed>0 && age>laneFrontMemory)return;
+        const auto p=frontLanePath.Project({e.pos.x,0,e.pos.z});
+        const float range=def?def->GetMaxRange(CCircuitDef::RangeType::LAND):300.f;
+        const float uncertainty=std::min(600.f,e.speed*age)+(e.los?0.f:CCombatSnapshot::RADAR_ERROR);
+        // Movement prediction is only along this lane; cross-lane weapons
+        // contribute firing reach but cannot magically walk through a ridge.
+        const float travel=p.distance<=frontLaneWidth?e.speed*laneFrontHorizon:0.f;
+        const float reach=range+uncertainty+travel;
+        if(p.distance>frontLaneWidth+reach)return;
+        const float along=std::sqrt(std::max(0.f,reach*reach-std::pow(std::max(0.f,p.distance-frontLaneWidth),2.f)));
+        laneFront.Add(p.progress-along,p.progress+along,def?def->GetPower():0.f,false,remembered || !def);
+    });
+}
+
+float CBattleAnalysis::AssessLaneAdvance(float from,float goal,bool* stale) {
+    if(stale)*stale=false;
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0)return goal;
+    // Missing/stale enemy publications cannot authorize further deployment.
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    if(observed<0 || circuit->GetLastFrame()-observed>60) {if(stale)*stale=true;return std::min(from,goal);}
+    return laneFront.Limit(from,goal,laneFrontMargin,laneFrontRatio,circuit->GetLastFrame(),90);
+}
+
+bool CBattleAnalysis::KnownEnemyNear(const AIFloat3& from,float radius,float memorySeconds) {
+    if(!std::isfinite(radius) || radius<=0 || !std::isfinite(memorySeconds)) return false;
+    const int frame=circuit->GetLastFrame();
+    auto& snapshot=circuit->GetAllyTeam()->GetCombatSnapshot();snapshot.Want(frame);
+    // A missing observation cannot clear a production emergency safely.
+    if(snapshot.Frame()<0 || frame-snapshot.Frame()>60) return true;
+    const int memory=int(std::clamp(memorySeconds,0.f,120.f)*FRAMES_PER_SEC);
+    bool found=false;
+    snapshot.Query({from.x,from.z},radius,[&](const CCombatSnapshot::Entry& e) {
+        const float dx=e.pos.x-from.x,dz=e.pos.z-from.z;
+        if((e.los || e.radar || frame-e.lastObserved<=memory) && dx*dx+dz*dz<=radius*radius) found=true;
+    });
+    return found;
+}
+float CBattleAnalysis::LaneCombatDistance(const AIFloat3& from,float memorySeconds) {
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0 || !laneFront.count || !std::isfinite(from.x) || !std::isfinite(from.z))
+        return std::numeric_limits<float>::infinity();
+    const int frame=circuit->GetLastFrame();
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    return laneFront.CombatDistance(GetFrontLaneProgress(from),frame,
+        int(std::clamp(memorySeconds,0.f,120.f)*FRAMES_PER_SEC),observed>=0 && frame-observed<=60);
+}
+
+bool CBattleAnalysis::LaneWorkAllowed(const AIFloat3& site) {
+    UpdateLaneFront();
+    if(laneFrontHorizon<=0 || !laneFront.count)return true;
+    if(!std::isfinite(site.x) || !std::isfinite(site.z))return false;
+    const auto p=frontLanePath.Project({site.x,site.y,site.z});
+    const auto state=laneFront.Status(laneFront.Index(p.progress),circuit->GetLastFrame(),90);
+    return state!=lane::Front::ACTIVE && state!=lane::Front::EXPECTED && state!=lane::Front::ENEMY;
+}
+
+std::string CBattleAnalysis::DescribeLaneFront() {
+    UpdateLaneFront();
+    std::ostringstream out;
+    out<<laneFrontFrame;
+    // Bounded run-length zones, sampled along the actual curved route by the
+    // renderer. States are evidence labels, not calibrated probabilities.
+    for(int i=0;i<laneFront.count;) {
+        const auto state=laneFront.Status(i,circuit->GetLastFrame(),90);
+        int end=i+1;
+        while(end<laneFront.count && laneFront.Status(end,circuit->GetLastFrame(),90)==state)++end;
+        out<<'|'<<i*laneFront.step<<','<<end*laneFront.step<<','<<int(state);
+        i=end;
+    }
+    return out.str();
+}
+
+float CBattleAnalysis::GetLaneHeldProgress() {
+    UpdateLaneFront();
+    const int frame=circuit->GetLastFrame();
+    const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
+    if(laneFrontHorizon<=0 || observed<0 || frame-observed>60) return -1.f;
+    return laneFront.HeldProgress(frame,90);
+}
+
 float CBattleAnalysis::GetFrontLaneDistance(const AIFloat3& p) const {
     if(frontLaneDistance.empty())return 0.f;
     return frontLaneDistance[Cell(p)];
@@ -432,9 +719,9 @@ AIFloat3 CBattleAnalysis::GetFrontLaneGoal(const AIFloat3& from,float advance) c
 
 std::vector<AIFloat3> CBattleAnalysis::GetUnitTerrainRoute(const CCircuitDef* def,
         const AIFloat3& from, const AIFloat3& to, bool dry, float landCost,
-        float waterCost, float threatWeight, float maxWaterThreat)
+        float waterCost, float threatWeight, float maxWaterThreat, float exitRadius)
 {
-    return UnitTerrainRoute(def, from, to, dry, landCost, waterCost, threatWeight, maxWaterThreat, nullptr, 0.f);
+    return UnitTerrainRoute(def, from, to, dry, landCost, waterCost, threatWeight, maxWaterThreat, nullptr, 0.f, exitRadius);
 }
 
 std::vector<AIFloat3> CBattleAnalysis::SafeAirRoute(const AIFloat3& from, const AIFloat3& to,
@@ -565,7 +852,7 @@ std::vector<AIFloat3> CBattleAnalysis::GetUnitRaidRoute(const CCircuitDef* def,
 
 std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
         const AIFloat3& from, const AIFloat3& to, bool dry, float landCost,
-        float waterCost, float threatWeight, float maxWaterThreat, const Grid* hazard, float hazardValue)
+        float waterCost, float threatWeight, float maxWaterThreat, const Grid* hazard, float hazardValue, float exitRadius)
 {
     performance::Scope routeScope(circuit, performance::UNIT_ROUTE);
     EnsureGrid();
@@ -644,7 +931,9 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
             circuit->LOG("[INVARIANT] INV-176 retained unit terrain differs from refresh");
     }
     // Endpoints must connect to their grid centres; never snap over a cliff.
-    if (!corridor(from,CellPos(Cell(from))) || !corridor(CellPos(Cell(to)),to)) return {};
+    const bool originConnected=corridor(from,CellPos(Cell(from)));
+    exitRadius=std::isfinite(exitRadius)?std::clamp(exitRadius,0.f,1024.f):0.f;
+    if ((!originConnected && exitRadius<=0) || !corridor(CellPos(Cell(to)),to)) return {};
     auto& threat = unitRouteThreat;
     {
     performance::Scope threatScope(circuit, performance::UNIT_ROUTE_THREAT);
@@ -656,6 +945,7 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
     }
     // Exclude allied structures; the engine still resolves mobile traffic.
     auto& obstacles = unitRouteObstacles;
+    std::vector<std::array<float,4>> localFootprints;
     {
     performance::Scope obstacleScope(circuit, performance::UNIT_ROUTE_OBSTACLES);
     obstacles.assign(height.size(),0);
@@ -665,6 +955,9 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
         if (building==nullptr || building->IsMobile()) continue;
         const auto p=kv.second->GetPos(frame);
         const float r=std::max(building->GetDef()->GetXSize(),building->GetDef()->GetZSize())*SQUARE_SIZE*0.5f+halfWidth+cellSize*0.5f;
+        const float fineRadius=r-cellSize*.5f+2.f;
+        if(exitRadius>0 && std::abs(p.x-from.x)<=exitRadius+fineRadius && std::abs(p.z-from.z)<=exitRadius+fineRadius)
+            localFootprints.push_back({p.x-fineRadius,p.z-fineRadius,p.x+fineRadius,p.z+fineRadius});
         for (int z=std::max(0,int((p.z-r)/cellSize));z<=std::min(gh-1,int((p.z+r)/cellSize));++z)
             for (int x=std::max(0,int((p.x-r)/cellSize));x<=std::min(gw-1,int((p.x+r)/cellSize));++x)
                 obstacles[z*gw+x]=1;
@@ -673,14 +966,45 @@ std::vector<AIFloat3> CBattleAnalysis::UnitTerrainRoute(const CCircuitDef* def,
     std::vector<int> cells;
     {
         performance::Scope searchScope(circuit, performance::UNIT_ROUTE_SEARCH);
-        cells=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
+        if(originConnected) cells=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
             L_AMPH,threat,landCost,waterCost,threatWeight,maxWaterThreat,&obstacles,&unitRouteWorkspace,0);
     }
     // Same inputs and ordered route oracle; deliberately excluded from timing.
-    if (verify) {
+    if (verify && exitRadius<=0) {
         const auto expected=lane::Solver(t,laneSettings).PointRoute({from.x,from.y,from.z},{to.x,to.y,to.z},
             L_AMPH,threat,landCost,waterCost,threatWeight,maxWaterThreat,&obstacles);
         if (cells!=expected) circuit->LOG("[INVARIANT] INV-176 unit route scratch differs from fresh search");
+    }
+    if(cells.empty() && exitRadius>0 && !obstacles[Cell(to)]) {
+        // D-419 opt-in only: coarse building dilation can seal a builder in
+        // open ground. One full goal field, not one search per exit candidate.
+        // O(G log G + K*(local footprints + fine corridor)), bounded K by the
+        // requested radius. Fresh footprints share the existing obstacle scan.
+        lane::Solver solver(t,laneSettings);
+        auto& ws=unitRouteWorkspace;
+        if(solver.PointRoute({to.x,to.y,to.z},{to.x,to.y,to.z},L_AMPH,threat,
+            landCost,waterCost,threatWeight,maxWaterThreat,&obstacles,&ws,0).empty()) return {};
+        solver.DijkstraMulti({Cell(to)},ws.penalty,L_AMPH,nullptr,ws.distance,ws.previous,
+            true,0.f,&ws.blocked,0.f,true,nullptr,-1,&ws.search);
+        int best=-1;float nearest=exitRadius*exitRadius;
+        const int radius=int(std::ceil(exitRadius/cellSize));
+        const int ox=Cell(from)%gw,oz=Cell(from)/gw;
+        for(int z=std::max(0,oz-radius);z<=std::min(gh-1,oz+radius);++z)
+            for(int x=std::max(0,ox-radius);x<=std::min(gw-1,ox+radius);++x) {
+                const int cell=z*gw+x;const auto point=CellPos(cell);
+                const float distance=point.SqDistance2D(from);
+                if(obstacles[cell] || !ws.search.Seen(cell) || distance>=nearest || !corridor(from,point)) continue;
+                bool clear=true;
+                for(const auto& box:localFootprints)
+                    if(!lane::SegmentOutsideBox(from.x,from.z,point.x,point.z,box[0],box[1],box[2],box[3])) {clear=false;break;}
+                if(clear) {best=cell;nearest=distance;}
+            }
+        for(size_t steps=0;best>=0 && steps<height.size();++steps) {
+            cells.push_back(best);
+            if(best==Cell(to)) break;
+            best=ws.previous[best];
+        }
+        if(cells.empty() || cells.back()!=Cell(to)) return {};
     }
     if (cells.empty()) return {};
     std::vector<AIFloat3> result;

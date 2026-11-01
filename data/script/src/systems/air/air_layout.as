@@ -203,6 +203,8 @@ namespace AirLayout {
                 if (bays[i] is reuse || (reuse.cluster >= 0 && bays[i].cluster == reuse.cluster)) members.insertLast(bays[i]);
             @plant = ai.GetCircuitDef(members[0].defName);
         }
+        const bool centerT2 = Global::RoleSettings::Air::CenteredT2FactorySupport;
+        const bool centerFirst = centerT2 && UnitHelpers::IsT2AircraftPlant(plant.GetName());
         const int cluster = reuse !is null && reuse.cluster >= 0 ? reuse.cluster : aiTerrainMgr.GetLayoutInt("air.clusters", 0);
         const string key = "air.cluster." + cluster;
         const bool compact = ai.frame >= (MetalEconomy::Active() ? MetalEconomy::CompactCampusAfterSeconds
@@ -229,7 +231,7 @@ namespace AirLayout {
                 // Narrow metal lanes need a longer compound with fewer columns.
                 // Keep the same six sites and support pins, using the shared geometry.
                 const int columns = AiMin(count, (MetalEconomy::Active() || compact) ? 3 - variant % 3 : 3);
-                if (!aiTerrainMgr.PlanAirFactoryCluster(key, plant, advanced, nano, at, planFacing, count, columns, firstNanos)) continue;
+                if (!aiTerrainMgr.PlanAirFactoryCluster(key, plant, advanced, nano, at, planFacing, count, columns, firstNanos, centerFirst, centerT2)) continue;
                 bool allowed = true;
                 for (int b = 0; b < count; ++b) {
                     const AIFloat3 p = aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(key + ".bay." + b + ".slot", -1));
@@ -451,8 +453,9 @@ namespace AirLayout {
     {
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
-        // Every AIR caller, including shared growth, must respect retirement.
-        if (!MetalEconomy::Active() && AirEconomy::CompletedAfus() > 0 && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
+        // Final admission guard covers recovery, shared growth and direct callers.
+        // Live completed reactors permit bootstrap power again if every reactor dies.
+        if (AirEconomy::HasReactor() && (d.GetName() == UnitHelpers::GetWindNameForSide(side)
             || d.GetName() == UnitHelpers::GetSolarNameForSide(side)
             || d.GetName() == UnitHelpers::GetAdvSolarNameForSide(side))) return null;
         if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
@@ -534,7 +537,7 @@ namespace AirLayout {
     }
     IUnitTask@ PlaceWind(CCircuitUnit@ u, CCircuitDef@ d, Task::Priority priority, float walkRadius = 0.0f)
     {
-        if (!MetalEconomy::Active() && (AirEconomy::CompletedAfus() > 0 || AirReclaim::Allowed())) return null;
+        if (AirEconomy::HasReactor()) return null;
         if (UnitHelpers::IsCommander(u.circuitDef)) {
             IUnitTask@ t = WindPass(u, d, priority, true);
             if (t !is null || (AirEconomy::CompletedConstructors() > 0 && walkRadius <= 0.0f)) return t;

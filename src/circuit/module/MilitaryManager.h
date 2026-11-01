@@ -39,7 +39,7 @@ namespace TaskF {
 
 	static inline SFightTask Common(IFighterTask::FightType type)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = type;
 
 		ti.check = type;
@@ -50,14 +50,14 @@ namespace TaskF {
 	}
 	static inline SFightTask Guard(CCircuitUnit* vip)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::GUARD;
 		ti.vip = vip;
 		return ti;
 	}
 	static inline SFightTask Defend(IFighterTask::FightType promote, float power)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::DEFEND;
 		ti.check = IFighterTask::FightType::_SIZE_;  // NONE
 		ti.promote = promote;
@@ -66,7 +66,7 @@ namespace TaskF {
 	}
 	static inline SFightTask Defend(IFighterTask::FightType check, IFighterTask::FightType promote, float power)
 	{
-		SFightTask ti;
+		SFightTask ti{};
 		ti.type = IFighterTask::FightType::DEFEND;
 		ti.check = check;
 		ti.promote = promote;
@@ -100,7 +100,7 @@ public:
 private:
 	void ReadConfig();
 	void InitEconomyScores(const std::vector<CCircuitDef*>&& builders);
-	void Init();
+	void InitMilitary();
 
 public:
 	virtual int UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder) override;

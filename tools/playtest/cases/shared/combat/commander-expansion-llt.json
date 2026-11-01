@@ -1,0 +1,96 @@
+{
+  "name": "commander-expansion-llt",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Commander covers expansion mexes with LLTs above 12 metal income, using the FRONT base-area radius.",
+  "commander_overrides": {
+    "front_push_screen": 0
+  },
+  "map": "Proving Grounds v1.0",
+  "map_key": "proving",
+  "starts": [
+    [
+      2524,
+      4194
+    ],
+    [
+      11805,
+      10125
+    ]
+  ],
+  "camera": [
+    3600,
+    4800,
+    2900
+  ],
+  "photos": [],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "hold_friendly": false,
+  "groups": [
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2400,
+        4000
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2200,
+        4000
+      ],
+      "after_seconds": 20
+    },
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2200,
+        4400
+      ],
+      "after_seconds": 28
+    },
+    {
+      "unit": "armck",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2350,
+        4050
+      ],
+      "after_seconds": 24
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-expansion-llt",
+  "commander_initial": true,
+  "start_metal": 100000,
+  "commander_trace": true,
+  "coverage_probe": false,
+  "coverage_min_advance": 1500,
+  "builders": true,
+  "production": false,
+  "start_energy": 1000000,
+  "storage_scenario": "commander-expansion-llt",
+  "modoptions": {
+    "multiplier_metalextraction": 10
+  },
+  "front_spacing_observation": false,
+  "commander_radar_package_check": false,
+  "expansion_mex_observation": true
+}

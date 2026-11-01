@@ -530,18 +530,26 @@ namespace AirBuild {
         const bool opening = !ProductionMath::CrewReady(crew, Global::RoleSettings::Air::OpeningAirConstructors);
         const bool useful = ProductionMath::FactoryAssistUseful(!opening, plant.GetBuildProgress() >= 1.0f, PlantHasWork(plant));
         IUnitTask@ t = null;
+        if (!opening) {
+            @t = FloatingSupport(u);
+            if (t !is null) return Record(t, "overflow.production.support", u);
+        }
         if (!opening && !AirEconomy::recovery && AirEconomy::OpeningSupportNeeded()) {
             @t = Nano(u, true);
             if (t !is null) return Record(t, "opening.support", u);
             @t = Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)), true);
             if (t !is null) return Record(t, "opening.support.assist", u);
         }
+        if (!opening) {
+            @t = PendingBayTurrets(u);   // D-365: a pending bay's turrets before anything discretionary
+            if (t !is null) return Record(t, "transition.turrets", u);
+        }
         if (!opening && AirEconomy::SavingForFirstLab()) {
             @t = Nano(u);
             if (t !is null) return Record(t, "transition.support", u);
             @t = Assist(u, false, null, true);
             if (t !is null) return Record(t, "transition.finish", u);
-            if (!AirEconomy::BankBeyondLab()) {   // D-362: no hold on a floating bank
+            if (!AirEconomy::BankBeyondLab()) {   // D-368: no hold on a floating bank
                 u.CmdStop();
                 return Record(aiBuilderMgr.Enqueue(TaskB::Wait(3 * SECOND)), "transition.save", u);
             }
@@ -687,7 +695,9 @@ namespace AirBuild {
     {
         const string name = advanced ? UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side) : UnitHelpers::GetT1AirPlantForSide(Global::AISettings::Side);
         CCircuitDef@ d = ai.GetCircuitDef(name);
-        if (!Can(u, d) || Busy(d, Task::BuildType::FACTORY)) return null;
+        if (d is null) return null;
+        if (!Can(u, d)) return advanced ? DeclinePlant(AirEconomy::Planned(d, Task::BuildType::FACTORY), u.circuitDef.GetName() + " cannot build it now") : null;
+        if (Busy(d, Task::BuildType::FACTORY)) return null;
         const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
         if (!advanced && count > 0) return null;
         if (!advanced && !AirScoutSweep::Enabled() && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) != 0 && !Team::Ferry::requestPending
@@ -698,12 +708,30 @@ namespace AirBuild {
             if (nearby !is null) return nearby;
         }
         if (advanced) {
-            if (!AirEconomy::Transition(d) && !FirstLabFunded(u, d)) return null;
-            if (!AirEconomy::ExistingT2SupportReady()) return null;
+            if (!AirEconomy::Transition(d) && !FirstLabFunded(u, d)) return DeclinePlant(count, "neither the income nor the bank admits it");
+            // D-365 (owner): the first advanced plant comes after at least OpeningNanoCount
+            // turrets at the starter and after the floating energy is converting. Played
+            // before the change: two minutes at 7,400 of 7,500 energy with one converter,
+            // then the plant; in the owner's 8v8 the plant came before any turret.
+            if (count == 0 && AirEconomy::t2 == 0 && !MetalEconomy::Active() && !FirstPlantAllowed()) return DeclinePlant(count, "the starter's opening turrets");
+            if (!AirEconomy::ExistingT2SupportReady()) return DeclinePlant(count, "an existing plant lacks its expansion turrets");
             if (!AirMath::BayAllowed(count, Global::RoleSettings::Air::MaxProductionBays)) return null;
-            if (!AirEconomy::BankedLab(d) && count > 0 && (AirEconomy::stableSince < 0 || !ProductionMath::CapacityReady(count, (Global::RoleSettings::Air::MaxProductionBays <= 0 ? count + 1 : Global::RoleSettings::Air::MaxProductionBays),
-                ai.frame - AirEconomy::stableSince, Global::RoleSettings::Air::CapacityStableSeconds * SECOND,
-                AirEconomy::bankM, d.costM * 0.6f))) return null;
+            // D-368 (owner): later plants follow the income ladder (PlantsWanted, a full
+            // bank admitting one more) with PlantBankFraction of the cost banked. The
+            // spare-capacity forecast is not an additional gate. Completed support
+            // above is required even when the bank can pay for another factory.
+            if (count > 0) {
+                // a full bank holding the whole plant admits one more (played: a full 3,000
+                // bank at +60 reserved a third bay four minutes after the second plant)
+                const bool fullBank = aiEconomyMgr.isMetalFull && AirEconomy::BankedLab(d);
+                const int wanted = AirEconomy::PlantsWanted() + (fullBank ? 1 : 0);
+                if (wanted != plantsWantedLogged && wanted > count) {   // one line per rise above the standing count
+                    plantsWantedLogged = wanted;
+                    GenericHelpers::LogUtil("[AIR][Plants] advanced plants wanted " + wanted + " at +" + int(AirEconomy::metal)
+                        + " metal (" + count + " standing or ordered" + (fullBank ? ", full bank admits one more" : "") + ")", 1);
+                }
+                if (count >= wanted || !AirMath::PlantBanked(AirEconomy::bankM, d.costM, Global::RoleSettings::Air::PlantBankFraction)) return null;
+            }
             if (count == 0) { firstLabAttemptFrame = ai.frame; firstLabAttemptBuilder = u.id; }
             // Owner 2026-10-27: no first T2 air plant before the T1 crew (AirProduction recruits it).
             if (count == 0 && AirEconomy::t2 == 0
@@ -711,34 +739,77 @@ namespace AirBuild {
                 FirstLabTrace("crew " + AirEconomy::CompletedConstructors() + "/" + Global::RoleSettings::Air::FirstLabMinT1Constructors);
                 return null;
             }
+            // D-368: the last order is in flight, or died without a frame (played: the engine
+            // refused one pinned site and the rule re-ordered it every eight frames)
+            if (count <= plantOrderCount) {
+                if (ai.frame - plantOrderFrame < Global::RoleSettings::Air::PlantOrderRetrySeconds * SECOND) return DeclinePlant(count, "the last order is in flight or died");
+                if (plantOrderBay.length() > 0 && ++plantOrderFails >= Global::RoleSettings::Air::PlantOrderRetries) {
+                    blockedBays.set(plantOrderBay, int64(ai.frame + Global::RoleSettings::Air::PlantBayBlockedSeconds * SECOND));
+                    GenericHelpers::LogUtil("[AIR][Plants] " + plantOrderFails + " plant orders on bay " + plantOrderBay
+                        + " died without a frame; bay skipped for " + Global::RoleSettings::Air::PlantBayBlockedSeconds + " s (D-368)", 1);
+                    plantOrderFails = 0;
+                }
+                plantOrderBay = "";
+                plantOrderCount = -1;
+            }
         }
         AirLayout::Bay@ bay = null;
+        int skippedBlocked = 0, skippedTaken = 0, skippedSite = 0, skippedReach = 0, candidates = 0;
         for (uint b = 0; b < AirLayout::bays.length(); ++b) {
             AirLayout::Bay@ candidate = AirLayout::bays[b];
             if (candidate.defName != name || candidate.cluster < 0 || candidate.factoryId >= 0) continue;
+            ++candidates;
+            if (advanced && BayBlocked(candidate)) { ++skippedBlocked; continue; }   // D-368
             @candidate = AirLayout::Activate(candidate);
             if (candidate is null && AirLayout::held) return null;   // waiting for an ally to clear it (owner, 2026-10-17)
-            if (candidate is null || aiTerrainMgr.GetReservationState(candidate.slot) != 0) continue;
+            if (candidate is null || aiTerrainMgr.GetReservationState(candidate.slot) != 0) { ++skippedTaken; continue; }
+            if (advanced && !BaySiteOpen(candidate, d)) { ++skippedSite; continue; }   // D-368
             // Match native factory access admission before allocating work.
             // A refusal by this worker does not invalidate another's slot.
-            if (!aiTerrainMgr.CanReachAtSafe(u, aiTerrainMgr.GetReservationPos(candidate.slot), u.circuitDef.GetBuildDistance())) continue;
+            if (!aiTerrainMgr.CanReachAtSafe(u, aiTerrainMgr.GetReservationPos(candidate.slot), u.circuitDef.GetBuildDistance())) { ++skippedReach; continue; }
             @bay = candidate; break;
         }
+        const string skipped = candidates + " bays: " + skippedBlocked + " blocked, " + skippedTaken + " taken or unplaceable, "
+            + skippedSite + " unbuildable, " + skippedReach + " unreachable or unsafe for " + u.circuitDef.GetName();
         if (bay is null) @bay = AirLayout::Reserve(d, advanced ? Global::Map::StartPos : u.GetPos(ai.frame));
-        if (bay is null) return null;
+        if (bay is null) return advanced ? DeclinePlant(count, "no bay to reserve; " + skipped) : null;
         @bay = AirLayout::Activate(bay);
-        if (bay is null) return null;
-        if (!aiTerrainMgr.CanReachAtSafe(u, aiTerrainMgr.GetReservationPos(bay.slot), u.circuitDef.GetBuildDistance())) return null;
-        if (advanced && count == 0 && AirEconomy::t2 == 0) {
+        if (bay is null) return advanced ? DeclinePlant(count, "the reserved bay could not be activated; " + skipped) : null;
+        if (advanced && (BayBlocked(bay) || !BaySiteOpen(bay, d))) return DeclinePlant(count, "the reserved bay's site is blocked; " + skipped);   // D-368: a fresh bay on a blocked site
+        if (!aiTerrainMgr.CanReachAtSafe(u, aiTerrainMgr.GetReservationPos(bay.slot), u.circuitDef.GetBuildDistance()))
+            return advanced ? DeclinePlant(count, "the reserved bay is unreachable or unsafe for " + u.circuitDef.GetName() + "; " + skipped) : null;
+        if (advanced && !MetalEconomy::Active()) {
+            // D-365 (owner, second report): the plant's own bay turrets first. The bay is
+            // reserved above; FirstPlantBayTurrets of its turret slots are built (this
+            // builder orders or assists one) and only then the plant's slot is ordered,
+            // so the turrets build the frame. Played before: the plant went in at 21.7
+            // min with none of its turrets and took three minutes in frame. D-368: every
+            // advanced plant, not only the first ("always ... at least 2 before").
+            IUnitTask@ turret = BayTurretsFirst(u, bay);
+            if (turret !is null) return turret;
+            // the plant waits for finished turrets (a frame builds nothing yet); frames
+            // only stop a third slot from being opened
+            if (AirMath::BayTurretsOwed(BayTurrets(bay, false), 0, Global::RoleSettings::Air::FirstPlantBayTurrets) > 0)
+                return DeclinePlant(count, "its bay's turrets: " + BayTurrets(bay, false) + " standing, " + BayTurrets(bay, true) + " framed or standing, none placeable by this builder");
+        }
+        // Ours (owner 2026-10-27, e5dd1f24): off since the 2026-11-01 merge, Cent's bay turrets
+        // first (D-365/D-368) above do this; FirstLabPreNanos > 0 turns it back on
+        if (advanced && count == 0 && AirEconomy::t2 == 0 && Global::RoleSettings::Air::FirstLabPreNanos > 0) {
             IUnitTask@ pre = null;
             if (!FirstLabTurretsReady(u, bay, pre)) return pre;
         }
         if (advanced) GenericHelpers::LogUtil("[AIR][LabGate] M10=" + int(Economy::GetMinMetalIncomeLast10s())
             + " window=" + Economy::IncomeWindowReady() + " bank=" + int(aiEconomyMgr.metal.current)
-            + " cost=" + int(d.costM) + " reason=" + (AirEconomy::BankedLab(d) ? "bank" : AirEconomy::Transition(d) ? "income" : "funded-first"), 1);
+            + " cost=" + int(d.costM) + " plant=" + (count + 1) + " reason=" + (AirEconomy::BankedLab(d) ? "bank" : AirEconomy::Transition(d) ? "income" : "funded-first"), 1);
         IUnitTask@ order = AirLayout::Pinned(Task::BuildType::FACTORY, Task::Priority::HIGH, d, bay.slot);
+        if (order !is null && advanced && !MetalEconomy::Active()
+            && ((count == 0 && AirEconomy::t2 == 0 && !FirstPlantAllowed())
+                || AirMath::BayTurretsOwed(BayTurrets(bay, false), 0, Global::RoleSettings::Air::FirstPlantBayTurrets) > 0))
+            Invariants::Violation("INV-244", "AIR", "advanced plant " + (count + 1) + " ordered with " + BayTurrets(bay, false) + " of "
+                + Global::RoleSettings::Air::FirstPlantBayTurrets + " bay turrets standing (" + BayTurrets(bay, true) + " framed or standing)");
         if (order !is null && advanced && count == 0 && Global::RoleSettings::Air::FundFirstLab)
             @fundedFirstLab = order;
+        if (order !is null && advanced) { plantOrderFrame = ai.frame; plantOrderCount = count; plantOrderBay = bay.key; }   // D-368
         // Native claims protect queued work; frame adoption commits the bay.
         return order;
     }
@@ -746,15 +817,141 @@ namespace AirBuild {
     {
         return !MetalEconomy::Active() && IsReactor(d) && !AirEconomy::BankRich();
     }
+    // D-365: the first plant's own bay turrets. `framed` counts frames as well as
+    // finished turrets. O(bay slots), twenty at most, only on a first-plant ask.
+    int BayTurrets(AirLayout::Bay@ bay, bool framed)
+    {
+        int count = 0;
+        for (uint s = 0; s < bay.nanos.length(); ++s) {
+            CCircuitUnit@ unit = aiTerrainMgr.GetReservationUnit(bay.nanos[s]);
+            if (unit is null || Lifecycle::IsRetiring(unit)) continue;
+            if (framed || unit.GetBuildProgress() >= 1.0f) ++count;
+        }
+        return count;
+    }
+    int bayTurretLog = -100000;
+    int plantsWantedLogged = -1;   // D-368: the last logged PlantsWanted; one line per change
+    // D-368: the last advanced plant order (frame, Planned count at the order, bay), the
+    // deaths counted since the last block, and the bays blocked until a frame.
+    int plantOrderFrame = -100000, plantOrderCount = -1, plantOrderFails = 0, plantBlockLog = -100000;
+    string plantOrderBay;
+    dictionary blockedBays;   // bay key -> frame the block ends (int64)
+    // D-368 diagnostics: the first advanced plant's refusals, once per 30 s, naming the
+    // gate (played: a Cortex AIR with the plant banked for ten minutes and no order, and
+    // no line saying why). Null is returned so the callers read as before.
+    int plantDeclineLog = -100000;
+    IUnitTask@ DeclinePlant(int count, const string &in why)
+    {
+        if (count == 0 && AirEconomy::t2 == 0 && ai.frame - plantDeclineLog >= 30 * SECOND) {
+            plantDeclineLog = ai.frame;
+            GenericHelpers::LogUtil("[AIR][LabGate] first plant declined: " + why + " (bank " + int(aiEconomyMgr.metal.current)
+                + ", M10 " + int(Economy::GetMinMetalIncomeLast10s()) + ")", 1);
+        }
+        return null;
+    }
+    bool BayBlocked(AirLayout::Bay@ bay)
+    {
+        int64 until = 0;
+        return bay !is null && blockedBays.get(bay.key, until) && ai.frame < int(until);
+    }
+    // The pinned site must be buildable now (the AI's blocking map and builder threat);
+    // a bay that is not is skipped for PlantBayBlockedSeconds, logged once per 30 s.
+    bool BaySiteOpen(AirLayout::Bay@ bay, CCircuitDef@ d)
+    {
+        if (bay is null || bay.slot < 0) return false;
+        if (aiTerrainMgr.CanUpgradeTerrain(d, aiTerrainMgr.GetReservationPos(bay.slot))) return true;
+        blockedBays.set(bay.key, int64(ai.frame + Global::RoleSettings::Air::PlantBayBlockedSeconds * SECOND));
+        if (ai.frame - plantBlockLog >= 30 * SECOND) {
+            plantBlockLog = ai.frame;
+            GenericHelpers::LogUtil("[AIR][Plants] bay " + bay.key + " site not buildable now; skipped for "
+                + Global::RoleSettings::Air::PlantBayBlockedSeconds + " s (D-368)", 1);
+        }
+        return false;
+    }
+    // D-365: an advanced bay once reserved and still without its plant, for the rule
+    // that puts every builder on its turrets (null while no such bay exists). D-368:
+    // every advanced plant's bay, not only the first.
+    AirLayout::Bay@ PendingAdvancedBay()
+    {
+        if (MetalEconomy::Active()) return null;
+        const string name = UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side);
+        for (uint b = 0; b < AirLayout::bays.length(); ++b) {
+            AirLayout::Bay@ bay = AirLayout::bays[b];
+            if (bay.defName == name && bay.cluster >= 0 && bay.factoryId < 0 && bay.started) return bay;
+        }
+        return null;
+    }
+    IUnitTask@ PendingBayTurrets(CCircuitUnit@ u)
+    {
+        AirLayout::Bay@ bay = PendingAdvancedBay();
+        return bay is null ? null : BayTurretsFirst(u, bay);
+    }
+    IUnitTask@ BayTurretsFirst(CCircuitUnit@ u, AirLayout::Bay@ bay)
+    {
+        const int wanted = Global::RoleSettings::Air::FirstPlantBayTurrets;
+        const int finished = BayTurrets(bay, false);
+        const int framed = BayTurrets(bay, true) - finished;
+        if (AirMath::BayTurretsOwed(finished, framed, wanted) <= 0) return null;
+        CCircuitDef@ nano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        if (nano is null || !Can(u, nano)) return null;
+        if (ai.frame - bayTurretLog >= 30 * SECOND) {
+            bayTurretLog = ai.frame;
+            GenericHelpers::LogUtil("[AIR][LabGate] bay turrets " + finished + "/" + wanted + " standing, " + framed
+                + " framed: turrets before the next plant, " + AirEconomy::PlantsHave() + " standing or ordered (D-365)", 1);
+        }
+        // a frame on the bay first: finish it rather than open a second slot
+        for (uint s = 0; s < bay.nanos.length(); ++s) {
+            CCircuitUnit@ frame = aiTerrainMgr.GetReservationUnit(bay.nanos[s]);
+            if (frame is null || frame.GetBuildProgress() >= 1.0f) continue;
+            if (aiTerrainMgr.CanReachAt(u, frame.GetPos(ai.frame), u.circuitDef.GetBuildDistance()))
+                return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 20 * SECOND));
+        }
+        for (uint s = 0; s < bay.nanos.length(); ++s) {
+            const int slot = bay.nanos[s];
+            if (aiTerrainMgr.GetReservationState(slot) != 0) continue;
+            if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(slot), u.circuitDef.GetBuildDistance())) continue;
+            IUnitTask@ t = AirLayout::Pinned(Task::BuildType::NANO, Task::Priority::HIGH, nano, slot);
+            if (t !is null) return t;
+        }
+        return null;
+    }
+    // D-365: the first-plant gate, logged once per 30 s while it holds
+    int firstPlantGateLog = -100000;
+    bool FirstPlantAllowed()
+    {
+        // The turret half latches once met, and counts as met once the starter is
+        // retired: the count reads the starter's bay, and the owner's 8v8 showed it
+        // fall from 3/2 to 0/2 when the starter went for the plant's metal, which
+        // held the plant for the rest of the game.
+        int support = AirEconomy::OpeningNanoCompleted();
+        const int wanted = AirEconomy::OpeningNanoTarget();
+        if (support >= wanted) aiTerrainMgr.SetLayoutInt("air.openingSupport.done", 1);
+        if (aiTerrainMgr.GetLayoutInt("air.openingSupport.done", 0) != 0 || aiTerrainMgr.GetLayoutInt("air.starter.retired", 0) != 0) support = wanted;
+        const bool allowed = AirMath::FirstPlantAllowed(AirEconomy::t2 > 0, support, wanted);
+        if (!allowed && ai.frame - firstPlantGateLog >= 30 * SECOND) {
+            firstPlantGateLog = ai.frame;
+            GenericHelpers::LogUtil("[AIR][LabGate] first plant waits: opening turrets " + support + "/" + wanted, 1);
+        }
+        return allowed;
+    }
     IUnitTask@ Convert(CCircuitUnit@ u)
     {
-        if (AirEconomy::recovery || AirEconomy::MexesReady()
+        // Upgraded mexes hand conversion to the advanced converter and the reactors,
+        // except while the energy floats (D-365): until a T2 builder exists the T1
+        // converter is the only sink, and the owner's 8v8 had 8,455 of 8,459 energy at
+        // +1,954 over a pull of 1,033 with every mex upgraded and twelve converters.
+        if (AirEconomy::recovery || (AirEconomy::MexesReady() && !AirEconomy::EnergyFloating())
             || AirEconomy::bankE < aiEconomyMgr.energy.storage * 0.75f) return null;
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
         if (!Can(u, d)) return null;
         const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), d);
-        const int target = ProductionMath::ConverterTarget(AirEconomy::energy, AirEconomy::demandE,
-            Global::RoleSettings::Air::ConverterEnergyReserve, Global::RoleSettings::Air::ConverterDraw);
+        // D-365: floating energy wants one converter over the plan whatever the aircraft
+        // demand says, bounded by income / ConverterDraw (played: 7,400 of 7,500 energy
+        // for two minutes at +600 with one converter, the demand target satisfied).
+        const int target = AirMath::FloatingConverterTarget(AirEconomy::EnergyFloating(),
+            ProductionMath::ConverterTarget(AirEconomy::energy, AirEconomy::demandE,
+                Global::RoleSettings::Air::ConverterEnergyReserve, Global::RoleSettings::Air::ConverterDraw),
+            d.count + queued, AirEconomy::energy, Global::RoleSettings::Air::ConverterDraw);
         if (!ProductionMath::ConverterMayQueue(target, d.count + queued, queued,
                 Global::RoleSettings::Air::ConverterParallel)) return null;
         return AirLayout::Place(u, d, Task::BuildType::CONVERT, Task::Priority::NORMAL);
@@ -860,7 +1057,7 @@ namespace AirBuild {
             CCircuitDef@ d = ai.GetCircuitDef(names[i]);
             if (!Can(u, d)) continue;
             const bool reactor = names[i] == UnitHelpers::GetFusionNameForSide(side) || names[i] == UnitHelpers::GetAdvFusionNameForSide(side);
-            if (!reactor && AirEconomy::CompletedAfus() > 0) continue;
+            if (!reactor && reactorIncome) continue;
             if (reactor && (Busy(ai.GetCircuitDef(fusion), Task::BuildType::ENERGY) || Busy(ai.GetCircuitDef(advancedFusion), Task::BuildType::ENERGY))) continue;
             if (!reactor && !ProductionMath::Funded(AirEconomy::bankM, AirEconomy::metal * 0.6f, 50.0f, float(pending) * d.costM, d.costM, 20.0f)) continue;
             IUnitTask@ task = AirLayout::Place(u, d, Task::BuildType::ENERGY, emergency ? Task::Priority::NOW : Task::Priority::NORMAL, reactor, walkRadius);
@@ -879,7 +1076,20 @@ namespace AirBuild {
         }
         return count;
     }
-    IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false)
+    // D-378: spend a floating bank on standing production before starting more
+    // projects. Reuse live queue ownership and funding; never interrupt a build.
+    IUnitTask@ FloatingSupport(CCircuitUnit@ u)
+    {
+        if (!Global::RoleSettings::Air::FloatingSupportFirst || AirEconomy::t2 == 0
+            || AirEconomy::recovery || (!AirEconomy::MetalFloating() && !AirWorkforce::pressure
+                && !AirEconomy::PlantWanted())) return null;
+        IUnitTask@ queued = aiBuilderMgr.FindQueuedTask(u, int(Task::BuildType::NANO));
+        if (queued !is null && projects.findByRef(queued) >= 0) return queued;
+        IUnitTask@ task = Nano(u, false, true);
+        if (task !is null) return task;
+        return Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
+    }
+    IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false, bool productionOnly = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
         const string key = "" + u.id;
@@ -897,15 +1107,28 @@ namespace AirBuild {
         if (BuildPowerMath::Batch(AirWorkforce::constructionPower, d.GetBuildTime(),
             Global::RoleSettings::Air::WorkforceSupportSeconds, AirWorkforce::pendingSupport,
             Global::RoleSettings::Air::WorkforceSupportBatchMax) <= 0) return null;
-        if (!openingOnly && !AirEconomy::recovery) {
+        if (!openingOnly && !productionOnly && !AirEconomy::recovery) {
             IUnitTask@ local = AirEcoLayout::Nano(u, d);
             if (local !is null) { AirWorkforce::Admit(d, true, true); return local; }
         }
         AirEconomy::RefreshSupport();
-        // FirstLabBankAssist: while the bank covers the funded first lab, its bay
-        // gets its first support turret without the forecast (Batch/NanoTarget caps stay).
-        const bool labBank = LabBankCovered(FundedLab());
-        for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
+        // Floating support starts at the least-supported standing advanced bay.
+        // O(B*Q) owner queries (each may fall back to a B-bay search),
+        // using existing reservation ownership; no extra unit census;
+        // funded fallback visits each bay once. Reservations remain synchronous.
+        uint first = 0;
+        if (productionOnly) {
+            int least = 2147483647;
+            for (uint b = 0; b < AirLayout::bays.length() && b < AirEconomy::nanoCount.length(); ++b) {
+                if (AirLayout::bays[b].factoryId < 0 || !UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName)) continue;
+                const int committed = SupportCommitted(b);
+                if (committed < AirEconomy::NanoTarget(b) && committed < least) { first = b; least = committed; }
+            }
+        }
+        for (uint offset = 0; offset < AirLayout::bays.length() && offset < AirEconomy::nanoCount.length(); ++offset) {
+            const uint b = (first + offset) % AirLayout::bays.length();
+            if (b >= AirEconomy::nanoCount.length()) continue;
+            if (productionOnly && !UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName)) continue;
             const bool keepT2 = !openingOnly && AirEconomy::KeepT2Support() && UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName);
             if (AirEconomy::recovery && !keepT2) continue;
             if (!keepT2 && (openingOnly || AirEconomy::energy < 250.0f) && (!UnitHelpers::IsT1AircraftPlant(AirLayout::bays[b].defName)
@@ -918,8 +1141,7 @@ namespace AirBuild {
             const float power = AirEconomy::power[b] + float(AiMax(0, SupportCommitted(b) - AirEconomy::nanoCount[b])) * d.GetBuildSpeed();
             const float delta = AiMax(0.0f, ProductionMath::Rate(work, power + d.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds)
                 - ProductionMath::Rate(work, power, Global::RoleSettings::Air::WarmFactoryGapSeconds));
-            const bool bankTurret = labBank && UnitHelpers::IsT2AircraftPlant(AirLayout::bays[b].defName) && SupportCommitted(b) == 0;
-            if (!bankTurret && !AirWorkforce::Fund(d, u.circuitDef.GetBuildSpeed(), delta * cm, delta * ce)) continue;
+            if (!AirWorkforce::Fund(d, u.circuitDef.GetBuildSpeed(), delta * cm, delta * ce, true)) continue;
             AirLayout::RepairSupport(b, d);
             for (uint s = 0; s < AirLayout::bays[b].nanos.length(); ++s) {
                 const int slot = AirLayout::bays[b].nanos[s];

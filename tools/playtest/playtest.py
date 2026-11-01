@@ -119,11 +119,15 @@ def engine_dir(name=None):
 def map_file_for(map_name, override=None):
     if override:
         return Path(override)
+    maps = REPO / "data" / "script" / "src" / "maps"
+    # A map version with its own file first ("Supreme Isthmus v1.7" ->
+    # supreme_isthmus_v1_7.as, since PR #28), then the unversioned name.
+    versioned = re.sub(r"[^a-z0-9]+", "_", map_name.strip().lower()).strip("_")
     base = re.sub(r"\s+v?[\d.]+$", "", map_name.strip(), flags=re.I).lower().replace(" ", "_")
-    p = REPO / "data" / "script" / "src" / "maps" / (base + ".as")
-    if not p.exists():
-        die("no AI map file for '%s' (looked for %s); pass --map-file" % (map_name, p))
-    return p
+    for candidate in (maps / (versioned + ".as"), maps / (base + ".as")):
+        if candidate.exists():
+            return candidate
+    die("no AI map file for '%s' (looked for %s and %s); pass --map-file" % (map_name, maps / (versioned + ".as"), maps / (base + ".as")))
 
 
 def map_spots(map_name, override=None):
@@ -395,9 +399,13 @@ def choose_teams(args, spots):
         die("no %s spot on the ally side of the map file" % args.role)
     teams = []  # (spot index, allyteam, ai kind, side)
     teams.append((tech[0], 0, "test", args.side))
+    if getattr(args, "isolated", False) and not getattr(args, "isolated_allies", False):
+        return teams
     others = "test" if args.others == "test" else ("prod" if args.others == "prod" else None)
     k = 0
     for ally, indices in ((0, west), (1, east)):
+        if ally == 1 and getattr(args, "isolated", False):
+            continue
         for i in indices:
             if i == tech[0]:
                 continue
@@ -410,7 +418,7 @@ def choose_teams(args, spots):
             side = SIDES[k % len(SIDES)]
             k += 1
             teams.append((i, ally, kind, side))
-    if not any(t[1] == 1 for t in teams):
+    if not getattr(args, "isolated", False) and not any(t[1] == 1 for t in teams):
         # the game ends at once with nobody to fight: keep one enemy
         j = east[0]
         teams.append((j, 1, others or "test", "armada"))
@@ -450,6 +458,8 @@ def write_script(args, d):
     for kv in args.modoption or []:
         k, _, v = kv.partition("=")
         mod[k.strip()] = v.strip()
+    if getattr(args, "isolated", False):
+        mod["deathmode"] = "neverend"
 
     ai_opts = {}
     for kv in args.ai_option or []:
@@ -839,7 +849,7 @@ def _watch(args):
         # minute by playtest_camera.lua) is not worth playing to stop_minute:
         # nothing the AI does after that is evidence. --play-decided keeps the
         # old behaviour for fixtures that need the loser's side to stay dead.
-        if decided_frame is not None and not getattr(args, 'play_decided', False):
+        if decided_frame is not None and not (getattr(args, 'play_decided', False) or getattr(args, 'isolated', False)):
             verdict = verdict or "PASS"
             reason = reason or "game decided at %.1f min (%s)" % (minute(decided_frame), decided_text)
             finished = True
@@ -972,6 +982,8 @@ def add_script_args(p):
     p.add_argument("--map-file", help="the AI map file with the StartSpot table (default: derived from the map name)")
     p.add_argument("--game", help="game archive name (default: the newest byar:test, else the last lobby script's)")
     p.add_argument("--roles", default="all", help="roles to field on both sides, e.g. TECH,FRONT; 'all' = every spot")
+    p.add_argument("--isolated", action="store_true", help="only team 0, no opposing AI; forces deathmode=neverend for economy timelines")
+    p.add_argument("--isolated-allies", action="store_true", help="with --isolated, retain selected allied roles for donation-dependent strategies")
     p.add_argument("--others", default="test", choices=["test", "prod", "none"],
                    help="the other AIs: this build (test), the deployed SMRTBARb (prod), or enemies only (none)")
     p.add_argument("--prod-ai", help="ShortName of the installed AI used for 'prod' teams (e.g. BARb for stock); it gets no test AI options")

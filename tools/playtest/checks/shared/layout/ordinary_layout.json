@@ -1,0 +1,51 @@
+{
+  "stop_minute": 3.3,
+  "expect": [
+    {
+      "key": "FRONT0",
+      "pattern": "PASS FRONT shared footprint phase=0",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "FRONT1",
+      "pattern": "PASS FRONT shared footprint phase=1",
+      "scope": "any",
+      "by_minute": 3.2
+    },
+    {
+      "key": "TACTICAL0",
+      "pattern": "PASS TACTICAL shared footprint phase=0",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "TACTICAL1",
+      "pattern": "PASS TACTICAL shared footprint phase=1",
+      "scope": "any",
+      "by_minute": 3.2
+    }
+  ],
+  "forbid": [
+    {
+      "key": "probe",
+      "pattern": "\\[OrdinaryLayoutProbe\\] FAIL",
+      "scope": "any"
+    },
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

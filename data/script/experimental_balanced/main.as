@@ -268,7 +268,8 @@ namespace Main {
         // TECH gantry (owner, 2026-10-17): the nearest spot up to 40% toward the front first, cramped allowed,
         // 24+ turrets, exit clear 480 ahead and leading to the front (src/settings/roles/tech.as GantryNearMaxShare, 0 there)
         Global::RoleSettings::Tech::GantryNearMaxShare = 0.4f;
-        Global::RoleSettings::Front::VehicleTankOpenerChance = 0.5f;
+        // Cent's six-raider opener finished by a constructor (smrt-test f443620e) replaces the tank opener; ours was 0.5f
+        Global::RoleSettings::Front::VehicleTankOpenerChance = 0.0f;
         // FRONT vehicles (owner, 2026-10-19): every 3 min from the opener to the first T2 factory, 50% for 5-8
         // medium tanks held at the plant until the last is out (src/settings/roles/front.as VehicleTankMass*, off there)
         Global::RoleSettings::Front::VehicleTankMassChance = 0.5f;

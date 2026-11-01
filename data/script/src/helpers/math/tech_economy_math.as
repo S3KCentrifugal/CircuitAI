@@ -1,5 +1,53 @@
 // Pure economy decisions shared by TECH policy and its actual-VM tests.
 namespace TechEconomyMath {
+    // D-429: demand is separate from the layout's parallel-project budget.
+    // Constant work, no cache. Bank pressure never removes the income ceiling.
+    float CapacityTarget(float income, float basePerMetal, float maximumPerMetal,
+        float energyIncome, float energyBank, float bankSeconds,
+        float projectWork, float projectEnergy) {
+        if (income <= 0 || basePerMetal <= 0 || maximumPerMetal <= 0) return 0;
+        float target = income * basePerMetal;
+        if (projectWork > 0 && projectEnergy > 0 && bankSeconds > 0) {
+            const float supply = energyIncome + energyBank / bankSeconds;
+            const float supported = supply * projectWork / projectEnergy;
+            if (supported > target) target = supported;
+        }
+        const float ceiling = income * maximumPerMetal;
+        return target < ceiling ? target : ceiling;
+    }
+    bool CapacityNeeded(float target, float standing, float arriving, bool draining) {
+        return !draining && target > 0 && standing + arriving < target;
+    }
+    bool MexesBlockReactor(bool pending, bool dedicatedRush, bool energyShort,
+        float metalIncome, float minimumMetal, float energyIncome, float minimumEnergy) {
+        return pending && (dedicatedRush || !energyShort
+            || metalIncome < minimumMetal || energyIncome < minimumEnergy);
+    }
+    bool FusionSuperseded(bool afusComplete, bool dedicatedRush, int fusionPending) {
+        return afusComplete && !dedicatedRush && fusionPending == 0;
+    }
+    bool KeepConstruction(bool live, bool construction, bool hasTarget, float progress) {
+        return live && construction && (!hasTarget || progress < 1.0f);
+    }
+
+    bool SingleProjectAvailable(int queued, int unfinished) {
+        return queued == 0 && unfinished == 0;
+    }
+    bool StructureAssistAllowed(bool mobile) { return !mobile; }
+    int ConstructorOpeningTarget(int opening, int retained, int requests) {
+        return requests > 0 && retained > opening ? retained : opening;
+    }
+    // Physical units include nanoframes; pending contains only unstarted tasks.
+    bool WorkforceNeeded(int physical, int pending, int target) {
+        return target > 0 && physical + pending < target;
+    }
+    // Do not let the retained-pool cap block requested deliveries. Only one
+    // additional physical frame is admitted at a time; requests bound orders.
+    int ConstructorUnitLimit(int retained, int physical, int requests) {
+        const int base = physical > retained ? physical : retained;
+        return base + (requests > 0 ? 1 : 0);
+    }
+
     int FastAssistTarget(float metalIncome, float incomeScale, bool rushActive, int maximum) {
         const float income = metalIncome * incomeScale;
         int wanted = income < 100.0f ? 5 * int(income / 45.0f) : 5 * int(income / 20.0f);

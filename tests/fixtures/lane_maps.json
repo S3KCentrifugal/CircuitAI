@@ -1,0 +1,106 @@
+{
+  "description": "Archive-derived lane geometry regressions. Boxes cover the outer 20 percent on the stated axis. Original and Extended Glitters are separate fixtures. This is a representative matrix, not every supported map.",
+  "maps": [
+    {
+      "key": "glitters",
+      "name": "All That Glitters v2.2.3",
+      "archive": "all_that_glitters_v2.2.3.sd7",
+      "member": "maps/ATG2.smf",
+      "axis": "ns",
+      "height_min": 100,
+      "height_max": 800,
+      "starts": [
+        [
+          497,
+          9730
+        ],
+        [
+          666,
+          8275
+        ],
+        [
+          3230,
+          8333
+        ]
+      ],
+      "west_lanes": true,
+      "mid_lane": {
+        "select_z": 7000,
+        "select_x": 3230,
+        "gates": [
+          [
+            5500,
+            3900
+          ],
+          [
+            4500,
+            4200
+          ]
+        ]
+      }
+    },
+    {
+      "key": "glitters-extended",
+      "name": "All That Glitters Extended v1.0.2",
+      "archive": "all_that_glitters_extended_v1.0.2.sd7",
+      "member": "maps/ATG2X.smf",
+      "axis": "ns",
+      "height_min": 100,
+      "height_max": 800
+    },
+    {
+      "key": "comet",
+      "name": "Comet Catcher Remake 1.8",
+      "archive": "comet_catcher_remake_1.8.sd7",
+      "member": "maps/CCRXR.smf",
+      "axis": "ew",
+      "height_min": 100,
+      "height_max": 450
+    },
+    {
+      "key": "glacial",
+      "name": "Glacial Gap v1.1",
+      "archive": "glacial_gap_v1.1.sd7",
+      "member": "maps/DGR.smf",
+      "axis": "ew",
+      "height_min": -205,
+      "height_max": 585
+    },
+    {
+      "key": "supreme",
+      "name": "Supreme Isthmus v1.7",
+      "archive": "supreme_isthmus_v1.7.sd7",
+      "member": "maps/supreme.smf",
+      "axis": "ew",
+      "height_min": -148,
+      "height_max": 655
+    },
+    {
+      "key": "salt-reef",
+      "name": "Salt Reef 1.1",
+      "archive": "salt_reef_1.1.sd7",
+      "member": "maps/salt_reef.smf",
+      "axis": "ns",
+      "height_min": -150,
+      "height_max": 850
+    },
+    {
+      "key": "serene",
+      "name": "Serene Caldera v1.3",
+      "archive": "serene_caldera_v1.3.sd7",
+      "member": "maps/SC.smf",
+      "axis": "ns",
+      "height_min": -125,
+      "height_max": 275,
+      "required_classes": [
+        2,
+        3,
+        5
+      ],
+      "absent_classes": [
+        0,
+        1
+      ]
+    }
+  ]
+}

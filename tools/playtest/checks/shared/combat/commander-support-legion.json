@@ -1,0 +1,65 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "member",
+      "pattern": "\\[FrontConstructors\\] assigned unit=\\d+ seat=2",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "T1 project",
+      "pattern": "\\[CommanderGroup\\] job_start def=(?:leglht|legmg|legrad|legjam) nano=0",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "defense completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=0",
+      "scope": "any",
+      "by_minute": 5,
+      "after_key": "T1 project"
+    },
+    {
+      "key": "following nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=legnanotc nano=1",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "defense completed"
+    },
+    {
+      "key": "nano completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=1",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "following nano"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "front turret crowding",
+      "pattern": "front_spacing_violation",
+      "scope": "any"
+    }
+  ]
+}

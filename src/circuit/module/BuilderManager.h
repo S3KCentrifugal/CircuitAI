@@ -33,7 +33,8 @@ class CQueryCostMap;
 class CBRepairTask;
 class CBReclaimTask;
 class CCombatTask;
-class CCommanderTask;
+class CControlledTask;
+class IUnitController;
 class CBRestoreTask;
 class CRestoreControl;
 
@@ -214,7 +215,7 @@ namespace TaskB {
 	static inline SServBTask Patrol(IBuilderTask::Priority priority,
 			const springai::AIFloat3& position, int timeout)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::PATROL;
 		ti.priority = priority;
 		ti.position = position;
@@ -224,7 +225,7 @@ namespace TaskB {
 	static inline SServBTask Guard(IBuilderTask::Priority priority,
 			CCircuitUnit* target, bool isInterrupt, int timeout = ASSIGN_TIMEOUT)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::GUARD;
 		ti.priority = priority;
 		ti.target = target;
@@ -234,14 +235,14 @@ namespace TaskB {
 	}
 	static inline SServBTask Combat(float powerMod)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::COMBAT;
 		ti.powerMod = powerMod;
 		return ti;
 	}
 	static inline SServBTask Wait(int timeout)
 	{
-		SServBTask ti;
+		SServBTask ti{};
 		ti.type = IBuilderTask::BuildType::WAIT;
 		ti.timeout = timeout;
 		return ti;
@@ -295,7 +296,7 @@ public:
 	void InitHandlers();
 private:
 	void ReadConfig();
-	void Init();
+	void InitBuilder();
 
 public:
 	virtual int UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder) override;
@@ -309,16 +310,26 @@ public:
 
 	float GetGoalExecTime() const { return goalExecTime; }
 	unsigned int GetWorkerCount() const { return workers.size(); }
-    CCommanderTask* EnqueueCommander(IUnitTask* previous);
+    IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
+    // D-388: the task a unit controller holds its unit with (formerly EnqueueCommander).
+    CControlledTask* EnqueueControlled(IUnitController* controller,IUnitTask* previous);
 	// Terrain restore (owner 2026-10-31): a detached task (not in buildTasks,
 	// not saved) created and assigned by CRestoreControl only.
 	CBRestoreTask* EnqueueRestore(const springai::AIFloat3& position, float radius, int reason, int maxFrames);
 	CRestoreControl* GetRestoreControl() const { return restoreControl.get(); }
 	bool RequestRestore(const springai::AIFloat3& position, float radius);  // script: restore this site if damaged
     bool SetCommanderCombatOption(const std::string& name,float value);
+    bool SetDefenseRule(int slot,const std::string& key,float value);
+    IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
+    IUnitTask* SupportConstruction(CCircuitUnit* unit);
+    IUnitTask* SupportAssist(CCircuitUnit* unit,CCircuitUnit* worker,float radius);
+    std::string DescribeDefense() const;
+    bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
     float GetCommanderEnergyReserve() const;
     float GetCommanderEnergyDeficit() const;
     int GetCommanderOperation() const;
+    std::string DescribeCommanderFront(int id) const;
+    int FrontCommanderId() const;
     IUnitTask* CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius);
     bool CommanderFrontAdopt(CCircuitUnit* unit,IUnitTask* task,float reach);
 	void AddBuildPower(CCircuitUnit* unit);

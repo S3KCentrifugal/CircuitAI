@@ -14,7 +14,9 @@ namespace Global { namespace Commander {
     // Order throttles (owner 2026-10-19); 0 = off. Balanced sets them in commander.json.
     float FrontDetourSeconds=0.f, T3DeclineGate=0.f;
     float MoveResendSeconds=0.f, FallbackGoalHoldSeconds=0.f;
-    float UncloakSeconds=3.f; // owner 2026-10-24: cloak off (fire at will) at most once per 3 s; cloak on is never limited
+    // merge smrt-test 2026-11-01: UncloakSeconds (owner 2026-10-24, cloak off at most once per 3 s) retired;
+    // Cent's D-389 cloak posture with the single command writer replaces the throttle.
+    float UncloakSeconds=3.f; // unused, kept so old map/settings overrides still compile
     float T3Intercept=1.f, T3Health=.2f, T3Distance=1000.f, DetectionMargin=32.f;
     float AfusDefenceRadius=0.f; // balanced opts into cloaked tier-priority base defence
     array<string> AfusDefenceUnits={"armafus","corafus","legafus"};
@@ -26,6 +28,7 @@ namespace Global { namespace Commander {
     bool Fallback=true;
     float FallbackMetal=400.f, FallbackRangeScale=2.f, FallbackGroupRadius=400.f;
     float FallbackOffset=120.f, FallbackSearch=2000.f, FallbackHoldSeconds=3.f, FallbackPorcRange=1500.f;
+    float FallbackPrepareSeconds=4.f; // weapon-clear arrival plus time to establish the next line
     // Seconds a mobile enemy sensor lost from sight and radar still blocks a
     // concealed approach; afterwards its position is treated as unknown.
     float SensorMemory=10.f;

@@ -1,0 +1,16 @@
+{
+  "stop_minute":2.5,
+  "complete_on":{"key":"complete","pattern":"\\[TechEnergyFocus\\] complete","scope":"any"},
+  "completion_grace_seconds":8,
+  "expect":[
+    {"key":"fixture","pattern":"\\[TechEnergyFocus\\] PASS fixture","scope":"any","by_minute":2},
+    {"key":"initial_admission","pattern":"\\[TechEnergyFocus\\] PASS initial_admission","scope":"any","by_minute":2},
+    {"key":"queued_blocks_second","pattern":"\\[TechEnergyFocus\\] PASS queued_blocks_second","scope":"any","by_minute":2},
+    {"key":"both_frames_exist","pattern":"\\[TechEnergyFocus\\] PASS both_frames_exist","scope":"any","by_minute":2},
+    {"key":"framed_blocks_second","pattern":"\\[TechEnergyFocus\\] PASS framed_blocks_second","scope":"any","by_minute":2},
+    {"key":"t1_rejects_fiend","pattern":"\\[TechEnergyFocus\\] PASS t1_rejects_fiend","scope":"any","by_minute":2},
+    {"key":"idle_air_assists_reactor","pattern":"\\[TechEnergyFocus\\] PASS idle_air_assists_reactor","scope":"any","by_minute":2},
+    {"key":"orphan_blocks_second","pattern":"\\[TechEnergyFocus\\] PASS orphan_blocks_second","scope":"any","by_minute":2}
+  ],
+  "forbid":[{"key":"errors","pattern":"\\[TechEnergyFocus\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:","scope":"any"}]
+}

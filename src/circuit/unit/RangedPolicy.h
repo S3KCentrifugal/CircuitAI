@@ -132,6 +132,11 @@ struct RangedPolicy {
     // it takes the unit and never sets hold fire (no poke, cohort-hold or spam
     // gating); priority targets still steer the guns. Overrides fireAtWill.
     bool alwaysFireAtWill = false;
+    // Cent (smrt-test 4a6ef45b): fire_in_range keeps the engine's automatic response
+    // without changing coordinated movement; commander_focus gives a peer-spotted
+    // commander strict shot priority.
+    bool fireInRange = false;
+    bool commanderFocus = false;
     float spamMaxCost = 0.f;
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.

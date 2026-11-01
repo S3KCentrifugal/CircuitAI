@@ -1,6 +1,7 @@
 // Shared defaults; existing Global namespaces are retained for callers.
 namespace Global {
 namespace Ferry {
+        float WalkArrivalRadius = 300.0f; // Give nearby donations directly; do not dispatch a pickup.
         float DropPullback = 300.0f;
         float SafeDropRadius = 900.0f;
         float DropSurfaceThreat = 1.0f;

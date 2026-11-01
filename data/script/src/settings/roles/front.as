@@ -4,6 +4,7 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
             uint GeothermalBuilders = 2;
             float GeothermalRadius = 3200.0f;
@@ -271,6 +272,9 @@ namespace Front {
             // If total T2 labs (bot + vehicle) < 1 and metal income >= this, FRONT will attempt to build one.
             float MinimumMetalIncomeForFirstT2Lab = 50.0f;
             float MinimumMetalIncomeForT2Lab = 40.0f;
+            // Permanent admission floor once TECH acknowledges a constructor plan.
+            // Uses the existing ten-second minimum income; no plan keeps defaults.
+            float DeliveredConstructorT2FactoryIncome = 40.0f;
             float MinimumEnergyIncomeForT2Lab = 2000.0f;
             float RequiredMetalCurrentForT2Lab = 200.0f;
 
@@ -366,6 +370,9 @@ namespace Front {
             float LabPorcReach = 3000.0f;              // idle, guarding or assisting T2 constructors this near the lab are asked
             float LabPorcTakeRadius = 1200.0f;         // ... and ones walking to an unframed build this near
             int LabPorcScanSeconds = 5;
+            // Hard AFUS admission floors, unlike native energy-table preferences.
+            float MinimumMetalIncomeForAFUS = 70.0f;
+            float MinimumEnergyIncomeForAFUS = 4000.0f;
         }
 }
 }
