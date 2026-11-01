@@ -235,7 +235,8 @@
 			// (the heat-ray tank; leghack, the combat engineer, shares the name).
 			"heavy_units": ["leginc", "armfboy", "corgol", "armmanni",
 				"armraz", "corsumo", "cordemon", "legaheattank"],
-			"heavy_speed_fraction": 0.25
+			"heavy_speed_fraction": 0.25,
+			"heavy_max_speed": 12   // owner 2026-11-01: no heavy-unit limit above 12 elmos/s
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base

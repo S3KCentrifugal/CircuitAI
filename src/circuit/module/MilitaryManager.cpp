@@ -675,9 +675,15 @@ void CMilitaryManager::ReadConfig()
 		std::set<std::string> heavyNames;
 		for (const auto& name : artyCommCfg["heavy_units"]) heavyNames.insert(name.asString());
 		const float heavyFrac = utils::clamp(artyCommCfg.get("heavy_speed_fraction", 0.25f).asFloat(), 0.f, 1.f);
+		// "heavy_min_speed" / "heavy_max_speed" (elmos/s) clamp each unit's limit;
+		// max 0 means no cap.
+		const float heavyMin = std::max(0.f, artyCommCfg.get("heavy_min_speed", 0.f).asFloat());
+		const float heavyMax = std::max(0.f, artyCommCfg.get("heavy_max_speed", 0.f).asFloat());
 		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
 			if (heavyNames.count(d.GetDef()->GetName()) > 0) {
-				artyCommInfo.heavyMaxSqSpeed[d.GetId()] = SQUARE(d.GetSpeed() * heavyFrac / FRAMES_PER_SEC);
+				float limit = std::max(heavyMin, d.GetSpeed() * heavyFrac);
+				if (heavyMax > 0.f) limit = std::min(limit, heavyMax);
+				artyCommInfo.heavyMaxSqSpeed[d.GetId()] = SQUARE(limit / FRAMES_PER_SEC);
 			}
 		}
 		artyCommInfo.isEnabled = !artyCommInfo.defs.empty();
