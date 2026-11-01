@@ -11,8 +11,8 @@
 // weapon range plus tower_margin. A commander inside one walks out at once;
 // commander and commander group work inside one is refused (BuilderTask and
 // GroupMayBuild ask KeepOutBlocks) and the front goal is pushed out of it.
-// Rarely (tower_dive_chance, once per tower per tower_dive_cooldown) a healthy
-// commander with a D-gun ready dives a tower that stands alone.
+// Owner 2026-11-01: never enter a built, alive tower's disc; the lone-tower dive
+// (tower_dive_chance, once per tower per tower_dive_cooldown) is off by default.
 //
 // Shelling: the commander's own health loss per second over shell_window,
 // mostly not explained by visible weapons in reach (or the posture's own
@@ -73,6 +73,8 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
     for(const auto& [id,enemy]:ai->GetEnemyManager()->GetEnemyUnits()) {
         auto* def=enemy?enemy->GetCircuitDef():nullptr;
         if(!def || !towerDefs.count(def->GetId()) || enemy->IsFake() || enemy->IsDead() || enemy->IsDying()) continue;
+        // Owner 2026-11-01: built and alive towers; a frame last seen unfinished does not count.
+        if(enemy->IsBeingBuilt()) continue;
         const auto& m=MatchupFor(def,unit->GetCircuitDef());
         if(m.range<=0.f) continue;
         KeepOutZone z; z.center=P(enemy->GetPos()); z.radius=m.range+cfg->safety.towerMargin; z.id=id; z.tower=true;
@@ -205,7 +207,7 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         return true;
     };
     if(ActualDecoy(def) || current==nullptr || current->GetType()==IUnitTask::Type::RETREAT
-        || s.pending>=0 || s.t3.target>=0) { release("other_owner",false); return false; }
+        || s.pending>=0 || T3Exempt(unit,s,frame)) { release("other_owner",false); return false; }
 
     // A dive owns the commander until its shot, its deadline or lost health.
     if(s.keep.diveTarget>=0) {

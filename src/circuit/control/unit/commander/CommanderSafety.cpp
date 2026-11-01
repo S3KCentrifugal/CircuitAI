@@ -1,6 +1,7 @@
 #include "control/unit/commander/CommanderController.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
+#include "module/FactoryManager.h"
 #include "control/core/ControlledTask.h"
 #include "task/RetreatTask.h"
 #include "terrain/BattleAnalysis.h"
@@ -11,6 +12,7 @@
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
 #include "CircuitAI.h"
+#include "util/math/Geometry.h"
 #include "util/Utils.h"
 #include "Log.h"
 
@@ -28,14 +30,35 @@ bool CCommanderController::HealthRetreat(CCircuitUnit* unit) const {
     return commander::HealthWithdrawal(unit->GetHealthPercent(),threshold,found && found->retreat.health);
 }
 
+bool CCommanderController::T3Exempt(CCircuitUnit* unit,const State& s,int frame) const {
+    if(s.t3.target>=0) return true; // an engaged T3 plan: approach, angle, shot
+    if(unit->GetUnit()->GetPos().y<0.f) return false; // no submerged D-gun
+    const float reach=unit->GetDGunRange()+cfg->combat.maxApproach;
+    const Point here=P(unit->GetPos(frame));
+    for(const auto& c:contacts)
+        if(c.t3 && !c.friendly && c.targetable && commander::Length(c.pos-here)<=reach+c.radius)
+            return unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur()-std::max(0.f,reserve));
+    return false;
+}
+
 bool CCommanderController::HealthControl(CCircuitUnit* unit,State& s,int frame) {
     const bool decoy=ActualDecoy(unit->GetCircuitDef());
     const float threshold=commander::RetreatHealth(decoy,cfg->safety.healthRetreat,cfg->safety.decoyHealthRetreat);
-    const float recover=decoy?cfg->safety.decoyHealthRecover:cfg->combat.recover;
+    // Owner 2026-11-01: retreat under health_retreat (30%) until health_recover (70%).
+    const float recover=decoy?cfg->safety.decoyHealthRecover
+        :cfg->safety.healthRecover>0?cfg->safety.healthRecover:cfg->combat.recover;
     if(commander::HealthRecovered(unit->GetHealthPercent(),threshold,recover)) {
+        if(s.retreat.health) ai->LOG("[CommanderSafety] unit=%i action=health_recovered hp=%.3f",unit->GetId(),unit->GetHealthPercent());
         s.retreat.health=false;s.retreat.healthGoal={-1,0,-1};s.retreat.healthShotUntil=-1;return false;
     }
     if(!HealthRetreat(unit)) return false;
+    // Priority 1 is a D-gun on a nearby T3 (the T3 plan and its immediate shot
+    // run after this); priority 2 is this retreat, over every other owner.
+    if(!decoy && T3Exempt(unit,s,frame)) {
+        if(frame>=s.lastLog+60) { s.lastLog=frame; ai->LOG("[CommanderSafety] unit=%i action=low_health_t3_dgun hp=%.3f target=%i",
+            unit->GetId(),unit->GetHealthPercent(),s.t3.target); }
+        return false;
+    }
     const auto pos=unit->GetPos(frame);
     auto* def=unit->GetCircuitDef();
     const float window=decoy?0.f:cfg->safety.healthShotSeconds;
@@ -91,8 +114,20 @@ bool CCommanderController::HealthControl(CCircuitUnit* unit,State& s,int frame) 
     // At most eight endpoint/path assessments per second while escaping.
     // Prefer visible rearward lane space; never query hidden enemy positions.
     // Keep a safe reached station rather than continuously walking to base.
-    if(frame>=s.retreat.healthPlan+FRAMES_PER_SEC && (s.retreat.healthGoal.x<0
-        || (threatened && pos.SqDistance2D(s.retreat.healthGoal)<SQUARE(64.f))
+    // Owner 2026-11-01 (Mescaline, team 14): a calm commander no longer parks at
+    // a local station at 5-38% health; with nothing shooting or in reach it walks
+    // to the closest haven (factory nanos and base repairers) until recovered.
+    if(!threatened && frame>=s.retreat.healthPlan+FRAMES_PER_SEC) {
+        s.retreat.healthPlan=frame;
+        AIFloat3 haven=ai->GetFactoryManager()->GetClosestHaven(unit);
+        if(!geom::is_valid(haven)) haven=ai->GetSetupManager()->GetBasePos();
+        if(s.retreat.healthGoal.SqDistance2D(haven)>SQUARE(200.f)) {
+            haven.y=ai->GetMap()->GetElevationAt(haven.x,haven.z);
+            s.retreat.healthGoal=haven;
+            ai->LOG("[CommanderSafety] unit=%i retreat_haven=%.0f,%.0f hp=%.3f",unit->GetId(),haven.x,haven.z,unit->GetHealthPercent());
+        }
+    } else if(frame>=s.retreat.healthPlan+FRAMES_PER_SEC && (s.retreat.healthGoal.x<0
+        || threatened
         || !battle->InLos(s.retreat.healthGoal)
         || Exposure(P(s.retreat.healthGoal),P(s.retreat.healthGoal),cfg->combat.escapeSeconds,s.retreat.healthGoal.y)>0)) {
         s.retreat.healthPlan=frame;
@@ -124,6 +159,7 @@ bool CCommanderController::HealthControl(CCircuitUnit* unit,State& s,int frame) 
             // Visibility dominates equal-exposure choices; progress and lane
             // distance break ties so withdrawing does not become lane hopping.
             const float score=risk*10000.f+(battle->InLos(at)?0.f:100000.f)+fog*1000.f
+                +(KeepOutAt(end)?50000.f:0.f) // never retreat into laser tower range
                 +(lane?std::max(0.f,battle->GetFrontLaneProgress(at)-own)*100.f
                     +battle->GetFrontLaneDistance(at):0.f)+commander::Length(P(at)-P(rear));
             if(score<best) {best=score;s.retreat.healthGoal=at;}
