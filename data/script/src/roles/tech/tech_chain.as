@@ -69,6 +69,9 @@ namespace TechChain
     int pendingStep = -1;      // an order for this step went out ...
     int pendingFrame = 0;      // ... at this frame; invisible to the queued and unfinished counts until its frame exists
     int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
+    int staleStep = -1;        // a cheap step whose only in-flight work is a queued order nobody builds ...
+    int staleHave = -1;        // ... at this count ...
+    int staleFrame = 0;        // ... since this frame (played: Coastlines Dry, wind 18/19 "queued 1" for 37 min, the silo never came)
 
     bool Active() { return active && !done; }
     // D-289: the def of the chain's current dear step (the step Next last
@@ -775,6 +778,23 @@ namespace TechChain
             +" completed="+completed+" required="+required+" queued="+queued+" siteRetryUntil="+powerSiteRetry,1);
     }
     int powerSiteRetry = 0;
+    // The silo's generator count stands for production: the income those
+    // generators and the fusion would give, already reached (rezzed or shared
+    // power, a geo, a lost turbine site), satisfies it too.
+    int siloPowerLog = 0;
+    bool SiloPowerMet(CCircuitDef@ fusion, CCircuitDef@ buffer)
+    {
+        if (buffer is null || fusion is null) return false;
+        const float each = buffer.GetName() == DefFor("wind") ? WindExpected() : aiEconomyMgr.GetEnergyMake(buffer);
+        const float need = float(nukeSiloEnergyCount) * each + aiEconomyMgr.GetEnergyMake(fusion);
+        if (each <= 0.0f || aiEconomyMgr.energy.income < need) return false;
+        if (ai.frame >= siloPowerLog) {
+            siloPowerLog = ai.frame + 60 * SECOND;
+            GenericHelpers::LogUtil("[TECH][NukeRush] silo power met by income " + int(aiEconomyMgr.energy.income) + " >= " + int(need)
+                + " (" + (buffer.count - aiBuilderMgr.GetUnfinishedCount(buffer)) + "/" + nukeSiloEnergyCount + " " + buffer.GetName() + ")", 1);
+        }
+        return true;
+    }
     IUnitTask@ SupportedProject(CCircuitDef@ d, Task::BuildType type)
     {
         if (d.GetName() == DefFor("silo")) {
@@ -788,7 +808,7 @@ namespace TechChain
             // T2 workers skip T1 energy steps; enforce the completed production
             // buffer at admission too, rather than counting planned generators.
             CCircuitDef@ buffer = ai.GetCircuitDef(nukeEnergyDef);
-            if (buffer is null || buffer.count - aiBuilderMgr.GetUnfinishedCount(buffer) < nukeSiloEnergyCount) {
+            if ((buffer is null || buffer.count - aiBuilderMgr.GetUnfinishedCount(buffer) < nukeSiloEnergyCount) && !SiloPowerMet(fusion, buffer)) {
                 ProjectBlocked("energy-buffer",d,buffer is null ? 0 : buffer.count-aiBuilderMgr.GetUnfinishedCount(buffer),nukeSiloEnergyCount);
                 return null;
             }
@@ -1225,7 +1245,16 @@ namespace TechChain
             }
             // an order of ours that has no frame yet is invisible to both counts
             const bool pending = (pendingStep == int(i)) && (have == pendingHave) && (unfinished == 0) && (ai.frame - pendingFrame < 120 * SECOND);
-            const int inFlight = unfinished + queued + (pending ? 1 : 0);
+            // A queued order with no frame that no builder adopts for
+            // ChainQueuedStaleSeconds is not in flight: order the generator
+            // again (the native queue still counts the orphan, which an
+            // unreachable or refused site keeps alive indefinitely).
+            int liveQueued = queued;
+            if (cheap && queued > 0 && unfinished == 0 && !pending) {
+                if (staleStep != int(i) || staleHave != have) { staleStep = int(i); staleHave = have; staleFrame = ai.frame; }
+                else if (ai.frame - staleFrame > int(Global::RoleSettings::Tech::ChainQueuedStaleSeconds) * SECOND) liveQueued = 0;
+            }
+            const int inFlight = unfinished + liveQueued + (pending ? 1 : 0);
             if (cheap) {
                 // one per builder, in parallel: a solar is not worth a walk to assist
                 if (!NukeRush() && !requiredFusion && can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105: no converter hold with the metal bank full
@@ -1236,6 +1265,11 @@ namespace TechChain
                 }
                 if (can && have + inFlight < s.target) {
                     IUnitTask@ t = Order(int(i), s, d, u);
+                    if (t !is null && liveQueued < queued) {
+                        staleFrame = ai.frame;   // the next re-order waits another full period
+                        GenericHelpers::LogUtil("[TECH][Chain] step " + (i + 1) + "/" + steps.length() + " " + s.key + " " + have + "/" + s.target
+                            + ": " + queued + " queued order(s) unadopted for " + int(Global::RoleSettings::Tech::ChainQueuedStaleSeconds) + " s; ordered again", 1);
+                    }
                     if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have + inFlight, u); return t; }
                 }
                 if (unfinished > 0) {

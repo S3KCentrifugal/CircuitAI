@@ -433,6 +433,7 @@ namespace Tech {
             float ChainWindBootstrap = 5.0f;
             float ChainAssistRadius = 4000.0f;
             float ChainParallelCostM = 400.0f;
+            float ChainQueuedStaleSeconds = 90.0f;          // a cheap chain step's queued order that no builder adopts this long is ordered again
             float ChainStepStallSeconds = 120.0f;           // D-070: a chain step with no progress for this long is skipped (an unreachable frame must not end the rush)              // D-070: structures cheaper than this (metal) are built one per builder in parallel; dearer ones get every builder on one frame              // D-070: every builder inside this joins the current step's frame
             float ChainNearFrameRadius = 600.0f;            // D-075: a chain frame of a cheap step within this of the builder is finished before anything else
             float PowerTurretBankFactor = 1.5f;             // D-075: ... and the bank holds this many turret costs
