@@ -22,8 +22,8 @@ namespace circuit {
 CScheduler::CScheduler()
 		: lastFrame(0)
 		, isProcessing(false)
+		, isRunning(true)
 {
-	isRunning = true;
 	if (const char* budget = std::getenv("CIRCUIT_FINISH_BUDGET")) finishBudget = std::max(0, std::atoi(budget));
 }
 

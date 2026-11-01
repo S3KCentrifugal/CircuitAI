@@ -42,6 +42,8 @@ public:
 	using PathCallback = std::function<void (const IPathQuery* query)>;
 
 	CPathFinder(terrain::CTerrainData* terrainData, int numThreads);
+	CPathFinder(const CPathFinder&) = delete;  // owns raw move arrays and one pather per worker
+	CPathFinder& operator=(const CPathFinder&) = delete;
 	virtual ~CPathFinder();
 
 	void UpdateAreaUsers(CTerrainManager* terrainMgr);

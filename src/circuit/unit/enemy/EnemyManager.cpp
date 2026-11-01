@@ -522,9 +522,10 @@ void CEnemyManager::KMeansIteration()
 					}
 				}
 
-				// position i is closest to the mean at closestIndex
+				// position i is closest to the mean at closestIndex; with no
+				// means (newK == 0) there is nothing to count against.
 				unitsClosestMeanID[i++] = closestIndex;
-				numUnitsAssignedToMean[closestIndex]++;
+				if (closestIndex >= 0) numUnitsAssignedToMean[closestIndex]++;
 			}
 		}
 	}

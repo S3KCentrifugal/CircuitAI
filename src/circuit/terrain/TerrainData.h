@@ -214,7 +214,7 @@ public:
 		return (sIndex >= 0) && (sIndex < sectorXSize * sectorZSize);
 	}
 
-	circuit::CDoubleBuffer<SAreaData> areas;  // D-431: Front() is published, Back() is being built
+	circuit::CDoubleBuffer<SAreaData> areaBuffers;  // D-431: Front() is published, Back() is being built
 	std::map<int, SMobileType::Id> udMobileType;    // key = ud->id, Used to find a TerrainMapMobileType for a unit
 	std::map<int, SImmobileType::Id> udImmobileType;  // key = ud->id, Used to find a TerrainMapImmobileType for a unit
 
@@ -242,10 +242,10 @@ public:
 	const FloatVec& GetSlopeMap() const { return slopeMap; }
 	int GetSlopeMapXSize() const { return slopeMapXSize; }
 	void OnAreaUsersUpdated();
-	SAreaData* GetNextAreaData() { return areas.BackPtr(); }
-	SAreaData* GetAreaData() { return areas.FrontPtr(); }
-	const SAreaData* GetAreaData() const { return areas.FrontPtr(); }
-	SAreaData& GetAreaAt(int index) { return areas.At(index); }
+	SAreaData* GetNextAreaData() { return areaBuffers.BackPtr(); }
+	SAreaData* GetAreaData() { return areaBuffers.FrontPtr(); }
+	const SAreaData* GetAreaData() const { return areaBuffers.FrontPtr(); }
+	SAreaData& GetAreaAt(int index) { return areaBuffers.At(index); }
 
 private:
 	static circuit::CMap* map;

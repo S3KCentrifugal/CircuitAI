@@ -85,7 +85,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 	/*
 	 *  Assign areaData references
 	 */
-	SAreaData& areaData = areas.Front();
+	SAreaData& areaData = areaBuffers.Front();
 	std::vector<SMobileType>& mobileType = areaData.mobileType;
 	std::vector<SImmobileType>& immobileType = areaData.immobileType;
 	std::vector<SAreaSector>& sectorAirType = areaData.sectorAirType;
@@ -492,7 +492,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 	/*
 	 *  Duplicate areaData
 	 */
-	SAreaData& nextAreaData = areas.Back();
+	SAreaData& nextAreaData = areaBuffers.Back();
 	nextAreaData.heightMapXSize = mapWidth;
 	nextAreaData.mobileType = mobileType;
 	for (auto& mt : nextAreaData.mobileType) {
@@ -580,14 +580,14 @@ void CTerrainData::AnalyzeMap(CCircuitAI* circuit)
 
 	CCircuitDef* cdef = circuit->GetCircuitDef(cfg.unitName.c_str());
 	if (cdef == nullptr) {
-		for (const SMobileType& mt : areas.At(0).mobileType) {
+		for (const SMobileType& mt : areaBuffers.At(0).mobileType) {
 			if (mt.typeUsable) {
 				rmt = &mt;
 				break;
 			}
 		}
 	} else {
-		rmt = &areas.At(0).mobileType[cdef->GetMobileId()];
+		rmt = &areaBuffers.At(0).mobileType[cdef->GetMobileId()];
 	}
 
 	sectors.resize(sectorXSize * sectorZSize);
@@ -729,7 +729,7 @@ std::shared_ptr<IMainJob> CTerrainData::UpdateAreas()
 	/*
 	 *  Reset areaData
 	 */
-	SAreaData& prevAreaData = areas.Front();
+	SAreaData& prevAreaData = areaBuffers.Front();
 	// O(H) exact comparison on the existing terrain worker, O(1) extra storage.
 	// Includes fine samples outside changed coarse sectors. Publication carries
 	// the revision to every manager before synchronous route readers use it.
@@ -1016,7 +1016,7 @@ void CTerrainData::OnAreaUsersUpdated()
 		return;
 	}
 
-	areas.Publish();
+	areaBuffers.Publish();
 	isUpdating = false;
 
 #ifdef DEBUG_VIS
@@ -1027,7 +1027,7 @@ void CTerrainData::OnAreaUsersUpdated()
 
 bool CTerrainData::IsWalkable(int xSlope, int ySlope) const
 {
-	const SAreaData& areaData0 = areas.At(0);
+	const SAreaData& areaData0 = areaBuffers.At(0);
 	const float elevation = areaData0.heightMap[areaData0.heightMapXSize * (ySlope * 2) + (xSlope * 2)];
 	const float slope = slopeMap[slopeMapXSize * ySlope + xSlope];
 	return (rmt->canHover && (rmt->maxElevation >= elevation) && !waterIsAVoid && ((elevation <= 0) || (rmt->maxSlope >= slope)))
