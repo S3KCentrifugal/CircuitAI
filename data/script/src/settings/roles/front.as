@@ -261,6 +261,7 @@ namespace Front {
             // ArtySquadPaceTolerance of its place, so the squad keeps its slowest member's pace.
             float ArtySquadHeavyAhead = 110.0f;    // owner 2026-11-01: 100-120 in front of the frontmost artillery/utility
             float ArtySquadHeavySpacing = 80.0f;    // heavies' line abreast, apart
+            float ArtySquadHeavyRepath = 32.0f;     // a heavy's place is re-sent once it moved this far (others: ArtySquadRepath)
             float ArtySquadPackRadius = 170.0f;     // the other artillery's ring around the lead (support: ArtySquadFollowBehind)
             float ArtySquadPaceStep = 200.0f;
             float ArtySquadPaceTolerance = 90.0f;

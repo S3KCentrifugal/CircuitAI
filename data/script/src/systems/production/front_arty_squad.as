@@ -464,8 +464,8 @@ namespace FrontArtySquad {
     // Owner (2026-10-31): spacing. Each member's own place relative to the lead's goal, as (forward, side):
     // heavies in a line abreast ArtySquadHeavyAhead in front of the frontmost artillery or support place (the lead
     // counts at 0; owner 2026-11-01: 100-120 elmos ahead of artillery and utility), ArtySquadHeavySpacing apart; the other artillery
-    // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (90..270 degrees, never
-    // ahead of the lead, so the heavy line holds ArtySquadHeavyAhead in front of every gun;
+    // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (100..260 degrees, a
+    // little behind the lead, so the heavy line holds ArtySquadHeavyAhead in front of every gun;
     // a second ring 1.35x out for every other unit of a pack above 8); support on a ring of ArtySquadFollowBehind
     // behind (135..225 degrees). O(members) per update; a place is re-sent only once it moved ArtySquadRepath.
     void Places(Squad@ s, array<float> &out fo, array<float> &out so, float &out heavyLine) {
@@ -491,7 +491,7 @@ namespace FrontArtySquad {
         float front = 0.0f;   // the frontmost artillery/support place (the lead at 0)
         for (uint k = 0; k < n; ++k) {
             if (cls[k] == 1) {
-                const float a = PI * (0.5f + (na > 1 ? float(ia) / float(na - 1) : 0.5f));
+                const float a = PI * (5.0f / 9.0f + (8.0f / 9.0f) * (na > 1 ? float(ia) / float(na - 1) : 0.5f));
                 const float r = ring * (na > 8 && (ia % 2) == 1 ? 1.35f : 1.0f);
                 ++ia;
                 fo[k] = cos(a) * r; so[k] = sin(a) * r;
@@ -634,9 +634,12 @@ namespace FrontArtySquad {
                 CRouteTask@ r = cast<CRouteTask>(cast<IFighterTask>(WantedRoute(s, m)));
                 if (r is null || m.task !is cast<IUnitTask>(r)) continue;
                 const AIFloat3 slot = Clamp(s.leadGoal.x + dx * fo[k] - dz * so[k], s.leadGoal.z + dz * fo[k] + dx * so[k]);
-                if (s.slotSent[k].x >= 0.0f && MapHelpers::SqDist(s.slotSent[k], slot) < repath * repath) continue;
+                // the screen tracks its place closer (owner 2026-11-01: 100-120 ahead of the guns, not 96 stale + 48 short)
+                const bool screen = !s.leadHeavy && IsHeavy(m.circuitDef.GetName());
+                const float rp = screen ? AiMin(repath, Global::RoleSettings::Front::ArtySquadHeavyRepath) : repath;
+                if (s.slotSent[k].x >= 0.0f && MapHelpers::SqDist(s.slotSent[k], slot) < rp * rp) continue;
                 const array<AIFloat3> points = {slot};
-                if (r.SetUnitRoute(m, points, 48.0f)) s.slotSent[k] = slot;
+                if (r.SetUnitRoute(m, points, screen ? 24.0f : 48.0f)) s.slotSent[k] = slot;
             }
             if (ai.frame >= s.nextLog) {
                 s.nextLog = ai.frame + 20 * SECOND;
