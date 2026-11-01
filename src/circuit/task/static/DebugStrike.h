@@ -24,7 +24,14 @@
 namespace circuit {
 namespace debug {
 
-enum Weapon: int {NUKE = 0, LOL = 1, _WEAPONS_};
+// GOAL (owner 2026-11-01): not a weapon - the army's move goal, CDebugGoalTask
+enum Weapon: int {NUKE = 0, LOL = 1, GOAL = 2, _WEAPONS_};
+
+inline bool ValidWeapon(int weapon) { return (weapon >= NUKE) && (weapon < _WEAPONS_); }
+inline const char* WeaponName(int weapon)
+{
+	return (weapon == NUKE) ? "nuke" : (weapon == LOL) ? "lol" : (weapon == GOAL) ? "goal" : "?";
+}
 // DONE: a team strike whose team has no scouted unit left after a launch
 enum class Mode: int {OFF = 0, POS = 1, TEAM = 2, DONE = 3};
 
@@ -33,7 +40,7 @@ struct Strike {
 	float x = 0.f, z = 0.f;  // POS: the aim
 	int team = -1;           // TEAM: the target team
 	int player = -1;         // TEAM by player id: the player the team was resolved from, else -1
-	int launches = 0;        // nuke launches since the strike began
+	int launches = 0;        // nuke launches since the strike began; GOAL: targets gone while units were sent to them
 	int serial = 0;          // bumped by every Set: tasks act on a change at once
 
 	bool Active() const { return (mode == Mode::POS) || (mode == Mode::TEAM); }
@@ -109,6 +116,31 @@ inline std::string Describe(const Strike& s, int units)
 		default:         std::snprintf(buf, sizeof(buf), "off"); break;
 	}
 	return buf;
+}
+
+// Goal (owner 2026-11-01): which units the goal takes, by the map's long
+// edge. A position goal takes the army within half of it of the point; a
+// player (team) goal the units within three quarters of it of that team's
+// nearest scouted unit.
+inline float GoalReach(Mode mode, float width, float height)
+{
+	const float edge = (width > height) ? width : height;
+	return (mode == Mode::POS) ? 0.5f * edge : (mode == Mode::TEAM) ? 0.75f * edge : 0.f;
+}
+
+// The index of the point nearest (x, z) no farther than reach, or -1.
+// P has .x and .z; O(points).
+template<typename P>
+int NearestWithin(float x, float z, const P* points, int count, float reach)
+{
+	int best = -1;
+	float bestSq = reach * reach;
+	for (int i = 0; i < count; ++i) {
+		const float dx = points[i].x - x, dz = points[i].z - z;
+		const float sq = dx * dx + dz * dz;
+		if (sq <= bestSq) { bestSq = sq; best = i; }
+	}
+	return best;
 }
 
 } // namespace debug

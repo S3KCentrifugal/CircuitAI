@@ -21,10 +21,16 @@ sends, to every AI its host may command:
     barb|debug|<teamId>|lol|team|<team>    every lolcannon in range of a scouted unit of that
                                            team fires at the dearest one it reaches
     barb|debug|<teamId>|nuke|off           back to normal targeting (lol|off the same)
+    barb|debug|<teamId>|goal|pos|<x>|<z>   (owner 2026-11-01) every military non-spam unit within
+                                           half the map's long edge of (x, z) moves there
+    barb|debug|<teamId>|goal|player|<player>  every one within three quarters of it of that
+                                           player's nearest scouted unit moves to it, then to
+                                           the next nearest when it is gone (goal|team|T too)
+    barb|debug|<teamId>|goal|off           back to normal behaviour (CDebugGoalTask)
 
 The orders are native (CSuperTask::UpdateDebug, task/static/DebugStrike.h);
 this file parses the line and publishes the state back as the widget state key
-"debug": "barb|debug|<team>|<ally>|<nuke state>|<lol state>", each state one
+"debug": "barb|debug|<team>|<ally>|<nuke state>|<lol state>|<goal state>", each state one
 of "off", "pos x z units launches", "team T units launches",
 "player P T units launches", "done T launches" or "done T launches P"
 (CMilitaryManager::GetDebugStrikeState). Nothing is published before the first
@@ -32,7 +38,7 @@ debug command, so games that never use the window write no extra state.
 
 ******************************************************************************/
 namespace DebugStrike {
-    const int NUKE = 0, LOL = 1;
+    const int NUKE = 0, LOL = 1, GOAL = 2;
     const int OFF = 0, POS = 1, TEAM = 2;
     const int TickFrames = SECOND;   // the state is read once a second, only after a command
     bool used = false;
@@ -56,7 +62,7 @@ namespace DebugStrike {
     bool Handle(array<string>@ parts)
     {
         if (parts.length() < 5) return false;
-        const int weapon = (parts[3] == "nuke") ? NUKE : ((parts[3] == "lol") ? LOL : -1);
+        const int weapon = (parts[3] == "nuke") ? NUKE : ((parts[3] == "lol") ? LOL : ((parts[3] == "goal") ? GOAL : -1));
         if (weapon < 0) return false;
         bool ok = false;
         if (parts[4] == "off") {
@@ -83,7 +89,8 @@ namespace DebugStrike {
     {
         if (!used || ai.frame - lastTick < TickFrames) return;
         lastTick = ai.frame;
-        const string state = aiMilitaryMgr.GetDebugStrikeState(NUKE) + "|" + aiMilitaryMgr.GetDebugStrikeState(LOL);
+        const string state = aiMilitaryMgr.GetDebugStrikeState(NUKE) + "|" + aiMilitaryMgr.GetDebugStrikeState(LOL)
+            + "|" + aiMilitaryMgr.GetDebugStrikeState(GOAL);
         if (state == lastState) return;
         lastState = state;
         WidgetLink::SetState("debug", WidgetLink::Line("debug", state));

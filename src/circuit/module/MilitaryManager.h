@@ -282,13 +282,14 @@ public:
 	springai::AIFloat3 GetNuclearAim() const { return nuclearAim; }
 	float GetNuclearAimRadius() const { return nuclearAimRadius; }
 	// Debug strikes (owner 2026-10-31, debug-widget-test): the widget's debug
-	// window, through the script (barb|debug). weapon: debug::NUKE or LOL;
+	// window, through the script (barb|debug). weapon: debug::NUKE, LOL or GOAL;
 	// mode: debug::Mode OFF, POS (x, z) or TEAM (team). False when malformed.
 	bool SetDebugStrike(int weapon, int mode, float x, float z, int team);
 	// A team strike on the team that player plays (engine GetPlayerTeam); false
 	// for an unknown player, a spectator or a player of our own team.
 	bool SetDebugStrikePlayer(int weapon, int player);
-	debug::Strike& GetDebugStrike(int weapon) { return debugStrikes[(weapon == debug::LOL) ? debug::LOL : debug::NUKE]; }
+	// debug::GOAL (owner 2026-11-01): the army's move goal, the same commands
+	debug::Strike& GetDebugStrike(int weapon) { return debugStrikes[debug::ValidWeapon(weapon) ? weapon : debug::NUKE]; }
 	// The widget's status line for one weapon (debug::Describe)
 	std::string GetDebugStrikeState(int weapon) const;
 	// Nuke launch scouting (owner 2026-10-31): every launch of ours counts and keeps
@@ -425,6 +426,10 @@ public:
 	void UpdateDefenceTasks();
 	void UpdateSensorGuards();
 	void UpdateCommanderSnipe();
+	// Debug goal: takes the military non-spam units in reach into one
+	// CDebugGoalTask while it is on, ends the task when it is off
+	void UpdateDebugGoal();
+	bool IsDebugGoalCandidate(CCircuitUnit* unit) const;
 	/*
 	 * Where this AI is currently fighting: the leader position of the strongest
 	 * ATTACK squad, or the enemy centroid when we have no attack squad, or an
@@ -574,6 +579,7 @@ private:
 	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearAimRadius = 0.f;
 	std::array<debug::Strike, debug::_WEAPONS_> debugStrikes;
+	IUnitTask* debugGoalTask = nullptr;  // owned reference (AssignOwnedReference)
 	int nuclearLaunches = 0;
 	springai::AIFloat3 nuclearLaunchPos = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearLaunchRadius = 0.f;

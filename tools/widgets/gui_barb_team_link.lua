@@ -3393,11 +3393,15 @@ local hoverId, pressedId = nil, nil
 -- button under the aggression slider opens a window that aims every hosted
 -- AI's nuke silos, or its lolcannons in range, at a map position or a player
 -- (barb|debug, data/script/src/systems/presentation/debug_strike.as).
+-- "goal" (owner 2026-11-01) moves the army instead: every military non-spam
+-- unit within half the map's long edge of (x, y) moves there; with a player
+-- id, every one within three quarters of it of that player's nearest scouted
+-- unit moves to it, then to the next nearest when it is gone.
 local debugOpen = false
 local debugWin = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
 local debugFields = { x = "", y = "", player = "" }
 local debugFocus = nil           -- "x", "y" or "player" while that field takes the keyboard
-local debugOn = { nuke = false, lol = false }
+local debugOn = { nuke = false, lol = false, goal = false }
 
 local ais = {}                   -- teamId -> { teamId, name, color, allyTeam, roster, lastReply, replyKind }
 local aiOrder = {}
@@ -3582,8 +3586,15 @@ end
 local function debugStateText(weapon, s)
 	local w = {}
 	for word in string.gmatch(s or "", "%S+") do w[#w + 1] = word end
-	local units = (weapon == "nuke") and "silo" or "cannon"
+	local units = (weapon == "nuke") and "silo" or ((weapon == "goal") and "unit" or "cannon")
 	local function n(v, unit) v = tonumber(v) or 0; return string.format("%d %s%s", v, unit, v == 1 and "" or "s") end
+	if weapon == "goal" then
+		-- "pos x z units gone" or "player P T units gone"; gone: targets lost on the way
+		if w[1] == "pos" then return string.format("to (%s, %s), %s", w[2] or "?", w[3] or "?", n(w[4], units)) end
+		if w[1] == "player" then return string.format("to %s, %s, %s gone", playerLabel(tonumber(w[2]) or -1), n(w[4], units), n(w[5], "target")) end
+		if w[1] == "team" then return string.format("to %s, %s, %s gone", teamLabel(tonumber(w[2]) or -1), n(w[3], units), n(w[4], "target")) end
+		return "off"
+	end
 	if w[1] == "pos" then
 		return string.format("(%s, %s), %s%s", w[2] or "?", w[3] or "?", n(w[4], units), weapon == "nuke" and (", " .. n(w[5], "launch")) or "")
 	elseif w[1] == "player" then
@@ -5233,7 +5244,7 @@ local function onAIMessage(aiTeam, dataStr)
             e.aggression, e.automaticAggression=delta,automatic
         end
 	elseif topic == "debug" and e then
-		e.debugNuke, e.debugLol = p[5] or "off", p[6] or "off"
+		e.debugNuke, e.debugLol, e.debugGoal = p[5] or "off", p[6] or "off", p[7] or "off"
 		-- a team nuke strike ends by itself: the button is off once no AI runs one
 		if string.sub(e.debugNuke, 1, 4) == "done" then
 			addEvent(string.format("Team %d: nuke strike %s", sender, debugStateText("nuke", e.debugNuke)), "ok")
@@ -5819,7 +5830,7 @@ local function drawDebugWindow()
 	local hh = px(22)
 	local hy1 = y2 - hh
 	roundRect(x1 + px(1), hy1, x2 - px(1), y2 - px(1), px(5), C.surfaceHigh)
-	text(font2, "Debug strikes", left, hy1 + hh * 0.5 - px(4), px(10.5), "o", C.onSurface)
+	text(font2, "Debug strikes and goal", left, hy1 + hh * 0.5 - px(4), px(10.5), "o", C.onSurface)
 	local bs = px(18)
 	iconButton(right - bs, hy1 + (hh - bs) / 2, bs, ICON.close, "debugClose", function()
 		playClick(); debugOpen = false; debugFocus = nil
@@ -5839,16 +5850,22 @@ local function drawDebugWindow()
 	local enabled = false
 	for _, id in ipairs(aiOrder) do if mayCommand(id) then enabled = true; break end end
 	local bh = px(22)
-	labelButton(left, cy - bh, left + half, cy, nil, "nuke", "debugNuke", function()
+	local third = (w - px(12)) / 3
+	labelButton(left, cy - bh, left + third, cy, nil, "nuke", "debugNuke", function()
 		playClick(); debugFocus = nil; debugStrike("nuke")
 	end, debugOn.nuke and "Stop: every nuke silo back to its own targets"
 		or "Every nuke silo, at fire at will, nukes (x, y) again and again; or the best scouted target of player # until the player has none left",
 		debugOn.nuke, enabled)
-	labelButton(left + half + px(6), cy - bh, right, cy, nil, "lol", "debugLol", function()
+	labelButton(left + third + px(6), cy - bh, left + 2 * third + px(6), cy, nil, "lol", "debugLol", function()
 		playClick(); debugFocus = nil; debugStrike("lol")
 	end, debugOn.lol and "Stop: every lolcannon back to its own targets"
 		or "Every lolcannon in range fires at (x, y) again and again; or at the scouted units of player # it can reach",
 		debugOn.lol, enabled)
+	labelButton(left + 2 * third + px(12), cy - bh, right, cy, nil, "goal", "debugGoal", function()
+		playClick(); debugFocus = nil; debugStrike("goal")
+	end, debugOn.goal and "Stop: every unit back to its normal orders"
+		or "Every military unit (not spam) within half the map of (x, y) moves there; or, with player #, each one within 3/4 of the map of that player's scouted units moves to the nearest, then the next",
+		debugOn.goal, enabled)
 	cy = cy - bh - px(6)
 
 	-- what each hosted AI reports (its state file, about a second behind)
@@ -5858,8 +5875,8 @@ local function drawDebugWindow()
 	for _, id in ipairs(aiOrder) do
 		local a = ais[id]
 		if a and mayCommand(id) then
-			for _, wpn in ipairs({ "nuke", "lol" }) do
-				local s = (wpn == "nuke") and a.debugNuke or a.debugLol
+			for _, wpn in ipairs({ "nuke", "lol", "goal" }) do
+				local s = (wpn == "nuke") and a.debugNuke or ((wpn == "lol") and a.debugLol or a.debugGoal)
 				if s and s ~= "off" and cy - lineH >= bottom then
 					text(font, fitText(font, string.format("T%d %s: %s", id, wpn, debugStateText(wpn, s)), px(8), w),
 						left, cy - px(8.5), px(8), "o", (string.sub(s, 1, 4) == "done") and C.ok or C.onSurface)
@@ -5872,7 +5889,7 @@ local function drawDebugWindow()
 	if shown == 0 then
 		text(font, enabled and "No strike running." or "No AI hosted here to command.", left, cy - px(8.5), px(8), "o", C.onSurfaceVariant)
 	end
-	text(font, "Press nuke or lol again to stop.", left, y1 + pad, px(7.5), "o", C.onSurfaceVariant)
+	text(font, "Press nuke, lol or goal again to stop.", left, y1 + pad, px(7.5), "o", C.onSurfaceVariant)
 end
 
 function widget:DrawScreen()

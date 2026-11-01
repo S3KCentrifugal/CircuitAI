@@ -102,6 +102,37 @@ class DebugWindowTests(unittest.TestCase):
             assert(sent('3>barb|debug|3|nuke|player|6'), messages[1])
         ''')
 
+    def test_goal_toggles_on_its_own_and_reports(self):
+        self.lua.execute('''
+            click('dbgFieldx'); typeText('2048'); key(9); typeText('1024'); key(13)
+            widget:DrawScreen(); messages={}
+            click('debugGoal')
+            assert(#messages==16 and sent('7>barb|debug|7|goal|pos|2048|1024'), #messages)
+            widget:DrawScreen(); messages={}
+            click('debugNuke')   -- the goal stays on: nuke is its own toggle
+            assert(sent('7>barb|debug|7|nuke|pos|2048|1024') and not sent('7>barb|debug|7|goal|off'))
+            widget:RecvSkirmishAIMessage(7,'barb|debug|7|0|off|off|pos 2048 1024 23 0')
+            widget:DrawScreen(); messages={}
+            click('debugGoal')
+            assert(#messages==16 and sent('7>barb|debug|7|goal|off'))
+        ''')
+
+    def test_goal_on_a_player_goes_only_to_enemies(self):
+        self.lua.execute('''
+            click('dbgFieldplayer'); typeText('6'); key(13)   -- player 6 plays team 9
+            widget:DrawScreen(); messages={}
+            click('debugGoal')
+            assert(#messages==8 and sent('0>barb|debug|0|goal|player|6') and not sent('9>barb|debug|9|goal|player|6'))
+            widget:RecvSkirmishAIMessage(0,'barb|debug|0|0|off|off|player 6 9 14 3')
+            widget:DrawScreen()
+        ''')
+
+    def test_old_two_state_report_still_reads(self):
+        self.lua.execute('''
+            widget:RecvSkirmishAIMessage(3,'barb|debug|3|0|pos 10 20 1 0|off')
+            widget:DrawScreen()
+        ''')
+
     def test_close_keeps_strike_and_draws_nothing(self):
         self.lua.execute('''
             click('debugClose'); widget:DrawScreen()

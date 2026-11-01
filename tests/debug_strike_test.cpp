@@ -73,6 +73,29 @@ void test_player_strike_runs_on_the_resolved_team()
     assert(Set(s, Mode::TEAM, 0.f, 0.f, 6, 8192.f, 8192.f, 3));
     assert(s.player == -1 && Describe(s, 0) == "team 6 0 0");   // a team strike forgets the player
 }
+void test_goal_weapon_and_reach()
+{
+    assert(ValidWeapon(NUKE) && ValidWeapon(LOL) && ValidWeapon(GOAL));
+    assert(!ValidWeapon(-1) && !ValidWeapon(_WEAPONS_));
+    assert(std::string(WeaponName(GOAL)) == "goal");
+    // half the long edge for a position goal, three quarters for a player goal
+    assert(GoalReach(Mode::POS, 12288.f, 8192.f) == 6144.f);
+    assert(GoalReach(Mode::TEAM, 8192.f, 12288.f) == 9216.f);
+    assert(GoalReach(Mode::OFF, 8192.f, 8192.f) == 0.f);
+    Strike s;
+    assert(Set(s, Mode::POS, 4000.f, 3000.f, -1, 8192.f, 8192.f, 0));
+    assert(Describe(s, 12) == "pos 4000 3000 12 0");
+}
+struct Pt { float x, z; };
+void test_nearest_within_reach()
+{
+    const Pt pts[] = {{100.f, 100.f}, {500.f, 0.f}, {0.f, 300.f}};
+    assert(NearestWithin(0.f, 0.f, pts, 3, 1000.f) == 0);      // 141 away beats 300 and 500
+    assert(NearestWithin(0.f, 0.f, pts, 3, 100.f) == -1);      // none within reach
+    assert(NearestWithin(450.f, 0.f, pts, 3, 60.f) == 1);
+    assert(NearestWithin(0.f, 0.f, pts, 0, 1000.f) == -1);
+    assert(NearestWithin(0.f, 300.f, pts, 3, 0.f) == 2);       // on the point: reach 0 still takes it
+}
 int main()
 {
     test_position_strike_needs_a_point_on_the_map();
@@ -81,6 +104,8 @@ int main()
     test_team_done_only_after_a_launch();
     test_describe();
     test_player_strike_runs_on_the_resolved_team();
+    test_goal_weapon_and_reach();
+    test_nearest_within_reach();
     std::cout << "debug_strike_test: all passed\n";
     return 0;
 }
