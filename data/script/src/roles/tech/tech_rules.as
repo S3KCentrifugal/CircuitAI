@@ -299,7 +299,7 @@ namespace TechRules {
     {
         // Its unfinished frame takes every free T2 constructor that can reach
         // it, ahead of new growth: the bigger build-power share wins the metal
-        // or energy it stalls on, so the interceptor is stocked before twelve.
+        // or energy it stalls on, so the interceptor is stocked by fourteen.
         CCircuitUnit@ frame = Layout::AntiNukeFrame();
         if (frame !is null) {
             if (!aiTerrainMgr.CanReachAt(c.u, frame.GetPos(ai.frame), c.u.circuitDef.GetBuildDistance())) return null;
@@ -522,7 +522,7 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
-        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 8:00 at sustained +20 metal/+300 energy, on its reserved nano-range pad; free T2 constructors assist its frame; armed before twelve minutes"));
+        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved nano-range pad; free T2 constructors assist its frame; armed by fourteen minutes"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));
         table.insertLast(Rule("nuke.afus",         CON_T2,       W0(), @DoNukeAfus,     "owner 2026-10-17: a nuke rush adds a silo after each completed advanced fusion (1 + AFUS, NukeLimit), one at a time, on the regular silo gates, packed on the base layout"));

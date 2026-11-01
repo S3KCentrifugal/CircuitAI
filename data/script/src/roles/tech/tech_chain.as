@@ -160,8 +160,9 @@ namespace TechChain
         }
     }
 
-    // First antinuke: from its frame until one interceptor is stocked (at most
-    // until AntiNukeBudgetUntilSeconds), every other build task, factory
+    // First antinuke still without an interceptor at AntiNukeHoldFromSeconds:
+    // from then until one is stocked (at most until AntiNukeBudgetUntilSeconds),
+    // every other build task, factory
     // production included, drops to BAR's low build priority and uses what the
     // antinuke leaves, as the first nuke stockpile does above. Its own builders,
     // reclaim and repairs stay high; the stockpile is not a builder and stays
@@ -183,7 +184,10 @@ namespace TechChain
         if (antiBudgetDone || !Global::RoleSettings::Tech::ExperimentalBuild || ai.frame < antiBudgetFrame) return;
         antiBudgetFrame = ai.frame + SECOND;
         CCircuitUnit@ anti = aiTerrainMgr.GetReservationUnit(aiTerrainMgr.GetLayoutInt("tech.antinuke.slot", -1));
-        if (anti is null && antiLowPriority.length() == 0) return;
+        if (antiLowPriority.length() == 0 && (anti is null || ai.frame < Global::RoleSettings::Tech::AntiNukeHoldFromSeconds * SECOND)) {
+            if (anti !is null && anti.GetBuildProgress() >= 1.0f && anti.GetStockpile() > 0) antiBudgetDone = true;   // armed in time: no hold
+            return;
+        }
         if (anti !is null && anti.GetBuildProgress() >= 1.0f && anti.GetStockpile() > 0) antiBudgetDone = true;
         if (anti is null || antiBudgetDone || nukeFundingSilo >= 0
             || ai.frame >= Global::RoleSettings::Tech::AntiNukeBudgetUntilSeconds * SECOND) {

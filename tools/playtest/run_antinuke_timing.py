@@ -37,10 +37,10 @@ def main():
     check=d/'checks.json'
     check.write_text(json.dumps({'stop_minute':a.minutes,'expect':[
         {'key':'pad','pattern':r'\['+a.role+r'\]\[AntiNuke\] reserved slot=', 'by_minute':2,'scope':'tech'},
-        {'key':'anti frame','pattern':r'\[AntiNukeTest\] created kind=anti team=0 ', 'by_minute':10,'scope':'any'},
-        {'key':'anti finished','pattern':r'\[AntiNukeTest\] finished kind=anti team=0 ', 'by_minute':11,'scope':'any'},
-        {'key':'anti armed','pattern':r'\[AntiNukeTest\] stock kind=anti team=0 .*count=[1-9]', 'by_minute':12,'scope':'any'},
-        {'key':'nano reach','pattern':r'\[AntiNukeTest\] PASS nano range ', 'by_minute':11,'scope':'any'},
+        {'key':'anti frame','pattern':r'\[AntiNukeTest\] created kind=anti team=0 ', 'by_minute':12,'scope':'any'},
+        {'key':'anti finished','pattern':r'\[AntiNukeTest\] finished kind=anti team=0 ', 'by_minute':13,'scope':'any'},
+        {'key':'anti armed','pattern':r'\[AntiNukeTest\] stock kind=anti team=0 .*count=[1-9]', 'by_minute':14,'scope':'any'},
+        {'key':'nano reach','pattern':r'\[AntiNukeTest\] PASS nano range ', 'by_minute':13,'scope':'any'},
         {'key':'nuke launch','pattern':r'\[AntiNukeTest\] projectile kind=silo team=1 ', 'by_minute':a.minutes,'scope':'any'}],
         'forbid':[{'key':'script','pattern':r': ERR\s+:|SCRIPT CRASH|Lib exception','scope':'any'},
             {'key':'policy or reach','pattern':r'\[AntiNukeTest\] FAIL ', 'scope':'any'}]},indent=2))

@@ -27,7 +27,7 @@ local function report(event,id,def,team)
     end
     echo(string.format("%s kind=%s team=%d id=%d frame=%d at=%.0f,%.0f nearestNano=%.1f",event,k,team,id,Spring.GetGameFrame(),x or -1,z or -1,nearest))
     if k=="anti" and team==0 then
-        if event=="created" and Spring.GetGameFrame()<14400 then echo("FAIL premature antinuke") end
+        if event=="created" and Spring.GetGameFrame()<16200 then echo("FAIL premature antinuke") end
         if event=="finished" then
             echo((nearest<=reach and "PASS" or "FAIL").." nano range distance="..nearest.." reach="..reach)
         end
@@ -46,7 +46,7 @@ function widget:GameFrame(frame)
         if mi and ei and mi>=35 and ei>=700 and not firstIncome[team] then
             firstIncome[team]=frame; echo("income-ready team="..team.." frame="..frame.." metal="..mi.." energy="..ei)
         end
-        if frame%900==0 and team==0 and frame>=14400 and frame<=23400 then
+        if frame%900==0 and team==0 and frame>=18000 and frame<=25200 then
             -- Read-only: the energy users by unit type, to explain a stockpile stall.
             local use={}
             for _,u in ipairs(Spring.GetTeamUnits(0) or {}) do
@@ -63,7 +63,7 @@ function widget:GameFrame(frame)
             echo("energy-users team=0 frame="..frame..s)
         end
         if frame%900==0 then
-            echo(string.format("economy team=%d frame=%d metal=%.1f/%.1f income=%.1f expense=%.1f energy=%.1f/%.1f income=%.1f expense=%.1f",team,frame,m or 0,ms or 0,mi or 0,mp or 0,e or 0,es or 0,ei or 0,ep or 0))
+            echo(string.format("economy team=%d frame=%d metal=%.1f/%.1f income=%.1f expense=%.1f energy=%.1f/%.1f income=%.1f expense=%.1f units=%d",team,frame,m or 0,ms or 0,mi or 0,mp or 0,e or 0,es or 0,ei or 0,ep or 0,Spring.GetTeamUnitCount(team) or 0))
         end
     end
     for id,s in pairs(watched) do
