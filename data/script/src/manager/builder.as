@@ -2009,6 +2009,10 @@ namespace Builder {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
+                // owner, 2026-11-01: the expansion seat builds the edge lane's lab and turrets
+                // once the lane is funded; a FRONT with only its three seated T1 constructors
+                // never asked EdgeLanes, so a funded lane (first holder or heir) stayed unbuilt
+                if (FrontConstructors::Seat(u.id) == 1) { IUnitTask@ edge = EdgeLanes::BuilderTask(u); if (edge !is null) return edge; }
                 if (FrontConstructors::Seat(u.id) != 2) return aiBuilderMgr.DefaultMakeTask(u);
             }
             IUnitTask@ front=UnitHelpers::IsCommander(u.circuitDef)?CommanderFront::Work(u):CommanderGroup::Work(u);

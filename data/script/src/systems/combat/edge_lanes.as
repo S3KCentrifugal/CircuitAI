@@ -517,9 +517,10 @@ namespace EdgeLanes {
     {
         int was = -1;
         const string k = "" + team;
-        if (deadFrame.get(k, was) && was <= frame) return;
+        const bool known = deadFrame.exists(k);   // get's &out zeroes `was` when the key is missing
+        if (known && deadFrame.get(k, was) && was <= frame) return;
         deadFrame.set(k, frame);
-        if (was < 0) GenericHelpers::LogUtil("[EdgeLanes] FRONT team " + team + " is dead at " + (frame / MINUTE) + ":"
+        if (!known) GenericHelpers::LogUtil("[EdgeLanes] FRONT team " + team + " is dead at " + (frame / MINUTE) + ":"
             + ((frame / SECOND) % 60 < 10 ? "0" : "") + ((frame / SECOND) % 60) + " (" + why + ")", 1);
     }
 
