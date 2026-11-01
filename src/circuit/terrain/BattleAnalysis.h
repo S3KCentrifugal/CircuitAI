@@ -204,7 +204,8 @@ public:
     void SetLaneFrontOptions(float horizon,float memory,float ratio,float margin,float minimumCost);
     void UpdateLaneFront();
     void RecordLaneCombat(const springai::AIFloat3& pos);
-    float LimitLaneAdvance(float from,float goal);
+    float LimitLaneAdvance(float from,float goal) { return AssessLaneAdvance(from,goal,nullptr); }
+    float AssessLaneAdvance(float from,float goal,bool* stale);
     bool LaneWorkAllowed(const springai::AIFloat3& site);
     float LaneCombatDistance(const springai::AIFloat3& from,float memorySeconds);
     bool KnownEnemyNear(const springai::AIFloat3& from,float radius,float memorySeconds);

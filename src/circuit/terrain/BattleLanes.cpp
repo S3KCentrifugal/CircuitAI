@@ -635,12 +635,13 @@ void CBattleAnalysis::UpdateLaneFront() {
     });
 }
 
-float CBattleAnalysis::LimitLaneAdvance(float from,float goal) {
+float CBattleAnalysis::AssessLaneAdvance(float from,float goal,bool* stale) {
+    if(stale)*stale=false;
     UpdateLaneFront();
     if(laneFrontHorizon<=0)return goal;
     // Missing/stale enemy publications cannot authorize further deployment.
     const int observed=circuit->GetAllyTeam()->GetCombatSnapshot().Frame();
-    if(observed<0 || circuit->GetLastFrame()-observed>60)return std::min(from,goal);
+    if(observed<0 || circuit->GetLastFrame()-observed>60) {if(stale)*stale=true;return std::min(from,goal);}
     return laneFront.Limit(from,goal,laneFrontMargin,laneFrontRatio,circuit->GetLastFrame(),90);
 }
 

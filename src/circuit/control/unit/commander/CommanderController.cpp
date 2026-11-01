@@ -161,6 +161,10 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         // D-299 work ladder
         Work<&WC::radius>("work_radius",0,3000),Work<&WC::clearance>("work_clearance",0,2000),
         Work<&WC::repairHealth>("repair_health",.5f,1),Work<&WC::reclaimStorage>("reclaim_storage",.1f,1),
+        Work<&WC::reclaimEnergy>("reclaim_energy",0,100000),
+        Work<&WC::reclaimEnergyStorage>("reclaim_energy_storage",0,1),
+        Work<&WC::reclaimEnergyPerMetal>("reclaim_energy_per_metal",1,10000),
+        Work<&WC::reclaimRetry>("reclaim_retry_seconds",1,30),
         Work<&WC::reclaimMetal>("reclaim_metal",0,10000),Work<&WC::lineIncome>("line_income",0,1000),
         Work<&WC::lineMin>("line_min",0,20),Work<&WC::lineMax>("line_max",0,20),
         Work<&WC::lineRadius>("line_radius",100,2000),Work<&WC::lineSpacing>("line_spacing",32,400),
@@ -185,7 +189,8 @@ std::string CCommanderController::DescribeFront(int id) const {
         std::to_string(s.front.pushScreens)+","+std::to_string(s.front.pushScreenProgress)+","+
         std::to_string(s.front.pushBound)+","+std::to_string(s.front.pushGoalProgress)+","+
         std::to_string(s.front.pushHome?1:0)+","+std::to_string(s.front.point.x)+","+
-        std::to_string(s.front.point.z)+","+std::to_string(s.work.task?1:0);
+        std::to_string(s.front.point.z)+","+std::to_string(s.work.task?1:0)+","+std::to_string(int(s.front.reason))+","+
+        std::to_string(s.work.reclaimMetalRoom)+","+std::to_string(s.work.reclaimEnergyRoom);
 }
 
 bool CCommanderController::ActualDecoy(CCircuitDef* definition) const {
@@ -1160,6 +1165,17 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 return true;
             }
         }
+        // Arrival is admission, not a reason to create and immediately release
+        // a controlled task. Preserve the existing yield for the work scheduler.
+        if(!commander::ShouldStartDeployment(pos.SqDistance2D(goal),cfg->front.radius*.5f)) {
+            s.front.yield=frame+60; s.detourFails=0;
+            if(s.front.arrived<0)s.front.arrived=frame;
+            // Preserve arrival posture/state even when no task allocation is
+            // needed (notably a withdrawal returning to its safe station).
+            s.deployed=true; Conceal(unit,s,false); Transition(unit,s,Mode::SUPPORT,frame);
+            if(task)task->Resume(unit);
+            return task!=nullptr;
+        }
         if(!task) {
             task=ai->GetBuilderManager()->EnqueueControlled(this,nullptr);
             ai->GetBuilderManager()->AssignTask(unit,task);
@@ -1169,11 +1185,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
             ai->LOG("[CommanderFront] unit=%i deploy x=%.0f z=%.0f",unit->GetId(),goal.x,goal.z);
         }
         s.deployed=true; Conceal(unit,s,false); Transition(unit,s,Mode::SUPPORT,frame);
-        if(pos.SqDistance2D(goal)<=cfg->front.radius*cfg->front.radius*.25f) {
-            s.front.yield=frame+60; s.detourFails=0;
-            if(s.front.arrived<0) s.front.arrived=frame; // D-299 timed defence clock
-            task->Resume(unit); // next builder callback selects front work
-        } else {
+        { // Arrival was handled before task ownership changed.
             if(role.frontRecovery) {
                 if(pos.SqDistance2D(s.front.progressPos)>=16.f*16.f) {
                     s.front.progressPos=pos; s.front.progressFrame=frame;
