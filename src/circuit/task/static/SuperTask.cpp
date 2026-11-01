@@ -1033,6 +1033,7 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	if (!CanAimStrategic(unit, aim)) circuit->LOG("[INVARIANT] INV-095 strategic launch violates target-area exclusion: unit=%i", unit->GetId());
 	lastStrategicLaunch = frame;
 	if (nuke) {
+		if (geom::is_valid(aim)) circuit->GetMilitaryManager()->NoteNuclearLaunch(aim, d->GetAoe());
 		const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 		circuit->GetAllyTeam()->GetNuclearHistory().Add(unit->GetId(), {aim.x, aim.z},
 			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);

@@ -142,6 +142,33 @@ namespace Front {
             float EcoLadderFrameHelpRadius = 3000.0f;     // a frame this near the constructor
             float EcoLadderConvertBankPercent = 0.6f;
             int EcoLadderGantryAfterAdvFusions = 2;       // the gantry step once this many advanced fusions stand (1 in experimental_balanced)
+            // Owner (2026-10-31): rezzed fusions of other factions, underwater/cloaked fusions and every geothermal
+            // plant (regular and advanced) count as fusions for the ladder, so one standing is "the first fusion stands"
+            bool EcoLadderFusionEquivalents = false;
+            // Owner (2026-10-31): energy overflow into metal (systems/construction/front_overflow.as). Off here, on in
+            // experimental_balanced. OverflowLog (the per-minute [FRONT][Overflow] line) runs either way.
+            bool OverflowConverters = false;
+            bool OverflowLog = true;
+            float OverflowBankPercent = 0.9f;     // the energy bank this full...
+            float OverflowSpareEnergy = 800.0f;   // ...or income beating the pull by this
+            int OverflowSeconds = 20;             // for this long
+            int OverflowParallel = 3;             // T2 converters unfinished at once
+            int OverflowMaxConverters = 40;
+            int OverflowBlockCols = 3;            // a block: cols x rows converters, no gaps
+            int OverflowBlockRows = 3;
+            float OverflowBlockMargin = 64.0f;    // free ground round a block (the converter's block-map yard)
+            int OverflowBlockFailLimit = 3;       // failed cells before the rest of a block is given up
+            float OverflowOrderBankPercent = 0.6f; // no converter order under this bank (native aborts them under 55%)
+            int OverflowFullBankParallel = 1;     // converters going up at once while the bank is full, whatever the spare
+            float OverflowMaxThreat = 0.0f;       // surface threat allowed at a new block
+            int OverflowPullSeconds = 10;         // a helping T2 constructor moved onto a converter at most this often
+            bool OverflowMexFirst = true;         // with the bank full, T1 mex upgrades before converters and reactors
+            int OverflowExtraT2Seconds = 45;      // extra T2 constructors once an overflow lasts this long:
+            int OverflowExtraT2Max = 3;           // 1, plus 1 per OverflowExtraT2Spare above OverflowSpareEnergy, at most this
+            float OverflowExtraT2Spare = 1200.0f;
+            int MexUpExtraT2Max = 3;              // extra T2 constructors while T1 mexes of ours wait for an upgrade
+            int MexUpExtraAssistMax = 2;          // fast-assist bots (Butler, Twitcher, Proteus) for those upgrades
+            int OverflowRecruitSeconds = 30;      // one extra recruit at most this often
             // FRONT recovery after losing the base (systems/construction/front_recovery.as); off here, on in experimental_balanced
             bool Recovery = false;
             float RecoveryEnterMetalIncome = 15.0f;      // recovery starts below this metal income...
@@ -200,6 +227,22 @@ namespace Front {
             float ArtySquadFollowBehind = 120.0f;
             float ArtySquadRepath = 96.0f;
             int ArtySquadStragglerSeconds = 60;   // longest the lead waits for stragglers before advancing anyway
+            // Owner (2026-10-31): formation. Heavies/anti-spam walk ArtySquadHeavyAhead in front of the artillery lead;
+            // the lead advances ArtySquadPaceStep at a time, the next step once every member is within
+            // ArtySquadPaceTolerance of its place, so the squad keeps its slowest member's pace.
+            float ArtySquadHeavyAhead = 60.0f;
+            float ArtySquadHeavySpacing = 80.0f;    // heavies' line abreast, apart
+            float ArtySquadPackRadius = 170.0f;     // the other artillery's ring around the lead (support: ArtySquadFollowBehind)
+            float ArtySquadPaceStep = 200.0f;
+            float ArtySquadPaceTolerance = 90.0f;
+            int ArtySquadPaceWaitSeconds = 20;   // longest the lead paces for one member short of its place
+            // Owner (2026-10-31): while a finished T2 bot lab stands, every T2BotSquadIntervalSeconds, T2BotSquadChance
+            // for one faction bot squad (heavy, or artillery on T2BotSquadArtyShare) with a radar, two jammer and a flak
+            // bot, held at the lab until complete, then moved as the artillery squad above. Off here.
+            float T2BotSquadChance = 0.0f;
+            int T2BotSquadIntervalSeconds = 180;
+            float T2BotSquadArtyShare = 0.5f;
+            int T2BotSquadGatherSeconds = 600;
             // Owner (2026-10-19): bot lab FRONTs, from the opener wave until a T2 factory stands: every
             // BotWaveIntervalSeconds, BotWaveChance for BotWaveMin..Max Pawns/Grunts (Goblins: BotWaveGoblinMin..Max),
             // held at the lab until the last is out, then one attack wave. Off here, on in experimental_balanced.

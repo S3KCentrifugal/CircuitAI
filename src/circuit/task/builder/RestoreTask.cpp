@@ -89,7 +89,7 @@ bool CBRestoreTask::Execute(CCircuitUnit* unit)
 	}
 	++orders;
 	TRY_UNIT(circuit, unit,
-		unit->CmdRestoreArea(position, radius, 0, frame + FRAMES_PER_SEC * 60);
+		unit->CmdRestoreArea(position, radius, 0, frame + std::max(maxFrames, FRAMES_PER_SEC * 60));  // the walk out included
 	)
 	return true;
 }

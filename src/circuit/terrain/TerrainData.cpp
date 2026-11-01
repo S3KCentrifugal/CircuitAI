@@ -294,6 +294,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 					}
 				}
 			}
+			sector[i].origMaxSlope = sector[i].maxSlope;  // terrain restore: craters that made it steeper
 
 			iMap = ((z * convertStoHM) * heightMapXSize) + x * convertStoHM;
 			sector[i].minElevation = standardHeightMap[iMap];

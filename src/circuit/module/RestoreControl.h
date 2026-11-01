@@ -8,7 +8,11 @@
  *
  * Where it looks: our base (behaviour.json restore.base_radius), sites a task
  * could not build on (RequestSite, e.g. a cratered metal spot), sites the
- * script asks for, and crater lava under our own ground units.
+ * script asks for, crater lava under our own ground units, and our attack
+ * paths (restore.path): around our ground army and along the line from the
+ * base to each unit, a crater that is now steeper than a vehicle can climb
+ * (restore.path_slope, Thor's 33 degrees, or the unit's own limit when lower)
+ * where the ground was not, or crater lava.
  *
  * Cost: one scan per restore.interval seconds. Damage per sector is computed
  * by the terrain worker inside its existing 10 s heightmap diff (changed
@@ -40,7 +44,7 @@ class CBRestoreTask;
 
 class CRestoreControl final {
 public:
-	enum Reason: int {BASE = 0, SITE = 1, LAVA = 2, SCRIPT = 3};
+	enum Reason: int {BASE = 0, SITE = 1, LAVA = 2, SCRIPT = 3, PATH = 4};
 
 	CRestoreControl(CCircuitAI* circuit);
 	~CRestoreControl();
@@ -71,7 +75,8 @@ private:
 		float depth;
 	};
 	bool BuildPatch(const springai::AIFloat3& nearPos, SPatch& patch);
-	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius);
+	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front);
+	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out) const;
 	bool IsCovered(const springai::AIFloat3& pos) const;
 	bool IsCoolingDown(int sector, int frame) const;
 	void CoolDown(const springai::AIFloat3& pos, float radius, int frames);
@@ -92,6 +97,11 @@ private:
 	int maxSeconds = 90;      // a restore not finished by then is aborted
 	int cooldownSeconds = 60; // a patch tried (or found too small) is left alone this long
 	float busyPenalty = 800.f;// distance added for a builder that is constructing
+	bool path = true;         // restore craters and crater lava on our attack paths
+	float pathRadius = 400.f; // around each ground army unit; half of it along base -> unit
+	float pathSlope = 0.161f; // 1 - cos(33 deg): steeper than this blocks a Thor
+	float pathReach = 4000.f; // builders sent this far for a path patch
+	int pathUnits = 300;      // ground army units looked at per scan
 
 	struct SActive {
 		CBRestoreTask* task;

@@ -141,6 +141,11 @@ namespace Air {
             int ScoutSweepTimeoutSeconds = 240;
             float ScoutSweepMetal = 60.0f;
             float ScoutSweepEnergy = 2000.0f;
+            // Nuke scouting (owner 2026-10-31): the rush scout and the nuked-spot scouts take
+            // 3 radar planes; a package still forming this long outside a base emergency
+            // flies with what it has.
+            int NukeScoutRadarCount = 3;
+            int ScoutSweepFormSeconds = 90;
             int RadarWaveIntervalSeconds = 600;
             int RadarMaxWaitSeconds = 90; // launch available planes even below the full cohort
             int RadarPatrolCheckSeconds = 2;

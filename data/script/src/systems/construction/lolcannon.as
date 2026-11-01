@@ -92,10 +92,21 @@ this program (owner, 2026-10-26):
           CrewRecruitBatch every CrewOrderSeconds. With no plant that makes a
           T2 air constructor, T2 ground constructors stand in for the starter
           and storage crews.
-  done    the crews are released (the turret crews first finish any turrets
-          still short, the starter and storage crew any storages, up to
-          StoreFinishSeconds) and the cannon's fire is tiered (below). A lost
-          cannon is rebuilt on its own site.
+  done    the turret crews first finish any turrets still short, the starter
+          and storage crew any storages, up to StoreFinishSeconds; then
+  cover   (owner 2026-10-31) the same crews, none released, build
+          ExtraShields (2) of the side's shield (armgate / corgate /
+          legdeflector) just ahead of the cannon, ExtraHeavyPorc (2) of its
+          heavy porc (armanni Pulsar / cordoom Bulwark / legbastion Bastion)
+          ExtraPorcAhead (200) further towards the enemy start the cannon is
+          sited against, ExtraPorcSpread (480) apart across the facing, and
+          ExtraFlak (1) T2 flak (armflak / corflak / legflak) behind the
+          cannon. Each slot reserves the nearest free spot round its place;
+          T2 constructors order, the rest help the frames. Once all stand
+          (or each short slot failed three orders, or no crew member can
+          build them, or ExtrasFinishSeconds (900) pass) the crews are
+          released and the cannon's fire is tiered (below). A lost cannon is
+          rebuilt on its own site (its missing cover with it).
   fire    Military::AiMakeTask hands each lolcannon's CSuperTask the roster
           below and sets FireState (2, fire at will, owner 2026-10-26; kept
           once a minute); a roster target in range is ordered, best tier first:
@@ -148,10 +159,15 @@ pass over the defs, CanBuild per constructor def x structure.
 namespace LolCannon {
 
     const int IDLE = 0, BUILD = 1, STORES = 2;   // STORES: the cannon stands, its storage crew finishes the strip
+    const int EXTRAS = 3;            // EXTRAS: all stand; the same crews build the cover (shields, heavy porc, flak)
     const int STARTER = 0, AIR = 1, STORE = 2, GROUND = 3;   // GROUND: the T1 ground turret crew
     const array<string> CANNONS = { "armvulc", "corbuzz", "legstarfall" };
     const array<string> T2_GROUND = { "armack", "armacv", "corack", "coracv", "legack", "legacv" };
     const array<string> T1_GROUND = { "armck", "armcv", "corck", "corcv", "legck", "legcv" };
+    // the cover, armada / cortex / legion: Keeper, Overseer, Soteria; Pulsar, Bulwark, Bastion; T2 flak
+    const array<string> SHIELDS = { "armgate", "corgate", "legdeflector" };
+    const array<string> HEAVY_PORC = { "armanni", "cordoom", "legbastion" };
+    const array<string> T2_FLAK = { "armflak", "corflak", "legflak" };
 
     int phase = IDLE;
     int built = 0;                   // cannons finished by the program (the gate index)
@@ -226,6 +242,12 @@ namespace LolCannon {
     int nextTurretRetry = 0;
     int nextGunHoldLog = 0;
     int nanosNear = 0, nanosNearAll = 0, storesNear = 0, storesNearAll = 0;   // CountSite
+    // the cover (owner 2026-10-31): group 0 shields, 1 heavy porc, 2 T2 flak
+    array<array<AIFloat3>> extraPos(3);
+    array<array<int>> extraRes(3);
+    array<array<IUnitTask@>> extraTask(3);
+    array<array<int>> extraMiss(3);
+    int extrasStarted = 0, extrasUntil = 0, nextExtrasLog = 0;
     int blockFails = 0;              // cannon order failures on a site whose turret block stands
 
     bool Enabled() { return Global::LolCannon::Enabled; }
@@ -247,6 +269,26 @@ namespace LolCannon {
     }
     int StoresNeeded() { return (Side() == "legion") ? Global::LolCannon::LegionStorages : Global::LolCannon::Storages; }
     CCircuitDef@ Nano() { return ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Side())); }
+    // The cover's defs: 0 the shield, 1 the heavy porc, 2 the T2 flak.
+    CCircuitDef@ ExtraDef(int g)
+    {
+        const string s = Side();
+        const int i = (s == "legion") ? 2 : (s == "cortex" ? 1 : 0);
+        if (g == 0) return ai.GetCircuitDef(SHIELDS[i]);
+        if (g == 1) return ai.GetCircuitDef(HEAVY_PORC[i]);
+        return ai.GetCircuitDef(T2_FLAK[i]);
+    }
+    int ExtraWanted(int g)
+    {
+        if (g == 0) return AiMax(0, Global::LolCannon::ExtraShields);
+        if (g == 1) return AiMax(0, Global::LolCannon::ExtraHeavyPorc);
+        return AiMax(0, Global::LolCannon::ExtraFlak);
+    }
+    string ExtraWhat(int g) { return g == 0 ? "shield" : (g == 1 ? "heavy porc" : "T2 flak"); }
+    bool ExtrasOn()
+    {
+        return Global::LolCannon::Extras && ExtraWanted(0) + ExtraWanted(1) + ExtraWanted(2) > 0;
+    }
     bool IsT2Air(const string &in n) { return n == "armaca" || n == "coraca" || n == "legaca"; }
     bool IsT1Air(const string &in n) { return n == "armca" || n == "corca" || n == "legca"; }
 
@@ -1415,9 +1457,13 @@ namespace LolCannon {
     // starter and storage crew the storages.
     IUnitTask@ BuilderTask(CCircuitUnit@ u)
     {
-        if (!Enabled() || (phase != BUILD && phase != STORES) || u is null || u.circuitDef is null || crewOf.isEmpty()) return null;
+        if (!Enabled() || (phase != BUILD && phase != STORES && phase != EXTRAS) || u is null || u.circuitDef is null || crewOf.isEmpty()) return null;
         const int kind = CrewKind(u.id);
         if (kind < 0) return null;
+        if (phase == EXTRAS) {
+            IUnitTask@ w = ExtraWork(u);
+            return (w is null) ? Wait(3) : w;   // the phase ends in FinishExtras
+        }
         if (phase == STORES) {
             const bool turretCrew = kind == AIR || kind == GROUND;
             IUnitTask@ w = turretCrew ? TurretWork(u) : StoreWork(u);
@@ -1627,12 +1673,15 @@ namespace LolCannon {
         const bool turretsShort = OpenTurrets() > 0;
         if ((stores < int(storePos.length()) || turretsShort) && Global::LolCannon::StoreFinishSeconds > 0) {
             // the storages and turrets are part of the order: their crews stay on them
-            KeepOnly(STARTER, STORE, turretsShort, Gun().GetName() + " stands; " + stores + " of " + storePos.length() + " storages, "
-                + turrets + " of " + turretPos.length() + " turrets; their crews finish them");
+            // with the cover to come every crew stays (owner 2026-10-31: the constructors
+            // that built the cannon stay on the project until the cover stands)
+            KeepOnly(STARTER, STORE, turretsShort || ExtrasOn(), Gun().GetName() + " stands; " + stores + " of " + storePos.length() + " storages, "
+                + turrets + " of " + turretPos.length() + " turrets; their crews finish them" + (ExtrasOn() ? ", then the cover" : ""));
             phase = STORES;
             storesUntil = ai.frame + Global::LolCannon::StoreFinishSeconds * SECOND;
             return;
         }
+        if (BeginExtras(Gun().GetName() + " stands with its turrets and storages")) { ReleaseHeldBlock(); return; }
         ReleaseHeldBlock();
         ReleaseCrew(Gun().GetName() + " stands (" + built + " built; the next at " + int(Gate()) + " metal/s)");
         phase = IDLE;
@@ -1649,7 +1698,7 @@ namespace LolCannon {
         const bool stuck = !done && OpenStores() == 0
             && aiBuilderMgr.FindUnfinishedNear(stripCentre, Global::LolCannon::StoreSearchRadius + 64.0f, Store()) is null;
         const bool turretsDone = !turretsOpen && aiBuilderMgr.FindUnfinishedNear(blockCentre, 260.0f, Nano()) is null;
-        if (turretsDone && crewCount[AIR] + crewCount[GROUND] > 0 && !(done || stuck))
+        if (turretsDone && crewCount[AIR] + crewCount[GROUND] > 0 && !(done || stuck) && !ExtrasOn())
             KeepOnly(STARTER, STORE, false, "turrets " + CountStanding(Nano(), turretPos, 24.0f) + " of " + turretPos.length() + " done");
         if (!((done || stuck) && turretsDone) && ai.frame < storesUntil) return;
         string why = "";
@@ -1657,8 +1706,247 @@ namespace LolCannon {
         else if (!done) why = " (gave up after " + Global::LolCannon::StoreFinishSeconds + " s)";
         GenericHelpers::LogUtil("[LolCannon] REPORT storages " + stores + "/" + storePos.length() + " turrets " + CountStanding(Nano(), turretPos, 24.0f)
             + "/" + turretPos.length() + " at=" + (ai.frame / SECOND) + "s" + why, 1);
+        if (BeginExtras("storage strip " + (done ? "done" : "left short") + ", turrets " + (turretsDone ? "done" : "left short"))) { ReleaseHeldBlock(); return; }
         ReleaseHeldBlock();
         ReleaseCrew("storage strip " + (done ? "done" : "left short") + ", turrets " + (turretsDone ? "done" : "left short"));
+        phase = IDLE;
+        nextPlan = ai.frame + 30 * SECOND;
+    }
+
+    // ---------------------------------------------------------------- the cover
+
+    // The cover's slot for def d centred on `base`: the nearest spot round it that
+    // reserves (rings of the def's pitch, up to 3 out, along side/fwd), else `base`
+    // itself, unpinned. With `ahead`, only spots nearer the enemy start than the cannon
+    // (by 64) are taken (Scylla test 2026-10-31: a ring slide put a heavy porc behind it).
+    void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead)
+    {
+        const float limit = (ahead && siteTarget.x >= 0.0f) ? site.distance2D(siteTarget) - 64.0f : -1.0f;
+        const float step = AiMax(LolCannonMath::Pitch(Layout::Across(d, facing)), LolCannonMath::Pitch(Layout::Along(d, facing))) + 16.0f;
+        const float w = float(AiTerrainWidth()), h = float(AiTerrainHeight());
+        for (int r = 0; r <= 3; ++r) {
+            for (int a = -r; a <= r; ++a) {
+                for (int b = -r; b <= r; ++b) {
+                    if (AiMax(a, -a) != r && AiMax(b, -b) != r) continue;   // the ring only
+                    const AIFloat3 q = At(base, side, float(a) * step, fwd, float(b) * step);
+                    if (q.x < 64.0f || q.z < 64.0f || q.x > w - 64.0f || q.z > h - 64.0f) continue;
+                    if (limit >= 0.0f && q.distance2D(siteTarget) > limit) continue;
+                    if (!aiTerrainMgr.CanReserveBuilding(d, q, facing)) continue;
+                    const int id = aiTerrainMgr.ReserveBuilding(d, q, facing);
+                    if (id < 0) continue;
+                    extraPos[g].insertLast(aiTerrainMgr.GetReservationPos(id));
+                    extraRes[g].insertLast(id);
+                    return;
+                }
+            }
+        }
+        extraPos[g].insertLast(base);
+        extraRes[g].insertLast(-1);
+    }
+
+    // The cover's slots round the cannon, facing the enemy start it is sited against
+    // (Layout::Fwd(facing) points at it): the shields just ahead of the cannon's front
+    // edge (and of the block's and the strip's), the heavy porc ExtraPorcAhead past
+    // them, both spread across the facing; the flak behind the cannon.
+    void PlaceExtras()
+    {
+        CCircuitDef@ gun = Gun();
+        CCircuitDef@ nano = Nano();
+        CCircuitDef@ st = Store();
+        for (int g = 0; g < 3; ++g) {
+            extraPos[g].resize(0); extraRes[g].resize(0); extraTask[g].resize(0); extraMiss[g].resize(0);
+        }
+        if (gun is null) return;
+        const int f = facing;
+        const float gunHalfL = LolCannonMath::Pitch(Layout::Along(gun, f)) * 0.5f;
+        const int rows = Global::LolCannon::TurretRows + AiMax(0, Global::LolCannon::TurretSpareRows);
+        const float blockHalfL = (nano is null) ? 0.0f : float(rows) * LolCannonMath::Pitch(Layout::Along(nano, f)) * 0.5f;
+        const int sr = LolCannonMath::Rows(StoresNeeded(), Global::LolCannon::StorageCols) + AiMax(0, Global::LolCannon::StorageSpareRows);
+        const float stripHalfL = (st is null) ? 0.0f : float(sr) * LolCannonMath::Pitch(Layout::Along(st, f)) * 0.5f;
+        const float front = AiMax(gunHalfL, AiMax(blockHalfL, stripHalfL)) + 32.0f;
+        const AIFloat3 side = Layout::Side(f), fwd = Layout::Fwd(f);
+        // the shields and the heavy porc go out along the true line to the enemy start,
+        // spread across it (Scylla test 2026-10-31: spread across the cardinal facing, with
+        // the start 40 degrees off it, one heavy porc stood further from the start than the
+        // cannon). `front` / cos keeps them clear of the cannon's, block's and strip's front edge.
+        AIFloat3 tFwd = fwd, tSide = side;
+        float cosT = 1.0f;
+        if (siteTarget.x >= 0.0f) {
+            const float dx = siteTarget.x - site.x, dz = siteTarget.z - site.z, len = sqrt(dx * dx + dz * dz);
+            if (len > 1.0f) {
+                tFwd = AIFloat3(dx / len, 0.0f, dz / len);
+                tSide = AIFloat3(-tFwd.z, 0.0f, tFwd.x);
+                cosT = AiMax(0.7f, tFwd.x * fwd.x + tFwd.z * fwd.z);
+            }
+        }
+        const float frontT = front / cosT;
+        // the reservations need the layout on (FRONT runs none: switched on for this only)
+        const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
+        if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) {
+            GenericHelpers::LogUtil("[LolCannon] cover: the profile's layout gate is closed; its slots go unreserved", 1);
+        }
+        CCircuitDef@ shield = ExtraDef(0);
+        CCircuitDef@ porc = ExtraDef(1);
+        CCircuitDef@ flak = ExtraDef(2);
+        float shieldAhead = frontT;
+        if (shield !is null) {
+            const float half = LolCannonMath::Pitch(Layout::Along(shield, f)) * 0.5f;
+            shieldAhead = frontT + half;
+            const int n = ExtraWanted(0);
+            for (int k = 0; k < n; ++k)
+                PlaceExtra(shield, At(site, tSide, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraShieldSpread / float(n - 1) : 0.0f), tFwd, shieldAhead), 0, tSide, tFwd, true);
+            shieldAhead += half;
+        }
+        if (porc !is null) {
+            const float half = LolCannonMath::Pitch(Layout::Along(porc, f)) * 0.5f;
+            const float along = shieldAhead + Global::LolCannon::ExtraPorcAhead + half;
+            const int n = ExtraWanted(1);
+            for (int k = 0; k < n; ++k)
+                PlaceExtra(porc, At(site, tSide, LolCannonMath::Offset(k, n, n > 1 ? Global::LolCannon::ExtraPorcSpread / float(n - 1) : 0.0f), tFwd, along), 1, tSide, tFwd, true);
+        }
+        if (flak !is null) {
+            const float half = LolCannonMath::Pitch(Layout::Along(flak, f)) * 0.5f;
+            const int n = ExtraWanted(2);
+            for (int k = 0; k < n; ++k)
+                PlaceExtra(flak, At(site, side, LolCannonMath::Offset(k, n, 160.0f), fwd, -(front + half)), 2, side, fwd, false);
+        }
+        if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
+        for (int g = 0; g < 3; ++g)
+            for (uint k = 0; k < extraPos[g].length(); ++k) { extraTask[g].insertLast(null); extraMiss[g].insertLast(0); }
+    }
+
+    // Our cover of group g round the cannon: finished, and all (frames too).
+    void ExtraCount(int g, int &out done, int &out all)
+    {
+        CountNear(ExtraDef(g), site, Global::LolCannon::ExtraCountRadius, done, all);
+    }
+
+    int ExtraFlying(int g)
+    {
+        int n = 0;
+        for (uint k = 0; k < extraTask[g].length(); ++k) if (extraTask[g][k] !is null && !extraTask[g][k].IsDead()) ++n;
+        return n;
+    }
+
+    // The cover stands (or every short slot was given up) once a second.
+    bool ExtraGroupDone(int g, int &out done)
+    {
+        int all;
+        ExtraCount(g, done, all);
+        const int want = int(extraPos[g].length());
+        if (done >= want) return true;
+        if (ExtraFlying(g) > 0 || (ExtraDef(g) !is null && aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g)) !is null)) return false;
+        for (uint k = 0; k < extraMiss[g].length(); ++k) if (extraMiss[g][k] < 3) return false;
+        return true;   // every short slot came to nothing three times
+    }
+
+    // The cover begins (owner 2026-10-31): the turrets, the storages and the cannon
+    // stand; every crew stays on. False when there is no cover to build.
+    bool BeginExtras(const string &in why)
+    {
+        if (!ExtrasOn() || Gun() is null || site.x < 0.0f) return false;
+        PlaceExtras();
+        int slots = 0, reserved = 0;
+        string at = "";
+        for (int g = 0; g < 3; ++g) {
+            slots += int(extraPos[g].length());
+            for (uint k = 0; k < extraPos[g].length(); ++k) {
+                if (extraRes[g][k] >= 0) ++reserved;
+                at += (at == "" ? "" : ", ") + ExtraWhat(g) + " (" + int(extraPos[g][k].x) + ", " + int(extraPos[g][k].z) + ")";
+            }
+        }
+        if (slots == 0) return false;
+        phase = EXTRAS;
+        extrasStarted = ai.frame;
+        extrasUntil = ai.frame + Global::LolCannon::ExtrasFinishSeconds * SECOND;
+        nextExtrasLog = ai.frame + 60 * SECOND;
+        CCircuitDef@ d0 = ExtraDef(0);
+        CCircuitDef@ d1 = ExtraDef(1);
+        CCircuitDef@ d2 = ExtraDef(2);
+        GenericHelpers::LogUtil("[LolCannon] cover begins (" + why + "): " + ExtraWanted(0) + " " + (d0 is null ? "?" : d0.GetName()) + ", "
+            + ExtraWanted(1) + " " + (d1 is null ? "?" : d1.GetName()) + ", " + ExtraWanted(2) + " " + (d2 is null ? "?" : d2.GetName())
+            + " facing " + facing + " towards (" + int(siteTarget.x) + ", " + int(siteTarget.z) + "), " + reserved + " of " + slots
+            + " slots reserved: " + at + "; crews kept " + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND], 1);
+        return true;
+    }
+
+    // A crew member's piece of the cover: a free slot ordered (any group, shields
+    // first), else a frame of the cover helped (any constructor can), else an order
+    // in flight helped; null when nothing is left for this unit.
+    IUnitTask@ ExtraWork(CCircuitUnit@ u)
+    {
+        for (int g = 0; g < 3; ++g) {
+            CCircuitDef@ d = ExtraDef(g);
+            if (d is null || !u.circuitDef.CanBuild(d)) continue;
+            int done, all;
+            ExtraCount(g, done, all);
+            if (all + ExtraFlying(g) >= int(extraPos[g].length())) continue;   // full: as many stand, are framed or ordered as slots
+            for (uint k = 0; k < extraPos[g].length(); ++k) {
+                IUnitTask@ t = extraTask[g][k];
+                if ((t !is null && !t.IsDead()) || extraMiss[g][k] >= 3) continue;
+                if (aiBuilderMgr.FindOwnNear(extraPos[g][k], 40.0f, d) !is null) continue;
+                if (t !is null) ++extraMiss[g][k];   // its last order ended with nothing standing
+                if (extraRes[g][k] >= 0 && !aiTerrainMgr.IsLayoutEnabled()) {
+                    // FRONT: a held slot is let go for its own order, which goes there unpinned
+                    aiTerrainMgr.ReleaseReservation(extraRes[g][k]);
+                    extraRes[g][k] = -1;
+                }
+                const Task::BuildType type = (g == 1) ? Task::BuildType::BUNKER : Task::BuildType::DEFENCE;
+                @extraTask[g][k] = OrderAt(type, d, extraPos[g][k], extraRes[g][k]);
+                if (extraTask[g][k] is null) { ++extraMiss[g][k]; continue; }
+                extraRes[g][k] = -1;   // pinned (TECH) or let go (FRONT): the order owns the spot now
+                GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " orders cover " + ExtraWhat(g) + " " + d.GetName()
+                    + " " + (k + 1) + " of " + extraPos[g].length() + " at (" + int(extraPos[g][k].x) + ", " + int(extraPos[g][k].z) + ")", 1);
+                return extraTask[g][k];
+            }
+        }
+        for (int g = 0; g < 3; ++g) {
+            CCircuitUnit@ unf = (ExtraDef(g) is null) ? null : aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g));
+            if (unf !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, unf, 30 * SECOND));
+        }
+        for (int g = 0; g < 3; ++g) {
+            CCircuitDef@ d = ExtraDef(g);
+            if (d is null || !u.circuitDef.CanBuild(d)) continue;
+            for (uint k = 0; k < extraTask[g].length(); ++k)
+                if (extraTask[g][k] !is null && !extraTask[g][k].IsDead()) return extraTask[g][k];
+        }
+        return null;
+    }
+
+    // Once a second in EXTRAS: the crews go once every group stands or is given up,
+    // no crew member can build any of it, or ExtrasFinishSeconds pass.
+    void FinishExtras()
+    {
+        array<int> done(3, 0);
+        bool all = true;
+        for (int g = 0; g < 3; ++g) if (!ExtraGroupDone(g, done[g])) all = false;
+        bool able = false;
+        array<string>@ keys = crewOf.getKeys();
+        for (uint i = 0; i < keys.length() && !able; ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
+            if (u is null || u.circuitDef is null) continue;
+            for (int g = 0; g < 3 && !able; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) able = true;
+        }
+        bool frames = false;
+        for (int g = 0; g < 3 && !frames; ++g)
+            frames = ExtraDef(g) !is null && aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g)) !is null;
+        const bool stuck = !all && !able && !frames;
+        const bool late = ai.frame >= extrasUntil;
+        const string tally = "shields=" + done[0] + "/" + extraPos[0].length() + " heavy=" + done[1] + "/" + extraPos[1].length()
+            + " flak=" + done[2] + "/" + extraPos[2].length();
+        if (!all && !stuck && !late) {
+            if (ai.frame >= nextExtrasLog) {
+                nextExtrasLog = ai.frame + 60 * SECOND;
+                GenericHelpers::LogUtil("[LolCannon] cover: " + tally + ", " + (ExtraFlying(0) + ExtraFlying(1) + ExtraFlying(2)) + " order(s) in flight, crews "
+                    + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND], 1);
+            }
+            return;
+        }
+        const string why = all ? "done" : (stuck ? "no crew member can build the rest" : "gave up after " + Global::LolCannon::ExtrasFinishSeconds + " s");
+        GenericHelpers::LogUtil("[LolCannon] REPORT cover " + tally + " at=" + (ai.frame / SECOND) + "s took=" + ((ai.frame - extrasStarted) / SECOND) + "s (" + why + ")", 1);
+        // slots never ordered still hold their reservation (TECH too: an ordered one is -1, owned by its order)
+        for (int g = 0; g < 3; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
+        ReleaseCrew("cover " + why + " (" + built + " built; the next at " + int(Gate()) + " metal/s)");
         phase = IDLE;
         nextPlan = ai.frame + 30 * SECOND;
     }
@@ -1693,6 +1981,7 @@ namespace LolCannon {
         for (uint i = 0; i < doneSites.length(); ++i) {
             if (aiBuilderMgr.FindOwnNear(doneSites[i], 96.0f, gun) !is null) continue;
             site = doneSites[i]; facing = doneFacings[i];
+            siteTarget = doneTargets[i];   // the cover faces the start this cannon was sited against
             array<AIFloat3> tc, sc;
             Slots(gun, nano, st, site, facing, 1.0f, tc, sc, blockCentre, stripCentre);
             const array<AIFloat3> tp = First(tc, TurretsWanted()), sp = First(sc, StoresNeeded());
@@ -1719,6 +2008,10 @@ namespace LolCannon {
         }
         if (phase == STORES) {
             FinishStores();
+            return;
+        }
+        if (phase == EXTRAS) {
+            FinishExtras();
             return;
         }
         if (phase == IDLE) {

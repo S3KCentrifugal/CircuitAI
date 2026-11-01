@@ -96,6 +96,13 @@ namespace Main {
         Global::RoleSettings::Front::EcoLadderGantryMetalIncome = 225.0f;   // owner, 2026-10-25 (175 from 2026-10-18)
         Global::RoleSettings::Front::EcoLadderGantryAfterAdvFusions = 1;
         Global::RoleSettings::Front::EcoLadderLaterAdvFusionAtStart = true;
+        Global::RoleSettings::Front::EcoLadderFusionEquivalents = true; // owner 2026-10-31: geos and rezzed fusions of any faction count as fusions
+        Global::RoleSettings::Front::OverflowConverters = true; // owner 2026-10-31: energy overflow into T2 converter blocks (front_overflow.as)
+        Global::RoleSettings::Front::OverflowSeconds = 10;          // 2026-10-31 arm C: headless A/B (20 s, 3 at once) left 1,000-7,000 E/s over
+        Global::RoleSettings::Front::OverflowParallel = 6;
+        Global::RoleSettings::Front::OverflowFullBankParallel = 2;
+        Global::RoleSettings::Front::OverflowPullSeconds = 5;
+        Global::RoleSettings::Front::OverflowExtraT2Seconds = 20;
         Global::RoleSettings::Front::SpawnFactoryEnabled = true;
         Global::RoleSettings::Front::T2FactoryNanos = 6; // owner 2026-10-25: a T2 lab's turrets from its frame (front_factory_nanos.as)
         Global::RoleSettings::Front::T2FactoryNanosMax = 14; // owner 2026-10-25: up to 14 as the metal bank nears overflow
@@ -213,6 +220,7 @@ namespace Main {
 		}
 		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
 		OvernukeRecon::Tick();      // owner, 2026-10-28: AIR scouts the overnuke target every 10 launches
+		NukeLaunchRecon::Tick();    // owner, 2026-10-31: AIR learns each nuke spot, scouts every 3rd below overnuke
 		Spam::Update();          // economy-gated spam: activation, focus rotation
 		FrontRadar::Update();    // owner, 2026-10-27: long-range radars at the front (census, allies' list)
 		AntiSpam::Update();      // owner, 2026-10-27: spot enemy spam lanes and hold them
@@ -270,6 +278,9 @@ namespace Main {
         Global::RoleSettings::Front::VehicleT2WaveEscorts = true;
         // ... and 15% for a faction artillery squad instead (owner, 2026-10-20; systems/production/front_arty_squad.as)
         Global::RoleSettings::Front::VehicleT2ArtySquadChance = 0.15f;
+        // ... and a T2 bot lab all game: every 3 min, 50% for a heavy or (half the time) artillery bot squad with a
+        // radar, two jammer and a flak bot, moving together behind its longest-ranged unit (owner, 2026-10-31)
+        Global::RoleSettings::Front::T2BotSquadChance = 0.5f;
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
         Global::RoleSettings::Front::BotWaveChance = 0.5f;

@@ -112,6 +112,7 @@ namespace Main {
 		}
 		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
 		OvernukeRecon::Tick();      // owner, 2026-10-28: AIR scouts the overnuke target every 10 launches
+		NukeLaunchRecon::Tick();    // owner, 2026-10-31: AIR learns each nuke spot, scouts every 3rd below overnuke
 		Spam::Update();          // economy-gated spam: activation, focus rotation
 		Team::Ferry::Update();   // transport ferry: hand-over on arrival, run polling
 		Team::SeaAssist::Update();  // SEA seeds a TACTICAL ally with a construction ship

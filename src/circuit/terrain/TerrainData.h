@@ -118,6 +118,7 @@ struct SSector {
 		, maxSlope(.0f)
 		, dug(.0f)
 		, raised(.0f)
+		, origMaxSlope(.0f)
 	{}
 
 	bool isWater;  // (Water = true) (Land = false)
@@ -133,6 +134,7 @@ struct SSector {
 	// current by UpdateAreas for changed sectors only; 0 until the first change.
 	float dug;
 	float raised;
+	float origMaxSlope;  // maxSlope at game start
 };
 
 struct SImmobileType {
