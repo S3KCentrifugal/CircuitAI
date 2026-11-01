@@ -8,6 +8,8 @@ namespace ArtilleryPolicy {
 
     void Check()
     {
+        // owner 2026-11-01: experimental_balanced lifts the veto for FRONT's forward agitators (front_agitator.as)
+        if (Global::RoleSettings::Front::Agitator) return;
         for (uint i = 0; i < ForbiddenT1.length(); ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(ForbiddenT1[i]);
             if (d !is null && d.IsBuildAllowed() && ai.frame - lastCheckWarning >= 60 * SECOND) {

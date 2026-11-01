@@ -286,7 +286,7 @@
 				"power": 1.0
 			},
 			"legcluster": {
-				"build": false, // never construct T1 static artillery
+				// owner 2026-11-01: FRONT builds forward Amputators (front_agitator.as); veto lifted, nothing native orders it
 				"role": ["static"],
 				"on": false,
 				"limit": 3,

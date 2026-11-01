@@ -270,7 +270,6 @@
 
 		"behaviour": {
 			"armdecom": {"role": ["builder"], "attribute": ["commander"], "controller": "commander"},
-	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {
 				"role": ["builder"],
 				"controller": "commander",
@@ -733,7 +732,7 @@
 				"power": 1.0
 			},
 			"armguard": {
-				"build": false, // never construct T1 static artillery
+				// owner 2026-11-01: FRONT builds forward Gauntlets (front_agitator.as); veto lifted, nothing native orders it
 				"role": ["static"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -939,7 +938,7 @@
 				"power": 1.0
 			},
 			"corpun": {
-				"build": false, // never construct T1 static artillery
+				// owner 2026-11-01: FRONT builds forward agitators (front_agitator.as); veto lifted, nothing native orders it
 				"role": ["static"],
 				"on": false,
 				"limit": 3,
