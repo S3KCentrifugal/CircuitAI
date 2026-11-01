@@ -404,6 +404,7 @@ namespace Tech {
             // and the bank plus income pays for in full; never under 1, never over
             // PowerTurretsMax; the other builders assist the turret going up
             float PowerTurretBatchSeconds = 20.0f;
+            float PowerCapacityBankSeconds = 60.0f;        // D-429: bounded energy-bank contribution to project power
             int PowerTurretsMax = 8;
             float PowerTurretBuildTime = 5300.0f;           // the T1 construction turret's buildtime (cornanotc, armnanotc, legnanotc: 5300 in BAR's unitdefs)
             float InvariantNoRoomSeconds = 120.0f;          // D-099: INV-020's patience - the layout refusing economy structures for lack of room     // D-097: INV-019's patience

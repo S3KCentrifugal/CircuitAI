@@ -119,6 +119,15 @@ namespace TechBuild {
         const string side = Global::AISettings::Side;
         const bool t1 = (name == UnitHelpers::GetWindNameForSide(side)) || (name == UnitHelpers::GetSolarNameForSide(side));
         const bool adv = (name == UnitHelpers::GetAdvSolarNameForSide(side));
+        if (name == UnitHelpers::GetFusionNameForSide(side)) {
+            CCircuitDef@ advanced = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+            CCircuitDef@ fusion = ai.GetCircuitDef(name);
+            const bool complete = advanced !is null && advanced.count > aiBuilderMgr.GetUnfinishedCount(advanced);
+            const int pending = fusion is null ? 0 : aiBuilderMgr.GetUnfinishedCount(fusion)
+                + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), fusion);
+            return TechEconomyMath::FusionSuperseded(complete,
+                TechChain::NukeRush() || TechHeavyRush::RequiresFusion(), pending);
+        }
         if (!t1 && !adv) return false;
         CCircuitDef@ fus = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
         const bool fusionUp = (fus !is null && fus.count - aiBuilderMgr.GetUnfinishedCount(fus) > 0) || IntoAfus();

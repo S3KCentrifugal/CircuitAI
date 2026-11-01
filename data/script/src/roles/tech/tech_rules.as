@@ -275,7 +275,24 @@ namespace TechRules {
     IUnitTask@ DoDefendMexes(Ctx@ c)    { return TechForward::DefendMexes(c.u); }  // D-109
     IUnitTask@ DoEngineering(Ctx@ c) { return FrontlineEngineering::Work(c.u); }
     IUnitTask@ DoForwardT1(Ctx@ c)      { return TechForward::ForwardT1(c.u, c.mi); }   // D-109
-    IUnitTask@ DoT1Turret(Ctx@ c)       { return Layout::NanoTask(c.u, Task::Priority::HIGH); }   // D-105
+    bool NeedsProjectPower(Ctx@ c) {
+        const EcoPlanner::State@ s = c.eco;
+        if (s is null || c.draining || aiEconomyMgr.isEnergyStalling) return false;
+        // Reuse the context's existing project snapshot. Without metal pressure
+        // there is no extra project allowance and no additional spatial scan.
+        const float ceiling = s.mIncome * Global::RoleSettings::Tech::PowerBuildPowerPerMetal;
+        if (!TechEconomyMath::CapacityNeeded(ceiling, s.buildPowerNear, s.arrivingBuildPower, false)) return false;
+        const CCircuitDef@ project = c.building is null ? null : c.building.circuitDef;
+        const float target = TechEconomyMath::CapacityTarget(s.mIncome,
+            Global::RoleSettings::Tech::EcoBuildPowerPerMetal,
+            Global::RoleSettings::Tech::PowerBuildPowerPerMetal, s.eIncome, s.eCur,
+            Global::RoleSettings::Tech::PowerCapacityBankSeconds,
+            project is null ? 0.0f : project.GetBuildTime(), project is null ? 0.0f : project.costE);
+        return TechEconomyMath::CapacityNeeded(target, s.buildPowerNear, s.arrivingBuildPower, false);
+    }
+    IUnitTask@ DoT1Turret(Ctx@ c) {
+        return NeedsProjectPower(c) ? Layout::NanoTask(c.u, Task::Priority::HIGH) : null;
+    }
     // D-105, D-289: a turret with nothing high-priority in reach assists the
     // nearest producing factory in reach (the fallback, no longer only a metal sink)
     IUnitTask@ DoTurretFactory(Ctx@ c)
@@ -330,6 +347,14 @@ namespace TechRules {
         if (redirect !is null) return redirect;
         return ByKey(c, key);
     }
+    bool ReactorRelief(Ctx@ c) {
+        if (TechChain::NukeRush() || !c.eco.builderIsT2 || c.eco.energyBuilding) return false;
+        return !TechEconomyMath::MexesBlockReactor(true, false,
+            c.eco.ePull > c.ei || c.ei < c.energyTarget, c.mi,
+            Global::RoleSettings::Tech::MinimumMetalIncomeForFUS, c.ei,
+            Global::RoleSettings::Tech::EcoFusionEnergyIncome)
+            && TechChain::MohosPending();
+    }
     IUnitTask@ DoAssistEnergy(Ctx@ c)   { return ByKey(c, "assistenergy"); }
     IUnitTask@ DoT2Lab(Ctx@ c)
     {
@@ -377,13 +402,9 @@ namespace TechRules {
         // has sat full for PowerAheadSeconds counts (played: a rising bank of 800
         // sent the commander to a turret at 4:00 and the advanced lab came at 7:13)
         if (!TechBuild::IntoT2() && !TechBuild::MetalFullLong()) return null;
-        // build power scales with income: at the target, the rows below spend the metal instead
-        // ... unless the metal bank has been full for PowerAheadSeconds: a full
-        // bank with a structure under construction is build power short whatever
-        // the ratio says (played: the advanced fusion took six minutes at a full
-        // bank with the rule at its cap; the cap exists for the idle base after
-        // the objective, D-075)
-        if (!TechBuild::MetalFullLong() && s.buildPowerNear >= s.mIncome * Global::RoleSettings::Tech::PowerBuildPowerPerMetal) return null;
+        // D-429: full metal is pressure, not permission to grow power without
+        // bound. T1, generic power and planner paths credit committed capacity.
+        if (!NeedsProjectPower(c)) return null;
         const bool onNano = (c.building.circuitDef is nano);
         if (!onNano && !Layout::TurretsCapped() && c.d.CanBuild(nano)) {   // D-097: queued orders count too
             IUnitTask@ t = Layout::NanoTask(c.u, Task::Priority::HIGH);
@@ -518,6 +539,7 @@ namespace TechRules {
         table.insertLast(Rule("energy.convert.float", MOBILE,     W4(@EnergyFloatsBank, @NotStalling, @NoDearOrderPending, @NotMetalFull), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
         table.insertLast(Rule("power.turret",      MOBILE,       W4(@MetalAhead, @StructureBuilding, @NotStalling, @NoDearOrderPending), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, Layout::TurretsAllowed at a time (D-097), else assist the turret going up"));
         table.insertLast(Rule("energy.geo",        MOBILE,       W0(), @DoLocalGeo, "safe local geothermal before discretionary reactors"));
+        table.insertLast(Rule("energy.reactor.relief", MOBILE, W1(@ReactorRelief), @DoEnergy, "D-429: affordable reactor relieves the mex-upgrade energy bottleneck"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
         table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W3(@OpeningDone, @NoConstructors, @NoLabAtAll), @DoStartFactory, "every constructor and every lab lost: the commander rebuilds a T1 lab"));

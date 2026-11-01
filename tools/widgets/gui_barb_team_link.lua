@@ -4238,6 +4238,7 @@ end)()
 -- Embedded by tools/widgets/embed_strategy.py into gui_barb_team_link.lua.
 -- Pure renderer of AI publications. No unit enumeration, orders or ownership inference.
 local strategy = (function()
+    local advanceReasons={"Advancing","At safe station","Contact stand-off","Lane combat boundary","No reachable route","Threat at destination","Return-home policy","No front goal","Observation stale"}
     local show, frozen, inspect = false, nil, false
     local frozenTerritory=nil
     local live, revision, built, modelSeen = {}, 0, -1, nil
@@ -4627,7 +4628,7 @@ local strategy = (function()
         if not show or Spring.IsGUIHidden() then return end
         for id in pairs(displayTeams) do if not isPermittedTeam(id) then invalidate();return end end
         controls={}
-        local sx,sy=gl.GetViewSizes();local w,h=560,520
+        local sx,sy=gl.GetViewSizes();local w,h=560,560
         local scale=dialogUI.Scale(sx,sy,w,h)
         sx,sy=sx/scale,sy/scale
         local x,y=12,sy-42
@@ -4710,6 +4711,10 @@ local strategy = (function()
             if s.native and #s.native>=10 and s.native[1]>=0 then
                 local n=s.native
                 text(string.format("Screens %d | bound %.0f | %s | decision %.0fs old",n[3],n[5],n[7]==1 and "return-home latch" or (n[10]==1 and "working" or "front active"),math.max(0,now-n[1])/30))
+                if n[11] then
+                    text("Movement: "..(advanceReasons[n[11]+1] or "Unknown"))
+                    text(string.format("Last reclaim headroom: %.0f metal / %.0f energy",n[12] or 0,n[13] or 0))
+                end
             else text("Commander front decision: not available yet (opening or inactive).") end
             text("Defense: "..(s.defense or "unavailable"))
             text(s.help[1]>=0 and ("ADVISORY: assist team "..s.help[1]..(s.help[3]==1 and " (income-loss suspect)" or " (pressure)")) or ("Proposal: "..s.proposalStatus..". Other units keep existing behavior."))
