@@ -509,6 +509,7 @@ namespace Tech {
             int CompactEcoModuleRows = 0;
             int CompactEcoModuleBanks = 12;                 // ... at most this many such banks, then single banks
             float CompactEcoModuleHaloElmos = 288.0f;       // ... packing ground on every side of the block
+            float CompactEcoModuleTightHaloElmos = 0.0f;    // ... round 2: a second pass with this smaller halo when no module fits with the full one; 0 = none
             float CompactEcoModuleStep = 96.0f;             // ... their site spiral's step
             int CompactEcoModuleBudget = 300;               // ... sites scored per ask (about 900 elmos out)
             int CompactEcoPackingAttempts = 8;              // expensive building fits per search

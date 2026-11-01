@@ -165,6 +165,9 @@ namespace Main {
         Global::RoleSettings::Tech::CompactEcoModuleColumns = 4;
         Global::RoleSettings::Tech::CompactEcoModuleRows = 4;
         Global::RoleSettings::Tech::ConvertPastMetalFullAfus = 10;
+        Global::RoleSettings::Tech::CompactEcoModuleTightHaloElmos = 160.0f; // round 2: Coastlines Dry fit one module with a 288 halo
+        Global::RoleSettings::Tech::CompactEcoModuleBudget = 400;
+        Global::RoleSettings::Tech::LayoutOverflowRings = 12;               // round 2: Carrot Mountains' 8-ring sweep blocked after 3 blocks
         Global::RoleSettings::Tech::LayoutForwardTurretMinimum = 12;  // owner 2026-10-20: T1 constructors put 12 turrets in the forward cluster before helping its economy
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 

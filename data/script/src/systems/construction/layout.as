@@ -1556,6 +1556,23 @@ namespace Layout {
         return -1;
     }
 
+    // Converters may take new ground (an overflow block or a grid box) when
+    // no advanced fusion asked for a site in the last minute, the next AFUS
+    // site is already held, or the AFUS found no ground at all (overflow
+    // spent and the grid failed within the last minute or is at its cap).
+    int afusNoRoomFrame = -100000;
+    bool ConvMayOpenGround()
+    {
+        CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        if (af is null) return true;
+        int asked = -100000;
+        if (!setAsk.get(af.GetName(), asked) || ai.frame - asked > 60 * SECOND) return true;
+        if (aiTerrainMgr.NextSetSlot(af) >= 0) return true;
+        const bool gridDone = !Global::RoleSettings::Tech::LayoutGrowAnywhere || int(gridZones.length()) >= Global::RoleSettings::Tech::LayoutGrowMaxBoxes
+            || ai.frame - gridFailFrame < 60 * SECOND;
+        return OverflowSpent() && gridDone && ai.frame - afusNoRoomFrame < 120 * SECOND;
+    }
+
     bool OverflowSupports(const AIFloat3 &in position)
     {
         if (nano is null) return false;
@@ -1684,14 +1701,21 @@ namespace Layout {
             const int group = overflowSupportGroups[index];
             id = aiTerrainMgr.PackNearGroup(aiTerrainMgr.GetGroupZone(group), def, group, facing, anchor, 0.0f, MinNanoDist(def), 0);
         }
-        if (id < 0) id = ReserveSupportedOverflow(def, builder);
+        // owner 2026-11-01 (10-20 AFUS on cramped maps): played, the 4x4
+        // overflow blocks all went to converters, which ask far more often,
+        // and Carrot Mountains stopped at 11 AFUS (24 before). New ground is
+        // the advanced fusions' first; converters pack only around turrets
+        // already laid until the next AFUS site is held or none is left.
+        const bool newGround = setSize <= 0 || def.GetName() != UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side) || ConvMayOpenGround();
+        if (id < 0 && newGround) id = ReserveSupportedOverflow(def, builder);
         // last resort: a new turret box on the grid, then this structure in it
-        if (id < 0 && OverflowSpent() && GrowAnywhere()) {
+        if (id < 0 && newGround && OverflowSpent() && GrowAnywhere()) {
             const int zone = ZoneAt(ZoneCount() - 1);
             if (setSize > 0) id = aiTerrainMgr.PackSet(zone, def, nanoGroup, facing, anchor, setSize, true, Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells);
             if (id < 0) id = aiTerrainMgr.PackNearGroup(zone, def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
         }
         if (id < 0) {
+            if (def.GetName() == UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) afusNoRoomFrame = ai.frame;
             if (noRoomSince < 0) noRoomSince = ai.frame;
             const float retry = Global::RoleSettings::Tech::LayoutNoRoomRetrySeconds;
             if (retry > 0.0f) {

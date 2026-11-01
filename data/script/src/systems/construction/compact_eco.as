@@ -129,24 +129,55 @@ namespace CompactEco {
     // nearest site whose block clears LayoutBoxMinScore and whose ground
     // around it is at least half usable wins. At most CompactEcoModuleBudget
     // sites scored per ask; a failed ask waits CompactEcoRetrySeconds.
+    // Round 2 (played: Coastlines Dry, one module then "no 4x4 turret module
+    // fits within 831 of (869, 3328)" while open ground lay east of the first
+    // module, and 55k E/s overflowed): the spiral runs around every module
+    // already laid first, then around the lab, each up to the budget, with
+    // the full halo; then again with CompactEcoModuleTightHaloElmos.
     int GrowModule(CCircuitUnit@ worker, CCircuitDef@ requested, int &out buildingSlot)
     {
         buildingSlot = -1;
         if (!ModulesOn() || moduleBanks >= Global::RoleSettings::Tech::CompactEcoModuleBanks || ai.frame < moduleRetryFrame) return 0;
+        array<AIFloat3> origins;
+        for (int index = int(groups.length()) - 1; index >= 0 && origins.length() < 3; --index) {   // the three newest modules
+            if (!IsModule(groups[index])) continue;
+            const AIFloat3 seed = aiTerrainMgr.GetReservationPos(seeds[index]);
+            if (seed.x >= 0.0f) origins.insertLast(seed);
+        }
+        origins.insertLast(SearchOrigin());
         const int direction = Layout::LabFacing();
         const int savedFacing = Layout::facing;
         Layout::facing = direction;   // the box helpers measure along Layout::facing
+        array<float> halos = { Global::RoleSettings::Tech::CompactEcoModuleHaloElmos };
+        if (Global::RoleSettings::Tech::CompactEcoModuleTightHaloElmos > 0.0f
+            && Global::RoleSettings::Tech::CompactEcoModuleTightHaloElmos < halos[0])
+            halos.insertLast(Global::RoleSettings::Tech::CompactEcoModuleTightHaloElmos);
+        int found = 0;
+        for (uint h = 0; h < halos.length() && found == 0; ++h)
+            for (uint o = 0; o < origins.length() && found == 0; ++o)
+                found = TryModule(worker, requested, origins[o], halos[h], direction, buildingSlot);
+        Layout::facing = savedFacing;
+        if (found == 0) {
+            moduleRetryFrame = ai.frame + int(Global::RoleSettings::Tech::CompactEcoRetrySeconds) * SECOND;
+            const int count = AiMin((Global::RoleSettings::Tech::CompactEcoSearchRings * 2 + 1) * (Global::RoleSettings::Tech::CompactEcoSearchRings * 2 + 1),
+                Global::RoleSettings::Tech::CompactEcoModuleBudget);
+            GenericHelpers::LogUtil("[Layout][Compact] no " + Global::RoleSettings::Tech::CompactEcoModuleColumns + "x" + Global::RoleSettings::Tech::CompactEcoModuleRows
+                + " turret module fits within " + int(Global::RoleSettings::Tech::CompactEcoModuleStep * sqrt(float(count)) * 0.5f) + " of "
+                + origins.length() + " origin(s); single banks meanwhile", 1);
+        }
+        return found;
+    }
+
+    int TryModule(CCircuitUnit@ worker, CCircuitDef@ requested, const AIFloat3 &in origin, float halo, int direction, int &out buildingSlot)
+    {
         const int cols = Global::RoleSettings::Tech::CompactEcoModuleColumns, rows = Global::RoleSettings::Tech::CompactEcoModuleRows;
         const int acrossCells = cols * Layout::Across(Layout::nano, direction);
         const int depthCells = rows * Layout::Along(Layout::nano, direction);
         const float halfAcross = float(acrossCells) * SQUARE_SIZE, halfDepth = float(depthCells) * SQUARE_SIZE;
-        const float halo = Global::RoleSettings::Tech::CompactEcoModuleHaloElmos;
         const AIFloat3 forward = Layout::Fwd(direction);
-        const AIFloat3 origin = SearchOrigin();
         const int diameter = Global::RoleSettings::Tech::CompactEcoSearchRings * 2 + 1;
         const int count = AiMin(diameter * diameter, Global::RoleSettings::Tech::CompactEcoModuleBudget);
         const float margin = AiMax(halfAcross, halfDepth);
-        int found = 0;
         for (int index = 0; index < count; ++index) {
             const AIFloat3 centre = origin + SearchOffset(index) * Global::RoleSettings::Tech::CompactEcoModuleStep;
             if (centre.x < margin || centre.z < margin || centre.x >= AiTerrainWidth() - margin || centre.z >= AiTerrainHeight() - margin) continue;
@@ -176,19 +207,12 @@ namespace CompactEco {
             aiTerrainMgr.SetLayoutInt(ROOT + ".module_banks", moduleBanks);
             RegisterFactories();
             buildingSlot = slot;
-            found = group;
             GenericHelpers::LogUtil("[Layout][Compact] cluster=" + groups.length() + " group=" + group + " zone=" + zone
                 + " module of " + aiTerrainMgr.GetGroupCount(group, false) + " turrets, block ground " + int(score * 100.0f) + "%, around it "
-                + int(ground * 100.0f) + "% at (" + int(centre.x) + ", " + int(centre.z) + ")", 1);
-            break;
+                + int(ground * 100.0f) + "% (halo " + int(halo) + ") at (" + int(centre.x) + ", " + int(centre.z) + ")", 1);
+            return group;
         }
-        Layout::facing = savedFacing;
-        if (found == 0) {
-            moduleRetryFrame = ai.frame + int(Global::RoleSettings::Tech::CompactEcoRetrySeconds) * SECOND;
-            GenericHelpers::LogUtil("[Layout][Compact] no " + cols + "x" + rows + " turret module fits within "
-                + int(Global::RoleSettings::Tech::CompactEcoModuleStep * sqrt(float(count)) * 0.5f) + " of (" + int(origin.x) + ", " + int(origin.z) + "); single banks meanwhile", 1);
-        }
-        return found;
+        return 0;
     }
 
     int Grow(CCircuitUnit@ worker, CCircuitDef@ requested, int &out buildingSlot)
