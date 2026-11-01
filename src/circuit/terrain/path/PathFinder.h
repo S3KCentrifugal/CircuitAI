@@ -12,6 +12,7 @@
 #include "terrain/path/MicroPather.h"
 #include "terrain/path/PathInfo.h"
 
+#include "util/DoubleBuffer.h"
 #include <atomic>
 #include <memory>
 #include <functional>
@@ -88,9 +89,7 @@ public:
 	}
 
 private:
-	SMoveData* GetNextMoveData() {
-		return (pMoveData.load() == &moveData0) ? &moveData1 : &moveData0;
-	}
+	SMoveData* GetNextMoveData() { return moves.BackPtr(); }
 
 	int MakeQueryId() { return queryId++; }
 	enum class MoveType { UNDERWATER, CLOAK, AIR, SWIM, DIVE, SURF };
@@ -115,8 +114,7 @@ private:
 	terrain::SAreaData* areaData;
 
 	std::vector<NSMicroPather::CMicroPather*> micropathers;
-	SMoveData moveData0, moveData1;
-	std::atomic<SMoveData*> pMoveData;
+	CDoubleBuffer<SMoveData> moves;  // D-431
 	float* airMoveArray;
 	struct SBlockCount {
 		int structs;

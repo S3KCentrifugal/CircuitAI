@@ -1,0 +1,41 @@
+{
+  "_doc": "D-431 worker pool smoke: a 16-AI game loads, every AI's parallel jobs complete on its own thread, the [PerfWorker] telemetry appears with CIRCUIT_PERF_PHASES, no crash, no script error, and the engine exits cleanly through the pause-and-release handshake. Five game minutes, headless.",
+  "stop_minute": 5,
+  "expect": [
+    {
+      "key": "widget",
+      "pattern": "\\[Playtest\\] widget loaded",
+      "by_minute": 0.5,
+      "scope": "any"
+    },
+    {
+      "key": "worker-telemetry",
+      "pattern": "\\[PerfWorker\\] team=\\d+ frame=\\d+ job=",
+      "by_minute": 2.5,
+      "scope": "any"
+    },
+    {
+      "key": "pool-summary",
+      "pattern": "\\[PerfWorker\\] .*finish_burst_max=\\d+ finish_carried_max=\\d+ coalesced=\\d+ pool_threads=\\d+",
+      "by_minute": 2.5,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:|deadlock",
+      "scope": "any"
+    }
+  ]
+}

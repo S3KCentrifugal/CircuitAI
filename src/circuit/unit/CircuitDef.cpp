@@ -690,7 +690,7 @@ void CCircuitDef::Init(CCircuitAI* circuit)
 			if ((mtId < 0) || (mtUsability.find(mtId) != mtUsability.end())) {
 				continue;
 			}
-			SMobileType& mt = terrainData.areaData0.mobileType[mtId];
+			SMobileType& mt = terrainData.GetAreaAt(0).mobileType[mtId];
 			mtUsability[mtId] = mt.area.empty() ? 00.0 : mt.areaLargest->percentOfMap;
 		}
 		float useMost = .0f;
@@ -719,12 +719,12 @@ void CCircuitDef::Init(CCircuitAI* circuit)
 	};
 	if (IsMobile()) {
 		if (mobileTypeId >= 0) {
-			SMobileType& mt = terrainData.areaData0.mobileType[mobileTypeId];
+			SMobileType& mt = terrainData.GetAreaAt(0).mobileType[mobileTypeId];
 			fillSurface(mt.minElevation, mt.maxElevation);
 		}
 	} else {
 		if (immobileTypeId >= 0) {
-			SImmobileType& it = terrainData.areaData0.immobileType[immobileTypeId];
+			SImmobileType& it = terrainData.GetAreaAt(0).immobileType[immobileTypeId];
 			fillSurface(it.minElevation, it.maxElevation);
 		}
 	}

@@ -27,6 +27,7 @@
 
 #include <map>
 #include <vector>
+#include "util/DoubleBuffer.h"
 #include <atomic>
 #include <memory>
 
@@ -222,8 +223,7 @@ public:
 		return (sIndex >= 0) && (sIndex < sectorXSize * sectorZSize);
 	}
 
-	SAreaData areaData0, areaData1;  // Double-buffer for threading
-	std::atomic<SAreaData*> pAreaData;
+	circuit::CDoubleBuffer<SAreaData> areas;  // D-431: Front() is published, Back() is being built
 	std::map<int, SMobileType::Id> udMobileType;    // key = ud->id, Used to find a TerrainMapMobileType for a unit
 	std::map<int, SImmobileType::Id> udImmobileType;  // key = ud->id, Used to find a TerrainMapImmobileType for a unit
 
@@ -256,9 +256,10 @@ public:
 	const FloatVec& GetOriginalHeightMap() const { return origHeightMap; }
 	int GetSlopeMapXSize() const { return slopeMapXSize; }
 	void OnAreaUsersUpdated();
-	SAreaData* GetNextAreaData() {
-		return (pAreaData.load() == &areaData0) ? &areaData1 : &areaData0;
-	}
+	SAreaData* GetNextAreaData() { return areas.BackPtr(); }
+	SAreaData* GetAreaData() { return areas.FrontPtr(); }
+	const SAreaData* GetAreaData() const { return areas.FrontPtr(); }
+	SAreaData& GetAreaAt(int index) { return areas.At(index); }
 
 private:
 	static circuit::CMap* map;

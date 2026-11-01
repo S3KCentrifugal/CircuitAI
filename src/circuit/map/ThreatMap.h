@@ -12,6 +12,7 @@
 #include "unit/enemy/EnemyUnit.h"
 
 #include <map>
+#include "util/DoubleBuffer.h"
 #include <vector>
 
 namespace circuit {
@@ -54,10 +55,10 @@ public:
     float GetAmphThreatAtPos(const springai::AIFloat3& position) const;
 	float GetAirThreatAtPos(const springai::AIFloat3& position) const;
 
-	float* GetAirThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->airThreat.data(); }
-	float* GetSurfThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->surfThreat.data(); }
-	float* GetAmphThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->amphThreat.data(); }
-	float* GetSwimThreatArray(CCircuitDef::RoleT type) { return pThreatData.load()->roleThreatPtrs[type]->swimThreat.data(); }
+	float* GetAirThreatArray(CCircuitDef::RoleT type) { return threat.Front().roleThreatPtrs[type]->airThreat.data(); }
+	float* GetSurfThreatArray(CCircuitDef::RoleT type) { return threat.Front().roleThreatPtrs[type]->surfThreat.data(); }
+	float* GetAmphThreatArray(CCircuitDef::RoleT type) { return threat.Front().roleThreatPtrs[type]->amphThreat.data(); }
+	float* GetSwimThreatArray(CCircuitDef::RoleT type) { return threat.Front().roleThreatPtrs[type]->swimThreat.data(); }
 	float* GetCloakThreatArray() { return cloakThreat; }
 	int GetThreatMapWidth() const { return width; }
 	int GetThreatMapHeight() const { return height; }
@@ -115,9 +116,7 @@ private:
 	std::shared_ptr<IMainJob> ApplyDrawers();
 	void Apply();
 	void SwapBuffers();
-	SThreatData* GetNextThreatData() {
-		return (pThreatData.load() == &threatData0) ? &threatData1 : &threatData0;
-	}
+	SThreatData* GetNextThreatData() { return threat.BackPtr(); }
 
 	std::vector<const SEnemyData*> airDraws;
 	std::vector<const SEnemyData*> amphDraws;
@@ -137,8 +136,7 @@ private:
 		int speedModMax;
 	} slackMod;
 
-	SThreatData threatData0, threatData1;  // Double-buffer for threading
-	std::atomic<SThreatData*> pThreatData;
+	CDoubleBuffer<SThreatData> threat;  // D-431: readers see Front(), the update fills Back()
 	CCircuitDef::RoleT defRole; // represents non-modded roles
 	bool isUpdating;
     std::uint64_t publicationVersion = 0;
