@@ -464,7 +464,8 @@ namespace FrontArtySquad {
     // Owner (2026-10-31): spacing. Each member's own place relative to the lead's goal, as (forward, side):
     // heavies in a line abreast ArtySquadHeavyAhead in front of the frontmost artillery or support place (the lead
     // counts at 0; owner 2026-11-01: 100-120 elmos ahead of artillery and utility), ArtySquadHeavySpacing apart; the other artillery
-    // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (60..300 degrees,
+    // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (90..270 degrees, never
+    // ahead of the lead, so the heavy line holds ArtySquadHeavyAhead in front of every gun;
     // a second ring 1.35x out for every other unit of a pack above 8); support on a ring of ArtySquadFollowBehind
     // behind (135..225 degrees). O(members) per update; a place is re-sent only once it moved ArtySquadRepath.
     void Places(Squad@ s, array<float> &out fo, array<float> &out so, float &out heavyLine) {
@@ -490,7 +491,7 @@ namespace FrontArtySquad {
         float front = 0.0f;   // the frontmost artillery/support place (the lead at 0)
         for (uint k = 0; k < n; ++k) {
             if (cls[k] == 1) {
-                const float a = PI * (1.0f / 3.0f + (4.0f / 3.0f) * (na > 1 ? float(ia) / float(na - 1) : 0.5f));
+                const float a = PI * (0.5f + (na > 1 ? float(ia) / float(na - 1) : 0.5f));
                 const float r = ring * (na > 8 && (ia % 2) == 1 ? 1.35f : 1.0f);
                 ++ia;
                 fo[k] = cos(a) * r; so[k] = sin(a) * r;
