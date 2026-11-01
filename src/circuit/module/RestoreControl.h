@@ -72,8 +72,9 @@ public:
 	// Live heights in the square, our and allied structures' pads skipped,
 	// every 2nd cell (at most 26x26 engine reads for the 200 cap).
 	CTerrainManager::STerrainDamage MeasureLive(const springai::AIFloat3& pos, float radius);
-	// Under a patch's minimum (min_cells, scaled to the every-2nd-cell sample)
-	bool IsRestored(const CTerrainManager::STerrainDamage& damage) const { return damage.cells * 4 < minCells; }
+	// Fewer than min_cells in the every-2nd-cell sample (about 4x min_cells
+	// cells): a residue the engine leaves at corners, too small to start on
+	bool IsRestored(const CTerrainManager::STerrainDamage& damage) const { return damage.cells < minCells; }
 
 private:
 	struct SPatch {
@@ -101,6 +102,7 @@ private:
 	bool IsCovered(const springai::AIFloat3& pos) const;
 	bool IsCoolingDown(int sector, int frame) const;
 	void CoolDown(const springai::AIFloat3& pos, float radius, int frames);
+	void ClearCoolDown(const springai::AIFloat3& pos, float radius);
 	int UnitClass(const CCircuitDef* cdef) const;
 
 	CCircuitAI* circuit;

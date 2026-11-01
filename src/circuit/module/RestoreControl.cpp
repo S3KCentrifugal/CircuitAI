@@ -276,6 +276,15 @@ CTerrainManager::STerrainDamage CRestoreControl::MeasureLive(const AIFloat3& pos
 	return Measure(pos, std::min(radius, RESTORE_MAX_RADIUS), true, 2);
 }
 
+void CRestoreControl::ClearCoolDown(const AIFloat3& pos, float radius)
+{
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	const float reachSq = SQUARE(radius + terrainMgr->GetConvertStoP() * 0.5f);
+	for (auto it = cooldown.begin(); it != cooldown.end();) {
+		it = (terrainMgr->GetSectorCenter(it->first).SqDistance2D(pos) <= reachSq) ? cooldown.erase(it) : std::next(it);
+	}
+}
+
 bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 {
 	patch.center = -RgtVector;
@@ -599,7 +608,13 @@ void CRestoreControl::TaskEnded(CBRestoreTask* task, bool done, float seconds)
 	if (done) {
 		++restored;
 		if (seconds >= 3.f) {
-			Spot(it->pos).tries = 0;  // real work: a later crater here is a new one
+			// Real work: what is left beside it (a large crater's next patch,
+			// confirmed live) may start on the next scan, and a later crater
+			// here is a new one. A patch "done" at once keeps its back-off.
+			SSpot& s = Spot(it->pos);
+			s.tries = 0;
+			s.until = 0;
+			ClearCoolDown(it->pos, it->radius);
 		}
 	} else {
 		++failed;
