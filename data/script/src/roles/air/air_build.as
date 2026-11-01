@@ -1148,7 +1148,7 @@ namespace AirBuild {
                 if (aiTerrainMgr.GetReservationState(slot) != 0) continue;
                 if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(slot), u.circuitDef.GetBuildDistance())) continue;
                 IUnitTask@ t = AirLayout::Pinned(Task::BuildType::NANO, Task::Priority::HIGH, d, slot);
-                if (t !is null) { AirWorkforce::Admit(d, !bankTurret); return t; }
+                if (t !is null) { AirWorkforce::Admit(d, true); return t; }
             }
         }
         return null;
