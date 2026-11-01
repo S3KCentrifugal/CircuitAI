@@ -73,7 +73,7 @@ namespace Main {
         ThugFireAtWill::Enabled = true;
         // Missing working-copy policy. Existing pending-all overrides retain precedence.
         Global::RoleSettings::Air::BankFunding = true; // AIR: bank funds energy/cons/T2 turrets; far mexes past a small home (owner 2026-10-17)
-        Global::RoleSettings::Air::FirstLabBankAssist = true; // AIR: idle T1 cons help the first T2 lab once the bank covers it (owner 2026-10-18)
+        Global::RoleSettings::Air::FirstLabBankAssist = false; // off 2026-11-01 (@Barscrewl): Cent's floating support runs alone for the A/B; true brings ours back
         Global::GremlinEcoFire::Enabled = true; // Gremlins scout, firing only at enemy economy (owner 2026-10-19)
         Global::RoleSettings::Tech::LayoutNoRoomRetrySeconds = 1.0f; // owner 2026-10-19: no-room sweep backoff 1-3 s
         Global::RoleSettings::Air::EcoSlotRetrySeconds = 2.0f;      // owner 2026-10-19: one AIR reactor order per slot per 2 s
