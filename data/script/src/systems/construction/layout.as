@@ -310,6 +310,7 @@ namespace Layout {
     void OnRoleLeave()
     {
         EconomyCluster::Clear();
+        RushBootstrap::Clear();
         @Global::energyAllowed = null;   // D-077: TECH's energy veto must not follow the AI into another role
         homeCentre = AIFloat3(-1.0f, 0.0f, -1.0f); labSlot = -1;   // D-085/D-086
         if (!planned && !aiTerrainMgr.IsLayoutEnabled()) return;
@@ -1888,21 +1889,21 @@ namespace Layout {
         if (task !is null) EconomyCluster::NanoAdmitted(slot);
         return task;
     }
-    IUnitTask@ NanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget = -1)
+    IUnitTask@ NanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget = -1, int preferredSlot = -1)
     {
         const int previousBudget = activeTurretAdmissionBudget;
         string why;
         activeTurretAdmissionBudget = parallelBudget >= 0 ? parallelBudget : TurretsAllowed(why);
         IUnitTask@ result;
-        if (HasBox() && aiTerrainMgr.GetGroupCount(nanoGroup,true) < Global::RoleSettings::Tech::CoastalSupportLandThreshold)
+        if (preferredSlot < 0 && HasBox() && aiTerrainMgr.GetGroupCount(nanoGroup,true) < Global::RoleSettings::Tech::CoastalSupportLandThreshold)
             @result = CoastalNanoTask(unit,priority);
-        if (result is null) @result = AdmitNanoTask(unit, priority, activeTurretAdmissionBudget);
-        if (result is null) @result = CoastalNanoTask(unit,priority);
+        if (result is null) @result = AdmitNanoTask(unit, priority, activeTurretAdmissionBudget, preferredSlot);
+        if (result is null && preferredSlot < 0) @result = CoastalNanoTask(unit,priority);
         activeTurretAdmissionBudget = previousBudget;
         return result;
     }
 
-    IUnitTask@ AdmitNanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget)
+    IUnitTask@ AdmitNanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget, int preferredSlot = -1)
     {
         const bool crampedLayout = fallback && aiTerrainMgr.IsLayoutEnabled();
         if ((!HasComplex() && !crampedLayout) || unit is null || unit.circuitDef is null || nano is null) return null;
@@ -1928,6 +1929,12 @@ namespace Layout {
         }
         // Cramped geometry changes where a turret fits, not whether another
         // concurrent project is affordable. Keep its admission gate shared.
+        if (preferredSlot >= 0) {
+            // A travelled-to site must be revalidated; ordinary slot queries
+            // below already perform safe reach checks and need no repeat.
+            if (!aiTerrainMgr.CanReachAtSafe(unit,aiTerrainMgr.GetReservationPos(preferredSlot),unit.circuitDef.GetBuildDistance())) return null;
+            return EnqueueNanoSlot(unit,priority,preferredSlot);
+        }
         if (CompactEco::Active()) return CompactEco::NanoTask(unit, priority);
         if (crampedLayout) return CrampedNanoTask(unit, priority);
         for (uint index = 0; index < overflowSupportGroups.length(); ++index) {
@@ -1960,18 +1967,20 @@ namespace Layout {
         // A full primary block must not strand an already reserved secondary block.
         if (id < 0 && fwdGroup > 0 && (economyOverflowNeeded || aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0))
             id = aiTerrainMgr.NextSupportSlot(unit,nano,fwdGroup,fwdCentre,8);
-        if (id < 0) return null;
+        return EnqueueNanoSlot(unit,priority,id);
+    }
+
+    IUnitTask@ EnqueueNanoSlot(CCircuitUnit@ unit,Task::Priority priority,int id)
+    {
+        if (id < 0 || aiTerrainMgr.GetReservationState(id) != 0
+            || !aiTerrainMgr.IsReservationBuildable(id)) return null;
         if (!EconomyCluster::NanoAdmission(id)) return null;
-        const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
-        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, priority, nano, pos, 0.0f, true, 120 * SECOND));
-        if (t is null) return null;
-        if (!AiPinReservation(t, id)) {
-            GenericHelpers::LogUtil("[Layout] could not pin a turret to slot " + id, 1);
-            aiBuilderMgr.AbortTask(t);
-            return null;
-        }
+        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,priority,nano,
+            aiTerrainMgr.GetReservationPos(id),0.f,true,120*SECOND));
+        if (task is null) return null;
+        if (!AiPinReservation(task,id)) {aiBuilderMgr.AbortTask(task);return null;}
         EconomyCluster::NanoAdmitted(id);
-        return t;
+        return task;
     }
 
     int PreferredLandSupportSlot(CCircuitUnit@ unit)

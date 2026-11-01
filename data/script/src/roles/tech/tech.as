@@ -680,6 +680,7 @@ namespace RoleTech
 		Layout::Update(metalIncome, hasT2Lab, t2ConstructionBotCount);
         EcoFlak::Tick();
         EconomyCluster::Tick();
+        RushBootstrap::Tick();
 
 		// --- Unlock advanced storages when economy is strong enough ---
 		if (!hasUnlockedAdvancedStorage && metalIncome >= 100.0f)

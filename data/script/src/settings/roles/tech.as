@@ -4,6 +4,11 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            bool RushBootstrapEnabled = true;
+            float RushBootstrapLocalRadius = 800.f;
+            float RushBootstrapMaxThreat = 0.f;
+            int RushBootstrapRetrySeconds = 5;
+            int RushBootstrapStallSeconds = 30;
             bool GrowthEnabled = true;
             bool ClusterEconomyEnabled = true;
             int ClusterTurretParallel = 10;

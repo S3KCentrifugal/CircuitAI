@@ -16,6 +16,7 @@
 #include "../../systems/construction/reclaim_policy.as"
 #include "../../systems/construction/tech_growth.as"
 #include "../../systems/construction/economy_cluster.as"
+#include "../../systems/construction/rush_bootstrap.as"
 
 /******************************************************************************
 

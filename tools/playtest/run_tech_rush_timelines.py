@@ -177,7 +177,7 @@ def main():
             # before pruning raw logs; no player text is retained here.
             measurements = [line for line in log.splitlines() if any(token in line for token in
                 ('[Playtest] finished ', '[Playtest] eco team 0', '[Census]', '[INVARIANT]', '[TECH][Chain]',
-                 '[TECH][Plan]', '[TECH][Growth]', '[GrowthTest]', '[GrowthState]', '[TECH][HeavyRush]', '[TECH][ProjectBlocked]', '[Layout]', '[Rule]',
+                 '[TECH][Plan]', '[TECH][Growth]', '[GrowthTest]', '[TECH][Bootstrap]', '[GrowthState]', '[TECH][HeavyRush]', '[TECH][ProjectBlocked]', '[Layout]', '[Rule]',
                  'RESERVE: packed ', 'RESERVE: planned ', 'SLOW:', 'Cheat', 'cheat', 'Invalid', 'Unknown', 'armaca'))]
             (archive / 'timeline-measurements.json').write_text(json.dumps(measurements, indent=2))
             # Keep the bounded construction tail too: a reactor can be blocked

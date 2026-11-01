@@ -816,16 +816,8 @@ namespace TechChain
             return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "nano") {
-            // A distant mex worker must not own a no-frame turret reservation
-            // while local workers wait for the completed bank. It can assist
-            // a real frame, but only local builders reserve new rush turrets.
-            if (NukeRush()) {
-                const AIFloat3 position = u.GetPos(ai.frame);
-                const bool local = CompactEco::Active() ? CompactEco::LocalWorker(position, 800.0f)
-                    : MapHelpers::SqDist(position, Layout::TurretSeed()) <= 800.0f * 800.0f;
-                if (!local) return null;
-            }
-            return Layout::NanoTask(u, Task::Priority::HIGH, NukeRush() ? 2 : -1);
+            if (NukeRush()) return RushBootstrap::Work(u);
+            return Layout::NanoTask(u, Task::Priority::HIGH);
         }
         if (NukeRush() && (key == "fusion" || key == "silo"))
             return SupportedProject(d, key == "silo" ? Task::BuildType::BIG_GUN : Task::BuildType::ENERGY);

@@ -386,6 +386,7 @@ namespace TechRules {
         return ByKey(c, "mexup");
     }
     IUnitTask@ DoGrowth(Ctx@ c) { return TechGrowth::Work(c.u,c.eco,c.building); }
+    IUnitTask@ DoRushBootstrap(Ctx@ c) { return RushBootstrap::TravelTask(c.u); }
     IUnitTask@ DoClusterBatch(Ctx@ c) { return EconomyCluster::BatchWork(c.u); }
     IUnitTask@ DoConverter(Ctx@ c)
     {
@@ -529,6 +530,7 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
+        table.insertLast(Rule("rush.bootstrap", CON_T1, W0(), @DoRushBootstrap, "retain one safe support-bootstrap journey without claiming a building"));
         table.insertLast(Rule("eco.cluster.batch", CON_T1, W0(), @DoClusterBatch, "funded local economy cluster: up to ten distinct turret projects, nearby T1 aircraft only"));
         table.insertLast(Rule("eco.growth", CONSTRUCTORS, W0(), @DoGrowth, "T1 energy retirement: one turret, AFUS and converter worker; air takes over without aborting construction"));
         table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
