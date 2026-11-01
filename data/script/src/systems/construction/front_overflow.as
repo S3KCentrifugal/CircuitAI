@@ -256,6 +256,8 @@ namespace FrontOverflow {
         IBuilderTask@ bt = cast<IBuilderTask>(t);
         if (bt !is null) bt.siteRadius = 24.0f;   // its own cell or nothing
         cellState[i] = 1; @cellTasks[i] = t;
+        if (cellOrdered.length() < cells.length()) cellOrdered.resize(cells.length());
+        cellOrdered[i] = ai.frame;
         ordered++;
         GenericHelpers::LogUtil("[FRONT][Overflow] T2 converter " + (d.count + Pending()) + " in block " + blocks + " cell " + (i + 1) + "/" + cells.length()
             + " at " + int(cells[i].x) + "," + int(cells[i].z) + " by " + u.circuitDef.GetName() + " " + u.id + " (" + why + ")"
@@ -264,6 +266,24 @@ namespace FrontOverflow {
         return t;
     }
     int ordered = 0;
+    array<int> cellOrdered;     // frame each cell was ordered
+
+    // Front_BuilderAiTaskRemoved: how a cell order ended (arm C diagnosis: cells failed with no site abort)
+    void TaskRemoved(IUnitTask@ task, bool done)
+    {
+        if (task is null || !On()) return;
+        for (uint i = 0; i < cellTasks.length(); ++i) {
+            if (cellTasks[i] !is task) continue;
+            IBuilderTask@ bt = cast<IBuilderTask>(task);
+            const bool framed = bt !is null && bt.target !is null;
+            const float pct = aiEconomyMgr.energy.storage > 0.0f ? aiEconomyMgr.energy.current / aiEconomyMgr.energy.storage : 0.0f;
+            const int age = i < cellOrdered.length() ? (ai.frame - cellOrdered[i]) / SECOND : -1;
+            GenericHelpers::LogUtil("[FRONT][Overflow] cell " + (i + 1) + " of block " + blocks + " order ended " + (done ? "done" : "unbuilt")
+                + (framed ? ", frame stands" : ", no frame") + " after " + age + " s, builders " + task.GetUnits().length()
+                + " | bank " + int(pct * 100.0f) + "% M bank " + int(aiEconomyMgr.metal.current), 1);
+            return;
+        }
+    }
 
     // ---- builder work ------------------------------------------------------------------------------
     bool IsAssistBot(CCircuitUnit@ u)

@@ -815,6 +815,7 @@ namespace RoleFront {
     void Front_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
         FrontFactoryNanos::TaskRemoved(task, done);
         FrontLabPorc::TaskRemoved(task, done);
+        FrontOverflow::TaskRemoved(task, done);
     }
 
     /******************************************************************************
