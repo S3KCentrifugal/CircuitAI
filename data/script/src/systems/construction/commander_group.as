@@ -73,7 +73,19 @@ namespace CommanderGroup {
             if(!Eligible(ai.GetTeamUnit(members[i]))) {members[i]=-1;Save(int(i));}
             aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,float(members[i]));
         }
-        aiBuilderMgr.SetCommanderCombatOption("commander_group_unit",Eligible(ai.GetTeamUnit(FrontConstructors::seats[2]))?float(FrontConstructors::seats[2]):-1.f);
+        // owner 2026-11-01: the group's T1 constructor also builds forward agitators (front_agitator.as GroupPull);
+        // while it is on one, native group work must not take it back, so it is unpublished meanwhile
+        CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);
+        if(Eligible(con)) {
+            IUnitTask@ agit=FrontAgitator::GroupPull(con);
+            if(agit !is null && con.task !is agit) aiBuilderMgr.AssignTask(con,agit);
+        }
+        PublishUnit(false);
+    }
+    void PublishUnit(bool detached) {   // native resets its group state only when the value changes
+        CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);
+        const int id=(!detached && Eligible(con) && !FrontAgitator::OnOrder(con))?FrontConstructors::seats[2]:-1;
+        aiBuilderMgr.SetCommanderCombatOption("commander_group_unit",float(id));
     }
     bool Owns(int id) {
         if(Global::AISettings::Role!=AiRole::FRONT) return false;
@@ -165,6 +177,12 @@ namespace CommanderGroup {
     }
     IUnitTask@ Work(CCircuitUnit@ unit) {
         Update();
-        return Owns(unit.id)?aiBuilderMgr.CommanderFrontWork(unit,19,null,0.f):null;
+        if(!Owns(unit.id)) return null;
+        if(FrontConstructors::seats[2]==unit.id) {
+            IUnitTask@ agit=FrontAgitator::GroupPull(unit);
+            PublishUnit(agit !is null);
+            if(agit !is null) return agit;
+        }
+        return aiBuilderMgr.CommanderFrontWork(unit,19,null,0.f);
     }
 }

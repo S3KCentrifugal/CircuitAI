@@ -390,6 +390,8 @@ namespace Front {
             float AgitatorTakeRadius = 1500.0f;        // ... and ones walking to an unframed build this near
             float AgitatorShake = 160.0f;              // native looks this far round the spot for room
             int AgitatorScanSeconds = 5;
+            bool AgitatorGroupConstructor = true;      // the commander group's T1 constructor builds them too (owner 2026-11-01)
+            float AgitatorGroupReach = 2000.0f;        // ... at spots this near it
             bool SpecialPorc = false;
             array<string> SpecialPorcUnits = { "armamb", "cortoast", "legacluster" };   // Rattlesnake, Persecutor, Eviscerator
             float SpecialPorcMetalShare = 0.5f;

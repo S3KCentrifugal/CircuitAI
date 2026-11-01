@@ -267,7 +267,7 @@ namespace FrontAgitator {
         return other;
     }
 
-    IUnitTask@ KindWork(int k, CCircuitUnit@ u) {
+    IUnitTask@ KindWork(int k, CCircuitUnit@ u, bool group = false) {
         Kind@ kd = kinds[k];
         CCircuitDef@ d = GunFor(kd, u);
         if (d is null) return null;   // this builder cannot make this kind's gun
@@ -276,7 +276,7 @@ namespace FrontAgitator {
             IBuilderTask@ b = cast<IBuilderTask>(kd.order);
             array<CCircuitUnit@>@ on = kd.order.GetUnits();
             if ((on is null || on.length() < 2) && b !is null && b.buildDef !is null && u.circuitDef.CanBuild(b.buildDef)
-                && FrontFactoryNanos::Free(u) && MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 1500.0f * 1500.0f)
+                && (group || FrontFactoryNanos::Free(u)) && MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 1500.0f * 1500.0f)
                 return kd.order;
             return null;
         }
@@ -294,9 +294,10 @@ namespace FrontAgitator {
                 + int(Global::RoleSettings::Front::AgitatorAdvance));
             return null;
         }
-        const bool free = FrontFactoryNanos::Free(u);
+        const bool free = group || FrontFactoryNanos::Free(u);
         if (!free && !FrontFactoryNanos::Takeable(u)) return null;
-        const float reach = free ? Global::RoleSettings::Front::AgitatorReach : Global::RoleSettings::Front::AgitatorTakeRadius;
+        const float reach = group ? Global::RoleSettings::Front::AgitatorGroupReach
+            : free ? Global::RoleSettings::Front::AgitatorReach : Global::RoleSettings::Front::AgitatorTakeRadius;
         const AIFloat3 wp = u.GetPos(ai.frame);
         for (uint i = 0; i < kd.open.length(); ++i) {
             Spot@ s = kd.open[i];
@@ -343,5 +344,32 @@ namespace FrontAgitator {
             if (t !is null) return t;
         }
         return null;
+    }
+
+    // The commander group's T1 constructor (FrontConstructors seat 2, the one that walks with the
+    // FRONT commander and builds its front porc; owner, 2026-11-01 20:40Z). Native CommanderGroup work
+    // reassigns it every second and FRONT's AiMakeTask never reaches Front_BuilderAiMakeTask for it,
+    // so CommanderGroup::Update asks here each second: when an agitator is due within AgitatorGroupReach
+    // of it and it is not finishing a framed build, it takes (or joins) the order; CommanderGroup then
+    // unpublishes it from the native group (commander_group_unit -1) until the order ends.
+    bool OnOrder(CCircuitUnit@ u) {
+        if (u is null || u.task is null || u.task.IsDead()) return false;
+        for (uint k = 0; k < kinds.length(); ++k) if (kinds[k].order is u.task) return true;
+        return false;
+    }
+    IUnitTask@ GroupPull(CCircuitUnit@ u) {
+        if (!On() || !Global::RoleSettings::Front::AgitatorGroupConstructor || u is null || u.circuitDef is null) return null;
+        if (FrontRecovery::Active() || u.GetBuildProgress() < 1.0f) return null;
+        if (kinds.length() != uint(KINDS)) Reset();
+        if (OnOrder(u)) return u.task;
+        IBuilderTask@ cur = cast<IBuilderTask>(u.task);
+        if (cur !is null && !cur.IsDead() && cur.target !is null && cur.GetBuildType() < int(Task::BuildType::REPAIR)) return null;
+        if (u.task !is null && (u.task.IsExternalControlled() || u.task.GetType() == int(Task::Type::PLAYER)
+            || u.task.GetType() == int(Task::Type::RETREAT))) return null;
+        Refresh();
+        if (!AgitatorOn()) return null;
+        IUnitTask@ t = KindWork(AGITATOR, u, true);
+        if (t !is null) GenericHelpers::LogUtil("[FRONT][Agitator] commander group constructor " + u.circuitDef.GetName() + " " + u.id + " takes the agitator order", 1);
+        return t;
     }
 }
