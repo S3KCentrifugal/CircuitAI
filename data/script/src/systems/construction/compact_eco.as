@@ -235,6 +235,25 @@ namespace CompactEco {
         return Order(slot, type, priority, definition, timeout, true);
     }
 
+    // The air plants: no planned box means Layout::OrderFactory has no site and
+    // the old spiral searched the start, where the first lab stands (played:
+    // Coastlines Dry, armap aborted 10-13 times from min 18 to 45, no air
+    // constructor, so nothing ordered a third advanced fusion). A bank's
+    // ground, as for the reactors.
+    IUnitTask@ OrderFactory(CCircuitDef@ definition, CCircuitUnit@ worker, int timeout)
+    {
+        if (!Active() || definition is null || worker is null || worker.circuitDef is null || !worker.circuitDef.CanBuild(definition)) return null;
+        int slot = Pack(Layout::nanoGroup, definition, worker);
+        for (uint index = 0; slot < 0 && index < groups.length(); ++index) slot = Pack(groups[index], definition, worker);
+        if (slot < 0) return null;
+        const AIFloat3 p = aiTerrainMgr.GetReservationPos(slot);
+        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, definition, p, null, 0.0f, false, true, timeout));
+        if (task is null) { aiTerrainMgr.ReleaseReservation(slot); return null; }
+        if (!AiPinReservation(task, slot)) { aiBuilderMgr.AbortTask(task); return null; }
+        GenericHelpers::LogUtil("[Layout][Compact] " + definition.GetName() + " on a bank's ground at (" + int(p.x) + ", " + int(p.z) + ")", 1);
+        return task;
+    }
+
     IUnitTask@ SupportTask(CCircuitUnit@ worker)
     {
         if (!Active() || Layout::nano is null || !worker.circuitDef.CanBuild(Layout::nano)

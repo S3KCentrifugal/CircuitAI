@@ -964,6 +964,10 @@ namespace TechChain
         // D-103: both air plants placed by the layout (a turret stands); the old
         // spiral only when the layout has no site
         if (key == "ap" || key == "aap") {
+            if (CompactEco::Active()) {
+                IUnitTask@ ct = CompactEco::OrderFactory(d, u, 300 * SECOND);
+                if (ct !is null) return ct;
+            }
             IUnitTask@ lt = Layout::OrderFactory(d, 300 * SECOND);
             if (lt !is null) return lt;
             if (key == "ap") return Builder::EnqueueT1AirFactory(Global::AISettings::Side, Layout::BaseCentre(), SQUARE_SIZE * 32, 300 * SECOND);
