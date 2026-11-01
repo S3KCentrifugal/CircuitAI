@@ -26,6 +26,13 @@ int main() {
         assert(c.Dominant() == Threat::LONG);
         const auto centroid = c.Centroid();
         assert(centroid.x == 280 && centroid.z == 0);  // metal-weighted
+        // Stand firm only against a short-range push: 200 of 500 here is not enough.
+        assert(!StandFirm(c, .6f));
+        Composition raiders;
+        raiders.Add(Threat::SHORT, 300, {0, 0}, 0); raiders.Add(Threat::PEER, 100, {0, 0}, 0);
+        assert(StandFirm(raiders, .6f));
+        assert(!StandFirm(raiders, 0.f));          // disabled
+        assert(!StandFirm(Composition(), .6f));    // nothing nearby
     }
     {  // Facing and the deadband: a weaving enemy does not re-slot the line.
         const auto back = Facing({1000, 1000}, {1000, 1400});

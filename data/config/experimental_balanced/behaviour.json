@@ -18,7 +18,8 @@
 		// the unchanged control. The family names the line template below.
 		"t1_cortex_line": {
 			"type": "ranged", "coordinated": true,
-			"sustained_rush": true, "sustained_rush_ratio": 2.0, "sustained_rush_radius": 900.0,
+			// sustained_rush itself sits on the children: it needs their formation to parse
+			"sustained_rush_ratio": 2.0, "sustained_rush_radius": 900.0,
 			"sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25, "sustained_rush_cooldown": 20.0,
 			"sustained_rush_range": 0.8,
 			"spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25,
@@ -27,7 +28,7 @@
 		},
 		"thug": {
 			"extends": "t1_cortex_line",
-			"formation": {"family": "t1_cortex_line", "position": "front"},
+			"formation": {"family": "t1_cortex_line", "position": "front"}, "sustained_rush": true,
 			"fire_in_range": true, "commander_focus": true, "fire_at_will": false,
 			"range_fraction": 0.97, "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05,
 			"poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5, "poke_pause_seconds": 5,
@@ -38,7 +39,7 @@
 		"aggravator": {
 			"extends": "t1_cortex_line",
 			"formation": {"family": "t1_cortex_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0},
-			"range_fraction": 0.95, "loss_fraction": 0.25, "static_loss_fraction": 0.08
+			"sustained_rush": true, "range_fraction": 0.95, "loss_fraction": 0.25, "static_loss_fraction": 0.08
 		},
 		"commander": {
 			"type": "commander",
@@ -67,8 +68,8 @@
 		"withdraw_screen_delay": 1.0, "withdraw_rear_delay": 0, "withdraw_screen_cover": 1,
 		"advance_screen_delay": 0, "advance_rear_delay": -1,
 		"attack_screen_delay": 0, "attack_rear_delay": 0, "hold_delay": 0,
-		"order_min_seconds": 1, "script_order_seconds": 20,
-		"orient": 1, "heading_deadband": 20, "threat_radius": 1400, "peer_band": 0.25,
+		"order_min_seconds": 3, "script_order_seconds": 20,
+		"orient": 1, "heading_deadband": 20, "threat_radius": 1400, "peer_band": 0.25, "stand_short_share": 0.6,
 		"spread": 1, "spread_cap": 2, "period": 15, "log": 1
 	}
 },

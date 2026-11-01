@@ -140,11 +140,21 @@ inline Stance StanceFor(Order order, Slot slot, const Routing& routing, int elap
     }
 }
 
+// Stand and shoot instead of kiting: the meta against a shorter-ranged push
+// (raiders, riots) is to keep the range advantage and let it walk into fire;
+// against peers and longer weapons the cohort's own kite stays. True when
+// short-range hostiles hold at least `share` of the metal nearby.
+inline bool StandFirm(const Composition& c, float share) {
+    return share > 0.f && c.any && c.total > 0.f && c.metal[int(Threat::SHORT)] >= share * c.total;
+}
+
 // What a member's controller reads. Plain data.
 struct Directive {
     Stance stance = Stance::FOLLOW;
     Order order = Order::NONE;
     int orderFrame = -1;        // when the current order was issued
+    bool scripted = false;      // the order came from script, not the cohort
+    bool standFirm = false;     // StandFirm: a cover or hold keeps the hull in place
     bool facingSet = false;
     ranged::Point facing{0.f, 0.f};
     float spread = 1.f;

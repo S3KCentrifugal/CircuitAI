@@ -36,10 +36,11 @@ struct LineConfig {
     float advanceScreenDelay = 0.f, advanceRearDelay = -1.f;
     float attackScreenDelay = 0.f, attackRearDelay = 0.f;
     float holdDelay = 0.f;
-    float orderMinSeconds = 1.f;      // a less cautious order waits this long
+    float orderMinSeconds = 3.f;      // a less cautious order waits this long (cohort modes flicker faster)
     float scriptOrderSeconds = 20.f;  // a script order's lifetime
     // Orientation and spacing from the enemy composition.
     float orient = 1.f, headingDeadband = 20.f, threatRadius = 1400.f, peerBand = .25f;
+    float standShortShare = .6f;      // stand and shoot when short-range hostiles hold this metal share (0: never)
     float spreadEnabled = 1.f, spreadCap = 2.f;
     float period = 15.f, log = 1.f;
 };
@@ -75,6 +76,7 @@ private:
         ranged::Point facing{0.f, 0.f};
         bool facingSet = false;
         float spread = 1.f, separation = 0.f, screenSpeed = 1.f;
+        bool scripted = false, standFirm = false;
         int screens = 0, rears = 0;
         line::Stance screenStance = line::Stance::FOLLOW, rearStance = line::Stance::FOLLOW;
     };

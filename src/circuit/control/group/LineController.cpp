@@ -33,6 +33,7 @@ const control::CConfigTable<LineConfig> kTable({
     F<&LineConfig::headingDeadband>("heading_deadband", 0.f, 90.f),
     F<&LineConfig::threatRadius>("threat_radius", 200.f, 4000.f),
     F<&LineConfig::peerBand>("peer_band", 0.f, 1.f),
+    F<&LineConfig::standShortShare>("stand_short_share", 0.f, 1.f),
     F<&LineConfig::spreadEnabled>("spread", 0.f, 1.f),
     F<&LineConfig::spreadCap>("spread_cap", 1.f, 4.f),
     F<&LineConfig::period>("period", 1.f, 300.f),
@@ -144,18 +145,20 @@ void CLineController::Observe(Line& l, CRangedWorld& world, int frame)
         }
     }
     l.spread = t.config.spreadEnabled > 0.f ? line::Spread(l.composition.maxSplash, def->GetRangedPolicy().spacing, t.config.spreadCap) : 1.f;
+    l.standFirm = line::StandFirm(l.composition, t.config.standShortShare);
     // The line's own order: the cohort's assessment.
     const line::Order internal = line::InternalOrder(int(plan.mode), plan.target >= 0, plan.committed);
     if (l.script != line::Order::NONE && frame - l.scriptFrame > int(t.config.scriptOrderSeconds * 30.f)) l.script = line::Order::NONE;
     const line::Order wanted = line::Effective(internal, l.script);
+    const bool scripted = l.script != line::Order::NONE && line::Caution(l.script) > line::Caution(internal);
     l.internal = internal;
     if (l.effective == line::Order::NONE || line::Replace(l.effective, wanted, frame - l.orderFrame, int(t.config.orderMinSeconds * 30.f))) {
         if (wanted != l.effective) {
             const auto& c = l.composition;
-            if (t.config.log > 0.f) ai->LOG("LINE: line=%i order=%s from=%s source=%s screens=%i rears=%i short=%i peer=%i long=%i static=%i comm=%i metal=%.0f facing=%.2f,%.2f spread=%.2f frame=%i",
-                l.key, line::Name(wanted), line::Name(l.effective), l.script != line::Order::NONE && line::Caution(l.script) > line::Caution(internal) ? "script" : "cohort",
-                l.screens, l.rears, c.count[0], c.count[1], c.count[2], c.count[3], c.count[4], c.total, l.facing.x, l.facing.z, l.spread, frame);
-            l.effective = wanted; l.orderFrame = frame;
+            if (t.config.log > 0.f) ai->LOG("LINE: line=%i order=%s from=%s source=%s screens=%i rears=%i short=%i peer=%i long=%i static=%i comm=%i metal=%.0f facing=%.2f,%.2f spread=%.2f firm=%i frame=%i",
+                l.key, line::Name(wanted), line::Name(l.effective), scripted ? "script" : "cohort",
+                l.screens, l.rears, c.count[0], c.count[1], c.count[2], c.count[3], c.count[4], c.total, l.facing.x, l.facing.z, l.spread, int(l.standFirm), frame);
+            l.effective = wanted; l.orderFrame = frame; l.scripted = scripted;
         }
     }
     Route(l, t, frame);
@@ -193,6 +196,7 @@ void CLineController::Write(const Line& l, const std::vector<int>& members, line
     for (int id : members) {
         auto& d = directives[id];
         d.stance = stance; d.order = l.effective; d.orderFrame = l.orderFrame;
+        d.scripted = l.scripted; d.standFirm = l.standFirm;
         d.facingSet = l.facingSet; d.facing = l.facing; d.spread = l.spread;
         d.line = l.key; d.generation = generation;
     }

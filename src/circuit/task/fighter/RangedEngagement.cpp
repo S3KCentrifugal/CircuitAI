@@ -585,14 +585,17 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             point=pos+(step->pos-pos)*((distance-reach+32.f)/distance);
         }
     }
-    // D-430: the line's stance. Cover and hold keep this hull where it is
-    // (firing); a withdraw ordered before the cohort itself withdraws steps
-    // back along the facing. A hazard escape above, and a sustained rush,
-    // always win over the line's timing.
+    // D-430: the line's stance. A cover, or a cohort-sourced hold, keeps this
+    // hull where it is (firing) only while the line stands firm against a
+    // shorter-ranged push; otherwise the cohort's own kite goes on. A script
+    // hold always holds. A withdraw ordered before the cohort itself withdraws
+    // steps back along the facing. A hazard escape above, and a sustained
+    // rush, always win over the line's timing.
     bool lineUrgent=false;
     if(directive && !danger && !group.sustainedRush) {
         switch(directive->stance) {
-            case line::Stance::COVER: case line::Stance::HOLD: point=pos; break;
+            case line::Stance::COVER: if(directive->standFirm) point=pos; break;
+            case line::Stance::HOLD: if(directive->standFirm || directive->scripted) point=pos; break;
             case line::Stance::WITHDRAW:
                 if(group.mode!=cohort::Mode::WITHDRAW && group.mode!=cohort::Mode::KITE) {
                     point=pos+back*std::max(192.f,policy.spacing*2.f); lineUrgent=true;
