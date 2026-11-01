@@ -122,7 +122,7 @@ namespace AirOperations {
             offensive ? Global::RoleSettings::Air::StrikeImmediatePriority : 0.0f,
             Global::RoleSettings::Air::StrikeImmediateRadius);
         if (offensive) wave.SetWindGridPolicy(Global::RoleSettings::Air::WindGridMinimum,
-            Global::RoleSettings::Air::WindGridLink, Global::RoleSettings::Air::WindGridPriority);
+            Global::RoleSettings::Air::WindGridDepth, Global::RoleSettings::Air::WindGridLink, Global::RoleSettings::Air::WindGridPriority);
         if (offensive) {
             // A committed wave exhausts each class before descending. This also
             // lets new waves finish a defeated base after its named targets die.

@@ -957,10 +957,11 @@ void CAirWaveTask::SetAttackHandoffPolicy(bool earlyApproach, float priority, fl
     immediateStrikeRadius = std::clamp(radius, 0.f, 10000.f);
 }
 
-void CAirWaveTask::SetWindGridPolicy(int minimum, float link, float priority)
+void CAirWaveTask::SetWindGridPolicy(int minimum, int depth, float link, float priority)
 {
     if (!std::isfinite(link) || !std::isfinite(priority)) return;
     windGridMinimum = std::clamp(minimum, 0, 1000);
+    windGridDepth = std::clamp(depth, 1, 50);
     windGridLink = std::clamp(link, 16.f, 400.f);
     windGridPriority = std::max(0.f, priority);
     windGridFrame = -100000;
@@ -1027,7 +1028,7 @@ void CAirWaveTask::RefreshWindGrids()
             sum += p;
             visible = visible || winds[i]->IsInLOS();
         }
-        if (!air_geometry::WindGridQualifies(int(members.size()), maxX - minX, maxZ - minZ, windGridMinimum, windGridLink)) continue;
+        if (!air_geometry::WindGridQualifies(int(members.size()), maxX - minX, maxZ - minZ, windGridMinimum, windGridDepth)) continue;
         SWindGrid grid;
         grid.count = int(members.size());
         grid.centre = sum / float(members.size());
