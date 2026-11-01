@@ -910,7 +910,7 @@ namespace TechChain
                 return null;
             }
             CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, d,
-                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius, true);
             // Never manufacture a position-only task: native admission checks
             // ownership, tier, live reachability and concurrent spot claims.
             // Rejection must let the income ladder consider energy instead.
@@ -1101,6 +1101,7 @@ namespace TechChain
         bool unmet = false;   // some step is not met, whether or not this builder could help
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
+            const bool unmetBefore = unmet;
             if (NukeRush() && nukeStorageReleased && s.key == "mstor") continue;
             // Disallow both starting AND assisting distant expansion with the
             // slow commander / local technology worker. Merely setting can=false
@@ -1304,6 +1305,14 @@ namespace TechChain
             // no mex this builder can upgrade: on to the fusion and advanced
             // fusion rather than hold every T2 constructor here
             if (s.key == "moho" && !NukeRush() && ai.frame < mohoBlockedUntil) {
+                // a blocked upgrade is waiting, not stalled: the step is never
+                // skipped for it, and every ask tries it again first, so the
+                // upgrades resume once the threat near the mex is gone
+                stallFrame = ai.frame;
+                // nor does it hold the chain open: with every other step met the
+                // chain completes (the strategic rows wait on that) and the
+                // economy rows take the remaining upgrades when they free up
+                unmet = unmetBefore;
                 Trace("no upgradable mex: on to the next step", int(i), s, have, u);
                 continue;
             }

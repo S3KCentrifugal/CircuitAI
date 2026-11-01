@@ -36,7 +36,7 @@ namespace OwnedEconomy {
     // per builder. Read completion/position live; ownership changes invalidate
     // Refresh. A remembered coordinate is not evidence of an upgradeable mex.
     CCircuitUnit@ NearestUpgradeTarget(CCircuitUnit@ worker, const CCircuitDef@ upgrade,
-            const AIFloat3& in center, float radius) {
+            const AIFloat3& in center, float radius, bool safeOnly = false) {
         if (worker is null || upgrade is null || radius <= 0.0f) return null;
         array<Id>@ ids = Extractors();
         const AIFloat3 from = worker.GetPos(ai.frame);
@@ -49,6 +49,9 @@ namespace OwnedEconomy {
             const AIFloat3 pos = unit.GetPos(ai.frame);
             const float distance = MapHelpers::SqDist(from, pos);
             if (distance >= best || MapHelpers::SqDist(center, pos) > radius * radius) continue;
+            // safeOnly: a mex under threat is passed over for the next one, not
+            // returned for native admission to refuse (one per closer candidate)
+            if (safeOnly && !aiTerrainMgr.CanReachAtSafe(worker, pos, worker.circuitDef.GetBuildDistance())) continue;
             best = distance;
             @chosen = unit;
         }

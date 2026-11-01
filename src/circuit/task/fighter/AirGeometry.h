@@ -41,6 +41,15 @@ inline bool ImmediateStrikeCandidate(float priority, float minimum, bool visible
     return minimum > 0.f && priority >= minimum && visible && stationary
         && radius > 0.f && distanceSq >= 0.f && distanceSq <= radius * radius;
 }
+// A wind grid is a priority chain-reaction target: enough touching winds and
+// at least `depth` winds deep both ways (owner 2026-11-01: 3+ rows; a double
+// row is an ordinary target, level with mexes). Winds touch at 48 elmos; the
+// 10% slack absorbs rounding of build positions.
+inline bool WindGridQualifies(int count, float spanX, float spanZ, int minimum, int depth)
+{
+    if (minimum <= 0 || depth <= 0 || count < minimum || !std::isfinite(spanX) || !std::isfinite(spanZ)) return false;
+    return std::min(spanX, spanZ) >= float(depth - 1) * 48.f * .9f;
+}
 // Short cohort legs bound how far faster escorts can run ahead. A leg is
 // longer than the arrival disc, so successive arrivals require real progress.
 inline int CohortLegCount(float distance, float arrivalRadius)
