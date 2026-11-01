@@ -35,6 +35,11 @@ struct Resolver {
 // A spam unit this game lacks is reported but does not invalidate the block.
 bool Parse(const Json::Value& settings, RangedPolicy& policy, const Resolver& resolver,
            const std::vector<std::string>& skip, std::vector<std::string>& problems);
+// D-432: the same, refusing keys in `forbidden` (another job's levers): a
+// block carrying one is invalid, with the key named in `problems`.
+bool Parse(const Json::Value& settings, RangedPolicy& policy, const Resolver& resolver,
+           const std::vector<std::string>& skip, const std::vector<std::string>& forbidden,
+           std::vector<std::string>& problems);
 
 // The numeric keys a script lever may set at runtime (CConfigTable form):
 // name, accessor, legal range. Strings and the formation object are load-time

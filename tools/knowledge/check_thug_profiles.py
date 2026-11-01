@@ -13,7 +13,7 @@ from check_ranged_profiles import parse, span
 ROOT = Path(__file__).resolve().parents[2]
 PROFILES = ('experimental_balanced', 'experimental_hard', 'experimental_terrible')
 BASE = 'd2d16b4a'  # the branch point of the controller rework
-NEUTRAL = ('corthud', 'corstorm', 'controllers', 'formations')
+NEUTRAL = ('corthud', 'corstorm', 'armham', 'armrock', 'controllers', 'formations')  # D-432: Mace and Rocketeer presets
 
 
 def resolve(presets, name, depth=0):
@@ -41,7 +41,7 @@ def policy_of(entry, document):
     if 'controller' in entry:
         preset = entry.pop('controller')
         policy = resolve(document['controllers']['presets'], preset)
-        assert policy.pop('type') == 'ranged', preset
+        assert policy.pop('type') in ('skirmisher', 'backline'), preset  # D-432: typed by job
         return entry, policy
     policy = entry.pop('ranged')
     assert entry.pop('attribute') == ['ranged']
@@ -75,6 +75,21 @@ def main():
         if 'controller' in after_doc['behaviour']['corthud']:
             assert family in after_doc.get('formations', {}), profile+' line template missing'
             assert after_doc['formations'][family]['type'] == 'line'
+            # D-432: Mace on the skirmisher preset carries the attribute block's values;
+            # the Aggravator and the Rocketeer are backline presets without sustained rush.
+            mace_before, mace_policy_before = policy_of(before_doc['behaviour']['armham'], before_doc)
+            mace_after, mace_policy = policy_of(after_doc['behaviour']['armham'], after_doc)
+            assert mace_before == mace_after, profile+' Mace production/classification changed'
+            assert {k: v for k, v in mace_policy.items() if k != 'formation'} == {k: v for k, v in mace_policy_before.items() if k != 'formation'}, profile+' Mace policy values changed'
+            assert mace_policy['formation'] == mace_policy_before['formation'] and mace_policy['formation']['family'] in after_doc['formations']
+            for unit in ('corstorm', 'armrock'):
+                presets = after_doc['controllers']['presets']
+                preset = after_doc['behaviour'][unit]['controller']
+                rear = resolve(presets, preset)
+                assert rear['type'] == 'backline' and rear['formation']['position'] == 'rear', unit
+                assert 'sustained_rush' not in rear and 'poke_in' not in rear and 'commander_focus' not in rear, unit
+                assert rear['formation']['family'] in after_doc['formations'], unit
+                assert 0 < rear['static_loss_fraction'] < rear['loss_fraction'] < .9 and rear['leak_radius'] > 0, unit
     for path in (ROOT/'data/config').rglob('behaviour.json'):
         if path.parent.name in PROFILES: continue
         entry = parse(path.read_bytes()).get('behaviour',{}).get('corthud',{})

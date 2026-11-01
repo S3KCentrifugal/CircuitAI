@@ -78,6 +78,47 @@ const char* kThugPreset = R"({"type": "ranged", "fire_in_range": true, "commande
     "regroup_seconds": 8, "rush_ratio": 1.5, "catch_seconds": 6, "engagement_seconds": 12, "support_allies": true,
     "support_loss_fraction": 0.70, "intent_gain": 0.20, "advantage_enter": 1.4, "advantage_exit": 1.1,
     "loss_fraction": 0.4, "static_loss_fraction": 0.12})";
+// D-432: the balanced Mace block (attribute form) and its resolved preset
+// (t1_skirmisher + mace): the Thug block without fire_in_range and
+// commander_focus, Armada family.
+const char* kMaceAttribute = R"({"coordinated": true, "sustained_rush": true, "sustained_rush_ratio": 2.0,
+    "sustained_rush_radius": 900.0, "sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25,
+    "sustained_rush_cooldown": 20.0, "sustained_rush_range": 0.8, "formation": {"family": "t1_bot_line", "position": "front"},
+    "range_fraction": 0.97, "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05, "poke_ratio": 1.5, "poke_health": 0.8,
+    "poke_press_health": 0.5, "poke_pause_seconds": 5, "fire_at_will": false, "spacing": 64, "safety_margin": 4,
+    "range_hysteresis": 16, "reaction_seconds": 1.25, "move_min_seconds": 0, "target_min_seconds": 0, "cohort_size": 12,
+    "cohort_radius": 900, "regroup_seconds": 8, "rush_ratio": 1.5, "catch_seconds": 6, "engagement_seconds": 12,
+    "support_allies": true, "support_loss_fraction": 0.70, "intent_gain": 0.20, "advantage_enter": 1.4, "advantage_exit": 1.1,
+    "loss_fraction": 0.4, "static_loss_fraction": 0.12})";
+const char* kMacePreset = R"({"type": "skirmisher", "coordinated": true,
+    "sustained_rush_ratio": 2.0, "sustained_rush_radius": 900.0, "sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25,
+    "sustained_rush_cooldown": 20.0, "sustained_rush_range": 0.8, "spacing": 64, "safety_margin": 4, "range_hysteresis": 16,
+    "reaction_seconds": 1.25, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8, "catch_seconds": 6,
+    "engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "intent_gain": 0.20, "range_fraction": 0.97,
+    "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05, "poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5,
+    "poke_pause_seconds": 5, "fire_at_will": false, "move_min_seconds": 0, "target_min_seconds": 0, "rush_ratio": 1.5,
+    "support_allies": true, "support_loss_fraction": 0.70, "loss_fraction": 0.4, "static_loss_fraction": 0.12,
+    "formation": {"family": "t1_bot_line", "position": "front"}, "sustained_rush": true})";
+// The balanced Rocketeer block (attribute form) and the resolved backline preset
+// (t1_backline + rocketeer): no sustained rush (the backline refuses it), the
+// backline's own keys skipped by the shared parser.
+const char* kRocketeerAttribute = R"({"coordinated": true, "range_fraction": 0.95, "spacing": 64, "safety_margin": 4,
+    "range_hysteresis": 16, "reaction_seconds": 1.25, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8,
+    "catch_seconds": 6, "engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "loss_fraction": 0.25,
+    "static_loss_fraction": 0.08, "intent_gain": 0.20,
+    "formation": {"family": "t1_bot_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}})";
+const char* kRocketeerPreset = R"({"type": "backline", "coordinated": true, "spacing": 64, "safety_margin": 4,
+    "range_hysteresis": 16, "reaction_seconds": 1.25, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8,
+    "catch_seconds": 6, "engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "intent_gain": 0.20,
+    "range_fraction": 0.95, "loss_fraction": 0.25, "static_loss_fraction": 0.08,
+    "screen_radius": 900, "static_bonus": 1.5, "beyond_screen_bonus": 1.3, "fast_target_speed": 70, "fast_target_penalty": 0.3,
+    "self_defence_radius": 250, "self_defence_bonus": 4, "move_after_shot": true, "aim_hold_seconds": 0.8,
+    "leak_radius": 350, "leak_corridor": 96, "tuck_count": 2, "tuck_offset": 96, "tuck_seconds": 8, "log": 1,
+    "formation": {"family": "t1_bot_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}})";
+const std::vector<std::string> kBacklineOwnKeys{"type", "screen_radius", "static_bonus", "beyond_screen_bonus", "fast_target_speed",
+    "fast_target_penalty", "self_defence_radius", "self_defence_bonus", "move_after_shot", "aim_hold_seconds", "leak_radius",
+    "leak_corridor", "tuck_count", "tuck_offset", "tuck_seconds", "log"};
+const std::vector<std::string> kBacklineForbidden{"poke_in", "sustained_rush", "commander_focus", "fire_in_range", "press_static"};
 const char* kAggravator = R"({"coordinated": true, "sustained_rush": true, "sustained_rush_ratio": 2.0,
     "sustained_rush_radius": 900.0, "sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25,
     "sustained_rush_cooldown": 20.0, "sustained_rush_range": 0.8, "range_fraction": 0.95, "spacing": 64,
@@ -152,6 +193,31 @@ int main() {
         }
         assert(pokeIn && cohort);
     }
-    std::puts("ranged policy: attribute and preset forms agree, legacy rejections and levers PASS");
+    {  // D-432: Mace, attribute form against the resolved skirmisher preset.
+        RangedPolicy attribute, preset;
+        std::vector<std::string> problems;
+        assert(ranged_policy::Parse(Parse(kMaceAttribute), attribute, kResolver, {}, problems) && problems.empty());
+        assert(ranged_policy::Parse(Parse(kMacePreset), preset, kResolver, {"type"}, problems) && problems.empty());
+        assert(Same(attribute, preset) && !attribute.fireInRange && !attribute.commanderFocus);
+        assert(attribute.formationFamily == "t1_bot_line" && attribute.sustainedRush);
+    }
+    {  // D-432: Rocketeer, attribute form against the resolved backline preset (own keys skipped).
+        RangedPolicy attribute, preset;
+        std::vector<std::string> problems;
+        assert(ranged_policy::Parse(Parse(kRocketeerAttribute), attribute, kResolver, {}, problems) && problems.empty());
+        assert(ranged_policy::Parse(Parse(kRocketeerPreset), preset, kResolver, kBacklineOwnKeys, kBacklineForbidden, problems) && problems.empty());
+        assert(Same(attribute, preset) && !attribute.sustainedRush);
+        assert(attribute.formationPosition == RangedPolicy::FormationPosition::REAR && attribute.withdrawalLeadSeconds == 1.f);
+    }
+    {  // D-432: a job's parser refuses another job's lever, naming it.
+        RangedPolicy p;
+        std::vector<std::string> problems;
+        assert(!ranged_policy::Parse(Parse(R"({"coordinated": true, "cloak_on_reload": true})"), p, kResolver, {}, {"cloak_on_reload"}, problems));
+        assert(problems.size() == 1 && problems.front().find("'cloak_on_reload' belongs to another job") != std::string::npos);
+        problems.clear();
+        assert(ranged_policy::Parse(Parse(R"({"coordinated": true, "cloak_on_reload": true})"), p, kResolver, {}, {"poke_in"}, problems) && problems.empty());
+        assert(!ranged_policy::Parse(Parse(kAggravator), p, kResolver, {}, kBacklineForbidden, problems));  // the D-430 rear carried sustained_rush
+    }
+    std::puts("ranged policy: attribute and preset forms agree, legacy rejections, job refusals and levers PASS");
     return 0;
 }

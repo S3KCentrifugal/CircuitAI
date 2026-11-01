@@ -98,9 +98,21 @@ const std::vector<NumericKey>& NumericKeys() { return kNumeric; }
 bool Parse(const Json::Value& settings, RangedPolicy& policy, const Resolver& resolver,
            const std::vector<std::string>& skip, std::vector<std::string>& problems)
 {
+    return Parse(settings, policy, resolver, skip, {}, problems);
+}
+
+bool Parse(const Json::Value& settings, RangedPolicy& policy, const Resolver& resolver,
+           const std::vector<std::string>& skip, const std::vector<std::string>& forbidden,
+           std::vector<std::string>& problems)
+{
     if (!settings.isObject()) { problems.push_back("ranged policy is not an object"); return false; }
     bool valid = true;
     const auto fail = [&](const std::string& why) { valid = false; problems.push_back(why); };
+    // D-432: a job's parser owns its levers; another job's key rejects the block.
+    for (const std::string& key : settings.getMemberNames()) {
+        if (std::find(forbidden.begin(), forbidden.end(), key) != forbidden.end())
+            fail("'" + key + "' belongs to another job's controller");
+    }
 
     const auto modeValue = settings.get("target_mode", "skirmish");
     if (!modeValue.isString()) fail("target_mode is not a string");

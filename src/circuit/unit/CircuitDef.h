@@ -195,7 +195,7 @@ public:
 	// policy: the legacy `ranged` attribute block, or a ranged controller
 	// preset ("controller" key). Every admission and membership test reads
 	// this, never the attribute, so a preset-bound type needs no attribute.
-	bool IsRangedControlled() const { return rangedControlled; }
+	bool HasEngagementPolicy() const { return rangedControlled; }  // D-432: a ranged policy was installed (attribute or preset)
 	const RangedPolicy& GetRangedPolicy() const { return rangedPolicy; }
 	void SetRangedPolicy(const RangedPolicy& value) { rangedPolicy = value; rangedControlled = true; }
 	void ClearRangedPolicy() { rangedPolicy = RangedPolicy(); rangedControlled = false; }

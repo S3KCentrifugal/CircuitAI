@@ -1,10 +1,13 @@
 #pragma once
-// D-430: the ranged unit controller, the second unit controller on the D-388
-// framework (unit-controller-architecture.md, plan phase 3). It owns a unit
-// type's ranged policy as a preset in behaviour.json "controllers" (type
-// "ranged"), publishes that policy to the unit type, attaches every unit of
-// a bound type, and runs the existing CRangedEngagement for a unit while it
-// holds the controller's lease (a CControlledTask from the military manager).
+// D-430, D-432: the skirmisher unit controller (type "skirmisher", named
+// "ranged" until D-432), the second unit controller on the D-388 framework
+// (unit-controller-architecture.md, plan phase 3). It owns a line
+// skirmisher's policy (Thug, Mace: hold the band, poke, stand firm, kite
+// peers) as a preset in behaviour.json "controllers", publishes that policy
+// to the unit type, attaches every unit of a bound type, and runs the shared
+// CRangedEngagement for a unit while it holds the controller's lease (a
+// CControlledTask from the military manager). Another job's levers (cloak on
+// reload, fire line, press, staging, target mode) are refused at load.
 //
 // Behaviour is deliberately that of the artillery-task path it replaces: the
 // engagement opens on lease assignment and closes on lease end, exactly where
@@ -30,10 +33,10 @@ class CControlledTask;
 class CRangedEngagement;
 class IUnitTask;
 
-struct RangedConfig {
+struct SkirmisherConfig {
     RangedPolicy policy;
 };
-struct RangedState : control::ControlledState {
+struct SkirmisherState : control::ControlledState {
     // The engagement lives exactly as long as the lease (artillery-task parity).
     std::unique_ptr<CRangedEngagement> engagement;
     IUnitTask* lease = nullptr;  // address only, compared never dereferenced
@@ -41,14 +44,14 @@ struct RangedState : control::ControlledState {
     int leases = 0;
 };
 
-class CRangedController final : public CUnitControllerBase<RangedConfig, RangedState> {
+class CSkirmisherController final : public CUnitControllerBase<SkirmisherConfig, SkirmisherState> {
 public:
-    using State = RangedState;
-    explicit CRangedController(CCircuitAI* ai);
-    ~CRangedController() override;
+    using State = SkirmisherState;
+    explicit CSkirmisherController(CCircuitAI* ai);
+    ~CSkirmisherController() override;
 
     // IUnitController
-    const char* Name() const override { return "ranged"; }
+    const char* Name() const override { return "skirmisher"; }
     int ParsePreset(const std::string& name, const Json::Value& resolved, std::vector<std::string>& problems) override;
     void BindDef(int defId, int preset) override;
     bool SetOption(const std::string& name, float value) override;

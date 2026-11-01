@@ -78,6 +78,7 @@ def analyse(directory):
         row['trade_ratio'] = round(row['enemy_metal']/row['lost_metal'], 2) if row['lost_metal'] > 0 else (None if row['enemy_metal'] == 0 else 'no losses')
     first_shot = min((f for f, _ in shots), default=None)
     withdraws = [o for o in orders if o['order'] == 'withdraw']
+    tucks = text.count('BACKLINE: tuck unit=')  # D-432: backline tuck events
     staged = []
     for s in stances:
         if s['order'] == 'withdraw' and s['rear'] == 'withdraw' and s['screen'] in ('cover', 'hold'):
@@ -85,7 +86,7 @@ def analyse(directory):
     summary = dict(schema=1, case=cfg['name'], directory=str(directory), waves=report,
                    first_shot_seconds=first_shot/30 if first_shot is not None else None,
                    line_orders=orders, stance_changes=len(stances),
-                   staged_withdrawals=staged, first_withdraw_seconds=withdraws[0]['frame']/30 if withdraws else None,
+                   staged_withdrawals=staged, tucks=tucks, first_withdraw_seconds=withdraws[0]['frame']/30 if withdraws else None,
                    total_enemy_kills=sum(1 for d in deaths if d[2] == enemy_team),
                    total_losses=sum(1 for d in deaths if d[2] == 0 and d[3] in watched),
                    lines_seen=sorted({o['line'] for o in orders}))
@@ -99,7 +100,7 @@ def table(summary):
         losses = ', '.join(f'{k} {v}' for k, v in row['losses_by_unit'].items()) or '0'
         lines.append(f"| {name} | {row['enemy_kills']} | {row['enemy_metal']:.0f} | {losses} | {row['lost_metal']:.0f} | {row['trade_ratio']} | {row['damage_dealt']} | {row['damage_taken']} |")
     lines += ['', f"First shot: {summary['first_shot_seconds']} s. First withdraw order: {summary['first_withdraw_seconds']} s. "
-              f"Orders: {len(summary['line_orders'])}, stance changes: {summary['stance_changes']}, staged withdrawals (rear first, screen covering): {len(summary['staged_withdrawals'])}.",
+              f"Orders: {len(summary['line_orders'])}, stance changes: {summary['stance_changes']}, staged withdrawals (rear first, screen covering): {len(summary['staged_withdrawals'])}, backline tucks: {summary.get('tucks', 0)}.",
               f"Totals: kills {summary['total_enemy_kills']}, losses {summary['total_losses']}."]
     return '\n'.join(lines)
 

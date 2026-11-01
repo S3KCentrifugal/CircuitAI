@@ -18,6 +18,9 @@ public:
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
     bool IsSustainedRush() const { return world.IsSustainedRush(id); }
+    // D-432: read by the backline controller to build its directive.
+    CRangedWorld& World() { return world; }
+    const CRangedWorld::Capabilities& Caps() const { return caps; }
 private:
     void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage,float score=-1.f);
     bool Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape,bool urgent=false);
@@ -54,6 +57,7 @@ private:
     int moveObjective=-1, moveMode=-1;
     int pokePhase=-1; // owner 2026-10-17: -1 not poking, 1 stepping in, 0 stepping out
     int lineOrderFrame=-1; // D-430: the line order this hull last moved under
+    bool tucking=false;    // D-432: moving to the backline tuck point
     bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;
     float reservedDamage=0.f;
     float heldScore=0.f; int heldScoreFrame=-1; // current target's score, the tick it last passed the candidate filters

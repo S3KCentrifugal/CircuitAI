@@ -36,7 +36,8 @@
 #include "task/fighter/ArtilleryTask.h"
 #include "task/fighter/RangedWorld.h"
 #include "control/core/ControlledTask.h"
-#include "control/unit/ranged/RangedController.h"
+#include "control/unit/skirmisher/SkirmisherController.h"
+#include "control/unit/backline/BacklineController.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -2002,7 +2003,7 @@ void CMilitaryManager::UpdateCommanderSnipe()
 		// and never fired. O(1) per unit; the existing release path runs.
 		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
 			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled()
-			|| unit->GetCircuitDef()->IsRangedControlled())
+			|| unit->GetCircuitDef()->HasEngagementPolicy())
 		{
 			if (locked >= 0) unit->SetCommanderTarget(-1, frame);
 			continue;
@@ -2346,11 +2347,15 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 	CCircuitDef* def = unit->GetCircuitDef();
 	// Ordinary assignment only: specialist missions and player control keep
 	// their owner. No polling loop steals already assigned units.
-	if (!def->IsRangedControlled() || !def->IsMobile() || !def->IsLander()
+	if (!def->HasEngagementPolicy() || !def->IsMobile() || !def->IsLander()
 			|| def->IsAbleToFly() || def->IsRoleTrans()) return nullptr;
-	// D-430: a type bound to a ranged controller preset holds the controller's
-	// lease instead of an artillery task; the engagement is the same.
-	if (CRangedController* controller = circuit->GetRangedController()) {
+	// D-430, D-432: a type bound to a skirmisher or backline preset holds
+	// that controller's lease instead of an artillery task; the engagement is
+	// the same.
+	if (CSkirmisherController* controller = circuit->GetSkirmisherController()) {
+		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
+	}
+	if (CBacklineController* controller = circuit->GetBacklineController()) {
 		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
 	}
 	return Enqueue(TaskF::Common(IFighterTask::FightType::ARTY));

@@ -1,5 +1,6 @@
 #include "task/fighter/RangedEngagement.h"
 #include "control/group/LineController.h"
+#include "control/unit/backline/BacklineController.h"
 #include "task/UnitTask.h"
 #include "CircuitAI.h"
 #include "module/MilitaryManager.h"
@@ -361,6 +362,9 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     // replaces the cohort's for slot geometry, its spread widens the slot
     // spacing, and its stance is applied below after every hazard rule.
     const line::Directive* directive=ai->GetLineController()?ai->GetLineController()->DirectiveFor(id):nullptr;
+    // D-432: the backline controller's directive for a rear hull it runs
+    // (null for every other hull): station, target weights, step window, tuck.
+    const backline::Directive* rear=ai->GetBacklineController()?ai->GetBacklineController()->DirectiveFor(id):nullptr;
     AIFloat3 back=group.back;
     if(directive && directive->facingSet) back=AIFloat3(directive->facing.x,0.f,directive->facing.z);
     const float spacing=policy.spacing*(directive?directive->spread:1.f);
@@ -469,6 +473,11 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(c.id==target) s*=policy.targetHysteresis;
             if(world.Reserved(c.id,id)>=c.health) s*=.2f;
             if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
+            // D-432: the backline's job weights: statics, what the screen cannot
+            // reach, a wasted missile on a fast runner unless it comes for us.
+            if(rear) s*=backline::TargetWeight(c.mobile,
+                std::sqrt(ranged::DistanceSq(P(c.pos),rear->screenCentre)),rear->screenReach,
+                c.def->GetSpeed(),distance,rear->weights);
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
             // repairers or existing shot reservations. Geometry still vetoes.
@@ -499,7 +508,12 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     if(group.target>=0) {
         const auto arc=cohort::Arc(P(group.focus),P(back),group.radius,rank,int(group.members.size()),spacing);
         point.x=arc.x; point.z=arc.z;
-        if(group.formationRear) {
+        if(rear && rear->stationSet) {
+            // D-432: the backline station behind the paired screen, members
+            // spread laterally along the line as the travel lanes are.
+            const float offset=(rank-(group.members.size()-1)*.5f)*(spacing+1.f);
+            point=AIFloat3(rear->station.x,0.f,rear->station.z)+AIFloat3(-back.z,0,back.x)*offset;
+        } else if(group.formationRear) {
             point.x-=back.z*spacing*.5f;
             point.z+=back.x*spacing*.5f;
         }
@@ -606,6 +620,20 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             default: break;
         }
         if(directive->orderFrame!=lineOrderFrame) { lineUrgent=true; lineOrderFrame=directive->orderFrame; }
+    }
+    // D-432: a leaked short-range hostile: tuck behind the nearest screen
+    // members with fire open instead of kiting alone; otherwise reposition
+    // only while the weapon has reload to spare (a move never costs a shot).
+    if(rear && rear->tuck && !group.sustainedRush) {
+        danger=nullptr; incoming=nullptr;
+        point=AIFloat3(rear->tuckPoint.x,0.f,rear->tuckPoint.z);
+        if(!tucking) lineUrgent=true;
+        tucking=true;
+    } else {
+        if(tucking) lineUrgent=true;
+        tucking=false;
+        if(rear && rear->moveAfterShot && !danger && !lineUrgent
+            && !backline::MayStep(frame,lastReload,rear->aimHoldFrames,best>=0)) point=pos;
     }
     CTerrainManager::CorrectPosition(point);
     // Advancing enemies can move the ideal firing arc behind a committed
