@@ -4004,27 +4004,32 @@ local territory = (function()
         local r, g, b = Spring.GetTeamColor(team)
         return r or 1, g or 1, b or 1, alpha
     end
-    local function ring(x, y, z, radius, n)
-        gl.BeginEnd(GL.LINE_LOOP, function()
-            for a = 0, (n or 20) - 1 do local t = a / (n or 20) * 2 * math.pi; gl.Vertex(x + math.cos(t) * radius, y, z + math.sin(t) * radius) end
-        end)
+    -- Memory: these draw every frame for every spot (170+ on a big map). A
+    -- function() ... end passed to gl.BeginEnd is a new closure plus one
+    -- upvalue object per captured local on EVERY call, which came to ~50 KB of
+    -- garbage per frame (6-15 MB/s, BAR's "keeps the garbage collector busy"
+    -- warning). The vertex emitters below are created once and get their
+    -- values through gl.BeginEnd's extra arguments, so drawing allocates nothing.
+    local function polyVerts(x, y, z, radius, sides, turn)
+        for a = 0, sides - 1 do local t = turn + a / sides * 2 * math.pi; gl.Vertex(x + math.cos(t) * radius, y, z + math.sin(t) * radius) end
     end
-    local function disc(x, y, z, radius)
-        gl.BeginEnd(GL.TRIANGLE_FAN, function()
-            gl.Vertex(x, y, z)
-            for a = 0, 20 do local t = a / 20 * 2 * math.pi; gl.Vertex(x + math.cos(t) * radius, y, z + math.sin(t) * radius) end
-        end)
+    local function discVerts(x, y, z, radius)
+        gl.Vertex(x, y, z)
+        for a = 0, 20 do local t = a / 20 * 2 * math.pi; gl.Vertex(x + math.cos(t) * radius, y, z + math.sin(t) * radius) end
     end
-    local function poly(x, y, z, radius, sides, turn)
-        gl.BeginEnd(GL.LINE_LOOP, function()
-            for a = 0, sides - 1 do local t = (turn or 0) + a / sides * 2 * math.pi; gl.Vertex(x + math.cos(t) * radius, y, z + math.sin(t) * radius) end
-        end)
+    local function crossVerts(x, y, z, r)
+        gl.Vertex(x - r, y, z - r); gl.Vertex(x + r, y, z + r); gl.Vertex(x - r, y, z + r); gl.Vertex(x + r, y, z - r)
     end
-    local function cross(x, y, z, r)
-        gl.BeginEnd(GL.LINES, function()
-            gl.Vertex(x - r, y, z - r); gl.Vertex(x + r, y, z + r); gl.Vertex(x - r, y, z + r); gl.Vertex(x + r, y, z - r)
-        end)
+    local function laneVerts(pts)
+        for i = 1, #pts - 1, 2 do
+            local a, c = pts[i], pts[i + 1]
+            gl.Vertex(a[1], a[2], a[3]); gl.Vertex(c[1], c[2], c[3])
+        end
     end
+    local function ring(x, y, z, radius, n) gl.BeginEnd(GL.LINE_LOOP, polyVerts, x, y, z, radius, n or 20, 0) end
+    local function disc(x, y, z, radius) gl.BeginEnd(GL.TRIANGLE_FAN, discVerts, x, y, z, radius) end
+    local function poly(x, y, z, radius, sides, turn) gl.BeginEnd(GL.LINE_LOOP, polyVerts, x, y, z, radius, sides, turn or 0) end
+    local function cross(x, y, z, r) gl.BeginEnd(GL.LINES, crossVerts, x, y, z, r) end
     local SPOT = 44
     -- Membership checks reuse the lane selection; no geometry rebuild or
     -- per-frame filtered arrays. Territory spots remain a separate layer.
@@ -4057,14 +4062,7 @@ local territory = (function()
                     if laneVisible(lane) then
                     local r, g, b = colour(lane.members[1], 1)
                     gl.Color(r, g, b, 0.55)
-                    if #lane.pts >= 2 then
-                        gl.BeginEnd(GL.LINES, function()
-                            for i = 1, #lane.pts - 1, 2 do
-                                local a, c = lane.pts[i], lane.pts[i + 1]
-                                gl.Vertex(a[1], a[2], a[3]); gl.Vertex(c[1], c[2], c[3])
-                            end
-                        end)
-                    end
+                    if #lane.pts >= 2 then gl.BeginEnd(GL.LINES, laneVerts, lane.pts) end
                     local mx, mz = lane.mid[1], lane.mid[2]
                     if mx and mx >= 0 then gl.Color(1, 1, 1, 0.8); ring(mx, ground(mx, mz), mz, 60, 12) end
                     local cx, cz = lane.choke[1], lane.choke[2]
