@@ -656,6 +656,7 @@ void CMilitaryManager::ReadConfig()
 	const Json::Value& artyCommCfg = root["artillery_commander"];
 	artyCommInfo.isEnabled = false;
 	artyCommInfo.defs.clear();
+	artyCommInfo.heavyMaxSqSpeed.clear();
 	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
 		std::set<std::string> names;
 		for (const auto& name : artyCommCfg["units"]) names.insert(name.asString());
@@ -664,11 +665,21 @@ void CMilitaryManager::ReadConfig()
 		}
 		const float maxSpeed = std::max(0.f, artyCommCfg.get("max_speed", 12.f).asFloat()) / FRAMES_PER_SEC;
 		artyCommInfo.maxSqSpeed = SQUARE(maxSpeed);
+		// "heavy_units": enemy defs shot after commanders and before structures,
+		// when moving at most "heavy_speed_fraction" of their own top speed.
+		std::set<std::string> heavyNames;
+		for (const auto& name : artyCommCfg["heavy_units"]) heavyNames.insert(name.asString());
+		const float heavyFrac = utils::clamp(artyCommCfg.get("heavy_speed_fraction", 0.25f).asFloat(), 0.f, 1.f);
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (heavyNames.count(d.GetDef()->GetName()) > 0) {
+				artyCommInfo.heavyMaxSqSpeed[d.GetId()] = SQUARE(d.GetSpeed() * heavyFrac / FRAMES_PER_SEC);
+			}
+		}
 		artyCommInfo.isEnabled = !artyCommInfo.defs.empty();
 	}
-	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f",
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u",
 			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
-			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC);
+			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()));
 
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();

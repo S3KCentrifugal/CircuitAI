@@ -223,7 +223,14 @@
 			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
 				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
 				"armmship", "cormship"],                  // Longbow, Messenger (rocket ships)
-			"max_speed": 12
+			"max_speed": 12,
+			// Owner 2026-11-01: next after a slow commander (and before any building), these
+			// heavy units in range when moving at most heavy_speed_fraction of their own top
+			// speed: Incinerator, Fatboy, Tzar, Starlight, Razorback, Mammoth, Demon, Prometheus
+			// (the heat-ray tank; leghack, the combat engineer, shares the name).
+			"heavy_units": ["leginc", "armfboy", "corgol", "armmanni",
+				"armraz", "corsumo", "cordemon", "legaheattank"],
+			"heavy_speed_fraction": 0.25
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
