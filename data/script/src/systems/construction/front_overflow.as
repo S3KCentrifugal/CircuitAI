@@ -85,9 +85,8 @@ namespace FrontOverflow {
 
     float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even footprints sit on 16-elmo lines
 
-    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells, CCircuitUnit@ u)
+    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells, CCircuitUnit@ u, int cols, int rows)
     {
-        const int cols = Global::RoleSettings::Front::OverflowBlockCols, rows = Global::RoleSettings::Front::OverflowBlockRows;
         // The def's own width (arm C, 2026-10-31): BAR footprint 4 is 8 engine squares, 64 elmo (GetFootprintX
         // = 4 cells of 16); a 32-elmo pitch put every neighbour cell half on its neighbour and the native site
         // search refused it - the TECH layout's converter grid is at 64 for the same reason
@@ -130,21 +129,20 @@ namespace FrontOverflow {
         return false;
     }
 
-    // Candidates: rings round the eco anchor, the side away from the map centre first
-    bool ChooseBlock(CCircuitDef@ d, CCircuitUnit@ u)
+    // The best site for a cols x rows block: rings round the eco anchor, the side away from the map centre first
+    bool SearchBlock(CCircuitDef@ d, CCircuitUnit@ u, int cols, int rows, AIFloat3 &out best, array<AIFloat3>@ bestCells)
     {
-        if (ai.frame < blockRetry) return false;
         const AIFloat3 anchor = FrontEcoLadder::Anchor();
         const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
         const AIFloat3 centre(w * 0.5f, 0.0f, h * 0.5f);
         float bx = anchor.x - centre.x, bz = anchor.z - centre.z;
         const float bl = sqrt(bx * bx + bz * bz);
         if (bl > 1.0f) { bx /= bl; bz /= bl; } else { bx = 1.0f; bz = 0.0f; }
+        const float startBack = (Global::Map::StartPos.x - centre.x) * bx + (Global::Map::StartPos.z - centre.z) * bz;
         array<AIFloat3> fit;
-        AIFloat3 best(-1.0f, 0.0f, -1.0f);
+        best = AIFloat3(-1.0f, 0.0f, -1.0f);
         float bestScore = -1.0e9f;
-        array<AIFloat3> bestCells;
-        const array<float> rings = {0.0f, 160.0f, 320.0f, 480.0f, 640.0f, 800.0f, 1000.0f, 1200.0f};
+        const array<float> rings = {0.0f, 160.0f, 320.0f, 480.0f, 640.0f, 800.0f, 1000.0f, 1200.0f, 1400.0f, 1600.0f};
         for (uint ri = 0; ri < rings.length(); ++ri) {
             const int spokes = rings[ri] <= 0.0f ? 1 : 12;
             for (int a = 0; a < spokes; ++a) {
@@ -152,19 +150,35 @@ namespace FrontOverflow {
                 const AIFloat3 p = FrontEcoLadder::Clamped(anchor.x + cos(ang) * rings[ri], anchor.z + sin(ang) * rings[ri]);
                 // away from the centre, then near the anchor; never nearer the centre than the start by more than 200
                 const float back = (p.x - centre.x) * bx + (p.z - centre.z) * bz;
-                const float startBack = (Global::Map::StartPos.x - centre.x) * bx + (Global::Map::StartPos.z - centre.z) * bz;
                 if (back < startBack - 200.0f) continue;
                 const float score = back - 0.5f * rings[ri];
                 if (score <= bestScore || NearGivenUp(p)) continue;
-                if (!CellsFit(d, p, fit, u)) continue;
+                if (!CellsFit(d, p, fit, u, cols, rows)) continue;
                 bestScore = score; best = p; bestCells = fit;
             }
             if (best.x >= 0.0f && ri >= 2) break;   // good enough: no need to walk further out
         }
-        if (best.x < 0.0f) {
+        return best.x >= 0.0f;
+    }
+
+    // The configured block, else smaller gap-free ones (arm D, 2026-10-31: in arm C no 3x3 block with its
+    // yard fitted 84 times, most on Carrot Mountains, Forge and Angel Crossing, and those FRONTs built none)
+    bool ChooseBlock(CCircuitDef@ d, CCircuitUnit@ u)
+    {
+        if (ai.frame < blockRetry) return false;
+        const int c0 = Global::RoleSettings::Front::OverflowBlockCols, r0 = Global::RoleSettings::Front::OverflowBlockRows;
+        const array<int> shapes = {c0, r0, c0, AiMax(1, r0 - 1), AiMax(1, r0 - 1), c0, 2, 2};
+        AIFloat3 best;
+        array<AIFloat3> bestCells;
+        int cols = 0, rows = 0;
+        for (uint k = 0; k + 1 < shapes.length() && cols == 0; k += 2) {
+            if (SearchBlock(d, u, shapes[k], shapes[k + 1], best, bestCells)) { cols = shapes[k]; rows = shapes[k + 1]; }
+        }
+        const AIFloat3 anchor = FrontEcoLadder::Anchor();
+        if (cols == 0) {
             blockRetry = ai.frame + 60 * SECOND;
-            GenericHelpers::LogUtil("[FRONT][Overflow] no " + Global::RoleSettings::Front::OverflowBlockCols + "x" + Global::RoleSettings::Front::OverflowBlockRows
-                + " converter block fits round the eco anchor " + int(anchor.x) + "," + int(anchor.z) + "; retry in 60 s", 1);
+            GenericHelpers::LogUtil("[FRONT][Overflow] no " + c0 + "x" + r0 + " (nor smaller) converter block fits round the eco anchor "
+                + int(anchor.x) + "," + int(anchor.z) + "; retry in 60 s", 1);
             return false;
         }
         cells = bestCells;
@@ -173,8 +187,7 @@ namespace FrontOverflow {
         blockCentre = best; blocks++; failsHere = 0; blockFirstCell = allCells.length(); anchored = false;
         for (uint i = 0; i < cells.length(); ++i) allCells.insertLast(cells[i]);
         GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
-            + Global::RoleSettings::Front::OverflowBlockCols + "x" + Global::RoleSettings::Front::OverflowBlockRows + ", eco anchor "
-            + int(anchor.x) + "," + int(anchor.z) + ")", 1);
+            + cols + "x" + rows + ", eco anchor " + int(anchor.x) + "," + int(anchor.z) + ")", 1);
         return true;
     }
 
@@ -263,14 +276,15 @@ namespace FrontOverflow {
         if (i < 0) return null;   // the rest of the block is ordered
         if (Planned(d, cells[i])) { cellState[i] = 3; blockFails++; failsHere++; return null; }   // planned over since the block was chosen
         if (!aiTerrainMgr.CanMoveTo(u, cells[i]) || aiBattle.SurfThreat(cells[i]) > Global::RoleSettings::Front::OverflowMaxThreat) return null;   // another constructor, or later
-        if (!anchored) {
-            // one cell until the block's first frame stands and sets the grid (Follow)
-            for (uint k = 0; k < cells.length(); ++k) if (cellState[k] == 1) return null;
-        }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::CONVERT, Task::Priority::HIGH, d, cells[i], 0.0f, true, 180 * SECOND));
         if (t is null) { cellState[i] = 3; blockFails++; failsHere++; return null; }
         IBuilderTask@ bt = cast<IBuilderTask>(t);
-        if (bt !is null) bt.siteRadius = 24.0f;   // its own cell or nothing
+        if (bt !is null) {
+            bt.siteRadius = 24.0f;   // its own cell or nothing
+            // native's unlogged auto-aborts (the reach/threat check on the walk, a retreat) dropped many cell
+            // orders 0-3 s after they were given with the bank full (arm D); the order's timeout still ends it
+            bt.canAutoAbort = false;
+        }
         cellState[i] = 1; @cellTasks[i] = t;
         if (cellOrdered.length() < cells.length()) cellOrdered.resize(cells.length());
         cellOrdered[i] = ai.frame;
