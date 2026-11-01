@@ -80,6 +80,10 @@ void ITaskModule::AssignTask(CCircuitUnit* unit, IUnitTask* task)
 		if (task != current.get() && task->GetAssignees().empty()) task->GetManager()->DiscardUnusedTask(task);
 		return;
 	}
+	if ((task != current.get()) && current->KeepsAssignee(task)) {
+		if (task->GetAssignees().empty()) task->GetManager()->DiscardUnusedTask(task);
+		return;
+	}
 	{
 		// D-070 diagnostics: a task swap of an experimental builder
 		CBuilderManager* bm = dynamic_cast<CBuilderManager*>(this);
@@ -103,7 +107,7 @@ void ITaskModule::AssignTask(CCircuitUnit* unit)
 		GetCircuit()->LOG("[TaskLifetime] event=make-task unit=%i invalid current task", unit->GetId());
 		return;
 	}
-	if (current->IsEnemyReclaim()) return;
+	if (current->IsEnemyReclaim() || current->KeepsAssignee(nullptr)) return;
 	const auto id = unit->GetId();
 	IUnitTask* task = MakeTask(unit);
 	if (task == nullptr || IUnitTask::LiveGeneration(task) == 0) {

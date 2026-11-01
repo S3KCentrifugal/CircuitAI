@@ -86,6 +86,9 @@ public:
 	virtual void Dead();
 	bool IsDead() const { return isDead; }
 	virtual bool IsEnemyReclaim() const { return false; }
+	// True when the current assignee stays on this task instead of taking
+	// next (nullptr: the manager's re-ask of a busy unit). Terrain restore.
+	virtual bool KeepsAssignee(const IUnitTask* next) const { return false; }
 	virtual bool IsExternalControlled() const { return false; }
 
 	// AS API

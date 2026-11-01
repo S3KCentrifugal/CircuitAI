@@ -24,6 +24,9 @@ public:
 
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
+	// restore.protect: ordinary builder and wait tasks, and the re-ask of a
+	// busy builder, do not take the restorer away while the patch is worked
+	virtual bool KeepsAssignee(const IUnitTask* next) const override;
 
 	virtual void Start(CCircuitUnit* unit) override;
 	virtual void Update() override;
@@ -48,6 +51,7 @@ private:
 	int orders;      // restore orders given (the engine can drop one)
 	int unitId;      // the restorer, for the log
 	std::string unitName;
+	mutable bool keptLogged;  // one "kept" line per task
 };
 
 } // namespace circuit
