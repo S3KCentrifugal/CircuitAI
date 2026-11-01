@@ -93,12 +93,12 @@ namespace Front {
             // off every allied start's line to its nearest enemy start, nearest home first. Log [FRONT][SiloGrid].
             bool SiloGrid = true;
             int NukeLimit = 8;
-            int NukeMinSeconds = 35 * 60;
-            float NukeMetalIncome = 225.0f;
-            float NukeEnergyIncome = 2000.0f;
-            int NukeSustainSeconds = 60;
+            int NukeMinSeconds = 35 * 60;       // owner 2026-11-01: 35 min
+            float NukeMetalIncome = 175.0f;      // owner 2026-11-01: 10 s minimum metal income
+            float NukeEnergyIncome = 5000.0f;    // owner 2026-11-01: 10 s minimum energy income
+            int NukeSustainSeconds = 0;         // owner 2026-10-31: the 10 s minimum metal income is the gate
             // block shapes tried in order, as columns,rows pairs; a block goes up next to the last one
-            array<int> SiloGridShapes = { 4, 2,  2, 2,  2, 1 };
+            array<int> SiloGridShapes = { 4, 2,  2, 2,  2, 1,  1, 1 };
             float SiloGridMargin = 48.0f;
             float SiloGridLaneClear = 200.0f;   // played: 500 left no site round a FRONT (8 allied lanes cross its base)
             float SiloGridSearchStep = 256.0f;

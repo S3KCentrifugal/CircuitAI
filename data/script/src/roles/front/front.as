@@ -701,7 +701,7 @@ namespace RoleFront {
         if (ladderGantry !is null) return ladderGantry;
         IUnitTask@ ladder=FrontEcoLadder::Work(builder);
         if (ladder !is null) return ladder;
-        // Owner (2026-10-30): from 35 min at sustained 225 metal / 2000 energy, silos in one tight grid off the lanes (front_silo_grid.as)
+        // Owner (2026-11-01): from 35 min at a 10 s minimum income of 175 metal / 5000 energy, silos in tight packs off the lanes (front_silo_grid.as)
         IUnitTask@ silo=FrontSiloGrid::Work(builder);
         if (silo !is null) return silo;
         // Owner (2026-10-22): T2 constructors upgrade our T1 mexes before native assist/help work
