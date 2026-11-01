@@ -235,7 +235,7 @@ void CEnemyManager::EnqueueUpdate()
 //	}
 	isUpdating = true;
 
-	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CEnemyManager::Update, this));
+	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CEnemyManager::Update, this), "enemy", jobs::Key("enemy"));  // D-431: coalesced
 }
 
 bool CEnemyManager::UnitInLOS(CEnemyUnit* data)

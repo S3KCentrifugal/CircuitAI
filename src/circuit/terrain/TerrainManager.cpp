@@ -161,7 +161,7 @@ void CTerrainManager::InitAnalyzer()
 	assert(terrainData->IsInitialized());
 	terrainData->AnalyzeMap(circuit);
 
-	areaData = terrainData->pAreaData.load();
+	areaData = terrainData->GetAreaData();
 
 	ReadConfig();
 }

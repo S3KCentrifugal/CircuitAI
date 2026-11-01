@@ -922,6 +922,7 @@ int CCircuitAI::Update(int frame)
 	FlushDrawQueue();  // D-118
 	if (performance::enabled && frame % (60 * FRAMES_PER_SEC) == 0) {
 		performance::Flush(this);
+		scheduler->FlushWorkerStats(this);  // D-431
 		unsigned current = 0, destroyedObjects = 0, detected = 0;
 		scriptManager->GetEngine()->GetGCStatistics(&current, &destroyedObjects, &detected);
 		performance::Garbage(this, current, destroyedObjects, detected);

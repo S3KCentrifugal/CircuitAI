@@ -39,6 +39,8 @@ CInfluenceMap::CInfluenceMap(CMapManager* manager)
 	height = circuit->GetTerrainManager()->GetSectorZSize() / 4;
 	mapSize = width * height;
 
+	SInfluenceData& inflData0 = influenceData.At(0);
+	SInfluenceData& inflData1 = influenceData.At(1);
 	for (SInfluenceData* inflData : {&inflData0, &inflData1}) {
 		inflData->enemyInfl.resize(mapSize, INFL_BASE);
 		inflData->allyInfl.resize(mapSize, INFL_BASE);
@@ -96,7 +98,7 @@ void CInfluenceMap::EnqueueUpdate()
 	CCircuitAI* circuit = manager->GetCircuit();
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	rangeScale = circuit->GetMilitaryManager()->GetRangeUnitCountCompensatorScale();
-	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CInfluenceMap::Update, this, enemyMgr));
+	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CInfluenceMap::Update, this, enemyMgr), "influence", jobs::Key("influence"));  // D-431: coalesced
 }
 
 void CInfluenceMap::Prepare(SInfluenceData& inflData)
@@ -185,8 +187,8 @@ void CInfluenceMap::Apply()
 
 void CInfluenceMap::SwapBuffers()
 {
-	pInflData = GetNextInflData();
-	SInfluenceData& inflData = *pInflData.load();
+	influenceData.Publish();
+	SInfluenceData& inflData = influenceData.Front();
 	enemyInfl = inflData.enemyInfl.data();
 	allyInfl = inflData.allyInfl.data();
 	allyDefendInfl = inflData.allyDefendInfl.data();
