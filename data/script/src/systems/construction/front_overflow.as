@@ -288,6 +288,8 @@ namespace FrontOverflow {
             GenericHelpers::LogUtil("[FRONT][Overflow] cell " + (i + 1) + " of block " + blocks + " order ended " + (done ? "done" : "unbuilt")
                 + (framed ? ", frame stands" : ", no frame") + " after " + age + " s, builders " + task.GetUnits().length()
                 + " | bank " + int(pct * 100.0f) + "% M bank " + int(aiEconomyMgr.metal.current), 1);
+            // native's own converter abort (bank under 55%, no frame yet): the cell is fine, it opens again
+            if (!done && !framed && pct < 0.56f && cellState[i] == 1) { cellState[i] = 0; @cellTasks[i] = null; }
             return;
         }
     }
