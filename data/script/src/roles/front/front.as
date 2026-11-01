@@ -52,6 +52,7 @@ namespace RoleFront {
         g_frontVehicleThresholdsApplied = false;
 
         Front_ApplyStartLimits();
+        FrontEnergy::Update();
 
         // Log all strategic objectives with distance from start
         ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::FRONT, "FRONT");
@@ -507,6 +508,11 @@ namespace RoleFront {
     }
 
     bool Front_AiIsSwitchAllowed(const CCircuitDef@ facDef, float armyCost, int factoryCount, float metalCurrent, bool &out assistRequired) {
+        if (facDef !is null && (Factory::userData[facDef.id].attr & Factory::Attr::T2) != 0
+            && !Team::Donation::FrontFactoryAllowed()) {
+            assistRequired = false;
+            return false;
+        }
         const bool isOK = (armyCost > Global::RoleSettings::Front::SwitchFactoryCostMultiplier * facDef.costM * float(factoryCount)) || (metalCurrent > facDef.costM);
         assistRequired = !isOK;
         return isOK;
@@ -747,6 +753,7 @@ namespace RoleFront {
         //Always apply map limits, regardless of how eco changes labs limits
         dictionary mapLimits = Global::Map::Config.UnitLimits;
         UnitHelpers::ApplyUnitLimits(mapLimits);
+        FrontEnergy::Update(true); // map caps must not reopen an unaffordable AFUS
     }
 
     void Front_IncomeLabLimits(float metalIncome) {
@@ -963,9 +970,8 @@ namespace RoleFront {
     }
 
     IUnitTask@ Front_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent) {
-        // Copy of TECH T2 constructor logic with Front-specific gating:
-        // - Before 20 minutes of game time, force eco: only build energy converter/AFUS/FUS (skip gantry/nuke/anti-nuke)
-        // - After 20 minutes, allow full TECH-style sequence (gantry, nuke, anti-nuke, etc.)
+        // Normal fusion stays eligible until both FRONT AFUS income floors clear.
+        // Native default energy selection observes the same availability gate.
 
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
@@ -975,22 +981,19 @@ namespace RoleFront {
         }
 
         const bool isPrimary = (u is Builder::primaryT2BotConstructor || u is Builder::primaryT2VehConstructor);
-        const bool isSecondary = (u is Builder::secondaryT2BotConstructor);
 
         AIFloat3 anchor = Global::Map::StartPos;
 
-        // Eco gating: force economy builds for the first 20 minutes
-        const bool forceEco = (ai.frame < (Global::RoleSettings::Front::TimeTriggerForT2EcoGatingSeconds * SECOND));
-
         if (isPrimary) {
             // Fusion Reactor
-            if (EconomyHelpers::ShouldBuildFusionReactor(
+            if (FrontEnergyMath::NormalAllowed(
                 /*mi*/ metalIncome,
                 /*ei*/ energyIncome,
                 /*energy<90%*/ isEnergyLessThan90Percent,
                 /*reqMi*/ Global::RoleSettings::Front::MinimumMetalIncomeForFUS,
                 /*reqEi*/ Global::RoleSettings::Front::MinimumEnergyIncomeForFUS,
-                /*maxEi*/ Global::RoleSettings::Front::MaxEnergyIncomeForFUS
+                /*maxEi*/ Global::RoleSettings::Front::MaxEnergyIncomeForFUS,
+                /*advancedAllowed*/ FrontEnergy::AdvancedAllowed(metalIncome, energyIncome)
             )) {
                 IUnitTask@ tFus2 = Builder::EnqueueFUS(unitSide, anchor, SQUARE_SIZE * 32, SECOND * 300);
                 if (tFus2 !is null) return tFus2;

@@ -2,6 +2,13 @@
 
 namespace circuit::reservation {
 
+// A reclaimed opening leaves cells without zone underlay. An existing exact
+// slot may own those reservation marks; a new slot or another zone may not.
+constexpr bool AllowsReservedCell(int zone, int cellZone, bool existingSlot)
+{
+    return zone > 0 && (cellZone == zone || (existingSlot && cellZone == 0));
+}
+
 // Transfer a task's exclusive unconsumed claim with a constant number of
 // registry operations (O(log N) for TerrainManager's ordered reservation map).
 // Re-pinning our own ID is idempotent; failure preserves our previous claim

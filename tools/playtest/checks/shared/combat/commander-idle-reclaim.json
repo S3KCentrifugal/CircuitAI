@@ -1,0 +1,47 @@
+{
+  "stop_minute": 3,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[CommanderIdleProbe\\] PASS complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 10,
+  "expect": [
+    {
+      "key": "energy_feature",
+      "pattern": "\\[CommanderIdleProbe\\] PASS energy_feature",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "reclaim_command",
+      "pattern": "\\[CommanderIdleProbe\\] PASS reclaim_command",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "reclaimed",
+      "pattern": "\\[CommanderIdleProbe\\] PASS reclaimed",
+      "scope": "any",
+      "by_minute": 2.8
+    },
+    {
+      "key": "stationary",
+      "pattern": "\\[CommanderIdleProbe\\] PASS stationary",
+      "scope": "any",
+      "by_minute": 2.8
+    }
+  ],
+  "forbid": [
+    {
+      "key": "failure",
+      "pattern": "\\[CommanderIdleProbe\\] FAIL|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

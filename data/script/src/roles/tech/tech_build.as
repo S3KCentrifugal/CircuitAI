@@ -14,6 +14,9 @@
 #include "../../systems/construction/layout.as"
 #include "../../systems/construction/eco_planner.as"
 #include "../../systems/construction/reclaim_policy.as"
+#include "../../systems/construction/tech_growth.as"
+#include "../../systems/construction/economy_cluster.as"
+#include "../../systems/construction/rush_bootstrap.as"
 
 /******************************************************************************
 
@@ -61,7 +64,10 @@ namespace TechBuild {
     IUnitTask@ KeepCurrent(CCircuitUnit@ u)
     {
         IBuilderTask@ cur = (u.task is null) ? null : cast<IBuilderTask>(u.task);
-        const bool keep = (cur !is null && Task::BuildType(cur.GetBuildType()) < Task::BuildType::REPAIR);
+        CCircuitUnit@ target = cur is null ? null : cur.target;
+        const bool keep = TechEconomyMath::KeepConstruction(cur !is null && !cur.IsDead(),
+            cur !is null && Task::BuildType(cur.GetBuildType()) < Task::BuildType::REPAIR,
+            target !is null, target is null ? 0.0f : target.GetBuildProgress());
         // diagnostic (D-070 benchmarks): what a re-asked builder holds, on change
         {
             const string sig = (u.task is null) ? "nothing" : (cur is null ? "a non-builder task" : ("build type " + int(cur.GetBuildType())
@@ -116,6 +122,15 @@ namespace TechBuild {
         const string side = Global::AISettings::Side;
         const bool t1 = (name == UnitHelpers::GetWindNameForSide(side)) || (name == UnitHelpers::GetSolarNameForSide(side));
         const bool adv = (name == UnitHelpers::GetAdvSolarNameForSide(side));
+        if (name == UnitHelpers::GetFusionNameForSide(side)) {
+            CCircuitDef@ advanced = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+            CCircuitDef@ fusion = ai.GetCircuitDef(name);
+            const bool complete = advanced !is null && advanced.count > aiBuilderMgr.GetUnfinishedCount(advanced);
+            const int pending = fusion is null ? 0 : aiBuilderMgr.GetUnfinishedCount(fusion)
+                + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), fusion);
+            return TechEconomyMath::FusionSuperseded(complete,
+                TechChain::NukeRush() || TechHeavyRush::RequiresFusion(), pending);
+        }
         if (!t1 && !adv) return false;
         CCircuitDef@ fus = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
         const bool fusionUp = (fus !is null && fus.count - aiBuilderMgr.GetUnfinishedCount(fus) > 0) || IntoAfus();
@@ -189,6 +204,21 @@ namespace TechBuild {
         return t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0;
     }
 
+    IUnitTask@ EnqueueOpeningFactory(CCircuitDef@ lab, int slot)
+    {
+        if (slot < 0 || aiTerrainMgr.GetReservationState(slot) != 0
+            || !aiTerrainMgr.IsReservationBuildable(slot)) return null;
+        const AIFloat3 position = aiTerrainMgr.GetReservationPos(slot);
+        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, lab,
+            position, null, 0.0f, false, true, 300 * SECOND));
+        if (task is null) return null;
+        if (!AiPinReservation(task, slot)) {
+            aiBuilderMgr.AbortTask(task);
+            return null;
+        }
+        return task;
+    }
+
     IUnitTask@ StartFactory(CCircuitUnit@ u)
     {
         if (!RoleTech::Opening::complete || IntoT2()) return null;
@@ -197,6 +227,12 @@ namespace TechBuild {
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         if (lab is null || !u.circuitDef.CanBuild(lab)) return null;
         if (lab.count > 0 || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) > 0) return null;
+        if (Layout::HasSpine()) {
+            // The opening site predates the campus. Pin it explicitly: the
+            // generic fallback may select a different, distant lab reservation.
+            IUnitTask@ opening = EnqueueOpeningFactory(lab, Layout::spineOpeningSlot);
+            if (opening !is null) return opening;
+        }
         // D-101 (owner's rule): only with no construction turret standing may the
         // lab go anywhere; with one, the layout places it
         if (Layout::TurretsStand()) {
@@ -381,6 +417,8 @@ namespace TechBuild {
     {
         CCircuitUnit@ u = ai.GetTeamUnit(id);
         if (u is null || u.task is null) return;
+        // Economy-role handover after retirement preserves paid construction.
+        if (TechGrowth::active && KeepCurrent(u) !is null) return;
         IBuilderTask@ bt = cast<IBuilderTask>(u.task);
         if (bt is null || bt.buildDef is null) return;
         const string side = Global::AISettings::Side;
@@ -454,6 +492,58 @@ namespace TechBuild {
         if (fr is null) return null;
         return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, fr, 60 * SECOND));
     }
+    // Native task counts intentionally forget cancelled frames. Retain only IDs
+    // from removal callbacks, pruning on completion, destruction or transfer.
+    // O(A) for orphan AFUS frames (normally zero); no recurring army census.
+    array<int> orphanAfus;
+    void ReactorTaskRemoved(IUnitTask@ task) {
+        if(Global::AISettings::Role!=AiRole::TECH) return;
+        IBuilderTask@ build=cast<IBuilderTask>(task);
+        if(build is null) return;
+        CCircuitUnit@ frame=build.target;
+        if(frame is null || frame.GetBuildProgress()>=1.0f
+            || frame.circuitDef.GetName()!=UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) return;
+        if(orphanAfus.find(frame.id)<0) orphanAfus.insertLast(frame.id);
+    }
+    CCircuitUnit@ OrphanAfus() {
+        CCircuitUnit@ first=null;
+        for(int i=int(orphanAfus.length())-1;i>=0;--i) {
+            CCircuitUnit@ frame=ai.GetTeamUnit(orphanAfus[i]);
+            if(frame is null || frame.GetBuildProgress()>=1.0f) orphanAfus.removeAt(i);
+            else @first=frame;
+        }
+        return first;
+    }
+    bool CanStartAfus(CCircuitDef@ def) {
+        if(Global::AISettings::Role!=AiRole::TECH || def is null
+            || def.GetName()!=UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) return true;
+        // Queue covers travel; indexed count covers managed frames; removal
+        // callbacks preserve physical frames after task cancellation.
+        return OrphanAfus() is null && TechEconomyMath::SingleProjectAvailable(
+            aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY),def),
+            aiBuilderMgr.GetUnfinishedCount(def));
+    }
+    int focusAfusId=-1,focusAfusCount=-1,focusAfusRetry=0;
+    IUnitTask@ AssistAfus(CCircuitUnit@ u) {
+        CCircuitDef@ def=ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        if(def is null) return null;
+        const int count=aiBuilderMgr.GetUnfinishedCount(def);
+        CCircuitUnit@ orphan=OrphanAfus();
+        if(count==0 && orphan is null) {focusAfusId=-1;focusAfusCount=0;return null;}
+        CCircuitUnit@ frame=ai.GetTeamUnit(focusAfusId);
+        // Cache a stable ID, never a borrowed wrapper. Creation/count change,
+        // completion and ownership loss invalidate it. Only a missing target
+        // retries the existing O(N) native lookup at most once per second.
+        if(frame is null || frame.GetBuildProgress()>=1.0f || frame.circuitDef !is def) {
+            if(focusAfusId<0 && count==focusAfusCount && ai.frame<focusAfusRetry) return null;
+            @frame=orphan;
+            if(frame is null) @frame=aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(),Global::RoleSettings::Tech::ChainAssistRadius,def);
+            focusAfusId=frame is null?-1:frame.id;
+            focusAfusCount=count;focusAfusRetry=ai.frame+SECOND;
+        }
+        if(frame is null) return null;
+        return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH,frame,60*SECOND));
+    }
     // Restore actual layout losses before discretionary expansion. Fixed roster,
     // live pending counts and bounded native candidate traversal; no unit scan.
     const array<string> recoveryKeys = {"nano", "advconv", "t1conv", "afus", "fusion", "advsolar", "solar", "wind", "estor", "mstor"};
@@ -483,12 +573,14 @@ namespace TechBuild {
         return null;
     }
 
-    IUnitTask@ BuildByLayout(CCircuitUnit@ u, const string &in defName, Task::BuildType type)
+    IUnitTask@ BuildByLayout(CCircuitUnit@ u, const string &in defName, Task::BuildType type, bool fundedGrowthEnergy = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(defName);
         if (d is null || !d.IsAvailable(ai.frame) || !u.circuitDef.CanBuild(d)) return null;
         if (type == Task::BuildType::ENERGY && Global::AISettings::Role == AiRole::TECH) {
-            if (!EnergyAllowed(defName)) return null;
+            // Retirement's fully funded AFUS breaks the both-banks-full
+            // deadlock. Single-project and reservation admission still apply.
+            if (!EnergyAllowed(defName) && !fundedGrowthEnergy) return null;
             if (Builder::EnergyBuildTask !is null && !Builder::EnergyBuildTask.IsDead())
                 return Builder::EnqueueAssistEnergy(Task::Priority::HIGH, 60 * SECOND, Global::RoleSettings::Tech::EnergyFocusMaxAssists);
         }
@@ -561,6 +653,9 @@ namespace TechBuild {
             CCircuitDef@ d = ai.GetCircuitDef(name);
             string why = (d is null) ? "no def" : (!d.IsAvailable(ai.frame) ? ("not available (" + d.count + " of " + d.maxThisUnit + ")")
                 : (!u.circuitDef.CanBuild(d) ? "cannot build it" : "no site in the layout"));
+            if(Layout::economySupportTask !is null && !Layout::economySupportTask.IsDead()) why="construction-turret support pending";
+            else if(role==1) why="converter admission: "+EcoPlanner::ConversionReasonName(EcoPlanner::TechConversionAdmission(d,u));
+            else if(!CanStartAfus(d)) why="existing reactor commitment";
             GenericHelpers::LogUtil("[TECH][Air] dedicated " + u.id + " waits for " + name + ": " + why + " (D-108)", 1);
         }
         // D-267: TECH's economy roles retry their layout rather than escape into
@@ -600,10 +695,12 @@ namespace TechBuild {
         TrackMetal();   // D-075
         TechReclaim::Tick();   // D-290: pause a script reclaim whose refund stopped fitting the bank
         RefillAirRoles();                                  // D-108
+        TechGrowth::Tick();
         if (airConvId >= 0) LiftCapForRole(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));   // D-108
         if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
         if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108
         TechForward::Tick();   // D-109
+        FrontlineEngineering::Tick(TechForward::T2Released());
         // D-076: the T1 lab retires the moment the advanced lab is under way.
         // One state, read by every actor: production stops (Lifecycle::Retire
         // stops the unit, the factory rows return nothing), guards and the
@@ -794,6 +891,9 @@ namespace TechBuild {
             if (t is null) continue;
             IBuilderTask@ bt = cast<IBuilderTask>(t);
             if (bt !is null) {
+                CCircuitUnit@ target=bt.target;
+                if(target !is null && (!TechEconomyMath::StructureAssistAllowed(target.circuitDef.IsMobile())
+                    || !EcoFlak::AssistanceAllowed(u, target))) continue;
                 const AIFloat3 at = bt.GetBuildPos();
                 if (at.x >= 0.0f && MapHelpers::SqDist(at, home) > radius * radius) continue;
             }
@@ -812,7 +912,7 @@ namespace TechBuild {
         return TechFortifications::Work(u);
     }
 
-    // D-077 (owner's rule): winds and solars are reclaimed once a fusion
+    // D-434: winds wait for a completed AFUS. D-077 solar retirement starts once a fusion
     // stands and energy income without them still covers the pull by
     // ReclaimT1EnergyMargin; advanced solars once income without every T1 and
     // advanced-solar source covers it by ReclaimAdvSolarMargin; an advanced
@@ -860,7 +960,7 @@ namespace TechBuild {
         if (ReclaimsInFlight() >= Global::RoleSettings::Tech::ReclaimEnergyConcurrent) return null;
         const string side = Global::AISettings::Side;
         array<string> names;
-        if (t1Ok && s.winds > 0) names.insertLast(UnitHelpers::GetWindNameForSide(side));
+        if (TechEconomyMath::WindReclaimAllowed(afusUp) && t1Ok && s.winds > 0) names.insertLast(UnitHelpers::GetWindNameForSide(side));
         if (t1Ok && s.solars > 0) names.insertLast(UnitHelpers::GetSolarNameForSide(side));
         if (advOk && s.advSolars > 0) names.insertLast(UnitHelpers::GetAdvSolarNameForSide(side));
         for (uint i = 0; i < names.length(); ++i) {
@@ -876,6 +976,7 @@ namespace TechBuild {
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::NORMAL, target, 120 * SECOND));
             if (t is null) continue;
             TechReclaim::Track(target, t, "energy.reclaim");
+            TechGrowth::MarkEnergyReclaim();
             PullTurrets(target);   // D-078
             const string key = "" + target.id;
             if (!reclaimInFlight.exists(key)) {
@@ -912,7 +1013,8 @@ namespace TechBuild {
     IUnitTask@ AssistAny(CCircuitUnit@ u, float radius)
     {
         CCircuitUnit@ target = aiBuilderMgr.FindUnfinishedNear(u.GetPos(ai.frame), radius, null);
-        if (target is null) return null;
+        if (target is null || !TechEconomyMath::StructureAssistAllowed(target.circuitDef.IsMobile())
+            || !EcoFlak::AssistanceAllowed(u, target)) return null;
         return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL, target, 60 * SECOND));
     }
 

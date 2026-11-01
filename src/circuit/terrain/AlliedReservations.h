@@ -23,36 +23,10 @@ struct Rect {
     }
 };
 
-class Reservations {
+// One spatial index per priority tier. Queries retain footprint-local cost;
+// lifecycle mutations update at most three indexes, not a scan on each ask.
+class CoverageIndex {
 public:
-    // EXIT (D-343): a factory exit corridor, shared in addition to its ZONE
-    // entry so teammates can keep the corridor's far end open for ships.
-    enum Kind { SLOT, ZONE, EXIT };
-    using Key = std::tuple<int, int, int>; // owner team, kind, local ID
-    uint64_t Revision() const { return revision; }
-    void Put(int owner, Kind kind, int id, const Rect& rect) {
-        ++revision;
-        Erase(owner, kind, id);
-        if (!rect.Valid()) return;
-        entries.emplace(Key(owner, kind, id), rect);
-        ChangeCells(owner, rect, true);
-    }
-    void Erase(int owner, Kind kind, int id) {
-        ++revision;
-        const auto it = entries.find(Key(owner, kind, id));
-        if (it == entries.end()) return;
-        ChangeCells(owner, it->second, false);
-        entries.erase(it);
-    }
-    void RemoveOwner(int owner) {
-        ++revision;
-        // Owner is the leading key: unrelated teams need not be scanned.
-        auto it = entries.lower_bound(Key(owner, SLOT, std::numeric_limits<int>::min()));
-        while (it != entries.end() && std::get<0>(it->first) == owner) {
-            ChangeCells(owner, it->second, false);
-            it = entries.erase(it);
-        }
-    }
     // O(footprint pages + occupied footprint cells), independent of claim count.
     // No map/hash lookup, allocation, or reservation traversal on this path.
     bool OverlapsOther(int owner, const Rect& rect) const {
@@ -84,18 +58,6 @@ public:
         }
         return false;
     }
-    size_t Size() const { return entries.size(); }
-    // D-343: visit the rectangles of other owners' entries of one kind that
-    // overlap a window. O(entries); used only by bounded, planning-time naval
-    // path checks, never per frame.
-    template <class Visit> void ForEachOther(int owner, Kind kind, const Rect& window, Visit&& visit) const {
-        for (const auto& entry : entries) {
-            if (std::get<0>(entry.first) != owner && std::get<1>(entry.first) == kind && entry.second.Overlaps(window))
-                visit(entry.second);
-        }
-    }
-private:
-    uint64_t revision = 0;
     static constexpr int pageCells = 32;
     struct Cell {
         uint32_t owners = 0;
@@ -181,8 +143,124 @@ private:
             }
         }
     }
-    std::map<Key, Rect> entries;
     std::vector<std::vector<std::unique_ptr<Page>>> pages;
+};
+
+class Reservations {
+public:
+    // EXIT (D-343): a factory exit corridor, shared in addition to its ZONE
+    // entry so teammates can keep the corridor's far end open for ships.
+    enum Kind { SLOT, ZONE, EXIT, TASK, STRUCTURE, COMMITTED_SLOT, COMMITTED_ZONE };
+    using Key = std::tuple<int, int, int>; // owner team, kind, local ID
+    uint64_t Revision() const { return revision; }
+    // Script policy chooses the tier: generic=0, AIR=1, TECH=2. Existing
+    // construction and factory access always block every tier. Role changes
+    // reindex only this owner's entries; hot queries never traverse entries.
+    void SetPriority(int owner, int priority) {
+        priority = std::clamp(priority, 0, 2);
+        if (Priority(owner) == priority) return;
+        const auto begin = entries.lower_bound(Key(owner, SLOT, std::numeric_limits<int>::min()));
+        for (auto it = begin; it != entries.end() && std::get<0>(it->first) == owner; ++it)
+            ChangeEntry(owner, std::get<1>(it->first), it->second, false);
+        priorities[owner] = priority;
+        for (auto it = begin; it != entries.end() && std::get<0>(it->first) == owner; ++it)
+            ChangeEntry(owner, std::get<1>(it->first), it->second, true);
+        ++revision;
+    }
+    // Simulation-thread transaction for ordinary placement. Retry keeps the
+    // same claim without allocation/index churn; another team's later claim
+    // is still checked. Tests: allied_reservations_test.
+    bool ClaimTask(int owner, int& id, const Rect& rect) {
+        if (!rect.Valid() || OverlapsOther(owner, rect)) return false;
+        if (id == 0) {
+            if (nextTaskId == std::numeric_limits<int>::max()) return false;
+            id = ++nextTaskId;
+        }
+        const auto it = entries.find(Key(owner, TASK, id));
+        if (it != entries.end() && Equal(it->second, rect)) return true;
+        Put(owner, TASK, id, rect);
+        return true;
+    }
+    void ReleaseTask(int owner, int& id) {
+        if (id != 0) Erase(owner, TASK, id);
+        id = 0;
+    }
+    void RemoveKind(int owner, Kind kind) {
+        if (kind == SLOT) RemoveKind(owner, COMMITTED_SLOT);
+        if (kind == ZONE) RemoveKind(owner, COMMITTED_ZONE);
+        auto it = entries.lower_bound(Key(owner, kind, std::numeric_limits<int>::min()));
+        while (it != entries.end() && std::get<0>(it->first) == owner && std::get<1>(it->first) == kind) {
+            ChangeEntry(owner, std::get<1>(it->first), it->second, false);
+            it = entries.erase(it);
+            ++revision;
+        }
+    }
+    static bool Equal(const Rect& a, const Rect& b) {
+        return a.x1 == b.x1 && a.z1 == b.z1 && a.x2 == b.x2 && a.z2 == b.z2;
+    }
+    void Put(int owner, Kind kind, int id, const Rect& rect) {
+        if (kind == COMMITTED_SLOT) Erase(owner, SLOT, id);
+        if (kind == COMMITTED_ZONE) Erase(owner, ZONE, id);
+        ++revision;
+        Erase(owner, kind, id);
+        if (!rect.Valid()) return;
+        entries.emplace(Key(owner, kind, id), rect);
+        ChangeEntry(owner, kind, rect, true);
+    }
+    void Erase(int owner, Kind kind, int id) {
+        if (kind == SLOT) Erase(owner, COMMITTED_SLOT, id);
+        if (kind == ZONE) Erase(owner, COMMITTED_ZONE, id);
+        ++revision;
+        const auto it = entries.find(Key(owner, kind, id));
+        if (it == entries.end()) return;
+        ChangeEntry(owner, std::get<1>(it->first), it->second, false);
+        entries.erase(it);
+    }
+    void RemoveOwner(int owner) {
+        ++revision;
+        // Owner is the leading key: unrelated teams need not be scanned.
+        auto it = entries.lower_bound(Key(owner, SLOT, std::numeric_limits<int>::min()));
+        while (it != entries.end() && std::get<0>(it->first) == owner) {
+            ChangeEntry(owner, std::get<1>(it->first), it->second, false);
+            it = entries.erase(it);
+        }
+    }
+    bool OverlapsOther(int owner, const Rect& rect) const {
+        return tiers[Priority(owner)].OverlapsOther(owner, rect);
+    }
+    // Ordinary placement must not inherit district-planning priority. Tier zero
+    // already contains every claim; no owner scan or temporary priority mutation.
+    bool OverlapsAnyOther(int owner, const Rect& rect) const {
+        return tiers[0].OverlapsOther(owner, rect);
+    }
+    size_t Size() const { return entries.size(); }
+    // D-343: visit the rectangles of other owners' entries of one kind that
+    // overlap a window. O(entries); used only by bounded, planning-time naval
+    // path checks, never per frame.
+    template <class Visit> void ForEachOther(int owner, Kind kind, const Rect& window, Visit&& visit) const {
+        for (const auto& entry : entries) {
+            if (std::get<0>(entry.first) != owner && (std::get<1>(entry.first) == kind || (kind == SLOT && std::get<1>(entry.first) == COMMITTED_SLOT) || (kind == ZONE && std::get<1>(entry.first) == COMMITTED_ZONE)) && entry.second.Overlaps(window))
+                visit(entry.second);
+        }
+    }
+private:
+    int nextTaskId = 0;
+    uint64_t revision = 0;
+    int Priority(int owner) const {
+        const auto it = priorities.find(owner);
+        return it == priorities.end() ? 0 : it->second;
+    }
+    int LastTier(int owner, int kind) const {
+        return kind == TASK || kind == STRUCTURE || kind == EXIT || kind == COMMITTED_SLOT || kind == COMMITTED_ZONE
+            ? 2 : Priority(owner);
+    }
+    void ChangeEntry(int owner, int kind, const Rect& rect, bool add) {
+        for (int tier = 0; tier <= LastTier(owner, kind); ++tier)
+            tiers[tier].ChangeCells(owner, rect, add);
+    }
+    std::array<CoverageIndex, 3> tiers;
+    std::map<int, int> priorities;
+    std::map<Key, Rect> entries;
 };
 
 }} // namespace circuit::allied_layout

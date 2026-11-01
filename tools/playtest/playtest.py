@@ -399,9 +399,13 @@ def choose_teams(args, spots):
         die("no %s spot on the ally side of the map file" % args.role)
     teams = []  # (spot index, allyteam, ai kind, side)
     teams.append((tech[0], 0, "test", args.side))
+    if getattr(args, "isolated", False) and not getattr(args, "isolated_allies", False):
+        return teams
     others = "test" if args.others == "test" else ("prod" if args.others == "prod" else None)
     k = 0
     for ally, indices in ((0, west), (1, east)):
+        if ally == 1 and getattr(args, "isolated", False):
+            continue
         for i in indices:
             if i == tech[0]:
                 continue
@@ -410,11 +414,11 @@ def choose_teams(args, spots):
                 continue
             if ally == 0 and others is None:
                 continue
-            kind = others if ally == 0 else (others or "test")
+            kind = others if ally == 0 else (getattr(args, "enemies", None) or others or "test")
             side = SIDES[k % len(SIDES)]
             k += 1
             teams.append((i, ally, kind, side))
-    if not any(t[1] == 1 for t in teams):
+    if not getattr(args, "isolated", False) and not any(t[1] == 1 for t in teams):
         # the game ends at once with nobody to fight: keep one enemy
         j = east[0]
         teams.append((j, 1, others or "test", "armada"))
@@ -449,6 +453,8 @@ def write_script(args, d):
     for kv in args.modoption or []:
         k, _, v = kv.partition("=")
         mod[k.strip()] = v.strip()
+    if getattr(args, "isolated", False):
+        mod["deathmode"] = "neverend"
 
     ai_opts = {}
     for kv in args.ai_option or []:
@@ -838,7 +844,7 @@ def _watch(args):
         # minute by playtest_camera.lua) is not worth playing to stop_minute:
         # nothing the AI does after that is evidence. --play-decided keeps the
         # old behaviour for fixtures that need the loser's side to stay dead.
-        if decided_frame is not None and not getattr(args, 'play_decided', False):
+        if decided_frame is not None and not (getattr(args, 'play_decided', False) or getattr(args, 'isolated', False)):
             verdict = verdict or "PASS"
             reason = reason or "game decided at %.1f min (%s)" % (minute(decided_frame), decided_text)
             finished = True
@@ -971,12 +977,16 @@ def add_script_args(p):
     p.add_argument("--map-file", help="the AI map file with the StartSpot table (default: derived from the map name)")
     p.add_argument("--game", help="game archive name (default: the last lobby script's, else the newest byar:test)")
     p.add_argument("--roles", default="all", help="roles to field on both sides, e.g. TECH,FRONT; 'all' = every spot")
+    p.add_argument("--isolated", action="store_true", help="only team 0, no opposing AI; forces deathmode=neverend for economy timelines")
+    p.add_argument("--isolated-allies", action="store_true", help="with --isolated, retain selected allied roles for donation-dependent strategies")
     p.add_argument("--others", default="test", choices=["test", "prod", "none"],
                    help="the other AIs: this build (test), the deployed SMRTBARb (prod), or enemies only (none)")
     p.add_argument("--prod-ai", help="ShortName of the installed AI used for 'prod' teams (e.g. BARb for stock); it gets no test AI options")
     p.add_argument("--prod-version", help="version of --prod-ai (default stable)")
     p.add_argument("--opponent-dll", help="head-to-head: 'prod' teams play this pinned build of the AI (staged as BARbBase/base)")
     p.add_argument("--opponent-data", help="data/ for --opponent-dll (default: the repo's data/)")
+    p.add_argument("--enemies", choices=["test", "prod"], help="the enemy side's AIs only (default: as --others); "
+                   "--others test --enemies prod --opponent-dll <pin> plays this build's side against the pinned build's side")
     p.add_argument("--side", default="cortex", choices=SIDES, help="the side of the AI under test")
     p.add_argument("--ally-spots", help="1-based spot numbers of the ally side, e.g. '1,2,3,4,5,6,7,8' (default: first half)")
     p.add_argument("--modoption", action="append", help="key=value override in [MODOPTIONS]")

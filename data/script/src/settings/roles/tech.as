@@ -4,6 +4,22 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            bool RushBootstrapEnabled = true;
+            float RushBootstrapLocalRadius = 800.f;
+            float RushBootstrapMaxThreat = 0.f;
+            int RushBootstrapRetrySeconds = 5;
+            int RushBootstrapStallSeconds = 30;
+            bool GrowthEnabled = true;
+            bool ClusterEconomyEnabled = true;
+            int ClusterTurretParallel = 10;
+            float ClusterWorkerRadius = 640.f;
+            float ClusterMetalReserve = 500.f;
+            float ClusterAssistMetalMinimum = 50.f;
+            float ClusterMinimumEnergyShare = .2f;
+            float ClusterConversionEnter = 100.f;
+            float ClusterConversionLeave = 0.f;
+            float GrowthMetalReserve = 500.f;
+            float GrowthDrainSeconds = 90.f;
             bool EcoFlakEnabled = false;
             int EcoFlakMinimum = 1, EcoFlakMaximum = 15;
             float EcoFlakCooldownSeconds = 30.f, EcoFlakBaseRadius = 1000.f;
@@ -195,8 +211,14 @@ namespace Tech {
             float HarbourConverterEnergyShare = 0.6f;       // construction subs add floating advanced converters while energy is over this share, else a naval fusion
             float HarbourTidalUntilEnergy = 1500.0f;        // T1 construction ships add tidals while energy income is under this
             float HarbourCommanderMinEnergy = 150.0f;       // ... and only with this much energy income
+            float HarbourCommanderSurplus = 100.0f; // sustained production above current demand, not just a full starting bank
+            bool CoastalSupportEnabled = true;
+            int CoastalSupportMaximum = 16;
+            int CoastalSupportProbeBudget = 32;
+            int CoastalSupportLandThreshold = 8;
+            float CoastalSupportRadius = 1024.0f;
             int HarbourCommanderConverters = 30;            // before the harbour: the commander's floating converters while energy floats, at most
-            float HarbourCommanderReach = 1200.0f;          // ... placed within this of it (the nearest deep-enough water)
+            float HarbourCommanderReach = 1200.0f;          // ... placed within this of the home anchor (nearest deep-enough water)
             float CrampedPlaceRadius = 640.0f;
             float CrampedReachElmos = 128.0f;              // D-121: a lab site counts as reachable when a land constructor gets this close
             float CrampedTurretRadius = 256.0f;
@@ -224,7 +246,7 @@ namespace Tech {
             bool EarlyGantryEnabled = false; // experimental_balanced opts in
             int EarlyGantryIncomeWindowSeconds = 10;
             int EarlyGantryMaximumSampleGapSeconds = 2;
-            float EarlyGantryMetalIncome = 200.0f;
+            float EarlyGantryMetalIncome = 175.0f;  // owner, 2026-10-22: the t3rush first gantry at 175 metal per second
             int EarlyGantryAttemptSeconds = 180;
             float GantryFundingSeconds = 180.0f;
             float GantryFundingShare = 0.70f;
@@ -236,6 +258,32 @@ namespace Tech {
             int GantryAssistSeconds = 60;
             int GantryMaximumTaskBuilders = 2;
             int GantryLogIntervalSeconds = 30;
+            // owner, 2026-10-24: the t3rush gantry is ordered once funded, without the
+            // FrontT3TurretsFirst block standing first; the turrets go up beside its frame
+            bool T3RushGantryWithoutTurrets = true;
+            int GantrySupportParallel = 4;          // gantry turret orders in flight at once (air constructors take them)
+            int GantrySupportNoFrameSeconds = 30;   // a support order with a worker but no frame this long stops holding the fallback
+            int GantrySupportSlotRestSeconds = 10;  // a support order that died with no frame: its slot rests this long
+            int GantrySupportSlotMaxFails = 3;      // and is given up after this many such deaths (played: 157 orders on one slot)
+            // Gantry turrets first (owner, 2026-10-26: "fill the planned nanos quickly"; played: 4 of 14-17
+            // turrets stood when the t3rush gantry finished, each turret built by its one T1 placer at 55 BP).
+            // While an open gantry cluster has fewer finished turrets than it plans (the t3rush roll, else
+            // FrontT3TurretsFirst), every builder (rule gantry.nanos: T2 constructors and the commander too) and
+            // every turret in reach builds the block's turret frames before the gantry frame; a finished turret
+            // repays its build time in about 26 s, so the gantry finishes sooner with its turrets standing.
+            bool GantryNanoFirst = false;
+            float GantryNanoFirstLandRadius = 2000.0f;   // a land builder (and the commander) further than this from the block is not pulled
+            int GantryNanoFirstAssistSeconds = 15;       // a turret-frame assist ends after this, so the builder re-asks
+            int GantryNanoFirstParallel = 8;             // turret orders in flight at once from rule gantry.nanos (played: 4 left the helpers one frame each)
+            // Turrets before the drop: from this share of the gantry's income gate (t3rush 175, else the
+            // GantryScale step) the cluster opens and its turret block goes up; the gantry itself is still
+            // ordered at the gate (0 = off)
+            float GantryNanoPrebuildShare = 0.0f;
+            // Extra T1 air constructors for the block (owner, 2026-10-26: "produce more air cons just for
+            // that purpose before dropping the gantry"): the T1 air plant's target rises by this many while a
+            // gantry block is short, and from this share of the t3rush gate (0 = off)
+            int GantryNanoExtraAirCons = 0;
+            float GantryNanoExtraAirConsShare = 0.7f;
             // D-287 (owner): Marauder-class units (armmar, corshiva, legjav) only in
             // the early T3 window. Late = game time OR 10 s minimum metal income,
             // latched once (never un-latches, persisted). Late gantries build the
@@ -246,23 +294,49 @@ namespace Tech {
             float HeavyLateMetalIncome = 400.0f;
             int HeavyAmphibiousMinBeaches = 1;          // assault beach fronts (StrategicSites) that make a map "amphibious"
             int LateMarauderMassBatch = 0;              // 0 = no late Marauders; N = one late batch of N Marauders on an amphibious map (owner's "very large numbers" exception, off)
+            bool HeavyAlternate = false;                // true: every other late heavy batch starts with the other unit of the pair (on in experimental_balanced)
             string HeavyLandArmada = "armthor";
             string HeavyAmphArmada = "armbanth";
             string HeavyLandCortex = "corkorg";         // owner default; "corjugg" (Behemoth: land only, very slow) is the alternative
             string HeavyAmphCortex = "corkorg";
             string HeavyLandLegion = "legerailtank";
             string HeavyAmphLegion = "legeheatraymech";
+            // HeavyPair<Side> (owner, 2026-10-26): when set, the late gantry batches use this pair,
+            // first unit first, instead of the land/amphibious pair above; with HeavyAlternate on,
+            // the batches alternate between the two. A moated start (no land route to any enemy
+            // start, StrategicSites::Moated) builds only the first unit. Empty = the terrain pair.
+            array<string> HeavyPairArmada = {};
+            array<string> HeavyPairCortex = {};
+            array<string> HeavyPairLegion = {};
             // D-288 (owner), step 400 since D-370: one land gantry per GantryScaleMetalStep of 10 s minimum
             // metal income (floor(income / step), capped at GantryScaleMax). The target
             // is a persisted high-water mark (a dip never lowers it); a new order also
             // needs income >= (have + 1) x step x GantryScaleDropShare right now.
             bool GantryScaleEnabled = true;
             float GantryScaleMetalStep = 400.0f;            // D-370 (owner): was 500; one gantry per 400 metal per second
+            float GantryScaleFirstMetal = 400.0f;       // owner, 2026-10-19: the first gantry at this income (not the t3rush plan, see below); 0 = the step
+            float GantryScaleFirstMetalT3Rush = 175.0f; // owner, 2026-10-22: the t3rush plan's first gantry at this 10 s minimum income; 0 = the step
             float GantryScaleDropShare = 0.80f;
             float GantryScaleEnergyFloor = 0.0f;        // optional absolute E/s floor (0 = metal only, the owner's rule)
             int GantryScaleMax = 6;
             int GantryScaleGraceSeconds = 300;          // INV-199: due this long without progress (cooldown 120 s + turrets + order)
             int FrontT3TurretsFirst = 10;                  // D-119: the gantry is ordered once this many of its turrets stand; the rest keep filling
+            // T3RushTurretsMin / T3RushTurretsMax (owner, 2026-10-11, back on 2026-10-18): the t3rush gantry's cluster
+            // gets a random number of turrets in [Min, Max], rolled once a game, while its gantry goes up
+            // (FrontT3TurretsFirst of them before the order) (Max 0: off) ...
+            int T3RushTurretsMin = 0;
+            int T3RushTurretsMax = 0;
+            // ... and, once its gantry stands, that number climbs evenly over T3RushTurretsRampSeconds to
+            // T3RushTurretsRampTo, never past the block the layout reserved (0: it stays at the roll)
+            int T3RushTurretsRampSeconds = 0;
+            int T3RushTurretsRampTo = 0;
+            // T3 rush opening (owner, 2026-10-14, ported 2026-10-22): on the t3rush plan the gantries build the
+            // side's two units in turn, T3RushUnitCount in all, then ordinary gantry production (0: off)
+            // (roles/tech/tech.as Tech_T3RushProduce, [TECH][T3Rush])
+            array<string> T3RushArmada = { "armraz", "armvang" };                   // Razorback + Vanguard
+            array<string> T3RushCortex = { "corshiva", "corcat" };                  // Shiva + Catapult
+            array<string> T3RushLegion = { "legerailtank", "legeallterrainmech" };  // Daedalus + Myrmidon
+            int T3RushUnitCount = 10;
             int FrontReclaimAtCount = 3;                    // D-114: this many land factories on the map retire the base's land factories
             float FrontBaseRadius = 1200.0f;                // D-114: a land factory within this of the base centre is the base's
             int FrontBaseReclaimSeconds = 240;              // D-114: INV-044: a base land factory still standing this long after the count is reached
@@ -305,11 +379,11 @@ namespace Tech {
             string EndgamePlan = "auto";                   // D-080: nuke | t2rush | t3rush | lrpc | auto (deterministic from the team id) - what follows the rush objective
             float PlanCombatGate = 200.0f;                  // D-080: no mobile combat unit under this metal income (every plan)
             float PlanT3RushCombatGate = 500.0f;            // D-080: ... the t3rush plan's gate
+            float PlanT3RushEcoMetal = 1000.0f;             // owner, 2026-10-19: the t3rush plan's phase 2 keeps climbing the metal ladder to this while the gantry produces (0 = off)
             float PlanLrpcMetal = 300.0f;                   // D-080: the lrpc plan's income before the long-range cannon
             float PlanAirConstructorsFromMetal = 200.0f;    // D-080: from this income T2 construction aircraft are the mobile build power
             float PlanAirConstructorPerMetal = 40.0f;       // D-080: one T2 air constructor per this much income ...
             int PlanMaxAirConstructors = 12;                // D-080: ... at most this many
-            int LadderParallelAfus = 2;                     // D-080: advanced fusions under construction at once on the ladder while the metal bank is full
             float InvariantLabReachSeconds = 90.0f;         // D-085 INV-016 / D-088 INV-017 patience         // D-085: INV-016 - the advanced lab standing this long with no static build power within ExpLabBuildPowerReach is a violation
             float InvariantDearOrderSeconds = 45.0f;        // D-084: INV-015 - a dear chain order with no frame this long is a violation
             float InvariantLadderFloatSeconds = 60.0f;      // D-080: INV-011 - the metal bank full this long with an income step unmet is a violation
@@ -352,6 +426,7 @@ namespace Tech {
             // and the bank plus income pays for in full; never under 1, never over
             // PowerTurretsMax; the other builders assist the turret going up
             float PowerTurretBatchSeconds = 20.0f;
+            float PowerCapacityBankSeconds = 60.0f;        // D-429: bounded energy-bank contribution to project power
             int PowerTurretsMax = 8;
             float PowerTurretBuildTime = 5300.0f;           // the T1 construction turret's buildtime (cornanotc, armnanotc, legnanotc: 5300 in BAR's unitdefs)
             float InvariantNoRoomSeconds = 120.0f;          // D-099: INV-020's patience - the layout refusing economy structures for lack of room     // D-097: INV-019's patience
@@ -440,6 +515,16 @@ namespace Tech {
             // a turret. Searched largest first over rear and side offsets; a
             // size is taken when its best ground clears LayoutBoxMinScore.
             int LayoutBoxAcrossCells = 40;           // 640 elmos
+            bool LayoutDynamicSpine = true;
+            float LayoutOpeningEnergyRadius = 320.0f;
+            int LayoutSpineMaximumRows = 24;
+            int LayoutSpineMaximumAfus = 20;
+            int LayoutSpineServiceDepth = 14;
+            int LayoutSpineCandidates = 192;
+            float LayoutSpineSearchRadius = 256.0f;
+            float LayoutSpineAirSearchRadius = 512.0f; // room to shift beyond the normal home search
+            float LayoutSpineNeighbourClearance = 192.0f;
+            float LayoutSpineAirClearance = 1024.0f; // soft expansion preference; zero disables
             int LayoutBoxDepthCells = 44;            // 704 elmos: four turret rows at a 14-cell pitch
             int LayoutBoxShrinkCells = 8;
             int LayoutBoxMinAcrossCells = 24;
@@ -457,8 +542,8 @@ namespace Tech {
             float LayoutLabServedReach = 300.0f;
             int LayoutLabMinSlots = 4;               // D-090: 8 found no site on Supreme (best 7)               // D-088: a lab site needs this many turret slots within reach (weighted) to be considered
             int LayoutLabFrontGapCells = 3;          // D-096: the advanced lab's front-line site may stand this many cells ahead of turret row 0 (the zone's edge, a rock)
-            int LayoutAfusSetSize = 3;               // D-101: advanced fusions per set: the first flush against a turret, the rest lined up away from it
-            int LayoutConvSetSize = 5;               // D-101: advanced converters per set, the same way
+            int LayoutAfusSetSize = 1;               // Re-rank around all sides for each reactor; do not project a three-reactor line
+            int LayoutConvSetSize = 1;               // Reserve converters individually around available support
             int LayoutSetMaximumTurretGapCells = 0;  // first member touches a supporting turret footprint
             float LayoutSetHoldSeconds = 300.0f;     // D-101: a set's unserved slots are released when nothing asked for its def this long
             float LayoutFrontMinCost = 1500.0f;      // D-096: a seen enemy group counts as a front at this metal cost; until one is seen the front is the map centre
@@ -663,20 +748,20 @@ namespace Tech {
             /******************** WORKFORCE MINIMUMS ********************/
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
-            int MinimumT2ConstructorBots = 1;
-            int T2BotConstructorCap = 10;                   // D-119 (owner): T2 construction bots at most this many for TECH (the T2 air constructors keep T2ConstructorCap)
-            int FastAssistBotCap = 10;                      // D-119 (owner): fast assist bots (Fark, Freaker, legaceb) at most this many
+            int MinimumT2ConstructorBots = 3;
+            int T2BotConstructorCap = 3;                    // Retained home pool; requested donations receive separate production headroom
+            int FastAssistBotCap = 5;                       // D-417: retained fast-assist pool (Fark, Freaker, legaceb)
             float FastAssistMetalReserve = 2000.0f;
             // D-308: compact banks need mobile support sooner; retain the hard
             // cap and rush budget, with no extra polling or recruit batches.
             float CompactFastAssistIncomeScale = 2.0f;
             float CompactFastAssistMetalReserve = 1000.0f;
-            int T2ConstructorCap = 60;                      // D-103: T2 constructors (bot and air) produced up to this while the metal bank is over T2ConstructorBankShare
+            int T2ConstructorCap = 60;                      // T2 air constructor ceiling; bots use the separate retained pool cap
             float T2ConstructorBankShare = 0.5f;            // D-103: the metal bank share of storage above which the advanced lab makes T2 constructors
             // T2 constructors TECH keeps before it builds any for an ally's
             // request (played: every one it made was ferried away, and the
             // advanced lab built nothing else).
-            int DonationKeepT2Constructors = 2;
+            int DonationKeepT2Constructors = 3;
 
             /******************** BUILDER CAP LIMITS ********************/
             // Hard caps for T1/T2 land builders used when computing income-based limits
@@ -686,7 +771,7 @@ namespace Tech {
             /******************** TECH START LIMIT CAPS ********************/
             // Initial caps applied at game start for the TECH role
             int StartCapRezBots = 0;
-            int StartCapFastAssistBots = 10;                // D-119 (owner): was 50
+            int StartCapFastAssistBots = 5;                 // Mobile support replaces excess home constructors
 
             int StartCapT1BotLabs = 1;
             int StartCapT2BotLabs = 1;

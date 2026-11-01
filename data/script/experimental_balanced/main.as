@@ -160,6 +160,23 @@ namespace Main {
 	void ApplyProfileSettings()
 	{
         Global::RoleSettings::Tech::EarlyGantryEnabled = true;
+        // Gantry turrets (owner, 2026-10-26; tested 2026-10-27 in 69 headless 8v8 games): every builder and
+        // turret builds the gantry block's turret frames first, the block opens at 80% of the gantry's income gate, and
+        // the T1 air plant keeps 4 more T1 air constructors for it (src/settings/roles/tech.as GantryNano*, off there)
+        Global::RoleSettings::Tech::GantryNanoFirst = true;
+        Global::RoleSettings::Tech::GantryNanoPrebuildShare = 0.8f;
+        Global::RoleSettings::Tech::GantryNanoExtraAirCons = 4;
+        Global::RoleSettings::Tech::HeavyAlternate = true; // owner 2026-10-22: late heavy batches alternate Thor / Titan (land and amphibious)
+        // owner 2026-10-26: after the t3rush units, every TECH gantry alternates these pairs, first unit first, on every map
+        Global::RoleSettings::Tech::HeavyPairArmada = array<string> = {"armbanth", "armthor"};         // Titan, Thor
+        Global::RoleSettings::Tech::HeavyPairCortex = array<string> = {"corkorg", "corcat"};           // Juggernaut, Catapult
+        Global::RoleSettings::Tech::HeavyPairLegion = array<string> = {"legeheatraymech", "legelrpcmech"}; // Sol Invictus, Astraeus
+        // TECH t3rush gantry turrets (owner, 2026-10-18): a random 14-20 construction turrets while the gantry goes up,
+        // then a slower climb to 40 over the 5 minutes after it stands (src/settings/roles/tech.as T3RushTurrets*, off there)
+        Global::RoleSettings::Tech::T3RushTurretsMin = 14;
+        Global::RoleSettings::Tech::T3RushTurretsMax = 20;
+        Global::RoleSettings::Tech::T3RushTurretsRampSeconds = 300;
+        Global::RoleSettings::Tech::T3RushTurretsRampTo = 40;
         Global::RoleSettings::Front::VehicleTankOpenerChance = 0.0f;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
 		// (src/settings/shared/spam.as EdgeLanesEnabled, off there; systems/combat/edge_lanes.as)

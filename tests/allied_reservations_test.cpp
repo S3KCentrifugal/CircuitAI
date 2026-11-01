@@ -174,7 +174,126 @@ void test_random_mutations_match_brute_force_and_legacy() {
         }
     }
 }
+static void test_ordinary_task_lifecycle() {
+    Reservations r;
+    int task = 0;
+    const Rect a{20,20,24,24}, b{40,40,44,44};
+    Check(r.ClaimTask(1,task,a) && task != 0, "ordinary task claims selected footprint");
+    const auto revision = r.Revision();
+    Check(r.ClaimTask(1,task,a) && revision == r.Revision(), "retry does not mutate index");
+    Check(r.OverlapsOther(2,a) && !r.OverlapsOther(1,a), "ordinary task excludes ally only");
+    for (auto kind : {Reservations::SLOT,Reservations::ZONE,Reservations::EXIT}) {
+        r.Put(2,kind,1,b);
+        Check(!r.ClaimTask(1,task,b), "ordinary task respects every planned exclusion");
+        Check(r.OverlapsOther(2,a), "rejected relocation preserves old claim");
+        r.Erase(2,kind,1);
+    }
+    Check(r.ClaimTask(1,task,b), "relocation succeeds after exclusion released");
+    Check(!r.OverlapsOther(2,a) && r.OverlapsOther(2,b), "relocation frees old site");
+    r.Put(1,Reservations::STRUCTURE,9,b);
+    r.ReleaseTask(1,task);
+    Check(task == 0 && r.OverlapsOther(2,b), "nanoframe survives task cancellation");
+    r.Erase(1,Reservations::STRUCTURE,9);
+    Check(!r.OverlapsOther(2,b), "destroyed structure releases footprint");
+    Check(r.ClaimTask(1,task,a), "released task can claim again");
+    r.Put(1,Reservations::SLOT,3,b);
+    r.RemoveKind(1,Reservations::TASK);
+    Check(!r.OverlapsOther(2,a) && r.OverlapsOther(2,b), "disable ordinary participation preserves plan");
+    r.ReleaseTask(1,task);
+    r.Put(1,Reservations::STRUCTURE,9,a);
+    r.RemoveOwner(1);
+    Check(!r.OverlapsOther(2,a) && !r.OverlapsOther(2,b), "AI teardown releases every kind");
+    int invalid = 0;
+    Check(!r.ClaimTask(1,invalid,{0,0,0,0}) && invalid == 0, "invalid site cannot allocate claim");
+}
+void test_priority_and_committed_work() {
+    Reservations r;
+    const Rect a{10,10,30,30};
+    r.SetPriority(10,2); r.SetPriority(20,1);
+    r.Put(30,Reservations::ZONE,1,a);
+    Check(!r.OverlapsOther(10,a) && !r.OverlapsOther(20,a), "higher priorities supersede unstarted generic space");
+    r.Put(20,Reservations::SLOT,1,a);
+    Check(!r.OverlapsOther(10,a) && r.OverlapsOther(30,a), "TECH precedes AIR precedes generic");
+    r.Put(20,Reservations::COMMITTED_SLOT,1,a);
+    Check(r.OverlapsOther(10,a), "active AIR construction survives TECH priority");
+    r.Erase(20,Reservations::SLOT,1);
+    Check(!r.OverlapsOther(10,a), "release clears committed alias");
+    r.Put(20,Reservations::COMMITTED_ZONE,1,a);
+    Check(r.OverlapsOther(10,a), "activated AIR campus protects future bays");
+    r.SetPriority(20,0);
+    Check(r.OverlapsOther(10,a), "active campus survives role change");
+    r.Erase(20,Reservations::ZONE,1);
+    Check(!r.OverlapsOther(10,a), "zone release clears activated alias");
+    r.Put(30,Reservations::EXIT,2,a);
+    Check(r.OverlapsOther(10,a), "factory access survives priority");
+    r.Erase(30,Reservations::EXIT,2);
+    r.SetPriority(30,2);
+    Check(r.OverlapsOther(10,a), "role change reindexes existing plans");
+    r.SetPriority(30,0);
+    int claim=0;
+    Check(r.ClaimTask(30,claim,a), "uncontested construction admitted");
+    Check(r.OverlapsOther(10,a), "ordinary task protects early factory");
+    r.ReleaseTask(30,claim);
+    r.Put(10,Reservations::ZONE,1,a);
+    Check(!r.ClaimTask(30,claim,a), "lower task cannot claim TECH district");
+    r.RemoveOwner(10);
+    Check(r.ClaimTask(30,claim,a), "teardown releases district");
+}
+static void test_priority_mutations_match_rectangles() {
+    Reservations r;
+    std::map<Reservations::Key, Rect> oracle;
+    std::array<int, 4> priority{};
+    std::mt19937 rng(431);
+    for (int step=0; step<1200; ++step) {
+        const int owner=int(rng()%4), id=int(rng()%16), action=int(rng()%5);
+        const auto kind=Reservations::Kind(rng()%7);
+        if (action==0) {
+            priority[owner]=int(rng()%3); r.SetPriority(owner,priority[owner]);
+        } else {
+            // SLOT and ZONE aliases represent one logical reservation each.
+            auto logical=[](int k) { return k==Reservations::COMMITTED_SLOT ? int(Reservations::SLOT)
+                : k==Reservations::COMMITTED_ZONE ? int(Reservations::ZONE) : k; };
+            const auto erase=[&](int k) {
+                for (auto it=oracle.begin();it!=oracle.end();) {
+                    if (std::get<0>(it->first)==owner && logical(std::get<1>(it->first))==logical(k)
+                        && std::get<2>(it->first)==id) it=oracle.erase(it); else ++it;
+                }
+            };
+            if (action==1) {
+                // Public release uses the uncommitted logical ID.
+                r.Erase(owner,Reservations::Kind(logical(kind)),id); erase(kind);
+            } else {
+                const int x=int(rng()%64),z=int(rng()%64);
+                const Rect rect{x,z,x+1+int(rng()%12),z+1+int(rng()%12)};
+                r.Put(owner,kind,id,rect); erase(kind); oracle[{owner,kind,id}]=rect;
+            }
+        }
+        for (int queryOwner=0;queryOwner<4;++queryOwner) {
+            const int x=int(rng()%64),z=int(rng()%64); const Rect rect{x,z,x+8,z+8};
+            bool expected=false;
+            for (const auto& [key,held]:oracle) {
+                const int who=std::get<0>(key),k=std::get<1>(key);
+                const bool hard=k!=Reservations::SLOT && k!=Reservations::ZONE;
+                expected|=who!=queryOwner && (hard || priority[who]>=priority[queryOwner]) && held.Overlaps(rect);
+            }
+            Check(r.OverlapsOther(queryOwner,rect)==expected,"priority mutations match rectangle oracle");
+        }
+    }
+}
 int main() {
+    {
+        Reservations r;
+        r.SetPriority(1,2);
+        r.Put(2,Reservations::ZONE,1,{0,0,10,10});
+        Check(!r.OverlapsOther(1,{2,2,4,4}),"TECH district planning retains priority");
+        Check(r.OverlapsAnyOther(1,{2,2,4,4}),"ordinary TECH construction respects soft allied zones");
+        Check(!r.OverlapsAnyOther(2,{2,2,4,4}),"strict query excludes own claims");
+        r.Erase(2,Reservations::ZONE,1);
+        Check(!r.OverlapsAnyOther(1,{2,2,4,4}),"strict query releases removed zones");
+    }
+    test_priority_mutations_match_rectangles();
+    test_priority_and_committed_work();
+    test_ordinary_task_lifecycle();
     test_foreign_overlap_interior_is_blocked(); test_owner_can_place_inside_own_zone();
     test_touching_edges_leave_no_overlap(); test_cross_bucket_footprint_detects_one_cell_overlap();
     test_replacement_frees_old_ground(); test_releasing_slot_keeps_overlapping_zone();

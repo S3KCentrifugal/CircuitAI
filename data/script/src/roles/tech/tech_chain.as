@@ -791,7 +791,7 @@ namespace TechChain
                 if (geo !is null && geo.count == 0)
                     Invariants::Violation("INV-242", "support-geo", "SUPPORT ordered the advanced lab with no geothermal standing or framed and a vent within reach");
             }
-            return Layout::T2LabTask(300 * SECOND);
+            return Layout::T2LabTask(300 * SECOND,u);
         }
         if (key == "geo") {
             // D-367: native validates the vent and places on it; the engine's build-over
@@ -808,24 +808,16 @@ namespace TechChain
                     && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), d) == 0) s.exhausted = true;
                 return null;
             }
-            // Eligibility is separate from exhaustion: blocked mexes still
-            // count toward rush prerequisites and are reconsidered next ask.
-            at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, d);
-            if (at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, d,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            // Never manufacture a position-only task: native admission checks
+            // ownership, tier, live reachability and concurrent spot claims.
+            // Rejection must let the income ladder consider energy instead.
+            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "nano") {
-            // A distant mex worker must not own a no-frame turret reservation
-            // while local workers wait for the completed bank. It can assist
-            // a real frame, but only local builders reserve new rush turrets.
-            if (NukeRush()) {
-                const AIFloat3 position = u.GetPos(ai.frame);
-                const bool local = CompactEco::Active() ? CompactEco::LocalWorker(position, 800.0f)
-                    : MapHelpers::SqDist(position, Layout::TurretSeed()) <= 800.0f * 800.0f;
-                if (!local) return null;
-            }
-            return Layout::NanoTask(u, Task::Priority::HIGH, NukeRush() ? 2 : -1);
+            if (NukeRush()) return RushBootstrap::Work(u);
+            return Layout::NanoTask(u, Task::Priority::HIGH);
         }
         if (NukeRush() && (key == "fusion" || key == "silo"))
             return SupportedProject(d, key == "silo" ? Task::BuildType::BIG_GUN : Task::BuildType::ENERGY);
@@ -1234,6 +1226,8 @@ namespace TechChain
         // T2 mex upgrades first: the cheapest metal there is
         CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
         if (moho !is null && u.circuitDef.CanBuild(moho)) {
+            // Income steps are not concrete definitions in Tick's cap lift.
+            if (moho.maxThisUnit <= moho.count) moho.maxThisUnit = moho.count + 1;
             Step tmp("moho", DefFor("moho"), 99);
             IUnitTask@ t = Order(i, @tmp, moho, u);
             if (t !is null) { Trace("mex upgrade", i, s, have, u); return t; }
@@ -1242,12 +1236,11 @@ namespace TechChain
         CCircuitDef@ afus = ai.GetCircuitDef(DefFor("afus"));
         if (afus is null) return null;
         const int building = aiBuilderMgr.GetUnfinishedCount(afus);
-        // a full metal bank means the ladder is build-power and order bound, not
-        // metal bound: another advanced fusion in parallel, up to LadderParallelAfus
-        const bool another = TechBuild::MetalFullLong() && building < Global::RoleSettings::Tech::LadderParallelAfus && u.circuitDef.CanBuild(afus);
-        if (building > 0 && !another) {
+        // Complete one reactor before spending on another, even at full metal.
+        if (building > 0) {
             CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, afus);
             if (frame !is null) { Trace("assist the advanced fusion", i, s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+            return null;
         }
         if (!u.circuitDef.CanBuild(afus)) return null;
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), afus) > 0) { Trace("advanced fusion order out", i, s, have, u); return null; }

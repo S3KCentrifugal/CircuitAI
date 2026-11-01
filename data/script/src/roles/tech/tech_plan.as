@@ -24,8 +24,9 @@ namespace TechPlan {
         if (want == "t2rush") return "spamrush"; // legacy explicit plan alias
         if (want == "nuke" || want == "spamrush" || want == "t3rush" || want == "lrpc") return want;
         if (Global::RoleSettings::Tech::HasStrategy(Strategy::NUKE_RUSH)) return "nuke";
-        if (Global::RoleSettings::Tech::HasStrategy(Strategy::SPAM_RUSH)) return "spamrush";
+        // owner, 2026-10-19: a T3_RUSH roll wins over the spam rush (spam is rolled on its own at 85%, so checked first it left T3 at about 5%)
         if (Global::RoleSettings::Tech::HasStrategy(Strategy::T3_RUSH)) return "t3rush";
+        if (Global::RoleSettings::Tech::HasStrategy(Strategy::SPAM_RUSH)) return "spamrush";
         return "eco";
 
     }
@@ -44,7 +45,9 @@ namespace TechPlan {
     // The metal income under which no mobile combat unit is produced.
     float CombatGate()
     {
-        if (plan == "t3rush") return Global::RoleSettings::Tech::PlanT3RushCombatGate;
+        // owner, 2026-10-19: the two rolls are independent; a T3 rush with the spam rush keeps the spam rush's gate
+        if (plan == "t3rush" && !Global::RoleSettings::Tech::HasStrategy(Strategy::SPAM_RUSH))
+            return Global::RoleSettings::Tech::PlanT3RushCombatGate;
         return Global::RoleSettings::Tech::PlanCombatGate;
     }
 
@@ -87,6 +90,10 @@ namespace TechPlan {
         const int gate200 = int(Global::RoleSettings::Tech::PlanCombatGate);
         const int gate500 = int(Global::RoleSettings::Tech::PlanT3RushCombatGate);
         const int lrpcAt = int(Global::RoleSettings::Tech::PlanLrpcMetal);
+        // owner, 2026-10-25: a plan's gantry step waits for the gantry scale's first income (400; the next
+        // gantries come from TechGantryScale at 800, 1200 ...), not the 500 combat gate
+        const int gantryAt = int(Global::RoleSettings::Tech::GantryScaleFirstMetal > 0.0f
+            ? Global::RoleSettings::Tech::GantryScaleFirstMetal : Global::RoleSettings::Tech::GantryScaleMetalStep);
         if (plan == "nuke") {
             if (phase == 1) {
                 if (objective != "nuke" && !TechHeavyRush::SiloReady()) s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
@@ -103,7 +110,7 @@ namespace TechPlan {
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", gate200));
             } else if (phase == 2) {
-                s.insertLast(TechChain::Step("income", "", gate500));
+                s.insertLast(TechChain::Step("income", "", gantryAt));
                 s.insertLast(TechChain::Step("gantry", TechChain::DefFor("gantry"), 1));
             }
         } else if (plan == "t3rush") {
@@ -114,8 +121,11 @@ namespace TechPlan {
                 }
                 s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
-                s.insertLast(TechChain::Step("income", "", gate500));
+                s.insertLast(TechChain::Step("income", "", gantryAt));
                 s.insertLast(TechChain::Step("gantry", TechChain::DefFor("gantry"), 1));
+            } else if (phase == 2 && Global::RoleSettings::Tech::PlanT3RushEcoMetal > 0.0f) {
+                // owner, 2026-10-19: the economy keeps climbing (AFUS, mex upgrades) while the gantry produces
+                s.insertLast(TechChain::Step("income", "", int(Global::RoleSettings::Tech::PlanT3RushEcoMetal)));
             }
         } else if (plan == "lrpc") {
             if (phase == 1) {

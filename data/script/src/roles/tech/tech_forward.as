@@ -1,6 +1,6 @@
 // TECH D-109: the land constructors leave the base once the air constructors
-// carry it. T2 land constructors defend the mex clusters (long-range AA and
-// flak first); T1 land constructors go forward to a spam cluster (T1 bot labs,
+// carry it. T2 bots join Frontline Engineering (D-419); T1 land constructors
+// go forward to a spam cluster (T1 bot labs,
 // each with two construction turrets directly behind it) and build its
 // defences and small turret pads. A tier whose air constructors go down calls
 // its land constructors back to the eco clusters.
@@ -63,7 +63,7 @@ namespace TechForward {
             if (!r1) recallT1 = ai.frame;
         }
         if (r2 != wasT2) {
-            GenericHelpers::LogUtil("[TECH][Forward] T2 land constructors " + (r2 ? "released to the mex clusters" : "recalled to the eco clusters: a dedicated air role is open")
+            GenericHelpers::LogUtil("[TECH][Forward] T2 land constructors " + (r2 ? "released to Frontline Engineering" : "recalled to the eco clusters: a dedicated air role is open")
                 + " (D-109)", 1);
             wasT2 = r2;
             everT2 = everT2 || r2;

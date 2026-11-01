@@ -3,58 +3,36 @@
   "expect": [
     {
       "key": "member",
-      "pattern": "\\[CommanderGroup\\] member=\\d+ side=cortex",
+      "pattern": "\\[FrontConstructors\\] assigned unit=\\d+ seat=2",
       "scope": "any",
       "by_minute": 3
     },
     {
-      "key": "owned power bootstrap",
-      "pattern": "\\[CommanderGroup\\] unit=\\d+ build=cornanotc bootstrap=1",
+      "key": "T1 project",
+      "pattern": "\\[CommanderGroup\\] job_start def=(?:corhllt|corrad|corjamt) nano=0",
       "scope": "any",
       "by_minute": 5
     },
     {
-      "key": "upgraded defense",
-      "pattern": "\\[CommanderGroup\\] unit=\\d+ defence=corhllt powered=1",
+      "key": "defense completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=0",
       "scope": "any",
-      "by_minute": 6
+      "by_minute": 5,
+      "after_key": "T1 project"
     },
     {
-      "key": "commander assists",
-      "pattern": "\\[CommanderGroup\\] commander=\\d+ assist=\\d+",
+      "key": "following nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=cornanotc nano=1",
       "scope": "any",
-      "by_minute": 6
+      "by_minute": 6,
+      "after_key": "defense completed"
     },
     {
-      "key": "completed powered radar package",
-      "pattern": "commander_group_radar_package radar=\\d+ nano=\\d+ jammer=\\d+",
+      "key": "nano completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=1",
       "scope": "any",
-      "by_minute": 6
-    },
-    {
-      "key": "jammer",
-      "pattern": "\\[CommanderGroup\\] unit=\\d+ build=corjamt bootstrap=0",
-      "scope": "any",
-      "by_minute": 6
-    },
-    {
-      "key": "finished forward package",
-      "pattern": "commander_group_finished nano=[1-9]\\d* defence=[1-9]\\d* radar=[1-9]\\d* jammer=[1-9]\\d*",
-      "scope": "any",
-      "by_minute": 6
-    },
-    {
-      "key": "continues lane advance",
-      "pattern": "\\[CoverageProbe\\] advanced_in_lane team=0",
-      "scope": "any",
-      "after_minute": 4,
-      "by_minute": 6
-    },
-    {
-      "key": "observed spaced forward defenses",
-      "pattern": "front_spacing_observed turrets=([2-9]|[1-9]\\d+)",
-      "scope": "any",
-      "by_minute": 6
+      "by_minute": 6,
+      "after_key": "following nano"
     }
   ],
   "forbid": [

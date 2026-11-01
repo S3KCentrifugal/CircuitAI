@@ -7,6 +7,7 @@
 #include "../systems/team/ferry.as"
 #include "../systems/amphibious/amphibious_ops.as"
 #include "../systems/world/coverage_lanes.as"
+#include "../systems/construction/commander_group.as"
 
 namespace Military {
 
@@ -62,7 +63,8 @@ namespace Military {
         // CoverageLanes::Load, not per objective query.
         if(Global::AISettings::Role==AiRole::FRONT && aiBattle.ArmyFrontLanesEnabled() && aiBattle.GetFrontLaneLength()>0.f) {
             CoverageLanes::Load();
-            return aiBattle.GetFrontLaneGoal(pos,CoverageLanes::advance);
+            const float progress=aiBattle.GetFrontLaneProgress(pos);
+            return aiBattle.GetFrontLaneGoal(pos,aiBattle.LimitLaneAdvance(progress,progress+CoverageLanes::advance)-progress);
         }
         const int lane = Lanes::BestLane(Lanes::BOT);
         if (lane >= 0) {
@@ -89,6 +91,7 @@ namespace Military {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+        if(u !is null && CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
 		// A transport is never spam and never subject to a role's military
 		// policy: it exists to carry, and the only task that carries is the
 		// native CFerryTask that DefaultMakeTask hands a TRANS-role unit.
@@ -162,6 +165,7 @@ namespace Military {
 
 	void AiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        if(CommanderGroup::OnAdded(unit)) return;
 		Team::Ferry::OnUnitAdded(unit);   // claim a transport, ours or a gift
 
 		// Delegate to role-specific handler if registered
@@ -173,6 +177,7 @@ namespace Military {
 
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        CommanderGroup::OnRemoved(unit);
         TechHeavyDelivery::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);

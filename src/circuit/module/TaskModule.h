@@ -11,6 +11,7 @@
 #include "module/Module.h"
 
 #include <vector>
+#include "AIFloat3.h"
 
 namespace circuit {
 
@@ -43,6 +44,7 @@ public:
 	// else. No-op unless the module tracks that (CBuilderManager does).
 	virtual void DiscardUnusedTask(IUnitTask* task) {}
 	void AbortTask(IUnitTask* task);
+    IUnitTask* EnqueueGroupFollow(int target,float radius,bool guard,const springai::AIFloat3& goal);
 	void DoneTask(IUnitTask* task) { DequeueTask(task, true); }
 
 public:

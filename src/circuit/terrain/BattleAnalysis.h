@@ -25,6 +25,7 @@
 #include "AIFloat3.h"
 #include "terrain/LaneSolver.h"
 #include "terrain/LanePath.h"
+#include "terrain/LaneFront.h"
 
 #include <algorithm>
 #include <cmath>
@@ -200,6 +201,16 @@ public:
     float GetFrontLaneDistance(const springai::AIFloat3& p) const;
     springai::AIFloat3 GetFrontLanePoint(float distance) const;
     springai::AIFloat3 GetFrontLaneGoal(const springai::AIFloat3& from,float advance) const;
+    void SetLaneFrontOptions(float horizon,float memory,float ratio,float margin,float minimumCost);
+    void UpdateLaneFront();
+    void RecordLaneCombat(const springai::AIFloat3& pos);
+    float LimitLaneAdvance(float from,float goal) { return AssessLaneAdvance(from,goal,nullptr); }
+    float AssessLaneAdvance(float from,float goal,bool* stale);
+    bool LaneWorkAllowed(const springai::AIFloat3& site);
+    float LaneCombatDistance(const springai::AIFloat3& from,float memorySeconds);
+    bool KnownEnemyNear(const springai::AIFloat3& from,float radius,float memorySeconds);
+    std::string DescribeLaneFront();
+    float GetLaneHeldProgress();
     // D-356: coverage.json levers the corridor consumers read (advance per
     // objective query, range slack and base radius of the attack filter, and
     // whether defend groups follow the lane); set once by CoverageLanes::Load.
@@ -226,7 +237,7 @@ public:
     }
     std::vector<springai::AIFloat3> GetUnitTerrainRoute(const CCircuitDef* def,
         const springai::AIFloat3& from, const springai::AIFloat3& to, bool dry,
-        float landCost, float waterCost, float threatWeight, float maxWaterThreat);
+        float landCost, float waterCost, float threatWeight, float maxWaterThreat, float exitRadius=0.f);
 
 	// --- water
 	void PrepareWater() { BuildWater(); }  // idempotent, without lane/beach policy side effects
@@ -338,7 +349,7 @@ private:
     std::vector<springai::AIFloat3> UnitTerrainRoute(const CCircuitDef* def,
         const springai::AIFloat3& from, const springai::AIFloat3& to, bool dry,
         float landCost, float waterCost, float threatWeight, float maxWaterThreat,
-        const Grid* hazard, float hazardValue);
+        const Grid* hazard, float hazardValue, float exitRadius=0.f);
     // D-296: unidentified radar dots are painted into the ground hazard with
     // this conservative radius (default 700, about a T1 turret's range).
     void SetUnknownHazardRange(float range);
@@ -439,6 +450,10 @@ private:
 	std::vector<springai::AIFloat3> allyEnds, enemyEnds;
 	std::vector<SLane> lanes;
     lane::Path frontLanePath;
+    lane::Front laneFront;
+    std::vector<int> frontCombatBin; // heat-grid cell -> nearest lane bin; route-owned
+    int laneFrontFrame=-1;
+    float laneFrontHorizon=0.f,laneFrontMemory=20.f,laneFrontRatio=1.5f,laneFrontMargin=128.f,laneFrontMinimumCost=100.f;
     Grid frontLaneDistance;
     float frontLaneWidth=0.f;
     float frontLaneAdvance=512.f,frontLaneRangeSlack=256.f,frontLaneBaseRadius=1200.f;

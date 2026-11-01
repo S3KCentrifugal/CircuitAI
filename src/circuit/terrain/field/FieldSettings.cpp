@@ -8,8 +8,44 @@
 #include "terrain/field/FieldLandmarks.h"
 
 #include "json/json.h"
+#include <algorithm>
 
 namespace circuit::field {
+
+// Shared by the live field service and offline map regression: tuning must
+// be exercised, not silently replaced by SSettings defaults in the test.
+void ReadTerrainSettings(const Json::Value& root, SSettings& settings)
+{
+	const Json::Value& f = root["field"];
+	settings.cellSize = f.get("cell_size", settings.cellSize).asInt();
+	settings.regionMinCells = f.get("region_min_cells", settings.regionMinCells).asInt();
+	settings.waterMinCells = f.get("water_min_cells", settings.waterMinCells).asInt();
+	settings.chokeFraction = f.get("choke_fraction", settings.chokeFraction).asFloat();
+	settings.highGroundRise = f.get("high_ground_rise", settings.highGroundRise).asFloat();
+	settings.rampMinRise = std::max(1.f, f.get("ramp_min_rise", settings.rampMinRise).asFloat());
+	settings.passageExpansion = std::max(1.05f, f.get("passage_expansion", settings.passageExpansion).asFloat());
+	settings.passageProbeCells = std::clamp(f.get("passage_probe_cells", settings.passageProbeCells).asInt(), 8, 256);
+	settings.beachDepth = f.get("beach_depth", settings.beachDepth).asFloat();
+	settings.crossingMinLength = f.get("crossing_min_length", settings.crossingMinLength).asInt();
+	settings.landingMerge = f.get("landing_merge", settings.landingMerge).asInt();
+	settings.avenueDetour = f.get("avenue_detour", settings.avenueDetour).asFloat();
+	settings.avenueMax = f.get("avenue_max", settings.avenueMax).asInt();
+	settings.seaReach = f.get("sea_reach", settings.seaReach).asFloat();
+	settings.pondMaxShare = f.get("pond_max_share", settings.pondMaxShare).asFloat();
+	// D-358: the corridor planner's levers (field.json "corridors")
+	const Json::Value& cr = f["corridors"];
+	if (cr.isObject()) {
+		settings.obstacleMinShare = std::clamp(cr.get("obstacle_min_share", settings.obstacleMinShare).asFloat(), 0.f, 0.1f);
+		settings.corridorDetour = std::clamp(cr.get("detour", settings.corridorDetour).asFloat(), 1.f, 8.f);
+		settings.corridorMax = std::clamp(cr.get("max_routes", settings.corridorMax).asInt(), 1, 32);
+		settings.seamBlocked = std::clamp(cr.get("seam_blocked", settings.seamBlocked).asFloat(), 0.f, 1.f);
+		settings.footprintWidth = std::clamp(cr.get("footprint_width", settings.footprintWidth).asFloat(), 0.f, 1024.f);
+		settings.corridorBand = std::clamp(cr.get("band", settings.corridorBand).asFloat(), 16.f, 4096.f);
+		settings.laneSpacing = std::clamp(cr.get("lane_spacing", settings.laneSpacing).asFloat(), 128.f, 4096.f);
+		settings.laneMax = std::clamp(cr.get("lane_max", settings.laneMax).asInt(), 1, 8);
+		settings.laneDistanceCost = std::clamp(cr.get("distance_cost", settings.laneDistanceCost).asFloat(), 0.f, 1.f);
+	}
+}
 
 void ReadMarkSettings(const Json::Value& root, SMarkSettings& ms)
 {

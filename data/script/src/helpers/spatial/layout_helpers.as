@@ -101,6 +101,12 @@ namespace LayoutHelpers {
     // Setup: run the role's plan once, after its caps and porc chain are in.
     void ApplyForRole()
     {
+        aiTerrainMgr.SetLayoutPriority(Global::AISettings::Role == AiRole::TECH ? 2
+            : Global::AISettings::Role == AiRole::AIR ? 1 : 0);
+        // Share ordinary sites without enabling factory packing or a role plan.
+        // Every accepted ordinary build becomes non-preemptible, including an
+        // AIR opening or TECH's freely placed first T1 factory.
+        aiTerrainMgr.SetBuildSiteReservations(true);
         RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
         if (cfg is null || cfg.LayoutPlanHandler is null) {
             GenericHelpers::LogUtil("[Layout] no plan for this role; placement is the native spiral", 2);

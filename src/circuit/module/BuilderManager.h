@@ -31,7 +31,8 @@ class CQueryCostMap;
 class CBRepairTask;
 class CBReclaimTask;
 class CCombatTask;
-class CCommanderTask;
+class CControlledTask;
+class IUnitController;
 
 struct SBuildChain;
 
@@ -306,12 +307,20 @@ public:
 	float GetGoalExecTime() const { return goalExecTime; }
 	unsigned int GetWorkerCount() const { return workers.size(); }
     IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
-    CCommanderTask* EnqueueCommander(IUnitTask* previous);
+    // D-388: the task a unit controller holds its unit with (formerly EnqueueCommander).
+    CControlledTask* EnqueueControlled(IUnitController* controller,IUnitTask* previous);
     bool SetCommanderCombatOption(const std::string& name,float value);
+    bool SetDefenseRule(int slot,const std::string& key,float value);
+    IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
+    IUnitTask* SupportConstruction(CCircuitUnit* unit);
+    IUnitTask* SupportAssist(CCircuitUnit* unit,CCircuitUnit* worker,float radius);
+    std::string DescribeDefense() const;
+    bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);
     float GetCommanderEnergyReserve() const;
     float GetCommanderEnergyDeficit() const;
     int GetCommanderOperation() const;
     std::string DescribeCommanderFront(int id) const;
+    int FrontCommanderId() const;
     IUnitTask* CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius);
 	void AddBuildPower(CCircuitUnit* unit);
 	void DelBuildPower(CCircuitUnit* unit);

@@ -4,6 +4,27 @@
 // D-296: non-spam land scouts raid the enemy backline (systems/combat/scout_raid.as).
 // Read once per AI by ScoutRaid::Active(); absent or false keeps native scouting.
 "scout_raid": {"enabled": true},
+// D-388 / D-389: unit controllers (unit-controller-architecture.md). A preset names
+// its controller "type" and that controller's levers; "extends" inherits another
+// preset. "roles" gives every type of a role a default preset; a unit's own
+// "controller" key below wins. Script SetCommanderCombatOption values (commander.json
+// combat block) still override these per AI. Lever table: CommanderController.cpp.
+"controllers": {
+	"presets": {
+		"commander": {
+			"type": "commander",
+			// D-389 cloak posture (commander-cloak-policy.md section 4)
+			"cloak_posture": 1, "threat_radius": 1500, "threat_horizon": 4,
+			"outrange_margin": 50, "outrange_dps": 120, "artillery_dps": 60, "artillery_range": 600,
+			"withdraw_seconds": 6, "escape_cloak_seconds": 3, "brawl_margin": 1.5, "dgun_kills": 2,
+			"ambush_seconds": 20, "withdraw_cloak_seconds": 10,
+			"threat_memory_seconds": 60, "threat_memory_cap": 600,
+			"front_cloak_income": 2000, "cloak_budget": 0.15, "cloak_still_seconds": 10, "posture_period": 30, "cloak_log": 1,
+			"blip_dps": 60, "blip_range": 450
+		}
+	},
+	"roles": {"commander": "commander"}
+},
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
 		"layout": {
@@ -151,6 +172,20 @@
 			"top_candidates": 3,    // aim at the nearest of the N most valuable uncovered squads
 			"rebalance": true       // release the surplus when two escorted squads merge
 		},
+		// D-352 commander snipe. A scouted enemy commander (in LOS, or its radar
+		// dot once cloaked) inside weapon range becomes the unit's Set Target, so
+		// it is shot before it can close to D-gun range. The unit keeps its move
+		// and other orders; only the weapon target changes. "units" always take
+		// part; "min_tech" adds every armed mobile def at that BAR techlevel.
+		"commander_snipe": {
+			"enabled": true,
+			"units": ["armfboy", "corsumo", "leginc", "corgol", "legaheattank"],  // Fatboy, Mammoth, Incinerator, Tzar, Prometheus
+			"min_tech": 3,          // every T3 (0: listed units only)
+			"air": false,           // T3 aircraft keep their own targeting
+			"interval": 15,         // frames between scans
+			"acquire_margin": 64,   // lock when within weapon range + this
+			"release_margin": 200   // keep the lock while within weapon range + this
+		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
 		// if there is, then ai checks speed, direction and threat on enemys position. if all conditions positive => com attacks
@@ -182,9 +217,11 @@
 //########################################################################################################################
 
 		"behaviour": {
+			"armdecom": {"role": ["builder"], "attribute": ["commander"], "controller": "commander"},
 	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,
@@ -192,6 +229,7 @@
 			},
 			"corcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,
@@ -2075,6 +2113,8 @@
 			},
 			"cordecom": {
 				"role": ["builder"],
+				"attribute": ["commander"],
+				"controller": "commander",
 				"limit": 2,
 				"build_speed": 10.0,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2257,9 +2297,11 @@
 				"power": 1.0
 			},
 			"corban": {
+				// owner 2026-10-27: a commander it can hit comes before every other target (x100 also
+				// breaks the 1 s target hold). Ranged hulls take this, not the commander_snipe lock.
 				"role":	["skirmish"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "commander_priority": 100},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},
@@ -2495,5 +2537,3 @@
 			}
 		}
 	}
-	
-	

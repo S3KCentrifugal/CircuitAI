@@ -1,3 +1,4 @@
+#include "control/service/CombatSnapshot.h"
 /*
  * CircuitDef.cpp
  *
@@ -763,6 +764,7 @@ void CCircuitDef::RemDGun()
 
 void CCircuitDef::SetRange(float range)
 {
+    CCombatSnapshot::InvalidateRangeBounds();
 	// TODO: Asserts >= 0?
 	minRange = range;
 	maxRangeType = RangeType::AIR;
@@ -773,6 +775,7 @@ void CCircuitDef::SetRange(float range)
 
 void CCircuitDef::SetRange(RangeType type, float range)
 {
+    CCombatSnapshot::InvalidateRangeBounds();
 	// TODO: Asserts >= 0?
 	minRange = std::min(minRange, range);
 	maxRange[static_cast<RangeT>(type)] = range;
