@@ -98,7 +98,7 @@ private:
 	bool IsSpotHeld(const springai::AIFloat3& pos, int frame) const;
 	void HoldSpot(const springai::AIFloat3& pos, float radius);
 	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front);
-	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out) const;
+	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out);
 	bool IsCovered(const springai::AIFloat3& pos) const;
 	bool IsCoolingDown(int sector, int frame) const;
 	void CoolDown(const springai::AIFloat3& pos, float radius, int frames);
@@ -125,6 +125,10 @@ private:
 	float pathSlope = 0.161f; // 1 - cos(33 deg): steeper than this blocks a Thor
 	float pathReach = 4000.f; // builders sent this far for a path patch
 	int pathUnits = 300;      // ground army units looked at per scan
+	int pathMemory = 300;     // seconds a sector the army stood on or passed stays on our paths
+	bool pathLane = true;     // this AI's front lane (FRONT, D-127) counts as our path too
+	std::vector<int> pathSeen;     // sector -> last frame on our paths, -1 never
+	std::vector<float> pathLimit;  // sector -> lowest slope limit seen there within the memory
 	int maxTries = 3;         // starts at one spot before it waits retry_cap
 	int retryCapSeconds = 600;// the longest a tried spot waits
 	bool protect = true;      // a restorer keeps its patch against ordinary builder tasks

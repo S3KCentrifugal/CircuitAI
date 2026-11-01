@@ -30,6 +30,8 @@
 	"path_slope": 33,      // degrees; 33 = Thor (armthor HTANK7), lower when a unit's own limit is
 	"path_reach": 4000,    // builders sent this far for a path patch
 	"path_units": 300,     // ground army units looked at per scan
+	"path_memory": 300,    // seconds a place our army stood on or passed stays on our paths
+	"path_lane": true,     // the FRONT lane we attack down counts as our path
 	// A spot tried before waits cooldown, doubled per try up to retry_cap
 	// seconds; max_tries starts in a row put it straight on the cap.
 	"max_tries": 3,
