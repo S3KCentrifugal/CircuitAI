@@ -32,7 +32,7 @@ inline bool BetterReclaim(const ReclaimCandidate& a,const ReclaimCandidate& b) {
 // Ownership: one task offer only; never retain feature handles between frames.
 class LocalReclaimCandidates {
 public:
-    void Add(ReclaimCandidate c) {
+    void Add(const ReclaimCandidate& c) {
         if(!(c.score>0) || !std::isfinite(c.score))return;
         size_t at=0;while(at<count && !BetterReclaim(c,items[at]))++at;
         if(at==items.size())return;
