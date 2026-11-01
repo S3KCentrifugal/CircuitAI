@@ -261,6 +261,10 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		const bool commTargets = artyComm.isEnabled && (artyComm.defs.count(cdef->GetId()) > 0);
 		CEnemyInfo* commTarget = nullptr;
 		float commSqDist = SQUARE(range);
+		// Then a heavy unit (Fatboy, Tzar, ...) moving at most a fraction of its
+		// own top speed, still ahead of every structure.
+		CEnemyInfo* heavyTarget = nullptr;
+		float heavySqDist = SQUARE(range);
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
 			if (enemy->IsHidden()
@@ -281,6 +285,17 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 					commSqDist = sqDist;
 				}
 				continue;
+			}
+			if (commTargets && (edef != nullptr) && ((edef->GetCategory() & canTargetCat) != 0)) {
+				auto it = artyComm.heavyMaxSqSpeed.find(edef->GetId());
+				if ((it != artyComm.heavyMaxSqSpeed.end()) && (enemy->GetVel().SqLength2D() <= it->second)) {
+					const float sqDist = pos.SqDistance2D(enemy->GetPos());
+					if (sqDist < heavySqDist) {
+						heavyTarget = enemy;
+						heavySqDist = sqDist;
+					}
+					continue;
+				}
 			}
 			if ((edef == nullptr) || edef->IsMobile() || edef->IsAttrSiege()
 				|| circuit->GetCircuitDef(edef->GetId())->IsIgnore())
@@ -321,6 +336,8 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		}
 		if (commTarget != nullptr) {
 			bestTarget = commTarget;
+		} else if (heavyTarget != nullptr) {
+			bestTarget = heavyTarget;
 		} else if (bestTarget == nullptr) {
 			bestTarget = (mediumTarget != nullptr) ? mediumTarget : worstTarget;
 		}
