@@ -161,11 +161,15 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	if (bestTarget != nullptr) {
 		unit->GetTravelAct()->StateWait();
 
+		// A commander can walk off: a short order so ATTACK never chases it out
+		// of the firing spot; the next Execute re-picks (a structure if it left).
+		const CCircuitDef* edef = bestTarget->GetCircuitDef();
+		const int timeout = frame + FRAMES_PER_SEC * ((edef != nullptr && edef->IsMobile()) ? 5 : 60);
 		TRY_UNIT(circuit, unit,
 			if (!circuit->IsCheating()) {
-				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
+				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			} else {
-				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
+				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			}
 			unit->CmdSetTarget(bestTarget);
 		)
@@ -251,6 +255,12 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		CEnemyInfo* bestTarget = nullptr;
 		CEnemyInfo* mediumTarget = nullptr;
 		CEnemyInfo* worstTarget = nullptr;
+		// Owner 2026-11-01: a stationary or slow enemy commander in range is shot
+		// before any structure (see SArtyCommInfo). Same O(enemies) loop.
+		const CMilitaryManager::SArtyCommInfo& artyComm = circuit->GetMilitaryManager()->GetArtyCommInfo();
+		const bool commTargets = artyComm.isEnabled && (artyComm.defs.count(cdef->GetId()) > 0);
+		CEnemyInfo* commTarget = nullptr;
+		float commSqDist = SQUARE(range);
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
 			if (enemy->IsHidden()
@@ -261,6 +271,17 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 			}
 
 			CCircuitDef* edef = enemy->GetCircuitDef();
+			if (commTargets && (edef != nullptr) && edef->IsRoleComm()
+				&& ((edef->GetCategory() & canTargetCat) != 0)
+				&& (enemy->GetVel().SqLength2D() <= artyComm.maxSqSpeed))
+			{
+				const float sqDist = pos.SqDistance2D(enemy->GetPos());
+				if (sqDist < commSqDist) {
+					commTarget = enemy;
+					commSqDist = sqDist;
+				}
+				continue;
+			}
 			if ((edef == nullptr) || edef->IsMobile() || edef->IsAttrSiege()
 				|| circuit->GetCircuitDef(edef->GetId())->IsIgnore())
 			{
@@ -298,7 +319,9 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 				enemyPositions.push_back(enemy->GetPos());
 //			}
 		}
-		if (bestTarget == nullptr) {
+		if (commTarget != nullptr) {
+			bestTarget = commTarget;
+		} else if (bestTarget == nullptr) {
 			bestTarget = (mediumTarget != nullptr) ? mediumTarget : worstTarget;
 		}
 		if (bestTarget != nullptr) {

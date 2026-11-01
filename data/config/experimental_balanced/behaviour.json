@@ -213,6 +213,18 @@
 			"acquire_margin": 64,   // lock when within weapon range + this
 			"release_margin": 200   // keep the lock while within weapon range + this
 		},
+		// Owner 2026-11-01: rocket artillery shoots parked enemy commanders. These units
+		// only ever ordered structures, so a human's commander standing still in range
+		// was ignored. An enemy commander inside weapon range moving at most max_speed
+		// (elmos/s; a walking commander is ~37) is now their first target, ahead of
+		// buildings; once it walks off they go back to structures.
+		"artillery_commander": {
+			"enabled": true,
+			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
+				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
+				"armmship", "cormship"],                  // Longbow, Messenger (rocket ships)
+			"max_speed": 12
+		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
 		// if there is, then ai checks speed, direction and threat on enemys position. if all conditions positive => com attacks
