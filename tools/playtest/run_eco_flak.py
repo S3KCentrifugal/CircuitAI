@@ -31,7 +31,7 @@ def main():
         '--map',map_name,'--map-file',str(starts),'--role','TECH','--roles','all','--ally-spots','1',
         '--engine','recoil_2026.07.04','--side',args.side,
         '--ai-option','profile='+args.profile,'--ai-option','random_seed=3211','--bonus','0',
-        '--mode','visual' if args.visual else 'fast','--speed','20','--minutes','12',
+        '--mode','visual' if args.visual else 'fast','--speed','20','--minutes','20',
         '--shots',f'3@2400@{x}:{z}' if args.visual else '', '--lean-render',
         '--modoption','deathmode=neverend','--modoption','experimentallegionfaction=1',
         '--modoption','startmetal=100000','--modoption','startmetalstorage=1000000',
@@ -63,10 +63,10 @@ def main():
         widget_source=widget_source.replace(old,str(new))
     widget.write_text(widget_source)
     complete=r'\[EcoFlakTest\] PASS '+('all waves' if enabled else 'disabled profile')
-    checks={'stop_minute':12,'complete_on':{'key':'complete','pattern':complete,'scope':'any'},'completion_grace_seconds':5,
-        'expect':[{'key':s,'pattern':r'\[EcoFlakTest\] PASS '+s,'scope':'any','by_minute':12} for s in
+    checks={'stop_minute':20,'complete_on':{'key':'complete','pattern':complete,'scope':'any'},'completion_grace_seconds':5,
+        'expect':[{'key':s,'pattern':r'\[EcoFlakTest\] PASS '+s,'scope':'any','by_minute':20} for s in
             ['default policy','geometry registered','profile gate','missing geometry rejected','no pre-AFUS construction']+
-            (['first AFUS minimum','order cooldown','physical order outside economy','air escalation','cap held','destroyed flak rebuilt','all waves'] if enabled else ['disabled profile'])+
+            (['builder loss recovered','single flak constructor','wind protected before AFUS','wind eligible after AFUS','first AFUS minimum','order cooldown','physical order outside economy','air escalation','cap held','destroyed flak rebuilt','all waves'] if enabled else ['disabled profile'])+
             (['compact economy unchanged'] if enabled and args.compact else [])],
         'forbid':[{'key':'failure','pattern':r'\[EcoFlakTest\] FAIL|\[INVARIANT\]|: ERR\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:|Error in.*eco_flak|\[GiveUnits\].*not a valid object-name','scope':'any'}]}
     check=directory/'eco-flak-checks.json';check.write_text(json.dumps(checks,indent=2))
@@ -75,7 +75,7 @@ def main():
         'scripts':{str(x.relative_to(directory)):storage.file_hash(x) for x in source.parent.rglob('*.as')},'widget':storage.file_hash(widget)},indent=2))
     try:
         subprocess.run(call+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']+([] if args.visual else ['--headless']),check=True)
-        return subprocess.call(call+['watch','--dir',str(directory),'--role','TECH','--minutes','12','--wall-minutes','10','--checks',str(check)])
+        return subprocess.call(call+['watch','--dir',str(directory),'--role','TECH','--minutes','20','--wall-minutes','10','--checks',str(check)])
     finally: subprocess.run(call+['stop','--dir',str(directory)],check=False)
 
 if __name__=='__main__': sys.exit(main())

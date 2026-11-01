@@ -100,7 +100,7 @@
 		"advance_roles": "FRONT,TACTICAL",
 		"front_repair_combat": 1,
 		"front_solar_income": 400, "front_solar_storage": 0.2, "front_solar_radius": 300,
-		"front_ladder": "repair_combat,mex_defence,mex_lane,commander_group,territory_line,advance,hold",
+		"front_ladder": "repair_combat,mex_defence,mex_lane,commander_group,territory_line,advance,reclaim,hold",
 		// D-357 corridor mex sweep: spots within half-width + front_mex_reach (0: build
 		// distance) of the lane, front_mex_behind behind to front_mex_ahead ahead of the
 		// commander, en route every front_mex_seconds; enemy extractors there are
@@ -128,7 +128,8 @@
 		"work": 1, "line_income": 20, "line_min": 1, "line_max": 6, "line_radius": 400, "line_spacing": 80,
 		"line_hold_seconds": 60, "line_retry_seconds": 5, "timed_interval": 30, "timed_until": 300,
 		"work_radius": 0, "work_clearance": 400, "repair_health": 0.98, "reclaim_storage": 0.95,
-		"reclaim_metal": 1, "radar_coverage": 0.8, "base_radius": 1500,
+		"reclaim_metal": 1, "reclaim_energy": 25, "reclaim_energy_storage": 0.9,
+		"reclaim_energy_per_metal": 60, "reclaim_retry_seconds": 3, "radar_coverage": 0.8, "base_radius": 1500,
 		"t3_profiles": {
 			// Drone carrier: its reach is indirect, so the auto plan never qualifies it
 			// as artillery. Treat as siege; a long hunt requires t3_hunt=1.

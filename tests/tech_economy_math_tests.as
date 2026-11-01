@@ -107,3 +107,74 @@ void test_keep_live_unfinished_construction() { Check(TechEconomyMath::KeepConst
 void test_release_completed_construction() { Check(!TechEconomyMath::KeepConstruction(true,true,true,1)); }
 void test_release_dead_construction() { Check(!TechEconomyMath::KeepConstruction(false,true,false,0)); }
 void test_do_not_retain_nonconstruction() { Check(!TechEconomyMath::KeepConstruction(true,false,false,0)); }
+void test_capacity_has_income_ceiling_even_with_full_banks() {
+    Check(TechEconomyMath::CapacityTarget(70,8,20,1500,100000,60,300000,64000)==1400);
+    Check(!TechEconomyMath::CapacityNeeded(1400,1200,200,false));
+    Check(TechEconomyMath::CapacityNeeded(1400,1200,0,false));
+    Check(!TechEconomyMath::CapacityNeeded(1400,200,0,true));
+}
+void test_project_power_and_idle_capacity_are_separate() {
+    Check(TechEconomyMath::CapacityTarget(40,8,20,300,0,60,0,0)==320);
+    Check(TechEconomyMath::CapacityTarget(40,8,20,300,0,60,10000,10000)==320);
+    Check(TechEconomyMath::CapacityTarget(40,8,20,600,0,60,10000,10000)==600);
+    Check(TechEconomyMath::CapacityTarget(0,8,20,600,0,60,10000,10000)==0);
+}
+void test_mex_first_allows_affordable_energy_relief_but_keeps_nuke_recipe() {
+    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,20,20,300,300));
+    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,true,true,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,false,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,19,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,40,20,299,300));
+    Check(!TechEconomyMath::MexesBlockReactor(false,false,false,0,20,0,300));
+    Check(!TechEconomyMath::MexesBlockReactor(false,true,false,0,20,0,300));
+}
+void test_completed_afus_satisfies_fusion_without_abandoning_work() {
+    Check(TechEconomyMath::FusionSuperseded(true,false,0));
+    Check(!TechEconomyMath::FusionSuperseded(false,false,0));
+    Check(!TechEconomyMath::FusionSuperseded(true,true,0));
+    Check(!TechEconomyMath::FusionSuperseded(true,false,1));
+}
+void test_floating_energy_yields_reactor_assist_to_economy_balancing() {
+    Check(!TechEconomyMath::ReactorAssistFirst(true, false));
+    Check(TechEconomyMath::ReactorAssistFirst(false, false));
+}
+void test_energy_stall_retains_reactor_assistance_even_with_a_full_bank() {
+    Check(TechEconomyMath::ReactorAssistFirst(true, true));
+    Check(TechEconomyMath::ReactorAssistFirst(false, true));
+}
+
+void test_wind_reclaim_waits_for_completed_afus() {
+    Check(!TechEconomyMath::WindReclaimAllowed(false));
+    Check(TechEconomyMath::WindReclaimAllowed(true));
+}
+void test_offshore_conversion_requires_real_surplus() {
+    Check(!TechEconomyMath::OffshoreConversionAllowed(true,false,false,150,150,100));
+    Check(!TechEconomyMath::OffshoreConversionAllowed(true,true,false,1000,100,100));
+    Check(!TechEconomyMath::OffshoreConversionAllowed(true,false,true,1000,100,100));
+    Check(!TechEconomyMath::OffshoreConversionAllowed(false,false,false,1000,100,100));
+    Check(!TechEconomyMath::OffshoreConversionAllowed(true,false,false,299,200,100));
+    Check(TechEconomyMath::OffshoreConversionAllowed(true,false,false,300,200,100));
+}
+void test_flak_keeps_other_t2_builders_on_economy() {
+    Check(!TechEconomyMath::FlakAssistAllowed(true,2,true,false));
+    Check(TechEconomyMath::FlakAssistAllowed(true,2,true,true));
+    Check(TechEconomyMath::FlakAssistAllowed(true,2,false,false));
+    Check(TechEconomyMath::FlakAssistAllowed(false,2,true,false));
+    Check(TechEconomyMath::FlakAssistAllowed(true,1,true,false));
+}
+void test_growth_power_includes_income_and_backlog_drain() {
+    Check(TechEconomyMath::GrowthPowerTarget(100,9500,500,90,8)==1600.f);
+    Check(TechEconomyMath::GrowthPowerTarget(150,9500,500,90,8)==2000.f);
+    Check(TechEconomyMath::GrowthPowerTarget(100,0,500,90,8)==800.f);
+}
+
+void test_growth_reactor_breaks_full_bank_deadlock_only_when_funded() {
+    Check(TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,90,false));
+    Check(!TechEconomyMath::FundedGrowthReactor(10000,500,9700,18000,20000,6000,250000,90,false));
+    Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,5000,20000,6000,250000,90,false));
+    Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,1000,250000,90,false));
+    Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,90,true));
+    Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,0,6000,250000,90,false));
+    Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,0,false));
+}

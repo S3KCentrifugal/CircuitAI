@@ -152,6 +152,17 @@ bool CCommanderController::CanResumeFrontTask(CCircuitUnit* unit,IUnitTask* task
     auto* build=dynamic_cast<IBuilderTask*>(task);
     if(!build) return false; // never restore a roaming guard/patrol/base queue
     auto at=build->GetPosition();
+    // The local selector owns this short-lived task. Keep its in-reach work
+    // through discretionary deployment; generic base reclaim is not adopted.
+    // Threat/recovery still preempt it before this retention check.
+    if(build->GetBuildType()==IBuilderTask::BuildType::RECLAIM && build->recoveryControlled) {
+        const auto* state=states.Find(unit->GetId());
+        const float reach=unit->GetCircuitDef()->GetBuildDistance();
+        return state && state->work.task==task && state->work.kind==WORK_RECLAIM
+            && at.SqDistance2D(unit->GetPos(ai->GetLastFrame()))<=reach*reach
+            && ai->GetBattle()->LaneWorkAllowed(at)
+            && ai->GetThreatMap()->GetThreatAt(unit,at)<=cfg->front.threat;
+    }
     auto* definition=build->GetBuildDef();
     if(!definition) {
         // Only the selected worker's unfinished support frame may invite the

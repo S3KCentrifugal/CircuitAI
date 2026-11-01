@@ -99,8 +99,21 @@ namespace Invariants {
     {
         IBuilderTask@ building = cast<IBuilderTask>(task);
         if (building is null || building.buildDef is null) return;
+        // Repair/assist tasks expose their target's definition too. They do
+        // not admit a new structure and must not re-test its original budget.
+        if (building.GetBuildType() >= int(Task::BuildType::REPAIR)) return;
         const string name = building.buildDef.GetName();
         const string side = Global::AISettings::Side;
+        if (name == UnitHelpers::GetFusionNameForSide(side) && !TechChain::NukeRush()
+            && !aiEconomyMgr.IsMetalMap() && !TechBuild::MetalFullLong() && TechChain::MohosPending()) {
+            const float mi = Economy::GetMinMetalIncomeLast10s();
+            const float ei = Economy::GetMinEnergyIncomeLast10s();
+            if (TechEconomyMath::MexesBlockReactor(true, false,
+                aiEconomyMgr.energy.pull > ei || ei < EcoPlanner::TargetEnergy(mi), mi,
+                Global::RoleSettings::Tech::MinimumMetalIncomeForFUS, ei,
+                Global::RoleSettings::Tech::EcoFusionEnergyIncome))
+                Violation("INV-021", "fusion", "fusion admitted before mex upgrades without affordable energy relief");
+        }
         const bool energy = name == UnitHelpers::GetWindNameForSide(side)
             || name == UnitHelpers::GetSolarNameForSide(side) || name == UnitHelpers::GetAdvSolarNameForSide(side)
             || name == UnitHelpers::GetFusionNameForSide(side) || name == UnitHelpers::GetAdvFusionNameForSide(side);
@@ -161,7 +174,6 @@ namespace Invariants {
     int lastLabFacing = -2;       // D-096: INV-018's log on change
     int lastLabExitCount = -1;
     int noForwardSince = -1;
-    int fusionFramesLast = 0;     // D-100: INV-021
     int lastT1LabId = -1;         // D-101: INV-023
     int t1LabFramesLast = 0;      // D-102: INV-025
     int t2ConsHighSince = -1;     // D-103: INV-028
@@ -267,16 +279,31 @@ namespace Invariants {
                     + int(Global::RoleSettings::Tech::InvariantFrameRadius) + " for " + int(Global::RoleSettings::Tech::InvariantFrameSeconds) + " s");
         }
 
-        // INV-004: metal does not float while a structure is under
-        // construction and static build power is under the income target
-        // (the owner's rule, D-075).
+        // INV-004: D-429 credits committed capacity and respects the same
+        // energy-funded ceiling as discretionary turret admission. Reuse this
+        // tick's existing project/static-power queries; add only scalar work
+        // and lifecycle-counter lookups (tech_economy_math_tests.as).
         const float stor = aiEconomyMgr.metal.storage;
         const float cur = aiEconomyMgr.metal.current;
         const float mi = Economy::GetMinMetalIncomeLast10s();
         const float bp = aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius);
-        const float target = mi * Global::RoleSettings::Tech::PowerBuildPowerPerMetal;
+        const float ei = Economy::GetMinEnergyIncomeLast10s();
+        const float target = TechEconomyMath::CapacityTarget(mi,
+            Global::RoleSettings::Tech::EcoBuildPowerPerMetal,
+            Global::RoleSettings::Tech::PowerBuildPowerPerMetal,
+            ei, aiEconomyMgr.energy.current,
+            Global::RoleSettings::Tech::PowerCapacityBankSeconds,
+            frame ? f.circuitDef.GetBuildTime() : 0.0f, frame ? f.circuitDef.costE : 0.0f);
+        CCircuitDef@ capacityNano = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        const float arriving = capacityNano is null ? 0.0f : capacityNano.GetBuildSpeed()
+            * float(aiBuilderMgr.GetUnfinishedCount(capacityNano)
+                + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO), capacityNano));
         const bool floating = (stor > 0.0f) && (cur >= Global::RoleSettings::Tech::InvariantFloatPercent * stor);
-        if (floating && frame && bp < target) {
+        const bool draining = aiEconomyMgr.energy.storage > 0.0f
+            && aiEconomyMgr.energy.current < Global::RoleSettings::Tech::EcoEnergyLowPercent * aiEconomyMgr.energy.storage
+            && aiEconomyMgr.energy.pull > ei;
+        if (floating && frame && TechEconomyMath::CapacityNeeded(target, bp, arriving,
+            aiEconomyMgr.isEnergyStalling || draining)) {
             if (floatSince < 0) floatSince = ai.frame;
             else if (ai.frame - floatSince >= int(Global::RoleSettings::Tech::InvariantFloatSeconds) * SECOND)
                 Violation("INV-004", "float", "metal floating at " + int(cur) + " of " + int(stor) + " for " + int(Global::RoleSettings::Tech::InvariantFloatSeconds)
@@ -316,8 +343,11 @@ namespace Invariants {
         } else ladderFloatSince = -1;
 
         // INV-013: a main cluster has a forward cluster planned within
-        // InvariantForwardSeconds, unless every re-plan was used up (D-081)
-        if (Layout::HasBox() && !Layout::ForwardPlanned() && !Layout::ForwardGivenUp()) {
+        // InvariantForwardSeconds, unless every re-plan was used up (D-081).
+        // Dynamic districts already reserve growth; a second cluster is needed
+        // only after actual primary capacity is exhausted (D-431).
+        if (Layout::HasBox() && (!Layout::HasSpine() || Layout::economyOverflowNeeded)
+            && !Layout::ForwardPlanned() && !Layout::ForwardGivenUp()) {
             if (noForwardSince < 0) noForwardSince = ai.frame;
             else if (ai.frame - noForwardSince >= int(Global::RoleSettings::Tech::InvariantForwardSeconds) * SECOND)
                 Violation("INV-013", "forward", "the main turret cluster has had no forward cluster planned for " + int(Global::RoleSettings::Tech::InvariantForwardSeconds) + " s");
@@ -371,22 +401,8 @@ namespace Invariants {
         // INV-019 is checked synchronously at construction admission below.
         // Existing frames must not be judged against a later, depleted bank.
 
-        // INV-021 (D-100): a fusion frame is not started while a mex of ours
-        // within ChainMexFarRadius is still T1 with no upgrade under way
-        {
-            CCircuitDef@ fd = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(Global::AISettings::Side));
-            const int frames = (fd is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(fd);
-            // not while the metal floats (the fusion then goes ahead on purpose, D-100)
-            // Nuke openings deliberately buy a bounded set of upgrades; the
-            // ordinary economy still requires all nearby mexes (D-229).
-            if (!TechChain::NukeRush() && !aiEconomyMgr.IsMetalMap() && frames > fusionFramesLast && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f && !TechBuild::MetalFullLong()) {
-                const AIFloat3 t1 = Economy::MexTracker::GetNearestNonUpgradedMexInRange(Global::Map::StartPos, Global::Map::StartPos,
-                    Global::RoleSettings::Tech::ChainMohoRadius);
-                if (t1.x >= 0.0f)
-                    Violation("INV-021", "fusion", "a fusion frame started with a T1 mex at (" + int(t1.x) + ", " + int(t1.z) + ") not upgraded");
-            }
-            fusionFramesLast = frames;
-        }
+        // INV-021 is checked at admission: reactor relief is a permitted
+        // D-429 exception, and later resource spending cannot revoke it.
 
         // INV-023 (D-101): a T1 lab after the first, while a turret stands, is
         // placed by the layout: a turret slot within ExpLabBuildPowerReach
@@ -439,10 +455,16 @@ namespace Invariants {
         {
             // D-119: the advanced lab's constructors only, to T2BotConstructorCap
             const int t2Cons = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+            // Opening factories deliberately retain wantAck, not the later
+            // surplus pool. Observe the same target as factory admission.
+            const int wanted = TechChain::Active()
+                ? TechEconomyMath::ConstructorOpeningTarget(TechChain::wantAck,
+                    Global::RoleSettings::Tech::DonationKeepT2Constructors, int(Team::Donation::pendingRequests.length()))
+                : Global::RoleSettings::Tech::T2BotConstructorCap;
             const float mStor = aiEconomyMgr.metal.storage;
             const bool high = mStor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * mStor
                 && Factory::primaryT2BotLab !is null && !Lifecycle::IsRetiring(Factory::primaryT2BotLab)
-                && t2Cons < (TechChain::NukeRush() ? TechChain::wantAck : Global::RoleSettings::Tech::T2BotConstructorCap);
+                && t2Cons < wanted;
             if (!high || t2Cons > t2ConsAtHigh) { t2ConsHighSince = high ? ai.frame : -1; t2ConsAtHigh = t2Cons; }
             else if (t2ConsHighSince < 0) { t2ConsHighSince = ai.frame; t2ConsAtHigh = t2Cons; }
             else if (ai.frame - t2ConsHighSince >= 60 * SECOND) {

@@ -34,7 +34,7 @@ static AIFloat3 F(Point p,float y=0) { return {p.x,y,p.z}; }
 // commander-local selection. Called only from the builder's task offer for an
 // idle commander (not per frame). Costs per offer, K = units/features inside
 // the work radius (the commander's LOS, ~450 elmos): repair O(K log K) plus at
-// most four reach/clearance checks; reclaim O(K) feature wrappers; radar O(N)
+// most four reach/clearance checks; reclaim O(K) feature wrappers and a fixed four-candidate shortlist; radar O(N)
 // over the ally snapshot at most once a second per commander (cached); line
 // O(K + T) over the defence tasks. No new recurring cadence, no orders here:
 // the returned task is assigned by the builder manager like any other offer.
@@ -175,42 +175,72 @@ IUnitTask* CCommanderController::RepairWork(CCircuitUnit* unit,const State& s,bo
     return nullptr;
 }
 
-IUnitTask* CCommanderController::ReclaimWork(CCircuitUnit* unit,const State& s,float radius,int frame) {
+IUnitTask* CCommanderController::ReclaimWork(CCircuitUnit* unit,State& s,float radius,int frame) {
     auto* economy=ai->GetEconomyManager();
-    const float store=economy->GetMetalStore();
-    if(!unit->GetCircuitDef()->IsAbleToReclaim() || store<=0 || economy->GetMetalCur()>=store*cfg->work.reclaimStorage) return nullptr;
+    s.work.reclaimMetalRoom=commander::ReclaimHeadroom(economy->GetMetalCur(),economy->GetMetalStore(),cfg->work.reclaimStorage);
+    s.work.reclaimEnergyRoom=commander::ReclaimHeadroom(economy->GetEnergyCur(),economy->GetEnergyStore(),cfg->work.reclaimEnergyStorage);
+    if(!unit->GetCircuitDef()->IsAbleToReclaim() || frame<s.work.reclaimNext
+        || (s.work.reclaimMetalRoom<=0 && s.work.reclaimEnergyRoom<=0))return nullptr;
     auto* builder=ai->GetBuilderManager();
     const AIFloat3 pos=unit->GetPos(frame);
     const float reach=unit->GetCircuitDef()->GetBuildDistance();
-    struct Candidate { AIFloat3 at; float metal,distance; int id; };
-    std::vector<Candidate> candidates;
+    // Idle work stays inside current build reach. It must not initiate a walk
+    // through a contested front to harvest a higher-valued feature.
+    radius=std::min(radius,std::max(0.f,reach-32.f));
+    commander::LocalReclaimCandidates candidates;
+    s.work.reclaimReason="no_features";
     auto features=ai->GetCallback()->GetFeaturesIn(pos,radius,false);
     for(springai::Feature* f:features) {
-        springai::FeatureDef* def=f->GetDef();
-        const bool reclaimable=def!=nullptr && def->IsReclaimable();
-        const float metal=reclaimable?def->GetContainedResource(economy->GetMetalRes())*f->GetReclaimLeft():0.f;
+        auto* def=f->GetDef();
+        const bool reclaimable=def && def->IsReclaimable();
+        const float left=f->GetReclaimLeft();
+        const float metal=reclaimable?def->GetContainedResource(economy->GetMetalRes())*left:0.f;
+        const float energy=reclaimable?def->GetContainedResource(economy->GetEnergyRes())*left:0.f;
         delete def;
-        if(metal<=0 || metal<cfg->work.reclaimMetal) continue;
         const AIFloat3 at=f->GetPosition();
-        if(!InsideLine(s,at,frame,reach) || builder->IsResurrect(at,8.f)) continue;
-        candidates.push_back({at,metal,pos.distance2D(at),f->GetFeatureId()});
+        // The engine query is cylindrical; a cliff-top feature can be close
+        // on the minimap but outside build reach in 3D. Never walk to it.
+        if(pos.SqDistance(at)>radius*radius)continue;
+        const float distance=pos.distance2D(at);
+        const auto value=commander::ResourceReclaimValue(metal,energy,s.work.reclaimMetalRoom,s.work.reclaimEnergyRoom,
+            cfg->work.reclaimMetal,cfg->work.reclaimEnergy,cfg->work.reclaimEnergyPerMetal,distance);
+        if(value.score<=0){s.work.reclaimReason="no_resource_demand";continue;}
+        if(!InsideLine(s,at,frame,reach)){s.work.reclaimReason="fallback_boundary";continue;}
+        if(builder->IsResurrect(at,8.f)){s.work.reclaimReason="resurrection_claim";continue;}
+        // Structure ownership polygons can exclude the start connector and
+        // adjacent vegetation already in reach. Harvest uses the existing
+        // lane work window below, not the narrower new-building partition.
+        // commander-idle-reclaim exercises this connector boundary.
+        if(!ai->GetBattle()->LaneWorkAllowed(at)){s.work.reclaimReason="combat_zone";continue;}
+        // Apply the same work window before claiming, not after enqueueing.
+        auto* battle=ai->GetBattle();
+        if(!FallbackActive(s,frame) && battle->GetFrontLaneLength()>0
+            && (battle->GetFrontLaneDistance(at)>battle->GetFrontLaneWidth()+(cfg->front.laneMargin>0?cfg->front.laneMargin:reach)
+                || (cfg->front.persistent>0 && battle->GetFrontLaneProgress(at)<battle->GetFrontLaneProgress(pos)-cfg->front.workBehind)))continue;
+        s.work.reclaimReason="candidates";
+        candidates.Add({at.x,at.y,at.z,value.score,distance,value.value,f->GetFeatureId(),value.metal});
     }
     utils::free_clear(features);
-    std::sort(candidates.begin(),candidates.end(),[](const Candidate& a,const Candidate& b) {
-        return a.distance!=b.distance?a.distance<b.distance:a.id<b.id;
-    });
     ai->GetThreatMap()->SetThreatType(unit);
-    const size_t tried=std::min<size_t>(4,candidates.size());
-    for(size_t i=0;i<tried;++i) {
-        const auto& c=candidates[i];
-        if(IBuilderTask* claim=builder->GetReclaimFeatureTask(c.at,8.f)) {
-            if(!claim->IsDead() && claim->CanAssignTo(unit)) return claim;
+    for(size_t i=0;i<candidates.count;++i) {
+        const auto& c=candidates.items[i];const AIFloat3 at(c.x,c.y,c.z);
+        if(IBuilderTask* claim=builder->GetReclaimFeatureTask(at,8.f)) {
+            if(!claim->IsDead() && claim->recoveryControlled && claim->CanAssignTo(unit))return claim;
             continue;
         }
-        if(cfg->work.clearance>0 && !ai->GetCallback()->GetEnemyUnitIdsIn(c.at,cfg->work.clearance,false).empty()) continue;
-        if(!ai->GetTerrainManager()->CanReachAtSafe2(unit,c.at,reach)) continue;
-        return builder->Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH,c.at,c.metal,FRAMES_PER_SEC*60,8.f));
+        if(cfg->work.clearance>0 && !ai->GetCallback()->GetEnemyUnitIdsIn(at,cfg->work.clearance,false).empty())continue;
+        if(!ai->GetTerrainManager()->CanReachAtSafe2(unit,at,reach))continue;
+        auto* task=builder->Enqueue(TaskB::Reclaim(IBuilderTask::Priority::NORMAL,at,c.value,15*FRAMES_PER_SEC,8.f,c.metal));
+        // Keep the selected local feature fixed: generic metal reclaim may
+        // retarget an enemy or another feature 500 elmos away on reevaluation.
+        // As with the original explicit commander offer and SEA recovery,
+        // this selector owns initial assignment. Generic pool CanAssignTo
+        // also requires cluster escorts, which would veto stationary work.
+        if(task) {task->recoveryControlled=true;s.work.reclaimReason="assigned";return task;}
+        s.work.reclaimReason="enqueue_failed";
     }
+    // Failed optional work only; never throttle threat observation or defense.
+    s.work.reclaimNext=frame+int(cfg->work.reclaimRetry*FRAMES_PER_SEC);
     return nullptr;
 }
 
