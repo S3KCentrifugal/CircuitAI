@@ -12,7 +12,7 @@
 //   - Mexes first: while the bank is full and our T1 mexes are not all upgraded, a T2 constructor asking for
 //     work takes an open mex upgrade (FrontMexUp) before converters and the ladder's reactor work.
 //   - Blocks: converters go in gap-free Front::OverflowBlockCols x Front::OverflowBlockRows rectangles
-//     (4x4 footprints at a 32-elmo pitch, nothing between rows or columns), sited behind the eco anchor away
+//     (footprint 4 = 64-elmo squares at a 64-elmo pitch, nothing between rows or columns), sited behind the eco anchor away
 //     from the map centre, every cell buildable and no surface threat at the block when it is chosen; one
 //     block is filled before the next is chosen. Each order keeps to its cell (siteRadius) or is dropped.
 //   - Build power: T2 labs and plants recruit extra T2 constructors on top of the profile minimum, 1-3 for
@@ -83,12 +83,15 @@ namespace FrontOverflow {
     uint blockFirstCell = 0;    // the current block's first entry in allCells
     bool anchored = false;      // the current block's first converter stands (its grid is set)
 
-    float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even 4x4 footprints sit on 16-elmo lines
+    float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even footprints sit on 16-elmo lines
 
     bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells)
     {
         const int cols = Global::RoleSettings::Front::OverflowBlockCols, rows = Global::RoleSettings::Front::OverflowBlockRows;
-        const float pitch = 32.0f;
+        // The def's own width (arm C, 2026-10-31): BAR footprint 4 is 8 engine squares, 64 elmo (GetFootprintX
+        // = 4 cells of 16); a 32-elmo pitch put every neighbour cell half on its neighbour and the native site
+        // search refused it - the TECH layout's converter grid is at 64 for the same reason
+        const float pitch = float(AiMax(2, d.GetFootprintX())) * 16.0f;
         fitCells.resize(0);
         // The whole block and the converter's block-map yard round it free of every structure and yard (arm C,
         // 2026-10-31): experimental_balanced block_map.json gives converters yard [8, 8] (64 elmo a side) that
@@ -101,7 +104,7 @@ namespace FrontOverflow {
         for (int r = 0; r < rows; ++r) {
             for (int k = 0; k < cols; ++k) {
                 const AIFloat3 p(Snap(c.x) + (float(k) - float(cols - 1) * 0.5f) * pitch, 0.0f, Snap(c.z) + (float(r) - float(rows - 1) * 0.5f) * pitch);
-                if (aiTerrainMgr.BuildableFraction(d, p, 15.0f, 15.0f, 0) < 1.0f) return false;
+                if (aiTerrainMgr.BuildableFraction(d, p, pitch * 0.5f - 1.0f, pitch * 0.5f - 1.0f, 0) < 1.0f) return false;
                 fitCells.insertLast(p);
             }
         }
