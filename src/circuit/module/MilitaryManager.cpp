@@ -29,6 +29,8 @@
 #include "task/fighter/FerryTask.h"
 #include "task/fighter/AirWaveTask.h"
 #include "task/fighter/EscortStrikeTask.h"
+#include "task/fighter/DebugGoalTask.h"
+#include "script/RefCounter.h"
 #include "task/fighter/DefendTask.h"
 #include "task/fighter/ScoutTask.h"
 #include "task/fighter/RaidTask.h"
@@ -93,6 +95,9 @@ CMilitaryManager::CMilitaryManager(CCircuitAI* circuit)
 
 CMilitaryManager::~CMilitaryManager()
 {
+	if (debugGoalTask != nullptr) {
+		debugGoalTask->Release();  // our reference; the task list let go of its own
+	}
 }
 
 void CMilitaryManager::InitHandlers()
@@ -850,6 +855,7 @@ void CMilitaryManager::InitMilitary()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Update, this), 1/*interval / 2*/, offset + 1);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDefenceTasks, this), FRAMES_PER_SEC * 5, offset + 2);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSensorGuards, this), FRAMES_PER_SEC * 5, offset + 3);
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDebugGoal, this), FRAMES_PER_SEC * 2, offset + 1);
 		if (commSnipeInfo.isEnabled) {
 			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
 					commSnipeInfo.interval, offset + 2);
@@ -2157,6 +2163,136 @@ void CMilitaryManager::UpdateSensorGuards()
 	}
 	if (!surplus.empty()) {
 		circuit->LOG("SENSOR: released %i surplus escort(s)", int(surplus.size()));
+	}
+}
+
+bool CMilitaryManager::SetDebugStrike(int weapon, int mode, float x, float z, int team)
+{
+	if (!debug::ValidWeapon(weapon)) return false;
+	debug::Strike& s = GetDebugStrike(weapon);
+	const bool ok = debug::Set(s, debug::Mode(mode), x, z, team,
+			CTerrainManager::GetTerrainWidth(), CTerrainManager::GetTerrainHeight(), circuit->GetTeamId());
+	if (ok) {
+		circuit->LOG("DEBUG: %s strike set: %s", debug::WeaponName(weapon), debug::Describe(s, 0).c_str());
+	} else {
+		circuit->LOG("DEBUG: %s strike refused: mode=%i x=%.0f z=%.0f team=%i", debug::WeaponName(weapon), mode, x, z, team);
+	}
+	return ok;
+}
+
+bool CMilitaryManager::SetDebugStrikePlayer(int weapon, int player)
+{
+	if (!debug::ValidWeapon(weapon)) return false;
+	debug::Strike& s = GetDebugStrike(weapon);
+	const int team = (player >= 0) ? circuit->GetGame()->GetPlayerTeam(player) : -1;  // -1: unknown or spectator
+	const bool ok = debug::SetPlayer(s, player, team, circuit->GetTeamId());
+	if (ok) {
+		circuit->LOG("DEBUG: %s strike set: %s (player %i plays team %i)", debug::WeaponName(weapon), debug::Describe(s, 0).c_str(), player, team);
+	} else {
+		circuit->LOG("DEBUG: %s strike refused: player=%i team=%i", debug::WeaponName(weapon), player, team);
+	}
+	return ok;
+}
+
+std::string CMilitaryManager::GetDebugStrikeState(int weapon) const
+{
+	const debug::Strike& s = debugStrikes[debug::ValidWeapon(weapon) ? weapon : debug::NUKE];
+	int units = 0;
+	if (weapon == debug::GOAL) {
+		if (s.Active() && (debugGoalTask != nullptr) && !debugGoalTask->IsDead()) {
+			units = int(debugGoalTask->GetAssignees().size());
+		}
+	} else if (s.Active()) {  // the handful of SUPER tasks, only while a strike is on
+		for (const IFighterTask* task : GetTasks(IFighterTask::FightType::SUPER)) {
+			const CSuperTask* st = static_cast<const CSuperTask*>(task);
+			if (st->IsDebugEngaged(weapon)) ++units;
+		}
+	}
+	return debug::Describe(s, units);
+}
+
+/*
+ * Debug goal (owner 2026-11-01): a military unit of ours, mobile and armed,
+ * not a constructor or commander, held by this manager's normal tasks - any
+ * fighter task but a spam route, a super static's or a transport ferry, or
+ * idle or retreating - not by a player, a gadget or the goal itself.
+ */
+bool CMilitaryManager::IsDebugGoalCandidate(CCircuitUnit* unit) const
+{
+	if ((unit == nullptr) || unit->IsDead()) return false;
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if ((cdef == nullptr) || !cdef->IsMobile() || !cdef->IsAttacker() || cdef->IsBuilder() || cdef->IsRoleComm()) return false;
+	const IUnitTask* task = unit->GetTask();
+	if ((task == nullptr) || (task->GetManager() != this) || task->IsDead() || (task == debugGoalTask)
+		|| task->IsExternalControlled()) return false;
+	switch (task->GetType()) {
+		case IUnitTask::Type::IDLE:
+		case IUnitTask::Type::RETREAT: return true;
+		case IUnitTask::Type::FIGHTER: break;
+		default: return false;
+	}
+	const IFighterTask* ft = static_cast<const IFighterTask*>(task);
+	switch (ft->GetFightType()) {
+		case IFighterTask::FightType::SUPER:
+		case IFighterTask::FightType::FERRY:
+		case IFighterTask::FightType::GOAL: return false;
+		case IFighterTask::FightType::ROUTE: {
+			const CRouteTask* route = dynamic_cast<const CRouteTask*>(ft);
+			return (route == nullptr) || !route->IsSpam();
+		}
+		default: return true;
+	}
+}
+
+/*
+ * Every 2 s: while the goal is on, every candidate in reach joins the one goal
+ * task (units finished later and units back from elsewhere too); a new goal
+ * (serial) or off ends that task, and its members go back to the idle task,
+ * where the normal assignment takes them. O(army) per call, plus O(army x
+ * targets) for a player goal.
+ */
+void CMilitaryManager::UpdateDebugGoal()
+{
+	debug::Strike& s = debugStrikes[debug::GOAL];
+	CDebugGoalTask* task = static_cast<CDebugGoalTask*>(debugGoalTask);
+	if ((task != nullptr) && (task->IsDead() || !s.Active() || (task->GetSerial() != s.serial))) {
+		const int members = int(task->GetAssignees().size());
+		const char* why = !s.Active() ? "off" : (task->IsDead() ? "task gone" : "new goal");
+		if (!task->IsDead()) AbortTask(task);  // members to the idle task: normal behaviour
+		circuit->LOG("DEBUG: goal ended (%s): %i unit(s) back to normal behaviour", why, members);
+		AssignOwnedReference<IUnitTask>(debugGoalTask, nullptr);
+		task = nullptr;
+	}
+	if (!s.Active()) return;
+	if (task == nullptr) {
+		task = new CDebugGoalTask(this, s.serial);
+		updateTasks.push_back(task);
+		TaskAdded(task);
+		AssignOwnedReference<IUnitTask>(debugGoalTask, task);  // updateTasks holds the first reference, we the second
+		circuit->LOG("DEBUG: goal started: %s", debug::Describe(s, 0).c_str());
+	}
+
+	const int frame = circuit->GetLastFrame();
+	const bool pos = (s.mode == debug::Mode::POS);
+	const float reach = debug::GoalReach(s.mode, CTerrainManager::GetTerrainWidth(), CTerrainManager::GetTerrainHeight());
+	const AIFloat3 goal(s.x, 0.f, s.z);
+	if (!pos) task->RefreshTargets();
+	// AssignTask runs script hooks that may destroy units: ids, resolved one by one
+	std::vector<int> ids;
+	ids.reserve(army.size());
+	for (CCircuitUnit* unit : army) ids.push_back(unit->GetId());
+	int joined = 0;
+	for (const int id : ids) {
+		CCircuitUnit* unit = circuit->GetTeamUnit(id);
+		if (!IsDebugGoalCandidate(unit) || task->IsDead()) continue;
+		const AIFloat3 at = unit->GetPos(frame);
+		if (pos ? (at.SqDistance2D(goal) > SQUARE(reach)) : (task->NearestTarget(at) < 0)) continue;
+		AssignTask(unit, task);
+		if (unit->GetTask() == task) ++joined;
+	}
+	if (joined > 0) {
+		circuit->LOG("DEBUG: goal took %i unit(s), %i in the goal: %s", joined, int(task->GetAssignees().size()),
+				debug::Describe(s, int(task->GetAssignees().size())).c_str());
 	}
 }
 
