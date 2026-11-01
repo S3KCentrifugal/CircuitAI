@@ -76,7 +76,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::jamSafe>("jam_safe",0,1),Safety<&SC::jamHeavyCost>("jam_heavy_cost",0,100000),
         Safety<&SC::cloakEnergyRetreat>("cloak_energy_retreat",0,1),
         Safety<&SC::cloakRetreatDistance>("cloak_retreat_distance",128,2000),
-        Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
+        Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthRecover>("health_recover",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
         Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
         Safety<&SC::decoyBait>("decoy_bait",0,1),
         Safety<&SC::towerKeepOut>("tower_keep_out",0,1),Safety<&SC::towerMargin>("tower_margin",0,600),

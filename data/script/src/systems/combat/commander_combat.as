@@ -90,7 +90,8 @@ namespace CommanderCombat {
             Option("front_mex_los",0.f);
             Option("cloak_energy_retreat",0.f);
             Option("cloak_retreat_distance",600.f);
-            Option("health_retreat",.4f);
+            Option("health_retreat",.3f);
+            Option("health_recover",.7f); // owner 2026-11-01: retreat under 30% until 70%
             Option("decoys",1.f);
             Option("decoy_bait",1.f);
             Option("decoy_health_retreat",.9f);

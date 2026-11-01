@@ -191,6 +191,8 @@ struct CommanderCombatConfig {
 };
 struct CommanderSafetyConfig {
     float healthRetreat=0,healthShotSeconds=2;
+    // Owner 2026-11-01: a health retreat lasts until healthRecover (0: combat.recover).
+    float healthRecover=0;
     float decoyHealthRetreat=.9f,decoyHealthRecover=.95f;
     float decoyBait=1; // reuse safety/lane work, never plan a real-commander D-gun attack
     float jamSafe=0,jamHeavyCost=900;
@@ -198,7 +200,7 @@ struct CommanderSafetyConfig {
     // Owner 2026-11-01 tower keep-out: stay towerMargin outside the weapon range
     // of scouted enemy LLTs, Beamers, Twin Guards and Cacophonies; dive one alone
     // rarely (towerDiveChance per tower per towerDiveCooldown seconds).
-    float towerKeepOut=1,towerMargin=100,towerDiveChance=.15f,towerDiveCooldown=180,towerDiveHealth=.85f;
+    float towerKeepOut=1,towerMargin=100,towerDiveChance=0,towerDiveCooldown=180,towerDiveHealth=.85f;
     // Shelling: health lost per second over shellWindow, mostly unexplained by
     // visible enemies in reach, with no radar dot closer than shellDotRange.
     // The commander steps shellStep back, keeps out of a shellZone disc there
@@ -519,6 +521,9 @@ private:
     commander::JammerDemandMemory jammerDemand;
     std::map<int,commander::JammerOutage> jammerOutages;
     bool HealthControl(CCircuitUnit* unit,State& s,int frame);
+    // Owner 2026-11-01: the only work a low-health commander keeps is a D-gun on a
+    // nearby T3 (an engaged T3 plan, or a T3 in D-gun reach with the D-gun ready).
+    bool T3Exempt(CCircuitUnit* unit,const State& s,int frame) const;
     // ---- keep-out and shelling withdrawal (CommanderKeepOut.cpp) ----
     struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false; };
     std::vector<KeepOutZone> keepOut; // towers rebuilt once a second; shell zones until expiry
