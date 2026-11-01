@@ -21,6 +21,7 @@ enum Phase {
     COMMANDER_OBSERVE, COMMANDER_DECISION,
     COMMANDER_T3, COMMANDER_FALLBACK, COMMANDER_DEPLOY, COMMANDER_HANDOVER, // D-294 attribution
     COMMANDER_DAMAGE, // immediate damage callback; separate root from scheduled decision
+    RANGED_CONTROLLER, LINE_DECISION, // D-430: ranged unit controller loop, line group controller
     PHASE_COUNT
 };
 extern const bool enabled;

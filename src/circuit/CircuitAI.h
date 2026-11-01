@@ -61,6 +61,8 @@ class CTerrainManager;
 class CBattleAnalysis;
 class CBuilderManager;
 class CCommanderController;
+class CRangedController;
+class CLineController;
 class CControllerRegistry;
 class CWidgetState;
 class CFactoryManager;
@@ -343,6 +345,8 @@ public:
     // D-388: unit controllers; the commander controller is the first of them.
     CControllerRegistry* GetControllers() const { return controllers.get(); }
     CCommanderController* GetCommanderController() const { return commanderController; }
+    CRangedController* GetRangedController() const { return rangedController; }  // D-430
+    CLineController* GetLineController() const { return lineController; }        // D-430
     CWidgetState* GetWidgetState() const { return widgetState.get(); }  // D-300
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -402,6 +406,8 @@ private:
 	std::shared_ptr<CBuilderManager> builderManager;
     std::unique_ptr<CControllerRegistry> controllers;  // owns every unit controller
     CCommanderController* commanderController=nullptr;  // owned by controllers
+    CRangedController* rangedController=nullptr;        // owned by controllers (D-430)
+    CLineController* lineController=nullptr;            // owned by controllers (D-430)
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

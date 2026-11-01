@@ -1,0 +1,35 @@
+{
+  "name": "line-waves-mirror",
+  "description": "D-430 control: the same Cortex line (ranged controller presets, line template) against its Armada mirror on the attribute path (6 Maces with 4 Rocketeers behind), one wave. The two lines meet head on; the report reads trades and the LINE: order log of team 0 only.",
+  "unit": "corthud",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "line-waves-mirror",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [4000, 3900, 1250],
+  "photos": [40, 70, 110],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3550, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4450, 4200]},
+    {"unit": "corthud", "count": 6, "team": 0, "position": [3800, 3700], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 4, "team": 0, "position": [3870, 3480], "columns": 4, "spacing": 90, "after_seconds": 15},
+    {"unit": "armham", "count": 6, "team": 1, "position": [3800, 5000], "columns": 6, "spacing": 70, "after_seconds": 35},
+    {"unit": "armrock", "count": 4, "team": 1, "position": [3870, 5220], "columns": 4, "spacing": 90, "after_seconds": 35}
+  ],
+  "waves": [
+    {"name": "mirror", "after_seconds": 35, "units": ["armham", "armrock"]}
+  ],
+  "enemy_destination": [3900, 3300],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 4,
+    "max_losses": 6,
+    "min_damage": 2000
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "line-waves"
+}

@@ -35,6 +35,8 @@
 #include "task/fighter/BombTask.h"
 #include "task/fighter/ArtilleryTask.h"
 #include "task/fighter/RangedWorld.h"
+#include "control/core/ControlledTask.h"
+#include "control/unit/ranged/RangedController.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -2000,7 +2002,7 @@ void CMilitaryManager::UpdateCommanderSnipe()
 		// and never fired. O(1) per unit; the existing release path runs.
 		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
 			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled()
-			|| unit->GetCircuitDef()->IsAttrRanged())
+			|| unit->GetCircuitDef()->IsRangedControlled())
 		{
 			if (locked >= 0) unit->SetCommanderTarget(-1, frame);
 			continue;
@@ -2344,8 +2346,13 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 	CCircuitDef* def = unit->GetCircuitDef();
 	// Ordinary assignment only: specialist missions and player control keep
 	// their owner. No polling loop steals already assigned units.
-	if (!def->IsAttrRanged() || !def->IsMobile() || !def->IsLander()
+	if (!def->IsRangedControlled() || !def->IsMobile() || !def->IsLander()
 			|| def->IsAbleToFly() || def->IsRoleTrans()) return nullptr;
+	// D-430: a type bound to a ranged controller preset holds the controller's
+	// lease instead of an artillery task; the engagement is the same.
+	if (CRangedController* controller = circuit->GetRangedController()) {
+		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
+	}
 	return Enqueue(TaskF::Common(IFighterTask::FightType::ARTY));
 }
 
@@ -2378,6 +2385,14 @@ void CMilitaryManager::UpdateExternalControl()
         auto* external=EnqueueExternalControl(externalOwnerRule);
         AssignTask(unit,external); // external AssignTo/Start never alter gadget commands
     }
+}
+
+CControlledTask* CMilitaryManager::EnqueueControlled(IUnitController* controller, IUnitTask* previous)
+{
+	auto* task = new CControlledTask(this, controller, previous);
+	updateTasks.push_back(task);
+	TaskAdded(task);
+	return task;
 }
 
 IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)

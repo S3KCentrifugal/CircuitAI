@@ -191,8 +191,14 @@ public:
 	bool IsAttrNoRepair()  const { return attr & AttrMask::NO_REPAIR; }  // also per-unit
 	bool IsAttrNoDisrupt() const { return attr & AttrMask::NO_DISRUPT; }  // also per-unit
 	bool IsAttrRanged() const { return attr & AttrMask::RANGED; }
+	// D-430: the type runs the ranged engagement, whichever path installed its
+	// policy: the legacy `ranged` attribute block, or a ranged controller
+	// preset ("controller" key). Every admission and membership test reads
+	// this, never the attribute, so a preset-bound type needs no attribute.
+	bool IsRangedControlled() const { return rangedControlled; }
 	const RangedPolicy& GetRangedPolicy() const { return rangedPolicy; }
-	void SetRangedPolicy(const RangedPolicy& value) { rangedPolicy = value; }
+	void SetRangedPolicy(const RangedPolicy& value) { rangedPolicy = value; rangedControlled = true; }
+	void ClearRangedPolicy() { rangedPolicy = RangedPolicy(); rangedControlled = false; }
 
 	bool IsHoldFire()   const { return fireState == FireType::HOLD; }
 	bool IsReturnFire() const { return fireState == FireType::RETURN; }
@@ -390,6 +396,7 @@ public:
 
 private:
 	RangedPolicy rangedPolicy;
+	bool rangedControlled = false;  // D-430: a policy was installed (attribute or controller preset)
 	static RoleName* roleNames;
 	static AttrName* attrNames;
 

@@ -41,13 +41,13 @@ CArtilleryTask::~CArtilleryTask()
 
 bool CArtilleryTask::CanAssignTo(CCircuitUnit* unit) const
 {
-	return units.empty() && (unit->GetCircuitDef()->IsRoleArty() || unit->GetCircuitDef()->IsAttrRanged());
+	return units.empty() && (unit->GetCircuitDef()->IsRoleArty() || unit->GetCircuitDef()->IsRangedControlled());
 }
 
 void CArtilleryTask::AssignTo(CCircuitUnit* unit)
 {
 	IFighterTask::AssignTo(unit);
-	if (unit->GetCircuitDef()->IsAttrRanged()) {
+	if (unit->GetCircuitDef()->IsRangedControlled()) {
 		ranged = std::make_unique<CRangedEngagement>(manager->GetCircuit(), this, unit);
 		return;
 	}

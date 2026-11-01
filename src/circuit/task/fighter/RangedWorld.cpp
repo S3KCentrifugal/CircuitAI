@@ -64,6 +64,12 @@ const CRangedWorld::Metadata& CRangedWorld::MetadataFor(CCircuitDef* def)
         const auto& params = ud->GetCustomParams();
         const auto level = params.find("techlevel");
         if (level != params.end()) it->second.tech = float(std::atof(level->second.c_str()));
+        // D-430: the largest splash of any mount, for the line's spacing.
+        for (auto* raw : ud->GetWeaponMounts()) {
+            const std::unique_ptr<springai::WeaponMount> mount(raw);
+            const std::unique_ptr<springai::WeaponDef> wd(mount->GetWeaponDef());
+            if (wd && !wd->IsShield()) it->second.maxSplash = std::max(it->second.maxSplash, wd->GetAreaOfEffect());
+        }
         const std::unique_ptr<springai::WeaponDef> explosion(ud->GetDeathExplosion());
         if(explosion) {
             const std::unique_ptr<springai::Damage> damage(explosion->GetDamage());
@@ -254,11 +260,11 @@ void CRangedWorld::Refresh()
             if(prototype.def) {
                 const auto& metadata=MetadataFor(definition);
                 prototype.radius=definition->GetRadius();
-                prototype.screen=definition->IsAttacker() && (!definition->IsAttrRanged() || definition->GetRangedPolicy().coordinated);
+                prototype.screen=definition->IsAttacker() && (!definition->IsRangedControlled() || definition->GetRangedPolicy().coordinated);
                 prototype.radar=metadata.radar; prototype.jammer=metadata.jammer; prototype.los=metadata.los;
                 // D-295: O(D) per frame with the existing prototype; never per unit.
                 prototype.range=prototype.screen ? definition->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
-                prototype.assist=definition->IsAttrRanged() && definition->GetRangedPolicy().assistRadius>0.f;
+                prototype.assist=definition->IsRangedControlled() && definition->GetRangedPolicy().assistRadius>0.f;
             }
         }
         if(!prototype.def) continue;
@@ -286,7 +292,7 @@ void CRangedWorld::Refresh()
             const auto p=u->GetPos(now);
             if(index>=friends.size() || friends[index].id!=id || friends[index].pos!=p
                 || friends[index].radius!=d->GetRadius()
-                || friends[index].screen!=(d->IsAttacker() && (!d->IsAttrRanged() || d->GetRangedPolicy().coordinated))
+                || friends[index].screen!=(d->IsAttacker() && (!d->IsRangedControlled() || d->GetRangedPolicy().coordinated))
                 || friends[index].radar!=MetadataFor(d).radar
                 || friends[index].jammer!=MetadataFor(d).jammer
                 || friends[index].los!=MetadataFor(d).los) equal=false;
@@ -298,7 +304,7 @@ void CRangedWorld::Refresh()
     performance::Scope statePhase(circuit,performance::RANGED_STATE);
     for (auto it=slots.begin();it!=slots.end();) {
         auto* u=circuit->GetTeamUnit(it->first);
-        if (!u || u->IsDead() || !u->GetCircuitDef()->IsAttrRanged()) {
+        if (!u || u->IsDead() || !u->GetCircuitDef()->IsRangedControlled()) {
             // Match task-release cleanup even if a lifecycle callback arrived
             // after this snapshot. Otherwise stale members inflate rush value
             // and keep empty cohorts alive. Advance before Leave erases here.

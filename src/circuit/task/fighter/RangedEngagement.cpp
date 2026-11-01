@@ -1,4 +1,5 @@
 #include "task/fighter/RangedEngagement.h"
+#include "control/group/LineController.h"
 #include "task/UnitTask.h"
 #include "CircuitAI.h"
 #include "module/MilitaryManager.h"
@@ -356,6 +357,13 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         return;
     }
     const int rank=int(member-group.members.begin());
+    // D-430: the line this hull stands in (null outside a line). Its facing
+    // replaces the cohort's for slot geometry, its spread widens the slot
+    // spacing, and its stance is applied below after every hazard rule.
+    const line::Directive* directive=ai->GetLineController()?ai->GetLineController()->DirectiveFor(id):nullptr;
+    AIFloat3 back=group.back;
+    if(directive && directive->facingSet) back=AIFloat3(directive->facing.x,0.f,directive->facing.z);
+    const float spacing=policy.spacing*(directive?directive->spread:1.f);
     float maxRange=0.f; for(const auto& w:caps.weapons) maxRange=std::max(maxRange,w.range);
     world.Nearby(pos,maxRange+600.f,nearby);
     const auto& contacts=world.Contacts();
@@ -489,19 +497,19 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     }
     auto point=group.focus;
     if(group.target>=0) {
-        const auto arc=cohort::Arc(P(group.focus),P(group.back),group.radius,rank,int(group.members.size()),policy.spacing);
+        const auto arc=cohort::Arc(P(group.focus),P(back),group.radius,rank,int(group.members.size()),spacing);
         point.x=arc.x; point.z=arc.z;
         if(group.formationRear) {
-            point.x-=group.back.z*policy.spacing*.5f;
-            point.z+=group.back.x*policy.spacing*.5f;
+            point.x-=back.z*spacing*.5f;
+            point.z+=back.x*spacing*.5f;
         }
     } else {
         // Keep separate lanes during travel as well as at the firing band.
         // Keep a rounding margin between adjacent straight-line reservations,
         // just as Arc does for chord distance. Exact float spacing can round
         // below FreeSlot's strict boundary and churn between lateral slots.
-        const float offset=(rank-(group.members.size()-1)*.5f)*(policy.spacing+1.f);
-        point+=AIFloat3(-group.back.z,0,group.back.x)*offset;
+        const float offset=(rank-(group.members.size()-1)*.5f)*(spacing+1.f);
+        point+=AIFloat3(-back.z,0,back.x)*offset;
     }
     // In to the band while the weapon is ready, out to poke_out while it
     // reloads: roughly one step in per reload cycle, straight along the line
@@ -525,13 +533,13 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         phase=fraction<1.f?1:0;
         const float reach=world.Range(caps.weapons.front(),pos,closest->pos)*fraction;
         AIFloat3 away=pos-closest->pos; away.Normalize2D();
-        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=back;
         point=closest->pos+away*reach;
     }
     if(group.sustainedRush) { danger=nullptr; incoming=nullptr; withdrawalUntil=0; }
     if(danger) {
         AIFloat3 away=pos-danger->pos; away.Normalize2D();
-        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=back;
         const bool disengage=!group.committed || group.mode==cohort::Mode::WITHDRAW || !danger->mobile
             || danger->def->IsEnemyRoleAny(CCircuitDef::COMM) || danger->def->IsAbleToReclaim()
             || (!(policy.supportAllies && group.supporting)
@@ -576,6 +584,23 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             // mobile danger and static/terrain validation still take precedence.
             point=pos+(step->pos-pos)*((distance-reach+32.f)/distance);
         }
+    }
+    // D-430: the line's stance. Cover and hold keep this hull where it is
+    // (firing); a withdraw ordered before the cohort itself withdraws steps
+    // back along the facing. A hazard escape above, and a sustained rush,
+    // always win over the line's timing.
+    bool lineUrgent=false;
+    if(directive && !danger && !group.sustainedRush) {
+        switch(directive->stance) {
+            case line::Stance::COVER: case line::Stance::HOLD: point=pos; break;
+            case line::Stance::WITHDRAW:
+                if(group.mode!=cohort::Mode::WITHDRAW && group.mode!=cohort::Mode::KITE) {
+                    point=pos+back*std::max(192.f,policy.spacing*2.f); lineUrgent=true;
+                }
+                break;
+            default: break;
+        }
+        if(directive->orderFrame!=lineOrderFrame) { lineUrgent=true; lineOrderFrame=directive->orderFrame; }
     }
     CTerrainManager::CorrectPosition(point);
     // Advancing enemies can move the ideal firing arc behind a committed
@@ -623,8 +648,8 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         && pos.SqDistance2D(destination)<arrival*arrival
         && ((!group.sustainedRush && !group.rushFallback && best>=0) || group.target<0 || (formationStaging
             && SafeMove(unit,pos,destination,policy.safetyMargin,false)))
-        && world.FreeSlot(id,destination,policy.spacing)) point=destination;
-    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode) || phase!=pokePhase;
+        && world.FreeSlot(id,destination,spacing)) point=destination;
+    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode) || phase!=pokePhase || lineUrgent;
     pokePhase=phase;
     moveObjective=group.target; moveMode=int(group.mode);
     const bool settled=pos.SqDistance2D(point)<arrival*arrival;
@@ -634,12 +659,12 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         bool placed=false;
         for(int k=0;k<5;++k) {
             const int side=k==0?0:(k%2?(k+1)/2:-k/2);
-            AIFloat3 candidate=point+AIFloat3(-group.back.z,0,group.back.x)*(side*(policy.spacing+1.f));
+            AIFloat3 candidate=point+AIFloat3(-back.z,0,back.x)*(side*(spacing+1.f));
             CTerrainManager::CorrectPosition(candidate);
             if(group.sustainedRush && (candidate.x-pos.x)*(group.focus.x-pos.x)
                 +(candidate.z-pos.z)*(group.focus.z-pos.z)<0.f) continue;
             candidate.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(candidate.x,candidate.z);
-            if(world.FreeSlot(id,candidate,policy.spacing) && Move(unit,candidate,true,danger!=nullptr)) { placed=true; break; }
+            if(world.FreeSlot(id,candidate,spacing) && Move(unit,candidate,true,danger!=nullptr)) { placed=true; break; }
         }
         // Spacing is subordinate to survival. A reserved retreat slot must not
         // leave the previous forward MOVE running into a closing assault.
@@ -662,10 +687,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
     if(trace && frame>=traceFrame+150) {
         traceFrame=frame;
-        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f poke=%d regime=%d own=%.0f hostile=%.0f closest=%d",
+        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f poke=%d regime=%d own=%.0f hostile=%.0f closest=%d line=%d stance=%d",
             id,unsigned(group.members.size()),int(group.mode),group.target,group.radius,point.x,point.z,danger?danger->id:-1,
             int(group.reason),group.loss,group.advantage,int(group.committed),int(group.supporting),group.screenDepth,
-            phase,int(regime),group.ownValue,group.hostileValue,closest?closest->id:-1);
+            phase,int(regime),group.ownValue,group.hostileValue,closest?closest->id:-1,directive?directive->line:-1,directive?int(directive->stance):-1);
     }
 }
 

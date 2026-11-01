@@ -131,6 +131,10 @@ public:
     bool CohortSafe(CCircuitUnit* unit,const springai::AIFloat3& from,
                     const springai::AIFloat3& to,float margin,bool escaping);
     void ReleaseEscort(int id) { escorts.erase(id); }
+    // D-430: read by the line group controller (control/group/LineController.cpp).
+    const std::map<int,CohortPlan>& Cohorts() const { return cohorts; }
+    // The largest weapon area of effect of a definition, cached once per type.
+    float MaxSplash(CCircuitDef* def) { return MetadataFor(def).maxSplash; }
 
 private:
     CCircuitAI* circuit;
@@ -146,7 +150,7 @@ private:
     float largestCohortHazard = 0.f;
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;
-    struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; };
+    struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; float maxSplash=0.f; };
     std::unordered_map<int,Metadata> metadata;
     const Metadata& MetadataFor(CCircuitDef* def);
     std::unordered_map<int,Capabilities> capabilities;
