@@ -21,6 +21,8 @@
 //   Cortex heavy: 5 Mammoth                              Cortex arty: 10 Sheldon, 3 Sumo
 //   Legion heavy: 3 Incinerator                          Legion arty: 5 Arquebus, 5 Thanatos, 3 Hoplite, 1 Incinerator
 //   support: Armada Compass/2 Smuggler/Archangel, Cortex Augur/2 Deceiver/Manticore, Legion Euclid/2 Tiresias/Aquilon
+// Owner (2026-11-01): Armada light artillery bot squad, T2BotSquadLightShare of Armada's artillery rolls:
+//   3 Gunslinger, 5 Recluse, with a Compass, 2 Smugglers and 2 Archangels
 // They move and fight as the vehicle squad, except the lead is the longest-ranged member (ties: the slowest),
 // and the squad keeps the slowest member's pace through the cohesion wait. Log [FRONT][ArtySquad] ... bot squad.
 namespace FrontArtySquad {
@@ -78,13 +80,18 @@ namespace FrontArtySquad {
 
     bool BotEnabled() { return Global::RoleSettings::Front::T2BotSquadChance > 0.0f; }
 
-    // Owner (2026-10-31): T2 bot lab squads; arty false = the heavy squad. Unit ids from Beyond-All-Reason unitdefs.
-    array<string> BotComposition(const string &in side, bool arty) {
+    // Owner (2026-10-31): T2 bot lab squads; arty false = the heavy squad, light (Armada) = the light artillery
+    // squad. Unit ids from Beyond-All-Reason unitdefs.
+    array<string> BotComposition(const string &in side, bool arty, bool light = false) {
         array<string> n;
         array<string> support;
         if (side == "armada") {
             support = array<string> = {"armmark", "armaser", "armaser", "armaak"};   // Compass, 2 Smuggler, Archangel
-            if (arty) n = array<string> = {"armfboy", "armfboy", "armsnipe", "armsnipe", "armsnipe", "armsnipe", "armzeus"};
+            if (arty && light) {
+                support.insertLast("armaak");                                         // a second Archangel
+                for (int i = 0; i < 3; ++i) n.insertLast("armmav");                   // Gunslinger
+                for (int i = 0; i < 5; ++i) n.insertLast("armsptk");                  // Recluse
+            } else if (arty) n = array<string> = {"armfboy", "armfboy", "armsnipe", "armsnipe", "armsnipe", "armsnipe", "armzeus"};
             else n = array<string> = {"armfboy", "armfboy", "armzeus", "armzeus", "armzeus", "armmav", "armmav"};   // Fatboy, Welder, Gunslinger
         } else if (side == "cortex") {
             support = array<string> = {"corvoyr", "corspec", "corspec", "coraak"};   // Augur, 2 Deceiver, Manticore
@@ -141,7 +148,14 @@ namespace FrontArtySquad {
         const float share = AiMax(0.0f, AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadArtyShare));
         const array<float> kind = {1.0f - share, share};
         const bool arty = AiDice(kind) == 1;
-        IUnitTask@ first = Queue(u, null, side, BotComposition(side, arty), -1, arty ? "artillery bot squad" : "heavy bot squad",
+        bool light = false;
+        if (arty && side == "armada") {   // only Armada has a light artillery squad (owner, 2026-11-01)
+            const float ls = AiMax(0.0f, AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadLightShare));
+            const array<float> lk = {1.0f - ls, ls};
+            light = AiDice(lk) == 1;
+        }
+        IUnitTask@ first = Queue(u, null, side, BotComposition(side, arty, light), -1,
+            light ? "light artillery bot squad" : (arty ? "artillery bot squad" : "heavy bot squad"),
             Global::RoleSettings::Front::T2BotSquadGatherSeconds);
         if (first !is null) GenericHelpers::LogUtil("[FRONT][ArtySquad] bot squad roll hit at lab " + u.id + "; next at " + (nextBotRoll / SECOND) + " s", 1);
         return first;
@@ -448,11 +462,12 @@ namespace FrontArtySquad {
     }
 
     // Owner (2026-10-31): spacing. Each member's own place relative to the lead's goal, as (forward, side):
-    // heavies in a line abreast ArtySquadHeavyAhead in front, ArtySquadHeavySpacing apart; the other artillery
+    // heavies in a line abreast ArtySquadHeavyAhead in front of the frontmost artillery or support place (the lead
+    // counts at 0; owner 2026-11-01: 100-120 elmos ahead of artillery and utility), ArtySquadHeavySpacing apart; the other artillery
     // (and heavies when a heavy leads) on a ring of ArtySquadPackRadius over the sides and back (60..300 degrees,
     // a second ring 1.35x out for every other unit of a pack above 8); support on a ring of ArtySquadFollowBehind
     // behind (135..225 degrees). O(members) per update; a place is re-sent only once it moved ArtySquadRepath.
-    void Places(Squad@ s, array<float> &out fo, array<float> &out so) {
+    void Places(Squad@ s, array<float> &out fo, array<float> &out so, float &out heavyLine) {
         const uint n = s.members.length();
         fo.resize(n); so.resize(n);
         int nh = 0, na = 0, ne = 0;
@@ -472,10 +487,9 @@ namespace FrontArtySquad {
         const float back = Global::RoleSettings::Front::ArtySquadFollowBehind;
         const float PI = 3.14159f;
         int ih = 0, ia = 0, ie = 0;
+        float front = 0.0f;   // the frontmost artillery/support place (the lead at 0)
         for (uint k = 0; k < n; ++k) {
-            if (cls[k] == 0) {
-                fo[k] = ahead; so[k] = (float(ih) - float(nh - 1) * 0.5f) * gap; ++ih;
-            } else if (cls[k] == 1) {
+            if (cls[k] == 1) {
                 const float a = PI * (1.0f / 3.0f + (4.0f / 3.0f) * (na > 1 ? float(ia) / float(na - 1) : 0.5f));
                 const float r = ring * (na > 8 && (ia % 2) == 1 ? 1.35f : 1.0f);
                 ++ia;
@@ -484,7 +498,31 @@ namespace FrontArtySquad {
                 const float a = PI * (0.75f + 0.5f * (ne > 1 ? float(ie) / float(ne - 1) : 0.5f)); ++ie;
                 fo[k] = cos(a) * back; so[k] = sin(a) * back;
             }
+            if (cls[k] == 1 || cls[k] == 2) front = AiMax(front, fo[k]);
         }
+        heavyLine = front + ahead;
+        for (uint k = 0; k < n; ++k) {
+            if (cls[k] != 0) continue;
+            fo[k] = heavyLine; so[k] = (float(ih) - float(nh - 1) * 0.5f) * gap; ++ih;
+        }
+    }
+
+    // Test log (owner, 2026-11-01): how far the rearmost heavy walks in front of the frontmost artillery/support
+    // member, along the advance; -1 without both
+    float HeavyGap(Squad@ s, CCircuitUnit@ l, float dx, float dz) {
+        if (s.leadHeavy) return -1.0f;
+        const AIFloat3 lp = l.GetPos(ai.frame);
+        float heavy = 1e9f, back = 0.0f;   // the lead is artillery: it counts at 0
+        bool any = false;
+        for (uint k = 0; k < s.members.length(); ++k) {
+            CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
+            if (m is null || m.circuitDef is null || m.id == l.id || !OnRoute(s, m)) continue;
+            const AIFloat3 mp = m.GetPos(ai.frame);
+            const float f = (mp.x - lp.x) * dx + (mp.z - lp.z) * dz;
+            if (IsHeavy(m.circuitDef.GetName())) { heavy = AiMin(heavy, f); any = true; }
+            else back = AiMax(back, f);
+        }
+        return any ? heavy - back : -1.0f;
     }
 
     // AiUpdate
@@ -530,7 +568,8 @@ namespace FrontArtySquad {
             if (len < 1.0f) { dx = 1.0f; dz = 0.0f; len = 1.0f; }
             dx /= len; dz /= len;
             array<float> fo, so;
-            Places(s, fo, so);
+            float heavyLine;
+            Places(s, fo, so, heavyLine);
             // pace: how far behind its place (relative to the lead's goal) is the slowest member; a member another
             // controller took is put back on its route
             const float goalAhead = (s.leadGoal.x - lp.x) * dx + (s.leadGoal.z - lp.z) * dz;
@@ -586,8 +625,7 @@ namespace FrontArtySquad {
             s.leadGoal = SetGoal(s.leadRoute, s.leadGoal, goal, Global::RoleSettings::Front::ArtySquadRepath);
             // every member to its own place around the lead's goal (heavies ahead, the pack around, support behind)
             const float repath = Global::RoleSettings::Front::ArtySquadRepath;
-            s.frontGoal = Clamp(s.leadGoal.x + dx * Global::RoleSettings::Front::ArtySquadHeavyAhead,
-                s.leadGoal.z + dz * Global::RoleSettings::Front::ArtySquadHeavyAhead);   // new members' first goal
+            s.frontGoal = Clamp(s.leadGoal.x + dx * heavyLine, s.leadGoal.z + dz * heavyLine);   // new members' first goal
             s.followGoal = s.leadGoal;
             for (uint k = 0; k < s.members.length(); ++k) {
                 CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
@@ -602,7 +640,8 @@ namespace FrontArtySquad {
             if (ai.frame >= s.nextLog) {
                 s.nextLog = ai.frame + 20 * SECOND;
                 GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": lead " + s.leader + " at (" + int(lp.x) + ", " + int(lp.z)
-                    + ") " + state + ", " + s.members.length() + " member(s) (" + Census(s) + "), farthest " + int(far), 1);
+                    + ") " + state + ", " + s.members.length() + " member(s) (" + Census(s) + "), farthest " + int(far)
+                    + (s.leadHeavy ? "" : ", heavy line " + int(heavyLine) + " gap " + int(HeavyGap(s, l, dx, dz))), 1);
             }
         }
     }

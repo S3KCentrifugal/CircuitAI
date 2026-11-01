@@ -259,7 +259,7 @@ namespace Front {
             // Owner (2026-10-31): formation. Heavies/anti-spam walk ArtySquadHeavyAhead in front of the artillery lead;
             // the lead advances ArtySquadPaceStep at a time, the next step once every member is within
             // ArtySquadPaceTolerance of its place, so the squad keeps its slowest member's pace.
-            float ArtySquadHeavyAhead = 60.0f;
+            float ArtySquadHeavyAhead = 110.0f;    // owner 2026-11-01: 100-120 in front of the frontmost artillery/utility
             float ArtySquadHeavySpacing = 80.0f;    // heavies' line abreast, apart
             float ArtySquadPackRadius = 170.0f;     // the other artillery's ring around the lead (support: ArtySquadFollowBehind)
             float ArtySquadPaceStep = 200.0f;
@@ -271,6 +271,7 @@ namespace Front {
             float T2BotSquadChance = 0.0f;
             int T2BotSquadIntervalSeconds = 180;
             float T2BotSquadArtyShare = 0.5f;
+            float T2BotSquadLightShare = 0.5f;    // Armada artillery rolls that make the light squad (owner, 2026-11-01)
             int T2BotSquadGatherSeconds = 600;
             // Owner (2026-10-19): bot lab FRONTs, from the opener wave until a T2 factory stands: every
             // BotWaveIntervalSeconds, BotWaveChance for BotWaveMin..Max Pawns/Grunts (Goblins: BotWaveGoblinMin..Max),
