@@ -254,6 +254,19 @@ bool CCommanderController::RetreatCloakFunded(CCircuitUnit* unit) const {
     const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(unit->GetCircuitDef());
     return ai->GetEconomyManager()->GetEnergyCur()>=cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
 }
+// Owner 2026-11-01 (AI 13 stood beside its nano for 7 minutes): a moving cloak
+// reserve (1000 E/s x escape seconds + margin, ~4450 E) can exceed the team's
+// whole energy storage (~2000-2700 E for a FRONT before its fusion), so the
+// energy retreat latch could never clear. Its target is capped at 90% of what
+// storage can hold; posture and hide decisions keep the full reserve.
+bool CCommanderController::EnergyRetreatFunded(CCircuitUnit* unit) const {
+    if(!Handles(unit) || !unit->GetCircuitDef()->IsAbleToCloak()) return false;
+    Bind bound(this,PresetOfUnit(unit->GetId()));
+    const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(unit->GetCircuitDef());
+    auto* economy=ai->GetEconomyManager();
+    const float need=cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
+    return economy->GetEnergyCur()>=std::min(need,.9f*economy->GetEnergyStore());
+}
 bool CCommanderController::EnergyRetreat(CCircuitUnit* unit) const {
     const State* s=states.Find(unit->GetId());
     return s && s->retreat.energy;
@@ -729,8 +742,15 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     // returns; no extra scan and no peaceful low-energy evacuation.
     const bool threatened=(s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC)
         || Exposure(P(pos),P(pos),cfg->combat.escapeSeconds,pos.y)>0.f;
-    if(cfg->safety.cloakEnergyRetreat>0 && def->IsAbleToCloak()
-        && !RetreatCloakFunded(unit) && (threatened || s.retreat.energy)) {
+    // A latched retreat also ends after 20 s with no threat, so a team that
+    // keeps spending its bank cannot park the commander for the rest of the game.
+    if(s.retreat.energy && !threatened) {
+        if(s.retreat.energyCalm<0) s.retreat.energyCalm=frame;
+    } else s.retreat.energyCalm=-1;
+    const bool energyCalm=s.retreat.energy && s.retreat.energyCalm>=0
+        && frame-s.retreat.energyCalm>=20*FRAMES_PER_SEC;
+    if(cfg->safety.cloakEnergyRetreat>0 && def->IsAbleToCloak() && !energyCalm
+        && !EnergyRetreatFunded(unit) && (threatened || s.retreat.energy)) {
         s.conceal.postureCloak=false;
         if(!s.retreat.energy) {
             ai->LOG("[Commander] unit=%i cloak_energy_retreat frame=%i",unit->GetId(),frame);
@@ -777,7 +797,9 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
             ai->GetBuilderManager()->AssignTask(unit,ai->GetBuilderManager()->EnqueueRetreat());
         return;
     }
-    s.retreat.energy=false;s.retreat.energyGoal={-1,0,-1};
+    if(s.retreat.energy) ai->LOG("[Commander] unit=%i cloak_energy_retreat_end frame=%i bank=%.0f/%.0f calm=%i",
+        unit->GetId(),frame,ai->GetEconomyManager()->GetEnergyCur(),ai->GetEconomyManager()->GetEnergyStore(),int(energyCalm));
+    s.retreat.energy=false;s.retreat.energyGoal={-1,0,-1};s.retreat.energyCalm=-1;
     // D-389: the cloak posture replaces the D-380 fog cloak.
     {
         const int due=s.conceal.postureNext;

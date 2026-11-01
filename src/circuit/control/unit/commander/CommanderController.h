@@ -50,7 +50,7 @@ struct CommanderConcealState {
     float stillSeconds=0,movingSeconds=0,energy=0,window=0;
 };
 struct CommanderRetreatState {
-    bool energy=false; int energyPlan=-10000; springai::AIFloat3 energyGoal{-1,0,-1};
+    bool energy=false; int energyPlan=-10000,energyCalm=-1; springai::AIFloat3 energyGoal{-1,0,-1};
     bool health=false; int healthPlan=-10000,healthShotUntil=-1; springai::AIFloat3 healthGoal{-1,0,-1};
     int lastTaskType=-1;    // D-389: detects the end of a retreat lease
 };
@@ -341,6 +341,7 @@ public:
     bool Handles(CCircuitUnit* unit) const;
     bool Jammed(CCircuitUnit* unit);
     bool RetreatCloakFunded(CCircuitUnit* unit) const;
+    bool EnergyRetreatFunded(CCircuitUnit* unit) const;
     bool EnergyRetreat(CCircuitUnit* unit) const;
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
