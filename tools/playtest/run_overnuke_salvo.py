@@ -8,6 +8,7 @@ prints one `[SalvoTest] RESULT` line.
 """
 import argparse
 import json
+import re
 import math
 import subprocess
 import sys
@@ -61,12 +62,10 @@ def main():
     # pin the roll to the salvo under test
     staged = d / 'AI/Skirmish/BARbTest/test/config/experimental_balanced/behaviour.json'
     s = staged.read_text()
-    for key in ('"overnuke_min": 10', '"overnuke_max": 25'):
+    for key in ('"overnuke_min": ', '"overnuke_max": '):
         if s.count(key) != 1:
             raise ValueError('overnuke roll lever missing in ' + str(staged))
-    s = s.replace('"overnuke_min": 10', '"overnuke_min": %d' % a.salvo).replace('"overnuke_max": 25', '"overnuke_max": %d' % a.salvo)
-    # the team breakpoint (8+ silos across the allied AIs) has its own roll: pin it too
-    s = s.replace('"overnuke_team_min": 15', '"overnuke_team_min": %d' % a.salvo).replace('"overnuke_team_max": 30', '"overnuke_team_max": %d' % a.salvo)
+    s = re.sub(r'"overnuke_(team_)?(min|max)": \d+', lambda m: '"overnuke_%s%s": %d' % (m.group(1) or '', m.group(2), a.salvo), s)
     staged.write_text(s)
     # Only the nuke matchup is under test: the AI's factories stay idle, so no
     # army reaches the defender's antinukes before the salvo.

@@ -1,6 +1,6 @@
     // Mono-space font required
 {
-"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_team_silos": 8, "overnuke_team_min": 15, "overnuke_team_max": 30, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
+"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 8, "overnuke_max": 14, "overnuke_team_silos": 8, "overnuke_team_min": 28, "overnuke_team_max": 36, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
 "pulse": {"enabled": true, "priority": ["jammer_advanced", "jammer_static", "radar_advanced", "radar_static", "jammer_mobile", "radar_mobile"], "scatter": true, "pending_seconds": 45, "coverage_seconds": 90, "scatter_step": 384, "scatter_depth": 192},
     //attack = 0.3 means enemy threat = enemy_threat*0.3
     //and attack group select only targets that have threat lower than the group's power. Power is like threat, but behaviour.json has separate modifiers for threat (enemy) and power (own).
