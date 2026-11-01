@@ -566,6 +566,11 @@ namespace Tech {
             int LayoutHaloCells = 18;                // D-082: the halo of packing ground on both sides and behind the turret block (288 elmos, inside a turret's 400 reach); the box is scored and its zone reserved with it
             float InvariantReachElmos = 450.0f;      // D-082: INV-014 - a packed economy structure further than this from every turret slot is a violation
             int LayoutBoxMaxExtra = 4;               // D-072: boxes grown behind the first when it is full (each with its own turret rows)
+            bool LayoutGrowAnywhere = false;         // owner 2026-10-31: once the zones, forward cluster and supported overflow have no room, a new turret box grows on a grid around the main box (last resort), so AFUS and converters keep coming until the ground runs out; needs a reachable centre for the asking builder
+            int LayoutGrowRings = 4;                 // ... grid rings searched to the sides and behind (half a box plus halo per step)
+            int LayoutGrowAheadRings = 0;            // ... rings ahead, beside the main block only (never in front of it)
+            int LayoutGrowMaxBoxes = 24;             // ... grid boxes at most (their own count, apart from LayoutBoxMaxExtra)
+            float LayoutGrowMinScore = 0.75f;        // ... ground a grid box needs (flat x buildable; the lower of this and LayoutBoxMinScore)
             int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
             int LayoutBoxNanoRows = 4;               // D-081: four turret rows per cluster (a MapConfig may override)
             bool LayoutTurretBlock = true;           // D-081: the rows touch (a solid block filled across every row), the shelf for other structures behind it; off = a shelf between rows

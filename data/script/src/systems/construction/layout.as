@@ -185,6 +185,7 @@ namespace Layout {
         factoryCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
         @nano = null;
         extraZones.resize(0);
+        gridZones.resize(0);
         lastBoxCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
         lastBoxDepth = 0;
     }
@@ -255,6 +256,9 @@ namespace Layout {
         extraZones.resize(0);
         const int extra = aiTerrainMgr.GetLayoutInt(BOX + ".extra_count", 0);
         for (int i = 0; i < extra; ++i) extraZones.insertLast(aiTerrainMgr.GetLayoutInt(BOX + ".extra" + i, 0));
+        gridZones.resize(0);
+        const int grid = aiTerrainMgr.GetLayoutInt(BOX + ".grid_count", 0);
+        for (int i = 0; i < grid; ++i) gridZones.insertLast(aiTerrainMgr.GetLayoutInt(BOX + ".grid" + i, 0));
         lastBoxCentre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(BOX + ".last_x", int(boxCentre.x))), 0.0f,
             float(aiTerrainMgr.GetLayoutInt(BOX + ".last_z", int(boxCentre.z))));
         lastBoxDepth = aiTerrainMgr.GetLayoutInt(BOX + ".last_depth", boxDepth);
@@ -699,6 +703,108 @@ namespace Layout {
         }
         growFailFrame = ai.frame;
         GenericHelpers::LogUtil("[Layout] turret box full and no ground behind or beside it scores " + int(minScore * 100.0f) + "%; retried in a minute", 1);
+        return false;
+    }
+
+    // owner 2026-10-31 (TECH keeps building AFUS and converters until the
+    // ground runs out): played, the box stalled once behind and both sides
+    // were taken ("advanced fusion set held ahead: no room") with open ground
+    // left. With LayoutGrowAnywhere the full box grows on a grid around the
+    // main box in half-box steps, sides and behind, and ahead only beside the
+    // main block (never in front of the factory pair), nearest good ground
+    // first. Each box lays its own turret rows, so everything stays in a
+    // turret's reach. Cost: at most (2R+1)(R+A+1) candidates x 3 sizes, only
+    // while the box is full, once a minute per AI.
+    // Played round 4: growing at the first "box full" (min 15-21) put turret
+    // blocks 2-3k away while the base still had overflow room; converters and
+    // metal trailed the unpatched AI. The grid is now the LAST resort, called
+    // by Place after the zones, the forward cluster and the supported overflow
+    // all failed, so until then the base plays exactly as before. Grid boxes
+    // are not factory zones: PackFactoryFlush walks every factory zone, and
+    // played its cost rose with each box (21 ms to 58 ms).
+    CCircuitUnit@ growBuilder = null;   // the builder asking, set by Place / NanoTask
+    int gridFailFrame = -100000;
+    array<int> gridZones;
+    bool IsGridZone(int zone) { return gridZones.find(zone) >= 0; }
+    bool overflowExhausted = false;   // a full supported-overflow sweep found nothing
+    bool OverflowSpent() { return overflowExhausted || overflowSupportGroups.length() >= uint(Global::RoleSettings::Tech::LayoutOverflowModules); }
+    bool GrowAnywhere()
+    {
+        if (!Global::RoleSettings::Tech::LayoutGrowAnywhere || growBuilder is null || boxCentre.x < 0.0f || nano is null) return false;
+        if (int(gridZones.length()) >= Global::RoleSettings::Tech::LayoutGrowMaxBoxes) return false;
+        if (ai.frame - gridFailFrame < 60 * SECOND) return false;
+        int offMap = 0, lowGround = 0, unreachable = 0, zoneFailed = 0, noRows = 0;
+        float bestSeen = 0.0f;
+        const AIFloat3 fwd = Fwd(facing);
+        const AIFloat3 sideVec = Side(facing);
+        const float cell = SQUARE_SIZE * 2;
+        const int halo = Global::RoleSettings::Tech::LayoutHaloCells;
+        // played round 2 (Entrenched Plains, base on the west edge): full-size
+        // steps put 168 of 180 candidates off the map, and the best one left
+        // scored 65% against the box's 75%. Half-box steps, smaller boxes, a
+        // lower bar and ground beside (not in front of) the main block.
+        const float minScore = AiMin(Global::RoleSettings::Tech::LayoutBoxMinScore, Global::RoleSettings::Tech::LayoutGrowMinScore);
+        const int rings = AiMax(1, Global::RoleSettings::Tech::LayoutGrowRings);
+        const int ahead = AiMax(0, Global::RoleSettings::Tech::LayoutGrowAheadRings);
+        const float reach = growBuilder.circuitDef.GetBuildDistance();
+        const AIFloat3 firstFront = boxCentre + fwd * (float(boxDepth) * 0.5f * cell);
+        for (uint d = 0; d < 3; ++d) {
+            const int across = (d == 2) ? AiMin(boxAcross, Global::RoleSettings::Tech::LayoutBoxMinAcrossCells) : boxAcross;
+            const int depth = (d == 0) ? Global::RoleSettings::Tech::LayoutBoxDepthCells : Global::RoleSettings::Tech::LayoutBoxMinDepthCells;
+            const float stepAcross = float(across + halo) * 0.5f * cell;
+            const float stepAlong = float(depth + halo) * 0.5f * cell;
+            const float clearAhead = (float(boxAcross) + float(across)) * 0.5f * cell;   // ahead only beside the main block, never in front of it
+            float bestHalo = -1.0f; float bestDist = 1.0e9f; float best = -1.0f;
+            AIFloat3 bestCentre; AIFloat3 bestFront; bool found = false;
+            for (int j = ahead; j >= -rings; --j) {
+                for (int i = -rings; i <= rings; ++i) {
+                    if (i == 0 && j == 0) continue;
+                    if (j > 0 && float(i < 0 ? -i : i) * stepAcross < clearAhead) continue;
+                    const AIFloat3 front = firstFront + sideVec * (float(i) * stepAcross) + fwd * (float(j) * stepAlong);
+                    const AIFloat3 centre = front - fwd * (float(depth) * 0.5f * cell);
+                    if (centre.x < 0.0f || centre.z < 0.0f || centre.x >= float(AiTerrainWidth()) || centre.z >= float(AiTerrainHeight())) { ++offMap; continue; }
+                    const float score = BoxScore(centre, across, depth);
+                    if (score > bestSeen) bestSeen = score;
+                    if (score < minScore) { ++lowGround; continue; }
+                    // nearest ground that clears the bar wins (played round 3: the
+                    // halo rule picked boxes 2-3.5k from home, an AFUS there took
+                    // 10 min and AfusAtOnce held every other one behind it)
+                    const float dist = sqrt(MapHelpers::SqDist(centre, HomeCentre()));
+                    if (dist > bestDist) continue;
+                    const float h = HaloScore(centre, across, depth);
+                    if (dist == bestDist && h <= bestHalo) continue;
+                    if (!aiTerrainMgr.CanReachAt(growBuilder, centre, reach)) { ++unreachable; continue; }
+                    best = score; bestHalo = h; bestDist = dist; bestCentre = centre; bestFront = front; found = true;
+                }
+            }
+            if (!found) continue;
+            const int zone = aiTerrainMgr.ReserveZone(HaloCentre(bestCentre), facing, HaloHalfAcross(across), HaloHalfAlong(depth), false);
+            if (zone == 0) { ++zoneFailed; continue; }
+            int laidGroup = 0;
+            const int previousSlots = nanoGroup > 0 ? aiTerrainMgr.GetGroupCount(nanoGroup, false) : 0;
+            const int rows = LayRows(zone, bestFront, across, depth, nanoGroup, laidGroup);
+            if (laidGroup <= 0 || aiTerrainMgr.GetGroupCount(laidGroup, false) <= previousSlots) {
+                aiTerrainMgr.ReleaseZone(zone);
+                ++noRows;
+                continue;
+            }
+            nanoGroup = laidGroup;
+            extraZones.insertLast(zone);
+            gridZones.insertLast(zone);
+            aiTerrainMgr.SetLayoutInt(BOX + ".extra_count", int(extraZones.length()));
+            aiTerrainMgr.SetLayoutInt(BOX + ".extra" + (extraZones.length() - 1), zone);
+            aiTerrainMgr.SetLayoutInt(BOX + ".grid_count", int(gridZones.length()));
+            aiTerrainMgr.SetLayoutInt(BOX + ".grid" + (gridZones.length() - 1), zone);
+            aiTerrainMgr.SetLayoutInt(BOX + ".nano_group", nanoGroup);
+            GenericHelpers::LogUtil("[Layout] turret box full: grown on the grid by " + across + "x" + depth + " cells at ("
+                + int(bestCentre.x) + ", " + int(bestCentre.z) + "), ground " + int(best * 100.0f) + "%, " + int(bestDist)
+                + " from home: zone " + zone + ", " + rows + " turret rows (box " + (extraZones.length() + 1) + ")", 1);
+            return true;
+        }
+        gridFailFrame = ai.frame;
+        GenericHelpers::LogUtil("[Layout] grid growth found no box: best ground " + int(bestSeen * 100.0f) + "% (need " + int(minScore * 100.0f)
+            + "%), rejected off map " + offMap + ", low ground " + lowGround + ", unreachable " + unreachable + ", zone " + zoneFailed
+            + ", no rows " + noRows + "; retried in a minute", 1);
         return false;
     }
 
@@ -1203,7 +1309,7 @@ namespace Layout {
     void RegisterFactoryZones()
     {
         aiTerrainMgr.ClearFactoryZones();
-        for (int i = 0; i < ZoneCount(); ++i) aiTerrainMgr.AddFactoryZone(ZoneAt(i), nanoGroup);
+        for (int i = 0; i < ZoneCount(); ++i) if (!IsGridZone(ZoneAt(i))) aiTerrainMgr.AddFactoryZone(ZoneAt(i), nanoGroup);
         if (fwdZone != 0 && fwdGroup > 0) aiTerrainMgr.AddFactoryZone(fwdZone, fwdGroup);
         aiTerrainMgr.SetFactoryFront(LabFacing());
     }
@@ -1442,6 +1548,7 @@ namespace Layout {
             }
         }
         GenericHelpers::LogUtil("[Layout] supported overflow search blocked for " + definition.GetName(), 1);
+        overflowExhausted = true;
         return -1;
     }
 
@@ -1480,7 +1587,10 @@ namespace Layout {
     IUnitTask@ Place(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder = null)
     {
         if (AiPerfEnabled) AiPerfBegin(4);
+        CCircuitUnit@ previousGrowBuilder = growBuilder;
+        @growBuilder = builder;
         IUnitTask@ result = PlaceMeasured(type, priority, def, timeout, builder);
+        @growBuilder = previousGrowBuilder;
         if (AiPerfEnabled) AiPerfEnd(4);
         return result;
     }
@@ -1571,6 +1681,12 @@ namespace Layout {
             id = aiTerrainMgr.PackNearGroup(aiTerrainMgr.GetGroupZone(group), def, group, facing, anchor, 0.0f, MinNanoDist(def), 0);
         }
         if (id < 0) id = ReserveSupportedOverflow(def, builder);
+        // last resort: a new turret box on the grid, then this structure in it
+        if (id < 0 && OverflowSpent() && GrowAnywhere()) {
+            const int zone = ZoneAt(ZoneCount() - 1);
+            if (setSize > 0) id = aiTerrainMgr.PackSet(zone, def, nanoGroup, facing, anchor, setSize, true, Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells);
+            if (id < 0) id = aiTerrainMgr.PackNearGroup(zone, def, nanoGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
+        }
         if (id < 0) {
             if (noRoomSince < 0) noRoomSince = ai.frame;
             const float retry = Global::RoleSettings::Tech::LayoutNoRoomRetrySeconds;
@@ -1849,7 +1965,10 @@ namespace Layout {
         const int previousBudget = activeTurretAdmissionBudget;
         string why;
         activeTurretAdmissionBudget = parallelBudget >= 0 ? parallelBudget : TurretsAllowed(why);
+        CCircuitUnit@ previousGrowBuilder = growBuilder;
+        @growBuilder = unit;
         IUnitTask@ result = AdmitNanoTask(unit, priority, activeTurretAdmissionBudget);
+        @growBuilder = previousGrowBuilder;
         activeTurretAdmissionBudget = previousBudget;
         return result;
     }

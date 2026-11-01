@@ -153,6 +153,11 @@ namespace Main {
         Global::RoleSettings::Tech::LayoutForwardTurretsEarly = true; // owner 2026-10-19: the forward turret block fills once the economy moves into it
         Global::RoleSettings::Tech::LayoutForwardTurretDemand = true; // owner 2026-10-20: the forward cluster's advanced fusions and converters order its turrets (second round)
         Global::RoleSettings::Tech::AfusAtOnce = 1;                   // owner 2026-10-20: one advanced fusion at a time, whoever orders it
+        Global::RoleSettings::Tech::LayoutGrowAnywhere = true;        // owner 2026-10-31: no AFUS/converter stop while buildable ground is left
+        Global::RoleSettings::Tech::LayoutGrowRings = 8;
+        Global::RoleSettings::Tech::LayoutGrowAheadRings = 4;
+        Global::RoleSettings::Tech::LayoutGrowMinScore = 0.6f;
+        Global::RoleSettings::Tech::LayoutGrowMaxBoxes = 36;
         Global::RoleSettings::Tech::LayoutForwardTurretMinimum = 12;  // owner 2026-10-20: T1 constructors put 12 turrets in the forward cluster before helping its economy
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 
