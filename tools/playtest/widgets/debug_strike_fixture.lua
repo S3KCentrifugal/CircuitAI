@@ -294,9 +294,6 @@ local function gameFrame(f)
                 elseif type(tgt)=="table" then m.tx,m.tz=tgt[1],tgt[3]; m.tteam=nearestTeam(tgt[1],tgt[3],120) end
                 proj[p]=m
                 local st=strikes[m.strike]
-                -- a silo's launch sequence takes about 9 s: a missile out within
-                -- 9 s of the command was ordered before it (normal targeting)
-                if st and w=="nuke" and m.phase=="run" and f-st.f0<270 then m.phase="carry"; st.carry=st.carry+1 end
                 if st then
                     if m.phase=="run" then
                         st.shots=st.shots+1; st.first=st.first or f; st.lastShot=f
