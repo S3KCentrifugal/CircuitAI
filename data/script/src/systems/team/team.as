@@ -61,6 +61,7 @@ namespace Team {
         if (LolCannonRecon::Handle(msg, fromTeamId)) return;
         if (FrontRadar::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-10-27: allied long-range radars
         if (AntiSpam::HandleMessage(msg, fromTeamId)) return;     // owner, 2026-10-27: allied anti-spam lanes and counts
+        if (EdgeLanes::HandleMessage(msg, fromTeamId)) return;    // owner, 2026-11-01: an edge-lane FRONT judged dead
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim

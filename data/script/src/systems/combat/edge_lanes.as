@@ -421,7 +421,10 @@ namespace EdgeLanes {
     // ---------------------------------------------------------------- which FRONTs
 
     // The FRONTs ordered by their sideways place: the leftmost takes -1, the
-    // rightmost +1; decided once the roster is complete (or after 3 minutes)
+    // rightmost +1; decided once the roster is complete (or after 3 minutes).
+    // Owner, 2026-11-01: the same order, read from each edge, is the lane's line of
+    // succession (Succession): orderLeft leftmost first, orderRight rightmost first
+    array<int> orderLeft, orderRight;
     int Decide()
     {
         if (decided) return lane;
@@ -447,10 +450,206 @@ namespace EdgeLanes {
         else if (left == 0) lane = -1;
         else if (right == 0) lane = 1;
         else lane = 0;
+        // both lines: by sideways place (team id breaks ties), O(F^2) with F <= 16 FRONTs, once
+        orderLeft.resize(0); orderRight.resize(0);
+        array<float> keyLeft, keyRight;
+        for (uint i = 0; i < teams.length(); ++i) {
+            uint at = 0;
+            while (at < keyLeft.length() && (keyLeft[at] < sides[i] || (keyLeft[at] == sides[i] && orderLeft[at] < teams[i]))) ++at;
+            orderLeft.insertAt(at, teams[i]); keyLeft.insertAt(at, sides[i]);
+            at = 0;
+            while (at < keyRight.length() && (keyRight[at] > sides[i] || (keyRight[at] == sides[i] && orderRight[at] < teams[i]))) ++at;
+            orderRight.insertAt(at, teams[i]); keyRight.insertAt(at, sides[i]);
+        }
+        // a lone FRONT holds only its own side's lane
+        if (teams.length() == 1) { if (lane < 0) orderRight.resize(0); else orderLeft.resize(0); }
         decided = true;
         GenericHelpers::LogUtil("[EdgeLanes] " + teams.length() + " FRONT(s); this one (team " + ai.teamId + ", "
-            + int(sides[0]) + " elmos sideways) " + ((lane == 0) ? "takes no edge lane" : ("takes the " + Name(lane) + " edge lane")), 1);
+            + int(sides[0]) + " elmos sideways) " + ((lane == 0) ? "takes no edge lane" : ("takes the " + Name(lane) + " edge lane"))
+            + "; succession left " + Teams(orderLeft) + ", right " + Teams(orderRight), 1);
         return lane;
+    }
+    string Teams(const array<int> &in ts)
+    {
+        string s = "";
+        for (uint i = 0; i < ts.length(); ++i) s += ((i == 0) ? "" : ",") + ts[i];
+        return (s.length() == 0) ? "none" : s;
+    }
+
+    // ---------------------------------------------------------------- succession
+
+    // Owner, 2026-11-01: a dead lane FRONT hands its lane to the next FRONT nearest
+    // that edge, which builds the lab, its two turrets and the edge porc itself once
+    // funded (EdgeMinMetalIncome, as the first); its lab's rally points come from the
+    // same rim geometry (RallyFor on the same side), so its units walk the same lane.
+    // When that one dies too the third takes it, and so on; a FRONT holds one lane.
+    //
+    // Every FRONT judges only itself (Judge: settings/shared/spam.as EdgeDead*),
+    // latches and broadcasts "edgelane|dead|<team>|<frame>"; a team with no metal
+    // income for 30 s counts as dead too (its AI may be gone). Every FRONT then
+    // replays the same deaths in (frame, team) order over the same two lines, so
+    // all agree on the holders without a hand-over exchange. Cost: Judge O(1) a
+    // second; Watch one team-economy refresh per living FRONT ally every 10 s;
+    // Holders O(D * F) per death, D deaths, F FRONTs (both at most 16).
+    dictionary deadFrame;            // team id string -> frame it was judged dead (the smallest heard)
+    bool selfDead = false;
+    bool hadCommander = false;
+    int lowSince = -1;               // own income under EdgeDeadMetalIncome since this frame
+    int starvedSince = -1;           // no mex and income under EdgeStarvedMetalIncome since this frame
+    int watchFrame = -1;
+    int resendFrame = -1;
+    dictionary noIncomeChecks;       // ally team id string -> 10 s checks in a row with no metal income
+    const string DeadPrefix = "edgelane|dead|";
+
+    int OwnMexes()
+    {
+        const string side = Global::AISettings::Side;
+        const array<string> names = { (side == "armada") ? "armmex" : ((side == "cortex") ? "cormex" : "legmex"), UnitHelpers::GetT2MexNameForSide(side) };
+        int n = 0;
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (d !is null) n += AiMax(0, d.count - aiBuilderMgr.GetUnfinishedCount(d));
+        }
+        return n;
+    }
+
+    void MarkDead(int team, int frame, const string &in why)
+    {
+        int was = -1;
+        const string k = "" + team;
+        if (deadFrame.get(k, was) && was <= frame) return;
+        deadFrame.set(k, frame);
+        if (was < 0) GenericHelpers::LogUtil("[EdgeLanes] FRONT team " + team + " is dead at " + (frame / MINUTE) + ":"
+            + ((frame / SECOND) % 60 < 10 ? "0" : "") + ((frame / SECOND) % 60) + " (" + why + ")", 1);
+    }
+
+    // Once a second: are we dead? Latched
+    void Judge(float mi)
+    {
+        if (selfDead) {
+            if (ai.frame - resendFrame >= 2 * MINUTE) { resendFrame = ai.frame; AiSendMessage(DeadPrefix + ai.teamId + "|" + deadSelfFrame); }
+            return;
+        }
+        if (Builder::commander !is null) hadCommander = true;
+        const int mexes = OwnMexes();
+        if (mi < Global::Spam::EdgeDeadMetalIncome) { if (lowSince < 0) lowSince = ai.frame; } else lowSince = -1;
+        if (mexes == 0 && mi < Global::Spam::EdgeStarvedMetalIncome) { if (starvedSince < 0) starvedSince = ai.frame; } else starvedSince = -1;
+        if (ai.frame < Global::Spam::EdgeDeadAfterMinutes * MINUTE) return;
+        string why = "";
+        if (hadCommander && Builder::commander is null && lowSince >= 0 && mexes < Global::Spam::EdgeDeadMexes
+            && ai.frame - lowSince >= Global::Spam::EdgeDeadHoldSeconds * SECOND)
+            why = "commander lost, metal income " + int(mi) + " under " + int(Global::Spam::EdgeDeadMetalIncome) + " for "
+                + ((ai.frame - lowSince) / SECOND) + " s, " + mexes + " mexes";
+        else if (starvedSince >= 0 && ai.frame - starvedSince >= Global::Spam::EdgeStarvedHoldSeconds * SECOND)
+            why = "no mex and metal income " + int(mi) + " under " + int(Global::Spam::EdgeStarvedMetalIncome) + " for "
+                + ((ai.frame - starvedSince) / SECOND) + " s";
+        if (why.length() == 0) return;
+        selfDead = true;
+        deadSelfFrame = ai.frame;
+        resendFrame = ai.frame;
+        MarkDead(ai.teamId, ai.frame, "this one: " + why);
+        AiSendMessage(DeadPrefix + ai.teamId + "|" + ai.frame);
+    }
+    int deadSelfFrame = -1;
+
+    // Every 10 s: an allied FRONT with no metal income for 30 s is gone
+    void Watch()
+    {
+        if (ai.frame - watchFrame < 10 * SECOND) return;
+        watchFrame = ai.frame;
+        if (ai.frame < Global::Spam::EdgeDeadAfterMinutes * MINUTE) return;
+        array<int> fronts = orderLeft;
+        for (uint i = 0; i < orderRight.length(); ++i) if (fronts.find(orderRight[i]) < 0) fronts.insertLast(orderRight[i]);
+        for (uint i = 0; i < fronts.length(); ++i) {
+            const int t = fronts[i];
+            const string k = "" + t;
+            if (t == ai.teamId || deadFrame.exists(k)) continue;
+            int n = 0;
+            noIncomeChecks.get(k, n);
+            TeamEconomy::UpdateTeam(t);
+            n = TeamEconomy::Alive(t) ? 0 : n + 1;
+            noIncomeChecks.set(k, n);
+            if (n < 3) continue;
+            MarkDead(t, ai.frame, "no metal income for 30 s");
+            AiSendMessage(DeadPrefix + t + "|" + ai.frame);
+        }
+    }
+
+    // Team::HandleMessage: an allied FRONT judged dead (by itself or by an ally)
+    bool HandleMessage(const string &in msg, int fromTeamId)
+    {
+        if (msg.findFirst(DeadPrefix) != 0) return false;
+        array<string>@ p = msg.split("|");
+        if (p.length() < 4) return true;
+        MarkDead(int(parseInt(p[2])), int(parseInt(p[3])), "reported by team " + fromTeamId);
+        return true;
+    }
+
+    // The holder of each lane, -1 none: the first of its line, replaying every death
+    // in (frame, team) order, a dead holder's lane going to the next living FRONT on
+    // its line that holds no lane. Every FRONT computes the same from the same deaths.
+    void Holders(int &out left, int &out right)
+    {
+        array<string>@ keys = deadFrame.getKeys();
+        array<int> dt, df;
+        for (uint i = 0; i < keys.length(); ++i) {
+            const int t = int(parseInt(keys[i]));
+            int f = 0;
+            deadFrame.get(keys[i], f);
+            uint at = 0;
+            while (at < df.length() && (df[at] < f || (df[at] == f && dt[at] < t))) ++at;
+            dt.insertAt(at, t); df.insertAt(at, f);
+        }
+        array<int> dead;
+        left = (orderLeft.length() > 0) ? orderLeft[0] : -1;
+        right = (orderRight.length() > 0) ? orderRight[0] : -1;
+        if (left == right) right = -1;   // never with two or more FRONTs; Decide keeps one line for a lone one
+        for (uint d = 0; d < dt.length(); ++d) {
+            dead.insertLast(dt[d]);
+            if (left == dt[d]) left = NextHolder(orderLeft, dead, right);
+            if (right == dt[d]) right = NextHolder(orderRight, dead, left);
+        }
+    }
+    int NextHolder(const array<int> &in order, const array<int> &in dead, int other)
+    {
+        for (uint i = 0; i < order.length(); ++i)
+            if (order[i] != other && dead.find(order[i]) < 0) return order[i];
+        return -1;
+    }
+
+    // Once a second (Update): judge ourselves, watch the allies, follow the holders
+    int holderLeft = -2, holderRight = -2;
+    void Succession(float mi)
+    {
+        if (!Global::Spam::EdgeHandoffEnabled || !decided) return;
+        Judge(mi);
+        Watch();
+        int l, r;
+        Holders(l, r);
+        if (l == holderLeft && r == holderRight) return;
+        const bool first = holderLeft == -2;
+        holderLeft = l; holderRight = r;
+        const int now = (l == ai.teamId) ? -1 : ((r == ai.teamId) ? 1 : 0);
+        if (!first) GenericHelpers::LogUtil("[EdgeLanes] lane holders now: left team " + l + ", right team " + r, 1);
+        if (now == lane) return;
+        if (lane != 0) {
+            // ours went to the next FRONT: stop the lab; its units on the lane keep going
+            GenericHelpers::LogUtil("[EdgeLanes] this one (team " + ai.teamId + ") gives up the " + Name(lane) + " edge lane"
+                + (selfDead ? " (dead)" : ""), 1);
+            if (repeat !is null && !repeat.IsDead()) repeat.Abort();
+            @repeat = null;
+            lane = 0;
+        }
+        if (now != 0 && !selfDead && labId < 0 && site.x < 0.0f) {
+            lane = now;
+            planFrame = -100000;
+            rally.resize(0);
+            const int rank = (now < 0) ? orderLeft.find(ai.teamId) : orderRight.find(ai.teamId);
+            const uint count = (now < 0) ? orderLeft.length() : orderRight.length();
+            GenericHelpers::LogUtil("[EdgeLanes] this one (team " + ai.teamId + ") takes the " + Name(lane) + " edge lane, FRONT "
+                + (rank + 1) + " of " + count + " nearest that edge; it builds once mi >= "
+                + int(Global::Spam::EdgeMinMetalIncome) + " held 10 s", 1);
+        }
     }
 
     // ---------------------------------------------------------------- economy
@@ -461,6 +660,8 @@ namespace EdgeLanes {
         if (!Enabled()) { funded = false; return; }
         const float mi = Economy::GetMinMetalIncomeLast10s();
         const float ei = Economy::GetMinEnergyIncomeLast10s();
+        Decide();
+        Succession(mi);   // owner, 2026-11-01: a dead lane FRONT's lane goes to the next FRONT on that edge
         const float keep = funded ? Global::Spam::ReleaseFraction : 1.0f;
         // owner, 2026-10-17: start only with a finished T2 factory and the
         // income held for 10 s (the sliding minimum); once on, ReleaseFraction pauses
@@ -706,6 +907,7 @@ namespace EdgeLanes {
         // builder went to reclaim a solar in the same frame, the order sat 120 s
         // unbuilt and the right lane never had a turret; team 12's lab builder went
         // to help an advanced fusion in the same frame.
+        if (decided && lane == 0) return null;   // no lane, or ours went to the next FRONT (Succession)
         if (OwnsTask(u.task)) return u.task;
         if (!funded) return null;
         if (Decide() == 0) return null;

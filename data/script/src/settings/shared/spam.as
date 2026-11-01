@@ -71,6 +71,28 @@ namespace Spam {
         bool EdgeVehicleLab = false;         // false: a T1 bot lab; true: a T1 vehicle plant
         int EdgeUnitLanes = 3;               // a narrow band along the edge
         float EdgeUnitLaneSpacing = 96.0f;
+        // owner, 2026-11-01: when a lane's FRONT dies its lane goes to the next FRONT
+        // nearest that edge (EdgeLanes::Succession), which builds the lab, its turrets
+        // and the edge porc once it holds EdgeMinMetalIncome; then the third, and so on.
+        // A FRONT counts as dead from EdgeDeadAfterMinutes on, latched, when either
+        //   lost  its commander is gone, its 10 s minimum metal income has stayed
+        //         under EdgeDeadMetalIncome for EdgeDeadHoldSeconds and it owns fewer
+        //         than EdgeDeadMexes mexes (T1 + T2), or
+        //   starved  it owns no mex and its income has stayed under
+        //         EdgeStarvedMetalIncome for EdgeStarvedHoldSeconds, commander or not,
+        // or when its whole team is gone (no metal income for 30 s). Picked from the
+        // 16 Sector 318C / Carrot Mountains games 2026-10-28..11-01: the right edge
+        // FRONT fit it in 13, at 10-17 min (two at 24-27); no FRONT that fit it ever
+        // got back to 40 income. "Fewer than 5 mexes" also fit two FRONTs that came
+        // back to 68 and 126 income; "after having had 40 for 2 minutes" missed the
+        // Sector right FRONTs, which never reached 40.
+        bool EdgeHandoffEnabled = true;
+        int EdgeDeadAfterMinutes = 10;
+        float EdgeDeadMetalIncome = 40.0f;
+        int EdgeDeadHoldSeconds = 120;
+        int EdgeDeadMexes = 3;
+        float EdgeStarvedMetalIncome = 20.0f;
+        int EdgeStarvedHoldSeconds = 240;
         // owner, 2026-10-20: every spam lane releases its units at its end, as the edge lanes do (off here)
         bool LaneReleaseAtEnd = false;
         // owner, 2026-10-24: a spam unit (edge lanes included) is handed back to normal

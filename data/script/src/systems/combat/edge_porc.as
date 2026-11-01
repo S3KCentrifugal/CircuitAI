@@ -207,6 +207,7 @@ namespace EdgePorc {
         if (!Enabled() || u is null || !u.circuitDef.IsMobile() || UnitHelpers::IsCommander(u.circuitDef)) return null;
         IBuilderTask@ current = u.task is null ? null : cast<IBuilderTask>(u.task);
         if (current !is null && Task::BuildType(current.GetBuildType()) < Task::BuildType::REPAIR) return null;
+        if (EdgeLanes::decided && EdgeLanes::lane == 0) return null;   // owner, 2026-11-01: our lane went to the next FRONT
         if (order !is null && !order.IsDead()) {
             if (orderCluster !is null && order.GetUnits().length() < 2 && aiTerrainMgr.CanReachAt(u, orderCluster.centre, u.circuitDef.GetBuildDistance())) {
                 IBuilderTask@ b = cast<IBuilderTask>(order);
