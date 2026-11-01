@@ -312,8 +312,32 @@ namespace FrontOverflow {
         }
         CCircuitDef@ d = ConvDef();
         if (d is null || !u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)) return null;
+        // Native re-asks busy builders (Reevaluate) and swaps on a new task (memory: builder re-ask swaps):
+        // a constructor on one of our cells keeps it, a busy one is left alone, and an order nobody is on
+        // is reused before a new cell is ordered (arm C, 2026-10-31: re-asks orphaned most cell orders, which
+        // then timed out with no builder)
+        if (IsCellTask(u.task)) return u.task;
+        if (!FrontFactoryNanos::Free(u)) return null;
+        IUnitTask@ orphan = Orphan(u);
+        if (orphan !is null) return orphan;
         if (Pending() >= Allowed()) return null;
         return OrderCell(u, d, "asked for work");
+    }
+    bool IsCellTask(IUnitTask@ t)
+    {
+        if (t is null || t.IsDead()) return false;
+        for (uint i = 0; i < cellTasks.length(); ++i) if (cellTasks[i] is t) return true;
+        return false;
+    }
+    // an ordered cell nobody is building, that this constructor can reach
+    IUnitTask@ Orphan(CCircuitUnit@ u)
+    {
+        for (uint i = 0; i < cellTasks.length(); ++i) {
+            if (cellState[i] != 1 || cellTasks[i] is null || cellTasks[i].IsDead()) continue;
+            if (cellTasks[i].GetUnits().length() > 0 || !aiTerrainMgr.CanMoveTo(u, cells[i])) continue;
+            return cellTasks[i];
+        }
+        return null;
     }
 
     // fast-assist bots: our mex upgrade frames, then our converter frames
@@ -336,13 +360,18 @@ namespace FrontOverflow {
         if (!Active() || ai.frame - lastPull < Global::RoleSettings::Front::OverflowPullSeconds * SECOND) return;
         lastPull = ai.frame;
         CCircuitDef@ d = ConvDef();
-        if (d is null || !d.IsAvailable(ai.frame) || Pending() > 0 || Allowed() <= 0) return;
+        if (d is null || !d.IsAvailable(ai.frame)) return;
+        bool orphaned = false;
+        for (uint i = 0; i < cellTasks.length() && !orphaned; ++i)
+            orphaned = cellState[i] == 1 && cellTasks[i] !is null && !cellTasks[i].IsDead() && cellTasks[i].GetUnits().length() == 0;
+        if (!orphaned && (Pending() > 0 || Allowed() <= 0)) return;
         array<int>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (!FrontMexUp::IsT2Constructor(u) || LolCannon::IsCrew(u.id) || !u.circuitDef.CanBuild(d)) continue;
             if (!FrontMexUp::Helper(u) || FrontMexUp::PulledRecently(u.id)) continue;
-            IUnitTask@ t = OrderCell(u, d, "left a helper's job");
+            IUnitTask@ t = Orphan(u);
+            if (t is null) @t = OrderCell(u, d, "left a helper's job");
             if (t is null) return;
             FrontMexUp::Pulled(u.id);
             aiBuilderMgr.AssignTask(u, t);
