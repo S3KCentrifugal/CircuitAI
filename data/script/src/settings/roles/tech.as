@@ -4,6 +4,17 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            bool GrowthEnabled = true;
+            bool ClusterEconomyEnabled = true;
+            int ClusterTurretParallel = 10;
+            float ClusterWorkerRadius = 640.f;
+            float ClusterMetalReserve = 500.f;
+            float ClusterAssistMetalMinimum = 50.f;
+            float ClusterMinimumEnergyShare = .2f;
+            float ClusterConversionEnter = 100.f;
+            float ClusterConversionLeave = 0.f;
+            float GrowthMetalReserve = 500.f;
+            float GrowthDrainSeconds = 90.f;
             bool EcoFlakEnabled = false;
             int EcoFlakMinimum = 1, EcoFlakMaximum = 15;
             float EcoFlakCooldownSeconds = 30.f, EcoFlakBaseRadius = 1000.f;
@@ -195,8 +206,14 @@ namespace Tech {
             float HarbourConverterEnergyShare = 0.6f;       // construction subs add floating advanced converters while energy is over this share, else a naval fusion
             float HarbourTidalUntilEnergy = 1500.0f;        // T1 construction ships add tidals while energy income is under this
             float HarbourCommanderMinEnergy = 150.0f;       // ... and only with this much energy income
+            float HarbourCommanderSurplus = 100.0f; // sustained production above current demand, not just a full starting bank
+            bool CoastalSupportEnabled = true;
+            int CoastalSupportMaximum = 16;
+            int CoastalSupportProbeBudget = 32;
+            int CoastalSupportLandThreshold = 8;
+            float CoastalSupportRadius = 1024.0f;
             int HarbourCommanderConverters = 30;            // before the harbour: the commander's floating converters while energy floats, at most
-            float HarbourCommanderReach = 1200.0f;          // ... placed within this of it (the nearest deep-enough water)
+            float HarbourCommanderReach = 1200.0f;          // ... placed within this of the home anchor (nearest deep-enough water)
             float CrampedPlaceRadius = 640.0f;
             float CrampedReachElmos = 128.0f;              // D-121: a lab site counts as reachable when a land constructor gets this close
             float CrampedTurretRadius = 256.0f;
@@ -493,6 +510,16 @@ namespace Tech {
             // a turret. Searched largest first over rear and side offsets; a
             // size is taken when its best ground clears LayoutBoxMinScore.
             int LayoutBoxAcrossCells = 40;           // 640 elmos
+            bool LayoutDynamicSpine = true;
+            float LayoutOpeningEnergyRadius = 320.0f;
+            int LayoutSpineMaximumRows = 24;
+            int LayoutSpineMaximumAfus = 20;
+            int LayoutSpineServiceDepth = 14;
+            int LayoutSpineCandidates = 192;
+            float LayoutSpineSearchRadius = 256.0f;
+            float LayoutSpineAirSearchRadius = 512.0f; // room to shift beyond the normal home search
+            float LayoutSpineNeighbourClearance = 192.0f;
+            float LayoutSpineAirClearance = 1024.0f; // soft expansion preference; zero disables
             int LayoutBoxDepthCells = 44;            // 704 elmos: four turret rows at a 14-cell pitch
             int LayoutBoxShrinkCells = 8;
             int LayoutBoxMinAcrossCells = 24;

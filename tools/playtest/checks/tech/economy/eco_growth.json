@@ -1,0 +1,13 @@
+{
+  "_doc": "Non-rush economy comparison: record first AFUS in a fixed 35-minute window. The 35-minute bound is the observation horizon, not a rush target.",
+  "stop_minute": 35,
+  "expect": [
+    {"key": "no rush", "pattern": "\\[TECH\\]\\[Chain\\] no rush objective", "by_minute": 0.5, "scope": "tech"},
+    {"key": "eco plan", "pattern": "\\[TECH\\]\\[Plan\\] eco", "by_minute": 0.5, "scope": "tech"},
+    {"key": "milestone", "pattern": "\\[Playtest\\] finished (armafus|corafus|legafus) team 0", "by_minute": 35, "scope": "any"}
+  ],
+  "forbid": [
+    {"key": "script error", "pattern": ": ERR\\s+:", "scope": "any"},
+    {"key": "invariant", "pattern": "\\[INVARIANT\\]", "scope": "tech"}
+  ]
+}

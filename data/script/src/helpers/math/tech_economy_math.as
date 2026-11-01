@@ -1,5 +1,28 @@
 // Pure economy decisions shared by TECH policy and its actual-VM tests.
 namespace TechEconomyMath {
+    bool FundedGrowthReactor(float metalBank,float metalReserve,float metalCost,
+            float energyBank,float energyStorage,float energyIncome,float energyCost,
+            float seconds,bool stalled) {
+        return !stalled && metalCost>0.f && metalBank>=metalReserve+metalCost
+            && energyStorage>0.f && energyBank>=energyStorage*.5f
+            && energyIncome>0.f && seconds>0.f && energyBank+energyIncome*seconds>=energyCost;
+    }
+    float GrowthPowerTarget(float income, float bank, float reserve, float seconds, float powerPerMetal) {
+        const float excess=bank>reserve ? bank-reserve : 0.f;
+        return (income + excess/(seconds>1.f ? seconds : 1.f))*powerPerMetal;
+    }
+    bool OffshoreConversionAllowed(bool full, bool stalled, bool metalFull, float income, float pull, float reserve) {
+        return full && !stalled && !metalFull && income - pull >= reserve;
+    }
+    bool WindReclaimAllowed(bool completedAfus) { return completedAfus; }
+    bool FlakAssistAllowed(bool mobile, int tier, bool flak, bool dedicatedWorker) {
+        return !mobile || tier != 2 || !flak || dedicatedWorker;
+    }
+    // Finishing a reactor is urgent during a stall. With a healthy energy bank,
+    // idle builders must first reach conversion and bounded capacity admission.
+    bool ReactorAssistFirst(bool energyBankFloats, bool energyStalling) {
+        return energyStalling || !energyBankFloats;
+    }
     // D-429: demand is separate from the layout's parallel-project budget.
     // Constant work, no cache. Bank pressure never removes the income ceiling.
     float CapacityTarget(float income, float basePerMetal, float maximumPerMetal,

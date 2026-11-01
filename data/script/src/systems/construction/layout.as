@@ -1,4 +1,6 @@
-// TECH base layout policy: the native factory pair (D-060) and the turret box (D-063).
+#include "../../helpers/construction/support_site_helpers.as"
+// TECH base layout policy: dynamic economy districts (D-431), with the
+// factory-pair/turret-box fallback (D-060/D-063).
 #include "../../define.as"
 #include "../../unit.as"
 #include "../../task.as"
@@ -14,7 +16,15 @@
 
 LAYOUT (doc/layout-design.md)
 
-Two things are planned at frame zero, before the first structure:
+TECH first attempts a terrain-fitted economy district: a central support spine,
+opposing reactor/converter banks and service space. It reserves capacity early,
+then constructs it only when the existing economy rules request work. The first
+ordinary fusion is reserved within the support district. Local temporary energy
+and the first T1 factory retain their opening placement rules. Once a compatible
+primary capacity is exhausted, the existing secondary-cluster machinery applies.
+
+If that district cannot reserve both transition services, the unstarted plan is
+released and two legacy components are planned before the first structure:
 
   1. The factory pair (D-060, native): the T1 and T2 bot labs side by side,
      each with its snug rear nano block and a held exit rectangle.
@@ -44,6 +54,179 @@ structure is placed by the spiral.
 
 ******************************************************************************/
 namespace Layout {
+    const string SPINE = "tech.spine";
+    bool spineActive = false;
+    int spineReactorGroup = 0, spineConverterGroup = 0;
+    int spineReactorDef = -1, spineConverterDef = -1;
+    int spineFusionSlot = -1, spineFusionDef = -1;
+    int spineOpeningSlot = -1;
+    bool HasSpine() { return spineActive; }
+    // IDs live for this AI's plan. Rehydrate on load; clear on role exit.
+    // Builder asks use scalar comparisons rather than repeated name lookups.
+    void ReadSpineState(const string& in side) {
+        spineActive = aiTerrainMgr.GetLayoutInt(SPINE + ".zone", 0) > 0;
+        spineReactorGroup = aiTerrainMgr.GetLayoutInt(SPINE + ".reactor", 0);
+        spineConverterGroup = aiTerrainMgr.GetLayoutInt(SPINE + ".converter", 0);
+        CCircuitDef@ reactor = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+        CCircuitDef@ converter = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(side));
+        spineReactorDef = reactor is null ? -1 : reactor.id;
+        spineConverterDef = converter is null ? -1 : converter.id;
+        CCircuitDef@ fusion = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
+        spineFusionDef = fusion is null ? -1 : fusion.id;
+        spineFusionSlot = aiTerrainMgr.GetLayoutInt(SPINE + ".fusion_slot", -1);
+        spineOpeningSlot = aiTerrainMgr.GetLayoutInt(SPINE + ".opening_slot", -1);
+    }
+    int SpineGroup(CCircuitDef@ def) {
+        if (!HasSpine() || def is null) return 0;
+        if (def.id == spineReactorDef) return spineReactorGroup;
+        if (def.id == spineConverterDef) return spineConverterGroup;
+        return 0;
+    }
+
+    int ReserveSpineFusion(CCircuitDef@ fusion) {
+        if (fusion is null || labSlot < 0) return -1;
+        const AIFloat3 seed = aiTerrainMgr.GetReservationPos(labSlot);
+        // Free the reactor placeholder nearest the lab, then use the existing
+        // terrain/pocket-aware packer for the transition fusion. The released
+        // bay is capacity, not a promise that the fusion can occupy that point.
+        // Startup only: exchange one unclaimed AFUS placeholder, not live work.
+        const int bay = aiTerrainMgr.NextSlotAny(spineReactorGroup, seed);
+        if (bay >= 0) aiTerrainMgr.ReleaseReservation(bay);
+        return aiTerrainMgr.PackNearGroup(boxZone, fusion, nanoGroup,
+            facing, seed, 0.0f, MinNanoDist(fusion), 0);
+    }
+
+    bool ReserveSpineServices(const string& in side) {
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
+        if (lab !is null) {
+            const array<int>@ facings = LabFacings();
+            for (uint i = 0; i < facings.length() && labSlot < 0; ++i)
+                labSlot = aiTerrainMgr.PackNearGroupMost(boxZone, lab, nanoGroup, facings[i],
+                    Global::RoleSettings::Tech::ExpLabBuildPowerReach, Global::RoleSettings::Tech::LayoutLabFlushElmos, 0, HomeCentre());
+            aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", labSlot);
+        }
+        // The lab gets first choice near opening builders; reserve the fusion
+        // next, before incidental service uses consume transition capacity.
+        // Startup-only: builder asks subsequently use the cached slot.
+        CCircuitDef@ fusion = ai.GetCircuitDef(UnitHelpers::GetFusionNameForSide(side));
+        spineFusionSlot = ReserveSpineFusion(fusion);
+        aiTerrainMgr.SetLayoutInt(SPINE + ".fusion_slot", spineFusionSlot);
+        return spineFusionSlot >= 0 && labSlot >= 0;
+    }
+
+    void RejectSpine() {
+        // No partial campus: release every slot in this unstarted zone.
+        aiTerrainMgr.ReleaseZone(boxZone);
+        aiTerrainMgr.SetLayoutInt(SPINE + ".zone", 0);
+        aiTerrainMgr.SetLayoutInt(SPINE + ".fusion_slot", -1);
+        aiTerrainMgr.SetLayoutInt(SPINE + ".opening_slot", -1);
+        aiTerrainMgr.SetLayoutInt(BOX + ".zone", 0);
+        aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", -1);
+        spineActive = false; boxZone = 0; nanoGroup = 0; labSlot = -1;
+        spineFusionSlot = -1;
+        spineOpeningSlot = -1;
+    }
+
+    int ReserveSpineOpening(const string& in side) {
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
+        if (lab is null) return -1;
+        // Hold a small opening footprint before the late-game campus. Otherwise
+        // the campus can cover every site in the commander's first-lab search.
+        // Startup only: at most 64 footprint/exit probes, no recurring survey.
+        for (int ring = 1; ring <= 2; ++ring) {
+            const float radius = Global::RoleSettings::Tech::ExpFirstLabRadius * float(ring) * 0.5f;
+            for (int direction = 0; direction < 8; ++direction) {
+                const float angle = 6.2831853f * float(direction) / 8.0f;
+                const AIFloat3 p(Global::Map::StartPos.x + cos(angle) * radius, 0.0f,
+                    Global::Map::StartPos.z + sin(angle) * radius);
+                for (int turn = 0; turn < 4; ++turn) {
+                    const int face = (facing + turn) % 4;
+                    if (!aiTerrainMgr.CanReserveBuilding(lab, p, face)
+                        || !aiTerrainMgr.IsExitClear(lab, p, face, 320.0f, 32.0f)) continue;
+                    const int slot = aiTerrainMgr.ReserveBuilding(lab, p, face, 0);
+                    if (slot >= 0) return slot;
+                }
+            }
+        }
+        return -1;
+    }
+
+    // Startup-only value snapshot. Map roles cover the pre-broadcast opening;
+    // an announced role overrides the map default. Never wait for the roster.
+    array<AIFloat3> SpineNeighbourPreferences() {
+        array<AIFloat3> result;
+        if (Global::RoleSettings::Tech::LayoutSpineAirClearance <= 0.0f) return result;
+        StartSpot@[]@ spots = Global::Map::Config.StartSpots;
+        array<Team::Roster::Entry@>@ roster = Team::Roster::All();
+        for (int i = 0; i < aiSetupMgr.GetScriptStartCount() && result.length() < 16; ++i) {
+            if (aiSetupMgr.IsScriptStartEnemy(i)) continue;
+            const AIFloat3 pos = aiSetupMgr.GetScriptStart(i);
+            if (MapHelpers::SqDist(pos, Global::Map::StartPos) < 64.0f * 64.0f) continue;
+            bool air = false;
+            float nearest = 256.0f * 256.0f;
+            if (spots !is null) for (uint j = 0; j < spots.length(); ++j) {
+                const float distance = MapHelpers::SqDist(pos, spots[j].pos);
+                if (distance < nearest) { nearest = distance; air = spots[j].aiRole == AiRole::AIR; }
+            }
+            nearest = 256.0f * 256.0f;
+            for (uint j = 0; j < roster.length(); ++j) {
+                const float distance = MapHelpers::SqDist(pos, roster[j].startPos);
+                if (distance < nearest) { nearest = distance; air = roster[j].role == AiRole::AIR; }
+            }
+            if (air) result.insertLast(pos);
+        }
+        return result;
+    }
+
+    bool PlanSpine(const string& in side) {
+        if (Global::AISettings::Role != AiRole::TECH || !Global::RoleSettings::Tech::LayoutDynamicSpine) return false;
+        CCircuitDef@ reactor = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+        CCircuitDef@ converter = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(side));
+        const int opening = ReserveSpineOpening(side);
+        if (opening < 0) return false; // a campus without a viable opening is not useful
+        const array<AIFloat3> preferences = SpineNeighbourPreferences();
+        if (!aiTerrainMgr.PlanEconomySpine(SPINE, nano, reactor, converter, HomeCentre(), facing,
+            Global::RoleSettings::Tech::LayoutSpineMaximumRows, Global::RoleSettings::Tech::LayoutSpineServiceDepth,
+            Global::RoleSettings::Tech::LayoutSpineCandidates,
+            preferences.length() > 0 ? Global::RoleSettings::Tech::LayoutSpineAirSearchRadius
+                : Global::RoleSettings::Tech::LayoutSpineSearchRadius,
+            Global::RoleSettings::Tech::LayoutSpineNeighbourClearance,
+            Global::RoleSettings::Tech::LayoutSpineMaximumAfus + 1, preferences,
+            Global::RoleSettings::Tech::LayoutSpineAirClearance)) {
+            if (opening >= 0) aiTerrainMgr.ReleaseReservation(opening);
+            return false;
+        } // one bay becomes ordinary fusion
+        aiTerrainMgr.SetLayoutInt(SPINE + ".opening_slot", opening);
+        ReadSpineState(side);
+        boxZone = aiTerrainMgr.GetLayoutInt(SPINE + ".zone", 0);
+        nanoGroup = aiTerrainMgr.GetLayoutInt(SPINE + ".support", 0);
+        facing = aiTerrainMgr.GetLayoutInt(SPINE + ".facing", facing);
+        boxRows = aiTerrainMgr.GetLayoutInt(SPINE + ".rows", 0);
+        boxAcross = aiTerrainMgr.GetLayoutInt(SPINE + ".columns", 0) * Across(nano, facing);
+        boxDepth = boxRows * Along(nano, facing);
+        boxCentre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(SPINE + ".x", -1)), 0,
+            float(aiTerrainMgr.GetLayoutInt(SPINE + ".z", -1)));
+        lastBoxCentre = boxCentre; lastBoxDepth = boxDepth;
+        factoryCentre = boxCentre;
+        aiTerrainMgr.SetLayoutInt(BOX + ".zone", boxZone);
+        aiTerrainMgr.SetLayoutInt(BOX + ".nano_group", nanoGroup);
+        aiTerrainMgr.SetLayoutInt(BOX + ".across", boxAcross);
+        aiTerrainMgr.SetLayoutInt(BOX + ".depth", boxDepth);
+        aiTerrainMgr.SetLayoutInt(BOX + ".rows", boxRows);
+        aiTerrainMgr.SetLayoutInt(BOX + ".centre_x", int(boxCentre.x));
+        aiTerrainMgr.SetLayoutInt(BOX + ".centre_z", int(boxCentre.z));
+        aiTerrainMgr.SetLayoutInt(BOX + ".factory_x", int(boxCentre.x));
+        aiTerrainMgr.SetLayoutInt(BOX + ".factory_z", int(boxCentre.z));
+        if (!ReserveSpineServices(side)) {
+            RejectSpine();
+            if (opening >= 0) aiTerrainMgr.ReleaseReservation(opening);
+            return false;
+        }
+        GenericHelpers::LogUtil("[Layout][Spine] ready zone=" + boxZone + " lab=" + labSlot
+            + " fusion=" + spineFusionSlot + " afus=" + aiTerrainMgr.GetGroupCount(spineReactorGroup, false)
+            + " converters=" + aiTerrainMgr.GetGroupCount(spineConverterGroup, false), 1);
+        return true;
+    }
 
     const string FACTORY_ROOT = "tech.factory.start";
     const string BOX = "tech.box";
@@ -98,6 +281,12 @@ namespace Layout {
 
     void ClearScriptState()
     {
+        coastalRetry = -1;
+        spineActive = false;
+        spineReactorGroup = 0; spineConverterGroup = 0;
+        spineReactorDef = -1; spineConverterDef = -1;
+        spineFusionSlot = -1; spineFusionDef = -1;
+        spineOpeningSlot = -1;
         CompactEco::Clear();
         economyOverflowNeeded=false;
         @economySupportTask=null;
@@ -120,6 +309,7 @@ namespace Layout {
 
     void OnRoleLeave()
     {
+        EconomyCluster::Clear();
         @Global::energyAllowed = null;   // D-077: TECH's energy veto must not follow the AI into another role
         homeCentre = AIFloat3(-1.0f, 0.0f, -1.0f); labSlot = -1;   // D-085/D-086
         if (!planned && !aiTerrainMgr.IsLayoutEnabled()) return;
@@ -167,11 +357,14 @@ namespace Layout {
 
     bool Adopt(const string& in side)
     {
-        if (!aiTerrainMgr.HasLayoutGroup(FACTORY_ROOT + ".t1.nano")) return false;
+        if (!aiTerrainMgr.HasLayoutGroup(FACTORY_ROOT + ".t1.nano")
+            && aiTerrainMgr.GetLayoutInt(SPINE + ".zone", 0) <= 0) return false;
         if (!ResolveDefs(side)) return false;
+        ReadSpineState(side);
         planned = true;
         fallback = false;
         facing = aiTerrainMgr.GetLayoutInt(FACTORY_ROOT + ".facing", 0);
+        if (HasSpine()) facing = aiTerrainMgr.GetLayoutInt(SPINE + ".facing", facing);
         boxZone = aiTerrainMgr.GetLayoutInt(BOX + ".zone", 0);
         nanoGroup = aiTerrainMgr.GetLayoutInt(BOX + ".nano_group", 0);
         boxAcross = aiTerrainMgr.GetLayoutInt(BOX + ".across", 0);
@@ -378,10 +571,14 @@ namespace Layout {
     // D-094: order the advanced lab on a reserved footprint, pinned. On failure
     // the reservation is released when the caller asks (a fresh search), kept
     // otherwise (the footprint planned at box time).
-    IUnitTask@ OrderLabOn(CCircuitDef@ t2, int slot, int timeout, bool releaseOnFail, const string &in how)
+    IUnitTask@ OrderLabOn(CCircuitDef@ t2, int slot, int timeout, bool releaseOnFail, const string &in how, CCircuitUnit@ builder = null)
     {
         const AIFloat3 p = aiTerrainMgr.GetReservationPos(slot);
         if (p.x < 0.0f) return null;
+        if (builder !is null && !aiTerrainMgr.CanReachAtSafe(builder,p,builder.circuitDef.GetBuildDistance())) {
+            if (releaseOnFail) aiTerrainMgr.ReleaseReservation(slot);
+            return null;
+        }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, t2, p, null, 0.0f, false, true, timeout));
         if (t is null) {
             if (releaseOnFail) aiTerrainMgr.ReleaseReservation(slot);
@@ -705,6 +902,7 @@ namespace Layout {
     // The forward cluster taken by an ally: given up and planned further on.
     void CheckForward(bool immediate = false)
     {
+        if (HasSpine() && !immediate) return;
         if (!immediate && ai.frame - fwdCheckFrame < 10 * SECOND) return;
         fwdCheckFrame = ai.frame;
         if (fwdZone == 0) { PlanForwardBox(); return; }
@@ -745,6 +943,14 @@ namespace Layout {
             return;
         }
         if (Adopt(side)) return;
+        if (ResolveDefs(side)) {
+            facing = LayoutHelpers::FacingToward(Global::Map::StartPos, LayoutHelpers::TerrainCentre());
+            if (PlanSpine(side)) {
+                planned = true;
+                fallback = false;
+                return;
+            }
+        }
         if (!ResolveDefs(side) || !PlanFactories(side)) {
             fallback = true;
             planned = false;
@@ -771,7 +977,7 @@ namespace Layout {
         if (!planned && aiTerrainMgr.IsLayoutEnabled()) {
             Adopt(Global::AISettings::Side);
         } else if (planned) {
-            facing = aiTerrainMgr.GetLayoutInt(FACTORY_ROOT + ".facing", facing);
+            facing = aiTerrainMgr.GetLayoutInt(HasSpine() ? SPINE + ".facing" : FACTORY_ROOT + ".facing", facing);
         }
         if (planned && HasBox()) CheckForward();   // D-081
         if (planned && HasBox()) RegisterFactoryZones();   // D-104
@@ -881,20 +1087,24 @@ namespace Layout {
         // Conservative center distance uses this faction's actual nano reach.
         return nano !is null && aiBuilderMgr.GetStaticBuildPowerNear(position,nano.GetBuildDistance())>0.0f;
     }
-    void PrepareEconomySupport(const AIFloat3& in position) {
+    void PrepareEconomySupport(const AIFloat3& in position, CCircuitUnit@ builder = null) {
         if(nano is null || !nano.IsAvailable(ai.frame) || TurretsCapped()
             || (economySupportTask !is null && !economySupportTask.IsDead())) return;
-        int slot=aiTerrainMgr.NextSlotAny(nanoGroup,position);
+        CCircuitUnit@ worker = builder !is null && builder.circuitDef.CanBuild(nano) ? builder : CrampedWalker(nano);
+        if (worker is null) return;
+        int slot=SupportSites::Nearest(worker,nano,nanoGroup,position);
         if(slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance())
-            slot=fwdGroup>0 ? aiTerrainMgr.NextSlotAny(fwdGroup,position) : -1;
+            slot=SupportSites::Nearest(worker,nano,fwdGroup,position);
         for(uint i=0;i<overflowSupportGroups.length()
             && (slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance());++i)
-            slot=aiTerrainMgr.NextSlotAny(overflowSupportGroups[i],position);
+            slot=SupportSites::Nearest(worker,nano,overflowSupportGroups[i],position);
         if(slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance()) return;
+        if(!EconomyCluster::NanoAdmission(slot)) return;
         IUnitTask@ task=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,Task::Priority::HIGH,nano,
             aiTerrainMgr.GetReservationPos(slot),0.0f,true,120*SECOND));
         if(task is null) return;
         if(!AiPinReservation(task,slot)) {aiBuilderMgr.AbortTask(task);return;}
+        EconomyCluster::NanoAdmitted(slot);
         @economySupportTask=task;
     }
     // D-108: while the advanced fusions have a dedicated builder, the next set of
@@ -903,6 +1113,7 @@ namespace Layout {
     int afusAheadTry = -100000;
     void HoldAfusSetAhead()
     {
+        if (HasSpine()) return; // the full primary reactor bank is already held
         if (!HasBox()) return;
         CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
         if (af is null || aiTerrainMgr.NextSetSlot(af) >= 0) return;
@@ -965,7 +1176,7 @@ namespace Layout {
 
     int ReserveFactorySite(CCircuitDef@ def)
     {
-        CheckForward(true);
+        if (!HasSpine()) CheckForward(true);
         if (def is null || !HasBox() || !TurretsStand()) return -1;
         // D-104: flush against the turrets (air: any facing, no exit test)
         RegisterFactoryZones();
@@ -988,9 +1199,21 @@ namespace Layout {
                     + ": a turret stands, so not anywhere (D-101)", 1);
                 return id;
             }
-            if (fwdZone != 0 && fwdGroup > 0) {
+            if (!HasSpine() && fwdZone != 0 && fwdGroup > 0) {
                 const int id = aiTerrainMgr.PackNearGroup(fwdZone, def, fwdGroup, labFacings[f], fwdCentre, 0.0f, 0.0f, 0);
                 if (id >= 0) return id;
+            }
+        }
+        if (HasSpine()) {
+            // Only a failed primary search justifies another factory campus.
+            // A speculative forward box must not compete with home build power.
+            CheckForward(true);
+            RegisterFactoryZones();
+            const int id = aiTerrainMgr.PackFactoryFlush(def, TurretSeed());
+            if (id >= 0) return id;
+            for (uint f = 0; f < labFacings.length() && fwdZone != 0 && fwdGroup > 0; ++f) {
+                const int forward = aiTerrainMgr.PackNearGroup(fwdZone, def, fwdGroup, labFacings[f], fwdCentre, 0.0f, 0.0f, 0);
+                if (forward >= 0) return forward;
             }
         }
         GenericHelpers::LogUtil("[Layout] no layout site for " + def.GetName() + " although a turret stands", 1);
@@ -1114,12 +1337,14 @@ namespace Layout {
         const int have = nano.count + aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO), nano);
         if (have >= allowed) return null;
         const AIFloat3 at = CrampedAnchor(unit);
-        const int supportSlot = aiTerrainMgr.NextSlotAny(nanoGroup, at);
+        const int supportSlot = aiTerrainMgr.NextSupportSlot(unit,nano,nanoGroup,at,8);
         if (supportSlot >= 0) {
+            if (!EconomyCluster::NanoAdmission(supportSlot)) return null;
             IUnitTask@ supported = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, priority, nano,
                 aiTerrainMgr.GetReservationPos(supportSlot), 0.0f, true, 120 * SECOND));
             if (supported is null) return null;
             if (!AiPinReservation(supported, supportSlot)) { aiBuilderMgr.AbortTask(supported); return null; }
+            EconomyCluster::NanoAdmitted(supportSlot);
             return supported;
         }
         GenericHelpers::LogUtil("[Layout] cramped turret " + (have + 1) + " of " + allowed + " near (" + int(at.x) + ", " + int(at.z) + ") (D-121)", 1);
@@ -1217,7 +1442,7 @@ namespace Layout {
         }
         const AIFloat3 position=aiTerrainMgr.GetReservationPos(id);
         if(HasBox() && SetSizeOf(def)>0 && !HasEconomySupport(position)) {
-            PrepareEconomySupport(position);return null;
+            PrepareEconomySupport(position,builder);return null;
         }
         IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, def,
             aiTerrainMgr.GetReservationPos(id), 0.0f, true, 300 * SECOND));
@@ -1235,6 +1460,25 @@ namespace Layout {
         return result;
     }
 
+    IUnitTask@ OpeningEnergy(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder)
+    {
+        if (!HasSpine() || builder is null || type != Task::BuildType::ENERGY) return null;
+        const string name = def.GetName();
+        const string side = Global::AISettings::Side;
+        if (name != UnitHelpers::GetWindNameForSide(side) && name != UnitHelpers::GetSolarNameForSide(side)
+            && name != UnitHelpers::GetAdvSolarNameForSide(side)) return null;
+        // Once real support exists, use the district's ordinary service-space
+        // packer below. A fixed-radius unscoped search can exhaust the opening
+        // perimeter while valid zone-owned space remains (nuke wind buffer).
+        // Definition counts are O(1); unfinished count uses the existing queue.
+        if (nano !is null && nano.count > aiBuilderMgr.GetUnfinishedCount(nano)) return null;
+        // Use a fixed opening anchor: centering each new order on its builder
+        // lets a chain of windmills drift beyond the rush's local-worker gate.
+        // Native ordinary placement still checks held slots and allied plans.
+        return aiBuilderMgr.Enqueue(TaskB::Common(type, priority, def, Global::Map::StartPos,
+            Global::RoleSettings::Tech::LayoutOpeningEnergyRadius, true, timeout));
+    }
+
     IUnitTask@ PlaceMeasured(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder)
     {
         if (def is null) return null;
@@ -1248,6 +1492,8 @@ namespace Layout {
                 && Economy::GetMinMetalIncomeLast10s() < Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter) return null;
         }
         if (CompactEco::Active()) return CompactEco::Place(type, priority, def, timeout, builder);
+        IUnitTask@ opening = OpeningEnergy(type, priority, def, timeout, builder);
+        if (opening !is null) return opening;
         // Among the cells equally close to a turret, the one nearest the
         // builder that asked: the less it walks, the sooner it builds (D-064).
         AIFloat3 anchor = factoryCentre;
@@ -1275,13 +1521,16 @@ namespace Layout {
             return aiBuilderMgr.Enqueue(TaskB::Common(type, priority, def, FactoryNanoCentre(),
                 float(Global::RoleSettings::Tech::LayoutFallbackShakeCells) * SQUARE_SIZE * 2, true, timeout));
         }
-        CheckForward(true);
-        int id = -1;
+        if (!HasSpine()) CheckForward(true);
+        const int spineGroup = SpineGroup(def);
+        int id = spineGroup > 0 ? aiTerrainMgr.NextSlotConnected(spineGroup, TurretSeed()) : -1;
+        if (HasSpine() && def.id == spineFusionDef && aiTerrainMgr.GetReservationState(spineFusionSlot) == 0
+            && aiTerrainMgr.IsReservationBuildable(spineFusionSlot)) id = spineFusionSlot;
         // D-101 (owner's rule): advanced fusions and advanced converters go in sets,
         // the first flush against a turret, the rest lined up away from it; the
         // set's next slot before a new set; a new set flush against the turrets again
         const int setSize = SetSizeOf(def);
-        if (setSize > 0) {
+        if (setSize > 0 && id < 0) {
             setAsk.set(def.GetName(), ai.frame);
             id = aiTerrainMgr.NextSetSlot(def);
             bool fresh = false;
@@ -1310,6 +1559,7 @@ namespace Layout {
         // around the turrets is used (native packs the ring around a full zone
         // within a turret's reach), then the next nearest cluster: the forward
         // one, served by its own turrets.
+        if (id < 0 && HasSpine()) CheckForward(true);
         if (id < 0 && fwdZone != 0 && fwdGroup > 0)
             id = aiTerrainMgr.PackNearGroup(fwdZone, def, fwdGroup, facing, anchor, 0.0f, MinNanoDist(def), 0);
         for (uint index = 0; index < overflowSupportGroups.length() && id < 0; ++index) {
@@ -1331,9 +1581,20 @@ namespace Layout {
             return null;
         }
         noRoomSince = -1;
+        if (!SupportSites::Usable(builder,id)) {
+            // Recheck terrain/occupancy as well as reach BEFORE arranging support:
+            // a once-valid slot must not strand a worker on an unusable reactor
+            // prerequisite. Keep bank reservations for later recovery; rotate
+            // through at most eight alternatives before bounded reachable packing.
+            if (setSize == 0 && id != spineFusionSlot) aiTerrainMgr.ReleaseReservation(id);
+            if (builder is null) return null;
+            id = spineGroup > 0 ? aiTerrainMgr.NextReachableSlot(builder,def,0,spineGroup,8) : -1;
+            if (id < 0) id = aiTerrainMgr.PackReachable(builder,def,boxZone,nanoGroup,facing,HomeCentre(),16);
+            if (id < 0) return null;
+        }
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
         if(setSize>0 && !HasEconomySupport(pos)) {
-            PrepareEconomySupport(pos);
+            PrepareEconomySupport(pos,builder);
             return null; // keep the economy reservation; construct its support first
         }
         // INV-014 (D-082): every packed structure stands within a turret's reach of a slot
@@ -1570,6 +1831,20 @@ namespace Layout {
         return committed;
     }
 
+    float TurretPowerInFlight()
+    {
+        // Same constant roster and lifecycle counters as the shared admission
+        // limit; planned empty slots are not funded build power.
+        const array<string> names = UnitHelpers::GetT1NanoUnitNames();
+        float power = 0.f;
+        for (uint i=0; i<names.length(); ++i) {
+            CCircuitDef@ def = ai.GetCircuitDef(names[i]);
+            if (def !is null) power += float(aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO),def)
+                + aiBuilderMgr.GetUnfinishedCount(def)) * def.GetBuildSpeed();
+        }
+        return power;
+    }
+
     bool TurretsCapped()
     {
         string why;
@@ -1582,12 +1857,47 @@ namespace Layout {
     // Synchronous enqueue callbacks see the same budget that admitted the order.
     // Restore it after the call so unrelated/native admissions use their own budget.
     int activeTurretAdmissionBudget = -1;
+    int coastalRetry = -1;
+    CCircuitDef@ CoastalDefinition(CCircuitUnit@ builder) {
+        if (!Global::RoleSettings::Tech::CoastalSupportEnabled || !HasBox() || builder is null) return null;
+        CCircuitDef@ def = ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(
+            UnitHelpers::GetSideForUnitName(builder.circuitDef.GetName())));
+        return def !is null && builder.circuitDef.CanBuild(def) ? def : null;
+    }
+    IUnitTask@ CoastalNanoTask(CCircuitUnit@ builder, Task::Priority priority) {
+        CCircuitDef@ def = CoastalDefinition(builder);
+        if (def is null || TurretsCapped()) return null;
+        int slot = aiTerrainMgr.NextReachableSlot(builder,def,0,nanoGroup,8);
+        if (slot < 0) {
+            if (ai.frame < coastalRetry) return null;
+            // One shared bounded survey per five seconds, only on funded demand
+            // from a capable worker. No shore polling or global capability scan.
+            coastalRetry = ai.frame + 5 * SECOND;
+            slot = aiTerrainMgr.ReserveCoastalSupport(builder,def,boxZone,nanoGroup,HomeCentre(),
+                Global::RoleSettings::Tech::CoastalSupportRadius,
+                Global::RoleSettings::Tech::CoastalSupportProbeBudget,
+                Global::RoleSettings::Tech::CoastalSupportMaximum);
+        }
+        if (slot < 0) return null;
+        if (!EconomyCluster::NanoAdmission(slot)) return null;
+        if (def.maxThisUnit <= def.count) def.maxThisUnit = def.count + 1;
+        if (!def.IsAvailable(ai.frame)) return null;
+        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,priority,def,
+            aiTerrainMgr.GetReservationPos(slot),0.f,true,120*SECOND));
+        if (task !is null && !AiPinReservation(task,slot)) { aiBuilderMgr.AbortTask(task); return null; }
+        if (task !is null) EconomyCluster::NanoAdmitted(slot);
+        return task;
+    }
     IUnitTask@ NanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget = -1)
     {
         const int previousBudget = activeTurretAdmissionBudget;
         string why;
         activeTurretAdmissionBudget = parallelBudget >= 0 ? parallelBudget : TurretsAllowed(why);
-        IUnitTask@ result = AdmitNanoTask(unit, priority, activeTurretAdmissionBudget);
+        IUnitTask@ result;
+        if (HasBox() && aiTerrainMgr.GetGroupCount(nanoGroup,true) < Global::RoleSettings::Tech::CoastalSupportLandThreshold)
+            @result = CoastalNanoTask(unit,priority);
+        if (result is null) @result = AdmitNanoTask(unit, priority, activeTurretAdmissionBudget);
+        if (result is null) @result = CoastalNanoTask(unit,priority);
         activeTurretAdmissionBudget = previousBudget;
         return result;
     }
@@ -1621,12 +1931,14 @@ namespace Layout {
         if (CompactEco::Active()) return CompactEco::NanoTask(unit, priority);
         if (crampedLayout) return CrampedNanoTask(unit, priority);
         for (uint index = 0; index < overflowSupportGroups.length(); ++index) {
-            const int slot = aiTerrainMgr.NextSlotAny(overflowSupportGroups[index], unit.GetPos(ai.frame));
+            const int slot = aiTerrainMgr.NextSupportSlot(unit,nano,overflowSupportGroups[index],unit.GetPos(ai.frame),8);
             if (slot < 0) continue;
+            if (!EconomyCluster::NanoAdmission(slot)) continue;
             IUnitTask@ support = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, priority, nano,
                 aiTerrainMgr.GetReservationPos(slot), 0.0f, true, 120 * SECOND));
             if (support is null) return null;
             if (!AiPinReservation(support, slot)) { aiBuilderMgr.AbortTask(support); return null; }
+            EconomyCluster::NanoAdmitted(slot);
             return support;
         }
         // D-088: the pair's factory-nano slots stand behind the T1 lab, the
@@ -1639,39 +1951,17 @@ namespace Layout {
             if (t !is null) return t;
         }
         if (!HasBox()) return null;
-        CheckForward(true);
+        if (!HasSpine() || aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0) CheckForward(true);
         const bool fwdFree = (fwdGroup > 0) && aiTerrainMgr.GetGroupCount(fwdGroup, true) > 0;
         if (aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0 && !fwdFree && !GrowBox()) return null;   // D-072: more rows behind
         // D-069: the slot nearest a standing lab, whichever lab that is, so
         // every turret reaches a lab; the pair's centre only when no lab stands.
-        int id = -1;
-        // D-077 (owner's rule): turrets start at the centre of the planned
-        // layout and grow outward as one connected cluster, so the most
-        // structures sit in range of the build power.
-        if (Global::RoleSettings::Tech::ExpTurretCentreOut && boxCentre.x >= 0.0f) {
-            // the block's seed is the nearest standing lab (D-069's reason: the first
-            // turrets must reach a lab), the box centre only while no lab stands;
-            // from the second turret on the block grows from its own centroid
-            const AIFloat3 seed = TurretSeed();
-            id = aiTerrainMgr.NextSlotConnected(nanoGroup, seed);
-            if (id < 0 && fwdGroup > 0 && economyOverflowNeeded) id = aiTerrainMgr.NextSlotConnected(fwdGroup, fwdCentre);   // D-081: the forward cluster once the main block is full
-            if (id >= 0) GenericHelpers::LogUtil("[Layout] turret slot " + id + ", " + int(sqrt(MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(id), boxCentre))) + " from the box centre (connected)", 2);
-        }
-        if (id < 0 && Global::RoleSettings::Tech::ExpTurretNearLab) {
-            float bestSq = 1.0e30f;
-            array<string>@ keys = Factory::allFactories.getKeys();
-            for (uint i = 0; keys !is null && i < keys.length(); ++i) {
-                CCircuitUnit@ f = null; if (!Factory::allFactories.get(keys[i], @f) || f is null) continue;
-                const AIFloat3 fp = f.GetPos(ai.frame);
-                const int cand = aiTerrainMgr.NextSlotAny(nanoGroup, fp);
-                if (cand < 0) continue;
-                const float sq = MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(cand), fp);
-                if (sq < bestSq) { bestSq = sq; id = cand; }
-            }
-            if (id >= 0) GenericHelpers::LogUtil("[Layout] turret slot " + id + ", " + int(sqrt(bestSq)) + " from the nearest lab", 2);
-        }
-        if (id < 0) id = aiTerrainMgr.NextSlotAny(nanoGroup, factoryCentre);
+        int id = PreferredLandSupportSlot(unit);
+        // A full primary block must not strand an already reserved secondary block.
+        if (id < 0 && fwdGroup > 0 && (economyOverflowNeeded || aiTerrainMgr.GetGroupCount(nanoGroup, true) == 0))
+            id = aiTerrainMgr.NextSupportSlot(unit,nano,fwdGroup,fwdCentre,8);
         if (id < 0) return null;
+        if (!EconomyCluster::NanoAdmission(id)) return null;
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, priority, nano, pos, 0.0f, true, 120 * SECOND));
         if (t is null) return null;
@@ -1680,7 +1970,31 @@ namespace Layout {
             aiBuilderMgr.AbortTask(t);
             return null;
         }
+        EconomyCluster::NanoAdmitted(id);
         return t;
+    }
+
+    int PreferredLandSupportSlot(CCircuitUnit@ unit)
+    {
+        if (Global::RoleSettings::Tech::ExpTurretCentreOut)
+            return aiTerrainMgr.NextSupportSlot(unit,nano,nanoGroup,TurretSeed(),8);
+        // Preserve the optional near-lab policy. Its existing factory scan is
+        // only used when centre-out is disabled; the normal path stays above.
+        int selected = -1;
+        if (Global::RoleSettings::Tech::ExpTurretNearLab) {
+            float best = 1.0e30f;
+            array<string>@ keys = Factory::allFactories.getKeys();
+            for (uint i=0; keys !is null && i<keys.length(); ++i) {
+                CCircuitUnit@ factory;
+                if (!Factory::allFactories.get(keys[i],@factory) || factory is null) continue;
+                const AIFloat3 pos = factory.GetPos(ai.frame);
+                const int slot = aiTerrainMgr.NextSupportSlot(unit,nano,nanoGroup,pos,8);
+                if (slot<0) continue;
+                const float distance = MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(slot),pos);
+                if (distance<best) { best=distance; selected=slot; }
+            }
+        }
+        return selected>=0 ? selected : aiTerrainMgr.NextSupportSlot(unit,nano,nanoGroup,factoryCentre,8);
     }
 
     // The advanced lab's site (D-069): the pair's planned slot, unless a free
@@ -1690,7 +2004,7 @@ namespace Layout {
     // zone and exit cone is honoured by CanReserveBuilding. The first lab is
     // the exception (tech_build.as: at the commander). Null when the lab
     // cannot be ordered now (cooldown, def unavailable, nothing enqueued).
-    IUnitTask@ T2LabTask(int timeout)
+    IUnitTask@ T2LabTask(int timeout, CCircuitUnit@ builder = null)
     {
         const string side = Global::AISettings::Side;
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
@@ -1702,12 +2016,24 @@ namespace Layout {
         }
         if (!t2.IsAvailable(ai.frame)) return null;
         if (!Builder::IsT2BotFactoryOffCooldown()) return null;
+        if (builder !is null && HasBox() && labSlot >= 0
+            && !aiTerrainMgr.CanReachAtSafe(builder,aiTerrainMgr.GetReservationPos(labSlot),builder.circuitDef.GetBuildDistance())) {
+            const array<int>@ faces = LabFacings();
+            for (uint i=0;i<faces.length();++i) {
+                const int replacement=aiTerrainMgr.PackReachable(builder,t2,boxZone,nanoGroup,faces[i],HomeCentre(),16);
+                if(replacement<0) continue;
+                aiTerrainMgr.ReleaseReservation(labSlot);
+                labSlot=replacement; aiTerrainMgr.SetLayoutInt(BOX+".lab_slot",labSlot);
+                return OrderLabOn(t2,labSlot,timeout,false,"on reachable land at",builder);
+            }
+            return null;
+        }
         // D-121: no planned pair (cramped ground): the nearest footprint to the T1
         // lab, any facing (played: the pair's slot is -1 there and every order aborted)
         if (fallback) {
             // the footprint held beside the first lab (ReserveCrampedLabSlot) first
             if (labSlot >= 0 && !aiTerrainMgr.IsSlotDead(labSlot) && aiTerrainMgr.GetReservationPos(labSlot).x >= 0.0f)
-                return OrderLabOn(t2, labSlot, timeout, false, "on its cramped slot beside the first lab (D-121)");
+                return OrderLabOn(t2, labSlot, timeout, false, "on its cramped slot beside the first lab (D-121)",builder);
             const AIFloat3 at = CrampedAnchor(null);
             const int id = CrampedLabSite(t2, at, Global::RoleSettings::Tech::CrampedPlaceRadius, CrampedWalker(t2), SQUARE_SIZE * 2, true);
             if (id < 0) {
@@ -1718,7 +2044,7 @@ namespace Layout {
                 }
                 return null;
             }
-            return OrderLabOn(t2, id, timeout, true, "on cramped ground (no planned pair, D-121) at");
+            return OrderLabOn(t2, id, timeout, true, "on cramped ground (no planned pair, D-121) at",builder);
         }
         // D-116: the planned footprint the engine refused (a dead slot, never
         // served again) is given up and the lab placed elsewhere (played on All
@@ -1767,7 +2093,7 @@ namespace Layout {
             }
         }
         if (labSlot >= 0 && aiTerrainMgr.GetReservationPos(labSlot).x >= 0.0f)
-            return OrderLabOn(t2, labSlot, timeout, false, "on its planned slot");
+            return OrderLabOn(t2, labSlot, timeout, false, "on its planned slot",builder);
         const int t2Slot = aiTerrainMgr.GetLayoutInt(FACTORY_ROOT + ".t2_slot", -1);
         AIFloat3 pairPos = (t2Slot >= 0) ? aiTerrainMgr.GetReservationPos(t2Slot) : Global::Map::StartPos;
         if (pairPos.x < 0.0f) pairPos = Global::Map::StartPos;
@@ -1795,7 +2121,7 @@ namespace Layout {
                 for (int i = 0; i < ZoneCount(); ++i) {
                     const int nid = aiTerrainMgr.PackNearGroup(ZoneAt(i), t2, nanoGroup, ff, TurretSeed(), 0.0f, 0.0f, 0);
                     if (nid < 0) continue;
-                    return OrderLabOn(t2, nid, timeout, true, "nearest a turret slot, facing " + ff + ", at");
+                    return OrderLabOn(t2, nid, timeout, true, "nearest a turret slot, facing " + ff + ", at",builder);
                 }
             }
             IUnitTask@ t = Builder::EnqueueT2BotLabIfNeeded(side, Global::Map::StartPos, 0.0f, timeout);
@@ -1808,7 +2134,7 @@ namespace Layout {
             GenericHelpers::LogUtil("[Layout] advanced lab: the turret-layout footprint could not be reserved; the pair's slot is used", 1);
             return Builder::EnqueueT2BotLabIfNeeded(side, Global::Map::StartPos, 0.0f, timeout);
         }
-        return OrderLabOn(t2, id, timeout, true, "in the turret layout (most slots reach it, nearest the seed) at");
+        return OrderLabOn(t2, id, timeout, true, "in the turret layout (most slots reach it, nearest the seed) at",builder);
     }
 
     // ---------------------------------------------------------------- overlay

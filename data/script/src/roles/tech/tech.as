@@ -679,6 +679,7 @@ namespace RoleTech
 		// state and the optional overlay.
 		Layout::Update(metalIncome, hasT2Lab, t2ConstructionBotCount);
         EcoFlak::Tick();
+        EconomyCluster::Tick();
 
 		// --- Unlock advanced storages when economy is strong enough ---
 		if (!hasUnlockedAdvancedStorage && metalIncome >= 100.0f)
@@ -2140,6 +2141,8 @@ namespace RoleTech
 	IUnitTask @Tech_TurretAssist(CCircuitUnit @u, bool factorySide = false)
 	{
 		if (u is null || u.circuitDef is null) return null;
+		IUnitTask@ economy=EconomyCluster::Assist(u,factorySide);
+		if(economy !is null) return economy;
 		const bool nukeRush = TechChain::NukeRush();
 		// step 1: a reclaim of ours in reach (D-290: only one the gate allows now)
 		if (!factorySide) {

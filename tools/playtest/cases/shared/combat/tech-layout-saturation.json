@@ -62,6 +62,13 @@
   "photos": [135],
   "start_metal": 100000,
   "start_energy": 1000000,
+  "modoptions": {
+    "multiplier_builddistance": 1,
+    "multiplier_buildpower": 1,
+    "multiplier_resourceincome": 1,
+    "ai_incomemultiplier": 1,
+    "multiplier_turnrate": 1
+  },
   "checks": "tech-layout-saturation",
   "assertions": {
     "min_kills": 0,

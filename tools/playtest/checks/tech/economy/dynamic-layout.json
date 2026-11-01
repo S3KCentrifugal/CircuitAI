@@ -1,0 +1,30 @@
+{
+  "_doc": "Natural opening: early dynamic TECH district and unrestricted first T1 bot factory, normal resources.",
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "district",
+      "pattern": "\\[Layout\\]\\[Spine\\] ready zone=",
+      "by_minute": 0.5,
+      "scope": "any"
+    },
+    {
+      "key": "opening factory",
+      "pattern": "\\[Playtest\\] finished (armlab|corlab|leglab) team 0",
+      "by_minute": 2,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script error",
+      "pattern": ": ERR\\s+:",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\] (?!INV-063\\b)",
+      "scope": "any"
+    }
+  ]
+}

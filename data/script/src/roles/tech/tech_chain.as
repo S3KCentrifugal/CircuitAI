@@ -791,7 +791,7 @@ namespace TechChain
                 if (geo !is null && geo.count == 0)
                     Invariants::Violation("INV-242", "support-geo", "SUPPORT ordered the advanced lab with no geothermal standing or framed and a vent within reach");
             }
-            return Layout::T2LabTask(300 * SECOND);
+            return Layout::T2LabTask(300 * SECOND,u);
         }
         if (key == "geo") {
             // D-367: native validates the vent and places on it; the engine's build-over
