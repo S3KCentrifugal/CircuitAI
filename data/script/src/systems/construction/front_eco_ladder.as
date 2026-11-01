@@ -556,18 +556,41 @@ namespace FrontEcoLadder {
     void WatchReactor(CCircuitDef@ reactor)
     {
         if (reactorTask is null) return;
-        if (reactorTask.IsDead()) { @reactorTask = null; return; }
         if (reactor.count > reactorBefore || aiBuilderMgr.GetUnfinishedCount(reactor) > 0) { @reactorTask = null; reactorFails = 0; return; }   // framed
-        if (ai.frame - reactorOrdered < ReactorFrameSeconds * SECOND) return;
+        // gone before it framed: a failure like an order that never frames (played 2026-11-01, Thermal Shock
+        // A/B: after its base fell, T0 re-ordered its second fusion at the same site every second for minutes)
+        const bool dead = reactorTask.IsDead();
+        if (!dead && ai.frame - reactorOrdered < ReactorFrameSeconds * SECOND) return;
         // played (h27, Scylla +75): T15 re-ordered its third advanced fusion six times in a row, none framed
         reactorFails++;
         const int wait = 30 * (reactorFails < 4 ? reactorFails : 4);
         reactorRetry = ai.frame + wait * SECOND;
-        GenericHelpers::LogUtil("[FRONT][Eco] " + reactor.GetName() + " order never framed in " + ReactorFrameSeconds + " s (" + reactorFails
-            + " in a row, bank " + int(aiEconomyMgr.metal.current) + "); aborted, next site in " + wait + " s", 1);
-        aiBuilderMgr.AbortTask(reactorTask);
+        GenericHelpers::LogUtil("[FRONT][Eco] " + reactor.GetName() + " order " + (dead ? "ended after " + ((ai.frame - reactorOrdered) / SECOND) + " s, never framed"
+            : "never framed in " + ReactorFrameSeconds + " s") + " (" + reactorFails + " in a row, bank " + int(aiEconomyMgr.metal.current)
+            + "); " + (dead ? "" : "aborted, ") + "next site in " + wait + " s", 1);
+        if (!dead) aiBuilderMgr.AbortTask(reactorTask);
         @reactorTask = null;
         reactorTry++;
+    }
+
+    // Our reactor order keeps its builder (manager/builder.as AiMakeTask, before any provider; null there
+    // is native's "keep the current task"). Played 2026-11-01 (Thermal Shock A/B): the builder of most
+    // ladder fusion orders was moved to a mex upgrade or a converter on re-evaluation, and with the energy
+    // bank full native never sent another to the order, so it never framed.
+    bool Keep(CCircuitUnit@ u)
+    {
+        if (!On() || u is null || reactorTask is null || reactorTask.IsDead()) return false;
+        return u.task is reactorTask;
+    }
+    // Our reactor order with nobody on it, for a ladder constructor that can build it
+    IUnitTask@ OrphanReactor(CCircuitUnit@ u, CCircuitDef@ reactor)
+    {
+        if (reactorTask is null || reactorTask.IsDead() || reactor is null || !u.circuitDef.CanBuild(reactor)) return null;
+        if (u.task is reactorTask) return reactorTask;
+        array<CCircuitUnit@>@ on = reactorTask.GetUnits();
+        if (on !is null && on.length() > 0) return null;
+        GenericHelpers::LogUtil("[FRONT][Eco] " + reactor.GetName() + " order had nobody on it: " + u.circuitDef.GetName() + " " + u.id + " takes it", 1);
+        return reactorTask;
     }
 
     bool IsLadderT1(CCircuitUnit@ u)
@@ -624,6 +647,8 @@ namespace FrontEcoLadder {
         // stage 2 from 14:20 past 20:00 with "fusions 1/1/3", metal bank 2-4.8k of 5k, E +3,800)
         const int have = fusionStep ? FusionsTotal() + (reactorTask !is null ? 1 : 0) : AdvFusionsTotal();
         if (reactor !is null) WatchReactor(reactor);
+        IUnitTask@ orphan = OrphanReactor(u, reactor);
+        if (orphan !is null) return orphan;
         if (mexFirst && reactor !is null && have < want)
             ReactorHeld(reactor.GetName() + " " + (have + 1) + "/" + want + ": mex gate, " + Done(MexName()) + " T1 mexes still to upgrade");
         else if (reactor !is null && u.circuitDef.CanBuild(reactor) && have < want) {
