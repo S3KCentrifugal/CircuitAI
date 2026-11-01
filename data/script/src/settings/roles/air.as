@@ -189,6 +189,16 @@ namespace Air {
             bool StrikeEarlyAttack = true; // ATTACK before the final approach MOVE
             float StrikeImmediatePriority = 4.0f; // visible local AFUS interrupts a committed raid; 0 disables
             float StrikeImmediateRadius = 1800.0f;
+            // Tight wind grids chain-react under bombs (owner 2026-11-01). A grid is
+            // WindGridMinimum winds linked within WindGridLink elmos (winds touch at
+            // 48), at least two deep both ways. A visible grid inside
+            // StrikeImmediateRadius takes over a raid's target unless that target's
+            // strike priority is >= WindGridPriority (AFUS 4, adv converter 3 keep
+            // theirs; labs 2, fusions 1, mexes and lone winds give way); at every new
+            // pick a grid wind ranks ahead of all other targets. 0 disables.
+            int WindGridMinimum = 12;
+            float WindGridLink = 72.0f;
+            float WindGridPriority = 2.5f;
             int RadarWaveSize = 20;
             // Mixed sweeps supersede the old continuous twenty-radar controller.
             bool ScoutSweepEnabled = true;

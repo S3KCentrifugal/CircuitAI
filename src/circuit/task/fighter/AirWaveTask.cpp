@@ -451,6 +451,12 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
 	const SEnemyData* best = nullptr;
 	float bestScore = -1.f;
     bool bestLocal = false;
+    // Grid winds outrank every other candidate of this pick (owner 2026-11-01:
+    // other winds stay valid targets but never ahead of a grid). Not for the
+    // "deepest" preference, which ranks by distance alone.
+    const bool gridRank = windGridMinimum > 0 && preference != 1;
+    if (gridRank) RefreshWindGrids();
+    bool bestGrid = false;
     requiredBombers = 0;
     int bestRequired = 0;
     float bestLocalAA = 0.f, bestRisk = 0.f;
@@ -543,9 +549,12 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
             score *= allowedStrikeDefs.at(e.cdef->GetId());
             if (local) score *= 8.f;
         }
-		if (air_geometry::PreferDistrictTarget(district, local, bestLocal, score, bestScore)) {
+        const bool grid = gridRank && e.cdef->IsWind() && WindGridOf(e.id) != nullptr;
+		if ((grid != bestGrid && best != nullptr) ? grid
+            : air_geometry::PreferDistrictTarget(district, local, bestLocal, score, bestScore)) {
 			bestScore = score;
             bestLocal = local;
+            bestGrid = grid;
 			best = &e;
             bestRequired = required; bestIngress = candidateRoute;
             bestLocalAA = localAA; bestRisk = routeRisk;
@@ -562,9 +571,20 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
     }
 	strikeTargetId = best->id;
 	aim = best->pos;
+    int gridWinds = 0;
+    if (const SWindGrid* grid = bestGrid ? WindGridOf(best->id) : nullptr) {
+        // Aim at the grid's central wind so the bombs chain both ways.
+        gridWinds = grid->count;
+        CEnemyInfo* centre = circuit->GetEnemyInfo(grid->centreId);
+        if (centre != nullptr && centre->GetUnit() != nullptr && !centre->IsHidden()
+            && !completedTargets.count(grid->centreId)) {
+            strikeTargetId = grid->centreId;
+            aim = centre->GetPos();
+        }
+    }
 	position = aim;
-	circuit->LOG("WAVE: strike target %s(%i) cost %.0f at (%.0f, %.0f), preference %i",
-			best->cdef->GetDef()->GetName(), best->id, best->cost, aim.x, aim.z, preference);
+	circuit->LOG("WAVE: strike target %s(%i) cost %.0f at (%.0f, %.0f), preference %i, grid winds %i of %zu grids",
+			best->cdef->GetDef()->GetName(), strikeTargetId, best->cost, aim.x, aim.z, preference, gridWinds, windGrids.size());
 	return true;
 }
 
@@ -937,12 +957,152 @@ void CAirWaveTask::SetAttackHandoffPolicy(bool earlyApproach, float priority, fl
     immediateStrikeRadius = std::clamp(radius, 0.f, 10000.f);
 }
 
+void CAirWaveTask::SetWindGridPolicy(int minimum, float link, float priority)
+{
+    if (!std::isfinite(link) || !std::isfinite(priority)) return;
+    windGridMinimum = std::clamp(minimum, 0, 1000);
+    windGridLink = std::clamp(link, 16.f, 400.f);
+    windGridPriority = std::max(0.f, priority);
+    windGridFrame = -100000;
+    windGrids.clear(); windGridIndex.clear();
+}
+
+/*
+ * Connected components of the known enemy winds, neighbours within
+ * windGridLink. Cost: one pass over the AI's enemy contacts, then a flood fill
+ * over winds only through link-sized buckets (each wind checks 9 buckets), so
+ * O(contacts + winds * local density). Rebuilt at most twice a second per
+ * wave; nothing is kept across frames but ids, resolved again at use.
+ */
+void CAirWaveTask::RefreshWindGrids()
+{
+    if (windGridMinimum <= 0) return;
+    auto* circuit = manager->GetCircuit();
+    const int frame = circuit->GetLastFrame();
+    if (frame - windGridFrame < FRAMES_PER_SEC / 2) return;
+    windGridFrame = frame;
+    windGrids.clear(); windGridIndex.clear();
+    std::vector<CEnemyInfo*> winds;
+    for (const auto& entry : circuit->GetEnemyInfos()) {
+        CEnemyInfo* enemy = entry.second;
+        const auto* data = enemy->GetData();
+        const CCircuitDef* def = enemy->GetCircuitDef();
+        if (def == nullptr || !def->IsWind() || def->IsMobile() || data->IsFake() || data->IsDead()
+            || data->IsDying() || enemy->IsHidden()) continue;
+        winds.push_back(enemy);
+    }
+    if (int(winds.size()) < windGridMinimum) return;
+    const auto cellKey = [this](const AIFloat3& p, int dx, int dz) {
+        return (static_cast<long long>(int(p.x / windGridLink) + dx) << 32)
+            ^ static_cast<long long>(static_cast<unsigned int>(int(p.z / windGridLink) + dz));
+    };
+    std::unordered_map<long long, std::vector<int>> cells;
+    for (int i = 0; i < int(winds.size()); ++i) cells[cellKey(winds[i]->GetPos(), 0, 0)].push_back(i);
+    const float linkSq = SQUARE(windGridLink);
+    std::vector<int> component(winds.size(), -1);
+    std::vector<int> members, open;
+    for (int seed = 0; seed < int(winds.size()); ++seed) {
+        if (component[seed] >= 0) continue;
+        members.clear(); open.assign(1, seed); component[seed] = seed;
+        while (!open.empty()) {
+            const int i = open.back(); open.pop_back();
+            members.push_back(i);
+            const AIFloat3& p = winds[i]->GetPos();
+            for (int dx = -1; dx <= 1; ++dx) for (int dz = -1; dz <= 1; ++dz) {
+                const auto cell = cells.find(cellKey(p, dx, dz));
+                if (cell == cells.end()) continue;
+                for (int j : cell->second) if (component[j] < 0 && p.SqDistance2D(winds[j]->GetPos()) <= linkSq) {
+                    component[j] = seed; open.push_back(j);
+                }
+            }
+        }
+        if (int(members.size()) < windGridMinimum) continue;
+        float minX = std::numeric_limits<float>::max(), minZ = minX, maxX = -minX, maxZ = -minX;
+        AIFloat3 sum;
+        bool visible = false;
+        for (int i : members) {
+            const AIFloat3& p = winds[i]->GetPos();
+            minX = std::min(minX, p.x); maxX = std::max(maxX, p.x);
+            minZ = std::min(minZ, p.z); maxZ = std::max(maxZ, p.z);
+            sum += p;
+            visible = visible || winds[i]->IsInLOS();
+        }
+        if (!air_geometry::WindGridQualifies(int(members.size()), maxX - minX, maxZ - minZ, windGridMinimum, windGridLink)) continue;
+        SWindGrid grid;
+        grid.count = int(members.size());
+        grid.centre = sum / float(members.size());
+        grid.visible = visible;
+        float nearest = std::numeric_limits<float>::max();
+        for (int i : members) {
+            const float d = grid.centre.SqDistance2D(winds[i]->GetPos());
+            if (d < nearest || (d == nearest && winds[i]->GetId() < grid.centreId)) { nearest = d; grid.centreId = winds[i]->GetId(); }
+        }
+        const int index = int(windGrids.size());
+        windGrids.push_back(grid);
+        for (int i : members) windGridIndex[winds[i]->GetId()] = index;
+    }
+}
+
+const CAirWaveTask::SWindGrid* CAirWaveTask::WindGridOf(int enemyId) const
+{
+    const auto it = windGridIndex.find(enemyId);
+    return it == windGridIndex.end() ? nullptr : &windGrids[it->second];
+}
+
+// A visible wind grid within reach interrupts any target ranked below
+// windGridPriority. Bombs on its central wind chain through the packed rows.
+bool CAirWaveTask::TryWindGridStrike(CEnemyInfo* current)
+{
+    if (windGridMinimum <= 0 || windGridPriority <= 0.f) return false;
+    RefreshWindGrids();
+    if (windGrids.empty()) return false;
+    if (current != nullptr && !current->IsHidden()) {
+        // Already on a grid: never reset the passes between its winds.
+        if (WindGridOf(current->GetId()) != nullptr) return false;
+        const CCircuitDef* def = current->GetCircuitDef();
+        const auto priority = def == nullptr ? allowedStrikeDefs.end() : allowedStrikeDefs.find(def->GetId());
+        if (priority != allowedStrikeDefs.end() && priority->second >= windGridPriority
+            && !def->IsMobile() && !def->IsAbleToFly()) return false;
+    }
+    auto* circuit = manager->GetCircuit();
+    const AIFloat3 centre = OperationCentre();
+    int bestIndex = -1;
+    float bestDistance = 0.f;
+    for (int i = 0; i < int(windGrids.size()); ++i) {
+        const SWindGrid& grid = windGrids[i];
+        if (!grid.visible || completedTargets.count(grid.centreId)) continue;
+        const float distance = centre.SqDistance2D(grid.centre);
+        if (distance > SQUARE(immediateStrikeRadius)) continue;
+        if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&grid](const auto& region) {
+            return grid.centre.SqDistance2D(region.first) <= SQUARE(region.second);
+        })) continue;
+        const SWindGrid* best = bestIndex < 0 ? nullptr : &windGrids[bestIndex];
+        if (best == nullptr || grid.count > best->count || (grid.count == best->count
+            && (distance < bestDistance || (distance == bestDistance && grid.centreId < best->centreId)))) {
+            bestIndex = i; bestDistance = distance;
+        }
+    }
+    if (bestIndex < 0) return false;
+    const SWindGrid grid = windGrids[bestIndex];
+    CEnemyInfo* target = circuit->GetEnemyInfo(grid.centreId);
+    if (target == nullptr || target->GetUnit() == nullptr || target->IsHidden()) return false;
+    const int previous = strikeTargetId;
+    if (operationPhase == 2 && current == nullptr && previous >= 0
+        && completedTargets.insert(previous).second) ++targetsDestroyed;
+    strikeTargetId = grid.centreId; aim = target->GetPos();
+    operationTargetHealth = 0.f;
+    if (!BeginOperationAttack("wind-grid")) return false;
+    circuit->LOG("WAVE: wind grid strike target=%i previous=%i winds=%i centre=(%.0f, %.0f) distance=%.0f",
+        strikeTargetId, previous, grid.count, grid.centre.x, grid.centre.z, std::sqrt(bestDistance));
+    return true;
+}
+
 bool CAirWaveTask::TryImmediateStrike()
 {
-    if (!committed || !offensive || operationPhase == 0 || immediateStrikePriority <= 0.f
-        || immediateStrikeRadius <= 0.f) return false;
+    if (!committed || !offensive || operationPhase == 0 || immediateStrikeRadius <= 0.f) return false;
     auto* circuit = manager->GetCircuit();
     CEnemyInfo* current = GetStrikeTarget();
+    if (immediateStrikePriority <= 0.f) return TryWindGridStrike(current);
     if (operationPhase == 2 && current != nullptr && current->IsInLOS() && !current->IsHidden()) {
         auto* def = current->GetCircuitDef();
         const auto priority = def == nullptr ? allowedStrikeDefs.end() : allowedStrikeDefs.find(def->GetId());
@@ -979,7 +1139,7 @@ bool CAirWaveTask::TryImmediateStrike()
             best = enemy; bestPriority = priority->second; bestDistance = distance;
         }
     }
-    if (best == nullptr) return false;
+    if (best == nullptr) return TryWindGridStrike(current);
     const int previous = strikeTargetId;
     // Preserve the ordinary disappeared-target accounting when acquisition
     // interrupts the dead-target branch, before replacing its identity.

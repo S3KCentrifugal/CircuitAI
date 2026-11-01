@@ -41,6 +41,14 @@ inline bool ImmediateStrikeCandidate(float priority, float minimum, bool visible
     return minimum > 0.f && priority >= minimum && visible && stationary
         && radius > 0.f && distanceSq >= 0.f && distanceSq <= radius * radius;
 }
+// A wind grid is a chain-reaction target: enough touching winds, at least two
+// deep both ways. A single row of winds is spread damage, not a grid.
+inline bool WindGridQualifies(int count, float spanX, float spanZ, int minimum, float link)
+{
+    if (minimum <= 0 || count < minimum || !std::isfinite(spanX) || !std::isfinite(spanZ)
+        || !std::isfinite(link) || link <= 0.f) return false;
+    return std::min(spanX, spanZ) >= link * .6f;
+}
 // Short cohort legs bound how far faster escorts can run ahead. A leg is
 // longer than the arrival disc, so successive arrivals require real progress.
 inline int CohortLegCount(float distance, float arrivalRadius)

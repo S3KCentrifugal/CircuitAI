@@ -15,6 +15,7 @@
 #include "task/fighter/FighterTask.h"
 
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace circuit {
@@ -74,6 +75,13 @@ public:
     void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
     void SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority, float immediateRadius);
+    /*
+     * Wind grids: minimum touching winds (0 disables), link distance between
+     * neighbours, and the strike priority a visible grid holds in flight
+     * (compared with AllowStrikeDef priorities). A grid wind also outranks
+     * every non-grid target when a new target is picked.
+     */
+    void SetWindGridPolicy(int minimum, float link, float priority);
     void AddTargetFallback(int preference);
     bool PickOperationTarget(const springai::AIFloat3& from, float minStaticCost, bool includePrimary = true);
     void AllowStrikeDef(CCircuitDef* def, float priority);
@@ -94,6 +102,15 @@ private:
     void IssueOperationLeg();
     bool BeginOperationAttack(const char* reason);
     bool TryImmediateStrike();
+    bool TryWindGridStrike(CEnemyInfo* current);
+    struct SWindGrid {
+        int count = 0;
+        int centreId = -1;               // the member nearest the centroid: the bombing aim
+        springai::AIFloat3 centre;
+        bool visible = false;            // any member in LOS now
+    };
+    void RefreshWindGrids();
+    const SWindGrid* WindGridOf(int enemyId) const;
     bool NextOperationTarget();
     bool IsOperationBomber(CCircuitUnit* unit) const;
     springai::AIFloat3 OperationCentre() const;
@@ -193,6 +210,12 @@ private:
     bool earlyAttackApproach = false;
     float immediateStrikePriority = 0.f;
     float immediateStrikeRadius = 0.f;
+    int windGridMinimum = 0;
+    float windGridLink = 72.f;
+    float windGridPriority = 0.f;
+    int windGridFrame = -100000;
+    std::vector<SWindGrid> windGrids;          // rebuilt at most twice a second
+    std::unordered_map<int, int> windGridIndex; // enemy id -> windGrids index
     springai::AIFloat3 assemblyPos;
     std::map<int, float> allowedStrikeDefs;
     std::set<int> operationBomberDefs;

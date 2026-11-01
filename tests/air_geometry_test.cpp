@@ -22,6 +22,10 @@ int main()
     assert(!ImmediateStrikeCandidate(4, 4, true, false, 100, 1800)); // mobile
     assert(!ImmediateStrikeCandidate(4, 4, true, true, 1801*1801, 1800));
     assert(!ImmediateStrikeCandidate(4, 4, true, true, 100, 0));
+    assert(WindGridQualifies(12, 48, 240, 12, 72));   // 2 x 6 touching winds
+    assert(!WindGridQualifies(11, 96, 96, 12, 72));   // too few
+    assert(!WindGridQualifies(12, 0, 528, 12, 72));   // one row of 12
+    assert(!WindGridQualifies(12, 48, 240, 0, 72));   // disabled
     // Cleanup admits support buildings but never confuses them with strategic
     // targets; mobile low-tier cleanup remains an explicit script opt-in.
     assert(OperationTargetClass(4, false, false, false, false, false));
