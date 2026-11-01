@@ -18,6 +18,7 @@
 #include "spring/SpringMap.h"
 
 #include "UnitDef.h"
+#include "Log.h"
 
 namespace circuit {
 
