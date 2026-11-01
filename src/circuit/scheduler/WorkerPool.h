@@ -43,12 +43,14 @@ public:
 	// False when the owner is not registered or a queued job already carries `key`.
 	bool Push(CScheduler* owner, SWorkItem item, jobs::Lane lane, std::uint64_t key);
 
+	// Fixed from construction (see the constructor): safe to size per-thread
+	// state from before the first Acquire.
 	int Threads() const { return maxThreads; }
 	std::size_t Queued();
 	std::size_t QueuedMax();  // high-water mark since the last call (telemetry)
 
 private:
-	CWorkerPool() = default;
+	CWorkerPool();
 	void StartThreads();
 	void StopThreads();
 	void WorkerThread(int num);

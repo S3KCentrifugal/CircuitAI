@@ -20,13 +20,19 @@ CWorkerPool& CWorkerPool::Instance()
 	return pool;
 }
 
+CWorkerPool::CWorkerPool()
+{
+	// Fixed for the process: CPathFinder sizes one MicroPather per worker from
+	// Threads() while the ally team initialises, before any scheduler acquires
+	// the pool (build four of D-431 computed it on acquire and worker 2 and up
+	// indexed past that array at frame 18).
+	const int cores = int(spring::thread::hardware_concurrency());
+	maxThreads = utils::clamp(cores - 1, 2, MAX_JOB_THREADS);
+}
+
 void CWorkerPool::Acquire(const std::shared_ptr<CScheduler>& owner)
 {
 	std::unique_lock<spring::mutex> lock(mutex);
-	if (instances == 0) {
-		const int cores = int(spring::thread::hardware_concurrency());
-		maxThreads = utils::clamp(cores - 1, 2, MAX_JOB_THREADS);
-	}
 	++instances;
 	owners[owner.get()] = owner;
 	queue.Register(owner.get());
