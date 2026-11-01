@@ -299,6 +299,62 @@ namespace RoleTech
 			+ " adv solar limit " + (adv is null ? -1 : aiEconomyMgr.GetEnergyLimit(adv)), 1);
 	}
 
+	// T3 rush opening (owner, 2026-10-14; ported 2026-10-22; forced 2026-10-25): on the
+	// t3rush plan the gantries build the side's T3RushArmada / T3RushCortex /
+	// T3RushLegion pair (Razorback + Vanguard, Shiva + Catapult, Daedalus + Myrmidon)
+	// in turn, T3RushUnitCount in all split evenly (5 of each) before anything else.
+	// The D-287 late latch does not cut the opening short (played: income 400 latched
+	// it after 2 Shivas and the gantry made 8 Catapults). A unit this gantry can never
+	// build gives its share to the other. While the opening is owed and a unit is only
+	// briefly unavailable, the gantry waits rather than starting other production.
+	int g_t3RushNext = 0;
+	int g_t3RushOrdered = 0;          // rush units ordered so far, every gantry together
+	array<int> g_t3RushEach = {0, 0}; // ordered per unit of the pair
+	IUnitTask@ Tech_T3RushProduce(CCircuitUnit@ gantry, const string &in side)
+	{
+		if (TechPlan::plan != "t3rush" || gantry is null || gantry.circuitDef is null) return null;
+		const int total = Global::RoleSettings::Tech::T3RushUnitCount;
+		if (total <= 0 || g_t3RushOrdered >= total) return null;   // released
+		array<string> pair;
+		if (side == "armada") pair = Global::RoleSettings::Tech::T3RushArmada;
+		else if (side == "cortex") pair = Global::RoleSettings::Tech::T3RushCortex;
+		else pair = Global::RoleSettings::Tech::T3RushLegion;
+		if (pair.length() == 0) return null;
+		if (g_t3RushEach.length() < pair.length()) g_t3RushEach.resize(pair.length());
+		// the units this gantry can build at all, the next in turn first; their shares of `total`
+		array<uint> order;
+		for (uint m = 0; m < pair.length(); ++m) {
+			const uint k = (uint(g_t3RushNext) + m) % pair.length();
+			CCircuitDef@ d = ai.GetCircuitDef(pair[k]);
+			if (d !is null && gantry.circuitDef.CanBuild(d)) order.insertLast(k);
+		}
+		if (order.length() == 0) return null;   // a water gantry: ordinary production
+		const int share = (total + int(order.length()) - 1) / int(order.length());
+		bool owed = false;
+		for (uint n = 0; n < order.length(); ++n)
+		{
+			const uint i = order[n];
+			if (g_t3RushEach[i] >= share) continue;
+			owed = true;
+			CCircuitDef@ d = ai.GetCircuitDef(pair[i]);
+			if (d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;   // TECH's start caps may hold combat units at 0
+			if (!d.IsAvailable(ai.frame)) continue;
+			IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, d, gantry.GetPos(ai.frame), 64.f));
+			if (t is null) continue;
+			g_t3RushNext = int((i + 1) % pair.length());
+			++g_t3RushEach[i];
+			if (TechHeavyChoice::IsMarauderClass(pair[i])) TechHeavyChoice::rushAdmitUntil = ai.frame + 180 * SECOND;   // INV-198: the opening's own
+			++g_t3RushOrdered;
+			GenericHelpers::LogUtil("[TECH][T3Rush] " + gantry.circuitDef.GetName() + " builds " + pair[i] + " (" + g_t3RushOrdered
+				+ " of " + total + "; " + g_t3RushEach[i] + " of " + share + " " + pair[i] + ")", 1);
+			if (g_t3RushOrdered >= total)
+				GenericHelpers::LogUtil("[TECH][T3Rush] " + g_t3RushOrdered + " ordered: gantry production released to ordinary weighting", 1);
+			return t;
+		}
+		if (!owed) { g_t3RushOrdered = total; return null; }   // every share filled
+		return aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND));   // owed but unavailable this moment: nothing else first
+	}
+
 	// D-068: the one income under which TECH's labs make no combat unit while the
 	// experimental build system is on. The legacy gates (the T2 rush's early gate,
 	// the bot-lab and vehicle-plant expansion gates) are raised to it, never
@@ -1047,15 +1103,27 @@ namespace RoleTech
             IUnitTask@ pending = aiFactoryMgr.GetPendingFactoryTask(u);
             if (pending !is null) return pending;
 			GenericHelpers::LogUtil("[TECH][Factory] Gantry detected ('" + facDef.GetName() + "')", 3);
+			// T3 rush opening (owner): the side's two units in turn, T3RushUnitCount in all
+			IUnitTask@ t3rush = Tech_T3RushProduce(u, side);
+			if (t3rush !is null) return t3rush;
             IUnitTask@ amphib = AmphibiousOps::Produce(u, botLabGate);
             if (amphib !is null) return amphib;
+			// owner, 2026-10-26: with a HeavyPair<Side> set the pair alternates from the
+			// gantry's first unit (after the t3rush units on that plan), whatever the income;
+			// one unit per ask (owner, 2026-10-27), so it goes Sol, Astraeus, Sol ... not five of each
+			if (TechHeavyChoice::HasPair(side))
+			{
+				IUnitTask @tPair = TechHeavyChoice::LateBatch(u, side, /*count*/ 1);
+				if (tPair !is null)
+					return tPair;
+			}
 			// If economy is very strong, queue a batch of signature experimentals.
 			// D-287: after the late latch the batch is the terrain's heavy (land:
 			// Thor-class, amphibious: Titan-class), the other heavy as fallback.
 			if (metalIncome > 200.0f)
 			{
 				IUnitTask @tSig = TechHeavyChoice::Late()
-					? TechHeavyChoice::LateBatch(u, side, /*count*/ 5)
+					? TechHeavyChoice::LateBatch(u, side, /*count*/ 1)   // owner, 2026-10-27: every pair batch is one unit
 					: Factory::EnqueueGantrySignatureBatch(u, side, /*count*/ 5, Task::Priority::HIGH);
 				if (tSig !is null)
 					return tSig;
@@ -1090,7 +1158,7 @@ namespace RoleTech
 		// D-109 (owner's rule): and keeps T1AirConstructorTarget of them: more than
 		// T1AirReleaseAbove carry the base so the T1 land constructors go forward
 		if (facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(side)
-			&& (TechChain::AirConstructors() == 0 || TechForward::T1AirCons() < Global::RoleSettings::Tech::T1AirConstructorTarget))
+			&& (TechChain::AirConstructors() == 0 || TechForward::T1AirCons() < Global::RoleSettings::Tech::T1AirConstructorTarget + TechGantry::ExtraAirCons()))
 		{
 			CCircuitDef @airCon = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(side));
 			if (airCon !is null && airCon.IsAvailable(ai.frame))
@@ -2096,6 +2164,11 @@ namespace RoleTech
 		// step 2: nothing under construction within build distance + the largest
 		// frame radius means no ordered scan below can find one
 		if (Tech_TurretNearFrame(u) is null) return null;
+		// GantryNanoFirst (owner, 2026-10-26): a gantry block short of its turrets: a turret frame in reach first
+		if (!nukeRush && TechGantry::ShortCluster() !is null) {
+			CCircuitUnit@ nanoFrame = aiBuilderMgr.FindUnfinishedFor(u, TechFactories::Nano());
+			if (nanoFrame !is null) return Tech_TurretRepair(nanoFrame, factorySide, Task::Priority::HIGH);
+		}
 		if (nukeRush) {
 			// A silo is not in TECH's ordinary economic assist list. Native
 			// fallback can refuse a large frame while metal is low, leaving
