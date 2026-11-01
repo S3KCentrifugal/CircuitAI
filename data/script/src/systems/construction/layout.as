@@ -83,10 +83,15 @@ namespace Layout {
     // retain their footprint through task failure, completion and destruction.
     // Failed terrain searches retry at most once per ten seconds per AI.
     int antiNukeSearchAfter = 0;
-    CCircuitUnit@ AntiNukeFrameInReach(CCircuitUnit@ u)
+    CCircuitUnit@ AntiNukeFrame()
     {
         CCircuitUnit@ frame = aiTerrainMgr.GetReservationUnit(aiTerrainMgr.GetLayoutInt("tech.antinuke.slot", -1));
-        if (frame is null || frame.GetBuildProgress() >= 1.0f) return null;
+        return frame is null || frame.GetBuildProgress() >= 1.0f ? null : frame;
+    }
+    CCircuitUnit@ AntiNukeFrameInReach(CCircuitUnit@ u)
+    {
+        CCircuitUnit@ frame = AntiNukeFrame();
+        if (frame is null) return null;
         const float reach = u.circuitDef.GetBuildDistance();
         return MapHelpers::SqDist(u.GetPos(ai.frame), frame.GetPos(ai.frame)) <= reach * reach ? frame : null;
     }

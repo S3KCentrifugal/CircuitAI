@@ -870,7 +870,21 @@ namespace Tech {
             /******************** ANTI-NUKE THRESHOLDS ********************/
             // Minimum economy thresholds to allow building anti-nuke defenses
             // and the minimum number of anti-nuke structures to maintain
-            int AntiNukeAfterSeconds = 10 * 60;
+            // First antinuke (rule defence.antinuke, experimental): eligible from
+            // 9:00 on its reserved nano pad at a natural T2 opening's income, to
+            // be armed by fourteen minutes (owner 2026-10-31). Frame to first
+            // interceptor took 2.5-4.5 min in natural openings. From 10:00 the
+            // T2 constructors sit on advanced fusions and the order came as late
+            // as 13:53. Later antinukes keep the Minimum* gates.
+            int AntiNukeAfterSeconds = 9 * 60;
+            float FirstAntiNukeMetalIncome = 20.0f;
+            float FirstAntiNukeEnergyIncome = 300.0f;
+            // Only if no interceptor is stocked by AntiNukeHoldFromSeconds: other
+            // build tasks run at BAR low priority (the antinuke's builders, reclaim
+            // and repairs stay high) until it is, at most until the second time.
+            int AntiNukeHoldFromSeconds = 11 * 60 + 30;
+            int AntiNukeBudgetUntilSeconds = 14 * 60;
+            float AntiNukeOrderRadius = 2000.0f;
             float MinimumMetalIncomeForAntiNuke = 100.0f;
             float MinimumEnergyIncomeForAntiNuke = 2000.0f;
             int MinimumAntiNukeCount = 1;

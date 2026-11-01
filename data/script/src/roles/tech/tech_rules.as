@@ -297,9 +297,17 @@ namespace TechRules {
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
     IUnitTask@ DoAntiNuke(Ctx@ c)
     {
+        // Its unfinished frame takes every free T2 constructor that can reach
+        // it, ahead of new growth: the bigger build-power share wins the metal
+        // or energy it stalls on, so the interceptor is stocked by fourteen.
+        CCircuitUnit@ frame = Layout::AntiNukeFrame();
+        if (frame !is null) {
+            if (!aiTerrainMgr.CanReachAt(c.u, frame.GetPos(ai.frame), c.u.circuitDef.GetBuildDistance())) return null;
+            return RoleTech::Tech_TurretRepair(frame, false, Task::Priority::HIGH);
+        }
         if (ai.frame < Global::RoleSettings::Tech::AntiNukeAfterSeconds * SECOND
-            || c.mi < Global::RoleSettings::Tech::MinimumMetalIncomeForAntiNuke
-            || c.ei < Global::RoleSettings::Tech::MinimumEnergyIncomeForAntiNuke) return null;
+            || c.mi < Global::RoleSettings::Tech::FirstAntiNukeMetalIncome
+            || c.ei < Global::RoleSettings::Tech::FirstAntiNukeEnergyIncome) return null;
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
         if (d is null || !c.u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)
             || EconomyHelpers::GetAntiNukeCount() > 0
@@ -308,6 +316,11 @@ namespace TechRules {
         if (slot < 0 || aiTerrainMgr.GetReservationState(slot) != 0) return null;
         const AIFloat3 p = aiTerrainMgr.GetReservationPos(slot);
         if (!aiTerrainMgr.CanReachAt(c.u, p, c.u.circuitDef.GetBuildDistance())) return null;
+        // A far constructor walks for a minute: for the first minute only one
+        // within AntiNukeOrderRadius of the pad takes the order.
+        const float near = Global::RoleSettings::Tech::AntiNukeOrderRadius;
+        if (ai.frame < (Global::RoleSettings::Tech::AntiNukeAfterSeconds + 60) * SECOND
+            && MapHelpers::SqDist(c.u.GetPos(ai.frame), p) > near * near) return null;
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH,
             d, p, 0.0f, true, 300 * SECOND));
         if (t !is null && !AiPinReservation(t, slot)) { aiBuilderMgr.AbortTask(t); return null; }
@@ -509,7 +522,7 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
-        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from ten minutes at sustained +100 metal/+2000 energy, on its reserved nano-range pad"));
+        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved nano-range pad; free T2 constructors assist its frame; armed by fourteen minutes"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));
         table.insertLast(Rule("nuke.afus",         CON_T2,       W0(), @DoNukeAfus,     "owner 2026-10-17: a nuke rush adds a silo after each completed advanced fusion (1 + AFUS, NukeLimit), one at a time, on the regular silo gates, packed on the base layout"));

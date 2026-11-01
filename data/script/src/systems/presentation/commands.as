@@ -583,7 +583,7 @@ namespace Commands {
         // and the native manager settings its InitHandler changed (CR-007).
         if (Global::AISettings::Role == AiRole::AIR) AirBuild::Leave();
         if (Global::AISettings::Role == AiRole::SEA) SeaBuild::Leave();
-        if (Global::AISettings::Role == AiRole::TECH) TechChain::LeaveNukeOpening();
+        if (Global::AISettings::Role == AiRole::TECH) { TechChain::LeaveNukeOpening(); TechChain::ReleaseAntiNukeBudget(); }
         aiBuilderMgr.ClearBuildRadii();
         aiBuilderMgr.ClearReclaimProtected();   // D-290: the incoming role's InitHandler sets its own
         if (Global::AISettings::Role == AiRole::SUPPORT) {
