@@ -1,4 +1,5 @@
 // FRONT nuclear silos in one tight grid (owner, 2026-10-30; Front::SiloGrid).
+// Gates (owner 2026-11-01): from 35 min at a 10 s minimum income of 175 metal and 5000 energy.
 //
 // When: from NukeMinSeconds of game time, once the 10 s minimum metal and energy income have
 // stayed at or above NukeMetalIncome / NukeEnergyIncome for NukeSustainSeconds without a break,
@@ -115,7 +116,9 @@ namespace FrontSiloGrid {
     // base is crossed by the lanes of the allies behind it; played: 8 lanes left no site), the one
     // farthest from any lane that still keeps the grid itself off every lane line. At most
     // SiloGridMaxTries reservations are attempted.
-    bool Reserve(CCircuitUnit@ u, CCircuitDef@ d, int cols, int rows)
+    // maxTier: 0 lane-clear and on our side, 1 off every lane line, 2 also toward the enemy, 3 also on a
+    // lane line (owner 2026-10-31: every FRONT builds; a pack on a lane is the last resort, the smallest first).
+    bool Reserve(CCircuitUnit@ u, CCircuitDef@ d, int cols, int rows, int maxTier)
     {
         const int limit = cols * rows;
         array<AIFloat3> allies = Lanes::AllyStarts(), enemies = Lanes::EnemyStarts();
@@ -135,7 +138,7 @@ namespace FrontSiloGrid {
             return false;
         }
         // candidates: centre, facing, lane distance, squared home distance, lane-clear
-        array<AIFloat3> candC; array<int> candF; array<float> candLane, candHome; array<bool> candClear;
+        array<AIFloat3> candC; array<int> candF; array<float> candLane, candHome; array<int> candTier;
         int offMap = 0, far = 0, onLane = 0, refused = 0, unbuildable = 0, unreachable = 0, forward = 0;
         const float enemyD = enemy.x < 0.0f ? 0.0f : sqrt(MapHelpers::SqDist(home, enemy));
         const AIFloat3 origin0 = centre.x >= 0.0f ? centre : home;
@@ -156,10 +159,12 @@ namespace FrontSiloGrid {
                     if (MapHelpers::SqDist(c, home) > Global::RoleSettings::Front::SiloGridMaxHomeDistance * Global::RoleSettings::Front::SiloGridMaxHomeDistance) { ++far; continue; }
                     if (c.x < own || c.z < own || c.x >= AiTerrainWidth() - own || c.z >= AiTerrainHeight() - own) { ++offMap; continue; }
                     // not toward the enemy: played, grids 4-5 km out stood mid-map and no constructor ever started one
-                    if (enemy.x >= 0.0f && sqrt(MapHelpers::SqDist(c, enemy)) < enemyD - Global::RoleSettings::Front::SiloGridMaxForward) { ++forward; continue; }
+                    const bool fwd = enemy.x >= 0.0f && sqrt(MapHelpers::SqDist(c, enemy)) < enemyD - Global::RoleSettings::Front::SiloGridMaxForward;
+                    if (fwd && maxTier < 2) { ++forward; continue; }
                     float laneD = 1e9f;
                     for (uint l = 0; l < laneA.length(); ++l) laneD = AiMin(laneD, sqrt(SqDistSegment(c, laneA[l], laneB[l])));
-                    if (laneD < own) { ++onLane; continue; }   // the grid itself would stand on a lane line
+                    if (laneD < own && maxTier < 3) { ++onLane; continue; }   // the grid itself would stand on a lane line
+                    const int tier = laneD < own ? 3 : (fwd ? 2 : (laneD >= clear ? 0 : 1));
                     if (!aiTerrainMgr.CanReachAt(u, c, u.circuitDef.GetBuildDistance() + halfAcross)) { ++unreachable; continue; }
                     if (!aiTerrainMgr.CanReserveArea(c, f, halfAcross, halfAlong)) { ++refused; continue; }
                     array<AIFloat3>@ at = SlotsAt(c, f, cols, rows, limit, w, dep);
@@ -167,7 +172,7 @@ namespace FrontSiloGrid {
                     for (uint s = 0; s < at.length() && ok; ++s) ok = aiTerrainMgr.CanReserveBuilding(d, at[s], f);
                     if (!ok) { ++unbuildable; continue; }
                     candC.insertLast(c); candF.insertLast(f); candLane.insertLast(laneD);
-                    candHome.insertLast(MapHelpers::SqDist(c, home)); candClear.insertLast(laneD >= clear);
+                    candHome.insertLast(MapHelpers::SqDist(c, home)); candTier.insertLast(tier);
                 }
             }
         }
@@ -177,8 +182,8 @@ namespace FrontSiloGrid {
             uint at = 0;
             while (at < order.length()) {
                 const int j = order[at];
-                const bool before = (candClear[i] != candClear[j]) ? candClear[i]
-                    : (candClear[i] ? candHome[i] < candHome[j] : candLane[i] > candLane[j]);
+                const bool before = (candTier[i] != candTier[j]) ? candTier[i] < candTier[j]
+                    : (candTier[i] == 0 ? candHome[i] < candHome[j] : candLane[i] > candLane[j]);
                 if (before) break;
                 ++at;
             }
@@ -211,7 +216,7 @@ namespace FrontSiloGrid {
             GenericHelpers::LogUtil("[FRONT][SiloGrid] reserved " + cols + "x" + rows + " " + d.GetName() + " block " + zones.length() + " at ("
                 + int(candC[i].x) + ", " + int(candC[i].z) + ") facing " + f + ", " + int(sqrt(candHome[i]))
                 + " from home, " + int(candLane[i]) + " from the nearest allied lane"
-                + (candClear[i] ? "" : " (no lane-clear site: the farthest)") + ", zone " + zones[zones.length() - 1] + "; "
+                + (candTier[i] == 0 ? "" : candTier[i] == 1 ? " (no lane-clear site: the farthest)" : candTier[i] == 2 ? " (toward the enemy)" : " (on a lane line: last resort)") + ", zone " + zones[zones.length() - 1] + "; "
                 + candC.length() + " candidates (skipped " + offMap + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + onLane + " on lanes, "
                 + unreachable + " unreachable, " + refused + " refused by layouts, " + unbuildable + " unbuildable), "
                 + tried + " tried", 1);
@@ -240,9 +245,14 @@ namespace FrontSiloGrid {
         // pinned slot reads free until it is served (played: "silo 1 of 8" on all eight slots, 10 s apart)
         if (pending !is null && !pending.IsDead()) return null;
         @pending = null;
-        if (!EconomyHelpers::ShouldRushNuke(Economy::GetMinMetalIncomeLast10s(), Economy::GetMinEnergyIncomeLast10s(),
-                queued, total, Global::RoleSettings::Front::NukeLimit,
-                Global::RoleSettings::Front::NukeMetalIncome, Global::RoleSettings::Front::NukeEnergyIncome)) return null;
+        const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
+        if (!EconomyHelpers::ShouldRushNuke(mi, ei, queued, total, Global::RoleSettings::Front::NukeLimit,
+                Global::RoleSettings::Front::NukeMetalIncome, Global::RoleSettings::Front::NukeEnergyIncome)) {
+            if (total < Global::RoleSettings::Front::NukeLimit)
+                Held("10 s min income +" + int(mi) + " metal of " + int(Global::RoleSettings::Front::NukeMetalIncome)
+                    + ", +" + int(ei) + " energy of " + int(Global::RoleSettings::Front::NukeEnergyIncome));
+            return null;
+        }
         if (!capsRaised) {
             UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), Global::RoleSettings::Front::NukeLimit);
             capsRaised = true;
@@ -256,9 +266,14 @@ namespace FrontSiloGrid {
             if (ai.frame < nextSearch) return null;
             bool reserved = false;
             const array<int>@ shapes = Global::RoleSettings::Front::SiloGridShapes;
+            // every shape off the lanes first; only then the smallest shapes on a lane line
             for (uint k = 0; k + 1 < shapes.length() && !reserved; k += 2) {
                 if (shapes[k] * shapes[k + 1] > Global::RoleSettings::Front::NukeLimit - int(slots.length())) continue;
-                reserved = Reserve(u, d, shapes[k], shapes[k + 1]);
+                reserved = Reserve(u, d, shapes[k], shapes[k + 1], 2);
+            }
+            for (int k = int(shapes.length()) - 2; k >= 0 && !reserved; k -= 2) {
+                if (shapes[k] * shapes[k + 1] > Global::RoleSettings::Front::NukeLimit - int(slots.length())) continue;
+                reserved = Reserve(u, d, shapes[k], shapes[k + 1], 3);
             }
             if (!reserved) {
                 nextSearch = ai.frame + AiMin(Global::RoleSettings::Front::SiloGridRetryMaxSeconds,

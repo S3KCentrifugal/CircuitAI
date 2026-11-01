@@ -26,6 +26,7 @@
 #define SMILEY_DEDUPE	(FRAMES_PER_SEC * 5)  // D-124: the stockpile watch draws only if the event did not within this
 #define SMILEY_DEDUPE_EVENT	(FRAMES_PER_SEC * 1)  // D-124: two launch signals this close are one launch
 #include "CircuitAI.h"
+#include "util/GameAttribute.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
 #include "WeaponMount.h"
@@ -613,13 +614,28 @@ bool CSuperTask::CanAimStrategic(CCircuitUnit* unit, const AIFloat3& pos) const
 	return true;
 }
 
+/*
+ * One overnuke per ally team (owner 2026-11-01): the silos of every allied BARb
+ * (TECH's, AIR's, FRONT's grid) count towards the breakpoints, stock the salvo
+ * and stop together. fn(owner AI, its super task, the silo). A walk over the
+ * allied AIs' SUPER tasks - a handful each.
+ */
+template<typename F> static void ForEachAllyNukeSilo(CCircuitAI* circuit, F&& fn)
+{
+	for (CCircuitAI* ai : circuit->GetGameAttribute()->GetCircuits()) {
+		if (!ai->IsInitialized() || (ai->GetAllyTeamId() != circuit->GetAllyTeamId())) continue;
+		for (IFighterTask* task : ai->GetMilitaryManager()->GetTasks(IFighterTask::FightType::SUPER)) {
+			const auto& assignees = task->GetAssignees();
+			if (assignees.empty() || !CSuperTask::IsNukeSilo((*assignees.begin())->GetCircuitDef())) continue;
+			fn(ai, static_cast<CSuperTask*>(task), *assignees.begin());
+		}
+	}
+}
+
 int CSuperTask::CountNukeSilos() const
 {
 	int count = 0;
-	for (const IFighterTask* task : manager->GetCircuit()->GetMilitaryManager()->GetTasks(IFighterTask::FightType::SUPER)) {
-		const auto& assignees = task->GetAssignees();
-		if (!assignees.empty() && IsNukeSilo((*assignees.begin())->GetCircuitDef())) ++count;
-	}
+	ForEachAllyNukeSilo(manager->GetCircuit(), [&count](CCircuitAI*, CSuperTask*, CCircuitUnit*) { ++count; });
 	return count;
 }
 
@@ -683,16 +699,8 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	}
 	if (!scan()) return false;
 	// Second breakpoint (owner 2026-10-30): with overnuke_team_silos finished silos across
-	// every allied BARb, the roll is overnuke_team_min..max. One walk over the allied units,
-	// once per new target (a few times a game).
-	int teamSilos = 0;
-	if (policy.overnukeTeamSilos > 0) {
-		const auto& aiTeams = circuit->GetAllyTeam()->GetTeamIds();
-		for (const auto& [id, ally] : circuit->GetAllyTeam()->GetFriendlyUnits()) {
-			if ((ally->GetCircuitDef() != nullptr) && IsNukeSilo(ally->GetCircuitDef())
-				&& (aiTeams.count(ally->GetUnit()->GetTeam()) != 0) && !ally->GetUnit()->IsBeingBuilt()) ++teamSilos;
-		}
-	}
+	// every allied BARb, the roll is overnuke_team_min..max. CountNukeSilos already counts them.
+	const int teamSilos = silos;
 	const bool teamRoll = (policy.overnukeTeamSilos > 0) && (teamSilos >= policy.overnukeTeamSilos);
 	const int lo = teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
 	const int hi = teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
@@ -714,7 +722,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 /*
  * Salvo (owner 2026-10-30). While the overnuke stocks, every silo that reaches
  * the target holds fire. Each of their updates (one per silo every
- * TARGET_DELAY) sums the stock of the reaching silos - a walk over our own
+ * TARGET_DELAY) sums the stock of the reaching silos - a walk over the allied AIs'
  * SUPER tasks, a handful - and opens fire once it reaches the roll (capped by
  * what they can hold), the timeout runs out, or a reaching silo is hit. At the
  * release the scan runs once more: when scouting has found a better aim point
@@ -729,18 +737,15 @@ bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
 	const AIFloat3 at(over.Pos().x, 0.f, over.Pos().z);
 	int stocked = 0, reaching = 0;
 	bool hit = false;
-	for (const IFighterTask* task : militaryMgr->GetTasks(IFighterTask::FightType::SUPER)) {
-		const auto& assignees = task->GetAssignees();
-		if (assignees.empty()) continue;
-		CCircuitUnit* silo = *assignees.begin();
+	ForEachAllyNukeSilo(circuit, [&](CCircuitAI*, CSuperTask*, CCircuitUnit* silo) {
 		CCircuitDef* sdef = silo->GetCircuitDef();
-		if (!IsNukeSilo(sdef) || (silo->GetPos(frame).SqDistance2D(at) >= SQUARE(sdef->GetMaxRange()))) continue;
+		if (silo->GetPos(frame).SqDistance2D(at) >= SQUARE(sdef->GetMaxRange())) return;
 		++reaching;
 		stocked += std::max(0, silo->GetUnit()->GetStockpile());
 		if (policy.overnukeFireBelowHealth > 0.f) {
 			hit = hit || (silo->GetUnit()->GetHealth() < policy.overnukeFireBelowHealth * silo->GetUnit()->GetMaxHealth());
 		}
-	}
+	});
 	const int need = std::min(over.Goal(), policy.overnukeStockCap * std::max(1, reaching));
 	const strategic::SalvoGate gate = strategic::SalvoRelease(stocked, need, frame, over.Since(),
 			policy.overnukeStockFrames, hit);
@@ -767,17 +772,12 @@ bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
  */
 void CSuperTask::StopNukeSilos()
 {
-	CCircuitAI* circuit = manager->GetCircuit();
-	for (IFighterTask* task : circuit->GetMilitaryManager()->GetTasks(IFighterTask::FightType::SUPER)) {
-		const auto& assignees = task->GetAssignees();
-		if (assignees.empty() || !IsNukeSilo((*assignees.begin())->GetCircuitDef())) continue;
-		CCircuitUnit* silo = *assignees.begin();
-		CSuperTask* st = static_cast<CSuperTask*>(task);
-		TRY_UNIT(circuit, silo, silo->CmdStop();)
+	ForEachAllyNukeSilo(manager->GetCircuit(), [](CCircuitAI* owner, CSuperTask* st, CCircuitUnit* silo) {
+		TRY_UNIT(owner, silo, silo->CmdStop();)
 		st->SetTarget(nullptr);
 		st->isTargetOverride = false;
 		st->state = State::ROAM;
-	}
+	});
 }
 
 bool CSuperTask::SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef)
@@ -1057,6 +1057,7 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 		const int scouts = over.Scouts();
 		const bool salvo = over.Salvo();
 		if (over.Count({aim.x, aim.z}, frame, policy.repeatFrames, policy.overnukeScoutEvery)) {
+			if (over.Scouts() > scouts) circuit->GetMilitaryManager()->NoteOvernukeScout();  // our launch: we ask AIR
 			circuit->LOG("NUKE: overnuke launch %i of %i from %s(%i)%s", over.Fired(), over.Goal(),
 					d->GetDef()->GetName(), unit->GetId(), (over.Scouts() > scouts) ? ": scouts asked" : "");
 			if (salvo && over.Active()) {

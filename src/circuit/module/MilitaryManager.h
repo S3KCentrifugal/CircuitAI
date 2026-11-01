@@ -277,11 +277,13 @@ public:
 		int overnukeTeamMax = 30;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
-	strategic::Overnuke& GetOvernuke() { return overnuke; }
+	strategic::Overnuke& GetOvernuke();  // the ally team's (CAllyTeam::GetOvernuke)
 	// Script reads: a new scout request is a rise in GetOvernukeScouts()
-	int GetOvernukeScouts() const { return overnuke.Scouts(); }
+	// Only the AI whose launch raised the ally team's scout count asks AIR: one package.
+	int GetOvernukeScouts() const { return overnukeScouts; }
+	void NoteOvernukeScout() { ++overnukeScouts; }
 	springai::AIFloat3 GetOvernukePos() const;
-	float GetOvernukeRadius() const { return overnuke.Radius(); }
+	float GetOvernukeRadius() const;
 	// Nuke rush scouting (owner 2026-10-28): the latest aim point the nuclear
 	// scan chose and its blast radius; x < 0 before the first one
 	void SetNuclearAim(const springai::AIFloat3& pos, float radius) { nuclearAim = pos; nuclearAimRadius = radius; }
@@ -585,7 +587,7 @@ private:
 	SBomberInfo bomberInfo;
 	SStockInfo stockInfo;
 	SNuclearInfo nuclearInfo;
-	strategic::Overnuke overnuke;
+	int overnukeScouts = 0;
 	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearAimRadius = 0.f;
 	std::array<debug::Strike, debug::_WEAPONS_> debugStrikes;
