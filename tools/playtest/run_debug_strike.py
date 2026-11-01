@@ -61,6 +61,10 @@ def main():
     p.add_argument('--lol-cutoff', type=float, default=34, help='minute after which a missing cannon is supplied')
     p.add_argument('--seed', default='31337')
     p.add_argument('--stage-only', action='store_true')
+    p.add_argument('--goal-pos', default='', help='x,z for the goal|pos step (default: the eco start)')
+    p.add_argument('--goal-smoke', type=float, default=0, metavar='MINUTE',
+                   help='instead of the strikes: from MINUTE, goal|pos at the eco start 60 s, off, goal|player|<host> 90 s, off '
+                        '(widgets/debug_goal_fixture.lua; results in the AI log "DEBUG: goal" lines)')
     a = p.parse_args()
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
     from playtest import map_spots, running_pids
@@ -80,9 +84,13 @@ def main():
         'Global::RoleSettings::Tech::NukeRushScoutSeconds = 60 * 60;'])
     copy_data(a.data, eco, ECO_MAIN, ['Global::LolCannon::Enabled = false;', 'Global::RoleSettings::Tech::NukeLimit = 0;'])
     check = d / 'checks.json'
-    check.write_text(json.dumps({'stop_minute': a.minutes, 'expect': [
-        {'key': 'strike1', 'pattern': r'\[DebugTest\] RESULT nuke-pos', 'by_minute': a.minutes, 'scope': 'any'},
-        {'key': 'done', 'pattern': r'\[DebugTest\] DONE all strikes', 'by_minute': a.minutes, 'scope': 'any'}],
+    if a.goal_smoke:
+        a.minutes = min(a.minutes, a.goal_smoke + 6)
+    expect = ([{'key': 'goal', 'pattern': r'DEBUG: goal started', 'by_minute': a.minutes, 'scope': 'any'},
+               {'key': 'done', 'pattern': r'\[DebugGoal\] DONE', 'by_minute': a.minutes, 'scope': 'any'}] if a.goal_smoke else
+              [{'key': 'strike1', 'pattern': r'\[DebugTest\] RESULT nuke-pos', 'by_minute': a.minutes, 'scope': 'any'},
+               {'key': 'done', 'pattern': r'\[DebugTest\] DONE all strikes', 'by_minute': a.minutes, 'scope': 'any'}])
+    check.write_text(json.dumps({'stop_minute': a.minutes, 'expect': expect,
         'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception', 'scope': 'any'}]}, indent=2))
     cmd = [sys.executable, str(HERE / 'playtest.py')]
     stage = cmd + ['stage', '--dir', str(d), '--dll', a.dll, '--data', str(striker), '--map', map_name,
@@ -92,7 +100,7 @@ def main():
                    '--modoption', 'dynamiccheats=0', '--modoption', 'deathmode=neverend',
                    '--ai-option', 'profile=experimental_balanced', '--ai-option', 'random_seed=' + a.seed,
                    '--mode', 'fast', '--speed', '20', '--minutes', str(a.minutes), '--headless', '--lean-render',
-                   '--extra-widget', str(HERE / 'widgets/debug_strike_fixture.lua')]
+                   '--extra-widget', str(HERE / ('widgets/debug_goal_fixture.lua' if a.goal_smoke else 'widgets/debug_strike_fixture.lua'))]
     subprocess.run(stage, cwd=ROOT, check=True)
     # the host plays: not a spectator, on its own ally team, its commander on the east SUPPORT spot
     script = d / 'script.txt'
@@ -112,6 +120,9 @@ def main():
         'return {startA={%d,%d}, startB={%d,%d},\n' % (west[0], west[1], east[0], east[1]) +
         '        nukeLaunches=3, nukePosSec=900, nukePlayerSec=720, lolSec=120, lolRange=5750, lolRadius=150,\n'
         '        siloCutoffMin=%s, lolCutoffMin=%s, strikeScoutWait=240, baseSettleSec=120}\n' % (a.silo_cutoff, a.lol_cutoff))
+    (d / 'LuaUI/Config/debug_goal.lua').write_text(
+        'return {startA={%d,%d}, startB={%d,%d}, startMin=%s, posSec=60, playerSec=90, armyA={armstump=12, armpw=8}%s}\n'
+        % (west[0], west[1], east[0], east[1], a.goal_smoke or 10, (', goalPos={%s}' % a.goal_pos) if a.goal_pos else ''))
     (d / 'scenario.json').write_text(json.dumps({
         'dll': a.dll, 'map': map_name, 'striker': {'team': 0, 'spot': west, 'bonus': a.bonus, 'data': str(striker),
             'overrides': 'roll pinned to NUKE_RUSH (no spam), lolcannon gate 120 m/s and 1500 E/s, 6 scout planes for 60 min'},
