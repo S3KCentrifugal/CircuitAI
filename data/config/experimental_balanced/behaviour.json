@@ -1,6 +1,6 @@
     // Mono-space font required
 	{
-"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 10, "overnuke_max": 25, "overnuke_team_silos": 8, "overnuke_team_min": 15, "overnuke_team_max": 30, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
+"nuclear": {"structures_only": true, "repeat_seconds": 300, "repeat_radius": 0, "overnuke_silos": 3, "overnuke_min": 8, "overnuke_max": 14, "overnuke_team_silos": 8, "overnuke_team_min": 28, "overnuke_team_max": 36, "overnuke_stock": true, "overnuke_stock_seconds": 900, "overnuke_fire_below_health": 0.5},
 // D-296: non-spam land scouts raid the enemy backline (systems/combat/scout_raid.as).
 // Read once per AI by ScoutRaid::Active(); absent or false keeps native scouting.
 "scout_raid": {"enabled": true},
