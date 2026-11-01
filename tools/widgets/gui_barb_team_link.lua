@@ -3318,6 +3318,7 @@ local MAX_EVENTS = 120
 local QUERY_INTERVAL_FRAMES = 1800
 local WIN_W, WIN_H = 340, 590   -- unscaled px (560: room for the Landmarks rows)
 local LAUNCHER = 26             -- unscaled px
+local DEBUG_W, DEBUG_H = 220, 200   -- the debug window, unscaled px
 
 local C = {
 	onSurface        = { 0.93, 0.93, 0.93, 1 },
@@ -3388,6 +3389,15 @@ local dragging = nil             -- { mx, my, offX, offY } while the header is d
 local hit = {}                   -- rebuilt every draw: { x1, y1, x2, y2, id, action, tooltip }
 local aggressionDrag
 local hoverId, pressedId = nil, nil
+-- Debug strikes (owner 2026-10-31, branch debug-widget-test): the "debug"
+-- button under the aggression slider opens a window that aims every hosted
+-- AI's nuke silos, or its lolcannons in range, at a map position or a player
+-- (barb|debug, data/script/src/systems/presentation/debug_strike.as).
+local debugOpen = false
+local debugWin = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+local debugFields = { x = "", y = "", player = "" }
+local debugFocus = nil           -- "x", "y" or "player" while that field takes the keyboard
+local debugOn = { nuke = false, lol = false }
 
 local ais = {}                   -- teamId -> { teamId, name, color, allyTeam, roster, lastReply, replyKind }
 local aiOrder = {}
@@ -3505,6 +3515,86 @@ local function requestAggression(teamId, value)
     -- Release-to-send: dragging is local preview, one targeted message at the
     -- end. The AI reply owns the displayed value; there is no polling/relay.
     return send(teamId, string.format("barb|aggression|%d|%.4f", teamId, value))
+end
+
+-- ---------------------------------------------------------------- debug strikes
+
+local function teamLabel(t)
+	local _, name = spGetAIInfo(t)
+	if name then return string.format("team %d (%s)", t, name) end
+	local _, leader = Spring.GetTeamInfo(t, false)
+	local pname = leader and Spring.GetPlayerInfo(leader, false)
+	return pname and string.format("team %d (%s)", t, pname) or string.format("team %d", t)
+end
+
+local function playerLabel(p)
+	local name = Spring.GetPlayerInfo(p, false)
+	return name and string.format("player %d (%s)", p, name) or string.format("player %d", p)
+end
+
+-- "nuke" or "lol": the first press sends the fields' strike to every AI this
+-- host may command, the second turns it off. x and y (the map's x and z, in
+-- elmos) win over #; # is a player id (not a spectator), sent only to the AIs
+-- that are enemies of the team the player plays. Units carry only their team,
+-- so each AI resolves the player to that team itself (engine GetPlayerTeam).
+local function debugStrike(weapon)
+	local ids = {}
+	for _, id in ipairs(aiOrder) do if mayCommand(id) then ids[#ids + 1] = id end end
+	if #ids == 0 then addEvent("Debug: no AI hosted here to command", "warn"); return end
+	if debugOn[weapon] then
+		for _, id in ipairs(ids) do send(id, string.format("barb|debug|%d|%s|off", id, weapon)) end
+		debugOn[weapon] = false
+		addEvent(string.format("Debug %s: off (%d AI%s)", weapon, #ids, #ids == 1 and "" or "s"), "info")
+		return
+	end
+	local payload, what
+	if debugFields.x ~= "" or debugFields.y ~= "" then
+		local x, z = tonumber(debugFields.x), tonumber(debugFields.y)
+		if not (x and z) then addEvent("Debug: enter both x and y", "warn"); return end
+		if x < 0 or z < 0 or x > Game.mapSizeX or z > Game.mapSizeZ then
+			addEvent(string.format("Debug: (%d, %d) is off the map (%d x %d)", x, z, Game.mapSizeX, Game.mapSizeZ), "warn")
+			return
+		end
+		payload = string.format("pos|%d|%d", mathFloor(x + 0.5), mathFloor(z + 0.5))
+		what = string.format("(%d, %d)", mathFloor(x + 0.5), mathFloor(z + 0.5))
+	elseif debugFields.player ~= "" then
+		local p = tonumber(debugFields.player)
+		local name, spec, t, _
+		if p and p == mathFloor(p) then name, _, spec, t = Spring.GetPlayerInfo(p, false) end
+		if not name or spec or not t then
+			addEvent("Debug: # must be the player id of a player (not a spectator) in this game", "warn"); return
+		end
+		local enemies = {}
+		for _, id in ipairs(ids) do if id ~= t and not spAreTeamsAllied(id, t) then enemies[#enemies + 1] = id end end
+		if #enemies == 0 then addEvent(string.format("Debug: no hosted AI is an enemy of %s", playerLabel(p)), "warn"); return end
+		ids = enemies
+		payload = string.format("player|%d", p)
+		what = string.format("%s, %s", playerLabel(p), teamLabel(t))
+	else
+		addEvent("Debug: enter x and y, or a player id in #", "warn"); return
+	end
+	for _, id in ipairs(ids) do send(id, string.format("barb|debug|%d|%s|%s", id, weapon, payload)) end
+	debugOn[weapon] = true
+	addEvent(string.format("Debug %s: %s by %d AI%s", weapon, what, #ids, #ids == 1 and "" or "s"), "ok")
+end
+
+-- one AI's state for one weapon (CMilitaryManager::GetDebugStrikeState), readable
+local function debugStateText(weapon, s)
+	local w = {}
+	for word in string.gmatch(s or "", "%S+") do w[#w + 1] = word end
+	local units = (weapon == "nuke") and "silo" or "cannon"
+	local function n(v, unit) v = tonumber(v) or 0; return string.format("%d %s%s", v, unit, v == 1 and "" or "s") end
+	if w[1] == "pos" then
+		return string.format("(%s, %s), %s%s", w[2] or "?", w[3] or "?", n(w[4], units), weapon == "nuke" and (", " .. n(w[5], "launch")) or "")
+	elseif w[1] == "player" then
+		return string.format("%s, %s%s", playerLabel(tonumber(w[2]) or -1), n(w[4], units), weapon == "nuke" and (", " .. n(w[5], "launch")) or "")
+	elseif w[1] == "team" then
+		return string.format("%s, %s%s", teamLabel(tonumber(w[2]) or -1), n(w[3], units), weapon == "nuke" and (", " .. n(w[4], "launch")) or "")
+	elseif w[1] == "done" then
+		local who = w[4] and playerLabel(tonumber(w[4]) or -1) or teamLabel(tonumber(w[2]) or -1)
+		return string.format("%s done after %s", who, n(w[3], "launch"))
+	end
+	return "off"
 end
 
 local function dragAggression(mx)
@@ -4898,6 +4988,7 @@ function widget:Shutdown()
 	if WG.guishader then
 		WG.guishader.RemoveRect("barblink")
 		WG.guishader.RemoveRect("barblinklauncher")
+		WG.guishader.RemoveRect("barblinkdebug")
 	end
 end
 
@@ -5141,6 +5232,18 @@ local function onAIMessage(aiTeam, dataStr)
         if delta and delta>=-1 and delta<=1 and automatic and automatic>=-1 and automatic<=1 then
             e.aggression, e.automaticAggression=delta,automatic
         end
+	elseif topic == "debug" and e then
+		e.debugNuke, e.debugLol = p[5] or "off", p[6] or "off"
+		-- a team nuke strike ends by itself: the button is off once no AI runs one
+		if string.sub(e.debugNuke, 1, 4) == "done" then
+			addEvent(string.format("Team %d: nuke strike %s", sender, debugStateText("nuke", e.debugNuke)), "ok")
+			local running = false
+			for _, a in pairs(ais) do
+				local w = a.debugNuke and string.match(a.debugNuke, "^(%a+)")
+				if w == "pos" or w == "team" or w == "player" then running = true end
+			end
+			if not running then debugOn.nuke = false end
+		end
 	elseif topic == "role" and e then
 		local role, status = p[5] or "?", p[6] or ""
 		e.lastReply = string.format("%s: %s", role, status)
@@ -5645,6 +5748,10 @@ local function drawWindow()
             requestAggression(e.teamId,0)
         end,"Reset this AI's aggression offset to zero",false,cmd)
         cy=cy-px(25)
+        labelButton(left,cy-px(18),left+px(70),cy,nil,"debug","debugOpen",function()
+            playClick(); debugOpen=not debugOpen; if not debugOpen then debugFocus=nil end
+        end,"Debug strikes: nuke or lolcannon fire at a map position or a player",debugOpen)
+        cy=cy-px(23)
 		local replyColor = C.onSurfaceVariant
 		if e.replyKind == "ok" then replyColor = C.ok elseif e.replyKind == "warn" then replyColor = C.warn end
 		text(font, fitText(font, e.lastReply and ("reply: " .. e.lastReply) or (cmd and "pick a role to switch this AI" or "read-only: this AI is not hosted by you"), px(8.5), w),
@@ -5676,6 +5783,98 @@ local function drawWindow()
 	end
 end
 
+-- the debug window: left of the main window (right of it when the left is short)
+local function placeDebug()
+	local gap = px(4)
+	local w, h = px(DEBUG_W), px(DEBUG_H)
+	local x2 = win.x1 - gap
+	if x2 - w < gap then x2 = mathMin(vsx - gap, win.x2 + gap + w) end
+	local y2 = mathMax(h + gap, mathMin(vsy - gap, win.y2))
+	debugWin.x1, debugWin.y1, debugWin.x2, debugWin.y2 = x2 - w, y2 - h, x2, y2
+end
+
+local function debugField(x1, y1, x2, y2, key, label, tip)
+	local my = y1 + (y2 - y1) * 0.5
+	text(font2, label, x1, my - px(3.4), px(9), "o", C.onSurfaceVariant)
+	local bx1 = x1 + px(12)
+	local focused = (debugFocus == key)
+	roundRect(bx1, y1, x2, y2, px(3), C.surfaceHigh)
+	outlineRect(bx1, y1, x2, y2, px(3), focused and C.primary or C.outlineStrong)
+	text(font, debugFields[key] .. (focused and "|" or ""), bx1 + px(4), my - px(3.4), px(9), "o", C.onSurface)
+	register(x1, y1, x2, y2, "dbgField" .. key, function() debugFocus = key end, tip)
+end
+
+local function drawDebugWindow()
+	placeDebug()
+	local x1, y1, x2, y2 = debugWin.x1, debugWin.y1, debugWin.x2, debugWin.y2
+	if hasFlowUI then
+		UiElement(x1, y1, x2, y2, 1, 1, 1, 1, 1, 1, 1, 1, WG.FlowUI.clampedOpacity)
+	else
+		roundRect(x1, y1, x2, y2, px(6), C.surface)
+	end
+	if WG.guishader then WG.guishader.InsertRect(x1, y1, x2, y2, "barblinkdebug", widget) end
+	local pad = px(7)
+	local left, right = x1 + pad, x2 - pad
+	local w = right - left
+	local hh = px(22)
+	local hy1 = y2 - hh
+	roundRect(x1 + px(1), hy1, x2 - px(1), y2 - px(1), px(5), C.surfaceHigh)
+	text(font2, "Debug strikes", left, hy1 + hh * 0.5 - px(4), px(10.5), "o", C.onSurface)
+	local bs = px(18)
+	iconButton(right - bs, hy1 + (hh - bs) / 2, bs, ICON.close, "debugClose", function()
+		playClick(); debugOpen = false; debugFocus = nil
+	end, "Close the debug window (strikes keep running)", false, "x")
+
+	local cy = hy1 - px(6)
+	local fh = px(18)
+	local half = (w - px(6)) / 2
+	debugField(left, cy - fh, left + half, cy, "x", "x", "Map x in elmos (left to right)")
+	debugField(left + half + px(6), cy - fh, right, cy, "y", "y", "Map y in elmos (top to bottom: the game's z)")
+	cy = cy - fh - px(5)
+	debugField(left, cy - fh, left + half, cy, "player", "#",
+		"A player id, used when x and y are empty: nuke the player's best scouted target, lolcannons fire at the player's scouted units in range")
+	text(font, "player id", left + half + px(6), cy - fh * 0.5 - px(3), px(8), "o", C.onSurfaceVariant)
+	cy = cy - fh - px(7)
+
+	local enabled = false
+	for _, id in ipairs(aiOrder) do if mayCommand(id) then enabled = true; break end end
+	local bh = px(22)
+	labelButton(left, cy - bh, left + half, cy, nil, "nuke", "debugNuke", function()
+		playClick(); debugFocus = nil; debugStrike("nuke")
+	end, debugOn.nuke and "Stop: every nuke silo back to its own targets"
+		or "Every nuke silo, at fire at will, nukes (x, y) again and again; or the best scouted target of player # until the player has none left",
+		debugOn.nuke, enabled)
+	labelButton(left + half + px(6), cy - bh, right, cy, nil, "lol", "debugLol", function()
+		playClick(); debugFocus = nil; debugStrike("lol")
+	end, debugOn.lol and "Stop: every lolcannon back to its own targets"
+		or "Every lolcannon in range fires at (x, y) again and again; or at the scouted units of player # it can reach",
+		debugOn.lol, enabled)
+	cy = cy - bh - px(6)
+
+	-- what each hosted AI reports (its state file, about a second behind)
+	local lineH = px(11)
+	local bottom = y1 + pad + lineH
+	local shown = 0
+	for _, id in ipairs(aiOrder) do
+		local a = ais[id]
+		if a and mayCommand(id) then
+			for _, wpn in ipairs({ "nuke", "lol" }) do
+				local s = (wpn == "nuke") and a.debugNuke or a.debugLol
+				if s and s ~= "off" and cy - lineH >= bottom then
+					text(font, fitText(font, string.format("T%d %s: %s", id, wpn, debugStateText(wpn, s)), px(8), w),
+						left, cy - px(8.5), px(8), "o", (string.sub(s, 1, 4) == "done") and C.ok or C.onSurface)
+					cy = cy - lineH
+					shown = shown + 1
+				end
+			end
+		end
+	end
+	if shown == 0 then
+		text(font, enabled and "No strike running." or "No AI hosted here to command.", left, cy - px(8.5), px(8), "o", C.onSurfaceVariant)
+	end
+	text(font, "Press nuke or lol again to stop.", left, y1 + pad, px(7.5), "o", C.onSurfaceVariant)
+end
+
 function widget:DrawScreen()
 	hit = {}
 	if not hasFlowUI or not font then initFlowUI() end
@@ -5687,6 +5886,8 @@ function widget:DrawScreen()
     strategy.DrawScreen()
 	drawLauncher()
 	if open then drawWindow() end
+	if debugOpen then drawDebugWindow()
+	elseif WG.guishader then WG.guishader.RemoveRect("barblinkdebug") end
 
 	local mx, my = spGetMouseState()
 	local newHover = nil
@@ -5701,9 +5902,10 @@ end
 
 local function overLauncher(mx, my) return inside(mx, my, launcher.x1, launcher.y1, launcher.x2, launcher.y2) end
 local function overWindow(mx, my) return open and inside(mx, my, win.x1, win.y1, win.x2, win.y2) end
+local function overDebug(mx, my) return debugOpen and inside(mx, my, debugWin.x1, debugWin.y1, debugWin.x2, debugWin.y2) end
 
 function widget:IsAbove(mx, my)
-	return overLauncher(mx, my) or overWindow(mx, my)
+	return overLauncher(mx, my) or overWindow(mx, my) or overDebug(mx, my)
 end
 
 function widget:GetTooltip(mx, my)
@@ -5715,6 +5917,17 @@ function widget:GetTooltip(mx, my)
 end
 
 function widget:MousePress(mx, my, mb)
+	if debugFocus and not overDebug(mx, my) then debugFocus = nil end
+	if overDebug(mx, my) then
+		local top = nil
+		for _, r in ipairs(hit) do
+			if inside(mx, my, r[1], r[2], r[3], r[4]) then top = r end
+		end
+		if mb == 1 and top then
+			if string.sub(top[5], 1, 8) == "dbgField" then top[6]() else debugFocus = nil; pressedId = top[5] end
+		elseif mb == 1 then debugFocus = nil end
+		return true
+	end
     if strategy.MousePress(mx,my,mb,overLauncher(mx,my) or overWindow(mx,my)) then return true end
 	if theatres.MousePress(mx,my,mb) then return true end
 	if field.MousePress(mx,my,mb) then return true end
@@ -5822,7 +6035,30 @@ function widget:TextCommand(cmd)
 	return false
 end
 
+-- SDL keycodes: the main row's digits and '.' are ASCII; the keypad's are
+-- SDLK_KP_1..9 (0x40000059..61), SDLK_KP_0 (0x40000062), SDLK_KP_PERIOD (0x40000063).
+local KP_ENTER, KP_1, KP_0, KP_PERIOD = 0x40000058, 0x40000059, 0x40000062, 0x40000063
+local DEBUG_ORDER = { x = "y", y = "player", player = "x" }
+
+-- While a debug field has the keyboard every key stops here, so typing a
+-- number never selects a control group or fires a hotkey.
+local function debugKey(key)
+	local f = debugFocus
+	if key == 27 or key == 13 or key == KP_ENTER then debugFocus = nil; return true end   -- escape, enter
+	if key == 9 then debugFocus = DEBUG_ORDER[f]; return true end   -- tab
+	local v = debugFields[f]
+	if key == 8 or key == 127 then debugFields[f] = string.sub(v, 1, -2); return true end   -- backspace, delete
+	local ch
+	if key >= 48 and key <= 57 then ch = string.char(key)
+	elseif key >= KP_1 and key <= KP_1 + 8 then ch = tostring(key - KP_1 + 1)
+	elseif key == KP_0 then ch = "0"
+	elseif (key == 46 or key == KP_PERIOD) and f ~= "player" and not string.find(v, ".", 1, true) then ch = "." end
+	if ch and #v < 7 then debugFields[f] = v .. ch end
+	return true
+end
+
 function widget:KeyPress(key, mods, isRepeat)
+	if debugFocus and debugOpen then return debugKey(key) end
 	if key == 98 and mods.ctrl and mods.alt and not isRepeat then   -- b
 		setOpen(not open)
 		return true

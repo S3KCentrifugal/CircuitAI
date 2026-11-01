@@ -9,6 +9,7 @@
 #define SRC_CIRCUIT_TASK_STATIC_SUPERTASK_H_
 
 #include "task/fighter/FighterTask.h"
+#include "task/static/DebugStrike.h"
 #include "task/static/TierTargeting.h"
 
 #include <algorithm>
@@ -107,6 +108,12 @@ private:
 	bool ValidArea(int i) const { return (i >= 0) && (i < int(tierAreas.size())); }
 	// A shot from a tiered gun (the weapon-fired event): one per burst.
 	void CountTierShot(CCircuitUnit* unit, int frame);
+	// Debug strikes (owner 2026-10-31, DebugStrike.h): true while the widget's
+	// strike owns this unit, and Update must not run the normal targeting.
+	bool UpdateDebug(CCircuitUnit* unit);
+	void DebugScan(CCircuitUnit* unit, debug::Strike& s);
+	void DebugOrder(CCircuitUnit* unit);
+	void EndDebug(CCircuitUnit* unit, const char* why);
 
 	int targetFrame;
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
@@ -114,6 +121,10 @@ public:
 	// D-124: where the silo aims: the attacked unit, else the aimed ground
 	springai::AIFloat3 GetAimPos() const;
 	static bool IsNukeSilo(CCircuitDef* cdef);
+	// Ragnarok, Calamity, Starfall (systems/construction/lolcannon.as CANNONS)
+	static bool IsLolCannon(CCircuitDef* cdef);
+	// Debug strikes (DebugStrike.h): this silo or cannon is acting on one now
+	bool IsDebugEngaged(int weapon) const { return debugEngaged && (debugKind == weapon); }
 	// D-124: a launch seen (the weapon-fired event, or a stockpile drop): the
 	// smiley over the aim, once per launch
 	void OnLaunch(CCircuitUnit* unit, const char* how);
@@ -140,6 +151,19 @@ private:
 	std::unordered_map<int, int> tierLastSeen;      // candidate id -> the last scan that had it, kept TIER_SEEN_FRAMES
 	int tierShotFrame = -1000000;     // the last shot counted
 	int tierShotGap = -1;             // frames between two shots of the main weapon's salvos; -1 not yet known
+	// Debug strikes
+	int debugKind = -2;               // debug::NUKE, LOL, -1 neither; -2 not yet read
+	int debugSerial = -1;             // the strike serial last acted on
+	int debugCheckFrame = -1000000;   // the last scan
+	bool debugEngaged = false;        // under the strike: orders given, normal targeting off
+	bool debugApplies = false;        // the last scan: the strike covers this unit
+	bool debugHasAim = false;         // the last scan found an aim
+	springai::AIFloat3 debugAim;
+	int debugTargetId = -1;           // a team strike's unit under fire, -1 ground
+	int debugOrderFrame = -1000000;   // the last order, renewed before its 60 s timeout
+	springai::AIFloat3 debugOrderAim;
+	int debugOrderTargetId = -1;
+	bool debugOrderOnUnit = false;
 };
 
 } // namespace circuit
