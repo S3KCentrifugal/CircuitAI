@@ -16,6 +16,7 @@
 #include "../systems/team/team.as"
 #include "../systems/team/ferry.as"
 #include "../systems/construction/layout.as"
+#include "../systems/construction/front_energy.as"
 #include "../systems/team/sea_assist.as"
 #include "../systems/construction/idle_reclaim.as"
 #include "../systems/construction/lolcannon.as"
@@ -1256,6 +1257,7 @@ namespace Builder {
 	}
 	IUnitTask@ EnqueueT2BotLabIfNeeded(const string &in unitSide, const AIFloat3 &in anchor, float squareSize, int timeoutFrames)
 	{
+		if (!Team::Donation::FrontFactoryAllowed()) return null;
 		// Enforce specialized T2 bot lab cooldown (decoupled from vehicle plants)
 		if (!IsT2BotFactoryOffCooldown()) {
 			GenericHelpers::LogUtil("[BUILDER] Blocked T2 Bot Lab enqueue: cooldown active (remainingFrames=" + (T2_FACTORY_COOLDOWN_FRAMES - (ai.frame - lastT2BotFactoryEnqueueFrame)) + ")", 2);
@@ -1571,6 +1573,7 @@ namespace Builder {
 	// New helper: enqueue a T2 Vehicle Plant (refactored from inline logic in FRONT role)
 	IUnitTask@ EnqueueT2VehiclePlant(const string &in unitSide, const AIFloat3 &in anchor, float squareSize, int timeoutFrames)
 	{
+		if (!Team::Donation::FrontFactoryAllowed()) return null;
 		// Enforce vehicle-specific T2 factory cooldown (separate from bot lab cooldown)
 		if (!IsT2VehFactoryOffCooldown()) {
 			GenericHelpers::LogUtil("[BUILDER] EnqueueT2VehiclePlant: blocked by VEH cooldown (remainingFrames=" + (T2_FACTORY_COOLDOWN_FRAMES - (ai.frame - lastT2VehFactoryEnqueueFrame)) + ")", 2);
@@ -1625,6 +1628,10 @@ namespace Builder {
 
 	IUnitTask@ EnqueueAFUS(const string &in unitSide, const AIFloat3 &in anchor, float squareSize, int timeoutFrames)
 	{
+		if (Global::AISettings::Role == AiRole::FRONT) {
+			FrontEnergy::Update();
+			if (!FrontEnergy::AdvancedAllowed(Economy::GetMinMetalIncomeLast10s(), Economy::GetMinEnergyIncomeLast10s())) return null;
+		}
 		// Never start if any Advanced Fusion is already queued
 		if (IsAdvancedFusionBuildQueued()) {
 			GenericHelpers::LogUtil("[BUILDER] Blocked AFUS enqueue: another Advanced Fusion is already queued (count=" + AdvancedFusionQueuedCount + ")", 2);
@@ -1993,6 +2000,20 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+        // FRONT ownership precedes generic edge/spam/economy providers and
+        // tracking gates. Otherwise they can bypass the role's front ladder.
+        if(Global::AISettings::Role==AiRole::FRONT) {
+            FrontEnergy::Update(); // before any group/base/default provider can enqueue energy
+            if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
+            if (FrontConstructors::Eligible(u)) {
+                if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
+                    || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+                if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
+                if (FrontConstructors::Seat(u.id) != 2) return aiBuilderMgr.DefaultMakeTask(u);
+            }
+            IUnitTask@ front=UnitHelpers::IsCommander(u.circuitDef)?CommanderFront::Work(u):CommanderGroup::Work(u);
+            if(front !is null) return front;
+        }
 		IUnitTask@ t = null;
 		GenericHelpers::LogUtil("[BUILDER] AiMakeTask called for builder id=" + u.id, 4);
 		// Finish what you started (D-050). Native re-evaluates a builder's task
@@ -2239,6 +2260,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		TechBuild::ReactorTaskRemoved(task);
 		SeaEconomy::Removed(task);
 		MetalEconomy::Removed(task, done);
 		{
@@ -2425,6 +2447,8 @@ namespace Builder {
 		// Log details (id, name, tier, commander)
 		LogAiUnitAdded(unit, cdef, usage);
 
+        if (CommanderGroup::OnAdded(unit)) return;
+
 		// Commander registration; if it's a new commander, record and stop
 		if (TryRegisterCommander(unit, cdef)) {
 			return;
@@ -2435,6 +2459,8 @@ namespace Builder {
 			DelegateRoleAiUnitAdded(unit, usage);
 			return;
 		}
+
+        if (usage == Unit::UseAs::BUILDER && FrontConstructors::OnAdded(unit)) return;
 
 		// Handle constructor-specific registration
 		int ctorTier = UnitHelpers::GetConstructorTier(cdef);
@@ -2794,6 +2820,8 @@ namespace Builder {
 		Team::SeaAssist::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
 		LolCannon::UnitRemoved(unit);
+        FrontConstructors::OnRemoved(unit);
+        CommanderGroup::OnRemoved(unit);
 
 		// Ensure any per-builder task mapping is cleared for this unit
 		ClearBuilderTaskByUnit(unit);

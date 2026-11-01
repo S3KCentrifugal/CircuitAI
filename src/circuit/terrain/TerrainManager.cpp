@@ -110,7 +110,9 @@ bool ReadLayoutString(std::istream& is, std::string& value)
 CTerrainManager::CTerrainManager(CCircuitAI* circuit, CTerrainData* terrainData)
 		: circuit(circuit)
 		, allyZoneCells(9)
+		, areaData(nullptr)
 		, terrainData(terrainData)
+		, minLandPercent(0.f)
 #ifdef DEBUG_VIS
 		, dbgTextureId(-1)
 		, sdlWindowId(-1)
@@ -792,10 +794,9 @@ AIFloat3 CTerrainManager::FindBuildSite(CCircuitDef* cdef, const AIFloat3& pos,
             if (IsAllyLayoutBlocked(cdef, p, facing)) return false;
             int2 a, b;
             if (ReservationCells(cdef, Pos2BuildPos(cdef, p, facing), facing, a, b)) {
-                for (const auto& entry : zones) {
-                    const auto& z = entry.second;
-                    if (a.x < z.c2.x && z.c1.x < b.x && a.y < z.c2.y && z.c1.y < b.y) return false;
-                }
+                // Exact zone envelopes already maintained by ShareZone/release/load.
+                // O(footprint cells), independent of the number of planned zones.
+                if (localReservations.OverlapsZone({a.x,a.y,b.x,b.y})) return false;
             }
         }
         return requested(p);
@@ -1252,6 +1253,65 @@ void CTerrainManager::ShareZone(int id)
         circuit->GetAllyTeam()->GetLayoutReservations().Put(circuit->GetTeamId(), allied_layout::Reservations::EXIT,
             id, {z.c1.x, z.c1.y, z.c2.x, z.c2.y});
     }
+}
+
+// Ordinary builders participate in shared exclusion without enabling layout packing.
+// Toggle/load is O(own units + pending tasks); normal updates touch one footprint.
+void CTerrainManager::SetBuildSiteReservations(bool enabled)
+{
+    layoutInts["native.ordinarySites"] = enabled ? 1 : 0;
+    if (buildSiteReservations == enabled) return;
+    buildSiteReservations = enabled;
+    auto& shared = circuit->GetAllyTeam()->GetLayoutReservations();
+    shared.RemoveKind(circuit->GetTeamId(), allied_layout::Reservations::TASK);
+    shared.RemoveKind(circuit->GetTeamId(), allied_layout::Reservations::STRUCTURE);
+    if (enabled) for (const auto& entry : circuit->GetTeamUnits()) ObserveBuildStructure(entry.second);
+    for (int type = 0; type < int(IBuilderTask::BuildType::REPAIR); ++type) {
+        for (auto* task : circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType(type))) {
+            task->RefreshBuildSiteClaim();
+        }
+    }
+}
+
+bool CTerrainManager::ReserveBuildSite(int& claim, CCircuitDef* def, const AIFloat3& pos, int facing)
+{
+    if (!geom::is_valid(pos)) return false;
+    if (facing < 0 || facing > 3) facing = UNIT_FACING_SOUTH;
+    if (def == nullptr || def->IsMobile() || IsResourceBuildingSite(def, pos, facing)) {
+        ReleaseBuildSite(claim);
+        return true;
+    }
+    int2 a, b;
+    if (!ReservationCells(def, Pos2BuildPos(def, pos, facing), facing, a, b)) return false;
+    auto& shared = circuit->GetAllyTeam()->GetLayoutReservations();
+    // ClaimTask performs admission itself; do not query the same cells twice.
+    if (buildSiteReservations) return shared.ClaimTask(circuit->GetTeamId(), claim, {a.x,a.y,b.x,b.y});
+    ReleaseBuildSite(claim);
+    return !shared.OverlapsOther(circuit->GetTeamId(), {a.x,a.y,b.x,b.y});
+}
+
+void CTerrainManager::ReleaseBuildSite(int& claim)
+{
+    if (claim != 0) circuit->GetAllyTeam()->GetLayoutReservations().ReleaseTask(circuit->GetTeamId(), claim);
+}
+
+void CTerrainManager::ObserveBuildStructure(CCircuitUnit* unit)
+{
+    if (!buildSiteReservations || unit->GetCircuitDef()->IsMobile()) return;
+    auto* def = unit->GetCircuitDef();
+    const int facing = unit->GetUnit()->GetBuildingFacing();
+    const auto pos = unit->GetPos(circuit->GetLastFrame()) + def->GetMidPosOffset(facing);
+    int2 a, b;
+    if (!IsResourceBuildingSite(def, pos, facing) && ReservationCells(def, Pos2BuildPos(def, pos, facing), facing, a, b)) {
+        circuit->GetAllyTeam()->GetLayoutReservations().Put(circuit->GetTeamId(), allied_layout::Reservations::STRUCTURE,
+            unit->GetId(), {a.x,a.y,b.x,b.y});
+    }
+}
+
+void CTerrainManager::ForgetBuildStructure(int unitId)
+{
+    if (buildSiteReservations) circuit->GetAllyTeam()->GetLayoutReservations().Erase(
+        circuit->GetTeamId(), allied_layout::Reservations::STRUCTURE, unitId);
 }
 
 bool CTerrainManager::IsAllyLayoutRectBlocked(const int2& c1, const int2& c2) const
@@ -1948,7 +2008,7 @@ bool CTerrainManager::PlanMexCluster(const std::string& name, CCircuitDef* def,
 
 bool CTerrainManager::PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory,
 		CCircuitDef* repeatedFactory, CCircuitDef* nanoDef, const AIFloat3& origin,
-		int facing, int count, int columns, int firstNanos)
+		int facing, int count, int columns, int firstNanos, bool centerFirst, bool centerRepeated)
 {
 	if (!layoutEnabled || name.empty() || !MakesAircraft(circuit, firstFactory)
 			|| !MakesAircraft(circuit, repeatedFactory) || nanoDef == nullptr || nanoDef->GetDef() == nullptr) return false;
@@ -1957,7 +2017,7 @@ bool CTerrainManager::PlanAirFactoryCluster(const std::string& name, CCircuitDef
 	};
 	const auto plan = base_layout::MakeAirFactoryCluster(
 			{int(std::lround(origin.x / 8.f)), int(std::lround(origin.z / 8.f))}, facing,
-			footprint(firstFactory), footprint(repeatedFactory), footprint(nanoDef), count, columns, firstNanos, 20);
+			footprint(firstFactory), footprint(repeatedFactory), footprint(nanoDef), count, columns, firstNanos, 20, centerFirst, centerRepeated);
 	if (!plan.valid || !IsRectFree(plan.bounds)) return false;
 	// Existing corridors are checked once; flying output needs no internal
 	// ground lanes. Every other reservation caller retains its original policy.
@@ -4498,6 +4558,7 @@ void CTerrainManager::ResetLayout()
 	layoutGroups.clear();
 	layoutZones.clear();
 	layoutInts.clear();
+    if (buildSiteReservations) layoutInts["native.ordinarySites"] = 1;
 	factoryLineReady = false;
 	factoryLineFacing = UNIT_FACING_SOUTH;
 	factoryRearCentre = {};
@@ -4613,7 +4674,8 @@ void CTerrainManager::LoadLayout(std::istream& is)
 	layoutGroups.clear();
 	layoutZones.clear();
 	layoutInts.clear();
-	circuit->GetAllyTeam()->GetLayoutReservations().RemoveOwner(circuit->GetTeamId());
+	for (auto kind : {allied_layout::Reservations::SLOT, allied_layout::Reservations::ZONE, allied_layout::Reservations::EXIT})
+        circuit->GetAllyTeam()->GetLayoutReservations().RemoveKind(circuit->GetTeamId(), kind);
 	zones.clear();
 	reservations.clear();
 	scopedSlots.clear();
@@ -4718,6 +4780,9 @@ void CTerrainManager::LoadLayout(std::istream& is)
 			}
 		}
 	}
+    // Reuse the named state format; task claims rebuild as tasks load next.
+    const auto ordinary = layoutInts.find("native.ordinarySites");
+    SetBuildSiteReservations(ordinary != layoutInts.end() && ordinary->second != 0);
 	circuit->LOG("RESERVE: layout loaded: %i zones, %i reservations, %s", (int)zones.size(), (int)reservations.size(), layoutEnabled ? "on" : "off");
 }
 
@@ -4826,7 +4891,7 @@ void CTerrainManager::MarkAllyBuildings()
 	markFrame = circuit->GetLastFrame();
 
 	circuit->UpdateFriendlyUnits();
-	const CAllyTeam::AllyUnits& friendlies = circuit->GetFriendlyUnits();
+	const auto& friendlies = circuit->GetAllyTeam()->GetFriendlyStructures();
 	const int teamId = circuit->GetTeamId();
 	const int frame = circuit->GetLastFrame();
 

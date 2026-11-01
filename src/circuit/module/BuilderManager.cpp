@@ -1,3 +1,4 @@
+#include "task/builder/CommanderGroupFollowTask.h"
 /*
  * BuilderManager.cpp
  *
@@ -45,8 +46,9 @@
 #include "task/builder/PatrolTask.h"
 #include "task/builder/GuardTask.h"
 #include "task/builder/CombatTask.h"
-#include "task/builder/CommanderTask.h"
-#include "module/CommanderControl.h"
+#include "control/core/ControlledTask.h"
+#include "control/core/ControllerRegistry.h"
+#include "control/unit/commander/CommanderController.h"
 #include "module/RestoreControl.h"
 #include "task/builder/BuildChain.h"
 #include "CircuitAI.h"
@@ -82,7 +84,7 @@ CBuilderManager::CBuilderManager(CCircuitAI* circuit)
 		, buildPower(.0f)
 		, dangerHysteresis(MAX_TRAVEL_SEC * FRAMES_PER_SEC)
 {
-	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CBuilderManager::Init, this));
+	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CBuilderManager::InitBuilder, this));
 	restoreControl = std::make_unique<CRestoreControl>(circuit);
 
 	buildTasks.resize(static_cast<IBuilderTask::BT>(IBuilderTask::BuildType::_SIZE_));
@@ -485,7 +487,7 @@ void CBuilderManager::ReadConfig()
 	}
 }
 
-void CBuilderManager::Init()
+void CBuilderManager::InitBuilder()
 {
 	CSetupManager::StartFunc subinit = [this](const AIFloat3& pos) {
 		CScheduler* scheduler = circuit->GetScheduler().get();
@@ -621,6 +623,15 @@ int CBuilderManager::UnitFinished(CCircuitUnit* unit)
 	}
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
+        // Completion event, before DoneTask releases/reassigns the builders.
+        // O(assigned builders), no new world scan or recurring callback.
+        if (iter->second->GetBuildType()==IBuilderTask::BuildType::MEX) {
+            for (auto* worker : iter->second->GetAssignees())
+                circuit->GetCommanderController()->MexFinished(worker,unit);
+            // D-387: a new extractor on an ally's spot goes to that ally
+            // (deferred a frame; upgrades are BuildType::MEXUP, never given).
+            circuit->GetEconomyManager()->MexBuilt(unit);
+        }
 		DoneTask(iter->second);
 	}
 	for (IBuilderTask* task : staleOwners) {
@@ -661,7 +672,7 @@ int CBuilderManager::UnitIdle(CCircuitUnit* unit)
 
 int CBuilderManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
-    if(circuit->GetCommanderControl()) circuit->GetCommanderControl()->Damaged(unit);
+    if(circuit->GetControllers()) circuit->GetControllers()->Damaged(unit);  // D-388
 	auto search = damagedHandler.find(unit->GetCircuitDef()->GetId());
 	if (search != damagedHandler.end()) {
 		search->second(unit, attacker);
@@ -1154,8 +1165,13 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 		case IBuilderTask::BuildType::RESURRECT: {
 			task = new CBResurrectTask(this, ti.priority, ti.position, ti.cost, ti.timeout, ti.f.radius);
 		} break;
-//		case IBuilderTask::BuildType::RECRUIT: {
-//		} break;
+        case IBuilderTask::BuildType::RECRUIT: {
+            // Mobile combat engineers use builder-owned production. A factory
+            // recruit would violate task-manager ownership (D-420 follow-up).
+            if(!ti.buildDef || !ti.buildDef->IsMobile()) return nullptr;
+            const SResource cost={ti.buildDef->GetCostM(),ti.buildDef->GetCostE()};
+            task=new CBGenericTask(this,ti.type,ti.priority,ti.buildDef,ti.position,cost,ti.f.shake,ti.timeout);
+        } break;
 		case IBuilderTask::BuildType::TERRAFORM: {
 			if (ti.ref.target != nullptr) {
 				task = new CBTerraformTask(this, ti.priority, ti.ref.target, ti.cost, ti.timeout);
@@ -1228,21 +1244,57 @@ IUnitTask* CBuilderManager::FindMatchingGuard(CCircuitUnit* unit, const TaskB::S
 		? current : nullptr;
 }
 
-CCommanderTask* CBuilderManager::EnqueueCommander(IUnitTask* previous) {
-    auto* task=new CCommanderTask(this,previous);
+IUnitTask* CBuilderManager::EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius) {
+    auto* task=new CCommanderGroupFollowTask(this,leader->GetId(),radius);
+    updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
+}
+CControlledTask* CBuilderManager::EnqueueControlled(IUnitController* controller,IUnitTask* previous) {
+    auto* task=new CControlledTask(this,controller,previous);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
 bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float value) {
-    return circuit->GetCommanderControl()->SetOption(name,value);
+    return circuit->GetCommanderController()->SetOption(name,value);
 }
-float CBuilderManager::GetCommanderEnergyReserve() const { return circuit->GetCommanderControl()->GetReserve(); }
-float CBuilderManager::GetCommanderEnergyDeficit() const { return circuit->GetCommanderControl()->GetDeficit(); }
-int CBuilderManager::GetCommanderOperation() const { return circuit->GetCommanderControl()->GetOperation(); }
+bool CBuilderManager::SetDefenseRule(int slot,const std::string& key,float value) {
+    return circuit->GetCommanderController()->SetDefenseRule(slot,key,value);
+}
+IUnitTask* CBuilderManager::SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third) {
+    return circuit->GetCommanderController()->SupportDefenseWork(unit,anchor,first,second,third);
+}
+IUnitTask* CBuilderManager::SupportConstruction(CCircuitUnit* unit) {
+    return circuit->GetCommanderController()->SupportConstruction(unit);
+}
+IUnitTask* CBuilderManager::SupportAssist(CCircuitUnit* unit,CCircuitUnit* worker,float radius) {
+    if(!unit || !worker || unit==worker || !std::isfinite(radius) || radius<=0) return nullptr;
+    auto* task=worker->GetTask();
+    auto* build=dynamic_cast<IBuilderTask*>(task);
+    if(!build || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim() || !build->GetBuildDef()) return nullptr;
+    const int frame=circuit->GetLastFrame();
+    const auto at=worker->GetPos(frame);
+    if(unit->GetPos(frame).SqDistance2D(at)>SQUARE(radius)
+        || circuit->GetThreatMap()->GetThreatAt(unit,at)>0.f) return nullptr;
+    if(task->GetType()!=IUnitTask::Type::FACTORY
+        && (unit->GetTask()==task || task->CanAssignTo(unit))) return task;
+    // An existing frame can use local assistance even when the original
+    // construction task's economic build-power target is already satisfied.
+    auto* target=build->GetTarget();
+    if(!target || target->IsFinished()) return nullptr;
+    auto* repair=EnqueueRepairFor(target,60*FRAMES_PER_SEC,unit);
+    if(repair && (unit->GetTask()==repair || repair->CanAssignTo(unit))) return repair;
+    if(repair) DiscardUnusedTask(repair);
+    return nullptr;
+}
+std::string CBuilderManager::DescribeDefense() const { return circuit->GetCommanderController()->DescribeDefense(); }
+bool CBuilderManager::PendingProtection(CCircuitDef* def,const AIFloat3& at) { return circuit->GetCommanderController()->PendingProtection(def,at); }
+float CBuilderManager::GetCommanderEnergyReserve() const { return circuit->GetCommanderController()->GetReserve(); }
+float CBuilderManager::GetCommanderEnergyDeficit() const { return circuit->GetCommanderController()->GetDeficit(); }
+int CBuilderManager::GetCommanderOperation() const { return circuit->GetCommanderController()->GetOperation(); }
+std::string CBuilderManager::DescribeCommanderFront(int id) const { return circuit->GetCommanderController()->DescribeFront(id); }
 IUnitTask* CBuilderManager::CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius) {
-    return circuit->GetCommanderControl()->FrontWork(unit,kind,def,radius);
+    return circuit->GetCommanderController()->FrontWork(unit,kind,def,radius);
 }
 bool CBuilderManager::CommanderFrontAdopt(CCircuitUnit* unit,IUnitTask* task,float reach) {
-    return circuit->GetCommanderControl()->AdoptFrontWork(unit,task,reach);
+    return circuit->GetCommanderController()->AdoptFrontWork(unit,task,reach);
 }
 
 IUnitTask* CBuilderManager::Enqueue(const TaskB::SServBTask& ti)
@@ -1308,6 +1360,7 @@ void CBuilderManager::AssignTask(CCircuitUnit* unit)
 
 void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 {
+    circuit->GetCommanderController()->TaskFinished(task,done);
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);
@@ -1707,7 +1760,7 @@ IUnitTask* CBuilderManager::DefaultMakeTaskImpl(CCircuitUnit* unit)
 	const CCircuitDef* cdef = unit->GetCircuitDef();
 	constexpr float POWER_MOD = 1.5f;
 	if ((cdef->GetPower() > THREAT_MIN)
-        && !(circuit->GetCommanderControl() && circuit->GetCommanderControl()->Handles(unit))
+        && !(circuit->GetCommanderController() && circuit->GetCommanderController()->Handles(unit))
 		&& (circuit->GetMilitaryManager()->FindBCombatTarget(unit, pos, POWER_MOD, true) != nullptr))
 	{
 		return Enqueue(TaskB::Combat(POWER_MOD));
@@ -2824,3 +2877,5 @@ void CBuilderManager::Log()
 #endif
 
 } // namespace circuit
+
+int circuit::CBuilderManager::FrontCommanderId() const { return circuit->GetCommanderController()->FrontCommanderId(); }

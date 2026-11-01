@@ -65,6 +65,7 @@ namespace TechChain
     int stallHave = -1;        // ... with this count ...
     int stallFrame = 0;        // ... since this frame; no progress for ChainStepStallSeconds skips it
     array<bool> skipped;
+    int mohoBlockedUntil = 0;  // no T1 mex left in range could be upgraded (terrain, approach, native refusal) until this frame
     int pendingStep = -1;      // an order for this step went out ...
     int pendingFrame = 0;      // ... at this frame; invisible to the queued and unfinished counts until its frame exists
     int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
@@ -405,6 +406,8 @@ namespace TechChain
         if (key == "aap") return UnitHelpers::GetT2AirPlantForSide(side);      // D-080
         if (key == "ap") return UnitHelpers::GetT1AirPlantForSide(side);       // D-103: its air constructor builds the advanced aircraft plant
         if (key == "lrpc") return UnitHelpers::GetLRPCNameForSide(side);       // D-080
+        if (key == "geo") return LocalGeothermal::Name(false);                   // D-367: SUPPORT's vent before the advanced lab
+        if (key == "t1conv") return UnitHelpers::GetEnergyConverterNameForSide(side);   // D-367
         return "";
     }
 
@@ -467,6 +470,8 @@ namespace TechChain
         if (key == "lrpc") return Task::BuildType::BIG_GUN;   // D-080
         if (key == "nano" || key == "nanot2") return Task::BuildType::NANO;
         if (key == "mstor" || key == "estor") return Task::BuildType::STORE;
+        if (key == "geo") return Task::BuildType::GEO;         // D-367
+        if (key == "t1conv") return Task::BuildType::CONVERT;  // D-367
         return Task::BuildType::ENERGY;
     }
 
@@ -584,6 +589,17 @@ namespace TechChain
         Add(energy, e1);
         Add("mex", mexes, Global::RoleSettings::Tech::ChainMexFarRadius);
         Add(energy, e2);
+        // D-367 (owner): SUPPORT with a vent within LocalGeothermalRadius takes one
+        // basic geothermal and the converters for its energy before the advanced
+        // lab (Supreme Isthmus, Forge); without a vent the recipe is unchanged.
+        // TECH keeps D-257's rule: a vent is an opportunity, never a T2 prerequisite.
+        // A vent nobody can place is skipped by the chain's ChainStepStallSeconds.
+        if (requestedObjective == "t2" && Global::AISettings::Role == AiRole::SUPPORT && LocalGeothermal::HasLocal()) {
+            Add("geo", 1);
+            Add("t1conv", AiMax(0, Global::RoleSettings::Support::GeothermalConverters));
+            GenericHelpers::LogUtil("[TECH][Chain] SUPPORT has a vent within " + int(Global::RoleSettings::Tech::LocalGeothermalRadius)
+                + ": one geothermal and " + AiMax(0, Global::RoleSettings::Support::GeothermalConverters) + " converters before the advanced lab (D-367)", 1);
+        }
         if (objective == "nuke") Add("estor", 1);
         Add("alab", 1);
         if (objective == "fusion") {
@@ -661,6 +677,9 @@ namespace TechChain
     bool MohosPending()
     {
         if (!Active() || TechBuild::MetalFullLong() || Global::RoleSettings::Tech::ChainMohoRadius <= 0.0f) return false;   // metal floating: the upgrades are not what it waits on
+        // played (Thermal Shock 2026-11-01): a mex no constructor could upgrade
+        // kept the fusion and advanced fusion out of the eco planner for good
+        if (ai.frame < mohoBlockedUntil) return false;
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
             if (s.key != "moho" || (i < skipped.length() && skipped[i])) continue;
@@ -864,7 +883,25 @@ namespace TechChain
             return t;
         }
         if (key == "lab") return TechBuild::StartFactory(u);
-        if (key == "alab") return Layout::T2LabTask(300 * SECOND);
+        if (key == "alab") {
+            // INV-242 (D-367): SUPPORT's advanced lab never precedes its local geothermal
+            // while the geo step stands unskipped in the recipe
+            for (uint k = 0; k < steps.length(); ++k) {
+                if (steps[k].key != "geo" || (k < skipped.length() && skipped[k])) continue;
+                CCircuitDef@ geo = ai.GetCircuitDef(steps[k].defName);
+                if (geo !is null && geo.count == 0)
+                    Invariants::Violation("INV-242", "support-geo", "SUPPORT ordered the advanced lab with no geothermal standing or framed and a vent within reach");
+            }
+            return Layout::T2LabTask(300 * SECOND);
+        }
+        if (key == "geo") {
+            // D-367: native validates the vent and places on it; the engine's build-over
+            // upgrade is LocalGeothermal's later (advanced) business
+            if (d.maxThisUnit < 1) d.maxThisUnit = 1;
+            IUnitTask@ gt = aiEconomyMgr.EnqueueLocalGeo(u, d, Global::Map::StartPos, Global::RoleSettings::Tech::LocalGeothermalRadius);
+            if (gt !is null) GenericHelpers::LogUtil("[Geo] ordered " + d.GetName() + " by the chain (D-367)", 1);
+            return gt;
+        }
         if (key == "moho") {
             AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
             if (at.x < 0.0f) {
@@ -872,12 +909,14 @@ namespace TechChain
                     && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), d) == 0) s.exhausted = true;
                 return null;
             }
-            // Eligibility is separate from exhaustion: blocked mexes still
-            // count toward rush prerequisites and are reconsidered next ask.
-            at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, d);
-            if (at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, d,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            // Never manufacture a position-only task: native admission checks
+            // ownership, tier, live reachability and concurrent spot claims.
+            // Rejection must let the income ladder consider energy instead.
+            IUnitTask@ up = (target is null) ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
+            mohoBlockedUntil = (up is null) ? ai.frame + 30 * SECOND : 0;
+            return up;
         }
         if (key == "nano") {
             // A distant mex worker must not own a no-frame turret reservation
@@ -1135,7 +1174,13 @@ namespace TechChain
             // donations prevent the ordinary full-metal exception. Query only
             // on the fusion row; other TECH energy ordering remains unchanged.
             const bool requiredFusion = s.key == "fusion" && (NukeRush() || TechHeavyRush::RequiresFusion());
-            if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
+            // A builder that cannot build this step only passes it on the way to
+            // a later one: it must not restart another step's clock (played:
+            // Thermal Shock 2026-11-01, the commander and T1 constructors went on
+            // to the advanced fusion step and reset the stuck mex-upgrade step's
+            // clock every few seconds; never skipped, no advanced fusion by 13 min)
+            if (stallStep != int(i) && !u.circuitDef.CanBuild(d)) {}
+            else if (stallStep != int(i) || stallHave != have || unfinished > 0 || waitsForAirCon) { stallStep = int(i); stallHave = have; stallFrame = ai.frame; }
             // Required nuke prerequisites are never skipped. A queued project
             // may inherit time spent waiting for its supporting turret bank;
             // that old clock must not skip fusion while its builder approaches.
@@ -1256,6 +1301,12 @@ namespace TechChain
             IUnitTask@ t = Order(int(i), s, d, u);
             if (t !is null) { pendingStep = int(i); pendingFrame = ai.frame; pendingHave = have; Trace("ordered", int(i), s, have, u); return t; }
             if (s.key == "mex" && s.exhausted) continue;
+            // no mex this builder can upgrade: on to the fusion and advanced
+            // fusion rather than hold every T2 constructor here
+            if (s.key == "moho" && !NukeRush() && ai.frame < mohoBlockedUntil) {
+                Trace("no upgradable mex: on to the next step", int(i), s, have, u);
+                continue;
+            }
             Trace("cannot order yet", int(i), s, have, u);
             return null;
         }
@@ -1306,6 +1357,8 @@ namespace TechChain
         // T2 mex upgrades first: the cheapest metal there is
         CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
         if (moho !is null && u.circuitDef.CanBuild(moho)) {
+            // Income steps are not concrete definitions in Tick's cap lift.
+            if (moho.maxThisUnit <= moho.count) moho.maxThisUnit = moho.count + 1;
             Step tmp("moho", DefFor("moho"), 99);
             IUnitTask@ t = Order(i, @tmp, moho, u);
             if (t !is null) { Trace("mex upgrade", i, s, have, u); return t; }
@@ -1314,12 +1367,11 @@ namespace TechChain
         CCircuitDef@ afus = ai.GetCircuitDef(DefFor("afus"));
         if (afus is null) return null;
         const int building = aiBuilderMgr.GetUnfinishedCount(afus);
-        // a full metal bank means the ladder is build-power and order bound, not
-        // metal bound: another advanced fusion in parallel, up to LadderParallelAfus
-        const bool another = TechBuild::MetalFullLong() && building < Global::RoleSettings::Tech::LadderParallelAfus && u.circuitDef.CanBuild(afus);
-        if (building > 0 && !another) {
+        // Complete one reactor before spending on another, even at full metal.
+        if (building > 0) {
             CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, afus);
             if (frame !is null) { Trace("assist the advanced fusion", i, s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+            return null;
         }
         if (!u.circuitDef.CanBuild(afus)) return null;
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), afus) > 0) { Trace("advanced fusion order out", i, s, have, u); return null; }

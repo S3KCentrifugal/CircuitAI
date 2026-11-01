@@ -1,3 +1,4 @@
+#include "control/unit/commander/CommanderController.h"
 /*
  * NanoTask.cpp
  *
@@ -65,8 +66,9 @@ bool CBNanoTask::Execute(CCircuitUnit* unit)
 	FindBuildSite(unit, pos, searchRadius);
 
 	if (geom::is_valid(buildPos)) {
+        if(!circuit->GetCommanderController()->GroupMayBuild(unit,buildDef,buildPos)) return false;
 		TRY_UNIT(circuit, unit,
-			unit->CmdBuild(buildDef, buildPos, facing, 0, CmdTimeout(frame));
+			if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 		)
 	} else if (pinFailed) {
 		manager->AbortTask(this);

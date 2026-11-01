@@ -84,7 +84,7 @@ CMilitaryManager::CMilitaryManager(CCircuitAI* circuit)
 		, armyCost(0.f)
 		, bigGunDef(nullptr)
 {
-	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CMilitaryManager::Init, this));
+	circuit->GetScheduler()->RunOnInit(CScheduler::GameJob(&CMilitaryManager::InitMilitary, this));
 
 	defence = circuit->GetAllyTeam()->GetDefenceData().get();
 
@@ -649,6 +649,27 @@ void CMilitaryManager::ReadConfig()
 			cfgName.c_str(), commSnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(commSnipeInfo.defs.size()),
 			commSnipeInfo.interval, commSnipeInfo.acquireMargin, commSnipeInfo.releaseMargin);
 
+	/*
+	 * Artillery commander targets: see SArtyCommInfo. "units" are def names;
+	 * "max_speed" is in elmos per second (a walking commander is ~37).
+	 */
+	const Json::Value& artyCommCfg = root["artillery_commander"];
+	artyCommInfo.isEnabled = false;
+	artyCommInfo.defs.clear();
+	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
+		std::set<std::string> names;
+		for (const auto& name : artyCommCfg["units"]) names.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (names.count(d.GetDef()->GetName()) > 0) artyCommInfo.defs.insert(d.GetId());
+		}
+		const float maxSpeed = std::max(0.f, artyCommCfg.get("max_speed", 12.f).asFloat()) / FRAMES_PER_SEC;
+		artyCommInfo.maxSqSpeed = SQUARE(maxSpeed);
+		artyCommInfo.isEnabled = !artyCommInfo.defs.empty();
+	}
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f",
+			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
+			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC);
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
@@ -776,7 +797,7 @@ void CMilitaryManager::InitEconomyScores(const std::vector<CCircuitDef*>&& build
 	});
 }
 
-void CMilitaryManager::Init()
+void CMilitaryManager::InitMilitary()
 {
 	CMetalManager* metalMgr = circuit->GetMetalManager();
 	const CMetalData::Clusters& clusters = metalMgr->GetClusters();
@@ -1465,9 +1486,12 @@ void CMilitaryManager::FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions, boo
 	outPositions.clear();
     // D-354/D-356: on a published corridor the lane goal is the front for
     // attack leaders; the advance and the defend opt-in come from coverage.json.
-    const auto* battle=circuit->GetBattle();
-    if(!unit->GetCircuitDef()->IsAbleToFly() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
-        const auto goal=battle->GetFrontLaneGoal(unit->GetPos(circuit->GetLastFrame()),battle->GetFrontLaneAdvance());
+    auto* battle=circuit->GetBattle();
+    if(!unit->GetCircuitDef()->IsAbleToFly() && battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
+        const auto pos=unit->GetPos(circuit->GetLastFrame());
+        const float from=battle->GetFrontLaneProgress(pos);
+        const float goalProgress=battle->LimitLaneAdvance(from,from+battle->GetFrontLaneAdvance());
+        const auto goal=battle->GetFrontLaneGoal(pos,goalProgress-from);
         if(circuit->GetTerrainManager()->CanReachAt(unit,goal,64)) {outPositions.push_back(goal);return;}
     }
 
@@ -2631,8 +2655,7 @@ void CMilitaryManager::PointOfInterest(CEnemyInfo* enemy, int start, int step)
 		CMetalData::ClusterGraph::IncEdgeIt edgeIt(clusterGraph, node);
 		for (; edgeIt != lemon::INVALID; ++edgeIt) {
 			const int childId = clusterGraph.id(clusterGraph.oppositeNode(node, edgeIt));
-			if (visited.find(childId) == visited.end()) {
-				visited.insert(childId);
+			if (visited.insert(childId).second) {
 				toVisit.emplace_back(childId, q.second + step);
 			}
 		}

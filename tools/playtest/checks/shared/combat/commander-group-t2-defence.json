@@ -1,0 +1,60 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "front T2",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "pit bull",
+      "pattern": "\\[CommanderGroup\\] job_start def=armpb nano=0",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "pit bull finished",
+      "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=armpb",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "pit bull"
+    },
+    {
+      "key": "following nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=armnanotc nano=1",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "pit bull finished",
+      "after_minute": 1.5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

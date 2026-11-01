@@ -1,0 +1,72 @@
+{
+  "stop_minute": 7.2,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[MaintenanceProbe\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS released",
+      "scope": "any",
+      "key": "released",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS nearby_healed",
+      "scope": "any",
+      "key": "nearby_healed",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS construction_started",
+      "scope": "any",
+      "key": "construction_started",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS build_retained_on_ask",
+      "scope": "any",
+      "key": "build_retained_on_ask",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS assist_retained_on_ask",
+      "scope": "any",
+      "key": "assist_retained_on_ask",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS build_retained_on_tick",
+      "scope": "any",
+      "key": "build_retained_on_tick",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS assist_retained_on_tick",
+      "scope": "any",
+      "key": "assist_retained_on_tick",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS construction_finished",
+      "scope": "any",
+      "key": "construction_finished",
+      "by_minute": 7
+    },
+    {
+      "pattern": "\\[MaintenanceProbe\\] PASS relocated_after_finish",
+      "scope": "any",
+      "key": "relocated_after_finish",
+      "by_minute": 7
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[MaintenanceProbe\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

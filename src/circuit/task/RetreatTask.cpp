@@ -9,7 +9,8 @@
 #include "map/ThreatMap.h"
 #include "map/InfluenceMap.h"
 #include "module/BuilderManager.h"
-#include "module/CommanderControl.h"
+#include "control/core/ControllerRegistry.h"
+#include "control/unit/commander/CommanderController.h"
 #include "module/EconomyManager.h"
 #include "module/FactoryManager.h"
 #include "resource/MetalManager.h"
@@ -82,12 +83,16 @@ void CRetreatTask::AssignTo(CCircuitUnit* unit)
 	unit->PushTravelAct(travelAction);
 	unit->SetAllowedToJump(cdef->IsAbleToJump() && !cdef->IsAttrNoJump());
 
-	if (unit->GetCircuitDef()->IsAbleToCloak()) {
+	// D-388: a unit its controller owns (a commander) gets its retreat cloak
+	// and fire state from that controller, the single writer (D-389: cloaked
+	// only when hidden from a real threat). Every other unit keeps the
+	// pre-D-388 rule: cloak on retreat, hold fire only for ret_hold ranged units.
+	const bool controlled = circuit->GetControllers() && circuit->GetControllers()->OwnerOf(unit) != nullptr;
+	if (unit->GetCircuitDef()->IsAbleToCloak() && !controlled) {
 		TRY_UNIT(manager->GetCircuit(), unit,
 			unit->CmdCloak(true);
 			// Opted-in precision retreat must not decloak on return fire.
 			unit->CmdSetFireState((cdef->IsAttrRanged() && cdef->IsAttrRetHold())
-                || (circuit->GetCommanderControl() && circuit->GetCommanderControl()->RetreatCloakFunded(unit))
 				? CCircuitDef::FireType::HOLD : CCircuitDef::FireType::RETURN);
 		)
 	}
@@ -111,15 +116,31 @@ void CRetreatTask::RemoveAssignee(CCircuitUnit* unit)
 	)
 }
 
+bool CRetreatTask::HoldInJam(CCircuitUnit* unit)
+{
+    auto* circuit=manager->GetCircuit();
+    if(!circuit->GetCommanderController()->Jammed(unit)) return false;
+    // Also veto a completed asynchronous path: coverage may have appeared
+    // since the request. Finish the travel action before it can emit a MOVE.
+    auto* travel=unit->GetTravelAct();
+    if(travel && !travel->IsFinished()) {
+        TRY_UNIT(circuit,unit,unit->CmdStop();)
+        travel->StateFinish();
+    }
+    state=State::REGROUP;
+    return true;
+}
+
 void CRetreatTask::Start(CCircuitUnit* unit)
 {
+    if(HoldInJam(unit)) return;
 	if (unit->GetTravelAct() == nullptr) {
 		return;
 	}
 	CCircuitAI* circuit = manager->GetCircuit();
 	AIFloat3 commanderStation;
-	const bool commanderFallback = circuit->GetCommanderControl()
-		&& circuit->GetCommanderControl()->RetreatStation(unit, commanderStation);
+	const bool commanderFallback = circuit->GetCommanderController()
+		&& circuit->GetCommanderController()->RetreatStation(unit, commanderStation);
 	if (unit->GetTravelAct()->IsFinished()) {
 		// D-346: waiting at a forward repair point that has become threatened
 		// or expired: resume the ordinary retreat to the haven.
@@ -222,12 +243,17 @@ void CRetreatTask::Update()
 	bool isExecute = (++updCount % 2 == 0);
 	auto assignees = units;
 	for (CCircuitUnit* unit : assignees) {
+        if(HoldInJam(unit)) continue;
 		const float healthPerc = unit->GetHealthPercent();
 		bool isRepaired = unit->HasShield()
 				? (healthPerc > 0.98f) && unit->IsShieldCharged(circuit->GetSetupManager()->GetFullShield())
 				: healthPerc > 0.98f;
 
 		CCircuitDef* cdef = unit->GetCircuitDef();
+		if(circuit->GetCommanderController()->EnergyRetreat(unit)
+            || circuit->GetCommanderController()->HealthRetreat(unit)) {
+            Start(unit);continue;
+        }
 		if (isRepaired && !unit->IsDisarmed(frame)) {
 			Recovered(unit);
 		} else if (unit->IsForceUpdate(frame) || isExecute) {
@@ -270,6 +296,7 @@ bool CRetreatTask::HoldValid(CCircuitUnit* unit, int frame)
 
 void CRetreatTask::OnUnitIdle(CCircuitUnit* unit)
 {
+    if(HoldInJam(unit)) return;
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	// D-346: at the forward repair point, wait there (idle heal plus the
@@ -283,7 +310,7 @@ void CRetreatTask::OnUnitIdle(CCircuitUnit* unit)
 		if (HoldValid(unit, frame)) { Start(unit); return; }
 	}
     AIFloat3 commanderStation;
-    if (circuit->GetCommanderControl() && circuit->GetCommanderControl()->RetreatStation(unit, commanderStation)) {
+    if (circuit->GetCommanderController() && circuit->GetCommanderController()->RetreatStation(unit, commanderStation)) {
         // Reaching repair range is not reaching safety from the T3. Keep the
         // existing route owner; do not patrol back toward the threatened haven.
         if (unit->GetPos(frame).SqDistance2D(commanderStation)>SQUARE(64.f)) Start(unit);
@@ -389,6 +416,7 @@ void CRetreatTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CRetreatTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+    if(HoldInJam(unit)) return;
 	if (State::REGROUP != state) {
 		return;
 	}
@@ -452,14 +480,20 @@ void CRetreatTask::Dead()
 
 void CRetreatTask::Recovered(CCircuitUnit* unit)
 {
-	TRY_UNIT(manager->GetCircuit(), unit,
-		if (unit->GetCircuitDef()->IsAbleToCloak()
-			&& unit->GetCircuitDef()->GetCloakCost() > manager->GetCircuit()->GetEconomyManager()->GetAvgEnergyIncome() * 0.1f)
-		{
-			unit->CmdCloak(false);
-		}
-		unit->CmdSetFireState(unit->GetCircuitDef()->GetFireState());
-	)
+	// D-388: a controlled unit's controller restores its states when the
+	// retreat lease ends (KI-689 defect 1: this rule left rich teams' commanders
+	// cloaked for the rest of the game). Other units keep the old rule.
+	auto* controllers = manager->GetCircuit()->GetControllers();
+	if (!controllers || controllers->OwnerOf(unit) == nullptr) {
+		TRY_UNIT(manager->GetCircuit(), unit,
+			if (unit->GetCircuitDef()->IsAbleToCloak()
+				&& unit->GetCircuitDef()->GetCloakCost() > manager->GetCircuit()->GetEconomyManager()->GetAvgEnergyIncome() * 0.1f)
+			{
+				unit->CmdCloak(false);
+			}
+			unit->CmdSetFireState(unit->GetCircuitDef()->GetFireState());
+		)
+	}
 
 	RemoveAssignee(unit);
 }
@@ -468,6 +502,7 @@ void CRetreatTask::ApplyPath(const CQueryPathSingle* query)
 {
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
+    if(HoldInJam(unit)) return;
 
 	if (pPath->posPath.empty()) {
 		pPath->PushPos(query->GetEndPos(), manager->GetCircuit()->GetPathfinder());

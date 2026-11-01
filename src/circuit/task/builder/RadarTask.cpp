@@ -6,7 +6,7 @@
  */
 
 #include "task/builder/RadarTask.h"
-#include "module/CommanderControl.h"
+#include "control/unit/commander/CommanderController.h"
 #include "module/TaskModule.h"
 #include "CircuitAI.h"
 #include "unit/CircuitDef.h"
@@ -40,7 +40,8 @@ bool CBRadarTask::CanAssignTo(CCircuitUnit* unit) const
 	// because coverage changed while it was travelling/building. The shared
 	// commander snapshot amortizes queue candidates; no new polling or orders.
 	return target != nullptr || units.count(unit) != 0
-			|| manager->GetCircuit()->GetCommanderControl()->CanStartRadar(unit);
+			|| manager->GetCircuit()->GetCommanderController()->OwnsGroupProject(this)
+			|| manager->GetCircuit()->GetCommanderController()->CanStartRadar(unit);
 }
 
 } // namespace circuit

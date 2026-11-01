@@ -145,7 +145,7 @@ namespace TechHeavyRush {
         // Preserve the existing high-bank constructor expansion before taking
         // the lab for combat. This is bounded by T2BotConstructorCap, unlike
         // discretionary fast-assist production whose target grows with income.
-        const int builderCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+        const int builderCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors(), true);
         if (aiEconomyMgr.metal.storage > 0.0f
             && aiEconomyMgr.metal.current > aiEconomyMgr.metal.storage * Global::RoleSettings::Tech::T2ConstructorBankShare
             && builderCount < Global::RoleSettings::Tech::T2BotConstructorCap) return null;
@@ -155,7 +155,7 @@ namespace TechHeavyRush {
         if (constructors.length() > 0) {
             CCircuitDef@ builder = ai.GetCircuitDef(constructors[0]);
             const int wanted = Global::RoleSettings::Tech::MinimumT2ConstructorBots;
-            if (builder !is null && builder.count + aiFactoryMgr.GetPendingRecruitCount(builder) < wanted) {
+            if (builder !is null && TechEconomyMath::WorkforceNeeded(builder.count, aiFactoryMgr.GetPendingRecruitCount(builder), wanted)) {
                 if (builder.maxThisUnit < wanted) builder.maxThisUnit = wanted;
                 return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH,
                     builder, factory.GetPos(ai.frame), 64.f));

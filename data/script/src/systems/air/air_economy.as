@@ -45,14 +45,22 @@ namespace AirEconomy {
     }
     void UpdateMilestones() {
         if (MetalEconomy::Active()) return;
-        if (!TechGrowth() && AirMath::GrowthPhase(Economy::IncomeWindowReady(), Economy::GetMinMetalIncomeLast10s(),
-            Global::RoleSettings::Air::TechEconomyMinMetal)) {
+        // D-368 (owner): the shared economy ladder from the first advanced plant on, as
+        // SUPPORT scales from its advanced lab (D-359), or from the income gate as before
+        if (!TechGrowth() && (t2 > 0 || AirMath::GrowthPhase(Economy::IncomeWindowReady(), Economy::GetMinMetalIncomeLast10s(),
+            Global::RoleSettings::Air::TechEconomyMinMetal))) {
             aiTerrainMgr.SetLayoutInt("air.techGrowth", 1);
-            GenericHelpers::LogUtil("[AIR][Growth] shared TECH economy enabled at M10=" + Economy::GetMinMetalIncomeLast10s(), 1);
+            GenericHelpers::LogUtil("[AIR][Growth] shared TECH economy enabled at M10=" + Economy::GetMinMetalIncomeLast10s()
+                + " plants=" + t2, 1);
         }
-        if (!GrowthComplete() && AirMath::MassBombersReady(CompletedAfus(), Global::RoleSettings::Air::MassBomberAfusCount)) {
+        // D-366: the growth objective is two advanced fusions, or the energy-income gate
+        // (AdvancedFusionEnergyIncome) reached with ordinary fusions first.
+        if (!GrowthComplete() && (AirMath::MassBombersReady(CompletedAfus(), Global::RoleSettings::Air::MassBomberAfusCount)
+            || AirMath::GrowthPhase(Economy::IncomeWindowReady(), Economy::GetMinEnergyIncomeLast10s(),
+                Global::RoleSettings::Air::AdvancedFusionEnergyIncome))) {
             aiTerrainMgr.SetLayoutInt("air.massBombers", 1);
-            GenericHelpers::LogUtil("[AIR][Growth] growth objective reached; completed AFUS=" + CompletedAfus(), 1);
+            GenericHelpers::LogUtil("[AIR][Growth] growth objective reached; completed AFUS=" + CompletedAfus()
+                + " energy income=" + int(Economy::GetMinEnergyIncomeLast10s()), 1);
         }
     }
     bool HasReactor()
@@ -267,7 +275,9 @@ namespace AirEconomy {
     {
         // Re-read gifts, deaths and completion immediately before an order.
         RefreshSupport();
-        int factories = 0, finished = 0, least = Global::RoleSettings::Air::T2ExpansionSupport;
+        // Every standing plant must finish its support bank before another starts.
+        // Framed and queued turrets must not unlock expansion early.
+        int factories = 0, finished = 0, least = Global::RoleSettings::Air::T2PlantExpansionTurrets;
         for (uint i = 0; i < owned.length(); ++i) {
             CCircuitUnit@ plant = ai.GetTeamUnit(owned[i]);
             if (plant is null || !UnitHelpers::IsT2AircraftPlant(plant.circuitDef.GetName()) || Lifecycle::IsRetiring(plant)) continue;
@@ -278,7 +288,7 @@ namespace AirEconomy {
                 if (AirLayout::bays[b].factoryId == plant.id) { count = nanoCount[b]; break; }
             least = AiMin(least, count);
         }
-        return ProductionMath::ExpansionSupportReady(factories, finished, least, Global::RoleSettings::Air::T2ExpansionSupport);
+        return ProductionMath::ExpansionSupportReady(factories, finished, least, Global::RoleSettings::Air::T2PlantExpansionTurrets);
     }
     void Tick()
     {
@@ -291,7 +301,8 @@ namespace AirEconomy {
             Invariants::Violation("INV-073", "AIR", "native nano planner enabled while AIR owns production support");
         metal = Economy::GetMinMetalIncomeLast10s(); energy = Economy::GetMinEnergyIncomeLast10s();
         bankM = aiEconomyMgr.metal.current; bankE = aiEconomyMgr.energy.current;
-        WatchTransitionOverflow();   // INV-239 (D-362), on last second's plant count
+        WatchTransitionOverflow();   // INV-239 (D-368), on last second's plant count
+        WatchPlantOverflow();        // INV-243 (upstream AIR PR #32), on last second's plant count
         const bool bad = aiEconomyMgr.isEnergyStalling && bankE < aiEconomyMgr.energy.storage * 0.3f;
         badSamples = bad ? badSamples + 1 : 0;
         goodSamples = !bad && bankE > aiEconomyMgr.energy.storage * 0.45f ? goodSamples + 1 : 0;
@@ -391,7 +402,7 @@ namespace AirEconomy {
             && ProductionMath::LabIncomeReady(Economy::GetMinMetalIncomeLast10s(),
             Economy::IncomeWindowReady(), Global::RoleSettings::Air::TransitionMinMetal, aiEconomyMgr.metal.current, plant.costM);
     }
-    // D-362: the saving hold is pointless once the bank is floating and holds the
+    // D-368: the saving hold is pointless once the bank is floating and holds the
     // funded lab's remaining cost plus TransitionBankFreeFraction of storage: the
     // reserve the hold protects is banked, and everything above it overflows.
     bool BankBeyondLab()
@@ -412,6 +423,67 @@ namespace AirEconomy {
         overflowLogged = ai.frame;
         Invariants::Violation("INV-239", "AIR", "metal bank full " + int((ai.frame - bankFullSince) / SECOND)
             + " s before the first advanced plant stands (savingLab=" + SavingForFirstLab() + ")");
+    }
+    // D-368 (owner): the production budget. Before the first advanced plant the reserve
+    // is that plant's cost once the transition may start (TransitionEarliestSeconds, the
+    // screen up) and until it is ordered; after it, GrowthReserveMetal. The share is
+    // TransitionProductionShare before the first plant, ProductionIncomeShare after.
+    float ProductionReserve()
+    {
+        if (MetalEconomy::Active()) return 0.0f;
+        if (t2 == 0) {
+            CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+            if (lab is null || ai.frame < Global::RoleSettings::Air::ProductionReserveSeconds * SECOND
+                || aiTerrainMgr.GetLayoutInt("air.screen.established", 0) == 0) return 0.0f;
+            if (Planned(lab, Task::BuildType::FACTORY) == 0) return lab.costM;
+        }
+        // a wanted plant's bank share on top, so production yields to it (played: with
+        // the reserve at 1,500 and the plant's 1,450, the bank sawed between the two
+        // and the second plant came ten minutes after the income wanted it)
+        return Global::RoleSettings::Air::GrowthReserveMetal + (PlantWanted() ? PlantBankWanted() : 0.0f);
+    }
+    // D-368: the income wants more advanced plants than stand, are framed or ordered.
+    bool PlantWanted() { return t2 > 0 && !MetalEconomy::Active() && PlantsHave() < PlantsWanted(); }
+    // The bank the next plant needs (PlantBankFraction of its cost), 0 without a def.
+    float PlantBankWanted()
+    {
+        CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side));
+        return lab is null ? 0.0f : lab.costM * Global::RoleSettings::Air::PlantBankFraction;
+    }
+    // A wanted plant whose bank is not there yet: reactors wait for it (AirGrowth).
+    bool PlantUnbanked() { return PlantWanted() && bankM < PlantBankWanted(); }
+    bool ProductionFunded()
+    {
+        if (MetalEconomy::Active()) return true;
+        const float share = t2 == 0 ? Global::RoleSettings::Air::TransitionProductionShare : Global::RoleSettings::Air::ProductionIncomeShare;
+        // the live bank, as D-276 reads it: several fast births can pass between samples
+        return AirMath::ProductionFunded(aiEconomyMgr.metal.current, ProductionReserve(), aiEconomyMgr.metal.pull, metal, share);
+    }
+    // D-368: advanced plants the 10-second minimum metal income wants, and those standing,
+    // framed or ordered.
+    int PlantsWanted()
+    {
+        return AirMath::PlantsWanted(metal, Global::RoleSettings::Air::T2PlantSecondMetalIncome,
+            Global::RoleSettings::Air::T2PlantMetalIncomeStep, Global::RoleSettings::Air::MaxT2AirPlants);
+    }
+    int PlantsHave()
+    {
+        return Planned(ai.GetCircuitDef(UnitHelpers::GetT2AirPlantForSide(Global::AISettings::Side)), Task::BuildType::FACTORY);
+    }
+    int plantBankFullSince = -1;   // INV-243: the frame the metal bank became full, -1 while it is not
+    int plantOverflowLogged = -100000;
+    void WatchPlantOverflow()
+    {
+        if (t2 == 0 || MetalEconomy::Active() || !aiEconomyMgr.isMetalFull) { plantBankFullSince = -1; return; }
+        if (plantBankFullSince < 0) plantBankFullSince = ai.frame;
+        if (ai.frame - plantBankFullSince < Global::RoleSettings::Air::PlantOverflowSeconds * SECOND
+            || ai.frame - plantOverflowLogged < 60 * SECOND || PlantsHave() >= PlantsWanted()) return;
+        plantOverflowLogged = ai.frame;
+        // A full bank must fund the standing support prerequisite first. Check
+        // live completion only at the existing one-minute diagnostic cadence.
+        if (!ExistingT2SupportReady()) return;
+        Invariants::Violation("INV-243", "plants", "metal bank full " + int((ai.frame - plantBankFullSince) / SECOND)
+            + " s with " + PlantsHave() + " of " + PlantsWanted() + " advanced plants at +" + int(metal) + " metal");
     }
     bool SavingForFirstLab()
     {
@@ -443,10 +515,14 @@ namespace AirEconomy {
         // RepairSupport to allocate its first turret.
         const int cap = limit;
         const int production = ProductionMath::SupportTarget(work, plant.GetBuildSpeed(), nano.GetBuildSpeed(), Global::RoleSettings::Air::WarmFactoryGapSeconds, rate, cap);
+        // A standing lab's prerequisite must remain a target even after income
+        // dips below the transition threshold. Funding still gates each order.
+        const int required = advanced && AirLayout::bays[bay].factoryId >= 0
+            ? AiMin(cap, Global::RoleSettings::Air::T2PlantExpansionTurrets) : 0;
         const int expansion = advanced && (Transition(plant) || BankRich()) ? AiMin(cap, Global::RoleSettings::Air::T2ExpansionSupport) : 0;
         const int opening = !advanced && CompletedConstructors() >= Global::RoleSettings::Air::OpeningAirConstructors
             ? AiMin(cap, OpeningNanoTarget()) : 0;
-        return AiMax(opening, AiMax(expansion, production));
+        return AiMax(required, AiMax(opening, AiMax(expansion, production)));
     }
     int OpeningNanoTarget() { return AiMax(0, AiMin(5, AiMin(Global::RoleSettings::Air::T1NanoLimit, Global::RoleSettings::Air::OpeningNanoCount))); }
     int OpeningNanoCompleted()
@@ -466,6 +542,11 @@ namespace AirEconomy {
         return AirWorkforce::mobile + AirWorkforce::arriving + AirWorkforce::shortage;
     }
     bool MetalFloating() { return ProductionMath::MetalFloating(aiEconomyMgr.metal.current, aiEconomyMgr.metal.storage); }
+    // D-365: energy a converter could still turn into metal (the once-per-second sample)
+    bool EnergyFloating() {
+        return AirMath::EnergyFloating(bankE, aiEconomyMgr.energy.storage, energy, aiEconomyMgr.energy.pull,
+            Global::RoleSettings::Air::FloatingEnergyFraction);
+    }
     int ConstructorTarget(CCircuitDef@ d, bool advanced)
     {
         return AirWorkforce::ConstructorTarget(d, advanced);

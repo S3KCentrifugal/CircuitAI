@@ -2065,7 +2065,7 @@
 			"corthud": {
 				"role": ["assault"],
 				"attribute": ["ranged"],
-				"ranged": {"always_fire_at_will": true, "coordinated": true,
+				"ranged": {"fire_in_range": true, "commander_focus": true, "coordinated": true,
                 "sustained_rush": true,
                 "sustained_rush_ratio": 2.0,
                 "sustained_rush_radius": 900.0,

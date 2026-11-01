@@ -199,6 +199,10 @@ namespace Commands {
             return true;
         }
 
+        if (cmd == "nuclear-warning" && parts.length() == 3) {
+            aiBuilderMgr.SetDefenseRule(-1,"nuclear_warning",1);
+            return true;
+        }
         if (cmd == "theatres") { Lanes::RequestOverlay(parts.length() > 3 && parts[3] == "refresh"); return true; }
         if (cmd == "query") {
             Aggression::Announce();
@@ -597,6 +601,7 @@ namespace Commands {
         const bool openerScoutQueued = FrontOpener::WasQueued("scout");
         const bool openerBatchQueued = FrontOpener::WasQueued("batch");
         Layout::OnRoleLeave();
+        FrontEnergy::Release(); // remove only our availability overlay before DefState restores caps
         if (openerScoutQueued) FrontOpener::MarkQueued("scout");
         if (openerBatchQueued) FrontOpener::MarkQueued("batch");
         TechWeapons::OnRoleLeave();   // D-126

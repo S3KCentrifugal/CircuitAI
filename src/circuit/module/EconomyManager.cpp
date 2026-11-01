@@ -50,6 +50,12 @@ using namespace springai;
 const char* RES_NAME_METAL = "Metal";
 const char* RES_NAME_ENERGY = "Energy";
 
+// D-387: MexOwnerTeam's sentinels. NONE: nobody owns the spot (anyone keeps
+// it). UNKNOWN: an ally owns it but its team is not known (refused, never
+// captured: there is no recipient). Matches the header comment.
+constexpr int MEX_OWNER_NONE = -1;
+constexpr int MEX_OWNER_UNKNOWN = -2;
+
 CEconomyManager::CEconomyManager(CCircuitAI* circuit)
 		: IModule(circuit, new CEconomyScript(circuit->GetScriptManager(), this))
 		, energyGrid(nullptr)
@@ -1010,12 +1016,25 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos)
 		}
 		return false;
 	}
+	const int owner = MexOwnerTeam(pos);
+	return owner == MEX_OWNER_NONE || owner == circuit->GetTeamId();
+}
+
+int CEconomyManager::MexOwnerTeam(const springai::AIFloat3& pos)
+{
+	// The same rules IsOwnSpot applies, reporting the owning team instead of
+	// a yes/no. Theatres: the resolved record (no in-flight precedence: that
+	// decides who may build, not who receives).
+	if (mexTheatresEnabled) {
+		const SMexResolved* r = MexResolvedAt(pos);
+		return (r == nullptr || r->owner < 0) ? MEX_OWNER_NONE : r->owner;
+	}
 	// D-322 ownership by walking distance holds for the opening window only;
 	// once it ends the D-072 Voronoi split below is the rule again (D-327).
 	if (mexNavigationEnabled && IsMexOwnershipActive()) {
 		auto* terrain = circuit->GetTerrainManager();
 		if (!std::isfinite(pos.x) || !std::isfinite(pos.z) || pos.x < 0 || pos.z < 0
-				|| pos.x >= terrain->GetTerrainWidth() || pos.z >= terrain->GetTerrainHeight()) return false;
+				|| pos.x >= terrain->GetTerrainWidth() || pos.z >= terrain->GetTerrainHeight()) return MEX_OWNER_UNKNOWN;
 		const int ownTeam = circuit->GetTeamId();
 		if (mexStarts.find(ownTeam) == mexStarts.end()) {
 			SMexStart own;
@@ -1034,7 +1053,7 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos)
 		}
 		const int index = metalMap ? -1 : circuit->GetMetalManager()->FindNearestSpot(pos);
 		const bool indexed = index >= 0 && std::size_t(index) < spots.size() && spots[index].position.SqDistance2D(pos) < 1.f;
-		if (indexed && mexOwners[index] != -2) return mexOwners[index] < 0 || mexOwners[index] == ownTeam;
+		if (indexed && mexOwners[index] != -2) return mexOwners[index] < 0 ? MEX_OWNER_NONE : mexOwners[index];
 		int owner = -1;
 		float best = mex_navigation::Unreachable;
 		for (auto& [team, start] : mexStarts) {
@@ -1042,7 +1061,7 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos)
 			if (mex_navigation::Better(distance, team, best, owner)) { best = distance; owner = team; }
 		}
 		if (indexed) mexOwners[index] = owner;
-		return owner < 0 || owner == ownTeam;
+		return owner < 0 ? MEX_OWNER_NONE : owner;
 	}
 	// Owner 2026-10-20: when the opening window ends every open spot is
 	// released to any ally. The D-072 split below would keep a rear start's
@@ -1052,14 +1071,59 @@ bool CEconomyManager::IsOwnSpot(const springai::AIFloat3& pos)
 		return true;
 	}
 	// D-072: the spot is ours when no ally's start position is nearer to it
-	// than our own (a Voronoi split of the map by start positions).
-	const float own = circuit->GetSetupManager()->GetStartPos().SqDistance2D(pos);
-	for (const springai::AIFloat3& s : allyStarts) {
-		if (s.SqDistance2D(pos) < own) {
-			return false;
+	// than our own (a Voronoi split of the map by start positions). The owner
+	// is the nearest strictly nearer ally; its team is unknown for a start
+	// added without one.
+	float best = circuit->GetSetupManager()->GetStartPos().SqDistance2D(pos);
+	int owner = MEX_OWNER_NONE;
+	for (std::size_t i = 0; i < allyStarts.size(); ++i) {
+		const float distance = allyStarts[i].SqDistance2D(pos);
+		if (distance < best) {
+			best = distance;
+			owner = (i < allyStartTeams.size() && allyStartTeams[i] >= 0) ? allyStartTeams[i] : MEX_OWNER_UNKNOWN;
 		}
 	}
-	return true;
+	return owner;
+}
+
+int CEconomyManager::MexCaptureOwner(const springai::AIFloat3& pos)
+{
+	// D-387. Metal maps place field sites, not spots; no capture there (KI-688).
+	if (!mexCaptureEnabled || metalMap) return -1;
+	return mex_territory::CaptureFor(true, MexOwnerTeam(pos), circuit->GetTeamId());
+}
+
+void CEconomyManager::MexBuilt(CCircuitUnit* unit)
+{
+	// D-387: one frame later, outside the finished-event dispatch. Giving a
+	// unit inside it lets the capture event unregister it while other
+	// handlers still hold it (the FactoryManager note). Event-driven, once
+	// per new extractor: an owner lookup, no scan and no recurring work.
+	if (!mexCaptureEnabled || metalMap || unit == nullptr) return;
+	const AIFloat3 pos = unit->GetPos(circuit->GetLastFrame());
+	if (MexCaptureOwner(pos) < 0) return;
+	const ICoreUnit::Id unitId = unit->GetId();
+	circuit->GetScheduler()->RunJobAfter(CScheduler::GameJob([this, unitId]() {
+		CCircuitUnit* mex = circuit->GetTeamUnit(unitId);
+		if (mex == nullptr || mex->IsDead() || !mex->IsFinished()) return;
+		const AIFloat3 at = mex->GetPos(circuit->GetLastFrame());
+		// Ownership may have moved in the frame (a window closing): give to
+		// the owner now, keep it when the spot became ours.
+		const int owner = MexCaptureOwner(at);
+		if (owner < 0) return;
+		auto* game = circuit->GetGame();
+		if (game->GetTeamAllyTeam(owner) != game->GetTeamAllyTeam(circuit->GetTeamId())) {
+			circuit->LOG("[INVARIANT] INV-245 captured mex owner is not an ally team=%i owner=%i unit=%i x=%.0f z=%.0f",
+				circuit->GetTeamId(), owner, unitId, at.x, at.z);
+			return;
+		}
+		if (circuit->GiveUnitIfAccepted(mex, owner)) {
+			circuit->LOG("[MexCapture] gave mex unit=%i to team=%i x=%.0f z=%.0f", unitId, owner, at.x, at.z);
+		} else {
+			// The engine refuses a dead team; the extractor stays ours and productive.
+			circuit->LOG("[MexCapture] kept mex unit=%i owner=%i refused x=%.0f z=%.0f", unitId, owner, at.x, at.z);
+		}
+	}), 1);
 }
 
 IBuilderTask* CEconomyManager::EnqueueMexWithin(
@@ -1108,7 +1172,7 @@ IBuilderTask* CEconomyManager::EnqueueMexWithin(
 			const AIFloat3& pos = task->GetPosition();
 			if ((pos.SqDistance2D(center) > radiusSq) || excludedSpot(pos)
 					|| !CanReachMex(builder, pos)
-					|| (mexNavigationEnabled && task->GetTarget() == nullptr && !IsOwnSpot(pos))) {
+					|| (mexNavigationEnabled && task->GetTarget() == nullptr && !IsMexSpotAdmissible(pos))) {
 				continue;
 			}
 			const float sq = from.SqDistance2D(pos);
@@ -1155,13 +1219,14 @@ IBuilderTask* CEconomyManager::EnqueueMexWithin(
 				static_cast<CBMexTask*>(task)->SetIgnoreAlly(!allyAware);
 				// Task-added callbacks are a mutation boundary. Audit territorial
 				// admission once per new order; this is a warm cached spot query.
-				if (IsMexOwnershipActive() && !IsOwnSpot(pos))
+				// D-387: a captured spot is admitted on purpose (built for its owner).
+				if (IsMexOwnershipActive() && !IsOwnSpot(pos) && MexCaptureOwner(pos) < 0)
 					circuit->LOG("[INVARIANT] INV-227 mex admitted outside protected ownership team=%i x=%.0f z=%.0f",
 						circuit->GetTeamId(), pos.x, pos.z);
 				// D-352: a sea or race-won spot of another ally must never be ordered.
 				if (mexTheatresEnabled) {
 					const int owner = MexSpotOwner(pos), rule = MexSpotRule(pos);
-					if (owner >= 0 && owner != circuit->GetTeamId()
+					if (owner >= 0 && owner != circuit->GetTeamId() && MexCaptureOwner(pos) < 0
 						&& (rule == int(mex_territory::Rule::SEA) || rule == int(mex_territory::Rule::RACE_SECURED)
 							|| rule == int(mex_territory::Rule::RACE_CONTESTED) || rule == int(mex_territory::Rule::RACE_AIR)))
 						circuit->LOG("[INVARIANT] INV-232 mex admitted on another ally's theatre spot team=%i x=%.0f z=%.0f theatre=%i owner=%i",
@@ -1642,7 +1707,8 @@ IBuilderTask* CEconomyManager::UpdateMetalTasks(const AIFloat3& position, CCircu
 				// while its opening window runs; afterwards the zone veto holds, except
 				// with mex navigation, where an open spot is free to any ally (owner 2026-10-30)
 				if (IsAllyOpenMexSpot(index)
-					&& (mexNavigationEnabled ? IsOwnSpot(pos) : !terrainMgr->IsZoneAlly(pos))
+					&& ((mexNavigationEnabled ? IsOwnSpot(pos) : !terrainMgr->IsZoneAlly(pos))
+						|| MexCaptureOwner(pos) >= 0)  // D-387 (Cent): an ally's spot, built for that ally
 					&& CanReachMex(unit, pos))  // hostile environment
 				{
 					for (CCircuitDef* mDef : mexDefs) {
@@ -1663,7 +1729,7 @@ IBuilderTask* CEconomyManager::UpdateMetalTasks(const AIFloat3& position, CCircu
 						IBuilderTask::Priority::HIGH, mexDef, pos, index));
 				if (mexTheatresEnabled) {  // D-352 audit, warm cached lookups
 					const int owner = MexSpotOwner(pos), rule = MexSpotRule(pos);
-					if (owner >= 0 && owner != circuit->GetTeamId()
+					if (owner >= 0 && owner != circuit->GetTeamId() && MexCaptureOwner(pos) < 0
 						&& (rule == int(mex_territory::Rule::SEA) || rule == int(mex_territory::Rule::RACE_SECURED)
 							|| rule == int(mex_territory::Rule::RACE_CONTESTED) || rule == int(mex_territory::Rule::RACE_AIR)))
 						circuit->LOG("[INVARIANT] INV-232 mex admitted on another ally's theatre spot team=%i x=%.0f z=%.0f theatre=%i owner=%i",

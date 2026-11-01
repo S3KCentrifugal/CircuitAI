@@ -9,7 +9,7 @@
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/CircuitUnit.h"
 #include "module/EconomyManager.h"
-#include "module/CommanderControl.h"
+#include "control/unit/commander/CommanderController.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -36,7 +36,7 @@ CDGunAction::~CDGunAction()
 void CDGunAction::Update(CCircuitAI* circuit)
 {
     auto* commander=static_cast<CCircuitUnit*>(ownerList);
-    if(circuit->GetCommanderControl() && circuit->GetCommanderControl()->Handles(commander)) {
+    if(circuit->GetCommanderController() && circuit->GetCommanderController()->Handles(commander)) {
         isBlocking=false; return;
     }
 	if (updCount++ % 4 != 0) {

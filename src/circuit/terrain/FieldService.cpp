@@ -112,21 +112,7 @@ bool CFieldService::ReadSettings(CCircuitAI* circuit)
 	const Json::Value& f = (*root)["field"];
 	if (!f.isObject()) return false;
 	enabled = f.get("enabled", false).asBool();
-	settings.cellSize = f.get("cell_size", settings.cellSize).asInt();
-	settings.regionMinCells = f.get("region_min_cells", settings.regionMinCells).asInt();
-	settings.waterMinCells = f.get("water_min_cells", settings.waterMinCells).asInt();
-	settings.chokeFraction = f.get("choke_fraction", settings.chokeFraction).asFloat();
-	settings.highGroundRise = f.get("high_ground_rise", settings.highGroundRise).asFloat();
-	settings.rampMinRise = std::max(1.f, f.get("ramp_min_rise", settings.rampMinRise).asFloat());
-	settings.passageExpansion = std::max(1.05f, f.get("passage_expansion", settings.passageExpansion).asFloat());
-	settings.passageProbeCells = std::clamp(f.get("passage_probe_cells", settings.passageProbeCells).asInt(), 8, 256);
-	settings.beachDepth = f.get("beach_depth", settings.beachDepth).asFloat();
-	settings.crossingMinLength = f.get("crossing_min_length", settings.crossingMinLength).asInt();
-	settings.landingMerge = f.get("landing_merge", settings.landingMerge).asInt();
-	settings.avenueDetour = f.get("avenue_detour", settings.avenueDetour).asFloat();
-	settings.avenueMax = f.get("avenue_max", settings.avenueMax).asInt();
-	settings.seaReach = f.get("sea_reach", settings.seaReach).asFloat();
-	settings.pondMaxShare = f.get("pond_max_share", settings.pondMaxShare).asFloat();
+	ReadTerrainSettings(*root, settings);
 	ReadMarkSettings(*root, settings.marks);
 	publishFile = f.get("publish_file", true).asBool();
 	dumpInput = f.get("dump_input", false).asBool();
@@ -306,11 +292,11 @@ void CFieldService::Complete(CCircuitAI* circuit)
 	summary = Summary(*model);
 	for (const std::string& f : model->checkFailures) circuit->LOG("FIELD: check failed: %s", f.c_str());
 	const STimings& t = model->timings;
-	circuit->LOG("FIELD_PERF owner=%i team=%i cells=%i capture_ms=%.1f queue_ms=%.1f analyse_ms=%.1f grid=%.1f mobility=%.1f sides=%.1f theatres=%.1f regions=%.1f boundaries=%.1f landings=%.1f avenues=%.1f key=%.1f theatres=%i regions=%i boundaries=%i chokes=%i avenues=%i landings=%i fingerprint=%llu",
+	circuit->LOG("FIELD_PERF owner=%i team=%i cells=%i capture_ms=%.1f queue_ms=%.1f analyse_ms=%.1f grid=%.1f mobility=%.1f sides=%.1f theatres=%.1f regions=%.1f boundaries=%.1f landings=%.1f avenues=%.1f key=%.1f corridors_ms=%.1f theatres=%i regions=%i boundaries=%i chokes=%i avenues=%i landings=%i corridors=%i obstacles=%i fingerprint=%llu",
 		ownerTeam, circuit->GetTeamId(), model->gw * model->gh, captureMs, result->queueMs, result->analyseMs,
-		t.gridMs, t.mobilityMs, t.sidesMs, t.theatresMs, t.regionsMs, t.boundariesMs, t.landingsMs, t.avenuesMs, t.keyMs,
+		t.gridMs, t.mobilityMs, t.sidesMs, t.theatresMs, t.regionsMs, t.boundariesMs, t.landingsMs, t.avenuesMs, t.keyMs, t.corridorsMs,
 		(int)model->theatres.size(), (int)model->regions.size(), (int)model->boundaries.size(), (int)model->chokes.size(),
-		(int)model->avenues.size(), (int)model->landings.size(), static_cast<unsigned long long>(model->fingerprint));
+		(int)model->avenues.size(), (int)model->landings.size(), (int)model->corridors.size(), (int)model->obstacles.size(), static_cast<unsigned long long>(model->fingerprint));
 	circuit->LOG("[Field] summary: %s", summary.c_str());
 	if (model->marksBuilt) {
 		for (const std::string& f : model->marksFailures) circuit->LOG("MARKS: check failed: %s", f.c_str());

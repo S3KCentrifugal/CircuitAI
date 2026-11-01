@@ -1,0 +1,16 @@
+{
+  "name": "front-energy-gate",
+  "unit": "armack",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Supplied FRONT T2 worker checks hard AFUS admission and normal fusion fallback.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [[3000,3000],[6000,5000]],
+  "commander_observation": true,
+  "commander_initial": false,
+  "groups": [{"unit":"armack", "team":0, "count":1, "position":[3000,3000], "after_seconds":12}],
+  "photos": [],
+  "camera": [3000,3000,1800],
+  "checks": "front-energy-gate"
+}

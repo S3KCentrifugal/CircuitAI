@@ -170,6 +170,8 @@ namespace Layout {
     {
         CompactEco::Clear();
         antiNukeSearchAfter = 0;
+        economyOverflowNeeded=false;
+        @economySupportTask=null;
         planned = false;
         fallback = false;
         facing = 0;
@@ -1081,17 +1083,26 @@ namespace Layout {
     // then, when no zone has room, the ring round each zone within turret reach
     // (played: the converters filled every zone and the advanced fusions found no
     // site after six)
+    bool economyOverflowNeeded=false;
     int PackSetAnywhere(CCircuitDef@ def, const AIFloat3& in anchor, int setSize)
     {
-        for (int pass = 0; pass < 2; ++pass) {
-            const bool ring = (pass == 1);
+        // Exhaust the primary cluster's interior AND all-sided reach ring
+        // before considering a secondary cluster. A larger gap is allowed only
+        // after flush sites are exhausted; native still checks support range,
+        // terrain, occupancy, reservations and factory exits for every footprint.
+        for (int pass = 0; pass < 3; ++pass) {
+            const bool ring = pass > 0;
+            const int gap = pass == 2 ? -1 : Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells;
             for (int i = 0; i < ZoneCount(); ++i) {
-                const int id = aiTerrainMgr.PackSet(ZoneAt(i), def, nanoGroup, facing, anchor, setSize, ring, Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells);
+                const int id = aiTerrainMgr.PackSet(ZoneAt(i), def, nanoGroup, facing, anchor, setSize, ring, gap);
                 if (id >= 0) return id;
             }
-            if (fwdZone != 0 && fwdGroup > 0) {
-                const int id = aiTerrainMgr.PackSet(fwdZone, def, fwdGroup, facing, anchor, setSize, ring, Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells);
-                if (id >= 0) return id;
+        }
+        economyOverflowNeeded=true;
+        if (fwdZone != 0 && fwdGroup > 0) {
+            for(int pass=0;pass<2;++pass) {
+                const int id=aiTerrainMgr.PackSet(fwdZone,def,fwdGroup,facing,anchor,setSize,pass>0,-1);
+                if(id>=0) return id;
             }
         }
         // Saturated support, not only saturated turret slots, needs capacity.
@@ -1105,6 +1116,32 @@ namespace Layout {
         return -1;
     }
 
+    IUnitTask@ economySupportTask;
+    IUnitTask@ EconomySupport(CCircuitUnit@ worker) {
+        if(economySupportTask is null || economySupportTask.IsDead()) { @economySupportTask=null; return null; }
+        return worker !is null && nano !is null && worker.circuitDef.CanBuild(nano) ? economySupportTask : null;
+    }
+    bool HasEconomySupport(const AIFloat3& in position) {
+        // Admission-only O(N) census through existing native API, not a new tick.
+        // Conservative center distance uses this faction's actual nano reach.
+        return nano !is null && aiBuilderMgr.GetStaticBuildPowerNear(position,nano.GetBuildDistance())>0.0f;
+    }
+    void PrepareEconomySupport(const AIFloat3& in position) {
+        if(nano is null || !nano.IsAvailable(ai.frame) || TurretsCapped()
+            || (economySupportTask !is null && !economySupportTask.IsDead())) return;
+        int slot=aiTerrainMgr.NextSlotAny(nanoGroup,position);
+        if(slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance())
+            slot=fwdGroup>0 ? aiTerrainMgr.NextSlotAny(fwdGroup,position) : -1;
+        for(uint i=0;i<overflowSupportGroups.length()
+            && (slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance());++i)
+            slot=aiTerrainMgr.NextSlotAny(overflowSupportGroups[i],position);
+        if(slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance()) return;
+        IUnitTask@ task=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,Task::Priority::HIGH,nano,
+            aiTerrainMgr.GetReservationPos(slot),0.0f,true,120*SECOND));
+        if(task is null) return;
+        if(!AiPinReservation(task,slot)) {aiBuilderMgr.AbortTask(task);return;}
+        @economySupportTask=task;
+    }
     // D-108: while the advanced fusions have a dedicated builder, the next set of
     // their ground is always held ahead, so the converters cannot take it
     int afusAheadLog = -100000;
@@ -1418,6 +1455,7 @@ namespace Layout {
 
     IUnitTask@ ReplaceLost(Task::BuildType type, CCircuitDef@ def, CCircuitUnit@ builder)
     {
+        if(!TechBuild::CanStartAfus(def)) return null;
         if (!Global::RoleSettings::Tech::EconomyRecoveryEnabled || builder is null || def is null
             || !def.IsAvailable(ai.frame) || !builder.circuitDef.CanBuild(def)) return null;
         const int id = aiTerrainMgr.NextLostReservation(builder, def, Global::RoleSettings::Tech::RecoverySlotBudget);
@@ -1426,6 +1464,10 @@ namespace Layout {
         if (aiTerrainMgr.GetReservationState(id) != 0 || aiTerrainMgr.GetLostReservationCount(def) <= 0) {
             Invariants::Violation("INV-223", def.GetName(), "recovery selected an owned or non-lost slot " + id);
             return null;
+        }
+        const AIFloat3 position=aiTerrainMgr.GetReservationPos(id);
+        if(HasBox() && SetSizeOf(def)>0 && !HasEconomySupport(position)) {
+            PrepareEconomySupport(position);return null;
         }
         IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, def,
             aiTerrainMgr.GetReservationPos(id), 0.0f, true, 300 * SECOND));
@@ -1446,6 +1488,7 @@ namespace Layout {
     IUnitTask@ PlaceMeasured(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder)
     {
         if (def is null) return null;
+        if(!TechBuild::CanStartAfus(def)) return null;
         if (Global::AISettings::Role == AiRole::TECH) {
             if (AfusAtLimit(def)) return null;   // owner 2026-10-20: one advanced fusion at a time
             IUnitTask@ replacement = ReplaceLost(type, def, builder);
@@ -1508,9 +1551,8 @@ namespace Layout {
                     if (fg >= 0 && (gap < 0 || fg < gap)) gap = fg;
                 }
                 GenericHelpers::LogUtil("[Layout] new set of " + def.GetName() + " at (" + int(sp.x) + ", " + int(sp.z) + "), " + gap + " cell(s) from a turret", 1);
-                // INV-022 (D-101): the first of a set touches a turret
-                if (gap < 0 || (Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells >= 0
-                    && gap > Global::RoleSettings::Tech::LayoutSetMaximumTurretGapCells))
+                // INV-022: a supported set has a valid relationship to its turret group
+                if (gap < 0)
                     Invariants::Violation("INV-022", def.GetName(), "a new set of " + def.GetName() + " starts " + gap + " cell(s) from the turrets, not flush");
             }
         }
@@ -1552,6 +1594,10 @@ namespace Layout {
         noRoomSince = -1;
         noRoomMisses.set(def.GetName(), 0);
         const AIFloat3 pos = aiTerrainMgr.GetReservationPos(id);
+        if(setSize>0 && !HasEconomySupport(pos)) {
+            PrepareEconomySupport(pos);
+            return null; // keep the economy reservation; construct its support first
+        }
         // INV-014 (D-082): every packed structure stands within a turret's reach of a slot
         if (aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, pos, Global::RoleSettings::Tech::InvariantReachElmos) == 0
             && (fwdGroup == 0 || aiTerrainMgr.CountGroupSlotsWithin(fwdGroup, pos, Global::RoleSettings::Tech::InvariantReachElmos) == 0)
@@ -1889,7 +1935,8 @@ namespace Layout {
                     id = fid;
                 }
             }
-            if (id < 0 && fwdGroup > 0) id = aiTerrainMgr.NextSlotConnected(fwdGroup, fwdCentre);   // D-081: the forward cluster once the main block is full
+            // Cent d4af5e54 (merge 2026-11-01): the forward cluster only once the primary cluster's economy overflowed
+            if (id < 0 && fwdGroup > 0 && economyOverflowNeeded) id = aiTerrainMgr.NextSlotConnected(fwdGroup, fwdCentre);   // D-081: the forward cluster once the main block is full
             if (id >= 0) GenericHelpers::LogUtil("[Layout] turret slot " + id + ", " + int(sqrt(MapHelpers::SqDist(aiTerrainMgr.GetReservationPos(id), boxCentre))) + " from the box centre (connected)", 2);
         }
         if (id < 0 && Global::RoleSettings::Tech::ExpTurretNearLab) {

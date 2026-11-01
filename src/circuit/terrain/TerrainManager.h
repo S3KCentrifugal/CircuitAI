@@ -209,6 +209,13 @@ public:
 	bool SetLayoutEnabled(bool enabled);
 	bool IsLayoutEnabled() const { return layoutEnabled; }
 	bool IsLayoutConfigured() const { return layoutConfigured; }
+    // Ordinary-placement participation, independent of planned-layout policy.
+    void SetBuildSiteReservations(bool enabled);
+    bool ReserveBuildSite(int& claim, CCircuitDef* def, const springai::AIFloat3& pos, int facing);
+    void ReleaseBuildSite(int& claim);
+    void ObserveBuildStructure(CCircuitUnit* unit);
+    void ForgetBuildStructure(int unitId);
+    bool buildSiteReservations = false;
 	struct SZone {
 		int id;
 		int2 c1, c2;   // cell rectangle [c1, c2)
@@ -287,7 +294,8 @@ public:
 			CCircuitDef* nanoDef, const springai::AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells);
 	int AcquireFactoryReservation(CCircuitDef* factoryDef);
 	bool PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* repeatedFactory,
-			CCircuitDef* nanoDef, const springai::AIFloat3& origin, int facing, int count, int columns, int firstNanos);
+			CCircuitDef* nanoDef, const springai::AIFloat3& origin, int facing, int count, int columns, int firstNanos,
+			bool centerFirst = false, bool centerRepeated = false);
 	bool PinLayoutTask(IBuilderTask* task, const std::string& groupName, CCircuitUnit* builder);
 	bool PinFactoryNanoTask(IBuilderTask* task, CCircuitUnit* builder);
 	int GetFactoryNanoAvailable() const;

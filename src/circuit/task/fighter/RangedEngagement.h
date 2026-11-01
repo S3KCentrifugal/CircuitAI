@@ -39,7 +39,7 @@ private:
     int lastProgressFrame=0, lastMoveFrame=-10000;
     int lastShotFrame=0, orientUntil=0;
     int traceFrame=-150;
-    bool fireOpen=false; int fireStateFrame=-10000; // fire_at_will: last state sent
+    bool fireOpen=false; int fireStateFrame=-10000; // individual fire_at_will: last state sent
     size_t pathCursor=0;
     springai::AIFloat3 lastPos, destination;
     std::unique_ptr<springai::Weapon> liveWeapon;

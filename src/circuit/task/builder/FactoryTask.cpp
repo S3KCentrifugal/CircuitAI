@@ -99,7 +99,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	// A served slot is kept across retries (D-055): the fixed-facing return
 	// below used to move a lab back to the shaken anchor on a second Execute.
-	if ((reservationId >= 0) && geom::is_valid(buildPos) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+	if ((reservationId >= 0) && geom::is_valid(buildPos) && !terrainMgr->IsAllyLayoutBlocked(buildDef, buildPos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
 		return;
 	}
 	// D-104 (owner's rule): every factory, whoever ordered it, stands flush
@@ -116,7 +116,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	}
 	// While a slot for this def is planned, the search runs so it is served.
 	const bool planned = terrainMgr->IsLayoutEnabled() && (terrainMgr->GetReservationCount(buildDef) > 0);
-	if (preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
+	if (preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && !terrainMgr->IsAllyLayoutBlocked(buildDef, pos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
 		SetBuildPos(pos);
 		return;
 	}

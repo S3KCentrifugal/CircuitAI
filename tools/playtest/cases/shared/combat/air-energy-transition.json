@@ -1,0 +1,84 @@
+{
+  "name": "air-energy-transition",
+  "unit": "corcom",
+  "side": "cortex",
+  "role": "AIR",
+  "enemy_role": "FRONT",
+  "description": "Completed fusion rejects basic/advanced solar and incremental cleanup physically reclaims obsolete power.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {
+      "unit": "corca",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3100,
+        2900
+      ],
+      "after_seconds": 10
+    },
+    {
+      "unit": "corfus",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2800,
+        2600
+      ],
+      "after_seconds": 10
+    },
+    {
+      "unit": "corsolar",
+      "team": 0,
+      "count": 2,
+      "position": [
+        3200,
+        2900
+      ],
+      "spacing": 160,
+      "after_seconds": 10
+    },
+    {
+      "unit": "cormstor",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2500,
+        2600
+      ],
+      "after_seconds": 10
+    }
+  ],
+  "photos": [],
+  "start_metal": 10,
+  "start_energy": 100000,
+  "checks": "air-energy-transition",
+  "assertions": {
+    "min_kills": 0,
+    "min_shooters": 0,
+    "max_losses": 2
+  },
+  "hold_all": true,
+  "hold_teams": [
+    1,
+    2
+  ],
+  "enemy_team": 2
+}

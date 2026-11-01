@@ -56,6 +56,9 @@ namespace CommanderCombat {
                     if(name==own) front=true;
                 }
             }
+            Option("commander_group_combat_distance",1000.f);
+            Option("commander_group_combat_memory",30.f);
+            Option("commander_group_radius",600.f);
             Option("enabled",Global::Commander::Enabled?1.f:0.f);
             Option("advance",front?1.f:0.f);
             aiBuilderMgr.SetCommanderCombatOption("front_duty",(role==int(AiRole::FRONT) && front)?1.f:0.f);
@@ -82,6 +85,55 @@ namespace CommanderCombat {
             Option("front_push_ahead",0.f);
             // D-356 push bound and end; D-357 corridor mex sweep. JSON supplies the
             // policy; the fallbacks equal the native defaults (legacy behaviour).
+            Option("front_persistent",0.f);
+            Option("front_radar_spacing",500.f);
+            Option("front_mex_los",0.f);
+            Option("cloak_energy_retreat",0.f);
+            Option("cloak_retreat_distance",600.f);
+            Option("health_retreat",.4f);
+            Option("decoys",1.f);
+            Option("decoy_bait",1.f);
+            Option("decoy_health_retreat",.9f);
+            Option("decoy_health_recover",.95f);
+            Option("decoy_front_cloak_income",0.f);
+            Option("health_shot_seconds",2.f);
+            Option("commander_group_jammer_edge",0.f);
+            Option("commander_group_jammer_gain",.25f);
+            Option("commander_group_jammer_spacing",.6f);
+            Option("commander_group_jammer_hold",10.f);
+            Option("commander_group_sensor_defense_band",3.f);
+            Option("commander_group_jammer_outage",60.f);
+            Option("commander_group_jammer_income",25.f);
+            Option("commander_group_defence_metal",50.f);
+            Option("commander_group_defence_energy",1000.f);
+            Option("commander_group_budget_seconds",30.f);
+            Option("commander_group_budget_fraction",.25f);
+            Option("commander_group_mex_upgrade",1.f);
+            Option("commander_group_mex_priority",3.f);
+            Option("commander_group_radar_priority",2.f);
+            Option("commander_group_line_priority",1.f);
+            Option("front_mex_defence",0.f);
+            Option("front_mex_min_income",0.f);
+            Option("front_mex_base_radius",Global::RoleSettings::Front::AllyRange);
+            Option("front_line_enabled",0.f);
+            Option("front_line_fog",1000.f);
+            Option("front_fortify_bank",.5f);
+            Option("front_fortify_priority",1.f);
+            Option("front_fortify_advance",0.f);
+            Option("front_line_spacing",1.5f);
+            Option("front_defence_spacing",.5f);
+            aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",-1.f);
+            array<string>@ defenceNames=aiSetupMgr.ConfigString("commander/combat/front_defence_definitions",
+                "armllt,corllt,leglht,armbeamer,corhllt,legmg").split(",");
+            for(uint i=0;i<defenceNames.length();++i) {
+                CCircuitDef@ defence=ai.GetCircuitDef(defenceNames[i]);
+                if(defence !is null) aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",float(defence.id));
+            }
+            Option("front_line_depth",800.f);
+            Option("front_mex_offset",160.f);
+            Option("front_work_behind",400.f);
+            Option("jam_safe",0.f);
+            Option("jam_heavy_cost",900.f);
             Option("front_push_screen",0.f);
             Option("front_push_until_seconds",0.f);
             Option("front_push_home_riot",0.f);
@@ -96,12 +148,15 @@ namespace CommanderCombat {
             Option("front_radius",Global::Commander::FrontRadius);
             Option("front_threat",Global::Commander::FrontThreat);
             Option("front_recovery",Global::Commander::FrontRecovery?1.f:0.f);
+            Option("front_repair_combat",0.f);
+            Option("front_solar_income",0.f);
+            Option("front_solar_storage",.2f);
+            Option("front_solar_radius",300.f);
             Option("front_mex_seconds",Global::Commander::FrontMexSeconds);
             Option("front_stall_seconds",Global::Commander::FrontStallSeconds);
             Option("front_detour_seconds",Global::Commander::FrontDetourSeconds);
             Option("t3_decline_gate",Global::Commander::T3DeclineGate);
             Option("move_resend_seconds",Global::Commander::MoveResendSeconds);
-            Option("uncloak_seconds",Global::Commander::UncloakSeconds);
             Option("fallback_goal_hold_seconds",Global::Commander::FallbackGoalHoldSeconds);
             Option("t3_immediate_shot",0.f);
             Option("t3_position_seconds",0.f);
@@ -121,6 +176,7 @@ namespace CommanderCombat {
             Option("fallback_group_radius",Global::Commander::FallbackGroupRadius);
             Option("fallback_offset",Global::Commander::FallbackOffset);
             Option("fallback_search",Global::Commander::FallbackSearch);
+            Option("fallback_prepare_seconds",Global::Commander::FallbackPrepareSeconds);
             Option("fallback_hold_seconds",Global::Commander::FallbackHoldSeconds);
             Option("fallback_porc_range",Global::Commander::FallbackPorcRange);
             Option("sensor_memory",Global::Commander::SensorMemory);
