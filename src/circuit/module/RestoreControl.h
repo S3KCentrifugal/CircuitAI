@@ -26,6 +26,7 @@
 #define SRC_CIRCUIT_MODULE_RESTORECONTROL_H_
 
 #include "AIFloat3.h"
+#include "terrain/TerrainManager.h"
 
 #include <map>
 #include <set>
@@ -65,6 +66,14 @@ public:
 	float GetLavaMargin() const { return lavaMargin; }
 
 	void TaskEnded(CBRestoreTask* task, bool done, float seconds);
+	// The restorer went away mid-patch (killed or taken): the spot backs off.
+	void Lost(const springai::AIFloat3& pos, bool killed);
+	bool IsProtected() const { return protect; }
+	// Live heights in the square, our and allied structures' pads skipped,
+	// every 2nd cell (at most 26x26 engine reads for the 200 cap).
+	CTerrainManager::STerrainDamage MeasureLive(const springai::AIFloat3& pos, float radius);
+	// Under a patch's minimum (min_cells, scaled to the every-2nd-cell sample)
+	bool IsRestored(const CTerrainManager::STerrainDamage& damage) const { return damage.cells * 4 < minCells; }
 
 private:
 	struct SPatch {
@@ -75,6 +84,18 @@ private:
 		float depth;
 	};
 	bool BuildPatch(const springai::AIFloat3& nearPos, SPatch& patch);
+	CTerrainManager::STerrainDamage Measure(const springai::AIFloat3& pos, float radius, bool live, int step);
+	// Spots tried before: each start or loss doubles the spot's wait from
+	// restore.cooldown up to restore.retry_cap; restore.max_tries starts in a
+	// row put it straight on the cap. A real restore (3 s+) clears the count.
+	struct SSpot {
+		springai::AIFloat3 pos;
+		int tries;
+		int until;  // frame
+	};
+	SSpot& Spot(const springai::AIFloat3& pos);
+	bool IsSpotHeld(const springai::AIFloat3& pos, int frame) const;
+	void HoldSpot(const springai::AIFloat3& pos, float radius);
 	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front);
 	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out) const;
 	bool IsCovered(const springai::AIFloat3& pos) const;
@@ -102,6 +123,11 @@ private:
 	float pathSlope = 0.161f; // 1 - cos(33 deg): steeper than this blocks a Thor
 	float pathReach = 4000.f; // builders sent this far for a path patch
 	int pathUnits = 300;      // ground army units looked at per scan
+	int maxTries = 3;         // starts at one spot before it waits retry_cap
+	int retryCapSeconds = 600;// the longest a tried spot waits
+	bool protect = true;      // a restorer keeps its patch against ordinary builder tasks
+	std::vector<SSpot> spots; // at most 64, the oldest dropped
+	std::vector<char> blocked;// structure mask scratch, reused
 
 	struct SActive {
 		CBRestoreTask* task;
@@ -120,6 +146,8 @@ private:
 	mutable std::map<int, int> unitClass;  // def id -> class bit (0: never)
 	int restored = 0;
 	int failed = 0;
+	int lostKilled = 0;
+	int lostTaken = 0;
 };
 
 } // namespace circuit

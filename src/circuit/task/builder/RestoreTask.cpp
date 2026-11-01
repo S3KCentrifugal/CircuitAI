@@ -31,6 +31,7 @@ CBRestoreTask::CBRestoreTask(ITaskModule* mgr, Priority priority, const AIFloat3
 		, startFrame(-1)
 		, orders(0)
 		, unitId(-1)
+		, keptLogged(false)
 {
 }
 
@@ -45,10 +46,37 @@ bool CBRestoreTask::CanAssignTo(CCircuitUnit* unit) const
 
 void CBRestoreTask::RemoveAssignee(CCircuitUnit* unit)
 {
+	const bool killed = unit->IsDead();
 	IBuilderTask::RemoveAssignee(unit);
 	if (units.empty() && !IsDead()) {
-		manager->AbortTask(this);  // one restorer per patch: taken away (retreat, script) ends it
+		manager->GetCircuit()->LOG("RESTORE: lost %s(%i) at (%.0f, %.0f): %s", unitName.c_str(), unitId,
+				position.x, position.z, killed ? "killed" : "taken (retreat, fight or a task that may take it)");
+		static_cast<CBuilderManager*>(manager)->GetRestoreControl()->Lost(position, killed);
+		manager->AbortTask(this);  // one restorer per patch: taken away ends it
 	}
+}
+
+bool CBRestoreTask::KeepsAssignee(const IUnitTask* next) const
+{
+	if (IsDead() || units.empty() || !static_cast<CBuilderManager*>(manager)->GetRestoreControl()->IsProtected()) {
+		return false;
+	}
+	if (next != nullptr) {
+		// Retreat, fights, player orders and NOW builder tasks still take it.
+		const IUnitTask::Type type = next->GetType();
+		if ((type != Type::BUILDER) && (type != Type::WAIT) && (type != Type::IDLE)) {
+			return false;
+		}
+		if ((type == Type::BUILDER) && (static_cast<const IBuilderTask*>(next)->GetPriority() == Priority::NOW)) {
+			return false;
+		}
+		if (!keptLogged) {
+			keptLogged = true;
+			manager->GetCircuit()->LOG("RESTORE: kept %s(%i) on its restore at (%.0f, %.0f) (refused task type %i)",
+					unitName.c_str(), unitId, position.x, position.z, int(type));
+		}
+	}
+	return true;
 }
 
 void CBRestoreTask::Start(CCircuitUnit* unit)
@@ -101,17 +129,13 @@ void CBRestoreTask::OnUnitIdle(CCircuitUnit* unit)
 	// itself, live, once per idle: at most 26x26 engine reads.
 	CCircuitAI* circuit = manager->GetCircuit();
 	CRestoreControl* control = static_cast<CBuilderManager*>(manager)->GetRestoreControl();
-	CTerrainManager::SDamageQuery query;
-	query.threshold = control->GetDamageThreshold();
-	query.lavaLevel = control->GetLavaLevel();
-	query.lavaMargin = control->GetLavaMargin();
-	query.live = true;
-	query.step = 2;
 	// One cell in from the square's edge: the engine moves corners, and an
-	// edge cell keeps the unrestored corners outside the square.
+	// edge cell keeps the unrestored corners outside the square. Our and our
+	// allies' building pads are skipped as in the scan, and less than a
+	// patch's minimum is restored (the scan would never start it).
 	const float inner = std::max(radius - 2.f * SQUARE_SIZE, float(SQUARE_SIZE));
-	const CTerrainManager::STerrainDamage left = circuit->GetTerrainManager()->GetTerrainDamage(position, inner, query);
-	if (left.cells == 0) {
+	const CTerrainManager::STerrainDamage left = control->MeasureLive(position, inner);
+	if (control->IsRestored(left)) {
 		manager->DoneTask(this);
 		return;
 	}
