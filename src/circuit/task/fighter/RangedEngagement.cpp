@@ -597,7 +597,9 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             case line::Stance::COVER: if(directive->standFirm) point=pos; break;
             case line::Stance::HOLD: if(directive->standFirm || directive->scripted) point=pos; break;
             case line::Stance::WITHDRAW:
-                if(group.mode!=cohort::Mode::WITHDRAW && group.mode!=cohort::Mode::KITE) {
+                // The cohort executes its own withdrawals (its poke cadence
+                // included); the line steps a hull back only for a script order.
+                if(directive->scripted && group.mode!=cohort::Mode::WITHDRAW && group.mode!=cohort::Mode::KITE) {
                     point=pos+back*std::max(192.f,policy.spacing*2.f); lineUrgent=true;
                 }
                 break;
