@@ -99,12 +99,16 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	pathSlope = 1.f - std::cos(slopeDeg * 3.14159265f / 180.f);  // the engine's slope unit
 	pathReach = std::max(0.f, cfg.get("path_reach", pathReach).asFloat());
 	pathUnits = std::max(0, cfg.get("path_units", pathUnits).asInt());
+	maxTries = std::max(1, cfg.get("max_tries", maxTries).asInt());
+	retryCapSeconds = std::max(cooldownSeconds, cfg.get("retry_cap", retryCapSeconds).asInt());
+	protect = cfg.get("protect", protect).asBool();
 	unitClass.clear();
-	circuit->LOG("RESTORE: %s units=%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f",
+	circuit->LOG("RESTORE: %s units=%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i",
 			enabled ? "on" : "off",
 			(allowMask & CLASS_COMMANDER) ? "commander " : "", (allowMask & CLASS_T1) ? "t1 " : "",
 			(allowMask & CLASS_T2) ? "t2 " : "", (allowMask & CLASS_REZ) ? "rez " : "",
-			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach);
+			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach,
+			maxTries, retryCapSeconds, int(protect));
 }
 
 int CRestoreControl::GetScanInterval() const
@@ -212,7 +216,7 @@ void CRestoreControl::CoolDown(const AIFloat3& pos, float radius, int frames)
 	cooldown[terrainMgr->GetSectorIndex(pos)] = until;
 }
 
-bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
+CTerrainManager::STerrainDamage CRestoreControl::Measure(const AIFloat3& nearPos, float radius, bool live, int step)
 {
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	const int frame = circuit->GetLastFrame();
@@ -220,13 +224,14 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 	// Structures keep their levelled pads: those cells are never damage. A
 	// footprint is taken as the circle around its larger side.
 	// Footprints are rasterised once into the window's cell grid (51x51 for
-	// the 200 radius), so the cell scan costs one lookup per cell.
-	const int x0 = int((nearPos.x - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
-	const int z0 = int((nearPos.z - RESTORE_MAX_RADIUS) / SQUARE_SIZE);
-	const int side = int(2 * RESTORE_MAX_RADIUS / SQUARE_SIZE) + 2;
-	std::vector<char> blocked;
+	// the 200 radius), so the cell scan costs one lookup per cell. The mask
+	// buffer is a member, reused across calls (no allocation per patch).
+	const int x0 = int((nearPos.x - radius) / SQUARE_SIZE);
+	const int z0 = int((nearPos.z - radius) / SQUARE_SIZE);
+	const int side = int(2 * radius / SQUARE_SIZE) + 2;
+	blocked.clear();
 	circuit->UpdateFriendlyUnits();
-	const std::vector<int> ids = circuit->GetCallback()->GetFriendlyUnitIdsIn(nearPos, RESTORE_MAX_RADIUS * 1.5f, false);
+	const std::vector<int> ids = circuit->GetCallback()->GetFriendlyUnitIdsIn(nearPos, radius * 1.5f + 64.f, false);
 	for (int id : ids) {
 		CAllyUnit* au = circuit->GetFriendlyUnit(id);
 		if ((au == nullptr) || (au->GetCircuitDef() == nullptr) || au->GetCircuitDef()->IsMobile()) {
@@ -253,14 +258,28 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 	query.threshold = threshold;
 	query.lavaLevel = GetLavaLevel();
 	query.lavaMargin = lavaMargin;
+	query.live = live;
+	query.step = step;
 	if (!blocked.empty()) {
-		query.skip = [&blocked, x0, z0, side](float x, float z) {
+		const std::vector<char>& mask = blocked;
+		query.skip = [&mask, x0, z0, side](float x, float z) {
 			const int cx = int(x / SQUARE_SIZE) - x0;
 			const int cz = int(z / SQUARE_SIZE) - z0;
-			return (cx >= 0) && (cz >= 0) && (cx < side) && (cz < side) && (blocked[cz * side + cx] != 0);
+			return (cx >= 0) && (cz >= 0) && (cx < side) && (cz < side) && (mask[cz * side + cx] != 0);
 		};
 	}
-	const CTerrainManager::STerrainDamage damage = terrainMgr->GetTerrainDamage(nearPos, RESTORE_MAX_RADIUS, query);
+	return terrainMgr->GetTerrainDamage(nearPos, radius, query);
+}
+
+CTerrainManager::STerrainDamage CRestoreControl::MeasureLive(const AIFloat3& pos, float radius)
+{
+	return Measure(pos, std::min(radius, RESTORE_MAX_RADIUS), true, 2);
+}
+
+bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
+{
+	patch.center = -RgtVector;
+	const CTerrainManager::STerrainDamage damage = Measure(nearPos, RESTORE_MAX_RADIUS, false, 1);
 	if (damage.cells < minCells) {
 		return false;
 	}
@@ -274,7 +293,57 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 	patch.cells = damage.cells;
 	patch.lavaCells = damage.lavaCells;
 	patch.depth = std::max(damage.dug, damage.raised);
-	return true;
+	// The scan reads the AI's cached heightmap (refreshed every 10 s by the
+	// terrain worker); confirm on the live ground before anyone walks out, or
+	// a patch the engine already restored is "done" at once and found again.
+	// At most 26x26 engine reads, for the few candidates a scan tries.
+	// Same square as the restorer's done check (RestoreTask::OnUnitIdle).
+	return !IsRestored(MeasureLive(patch.center, std::max(patch.radius - 2.f * SQUARE_SIZE, float(SQUARE_SIZE))));
+}
+
+CRestoreControl::SSpot& CRestoreControl::Spot(const AIFloat3& pos)
+{
+	for (SSpot& s : spots) {
+		if (s.pos.SqDistance2D(pos) < SQUARE(64.f)) {
+			return s;
+		}
+	}
+	if (spots.size() >= 64) {
+		spots.erase(spots.begin());
+	}
+	spots.push_back({pos, 0, 0});
+	return spots.back();
+}
+
+bool CRestoreControl::IsSpotHeld(const AIFloat3& pos, int frame) const
+{
+	for (const SSpot& s : spots) {
+		if ((s.until > frame) && (s.pos.SqDistance2D(pos) < SQUARE(64.f))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void CRestoreControl::HoldSpot(const AIFloat3& pos, float radius)
+{
+	// 60, 120, 240 ... seconds, capped; max_tries in a row go straight to the cap
+	SSpot& s = Spot(pos);
+	++s.tries;
+	const int seconds = (s.tries >= maxTries) ? retryCapSeconds
+			: std::min(retryCapSeconds, cooldownSeconds << std::min(s.tries - 1, 10));
+	s.until = circuit->GetLastFrame() + FRAMES_PER_SEC * seconds;
+	CoolDown(pos, radius, FRAMES_PER_SEC * seconds);
+}
+
+void CRestoreControl::Lost(const AIFloat3& pos, bool killed)
+{
+	if (killed) {
+		++lostKilled;
+	} else {
+		++lostTaken;
+	}
+	HoldSpot(pos, 64.f);
 }
 
 CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float maxDist, bool front)
@@ -405,16 +474,24 @@ void CRestoreControl::Scan()
 		if ((int(active.size()) >= maxActive) || (tried >= 8)) {
 			break;
 		}
-		if (IsCoolingDown(terrainMgr->GetSectorIndex(c.pos), frame) || IsCovered(c.pos)) {
+		if (IsCoolingDown(terrainMgr->GetSectorIndex(c.pos), frame) || IsCovered(c.pos) || IsSpotHeld(c.pos, frame)) {
 			continue;
 		}
 		++tried;
 		SPatch patch;
 		if (!BuildPatch(c.pos, patch)) {
 			CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
+			if (geom::is_valid(patch.center)) {
+				CoolDown(patch.center, patch.radius, cooldownFrames);  // cached damage the live ground lacks
+			}
 			continue;
 		}
-		if (IsCovered(patch.center)) {
+		// The candidate's sector can lie outside an earlier patch's cooled
+		// radius while its patch is the same one: check the patch itself.
+		if (IsCovered(patch.center) || IsCoolingDown(terrainMgr->GetSectorIndex(patch.center), frame)
+			|| IsSpotHeld(patch.center, frame))
+		{
+			CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
 			continue;
 		}
 		CCircuitUnit* unit = PickUnit(patch.center, patch.radius, (c.reason == PATH) ? std::max(reach, pathReach) : reach, c.reason == PATH);
@@ -429,7 +506,8 @@ void CRestoreControl::Scan()
 		CBRestoreTask* task = builderMgr->EnqueueRestore(patch.center, patch.radius, c.reason,
 				FRAMES_PER_SEC * (maxSeconds + int(walk * 1.5f)));
 		active.push_back({task, patch.center, patch.radius});
-		CoolDown(patch.center, patch.radius, cooldownFrames);
+		HoldSpot(patch.center, patch.radius);
+		CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
 		circuit->LOG("RESTORE: start %s(%i) reason=%s at (%.0f, %.0f) r=%.0f cells=%i lava=%i depth=%.0f lavaLevel=%.0f from %.0f away",
 				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), ReasonName(c.reason),
 				patch.center.x, patch.center.z, patch.radius, patch.cells, patch.lavaCells, patch.depth,
@@ -520,12 +598,15 @@ void CRestoreControl::TaskEnded(CBRestoreTask* task, bool done, float seconds)
 	}
 	if (done) {
 		++restored;
+		if (seconds >= 3.f) {
+			Spot(it->pos).tries = 0;  // real work: a later crater here is a new one
+		}
 	} else {
 		++failed;
 	}
-	circuit->LOG("RESTORE: %s reason=%s at (%.0f, %.0f) r=%.0f seconds=%.1f (restored %i, failed %i)",
+	circuit->LOG("RESTORE: %s reason=%s at (%.0f, %.0f) r=%.0f seconds=%.1f (restored %i, failed %i, lost killed %i taken %i)",
 			done ? "done" : "aborted", ReasonName(task->GetReason()), it->pos.x, it->pos.z, it->radius, seconds,
-			restored, failed);
+			restored, failed, lostKilled, lostTaken);
 	active.erase(it);
 }
 
