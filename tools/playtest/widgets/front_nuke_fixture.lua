@@ -68,7 +68,29 @@ function widget:GameFrame(f)
             end
         end
         echo(string.format("minute=%d silos tech=%d front=%d (front frames %d) launches tech=%d front=%d",
-            f//1800,n[1],n[2],b[2],launches[0] or 0,launches[front] or 0))
+            math.floor(f/1800),n[1],n[2],b[2],launches[0] or 0,launches[front] or 0))
+    end
+    if f%300==0 and front then
+        -- FRONT's silo frames: progress and who builds them
+        for u,t in pairs(silos) do
+            if t==front and Spring.ValidUnitID(u) and not Spring.GetUnitIsDead(u) then
+                local _,_,_,_,bp=Spring.GetUnitHealth(u)
+                if bp and bp<1 then
+                    local n,near=0,0
+                    local x,_,z=Spring.GetUnitPosition(u)
+                    for _,b in ipairs(Spring.GetTeamUnits(front) or {}) do
+                        if Spring.GetUnitIsBuilding(b)==u then n=n+1 end
+                        local d=UnitDefs[Spring.GetUnitDefID(b)]
+                        if d and (d.buildSpeed or 0)>0 and d.canMove then
+                            local bx,_,bz=Spring.GetUnitPosition(b)
+                            if (bx-x)^2+(bz-z)^2<600*600 then near=near+1 end
+                        end
+                    end
+                    local m,_,_,inc=Spring.GetTeamResources(front,"metal")
+                    echo(string.format("frame %d progress=%.3f builders=%d mobileBuildersNear=%d metal bank=%d income=%.0f",u,bp,n,near,m or -1,inc or -1))
+                end
+            end
+        end
     end
     local live={}
     for _,p in ipairs(Spring.GetProjectilesInRectangle(0,0,Game.mapSizeX,Game.mapSizeZ,false,false) or {}) do

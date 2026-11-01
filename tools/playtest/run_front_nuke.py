@@ -31,6 +31,7 @@ def main():
     p.add_argument('--con-minute', type=int, default=30)
     p.add_argument('--minutes', type=float, default=38)
     p.add_argument('--map', default='Supreme Isthmus v1.7')
+    p.add_argument('--set', action='append', default=[], help='role setting override for playtest.py stage, e.g. Front.NukeMinSeconds=600')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     silos = a.tech_silos + a.front_silos
@@ -58,7 +59,7 @@ def main():
                    '--modoption', 'ai_incomemultiplier=1', '--modoption', 'dynamiccheats=0', '--modoption', 'deathmode=neverend',
                    '--ai-option', 'profile=experimental_balanced', '--ai-option', 'random_seed=22901',
                    '--speed', '20', '--minutes', str(a.minutes), '--headless', '--lean-render',
-                   '--extra-widget', str(HERE / 'widgets/front_nuke_fixture.lua')]
+                   '--extra-widget', str(HERE / 'widgets/front_nuke_fixture.lua')] + [x for kv in a.set for x in ('--set', kv)]
     subprocess.run(stage, cwd=ROOT, check=True)
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     (d / 'LuaUI/Config/front_nuke.lua').write_text(
@@ -76,7 +77,7 @@ def main():
     if a.stage_only:
         return 0
     watch = cmd + ['watch', '--dir', str(d), '--role', 'TECH', '--checks', str(check),
-                   '--minutes', str(a.minutes), '--wall-minutes', '40']
+                   '--minutes', str(a.minutes), '--wall-minutes', '40', '--play-decided']
     try:
         subprocess.run(cmd + ['launch', '--dir', str(d), '--headless'], cwd=ROOT, check=True)
         return subprocess.run(watch, cwd=ROOT).returncode
