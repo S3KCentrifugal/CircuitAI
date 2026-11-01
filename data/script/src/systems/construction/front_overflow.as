@@ -108,11 +108,19 @@ namespace FrontOverflow {
                 // ground the constructor can walk to (arm C, 2026-10-31: "behind the base" on Forge was a ledge the
                 // T2 vehicles could not reach, and native's site search, which needs a reach, refused every cell)
                 if (u !is null && !aiTerrainMgr.CanMoveTo(u, p)) return false;
+                if (Planned(d, p)) return false;
                 fitCells.insertLast(p);
             }
         }
         // no surface threat at the block
         return aiBattle.SurfThreat(c) <= Global::RoleSettings::Front::OverflowMaxThreat;
+    }
+
+    // ground an ally's layout holds (a gantry site, a TECH zone) or a reservation covers: native's site
+    // search refuses it (arm C, 2026-10-31: a block on Forge sat on an allied gantry reservation)
+    bool Planned(CCircuitDef@ d, const AIFloat3 &in p)
+    {
+        return aiTerrainMgr.IsAllyLayoutBlocked(d, p, 0) || aiTerrainMgr.IsReserved(p);
     }
 
     array<AIFloat3> givenUp;    // centres of blocks given up: not chosen again
@@ -253,6 +261,7 @@ namespace FrontOverflow {
         }
         const int i = OpenCell();
         if (i < 0) return null;   // the rest of the block is ordered
+        if (Planned(d, cells[i])) { cellState[i] = 3; blockFails++; failsHere++; return null; }   // planned over since the block was chosen
         if (!aiTerrainMgr.CanMoveTo(u, cells[i]) || aiBattle.SurfThreat(cells[i]) > Global::RoleSettings::Front::OverflowMaxThreat) return null;   // another constructor, or later
         if (!anchored) {
             // one cell until the block's first frame stands and sets the grid (Follow)
