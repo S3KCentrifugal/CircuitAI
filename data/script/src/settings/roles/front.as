@@ -370,6 +370,31 @@ namespace Front {
             float LabPorcReach = 3000.0f;              // idle, guarding or assisting T2 constructors this near the lab are asked
             float LabPorcTakeRadius = 1200.0f;         // ... and ones walking to an unframed build this near
             int LabPorcScanSeconds = 5;
+            // Forward agitators and special porc (owner, 2026-11-01; systems/construction/front_agitator.as).
+            // Agitator: at our most forward mex or static land gun that stands AgitatorMapShare or more of the
+            // map toward the enemy (along the ally-start -> enemy-start axis, map edge to map edge), when the
+            // metal bank reached AgitatorMetalShare of storage in the last AgitatorMetalWindowSeconds, a FRONT
+            // constructor builds the faction's T1 area-control plasma artillery there.
+            // SpecialPorc: the T2 pop-up plasma artillery at the same spots, by T2 constructors, while the bank is
+            // above SpecialPorcMetalShare, the 10 s minimum metal income above SpecialPorcMinMetalIncome and a T2 lab stands.
+            // Both off here; experimental_balanced turns them on. Log [FRONT][Agitator], [FRONT][SpecialPorc].
+            bool Agitator = false;
+            array<string> AgitatorUnits = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
+            float AgitatorMetalShare = 0.8f;
+            int AgitatorMetalWindowSeconds = 120;
+            float AgitatorMapShare = 0.4f;
+            float AgitatorCoverRadius = 350.0f;        // a spot with one of ours this near is done
+            int AgitatorMax = 6;                       // most standing at once
+            float AgitatorReach = 3000.0f;             // idle, guarding or assisting constructors this near the spot are asked
+            float AgitatorTakeRadius = 1500.0f;        // ... and ones walking to an unframed build this near
+            float AgitatorShake = 160.0f;              // native looks this far round the spot for room
+            int AgitatorScanSeconds = 5;
+            bool SpecialPorc = false;
+            array<string> SpecialPorcUnits = { "armamb", "cortoast", "legacluster" };   // Rattlesnake, Persecutor, Eviscerator
+            float SpecialPorcMetalShare = 0.5f;
+            float SpecialPorcMinMetalIncome = 100.0f;
+            float SpecialPorcCoverRadius = 350.0f;
+            int SpecialPorcMax = 6;
             // Hard AFUS admission floors, unlike native energy-table preferences.
             float MinimumMetalIncomeForAFUS = 70.0f;
             float MinimumEnergyIncomeForAFUS = 4000.0f;
