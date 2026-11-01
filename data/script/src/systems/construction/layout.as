@@ -1533,8 +1533,10 @@ namespace Layout {
                 if (!aiTerrainMgr.CanReserveBuilding(definition, position, direction)) continue;
                 const int slot = aiTerrainMgr.ReserveBuilding(definition, position, direction, 0);
                 if (slot < 0) continue;
+                const bool block = Global::RoleSettings::Tech::LayoutOverflowSupportColumns > 0 && Global::RoleSettings::Tech::LayoutOverflowSupportRows > 0;
                 const int support = aiTerrainMgr.ReserveNanoBlockAt(nano, definition, position, direction,
-                    Global::RoleSettings::Tech::CrampedSupportColumns, Global::RoleSettings::Tech::CrampedSupportRows, 0);
+                    block ? Global::RoleSettings::Tech::LayoutOverflowSupportColumns : Global::RoleSettings::Tech::CrampedSupportColumns,
+                    block ? Global::RoleSettings::Tech::LayoutOverflowSupportRows : Global::RoleSettings::Tech::CrampedSupportRows, 0);
                 if (support <= 0 || aiTerrainMgr.CountGroupSlotsWithin(support, position, nano.GetBuildDistance()) == 0) {
                     if (support > 0) { const int zone = aiTerrainMgr.GetGroupZone(support); aiTerrainMgr.ReleaseGroup(support); if (zone > 0) aiTerrainMgr.ReleaseZone(zone); }
                     aiTerrainMgr.ReleaseReservation(slot);
@@ -1543,7 +1545,9 @@ namespace Layout {
                 aiTerrainMgr.SetLayoutInt(BOX + ".overflow_group" + overflowSupportGroups.length(), support);
                 overflowSupportGroups.insertLast(support);
                 aiTerrainMgr.SetLayoutInt(BOX + ".overflow_count", int(overflowSupportGroups.length()));
-                GenericHelpers::LogUtil("[Layout] supported overflow " + definition.GetName() + " slot=" + slot + " support=" + support, 1);
+                GenericHelpers::LogUtil("[Layout] supported overflow " + definition.GetName() + " slot=" + slot + " support=" + support
+                    + " (" + aiTerrainMgr.GetGroupCount(support, false) + " turret slots, " + aiTerrainMgr.CountGroupSlotsWithin(support, position, nano.GetBuildDistance())
+                    + " in reach) at (" + int(position.x) + ", " + int(position.z) + ")", 1);
                 return slot;
             }
         }

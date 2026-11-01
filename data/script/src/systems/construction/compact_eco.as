@@ -7,6 +7,8 @@ namespace CompactEco {
     array<int> projects;
     array<int> expansionRetry;
     int failedSearchFrame = -100000;
+    int moduleBanks = 0;
+    int moduleRetryFrame = -100000;
     int searchCursor = 0;
     AIFloat3 searchOrigin(-1.0f, 0.0f, -1.0f);
 
@@ -20,6 +22,7 @@ namespace CompactEco {
         projects.resize(0);
         expansionRetry.resize(0);
         failedSearchFrame = -100000;
+        moduleBanks = 0; moduleRetryFrame = -100000;
         searchCursor = 0; searchOrigin = AIFloat3(-1.0f, 0.0f, -1.0f);
     }
 
@@ -37,6 +40,7 @@ namespace CompactEco {
             projects.insertLast(aiTerrainMgr.GetLayoutInt(ROOT + ".project" + index, -1));
             expansionRetry.insertLast(0);
         }
+        moduleBanks = aiTerrainMgr.GetLayoutInt(ROOT + ".module_banks", 0);
         // The cramped advanced lab owns its initial two support slots.
         Layout::nanoGroup = aiTerrainMgr.GetLayoutInt(Layout::BOX + ".nano_group", 0);
         Layout::labSlot = aiTerrainMgr.GetLayoutInt(Layout::BOX + ".lab_slot", -1);
@@ -115,12 +119,88 @@ namespace CompactEco {
     // same blocked prefix forever. Only capacity growth searches terrain.
     // Native owns claims, loss recovery and saved IDs; Clear/Adopt owns arrays.
     // A one-turret bank commits only if the requested economy footprint fits too.
+    bool ModulesOn() { return Global::RoleSettings::Tech::CompactEcoModuleColumns > 0 && Global::RoleSettings::Tech::CompactEcoModuleRows > 0; }
+    int ModuleTurrets() { return Global::RoleSettings::Tech::CompactEcoModuleColumns * Global::RoleSettings::Tech::CompactEcoModuleRows; }
+    bool IsModule(int group) { return ModulesOn() && aiTerrainMgr.GetGroupCount(group, false) * 4 >= ModuleTurrets() * 3; }
+
+    // owner 2026-11-01 (16+ turrets in reach of every AFUS and converter): a
+    // bank is a block of CompactEcoModuleColumns x Rows turrets, laid at once,
+    // with CompactEcoModuleHaloElmos of packing ground reserved around it. The
+    // nearest site whose block clears LayoutBoxMinScore and whose ground
+    // around it is at least half usable wins. At most CompactEcoModuleBudget
+    // sites scored per ask; a failed ask waits CompactEcoRetrySeconds.
+    int GrowModule(CCircuitUnit@ worker, CCircuitDef@ requested, int &out buildingSlot)
+    {
+        buildingSlot = -1;
+        if (!ModulesOn() || moduleBanks >= Global::RoleSettings::Tech::CompactEcoModuleBanks || ai.frame < moduleRetryFrame) return 0;
+        const int direction = Layout::LabFacing();
+        const int savedFacing = Layout::facing;
+        Layout::facing = direction;   // the box helpers measure along Layout::facing
+        const int cols = Global::RoleSettings::Tech::CompactEcoModuleColumns, rows = Global::RoleSettings::Tech::CompactEcoModuleRows;
+        const int acrossCells = cols * Layout::Across(Layout::nano, direction);
+        const int depthCells = rows * Layout::Along(Layout::nano, direction);
+        const float halfAcross = float(acrossCells) * SQUARE_SIZE, halfDepth = float(depthCells) * SQUARE_SIZE;
+        const float halo = Global::RoleSettings::Tech::CompactEcoModuleHaloElmos;
+        const AIFloat3 forward = Layout::Fwd(direction);
+        const AIFloat3 origin = SearchOrigin();
+        const int diameter = Global::RoleSettings::Tech::CompactEcoSearchRings * 2 + 1;
+        const int count = AiMin(diameter * diameter, Global::RoleSettings::Tech::CompactEcoModuleBudget);
+        const float margin = AiMax(halfAcross, halfDepth);
+        int found = 0;
+        for (int index = 0; index < count; ++index) {
+            const AIFloat3 centre = origin + SearchOffset(index) * Global::RoleSettings::Tech::CompactEcoModuleStep;
+            if (centre.x < margin || centre.z < margin || centre.x >= AiTerrainWidth() - margin || centre.z >= AiTerrainHeight() - margin) continue;
+            if (!aiTerrainMgr.CanReachAt(worker, centre, worker.circuitDef.GetBuildDistance())) continue;
+            const float score = Layout::BoxScore(centre, acrossCells, depthCells);
+            if (score < Global::RoleSettings::Tech::LayoutBoxMinScore) continue;
+            const float ground = aiTerrainMgr.FlatFraction(centre, direction, halfAcross + halo, halfDepth + halo, Global::RoleSettings::Tech::LayoutBoxMaxSlope)
+                * aiTerrainMgr.BuildableFraction(Layout::nano, centre, halfAcross + halo, halfDepth + halo, direction);
+            if (ground < 0.5f) continue;
+            const int zone = aiTerrainMgr.ReserveZone(centre, direction, halfAcross + halo, halfDepth + halo, false);
+            if (zone <= 0) continue;
+            const int group = aiTerrainMgr.LayBand(zone, Layout::nano, centre + forward * halfDepth, direction, cols, rows, 0, false, true, false, 0);
+            if (group <= 0 || aiTerrainMgr.GetGroupCount(group, false) * 4 < ModuleTurrets() * 3) {
+                if (group > 0) aiTerrainMgr.ReleaseGroup(group);
+                aiTerrainMgr.ReleaseZone(zone);
+                continue;
+            }
+            const int slot = (requested is null) ? aiTerrainMgr.NextReachableSlot(worker, Layout::nano, zone, group, 8) : Pack(group, requested, worker);
+            const int seed = (requested is null && slot >= 0) ? slot : aiTerrainMgr.NextSlotAny(group, centre);
+            aiTerrainMgr.SetLayoutInt(ROOT + ".group" + groups.length(), group);
+            aiTerrainMgr.SetLayoutInt(ROOT + ".seed" + groups.length(), seed);
+            aiTerrainMgr.SetLayoutInt(ROOT + ".project" + groups.length(), slot);
+            groups.insertLast(group); zones.insertLast(zone); seeds.insertLast(seed); projects.insertLast(slot);
+            expansionRetry.insertLast(0);
+            aiTerrainMgr.SetLayoutInt(ROOT + ".count", int(groups.length()));
+            ++moduleBanks;
+            aiTerrainMgr.SetLayoutInt(ROOT + ".module_banks", moduleBanks);
+            RegisterFactories();
+            buildingSlot = slot;
+            found = group;
+            GenericHelpers::LogUtil("[Layout][Compact] cluster=" + groups.length() + " group=" + group + " zone=" + zone
+                + " module of " + aiTerrainMgr.GetGroupCount(group, false) + " turrets, block ground " + int(score * 100.0f) + "%, around it "
+                + int(ground * 100.0f) + "% at (" + int(centre.x) + ", " + int(centre.z) + ")", 1);
+            break;
+        }
+        Layout::facing = savedFacing;
+        if (found == 0) {
+            moduleRetryFrame = ai.frame + int(Global::RoleSettings::Tech::CompactEcoRetrySeconds) * SECOND;
+            GenericHelpers::LogUtil("[Layout][Compact] no " + cols + "x" + rows + " turret module fits within "
+                + int(Global::RoleSettings::Tech::CompactEcoModuleStep * sqrt(float(count)) * 0.5f) + " of (" + int(origin.x) + ", " + int(origin.z) + "); single banks meanwhile", 1);
+        }
+        return found;
+    }
+
     int Grow(CCircuitUnit@ worker, CCircuitDef@ requested, int &out buildingSlot)
     {
         buildingSlot = -1;
         if (Layout::nano is null || worker is null || worker.circuitDef is null
-            || groups.length() >= uint(Global::RoleSettings::Tech::CompactEcoMaxClusters)
-            || ai.frame - failedSearchFrame < int(Global::RoleSettings::Tech::CompactEcoRetrySeconds) * SECOND) return 0;
+            || groups.length() >= uint(Global::RoleSettings::Tech::CompactEcoMaxClusters)) return 0;
+        {
+            const int module = GrowModule(worker, requested, buildingSlot);
+            if (module > 0) return module;
+        }
+        if (ai.frame - failedSearchFrame < int(Global::RoleSettings::Tech::CompactEcoRetrySeconds) * SECOND) return 0;
         const int direction = Layout::LabFacing();
         const AIFloat3 forward = Layout::Fwd(direction);
         const AIFloat3 origin = SearchOrigin();
@@ -227,8 +307,13 @@ namespace CompactEco {
     IUnitTask@ Place(Task::BuildType type, Task::Priority priority, CCircuitDef@ definition, int timeout, CCircuitUnit@ worker)
     {
         if (worker is null || worker.circuitDef is null || !worker.circuitDef.CanBuild(definition)) return null;
-        int slot = Pack(Layout::nanoGroup, definition, worker);
-        for (uint index = 0; slot < 0 && index < groups.length(); ++index) slot = Pack(groups[index], definition, worker);
+        int slot = -1;
+        // owner 2026-11-01: the turret modules' ground first (16+ in reach)
+        for (uint index = 0; slot < 0 && index < groups.length(); ++index) if (IsModule(groups[index])) slot = Pack(groups[index], definition, worker);
+        // a module that fits is grown before a structure goes beside a lone turret
+        if (slot < 0 && ModulesOn()) GrowModule(worker, definition, slot);
+        if (slot < 0) slot = Pack(Layout::nanoGroup, definition, worker);
+        for (uint index = 0; slot < 0 && index < groups.length(); ++index) if (!IsModule(groups[index])) slot = Pack(groups[index], definition, worker);
         if (slot < 0) Grow(worker, definition, slot);
         // Small banks hold individual reactors/converters. Every footprint is
         // still within native-verified turret reach; no long set or loose spiral.

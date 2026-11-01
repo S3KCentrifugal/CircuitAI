@@ -121,8 +121,18 @@ namespace EcoPlanner {
             && ReplacementFunded(aiTerrainMgr.GetLostReservationCount(def), pending,
                 aiEconomyMgr.metal.current, def.costM);
     }
+    // owner 2026-11-01: past ConvertPastMetalFullAfus finished advanced fusions a
+    // floating energy bank is converted even with the metal bank full (played:
+    // Carrot Mountains, 100k E/s wasted at min 60; converters stopped at 48 on
+    // "metal-full" from min 38 while the advanced fusions kept coming)
+    bool ConvertPastMetalFull() {
+        const int from = Global::RoleSettings::Tech::ConvertPastMetalFullAfus;
+        if (from <= 0 || !TechChain::EnergyBankFloats()) return false;
+        CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+        return af !is null && af.count - aiBuilderMgr.GetUnfinishedCount(af) >= from;
+    }
     ConversionReason TechConversionAdmission(CCircuitDef@ def, CCircuitUnit@ worker) {
-        if (TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) return METAL_FULL;
+        if ((TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) && !ConvertPastMetalFull()) return METAL_FULL;
         if (def is null) return UNAVAILABLE;
         const int pending = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), def)
             + aiBuilderMgr.GetUnfinishedCount(def);

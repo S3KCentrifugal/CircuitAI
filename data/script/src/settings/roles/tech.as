@@ -486,6 +486,7 @@ namespace Tech {
             float InvariantTurretIdleSeconds = 20.0f;       // D-289: INV-200 - a turret waiting this long while a producing factory it may assist stands in reach is a violation
             float ChainEnergyFloatMax = 300.0f;             // D-079: ... or the bank at EcoConvertEnergyPercent with income over the pull by this now (played: the advanced fusion ordered 15 s after the fusion at +1,291)
             float ChainEnergyFloatRise = 100.0f;            // D-079: ... or the bank above half of storage, up by this over ChainEnergyFloatSeconds, with income over the pull by ChainEnergyFloatMax (the moment a fusion completes)
+            int ConvertPastMetalFullAfus = 0;               // owner 2026-11-01 (no energy overflow after 10 AFUS): from this many finished advanced fusions a full metal bank no longer refuses converters while energy floats (0 = always refuses)
             int ConverterParallel = 3;                      // D-079: converters queued at once while energy floats (one at a time otherwise); the pull-inflated surplus is replaced by half the income while floating
             float ChainEnergyFloatSeconds = 15.0f;          // D-079: the energy bank at EcoConvertEnergyPercent of storage for this long = energy floats: no energy structure is ordered, converters first (the pull is inflated by the build in progress, so the bank is read, not the pull)
             float InvariantFloatOrderSeconds = 90.0f;        // D-079: INV-009 - an energy frame appearing after the bank has been full this long was ordered while floating
@@ -504,12 +505,20 @@ namespace Tech {
             int CompactEcoSearchBudget = 128;                // individual footprints per growth ask
             float CompactEcoTurretSpread = 128.0f;           // individual additions, up to columns * rows
             float CompactEcoRetrySeconds = 60.0f;            // failed searches only
+            int CompactEcoModuleColumns = 0;                // owner 2026-11-01 (16+ turrets in reach): compact banks are blocks of columns x rows turrets with packing ground around them; 0 = single-turret adaptive banks
+            int CompactEcoModuleRows = 0;
+            int CompactEcoModuleBanks = 12;                 // ... at most this many such banks, then single banks
+            float CompactEcoModuleHaloElmos = 288.0f;       // ... packing ground on every side of the block
+            float CompactEcoModuleStep = 96.0f;             // ... their site spiral's step
+            int CompactEcoModuleBudget = 300;               // ... sites scored per ask (about 900 elmos out)
             int CompactEcoPackingAttempts = 8;              // expensive building fits per search
             float LayoutForwardRetrySeconds = 30.0f;
             float LayoutForwardBlockedRetrySeconds = 300.0f;
             int CrampedSupportColumns = 2;
             int CrampedSupportRows = 1;
             int LayoutOverflowModules = 8;
+            int LayoutOverflowSupportColumns = 0;            // owner 2026-11-01 (16+ turrets in reach): the turret block behind an overflow module, columns x rows; 0 = CrampedSupportColumns/Rows
+            int LayoutOverflowSupportRows = 0;
             int LayoutOverflowRings = 8;
             float LayoutOverflowStepElmos = 128.0f;
             float LayoutOverflowRetrySeconds = 60.0f;

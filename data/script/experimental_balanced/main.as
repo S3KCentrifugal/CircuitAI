@@ -158,6 +158,13 @@ namespace Main {
         Global::RoleSettings::Tech::LayoutGrowAheadRings = 4;
         Global::RoleSettings::Tech::LayoutGrowMinScore = 0.6f;
         Global::RoleSettings::Tech::LayoutGrowMaxBoxes = 36;
+        // owner 2026-11-01: 16+ turrets in reach of every advanced fusion and
+        // converter, 10-20 AFUS on cramped maps, no energy overflow past 10 AFUS
+        Global::RoleSettings::Tech::LayoutOverflowSupportColumns = 4;
+        Global::RoleSettings::Tech::LayoutOverflowSupportRows = 4;
+        Global::RoleSettings::Tech::CompactEcoModuleColumns = 4;
+        Global::RoleSettings::Tech::CompactEcoModuleRows = 4;
+        Global::RoleSettings::Tech::ConvertPastMetalFullAfus = 10;
         Global::RoleSettings::Tech::LayoutForwardTurretMinimum = 12;  // owner 2026-10-20: T1 constructors put 12 turrets in the forward cluster before helping its economy
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 

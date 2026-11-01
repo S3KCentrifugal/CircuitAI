@@ -172,7 +172,7 @@ namespace TechRules {
 
     bool EcoOnline(Ctx@ c)        { return TechBuild::EcoOnline(); }   // D-102
 
-    bool NotMetalFull(Ctx@ c)     { return !TechBuild::MetalFullLong(); }   // D-105: converters make metal; a full bank wastes it
+    bool NotMetalFull(Ctx@ c)     { return !TechBuild::MetalFullLong() || EcoPlanner::ConvertPastMetalFull(); }   // D-105: converters make metal; a full bank wastes it
     bool DearFrameUp(Ctx@ c)      { return aiBuilderMgr.CountUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::EcoBuildPowerRadius, Global::RoleSettings::Tech::ChainParallelCostM, null) > 0
                                            || (Layout::ForwardDemandOpen() && Layout::ForwardDearFrames() > 0); }   // D-105; owner 2026-10-20: the forward cluster's too
     bool TurretRoom(Ctx@ c)       { return !Layout::TurretsCapped() && Layout::CanPlaceTurret(); }   // D-105
