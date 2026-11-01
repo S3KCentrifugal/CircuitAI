@@ -50,6 +50,7 @@ def main():
     p.add_argument('--map', default='Forge')
     p.add_argument('--side', default='armada')
     p.add_argument('--role', default='TECH', help='the AI role (FRONT sends the ground army down the lanes)')
+    p.add_argument('--seed', type=int, default=31031, help='the AI random_seed option')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     for c in a.case.split(','):
@@ -80,7 +81,7 @@ def main():
                    '--map-file', str(mapfile), '--role', a.role, '--roles', a.role, '--side', a.side,
                    '--enemies', 'prod', '--prod-ai', 'NullAI', '--prod-version', '0.1',
                    '--modoption', 'dynamiccheats=0', '--modoption', 'deathmode=neverend',
-                   '--ai-option', 'profile=experimental_balanced', '--ai-option', 'random_seed=31031',
+                   '--ai-option', 'profile=experimental_balanced', '--ai-option', f'random_seed={a.seed}',
                    '--speed', '20', '--minutes', str(a.minutes), '--headless', '--lean-render',
                    '--extra-widget', str(HERE / 'widgets/terrain_restore_fixture.lua')]
     subprocess.run(stage, cwd=ROOT, check=True)

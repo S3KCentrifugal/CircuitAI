@@ -7,6 +7,7 @@
 #include "module/RestoreControl.h"
 #include "module/BuilderManager.h"
 #include "setup/SetupManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "task/builder/RestoreTask.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/TerrainData.h"
@@ -99,6 +100,8 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	pathSlope = 1.f - std::cos(slopeDeg * 3.14159265f / 180.f);  // the engine's slope unit
 	pathReach = std::max(0.f, cfg.get("path_reach", pathReach).asFloat());
 	pathUnits = std::max(0, cfg.get("path_units", pathUnits).asInt());
+	pathMemory = std::max(0, cfg.get("path_memory", pathMemory).asInt());
+	pathLane = cfg.get("path_lane", pathLane).asBool();
 	maxTries = std::max(1, cfg.get("max_tries", maxTries).asInt());
 	retryCapSeconds = std::max(cooldownSeconds, cfg.get("retry_cap", retryCapSeconds).asInt());
 	protect = cfg.get("protect", protect).asBool();
@@ -396,8 +399,12 @@ CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float
 		if (score >= bestScore) {
 			continue;
 		}
-		// The engine stops within build range + 0.7 radius of the centre.
-		if (!terrainMgr->CanReachAtSafe(unit, pos, unit->GetCircuitDef()->GetBuildDistance() + radius * 0.7f)) {
+		// The engine stops within build range + 0.7 radius of the centre. A
+		// deep or lava crater drops its own sector from the land areas, and the
+		// nearest area sector's centre is a sector length away: the restorer
+		// works from the rim, so one sector more is allowed.
+		if (!terrainMgr->CanReachAtSafe(unit, pos, unit->GetCircuitDef()->GetBuildDistance() + radius * 0.7f
+				+ terrainMgr->GetConvertStoP())) {
 			continue;
 		}
 		best = unit;
@@ -528,7 +535,7 @@ void CRestoreControl::Scan()
 	}
 }
 
-void CRestoreControl::FindPathSectors(const AIFloat3& basePos, float lavaLevel, std::vector<int>& out) const
+void CRestoreControl::FindPathSectors(const AIFloat3& basePos, float lavaLevel, std::vector<int>& out)
 {
 	// Marks the sectors our ground army stands on (pathRadius) and the lane
 	// it came along from the base (half of it), each with the lowest slope
@@ -587,11 +594,41 @@ void CRestoreControl::FindPathSectors(const AIFloat3& basePos, float lavaLevel, 
 			break;
 		}
 	}
-	const std::vector<terrain::SSector>& sector = terrainMgr->GetAreaData()->sector;
+	// The front lane our army is sent down (FRONT's corridor, set by the
+	// script): a crater on it is found before the army walks there. One mark
+	// per sector length along the lane, a lane's width or path_radius wide.
+	CBattleAnalysis* battle = circuit->GetBattle();
+	if (pathLane && (battle != nullptr) && (battle->GetFrontLaneLength() > 0.f)) {
+		const float len = battle->GetFrontLaneLength();
+		const float r = std::max(battle->GetFrontLaneWidth(), pathRadius * 0.5f);
+		for (float d = 0.f; d <= len; d += size) {
+			mark(battle->GetFrontLanePoint(d), r, pathSlope);
+		}
+	}
+	// Path memory (restore.path_memory): a sector our army stood on or passed
+	// in the last N seconds stays on our paths with the lowest slope limit
+	// seen there, so a crater on a lane the army has moved on from (or is
+	// coming back along) is found without a unit standing next to it.
+	// Two arrays of one entry per sector; the test below walks the sector
+	// grid once per scan (a few thousand entries every restore.interval).
+	const int memFrames = FRAMES_PER_SEC * pathMemory;
+	if (pathSeen.size() != limit.size()) {
+		pathSeen.assign(limit.size(), -1);
+		pathLimit.assign(limit.size(), 0.f);
+	}
 	for (int i : marked) {
+		const bool recent = (pathSeen[i] >= 0) && (frame - pathSeen[i] <= memFrames);
+		pathLimit[i] = recent ? std::min(pathLimit[i], limit[i]) : limit[i];
+		pathSeen[i] = frame;
+	}
+	const std::vector<terrain::SSector>& sector = terrainMgr->GetAreaData()->sector;
+	for (int i = 0; i < int(pathSeen.size()); ++i) {
+		if ((pathSeen[i] < 0) || (frame - pathSeen[i] > memFrames)) {
+			continue;
+		}
 		const terrain::SSector& s = sector[i];
 		const bool damaged = (s.dug >= threshold) || (s.raised >= threshold);
-		const bool steep = damaged && (s.maxSlope > limit[i]) && (s.origMaxSlope <= limit[i]);
+		const bool steep = damaged && (s.maxSlope > pathLimit[i]) && (s.origMaxSlope <= pathLimit[i]);
 		const bool hot = (s.dug > 1.f) && (s.minElevation < lavaLevel);
 		if (steep || hot) {
 			out.push_back(i);
@@ -618,6 +655,14 @@ void CRestoreControl::TaskEnded(CBRestoreTask* task, bool done, float seconds)
 		}
 	} else {
 		++failed;
+		// The start cooled the whole patch: free the rest of the crater for
+		// another restorer; the spot itself keeps its back-off.
+		ClearCoolDown(it->pos, it->radius);
+		const SSpot& s = Spot(it->pos);
+		const int frame = circuit->GetLastFrame();
+		if (s.until > frame) {
+			CoolDown(it->pos, 64.f, s.until - frame);
+		}
 	}
 	circuit->LOG("RESTORE: %s reason=%s at (%.0f, %.0f) r=%.0f seconds=%.1f (restored %i, failed %i, lost killed %i taken %i)",
 			done ? "done" : "aborted", ReasonName(task->GetReason()), it->pos.x, it->pos.z, it->radius, seconds,
