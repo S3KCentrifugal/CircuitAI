@@ -147,6 +147,8 @@ bool IBuilderTask::CanAssignTo(CCircuitUnit* unit) const
 {
     const auto health = constructionHealth.find(unit);
     if (health != constructionHealth.end() && manager->GetCircuit()->GetLastFrame() < health->second.retryAfter) return false;
+    // Owner 2026-11-01: no commander work inside scouted laser tower range or recent shelling
+    if (manager->GetCircuit()->GetCommanderController()->KeepOutBlocks(unit, position)) return false;
 	// can unit build at all
 	const CCircuitDef* cdef = unit->GetCircuitDef();
 	if (((target == nullptr) || !cdef->IsAbleToAssist() || unit->IsAttrSolo()) && !cdef->CanBuild(buildDef)) {

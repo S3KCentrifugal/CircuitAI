@@ -79,6 +79,13 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
         Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
         Safety<&SC::decoyBait>("decoy_bait",0,1),
+        Safety<&SC::towerKeepOut>("tower_keep_out",0,1),Safety<&SC::towerMargin>("tower_margin",0,600),
+        Safety<&SC::towerDiveChance>("tower_dive_chance",0,1),Safety<&SC::towerDiveCooldown>("tower_dive_cooldown",0,1800),
+        Safety<&SC::towerDiveHealth>("tower_dive_health",.3f,1),
+        Safety<&SC::shellLossRate>("shell_loss_rate",0,5000),Safety<&SC::shellWindow>("shell_window",1,20),
+        Safety<&SC::shellUnexplained>("shell_unexplained",0,1),Safety<&SC::shellDotRange>("shell_dot_range",0,3000),
+        Safety<&SC::shellStep>("shell_step",128,2000),Safety<&SC::shellZone>("shell_zone",0,2000),
+        Safety<&SC::shellZoneSeconds>("shell_zone_seconds",0,600),Safety<&SC::shellHold>("shell_hold",0,60),
         // D-389 cloak posture
         Cloak<&KC::posture>("cloak_posture",0,1),Cloak<&KC::threatRadius>("threat_radius",400,4000),
         Cloak<&KC::horizon>("threat_horizon",0,15),Cloak<&KC::outrangeMargin>("outrange_margin",0,500),
@@ -359,6 +366,7 @@ bool CCommanderController::SetOption(const std::string& name,float value) {
 void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_OBSERVE);
     contacts.clear(); threats.clear(); seeds.clear(); attackers.clear(); submergedContact=false; protectedAfus=-1;
+    nearestDot=-1; visibleReachDps=0;
     auto& claims=ai->GetAllyTeam()->GetCommanderShots(); claims.Prune(frame);
     auto world=ai->GetMilitaryManager()->GetRangedWorld();
     auto* api=ai->GetUnitAPI(); auto* def=unit->GetCircuitDef();
@@ -383,6 +391,9 @@ void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
             const float damage=w.damage[std::min(size_t(std::max(0,armor)),w.damage.size()-1)]*w.alphaScale*hits;
             if(damage<=0) continue;
             const int reload=api->GetVisibleWeaponReload(id,w.index);
+            // Shelling attribution: damage this visible weapon can deal from where it stands.
+            if(commander::Length(c.pos-P(pos))<=w.range+def->GetRadius()+32.f)
+                visibleReachDps+=damage/std::max(.1f,w.reload);
             threats.push_back({c.pos,c.velocity,w.range,damage,w.reload,
                 std::max(0.f,float(reload-frame)/30.f),w.splash,w.speed*30.f,w.arc,w.heightMod,c.height,
                 !w.instant && w.speed>0.f,w.guided,(w.ballistic || w.high) && !w.guided,
@@ -408,6 +419,10 @@ void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
         if(data.IsIgnore() && (!enemy->GetCircuitDef() || !enemy->GetCircuitDef()->IsIgnore()
             || enemy->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
         if(!enemy->IsInLOS()) {
+            {
+                const float dot=commander::Length(P(enemy->GetPos())-P(pos));
+                if(nearestDot<0 || dot<nearestDot) { nearestDot=dot; nearestDotPos=enemy->GetPos(); }
+            }
             // Radar uncertainty contributes danger, never a precision aim.
             threats.push_back({P(enemy->GetPos()),{},450,250,1,0,100,0,-1,0,enemy->GetPos().y,false,false});
             // Under water and out of sight: sonar shows an amphibious threat
@@ -633,6 +648,10 @@ void CCommanderController::Update() {
     // D-389: keep the side's combat snapshot alive while commanders read it.
     if(role.enabled && !states.Empty()) ai->GetAllyTeam()->GetCombatSnapshot().Want(frame);
     UpdateCommanderGroup();
+    if(frame>=keepOutFrame+FRAMES_PER_SEC) for(auto& entry:states) {
+        auto* unit=ai->GetTeamUnit(entry.id);
+        if(unit && !unit->IsDead()) { RefreshKeepOut(unit,frame); break; }
+    }
     for(auto& entry:states) {
         const int id=entry.id; auto& s=*entry.value;
         auto* unit=ai->GetTeamUnit(id); if(!unit || unit->IsDead()) continue;
@@ -773,6 +792,9 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
         if(unit->GetTask() && unit->GetTask()->GetType()==IUnitTask::Type::RETREAT) RetreatConceal(unit,s,frame,threatened);
         return;
     }
+    // Owner 2026-11-01: out of scouted laser tower range and away from shelling,
+    // ahead of jam, T3 and ordinary engagement plans.
+    if(SafetyWithdraw(unit,s,frame)) return;
     if(cfg->safety.decoyBait>0 && ActualDecoy(def)) {
         // A fake D-gun must not inherit the real commander's kill/trade plans.
         // Retain ordinary lane construction and threat-based retreat concealment.
@@ -1089,7 +1111,9 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         // D-299: hold the last fallback line until its turret quota stands
         // (bounded by line_hold_seconds); the ladder offers that work.
         if(frame<s.work.lineUntil && !s.work.lineDone) return false;
-        const auto pos=unit->GetPos(frame),goal=FrontPosition(unit,s,frame);
+        const auto pos=unit->GetPos(frame);
+        // Owner 2026-11-01: the front goal never stands inside a keep-out zone.
+        const auto goal=KeepOutGoal(unit,FrontPosition(unit,s,frame));
         if(commanderTrace && frame%300<3) ai->LOG("[CommanderTrace] front unit=%i own=%.0f bound=%.0f goal_progress=%.0f goal=%.0f,%.0f",
             unit->GetId(),ai->GetBattle()->GetFrontLaneProgress(pos),s.front.pushBound,s.front.pushGoalProgress,goal.x,goal.z);
         if(goal.x<0 || Exposure(P(pos),P(pos),1.f,pos.y)>unit->GetUnit()->GetHealth()*.12f) return false;
