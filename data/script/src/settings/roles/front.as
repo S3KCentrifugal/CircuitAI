@@ -383,6 +383,7 @@ namespace Front {
             float AgitatorMetalShare = 0.8f;
             int AgitatorMetalWindowSeconds = 120;
             float AgitatorMapShare = 0.4f;
+            float AgitatorAdvance = 500.0f;            // a further agitator waits for a spot this much further forward (elmos, lane axis)
             float AgitatorCoverRadius = 350.0f;        // a spot with one of ours this near is done
             int AgitatorMax = 6;                       // most standing at once
             float AgitatorReach = 3000.0f;             // idle, guarding or assisting constructors this near the spot are asked

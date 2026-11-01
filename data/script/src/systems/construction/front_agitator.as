@@ -16,7 +16,9 @@
 // or more. Map share: the spot's position along the lane axis (our allies' start centre toward the
 // enemies' start centre), measured across the whole map in that direction: 0 at our edge of the map,
 // 1 at the enemy's edge. A spot with an agitator of ours (finished or framed) within AgitatorCoverRadius
-// is done. The most forward open spot gets the next order, so the guns follow the front out.
+// is done. The most forward open spot gets the next order, so the guns follow the front out. A further
+// agitator (any after the first standing one) waits until that spot is AgitatorAdvance (500) elmos further
+// forward along the axis than our most forward agitator (owner, 2026-11-01 20:31Z); special porc does not.
 //
 // Builders: FRONT constructors that can build the gun (not commanders, not lolcannon crews), idle /
 // guarding / assisting within AgitatorReach of the spot, or walking to an unframed build within
@@ -50,6 +52,7 @@ namespace FrontAgitator {
         array<CCircuitDef@> guns;
         array<Spot@> open;    // sorted, most forward first
         int standing = 0;
+        float forwardMost = -1e30f;   // the most forward of ours along the lane axis (elmos)
         IUnitTask@ order;
         int orderSpot = -1;
         dictionary fails;     // spot id -> fails in a row
@@ -164,13 +167,15 @@ namespace FrontAgitator {
         return axisOk;
     }
 
+    float Along(const AIFloat3 &in p) { return p.x * ax + p.z * az; }
+
     float Share(const AIFloat3 &in p) {
         return (p.x * ax + p.z * az - spanMin) / (spanMax - spanMin);
     }
 
     void Scan() {
         lastScan = ai.frame;
-        for (int k = 0; k < KINDS; ++k) { kinds[k].open.resize(0); kinds[k].standing = 0; }
+        for (int k = 0; k < KINDS; ++k) { kinds[k].open.resize(0); kinds[k].standing = 0; kinds[k].forwardMost = -1e30f; }
         if (!Axis()) return;
         array<array<AIFloat3>> placed(KINDS);
         array<Spot@> spots;
@@ -183,7 +188,9 @@ namespace FrontAgitator {
             const int gk = GunKind(d);
             if (gk >= 0) {   // ours, finished or framed
                 ++kinds[gk].standing;
-                placed[gk].insertLast(u.GetPos(ai.frame));
+                const AIFloat3 gp = u.GetPos(ai.frame);
+                placed[gk].insertLast(gp);
+                kinds[gk].forwardMost = AiMax(kinds[gk].forwardMost, Along(gp));
                 continue;
             }
             if (d.IsMobile() || u.GetBuildProgress() < 1.0f) continue;
@@ -278,12 +285,22 @@ namespace FrontAgitator {
         if (kd.standing >= cap) { Why(kd, k, "cap reached: " + kd.standing + " standing"); return null; }
         const string gate = Gate(k);
         if (gate != "") { Why(kd, k, "waiting: " + gate + " (" + kd.open.length() + " forward spots open)"); return null; }
+        // owner 2026-11-01 20:31Z: a further agitator only once the most forward mex / turret is
+        // AgitatorAdvance (500) elmos further forward along the lane axis than our most forward agitator
+        const bool advanceGate = (k == AGITATOR && kd.standing > 0);
+        const float needAlong = kd.forwardMost + Global::RoleSettings::Front::AgitatorAdvance;
+        if (advanceGate && Along(kd.open[0].pos) < needAlong) {
+            Why(kd, k, "waiting: most forward spot " + int(Along(kd.open[0].pos) - kd.forwardMost) + " elmos ahead of our most forward agitator, needs "
+                + int(Global::RoleSettings::Front::AgitatorAdvance));
+            return null;
+        }
         const bool free = FrontFactoryNanos::Free(u);
         if (!free && !FrontFactoryNanos::Takeable(u)) return null;
         const float reach = free ? Global::RoleSettings::Front::AgitatorReach : Global::RoleSettings::Front::AgitatorTakeRadius;
         const AIFloat3 wp = u.GetPos(ai.frame);
         for (uint i = 0; i < kd.open.length(); ++i) {
             Spot@ s = kd.open[i];
+            if (advanceGate && Along(s.pos) < needAlong) break;   // sorted most forward first
             int until = -1;
             if (kd.holds.get("" + s.id, until) && ai.frame < until) continue;
             if (MapHelpers::SqDist(wp, s.pos) > reach * reach || ai.GetTeamUnit(s.id) is null) continue;
