@@ -85,7 +85,7 @@ namespace FrontOverflow {
 
     float Snap(float v) { return float(int(v / 16.0f)) * 16.0f; }   // even footprints sit on 16-elmo lines
 
-    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells)
+    bool CellsFit(CCircuitDef@ d, const AIFloat3 &in c, array<AIFloat3>@ fitCells, CCircuitUnit@ u)
     {
         const int cols = Global::RoleSettings::Front::OverflowBlockCols, rows = Global::RoleSettings::Front::OverflowBlockRows;
         // The def's own width (arm C, 2026-10-31): BAR footprint 4 is 8 engine squares, 64 elmo (GetFootprintX
@@ -105,6 +105,9 @@ namespace FrontOverflow {
             for (int k = 0; k < cols; ++k) {
                 const AIFloat3 p(Snap(c.x) + (float(k) - float(cols - 1) * 0.5f) * pitch, 0.0f, Snap(c.z) + (float(r) - float(rows - 1) * 0.5f) * pitch);
                 if (aiTerrainMgr.BuildableFraction(d, p, pitch * 0.5f - 1.0f, pitch * 0.5f - 1.0f, 0) < 1.0f) return false;
+                // ground the constructor can walk to (arm C, 2026-10-31: "behind the base" on Forge was a ledge the
+                // T2 vehicles could not reach, and native's site search, which needs a reach, refused every cell)
+                if (u !is null && !aiTerrainMgr.CanMoveTo(u, p)) return false;
                 fitCells.insertLast(p);
             }
         }
@@ -120,7 +123,7 @@ namespace FrontOverflow {
     }
 
     // Candidates: rings round the eco anchor, the side away from the map centre first
-    bool ChooseBlock(CCircuitDef@ d)
+    bool ChooseBlock(CCircuitDef@ d, CCircuitUnit@ u)
     {
         if (ai.frame < blockRetry) return false;
         const AIFloat3 anchor = FrontEcoLadder::Anchor();
@@ -145,7 +148,7 @@ namespace FrontOverflow {
                 if (back < startBack - 200.0f) continue;
                 const float score = back - 0.5f * rings[ri];
                 if (score <= bestScore || NearGivenUp(p)) continue;
-                if (!CellsFit(d, p, fit)) continue;
+                if (!CellsFit(d, p, fit, u)) continue;
                 bestScore = score; best = p; bestCells = fit;
             }
             if (best.x >= 0.0f && ri >= 2) break;   // good enough: no need to walk further out
@@ -246,10 +249,11 @@ namespace FrontOverflow {
     {
         RefreshCells(d);
         if (cells.length() == 0 || (OpenCell() < 0 && BlockFinished())) {
-            if (!ChooseBlock(d)) return null;
+            if (!ChooseBlock(d, u)) return null;
         }
         const int i = OpenCell();
         if (i < 0) return null;   // the rest of the block is ordered
+        if (!aiTerrainMgr.CanMoveTo(u, cells[i]) || aiBattle.SurfThreat(cells[i]) > Global::RoleSettings::Front::OverflowMaxThreat) return null;   // another constructor, or later
         if (!anchored) {
             // one cell until the block's first frame stands and sets the grid (Follow)
             for (uint k = 0; k < cells.length(); ++k) if (cellState[k] == 1) return null;
