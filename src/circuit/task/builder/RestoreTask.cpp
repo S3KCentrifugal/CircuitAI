@@ -22,6 +22,8 @@ namespace circuit {
 
 using namespace springai;
 
+#define RLOG(c, fmt, ...) (c)->LOG("RESTORE[t%i]: " fmt, (c)->GetTeamId() __VA_OPT__(,) __VA_ARGS__)
+
 CBRestoreTask::CBRestoreTask(ITaskModule* mgr, Priority priority, const AIFloat3& position,
 							 float radius, int reason, int maxFrames)
 		: IBuilderTask(mgr, priority, nullptr, position, Type::BUILDER, BuildType::TERRAFORM, {0.f, 0.f}, 0.f, maxFrames)
@@ -41,18 +43,29 @@ CBRestoreTask::~CBRestoreTask()
 
 bool CBRestoreTask::CanAssignTo(CCircuitUnit* unit) const
 {
-	return units.empty() && static_cast<CBuilderManager*>(manager)->GetRestoreControl()->IsEligible(unit);
+	// Up to restore.max_per_task restorers, all of the first one's class
+	// (owner 2026-11-01: at most 2 air cons, or 2 T1 cons, or 2 rez bots)
+	const CRestoreControl* control = static_cast<CBuilderManager*>(manager)->GetRestoreControl();
+	if ((int(units.size()) >= control->GetMaxPerTask()) || !control->IsEligible(unit)) {
+		return false;
+	}
+	return units.empty() || (control->ClassOf(*units.begin()) == control->ClassOf(unit));
 }
 
 void CBRestoreTask::RemoveAssignee(CCircuitUnit* unit)
 {
 	const bool killed = unit->IsDead();
+	const bool wasOurs = (units.find(unit) != units.end());
 	IBuilderTask::RemoveAssignee(unit);
-	if (units.empty() && !IsDead()) {
-		manager->GetCircuit()->LOG("RESTORE: lost %s(%i) at (%.0f, %.0f): %s", unitName.c_str(), unitId,
-				position.x, position.z, killed ? "killed" : "taken (retreat, fight or a task that may take it)");
-		static_cast<CBuilderManager*>(manager)->GetRestoreControl()->Lost(position, killed);
-		manager->AbortTask(this);  // one restorer per patch: taken away ends it
+	if (!wasOurs || IsDead()) {
+		return;
+	}
+	RLOG(manager->GetCircuit(), "lost %s(%i) at (%.0f, %.0f): %s, %i restorer(s) left",
+			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), position.x, position.z,
+			killed ? "killed" : "taken (retreat, fight or a task that may take it)", int(units.size()));
+	static_cast<CBuilderManager*>(manager)->GetRestoreControl()->Lost(position, radius, killed);
+	if (units.empty()) {
+		manager->AbortTask(this);  // the last restorer is gone: the patch ends
 	}
 }
 
@@ -72,7 +85,7 @@ bool CBRestoreTask::KeepsAssignee(const IUnitTask* next) const
 		}
 		if (!keptLogged) {
 			keptLogged = true;
-			manager->GetCircuit()->LOG("RESTORE: kept %s(%i) on its restore at (%.0f, %.0f) (refused task type %i)",
+			RLOG(manager->GetCircuit(), "kept %s(%i) on its restore at (%.0f, %.0f) (refused task type %i)",
 					unitName.c_str(), unitId, position.x, position.z, int(type));
 		}
 	}
@@ -81,8 +94,10 @@ bool CBRestoreTask::KeepsAssignee(const IUnitTask* next) const
 
 void CBRestoreTask::Start(CCircuitUnit* unit)
 {
-	unitId = unit->GetId();
-	unitName = unit->GetCircuitDef()->GetDef()->GetName();
+	if (unitId < 0) {  // the first restorer names the patch in the log
+		unitId = unit->GetId();
+		unitName = unit->GetCircuitDef()->GetDef()->GetName();
+	}
 	Execute(unit);
 }
 
@@ -93,7 +108,7 @@ void CBRestoreTask::Update()
 		return;
 	}
 	if (manager->GetCircuit()->GetLastFrame() - startFrame > maxFrames) {
-		manager->GetCircuit()->LOG("RESTORE: timeout %s(%i) at (%.0f, %.0f) r=%.0f after %i orders",
+		RLOG(manager->GetCircuit(), "timeout %s(%i) at (%.0f, %.0f) r=%.0f after %i orders",
 				unitName.c_str(), unitId, position.x, position.z, radius, orders);
 		manager->AbortTask(this);
 	}
@@ -139,13 +154,13 @@ void CBRestoreTask::OnUnitIdle(CCircuitUnit* unit)
 		manager->DoneTask(this);
 		return;
 	}
-	if (orders < 3) {
-		circuit->LOG("RESTORE: again %s(%i) at (%.0f, %.0f): %i cells left, dug %.0f raised %.0f",
-				unitName.c_str(), unitId, position.x, position.z, left.cells, left.dug, left.raised);
+	if (orders < 3 * std::max(1, int(units.size()))) {  // three orders per restorer
+		RLOG(circuit, "again %s(%i) at (%.0f, %.0f): %i cells left, dug %.0f raised %.0f",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), position.x, position.z, left.cells, left.dug, left.raised);
 		Execute(unit);
 		return;
 	}
-	circuit->LOG("RESTORE: gave up %s(%i) at (%.0f, %.0f): %i cells left after %i orders",
+	RLOG(circuit, "gave up %s(%i) at (%.0f, %.0f): %i cells left after %i orders",
 			unitName.c_str(), unitId, position.x, position.z, left.cells, orders);
 	manager->AbortTask(this);
 }

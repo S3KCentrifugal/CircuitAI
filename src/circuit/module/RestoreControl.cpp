@@ -8,6 +8,9 @@
 #include "module/BuilderManager.h"
 #include "setup/SetupManager.h"
 #include "terrain/BattleAnalysis.h"
+#include "map/ThreatMap.h"
+#include "unit/enemy/EnemyManager.h"
+#include "unit/enemy/EnemyUnit.h"
 #include "task/builder/RestoreTask.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/TerrainData.h"
@@ -37,7 +40,9 @@ using namespace springai;
 // The engine caps a restore's half side here (BuilderCAI::ExecuteRestore).
 static constexpr float RESTORE_MAX_RADIUS = 200.f;
 static constexpr float RESTORE_MIN_RADIUS = 32.f;
-static constexpr unsigned CLASS_COMMANDER = 1, CLASS_T1 = 2, CLASS_T2 = 4, CLASS_REZ = 8;
+static constexpr unsigned CLASS_COMMANDER = 1, CLASS_T1 = 2, CLASS_T2 = 4, CLASS_REZ = 8, CLASS_AIR = 16;
+// Every native restore line names the AI's team: several AIs share one infolog.
+#define RLOG(c, fmt, ...) (c)->LOG("RESTORE[t%i]: " fmt, (c)->GetTeamId() __VA_OPT__(,) __VA_ARGS__)
 
 static const char* ReasonName(int reason)
 {
@@ -64,7 +69,7 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 {
 	const Json::Value& cfg = root["restore"];
 	enabled = cfg.get("enable", false).asBool();
-	allowMask = CLASS_COMMANDER | CLASS_T1 | CLASS_REZ;
+	allowMask = CLASS_COMMANDER | CLASS_T1 | CLASS_AIR | CLASS_REZ;
 	const Json::Value& units = cfg["units"];
 	if (units.isArray()) {
 		allowMask = 0;
@@ -73,13 +78,17 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 			if (s == "commander") {
 				allowMask |= CLASS_COMMANDER;
 			} else if (s == "t1") {
+				allowMask |= CLASS_T1 | CLASS_AIR;  // "t1" has always meant air constructors too
+			} else if (s == "air") {
+				allowMask |= CLASS_AIR;
+			} else if (s == "t1ground") {
 				allowMask |= CLASS_T1;
 			} else if (s == "t2") {
 				allowMask |= CLASS_T2;
 			} else if (s == "rez") {
 				allowMask |= CLASS_REZ;
 			} else {
-				circuit->LOG("RESTORE: unknown unit class '%s' (commander, t1, t2, rez)", s.c_str());
+				RLOG(circuit, "unknown unit class '%s' (commander, t1, t2, rez)", s.c_str());
 			}
 		}
 	}
@@ -105,13 +114,16 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	maxTries = std::max(1, cfg.get("max_tries", maxTries).asInt());
 	retryCapSeconds = std::max(cooldownSeconds, cfg.get("retry_cap", retryCapSeconds).asInt());
 	protect = cfg.get("protect", protect).asBool();
+	maxPerTask = std::clamp(cfg.get("max_per_task", maxPerTask).asInt(), 1, 2);
+	porcMargin = std::max(0.f, cfg.get("porc_margin", porcMargin).asFloat());
 	unitClass.clear();
-	circuit->LOG("RESTORE: %s units=%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i",
+	RLOG(circuit, "%s units=%s%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i path_lane=%i path_memory=%i max_per_task=%i porc_margin=%.0f",
 			enabled ? "on" : "off",
 			(allowMask & CLASS_COMMANDER) ? "commander " : "", (allowMask & CLASS_T1) ? "t1 " : "",
+			(allowMask & CLASS_AIR) ? "air " : "",
 			(allowMask & CLASS_T2) ? "t2 " : "", (allowMask & CLASS_REZ) ? "rez " : "",
 			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach,
-			maxTries, retryCapSeconds, int(protect));
+			maxTries, retryCapSeconds, int(protect), int(pathLane), pathMemory, maxPerTask, porcMargin);
 }
 
 int CRestoreControl::GetScanInterval() const
@@ -140,6 +152,8 @@ int CRestoreControl::UnitClass(const CCircuitDef* cdef) const
 	if (cdef->IsMobile() && cdef->IsAbleToRestore()) {
 		if (cdef->IsRoleComm()) {
 			cls = CLASS_COMMANDER;
+		} else if (cdef->IsBuilder() && cdef->IsAbleToFly()) {
+			cls = CLASS_AIR;  // air constructors, any tech level
 		} else if (cdef->IsBuilder()) {
 			// BAR customparams.techlevel (alldefs_post sets 1 when absent)
 			const std::map<std::string, std::string>& params = cdef->GetDef()->GetCustomParams();
@@ -157,6 +171,55 @@ int CRestoreControl::UnitClass(const CCircuitDef* cdef) const
 bool CRestoreControl::IsEligible(CCircuitUnit* unit) const
 {
 	return enabled && ((UnitClass(unit->GetCircuitDef()) & allowMask) != 0);
+}
+
+unsigned CRestoreControl::ClassOf(const CCircuitUnit* unit) const
+{
+	return unsigned(UnitClass(unit->GetCircuitDef()));
+}
+
+bool CRestoreControl::IsPorcCovered(const AIFloat3& pos, bool air) const
+{
+	// Every known enemy unit once per front patch (a few per scan, every
+	// restore.interval seconds): finished, armed, immobile ones only.
+	const CCircuitDef::RangeType rt = air ? CCircuitDef::RangeType::AIR : CCircuitDef::RangeType::LAND;
+	for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+		const CEnemyUnit* e = kv.second;
+		if ((e == nullptr) || e->IsDead() || e->IsBeingBuilt()) {
+			continue;
+		}
+		const CCircuitDef* edef = e->GetCircuitDef();
+		if ((edef == nullptr) || edef->IsMobile() || !edef->IsAttacker()) {
+			continue;
+		}
+		const float range = edef->GetMaxRange(rt);
+		if ((range > 0.f) && (e->GetPos().SqDistance2D(pos) < SQUARE(range + porcMargin))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CRestoreControl::IsLineSafe(CCircuitUnit* unit, const AIFloat3& to) const
+{
+	// The unit's own threat layer (air for air constructors) every 256 elmos
+	// from where it stands to the patch: at most path_reach / 256 + 1 reads.
+	CThreatMap* threatMap = circuit->GetThreatMap();
+	const AIFloat3& from = unit->GetPos(circuit->GetLastFrame());
+	const float len = std::sqrt(from.SqDistance2D(to));
+	const float w = CTerrainManager::GetTerrainWidth() - 1.f, h = CTerrainManager::GetTerrainHeight() - 1.f;
+	for (float d = 0.f; ; d += 256.f) {
+		const float t = (len > 0.f) ? std::min(d / len, 1.f) : 1.f;
+		const AIFloat3 p(std::clamp(from.x + (to.x - from.x) * t, 0.f, w), 0.f,
+				std::clamp(from.z + (to.z - from.z) * t, 0.f, h));
+		if (threatMap->GetThreatAt(unit, p) > THREAT_MIN) {
+			return false;
+		}
+		if (t >= 1.f) {
+			break;
+		}
+	}
+	return true;
 }
 
 bool CRestoreControl::RequestSite(const AIFloat3& pos, float radius, int reason)
@@ -316,49 +379,53 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 CRestoreControl::SSpot& CRestoreControl::Spot(const AIFloat3& pos)
 {
 	for (SSpot& s : spots) {
-		if (s.pos.SqDistance2D(pos) < SQUARE(64.f)) {
+		if (s.pos.SqDistance2D(pos) < SQUARE(std::max(64.f, s.radius))) {
 			return s;
 		}
 	}
 	if (spots.size() >= 64) {
 		spots.erase(spots.begin());
 	}
-	spots.push_back({pos, 0, 0});
+	spots.push_back({pos, 0, 0, 64.f});
 	return spots.back();
 }
 
 bool CRestoreControl::IsSpotHeld(const AIFloat3& pos, int frame) const
 {
 	for (const SSpot& s : spots) {
-		if ((s.until > frame) && (s.pos.SqDistance2D(pos) < SQUARE(64.f))) {
+		if ((s.until > frame) && (s.pos.SqDistance2D(pos) < SQUARE(std::max(64.f, s.radius)))) {
 			return true;
 		}
 	}
 	return false;
 }
 
-void CRestoreControl::HoldSpot(const AIFloat3& pos, float radius)
+void CRestoreControl::HoldSpot(const AIFloat3& pos, float radius, float spotRadius)
 {
 	// 60, 120, 240 ... seconds, capped; max_tries in a row go straight to the cap
 	SSpot& s = Spot(pos);
 	++s.tries;
+	s.radius = std::max(s.radius, spotRadius);
 	const int seconds = (s.tries >= maxTries) ? retryCapSeconds
 			: std::min(retryCapSeconds, cooldownSeconds << std::min(s.tries - 1, 10));
 	s.until = circuit->GetLastFrame() + FRAMES_PER_SEC * seconds;
 	CoolDown(pos, radius, FRAMES_PER_SEC * seconds);
 }
 
-void CRestoreControl::Lost(const AIFloat3& pos, bool killed)
+void CRestoreControl::Lost(const AIFloat3& pos, float radius, bool killed)
 {
 	if (killed) {
 		++lostKilled;
 	} else {
 		++lostTaken;
 	}
-	HoldSpot(pos, 64.f);
+	// The whole crater waits (owner 2026-11-01): the patch area + 64, with
+	// the spot's escalating wait.
+	HoldSpot(pos, radius + 64.f, radius + 64.f);
 }
 
-CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float maxDist, bool front)
+CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float maxDist, bool front,
+		unsigned classMask, int* threatSkips)
 {
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
@@ -367,6 +434,9 @@ CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float
 	float bestScore = std::numeric_limits<float>::max();
 	for (CCircuitUnit* unit : builderMgr->GetWorkers()) {
 		if (unit->IsDead() || unit->IsDestroying() || !IsEligible(unit) || (unit->GetCommanderTarget() >= 0)) {
+			continue;
+		}
+		if ((unsigned(UnitClass(unit->GetCircuitDef())) & classMask) == 0) {
 			continue;
 		}
 		if (front && (UnitClass(unit->GetCircuitDef()) == CLASS_COMMANDER)) {
@@ -407,6 +477,14 @@ CCircuitUnit* CRestoreControl::PickUnit(const AIFloat3& pos, float radius, float
 				+ terrainMgr->GetConvertStoP())) {
 			continue;
 		}
+		// Front patches: no enemy threat between the unit and the patch
+		// (owner 2026-11-01: skip lanes with enemy threat)
+		if (front && !IsLineSafe(unit, pos)) {
+			if (threatSkips != nullptr) {
+				++*threatSkips;
+			}
+			continue;
+		}
 		best = unit;
 		bestScore = score;
 	}
@@ -421,6 +499,15 @@ void CRestoreControl::Scan()
 	const int frame = circuit->GetLastFrame();
 	for (auto it = cooldown.begin(); it != cooldown.end();) {
 		it = (it->second <= frame) ? cooldown.erase(it) : std::next(it);
+	}
+	// A second restorer of the same class joins a patch that has one.
+	if (maxPerTask > 1) {
+		for (size_t k = 0; k < active.size(); ++k) {
+			const SActive a = active[k];  // TryJoin's assignment can end the task
+			if (!a.task->IsDead() && (int(a.task->GetAssignees().size()) < maxPerTask)) {
+				TryJoin(a.task, a.pos, a.radius, a.reason, a.cls);
+			}
+		}
 	}
 	if (int(active.size()) >= maxActive) {
 		return;
@@ -456,7 +543,7 @@ void CRestoreControl::Scan()
 	// 2. Sites a task could not build on, and script requests.
 	for (const SRequest& r : requests) {
 		if (frame - r.frame < FRAMES_PER_SEC * 120) {
-			candidates.push_back({r.pos, r.reason, 1.f});
+			candidates.push_back({r.pos, r.reason, 0.5f});
 		}
 	}
 	requests.clear();
@@ -465,7 +552,7 @@ void CRestoreControl::Scan()
 		std::vector<int> sectors;
 		FindPathSectors(basePos, lavaLevel, sectors);
 		for (int i : sectors) {
-			candidates.push_back({terrainMgr->GetSectorCenter(i), PATH, 1.5f});
+			candidates.push_back({terrainMgr->GetSectorCenter(i), PATH, 2.f});
 		}
 	}
 	// 4. Our base.
@@ -474,7 +561,7 @@ void CRestoreControl::Scan()
 		terrainMgr->FindDamagedSectors(basePos, baseRadius, threshold, lavaLevel, sectors);
 		for (int i : sectors) {
 			const AIFloat3 pos = terrainMgr->GetSectorCenter(i);
-			candidates.push_back({pos, BASE, 2.f + std::sqrt(pos.SqDistance2D(basePos)) * 1e-5f});
+			candidates.push_back({pos, BASE, 1.f + std::sqrt(pos.SqDistance2D(basePos)) * 1e-5f});
 		}
 	}
 	if (candidates.empty()) {
@@ -483,12 +570,40 @@ void CRestoreControl::Scan()
 	std::stable_sort(candidates.begin(), candidates.end(),
 			[](const SCandidate& a, const SCandidate& b) { return a.order < b.order; });
 
+	// Our base and build sites first (owner 2026-11-01): they sort ahead of
+	// the front, and while there is base or site work (this scan or the last
+	// two) the front keeps one of the max_active slots free for it.
+	for (const SCandidate& c : candidates) {
+		if ((c.reason == BASE) || (c.reason == SITE) || (c.reason == SCRIPT)) {
+			baseSeenFrame = frame;
+			break;
+		}
+	}
+	const bool baseWork = (baseSeenFrame >= 0) && (frame - baseSeenFrame <= GetScanInterval() * 2);
+	const int frontSlots = baseWork ? (maxActive - 1) : maxActive;
+	int frontActive = 0;
+	for (const SActive& a : active) {
+		if ((a.reason == PATH) || (a.reason == LAVA)) {
+			++frontActive;
+		}
+	}
+	bool reservedLogged = false;
+
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
 	const int cooldownFrames = FRAMES_PER_SEC * cooldownSeconds;
 	int tried = 0;
 	for (const SCandidate& c : candidates) {
 		if ((int(active.size()) >= maxActive) || (tried >= 8)) {
 			break;
+		}
+		const bool front = (c.reason == PATH) || (c.reason == LAVA);
+		if (front && (frontActive >= frontSlots)) {
+			if (!reservedLogged) {
+				reservedLogged = true;
+				RLOG(circuit, "slot reserved for base: front %i of %i, base/site work seen %.0f s ago",
+						frontActive, maxActive, float(frame - baseSeenFrame) / FRAMES_PER_SEC);
+			}
+			continue;
 		}
 		if (IsCoolingDown(terrainMgr->GetSectorIndex(c.pos), frame) || IsCovered(c.pos) || IsSpotHeld(c.pos, frame)) {
 			continue;
@@ -510,8 +625,33 @@ void CRestoreControl::Scan()
 			CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
 			continue;
 		}
-		CCircuitUnit* unit = PickUnit(patch.center, patch.radius, (c.reason == PATH) ? std::max(reach, pathReach) : reach, c.reason == PATH);
+		// Front patches (attack paths, crater lava under our units): only
+		// out of reach of enemy static defence (owner 2026-11-01: pulsars etc),
+		// checked against ground weapons for ground restorers and anti-air for
+		// air constructors.
+		unsigned classMask = allowMask;
+		if (front) {
+			if (IsPorcCovered(patch.center, false)) {
+				classMask &= ~(CLASS_COMMANDER | CLASS_T1 | CLASS_T2 | CLASS_REZ);
+			}
+			if (IsPorcCovered(patch.center, true)) {
+				classMask &= ~CLASS_AIR;
+			}
+			if (classMask == 0) {
+				RLOG(circuit, "skip porc at (%.0f, %.0f) r=%.0f: an enemy static weapon reaches it (+%.0f)",
+						patch.center.x, patch.center.z, patch.radius, porcMargin);
+				CoolDown(patch.center, patch.radius, cooldownFrames);
+				continue;
+			}
+		}
+		int threatSkips = 0;
+		CCircuitUnit* unit = PickUnit(patch.center, patch.radius, (c.reason == PATH) ? std::max(reach, pathReach) : reach,
+				c.reason == PATH, classMask, &threatSkips);
 		if (unit == nullptr) {
+			if (threatSkips > 0) {
+				RLOG(circuit, "skip threat at (%.0f, %.0f) r=%.0f: enemy threat on the way for %i restorer(s)",
+						patch.center.x, patch.center.z, patch.radius, threatSkips);
+			}
 			// nobody may go (busy, too far, unsafe): ask again in two scans
 			CoolDown(patch.center, patch.radius, GetScanInterval() * 2);
 			continue;
@@ -521,18 +661,41 @@ void CRestoreControl::Scan()
 		const float walk = std::sqrt(upos.SqDistance2D(patch.center)) / std::max(unit->GetCircuitDef()->GetSpeed(), 20.f);
 		CBRestoreTask* task = builderMgr->EnqueueRestore(patch.center, patch.radius, c.reason,
 				FRAMES_PER_SEC * (maxSeconds + int(walk * 1.5f)));
-		active.push_back({task, patch.center, patch.radius});
+		const unsigned cls = unsigned(UnitClass(unit->GetCircuitDef()));
+		active.push_back({task, patch.center, patch.radius, c.reason, cls});
+		if (front) {
+			++frontActive;
+		}
 		HoldSpot(patch.center, patch.radius);
 		CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
-		circuit->LOG("RESTORE: start %s(%i) reason=%s at (%.0f, %.0f) r=%.0f cells=%i lava=%i depth=%.0f lavaLevel=%.0f from %.0f away",
+		RLOG(circuit, "start %s(%i) reason=%s at (%.0f, %.0f) r=%.0f cells=%i lava=%i depth=%.0f lavaLevel=%.0f from %.0f away",
 				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), ReasonName(c.reason),
 				patch.center.x, patch.center.z, patch.radius, patch.cells, patch.lavaCells, patch.depth,
 				(lavaLevel > -1e8f) ? lavaLevel : 0.f, std::sqrt(upos.SqDistance2D(patch.center)));
 		builderMgr->AssignTask(unit, task);
 		if (!task->IsDead() && task->GetAssignees().empty()) {
 			builderMgr->AbortTask(task);  // the assignment was refused; TaskEnded drops it
+		} else if (!task->IsDead() && (maxPerTask > 1)) {
+			TryJoin(task, patch.center, patch.radius, c.reason, cls);  // a second one at once, when there is one
 		}
 	}
+}
+
+void CRestoreControl::TryJoin(CBRestoreTask* task, const AIFloat3& pos, float radius, int reason, unsigned cls)
+{
+	const bool front = (reason == PATH) || (reason == LAVA);
+	CCircuitUnit* unit = PickUnit(pos, radius, (reason == PATH) ? std::max(reach, pathReach) : reach, reason == PATH, cls, nullptr);
+	if (unit == nullptr) {
+		return;
+	}
+	if (front && IsPorcCovered(pos, cls == CLASS_AIR)) {
+		return;
+	}
+	const AIFloat3& upos = unit->GetPos(circuit->GetLastFrame());
+	RLOG(circuit, "join %s(%i) reason=%s at (%.0f, %.0f) r=%.0f from %.0f away",
+			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), ReasonName(reason),
+			pos.x, pos.z, radius, std::sqrt(upos.SqDistance2D(pos)));
+	circuit->GetBuilderManager()->AssignTask(unit, task);
 }
 
 void CRestoreControl::FindPathSectors(const AIFloat3& basePos, float lavaLevel, std::vector<int>& out)
@@ -651,6 +814,7 @@ void CRestoreControl::TaskEnded(CBRestoreTask* task, bool done, float seconds)
 			SSpot& s = Spot(it->pos);
 			s.tries = 0;
 			s.until = 0;
+			s.radius = 64.f;
 			ClearCoolDown(it->pos, it->radius);
 		}
 	} else {
@@ -661,10 +825,10 @@ void CRestoreControl::TaskEnded(CBRestoreTask* task, bool done, float seconds)
 		const SSpot& s = Spot(it->pos);
 		const int frame = circuit->GetLastFrame();
 		if (s.until > frame) {
-			CoolDown(it->pos, 64.f, s.until - frame);
+			CoolDown(it->pos, s.radius, s.until - frame);  // the patch area + 64 after a retreat (Lost)
 		}
 	}
-	circuit->LOG("RESTORE: %s reason=%s at (%.0f, %.0f) r=%.0f seconds=%.1f (restored %i, failed %i, lost killed %i taken %i)",
+	RLOG(circuit, "%s reason=%s at (%.0f, %.0f) r=%.0f seconds=%.1f (restored %i, failed %i, lost killed %i taken %i)",
 			done ? "done" : "aborted", ReasonName(task->GetReason()), it->pos.x, it->pos.z, it->radius, seconds,
 			restored, failed, lostKilled, lostTaken);
 	active.erase(it);

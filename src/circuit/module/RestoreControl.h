@@ -66,8 +66,13 @@ public:
 	float GetLavaMargin() const { return lavaMargin; }
 
 	void TaskEnded(CBRestoreTask* task, bool done, float seconds);
-	// The restorer went away mid-patch (killed or taken): the spot backs off.
-	void Lost(const springai::AIFloat3& pos, bool killed);
+	// A restorer went away mid-patch (killed or taken): the whole patch area
+	// (radius + 64) backs off, so the crater is not re-sent at a shifted centre.
+	void Lost(const springai::AIFloat3& pos, float radius, bool killed);
+	// Restorer class bit (commander, t1 ground, t2, rez, air); a patch's
+	// restorers are all of one class, at most restore.max_per_task of them
+	unsigned ClassOf(const CCircuitUnit* unit) const;
+	int GetMaxPerTask() const { return maxPerTask; }
 	bool IsProtected() const { return protect; }
 	// Live heights in the square, our and allied structures' pads skipped,
 	// every 2nd cell (at most 26x26 engine reads for the 200 cap).
@@ -92,12 +97,21 @@ private:
 	struct SSpot {
 		springai::AIFloat3 pos;
 		int tries;
-		int until;  // frame
+		int until;     // frame
+		float radius;  // matches within it (64; the patch + 64 after a loss)
 	};
 	SSpot& Spot(const springai::AIFloat3& pos);
 	bool IsSpotHeld(const springai::AIFloat3& pos, int frame) const;
-	void HoldSpot(const springai::AIFloat3& pos, float radius);
-	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front);
+	void HoldSpot(const springai::AIFloat3& pos, float radius, float spotRadius = 64.f);
+	// classMask: restorer classes allowed; front: no commander, and the line
+	// from the unit to the patch must be free of threat for that unit
+	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front,
+			unsigned classMask, int* threatSkips);
+	// A known, finished, armed enemy structure reaches pos (its weapon range
+	// against ground or air plus restore.porc_margin)
+	bool IsPorcCovered(const springai::AIFloat3& pos, bool air) const;
+	bool IsLineSafe(CCircuitUnit* unit, const springai::AIFloat3& to) const;
+	void TryJoin(CBRestoreTask* task, const springai::AIFloat3& pos, float radius, int reason, unsigned cls);
 	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out);
 	bool IsCovered(const springai::AIFloat3& pos) const;
 	bool IsCoolingDown(int sector, int frame) const;
@@ -132,6 +146,9 @@ private:
 	int maxTries = 3;         // starts at one spot before it waits retry_cap
 	int retryCapSeconds = 600;// the longest a tried spot waits
 	bool protect = true;      // a restorer keeps its patch against ordinary builder tasks
+	int maxPerTask = 2;       // restorers per patch, all of one class
+	float porcMargin = 100.f; // elmos beyond an enemy static weapon's range a front patch must be
+	int baseSeenFrame = -1;   // last scan that had base/site work: PATH leaves it a slot
 	std::vector<SSpot> spots; // at most 64, the oldest dropped
 	std::vector<char> blocked;// structure mask scratch, reused
 
@@ -139,6 +156,8 @@ private:
 		CBRestoreTask* task;
 		springai::AIFloat3 pos;
 		float radius;
+		int reason;
+		unsigned cls;  // the restorers' class
 	};
 	std::vector<SActive> active;
 	struct SRequest {
