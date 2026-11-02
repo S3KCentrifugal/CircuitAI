@@ -87,8 +87,13 @@ private:
 			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
 			bool pulseClaims = false, bool nuclearHistory = false, const TAimScale& aimScale = nullptr,
 			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr);
-	// Share of a target's value a blast of wd at sqDist takes (1 = killed); see SuperTask.cpp.
-	static float BlastKill(const CWeaponDef* wd, float sqAoe, float sqDist, float health);
+	// Blast + chain kills of a nuke (SuperTask.cpp, ChainKill).
+	struct SDeathBlast { float damage = 0.f, radius = 0.f, edge = 0.f, volume = 0.f; };
+	struct SChainUnit { springai::AIFloat3 pos; float value; float health; const CCircuitDef* cdef; };
+	static float AreaDamage(float damage, float radius, float edge, float dist);
+	SDeathBlast DeathBlastOf(const CCircuitDef* cdef);
+	float ChainKill(const CWeaponDef* wd, float radius, const springai::AIFloat3& aim, const std::vector<SChainUnit>& units);
+	std::unordered_map<const CCircuitDef*, SDeathBlast> deathBlasts;
 	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
 	std::vector<std::pair<springai::AIFloat3, float>> KnownInterceptors();
 	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,

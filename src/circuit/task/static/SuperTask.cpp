@@ -32,6 +32,8 @@
 #include "spring/SpringCallback.h"
 #include "WeaponMount.h"
 #include "WeaponDef.h"
+#include "Damage.h"
+#include "UnitDef.h"
 
 #include "spring/SpringMap.h"
 #include "spring/SpringUnit.h"
@@ -420,6 +422,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		int rank;
 		float value;
 		float health;
+		const CCircuitDef* cdef;
 	};
 	std::vector<SAreaCand> cands;
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
@@ -466,7 +469,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				continue;
 			}
 		}
-		cands.push_back({e.pos, rank, value, edef->GetHealth()});
+		cands.push_back({e.pos, rank, value, ((e.health > 0.f) ? e.health : edef->GetHealth()), edef});
 	}
 	}
 
@@ -495,11 +498,39 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		}
 	}
 
+	// Chain reactions (owner 2026-11-02): with a blast weapon, an aim point is
+	// worth the metal of everything that dies - the blast's own kills, then
+	// every death explosion's kills, repeated - see ChainKill.
+	float chainReach = 0.f;
+	if (blastWeapon != nullptr) {
+		for (const SAreaCand& c : cands) chainReach = std::max(chainReach, DeathBlastOf(c.cdef).radius);
+	}
+	const float sqReach = SQUARE(std::sqrt(sqAoe) + chainReach);
+	std::vector<SChainUnit> nearUnits;
+
 	int bestRank = std::numeric_limits<int>::max();
 	float bestValue = 0.f;
 	int bestCount = 0;
 	int bestIdx = -1;
 	for (unsigned i = 0; i < aims.size(); ++i) {
+		if (blastWeapon != nullptr) {
+			int rank = std::numeric_limits<int>::max();
+			int count = 0;
+			nearUnits.clear();
+			for (const SAreaCand& c : cands) {
+				const float sqDist = aims[i].SqDistance2D(c.pos);
+				if (sqDist >= sqReach) continue;
+				if (sqDist < sqAoe) { rank = std::min(rank, c.rank); ++count; }
+				nearUnits.push_back({c.pos, c.value, c.health, c.cdef});
+			}
+			if (count < minTargets) continue;
+			float value = ChainKill(blastWeapon, std::sqrt(sqAoe), aims[i], nearUnits);
+			if (aimScale) value *= aimScale(aims[i]);
+			if ((rank < bestRank) || ((rank == bestRank) && (value > bestValue))) {
+				bestRank = rank; bestValue = value; bestCount = count; bestIdx = int(i);
+			}
+			continue;
+		}
 		int rank = std::numeric_limits<int>::max();
 		float value = 0.f;
 		int count = 0;
@@ -509,7 +540,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				continue;
 			}
 			rank = std::min(rank, cands[j].rank);
-			value += cands[j].value * BlastKill(blastWeapon, sqAoe, sqDist, cands[j].health);
+			value += cands[j].value;
 			++count;
 		}
 		if (count < minTargets) {
@@ -551,20 +582,79 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 }
 
 /*
- * Blast kill (owner 2026-11-02): how much of a target's value a blast at this
- * distance takes, from the engine's area damage, damage x (R - d) / (R - d x
- * edge effectiveness): 1 where the hit kills, else the share of health it
- * removes. A nuke (15000 default, edge 0, R 960) kills a 9400-health AFUS only
- * within about 360 of the impact, so an aim point no longer counts the whole
- * blast circle at full value. No weapon: every target in the circle counts in full.
+ * Blast and chain kills (owner 2026-11-02). Engine area damage is
+ * damage x (R - d) / (R - d x edge effectiveness), d measured to the unit's
+ * collision volume, which the def's radius x volumeFactor approximates. A nuke
+ * (15000, R 960, edge 0) kills a full 9400-health Cortex AFUS only within about
+ * 360 of the impact, but each AFUS or advanced geo that dies explodes for 10600
+ * over 640 (customfusionexplo), fusions and nuke silos for 2650 over 240, so a
+ * tight economy block usually dies whole once one of them goes. ChainKill
+ * applies the blast to every known unit near the aim point (health as last
+ * seen), then each death's explosion to the survivors, until nothing more
+ * dies, and returns the metal of the dead.
  */
-float CSuperTask::BlastKill(const CWeaponDef* wd, float sqAoe, float sqDist, float health)
+float CSuperTask::AreaDamage(float damage, float radius, float edge, float dist)
 {
-	if ((wd == nullptr) || (wd->GetDamage() <= 0.f) || (health <= 0.f)) return 1.f;
-	const float r = std::sqrt(sqAoe), d = std::sqrt(sqDist);
-	const float denom = r - d * wd->GetEdgeEffectiveness();
-	const float mod = (denom > 0.f) ? std::max(0.f, (r - d) / denom) : 0.f;
-	return std::min(1.f, wd->GetDamage() * mod / health);
+	if ((damage <= 0.f) || (dist >= radius)) return 0.f;
+	const float denom = radius - dist * edge;
+	return (denom > 0.f) ? damage * (radius - dist) / denom : damage;
+}
+
+CSuperTask::SDeathBlast CSuperTask::DeathBlastOf(const CCircuitDef* cdef)
+{
+	auto it = deathBlasts.find(cdef);
+	if (it != deathBlasts.end()) return it->second;
+	SDeathBlast b;
+	CCircuitDef* d = const_cast<CCircuitDef*>(cdef);
+	b.volume = d->GetRadius();
+	const std::unique_ptr<WeaponDef> wd(d->GetDef()->GetDeathExplosion());
+	if (wd != nullptr) {
+		b.radius = wd->GetAreaOfEffect();
+		b.edge = wd->GetEdgeEffectiveness();
+		Damage* damage = wd->GetDamage();
+		const std::vector<float>& types = damage->GetTypes();
+		b.damage = types.empty() ? 0.f : types[0];  // default armour
+		delete damage;
+	}
+	deathBlasts.emplace(cdef, b);
+	return b;
+}
+
+float CSuperTask::ChainKill(const CWeaponDef* wd, float radius, const AIFloat3& aim, const std::vector<SChainUnit>& units)
+{
+	const float volumeFactor = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo().volumeFactor;
+	auto dist = [volumeFactor](const AIFloat3& a, const AIFloat3& b, float volume) {
+		return std::max(0.f, std::sqrt(a.SqDistance2D(b)) - volume * volumeFactor);
+	};
+	const unsigned n = units.size();
+	std::vector<float> hp(n);
+	std::vector<SDeathBlast> blasts(n);
+	std::vector<unsigned> frontier;
+	for (unsigned k = 0; k < n; ++k) {
+		blasts[k] = DeathBlastOf(units[k].cdef);
+		hp[k] = units[k].health - AreaDamage(wd->GetDamage(), radius, wd->GetEdgeEffectiveness(),
+				dist(aim, units[k].pos, blasts[k].volume));
+		if (hp[k] <= 0.f) frontier.push_back(k);
+	}
+	std::vector<bool> dead(n, false);
+	float value = 0.f;
+	while (!frontier.empty()) {
+		std::vector<unsigned> next;
+		for (unsigned k : frontier) {
+			if (dead[k]) continue;
+			dead[k] = true;
+			value += units[k].value;
+			const SDeathBlast& b = blasts[k];
+			if (b.damage <= 0.f) continue;
+			for (unsigned j = 0; j < n; ++j) {
+				if (dead[j] || (hp[j] <= 0.f)) continue;
+				hp[j] -= AreaDamage(b.damage, b.radius, b.edge, dist(units[k].pos, units[j].pos, blasts[j].volume));
+				if (hp[j] <= 0.f) next.push_back(j);
+			}
+		}
+		frontier.swap(next);
+	}
+	return value;
 }
 
 /*
