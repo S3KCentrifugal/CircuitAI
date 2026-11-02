@@ -234,6 +234,14 @@ inline float UsefulScore(float cost, float hp, float damage, float reserved,
     return (1.f+cost)*(.05f+.95f*efficiency)*(heavy?1.2f:1.f)*(los?1.f:.65f)*progress;
 }
 
+// D-433: threat per HP. The target score is multiplied by
+// 1 + weight x targetDps / ownDps: what kills us fastest for its health comes
+// first (the meta's first focus rule). Weight 0, or an unknown DPS, is 1.
+inline float ThreatFactor(float targetDps, float ownDps, float weight) {
+    if (!(weight>0.f) || !(ownDps>0.f) || !(targetDps>0.f)) return 1.f;
+    return 1.f+weight*targetDps/ownDps;
+}
+
 // Callback-owned storage for a map-sized grid, with a sparse overflow for legal
 // negative/off-map coordinates. Configure only before use: touched holds bucket
 // addresses. Clear visits last generation's occupied cells, not all historical

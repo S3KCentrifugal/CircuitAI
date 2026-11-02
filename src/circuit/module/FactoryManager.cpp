@@ -22,6 +22,7 @@
 #include "task/static/EnemyReclaimPolicy.h"
 #include "task/static/PatrolTask.h"
 #include "unit/FactoryData.h"
+#include "unit/RangedPolicyParse.h"
 #include "CircuitAI.h"
 #include "util/GameAttribute.h"
 #include "util/Utils.h"
@@ -38,20 +39,6 @@
 #include "Log.h"
 
 namespace circuit {
-namespace {
-constexpr float POKE_MIN_IN_RANGE = 0.f;
-constexpr float POKE_MAX_IN_RANGE = .99f;
-constexpr float POKE_MIN_PRESS_RANGE = .5f;
-constexpr float POKE_MIN_OUT_RANGE = 1.f;
-constexpr float POKE_MAX_OUT_RANGE = 1.5f;
-constexpr float POKE_MIN_METAL_RATIO = 1.f;
-constexpr float POKE_MAX_METAL_RATIO = 10.f;
-constexpr float POKE_MIN_HEALTH = 0.f;
-constexpr float POKE_MAX_HEALTH = 1.f;
-constexpr float POKE_MIN_PAUSE_SECONDS = 0.f;
-constexpr float POKE_MAX_PAUSE_SECONDS = 60.f;
-}
-
 using namespace springai;
 using namespace terrain;
 
@@ -482,160 +469,26 @@ void CFactoryManager::ReadConfig()
 			cdef->RemDGun();
 		}
 		if (cdef->IsAttrRanged()) {
-			// Invalid containers/types must disable this opt-in controller, not
-			// throw while parsing an otherwise usable profile.
-			const Json::Value settings = behaviour["ranged"].isObject() ? behaviour["ranged"] : Json::Value(Json::objectValue);
+			// D-430: the legacy attribute path and the ranged controller's presets
+			// share one parser (unit/RangedPolicyParse.cpp). Invalid containers or
+			// types disable this opt-in controller, not throw while parsing an
+			// otherwise usable profile.
 			RangedPolicy policy;
-			bool valid = behaviour["ranged"].isObject();
-			const auto modeValue = settings.get("target_mode", "skirmish");
-			if (!modeValue.isString()) valid = false;
-			const std::string mode = modeValue.isString() ? modeValue.asString() : "";
-			if (mode == "precision") policy.mode = RangedPolicy::Mode::PRECISION;
-			else if (mode == "bombardment") policy.mode = RangedPolicy::Mode::BOMBARDMENT;
-			else if (mode == "carrier") policy.mode = RangedPolicy::Mode::CARRIER;
-			else if (mode != "skirmish") valid = false;
-			// Validate at load, not in each shooter update. Reject malformed
-			// policies explicitly instead of letting NaNs disable safety checks.
-			auto number = [&](const char* key, float& value, float low, float high) {
-				const auto& setting = settings[key];
-				if (setting.isNull()) return;
-				if (!setting.isNumeric()) { valid = false; return; }
-				const float candidate = setting.asFloat();
-				if (!std::isfinite(candidate) || candidate < low || candidate > high) { valid = false; return; }
-				value = candidate;
-			};
-			auto boolean = [&](const char* key, bool& value) {
-				const auto& setting = settings[key];
-				if (setting.isNull()) return;
-				if (!setting.isBool()) { valid = false; return; }
-				value = setting.asBool();
-			};
-			number("range_fraction", policy.rangeFraction, .5f, .99f);
-			number("spacing", policy.spacing, 16.f, 1024.f);
-			number("safety_margin", policy.safetyMargin, 0.f, 512.f);
-			number("range_hysteresis", policy.hysteresis, 8.f, 256.f);
-			number("reaction_seconds", policy.reactionSeconds, .1f, 5.f);
-			number("target_hysteresis", policy.targetHysteresis, 1.f, 3.f);
-			number("move_min_seconds", policy.moveMinSeconds, 0.f, 3.f);
-			number("target_min_seconds", policy.targetMinSeconds, 0.f, 3.f);
-			number("target_switch_ratio", policy.targetSwitchRatio, 1.f, 5.f);
-			number("sensor_offset", policy.sensorOffset, 32.f, 512.f);
-			number("cloak_reserve_seconds", policy.cloakReserve, 0.f, 30.f);
-			number("repaired_target_penalty", policy.repairedTargetPenalty, .01f, 1.f);
-			number("splash_weight", policy.splashWeight, 0.f, 3.f);
-			boolean("cloak_on_reload", policy.cloakOnReload);
-			boolean("allow_mobile", policy.allowMobile);
-			boolean("allow_static", policy.allowStatic);
-			boolean("prefer_heavy", policy.preferHeavy);
-			boolean("prefer_screen", policy.preferScreen);
-			boolean("allow_radar", policy.allowRadar);
-			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
-			boolean("low_trajectory", policy.lowTrajectory);
-			boolean("hold_fireline", policy.holdFireline);
-			boolean("stage_when_blocked", policy.stageWhenBlocked);
-			boolean("fire_at_will", policy.fireAtWill);
-            boolean("fire_in_range", policy.fireInRange);
-            boolean("commander_focus", policy.commanderFocus);
-			number("spam_max_cost", policy.spamMaxCost, 0.f, 2000.f);
-			{
-				// Owner 2026-10-27: an explicit spam roster. A name this game
-				// does not have is logged and skipped, not a malformed policy.
-				const auto& spam = settings["spam_units"];
-				if (!spam.isNull() && !spam.isArray()) valid = false;
-				else for (const auto& name : spam) {
-					if (!name.isString()) { valid = false; continue; }
-					CCircuitDef* spamDef = circuit->GetCircuitDef(name.asCString());
-					if (spamDef == nullptr) circuit->LOG("CONFIG %s: %s spam_units has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
-					else policy.spamDefs.insert(spamDef->GetId());
-				}
+			std::vector<std::string> problems;
+			const ranged_policy::Resolver resolver{
+				[this](const std::string& name) { CCircuitDef* d = circuit->GetCircuitDef(name.c_str()); return d ? d->GetId() : -1; },
+				[this](const std::string& names) { return circuit->GetGame()->GetCategoriesFlag(names.c_str()); }};
+			const bool valid = behaviour["ranged"].isObject()
+				&& ranged_policy::Parse(behaviour["ranged"], policy, resolver, {}, problems);
+			for (const auto& p : problems) {
+				if (p.rfind("unknown key", 0) == 0) continue;  // legacy: silently ignored
+				circuit->LOG("CONFIG %s: %s ranged policy: %s", cfgName.c_str(), defName.c_str(), p.c_str());
 			}
-            number("commander_priority", policy.commanderPriority, 1.f, 100.f);
-			boolean("coordinated", policy.coordinated);
-            // Fireline holding is an individual forward-arc doctrine. Reject
-            // unsupported cohort ownership instead of silently allowing retreats.
-            if (policy.holdFireline && policy.coordinated) valid = false;
-			number("cohort_size", policy.cohortSize, 1.f, 12.f);
-			number("cohort_radius", policy.cohortRadius, 128.f, 1600.f);
-			number("regroup_seconds", policy.regroupSeconds, 0.f, 20.f);
-			number("rush_ratio", policy.rushRatio, 1.f, 5.f);
-			number("catch_seconds", policy.catchSeconds, 0.f, 15.f);
-			number("engagement_seconds", policy.engagementSeconds, 0.f, 30.f);
-            boolean("sustained_rush", policy.sustainedRush);
-            number("sustained_rush_ratio", policy.sustainedRushRatio, 1.f, 10.f);
-            number("sustained_rush_radius", policy.sustainedRushRadius, 128.f, 1600.f);
-            number("sustained_rush_min_front", policy.sustainedRushMinFront, 1.f, 256.f);
-            number("sustained_rush_remaining", policy.sustainedRushRemaining, .01f, 1.f);
-            number("sustained_rush_cooldown", policy.sustainedRushCooldown, 1.f, 120.f);
-            number("sustained_rush_range", policy.sustainedRushRange, .25f, 1.f);
-			number("advantage_enter", policy.advantageEnter, 1.f, 5.f);
-			number("advantage_exit", policy.advantageExit, 1.f, 5.f);
-			number("loss_fraction", policy.lossFraction, 0.f, .9f);
-			number("static_loss_fraction", policy.staticLossFraction, 0.f, .9f);
-            boolean("support_allies", policy.supportAllies);
-            number("support_loss_fraction", policy.supportLossFraction, 0.f, .9f);
-            number("intent_gain", policy.intentGain, 0.f, .5f);
-            // D-294: resolve category names once at load. A malformed value or
-            // a non-empty name the engine does not know disables the policy
-            // with the standard diagnostic rather than silently targeting all.
-            const auto& avoid = settings["avoid_categories"];
-            if (!avoid.isNull()) {
-                if (!avoid.isString()) valid = false;
-                else if (!avoid.asString().empty()) {
-                    policy.avoidCategory = circuit->GetGame()->GetCategoriesFlag(avoid.asString().c_str());
-                    if (policy.avoidCategory == 0) valid = false;
-                }
-            }
-            number("evasion_limit", policy.evasionLimit, 0.f, 10.f);
-            // Owner 2026-10-17: poke cadence; only the coordinated controller reads it.
-            number("poke_in", policy.pokeIn, POKE_MIN_IN_RANGE, POKE_MAX_IN_RANGE);
-            number("poke_in_dominant", policy.pokeInDominant, POKE_MIN_PRESS_RANGE, POKE_MAX_IN_RANGE);
-            number("poke_out", policy.pokeOut, POKE_MIN_OUT_RANGE, POKE_MAX_OUT_RANGE);
-            number("poke_ratio", policy.pokeRatio, POKE_MIN_METAL_RATIO, POKE_MAX_METAL_RATIO);
-            // Owner 2026-10-19: poke regimes and the static press.
-            number("poke_health", policy.pokeHealth, POKE_MIN_HEALTH, POKE_MAX_HEALTH);
-            number("poke_press_health", policy.pokePressHealth, POKE_MIN_HEALTH, POKE_MAX_HEALTH);
-            number("poke_pause_seconds", policy.pokePauseSeconds, POKE_MIN_PAUSE_SECONDS, POKE_MAX_PAUSE_SECONDS);
-            number("press_static", policy.pressStatic, 0.f, 3.f);
-            // The cohort controller has its own static admission (assault list).
-            if (policy.pressStatic > 0.f && policy.coordinated) valid = false;
-            // D-295: assist is an individual-controller lever; a coordinated
-            // cohort already has support_allies. Reject the combination.
-            number("assist_radius", policy.assistRadius, 0.f, 6000.f);
-            number("assist_margin", policy.assistMargin, 0.f, 600.f);
-            boolean("assist_screen", policy.assistScreen);
-            if (policy.assistRadius > 0.f && policy.coordinated) valid = false;
-            const auto& formation = settings["formation"];
-            if (!formation.isNull()) {
-                if (!formation.isObject() || !formation["family"].isString()
-                    || !formation["position"].isString()) valid = false;
-                else {
-                    policy.formationFamily = formation["family"].asString();
-                    const auto position = formation["position"].asString();
-                    if (position == "front") policy.formationPosition = RangedPolicy::FormationPosition::FRONT;
-                    else if (position == "rear") policy.formationPosition = RangedPolicy::FormationPosition::REAR;
-                    else valid = false;
-                    if (policy.formationFamily.empty() || !policy.coordinated) valid = false;
-                    const auto readFormationNumber = [&](const char* name, float& value, float minimum, float maximum) {
-                        const auto& setting = formation[name];
-                        if (setting.isNull()) return;
-                        if (!setting.isNumeric()) { valid = false; return; }
-                        const float candidate = setting.asFloat();
-                        if (!std::isfinite(candidate) || candidate < minimum || candidate > maximum) valid = false;
-                        else value = candidate;
-                    };
-                    readFormationNumber("separation_minimum", policy.formationSeparationMinimum, 16.f, 512.f);
-                    readFormationNumber("separation_maximum", policy.formationSeparationMaximum, 16.f, 1024.f);
-                    readFormationNumber("withdrawal_lead_seconds", policy.withdrawalLeadSeconds, 0.f, 5.f);
-                    if (policy.formationSeparationMinimum > policy.formationSeparationMaximum) valid = false;
-                }
-            }
-            if (policy.sustainedRush && (!policy.coordinated || policy.engagementSeconds <= 0.f
-                || policy.formationPosition == RangedPolicy::FormationPosition::NONE)) valid = false;
-			if (policy.advantageExit > policy.advantageEnter) valid = false;
 			if (valid) cdef->SetRangedPolicy(policy);
 			else {
 				circuit->LOG("CONFIG %s: %s has invalid ranged policy; ranged disabled", cfgName.c_str(), defName.c_str());
 				cdef->DelAttribute(ATTR_TYPE(RANGED));
+				cdef->ClearRangedPolicy();
 			}
 		}
 

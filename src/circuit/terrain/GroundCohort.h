@@ -138,6 +138,22 @@ inline float PokeFraction(Poke regime,bool reloading,float health,bool paused,
 inline float HealthValue(float cost,float health,float maximum) {
     return cost*std::clamp(health/std::max(1.f,maximum),0.f,1.f);
 }
+// D-433: overkill split. `any` is the best admitted target, `open` the best
+// whose reservations do not yet cover its health (-1 when none). With the
+// skip on, the open one wins; otherwise the damped covered pick stands.
+inline int OverkillPick(bool skip,int any,int open) {
+    return skip && open>=0 ? open : any;
+}
+// D-433: terrain preference. A lateral slot candidate scores its height over
+// the enemy point in hundreds of elmos times the weight; the advantage a
+// cohort needs to advance rises by `penalty` when the enemy stands more than
+// `rampHeight` above it (a line does not walk up a ramp into a defender).
+inline float HeightScore(float candidateHeight,float enemyHeight,float weight) {
+    return weight*(candidateHeight-enemyHeight)/100.f;
+}
+inline float RampEntry(float entry,float enemyHeight,float ownHeight,float rampHeight,float penalty) {
+    return (penalty>0.f && enemyHeight-ownHeight>rampHeight) ? entry+penalty : entry;
+}
 // Frontline screens and rear artillery have different formation jobs. Keep
 // same-family spacing exact; a mixed pair needs physical room and the smaller
 // tactical spacing, not the artillery's anti-chain-explosion exclusion ring.

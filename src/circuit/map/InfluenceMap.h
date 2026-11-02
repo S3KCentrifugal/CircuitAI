@@ -10,6 +10,7 @@
 
 #include "unit/enemy/EnemyUnit.h"
 
+#include "util/DoubleBuffer.h"
 #include <vector>
 #ifdef DEBUG_VIS
 #include <stdint.h>
@@ -73,9 +74,7 @@ private:
 	std::shared_ptr<IMainJob> Update(CEnemyManager* enemyMgr);
 	void Apply();
 	void SwapBuffers();
-	SInfluenceData* GetNextInflData() {
-		return (pInflData.load() == &inflData0) ? &inflData1 : &inflData0;
-	}
+	SInfluenceData* GetNextInflData() { return influenceData.BackPtr(); }
 
 	int squareSize;
 	int width;
@@ -84,8 +83,7 @@ private:
 
 //	float vulnMax;
 
-	SInfluenceData inflData0, inflData1;  // Double-buffer for threading
-	std::atomic<SInfluenceData*> pInflData;
+	CDoubleBuffer<SInfluenceData> influenceData;  // D-431
 	float* drawEnemyInfl;
 	float* drawAllyInfl;
 	float* drawAllyDefendInfl;

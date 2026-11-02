@@ -132,6 +132,20 @@ struct RangedPolicy {
     float assistRadius = 0.f;
     float assistMargin = 150.f; // ally counts as engaged within its ground range + margin + contact radius
     bool assistScreen = true;   // assist firing sites require an allied screen toward the target
+    // D-433 (thug-micro-fixes-proposal.md). Every default reproduces the
+    // D-432 behaviour; the balanced skirmisher and backline presets opt in.
+    float splashVetoHealth = 0.f;    // splash_veto_health: 0 = any friend in the splash vetoes the shot; else only a friend
+                                     // below factor x the weapon's hit on it (or a commander) does (CRangedWorld::FriendlySplash)
+    float threatWeight = 0.f;        // threat_weight: target score x (1 + weight x target DPS / own DPS) (ranged::ThreatFactor)
+    bool overkillSkip = false;       // overkill_skip: a target whose reservations cover its health is skipped when another admitted one exists
+    float retreatHealth = 0.f;       // retreat_health: retreat at this health fraction when the hull can escape (disengage::ShouldRetreat); 0 = floor only
+    float retreatVeteranBonus = 0.f; // retreat_veteran_bonus: added to retreat_health x experience
+    float repairHealth = 0.f;        // repair_health: a repair trip under this fraction when a builder is near; 0 = off
+    float repairRadius = 600.f;      // repair_radius: elmos a builder must be within
+    float repairCooldownSeconds = 20.f; // repair_cooldown_seconds: least seconds between two trips of one hull
+    float heightWeight = 0.f;        // height_weight: lateral slot candidates ranked by height over the enemy point (cohort::HeightScore); 0 = first fit
+    float rampHeight = 40.f;         // ramp_height: elmos the enemy must stand above the cohort to count as a ramp
+    float rampPenalty = 0.f;         // ramp_penalty: added to advantage_enter below a ramp (cohort::RampEntry); 0 = off
 };
 }
 #endif

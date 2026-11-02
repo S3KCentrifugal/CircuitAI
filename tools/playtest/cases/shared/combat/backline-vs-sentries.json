@@ -1,0 +1,38 @@
+{
+  "name": "backline-vs-sentries",
+  "description": "D-432: a Cortex line (6 Thugs screen, 6 Aggravators on the backline controller) against two Armada Sentries (430 reach) with a Mace picket, then four Pawns walking in. The backline's job: shoot the towers from outside their reach while the Thugs screen, weight the Maces the screen cannot reach, and not waste missiles on the Pawns unless they come for the rockets. ranged_benchmark --summarize reads every corstorm shot and its target.",
+  "unit": "corstorm",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "backline-vs-sentries",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [3950, 4000, 1150],
+  "photos": [40, 70, 100, 150],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3550, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4450, 4200]},
+    {"unit": "corthud", "count": 6, "team": 0, "position": [3800, 3700], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 6, "team": 0, "position": [3870, 3480], "columns": 6, "spacing": 80, "after_seconds": 15},
+    {"unit": "armllt", "count": 1, "team": 1, "position": [3850, 4450], "after_seconds": 20},
+    {"unit": "armllt", "count": 1, "team": 1, "position": [4050, 4450], "after_seconds": 20},
+    {"unit": "armham", "count": 3, "team": 1, "position": [3950, 4600], "columns": 3, "spacing": 90, "after_seconds": 20},
+    {"unit": "armpw", "count": 4, "team": 1, "position": [3800, 5000], "columns": 4, "spacing": 80, "after_seconds": 90}
+  ],
+  "waves": [
+    {"name": "sentries with a Mace picket", "after_seconds": 20, "units": ["armllt", "armham"]},
+    {"name": "raiders 4 Pawns", "after_seconds": 90, "units": ["armpw"]}
+  ],
+  "enemy_destination": [3900, 3300],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 3,
+    "max_losses": 6,
+    "min_damage": 2500
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "backline"
+}

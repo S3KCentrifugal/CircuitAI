@@ -11,7 +11,6 @@
 #include "task/fighter/FighterTask.h"
 
 namespace circuit {
-class CRangedEngagement;
 
 class CArtilleryTask final: public IFighterTask {
 public:
@@ -32,7 +31,6 @@ public:
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 
 private:
-	std::unique_ptr<CRangedEngagement> ranged;
 	void Execute(CCircuitUnit* unit);
 	CEnemyInfo* FindTarget(CCircuitUnit* unit, const springai::AIFloat3& pos);
 	void ApplyTargetPath(const CQueryPathMulti* query);

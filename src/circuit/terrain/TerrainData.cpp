@@ -47,8 +47,7 @@ int CTerrainData::convertStoP(1);
 CMap* CTerrainData::map(nullptr);
 
 CTerrainData::CTerrainData()
-		: pAreaData(&areaData0)
-		, waterIsHarmful(false)
+		: waterIsHarmful(false)
 		, waterIsAVoid(false)
 		, gameAttribute(nullptr)
 		, slopeMapXSize(0)
@@ -86,7 +85,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 	/*
 	 *  Assign areaData references
 	 */
-	SAreaData& areaData = *pAreaData.load();
+	SAreaData& areaData = areaBuffers.Front();
 	std::vector<SMobileType>& mobileType = areaData.mobileType;
 	std::vector<SImmobileType>& immobileType = areaData.immobileType;
 	std::vector<SAreaSector>& sectorAirType = areaData.sectorAirType;
@@ -493,7 +492,7 @@ void CTerrainData::Init(CCircuitAI* circuit)
 	/*
 	 *  Duplicate areaData
 	 */
-	SAreaData& nextAreaData = (pAreaData.load() == &areaData0) ? areaData1 : areaData0;
+	SAreaData& nextAreaData = areaBuffers.Back();
 	nextAreaData.heightMapXSize = mapWidth;
 	nextAreaData.mobileType = mobileType;
 	for (auto& mt : nextAreaData.mobileType) {
@@ -581,14 +580,14 @@ void CTerrainData::AnalyzeMap(CCircuitAI* circuit)
 
 	CCircuitDef* cdef = circuit->GetCircuitDef(cfg.unitName.c_str());
 	if (cdef == nullptr) {
-		for (const SMobileType& mt : areaData0.mobileType) {
+		for (const SMobileType& mt : areaBuffers.At(0).mobileType) {
 			if (mt.typeUsable) {
 				rmt = &mt;
 				break;
 			}
 		}
 	} else {
-		rmt = &areaData0.mobileType[cdef->GetMobileId()];
+		rmt = &areaBuffers.At(0).mobileType[cdef->GetMobileId()];
 	}
 
 	sectors.resize(sectorXSize * sectorZSize);
@@ -709,7 +708,7 @@ void CTerrainData::EnqueueUpdate()
 	map->GetHeightMap(GetNextAreaData()->heightMap);
 	map->GetSlopeMap(slopeMap);
 
-	scheduler->RunPriorityJob(CScheduler::WorkJob(&CTerrainData::UpdateAreas, this));
+	scheduler->RunPriorityJob(CScheduler::WorkJob(&CTerrainData::UpdateAreas, this), "terrain-areas", jobs::Key("terrain-areas"));
 }
 
 std::shared_ptr<IMainJob> CTerrainData::UpdateAreas()
@@ -730,7 +729,7 @@ std::shared_ptr<IMainJob> CTerrainData::UpdateAreas()
 	/*
 	 *  Reset areaData
 	 */
-	SAreaData& prevAreaData = *pAreaData.load();
+	SAreaData& prevAreaData = areaBuffers.Front();
 	// O(H) exact comparison on the existing terrain worker, O(1) extra storage.
 	// Includes fine samples outside changed coarse sectors. Publication carries
 	// the revision to every manager before synchronous route readers use it.
@@ -1017,7 +1016,7 @@ void CTerrainData::OnAreaUsersUpdated()
 		return;
 	}
 
-	pAreaData = GetNextAreaData();
+	areaBuffers.Publish();
 	isUpdating = false;
 
 #ifdef DEBUG_VIS
@@ -1028,6 +1027,7 @@ void CTerrainData::OnAreaUsersUpdated()
 
 bool CTerrainData::IsWalkable(int xSlope, int ySlope) const
 {
+	const SAreaData& areaData0 = areaBuffers.At(0);
 	const float elevation = areaData0.heightMap[areaData0.heightMapXSize * (ySlope * 2) + (xSlope * 2)];
 	const float slope = slopeMap[slopeMapXSize * ySlope + xSlope];
 	return (rmt->canHover && (rmt->maxElevation >= elevation) && !waterIsAVoid && ((elevation <= 0) || (rmt->maxSlope >= slope)))

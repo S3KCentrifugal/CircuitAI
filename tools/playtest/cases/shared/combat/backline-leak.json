@@ -1,0 +1,37 @@
+{
+  "name": "backline-leak",
+  "description": "D-432: a Cortex line (6 Thugs screen, 4 Aggravators on the backline controller) takes a frontal Pawn wave, then five Pawns come round the west flank straight at the rockets with no Thug between. The backline should tuck behind the nearest Thugs with fire open (BACKLINE: tuck) instead of kiting alone; line_wave_report.py counts the tucks and the rocket losses per wave.",
+  "unit": "corstorm",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "backline-leak",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [3800, 3800, 1150],
+  "photos": [40, 85, 100, 120],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3550, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4450, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3100, 3600]},
+    {"unit": "corthud", "count": 6, "team": 0, "position": [3800, 3700], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 4, "team": 0, "position": [3870, 3480], "columns": 4, "spacing": 90, "after_seconds": 15},
+    {"unit": "armpw", "count": 6, "team": 1, "position": [3800, 5000], "columns": 6, "spacing": 80, "after_seconds": 35},
+    {"unit": "armpw", "count": 5, "team": 1, "position": [2900, 3500], "columns": 5, "spacing": 70, "after_seconds": 80}
+  ],
+  "waves": [
+    {"name": "raiders 6 Pawns frontal", "after_seconds": 35, "units": ["armpw"]},
+    {"name": "leak 5 Pawns from the flank", "after_seconds": 80, "units": ["armpw"]}
+  ],
+  "enemy_destination": [3950, 3400],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 7,
+    "max_losses": 5,
+    "min_damage": 2000
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "backline-leak"
+}

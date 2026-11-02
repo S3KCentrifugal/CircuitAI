@@ -513,7 +513,12 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     // user offset changes ordinary engagement/withdrawal risk tolerance.
     const float bias=p.sustainedRush?circuit->GetMilitaryManager()->GetAggressionDelta():0.f;
     const float caution=std::clamp(1.f-.5f*bias,.5f,1.5f);
-    const auto result=cohort::Assess(own,hostile,horizon,approach,p.advantageEnter*caution,p.advantageExit*caution,limit/caution,
+    // D-433: below a ramp the advantage needed to advance rises (two
+    // elevation reads per plan, only with ramp_penalty set).
+    float entry=p.advantageEnter;
+    if(p.rampPenalty>0.f) entry=cohort::RampEntry(entry,area->GetElevationAt(enemy.pos.x,enemy.pos.z),
+        area->GetElevationAt(g.center.x,g.center.z),p.rampHeight,p.rampPenalty);
+    const auto result=cohort::Assess(own,hostile,horizon,approach,entry*caution,p.advantageExit*caution,limit/caution,
         g.committed || screening,screening?hostileArmed:1);
     g.loss=result.loss; g.advantage=result.advantage;
     g.committed=result.commit && !uncertain && !forbidden && approach<=p.catchSeconds;

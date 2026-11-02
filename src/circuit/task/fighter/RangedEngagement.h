@@ -18,6 +18,14 @@ public:
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
     bool IsSustainedRush() const { return world.IsSustainedRush(id); }
+    // D-432: read by the backline controller to build its directive.
+    CRangedWorld& World() { return world; }
+    const CRangedWorld::Capabilities& Caps() const { return caps; }
+    // D-433: the hazard the last cohort decision escaped from, for the
+    // retreat rule's escape test (control/unit/DisengageRule.cpp).
+    struct Danger { bool present=false, mobile=false; float speed=0.f, range=0.f; int frame=-1; };
+    const Danger& LastDanger() const { return lastDanger; }
+    float MaxRange() const;
 private:
     void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage,float score=-1.f);
     bool Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape,bool urgent=false);
@@ -53,6 +61,10 @@ private:
     bool completedMove=false;
     int moveObjective=-1, moveMode=-1;
     int pokePhase=-1; // owner 2026-10-17: -1 not poking, 1 stepping in, 0 stepping out
+    int lineOrderFrame=-1; // D-430: the line order this hull last moved under
+    bool tucking=false;    // D-432: moving to the backline tuck point
+    Danger lastDanger;     // D-433
+    int noScreenOrderFrame=-1; // D-433: the fallback station this hull last moved under
     bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;
     float reservedDamage=0.f;
     float heldScore=0.f; int heldScoreFrame=-1; // current target's score, the tick it last passed the candidate filters
