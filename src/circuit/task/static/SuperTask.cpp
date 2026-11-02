@@ -11,6 +11,7 @@
 #include "map/MapManager.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "unit/enemy/EnemyManager.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/ally/AllyTeam.h"
@@ -408,7 +409,7 @@ void CSuperTask::Update()
  */
 bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly,
-		bool allEnemies, bool pulseClaims, bool nuclearHistory)
+		bool allEnemies, bool pulseClaims, bool nuclearHistory, const TAimScale& aimScale, const TExtraAims& extraAims, const CWeaponDef* blastWeapon)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
@@ -418,6 +419,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		springai::AIFloat3 pos;
 		int rank;
 		float value;
+		float health;
 	};
 	std::vector<SAreaCand> cands;
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
@@ -464,28 +466,57 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				continue;
 			}
 		}
-		cands.push_back({e.pos, rank, value});
+		cands.push_back({e.pos, rank, value, edef->GetHealth()});
 	}
+	}
+
+	// Aim points: every candidate, plus the caller's extra points (nukes: just
+	// outside an antinuke's coverage), which pass the same range, claim and
+	// friendly checks as a candidate.
+	std::vector<springai::AIFloat3> aims;
+	aims.reserve(cands.size());
+	for (const SAreaCand& c : cands) aims.push_back(c.pos);
+	if (extraAims && !cands.empty()) {
+		std::vector<springai::AIFloat3> cpos;
+		cpos.reserve(cands.size());
+		for (const SAreaCand& c : cands) cpos.push_back(c.pos);
+		for (springai::AIFloat3 p : extraAims(cpos)) {
+			if ((p.x < 0.f) || (p.z < 0.f) || (p.x >= CTerrainManager::GetTerrainWidth()) || (p.z >= CTerrainManager::GetTerrainHeight())) continue;
+			if (position.SqDistance2D(p) >= maxSqRange) continue;
+			if ((pulseClaims || nuclearHistory) && !CanAimStrategic(unit, p)) continue;
+			if (avoidFriendly) {
+				auto& friendlies = circuit->GetCallback()->GetFriendlyUnitsIn(p, std::sqrt(sqAoe));
+				const bool hit = !friendlies.empty();
+				utils::free(friendlies);
+				if (hit) continue;
+			}
+			p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+			aims.push_back(p);
+		}
 	}
 
 	int bestRank = std::numeric_limits<int>::max();
 	float bestValue = 0.f;
 	int bestCount = 0;
 	int bestIdx = -1;
-	for (unsigned i = 0; i < cands.size(); ++i) {
+	for (unsigned i = 0; i < aims.size(); ++i) {
 		int rank = std::numeric_limits<int>::max();
 		float value = 0.f;
 		int count = 0;
 		for (unsigned j = 0; j < cands.size(); ++j) {
-			if (cands[i].pos.SqDistance2D(cands[j].pos) >= sqAoe) {
+			const float sqDist = aims[i].SqDistance2D(cands[j].pos);
+			if (sqDist >= sqAoe) {
 				continue;
 			}
 			rank = std::min(rank, cands[j].rank);
-			value += cands[j].value;
+			value += cands[j].value * BlastKill(blastWeapon, sqAoe, sqDist, cands[j].health);
 			++count;
 		}
 		if (count < minTargets) {
 			continue;
+		}
+		if (aimScale) {
+			value *= aimScale(aims[i]);
 		}
 		if ((rank < bestRank) || ((rank == bestRank) && (value > bestValue))) {
 			bestRank = rank;
@@ -508,8 +539,8 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	}
 
 	SetTarget(nullptr);  // area effect at a position, possibly of a unit we can no longer see
-	const bool isMoved = (targetPos.SqDistance2D(cands[bestIdx].pos) > SQUARE(1.f));
-	targetPos = cands[bestIdx].pos;
+	const bool isMoved = (targetPos.SqDistance2D(aims[bestIdx]) > SQUARE(1.f));
+	targetPos = aims[bestIdx];
 	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
 	if (isMoved) {  // Update runs every TARGET_DELAY: only log a new aim point
 		circuit->LOG("%s %s(%i): rank=%i targets=%i value=%.0f at (%i,%i)",
@@ -517,6 +548,23 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				int(targetPos.x), int(targetPos.z));
 	}
 	return true;
+}
+
+/*
+ * Blast kill (owner 2026-11-02): how much of a target's value a blast at this
+ * distance takes, from the engine's area damage, damage x (R - d) / (R - d x
+ * edge effectiveness): 1 where the hit kills, else the share of health it
+ * removes. A nuke (15000 default, edge 0, R 960) kills a 9400-health AFUS only
+ * within about 360 of the impact, so an aim point no longer counts the whole
+ * blast circle at full value. No weapon: every target in the circle counts in full.
+ */
+float CSuperTask::BlastKill(const CWeaponDef* wd, float sqAoe, float sqDist, float health)
+{
+	if ((wd == nullptr) || (wd->GetDamage() <= 0.f) || (health <= 0.f)) return 1.f;
+	const float r = std::sqrt(sqAoe), d = std::sqrt(sqDist);
+	const float denom = r - d * wd->GetEdgeEffectiveness();
+	const float mod = (denom > 0.f) ? std::max(0.f, (r - d) / denom) : 0.f;
+	return std::min(1.f, wd->GetDamage() * mod / health);
 }
 
 /*
@@ -652,18 +700,39 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	const int frame = circuit->GetLastFrame();
 	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 	const float floor = StockedShotFloor(unit, cdef, frame, cdef->GetWeaponDef()->GetCostMShot());
+	float coverDrop = policy.antinukeDropOrdinary;  // overnuke: antinukeDropOvernuke, set below
 	auto scan = [&]() {
+		const auto interceptors = KnownInterceptors();
 		const bool found = SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
 			[&policy](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
 				if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
 				rank = 0; value = e.cost; return true;
-			}, floor, true, true, false, true);
+			}, floor, true, true, false, true,
+			[&policy, &interceptors, &coverDrop](const AIFloat3& pos) {
+				const int n = CountInterceptorCover(interceptors, pos);
+				return (n <= 0) ? 1.f : std::max(policy.antinukeFloor, 1.f - coverDrop * float(n));
+			},
+			[&interceptors](const std::vector<AIFloat3>& targets) {
+				return CoverEdgeAims(interceptors, targets);
+			}, policy.blastKill ? cdef->GetWeaponDef() : nullptr);
+		if (found) {
+			const int cover = CountInterceptorCover(interceptors, targetPos);
+			if (coverLogPos.SqDistance2D(targetPos) > SQUARE(1.f)) {  // once per new aim point
+			coverLogPos = targetPos;
+			circuit->LOG("NUCLEAR %s(%i): aim (%i,%i) antinukes covering=%i of %zu known, value x%.2f",
+					cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), cover,
+					interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, 1.f - coverDrop * float(cover)));
+			}
+		}
 		// nuke rush scouting (team/nuke_recon.as) sends AIR to the latest aim
 		if (found) circuit->GetMilitaryManager()->SetNuclearAim(targetPos, cdef->GetAoe());
 		return found;
 	};
 	strategic::Overnuke& over = circuit->GetMilitaryManager()->GetOvernuke();
 	const int silos = CountNukeSilos();
+	if ((policy.overnukeSilos > 0) && (silos >= policy.overnukeSilos)) {
+		coverDrop = policy.antinukeDropOvernuke;
+	}
 	if ((policy.overnukeSilos <= 0) || (silos < policy.overnukeSilos)) {
 		if (over.Active()) {
 			circuit->LOG("NUKE: overnuke ends at %i of %i launches: %i silos left", over.Fired(), over.Goal(), silos);
@@ -717,6 +786,74 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	targetPos = AIFloat3(over.Pos().x, 0.f, over.Pos().z);
 	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
 	return true;
+}
+
+/*
+ * Antinuke cover (owner 2026-11-02). BAR interceptors engage a missile whose
+ * target lies inside their weapon coverage, so an aim point is judged by the
+ * known enemy units with an interceptor weapon (read from the def, not from a
+ * role list, so Legion's Rampart - a geothermal with an antinuke - counts)
+ * whose coverage holds it. Enemy stockpiles are unknown: every known
+ * interceptor counts as armed. Mobile ones count only while in radar or LOS.
+ * Each one cuts the aim point's metal value linearly (SNuclearInfo).
+ */
+std::vector<std::pair<AIFloat3, float>> CSuperTask::KnownInterceptors()
+{
+	std::vector<std::pair<AIFloat3, float>> out;
+	CCircuitAI* circuit = manager->GetCircuit();
+	CBattleAnalysis* battle = circuit->GetBattle();
+	if (battle == nullptr) return out;
+	const float margin = circuit->GetMilitaryManager()->GetNuclearInfo().coveredMargin;
+	const auto* enemies = circuit->GetEnemyManager();
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) for (const SEnemyData& e : *pool) {
+		if (e.IsFake() || e.IsDead() || e.IsDying() || (e.cdef == nullptr)) continue;
+		if (e.cdef->IsMobile() && !e.IsInRadarOrLOS()) continue;  // a mobile antinuke's old position says little
+		auto it = interceptorCoverage.find(e.cdef);
+		if (it == interceptorCoverage.end()) {
+			it = interceptorCoverage.emplace(e.cdef, battle->InterceptorCoverage(e.cdef)).first;
+		}
+		if (it->second > 0.f) out.emplace_back(e.pos, SQUARE(it->second + margin));
+	}
+	return out;
+}
+
+/*
+ * Edge aims (owner 2026-11-02): an interceptor engages a missile by where it
+ * will land, so a point just outside the coverage still blasts whatever lies
+ * within the blast radius inside it. For each target inside a coverage the
+ * point on the line from that interceptor through the target, just past its
+ * coverage, is an extra aim point; the scan then scores it like any other (its
+ * own cover by the other interceptors included), so a two-antinuke area can
+ * be hit from the edge where only one covers.
+ */
+std::vector<AIFloat3> CSuperTask::CoverEdgeAims(const std::vector<std::pair<AIFloat3, float>>& interceptors,
+		const std::vector<AIFloat3>& targets)
+{
+	std::vector<AIFloat3> out;
+	for (const auto& ic : interceptors) {
+		const float r = std::sqrt(ic.second) + 8.f;  // ic.second: squared coverage incl. margin
+		std::vector<AIFloat3> mine;
+		for (const AIFloat3& t : targets) {
+			const float sq = t.SqDistance2D(ic.first);
+			if (sq >= ic.second) continue;
+			AIFloat3 dir(t.x - ic.first.x, 0.f, t.z - ic.first.z);
+			const float len = std::sqrt(sq);
+			if (len < 1.f) continue;  // the interceptor itself: no direction
+			const AIFloat3 p(ic.first.x + dir.x / len * r, 0.f, ic.first.z + dir.z / len * r);
+			bool dup = false;  // targets in one direction share an edge point
+			for (const AIFloat3& q : mine) if (q.SqDistance2D(p) < SQUARE(128.f)) { dup = true; break; }
+			if (!dup) mine.push_back(p);
+		}
+		out.insert(out.end(), mine.begin(), mine.end());
+	}
+	return out;
+}
+
+int CSuperTask::CountInterceptorCover(const std::vector<std::pair<AIFloat3, float>>& interceptors, const AIFloat3& pos)
+{
+	int count = 0;
+	for (const auto& ic : interceptors) if (pos.SqDistance2D(ic.first) < ic.second) ++count;
+	return count;
 }
 
 /*

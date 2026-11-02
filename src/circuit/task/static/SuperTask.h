@@ -20,6 +20,8 @@
 
 namespace circuit {
 
+class CWeaponDef;
+
 class CCircuitDef;
 struct SEnemyData;
 
@@ -76,10 +78,23 @@ private:
 	// minValue: the best aim point must sum to at least this, else no target.
 	// avoidFriendly: an aim point whose blast holds one of our own units is
 	// rejected (damaging weapons: Perdition, Catalyst). EMP and Juno do no damage.
+	// aimScale: optional, multiplies an aim point's summed value (nukes: antinuke cover).
+	using TAimScale = std::function<float (const springai::AIFloat3&)>;
+	// extraAims: optional, extra aim points from the candidates' positions (nukes: antinuke edges).
+	using TExtraAims = std::function<std::vector<springai::AIFloat3> (const std::vector<springai::AIFloat3>&)>;
 	bool SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
 			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
-			bool pulseClaims = false, bool nuclearHistory = false);
+			bool pulseClaims = false, bool nuclearHistory = false, const TAimScale& aimScale = nullptr,
+			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr);
+	// Share of a target's value a blast of wd at sqDist takes (1 = killed); see SuperTask.cpp.
+	static float BlastKill(const CWeaponDef* wd, float sqAoe, float sqDist, float health);
+	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
+	std::vector<std::pair<springai::AIFloat3, float>> KnownInterceptors();
+	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
+			const std::vector<springai::AIFloat3>& targets);
+	static int CountInterceptorCover(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
+			const springai::AIFloat3& pos);
 	bool IsPulse(CCircuitDef* cdef) const;
 	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	int CountNukeSilos() const;  // finished nuke silos of every allied BARb (one super task each)
@@ -116,6 +131,8 @@ private:
 	void EndDebug(CCircuitUnit* unit, const char* why);
 
 	int targetFrame;
+	std::unordered_map<const CCircuitDef*, float> interceptorCoverage;  // def -> coverage radius, 0 none
+	springai::AIFloat3 coverLogPos = springai::AIFloat3(-1.f, 0.f, -1.f);  // last aim point logged with its antinuke cover
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
 public:
 	// D-124: where the silo aims: the attacked unit, else the aimed ground

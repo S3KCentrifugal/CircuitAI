@@ -579,6 +579,14 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.overnukeTeamSilos = std::max(0, nuclear.get("overnuke_team_silos", 8).asInt());
 	nuclearInfo.overnukeTeamMin = std::max(1, nuclear.get("overnuke_team_min", 15).asInt());
 	nuclearInfo.overnukeTeamMax = std::max(nuclearInfo.overnukeTeamMin, nuclear.get("overnuke_team_max", 30).asInt());
+	nuclearInfo.antinukeDropOrdinary = std::max(0.f, nuclear.get("antinuke_drop", 0.5f).asFloat());
+	nuclearInfo.antinukeDropOvernuke = std::max(0.f, nuclear.get("antinuke_drop_overnuke", 0.15f).asFloat());
+	nuclearInfo.antinukeFloor = std::min(1.f, std::max(0.f, nuclear.get("antinuke_floor", 0.05f).asFloat()));
+	nuclearInfo.coveredMargin = std::max(0.f, nuclear.get("antinuke_margin", 64.f).asFloat());
+	nuclearInfo.blastKill = nuclear.get("blast_kill", true).asBool();
+	circuit->LOG("CONFIG %s: nuclear antinuke drop=%.2f overnuke drop=%.2f floor=%.2f margin=%.0f",
+			cfgName.c_str(), nuclearInfo.antinukeDropOrdinary, nuclearInfo.antinukeDropOvernuke,
+			nuclearInfo.antinukeFloor, nuclearInfo.coveredMargin);
 	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i team(silos=%i roll=%i..%i) scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
 			cfgName.c_str(), nuclearInfo.overnukeSilos, nuclearInfo.overnukeMin, nuclearInfo.overnukeMax,
 			nuclearInfo.overnukeTeamSilos, nuclearInfo.overnukeTeamMin, nuclearInfo.overnukeTeamMax,
