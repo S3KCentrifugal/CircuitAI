@@ -2008,6 +2008,9 @@ namespace Builder {
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+                // owner, 2026-11-02: the T1 seats (not the commander group's) help a tactical launcher order (front_tactical.as)
+                IUnitTask@ tacticalHelp = FrontTactical::AssistPull(u);
+                if (tacticalHelp !is null) return tacticalHelp;
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
                 // owner, 2026-11-01: the expansion seat builds the edge lane's lab and turrets
                 // once the lane is funded; a FRONT with only its three seated T1 constructors

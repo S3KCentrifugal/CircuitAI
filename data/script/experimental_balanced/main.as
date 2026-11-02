@@ -110,6 +110,7 @@ namespace Main {
         Global::RoleSettings::Front::LabPorc = true;     // owner 2026-10-30: T2 labs beyond 900 from our start get 2 pop-ups, a heavy plasma and a T2 flak
         Global::RoleSettings::Front::Agitator = true;    // owner 2026-11-01: forward agitator at a front mex / porc 40%+ toward the enemy after the bank hit 50% (front_agitator.as)
         Global::RoleSettings::Front::SpecialPorc = true; // owner 2026-11-01: Rattlesnake / Persecutor / Eviscerator there too while bank > 50%, 10 s min income > 100, a T2 lab stands
+        Global::RoleSettings::Front::Tactical = true;    // owner 2026-11-02: Paralyzer / Catalyst / Perdition just inside range of clustered enemy Pulsars / Bulwarks / Bastions near our mexes / porc (front_tactical.as)
         Global::RoleSettings::Front::Recovery = true; // owner 2026-10-19: after losing the base, T1 eco and retake the mexes first (front_recovery.as)
         Global::RoleSettings::Front::TimeTriggerForFirstT2LabMinMetalIncome = 20.0f; // 22-min T2 lab/plant trigger needs +20 metal (AI 11 ordered legavp at +3 after losing its base)
         Global::Team::PinpointerPoolSize = 3;

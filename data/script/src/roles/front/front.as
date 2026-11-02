@@ -25,6 +25,7 @@
 #include "../../systems/construction/front_factory_nanos.as"
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/front_agitator.as"
+#include "../../systems/construction/front_tactical.as"
 #include "../../systems/construction/front_silo_grid.as"
 #include "../../systems/construction/commander_front.as"
 #include "../../systems/construction/front_spawn_factory.as"
@@ -53,6 +54,7 @@ namespace RoleFront {
         FrontFactoryNanos::Reset();
         FrontLabPorc::Reset();
         FrontAgitator::Reset();
+        FrontTactical::Reset();
         FrontSpawnFactory::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
@@ -691,6 +693,9 @@ namespace RoleFront {
         // Owner (2026-11-01): forward agitators and T2 pop-up artillery at our front mex / porc (front_agitator.as)
         IUnitTask@ agitator=FrontAgitator::Work(builder);
         if (agitator !is null) return agitator;
+        // Owner (2026-11-02): Paralyzer / Catalyst / Perdition just inside range of clustered enemy heavy turrets (front_tactical.as)
+        IUnitTask@ tactical=FrontTactical::Work(builder);
+        if (tactical !is null) return tactical;
         // Select explicit geo work before asking native to enqueue another
         // energy task. Overriding an already-created task would leak work.
         IUnitTask@ geothermal=FrontGeothermal::Work(builder);
@@ -881,6 +886,7 @@ namespace RoleFront {
         FrontFactoryNanos::TaskRemoved(task, done);
         FrontLabPorc::TaskRemoved(task, done);
         FrontAgitator::TaskRemoved(task, done);
+        FrontTactical::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
     }
 

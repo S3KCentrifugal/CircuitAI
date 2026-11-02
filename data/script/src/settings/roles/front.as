@@ -428,6 +428,27 @@ namespace Front {
             float SpecialPorcMinMetalIncome = 100.0f;
             float SpecialPorcCoverRadius = 350.0f;
             int SpecialPorcMax = 6;
+            // Tactical launchers against enemy heavy turret clusters (owner, 2026-11-02; systems/construction/front_tactical.as).
+            // While two known Pulsars / Bulwarks / Bastions (seen now or ghost images) stand within TacticalClusterRadius
+            // of each other, every such turret with one of our mexes / static land guns within TacticalFrontRadius gets
+            // one launcher of ours (Paralyzer / Catalyst / Perdition) just inside its range, built by a T2 constructor
+            // with T1 constructors helping, at a 10 s minimum metal income of TacticalMinMetalIncome and an energy
+            // income of TacticalMinEnergyIncome. Off here; experimental_balanced turns it on. Log [FRONT][Tactical].
+            bool Tactical = false;
+            array<string> TacticalUnits = { "armemp", "cortron", "legperdition" };     // Paralyzer, Catalyst, Perdition
+            array<string> TacticalTargets = { "armanni", "cordoom", "legbastion" };    // Pulsar, Bulwark, Bastion
+            float TacticalClusterRadius = 700.0f;      // two targets this near each other open the step
+            float TacticalFrontRadius = 2250.0f;       // a target counts with one of our mexes / porc this near it
+            float TacticalMinMetalIncome = 150.0f;     // 10 s minimum metal income
+            float TacticalMinEnergyIncome = 5000.0f;   // energy income
+            float TacticalRangeMargin = 120.0f;        // the site stands this far inside the launcher's range
+            float TacticalShake = 40.0f;               // native looks this far round the site for room
+            int TacticalMax = 12;                      // most standing at once
+            float TacticalReach = 4000.0f;             // idle, guarding or assisting T2 constructors this near the site are asked
+            float TacticalTakeRadius = 2000.0f;        // ... and ones walking to an unframed build this near
+            int TacticalAssistT1 = 3;                  // T1 constructors helping an order
+            float TacticalAssistReach = 2500.0f;       // ... from this near the site
+            int TacticalScanSeconds = 5;
             // Hard AFUS admission floors, unlike native energy-table preferences.
             float MinimumMetalIncomeForAFUS = 70.0f;
             float MinimumEnergyIncomeForAFUS = 4000.0f;
