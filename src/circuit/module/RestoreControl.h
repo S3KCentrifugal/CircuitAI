@@ -42,6 +42,7 @@ class CCircuitAI;
 class CCircuitUnit;
 class CCircuitDef;
 class CBRestoreTask;
+class CEnemyUnit;
 
 class CRestoreControl final {
 public:
@@ -108,8 +109,9 @@ private:
 	CCircuitUnit* PickUnit(const springai::AIFloat3& pos, float radius, float maxDist, bool front,
 			unsigned classMask, int* threatSkips);
 	// A known, finished, armed enemy structure reaches pos (its weapon range
-	// against ground or air plus restore.porc_margin)
-	bool IsPorcCovered(const springai::AIFloat3& pos, bool air) const;
+	// against ground or air plus restore.porc_margin); ground weapons longer
+	// than restore.porc_range are ignored. who: the first one found
+	bool IsPorcCovered(const springai::AIFloat3& pos, bool air, const CEnemyUnit** who = nullptr) const;
 	bool IsLineSafe(CCircuitUnit* unit, const springai::AIFloat3& to) const;
 	void TryJoin(CBRestoreTask* task, const springai::AIFloat3& pos, float radius, int reason, unsigned cls);
 	void FindPathSectors(const springai::AIFloat3& basePos, float lavaLevel, std::vector<int>& out);
@@ -148,6 +150,7 @@ private:
 	bool protect = true;      // a restorer keeps its patch against ordinary builder tasks
 	int maxPerTask = 2;       // restorers per patch, all of one class
 	float porcMargin = 100.f; // elmos beyond an enemy static weapon's range a front patch must be
+	float porcRange = 1500.f; // ground weapons longer than this (Juno, nukes, LRPC) are not porc
 	int baseSeenFrame = -1;   // last scan that had base/site work: PATH leaves it a slot
 	std::vector<SSpot> spots; // at most 64, the oldest dropped
 	std::vector<char> blocked;// structure mask scratch, reused

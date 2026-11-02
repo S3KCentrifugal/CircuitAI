@@ -116,14 +116,15 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	protect = cfg.get("protect", protect).asBool();
 	maxPerTask = std::clamp(cfg.get("max_per_task", maxPerTask).asInt(), 1, 2);
 	porcMargin = std::max(0.f, cfg.get("porc_margin", porcMargin).asFloat());
+	porcRange = std::max(0.f, cfg.get("porc_range", porcRange).asFloat());
 	unitClass.clear();
-	RLOG(circuit, "%s units=%s%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i path_lane=%i path_memory=%i max_per_task=%i porc_margin=%.0f",
+	RLOG(circuit, "%s units=%s%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i path_lane=%i path_memory=%i max_per_task=%i porc_margin=%.0f porc_range=%.0f",
 			enabled ? "on" : "off",
 			(allowMask & CLASS_COMMANDER) ? "commander " : "", (allowMask & CLASS_T1) ? "t1 " : "",
 			(allowMask & CLASS_AIR) ? "air " : "",
 			(allowMask & CLASS_T2) ? "t2 " : "", (allowMask & CLASS_REZ) ? "rez " : "",
 			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach,
-			maxTries, retryCapSeconds, int(protect), int(pathLane), pathMemory, maxPerTask, porcMargin);
+			maxTries, retryCapSeconds, int(protect), int(pathLane), pathMemory, maxPerTask, porcMargin, porcRange);
 }
 
 int CRestoreControl::GetScanInterval() const
@@ -178,10 +179,13 @@ unsigned CRestoreControl::ClassOf(const CCircuitUnit* unit) const
 	return unsigned(UnitClass(unit->GetCircuitDef()));
 }
 
-bool CRestoreControl::IsPorcCovered(const AIFloat3& pos, bool air) const
+bool CRestoreControl::IsPorcCovered(const AIFloat3& pos, bool air, const CEnemyUnit** who) const
 {
 	// Every known enemy unit once per front patch (a few per scan, every
 	// restore.interval seconds): finished, armed, immobile ones only.
+	// Ground: map-wide statics (Juno 32000, nuke silos, LRPC, tactical
+	// launchers) are not porc; above restore.porc_range they would cover every
+	// front patch all game.
 	const CCircuitDef::RangeType rt = air ? CCircuitDef::RangeType::AIR : CCircuitDef::RangeType::LAND;
 	for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
 		const CEnemyUnit* e = kv.second;
@@ -193,7 +197,13 @@ bool CRestoreControl::IsPorcCovered(const AIFloat3& pos, bool air) const
 			continue;
 		}
 		const float range = edef->GetMaxRange(rt);
+		if (!air && (range > porcRange)) {
+			continue;
+		}
 		if ((range > 0.f) && (e->GetPos().SqDistance2D(pos) < SQUARE(range + porcMargin))) {
+			if (who != nullptr) {
+				*who = e;
+			}
 			return true;
 		}
 	}
@@ -631,15 +641,19 @@ void CRestoreControl::Scan()
 		// air constructors.
 		unsigned classMask = allowMask;
 		if (front) {
-			if (IsPorcCovered(patch.center, false)) {
+			const CEnemyUnit* porc = nullptr;
+			if (IsPorcCovered(patch.center, false, &porc)) {
 				classMask &= ~(CLASS_COMMANDER | CLASS_T1 | CLASS_T2 | CLASS_REZ);
 			}
-			if (IsPorcCovered(patch.center, true)) {
+			if (IsPorcCovered(patch.center, true, (porc == nullptr) ? &porc : nullptr)) {
 				classMask &= ~CLASS_AIR;
 			}
 			if (classMask == 0) {
-				RLOG(circuit, "skip porc at (%.0f, %.0f) r=%.0f: an enemy static weapon reaches it (+%.0f)",
-						patch.center.x, patch.center.z, patch.radius, porcMargin);
+				const AIFloat3 ppos = (porc != nullptr) ? porc->GetPos() : patch.center;
+				RLOG(circuit, "skip porc at (%.0f, %.0f) r=%.0f: enemy %s(%i) at (%.0f, %.0f) reaches it (+%.0f)",
+						patch.center.x, patch.center.z, patch.radius,
+						(porc != nullptr) ? porc->GetCircuitDef()->GetDef()->GetName() : "?",
+						(porc != nullptr) ? porc->GetId() : -1, ppos.x, ppos.z, porcMargin);
 				CoolDown(patch.center, patch.radius, cooldownFrames);
 				continue;
 			}
