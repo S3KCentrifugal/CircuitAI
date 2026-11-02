@@ -23,7 +23,8 @@
             "hlt": {"surplus_priority": 2, "metal": 20, "energy": 500, "limit": 3},
             "t2": {"surplus_priority": 4, "metal": 50, "energy": 1000, "seconds": 90, "limit": 4},
             "heavy": {"metal": 120, "energy": 2500, "seconds": 120, "value_ratio": 0.75, "limit": 3},
-            "artillery": {"metal": 120, "energy": 2500, "seconds": 120, "limit": 3},
+            // Owner 2026-11-02: Persecutor / Eviscerator / Rattlesnake step between t2 and heavy
+            "artillery": {"metal": 75, "energy": 1500, "seconds": 120, "limit": 3},
             "lrpc": {"metal": 200, "energy": 5000, "seconds": 240, "value_ratio": 1, "limit": 2},
             "antinuke": {"metal": 50, "energy": 1000, "seconds": 240, "limit": 2},
             "shield": {"metal": 100, "energy": 2500, "seconds": 150, "limit": 2}

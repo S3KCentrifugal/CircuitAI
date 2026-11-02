@@ -50,7 +50,10 @@ namespace DefensePlanner {
         Rule(1,cor?"corhlt":leg?"legmg":"armhlt","hlt",2,3,20,500,90,2,0,1,.6f,0,0,0,0);
         Rule(2,cor?"corvipe":leg?"legapopupdef":"armpb","t2",2,4,50,1000,90,4,0,1,1,0,0,0,0);
         Rule(3,cor?"cordoom":leg?"legbastion":"armanni","heavy",2,3,120,2500,120,3,.75f,cor||leg?.5f:0,1,0,0,0,0);
-        Rule(4,cor?"cortoast":leg?"legacluster":"armamb","artillery",1,3,120,2500,120,2,.5f,0,0,0,1,0,0);
+        // Owner 2026-11-02: the T2 pop-up plasma artillery (Persecutor / Eviscerator / Rattlesnake) is a
+        // step between the T2 pop-up (+50/+1000) and the heavy (+120/+2500): +75/+1500, against ground
+        // like the T2 row. No static weight: that would hold it until the group stood still 60 s.
+        Rule(4,cor?"cortoast":leg?"legacluster":"armamb","artillery",2,3,75,1500,120,3,0,1,1,0,0,0,0);
         Rule(5,cor?"corint":leg?"leglrpc":"armbrtha","lrpc",1,2,200,5000,240,2,1,0,0,0,1,0,0);
         Rule(6,cor?"corflak":leg?"legflak":"armflak","aa",2,3,50,1000,90,2,0,0,0,1,0,0,0);
         Rule(7,cor?"corfmd":leg?"legabm":"armamd","antinuke",3,2,50,1000,240,1,0,0,0,0,0,1,0);
