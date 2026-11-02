@@ -258,15 +258,22 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	if (weapon == nullptr) {
 		return false;
 	}
-	// A rising reload frame is a shot. O(1) engine read per Execute.
+	// A shot is the engine's weapon-fired event for this unit, or a rising
+	// main-weapon reload frame (sampled per call, so it can lag). Test g1: the
+	// reload sample alone missed an Ambassador's ghost volley and re-fired 21 s
+	// later as if idle. O(1) per call.
 	const int reload = weapon->GetReloadFrame();
 	if (track.reload < 0) {
-		track.shot = (reload > frame) ? frame : -info.ghostIdleFrames;
+		track.shot = (reload > frame) ? frame : -1;
 	} else if (reload > track.reload) {
 		track.shot = frame;
 		track.orderUntil = -1;
 	}
 	track.reload = reload;
+	if (unit->GetFireFrame() > track.shot) {
+		track.shot = unit->GetFireFrame();
+		if (track.shot >= track.orderUntil - FRAMES_PER_SEC * 5) track.orderUntil = -1;
+	}
 	if (frame < track.orderUntil) {
 		return true;  // the volley is on its way; do not replace the order
 	}
@@ -322,9 +329,10 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	TRY_UNIT(circuit, unit,
 		unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 	)
-	circuit->LOG("ARTY: %s %i fires on ghost %s at (%.0f, %.0f), idle %.0f s",
+	circuit->LOG("ARTY: %s %i fires on ghost %s at (%.0f, %.0f), last shot %s %.0f s ago",
 			cdef->GetDef()->GetName(), unit->GetId(), best->GetCircuitDef()->GetDef()->GetName(),
-			best->GetPos().x, best->GetPos().z, float(frame - track.shot) / FRAMES_PER_SEC);
+			best->GetPos().x, best->GetPos().z, (track.shot < 0) ? "never seen, game time" : "",
+			float(frame - std::max(0, track.shot)) / FRAMES_PER_SEC);
 	return true;
 }
 

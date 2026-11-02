@@ -139,6 +139,9 @@ public:
 
 	void SetDamagedFrame(int frame) { damagedFrame = frame; }
 	int GetDamagedFrame() const { return damagedFrame; }
+	// Owner 2026-11-02: last EVENT_WEAPON_FIRED frame of any weapon, -1 none.
+	void SetFireFrame(int frame) { fireFrame = frame; }
+	int GetFireFrame() const { return fireFrame; }
 
 	bool HasDGun() const { return dgun != nullptr; }
 	bool HasWeapon() const { return weapon != nullptr; }
@@ -288,6 +291,7 @@ private:
 	int moveFails;
 	int failFrame;
 	int damagedFrame;
+	int fireFrame;
 	int execFrame;  // TODO: Replace by CExecuteAction?
 	int disarmFrame;
 	int ammoFrame;
