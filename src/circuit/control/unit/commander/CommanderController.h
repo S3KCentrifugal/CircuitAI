@@ -240,6 +240,7 @@ struct CommanderGroupConfig {
     float jammerGain=.25f,jammerSpacing=.6f,jammerHold=10,jammerOutage=60;
     float mexPriority=3,radarPriority=2,linePriority=1;
     float sensorDefenseBand=3; // weapons at/above this band precede sensor work
+    float lightFloor=2; // owner 2026-11-02: light towers kept within radius, ahead of sensors and nanos (0 off)
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
 };
@@ -409,6 +410,8 @@ private:
     // the planner radius is committed; later threat/contact/anchor drift must
     // not release its workers or retire it as an orphan (GroupProjectAllowed).
     bool groupJobCommitted=false;
+    int groupLightNext=0,groupLightCount=0; // light-floor census, once per group/second
+    IUnitTask* GroupLightFloor(CCircuitUnit* unit,CCircuitUnit* anchor,int frame);
     unsigned groupNanoOwed=0;
     int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0,groupProjectUntil=-1;
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;
