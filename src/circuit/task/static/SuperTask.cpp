@@ -613,7 +613,8 @@ CSuperTask::SDeathBlast CSuperTask::DeathBlastOf(const CCircuitDef* cdef)
 		b.edge = wd->GetEdgeEffectiveness();
 		Damage* damage = wd->GetDamage();
 		const std::vector<float>& types = damage->GetTypes();
-		b.damage = types.empty() ? 0.f : types[0];  // default armour
+		// default armour; a paralyzer death blast (armamex, armshockwave: empblast) stuns, it kills nothing
+		b.damage = (types.empty() || wd->IsParalyzer()) ? 0.f : types[0];
 		delete damage;
 	}
 	deathBlasts.emplace(cdef, b);
