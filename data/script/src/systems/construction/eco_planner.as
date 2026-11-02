@@ -390,6 +390,15 @@ namespace EcoPlanner {
             // across this AI's sites; mandatory local layout support is separate.
             if (!air && Global::AISettings::Role == AiRole::TECH && nanoDef !is null)
                 s.arrivingBuildPower = float(s.nanosQueued + s.nanosBuilding) * nanoDef.GetBuildSpeed();
+            if (!air && Global::AISettings::Role == AiRole::TECH) {
+                CCircuitDef@ naval = ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(side));
+                if (naval !is null) {
+                    const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO),naval);
+                    const int building = aiBuilderMgr.GetUnfinishedCount(naval);
+                    s.nanosQueued += queued; s.nanosBuilding += building;
+                    s.arrivingBuildPower += float(queued + building) * naval.GetBuildSpeed();
+                }
+            }
         }
         s.builderIsCommander = (u !is null) && UnitHelpers::IsCommander(u.circuitDef);
         s.turretSlot = air ? AirEconomy::t1 + AirEconomy::t2 > 0 : Layout::CanPlaceTurret();
@@ -818,7 +827,7 @@ namespace EcoPlanner {
         if (key == "t2lab") {
             // The site is the layout's call (D-069): the pair's slot or the
             // footprint the most static build power reaches.
-            return Layout::T2LabTask(300 * SECOND);
+            return Layout::T2LabTask(300 * SECOND,u);
         }
         if (key == "assistenergy") {
             return Builder::EnqueueAssistEnergy(Task::Priority::HIGH, 60 * SECOND, Global::RoleSettings::Tech::EnergyFocusMaxAssists);

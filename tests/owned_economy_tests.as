@@ -18,6 +18,7 @@ class CCircuitDef {
     float GetExtractsMetal() const { return extract; }
     bool IsMobile() const { return mobile; }
     bool CanBuild(const CCircuitDef@ other) const { return mobile && other !is null; }
+    float GetBuildDistance() const { return 100.f; }
 }
 class CCircuitUnit {
     int id;
@@ -45,6 +46,22 @@ class FakeAI {
     }
 }
 FakeAI ai;
+class FakeTerrain {
+    float blockedX=-999.f;
+    bool CanReachAtSafe(CCircuitUnit@ worker,const AIFloat3& in pos,float range) {return pos.x!=blockedX;}
+}
+FakeTerrain aiTerrainMgr;
+void test_owned_upgrade_skips_unreachable_nearest_and_allows_distant_route() {
+    ResetOwned();
+    CCircuitUnit@ worker=AddOwned("worker",0,0,true);
+    CCircuitUnit@ upgraded=AddOwned("moho",2,1);
+    AddOwned("mex",1,10);
+    CCircuitUnit@ distant=AddOwned("mex",1,5000);
+    aiTerrainMgr.blockedX=10;
+    Check(OwnedEconomy::NearestUpgradeTarget(worker,upgraded.circuitDef,AIFloat3(),0,true) is distant);
+    Check(OwnedEconomy::NearestUpgradeTarget(worker,upgraded.circuitDef,AIFloat3(),100,true) is null);
+    aiTerrainMgr.blockedX=-999;
+}
 void ResetOwned() {
     ai.units.resize(0); ai.enumerations=0; ++ai.revision;
     OwnedEconomy::initialized=false; OwnedEconomy::workerTargetName="";

@@ -314,7 +314,14 @@ namespace TechRules {
     IUnitTask@ DoKeepCurrent(Ctx@ c)    { return TechBuild::KeepCurrent(c.u); }
     IUnitTask@ DoEconomySupport(Ctx@ c) { return Layout::EconomySupport(c.u); }
     IUnitTask@ DoAirReactor(Ctx@ c) {
-        return UnitHelpers::IsAirConstructor(c.u.circuitDef) ? TechBuild::AssistAfus(c.u) : null;
+        if (!UnitHelpers::IsAirConstructor(c.u.circuitDef)) return null;
+        // Do not preempt dedicated conversion or power.t1 with another AFUS
+        // repair when energy already floats. Later rules retain AFUS assistance
+        // if no useful balancing task exists; keep.current still owns live builds.
+        // Fixed scalar admission, no new scan/cache or command cadence.
+        if (!TechEconomyMath::ReactorAssistFirst(TechChain::EnergyBankFloats(),
+            aiEconomyMgr.isEnergyStalling)) return null;
+        return TechBuild::AssistAfus(c.u);
     }
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
@@ -401,10 +408,23 @@ namespace TechRules {
     }
     IUnitTask@ DoMexUpgrade(Ctx@ c)
     {
+        if (Global::AISettings::Role == AiRole::TECH && !MetalEconomy::Active()) {
+            if (FrontlineEngineering::members.exists(""+c.u.id)
+                || c.eco.mexUpsQueued >= Global::RoleSettings::MexUpgradeMaxConcurrent) return null;
+            CCircuitDef@ upgrade=ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
+            if(upgrade is null || !c.d.CanBuild(upgrade)) return null;
+            // Revision-maintained extractor subset, live reach checks. Zero
+            // radius permits reachable owned mexes beyond the old home circle.
+            CCircuitUnit@ target=OwnedEconomy::NearestUpgradeTarget(c.u,upgrade,Global::Map::StartPos,0.f,true);
+            return target is null?null:aiEconomyMgr.EnqueueMexUpgrade(c.u,target);
+        }
         string why;
         if (EcoPlanner::PickMexUpgrade(c.eco, why).length() == 0) return null;
         return ByKey(c, "mexup");
     }
+    IUnitTask@ DoGrowth(Ctx@ c) { return TechGrowth::Work(c.u,c.eco,c.building); }
+    IUnitTask@ DoRushBootstrap(Ctx@ c) { return RushBootstrap::TravelTask(c.u); }
+    IUnitTask@ DoClusterBatch(Ctx@ c) { return EconomyCluster::BatchWork(c.u); }
     IUnitTask@ DoConverter(Ctx@ c)
     {
         string why;
@@ -458,7 +478,7 @@ namespace TechRules {
         if (s.nanosBuilding > 0) return ByKey(c, "assistnano");
         // D-098 (owner's rule): metal high while a structure is going up and no
         // turret may start: this builder's power goes on that structure
-        if (c.building !is null && c.d.IsMobile())
+        if (c.building !is null && c.d.IsMobile() && EcoFlak::AssistanceAllowed(c.u, c.building))
             return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, c.building, 60 * SECOND));
         return null;
     }
@@ -540,7 +560,6 @@ namespace TechRules {
         table.insertLast(Rule("ferry.cargo",       MOBILE,       W0(), @DoFerryCargo,   "D-110/D-112/D-160: a gift belongs to the ferry before discretionary harbour or economy work"));
         table.insertLast(Rule("harbour.sea",       SEA_CON,      W0(), @DoHarbourSea,   "D-121: construction ships and subs: the advanced shipyard, floating turrets, then the sea economy"));
         table.insertLast(Rule("harbour.yard",      MOBILE,       W0(), @DoHarbourYard,  "D-121: an island TECH with its advanced fusions: the T1 shipyard offshore, once"));
-        table.insertLast(Rule("harbour.float",     COMMANDER,    W0(), @DoHarbourFloat, "D-121: an island TECH's commander: floating converters while energy floats (the land is for labs and fusions)"));
         table.insertLast(Rule("turret.spam",       TURRET,       W0(), @DoTurretSpam,   "D-109: the two turrets directly behind a spam lab always work for that lab"));
         table.insertLast(Rule("turret.assist",     TURRET,       W0(), @DoTurretAssist, "D-289 steps 1-2: a reclaim in reach the D-290 gate allows, then high-priority frames in reach (nuke projects; the advanced fusion when converters starve; the chain's dear frame; the labs; the D-065 economy order)"));
         table.insertLast(Rule("turret.any",        TURRET,       W0(), @DoTurretAny,    "D-289 step 3: any structure of ours under construction in exact reach (build distance + model radius)"));
@@ -549,9 +568,13 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
-        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved nano-range pad; free T2 constructors assist its frame; armed by fourteen minutes"));
+        table.insertLast(Rule("rush.bootstrap", CON_T1, W0(), @DoRushBootstrap, "retain one safe support-bootstrap journey without claiming a building"));
+        table.insertLast(Rule("eco.cluster.batch", CON_T1, W0(), @DoClusterBatch, "funded local economy cluster: up to ten distinct turret projects, nearby T1 aircraft only"));
+        table.insertLast(Rule("eco.growth", CONSTRUCTORS, W0(), @DoGrowth, "T1 energy retirement: one turret, AFUS and converter worker; air takes over without aborting construction"));
+        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved pad on the economy box periphery (2026-11-02); free T2 constructors assist its frame; armed by fourteen minutes"));
+        table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
         table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));
-        table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors finish the shared advanced fusion before discretionary work"));
+        table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors prioritize the shared advanced fusion while energy is short; a floating bank yields to conversion and bounded build power"));
         table.insertLast(Rule("engineering.front", MOBILE, W1(@T2LandReleased), @DoEngineering, "Released T2 bots and fast assistants reinforce the least-progressed reachable FRONT lane"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));
@@ -574,7 +597,7 @@ namespace TechRules {
         table.insertLast(Rule("lab.base.reclaim",   MOBILE,       W1(@BaseFactoryToGo), @DoBaseFactoryReclaim, "D-114: with 3 land factories on the map the base's land factories are retired and reclaimed; their ground goes back to the economy"));
         table.insertLast(Rule("lab.spam.reclaim",   MOBILE,       W1(@SpamLabToGo), @DoSpamLabReclaim, "owner, 2026-10-25: spam is paused and a spam lab stood idle PausedIdleRetireSeconds: builders within PausedReclaimRadius reclaim it"));
         table.insertLast(Rule("lab.front",          CONSTRUCTORS, W1(@FrontClusterOpen), @DoFrontCluster, "D-114: a front cluster's lost turret; an open T2 or T3 front factory cluster: its turrets, help on one going up, then its factory"));
-        table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim winds and solars nearest the base centre; advanced solars at ReclaimAdvSolarMargin; an advanced fusion reclaims all"));
+        table.insertLast(Rule("energy.reclaim",     MOBILE,       W2(@EnergyReclaimable, @NotStalling), @DoEnergyReclaim, "D-077: a fusion stands and energy income without the T1 sources covers the pull by ReclaimT1EnergyMargin: reclaim solars nearest the base centre; winds wait for a completed AFUS; advanced solars at ReclaimAdvSolarMargin; an advanced fusion permits all tiers"));
         // D-105 (owner's rule): T1 constructors add build power before assisting a
         // T2 construction; the reclaim rows above stay first
         table.insertLast(Rule("power.t1",          CON_T1,       W2(@DearFrameUp, @TurretRoom), @DoT1Turret,     "D-105: a dear frame is up and the turret calculation has room: a T1 constructor adds a construction turret rather than assist"));
@@ -589,7 +612,6 @@ namespace TechRules {
         table.insertLast(Rule("energy.draining",   MOBILE,       W2(@Draining, @EnergyIdle), @DoEnergy,       "the base is stalling: cheapest energy per E/s, a fusion in the fusion era"));
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));
         table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYetOrAgain), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab); again once the economy is online and none stands (D-102)"));
-        table.insertLast(Rule("mex.upgrade",       CON_T2,       W0(), @DoMexUpgrade,   "the nearest owned T1 mex within MexUpgradeRadius, one at a time"));
         table.insertLast(Rule("energy.convert",    MOBILE,       W3(@ConverterWanted, @NotStalling, @NotMetalFull), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
         table.insertLast(Rule("turret.build",      MOBILE,       W0(), @DoTurret,       "static build power under EcoBuildPowerPerMetal x metal, or metal floating: a turret on its slot; else assist the one going up"));
         table.insertLast(Rule("energy.short",      MOBILE,       W3(@EnergyShort, @EnergyIdle, @EnergyForMe), @DoEnergy,       "below the energy target and nothing going up: cheapest energy per E/s"));
@@ -601,6 +623,7 @@ namespace TechRules {
         table.insertLast(Rule("defence.base",      CONSTRUCTORS, W1(@FirstTurretStands), @DoDefence,      "one light laser and one light AA near the factories"));
         table.insertLast(Rule("order.repair",      CONSTRUCTORS, W0(), @DoQueuedRepair, "native's queued repairs of our own unfinished structures within ExpOrderRadius"));
         table.insertLast(Rule("assist.any",        MOBILE,       W0(), @DoAssistAny,    "the nearest structure under construction within the builder's assist radius"));
+        table.insertLast(Rule("harbour.float",     COMMANDER,    W0(), @DoHarbourFloat, "home economy first; convert genuine surplus at the home shore"));
         table.insertLast(Rule("guard.factory",     CONSTRUCTORS, W0(), @DoGuardFactory, "guard the primary T1 lab"));
         table.insertLast(Rule("air.defend",        CONSTRUCTORS, W0(), @DoAirDefend,    "D-123 (owner): an air constructor with nothing else to do builds defences: the mex clusters' AA, then a ring round the base toward the front"));
         table.insertLast(Rule("wait",              MOBILE,       W0(), @DoWait,         "3 s, then ask again"));
@@ -644,7 +667,8 @@ namespace TechRules {
         // more idle): after AirIdleAsks such asks, defences
         // Dedicated economy workers must retry their own layout, not accumulate
         // idle asks and escape into defensive work. Two ID comparisons; no scan.
-        const bool dedicatedEconomy = Global::AISettings::Role == AiRole::TECH && TechBuild::IsDedicatedAirCon(u);
+        TechGrowth::Claim(u);
+        const bool dedicatedEconomy = Global::AISettings::Role == AiRole::TECH && (TechBuild::IsDedicatedAirCon(u) || TechGrowth::Dedicated(u));
         if (UnitHelpers::IsAirConstructor(c.d) && !dedicatedEconomy) {
             const string ik = "idle" + u.id;
             int64 asks = 0;
@@ -668,6 +692,7 @@ namespace TechRules {
             // budget. Once its silo stands this gate disappears; the shared
             // economic policy and its placement sequence are unchanged.
             if (nukeRush) {
+                if (r.key == "eco.growth") continue;
                 if (r.key == "eco.recover" || r.key == "eco.compact.support") continue;
                 if (r.key == "defence.fortify" || r.key == "mex.upgrade" || r.key == "mex.expand"
                     || r.key == "energy.reclaim" || r.key == "lab.t2" || r.key == "defence.base"

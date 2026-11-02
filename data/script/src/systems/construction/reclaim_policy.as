@@ -30,6 +30,7 @@ tracked arrays are swap-removed. Audit is O(1) per builder task added.
 
 ******************************************************************************/
 namespace TechReclaim {
+    int windProtection = -1;
 
     string lastSource = "";       // the source last admitted by Allowed ...
     int lastTarget = -1;          // ... for this target id (read by Audit)
@@ -109,6 +110,11 @@ namespace TechReclaim {
     // The gate. `source` names the path for the audit line and the logs.
     bool Allowed(CCircuitUnit@ target, const string &in source)
     {
+        if (target !is null && Global::AISettings::Role == AiRole::TECH
+            && target.circuitDef.GetName() == UnitHelpers::GetWindNameForSide(Global::AISettings::Side)
+            && !TechEconomyMath::WindReclaimAllowed(TechBuild::FinishedOf(
+                UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) > 0)) return false;
+
         if (target is null || target.circuitDef is null) return false;
         const string key = "" + target.id;
         if (IsEnergyStorage(target)) {
@@ -171,6 +177,18 @@ namespace TechReclaim {
     // Once a second (TechBuild::Tick): the pause, INV-201 and INV-209.
     void Tick()
     {
+        // Definition counters are maintained natively. Protect collision/native
+        // reclaim paths too; update the set only when completed AFUS state changes.
+        if (Global::AISettings::Role == AiRole::TECH) {
+            const bool protect = !TechEconomyMath::WindReclaimAllowed(TechBuild::FinishedOf(
+                UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) > 0);
+            if (windProtection != (protect ? 1 : 0)) {
+                CCircuitDef@ wind = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(Global::AISettings::Side));
+                if (wind !is null) aiBuilderMgr.SetReclaimProtected(wind, protect);
+                windProtection = protect ? 1 : 0;
+            }
+        }
+
         for (uint i = 0; i < trackedIds.length(); ) {
             CCircuitUnit@ t = ai.GetTeamUnit(trackedIds[i]);
             IUnitTask@ task = trackedTasks[i];
