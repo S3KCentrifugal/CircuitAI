@@ -150,6 +150,10 @@ namespace FrontAgitator {
     // "" when the kind's metal gate is open, else why not
     string Gate(int k) {
         if (k == AGITATOR) {
+            // owner 2026-11-02 17:20Z: the 10 s minimum metal income at least AgitatorMinMetalIncome (35), all factions
+            const float ami = Economy::GetMinMetalIncomeLast10s();
+            if (ami < Global::RoleSettings::Front::AgitatorMinMetalIncome)
+                return "10 s minimum metal income +" + int(ami) + " below +" + int(Global::RoleSettings::Front::AgitatorMinMetalIncome);
             if (lastHigh >= 0 && ai.frame - lastHigh <= Global::RoleSettings::Front::AgitatorMetalWindowSeconds * SECOND) return "";
             return "metal bank not at " + int(Global::RoleSettings::Front::AgitatorMetalShare * 100.0f) + "% in the last "
                 + Global::RoleSettings::Front::AgitatorMetalWindowSeconds + " s";

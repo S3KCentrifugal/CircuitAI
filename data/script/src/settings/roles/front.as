@@ -417,6 +417,7 @@ namespace Front {
             array<string> AgitatorUnits = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
             float AgitatorMetalShare = 0.5f;               // owner 2026-11-02: was 0.8
             int AgitatorMetalWindowSeconds = 120;
+            float AgitatorMinMetalIncome = 35.0f;      // and the 10 s minimum metal income at least this (owner 2026-11-02; Agitator / Gauntlet / Amputator)
             float AgitatorMapShare = 0.4f;
             float AgitatorAdvance = 500.0f;            // a further agitator waits for a spot this much further forward (elmos, lane axis)
             float AgitatorCoverRadius = 350.0f;        // a spot with one of ours this near is done
