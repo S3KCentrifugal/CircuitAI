@@ -54,6 +54,14 @@ local LAYOUTS={
        {"corafus",-300,300},{"corafus",0,300},{"corafus",300,300}},
     -- chain carry: 5 corafus in a line 450 apart (one chain step reaches the neighbours, not beyond)
     I={{"corafus",-900,0},{"corafus",-450,0},{"corafus",0,0},{"corafus",450,0},{"corafus",900,0}},
+    -- other big death blasts: nuke silos and the tactical nuke (2650/R240), Legion adv
+    -- storage (2650/R240), T2 converters (1220/R160), an EMP mex (paralyzer, no damage)
+    J={{"armsilo",0,0},{"corsilo",260,0},{"cortron",-240,0},{"legadvestore",0,260},{"armamex",0,-240},
+       {"cormmkr",-130,-130},{"cormmkr",130,-130},{"cormmkr",-130,130},{"cormmkr",130,130}},
+    -- a lolcannon (33500 HP, the nuke alone cannot kill it) ringed by 4 AFUS: only the chain can
+    K={{"corbuzz",0,0},{"corafus",-230,0},{"corafus",230,0},{"corafus",0,-230},{"corafus",0,230}},
+    -- the same lolcannon with 2 fusions: it must not count
+    L={{"corbuzz",0,0},{"corfus",-200,0},{"corfus",200,0}},
 }
 
 local later={}      -- {frame, command}: delayed gives
@@ -181,7 +189,7 @@ local function gameFrame(f)
         cmd("selfd")
     end
     if f==60 then placeEco() end
-    if f==400 then
+    if f==(cfg.placeAt or 400) then   -- placeAt: just before the silo stocks, so raiders have no time to reach the targets
         if cfg.mode=="calib" then placeCalib() else placeLayout() end
         placedFrame=f
     end
