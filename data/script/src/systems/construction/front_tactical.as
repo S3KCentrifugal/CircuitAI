@@ -28,8 +28,12 @@
 //
 // Site: from the target toward our nearest mex / porc within TacticalFrontRadius of it, at the launcher's
 // range less TacticalRangeMargin, then pulled in until the height-aware range (aiBattle.EffectiveRange,
-// measured from the site to the image) still holds the target with half that margin to spare. Built with
-// TacticalShake of room, small enough that the frame stays in range.
+// measured from the site to the image) still holds the target with half that margin to spare. A site within
+// EdgeGap of a map edge is never used (a clamped point was out of range and never got a constructor, B13):
+// the direction is turned by +-20, 40, 60, 80 degrees, then the same directions are walked in down to
+// ShortestRangeShare of the range; with none the target is held. Built with TacticalShake of room, small
+// enough that the frame stays in range. An order no constructor took within UnmannedSeconds (the placing
+// T2 is assigned to it) is aborted as a fail.
 //
 // Builders: FRONT constructors that can build the launcher (T2), idle / guarding / assisting within
 // TacticalReach of the site, or walking to an unframed build within TacticalTakeRadius; one order at a
@@ -51,6 +55,12 @@ namespace FrontTactical {
     const int TargetHoldSeconds = 240;
     const int AssistGuardSeconds = 60;
     const int PullSeconds = 2;
+    const int UnmannedSeconds = 30;      // an order no constructor took by then is aborted as a fail (B13)
+    const int FrameDeadlineSeconds = 180; // an order with no frame by then is aborted as a fail
+    const float BadSiteRadius = 160.0f;  // a new site keeps this far from a site an order died on
+    const uint MaxBadSites = 32;
+    const float EdgeGap = 96.0f;       // a site stands this far inside every map edge
+    const float ShortestRangeShare = 0.7f;
     const int DiagSeconds = 30;
 
     class Target {
@@ -81,6 +91,10 @@ namespace FrontTactical {
     array<IUnitTask@> helperTask;  // the guard / repair each helper was given
     array<string> announced;   // "G" / "R" + helper id already logged for this order
     int lastPull = -100000;
+    int orderFrame = 0;        // when the order was placed
+    int orderBy = -1;          // the T2 constructor that placed it
+    array<AIFloat3> badSites;  // sites orders died on, oldest first (at most MaxBadSites)
+    bool orderManned = false;  // a constructor was on it once
     dictionary diagAt;         // helper skip reason -> frame it may print again
     dictionary fails;          // target key -> fails in a row
     dictionary holds;          // target key -> frame the hold ends
@@ -93,7 +107,7 @@ namespace FrontTactical {
         standing = 0; cluster = false; lastScan = -100000; defsDone = false;
         @order = null; orderKey = ""; @assist = null;
         helpers.resize(0); helperUntil.resize(0); helperTask.resize(0);
-        fails.deleteAll(); holds.deleteAll(); diagAt.deleteAll();
+        fails.deleteAll(); holds.deleteAll(); diagAt.deleteAll(); badSites.resize(0);
         lastWhy = ""; lastPull = -100000;
     }
 
@@ -232,7 +246,10 @@ namespace FrontTactical {
         int n = 0;
         if (!fails.get(key, n)) n = 0;   // an &out argument is junk when the key is missing
         ++n;
-        GenericHelpers::LogUtil("[FRONT][Tactical] order against target " + key + " died with no launcher (fail " + n + " in a row)", 1);
+        GenericHelpers::LogUtil("[FRONT][Tactical] order against target " + key + " died with no launcher (fail " + n + " in a row); site ("
+            + int(orderSite.x) + "," + int(orderSite.z) + ") avoided from now on", 1);
+        if (badSites.length() >= MaxBadSites) badSites.removeAt(0);
+        badSites.insertLast(orderSite);
         if (n >= 3) {
             holds.set(key, ai.frame + TargetHoldSeconds * SECOND);
             fails.delete(key);
@@ -254,26 +271,55 @@ namespace FrontTactical {
         return other;
     }
 
-    // Just inside the launcher's range of t, on the side of our nearest mex / porc; x < 0 when there is none
+    // A site an order died on (no constructor, no frame): the next site is looked for elsewhere
+    bool NearBadSite(const AIFloat3 &in p) {
+        for (uint i = 0; i < badSites.length(); ++i) if (MapHelpers::SqDist(p, badSites[i]) <= BadSiteRadius * BadSiteRadius) return true;
+        return false;
+    }
+
+    // The point r0 from t along (dx, dz), pulled in until the height-aware range holds t with half the margin
+    // to spare; never below rMin (when < 0: at most 4 range fits); x < 0 when none, or it leaves the map
+    // (EdgeGap from every edge; a clamped point was not where the range was measured, B13)
+    AIFloat3 TrySite(CCircuitDef@ d, Target@ t, float dx, float dz, float r0, float rMin) {
+        const float margin = Global::RoleSettings::Front::TacticalRangeMargin;
+        const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
+        float r = r0;
+        for (int it = 0; it < 16 && (rMin >= 0.0f || it < 4); ++it) {
+            if (r < 300.0f || (rMin >= 0.0f && r < rMin)) break;
+            const AIFloat3 p(t.pos.x + dx * r, 0.0f, t.pos.z + dz * r);
+            if (p.x < EdgeGap || p.z < EdgeGap || p.x > w - EdgeGap || p.z > h - EdgeGap || NearBadSite(p)) {
+                if (rMin < 0.0f) break;   // the first pass keeps the range; the second walks in
+                r -= 64.0f;
+                continue;
+            }
+            const float dist = sqrt(MapHelpers::SqDist(p, t.pos));
+            const float eff = RangeAt(d, p, t.pos);
+            if (dist <= eff - margin * 0.5f) return p;
+            r = AiMin(r - 64.0f, eff - margin);
+        }
+        return AIFloat3(-1.0f, 0.0f, -1.0f);
+    }
+
+    // Just inside the launcher's range of t, on the side of our nearest mex / porc; when that leaves the map,
+    // the direction turned by +-20, 40, 60, 80 degrees (nearest first); then the same directions down to
+    // ShortestRangeShare of the range; x < 0 when there is none (the target is held)
     AIFloat3 Site(CCircuitDef@ d, Target@ t) {
         float dx = t.asset.x - t.pos.x, dz = t.asset.z - t.pos.z;
         float len = sqrt(dx * dx + dz * dz);
         if (len < 1.0f) { dx = Global::Map::StartPos.x - t.pos.x; dz = Global::Map::StartPos.z - t.pos.z; len = sqrt(dx * dx + dz * dz); }
         if (len < 1.0f) return AIFloat3(-1.0f, 0.0f, -1.0f);
         dx /= len; dz /= len;
-        const float margin = Global::RoleSettings::Front::TacticalRangeMargin;
-        const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
-        float r = aiBattle.MainRange(d);
-        if (r <= 0.0f) r = d.GetMaxRange();
-        r -= margin;
-        AIFloat3 p;
-        for (int it = 0; it < 4; ++it) {
-            if (r < 300.0f) return AIFloat3(-1.0f, 0.0f, -1.0f);
-            p = AIFloat3(AiMax(64.0f, AiMin(w - 64.0f, t.pos.x + dx * r)), 0.0f, AiMax(64.0f, AiMin(h - 64.0f, t.pos.z + dz * r)));
-            const float dist = sqrt(MapHelpers::SqDist(p, t.pos));
-            const float eff = RangeAt(d, p, t.pos);
-            if (dist <= eff - margin * 0.5f) return p;
-            r = AiMin(r - 64.0f, eff - margin);
+        float range = aiBattle.MainRange(d);
+        if (range <= 0.0f) range = d.GetMaxRange();
+        const float r0 = range - Global::RoleSettings::Front::TacticalRangeMargin;
+        for (int pass = 0; pass < 2; ++pass) {
+            for (int k = 0; k < 9; ++k) {
+                const float deg = (k == 0) ? 0.0f : 20.0f * float((k + 1) / 2) * ((k % 2 == 1) ? 1.0f : -1.0f);
+                const float a = deg * 3.14159265f / 180.0f;
+                const float c = cos(a), s = sin(a);
+                const AIFloat3 p = TrySite(d, t, dx * c - dz * s, dx * s + dz * c, r0, pass == 0 ? -1.0f : range * ShortestRangeShare);
+                if (p.x >= 0.0f) return p;
+            }
         }
         return AIFloat3(-1.0f, 0.0f, -1.0f);
     }
@@ -344,6 +390,7 @@ namespace FrontTactical {
             if (order is null) { holds.set(t.key, ai.frame + FailHoldSeconds * SECOND); continue; }
             orderKey = t.key; orderSite = site; @assist = null;
             ClearHelpers(); lastPull = -100000;
+            orderFrame = ai.frame; orderBy = u.id; orderManned = false;
             lastWhy = "";
             GenericHelpers::LogUtil("[FRONT][Tactical] " + u.circuitDef.GetName() + " " + u.id + " orders " + d.GetName() + " at (" + int(site.x) + ","
                 + int(site.z) + "), " + int(sqrt(MapHelpers::SqDist(site, t.pos))) + " from " + (t.ghost ? "ghost of " : "") + t.defName + " at ("
@@ -423,6 +470,34 @@ namespace FrontTactical {
         lastPull = ai.frame;
         IBuilderTask@ b = cast<IBuilderTask>(order);
         if (b is null) return;
+        // B13: native may leave the order with nobody on it; the constructor that placed it takes it, and an
+        // order nobody took within UnmannedSeconds is aborted as a fail (it sat its whole 240 s timeout)
+        // a manned order whose frame never stood (g10: a T2 and three guards on one for 14 min, the
+        // order's own timeout never fired) is aborted at FrameDeadlineSeconds and counted as a fail
+        if (b.target is null && ai.frame - orderFrame >= FrameDeadlineSeconds * SECOND) {
+            GenericHelpers::LogUtil("[FRONT][Tactical] order against target " + orderKey + " had no frame after " + FrameDeadlineSeconds + " s; aborted", 1);
+            IUnitTask@ dead = order;
+            aiBuilderMgr.AbortTask(dead);
+            if (order is dead) TaskRemoved(dead, false);
+            return;
+        }
+        if (!orderManned) {
+            array<CCircuitUnit@>@ on = order.GetUnits();
+            if (on !is null && on.length() > 0) orderManned = true;
+            else if (ai.frame - orderFrame >= UnmannedSeconds * SECOND) {
+                GenericHelpers::LogUtil("[FRONT][Tactical] order against target " + orderKey + " had no constructor after " + UnmannedSeconds + " s; aborted", 1);
+                IUnitTask@ dead = order;
+                aiBuilderMgr.AbortTask(dead);
+                if (order is dead) TaskRemoved(dead, false);   // count the fail when the abort did not call back
+                return;
+            } else {
+                CCircuitUnit@ by = ai.GetTeamUnit(orderBy);
+                if (by !is null && !(by.task is order) && (FrontFactoryNanos::Free(by) || FrontFactoryNanos::Takeable(by))) {
+                    aiBuilderMgr.AssignTask(by, order);
+                    RateLog("assign", by.circuitDef.GetName() + " " + by.id + " assigned to its unmanned order against " + orderKey);
+                }
+            }
+        }
         PruneHelpers();
         const int want = Global::RoleSettings::Front::TacticalAssistT1;
         AIFloat3 site = orderSite;
