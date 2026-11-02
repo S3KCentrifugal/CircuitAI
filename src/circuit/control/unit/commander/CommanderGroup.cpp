@@ -22,6 +22,7 @@
 #include "Log.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 
@@ -255,7 +256,7 @@ bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,con
 }
 IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
     if(task) {
-        groupJob=task;groupJobEarnsNano=earnsNano;
+        groupJob=task;groupJobEarnsNano=earnsNano;groupJobCommitted=false;
         groupProjectUntil=ai->GetLastFrame()+int(cfg->group.projectHoldSeconds*FRAMES_PER_SEC);
         auto* build=dynamic_cast<IBuilderTask*>(task);
         auto* def=build?build->GetBuildDef():nullptr;
@@ -278,8 +279,9 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     defenseNext=defenseOfferNext=defenseDecisionNext=0;
     const auto* finishedBuild=dynamic_cast<IBuilderTask*>(task);
     const auto* finishedDef=finishedBuild?finishedBuild->GetBuildDef():nullptr;
-    ai->LOG("[CommanderGroup] job_end done=%i nano=%i team=%i def=%s",int(done),int(groupJobNano),
-        ai->GetTeamId(),finishedDef?finishedDef->GetDef()->GetName():"repair");
+    ai->LOG("[CommanderGroup] job_end done=%i nano=%i team=%i def=%s committed=%i",int(done),int(groupJobNano),
+        ai->GetTeamId(),finishedDef?finishedDef->GetDef()->GetName():"repair",int(groupJobCommitted));
+    groupJobCommitted=false;
     if(done) if(auto* upgrade=dynamic_cast<IBuilderTask*>(task);upgrade && upgrade->GetBuildType()==BT::MEXUP
         && upgrade->GetTarget() && upgrade->GetTarget()->IsFinished())
         ai->LOG("[CommanderGroup] mex_upgrade_done target=%i",upgrade->GetTarget()->GetId());
@@ -441,6 +443,11 @@ bool CCommanderController::GroupProjectAllowed(CCircuitUnit* unit,IUnitTask* tas
             >SQUARE(unit->GetCircuitDef()->GetBuildDistance())) return false;
     }
     auto* anchor=GroupCommander();
+    // A committed defense was admitted against seen enemies: their threat,
+    // the lane contact zone and the anchor walking on are why it exists, not
+    // reasons to drop it. Site territory, health and energy retreat still apply.
+    if(task==groupJob && groupJobCommitted)
+        return anchor && OnMap(at) && GroupBuildSiteAllowed(unit,def,at);
     return anchor && OnMap(at) && GroupBuildSiteAllowed(unit,def,at) && GroupLaneWorkAllowed(unit,def,at)
         && ai->GetThreatMap()->GetThreatAt(unit,at)<=cfg->front.threat
         && commander::GroupJobInRange(at.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
@@ -629,7 +636,14 @@ void CCommanderController::UpdateCommanderGroup() {
     // A moving anchor can invalidate a site after its last worker yields.
     // Retire that orphan instead of letting it block the one shared job slot.
     if(anchor && groupJob && groupJob->GetAssignees().empty() && !GroupProjectAllowed(anchor,groupJob)) {
-        if(std::getenv("CIRCUIT_COMMANDER_TRACE")) ai->LOG("[CommanderGroup] orphan_project_rejected");
+        // Rare (one per retired job): always log why, so cancelled defenses are traceable.
+        if(auto* build=dynamic_cast<IBuilderTask*>(groupJob)) {
+            const auto at=build->GetPosition();
+            ai->LOG("[CommanderGroup] orphan_project_rejected def=%s committed=%i threat=%.1f lane=%i site=%i dist=%.0f",
+                build->GetBuildDef()?build->GetBuildDef()->GetDef()->GetName():"repair",int(groupJobCommitted),
+                ai->GetThreatMap()->GetThreatAt(anchor,at),int(GroupLaneWorkAllowed(anchor,build->GetBuildDef(),at)),
+                int(GroupBuildSiteAllowed(anchor,build->GetBuildDef(),at)),std::sqrt(at.SqDistance2D(anchor->GetPos(frame))));
+        } else ai->LOG("[CommanderGroup] orphan_project_rejected def=repair");
         groupJob->GetManager()->AbortTask(groupJob); // dequeue clears borrowed identity
     }
     if(anchorId!=groupAnchorId) {

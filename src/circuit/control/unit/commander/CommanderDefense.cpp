@@ -437,6 +437,9 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     for(const auto& offset:offsets) if(auto* task=GroupBuild(unit,def,center+offset,false,selected,best.surplus)) {
         ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f surplus=%i",def->GetDef()->GetName(),best.band,best.ready,best.score,int(best.surplus));
         TrackGroupJob(task,supportAnchor<0); defenseNext=defenseDecisionNext=0;
+        // Owner 2026-11-02: gates passed with enemies seen in the planner radius
+        // (this second's assessment) commits the job; see GroupProjectAllowed.
+        groupJobCommitted=!best.surplus && defenseLocalDanger;
         return task;
     }
     defenseReason+=" placement_blocked";

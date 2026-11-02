@@ -404,6 +404,10 @@ private:
     IUnitTask* groupJob=nullptr; // borrowed until BuilderManager::DequeueTask callback
     springai::AIFloat3 groupNanoSite{-1,0,-1};
     bool groupNanoDue=false,groupJobNano=false,groupJobEarnsNano=true;
+    // Owner 2026-11-02: a planned defense admitted while enemies were seen in
+    // the planner radius is committed; later threat/contact/anchor drift must
+    // not release its workers or retire it as an orphan (GroupProjectAllowed).
+    bool groupJobCommitted=false;
     unsigned groupNanoOwed=0;
     int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0,groupProjectUntil=-1;
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;
