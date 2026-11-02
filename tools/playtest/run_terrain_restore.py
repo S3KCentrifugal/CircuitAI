@@ -67,12 +67,12 @@ def main():
     mapfile.write_text(f'StartSpot(AIFloat3({west[0]},0,{west[1]}), AiRole::{a.role}, false),\n'
                        f'StartSpot(AIFloat3({east[0]},0,{east[1]}), AiRole::{a.role}, false)\n')
     expect = [
-        {'key': 'config', 'pattern': r'RESTORE: on units=', 'by_minute': 1, 'scope': 'any'},
-        {'key': 'start', 'pattern': r'RESTORE: start ', 'by_minute': a.minutes, 'scope': 'any'},
-        {'key': 'done', 'pattern': r'RESTORE: done ', 'by_minute': a.minutes, 'scope': 'any'},
+        {'key': 'config', 'pattern': r'RESTORE(\[t\d+\])?: on units=', 'by_minute': 1, 'scope': 'any'},
+        {'key': 'start', 'pattern': r'RESTORE(\[t\d+\])?: start ', 'by_minute': a.minutes, 'scope': 'any'},
+        {'key': 'done', 'pattern': r'RESTORE(\[t\d+\])?: done ', 'by_minute': a.minutes, 'scope': 'any'},
         {'key': 'result', 'pattern': r'\[RestoreTest\] RESULT ', 'by_minute': a.minutes, 'scope': 'any'}]
     if 'path' in a.case or 'lava' in a.case:
-        expect.append({'key': 'path', 'pattern': r'RESTORE: start .*reason=(path|lava)', 'by_minute': a.minutes, 'scope': 'any'})
+        expect.append({'key': 'path', 'pattern': r'RESTORE(\[t\d+\])?: start .*reason=(path|lava)', 'by_minute': a.minutes, 'scope': 'any'})
     check = d / 'checks.json'
     check.write_text(json.dumps({'stop_minute': a.minutes, 'expect': expect,
         'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception', 'scope': 'any'}]}, indent=2))
