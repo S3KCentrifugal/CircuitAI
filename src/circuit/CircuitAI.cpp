@@ -615,7 +615,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
 
 	CreateGameAttribute();
 	scheduler = std::make_shared<CScheduler>();
-	scheduler->Init(scheduler);
+	scheduler->Init(scheduler, this);  // D-441: joins the worker pool now
 
 	InitRoles();  // core c++ implemented roles
 	const std::string profile = InitOptions();  // Inits GameAttribute

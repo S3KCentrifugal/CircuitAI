@@ -33,7 +33,9 @@ public:
 	CScheduler();
 	~CScheduler();
 
-	void Init(const std::shared_ptr<CScheduler>& thisPtr) { self = thisPtr; }
+	// D-441: registers with the worker pool at once, so a job pushed before
+	// ProcessInit (the field analysis, a widget write) is queued, not refused.
+	void Init(const std::shared_ptr<CScheduler>& thisPtr, CCircuitAI* ai);
 	void ProcessInit();
 	void ProcessRelease();
 
@@ -181,6 +183,9 @@ private:
 	spring::mutex statsMutex;
 	std::map<const char*, WorkerStat> workerStats;
 	std::uint64_t coalesced = 0;
+	std::uint64_t refused = 0;  // INV-248: pushes the pool refused for an unregistered owner (always 0)
+	CCircuitAI* circuit = nullptr;  // borrowed; outlives the scheduler (CCircuitAI owns it)
+	bool Queue(jobs::Lane lane, const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key);
 
 	std::vector<std::shared_ptr<IMainJob>> initJobs;
 	std::vector<std::shared_ptr<IMainJob>> releaseJobs;

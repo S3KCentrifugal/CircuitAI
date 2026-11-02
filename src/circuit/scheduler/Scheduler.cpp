@@ -32,13 +32,24 @@ CScheduler::~CScheduler()
 	Release();
 }
 
+void CScheduler::Init(const std::shared_ptr<CScheduler>& thisPtr, CCircuitAI* ai)
+{
+	self = thisPtr;
+	circuit = ai;
+	// D-441: acquire the pool here, not in ProcessInit. Between the AI's
+	// construction and ProcessInit, CCircuitAI::Init launches the field
+	// analysis (a background job) and the widget state; the pool refuses a push
+	// from an owner it does not know, so those jobs were silently lost after
+	// D-431 (the old global queue held them until its threads started).
+	CWorkerPool::Instance().Acquire(thisPtr);
+}
+
 void CScheduler::ProcessInit()
 {
 	for (auto& job : initJobs) {
 		job->Run();
 	}
 //	initJobs.clear();
-	if (auto owner = self.lock()) CWorkerPool::Instance().Acquire(owner);
 }
 
 void CScheduler::ProcessRelease()
@@ -117,25 +128,32 @@ void CScheduler::ProcessJobs(int frame)
 	isProcessing = false;
 }
 
+bool CScheduler::Queue(jobs::Lane lane, const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
+{
+	if (!isRunning) return false;  // released: the old threads were stopping too; nothing would run it
+	const bool queued = CWorkerPool::Instance().Push(this, {job, name}, lane, key);
+	if (queued) return true;
+	if (key != 0) { ++coalesced; return false; }  // a job with this key already waits: by design
+	// INV-248: a keyless push is never refused while the scheduler runs; a
+	// refusal means the owner is not registered and the job is lost (D-441).
+	++refused;
+	if (circuit != nullptr) circuit->LOG("[INVARIANT] INV-248 scheduler job '%s' refused: pool not acquired (lane %i)", name, int(lane));
+	return false;
+}
+
 bool CScheduler::RunParallelJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-	const bool queued = CWorkerPool::Instance().Push(this, {job, name}, jobs::Lane::NORMAL, key);
-	if (!queued && key != 0) ++coalesced;
-	return queued;
+	return Queue(jobs::Lane::NORMAL, job, name, key);
 }
 
 bool CScheduler::RunBackgroundJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-	const bool queued = CWorkerPool::Instance().Push(this, {job, name}, jobs::Lane::BACKGROUND, key);
-	if (!queued && key != 0) ++coalesced;
-	return queued;
+	return Queue(jobs::Lane::BACKGROUND, job, name, key);
 }
 
 bool CScheduler::RunPriorityJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-	const bool queued = CWorkerPool::Instance().Push(this, {job, name}, jobs::Lane::PRIORITY, key);
-	if (!queued && key != 0) ++coalesced;
-	return queued;
+	return Queue(jobs::Lane::PRIORITY, job, name, key);
 }
 
 void CScheduler::WorkerCompleted(const char* name, double ms, const std::shared_ptr<IMainJob>& onComplete)
@@ -161,10 +179,10 @@ void CScheduler::FlushWorkerStats(CCircuitAI* ai)
 		ai->LOG("[PerfWorker] team=%i frame=%i job=%s calls=%llu total_ms=%.3f max_ms=%.3f",
 			ai->GetTeamId(), ai->GetLastFrame(), name, static_cast<unsigned long long>(stat.calls), stat.total, stat.maximum);
 	}
-	ai->LOG("[PerfWorker] team=%i frame=%i finish_burst_max=%u finish_carried_max=%u coalesced=%llu pool_threads=%i pool_queued_max=%u",
+	ai->LOG("[PerfWorker] team=%i frame=%i finish_burst_max=%u finish_carried_max=%u coalesced=%llu refused=%llu pool_threads=%i pool_queued_max=%u",
 		ai->GetTeamId(), ai->GetLastFrame(), unsigned(finishBurstMax), unsigned(finishCarried),
-		static_cast<unsigned long long>(coalesced), CWorkerPool::Instance().Threads(), unsigned(CWorkerPool::Instance().QueuedMax()));
-	finishBurstMax = 0; finishCarried = 0; coalesced = 0;
+		static_cast<unsigned long long>(coalesced), static_cast<unsigned long long>(refused), CWorkerPool::Instance().Threads(), unsigned(CWorkerPool::Instance().QueuedMax()));
+	finishBurstMax = 0; finishCarried = 0; coalesced = 0; refused = 0;
 }
 
 void CScheduler::RemoveJob(const std::shared_ptr<IMainJob>& job)
