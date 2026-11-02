@@ -1831,6 +1831,7 @@ void CInitScript::RegisterIBuilderTask(asIScriptEngine* engine, const char* cls)
 	r = engine->RegisterObjectProperty(cls, "CCircuitDef@ const buildDef", asOFFSET(T, buildDef)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "CCircuitUnit@ const target", asOFFSET(T, target)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "bool canAutoAbort", asOFFSET(T, canAutoAbort)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty(cls, "float siteRadius", asOFFSET(T, siteRadius)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "int GetGuardTargetId() const", asFUNCTION(IBuilderTask_GuardTargetId), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 }
 
@@ -1847,6 +1848,19 @@ void CInitScript::RegisterCSuperTask(asIScriptEngine* engine)
 	RegisterIFighterTask<CSuperTask>(engine, "CSuperTask");
 	RegisterCast<IFighterTask, CSuperTask>(engine, "IFighterTask", "CSuperTask");
 	int r = engine->RegisterObjectMethod("CSuperTask", "void SetTargetPos(const AIFloat3& in)", asMETHOD(CSuperTask, SetTargetPos), asCALL_THISCALL); ASSERT(r >= 0);
+	// Tiered fire (lolcannons, owner 2026-10-26): script/src/systems/construction/lolcannon.as
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTargetTier(const CCircuitDef@, int)", asMETHOD(CSuperTask, SetTargetTier), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierRetarget(int)", asMETHOD(CSuperTask, SetTierRetarget), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierTargetId() const", asMETHOD(CSuperTask, GetTierTargetId), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierCount() const", asMETHOD(CSuperTask, GetTierCount), asCALL_THISCALL); ASSERT(r >= 0);
+	// Area rotation (owner 2026-10-27): the ranked target areas, readable by any role
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierRotation(int, int, int, float)", asMETHOD(CSuperTask, SetTierRotation), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaCount() const", asMETHOD(CSuperTask, GetTierAreaCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaIndex() const", asMETHOD(CSuperTask, GetTierAreaIndex), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "AIFloat3 GetTierAreaPos(int) const", asMETHOD(CSuperTask, GetTierAreaPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaTier(int) const", asMETHOD(CSuperTask, GetTierAreaTier), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "float GetTierAreaMetal(int) const", asMETHOD(CSuperTask, GetTierAreaMetal), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaTargetId(int) const", asMETHOD(CSuperTask, GetTierAreaTargetId), asCALL_THISCALL); ASSERT(r >= 0);
 }
 
 static void CRouteTask_SetRoute(CRouteTask* task, const CScriptArray* array)
