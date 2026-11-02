@@ -38,7 +38,7 @@ OUT="${TMPDIR:-${TEMP:-/tmp}}/circuit-native-tests"
 mkdir -p "$OUT"
 
 # The C++ tests, each a single translation unit, plus the extra sources a few need.
-tests=(performance_helpers_test defense_planner_test commander_group_work_test commander_fallback_test field_corridor_helpers_test lane_front_test control_core_test commander_posture_test mex_navigation_test mex_territory_test transport_definition_test commander_combat_test commander_jammer_coverage_test fog_proximity_test callback_buffer_test resurrection_claim_test reservation_claim_test task_reference_test dormant_task_chain_test economy_index_test route_command_test reservation_candidates_test construction_recovery_test guard_command_test target_preference_test layout_ranking_test base_layout_geometry_test allied_reservations_test local_reservations_test lane_solver_test lane_raster_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test naval_geometry_test air_safety_test widget_state_test ranged_geometry_test ground_cohort_test local_rush_test water_survey_test field_analysis_test ranged_policy_test line_formation_test job_queue_test double_buffer_test backline_station_test disengage_test)
+tests=(performance_helpers_test defense_planner_test commander_group_work_test commander_fallback_test field_corridor_helpers_test lane_front_test control_core_test commander_posture_test mex_navigation_test mex_territory_test transport_definition_test commander_combat_test commander_jammer_coverage_test fog_proximity_test callback_buffer_test resurrection_claim_test reservation_claim_test task_reference_test dormant_task_chain_test economy_index_test route_command_test reservation_candidates_test construction_recovery_test guard_command_test target_preference_test layout_ranking_test base_layout_geometry_test economy_spine_test coastal_support_test allied_reservations_test local_reservations_test lane_solver_test lane_raster_test strategic_targeting_test terrain_route_test air_geometry_test metal_field_test enemy_reclaim_policy_test naval_geometry_test air_safety_test widget_state_test ranged_geometry_test ground_cohort_test local_rush_test water_survey_test field_analysis_test ranged_policy_test line_formation_test job_queue_test double_buffer_test backline_station_test disengage_test)
 extra_sources() {
 	case "$1" in
 		lane_solver_test|terrain_route_test) echo "src/circuit/terrain/LaneSolver.cpp" ;;
@@ -50,6 +50,9 @@ extra_sources() {
 }
 # The AngelScript suites: policy script, its tests, runner flags.
 as_suites=(
+	"data/script/src/helpers/construction/support_site_helpers.as tests/support_site_tests.as"
+    "data/script/src/helpers/math/rush_bootstrap_math.as tests/rush_bootstrap_math_tests.as"
+    "data/script/src/helpers/math/economy_cluster_math.as tests/economy_cluster_math_tests.as"
 	"data/script/src/helpers/construction/owned_economy_helpers.as tests/owned_economy_tests.as --strings"
 	"data/script/src/helpers/math/geothermal_math.as tests/geothermal_math_tests.as"
 	"data/script/src/helpers/math/production_math.as tests/production_math_tests.as"

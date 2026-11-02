@@ -403,10 +403,35 @@ static int CTerrainManager_GetReservationCount(CTerrainManager* terrainMgr, cons
 	return terrainMgr->GetReservationCount(const_cast<CCircuitDef*>(cdef));
 }
 
+static void CTerrainManager_GetScopedReservationIds(CTerrainManager* mgr, int zone, int group,
+    const CCircuitDef* def, CScriptArray* output)
+{
+    // Callback-thread copy from the lifecycle-maintained scope index. Reuse the
+    // caller's array capacity; no all-reservation scan or retained iterators.
+    const auto& ids = mgr->GetScopedReservationIds(zone, group, def);
+    output->Resize(static_cast<asUINT>(ids.size()));
+    asUINT i = 0;
+    for (int id : ids) *static_cast<int*>(output->At(i++)) = id;
+}
+
 static int CTerrainManager_LayBand(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, const AIFloat3& frontCentre,
 		int facing, int cols, int rows, int gap, bool armed, bool anyReach, bool tenant, int group)
 {
 	return terrainMgr->LayBand(zone, const_cast<CCircuitDef*>(cdef), frontCentre, facing, cols, rows, gap, armed, anyReach, tenant, group);
+}
+
+static bool CTerrainManager_PlanEconomySpine(CTerrainManager* mgr, const std::string& name,
+    const CCircuitDef* nano, const CCircuitDef* reactor, const CCircuitDef* converter,
+    const AIFloat3& origin, int facing, int rows, int serviceDepth, int candidates, float radius, float clearance, int reactorLimit,
+    const CScriptArray* preferences, float preferenceRadius)
+{
+    if (preferences == nullptr || preferences->GetSize() > 16) return false;
+    F3Vec points;
+    points.reserve(preferences->GetSize());
+    for (asUINT i = 0; i < preferences->GetSize(); ++i)
+        points.push_back(*static_cast<const AIFloat3*>(preferences->At(i)));
+    return mgr->PlanEconomySpine(name, const_cast<CCircuitDef*>(nano), const_cast<CCircuitDef*>(reactor),
+        const_cast<CCircuitDef*>(converter), origin, facing, rows, serviceDepth, candidates, radius, clearance, reactorLimit, points, preferenceRadius);
 }
 
 static int CTerrainManager_PackNearGroup(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup,
@@ -1387,6 +1412,10 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleasePersistentBuilding(int)", asMETHOD(CTerrainManager, ReleasePersistentBuilding), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationState(int) const", asMETHOD(CTerrainManager, GetReservationState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsReservationBuildable(int) const", asMETHOD(CTerrainManager, IsReservationBuildable), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "bool IsAlliedSpaceFree(const CCircuitDef@, const AIFloat3& in, int facing) const", asMETHOD(CTerrainManager, IsAlliedSpaceFree), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveCoastalSupport(CCircuitUnit@, const CCircuitDef@, int zone, int group, const AIFloat3& in anchor, float radius, int budget, int maximum)", asMETHOD(CTerrainManager, ReserveCoastalSupport), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int NextSupportSlot(CCircuitUnit@, const CCircuitDef@, int group, const AIFloat3& in seed, int budget)", asMETHOD(CTerrainManager, NextSupportSlot), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int PackReachable(CCircuitUnit@, const CCircuitDef@, int zone, int supportGroup, int facing, const AIFloat3& in seed, int budget)", asMETHOD(CTerrainManager, PackReachable), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetGroupActivationState(int) const", asMETHOD(CTerrainManager, GetGroupActivationState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetGroupZone(int) const", asMETHOD(CTerrainManager, GetGroupZone), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetZoneActivationState(int) const", asMETHOD(CTerrainManager, GetZoneActivationState), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1405,6 +1434,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseGroup(int)", asMETHOD(CTerrainManager, ReleaseGroup), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsReserved(const AIFloat3& in) const", asMETHOD(CTerrainManager, IsReserved), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetReservationCount(const CCircuitDef@) const", asFUNCTION(CTerrainManager_GetReservationCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "void GetScopedReservationIds(int zone, int group, const CCircuitDef@, array<int>& inout) const", asFUNCTION(CTerrainManager_GetScopedReservationIds), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CTerrainManager", "float reservationMatchRadius", asOFFSET(CTerrainManager, reservationMatchRadius)); ASSERT(r >= 0);
 	// Layout: JSON permits the mechanism and TECH opts its own AI instance in.
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetBuildSiteReservations(bool)", asMETHOD(CTerrainManager, SetBuildSiteReservations), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1446,6 +1476,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotAny(int group, const AIFloat3& in anchor) const", asMETHOD(CTerrainManager, NextSlotAny), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int NextSlotConnected(int group, const AIFloat3& in centre) const", asMETHOD(CTerrainManager, NextSlotConnected), asCALL_THISCALL); ASSERT(r >= 0);  // D-077
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsZoneAlly(const AIFloat3& in) const", asMETHOD(CTerrainManager, IsZoneAlly), asCALL_THISCALL); ASSERT(r >= 0);  // D-081
+    r = engine->RegisterObjectMethod("CTerrainManager", "void SetLayoutPriority(int)", asMETHOD(CTerrainManager, SetLayoutPriority), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanEconomySpine(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int, int, int, int, float, float, int, const array<AIFloat3>& in, float)", asFUNCTION(CTerrainManager_PlanEconomySpine), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetLayoutInt(const string& in, int)", asMETHOD(CTerrainManager, SetLayoutInt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackNearGroup(int zone, const CCircuitDef@, int nanoGroup, int facing, const AIFloat3& in anchor, float maxReach, float minNanoDist, int group)", asFUNCTION(CTerrainManager_PackNearGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PickMost(int zone, const CCircuitDef@, int nanoGroup, int facing, float reach, float flush, const AIFloat3& in seed, AIFloat3& out)", asFUNCTION(CTerrainManager_PickMost), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

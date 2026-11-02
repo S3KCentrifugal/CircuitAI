@@ -99,6 +99,9 @@ namespace Invariants {
     {
         IBuilderTask@ building = cast<IBuilderTask>(task);
         if (building is null || building.buildDef is null) return;
+        // Repair/assist tasks expose their target's definition too. They do
+        // not admit a new structure and must not re-test its original budget.
+        if (building.GetBuildType() >= int(Task::BuildType::REPAIR)) return;
         const string name = building.buildDef.GetName();
         const string side = Global::AISettings::Side;
         if (name == UnitHelpers::GetFusionNameForSide(side) && !TechChain::NukeRush()
@@ -340,8 +343,11 @@ namespace Invariants {
         } else ladderFloatSince = -1;
 
         // INV-013: a main cluster has a forward cluster planned within
-        // InvariantForwardSeconds, unless every re-plan was used up (D-081)
-        if (Layout::HasBox() && !Layout::ForwardPlanned() && !Layout::ForwardGivenUp()) {
+        // InvariantForwardSeconds, unless every re-plan was used up (D-081).
+        // Dynamic districts already reserve growth; a second cluster is needed
+        // only after actual primary capacity is exhausted (D-431).
+        if (Layout::HasBox() && (!Layout::HasSpine() || Layout::economyOverflowNeeded)
+            && !Layout::ForwardPlanned() && !Layout::ForwardGivenUp()) {
             if (noForwardSince < 0) noForwardSince = ai.frame;
             else if (ai.frame - noForwardSince >= int(Global::RoleSettings::Tech::InvariantForwardSeconds) * SECOND)
                 Violation("INV-013", "forward", "the main turret cluster has had no forward cluster planned for " + int(Global::RoleSettings::Tech::InvariantForwardSeconds) + " s");
