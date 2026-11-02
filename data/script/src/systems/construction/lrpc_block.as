@@ -365,7 +365,7 @@ namespace LrpcBlock {
 
     // ---------------------------------------------------------------- the crew
 
-    int Tier(CCircuitDef@ d)
+    int Tier(const CCircuitDef@ d)
     {
         if (d is null) return 0;
         const string n = d.GetName();
