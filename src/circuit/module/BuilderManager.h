@@ -374,7 +374,13 @@ public:
 	IBuilderTask* FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred, int groupLimit = 1, bool highestValue = false, float combatClearance = 0.f);
     float GetRecoveryMetal(CCircuitUnit* worker, float radius);
     bool ReceiveResurrectionClaim(const char* message);
+    // Rez bots only reclaim (never resurrect) inside the weapon reach of
+    // enemy short-ranged porc, seen or ghost (last-known). Porc = built,
+    // armed static defence whose ground range is at most rezPorcRange.
+    bool IsUnderEnemyShortPorc(const springai::AIFloat3& pos) const;
 private:
+    float rezPorcRange = 1000.f;
+    float rezPorcMargin = 64.f;
     struct SRelayedResurrection { ResurrectionClaim claim; int team; int expires; };
     std::map<int, SRelayedResurrection> relayedResurrections;
     void RefreshRecoveryFeatures();

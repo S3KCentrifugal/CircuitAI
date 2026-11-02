@@ -10,6 +10,8 @@
 
 #include "task/builder/BuilderTask.h"
 
+#include <set>
+
 namespace circuit {
 
 class CBResurrectTask final: public IBuilderTask {
@@ -41,6 +43,9 @@ private:
 	virtual void Save(std::ostream& os) const override;
 
 	float radius;
+	// Executors given reclaim instead of resurrect (enemy short porc reach).
+	std::set<CCircuitUnit*> reclaimOnly;
+	bool IsPorcReclaim(CCircuitUnit* unit, const springai::AIFloat3& target) const;
 };
 
 } // namespace circuit

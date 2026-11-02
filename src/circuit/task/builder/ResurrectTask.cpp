@@ -16,6 +16,7 @@
 
 #include "spring/SpringCallback.h"
 
+#include "Log.h"
 #include "Feature.h"
 #include "FeatureDef.h"
 
@@ -55,6 +56,7 @@ void CBResurrectTask::AssignTo(CCircuitUnit* unit)
 
 void CBResurrectTask::RemoveAssignee(CCircuitUnit* unit)
 {
+	reclaimOnly.erase(unit);
 	IBuilderTask::RemoveAssignee(unit);
 	if (units.empty()) {
 		manager->AbortTask(this);
@@ -88,14 +90,46 @@ bool CBResurrectTask::Execute(CCircuitUnit* unit)
 		pos = position;
 		rezzRadius = radius;
 	}
+	// Owner rule: inside the reach of enemy short-ranged porc (LLT, Beamer,
+	// HLT, Twin Guard, pop-ups...; seen or ghost) the wreck is reclaimed, not
+	// resurrected - a rez takes far longer under fire and the new unit spawns
+	// into the porc. Not for the whole-map area order (radius 0).
+	if ((radius > .0f) && IsPorcReclaim(unit, pos)) {
+		if (reclaimOnly.insert(unit).second) {
+			circuit->LOG("REZ: %s(%i) reclaims instead of resurrecting at (%.0f, %.0f): enemy short porc reach",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), pos.x, pos.z);
+		}
+		TRY_UNIT(circuit, unit,
+			unit->CmdReclaimInArea(pos, rezzRadius, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+		)
+		return true;
+	}
+	reclaimOnly.erase(unit);
 	TRY_UNIT(circuit, unit,
 		unit->CmdResurrectInArea(pos, rezzRadius, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
 	)
 	return true;
 }
 
+bool CBResurrectTask::IsPorcReclaim(CCircuitUnit* unit, const AIFloat3& target) const
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CBuilderManager* builderMgr = circuit->GetBuilderManager();
+	return builderMgr->IsUnderEnemyShortPorc(target)
+		|| builderMgr->IsUnderEnemyShortPorc(unit->GetPos(circuit->GetLastFrame()));
+}
+
 bool CBResurrectTask::Reevaluate(CCircuitUnit* unit)
 {
+	// A unit already working the wreck switches order when the porc picture
+	// changes (porc spotted or ghost cleared) instead of waiting for its
+	// 60 s area order to time out.
+	if ((radius > .0f) && (executors.find(unit) != executors.end())
+		&& (IsPorcReclaim(unit, position) != (reclaimOnly.find(unit) != reclaimOnly.end())))
+	{
+		Execute(unit);
+		return false;
+	}
 	if (recoveryControlled) return true; // SEA selector owns target changes.
 	CCircuitAI* circuit = manager->GetCircuit();
 	if (units.empty()) {

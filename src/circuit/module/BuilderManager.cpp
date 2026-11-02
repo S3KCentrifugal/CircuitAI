@@ -296,6 +296,8 @@ void CBuilderManager::InitHandlers()
 	const float builderRet = (float)rand() / RAND_MAX * (maxRet - minRet) + minRet;
 	const float retMod = retreat.get((unsigned)2, 1.0f).asFloat();
 	const float goalBuildMod = root["economy"].get("build_mod", 320.f).asFloat();
+	rezPorcRange = root["economy"].get("rez_porc_range", 1000.f).asFloat();
+	rezPorcMargin = root["economy"].get("rez_porc_margin", 64.f).asFloat();
 
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
@@ -2023,6 +2025,22 @@ bool CBuilderManager::ReceiveResurrectionClaim(const char* message)
     if (claim.Decode(parameters, count, callback->Unit_Maximum()))
         relayedResurrections[unitId] = {claim, team, frame + 3 * FRAMES_PER_SEC};
     return true;
+}
+
+bool CBuilderManager::IsUnderEnemyShortPorc(const AIFloat3& pos) const
+{
+    if (rezPorcRange <= 0.f || !geom::is_valid(pos)) return false;
+    // Ghosts count: an enemy structure stays in the enemy infos at its last
+    // seen spot until that spot is seen empty (then it is hidden/dead).
+    for (const auto& kv : circuit->GetEnemyInfos()) {
+        const CEnemyInfo* enemy = kv.second;
+        const CCircuitDef* edef = enemy->GetCircuitDef();
+        if (edef == nullptr || edef->IsMobile() || enemy->IsHidden() || enemy->IsBeingBuilt()) continue;
+        const float range = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
+        if (range <= 0.f || range > rezPorcRange) continue;
+        if (pos.SqDistance2D(enemy->GetPos()) <= SQUARE(range + rezPorcMargin)) return true;
+    }
+    return false;
 }
 
 IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred,
