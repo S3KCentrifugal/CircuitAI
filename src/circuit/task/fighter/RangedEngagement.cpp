@@ -399,8 +399,11 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     // only intermittently. EVEN and OUTMATCHED hulls pop out at poke_health.
     const bool poking=assessed && policy.pokeIn>0.f && group.target>=0
         && !group.sustainedRush && !group.rushFallback && !group.formationRear
-        && group.mode!=cohort::Mode::REGROUP
-        && (group.reason==cohort::Reason::FAVORABLE || group.reason==cohort::Reason::OUTMATCHED);
+        && group.mode!=cohort::Mode::REGROUP;
+    // Owner 2026-11-02: restored. Every assessed cohort with a target pokes,
+    // whatever AssessCohort's reason (D-355 had limited it to FAVORABLE and
+    // OUTMATCHED, so TRAVEL/UNKNOWN/UNREACHABLE/STATIC cohorts stopped poking).
+    // The local metal regime below, not the reason, decides how hard.
     const cohort::Poke regime=poking?cohort::PokeRegime(group.ownValue,group.hostileValue,policy.pokeRatio):cohort::Poke::EVEN;
     const bool dominant=poking && regime==cohort::Poke::PRESS;
     const float pokeIn=dominant?policy.pokeInDominant:policy.pokeIn;
