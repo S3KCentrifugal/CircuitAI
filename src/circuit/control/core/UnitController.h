@@ -25,6 +25,7 @@
 namespace circuit {
 
 class CCircuitUnit;
+class CEnemyInfo;
 class IUnitTask;
 
 class IUnitController {
@@ -52,6 +53,8 @@ public:
 
 	virtual void Update() = 0;
 	virtual void Damaged(CCircuitUnit* /*unit*/) {}
+	// Called just before Damaged with the attacker, when it is known (null otherwise).
+	virtual void DamagedBy(CCircuitUnit* /*unit*/, CEnemyInfo* /*attacker*/) {}
 	virtual void MoveFailed(int /*unitId*/) {}
 	virtual void WeaponFired(int /*unitId*/, int /*weaponDefId*/) {}
 	virtual bool ReceiveMessage(const char* /*message*/) { return false; }

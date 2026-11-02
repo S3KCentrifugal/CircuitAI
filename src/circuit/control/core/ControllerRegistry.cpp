@@ -139,8 +139,11 @@ void CControllerRegistry::Update() {
 	for (auto& c : controllers) c->Update();
 }
 
-void CControllerRegistry::Damaged(CCircuitUnit* unit) {
-	if (IUnitController* c = Controlling(unit->GetId())) c->Damaged(unit);
+void CControllerRegistry::Damaged(CCircuitUnit* unit, CEnemyInfo* attacker) {
+	if (IUnitController* c = Controlling(unit->GetId())) {
+		c->DamagedBy(unit, attacker);
+		c->Damaged(unit);
+	}
 }
 
 void CControllerRegistry::WeaponFired(int unitId, int weaponDefId) {

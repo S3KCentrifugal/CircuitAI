@@ -260,6 +260,12 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 		jumpRange = (it != customParams.end()) ? utils::string_to_float(it->second) : 400.0f;
 	}
 
+	// Owner 2026-11-02: commanders withdraw from drone fire. BAR tags its
+	// drones customparams.drone = 1; the older is_drone key is kept too.
+	it = customParams.find("drone");
+	isDrone = (it != customParams.end()) && (utils::string_to_int(it->second) == 1);
+	it = customParams.find("is_drone");
+	isDrone = isDrone || ((it != customParams.end()) && (utils::string_to_int(it->second) == 1));
 	it = customParams.find("is_drone");
 	if ((it != customParams.end()) && (utils::string_to_int(it->second) == 1)) {
 		category |= circuit->GetBadCategory();

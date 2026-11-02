@@ -28,6 +28,7 @@ namespace circuit {
 
 class CCircuitAI;
 class CCircuitUnit;
+class CEnemyInfo;
 
 class CControllerRegistry final {
 public:
@@ -51,7 +52,7 @@ public:
 	void UnitAdded(CCircuitUnit* unit);
 	void UnitRemoved(int unitId);
 	void Update();
-	void Damaged(CCircuitUnit* unit);
+	void Damaged(CCircuitUnit* unit, CEnemyInfo* attacker = nullptr);
 	void WeaponFired(int unitId, int weaponDefId);
 	bool ReceiveMessage(const char* message);
 

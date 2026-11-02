@@ -318,6 +318,8 @@ public:
 	bool IsAbleToDive()      const { return isAbleToDive; }  // for any aircraft = false
 	bool IsAbleToCloak()     const { return isAbleToCloak; }
 	bool IsAbleToJump()      const { return isAbleToJump; }
+	// BAR customparams.drone (or is_drone) = 1: a carrier/hive drone.
+	bool IsDrone()           const { return isDrone; }
 	bool IsAbleToRepair()    const { return isAbleToRepair; }
 	bool IsAbleToReclaim()   const { return isAbleToReclaim; }
 	bool IsAbleToResurrect() const { return isAbleToResurrect; }
@@ -490,6 +492,7 @@ private:
 	bool isAbleToDive : 1;  // isSubmarine || isAmphibious
 	bool isAbleToCloak : 1;
 	bool isAbleToJump : 1;
+	bool isDrone : 1;
 	bool isAbleToRepair : 1;
 	bool isAbleToReclaim : 1;
 	bool isAbleToResurrect : 1;

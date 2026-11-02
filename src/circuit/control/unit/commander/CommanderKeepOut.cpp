@@ -21,6 +21,13 @@
 // its lane), keeps out of a shell_zone disc there for shell_zone_seconds and
 // holds the withdrawal shell_hold seconds after the last such loss.
 //
+// Drones (owner 2026-11-02): a commander hit by a carrier or hive drone (BAR
+// customparams.drone), or damaged while a visible enemy drone's weapon reaches
+// it, steps drone_step back toward its rear (base, or back along its lane) and
+// holds drone_hold seconds after the last hit. Not at home (BASE_RADIUS), where
+// the base's AA is the cover. The only exception is the commander's top task:
+// a nearby T3 it can D-gun (PriorityDGun runs first; T3Exempt releases this).
+//
 // Cost: the tower list is rebuilt once a second from the enemy manager
 // (O(enemy units)); a commander tick reads O(zones) and engine reachability for
 // at most eight goal candidates once a second while withdrawing.
@@ -118,7 +125,7 @@ AIFloat3 CCommanderController::KeepOutGoal(CCircuitUnit* unit,const AIFloat3& go
     return KeepOutAt(P(at))?unit->GetPos(ai->GetLastFrame()):at;
 }
 
-AIFloat3 CCommanderController::WithdrawGoal(CCircuitUnit* unit,State& s,const AIFloat3& pos,bool shelled,int frame) {
+AIFloat3 CCommanderController::WithdrawGoal(CCircuitUnit* unit,State& s,const AIFloat3& pos,bool shelled,int frame,bool droned) {
     const Point here=P(pos);
     auto* battle=ai->GetBattle();
     const bool lane=battle->GetFrontLaneLength()>0;
@@ -131,6 +138,9 @@ AIFloat3 CCommanderController::WithdrawGoal(CCircuitUnit* unit,State& s,const AI
         away=commander::Normal(here-z->center);
         step=std::max(160.f,z->radius-commander::Length(here-z->center)+ZONE_EXIT);
     } else if(shelled && nearestDot>=0) away=commander::Normal(here-P(nearestDotPos));
+    // Drones orbit their target; the rear (friendly AA, away from the carrier's
+    // leash) is the useful direction, not away from one drone.
+    else if(droned && !shelled) step=cfg->safety.droneStep;
     if(commander::Length(away)<.1f) away=commander::Normal(P(rear)-here);
     if(commander::Length(away)<.1f) away={0,-1};
     // Eight headings, straight away first, then turning toward the rear.
@@ -246,10 +256,25 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         }
     }
 
+    // Drone fire: a known drone hit us within the last second, or we took
+    // damage within the last second with a visible drone's weapon in reach.
+    if(cfg->safety.droneRetreat>0) {
+        const bool recentDamage=s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC;
+        const bool hitByDrone=frame-s.keep.droneHit<FRAMES_PER_SEC;
+        const bool home=pos.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
+        if(!home && (hitByDrone || (recentDamage && dronesInReach>0))) {
+            if(frame>=s.keep.droneUntil)
+                ai->LOG("[CommanderSafety] unit=%i action=drone_fire hit=%i drones=%i hp=%.2f",
+                    unit->GetId(),int(hitByDrone),dronesInReach,unit->GetHealthPercent());
+            s.keep.droneUntil=frame+int(cfg->safety.droneHold*FRAMES_PER_SEC);
+        }
+    } else s.keep.droneUntil=-1;
+
     const auto* zone=KeepOutAt(P(pos));
     const bool shelled=frame<s.keep.shelledUntil;
-    if(!zone && !shelled) return release("clear",true);
-    if(zone && zone->tower && !shelled && !s.keep.active && TowerDive(unit,s,*zone,frame)) {
+    const bool droned=frame<s.keep.droneUntil;
+    if(!zone && !shelled && !droned) return release("clear",true);
+    if(zone && zone->tower && !shelled && !droned && !s.keep.active && TowerDive(unit,s,*zone,frame)) {
         // The dive is held under a controlled task like any engagement.
         if(!task) {
             task=ai->GetBuilderManager()->EnqueueControlled(this,nullptr);
@@ -269,7 +294,7 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
         TRY_UNIT(ai,unit,unit->CmdStop();)
     }
-    const char* reason=zone && zone->tower?"tower":shelled?"shelled":"shell_zone";
+    const char* reason=zone && zone->tower?"tower":shelled?"shelled":droned?"drones":"shell_zone";
     if(!s.keep.active || std::strcmp(s.keep.reason,reason)!=0)
         ai->LOG("[CommanderSafety] unit=%i action=keep_out reason=%s tower=%i hp=%.2f x=%.0f z=%.0f",
             unit->GetId(),reason,zone && zone->tower?zone->id:-1,unit->GetHealthPercent(),pos.x,pos.z);
@@ -280,7 +305,7 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
     if(frame>=s.keep.goalPlan+FRAMES_PER_SEC || s.keep.goal.x<0 || pos.SqDistance2D(s.keep.goal)<SQUARE(48.f)
         || KeepOutAt(P(s.keep.goal))) {
         s.keep.goalPlan=frame;
-        s.keep.goal=WithdrawGoal(unit,s,pos,shelled,frame);
+        s.keep.goal=WithdrawGoal(unit,s,pos,shelled,frame,droned);
     }
     if(s.keep.goal.SqDistance2D(pos)>SQUARE(32.f)) Move(unit,s,s.keep.goal,frame,true);
     return true;

@@ -86,6 +86,8 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::shellUnexplained>("shell_unexplained",0,1),Safety<&SC::shellDotRange>("shell_dot_range",0,3000),
         Safety<&SC::shellStep>("shell_step",128,2000),Safety<&SC::shellZone>("shell_zone",0,2000),
         Safety<&SC::shellZoneSeconds>("shell_zone_seconds",0,600),Safety<&SC::shellHold>("shell_hold",0,60),
+        Safety<&SC::droneRetreat>("drone_retreat",0,1),Safety<&SC::droneHold>("drone_hold",0,60),
+        Safety<&SC::droneStep>("drone_step",128,2000),
         // D-389 cloak posture
         Cloak<&KC::posture>("cloak_posture",0,1),Cloak<&KC::threatRadius>("threat_radius",400,4000),
         Cloak<&KC::horizon>("threat_horizon",0,15),Cloak<&KC::outrangeMargin>("outrange_margin",0,500),
@@ -285,6 +287,12 @@ void CCommanderController::Damaged(CCircuitUnit* unit) {
     const float previousReserve=reserve; reserve=std::max(0.f,reserve-std::max(s.budget,s.fundingBudget));
     Tick(unit,s,frame); reserve=std::max(previousReserve,reserve+std::max(s.budget,s.fundingBudget));
 }
+void CCommanderController::DamagedBy(CCircuitUnit* unit,CEnemyInfo* attacker) {
+    if(!attacker || !Handles(unit)) return;
+    State* found=states.Find(unit->GetId());
+    auto* ad=attacker->GetCircuitDef();
+    if(found && ad && ad->IsDrone()) found->keep.droneHit=ai->GetLastFrame();
+}
 void CCommanderController::MoveFailed(int id) {
     State* s=states.Find(id); if(!s) return;
     s->route.clear(); ++s->failed;
@@ -380,7 +388,7 @@ bool CCommanderController::SetOption(const std::string& name,float value) {
 void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_OBSERVE);
     contacts.clear(); threats.clear(); seeds.clear(); attackers.clear(); submergedContact=false; protectedAfus=-1;
-    nearestDot=-1; visibleReachDps=0;
+    nearestDot=-1; visibleReachDps=0; dronesInReach=0; nearestDronePos={-1,0,-1};
     auto& claims=ai->GetAllyTeam()->GetCommanderShots(); claims.Prune(frame);
     auto world=ai->GetMilitaryManager()->GetRangedWorld();
     auto* api=ai->GetUnitAPI(); auto* def=unit->GetCircuitDef();
@@ -477,6 +485,14 @@ void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
             || enemy->GetUnit()->GetRulesParamFloat("disarmed",0)>0) continue;
         if(canHit(cap)) attackers.push_back({c.pos,c.cost});
         observeWeapons(id,c,cap);
+        // Owner 2026-11-02: a drone whose weapon reaches the commander.
+        if(ed->IsDrone()) {
+            const float d=commander::Length(c.pos-P(pos));
+            for(const auto& w:cap.weapons) if((w.category & def->GetCategory())!=0 && d<=w.range+def->GetRadius()+64.f) {
+                if(dronesInReach==0 || d<commander::Length(P(nearestDronePos)-P(pos))) nearestDronePos=ep;
+                ++dronesInReach; break;
+            }
+        }
     }
     // Bounded candidate seeds, but ScoreLine still scores every local contact.
     const auto order=[this](int a,int b) {

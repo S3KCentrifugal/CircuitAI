@@ -672,7 +672,7 @@ int CBuilderManager::UnitIdle(CCircuitUnit* unit)
 
 int CBuilderManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
-    if(circuit->GetControllers()) circuit->GetControllers()->Damaged(unit);  // D-388
+    if(circuit->GetControllers()) circuit->GetControllers()->Damaged(unit, attacker);  // D-388
 	auto search = damagedHandler.find(unit->GetCircuitDef()->GetId());
 	if (search != damagedHandler.end()) {
 		search->second(unit, attacker);

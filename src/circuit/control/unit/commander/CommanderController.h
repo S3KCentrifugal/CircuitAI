@@ -64,6 +64,9 @@ struct CommanderKeepOutState {
     int diveTarget=-1,diveStart=-1,diveUntil=-1; // a rare D-gun dive on one tower
     float lastHp=-1; int lastHpFrame=-10000;
     std::vector<std::pair<int,float>> losses; // (frame, health lost) inside the loss window
+    // Owner 2026-11-02: drone fire. droneHit: last frame a known drone damaged
+    // the commander; droneUntil: the withdrawal holds until this frame.
+    int droneHit=-10000,droneUntil=-1;
 };
 struct CommanderFallbackState {
     // D-293 fallback: held until `until`, porc line replanned once/second.
@@ -207,6 +210,10 @@ struct CommanderSafetyConfig {
     // for shellZoneSeconds and holds the withdrawal shellHold seconds. 0 rate = off.
     float shellLossRate=35,shellWindow=5,shellUnexplained=.5f,shellDotRange=500;
     float shellStep=600,shellZone=450,shellZoneSeconds=45,shellHold=8;
+    // Owner 2026-11-02: under drone fire (carrier/hive drones) the commander
+    // withdraws droneStep toward its rear and holds droneHold seconds after the
+    // last drone hit. A nearby T3 it can D-gun still comes first. 0 = off.
+    float droneRetreat=1,droneHold=6,droneStep=600;
 };
 // D-389 cloak posture levers (commander-cloak-policy.md section 4.4).
 struct CommanderCloakConfig {
@@ -332,6 +339,7 @@ public:
     bool Owns(CCircuitUnit* unit) const override;
     void Update() override;
     void Damaged(CCircuitUnit* unit) override;
+    void DamagedBy(CCircuitUnit* unit,CEnemyInfo* attacker) override;
     void MoveFailed(int id) override;
     void WeaponFired(int id,int weapon) override;
     bool ReceiveMessage(const char* message) override { return ReceiveProjectiles(message); }
@@ -541,10 +549,11 @@ private:
     std::map<int,int> diveRolled; // tower id -> frame a new dive roll is allowed
     float nearestDot=-1; springai::AIFloat3 nearestDotPos; // radar-only contact, from Observe
     float visibleReachDps=0; // in-LOS weapons whose range reaches the commander, from Observe
+    int dronesInReach=0; springai::AIFloat3 nearestDronePos{-1,0,-1}; // in-LOS enemy drones in weapon reach, from Observe
     void RefreshKeepOut(CCircuitUnit* unit,int frame);
     const KeepOutZone* KeepOutAt(commander::Point p,float margin=0) const;
     springai::AIFloat3 KeepOutGoal(CCircuitUnit* unit,const springai::AIFloat3& goal) const;
-    springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame);
+    springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame,bool droned=false);
     bool TowerDive(CCircuitUnit* unit,State& s,const KeepOutZone& zone,int frame);
     bool SafetyWithdraw(CCircuitUnit* unit,State& s,int frame);
     struct JamZone { commander::Point center; float radius; };
