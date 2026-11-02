@@ -2,7 +2,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "task/fighter/RangedWorld.h"
 #include "unit/CircuitUnit.h"
 #include "unit/ally/AllyUnit.h"
@@ -122,7 +122,7 @@ void CCommanderController::Decline(CCircuitUnit* unit,State& s,const commander::
 void CCommanderController::EndT3(CCircuitUnit* unit,State& s,int frame,const char* reason) {
     s.t3.positionUntil=0; s.t3.positionTarget=-1;
     if(s.t3.screenDef>=0) {
-        if(dynamic_cast<CControlledTask*>(unit->GetTask())) { TRY_UNIT(ai,unit,unit->CmdStop();) }
+        if(dynamic_cast<CLeaseTask*>(unit->GetTask())) { TRY_UNIT(ai,unit,unit->CmdStop();) }
         s.t3.screenDef=-1; s.t3.screenUnit=-1;
     }
     if(s.t3.target<0) return;
@@ -137,7 +137,7 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
     auto* def=unit->GetCircuitDef();
     const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(def);
     const AIFloat3 pos=unit->GetPos(frame);
-    auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
+    auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask());
     const auto acceptIntercept=[&]() {
         // A reconsidered, now-safe T3 plan takes ownership from fallback.
         // Its own leash governs movement; retaining the old porc perimeter
@@ -194,7 +194,7 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
             projectile,width,cfg->combat.killReward,cfg->combat.friendlyMargin);
         if(line.target>=0) {
             if(!task) {
-                task=ai->GetBuilderManager()->EnqueueControlled(this,unit->GetTask());
+                task=ai->GetBuilderManager()->EnqueueLease(this,unit->GetTask());
                 ai->GetBuilderManager()->AssignTask(unit,task);
                 if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); return true; }
                 s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
@@ -497,9 +497,9 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
                     AIFloat3 spot=F(P(pos)+toward*cfg->t3.baitDistance+across*(float((s.t3.screens%2)*2-1)
                         *cfg->t3.baitSpacing*(1.f+.5f*float(s.t3.screens/2))));
                     spot.y=ai->GetMap()->GetElevationAt(spot.x,spot.z);
-                    auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
+                    auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask());
                     if(!task && spot.y>=0 && OnMap(spot)) {
-                        task=ai->GetBuilderManager()->EnqueueControlled(this,unit->GetTask());
+                        task=ai->GetBuilderManager()->EnqueueLease(this,unit->GetTask());
                         ai->GetBuilderManager()->AssignTask(unit,task);
                         if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); task=nullptr; }
                         else { s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation; }
@@ -556,7 +556,7 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
     if(!task) {
         auto* current=unit->GetTask();
         if(current->GetType()==IUnitTask::Type::RETREAT && !engaged) { EndT3(unit,s,frame,"retreat"); return false; }
-        task=ai->GetBuilderManager()->EnqueueControlled(this,current);
+        task=ai->GetBuilderManager()->EnqueueLease(this,current);
         ai->GetBuilderManager()->AssignTask(unit,task);
         if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); return true; }
         s.started=frame; s.conceal.requested=cloaked; s.failed=0; ++operation;

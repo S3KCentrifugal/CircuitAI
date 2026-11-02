@@ -2,7 +2,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "task/fighter/RangedWorld.h"
 #include "unit/CircuitUnit.h"
 #include "unit/ally/AllyUnit.h"
@@ -253,7 +253,7 @@ bool CCommanderController::RetreatStation(CCircuitUnit* unit,AIFloat3& goal) con
 
 bool CCommanderController::Fallback(CCircuitUnit* unit,State& s,IUnitTask* current,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_FALLBACK);
-    auto* task=dynamic_cast<CControlledTask*>(current);
+    auto* task=dynamic_cast<CLeaseTask*>(current);
     const AIFloat3 pos=unit->GetPos(frame);
     auto* def=unit->GetCircuitDef();
     if(role.fallback) {
@@ -318,7 +318,7 @@ bool CCommanderController::Fallback(CCircuitUnit* unit,State& s,IUnitTask* curre
     const auto seize=[&]() {
         // A safety withdrawal, like a defensive shot, may interrupt
         // no-disrupt construction; enemy reclaim was excluded by Tick.
-        task=ai->GetBuilderManager()->EnqueueControlled(this,current);
+        task=ai->GetBuilderManager()->EnqueueLease(this,current);
         ai->GetBuilderManager()->AssignTask(unit,task);
         if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); task=nullptr; return false; }
         s.started=frame; s.exit=s.fallback.goal; s.failed=0; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;

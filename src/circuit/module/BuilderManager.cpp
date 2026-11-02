@@ -45,7 +45,7 @@
 #include "task/builder/PatrolTask.h"
 #include "task/builder/GuardTask.h"
 #include "task/builder/CombatTask.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/ControllerRegistry.h"
 #include "control/unit/commander/CommanderController.h"
 #include "task/builder/BuildChain.h"
@@ -1230,8 +1230,8 @@ IUnitTask* CBuilderManager::EnqueueCommanderGroupFollow(CCircuitUnit* leader,flo
     auto* task=new CCommanderGroupFollowTask(this,leader->GetId(),radius);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
-CControlledTask* CBuilderManager::EnqueueControlled(IUnitController* controller,IUnitTask* previous) {
-    auto* task=new CControlledTask(this,controller,previous);
+CLeaseTask* CBuilderManager::EnqueueLease(IUnitController* controller,IUnitTask* previous) {
+    auto* task=new CLeaseTask(this,controller,previous);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
 bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float value) {

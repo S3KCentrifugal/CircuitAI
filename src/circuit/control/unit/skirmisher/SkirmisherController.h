@@ -6,7 +6,7 @@
 // peers) as a preset in behaviour.json "controllers", publishes that policy
 // to the unit type, attaches every unit of a bound type, and runs the shared
 // CRangedEngagement for a unit while it holds the controller's lease (a
-// CControlledTask from the military manager). Another job's levers (cloak on
+// CLeaseTask from the military manager). Another job's levers (cloak on
 // reload, fire line, press, staging, target mode) are refused at load.
 //
 // Behaviour is deliberately that of the artillery-task path it replaces: the
@@ -30,7 +30,7 @@
 namespace circuit {
 class CCircuitAI;
 class CCircuitUnit;
-class CControlledTask;
+class CLeaseTask;
 class CRangedEngagement;
 class IUnitTask;
 

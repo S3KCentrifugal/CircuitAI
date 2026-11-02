@@ -10,7 +10,7 @@
 // matchup lookups for M definition pairs (no per-query allocation on hits).
 // AccountCloak runs on the three-frame tick: two engine reads.
 #include "control/unit/commander/CommanderController.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/service/CombatSnapshot.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
@@ -224,7 +224,7 @@ bool CCommanderController::SupportCloak(CCircuitUnit* /*unit*/,const State& s) c
 void CCommanderController::SyncSupportCloak(CCircuitUnit* unit,State& s,int frame,bool verify) {
     const IUnitTask* current=unit->GetTask();
     // An engagement owns the cloak through Conceal; a retreat through RetreatConceal.
-    if(current==nullptr || dynamic_cast<const CControlledTask*>(current)!=nullptr
+    if(current==nullptr || dynamic_cast<const CLeaseTask*>(current)!=nullptr
         || current->GetType()==IUnitTask::Type::RETREAT) return;
     const bool want=SupportCloak(unit,s);
     if(verify) {

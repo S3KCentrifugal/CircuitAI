@@ -53,7 +53,7 @@ public:
 	virtual void Update() = 0;
 	virtual void Damaged(CCircuitUnit* /*unit*/) {}
 	virtual void MoveFailed(int /*unitId*/) {}
-	// D-430: the controlled task's unit went idle (an order completed or was
+	// D-430: the lease task's unit went idle (an order completed or was
 	// dropped). The commander ignores it; the ranged controller re-decides.
 	virtual void Idle(int /*unitId*/) {}
 	virtual void WeaponFired(int /*unitId*/, int /*weaponDefId*/) {}
@@ -66,7 +66,7 @@ public:
 	virtual bool AssignPreset(int defId, const std::string& preset) = 0;
 	virtual std::string PresetName(int preset) const = 0;
 
-	// Lease hooks for CControlledTask: the task starts (D-430: the ranged
+	// Lease hooks for CLeaseTask: the task starts (D-430: the ranged
 	// controller opens its engagement here, as the artillery task used to on
 	// assignment), the task ends, the controller restores.
 	virtual void Leased(CCircuitUnit* /*unit*/, IUnitTask* /*task*/) {}

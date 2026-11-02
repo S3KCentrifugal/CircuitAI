@@ -61,68 +61,68 @@ public:
 	}
 
 	/*
-	 * Add task at specified frame, or execute immediately at next frame
+	 * Add job at specified frame, or execute immediately at next frame
 	 */
-	void RunJobAt(const std::shared_ptr<IMainJob>& task, int frame = 0) {
-		onceTasks.push_back({task, frame});
+	void RunJobAt(const std::shared_ptr<IMainJob>& job, int frame = 0) {
+		onceJobs.push_back({job, frame});
 	}
 
 	/*
-	 * Add task at frame relative to current frame
+	 * Add job at frame relative to current frame
 	 */
-	void RunJobAfter(const std::shared_ptr<IMainJob>& task, int frame = 0) {
-		onceTasks.push_back({task, lastFrame + frame});
+	void RunJobAfter(const std::shared_ptr<IMainJob>& job, int frame = 0) {
+		onceJobs.push_back({job, lastFrame + frame});
 	}
 
 	/*
-	 * Add task at specified interval
+	 * Add job at specified interval
 	 */
-	void RunJobEvery(const std::shared_ptr<IMainJob>& task, int frameInterval = FRAMES_PER_SEC, int frameOffset = 0) {
-		repeatTasks.push_back({task, frameInterval, lastFrame - frameInterval + frameOffset});
+	void RunJobEvery(const std::shared_ptr<IMainJob>& job, int frameInterval = FRAMES_PER_SEC, int frameOffset = 0) {
+		repeatJobs.push_back({job, frameInterval, lastFrame - frameInterval + frameOffset});
 	}
 
 	/*
-	 * Process queued tasks at specified frame
+	 * Process queued jobs at specified frame
 	 */
 	void ProcessJobs(int frame);
 
 	/*
-	 * Run concurrent task, finalize on success at main thread. `name` is a
+	 * Run concurrent job, finalize on success at main thread. `name` is a
 	 * string literal for telemetry; a non-zero `key` keeps at most one queued
 	 * job with that key for this AI (the second is dropped, returns false).
 	 */
-	bool RunParallelJob(const std::shared_ptr<IThreadJob>& task, const char* name = "job", std::uint64_t key = 0);
+	bool RunParallelJob(const std::shared_ptr<IThreadJob>& job, const char* name = "job", std::uint64_t key = 0);
 	// Infrequent strategic analysis yields queue priority to unit pathfinding.
 	// This does not preempt a running job; callers must bound/coalesce requests.
-	bool RunBackgroundJob(const std::shared_ptr<IThreadJob>& task, const char* name = "background", std::uint64_t key = 0);
+	bool RunBackgroundJob(const std::shared_ptr<IThreadJob>& job, const char* name = "background", std::uint64_t key = 0);
 	/*
 	 * Same as RunParallelJob but served before every normal job, newest first
 	 */
-	bool RunPriorityJob(const std::shared_ptr<IThreadJob>& task, const char* name = "priority", std::uint64_t key = 0);
+	bool RunPriorityJob(const std::shared_ptr<IThreadJob>& job, const char* name = "priority", std::uint64_t key = 0);
 
 	/*
-	 * Remove scheduled task from queue
+	 * Remove scheduled job from queue
 	 */
-	void RemoveJob(const std::shared_ptr<IMainJob>& task);
+	void RemoveJob(const std::shared_ptr<IMainJob>& job);
 
 	/*
-	 * Run task on init. Not affected by RemoveJob
+	 * Run job on init. Not affected by RemoveJob
 	 */
-	void RunOnInit(std::shared_ptr<IMainJob>&& task) {
-		initTasks.push_back(task);
+	void RunOnInit(std::shared_ptr<IMainJob>&& job) {
+		initJobs.push_back(job);
 	}
 
 	/*
-	 * Run task on release
+	 * Run job on release
 	 */
-	void RunOnRelease(const std::shared_ptr<IMainJob>& task) {
-		releaseTasks.push_back(task);
+	void RunOnRelease(const std::shared_ptr<IMainJob>& job) {
+		releaseJobs.push_back(job);
 	}
 
 	/*
-	 * Remove task from on-release queue
+	 * Remove job from on-release queue
 	 */
-	void RemoveReleaseJob(const std::shared_ptr<IMainJob>& task);
+	void RemoveReleaseJob(const std::shared_ptr<IMainJob>& job);
 
 	static int GetMaxWorkThreads();
 
@@ -145,34 +145,34 @@ private:
 	std::atomic<bool> isRunning;  // parallel
 
 	struct BaseContainer {
-		BaseContainer(const std::shared_ptr<IMainJob>& task) : task(task) {}
-		std::shared_ptr<IMainJob> task;
+		BaseContainer(const std::shared_ptr<IMainJob>& job) : job(job) {}
+		std::shared_ptr<IMainJob> job;
 		bool operator==(const BaseContainer& other) const {
-			return task == other.task;
+			return job == other.job;
 		}
 	};
-	struct OnceTask: public BaseContainer {
-		OnceTask(const std::shared_ptr<IMainJob>& task, int frame)
-			: BaseContainer(task), frame(frame) {}
+	struct OnceJob: public BaseContainer {
+		OnceJob(const std::shared_ptr<IMainJob>& job, int frame)
+			: BaseContainer(job), frame(frame) {}
 		int frame;
 	};
-	std::list<OnceTask> onceTasks;
+	std::list<OnceJob> onceJobs;
 
-	struct RepeatTask: public BaseContainer {
-		RepeatTask(const std::shared_ptr<IMainJob>& task, int frameInterval, int lastFrame)
-			: BaseContainer(task), frameInterval(frameInterval), lastFrame(lastFrame) {}
+	struct RepeatJob: public BaseContainer {
+		RepeatJob(const std::shared_ptr<IMainJob>& job, int frameInterval, int lastFrame)
+			: BaseContainer(job), frameInterval(frameInterval), lastFrame(lastFrame) {}
 		int frameInterval;
 		int lastFrame;
 	};
-	std::list<RepeatTask> repeatTasks;
+	std::list<RepeatJob> repeatJobs;
 
-	std::vector<std::shared_ptr<IMainJob>> removeTasks;
+	std::vector<std::shared_ptr<IMainJob>> removeJobs;
 
-	struct FinishTask: public BaseContainer {
-		FinishTask(const std::shared_ptr<IMainJob>& task)
-			: BaseContainer(task) {}
+	struct FinishJob: public BaseContainer {
+		FinishJob(const std::shared_ptr<IMainJob>& job)
+			: BaseContainer(job) {}
 	};
-	CMultiQueue<FinishTask> finishTasks;  // WorkTask.onComplete
+	CMultiQueue<FinishJob> finishJobs;  // CWorkJob.onComplete
 	int finishBudget = 0;
 	std::size_t finishBurstMax = 0, finishCarried = 0;
 
@@ -182,8 +182,8 @@ private:
 	std::map<const char*, WorkerStat> workerStats;
 	std::uint64_t coalesced = 0;
 
-	std::vector<std::shared_ptr<IMainJob>> initTasks;
-	std::vector<std::shared_ptr<IMainJob>> releaseTasks;
+	std::vector<std::shared_ptr<IMainJob>> initJobs;
+	std::vector<std::shared_ptr<IMainJob>> releaseJobs;
 };
 
 } // namespace circuit

@@ -34,8 +34,9 @@
 #include "task/fighter/AttackTask.h"
 #include "task/fighter/BombTask.h"
 #include "task/fighter/ArtilleryTask.h"
+#include "task/fighter/EngagementTask.h"
 #include "task/fighter/RangedWorld.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/unit/skirmisher/SkirmisherController.h"
 #include "control/unit/backline/BacklineController.h"
 #include "task/fighter/AntiAirTask.h"
@@ -908,6 +909,9 @@ IFighterTask* CMilitaryManager::Enqueue(const TaskF::SFightTask& ti)
 		} break;
 		case IFighterTask::FightType::ARTY: {
 			task = new CArtilleryTask(this);
+		} break;
+		case IFighterTask::FightType::ENGAGE: {
+			task = new CEngagementTask(this);
 		} break;
 		case IFighterTask::FightType::AA: {
 			const float mod = (float)rand() / RAND_MAX * attackMod.len + attackMod.min;
@@ -2350,7 +2354,7 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 	if (!def->HasEngagementPolicy() || !def->IsMobile() || !def->IsLander()
 			|| def->IsAbleToFly() || def->IsRoleTrans()) return nullptr;
 	// D-430, D-432: a type bound to a skirmisher or backline preset holds
-	// that controller's lease instead of an artillery task; the engagement is
+	// that controller's lease instead of an engagement task; the engagement is
 	// the same.
 	if (CSkirmisherController* controller = circuit->GetSkirmisherController()) {
 		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
@@ -2358,7 +2362,7 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 	if (CBacklineController* controller = circuit->GetBacklineController()) {
 		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
 	}
-	return Enqueue(TaskF::Common(IFighterTask::FightType::ARTY));
+	return Enqueue(TaskF::Common(IFighterTask::FightType::ENGAGE));
 }
 
 IUnitTask* CMilitaryManager::MakeTask(CCircuitUnit* unit)
@@ -2392,9 +2396,9 @@ void CMilitaryManager::UpdateExternalControl()
     }
 }
 
-CControlledTask* CMilitaryManager::EnqueueControlled(IUnitController* controller, IUnitTask* previous)
+CLeaseTask* CMilitaryManager::EnqueueLease(IUnitController* controller, IUnitTask* previous)
 {
-	auto* task = new CControlledTask(this, controller, previous);
+	auto* task = new CLeaseTask(this, controller, previous);
 	updateTasks.push_back(task);
 	TaskAdded(task);
 	return task;

@@ -1,5 +1,5 @@
 #include "control/unit/skirmisher/SkirmisherController.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/Ownership.h"
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
@@ -135,7 +135,7 @@ IUnitTask* CSkirmisherController::MakeLease(CCircuitUnit* unit)
 {
 	if (unit == nullptr || !Bound(unit->GetCircuitDef()->GetId())) return nullptr;
 	Attach(unit);  // a gifted or loaded unit may not have come through UnitAdded
-	return ai->GetMilitaryManager()->EnqueueControlled(this, nullptr);
+	return ai->GetMilitaryManager()->EnqueueLease(this, nullptr);
 }
 void CSkirmisherController::Leased(CCircuitUnit* unit, IUnitTask* task)
 {

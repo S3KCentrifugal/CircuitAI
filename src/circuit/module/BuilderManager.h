@@ -31,7 +31,7 @@ class CQueryCostMap;
 class CBRepairTask;
 class CBReclaimTask;
 class CCombatTask;
-class CControlledTask;
+class CLeaseTask;
 class IUnitController;
 
 struct SBuildChain;
@@ -308,7 +308,7 @@ public:
 	unsigned int GetWorkerCount() const { return workers.size(); }
     IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
     // D-388: the task a unit controller holds its unit with (formerly EnqueueCommander).
-    CControlledTask* EnqueueControlled(IUnitController* controller,IUnitTask* previous);
+    CLeaseTask* EnqueueLease(IUnitController* controller,IUnitTask* previous);
     bool SetCommanderCombatOption(const std::string& name,float value);
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);

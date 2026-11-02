@@ -3,7 +3,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
 #include "unit/ally/AllyUnit.h"
@@ -140,7 +140,7 @@ bool CCommanderController::JamControl(CCircuitUnit* unit,State& s,int frame) {
     // evaluated again at the ordinary combat cadence and final shot admission.
     if(jamZones.empty()) return false;
     const auto pos=unit->GetPos(frame);
-    auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
+    auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask());
     const bool wasWithdrawing=s.fallback.active || s.mode==Mode::ESCAPE || s.mode==Mode::RECOVER
         || unit->GetTask()->GetType()==IUnitTask::Type::RETREAT;
     s.fallback.active=false;s.fallback.until=-1;s.conceal.unseenUntil=0;s.fallback.moveUntil=-1;
@@ -210,7 +210,7 @@ bool CCommanderController::JamControl(CCircuitUnit* unit,State& s,int frame) {
     if(best.target>=0 && pos.y>=0) {
         if(!task) {
             auto* previous=unit->GetTask();
-            task=ai->GetBuilderManager()->EnqueueControlled(this,
+            task=ai->GetBuilderManager()->EnqueueLease(this,
                 previous->GetType()==IUnitTask::Type::RETREAT?nullptr:previous);
             ai->GetBuilderManager()->AssignTask(unit,task);
             if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task);return true; }

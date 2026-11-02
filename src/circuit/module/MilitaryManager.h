@@ -26,7 +26,7 @@ class IMainJob;
 class CBDefenceTask;
 class CFGuardTask;
 class CRangedWorld;
-class CControlledTask;
+class CLeaseTask;
 class IUnitController;
 
 namespace TaskF {
@@ -123,7 +123,7 @@ public:
 	// D-430: the lease a unit controller (the ranged controller) holds its
 	// unit through while it acts on it directly; the builder manager has
 	// the same for commanders. Never resumes implicitly on removal.
-	CControlledTask* EnqueueControlled(IUnitController* controller, IUnitTask* previous);
+	CLeaseTask* EnqueueLease(IUnitController* controller, IUnitTask* previous);
 
 	/*
 	 * Pulse-weapon target policy (Juno). A pulse weapon does no damage: its

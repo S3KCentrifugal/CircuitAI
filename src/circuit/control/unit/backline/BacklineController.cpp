@@ -1,5 +1,5 @@
 #include "control/unit/backline/BacklineController.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/Ownership.h"
 #include "control/group/LineController.h"
 #include "map/ThreatMap.h"
@@ -181,7 +181,7 @@ IUnitTask* CBacklineController::MakeLease(CCircuitUnit* unit)
 {
 	if (unit == nullptr || !Bound(unit->GetCircuitDef()->GetId())) return nullptr;
 	Attach(unit);
-	return ai->GetMilitaryManager()->EnqueueControlled(this, nullptr);
+	return ai->GetMilitaryManager()->EnqueueLease(this, nullptr);
 }
 void CBacklineController::Leased(CCircuitUnit* unit, IUnitTask* task)
 {
