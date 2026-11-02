@@ -1344,8 +1344,45 @@ namespace Layout {
                 if (id >= 0) return id;
             }
         }
+        // Round 2 (played: Carrot Mountains, "no layout site for armaap" 1,625
+        // times from min 24 once the box was full: no T2 air plant, no
+        // dedicated AFUS constructor, 10 AFUS from min 38 to 60): the
+        // overflow blocks' and grid boxes' ground, then for an air plant
+        // (no exit lane) the nearest free site on the overflow rings.
+        for (uint index = 0; index < overflowSupportGroups.length(); ++index) {
+            const int group = overflowSupportGroups[index];
+            const int id = aiTerrainMgr.PackNearGroup(aiTerrainMgr.GetGroupZone(group), def, group, LabFacing(), TurretSeed(), 0.0f, 0.0f, 0);
+            if (id >= 0) { LogFactorySite(def, id, "an overflow block's ground"); return id; }
+        }
+        for (uint index = 0; index < gridZones.length(); ++index) {
+            const int id = aiTerrainMgr.PackNearGroup(gridZones[index], def, nanoGroup, LabFacing(), TurretSeed(), 0.0f, 0.0f, 0);
+            if (id >= 0) { LogFactorySite(def, id, "a grid box"); return id; }
+        }
+        const string name = def.GetName();
+        const bool airPlant = name.length() > 2 && name.substr(name.length() - 2) == "ap";
+        if (airPlant) {
+            const AIFloat3 home = BaseCentre();
+            const int direction = LabFacing();
+            for (int ring = 1; ring <= Global::RoleSettings::Tech::LayoutOverflowRings; ++ring) {
+                for (int step = 0; step < 8 * ring; ++step) {
+                    const float angle = 6.2831853f * float(step) / float(8 * ring);
+                    const float radius = float(ring) * Global::RoleSettings::Tech::LayoutOverflowStepElmos;
+                    const AIFloat3 position = home + AIFloat3(cos(angle) * radius, 0.0f, sin(angle) * radius);
+                    if (position.x < 0 || position.z < 0 || position.x >= AiTerrainWidth() || position.z >= AiTerrainHeight()) continue;
+                    if (!aiTerrainMgr.CanReserveBuilding(def, position, direction)) continue;
+                    const int id = aiTerrainMgr.ReserveBuilding(def, position, direction, 0);
+                    if (id >= 0) { LogFactorySite(def, id, "the nearest free ground (box full)"); return id; }
+                }
+            }
+        }
         GenericHelpers::LogUtil("[Layout] no layout site for " + def.GetName() + " although a turret stands", 1);
         return -1;
+    }
+
+    void LogFactorySite(CCircuitDef@ def, int id, const string &in where)
+    {
+        const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
+        GenericHelpers::LogUtil("[Layout] " + def.GetName() + " on " + where + " at (" + int(p.x) + ", " + int(p.z) + ")", 1);
     }
 
     // D-121: where cramped-ground structures gather: the advanced lab, else the
