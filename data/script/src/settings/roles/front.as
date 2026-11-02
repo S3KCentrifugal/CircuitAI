@@ -395,7 +395,7 @@ namespace Front {
             float LabPorcShake = 128.0f;               // native looks this far round a slot for room
             float LabPorcRadius = 600.0f;              // our guns of those kinds this near a far lab count for it
             float LabPorcPopupMetalIncome = 15.0f;     // sustained (10 s minimum) metal income for a pop-up order
-            float LabPorcHeavyMetalIncome = 30.0f;     // ... and for the heavy
+            float LabPorcHeavyMetalIncome = 15.0f;     // ... and for the heavy (T2 pop-up artillery: the pop-up's gate, owner 2026-11-02; was 30)
             float LabPorcFlakMetalIncome = 30.0f;      // ... and for the T2 flak
             float LabPorcReach = 3000.0f;              // idle, guarding or assisting T2 constructors this near the lab are asked
             float LabPorcTakeRadius = 1200.0f;         // ... and ones walking to an unframed build this near
