@@ -3,10 +3,13 @@
  *
  * Strike aircraft that fly with another cohort instead of on a route of their
  * own (the Armada Liches with a T2 bomber raid; AirLiches:: in
- * data/script/src/systems/air/air_liches.as). Every member guards one living
+ * data/script/src/systems/air/air_liches.as). Every member follows one living
  * escort target (the vip), picked from the unit ids script supplies; when the
- * vip dies the members guard the nearest living one. A member stays on its
- * guard until an allowed target is in sight within the strike radius of it,
+ * vip dies the members follow the nearest living one. Following is a MOVE to
+ * where the vip really is, given again whenever it has flown on more than
+ * ESCORT_FOLLOW_SLACK (owner 2026-11-02: the engine's air GUARD trailed the
+ * bombers and the Liches fell far behind). A member stays with the vip
+ * until an allowed target is in sight within the strike radius of it,
  * then breaks off with one ATTACK on that unit; when the target drops out of
  * sight it bombs the spot where it was last seen (ATTACK ground), and it
  * rejoins the escort when the target is gone or the order expires.
@@ -26,7 +29,8 @@
  * states so the engine's air GUARD engages whatever attacks the vip, and are not
  * re-guarded when it does.
  *
- * Orders: one GUARD per member per escort change, one ATTACK per strike and
+ * Orders: at most one MOVE per member per half second while the vip flies on
+ * (one GUARD per escort change in fighter mode), one ATTACK per strike and
  * one more each time its target leaves or re-enters sight.
  * Nothing is re-issued while a member's order stands (lag fix, 2026-10-23).
  * Every unit and enemy is held by id and resolved at the point of use.
@@ -99,7 +103,8 @@ private:
 	CCircuitUnit* ResolveVip(int frame);
 	void CollectCandidates();
 	bool TryStrike(CCircuitUnit* unit, int frame);
-	void GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame);
+	void GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame);  // fighter mode: GUARD; else FollowVip
+	void FollowVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame);
 	void CheckGuards(CCircuitUnit* vip, int frame);
 	bool IsTargetGone(int targetId) const;
 	bool IsSiegeTargetGone(SStrike& strike, int frame) const;
@@ -118,7 +123,8 @@ private:
 	std::set<int> sentHome;                // siege: members whose standing order is the MOVE home
 	bool fighterEscort;                    // guard only, fire at will, engine guard responses kept
 	std::map<int, SStrike> strikes;        // member id -> its attack
-	std::map<int, int> guarding;           // member id -> vip id its standing GUARD names
+	std::map<int, int> guarding;           // member id -> vip id its standing GUARD / follow MOVE names
+	std::map<int, springai::AIFloat3> followSpot;  // member id -> where its standing follow MOVE goes
 	std::map<int, int> lastOrder;          // member id -> frame of its last order
 	std::set<int> fired;                   // members that released a weapon on a strike
 	std::vector<SCandidate> candidates;    // this update's targets, one enemy scan

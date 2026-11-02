@@ -63,6 +63,35 @@ int main()
 		if (NeedsGuardOrder(guarding, 42, last, frame, 15)) { ++orders; guarding = 42; last = frame; }
 	}
 	assert(orders == 1);
+	// Liches follow with MOVEs to the vip's real position (owner 2026-11-02).
+	assert(NeedsFollowOrder(-1, 42, 0.f, 32.f, -1000, 0, 15));          // first follow
+	assert(!NeedsFollowOrder(42, 42, 10.f * 10.f, 32.f, 0, 30, 15));    // vip barely moved
+	assert(NeedsFollowOrder(42, 42, 40.f * 40.f, 32.f, 0, 15, 15));     // vip flew on: move again
+	assert(!NeedsFollowOrder(42, 42, 400.f * 400.f, 32.f, 0, 14, 15));  // same half second
+	assert(NeedsFollowOrder(42, 43, 0.f, 32.f, 0, 15, 15));             // vip died: swap
+	assert(!NeedsFollowOrder(-1, -1, 0.f, 32.f, -1000, 0, 15));         // no vip left
+	// A bomber at 258 elmos/s, updates every 15 frames: one MOVE per update, no more.
+	orders = 0; last = -1000;
+	{
+		int following = -1; float spot = 0.f;
+		for (int frame = 0; frame < 30 * 10; frame += 15) {
+			const float vipX = 258.f * frame / 30.f;
+			const float moved = vipX - spot;
+			if (NeedsFollowOrder(following, 42, moved * moved, 32.f, last, frame, 15)) {
+				++orders; following = 42; spot = vipX; last = frame;
+			}
+		}
+	}
+	assert(orders == 20);
+	// A parked vip: one MOVE only.
+	orders = 0; last = -1000;
+	{
+		int following = -1;
+		for (int frame = 0; frame < 30 * 10; frame += 15) {
+			if (NeedsFollowOrder(following, 42, 0.f, 32.f, last, frame, 15)) { ++orders; following = 42; last = frame; }
+		}
+	}
+	assert(orders == 1);
 	assert(OrderAllowed(0, 15, 15));
 	assert(!OrderAllowed(0, 14, 15));
 

@@ -34,6 +34,9 @@ using namespace springai;
 #define ESCORT_ORDER_GAP	(FRAMES_PER_SEC / 2)
 // Siege: a target's spot seen empty this long means the target no longer exists.
 #define SIEGE_HIDDEN_FRAMES	(FRAMES_PER_SEC * 3)
+// Follow: the vip flown this far from the standing MOVE's spot gets a new MOVE
+// (at most every ESCORT_ORDER_GAP: ~130 elmos at a Phoenix's 258 elmos/s).
+#define ESCORT_FOLLOW_SLACK	32.f
 
 CEscortStrikeTask::CEscortStrikeTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::GUARD, 1.f)
@@ -69,7 +72,7 @@ void CEscortStrikeTask::AssignTo(CCircuitUnit* unit)
 void CEscortStrikeTask::RemoveAssignee(CCircuitUnit* unit)
 {
 	const int id = unit->GetId();
-	strikes.erase(id); guarding.erase(id); lastOrder.erase(id); fired.erase(id); sentHome.erase(id);
+	strikes.erase(id); guarding.erase(id); followSpot.erase(id); lastOrder.erase(id); fired.erase(id); sentHome.erase(id);
 	IFighterTask::RemoveAssignee(unit);
 	if (!unit->IsDead()) {
 		// Back to the def's own states for whatever task takes it next.
@@ -85,7 +88,7 @@ void CEscortStrikeTask::RemoveAssignee(CCircuitUnit* unit)
 bool CEscortStrikeTask::ForgetUnit(CCircuitUnit* unit)
 {
 	const int id = unit->GetId();
-	strikes.erase(id); guarding.erase(id); lastOrder.erase(id); fired.erase(id); sentHome.erase(id);
+	strikes.erase(id); guarding.erase(id); followSpot.erase(id); lastOrder.erase(id); fired.erase(id); sentHome.erase(id);
 	return IFighterTask::ForgetUnit(unit);
 }
 
@@ -179,6 +182,10 @@ CCircuitUnit* CEscortStrikeTask::ResolveVip(int frame)
 
 void CEscortStrikeTask::GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame)
 {
+	if (!fighterEscort) {
+		FollowVip(unit, vip, frame);
+		return;
+	}
 	const int id = unit->GetId();
 	auto last = lastOrder.find(id);
 	const int lastFrame = (last != lastOrder.end()) ? last->second : INT_MIN / 2;
@@ -191,6 +198,39 @@ void CEscortStrikeTask::GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int fram
 		unit->GetUnit()->Guard(vip->GetUnit());
 	)
 	guarding[id] = vip->GetId();
+	lastOrder[id] = frame;
+}
+
+/*
+ * Liches: a MOVE to the vip's current position, not a GUARD. The engine's air
+ * GUARD flies to a spot trailing the guarded unit, so a Liche never closed on
+ * the bombers and fell far behind them (owner 2026-11-02). A new MOVE when the
+ * vip changed or has flown on more than ESCORT_FOLLOW_SLACK, at most one per
+ * member per ESCORT_ORDER_GAP; O(1) per member per update.
+ */
+void CEscortStrikeTask::FollowVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame)
+{
+	if (unit->IsDead() || vip->IsDead()) return;
+	const int id = unit->GetId();
+	auto last = lastOrder.find(id);
+	const int lastFrame = (last != lastOrder.end()) ? last->second : INT_MIN / 2;
+	auto follow = guarding.find(id);
+	const int current = (follow != guarding.end()) ? follow->second : -1;
+	const AIFloat3& vipPos = vip->GetPos(frame);
+	auto spot = followSpot.find(id);
+	const float movedSq = (spot != followSpot.end()) ? spot->second.SqDistance2D(vipPos) : 0.f;
+	if (!escort_strike::NeedsFollowOrder(current, vip->GetId(), movedSq, ESCORT_FOLLOW_SLACK, lastFrame, frame,
+			ESCORT_ORDER_GAP)) return;
+	CCircuitAI* circuit = manager->GetCircuit();
+	TRY_UNIT(circuit, unit,
+		unit->CmdMoveTo(vipPos);
+	)
+	if (current != vip->GetId()) {
+		circuit->LOG("ESCORT: team=%i follow unit=%i vip=%i at=%.0f,%.0f", circuit->GetTeamId(), id, vip->GetId(),
+				vipPos.x, vipPos.z);
+	}
+	guarding[id] = vip->GetId();
+	followSpot[id] = vipPos;
 	lastOrder[id] = frame;
 }
 
@@ -466,9 +506,10 @@ void CEscortStrikeTask::OnUnitIdle(CCircuitUnit* unit)
 	}
 	if (strike != strikes.end()) {
 		EndStrike(id, "idle");
-	} else {
+	} else if (fighterEscort) {
 		guarding[id] = -1;
 	}
+	// Follow: a MOVE that reached its spot is not re-issued until the vip flies on.
 	const int frame = manager->GetCircuit()->GetLastFrame();
 	CCircuitUnit* vip = ResolveVip(frame);
 	if (vip != nullptr) {

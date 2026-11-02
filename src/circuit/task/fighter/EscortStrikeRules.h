@@ -75,6 +75,17 @@ inline bool NeedsGuardOrder(int guardingId, int vipId, int lastOrderFrame, int f
 	return vipId >= 0 && guardingId != vipId && frame - lastOrderFrame >= minGap;
 }
 
+// Liches (owner 2026-11-02): no GUARD; a MOVE to where the vip really is, given
+// again when the vip changed, or when it has flown more than slack elmos from
+// the spot of the standing MOVE; never twice inside minGap frames. The engine's
+// air GUARD trailed the bombers and the Liches fell far behind.
+inline bool NeedsFollowOrder(int followingId, int vipId, float movedSq, float slack, int lastOrderFrame, int frame,
+		int minGap)
+{
+	if (vipId < 0 || frame - lastOrderFrame < minGap) return false;
+	return followingId != vipId || movedSq > slack * slack;
+}
+
 // No new order of any kind inside minGap frames of the last one.
 inline bool OrderAllowed(int lastOrderFrame, int frame, int minGap)
 {
