@@ -9,6 +9,7 @@
 #include "unit/CircuitUnit.h"
 #include "unit/enemy/EnemyManager.h"
 #include "util/Defines.h"
+#include "util/Utils.h"
 #include "CircuitAI.h"
 
 #include "Log.h"
