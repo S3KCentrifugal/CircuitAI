@@ -56,6 +56,9 @@ bool CBReclaimTask::CanAssignTo(CCircuitUnit* unit) const
 	if (!IReclaimTask::CanAssignTo(unit)) {
 		return false;
 	}
+	if ((enemyWallId >= 0) && !unit->GetCircuitDef()->IsAbleToResurrect()) {
+		return false;  // enemy walls are a rez bot job
+	}
 	CCircuitAI* circuit = manager->GetCircuit();
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	const AIFloat3& pos = GetPosition();

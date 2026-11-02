@@ -2100,7 +2100,7 @@ IBuilderTask* CBuilderManager::FindEnemyWallReclaim(CCircuitUnit* unit)
                                                     FRAMES_PER_SEC * 120, 8.f, false));
         if (task == nullptr) return nullptr;
         static_cast<CBReclaimTask*>(task)->SetEnemyWall(enemy->GetId());
-        circuit->LOG("REZ: %s(%i) reclaims enemy wall %s(%i) at (%.0f, %.0f)",
+        circuit->LOG("REZ: %s(%i) offers enemy wall %s(%i) at (%.0f, %.0f)",
                 unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
                 enemy->GetCircuitDef()->GetDef()->GetName(), enemy->GetId(), at.x, at.z);
         return task;
@@ -2431,13 +2431,12 @@ IBuilderTask* CBuilderManager::MakeBuilderTask(CCircuitUnit* unit, const CQueryC
 	if (task != nullptr) {
 		return const_cast<IBuilderTask*>(task);
 	}
-	// Owner rule: rez bots clear enemy dragon's teeth whose spot is safe on the
-	// threat map before looking at wrecks.
+	// Owner rule: enemy dragon's teeth are one more rez bot job of equal rank
+	// with wrecks (resurrect or reclaim). The nearest safe wall is offered as a
+	// HIGH task - the same priority as wreck tasks - and the pick below chooses
+	// among all of them by threat-aware path cost.
 	if (unit->GetCircuitDef()->IsAbleToResurrect()) {
-		IBuilderTask* wall = FindEnemyWallReclaim(unit);
-		if (wall != nullptr) {
-			return wall;
-		}
+		FindEnemyWallReclaim(unit);
 	}
 
 	// FIXME: MakeEconomyTasks doesn't check CanAssignTo() and may create task irrelevant for unit
