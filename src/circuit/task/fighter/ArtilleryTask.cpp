@@ -240,15 +240,15 @@ void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 	IFighterTask::OnUnitDamaged(unit, attacker);
 }
 
-bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int frame)
+bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame,
+		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport)
 {
-	// Owner 2026-11-02: listed rocket artillery (Arbiter, Negotiator,
+	// Owner 2026-11-02: listed rocket artillery (Arbiter, Negotiator, Thanatos,
 	// Ambassador, Boreas) with nothing seen to shoot fires on a ghost image of
 	// enemy porc already in weapon range, once it has not fired for
 	// ghost_idle_seconds. One ATTACK_GROUND volley; never a move toward it.
 	// Owner 2026-11-02: porc here includes building radars, building jammers
 	// and shields, besides armed structures.
-	CCircuitAI* circuit = manager->GetCircuit();
 	const CMilitaryManager::SArtyCommInfo& info = circuit->GetMilitaryManager()->GetArtyCommInfo();
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	if (!info.isEnabled || info.ghostDefs.count(cdef->GetId()) == 0) {
@@ -259,7 +259,6 @@ bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int fr
 		return false;
 	}
 	// A rising reload frame is a shot. O(1) engine read per Execute.
-	GhostFire& track = ghostFire[unit->GetId()];
 	const int reload = weapon->GetReloadFrame();
 	if (track.reload < 0) {
 		track.shot = (reload > frame) ? frame : -info.ghostIdleFrames;
@@ -327,6 +326,11 @@ bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int fr
 			cdef->GetDef()->GetName(), unit->GetId(), best->GetCircuitDef()->GetDef()->GetName(),
 			best->GetPos().x, best->GetPos().z, float(frame - track.shot) / FRAMES_PER_SEC);
 	return true;
+}
+
+bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int frame)
+{
+	return GhostFireStep(manager->GetCircuit(), unit, pos, frame, ghostFire[unit->GetId()], ghostSupport);
 }
 
 CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)

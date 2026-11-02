@@ -91,6 +91,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// when the factory is gone. Fighter tasks have no timeout, so an empty
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
+	ghostFire.erase(unit->GetId());
 	lanes.erase(unit);
     rows.erase(unit);
     const auto slot = formationSlots.find(unit);
@@ -208,6 +209,12 @@ void CRouteTask::Update()
 						def->GetDef()->GetName(), unit->GetId(), std::sqrt(nearestSq), def->GetMaxRange());
 			}
 			if (unit->KeepWeaponRange(nearest, circuit->GetLastFrame() + FRAMES_PER_SEC * 10)) continue;
+		} else if (GhostFireStep(circuit, unit, unit->GetPos(circuit->GetLastFrame()), circuit->GetLastFrame(),
+				ghostFire[unit->GetId()], ghostSupport)) {
+			// Owner 2026-11-02: a ghost volley pauses the route like range micro;
+			// the route resumes on the next update once it has fired.
+			engaging.insert(unit);
+			continue;
 		}
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());

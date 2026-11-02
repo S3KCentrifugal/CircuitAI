@@ -13,7 +13,16 @@
 #include <unordered_map>
 
 namespace circuit {
+class CCircuitAI;
 class CRangedEngagement;
+
+// Owner 2026-11-02: ghost porc fire (SArtyCommInfo::ghostDefs), shared by
+// the native artillery task and specialist routes (FRONT squads). Last shot is
+// read off the main weapon's reload frame, sampled on every call. True while
+// a ghost volley order is issued or in flight (the caller leaves the unit be).
+struct SGhostFire { int reload = -1, shot = -1, orderUntil = -1; };
+bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFloat3& pos, int frame,
+		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport);
 
 class CArtilleryTask final: public IFighterTask {
 public:
@@ -41,10 +50,7 @@ private:
 	void FallbackSafePos(CCircuitUnit* unit);
 	void ApplySafePos(const CQueryPathMulti* query);
 	void Fallback(CCircuitUnit* unit, bool proceed);
-	// Owner 2026-11-02: ghost porc fire (SArtyCommInfo::ghostDefs). Last shot
-	// is read off the main weapon's reload frame, sampled every Execute.
-	struct GhostFire { int reload = -1, shot = -1, orderUntil = -1; };
-	std::unordered_map<int, GhostFire> ghostFire;
+	std::unordered_map<int, SGhostFire> ghostFire;  // see GhostFireStep
 	// Unit def id -> radar/jammer/shield structure (owner: counts as porc).
 	std::unordered_map<int, bool> ghostSupport;
 	bool FireAtGhost(CCircuitUnit* unit, const springai::AIFloat3& pos, int frame);
