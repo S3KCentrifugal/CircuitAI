@@ -14,6 +14,9 @@ namespace Main {
 		float Tech_T3_RUSH = 0.35f;   // 35% chance
 		float Tech_NUKE_RUSH = 0.25f; // 25% chance
 		float Tech_T2_RUSH = 0.25f; // Independent finite heavy rush; TECH keeps the heavies (D-449)
+		// roll 3, on its own (owner, 2026-11-02): the heavy LRPC block at 500 metal/s
+		// (settings/shared/lrpc_block.as, systems/construction/lrpc_block.as)
+		float Tech_LRPC_BLOCK = 0.60f;
 	}
 
 	// Decide a boolean from a probability using AiDice with two weights: off vs on.
@@ -47,9 +50,13 @@ namespace Main {
 			Global::RoleSettings::Tech::EnableStrategy(Strategy::T2_RUSH);
 		}
 
+		// Roll 3: the heavy LRPC block, on its own (owner, 2026-11-02); drawn last so
+		// rolls 1 and 2 keep their draws. Only a TECH builds it.
+		Global::LrpcBlock::Enabled = DecideEnabled(StrategyWeights::Tech_LRPC_BLOCK);
+
 		GenericHelpers::LogUtil(
 			"[Strategy] (EXPERIMENTAL BALANCED) Decided: Tech mask=" + Global::RoleSettings::Tech::StrategyMask +
-			" (" + StrategyUtil::NamesFromMask(Global::RoleSettings::Tech::StrategyMask) + ")",
+			" (" + StrategyUtil::NamesFromMask(Global::RoleSettings::Tech::StrategyMask) + "); roll 3: heavy LRPC block " + (Global::LrpcBlock::Enabled ? "on" : "off"),
 			2);
 	}
 
