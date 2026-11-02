@@ -13,6 +13,11 @@ inline constexpr float POKE_METAL_RATIO = 2.f;
 inline constexpr float POKE_HEALTH = .8f;
 inline constexpr float POKE_PRESS_HEALTH = .5f;
 inline constexpr float POKE_PAUSE_SECONDS = 5.f;
+// Owner 2026-11-02: ghost porc. Default reach for individual hulls, and the
+// longest one a profile may set (LRPCs, tactical launchers and super weapons
+// beyond it are not porc a hull can wait out).
+inline constexpr float GHOST_PORC_RANGE = 2000.f;
+inline constexpr float GHOST_PORC_MAX_RANGE = 3000.f;
 }
 // JSON owns policy. The RANGED attribute is the only admission switch; these
 // values do not change legacy siege, squad, naval, air or specialist owners.
@@ -141,6 +146,15 @@ struct RangedPolicy {
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.
     std::unordered_set<int> spamDefs;
+    // Owner 2026-11-02: "stay out of weapon range of ghost images that are
+    // porc and wait for other units to give LOS". 0 = off. An armed structure
+    // known only as a ghost (out of radar and LOS, spot not seen empty) with a
+    // ground range up to this many elmos is coverage this hull does not path,
+    // stage or fire from inside of, and escapes like observed coverage; it is
+    // never a target, so the hull waits until someone's radar or LOS shows it.
+    // press_static still applies (a pressed ghost counts only its death blast).
+    // Individual (non-coordinated) controller only: cohorts ignore it.
+    float ghostPorcRange = ranged_policy_defaults::GHOST_PORC_RANGE;
     float assistMargin = 150.f; // ally counts as engaged within its ground range + margin + contact radius
     bool assistScreen = true;   // assist firing sites require an allied screen toward the target
 };

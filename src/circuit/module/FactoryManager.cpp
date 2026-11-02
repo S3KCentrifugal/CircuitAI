@@ -637,6 +637,7 @@ void CFactoryManager::ReadConfig()
             number("poke_press_health", policy.pokePressHealth, POKE_MIN_HEALTH, POKE_MAX_HEALTH);
             number("poke_pause_seconds", policy.pokePauseSeconds, POKE_MIN_PAUSE_SECONDS, POKE_MAX_PAUSE_SECONDS);
             number("press_static", policy.pressStatic, 0.f, 3.f);
+            number("ghost_porc_range", policy.ghostPorcRange, 0.f, ranged_policy_defaults::GHOST_PORC_MAX_RANGE);
             // The cohort controller has its own static admission (assault list).
             if (policy.pressStatic > 0.f && policy.coordinated) valid = false;
             // D-295: assist is an individual-controller lever; a coordinated

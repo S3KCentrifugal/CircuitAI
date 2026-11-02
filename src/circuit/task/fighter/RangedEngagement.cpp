@@ -31,6 +31,8 @@ constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
 static const bool trace = std::getenv("CIRCUIT_RANGED_TRACE") != nullptr;
+// Owner 2026-11-02: ghost porc reach for this hull; cohorts keep observed-only.
+static float GhostRange(const RangedPolicy& p) { return p.coordinated ? 0.f : p.ghostPorcRange; }
 
 CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUnit* unit)
     : ai(ai),owner(owner),worldOwner(ai->GetMilitaryManager()->GetRangedWorld()),world(*worldOwner),
@@ -175,7 +177,7 @@ bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const A
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
     return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape)
-        :world.Safe(from,to,margin,escape,p.pressStatic);
+        :world.Safe(from,to,margin,escape,p.pressStatic,GhostRange(p));
 }
 bool CRangedEngagement::LegalPath(CCircuitUnit* unit,const std::vector<AIFloat3>& route,bool escape)
 {
@@ -210,8 +212,8 @@ void CRangedEngagement::Disperse(CCircuitUnit* unit)
         AIFloat3 point=pos+AIFloat3(std::cos(angle),0.f,std::sin(angle))*policy.spacing*float(ring);
         CTerrainManager::CorrectPosition(point);
         point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
-        if (world.FreeSlot(id,point,policy.spacing) && world.Safe(pos,point,policy.safetyMargin,true,policy.pressStatic)
-            && world.DangerSign(point,policy.safetyMargin,policy.pressStatic)==0.f
+        if (world.FreeSlot(id,point,policy.spacing) && world.Safe(pos,point,policy.safetyMargin,true,policy.pressStatic,GhostRange(policy))
+            && world.DangerSign(point,policy.safetyMargin,policy.pressStatic,GhostRange(policy))==0.f
             && ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) {
             Move(unit,point,true); return;
         }
@@ -773,6 +775,17 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const float reach=hazard+policy.safetyMargin+closingSpeed*escapeSeconds;
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
+    // Owner 2026-11-02: inside a ghost porc's reach, leave it like observed
+    // coverage (stationary, so no closing term). Ghosts are never targets, so
+    // the hull then waits outside until radar or LOS shows the structure.
+    world.NearbyGhosts(pos,policy.safetyMargin,GhostRange(policy),policy.pressStatic,ghostNearby);
+    for(int i:ghostNearby) {
+        const auto& c=world.Ghosts()[i];
+        const float reach=CRangedWorld::HazardFor(c,policy.pressStatic)+policy.safetyMargin;
+        const float d=std::sqrt(pos.SqDistance2D(c.pos));
+        if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
+    }
+    if(report && !ghostNearby.empty()) ai->LOG("RANGED: ghost porc reach unit=%d ghosts=%u",id,unsigned(ghostNearby.size()));
     if(!policy.holdFireline && (closing || frame<withdrawalUntil)) {
         if(closing && !(frame<withdrawalUntil && moving)) {
             AIFloat3 away=pos-closing->pos;
@@ -782,7 +795,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             AIFloat3 escape=pos+away*std::min(600.f,separation);
             CTerrainManager::CorrectPosition(escape);
             escape.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(escape.x,escape.z);
-            if(world.Safe(pos,escape,policy.safetyMargin,true,policy.pressStatic)) {
+            if(world.Safe(pos,escape,policy.safetyMargin,true,policy.pressStatic,GhostRange(policy))) {
                 // Forward-arc hulls commit to their exit; unrestricted turrets
                 // may retain a safe pursuer as target while MOVE remains owner.
                 if(forward) { SelectTarget(unit,-1,-1,0.f); reorient=true; }
@@ -891,7 +904,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // finish. Real fire, new danger and the bounded deadline still
             // interrupt it. This is one local candidate, not another scan.
             AIFloat3 facing=c.pos-pos; facing.Normalize2D(); auto point=pos+facing*64.f;
-            if(world.Safe(pos,point,policy.safetyMargin,false,policy.pressStatic) && world.FreeSlot(id,point,spacing)
+            if(world.Safe(pos,point,policy.safetyMargin,false,policy.pressStatic,GhostRange(policy)) && world.FreeSlot(id,point,spacing)
                 && Move(unit,point,false)) {
                 orientUntil=frame+std::max(30,int(escapeSeconds*30.f));
                 lastShotFrame=frame;
@@ -1010,8 +1023,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
             if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) { ++terrainRejected; continue; }
             if(!world.FreeSlot(id,point,spacing)) { ++slotRejected; continue; }
-            if(!world.Safe(pos,point,policy.safetyMargin,true,policy.pressStatic)
-                || world.DangerSign(point,policy.safetyMargin,policy.pressStatic)>0.f) { ++coverageRejected; continue; }
+            if(!world.Safe(pos,point,policy.safetyMargin,true,policy.pressStatic,GhostRange(policy))
+                || world.DangerSign(point,policy.safetyMargin,policy.pressStatic,GhostRange(policy))>0.f) { ++coverageRejected; continue; }
             // D-295: an assist standoff stays behind the allied screen.
             if(assisting && policy.assistScreen && !world.HasScreen(id,point,c.pos)) { ++coverageRejected; continue; }
             if(!world.Trajectory(w,point,c.pos)) { ++fireRejected; continue; }
@@ -1045,8 +1058,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Advance, never replace an already closer position with rearward
             // staging. Slot reservations preserve spacing between the hulls.
             if (point.SqDistance2D(c.pos) >= pos.SqDistance2D(c.pos)
-                || !world.FreeSlot(id, point, spacing) || world.DangerSign(point, policy.safetyMargin, policy.pressStatic) > 0.f
-                || !world.Safe(pos, point, policy.safetyMargin, true, policy.pressStatic)
+                || !world.FreeSlot(id, point, spacing) || world.DangerSign(point, policy.safetyMargin, policy.pressStatic, GhostRange(policy)) > 0.f
+                || !world.Safe(pos, point, policy.safetyMargin, true, policy.pressStatic, GhostRange(policy))
                 || !ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(), point)) continue;
             const float score = pos.SqDistance2D(point);
             if (score < chosenScore) { chosenScore = score; chosen = point; found = true; }
@@ -1057,7 +1070,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // INV-205: the selected assist site is outside known static coverage
         // on its path and carries no danger sign. Same predicates as the
         // site loop; fires only on a regression. Two O(local) queries.
-        if(!world.Safe(pos,chosen,policy.safetyMargin,true,policy.pressStatic) || world.DangerSign(chosen,policy.safetyMargin,policy.pressStatic)>0)
+        if(!world.Safe(pos,chosen,policy.safetyMargin,true,policy.pressStatic,GhostRange(policy)) || world.DangerSign(chosen,policy.safetyMargin,policy.pressStatic,GhostRange(policy))>0)
             ai->LOG("[INVARIANT] INV-205 ranged assist destination is covered unit=%d target=%d dest=%.0f,%.0f",id,c.id,chosen.x,chosen.z);
         if(c.id!=assistTarget) {
             assistTarget=c.id; assistInvariantLogged=false; assistIdleStreak=0;

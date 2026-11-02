@@ -52,6 +52,7 @@ namespace FrontArtySquad {
         int nextLog;
         int waitSince;          // frame the lead began waiting for stragglers, -1 when not waiting
         int paceSince;          // frame the lead began pacing for a member short of its place, -1 when not
+        bool ghostHeld;         // held or backing out at ghost porc reach (owner, 2026-11-02), for the log
     }
     array<Squad@> squads;
     int nextSquadId = 1;
@@ -167,7 +168,7 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDefId; s.label = label;
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false;
         s.botLabId = botLab is null ? (leadDefId < 0 ? u.id : -1) : botLab.id;
         s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
@@ -245,7 +246,7 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDef.id; s.label = "artillery squad";
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false;
         s.botLabId = botLab is null ? -1 : botLab.id;
         s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
@@ -508,6 +509,51 @@ namespace FrontArtySquad {
         }
     }
 
+    // Owner (2026-11-02): ghost porc. How deep `p` sits inside the reach (ground range + ArtySquadGhostMargin) of an
+    // armed enemy structure known only as a ghost image (out of radar and LOS, its spot not seen empty), and which
+    // image (-1 none). Super weapons and ranges past ArtySquadGhostMaxRange do not count. O(ghosts).
+    float GhostDepth(const AIFloat3 &in p, int &out ghost) {
+        ghost = -1;
+        float worst = 0.0f;
+        const float maxRange = Global::RoleSettings::Front::ArtySquadGhostMaxRange;
+        if (maxRange <= 0.0f) return 0.0f;
+        const int n = aiBattle.GetGhostCount();
+        for (int i = 0; i < n; ++i) {
+            const int defId = aiBattle.GetGhostDefId(i);
+            if (defId < 1 || defId > ai.GetDefCount()) continue;   // ai.GetCircuitDef(Id) has no bounds check
+            CCircuitDef@ d = ai.GetCircuitDef(defId);
+            if (d is null || d.IsMobile() || !d.HasSurfToLand() || d.IsRoleAny(Unit::Role::SUPER.mask)) continue;
+            const float r = d.GetMaxRange(1);   // CCircuitDef::RangeType::LAND
+            if (r <= 0.0f || r > maxRange) continue;
+            const AIFloat3 g = aiBattle.GetGhostPos(i);
+            if (g.x < 0.0f) continue;
+            const float depth = r + Global::RoleSettings::Front::ArtySquadGhostMargin - sqrt(MapHelpers::SqDist(p, g));
+            if (depth > worst) { worst = depth; ghost = i; }
+        }
+        return worst;
+    }
+
+    // The deepest any of the lead's and the non-heavy members' places around `goal` sits in ghost porc reach.
+    // The heavy screen is left out (owner: the units like Thanatos stay out). O(members x ghosts).
+    float SquadGhostDepth(Squad@ s, const AIFloat3 &in goal, float dx, float dz, const array<float> &in fo,
+                          const array<float> &in so, int &out ghost) {
+        float worst = GhostDepth(goal, ghost);
+        for (uint k = 0; k < s.members.length(); ++k) {
+            CCircuitUnit@ m = ai.GetTeamUnit(s.members[k]);
+            if (m is null || m.circuitDef is null || m.id == s.leader || IsHeavy(m.circuitDef.GetName())) continue;
+            int g;
+            const float d = GhostDepth(AIFloat3(goal.x + dx * fo[k] - dz * so[k], 0.0f, goal.z + dz * fo[k] + dx * so[k]), g);
+            if (d > worst) { worst = d; ghost = g; }
+        }
+        return worst;
+    }
+
+    string GhostName(int ghost) {
+        const int defId = ghost < 0 ? -1 : aiBattle.GetGhostDefId(ghost);
+        CCircuitDef@ d = (defId >= 1 && defId <= ai.GetDefCount()) ? ai.GetCircuitDef(defId) : null;
+        return d is null ? "?" : d.GetName();
+    }
+
     // Test log (owner, 2026-11-01): how far the rearmost heavy walks in front of the frontmost artillery/support
     // member, along the advance; -1 without both
     float HeavyGap(Squad@ s, CCircuitUnit@ l, float dx, float dz) {
@@ -621,6 +667,36 @@ namespace FrontArtySquad {
                     const float step = AiMin(d - range, AiMax(1.0f, Global::RoleSettings::Front::ArtySquadPaceStep));
                     goal = Clamp(lp.x + dx * step, lp.z + dz * step);
                     state = "advances, enemy at " + int(d) + (straggling ? ", stragglers left behind " + int(far) + " (" + farName + ")" : "");
+                }
+            }
+            // Owner (2026-11-02): never into ghost porc reach. Hold where the squad stands while that is clear (it
+            // waits for other units' radar or LOS to show the structure); from inside, back straight out of it.
+            if (!s.leadHeavy) {
+                int ghost;
+                const float depth = SquadGhostDepth(s, goal, dx, dz, fo, so, ghost);
+                if (depth > 0.0f) {
+                    const AIFloat3 gp = aiBattle.GetGhostPos(ghost);
+                    int here;
+                    const float inside = SquadGhostDepth(s, lp, dx, dz, fo, so, here);
+                    if (inside <= 0.0f) {
+                        goal = lp;
+                        state = "holds outside ghost " + GhostName(ghost) + " at (" + int(gp.x) + ", " + int(gp.z)
+                            + ") reach, waits for LOS (" + state + ")";
+                    } else {
+                        const AIFloat3 hp = aiBattle.GetGhostPos(here);
+                        float ax = lp.x - hp.x, az = lp.z - hp.z;
+                        const float al = sqrt(ax * ax + az * az);
+                        if (al < 1.0f) { ax = -dx; az = -dz; } else { ax /= al; az /= al; }
+                        const float backOff = inside + Global::RoleSettings::Front::ArtySquadRepath;
+                        goal = Clamp(lp.x + ax * backOff, lp.z + az * backOff);
+                        state = "backs out of ghost " + GhostName(here) + " at (" + int(hp.x) + ", " + int(hp.z)
+                            + ") reach by " + int(inside);
+                    }
+                    if (!s.ghostHeld) GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": " + state, 1);
+                    s.ghostHeld = true;
+                } else if (s.ghostHeld) {
+                    s.ghostHeld = false;
+                    GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": ghost porc reach clear, " + state, 1);
                 }
             }
             s.leadGoal = SetGoal(s.leadRoute, s.leadGoal, goal, Global::RoleSettings::Front::ArtySquadRepath);

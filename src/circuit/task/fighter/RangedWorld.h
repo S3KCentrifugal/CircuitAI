@@ -51,6 +51,11 @@ public:
         float explosionRadius = 0.f, hazardRadius = 0.f;
         float tech = 1.f; // BAR customparams.techlevel, 1 when absent
         bool los = false, armed = false, mobile = false;
+        // Owner 2026-11-02: an armed structure known only as a ghost image
+        // (out of radar and LOS, its spot not seen empty). Ghosts live in
+        // their own list/index: a hazard for shooters that opt in (see
+        // RangedPolicy::ghostPorcRange), never a target or an objective.
+        bool ghost = false;
     };
     struct Friend {
         int id; springai::AIFloat3 pos; float radius;
@@ -76,9 +81,14 @@ public:
     const std::vector<int>& Objectives() const { return objectives; }
     // press (owner 2026-10-19, RangedPolicy::pressStatic): armed static
     // contacts of that tech level or lower count only with their death blast.
-    bool Safe(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping=false, float press=0.f) const;
-    float Danger(const springai::AIFloat3& pos, float margin, float press=0.f) const;
-    int DangerSign(const springai::AIFloat3& pos, float margin, float press=0.f) const;
+    // ghostRange (owner 2026-11-02): >0 also counts ghost porc whose ground
+    // range is at most ghostRange; 0 keeps the observed-only predicate.
+    bool Safe(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping=false, float press=0.f, float ghostRange=0.f) const;
+    float Danger(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f) const;
+    int DangerSign(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f) const;
+    const std::vector<Contact>& Ghosts() const { return ghosts; }
+    // Ghost porc (indices into Ghosts()) whose hazard (+margin) reaches pos.
+    void NearbyGhosts(const springai::AIFloat3& pos, float margin, float ghostRange, float press, std::vector<int>& result) const;
     static bool Pressed(const Contact& c, float press) {
         return press>0.f && c.def && c.armed && !c.mobile && c.tech<=press;
     }
@@ -151,6 +161,9 @@ private:
     const Metadata& MetadataFor(CCircuitDef* def);
     std::unordered_map<int,Capabilities> capabilities;
     std::vector<Contact> contacts;
+    std::vector<Contact> ghosts; // owner 2026-11-02: ghost porc, hazard only
+    float largestGhostHazard = 0.f;
+    bool GhostBlocks(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping, float press, float ghostRange) const;
     std::vector<Friend> friends;
     // Per-observation definition prototypes. Unit IDs/positions are never
     // cached; mutable policy flags are reread on every Refresh publication.
@@ -159,7 +172,7 @@ private:
     std::vector<int> friendlyIds;
     ranged::OrderedIds friendlyOrder;
     std::vector<int> objectives;
-    ranged::SpatialIndex enemies, staticHazards, formations;
+    ranged::SpatialIndex enemies, staticHazards, formations, ghostHazards;
     mutable ranged::SpatialIndex allies;
     mutable bool alliesDirty = true;
     void EnsureAllies() const;

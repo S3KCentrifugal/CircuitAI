@@ -45,7 +45,7 @@ CRangedWorld::CRangedWorld(CCircuitAI* circuit): circuit(circuit), friendlyOrder
 {
     const float width=float(circuit->GetMap()->GetWidth()*SQUARE_SIZE);
     const float height=float(circuit->GetMap()->GetHeight()*SQUARE_SIZE);
-    enemies.Configure(width,height); staticHazards.Configure(width,height);
+    enemies.Configure(width,height); staticHazards.Configure(width,height); ghostHazards.Configure(width,height);
     allies.Configure(width,height); formations.Configure(width,height);
     clusterValues.Configure(int(width/128.f)+1,int(height/128.f)+1);
 }
@@ -131,9 +131,10 @@ void CRangedWorld::Refresh()
     const int now=circuit->GetLastFrame();
     if (frame==now) return;
     performance::Scope measured(circuit,performance::RANGED_SNAPSHOT);
-    frame=now; contacts.clear(); friends.clear(); objectives.clear();
+    frame=now; contacts.clear(); ghosts.clear(); friends.clear(); objectives.clear();
     clusterValues.Clear();
-    enemies.Clear(); staticHazards.Clear(); formations.Clear();
+    enemies.Clear(); staticHazards.Clear(); formations.Clear(); ghostHazards.Clear();
+    largestGhostHazard=0.f;
     alliesDirty = true;
     largestRange=largestStaticRange=0.f; nonnegativeHazardCosts=finiteStaticHazards=true;
     largestCohortHazard=0.f;
@@ -143,7 +144,32 @@ void CRangedWorld::Refresh()
     {
     performance::Scope enemyPhase(circuit,performance::RANGED_ENEMIES);
     for (const auto& [id,e]:circuit->GetEnemyManager()->GetEnemyUnits()) {
-        if (!e || !e->IsInRadarOrLOS()) continue;
+        if (!e) continue;
+        if (!e->IsInRadarOrLOS()) {
+            // Owner 2026-11-02: ghost porc. An identified armed structure
+            // out of radar and LOS whose spot has not been seen empty (the
+            // map manager sets HIDDEN then; same rule as BattleAnalysis'
+            // ghost images). Last-known state only: no engine reads.
+            const auto& g=e->GetData();
+            CCircuitDef* gd=e->GetCircuitDef();
+            if (!gd || gd->IsMobile() || gd->IsAbleToFly() || gd->IsRoleSuper() || !gd->HasSurfToLand()
+                || (g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN))
+                || (e->IsIgnore() && !gd->IsIgnore()) || e->IsBeingBuilt()
+                || !std::isfinite(e->GetPos().x) || !std::isfinite(e->GetPos().z)) continue;
+            Contact c; c.id=id; c.def=gd; c.pos=e->GetPos(); c.ghost=true;
+            c.health=std::max(1.f,e->GetHealth()); c.radius=e->GetRadius(); c.cost=e->GetCost();
+            c.armed=true; c.groundRange=gd->GetMaxRange(CCircuitDef::RangeType::LAND);
+            // Ghosts past the longest configurable ghost reach are never read.
+            if (!(c.groundRange>0.f) || c.groundRange>ranged_policy_defaults::GHOST_PORC_MAX_RANGE) continue;
+            const auto& meta=MetadataFor(gd);
+            c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech;
+            c.hazardRadius=std::max(c.groundRange+c.radius,c.explosionRadius);
+            if (!std::isfinite(c.hazardRadius) || !std::isfinite(c.cost) || c.cost<0.f) continue;
+            largestGhostHazard=std::max(largestGhostHazard,c.hazardRadius);
+            ghostHazards.Add(P(c.pos),int(ghosts.size()));
+            ghosts.push_back(c);
+            continue;
+        }
         const auto& data=e->GetData();
         if (data.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
         if (e->IsIgnore() && (!e->GetCircuitDef() || !e->GetCircuitDef()->IsIgnore()
@@ -416,7 +442,7 @@ void CRangedWorld::Nearby(const AIFloat3& pos,float radius,std::vector<int>& res
         if(contacts[i].pos.SqDistance2D(pos)<=radius*radius) result.push_back(i);
     });
 }
-bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,float press) const
+bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,float press,float ghostRange) const
 {
     const AIFloat3 center=(from+to)*.5f;
     // Only static hazards can reject this predicate. Preserve the old bounds
@@ -444,18 +470,48 @@ bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,boo
         });
         if(legacy!=safe) circuit->LOG("[INVARIANT] INV-161 ranged safety query differs from legacy predicate");
     }
-    return safe;
+    return safe && !GhostBlocks(from,to,margin,escaping,press,ghostRange);
 }
-float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press) const
+bool CRangedWorld::GhostBlocks(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,float press,float ghostRange) const
+{
+    if(!(ghostRange>0.f) || ghosts.empty()) return false;
+    const AIFloat3 center=(from+to)*.5f;
+    return ghostHazards.Any(P(center),largestGhostHazard+std::max(0.f,margin)+std::sqrt(from.SqDistance2D(to))*.5f,[&](int i) {
+        const auto& c=ghosts[i];
+        if(c.groundRange>ghostRange) return false;
+        const float hazard=HazardFor(c,press);
+        if(!(hazard>0.f)) return false;
+        const float radius=hazard+margin;
+        if(escaping) return !ranged::SafeSegment(P(from),P(to),P(c.pos),radius);
+        return !(ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius);
+    });
+}
+void CRangedWorld::NearbyGhosts(const AIFloat3& pos,float margin,float ghostRange,float press,std::vector<int>& result) const
+{
+    result.clear();
+    if(!(ghostRange>0.f) || ghosts.empty()) return;
+    ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
+        const auto& c=ghosts[i];
+        if(c.groundRange>ghostRange) return;
+        const float hazard=HazardFor(c,press);
+        if(hazard>0.f && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) result.push_back(i);
+    });
+}
+float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press,float ghostRange) const
 {
     float danger=0.f;
     enemies.Query(P(pos),largestRange+margin,[&](int i) {
         const auto& c=contacts[i]; const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
         if(pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) danger+=c.cost;
     });
+    if(ghostRange>0.f && !ghosts.empty()) ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
+        const auto& c=ghosts[i]; if(c.groundRange>ghostRange) return;
+        const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
+        if(pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) danger+=c.cost;
+    });
     return danger;
 }
-int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press) const
+int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float ghostRange) const
 {
     // Callers ask ==0 or >0, not a magnitude. Nonnegative finite contributions
     // permit existence short-circuiting without changing either comparison.
@@ -463,15 +519,22 @@ int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press) const
     // represents NaN, for which both original comparisons are false.
     int result;
     if(!nonnegativeHazardCosts) {
-        const float value=Danger(pos,margin,press);
+        const float value=Danger(pos,margin,press,ghostRange);
         result=value>0.f?1:value==0.f?0:-1;
-    } else result=enemies.Any(P(pos),largestRange+margin,[&](int i) {
-        const auto& c=contacts[i]; const float hazard=HazardFor(c,press);
-        return hazard>0.f && c.cost>0.f
-            && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f);
-    }) ? 1 : 0;
+    } else {
+        const auto hit=[&](const Contact& c) {
+            const float hazard=HazardFor(c,press);
+            return hazard>0.f && c.cost>0.f
+                && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f);
+        };
+        result=enemies.Any(P(pos),largestRange+margin,[&](int i) { return hit(contacts[i]); }) ? 1 : 0;
+        // Ghost costs are filtered finite and nonnegative at Refresh.
+        if(result==0 && ghostRange>0.f && !ghosts.empty()
+            && ghostHazards.Any(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
+                return ghosts[i].groundRange<=ghostRange && hit(ghosts[i]); })) result=1;
+    }
     if(verifyRangedQueries) {
-        const float value=Danger(pos,margin,press);
+        const float value=Danger(pos,margin,press,ghostRange);
         const int expected=value>0.f?1:value==0.f?0:-1;
         if(result!=expected) circuit->LOG("[INVARIANT] INV-161 ranged danger sign differs from ordered sum");
     }

@@ -266,6 +266,11 @@ namespace Front {
             float ArtySquadPaceStep = 200.0f;
             float ArtySquadPaceTolerance = 90.0f;
             int ArtySquadPaceWaitSeconds = 20;   // longest the lead paces for one member short of its place
+            // Owner (2026-11-02): artillery squads stay out of the weapon range of ghost porc (an armed enemy structure
+            // known only as its last-seen image, ground range up to ArtySquadGhostMaxRange) by ArtySquadGhostMargin, and
+            // wait there until other units' radar or LOS shows it; a squad already inside backs out. 0 = off.
+            float ArtySquadGhostMaxRange = 2000.0f;
+            float ArtySquadGhostMargin = 150.0f;
             // Owner (2026-10-31): while a finished T2 bot lab stands, every T2BotSquadIntervalSeconds, T2BotSquadChance
             // for one faction bot squad (heavy, or artillery on T2BotSquadArtyShare) with a radar, two jammer and a flak
             // bot, held at the lab until complete, then moved as the artillery squad above. Off here.
