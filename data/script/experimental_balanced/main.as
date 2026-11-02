@@ -151,6 +151,8 @@ namespace Main {
         Global::ScoutRaid::KeepNativeScouts = 0;
         Global::RoleSettings::Tech::HeavyDeliveryFrontEnabled = true;
         Global::RoleSettings::Tech::HeavyDeliveryBlockedSeconds = 5.0f;
+        Global::RoleSettings::Tech::HeavyDeliveryFrontProbes = 40;        // owner 2026-11-01: Carrot Incinerators held ~2 min with no front drop
+        Global::RoleSettings::Tech::HeavyDeliveryWalkWithoutFront = true; // walk toward the recipient meanwhile, never hold at the factory
 
 		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
 		//     GetEnemyThreat(AA) <= maxAAThreat

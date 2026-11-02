@@ -47,6 +47,19 @@ namespace Team { namespace HeavyTransport {
         }
         return -1;
     }
+    // Diagnostics only: why Available() found no carrier. O(P), called at the
+    // delivery retry cadence, never per frame.
+    string Describe(CCircuitUnit@ cargo) {
+        string text = "carriers=" + carriers.length();
+        for (uint index = 0; index < carriers.length(); ++index) {
+            CCircuitUnit@ aircraft = ai.GetTeamUnit(carriers[index]);
+            CFerryTask@ task = Ferry::TaskOf(aircraft);
+            text += " " + carriers[index] + ":" + (aircraft is null ? "gone"
+                : task is null ? "notask" : ("state" + task.GetState()
+                + (cargo !is null && !task.CanCarry(cargo.id) ? ",cannotcarry" : "")));
+        }
+        return text;
+    }
     int CompletedCount() { return int(carriers.length()); }
     string OwnDefinition() {
         string name;

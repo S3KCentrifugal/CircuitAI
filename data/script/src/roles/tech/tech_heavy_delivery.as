@@ -12,6 +12,7 @@ namespace TechHeavyDelivery {
         bool landed = false;
         int nextFrontPlan = 0;
         int nextFlightAttempt = 0;
+        int nextRefusalLog = 0;
         AIFloat3 frontDestination = AIFloat3(-1,0,-1);
         array<AIFloat3> frontRoute;
         AIFloat3 destination = AIFloat3(-1.0f, 0.0f, -1.0f);
@@ -29,6 +30,11 @@ namespace TechHeavyDelivery {
         Delivery@ delivery;
         if (!deliveries.get(""+unitId,@delivery) || delivery is null || delivery.recipient!=recipient)
             return AIFloat3(-1,0,-1);
+        // No front drop yet: walk toward the recipient rather than hold at the
+        // factory (Carrot Mountains 2026-11-01, ~2 min idle). Flights still
+        // wait for a planned front drop; see Update.
+        if (delivery.frontDestination.x < 0.0f && Global::RoleSettings::Tech::HeavyDeliveryWalkWithoutFront)
+            return Team::Roster::DeliveryAnchor(Team::Roster::Get(recipient));
         return delivery.frontDestination;
     }
 
@@ -114,6 +120,32 @@ namespace TechHeavyDelivery {
         }
         return delivery.route;
     }
+    // Diagnostics: SetCargoRoute refuses silently. Log why a cargo walks instead
+    // of flying, at most once per retry interval per cargo (bounded batch).
+    void LogRefusal(Delivery@ delivery, CCircuitUnit@ unit, const string& in why) {
+        if (ai.frame < delivery.nextRefusalLog) return;
+        delivery.nextRefusalLog = ai.frame + int(Global::RoleSettings::Tech::HeavyDeliveryRouteRetrySeconds * SECOND);
+        GenericHelpers::LogUtil("[HeavyDelivery] walk-not-fly cargo=" + unit.id + " " + why, 1);
+    }
+    // The same corridor test native SetCargoRoute applies first to each leg.
+    // A leg over the limit is not proof of refusal (native may detour), but
+    // a covered carrier or pickup end is (native refuses a covered origin).
+    string RouteThreat(CCircuitUnit@ aircraft, CCircuitUnit@ cargo, const array<AIFloat3>& in route) {
+        if (aircraft is null || cargo is null) return "carrier gone";
+        const float pad = Global::RoleSettings::Tech::HeavyDeliveryAirPadding;
+        const AIFloat3 from = aircraft.GetPos(ai.frame), pickup = cargo.GetPos(ai.frame);
+        string text = "limit=" + Global::RoleSettings::Tech::HeavyDeliveryAirThreat
+            + " carrierAt=" + int(from.x) + "," + int(from.z)
+            + " carrier=" + aiBattle.AirThreatAlong(from, from, pad)
+            + " pickup=" + aiBattle.AirThreatAlong(pickup, pickup, pad)
+            + " toPickup=" + aiBattle.AirThreatAlong(from, pickup, pad) + " legs=";
+        AIFloat3 previous = pickup;
+        for (uint i = 0; i < route.length(); ++i) {
+            text += (i > 0 ? "/" : "") + aiBattle.AirThreatAlong(previous, route[i], pad);
+            previous = route[i];
+        }
+        return text;
+    }
     void Finish(int index, Delivery@ delivery, const string& in outcome) {
         ReleaseRoute(delivery);
         aiTerrainMgr.SetLayoutInt(TechHeavyRush::StateKey + "sent." + index, 1);
@@ -144,7 +176,9 @@ namespace TechHeavyDelivery {
             array<AIFloat3> path; AIFloat3 destination;
             if (TechDeliveryFront::Plan(unit,path,destination)) {
                 delivery.frontRoute=path; delivery.frontDestination=destination;
-            }
+            } else if (delivery.frontDestination.x < 0.0f)
+                GenericHelpers::LogUtil("[HeavyDelivery] no front drop cargo=" + unit.id + ": "
+                    + TechDeliveryFront::failure, 1);
         }
         const AIFloat3 anchor = ArrivalAnchor(unit.id,delivery.recipient);
         if (delivery.carrier >= 0) {
@@ -166,7 +200,8 @@ namespace TechHeavyDelivery {
             if (carrier !is null && carrier.GetCargoId() == unitId) carrier.Reset();
             @delivery.route = null;
         }
-        if (anchor.x >= 0.0f && TransportMath::Arrived(MapHelpers::SqDist(unit.GetPos(ai.frame), anchor),
+        // The walking fallback anchor is a staging point, not the gift spot.
+        if (anchor.x >= 0.0f && (!forward || delivery.frontDestination.x >= 0.0f) && TransportMath::Arrived(MapHelpers::SqDist(unit.GetPos(ai.frame), anchor),
             ArrivalRadius(), false)) {
             if (!Invariants::HeavyDeliveryArrival(unit, delivery.recipient, delivery.carrier)) return;
             delivery.giving = true;
@@ -176,7 +211,9 @@ namespace TechHeavyDelivery {
             ai.GiveUnits(gift, delivery.recipient);
             return;
         }
-        const int available = delivery.landed ? -1 : Team::HeavyTransport::Available(unit);
+        // A forward flight needs a planned front drop, never the walking fallback anchor.
+        const bool flightReady = !forward || (delivery.frontDestination.x >= 0.0f && delivery.frontRoute.length() > 0);
+        const int available = delivery.landed || !flightReady ? -1 : Team::HeavyTransport::Available(unit);
         if (available >= 0 && anchor.x >= 0.0f && (!forward || ai.frame>=delivery.nextFlightAttempt)) {
             delivery.nextFlightAttempt=ai.frame+int(Global::RoleSettings::Tech::HeavyDeliveryRouteRetrySeconds*SECOND);
             CFerryTask@ carrier = Team::Ferry::TaskOf(ai.GetTeamUnit(available));
@@ -194,7 +231,10 @@ namespace TechHeavyDelivery {
                     + " recipient=" + delivery.recipient, 1);
                 return;
             }
-        }
+            if (forward && drop.x >= 0.0f) LogRefusal(delivery, unit, "route refused "
+                + RouteThreat(ai.GetTeamUnit(available), unit, delivery.frontRoute));
+        } else if (available < 0 && !delivery.landed && flightReady && anchor.x >= 0.0f)
+            LogRefusal(delivery, unit, "no free carrier " + Team::HeavyTransport::Describe(unit));
         IUnitTask@ walking = MilitaryTask(unit);
         if (walking !is null && unit.task !is walking) aiMilitaryMgr.TransferUnit(unit, walking);
     }
