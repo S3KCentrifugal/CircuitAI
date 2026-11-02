@@ -86,6 +86,10 @@ namespace Front {
             int StartCapT1AircraftPlants = 0;
             int StartCapNukeSilos = 0;
 
+            // T3 gantries (owner, 2026-11-01; systems/production/front_gantry.as): build TECH's late heavies
+            // (HeavyPair<Side>, HeavyMoated<Side> on a moated start), one unit per ask. false = native picker.
+            bool GantryHeavies = true;
+
             // Nuclear silos (owner, 2026-10-30; systems/construction/front_silo_grid.as). From NukeMinSeconds,
             // once the 10 s minimum metal / energy income have stayed at or above NukeMetalIncome / NukeEnergyIncome
             // for NukeSustainSeconds without a break, one silo at a time up to NukeLimit, all on one grid reserved

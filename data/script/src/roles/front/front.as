@@ -14,6 +14,7 @@
 #include "../../systems/production/front_tank_mass.as"
 #include "../../systems/production/front_wave_escort.as"
 #include "../../systems/production/front_arty_squad.as"
+#include "../../systems/production/front_gantry.as"
 #include "../../systems/combat/land_siege.as"
 #include "../../systems/construction/front_geothermal.as"
 #include "../../systems/construction/front_reclaim.as"
@@ -475,6 +476,10 @@ namespace RoleFront {
             IUnitTask@ massTask = FrontTankMass::Try(u, factoryName, side, g_frontRaiderOpenerDone || FrontOpener::WasQueued("batch"));
             if (massTask !is null) return massTask;
         }
+
+        // Owner (2026-11-01): a FRONT gantry builds TECH's late heavies, one per ask (native gave it only waits)
+        IUnitTask@ heavy = FrontGantry::Produce(u, side);
+        if (heavy !is null) return heavy;
 
         // Owner (2026-10-31): extra T2 constructors (and assist bots) for converter blocks and mex upgrades
         IUnitTask@ extraBuilder = FrontOverflow::Recruit(u, factoryName, side);
