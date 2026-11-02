@@ -364,6 +364,12 @@ public:
 		// targets after commanders, when moving at most `heavy_speed_fraction`
 		// of their own top speed. Value: that speed limit, (elmos/frame)^2.
 		std::unordered_map<CCircuitDef::Id, float> heavyMaxSqSpeed;
+		// Owner 2026-11-02: "ghost_units" fire on a ghost image of enemy porc
+		// (armed structure out of radar and LOS, spot not seen empty) already
+		// in weapon range, with nothing else to shoot, once they have not fired
+		// for "ghost_idle_seconds". They never move toward a ghost.
+		std::unordered_set<CCircuitDef::Id> ghostDefs;
+		int ghostIdleFrames = 300;
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
 	// A def whose escort is rationed: a mobile radar or jammer.

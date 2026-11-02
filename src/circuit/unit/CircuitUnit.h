@@ -142,6 +142,7 @@ public:
 
 	bool HasDGun() const { return dgun != nullptr; }
 	bool HasWeapon() const { return weapon != nullptr; }
+	springai::Weapon* GetMainWeapon() const { return weapon; }
 	bool HasShield() const { return shield != nullptr; }
 	void ManualFire(CEnemyInfo* target, int timeout);
 	bool IsDGunHigh() const;

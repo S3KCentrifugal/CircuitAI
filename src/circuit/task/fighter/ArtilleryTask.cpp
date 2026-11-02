@@ -24,6 +24,8 @@
 #include "spring/SpringMap.h"
 
 #include "AISCommands.h"
+#include "Log.h"
+#include "Weapon.h"
 
 namespace circuit {
 
@@ -87,6 +89,7 @@ void CArtilleryTask::RemoveAssignee(CCircuitUnit* unit)
 	} else if (unit->GetCircuitDef()->IsAttrSiege()) {
 		unit->CmdSetFireState(CCircuitDef::FireType::OPEN);
 	}
+	ghostFire.erase(unit->GetId());
 	IFighterTask::RemoveAssignee(unit);
 	if (units.empty()) {
 		manager->AbortTask(this);
@@ -176,6 +179,10 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		return;
 	}
 
+	if (FireAtGhost(unit, pos, frame)) {
+		return;
+	}
+
 	if (!IsQueryReady(unit)) {
 		return;
 	}
@@ -231,6 +238,95 @@ void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 		}
 	}
 	IFighterTask::OnUnitDamaged(unit, attacker);
+}
+
+bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int frame)
+{
+	// Owner 2026-11-02: listed rocket artillery (Arbiter, Negotiator,
+	// Ambassador, Boreas) with nothing seen to shoot fires on a ghost image of
+	// enemy porc already in weapon range, once it has not fired for
+	// ghost_idle_seconds. One ATTACK_GROUND volley; never a move toward it.
+	// Owner 2026-11-02: porc here includes building radars, building jammers
+	// and shields, besides armed structures.
+	CCircuitAI* circuit = manager->GetCircuit();
+	const CMilitaryManager::SArtyCommInfo& info = circuit->GetMilitaryManager()->GetArtyCommInfo();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.isEnabled || info.ghostDefs.count(cdef->GetId()) == 0) {
+		return false;
+	}
+	springai::Weapon* weapon = unit->GetMainWeapon();
+	if (weapon == nullptr) {
+		return false;
+	}
+	// A rising reload frame is a shot. O(1) engine read per Execute.
+	GhostFire& track = ghostFire[unit->GetId()];
+	const int reload = weapon->GetReloadFrame();
+	if (track.reload < 0) {
+		track.shot = (reload > frame) ? frame : -info.ghostIdleFrames;
+	} else if (reload > track.reload) {
+		track.shot = frame;
+		track.orderUntil = -1;
+	}
+	track.reload = reload;
+	if (frame < track.orderUntil) {
+		return true;  // the volley is on its way; do not replace the order
+	}
+	if ((frame - track.shot < info.ghostIdleFrames) || (reload > frame)) {
+		return false;
+	}
+	CThreatMap* threatMap = circuit->GetThreatMap();
+	threatMap->SetThreatType(unit);
+	if (threatMap->GetThreatAt(pos) > THREAT_MIN) {
+		return false;  // retreat comes first
+	}
+	const bool notAW = !cdef->HasSurfToWater();
+	const int canTargetCat = cdef->GetTargetCategory();
+	float bestSqDist = SQUARE(cdef->GetMaxRange(CCircuitDef::RangeType::LAND));
+	const CEnemyUnit* best = nullptr;
+	// O(known enemies), only while idle past the gate.
+	for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+		const CEnemyUnit* e = kv.second;
+		const CCircuitDef* edef = (e != nullptr) ? e->GetCircuitDef() : nullptr;
+		if ((edef == nullptr) || !e->NotInRadarAndLOS() || e->IsIgnore() || e->IsBeingBuilt()
+			|| (e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))
+			|| edef->IsMobile() || edef->IsAbleToFly()
+			|| ((edef->GetCategory() & canTargetCat) == 0)
+			|| (notAW && (e->GetPos().y < -SQUARE_SIZE * 5)))
+		{
+			continue;
+		}
+		if (!edef->HasSurfToLand()) {
+			// Engine def reads once per type per task, then O(1).
+			auto it = ghostSupport.find(edef->GetId());
+			if (it == ghostSupport.end()) {
+				springai::UnitDef* ud = edef->GetDef();
+				const bool support = (edef->GetShieldMount() != nullptr)
+					|| (ud->GetRadarRadius() > 0) || (ud->GetJammerRadius() > 0);
+				it = ghostSupport.emplace(edef->GetId(), support).first;
+			}
+			if (!it->second) {
+				continue;
+			}
+		}
+		const float sqDist = pos.SqDistance2D(e->GetPos());
+		if (sqDist < bestSqDist) {
+			bestSqDist = sqDist;
+			best = e;
+		}
+	}
+	if (best == nullptr) {
+		return false;
+	}
+	unit->GetTravelAct()->StateWait();
+	const int timeout = frame + FRAMES_PER_SEC * 5;
+	track.orderUntil = timeout;
+	TRY_UNIT(circuit, unit,
+		unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+	)
+	circuit->LOG("ARTY: %s %i fires on ghost %s at (%.0f, %.0f), idle %.0f s",
+			cdef->GetDef()->GetName(), unit->GetId(), best->GetCircuitDef()->GetDef()->GetName(),
+			best->GetPos().x, best->GetPos().z, float(frame - track.shot) / FRAMES_PER_SEC);
+	return true;
 }
 
 CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)

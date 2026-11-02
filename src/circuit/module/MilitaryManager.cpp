@@ -666,6 +666,7 @@ void CMilitaryManager::ReadConfig()
 	artyCommInfo.isEnabled = false;
 	artyCommInfo.defs.clear();
 	artyCommInfo.heavyMaxSqSpeed.clear();
+	artyCommInfo.ghostDefs.clear();
 	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
 		std::set<std::string> names;
 		for (const auto& name : artyCommCfg["units"]) names.insert(name.asString());
@@ -690,11 +691,18 @@ void CMilitaryManager::ReadConfig()
 				artyCommInfo.heavyMaxSqSpeed[d.GetId()] = SQUARE(limit / FRAMES_PER_SEC);
 			}
 		}
-		artyCommInfo.isEnabled = !artyCommInfo.defs.empty();
+		std::set<std::string> ghostNames;
+		for (const auto& name : artyCommCfg["ghost_units"]) ghostNames.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (ghostNames.count(d.GetDef()->GetName()) > 0) artyCommInfo.ghostDefs.insert(d.GetId());
+		}
+		artyCommInfo.ghostIdleFrames = int(std::max(0.f, artyCommCfg.get("ghost_idle_seconds", 10.f).asFloat()) * FRAMES_PER_SEC);
+		artyCommInfo.isEnabled = !artyCommInfo.defs.empty() || !artyCommInfo.ghostDefs.empty();
 	}
-	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u",
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u ghost=%u idle=%i",
 			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
-			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()));
+			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()),
+			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames);
 
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
