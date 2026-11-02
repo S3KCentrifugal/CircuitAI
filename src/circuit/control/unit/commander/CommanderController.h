@@ -347,6 +347,7 @@ public:
     int FrontCommanderId() const;
     void TaskFinished(IUnitTask* task,bool done);
     bool OwnsGroupProject(const IUnitTask* task) const { return task && task==groupJob; }
+    bool CommittedGroupProject(const IUnitTask* task) const { return task && task==groupJob && groupJobCommitted; }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);

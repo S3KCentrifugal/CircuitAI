@@ -519,7 +519,12 @@ void IBuilderTask::RecoverConstruction(CCircuitUnit* unit, int retryFrames, int 
             }
         }
     }
-    if (construction::RetireUnstarted(target != nullptr, !units.empty(), validSite, reachable)) manager->AbortTask(this);
+    if (construction::RetireUnstarted(target != nullptr, !units.empty(), validSite, reachable)) {
+        if (circuit->GetCommanderController()->OwnsGroupProject(this))
+            circuit->LOG("[CommanderGroup] retire_unstarted def=%s valid=%i reachable=%i",
+                    buildDef->GetDef()->GetName(), int(validSite), int(reachable));
+        manager->AbortTask(this);
+    }
 }
 
 void IBuilderTask::OnUnitIdle(CCircuitUnit* unit)
@@ -580,10 +585,18 @@ void IBuilderTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 		return;
 	}
 
+	// Owner 2026-11-02: a committed commander-group defense outlives one
+	// damaged worker; the group's next healthy worker resumes the site.
+	const bool committed = circuit->GetCommanderController()->CommittedGroupProject(this);
+	if (committed || circuit->GetCommanderController()->OwnsGroupProject(this)) {
+		circuit->LOG("[CommanderGroup] worker_damaged unit=%i def=%s committed=%i abort=%i",
+				unit->GetId(), (buildDef != nullptr) ? buildDef->GetDef()->GetName() : "none",
+				int(committed), int(canAutoAbort && (target == nullptr) && !committed));
+	}
 	CRetreatTask* task = manager->EnqueueRetreat();
 	manager->AssignTask(unit, task);
 
-	if (canAutoAbort && (target == nullptr)) {
+	if (canAutoAbort && (target == nullptr) && !committed) {
 		manager->AbortTask(this);  // Doesn't call RemoveAssignee
 	}
 }

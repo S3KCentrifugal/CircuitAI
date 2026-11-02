@@ -256,7 +256,9 @@ bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,con
 }
 IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
     if(task) {
-        groupJob=task;groupJobEarnsNano=earnsNano;groupJobCommitted=false;
+        // Re-adopting the same job (assist, maintenance) keeps its commitment.
+        if(task!=groupJob) groupJobCommitted=false;
+        groupJob=task;groupJobEarnsNano=earnsNano;
         groupProjectUntil=ai->GetLastFrame()+int(cfg->group.projectHoldSeconds*FRAMES_PER_SEC);
         auto* build=dynamic_cast<IBuilderTask*>(task);
         auto* def=build?build->GetBuildDef():nullptr;
