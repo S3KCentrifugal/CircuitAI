@@ -50,6 +50,7 @@ public:
         float health = 1.f, radius = 16.f, cost = 1.f, groundRange = 0.f;
         float explosionRadius = 0.f, hazardRadius = 0.f;
         float tech = 1.f; // BAR customparams.techlevel, 1 when absent
+        float dps = 0.f;  // D-433: raw surface DPS of the type (CCircuitDef::GetSurfaceDps), per-type cached
         bool los = false, armed = false, mobile = false;
     };
     struct Friend {
@@ -86,6 +87,15 @@ public:
         return Pressed(c,press) ? c.explosionRadius : c.hazardRadius;
     }
     bool FriendlySplash(int id, const springai::AIFloat3& target, float radius) const;
+    // D-433: the damage-aware splash veto: the shot is vetoed only when a
+    // friend inside the radius would not survive `factor` hits of `weapon`
+    // on its armour, or is a commander. Factor 0 is the veto above. One
+    // combat-health read per friend inside the radius, memoised per frame.
+    bool FriendlySplash(int id, const springai::AIFloat3& target, float radius, const Weapon& weapon, float factor);
+    // D-433: allied armed statics (immobile screen definitions) within
+    // radius of `from`: position and land range, into the caller's buffer.
+    struct StaticPost { springai::AIFloat3 pos; float range; };
+    void Statics(const springai::AIFloat3& from, float radius, std::vector<StaticPost>& out) const;
     bool FriendlyLine(const Weapon& weapon, int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
     bool HasScreen(int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
     // D-295: is an allied screen (any team of our allyteam, from the friendly
@@ -150,7 +160,7 @@ private:
     float largestCohortHazard = 0.f;
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;
-    struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; float maxSplash=0.f; };
+    struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; float maxSplash=0.f; float dps=0.f; };
     std::unordered_map<int,Metadata> metadata;
     const Metadata& MetadataFor(CCircuitDef* def);
     std::unordered_map<int,Capabilities> capabilities;

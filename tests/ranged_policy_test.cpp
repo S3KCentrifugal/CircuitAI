@@ -53,7 +53,11 @@ bool Same(const RangedPolicy& a, const RangedPolicy& b) {
         && a.pokeHealth == b.pokeHealth && a.pokePressHealth == b.pokePressHealth && a.pokePauseSeconds == b.pokePauseSeconds
         && a.fireAtWill == b.fireAtWill && a.fireInRange == b.fireInRange && a.commanderFocus == b.commanderFocus
         && a.spamMaxCost == b.spamMaxCost && a.spamDefs == b.spamDefs && a.pressStatic == b.pressStatic
-        && a.assistRadius == b.assistRadius && a.assistMargin == b.assistMargin && a.assistScreen == b.assistScreen;
+        && a.assistRadius == b.assistRadius && a.assistMargin == b.assistMargin && a.assistScreen == b.assistScreen
+        && a.splashVetoHealth == b.splashVetoHealth && a.threatWeight == b.threatWeight && a.overkillSkip == b.overkillSkip
+        && a.retreatHealth == b.retreatHealth && a.retreatVeteranBonus == b.retreatVeteranBonus && a.repairHealth == b.repairHealth
+        && a.repairRadius == b.repairRadius && a.repairCooldownSeconds == b.repairCooldownSeconds && a.heightWeight == b.heightWeight
+        && a.rampHeight == b.rampHeight && a.rampPenalty == b.rampPenalty;
 }
 
 // The balanced profile's Thug block (2026-11-01) in both forms.
@@ -117,7 +121,7 @@ const char* kRocketeerPreset = R"({"type": "backline", "coordinated": true, "spa
     "formation": {"family": "t1_bot_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}})";
 const std::vector<std::string> kBacklineOwnKeys{"type", "screen_radius", "static_bonus", "beyond_screen_bonus", "fast_target_speed",
     "fast_target_penalty", "self_defence_radius", "self_defence_bonus", "move_after_shot", "aim_hold_seconds", "leak_radius",
-    "leak_corridor", "tuck_count", "tuck_offset", "tuck_seconds", "log"};
+    "leak_corridor", "tuck_count", "tuck_offset", "tuck_seconds", "log", "station_slack", "no_screen", "no_screen_seconds"};
 const std::vector<std::string> kBacklineForbidden{"poke_in", "sustained_rush", "commander_focus", "fire_in_range", "press_static"};
 const char* kAggravator = R"({"coordinated": true, "sustained_rush": true, "sustained_rush_ratio": 2.0,
     "sustained_rush_radius": 900.0, "sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25,
@@ -217,6 +221,20 @@ int main() {
         problems.clear();
         assert(ranged_policy::Parse(Parse(R"({"coordinated": true, "cloak_on_reload": true})"), p, kResolver, {}, {"poke_in"}, problems) && problems.empty());
         assert(!ranged_policy::Parse(Parse(kAggravator), p, kResolver, {}, kBacklineForbidden, problems));  // the D-430 rear carried sustained_rush
+    }
+    {  // D-433: the micro levers parse, default off, and keep the legacy range rule.
+        RangedPolicy p;
+        std::vector<std::string> problems;
+        assert(ranged_policy::Parse(Parse(R"({"splash_veto_health": 2, "threat_weight": 0.5, "overkill_skip": true, "retreat_health": 0.35,
+            "retreat_veteran_bonus": 0.1, "repair_health": 0.6, "repair_radius": 600, "repair_cooldown_seconds": 20,
+            "height_weight": 1, "ramp_height": 40, "ramp_penalty": 0.3})"), p, kResolver, {}, problems) && problems.empty());
+        assert(p.splashVetoHealth == 2.f && p.threatWeight == .5f && p.overkillSkip && p.retreatHealth == .35f && p.retreatVeteranBonus == .1f);
+        assert(p.repairHealth == .6f && p.repairRadius == 600.f && p.repairCooldownSeconds == 20.f && p.heightWeight == 1.f && p.rampHeight == 40.f && p.rampPenalty == .3f);
+        const RangedPolicy off;
+        assert(off.splashVetoHealth == 0.f && off.threatWeight == 0.f && !off.overkillSkip && off.retreatHealth == 0.f && off.repairHealth == 0.f
+            && off.heightWeight == 0.f && off.rampPenalty == 0.f);
+        assert(!ranged_policy::Parse(Parse(R"({"retreat_health": 0.95})"), p, kResolver, {}, problems));  // above the floor's range
+        assert(!ranged_policy::Parse(Parse(R"({"overkill_skip": 1})"), p, kResolver, {}, problems));
     }
     std::puts("ranged policy: attribute and preset forms agree, legacy rejections, job refusals and levers PASS");
     return 0;

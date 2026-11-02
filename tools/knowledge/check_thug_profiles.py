@@ -14,6 +14,21 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILES = ('experimental_balanced', 'experimental_hard', 'experimental_terrible')
 BASE = 'd2d16b4a'  # the branch point of the controller rework
 NEUTRAL = ('corthud', 'corstorm', 'armham', 'armrock', 'controllers', 'formations')  # D-432: Mace and Rocketeer presets
+# D-433 (thug-micro-fixes-proposal.md): the micro levers the balanced presets add
+# on top of the D-430 block. Parity with the branch point is checked without them.
+MICRO_KEYS = ('threat_weight', 'overkill_skip', 'retreat_health', 'retreat_veteran_bonus', 'repair_health', 'repair_radius',
+              'repair_cooldown_seconds', 'height_weight', 'ramp_height', 'ramp_penalty')
+
+
+def without_micro(policy):
+    return {k: v for k, v in policy.items() if k != 'formation' and k not in MICRO_KEYS}
+
+
+def check_micro(policy, name):
+    assert 0 <= policy['threat_weight'] <= 5 and policy['overkill_skip'] is True, name
+    assert .2 <= policy['retreat_health'] <= .6 and 0 <= policy['retreat_veteran_bonus'] <= .5, name
+    assert policy['retreat_health'] < policy['repair_health'] <= 1 and policy['repair_radius'] > 0 and policy['repair_cooldown_seconds'] > 0, name
+    assert policy['height_weight'] >= 0 and policy['ramp_height'] > 0 and 0 <= policy['ramp_penalty'] <= 3, name
 
 
 def resolve(presets, name, depth=0):
@@ -69,10 +84,11 @@ def main():
         assert 0 < policy['static_loss_fraction'] < policy['loss_fraction'] < .9
         # D-430: the preset form carries the same keys and values as the block it replaced.
         family = policy['formation']['family']
-        compared = {k: v for k, v in policy_before.items() if k != 'formation'}
-        assert {k: v for k, v in policy.items() if k != 'formation'} == compared, profile+' Thug policy values changed'
+        compared = without_micro(policy_before)
+        assert without_micro(policy) == compared, profile+' Thug policy values changed'
         assert policy['formation']['position'] == 'front' and family
         if 'controller' in after_doc['behaviour']['corthud']:
+            check_micro(policy, profile+' Thug')  # D-433: the skirmisher preset carries the micro levers
             assert family in after_doc.get('formations', {}), profile+' line template missing'
             assert after_doc['formations'][family]['type'] == 'line'
             # D-432: Mace on the skirmisher preset carries the attribute block's values;
@@ -80,8 +96,9 @@ def main():
             mace_before, mace_policy_before = policy_of(before_doc['behaviour']['armham'], before_doc)
             mace_after, mace_policy = policy_of(after_doc['behaviour']['armham'], after_doc)
             assert mace_before == mace_after, profile+' Mace production/classification changed'
-            assert {k: v for k, v in mace_policy.items() if k != 'formation'} == {k: v for k, v in mace_policy_before.items() if k != 'formation'}, profile+' Mace policy values changed'
+            assert without_micro(mace_policy) == without_micro(mace_policy_before), profile+' Mace policy values changed'
             assert mace_policy['formation'] == mace_policy_before['formation'] and mace_policy['formation']['family'] in after_doc['formations']
+            check_micro(mace_policy, profile+' Mace')
             for unit in ('corstorm', 'armrock'):
                 presets = after_doc['controllers']['presets']
                 preset = after_doc['behaviour'][unit]['controller']
@@ -90,6 +107,10 @@ def main():
                 assert 'sustained_rush' not in rear and 'poke_in' not in rear and 'commander_focus' not in rear, unit
                 assert rear['formation']['family'] in after_doc['formations'], unit
                 assert 0 < rear['static_loss_fraction'] < rear['loss_fraction'] < .9 and rear['leak_radius'] > 0, unit
+                # D-433: the backline contribution fixes and the shared micro levers.
+                check_micro(rear, unit)
+                assert rear['fire_at_will'] is True and rear['splash_veto_health'] > 0 and rear['station_slack'] >= 0, unit
+                assert rear['no_screen'] in (0, 1, 2) and rear['no_screen_seconds'] >= 0, unit
     for path in (ROOT/'data/config').rglob('behaviour.json'):
         if path.parent.name in PROFILES: continue
         entry = parse(path.read_bytes()).get('behaviour',{}).get('corthud',{})

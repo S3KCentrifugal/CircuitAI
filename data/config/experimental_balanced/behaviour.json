@@ -31,7 +31,11 @@
 			"poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5, "poke_pause_seconds": 5,
 			"fire_at_will": false, "move_min_seconds": 0, "target_min_seconds": 0, "rush_ratio": 1.5,
 			"support_allies": true, "support_loss_fraction": 0.70,
-			"loss_fraction": 0.4, "static_loss_fraction": 0.12
+			"loss_fraction": 0.4, "static_loss_fraction": 0.12,
+			// D-433 (thug-micro-fixes-proposal.md): threat per HP, overkill split, the retreat rule and repair rotation, terrain preference
+			"threat_weight": 0.5, "overkill_skip": true,
+			"retreat_health": 0.35, "retreat_veteran_bonus": 0.1, "repair_health": 0.6, "repair_radius": 600, "repair_cooldown_seconds": 20,
+			"height_weight": 1, "ramp_height": 40, "ramp_penalty": 0.3
 		},
 		"thug": {
 			"extends": "t1_skirmisher",
@@ -54,7 +58,13 @@
 			"screen_radius": 900, "static_bonus": 1.5, "beyond_screen_bonus": 1.3,
 			"fast_target_speed": 70, "fast_target_penalty": 0.3, "self_defence_radius": 250, "self_defence_bonus": 4,
 			"move_after_shot": true, "aim_hold_seconds": 0.8,
-			"leak_radius": 350, "leak_corridor": 96, "tuck_count": 2, "tuck_offset": 96, "tuck_seconds": 8, "log": 1
+			"leak_radius": 350, "leak_corridor": 96, "tuck_count": 2, "tuck_offset": 96, "tuck_seconds": 8, "log": 1,
+			// D-433: the backline contribution fixes (station from the bands, engine auto-fire while the priority target is vetoed,
+			// the damage-aware splash veto, the no-screen fallback) and the shared fixes
+			"station_slack": 48, "fire_at_will": true, "splash_veto_health": 2, "no_screen": 1, "no_screen_seconds": 6,
+			"threat_weight": 0.5, "overkill_skip": true,
+			"retreat_health": 0.45, "retreat_veteran_bonus": 0.1, "repair_health": 0.6, "repair_radius": 600, "repair_cooldown_seconds": 20,
+			"height_weight": 1, "ramp_height": 40, "ramp_penalty": 0.3
 		},
 		"aggravator": {
 			"extends": "t1_backline"

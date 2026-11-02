@@ -34,14 +34,19 @@ struct Directive {
     float screenReach = 0.f;
     bool tuck = false;
     ranged::Point tuckPoint{0.f, 0.f};
+    bool noScreen = false;    // D-433: the station is the no-screen fallback (held like a tuck)
+    int noScreenFrame = -1;   // D-433: the frame the fallback was taken (one urgent order)
     bool moveAfterShot = true;
     int aimHoldFrames = 24;
     Weights weights;
 };
 
-// How far behind the screen the rear stands: its reach advantage over the
-// screen less the margin, clamped to the formation's separation band, so it
-// fires at everything the screen fights from outside the screen's own band.
+// How far behind the screen the rear stands: its advantage over the screen
+// less the margin, clamped to the formation's separation band. D-433: the
+// controller passes the firing bands (reach x range_fraction) and the
+// station_slack, so the hull stands inside its own band and fires at
+// everything the screen fights; D-432 passed the raw reaches and stood 9
+// elmos beyond its band.
 inline float Separation(float ownReach, float screenReach, float margin, float minimum, float maximum) {
     const float wanted = ownReach - screenReach - margin;
     return std::clamp(wanted, std::min(minimum, maximum), std::max(minimum, maximum));
@@ -100,6 +105,24 @@ inline ranged::Point Tuck(ranged::Point hull, ranged::Point hostile, std::vector
     if (length < 1.f) return mean;
     ax /= length; az /= length;
     return {mean.x + ax * offset, mean.z + az * offset};
+}
+
+// D-433: with no screen to stand behind (every screen hull dead or out of
+// screen_radius): the nearest allied armed static that outranges the
+// hostile and stands on the hull's side of it (never reached through the
+// hostile); -1 when there is none. The world lists the posts.
+struct Post { ranged::Point pos{0.f, 0.f}; float range = 0.f; };
+inline int NearestOutranging(ranged::Point hull, ranged::Point hostile, const std::vector<Post>& posts, float hostileRange) {
+    int best = -1; float bestSq = 0.f;
+    const float ax = hull.x - hostile.x, az = hull.z - hostile.z;
+    for (int i = 0; i < int(posts.size()); ++i) {
+        const Post& p = posts[i];
+        if (p.range <= hostileRange) continue;
+        if ((p.pos.x - hull.x) * ax + (p.pos.z - hull.z) * az < 0.f) continue;
+        const float d = ranged::DistanceSq(p.pos, hull);
+        if (best < 0 || d < bestSq) { best = i; bestSq = d; }
+    }
+    return best;
 }
 
 } // namespace circuit::backline

@@ -126,6 +126,7 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 		, weaponMount(nullptr)
 		, pwrDmg(.0f), pwrMod(1.f)
 		, defThrDmg(.0f), defThrMod(1.f)
+		, surfaceDps(.0f)
 		, airThrDmg(.0f), airThrMod(1.f)
 		, surfThrDmg(.0f), surfThrMod(1.f)
 		, waterThrDmg(.0f), waterThrMod(1.f)
@@ -621,6 +622,7 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 
 	// TODO: Include projectile-speed/range, armor
 	//       health /= def->GetArmoredMultiple();
+	surfaceDps = surfDps;  // D-433: kept raw; the profile's threat modifiers scale defThrDmg only
 	const float dmg = std::max(std::max(waterDmg, surfDmg), airDmg);
 	const float dps = std::max(std::max(waterDps, surfDps), airDps);
 	defThrDmg = pwrDmg = sqrtf(dps) * std::pow(dmg, 0.25f) * THREAT_MOD;

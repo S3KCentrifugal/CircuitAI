@@ -19,6 +19,7 @@
 // the same engagement's cohort and writes directives the engagement consumes.
 #include "control/core/CommandWriter.h"
 #include "control/core/UnitController.h"
+#include "control/unit/DisengageRule.h"
 #include "unit/RangedPolicy.h"
 
 #include <cstddef>
@@ -42,6 +43,7 @@ struct SkirmisherState : control::ControlledState {
     IUnitTask* lease = nullptr;  // address only, compared never dereferenced
     int lastTaskType = -1;       // detects a retreat lease ending (restore fire state)
     int leases = 0;
+    disengage_rule::Memory disengage; // D-433
 };
 
 class CSkirmisherController final : public CUnitControllerBase<SkirmisherConfig, SkirmisherState> {

@@ -12,6 +12,8 @@
 #include "control/core/CommandWriter.h"
 #include "control/core/UnitController.h"
 #include "control/kernel/BacklineStation.h"
+#include "control/unit/DisengageRule.h"
+#include "task/fighter/RangedWorld.h"
 #include "unit/RangedPolicy.h"
 
 #include <cstddef>
@@ -42,6 +44,10 @@ struct BacklineConfig {
     float tuckOffset = 96.f;        // tuck_offset: elmos beyond them
     float tuckSeconds = 8.f;        // tuck_seconds: how long a tuck outlives its last sighting
     float log = 1.f;                // log: BACKLINE: lines on station and tuck changes
+    // D-433
+    float stationSlack = 48.f;      // station_slack: elmos inside its own band the hull stands
+    float noScreen = 1.f;           // no_screen: 0 hold, 1 the nearest outranging allied static, 2 the cohort's rally point
+    float noScreenSeconds = 6.f;    // no_screen_seconds: keep the last station this long while the screen regroups
 };
 struct BacklineState : control::ControlledState {
     std::unique_ptr<CRangedEngagement> engagement;
@@ -52,6 +58,12 @@ struct BacklineState : control::ControlledState {
     int tuckUntil = -1, tuckThreat = -1;
     int lastLogFrame = -10000;
     bool loggedStation = false;
+    // D-433
+    int lastScreenFrame = -1;
+    bool lastStationSet = false;
+    ranged::Point lastStation{0.f, 0.f};
+    bool noScreenActive = false;
+    disengage_rule::Memory disengage;
 };
 
 class CBacklineController final : public CUnitControllerBase<BacklineConfig, BacklineState> {
@@ -82,6 +94,7 @@ public:
     const backline::Directive* DirectiveFor(int unitId) const;
     int Leases() const { return leasesOpened; }
     int Tucks() const { return tucksStarted; }
+    int NoScreens() const { return noScreensTaken; }
 
 private:
     void OnPresetAssigned(int defId, int preset) override;
@@ -95,7 +108,9 @@ private:
     std::size_t cursor = 0;
     std::vector<int> nearby;                 // reused query buffer
     std::vector<ranged::Point> screenPoints; // reused per decision
-    int leasesOpened = 0, tucksStarted = 0;
+    std::vector<CRangedWorld::StaticPost> statics; // D-433: reused, only while no screen is paired
+    std::vector<backline::Post> posts;
+    int leasesOpened = 0, tucksStarted = 0, noScreensTaken = 0;
     bool trace = false;
 };
 

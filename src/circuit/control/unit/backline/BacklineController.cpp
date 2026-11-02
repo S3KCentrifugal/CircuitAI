@@ -46,6 +46,10 @@ const std::vector<Field> kOwnFields{
 	F<&BacklineConfig::tuckOffset>("tuck_offset", 0.f, 512.f),
 	F<&BacklineConfig::tuckSeconds>("tuck_seconds", 0.f, 60.f),
 	F<&BacklineConfig::log>("log", 0.f, 1.f),
+	// D-433
+	F<&BacklineConfig::stationSlack>("station_slack", 0.f, 256.f),
+	F<&BacklineConfig::noScreen>("no_screen", 0.f, 2.f),
+	F<&BacklineConfig::noScreenSeconds>("no_screen_seconds", 0.f, 60.f),
 };
 template <std::size_t I>
 float& Access(BacklineConfig& c) { return ranged_policy::NumericKeys()[I].access(c.policy); }
@@ -95,7 +99,7 @@ int CBacklineController::ParsePreset(const std::string& name, const Json::Value&
 	for (const auto& key : ranged_policy::NumericKeys()) policyKeys.push_back(key.name);
 	std::vector<std::string> skipForTable = policyKeys;
 	for (const char* k : {"type", "coordinated", "fire_at_will", "prefer_heavy", "prefer_screen", "allow_mobile", "allow_static",
-	                      "allow_radar", "advance_unknown_radar", "low_trajectory", "formation", "spam_units"}) skipForTable.push_back(k);
+	                      "allow_radar", "advance_unknown_radar", "low_trajectory", "formation", "spam_units", "overkill_skip"}) skipForTable.push_back(k);
 	Table().Apply(config, resolved, skipForTable, problems);
 	const ranged_policy::Resolver resolver{
 		[this](const std::string& unitName) { CCircuitDef* d = ai->GetCircuitDef(unitName.c_str()); return d ? d->GetId() : -1; },
@@ -188,6 +192,7 @@ void CBacklineController::Leased(CCircuitUnit* unit, IUnitTask* task)
 	s->lease = task;
 	s->directive = backline::Directive{};
 	s->tuckUntil = -1; s->tuckThreat = -1; s->loggedStation = false;
+	s->lastScreenFrame = -1; s->lastStationSet = false; s->noScreenActive = false;
 	++s->leases; ++leasesOpened;
 }
 void CBacklineController::CloseEngagement(CCircuitUnit* unit, State& s, bool commands)
@@ -263,7 +268,10 @@ void CBacklineController::Decide(CCircuitUnit* unit, State& s, int frame)
 	d.weights = {c.staticBonus, c.beyondScreenBonus, c.fastTargetSpeed, c.fastTargetPenalty, c.selfDefenceRadius, c.selfDefenceBonus};
 	const auto& plan = world.PlanCohort(unit);
 	screenPoints.clear();
-	float ownReach = 0.f;
+	float ownReach = 0.f, screenFraction = 1.f;
+	const line::Directive* lineDirective = ai->GetLineController() ? ai->GetLineController()->DirectiveFor(unit->GetId()) : nullptr;
+	ranged::Point back = P(plan.back);
+	if (lineDirective && lineDirective->facingSet) back = lineDirective->facing;
 	for (const auto& w : s.engagement->Caps().weapons) ownReach = std::max(ownReach, w.range);
 	if (plan.formationRear && plan.formationPartner >= 0) {
 		const auto partner = world.Cohorts().find(plan.formationPartner);
@@ -275,18 +283,60 @@ void CBacklineController::Decide(CCircuitUnit* unit, State& s, int frame)
 				if (d.screenReach <= 0.f) {
 					const auto& caps = world.CapabilitiesFor(member->GetCircuitDef());
 					for (const auto& w : caps.weapons) d.screenReach = std::max(d.screenReach, w.range);
+					const CCircuitDef* mdef = member->GetCircuitDef();
+					screenFraction = mdef->HasEngagementPolicy() ? mdef->GetRangedPolicy().rangeFraction : 1.f;
 				}
 				screenPoints.push_back(P(member->GetPos(frame)));
 			}
 			if (!screenPoints.empty()) {
-				const line::Directive* lineDirective = ai->GetLineController() ? ai->GetLineController()->DirectiveFor(unit->GetId()) : nullptr;
-				ranged::Point back = P(plan.back);
-				if (lineDirective && lineDirective->facingSet) back = lineDirective->facing;
-				const float separation = backline::Separation(ownReach, d.screenReach, policy.safetyMargin,
+				// D-433: from the bands, not the reaches, less station_slack: the
+				// hull stands inside its own band and fires at everything the screen
+				// fights (D-432 stood 9 elmos beyond its band and stepped in and out).
+				const float separation = backline::Separation(ownReach * policy.rangeFraction, d.screenReach * screenFraction, c.stationSlack,
 					policy.formationSeparationMinimum, policy.formationSeparationMaximum);
 				d.screenCentre = P(partner->second.center);
 				d.station = backline::Station(d.screenCentre, back, separation);
 				d.stationSet = true;
+			}
+		}
+	}
+	// D-433: the no-screen fallback. A paired screen refreshes the memory;
+	// without one the last station holds for no_screen_seconds, then the
+	// station moves to the nearest allied static that outranges the nearest
+	// hostile (one bounded friend query) or to the cohort's rally point.
+	if (d.stationSet) {
+		s.lastScreenFrame = frame; s.lastStation = d.station; s.lastStationSet = true;
+		if (s.noScreenActive) {
+			s.noScreenActive = false;
+			if (c.log > 0.f) ai->LOG("BACKLINE: no_screen_end unit=%i frame=%i", unit->GetId(), frame);
+		}
+	} else if (s.lastStationSet && !s.noScreenActive && frame < s.lastScreenFrame + int(c.noScreenSeconds * FRAMES_PER_SEC)) {
+		d.station = s.lastStation; d.stationSet = true;
+	} else if (c.noScreen >= 1.f) {
+		float hostileRange = 0.f, hostileSq = 0.f; ranged::Point hostileAt = P(pos); bool hostileFound = false;
+		world.Nearby(pos, c.screenRadius, nearby);
+		for (int i : nearby) {
+			const auto& contact = world.Contacts()[i];
+			if (!contact.def || !contact.armed || contact.def->IsAbleToFly()) continue;
+			const float distanceSq = pos.SqDistance2D(contact.pos);
+			if (!hostileFound || distanceSq < hostileSq) { hostileFound = true; hostileSq = distanceSq; hostileRange = contact.groundRange; hostileAt = P(contact.pos); }
+		}
+		bool set = false; ranged::Point station{0.f, 0.f};
+		if (c.noScreen < 1.5f) {
+			world.Statics(pos, c.screenRadius, statics);
+			posts.clear();
+			for (const auto& post : statics) posts.push_back({P(post.pos), post.range});
+			const int pick = backline::NearestOutranging(P(pos), hostileAt, posts, hostileRange);
+			if (pick >= 0) { station = backline::Station(posts[pick].pos, back, policy.formationSeparationMinimum); set = true; }
+		} else if (plan.strategic.SqLength2D() > 0.f) {
+			station = P(plan.strategic); set = true;
+		}
+		if (set) {
+			d.station = station; d.stationSet = true; d.noScreen = true;
+			if (!s.noScreenActive) {
+				s.noScreenActive = true; d.noScreenFrame = frame; ++noScreensTaken;
+				if (c.log > 0.f) ai->LOG("BACKLINE: no_screen unit=%i mode=%i hostile_range=%.0f at=%.0f,%.0f frame=%i",
+					unit->GetId(), int(c.noScreen), hostileRange, station.x, station.z, frame);
 			}
 		}
 	}
@@ -321,8 +371,8 @@ void CBacklineController::Decide(CCircuitUnit* unit, State& s, int frame)
 	}
 	if (c.log > 0.f && d.stationSet && !s.loggedStation) {
 		s.loggedStation = true;
-		ai->LOG("BACKLINE: station unit=%i screen=%i reach=%.0f/%.0f separation=%.0f at=%.0f,%.0f frame=%i",
-			unit->GetId(), plan.formationPartner, ownReach, d.screenReach,
+		ai->LOG("BACKLINE: station unit=%i screen=%i reach=%.0f/%.0f band=%.0f/%.0f separation=%.0f at=%.0f,%.0f frame=%i",
+			unit->GetId(), plan.formationPartner, ownReach, d.screenReach, ownReach * policy.rangeFraction, d.screenReach * screenFraction,
 			std::sqrt(ranged::DistanceSq(d.station, d.screenCentre)), d.station.x, d.station.z, frame);
 	}
 	if (trace && frame >= s.lastLogFrame + 150) {
@@ -338,23 +388,8 @@ void CBacklineController::Damaged(CCircuitUnit* unit)
 	if (s == nullptr || !s->engagement || unit->IsDead()) return;
 	Bind bound(this, s->preset);
 	s->engagement->Idle();
-	CCircuitDef* cdef = unit->GetCircuitDef();
-	if (unit->GetHealthPercent() <= cdef->GetRetreat()) {
-		auto* military = ai->GetMilitaryManager();
-		military->AssignTask(unit, military->EnqueueRetreat());
-		return;
-	}
-	const int frame = ai->GetLastFrame();
-	unit->ForceUpdate(frame + THREAT_UPDATE_RATE);
-	const float healthPerc = unit->GetHealthPercent();
-	if (!unit->IsDisarmed(frame)) {
-		if (cdef->IsRoleHeavy() && (healthPerc < 0.9f) && !unit->IsAttrNoRepair()) {
-			ai->GetBuilderManager()->Enqueue(TaskB::Repair(IBuilderTask::Priority::NOW, unit));
-		}
-		if (healthPerc < cdef->GetSelfDHP()) {
-			TRY_UNIT(ai, unit, unit->CmdSelfD(true);)
-		}
-	}
+	// D-433: the floor, the retreat rule, the repair rotation, self-destruct.
+	disengage_rule::Apply(ai, unit, *s->engagement, unit->GetCircuitDef()->GetRangedPolicy(), s->disengage, ai->GetLastFrame(), "BACKLINE");
 }
 void CBacklineController::MoveFailed(int unitId)
 {

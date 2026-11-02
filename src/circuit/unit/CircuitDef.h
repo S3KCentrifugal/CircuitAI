@@ -254,6 +254,7 @@ public:
 	springai::WeaponMount* GetWeaponMount() const { return weaponMount; }
 	float GetPwrDamage() const { return pwrDmg; }  // ally
 	float GetDefDamage() const { return defThrDmg; }  // enemy, for influence
+	float GetSurfaceDps() const { return surfaceDps; }  // D-433: raw surface DPS, no profile threat modifier (target score threat term)
 	float GetAirDmg(RoleT type) const { return airThrDmg * thrDmgMod[type]; }  // enemy
 	float GetSurfDmg(RoleT type) const { return surfThrDmg * thrDmgMod[type]; }  // enemy
 	float GetWaterDmg(RoleT type) const { return waterThrDmg * thrDmgMod[type]; }  // enemy
@@ -430,6 +431,7 @@ private:
 	springai::WeaponMount* weaponMount;
 	float pwrDmg, pwrMod;  // ally damage
 	float defThrDmg, defThrMod;  // enemy damage, for influence
+	float surfaceDps;  // D-433: raw surface DPS of the definition
 	float airThrDmg, airThrMod;  // air enemy damage
 	float surfThrDmg, surfThrMod;  // surface, even on water
 	float waterThrDmg, waterThrMod;  // underwater enemy damage

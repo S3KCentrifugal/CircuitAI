@@ -64,6 +64,7 @@ const CRangedWorld::Metadata& CRangedWorld::MetadataFor(CCircuitDef* def)
         const auto& params = ud->GetCustomParams();
         const auto level = params.find("techlevel");
         if (level != params.end()) it->second.tech = float(std::atof(level->second.c_str()));
+        it->second.dps = def->GetSurfaceDps();  // D-433
         // D-430: the largest splash of any mount, for the line's spacing.
         for (auto* raw : ud->GetWeaponMounts()) {
             const std::unique_ptr<springai::WeaponMount> mount(raw);
@@ -186,7 +187,7 @@ void CRangedWorld::Refresh()
         // Definition facts are immutable for this AI/game load. Resolve once
         // per type, not once per candidate mount in every shooter's hot loop.
         const auto& meta=MetadataFor(c.def);
-        c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech;
+        c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech; c.dps=meta.dps;
         c.hazardRadius=std::max(c.armed ? c.groundRange+c.radius : 0.f,c.explosionRadius);
         largestRange=std::max(largestRange,c.hazardRadius);
         // Reclaimers can be unarmed and exceed 600 elmos (including the
@@ -490,6 +491,32 @@ bool CRangedWorld::FriendlySplash(int id,const AIFloat3& target,float radius) co
     return allies.Any(P(target),radius+largestFriendRadius,[&](int i) {
         const auto& f=friends[i];
         return f.id!=id && target.SqDistance2D(f.pos)<std::pow(radius+f.radius,2.f);
+    });
+}
+bool CRangedWorld::FriendlySplash(int id,const AIFloat3& target,float radius,const Weapon& weapon,float factor)
+{
+    if(factor<=0.f) return FriendlySplash(id,target,radius);
+    if(radius<=16.f) return false;
+    EnsureAllies();
+    return allies.Any(P(target),radius+largestFriendRadius,[&](int i) {
+        Friend& f=friends[i];
+        if(f.id==id || target.SqDistance2D(f.pos)>=std::pow(radius+f.radius,2.f)) return false;
+        if(!f.def || f.def->IsRoleComm()) return true;
+        const int armor=MetadataFor(f.def).armor;
+        const float hit=armor>=0 && size_t(armor)<weapon.damage.size()?weapon.damage[armor]*weapon.alphaScale:0.f;
+        if(hit<=0.f) return false;
+        if(f.combatHealth<0.f) f.combatHealth=circuit->GetUnitAPI()->GetCombatHealth(f.id);
+        return f.combatHealth<factor*hit;
+    });
+}
+void CRangedWorld::Statics(const AIFloat3& from,float radius,std::vector<StaticPost>& out) const
+{
+    out.clear();
+    EnsureAllies();
+    allies.Query(P(from),radius,[&](int i) {
+        const Friend& f=friends[i];
+        if(!f.def || f.def->IsMobile() || !f.screen || f.range<=0.f) return;
+        if(from.SqDistance2D(f.pos)<=radius*radius) out.push_back({f.pos,f.range});
     });
 }
 bool CRangedWorld::HasScreen(int id,const AIFloat3& from,const AIFloat3& target) const

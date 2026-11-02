@@ -221,22 +221,8 @@ void CSkirmisherController::Damaged(CCircuitUnit* unit)
 	// and a sustained rush keep their weapon owner even at low HP.
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	if (cdef->GetRangedPolicy().holdFireline || s->engagement->IsSustainedRush()) return;
-	if (unit->GetHealthPercent() <= cdef->GetRetreat()) {
-		auto* military = ai->GetMilitaryManager();
-		military->AssignTask(unit, military->EnqueueRetreat());
-		return;
-	}
-	const int frame = ai->GetLastFrame();
-	unit->ForceUpdate(frame + THREAT_UPDATE_RATE);
-	const float healthPerc = unit->GetHealthPercent();
-	if (!unit->IsDisarmed(frame)) {
-		if (cdef->IsRoleHeavy() && (healthPerc < 0.9f) && !unit->IsAttrNoRepair()) {
-			ai->GetBuilderManager()->Enqueue(TaskB::Repair(IBuilderTask::Priority::NOW, unit));
-		}
-		if (healthPerc < cdef->GetSelfDHP()) {
-			TRY_UNIT(ai, unit, unit->CmdSelfD(true);)
-		}
-	}
+	// D-433: the floor, the retreat rule, the repair rotation, self-destruct.
+	disengage_rule::Apply(ai, unit, *s->engagement, cdef->GetRangedPolicy(), s->disengage, ai->GetLastFrame(), "SKIRMISHER");
 }
 void CSkirmisherController::MoveFailed(int unitId)
 {

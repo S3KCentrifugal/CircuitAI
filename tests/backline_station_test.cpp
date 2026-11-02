@@ -23,6 +23,19 @@ int main() {
         assert(Near(backline::Separation(475.f, 380.f, 4.f, 48.f, 96.f), 91.f));    // the balanced margin 4
         assert(Near(backline::Separation(475.f, 600.f, 4.f, 48.f, 96.f), 48.f));    // a longer screen: never ahead of it
         assert(Near(backline::Separation(475.f, 380.f, 4.f, 96.f, 48.f), 91.f));    // a swapped band still clamps
+        // D-433: from the bands (reach x range_fraction) less the station slack.
+        assert(Near(backline::Separation(475.f * .95f, 380.f * .97f, 48.f, 64.f, 96.f), 64.f));  // 451 - 369 - 48 = 34 -> the minimum 64
+        assert(Near(backline::Separation(475.f * .95f, 325.f * .97f, 48.f, 64.f, 96.f), 88.f));    // behind Centurions: 451.25 - 315.25 - 48
+        assert(451.25f - 64.f - 369.f > 0.f);  // the Aggravator at the minimum stands 18 elmos inside its band of what the screen fights
+    }
+    {  // D-433: the no-screen fallback picks the nearest static that outranges the hostile, on the hull's side of it.
+        const Point hull{0.f, 0.f}, hostile{0.f, 500.f};
+        const std::vector<backline::Post> posts{{{0.f, -300.f}, 430.f}, {{0.f, -100.f}, 300.f}, {{0.f, 700.f}, 600.f}, {{400.f, -50.f}, 700.f}};
+        assert(backline::NearestOutranging(hull, hostile, posts, 325.f) == 0);   // the LLT behind: nearest outranging a Thug
+        assert(backline::NearestOutranging(hull, hostile, posts, 450.f) == 3);   // against a longer hostile only the 700 post counts
+        assert(backline::NearestOutranging(hull, hostile, posts, 800.f) == -1);  // nothing outranges it
+        assert(backline::NearestOutranging(hull, hostile, {}, 0.f) == -1);
+        assert(backline::NearestOutranging(hull, hull, posts, 0.f) == 1);        // no hostile: the nearest armed static
     }
     {  // Station: the screen centre moved along the back direction.
         const Point station = backline::Station({1000.f, 2000.f}, {0.f, -1.f}, 91.f);

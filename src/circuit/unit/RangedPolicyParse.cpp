@@ -68,6 +68,17 @@ const std::vector<NumericKey> kNumeric{
     {"press_static", Field<&RangedPolicy::pressStatic>, 0.f, 3.f},
     {"assist_radius", Field<&RangedPolicy::assistRadius>, 0.f, 6000.f},
     {"assist_margin", Field<&RangedPolicy::assistMargin>, 0.f, 600.f},
+    // D-433
+    {"splash_veto_health", Field<&RangedPolicy::splashVetoHealth>, 0.f, 20.f},
+    {"threat_weight", Field<&RangedPolicy::threatWeight>, 0.f, 5.f},
+    {"retreat_health", Field<&RangedPolicy::retreatHealth>, 0.f, .9f},
+    {"retreat_veteran_bonus", Field<&RangedPolicy::retreatVeteranBonus>, 0.f, .5f},
+    {"repair_health", Field<&RangedPolicy::repairHealth>, 0.f, 1.f},
+    {"repair_radius", Field<&RangedPolicy::repairRadius>, 0.f, 3000.f},
+    {"repair_cooldown_seconds", Field<&RangedPolicy::repairCooldownSeconds>, 0.f, 300.f},
+    {"height_weight", Field<&RangedPolicy::heightWeight>, 0.f, 10.f},
+    {"ramp_height", Field<&RangedPolicy::rampHeight>, 0.f, 500.f},
+    {"ramp_penalty", Field<&RangedPolicy::rampPenalty>, 0.f, 3.f},
 };
 
 struct BoolKey { const char* name; bool RangedPolicy::* member; };
@@ -89,6 +100,7 @@ const BoolKey kBooleans[]{
     {"sustained_rush", &RangedPolicy::sustainedRush},
     {"support_allies", &RangedPolicy::supportAllies},
     {"assist_screen", &RangedPolicy::assistScreen},
+    {"overkill_skip", &RangedPolicy::overkillSkip},  // D-433
 };
 const char* const kOtherKeys[]{"target_mode", "spam_units", "avoid_categories", "formation"};
 }
