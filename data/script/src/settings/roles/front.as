@@ -428,6 +428,10 @@ namespace Front {
             bool AgitatorGroupConstructor = true;      // the commander group's T1 constructor builds them too (owner 2026-11-01)
             float AgitatorGroupReach = 2000.0f;        // ... at spots this near it
             int AgitatorReclaimAt = 3;                 // the group constructor reclaims our furthest-back agitator once this many stand (owner 2026-11-02; 0 off)
+            bool AgitatorPrep = true;                  // a nano turret, then an LLT, near the spot before each agitator (owner 2026-11-02)
+            array<string> AgitatorPrepNanoUnits = { "armnanotc", "cornanotc", "legnanotc" };
+            array<string> AgitatorPrepLltUnits = { "armllt", "corllt", "leglht" };   // Sentry, Guard, Pharos
+            float AgitatorPrepRadius = 250.0f;         // one of ours this near the spot counts; prep orders are placed within 0.6x of it
             bool SpecialPorc = false;
             array<string> SpecialPorcUnits = { "armamb", "cortoast", "legacluster" };   // Rattlesnake, Persecutor, Eviscerator
             float SpecialPorcMetalShare = 0.5f;

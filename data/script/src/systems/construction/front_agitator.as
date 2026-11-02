@@ -55,6 +55,7 @@ namespace FrontAgitator {
         float forwardMost = -1e30f;   // the most forward of ours along the lane axis (elmos)
         IUnitTask@ order;
         int orderSpot = -1;
+        string orderWhat;
         dictionary fails;     // spot id -> fails in a row
         dictionary holds;     // spot id -> frame the hold ends
         string lastWhy = "";
@@ -74,6 +75,7 @@ namespace FrontAgitator {
         kinds.resize(0);
         for (int k = 0; k < KINDS; ++k) kinds.insertLast(Kind());
         t2Labs.resize(0);
+        prepNanos.resize(0); prepLlts.resize(0); committedSpot = -1;
         lastScan = -100000; lastHigh = -1;
         defsDone = false;
     }
@@ -89,6 +91,14 @@ namespace FrontAgitator {
                 if (d !is null) kinds[k].guns.insertLast(d);
             }
         }
+        for (uint i = 0; i < Global::RoleSettings::Front::AgitatorPrepNanoUnits.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(Global::RoleSettings::Front::AgitatorPrepNanoUnits[i]);
+            if (d !is null) prepNanos.insertLast(d);
+        }
+        for (uint i = 0; i < Global::RoleSettings::Front::AgitatorPrepLltUnits.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(Global::RoleSettings::Front::AgitatorPrepLltUnits[i]);
+            if (d !is null) prepLlts.insertLast(d);
+        }
         array<string> labs = UnitHelpers::GetAllT2BotLabs();
         array<string> veh = UnitHelpers::GetAllT2VehicleLabs();
         for (uint i = 0; i < veh.length(); ++i) labs.insertLast(veh[i]);
@@ -96,6 +106,26 @@ namespace FrontAgitator {
             CCircuitDef@ d = ai.GetCircuitDef(labs[i]);
             if (d !is null) t2Labs.insertLast(d);
         }
+    }
+
+    bool InDefs(const array<CCircuitDef@>& in defs, const CCircuitDef@ d) {
+        for (uint i = 0; i < defs.length(); ++i) if (defs[i] is d) return true;
+        return false;
+    }
+    bool Near(const array<AIFloat3>& in at, const AIFloat3 &in p, float r) {
+        for (uint i = 0; i < at.length(); ++i) if (MapHelpers::SqDist(at[i], p) <= r * r) return true;
+        return false;
+    }
+    // The builder's own faction's def from a list first, then any it can build
+    CCircuitDef@ PickFor(const array<CCircuitDef@>& in defs, CCircuitUnit@ u) {
+        const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
+        CCircuitDef@ other = null;
+        for (uint i = 0; i < defs.length(); ++i) {
+            if (!u.circuitDef.CanBuild(defs[i])) continue;
+            if (UnitHelpers::GetSideForUnitName(defs[i].GetName()) == side) return defs[i];
+            if (other is null) @other = defs[i];
+        }
+        return other;
     }
 
     int GunKind(const CCircuitDef@ d) {
@@ -176,6 +206,14 @@ namespace FrontAgitator {
     // owner 2026-11-02 15:56Z: "if a single FRONT builds a third agitator and similar, it should reclaim the
     // furthest back agitator. This is for commander group." Once AgitatorReclaimAt (3) of our agitators stand
     // finished, the commander group's T1 constructor reclaims the one furthest back along the lane axis.
+    // owner 2026-11-02 16:54Z: "first drop a nano turret and an llt within range of the agitator ... before
+    // proceeding to build the agitator". A spot gets our nano turret, then our LLT (Front::AgitatorPrepNanoUnits /
+    // AgitatorPrepLltUnits, the builder's faction first), each within AgitatorPrepRadius of it, before the gun.
+    // A spot whose prep has begun (committedSpot) skips the metal and advance gates until its gun is ordered.
+    array<CCircuitDef@> prepNanos, prepLlts;
+    array<AIFloat3> nanoAt, lltAt;
+    int committedSpot = -1;
+
     int finishedAgitators = 0;
     int backmostAgitator = -1;
     IUnitTask@ reclaim;
@@ -187,6 +225,7 @@ namespace FrontAgitator {
         finishedAgitators = 0;
         backmostAgitator = -1;
         float backmostAlong = 1e30f;
+        nanoAt.resize(0); lltAt.resize(0);
         for (int k = 0; k < KINDS; ++k) { kinds[k].open.resize(0); kinds[k].standing = 0; kinds[k].forwardMost = -1e30f; }
         if (!Axis()) return;
         array<array<AIFloat3>> placed(KINDS);
@@ -209,6 +248,8 @@ namespace FrontAgitator {
                 }
                 continue;
             }
+            if (InDefs(prepNanos, d)) { nanoAt.insertLast(u.GetPos(ai.frame)); continue; }
+            if (InDefs(prepLlts, d)) lltAt.insertLast(u.GetPos(ai.frame));
             if (d.IsMobile() || u.GetBuildProgress() < 1.0f) continue;
             const bool mex = d.GetExtractsMetal() > 0.0f;
             if (!mex && !d.HasSurfToLand()) continue;
@@ -258,7 +299,8 @@ namespace FrontAgitator {
             lastScan = -100000;   // the next ask rescans
             if (done) {
                 kd.fails.delete(key);
-                GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] built at spot " + kd.orderSpot, 1);
+                GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] built " + kd.orderWhat + " at spot " + kd.orderSpot, 1);
+                if (k == AGITATOR && kd.orderWhat != "" && GunKind(ai.GetCircuitDef(kd.orderWhat)) == AGITATOR) committedSpot = -1;
                 return;
             }
             // an &out argument is overwritten even when the key is missing: check the result
@@ -309,13 +351,19 @@ namespace FrontAgitator {
             return null;
         }
         if (kd.open.length() == 0) return null;
+        // a spot whose nano / LLT prep has begun is finished first, past the metal and advance gates
+        Spot@ committed = null;
+        if (k == AGITATOR && committedSpot >= 0) {
+            for (uint i = 0; i < kd.open.length() && committed is null; ++i) if (kd.open[i].id == committedSpot) @committed = kd.open[i];
+            if (committed is null) committedSpot = -1;   // covered, gone or no longer forward
+        }
         const int cap = (k == AGITATOR) ? Global::RoleSettings::Front::AgitatorMax : Global::RoleSettings::Front::SpecialPorcMax;
         if (kd.standing >= cap) { Why(kd, k, "cap reached: " + kd.standing + " standing"); return null; }
-        const string gate = Gate(k);
+        const string gate = (committed !is null) ? "" : Gate(k);
         if (gate != "") { Why(kd, k, "waiting: " + gate + " (" + kd.open.length() + " forward spots open)"); return null; }
         // owner 2026-11-01 20:31Z: a further agitator only once the most forward mex / turret is
         // AgitatorAdvance (500) elmos further forward along the lane axis than our most forward agitator
-        const bool advanceGate = (k == AGITATOR && kd.standing > 0);
+        const bool advanceGate = (k == AGITATOR && kd.standing > 0 && committed is null);
         const float needAlong = kd.forwardMost + Global::RoleSettings::Front::AgitatorAdvance;
         if (advanceGate && Along(kd.open[0].pos) < needAlong) {
             Why(kd, k, "waiting: most forward spot " + int(Along(kd.open[0].pos) - kd.forwardMost) + " elmos ahead of our most forward agitator, needs "
@@ -329,26 +377,43 @@ namespace FrontAgitator {
         const AIFloat3 wp = u.GetPos(ai.frame);
         for (uint i = 0; i < kd.open.length(); ++i) {
             Spot@ s = kd.open[i];
+            if (committed !is null && s !is committed) continue;
             if (advanceGate && Along(s.pos) < needAlong) break;   // sorted most forward first
             int until = -1;
             if (kd.holds.get("" + s.id, until) && ai.frame < until) continue;
             if (MapHelpers::SqDist(wp, s.pos) > reach * reach || ai.GetTeamUnit(s.id) is null) continue;
             if (!aiTerrainMgr.CanReachAt(u, s.pos, u.circuitDef.GetBuildDistance())) continue;
-            if (d.maxThisUnit >= 0 && d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
-            if (!d.IsAvailable(ai.frame)) return null;
+            // owner 2026-11-02: a nano turret, then an LLT, within AgitatorPrepRadius of the spot first
+            CCircuitDef@ what = d;
+            string step = "";
+            if (k == AGITATOR && Global::RoleSettings::Front::AgitatorPrep) {
+                const float pr = Global::RoleSettings::Front::AgitatorPrepRadius;
+                CCircuitDef@ nano = PickFor(prepNanos, u);
+                CCircuitDef@ llt = PickFor(prepLlts, u);
+                if (nano !is null && !Near(nanoAt, s.pos, pr)) { @what = nano; step = " (step 1 of 3: nano turret first)"; }
+                else if (llt !is null && !Near(lltAt, s.pos, pr)) { @what = llt; step = " (step 2 of 3: LLT next)"; }
+                else if (committedSpot == s.id) step = " (step 3 of 3)";
+            }
+            if (what.maxThisUnit >= 0 && what.maxThisUnit <= what.count) what.maxThisUnit = what.count + 1;
+            if (!what.IsAvailable(ai.frame)) return null;
             int n = 0;
             if (!kd.fails.get("" + s.id, n)) n = 0;
             const float shake = Global::RoleSettings::Front::AgitatorShake + 80.0f * float(n);
-            @kd.order = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, d, s.pos, shake, true,
+            const Task::BuildType bt = (what is d) ? Task::BuildType::DEFENCE
+                : InDefs(prepNanos, what) ? Task::BuildType::NANO : Task::BuildType::DEFENCE;
+            const float prepShake = (what is d) ? shake : AiMin(shake, Global::RoleSettings::Front::AgitatorPrepRadius * 0.6f);
+            @kd.order = aiBuilderMgr.Enqueue(TaskB::Common(bt, Task::Priority::HIGH, what, s.pos, prepShake, true,
                 OrderTimeoutSeconds * SECOND));
             if (kd.order is null) { kd.holds.set("" + s.id, ai.frame + FailHoldSeconds * SECOND); continue; }
             kd.orderSpot = s.id;
+            kd.orderWhat = what.GetName();
+            if (k == AGITATOR) committedSpot = (what is d) ? -1 : s.id;
             kd.lastWhy = "";
             const string why = (k == AGITATOR)
                 ? "bank hit " + int(Global::RoleSettings::Front::AgitatorMetalShare * 100.0f) + "% " + ((ai.frame - lastHigh) / SECOND) + " s ago"
                 : "bank " + int(100.0f * aiEconomyMgr.metal.current / AiMax(1.0f, aiEconomyMgr.metal.storage)) + "%, 10 s min income +"
                     + int(Economy::GetMinMetalIncomeLast10s()) + ", T2 lab standing";
-            GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] " + u.circuitDef.GetName() + " " + u.id + " orders " + d.GetName() + " at front "
+            GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] " + u.circuitDef.GetName() + " " + u.id + " orders " + what.GetName() + step + " at front "
                 + (s.mex ? "mex " : "porc ") + s.defName + " " + s.id + " (" + int(s.pos.x) + "," + int(s.pos.z) + "), "
                 + int(s.share * 100.0f) + "% of the map toward the enemy; " + why + "; " + kd.standing + " standing", 1);
             return kd.order;
