@@ -72,6 +72,8 @@ def prepare(args):
         '--modoption','startenergystorage='+str(case.get('start_energy_storage',1000000)),
         '--extra-widget',str(HERE/'widgets/ranged_arena.lua'),
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')]
+    if getattr(args,'opponent_dll',None):
+        stage += ['--enemies','prod','--opponent-dll',str(args.opponent_dll),'--opponent-data',str(args.opponent_data or args.data)]
     # Declared per-case mod options (e.g. the Legion faction for legscout).
     for key, value in case.get('modoptions', {}).items():
         stage += ['--modoption', f'{key}={value}']
@@ -352,7 +354,7 @@ def prepare(args):
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
     pins={'dll_sha256':hashlib.sha256(args.dll.read_bytes()).hexdigest(),
           'diagnostics':{name:os.environ[name] for name in
-              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
+              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
               if name in os.environ},
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),
@@ -395,7 +397,11 @@ def main():
     parser.add_argument('--mode',choices=['fast','visual','performance'],default='fast')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--stage-only',action='store_true')
-    parser.add_argument('--keep-going',action='store_true',help='Bounded diagnostic continuation after a recorded failure; the FAIL verdict is kept')
+    parser.add_argument('--keep-going',action='store_true',help='bounded diagnostic (KI-734): the watch runs to --minutes after a forbidden line; the verdict stays FAIL')
+    # D-432: head-to-head. The enemy side plays this pinned build with its own, unpatched data
+    # (its units are under its own controllers, not the fixture's route), staged as BARbBase/base.
+    parser.add_argument('--opponent-dll',type=Path,default=None)
+    parser.add_argument('--opponent-data',type=Path,default=None)
     args=parser.parse_args();directory,command=prepare(args)
     if args.stage_only: return 0
     launch=command+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']
@@ -404,7 +410,8 @@ def main():
     case=json.loads((directory/'ranged-arena.json').read_text())
     playtest.validate_checks(case.get('checks','ranged-arena'))
     watch=command+['watch','--dir',str(directory),'--role',case.get('role','FRONT'),'--checks',case.get('checks','ranged-arena'),
-        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']+(['--keep-going'] if args.keep_going else [])
+        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']
+    if args.keep_going: watch+=['--keep-going']
     # Supplied arenas can temporarily have no enemies between waves. Their
     # completion/grace contract (or fixed performance horizon) owns the end.
     try:

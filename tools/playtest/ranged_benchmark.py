@@ -199,7 +199,7 @@ def main():
     parser.add_argument('--speed', type=int, default=8)
     parser.add_argument('--seed', type=int, default=2071)
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--keep-going', action='store_true', help='Pass to ranged_arena: continue after a recorded failure')
+    parser.add_argument('--keep-going', action='store_true', help='passed to ranged_arena.py (KI-734 diagnostic)')
     args = parser.parse_args()
     if args.summarize:
         print(json.dumps(summarize(args.summarize), indent=2))
