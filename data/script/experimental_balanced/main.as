@@ -226,6 +226,7 @@ namespace Main {
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
+		ArtilleryPolicy::VetoLifted = Global::RoleSettings::Front::Agitator;
 		ArtilleryPolicy::Check();
         Lanes::Poll(); // complete async surveys for every role before consumers run
         AmphibiousOps::Tick();

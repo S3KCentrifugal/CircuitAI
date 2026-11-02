@@ -5,11 +5,15 @@ namespace ArtilleryPolicy {
     const array<string> SuperCannons = {"armvulc", "corbuzz", "legstarfall"};
     dictionary celebrated;
     int lastCheckWarning = -100000;
+    // Set by a profile that lifts the veto on purpose (experimental_balanced:
+    // FRONT's forward agitators, front_agitator.as). The easy/medium/hard
+    // profiles include only this file, so it cannot read Global settings.
+    bool VetoLifted = false;
 
     void Check()
     {
         // owner 2026-11-01: experimental_balanced lifts the veto for FRONT's forward agitators (front_agitator.as)
-        if (Global::RoleSettings::Front::Agitator) return;
+        if (VetoLifted) return;
         for (uint i = 0; i < ForbiddenT1.length(); ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(ForbiddenT1[i]);
             if (d !is null && d.IsBuildAllowed() && ai.frame - lastCheckWarning >= 60 * SECOND) {
