@@ -82,6 +82,10 @@ public:
 	 * waypoint ahead (AheadIndex), never from the first one.
 	 */
 	void SetResumeAhead(bool enabled) { resumeAhead = enabled; }
+	// Spam lanes (Spam:: marks its factory routes): the debug goal
+	// (CDebugGoalTask, debug-widget-test) never takes a unit on one
+	void SetSpam(bool enabled) { spam = enabled; }
+	bool IsSpam() const { return spam; }
 	int GetRouteVersion() const { return version; }
 	unsigned int GetRouteSize() const { return route.size(); }
 	bool IsAtEnd(CCircuitUnit* unit) const;
@@ -118,6 +122,7 @@ private:
 	int version;
 	bool dirty;
 	float arriveRadius;
+	bool spam = false;
 	bool preserveWaypoints = false;
 	bool fightAtEnd = false;
 	bool patrol = false;

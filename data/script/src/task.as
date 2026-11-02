@@ -56,6 +56,7 @@ namespace Task {
 		ROUTE,   // CRouteTask: script-owned waypoint route (Spam::)
 		FERRY,   // CFerryTask: transport ferry (Team::Ferry), created natively
 		WAVE,    // CAirWaveTask: script-planned bomber wave (AirWaves::)
+		GOAL,    // CDebugGoalTask: the debug window's goal toggle (native only)
 		_SIZE_
 	}
 

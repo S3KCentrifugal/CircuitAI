@@ -21,6 +21,8 @@ namespace circuit {
 
 using namespace springai;
 
+static std::string CMilitaryManager_GetDebugStrikeState(const CMilitaryManager* mgr, int weapon) { return mgr->GetDebugStrikeState(weapon); }
+
 /*
  * Porcupine chain marshalling. The chain is the ordered list of defences a
  * cluster works through, seeded per side from build_chain.json. Exposing it as
@@ -109,6 +111,10 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	// Nuke rush scouting (owner 2026-10-28): where the first silo aims, for TECH's scout request
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetNuclearAim() const", asMETHOD(CMilitaryManager, GetNuclearAim), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetNuclearAimRadius() const", asMETHOD(CMilitaryManager, GetNuclearAimRadius), asCALL_THISCALL); ASSERT(r >= 0);
+	// Debug strikes (owner 2026-10-31, debug-widget-test): barb|debug from the widget (presentation/commands.as)
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetDebugStrike(int, int, float, float, int)", asMETHOD(CMilitaryManager, SetDebugStrike), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetDebugStrikePlayer(int, int)", asMETHOD(CMilitaryManager, SetDebugStrikePlayer), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "string GetDebugStrikeState(int) const", asFUNCTION(CMilitaryManager_GetDebugStrikeState), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	// Nuke launch scouting (owner 2026-10-31): a rise in the launch count is a new launch
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetNuclearLaunches() const", asMETHOD(CMilitaryManager, GetNuclearLaunches), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetNuclearLaunchPos() const", asMETHOD(CMilitaryManager, GetNuclearLaunchPos), asCALL_THISCALL); ASSERT(r >= 0);

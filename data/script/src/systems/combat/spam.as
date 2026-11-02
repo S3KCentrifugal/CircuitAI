@@ -866,6 +866,7 @@ namespace Spam {
         @task = (ft is null) ? null : cast<CRouteTask>(ft);
         if (task is null) return null;
         task.SetRoute(points);
+        task.SetSpam(true);   // debug goal (debug-widget-test): never takes spam units
         // Owner, 2026-10-24: a unit keeps its move queue to the very end. A lane
         // change applies to units produced after it (those on the field keep their
         // own lane, CRouteTask per-unit routes); a unit that rejoins or idles carries
