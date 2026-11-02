@@ -184,16 +184,27 @@ namespace FrontTactical {
                 if (sq <= best) { best = sq; t.asset = assets[a]; t.assetDist = sqrt(sq); }
             }
         }
-        // one launcher per target: each takes the in-range target it is nearest to losing
+        // one launcher per target: greedy over every in-range (launcher, target) pair, targets near our mexes /
+        // porc first, then the pair nearest to losing range. Launcher by launcher let one "cover" a far target
+        // with nothing of ours near it and left its own open (fixture g12: 4 Catalysts on one Pulsar).
+        // O(l x t) pairs, sorted by insertion; l <= TacticalMax, t the known heavy turrets.
+        array<int> pl, pt;
+        array<float> ps;
         for (uint l = 0; l < lpos.length(); ++l) {
-            int pick = -1;
-            float slack = 1e30f;
             for (uint i = 0; i < targets.length(); ++i) {
-                if (targets[i].covered) continue;
                 const float s = RangeAt(ldef[l], lpos[l], targets[i].pos) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], targets[i].pos));
-                if (s >= 0.0f && s < slack) { slack = s; pick = int(i); }
+                if (s < 0.0f) continue;
+                const float key = s + ((targets[i].assetDist >= 0.0f) ? 0.0f : 1e6f);
+                uint k = 0;
+                while (k < ps.length() && ps[k] <= key) ++k;
+                pl.insertAt(k, int(l)); pt.insertAt(k, int(i)); ps.insertAt(k, key);
             }
-            if (pick >= 0) targets[pick].covered = true;
+        }
+        array<bool> used(lpos.length(), false);
+        for (uint k = 0; k < ps.length(); ++k) {
+            if (used[uint(pl[k])] || targets[pt[k]].covered) continue;
+            used[uint(pl[k])] = true;
+            targets[pt[k]].covered = true;
         }
         if (order !is null && order.IsDead()) @order = null;
     }
@@ -538,6 +549,14 @@ namespace FrontTactical {
         if (int(helpers.length()) < want && pulled == 0)
             Diag("none free", "" + helpers.length() + " of " + want + " helping; " + t1 + " T1s: " + group + " commander group / crew, " + framed
                 + " on their own framed build, " + busy + " busy, " + far + " beyond " + int(reach) + ", " + cand.length() + " near and free");
+    }
+
+    // Builder AiMakeTask, first for every FRONT constructor: one on the order (or a T1 on its repair) keeps it.
+    // Without this a re-ask of the T2 went to other rungs, the order lost its only unit and died
+    // (fixture g12: 9 Perdition orders died 0.5-20 s after their T2 took them).
+    bool Owns(CCircuitUnit@ u) {
+        if (!On() || u is null || u.task is null || u.task.IsDead()) return false;
+        return (order !is null && !order.IsDead() && u.task is order) || (assist !is null && !assist.IsDead() && u.task is assist);
     }
 
     // Builder AiMakeTask, before the FRONT T1 seats route to native work: the base / expansion /
