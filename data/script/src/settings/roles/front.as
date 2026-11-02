@@ -447,7 +447,7 @@ namespace Front {
             float TacticalReach = 4000.0f;             // idle, guarding or assisting T2 constructors this near the site are asked
             float TacticalTakeRadius = 2000.0f;        // ... and ones walking to an unframed build this near
             int TacticalAssistT1 = 3;                  // T1 constructors helping an order
-            float TacticalAssistReach = 2500.0f;       // ... from this near the site
+            float TacticalAssistReach = 4000.0f;       // ... from this near the site (FrontTactical::Update pulls them)
             int TacticalScanSeconds = 5;
             // Hard AFUS admission floors, unlike native energy-table preferences.
             float MinimumMetalIncomeForAFUS = 70.0f;

@@ -35,8 +35,12 @@
 // TacticalReach of the site, or walking to an unframed build within TacticalTakeRadius; one order at a
 // time, a second constructor that can build it may join. T1 constructors help (TacticalAssistT1 at most,
 // within TacticalAssistReach, never the commander group's seat): they guard the T2 constructor until the
-// frame stands, then repair the frame. An order that dies without a launcher holds that target
-// FailHoldSeconds x fails; three in a row, TargetHoldSeconds.
+// frame stands, then repair the frame. Update (from Front_EconomyUpdate, every PullSeconds) pulls the
+// nearest free / takeable T1s onto the order with AssignTask: only seats 0 and 1 reach AssistPull from
+// AiMakeTask, and native re-asks busy builders only now and then, so asked-for help alone never came
+// (fixture run 2026-11-02: 6 launchers, 0 T1 helpers). A helper's guard is returned unchanged on a re-ask.
+// An order that dies without a launcher holds that target FailHoldSeconds x fails; three in a row,
+// TargetHoldSeconds. Every failed order is logged.
 //
 // Firing is native: the launchers are role "super" statics and CSuperTask aims them.
 // Cost: the battle snapshot's ground contacts and ghosts plus one owned-unit scan every TacticalScanSeconds
@@ -45,7 +49,9 @@ namespace FrontTactical {
     const int OrderTimeoutSeconds = 240;
     const int FailHoldSeconds = 30;
     const int TargetHoldSeconds = 240;
-    const int AssistGuardSeconds = 20;
+    const int AssistGuardSeconds = 60;
+    const int PullSeconds = 2;
+    const int DiagSeconds = 30;
 
     class Target {
         string key;
@@ -72,6 +78,10 @@ namespace FrontTactical {
     IUnitTask@ assist;         // the repair of the order's frame, shared by the T1 helpers
     array<int> helpers;        // T1 constructors on the order, with when their guard / repair is due again
     array<int> helperUntil;
+    array<IUnitTask@> helperTask;  // the guard / repair each helper was given
+    array<string> announced;   // "G" / "R" + helper id already logged for this order
+    int lastPull = -100000;
+    dictionary diagAt;         // helper skip reason -> frame it may print again
     dictionary fails;          // target key -> fails in a row
     dictionary holds;          // target key -> frame the hold ends
     string lastWhy = "";
@@ -82,9 +92,9 @@ namespace FrontTactical {
         launchers.resize(0); targetDefs.resize(0); targets.resize(0); assets.resize(0);
         standing = 0; cluster = false; lastScan = -100000; defsDone = false;
         @order = null; orderKey = ""; @assist = null;
-        helpers.resize(0); helperUntil.resize(0);
-        fails.deleteAll(); holds.deleteAll();
-        lastWhy = "";
+        helpers.resize(0); helperUntil.resize(0); helperTask.resize(0);
+        fails.deleteAll(); holds.deleteAll(); diagAt.deleteAll();
+        lastWhy = ""; lastPull = -100000;
     }
 
     void Defs() {
@@ -179,10 +189,30 @@ namespace FrontTactical {
         if (ai.frame - lastScan >= Global::RoleSettings::Front::TacticalScanSeconds * SECOND) Scan();
     }
 
+    // One line per key per DiagSeconds (LOG_LEVEL is 1, so level 2 never prints)
+    void RateLog(const string &in key, const string &in text) {
+        int until = 0;
+        if (diagAt.get(key, until) && ai.frame < until) return;
+        diagAt.set(key, ai.frame + DiagSeconds * SECOND);
+        GenericHelpers::LogUtil("[FRONT][Tactical] " + text, 1);
+    }
+    // why a T1 constructor did not help
+    void Diag(const string &in reason, const string &in detail) { RateLog("helper " + reason, "helper skip (" + reason + "): " + detail); }
+
+    string TaskText(CCircuitUnit@ u) {
+        if (u.task is null || u.task.IsDead()) return "no task";
+        IBuilderTask@ b = cast<IBuilderTask>(u.task);
+        return "task type " + int(u.task.GetType()) + (b is null ? "" : " build " + int(b.GetBuildType()) + (b.target is null ? "" : " framed"));
+    }
+
+    void ClearHelpers() { helpers.resize(0); helperUntil.resize(0); helperTask.resize(0); announced.resize(0); }
+
     void Why(const string &in why) {
+        // a changed reason prints, at most once per DiagSeconds per kind ("waiting", "cap")
         if (why == lastWhy) return;
         lastWhy = why;
-        GenericHelpers::LogUtil("[FRONT][Tactical] " + why, 2);
+        const int colon = why.findFirst(":");
+        RateLog(colon > 0 ? why.substr(0, colon) : why, why);
     }
 
     // Front_BuilderAiTaskRemoved
@@ -191,7 +221,7 @@ namespace FrontTactical {
         if (assist is task) { @assist = null; return; }
         if (order !is task) return;
         @order = null; @assist = null;
-        helpers.resize(0); helperUntil.resize(0);
+        ClearHelpers();
         lastScan = -100000;
         const string key = orderKey;
         if (done) {
@@ -202,6 +232,7 @@ namespace FrontTactical {
         int n = 0;
         if (!fails.get(key, n)) n = 0;   // an &out argument is junk when the key is missing
         ++n;
+        GenericHelpers::LogUtil("[FRONT][Tactical] order against target " + key + " died with no launcher (fail " + n + " in a row)", 1);
         if (n >= 3) {
             holds.set(key, ai.frame + TargetHoldSeconds * SECOND);
             fails.delete(key);
@@ -312,7 +343,7 @@ namespace FrontTactical {
                 Global::RoleSettings::Front::TacticalShake, true, OrderTimeoutSeconds * SECOND));
             if (order is null) { holds.set(t.key, ai.frame + FailHoldSeconds * SECOND); continue; }
             orderKey = t.key; orderSite = site; @assist = null;
-            helpers.resize(0); helperUntil.resize(0);
+            ClearHelpers(); lastPull = -100000;
             lastWhy = "";
             GenericHelpers::LogUtil("[FRONT][Tactical] " + u.circuitDef.GetName() + " " + u.id + " orders " + d.GetName() + " at (" + int(site.x) + ","
                 + int(site.z) + "), " + int(sqrt(MapHelpers::SqDist(site, t.pos))) + " from " + (t.ghost ? "ghost of " : "") + t.defName + " at ("
@@ -330,17 +361,27 @@ namespace FrontTactical {
         if (assist !is null && !assist.IsDead() && u.task is assist) return assist;
         IBuilderTask@ b = cast<IBuilderTask>(order);
         if (b is null) return null;
-        // prune helpers that are gone or done
-        for (int i = int(helpers.length()) - 1; i >= 0; --i)
-            if (ai.GetTeamUnit(helpers[i]) is null || ai.frame >= helperUntil[i]) { helpers.removeAt(i); helperUntil.removeAt(i); }
+        PruneHelpers();
         const int at = helpers.find(u.id);
+        // a re-ask of a helper still on its guard keeps it (a new guard each ask churned tasks)
+        if (at >= 0 && b.target is null && helperTask[at] !is null && !helperTask[at].IsDead() && u.task is helperTask[at]) return u.task;
         if (at < 0 && int(helpers.length()) >= Global::RoleSettings::Front::TacticalAssistT1) return null;
-        if (at < 0 && !FrontFactoryNanos::Free(u) && !FrontFactoryNanos::Takeable(u)) return null;
+        if (at < 0 && !FrontFactoryNanos::Free(u) && !FrontFactoryNanos::Takeable(u)) {
+            Diag("busy", u.circuitDef.GetName() + " " + u.id + " seat " + FrontConstructors::Seat(u.id) + ", " + TaskText(u));
+            return null;
+        }
         const float reach = Global::RoleSettings::Front::TacticalAssistReach;
         AIFloat3 site = orderSite;
         if (b.target !is null) site = b.target.GetPos(ai.frame);
-        if (MapHelpers::SqDist(u.GetPos(ai.frame), site) > reach * reach) return null;
-        if (!aiTerrainMgr.CanReachAt(u, site, u.circuitDef.GetBuildDistance() + 200.0f)) return null;
+        const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), site);
+        if (sq > reach * reach) {
+            Diag("far", u.circuitDef.GetName() + " " + u.id + " seat " + FrontConstructors::Seat(u.id) + " " + int(sqrt(sq)) + " from the site (reach " + int(reach) + ")");
+            return null;
+        }
+        if (!aiTerrainMgr.CanReachAt(u, site, u.circuitDef.GetBuildDistance() + 200.0f)) {
+            Diag("unreachable", u.circuitDef.GetName() + " " + u.id + " cannot reach the site");
+            return null;
+        }
         IUnitTask@ t = null;
         int secs = AssistGuardSeconds;
         if (b.target !is null) {
@@ -349,16 +390,79 @@ namespace FrontTactical {
             secs = 120;
         } else {
             array<CCircuitUnit@>@ on = order.GetUnits();
-            if (on is null || on.length() == 0) return null;   // nobody to follow yet
+            if (on is null || on.length() == 0) { Diag("no T2 yet", "the order has no constructor to guard"); return null; }
             @t = aiBuilderMgr.Enqueue(TaskB::Guard(Task::Priority::HIGH, on[0], true, AssistGuardSeconds * SECOND));
         }
         if (t is null) return null;
-        if (at < 0) {
-            helpers.insertLast(u.id); helperUntil.insertLast(ai.frame + secs * SECOND);
-            GenericHelpers::LogUtil("[FRONT][Tactical] T1 " + u.circuitDef.GetName() + " " + u.id + (b.target !is null ? " repairs the launcher frame" : " guards the launcher's constructor")
-                + " (" + helpers.length() + " of " + Global::RoleSettings::Front::TacticalAssistT1 + ")", 2);
-        } else helperUntil[at] = ai.frame + secs * SECOND;
+        // one line per helper per order and per kind of help (a re-pull after its guard expires is silent)
+        const string kind = (b.target !is null) ? "R" : "G";
+        if (announced.find(kind + u.id) < 0) {
+            announced.insertLast(kind + u.id);
+            GenericHelpers::LogUtil("[FRONT][Tactical] T1 " + u.circuitDef.GetName() + " " + u.id + " seat " + FrontConstructors::Seat(u.id)
+                + (b.target !is null ? " repairs the launcher frame" : " guards the launcher's constructor") + ", " + int(sqrt(sq)) + " from the site ("
+                + (at < 0 ? helpers.length() + 1 : helpers.length()) + " of " + Global::RoleSettings::Front::TacticalAssistT1 + ")", 1);
+        }
+        if (at < 0) { helpers.insertLast(u.id); helperUntil.insertLast(ai.frame + secs * SECOND); helperTask.insertLast(t); }
+        else { helperUntil[at] = ai.frame + secs * SECOND; @helperTask[at] = t; }
         return t;
+    }
+
+    void PruneHelpers() {
+        for (int i = int(helpers.length()) - 1; i >= 0; --i)
+            if (ai.GetTeamUnit(helpers[i]) is null || ai.frame >= helperUntil[i]) { helpers.removeAt(i); helperUntil.removeAt(i); helperTask.removeAt(i); }
+    }
+
+    // Front_EconomyUpdate: while an order is open, every PullSeconds the nearest T1 constructors that are free
+    // or walking to an unframed build (never one on its own framed build, the commander group's seat, the
+    // lolcannon crew) within TacticalAssistReach are given Help() until TacticalAssistT1 help; a helper native
+    // swapped off is given its help again. Cost: one owned-unit scan per PullSeconds while an order is open,
+    // O(units + T1s x helpers).
+    void Update() {
+        if (!On() || order is null || order.IsDead() || FrontRecovery::Active()) return;
+        if (ai.frame - lastPull < PullSeconds * SECOND) return;
+        lastPull = ai.frame;
+        IBuilderTask@ b = cast<IBuilderTask>(order);
+        if (b is null) return;
+        PruneHelpers();
+        const int want = Global::RoleSettings::Front::TacticalAssistT1;
+        AIFloat3 site = orderSite;
+        if (b.target !is null) site = b.target.GetPos(ai.frame);
+        const float reach = Global::RoleSettings::Front::TacticalAssistReach;
+        array<CCircuitUnit@> cand;
+        array<float> candSq;
+        int t1 = 0, group = 0, framed = 0, busy = 0, far = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef is null || UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) != 1) continue;
+            if (u.GetBuildProgress() < 1.0f || LauncherFor(u) !is null) continue;
+            ++t1;
+            const int at = helpers.find(u.id);
+            if (at >= 0 && (u.task is helperTask[at] || (assist !is null && u.task is assist))) continue;   // helping
+            if (FrontConstructors::Seat(u.id) == 2 || CommanderGroup::Owns(u.id) || LolCannon::IsCrew(u.id)) { ++group; continue; }
+            if (u.task !is null && (u.task.IsExternalControlled() || u.task.GetType() == int(Task::Type::PLAYER)
+                || u.task.GetType() == int(Task::Type::RETREAT))) { ++busy; continue; }
+            IBuilderTask@ cur = cast<IBuilderTask>(u.task);
+            if (cur !is null && !cur.IsDead() && cur.target !is null && cur.GetBuildType() < int(Task::BuildType::REPAIR)) { ++framed; continue; }
+            if (!FrontFactoryNanos::Free(u) && !FrontFactoryNanos::Takeable(u)) { ++busy; continue; }
+            const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), site);
+            if (sq > reach * reach) { ++far; continue; }
+            uint k = 0;
+            while (k < candSq.length() && candSq[k] <= sq) ++k;
+            cand.insertAt(k, u); candSq.insertAt(k, sq);
+        }
+        int pulled = 0;
+        for (uint k = 0; k < cand.length(); ++k) {
+            CCircuitUnit@ u = cand[k];
+            if (helpers.find(u.id) < 0 && int(helpers.length()) >= want) break;
+            IUnitTask@ t = Help(u);
+            if (t is null || u.task is t) continue;
+            aiBuilderMgr.AssignTask(u, t);
+            ++pulled;
+        }
+        if (int(helpers.length()) < want && pulled == 0)
+            Diag("none free", "" + helpers.length() + " of " + want + " helping; " + t1 + " T1s: " + group + " commander group / crew, " + framed
+                + " on their own framed build, " + busy + " busy, " + far + " beyond " + int(reach) + ", " + cand.length() + " near and free");
     }
 
     // Builder AiMakeTask, before the FRONT T1 seats route to native work: the base / expansion /
