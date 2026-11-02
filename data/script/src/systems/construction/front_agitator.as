@@ -173,8 +173,20 @@ namespace FrontAgitator {
         return (p.x * ax + p.z * az - spanMin) / (spanMax - spanMin);
     }
 
+    // owner 2026-11-02 15:56Z: "if a single FRONT builds a third agitator and similar, it should reclaim the
+    // furthest back agitator. This is for commander group." Once AgitatorReclaimAt (3) of our agitators stand
+    // finished, the commander group's T1 constructor reclaims the one furthest back along the lane axis.
+    int finishedAgitators = 0;
+    int backmostAgitator = -1;
+    IUnitTask@ reclaim;
+    int reclaimTarget = -1;
+    int reclaimHoldUntil = -1;
+
     void Scan() {
         lastScan = ai.frame;
+        finishedAgitators = 0;
+        backmostAgitator = -1;
+        float backmostAlong = 1e30f;
         for (int k = 0; k < KINDS; ++k) { kinds[k].open.resize(0); kinds[k].standing = 0; kinds[k].forwardMost = -1e30f; }
         if (!Axis()) return;
         array<array<AIFloat3>> placed(KINDS);
@@ -191,6 +203,10 @@ namespace FrontAgitator {
                 const AIFloat3 gp = u.GetPos(ai.frame);
                 placed[gk].insertLast(gp);
                 kinds[gk].forwardMost = AiMax(kinds[gk].forwardMost, Along(gp));
+                if (gk == AGITATOR && u.GetBuildProgress() >= 1.0f) {
+                    ++finishedAgitators;
+                    if (Along(gp) < backmostAlong) { backmostAlong = Along(gp); backmostAgitator = u.id; }
+                }
                 continue;
             }
             if (d.IsMobile() || u.GetBuildProgress() < 1.0f) continue;
@@ -227,6 +243,13 @@ namespace FrontAgitator {
     // Front_BuilderAiTaskRemoved
     void TaskRemoved(IUnitTask@ task, bool done) {
         if (task is null) return;
+        if (reclaim is task) {
+            @reclaim = null;
+            lastScan = -100000;
+            GenericHelpers::LogUtil("[FRONT][Agitator] reclaim of the furthest-back agitator " + reclaimTarget + (done ? " done" : " ended unfinished"), 1);
+            if (!done) reclaimHoldUntil = ai.frame + FailHoldSeconds * SECOND;
+            return;
+        }
         for (uint k = 0; k < kinds.length(); ++k) {
             Kind@ kd = kinds[k];
             if (kd.order !is task) continue;
@@ -360,7 +383,29 @@ namespace FrontAgitator {
     bool OnOrder(CCircuitUnit@ u) {
         if (u is null || u.task is null || u.task.IsDead()) return false;
         for (uint k = 0; k < kinds.length(); ++k) if (kinds[k].order is u.task) return true;
-        return false;
+        return reclaim !is null && reclaim is u.task;
+    }
+
+    // The group constructor reclaims our furthest-back agitator once AgitatorReclaimAt stand finished
+    IUnitTask@ ReclaimBackmost(CCircuitUnit@ u) {
+        const int at = Global::RoleSettings::Front::AgitatorReclaimAt;
+        if (at <= 0 || finishedAgitators < at || ai.frame < reclaimHoldUntil) return null;
+        if (reclaim !is null && !reclaim.IsDead()) return null;
+        @reclaim = null;
+        CCircuitUnit@ back = ai.GetTeamUnit(backmostAgitator);
+        if (back is null || back.GetBuildProgress() < 1.0f) return null;
+        @reclaim = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, back, 180 * SECOND));
+        if (reclaim is null) {
+            reclaimHoldUntil = ai.frame + 60 * SECOND;
+            GenericHelpers::LogUtil("[FRONT][Agitator] reclaim of agitator " + back.id + " refused natively; retry in 60 s", 1);
+            return null;
+        }
+        reclaimTarget = back.id;
+        const AIFloat3 bp = back.GetPos(ai.frame);
+        GenericHelpers::LogUtil("[FRONT][Agitator] " + finishedAgitators + " agitators standing: commander group constructor " + u.circuitDef.GetName()
+            + " " + u.id + " reclaims the furthest back, " + back.circuitDef.GetName() + " " + back.id + " (" + int(bp.x) + "," + int(bp.z) + "), "
+            + int(Share(bp) * 100.0f) + "% of the map", 1);
+        return reclaim;
     }
     IUnitTask@ GroupPull(CCircuitUnit@ u) {
         if (!On() || !Global::RoleSettings::Front::AgitatorGroupConstructor || u is null || u.circuitDef is null) return null;
@@ -373,6 +418,8 @@ namespace FrontAgitator {
             || u.task.GetType() == int(Task::Type::RETREAT))) return null;
         Refresh();
         if (!AgitatorOn()) return null;
+        IUnitTask@ r = ReclaimBackmost(u);
+        if (r !is null) return r;
         IUnitTask@ t = KindWork(AGITATOR, u, true);
         if (t !is null) GenericHelpers::LogUtil("[FRONT][Agitator] commander group constructor " + u.circuitDef.GetName() + " " + u.id + " takes the agitator order", 1);
         return t;

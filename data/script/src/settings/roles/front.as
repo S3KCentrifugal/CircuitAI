@@ -422,6 +422,7 @@ namespace Front {
             int AgitatorScanSeconds = 5;
             bool AgitatorGroupConstructor = true;      // the commander group's T1 constructor builds them too (owner 2026-11-01)
             float AgitatorGroupReach = 2000.0f;        // ... at spots this near it
+            int AgitatorReclaimAt = 3;                 // the group constructor reclaims our furthest-back agitator once this many stand (owner 2026-11-02; 0 off)
             bool SpecialPorc = false;
             array<string> SpecialPorcUnits = { "armamb", "cortoast", "legacluster" };   // Rattlesnake, Persecutor, Eviscerator
             float SpecialPorcMetalShare = 0.5f;
